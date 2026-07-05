@@ -43,6 +43,13 @@
       "when": 1783256050100,
       "tag": "0005_chief_the_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783256838840,
+      "tag": "0006_same_war_machine",
+      "breakpoints": true
     }
   ]
 }

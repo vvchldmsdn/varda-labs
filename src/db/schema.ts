@@ -408,6 +408,75 @@ export const dailyPositionSnapshots = pgTable(
   }),
 );
 
+export const settings = pgTable(
+  "settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    annualIncomeGrowth: decimal("annual_income_growth", {
+      precision: 20,
+      scale: 6,
+    }),
+    housingGoal: decimal("housing_goal", { precision: 24, scale: 6 }),
+    housingGoalDate: date("housing_goal_date"),
+    housingContractSigned: boolean("housing_contract_signed")
+      .default(false)
+      .notNull(),
+    incomeCashPct: decimal("income_cash_pct", { precision: 20, scale: 6 }),
+    incomeIsaPct: decimal("income_isa_pct", { precision: 20, scale: 6 }),
+    incomeSecuritiesPct: decimal("income_securities_pct", {
+      precision: 20,
+      scale: 6,
+    }),
+    isaContributedThisYear: decimal("isa_contributed_this_year", {
+      precision: 24,
+      scale: 6,
+    }),
+    isaYearlyLimit: decimal("isa_yearly_limit", { precision: 24, scale: 6 }),
+    minExecutionRatioPct: decimal("min_execution_ratio_pct", {
+      precision: 20,
+      scale: 6,
+    }),
+    postGoalCashCap: decimal("post_goal_cash_cap", { precision: 24, scale: 6 }),
+    postGoalCashRatio: decimal("post_goal_cash_ratio", {
+      precision: 20,
+      scale: 6,
+    }),
+    postGoalEtfRatio: decimal("post_goal_etf_ratio", {
+      precision: 20,
+      scale: 6,
+    }),
+    preGoalCashCap: decimal("pre_goal_cash_cap", { precision: 24, scale: 6 }),
+    preGoalCashRatio: decimal("pre_goal_cash_ratio", {
+      precision: 20,
+      scale: 6,
+    }),
+    preGoalEtfRatio: decimal("pre_goal_etf_ratio", {
+      precision: 20,
+      scale: 6,
+    }),
+    trimDriftThreshold: decimal("trim_drift_threshold", {
+      precision: 20,
+      scale: 6,
+    }),
+    usdKrwRate: decimal("usd_krw_rate", { precision: 20, scale: 6 }),
+    useTrendFilter: boolean("use_trend_filter").default(false).notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+    description: text("description"),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex("settings_legacy_base44_id_unique").on(
+      table.legacyBase44Id,
+    ),
+  }),
+);
+
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 
@@ -430,3 +499,6 @@ export type NewDailyPortfolioSnapshot =
 
 export type DailyPositionSnapshot = typeof dailyPositionSnapshots.$inferSelect;
 export type NewDailyPositionSnapshot = typeof dailyPositionSnapshots.$inferInsert;
+
+export type Settings = typeof settings.$inferSelect;
+export type NewSettings = typeof settings.$inferInsert;

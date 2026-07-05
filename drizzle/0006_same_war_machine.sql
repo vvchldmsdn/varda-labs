@@ -1,0 +1,31 @@
+CREATE TABLE "settings" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"legacy_base44_id" varchar(24),
+	"annual_income_growth" numeric(20, 6),
+	"housing_goal" numeric(24, 6),
+	"housing_goal_date" date,
+	"housing_contract_signed" boolean DEFAULT false NOT NULL,
+	"income_cash_pct" numeric(20, 6),
+	"income_isa_pct" numeric(20, 6),
+	"income_securities_pct" numeric(20, 6),
+	"isa_contributed_this_year" numeric(24, 6),
+	"isa_yearly_limit" numeric(24, 6),
+	"min_execution_ratio_pct" numeric(20, 6),
+	"post_goal_cash_cap" numeric(24, 6),
+	"post_goal_cash_ratio" numeric(20, 6),
+	"post_goal_etf_ratio" numeric(20, 6),
+	"pre_goal_cash_cap" numeric(24, 6),
+	"pre_goal_cash_ratio" numeric(20, 6),
+	"pre_goal_etf_ratio" numeric(20, 6),
+	"trim_drift_threshold" numeric(20, 6),
+	"usd_krw_rate" numeric(20, 6),
+	"use_trend_filter" boolean DEFAULT false NOT NULL,
+	"is_sample" boolean DEFAULT false NOT NULL,
+	"description" text,
+	"base44_created_at" timestamp with time zone,
+	"base44_updated_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX "settings_legacy_base44_id_unique" ON "settings" USING btree ("legacy_base44_id");

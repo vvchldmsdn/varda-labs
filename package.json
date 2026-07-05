@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "import:base44:core": "node scripts/import-base44-core.mjs",
-    "import:base44:history": "node scripts/import-base44-history.mjs"
+    "import:base44:history": "node scripts/import-base44-history.mjs",
+    "import:base44:settings": "node scripts/import-base44-settings.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
