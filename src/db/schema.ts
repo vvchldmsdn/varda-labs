@@ -181,6 +181,86 @@ export const fxRates = pgTable(
   }),
 );
 
+export const assetPriceSnapshots = pgTable(
+  "asset_price_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    priceDate: date("date").notNull(),
+    ticker: varchar("ticker", { length: 50 }).notNull(),
+    assetId: uuid("asset_id"),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    closePrice: decimal("close_price", { precision: 28, scale: 12 }).notNull(),
+    adjustedClosePrice: decimal("adjusted_close_price", {
+      precision: 28,
+      scale: 12,
+    }).notNull(),
+    closePriceKrw: decimal("close_price_krw", { precision: 28, scale: 12 }),
+    fxRate: decimal("fx_rate", { precision: 20, scale: 6 }),
+    source: varchar("source", { length: 100 }),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "asset_price_snapshots_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    tickerDateIdx: index("asset_price_snapshots_ticker_date_idx").on(
+      table.ticker,
+      table.priceDate,
+    ),
+    priceDateIdx: index("asset_price_snapshots_date_idx").on(table.priceDate),
+    assetDateIdx: index("asset_price_snapshots_asset_date_idx").on(
+      table.assetId,
+      table.priceDate,
+    ),
+  }),
+);
+
+export const benchmarkSnapshots = pgTable(
+  "benchmark_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    benchmarkDate: date("date").notNull(),
+    benchmarkTicker: varchar("benchmark_ticker", { length: 50 }).notNull(),
+    benchmarkName: varchar("benchmark_name", { length: 255 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    closePrice: decimal("close_price", { precision: 28, scale: 12 }).notNull(),
+    normalizedIndexValue: decimal("normalized_index_value", {
+      precision: 28,
+      scale: 12,
+    }).notNull(),
+    fxRate: decimal("fx_rate", { precision: 20, scale: 6 }),
+    source: varchar("source", { length: 100 }),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "benchmark_snapshots_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    tickerDateIdx: index("benchmark_snapshots_ticker_date_idx").on(
+      table.benchmarkTicker,
+      table.benchmarkDate,
+    ),
+    benchmarkDateIdx: index("benchmark_snapshots_date_idx").on(
+      table.benchmarkDate,
+    ),
+  }),
+);
+
 export const accountBalanceSnapshots = pgTable(
   "account_balance_snapshots",
   {
@@ -488,6 +568,12 @@ export type NewAssetGroupMember = typeof assetGroupMembers.$inferInsert;
 
 export type FxRate = typeof fxRates.$inferSelect;
 export type NewFxRate = typeof fxRates.$inferInsert;
+
+export type AssetPriceSnapshot = typeof assetPriceSnapshots.$inferSelect;
+export type NewAssetPriceSnapshot = typeof assetPriceSnapshots.$inferInsert;
+
+export type BenchmarkSnapshot = typeof benchmarkSnapshots.$inferSelect;
+export type NewBenchmarkSnapshot = typeof benchmarkSnapshots.$inferInsert;
 
 export type AccountBalanceSnapshot = typeof accountBalanceSnapshots.$inferSelect;
 export type NewAccountBalanceSnapshot =

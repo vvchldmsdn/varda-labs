@@ -1,6 +1,6 @@
 # Base44 Migration Coverage Audit
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 Source inventory: `C:\Users\Eunwoo_2\Desktop\gyeol-fin\migration-data\base44-full-entity-inventory.json`
 
@@ -17,8 +17,8 @@ Sensitive Settings values are intentionally not included here. This document use
 
 | Status | Entities | Rows represented |
 | --- | ---: | ---: |
-| `migrated` | 7 | 983 |
-| `pending` | 11 | 27,432 |
+| `migrated` | 9 | 13,786 |
+| `pending` | 9 | 14,629 |
 | `intentionally_skipped` | 17 | 0 |
 | `needs_decision` | 11 | 284 plus 3 unavailable entities |
 
@@ -27,7 +27,7 @@ Inventory totals:
 - Entity definitions: 46
 - Fetch OK: 43
 - Fetch failed: 3 (`CompanyFundamentalSnapshot`, `MarketPriceDaily`, `SecurityMaster`, all 404)
-- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `FxRate`, `Settings`
+- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `FxRate`, `Settings`
 
 ## Coverage Matrix
 
@@ -38,9 +38,9 @@ Inventory totals:
 | `AssetFactorEstimate` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. Add only if future factor-estimate history appears. |
 | `AssetFactorProfile` | `needs_decision` | 27 | 2026-06-23 to 2026-07-01 | candidate: `asset_factor_profiles` or fold into ETF/factor analytics | Nonzero and useful for diversification, but overlaps with `EtfMaster`, `EtfHolding`, and future factor models. Decide whether this is imported source data or regenerated analysis output. |
 | `AssetGroup` | `migrated` | 1 | 2026-03-19 | `asset_groups`, derived `asset_group_members` | Imported by core import. Empty member priority/ratio JSON was not separately modeled. |
-| `AssetPriceSnapshot` | `pending` | 11,284 | 2022-12-01 to 2026-07-03 | proposed `asset_price_snapshots` | High-priority next candidate. Preserve `legacy_base44_id`, `ticker`, `date`, `market`, `currency`, local/KRW prices, `fx_rate`, and `source`. |
+| `AssetPriceSnapshot` | `migrated` | 11,284 | 2022-10-17 to 2026-07-03 | `asset_price_snapshots` | Imported by `scripts/import-base44-market-data.mjs`. `asset_id` is nullable; ticker/date and price source are preserved for unmatched tickers. |
 | `BacktestValidationRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `BenchmarkSnapshot` | `pending` | 1,519 | 2022-10-17 to 2026-06-24 | proposed `benchmark_snapshots` | High-priority next candidate. This is raw benchmark history; do not treat the benchmark columns already copied into `daily_portfolio_snapshots` as a substitute. |
+| `BenchmarkSnapshot` | `migrated` | 1,519 | 2022-10-17 to 2026-06-24 | `benchmark_snapshots` | Imported by `scripts/import-base44-market-data.mjs`. This is raw benchmark history; the benchmark columns in `daily_portfolio_snapshots` remain aggregate output. |
 | `CompanyFundamentalSnapshot` | `needs_decision` | unavailable | 404 | candidate external source or skip | Base44 fetch failed. Decide whether varda-labs needs company fundamentals independently of Base44. |
 | `DailyGroupSnapshot` | `needs_decision` | 23 | 2026-03-24 to 2026-07-05 | candidate `daily_group_snapshots` or derive from `daily_position_snapshots` | Contains group-level weights/drift/execution flags. It may be recomputable, but importing preserves historical audit output. |
 | `DailyPortfolioSnapshot` | `migrated` | 74 | 2026-05-20 to 2026-07-05 | `daily_portfolio_snapshots` | Imported by history import. |
@@ -84,7 +84,9 @@ Inventory totals:
 
 ### 1. `AssetPriceSnapshot` to `asset_price_snapshots`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-market-data.mjs`.
+
+Why this was migrated first:
 
 - Largest price-history source for portfolio charts, trend checks, and historical valuation.
 - Does not require the Base44 functions to be ported.
@@ -94,7 +96,7 @@ Proposed columns:
 
 - Identity: `id uuid`, `legacy_base44_id varchar(24) unique`
 - Keys: `price_date date`, `ticker varchar(50)`, nullable `asset_id uuid`
-- Attributes: `market`, `currency`, `source`, `description`, `is_sample`
+- Attributes: `market`, `currency`, `source`, `is_sample`
 - Values: `close_price`, `adjusted_close_price`, `close_price_krw`, `fx_rate`
 - Timestamps: `base44_created_at`, `base44_updated_at`, `created_at`, `updated_at`
 - Indexes: `(ticker, price_date)`, `price_date`, optional `(asset_id, price_date)`
@@ -103,7 +105,9 @@ Import note: match `asset_id` by `assets.ticker` where possible, but keep ticker
 
 ### 2. `BenchmarkSnapshot` to `benchmark_snapshots`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-market-data.mjs`.
+
+Why this was migrated first:
 
 - Complements asset prices for portfolio-relative performance.
 - The benchmark fields inside `daily_portfolio_snapshots` are aggregate outputs, not a full benchmark time series.
@@ -112,7 +116,7 @@ Proposed columns:
 
 - Identity: `id uuid`, `legacy_base44_id varchar(24) unique`
 - Keys: `benchmark_ticker`, `benchmark_name`, `benchmark_date`
-- Attributes: `currency`, `source`, `description`, `is_sample`
+- Attributes: `currency`, `source`, `is_sample`
 - Values: `close_price`, `normalized_index_value`, `fx_rate`
 - Timestamps and indexes: same Base44 timestamp pattern, index `(benchmark_ticker, benchmark_date)`
 
@@ -203,31 +207,26 @@ Proposed columns:
 
 ## Recommended Next Migration Order
 
-1. Add market time-series foundation:
-   - Schema/import: `asset_price_snapshots`, `benchmark_snapshots`
-   - Script: `scripts/import-base44-market-data.mjs`
-   - Rationale: highest utility for dashboard and valuation history; independent of future engines.
-
-2. Add ETF reference and lookthrough:
+1. Add ETF reference and lookthrough:
    - Schema/import: `etf_masters`, then `etf_holdings`
    - Script: `scripts/import-base44-etf-reference.mjs`
    - Rationale: `EtfHolding` depends on `EtfMaster`; both unlock lookthrough/diversification views.
 
-3. Add event audit trail:
+2. Add event audit trail:
    - Schema/import: `event_ledger_entries`
    - Script: either separate `scripts/import-base44-events.mjs` or included with a future finance-ledger import.
    - Rationale: preserves historical decisions and corrections before any interactive write workflow.
 
-4. Add market context:
+3. Add market context:
    - Schema/import: `market_regime_daily`, `global_market_factors`
    - Script: `scripts/import-base44-market-context.mjs`
    - Rationale: useful for read-only explanations and future recommendation context, but less blocking than raw prices/ETF reference.
 
-5. Add goals and cashflow:
+4. Add goals and cashflow:
    - Schema/import: `goals`, `transactions`, `fixed_transactions`, `monthly_incomes`
    - Rationale: clear mappings, but not required for the initial read-only portfolio dashboard.
 
-6. Resolve `needs_decision` entities:
+5. Resolve `needs_decision` entities:
    - `PortfolioSnapshot`: import only if earlier account-total history is required.
    - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
    - `AssetFactorProfile`: decide after ETF/reference data model is in place.
