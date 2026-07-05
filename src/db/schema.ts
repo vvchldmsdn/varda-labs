@@ -594,6 +594,159 @@ export const globalMarketFactors = pgTable(
   }),
 );
 
+export const goals = pgTable(
+  "goals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    ownerUserId: varchar("owner_user_id", { length: 255 }),
+
+    title: text("title"),
+    category: varchar("category", { length: 100 }).notNull(),
+    targetDate: date("target_date").notNull(),
+    priority: integer("priority"),
+    memo: text("memo"),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    targetAmount: decimal("target_amount", { precision: 28, scale: 6 }).notNull(),
+    currentAllocatedAmount: decimal("current_allocated_amount", {
+      precision: 28,
+      scale: 6,
+    }),
+    monthlyContribution: decimal("monthly_contribution", {
+      precision: 28,
+      scale: 6,
+    }),
+    expectedReturn: decimal("expected_return", { precision: 20, scale: 8 }),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex("goals_legacy_base44_id_unique").on(
+      table.legacyBase44Id,
+    ),
+    ownerTargetDateIdx: index("goals_owner_target_date_idx").on(
+      table.ownerUserId,
+      table.targetDate,
+    ),
+  }),
+);
+
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    ownerUserId: varchar("owner_user_id", { length: 255 }),
+
+    transactionDate: date("date").notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    category: varchar("category", { length: 100 }).notNull(),
+    description: text("description"),
+    memo: text("memo"),
+    account: varchar("account", { length: 50 }),
+    accountId: uuid("account_id"),
+    paymentMethod: varchar("payment_method", { length: 50 }),
+    isFixed: boolean("is_fixed").default(false).notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    amount: decimal("amount", { precision: 28, scale: 6 }).notNull(),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex("transactions_legacy_base44_id_unique").on(
+      table.legacyBase44Id,
+    ),
+    ownerDateIdx: index("transactions_owner_date_idx").on(
+      table.ownerUserId,
+      table.transactionDate,
+    ),
+    typeDateIdx: index("transactions_type_date_idx").on(
+      table.type,
+      table.transactionDate,
+    ),
+    accountDateIdx: index("transactions_account_date_idx").on(
+      table.account,
+      table.transactionDate,
+    ),
+  }),
+);
+
+export const fixedTransactions = pgTable(
+  "fixed_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    ownerUserId: varchar("owner_user_id", { length: 255 }),
+
+    name: text("name").notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    category: varchar("category", { length: 100 }).notNull(),
+    dayOfMonth: integer("day_of_month").notNull(),
+    holidayShift: varchar("holiday_shift", { length: 50 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    amount: decimal("amount", { precision: 28, scale: 6 }).notNull(),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "fixed_transactions_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    ownerActiveIdx: index("fixed_transactions_owner_active_idx").on(
+      table.ownerUserId,
+      table.isActive,
+    ),
+    dayOfMonthIdx: index("fixed_transactions_day_of_month_idx").on(
+      table.dayOfMonth,
+    ),
+  }),
+);
+
+export const monthlyIncomes = pgTable(
+  "monthly_incomes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    ownerUserId: varchar("owner_user_id", { length: 255 }),
+
+    year: integer("year").notNull(),
+    month: integer("month").notNull(),
+    payDay: integer("pay_day").notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    amount: decimal("amount", { precision: 28, scale: 6 }).notNull(),
+    actualAmount: decimal("actual_amount", { precision: 28, scale: 6 }),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "monthly_incomes_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    ownerYearMonthUnique: uniqueIndex("monthly_incomes_owner_year_month_unique").on(
+      table.ownerUserId,
+      table.year,
+      table.month,
+    ),
+  }),
+);
+
 export const accountBalanceSnapshots = pgTable(
   "account_balance_snapshots",
   {
@@ -922,6 +1075,18 @@ export type NewMarketRegimeDaily = typeof marketRegimeDaily.$inferInsert;
 
 export type GlobalMarketFactor = typeof globalMarketFactors.$inferSelect;
 export type NewGlobalMarketFactor = typeof globalMarketFactors.$inferInsert;
+
+export type Goal = typeof goals.$inferSelect;
+export type NewGoal = typeof goals.$inferInsert;
+
+export type Transaction = typeof transactions.$inferSelect;
+export type NewTransaction = typeof transactions.$inferInsert;
+
+export type FixedTransaction = typeof fixedTransactions.$inferSelect;
+export type NewFixedTransaction = typeof fixedTransactions.$inferInsert;
+
+export type MonthlyIncome = typeof monthlyIncomes.$inferSelect;
+export type NewMonthlyIncome = typeof monthlyIncomes.$inferInsert;
 
 export type AccountBalanceSnapshot = typeof accountBalanceSnapshots.$inferSelect;
 export type NewAccountBalanceSnapshot =

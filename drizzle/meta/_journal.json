@@ -78,6 +78,13 @@
       "when": 1783267678300,
       "tag": "0010_yielding_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783291457979,
+      "tag": "0011_first_riptide",
+      "breakpoints": true
     }
   ]
 }

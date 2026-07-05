@@ -17,8 +17,8 @@ Sensitive Settings values are intentionally not included here. This document use
 
 | Status | Entities | Rows represented |
 | --- | ---: | ---: |
-| `migrated` | 14 | 28,381 |
-| `pending` | 4 | 34 |
+| `migrated` | 18 | 28,415 |
+| `pending` | 0 | 0 |
 | `intentionally_skipped` | 17 | 0 |
 | `needs_decision` | 11 | 284 plus 3 unavailable entities |
 
@@ -27,7 +27,7 @@ Inventory totals:
 - Entity definitions: 46
 - Fetch OK: 43
 - Fetch failed: 3 (`CompanyFundamentalSnapshot`, `MarketPriceDaily`, `SecurityMaster`, all 404)
-- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `EventLedger`, `FxRate`, `GlobalMarketFactor`, `MarketRegimeDaily`, `Settings`
+- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `EventLedger`, `FixedTransaction`, `FxRate`, `GlobalMarketFactor`, `Goal`, `MarketRegimeDaily`, `MonthlyIncome`, `Settings`, `Transaction`
 
 ## Coverage Matrix
 
@@ -52,15 +52,15 @@ Inventory totals:
 | `EtfMaster` | `migrated` | 1,202 | 2026-04-19 to 2026-04-20 | `etf_masters` | Imported by `scripts/import-base44-etf-reference.mjs`. JSON tag/exposure/substitute/top10 fields are stored as JSONB while searchable scalar columns remain separate. |
 | `EtfSyncJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. |
-| `FixedTransaction` | `pending` | 7 | 2026-02-18 to 2026-02-19 | proposed `fixed_transactions` | Clear cashflow table, lower priority than market/ETF/ledger data. |
+| `FixedTransaction` | `migrated` | 7 | 2026-02-18 to 2026-02-19 | `fixed_transactions` | Imported by `scripts/import-base44-cashflow-goals.mjs` with recurrence day, holiday shift, active flag, type/category/name, and amount. |
 | `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. |
 | `GlobalMarketFactor` | `migrated` | 2,401 | 2025-06-01 to 2026-06-23 | `global_market_factors` | Imported by `scripts/import-base44-market-context.mjs`. Scalar factor keys/date/value/change fields are separated and `derived_metrics_json` is stored as JSONB. |
-| `Goal` | `pending` | 1 | 2026-03-18 | proposed `goals` | Clear mapping, but not required for read-only dashboard v1. |
+| `Goal` | `migrated` | 1 | 2026-03-18 | `goals` | Imported by `scripts/import-base44-cashflow-goals.mjs` for source preservation. The source title is empty, so UI usage should remain opt-in until a new goal model is designed. |
 | `MacroSeries` | `needs_decision` | 20 | 2025-10-01 to 2026-06-22 | candidate `macro_series` or merge into `global_market_factors` | Overlaps with `GlobalMarketFactor`. Decide whether to keep a separate macro-source table or normalize both into one factor time-series model. |
 | `MarketPriceDaily` | `needs_decision` | unavailable | 404 | likely replaced by `asset_price_snapshots` | Base44 fetch failed. Decide whether this legacy entity is obsolete once `AssetPriceSnapshot` is imported. |
 | `MarketRegimeDaily` | `migrated` | 69 | 2026-05-20 to 2026-07-05 | `market_regime_daily` | Imported by `scripts/import-base44-market-context.mjs`. Preserves `drivers_json` as JSONB plus scores, labels, account/date, and nullable current account mapping. |
 | `MarketSignal` | `needs_decision` | 2 | 2026-04-20 to 2026-04-21 | candidate `market_signals` or generated insights | Only two rows. Decide whether historical signals are source-of-record data or derived/recomputed output. |
-| `MonthlyIncome` | `pending` | 12 | 2026-02-18 | proposed `monthly_incomes` | Clear cashflow table, lower priority than market/ETF/ledger data. |
+| `MonthlyIncome` | `migrated` | 12 | 2026-02-18 | `monthly_incomes` | Imported by `scripts/import-base44-cashflow-goals.mjs` with year/month/pay day and nullable actual amount. |
 | `NewsSentimentDaily` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `PortfolioOptimizationRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `PortfolioSimulationRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
@@ -78,7 +78,7 @@ Inventory totals:
 | `SimulationJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `SimulationRunResult` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `SimulationSampleShard` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `Transaction` | `pending` | 14 | 2026-02-11 to 2026-03-01 | proposed `transactions` | Clear cashflow/expense table, lower priority than market/ETF/ledger data. |
+| `Transaction` | `migrated` | 14 | 2026-02-11 to 2026-03-01 | `transactions` | Imported by `scripts/import-base44-cashflow-goals.mjs`. Raw account is preserved and `account_id` is nullable because most rows have no account. |
 
 ## Priority Candidate Review
 
@@ -217,17 +217,18 @@ Implemented columns:
 
 ## Recommended Next Migration Order
 
-1. Add goals and cashflow:
-   - Schema/import: `goals`, `transactions`, `fixed_transactions`, `monthly_incomes`
-   - Rationale: clear mappings, but not required for the initial read-only portfolio dashboard.
-
-2. Resolve `needs_decision` entities:
+1. Resolve `needs_decision` entities:
    - `PortfolioSnapshot`: import only if earlier account-total history is required.
    - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
    - `AssetFactorProfile`: decide now that the ETF/reference data model is in place.
    - `MacroSeries` and `MarketSignal`: decide whether to merge into market-factor/signal models.
    - Recommendation entities: decide whether legacy recommendations are audit history or should be regenerated by a varda-labs engine.
    - 404 entities: treat `MarketPriceDaily` as superseded by `AssetPriceSnapshot` unless a new source is found; treat `SecurityMaster` as superseded by `EtfMaster` unless generic securities are needed.
+
+2. Start read-only product work:
+   - Build `Read-only Portfolio Dashboard v1` from imported varda-labs tables.
+   - Do not port old Base44 `Portfolio.jsx` wholesale.
+   - Keep legacy `Goal` data out of first-screen UI unless a new goal product model is defined.
 
 ## Import Rules To Carry Forward
 
