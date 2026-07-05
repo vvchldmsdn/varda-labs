@@ -17,8 +17,8 @@ Sensitive Settings values are intentionally not included here. This document use
 
 | Status | Entities | Rows represented |
 | --- | ---: | ---: |
-| `migrated` | 11 | 25,860 |
-| `pending` | 7 | 2,555 |
+| `migrated` | 12 | 25,911 |
+| `pending` | 6 | 2,504 |
 | `intentionally_skipped` | 17 | 0 |
 | `needs_decision` | 11 | 284 plus 3 unavailable entities |
 
@@ -27,7 +27,7 @@ Inventory totals:
 - Entity definitions: 46
 - Fetch OK: 43
 - Fetch failed: 3 (`CompanyFundamentalSnapshot`, `MarketPriceDaily`, `SecurityMaster`, all 404)
-- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `FxRate`, `Settings`
+- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `EventLedger`, `FxRate`, `Settings`
 
 ## Coverage Matrix
 
@@ -51,7 +51,7 @@ Inventory totals:
 | `EtfLookthroughRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EtfMaster` | `migrated` | 1,202 | 2026-04-19 to 2026-04-20 | `etf_masters` | Imported by `scripts/import-base44-etf-reference.mjs`. JSON tag/exposure/substitute/top10 fields are stored as JSONB while searchable scalar columns remain separate. |
 | `EtfSyncJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `EventLedger` | `pending` | 51 | 2026-04-28 to 2026-07-02 | proposed `event_ledger_entries` | High-priority next candidate before any write/rebalance UI. Preserve historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings. |
+| `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. |
 | `FixedTransaction` | `pending` | 7 | 2026-02-18 to 2026-02-19 | proposed `fixed_transactions` | Clear cashflow table, lower priority than market/ETF/ledger data. |
 | `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. |
 | `GlobalMarketFactor` | `pending` | 2,401 | 2025-06-01 to 2026-06-23 | proposed `global_market_factors` | Priority market-context candidate. Use scalar fields for key/date/value/change/volatility and JSONB for derived metrics. |
@@ -160,21 +160,23 @@ Import note: preserve `legacy_etf_id` even if `etf_master_id` cannot be resolved
 
 ### 5. `EventLedger` to `event_ledger_entries`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-events.mjs`.
+
+Why this was migrated next:
 
 - Small row count and high audit value.
 - Should be imported before any write, transaction, rebalance, or correction UI.
 
-Proposed columns:
+Implemented columns:
 
 - Identity: `id uuid`, `legacy_base44_id varchar(24) unique`
 - Event keys: `event_date`, `event_type`, `source`, `rule_version`, `recorded_at`
 - Optional mappings: `account_id`, `asset_id`, `group_id`, plus raw `account`, `legacy_asset_id`, `asset_name`, `ticker`, `legacy_group_id`, `group_name`
 - Values: `amount_krw`, `quantity_delta`, `price`, `fx_rate`, `before_value`, `after_value`
-- Correction link: `legacy_corrects_event_id`, later nullable `corrects_event_id`
+- Correction link: `legacy_corrects_event_id`, nullable `corrects_event_id`
 - Notes: `memo`, `description`, `is_sample`
 
-Import note: all current UUID FKs should be nullable. Historical events may reference assets/groups that are no longer present.
+Import note: all current UUID mappings are nullable. Historical events may reference assets/groups that are no longer present, so raw legacy ids and raw before/after strings are preserved.
 
 ### 6. `MarketRegimeDaily` to `market_regime_daily`
 
@@ -211,21 +213,16 @@ Proposed columns:
 
 ## Recommended Next Migration Order
 
-1. Add event audit trail:
-   - Schema/import: `event_ledger_entries`
-   - Script: either separate `scripts/import-base44-events.mjs` or included with a future finance-ledger import.
-   - Rationale: preserves historical decisions and corrections before any interactive write workflow.
-
-2. Add market context:
+1. Add market context:
    - Schema/import: `market_regime_daily`, `global_market_factors`
    - Script: `scripts/import-base44-market-context.mjs`
    - Rationale: useful for read-only explanations and future recommendation context, but less blocking than raw prices/ETF reference.
 
-3. Add goals and cashflow:
+2. Add goals and cashflow:
    - Schema/import: `goals`, `transactions`, `fixed_transactions`, `monthly_incomes`
    - Rationale: clear mappings, but not required for the initial read-only portfolio dashboard.
 
-4. Resolve `needs_decision` entities:
+3. Resolve `needs_decision` entities:
    - `PortfolioSnapshot`: import only if earlier account-total history is required.
    - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
    - `AssetFactorProfile`: decide now that the ETF/reference data model is in place.

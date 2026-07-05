@@ -399,6 +399,74 @@ export const etfHoldings = pgTable(
   }),
 );
 
+export const eventLedgerEntries = pgTable(
+  "event_ledger_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    eventDate: date("event_date").notNull(),
+    eventType: varchar("event_type", { length: 50 }).notNull(),
+    source: varchar("source", { length: 100 }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }),
+    ruleVersion: varchar("rule_version", { length: 100 }),
+
+    account: varchar("account", { length: 50 }),
+    accountId: uuid("account_id"),
+
+    assetId: uuid("asset_id"),
+    legacyAssetId: varchar("legacy_asset_id", { length: 24 }).notNull(),
+    ticker: varchar("ticker", { length: 50 }),
+    assetName: text("asset_name").notNull(),
+
+    groupId: uuid("group_id"),
+    legacyGroupId: varchar("legacy_group_id", { length: 24 }),
+    groupName: text("group_name"),
+
+    correctsEventId: uuid("corrects_event_id"),
+    legacyCorrectsEventId: varchar("legacy_corrects_event_id", { length: 24 }),
+
+    amountKrw: decimal("amount_krw", { precision: 28, scale: 8 }),
+    quantityDelta: decimal("quantity_delta", { precision: 28, scale: 8 }),
+    price: decimal("price", { precision: 28, scale: 12 }),
+    fxRate: decimal("fx_rate", { precision: 20, scale: 6 }),
+
+    beforeValue: text("before_value").notNull(),
+    afterValue: text("after_value").notNull(),
+    memo: text("memo"),
+    description: text("description"),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "event_ledger_entries_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    eventDateTypeIdx: index("event_ledger_entries_date_type_idx").on(
+      table.eventDate,
+      table.eventType,
+    ),
+    legacyAssetIdIdx: index("event_ledger_entries_legacy_asset_id_idx").on(
+      table.legacyAssetId,
+    ),
+    assetDateIdx: index("event_ledger_entries_asset_date_idx").on(
+      table.assetId,
+      table.eventDate,
+    ),
+    accountDateIdx: index("event_ledger_entries_account_date_idx").on(
+      table.account,
+      table.eventDate,
+    ),
+    legacyGroupIdIdx: index("event_ledger_entries_legacy_group_id_idx").on(
+      table.legacyGroupId,
+    ),
+  }),
+);
+
 export const accountBalanceSnapshots = pgTable(
   "account_balance_snapshots",
   {
@@ -718,6 +786,9 @@ export type NewEtfMaster = typeof etfMasters.$inferInsert;
 
 export type EtfHolding = typeof etfHoldings.$inferSelect;
 export type NewEtfHolding = typeof etfHoldings.$inferInsert;
+
+export type EventLedgerEntry = typeof eventLedgerEntries.$inferSelect;
+export type NewEventLedgerEntry = typeof eventLedgerEntries.$inferInsert;
 
 export type AccountBalanceSnapshot = typeof accountBalanceSnapshots.$inferSelect;
 export type NewAccountBalanceSnapshot =
