@@ -4,6 +4,7 @@ import type {
   DashboardAccount,
   DashboardData,
   DashboardHolding,
+  NonInvestmentAsset,
   RecentPortfolioPoint,
 } from "@/lib/portfolio-dashboard";
 
@@ -170,11 +171,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                   <p
                     className={cn(
                       "mt-1 text-sm font-medium",
-                      moneyToneClass(summary.unrealizedPnlKrw),
+                      moneyToneClass(summary.totalPnlKrw),
                     )}
                   >
-                    {formatSignedKrw(summary.unrealizedPnlKrw)} ·{" "}
-                    {formatPct(summary.holdingReturnPct, true)}
+                    {formatSignedKrw(summary.totalPnlKrw)} ·{" "}
+                    {formatPct(summary.totalReturnPct, true)}
                   </p>
                 </div>
               ))}
@@ -229,9 +230,9 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                 tone={toneFor(data.todayReturnPct)}
               />
               <BriefingRow
-                label="환율"
-                value={formatNumber(data.usdKrwRate)}
-                subValue="USD/KRW"
+                label="환율 영향"
+                value={formatSignedKrw(data.todayFxChangeKrw)}
+                tone={moneyToneFor(data.todayFxChangeKrw)}
               />
               <BriefingRow
                 label="실현손익"
@@ -239,12 +240,24 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                 tone={moneyToneFor(data.realizedPnlKrw)}
               />
             </div>
-            {!data.dataHealth.movementReady ? (
-              <p className="mt-4 rounded-md border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-xs font-medium text-[#7a5b16]">
-                기준 스냅샷 없음
-              </p>
-            ) : null}
+            <p
+              className={cn(
+                "mt-4 rounded-md border px-3 py-2 text-xs font-medium",
+                data.dataHealth.movementReady
+                  ? "border-[#d7e3d2] bg-[#f3f8ef] text-[#2c643f]"
+                  : "border-[#eadfc7] bg-[#fff8e7] text-[#7a5b16]",
+              )}
+            >
+              {movementHealthText(data)}
+            </p>
           </section>
+
+          {data.nonInvestmentAssets.length > 0 ? (
+            <NonInvestmentCard
+              assets={data.nonInvestmentAssets}
+              totalValue={data.nonInvestmentTotalKrw}
+            />
+          ) : null}
 
           <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
             <h2 className="text-base font-semibold tracking-normal">주요 변동 종목</h2>
@@ -359,7 +372,7 @@ function HeatmapCell({
   holding: DashboardHolding;
   maxValue: number;
 }) {
-  const signal = holding.dailyReturnPct ?? holding.holdingReturnPct ?? 0;
+  const signal = holding.dailyReturnPct ?? holding.totalReturnPct ?? 0;
   const intensity = Math.min(Math.abs(signal) / 4, 1);
   const valueRatio = Math.max(holding.valueKrw / maxValue, 0.18);
   const color =
@@ -427,17 +440,58 @@ function HoldingRow({ holding }: { holding: DashboardHolding }) {
           moneyToneClass(holding.dailyChangeKrw),
         )}
       >
-        {formatSignedKrw(holding.dailyChangeKrw)}
+        <p>{formatSignedKrw(holding.dailyChangeKrw)}</p>
+        <p className="text-[11px] font-medium text-[#737b70]">
+          {movementSourceLabel(holding.dailySource)}
+        </p>
       </td>
       <td
         className={cn(
           "px-4 py-3 text-right font-semibold tabular-nums",
-          toneClass(holding.holdingReturnPct),
+          toneClass(holding.totalReturnPct),
         )}
       >
-        {formatPct(holding.holdingReturnPct, true)}
+        {formatPct(holding.totalReturnPct, true)}
       </td>
     </tr>
+  );
+}
+
+function NonInvestmentCard({
+  assets,
+  totalValue,
+}: {
+  assets: NonInvestmentAsset[];
+  totalValue: number;
+}) {
+  return (
+    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-normal">
+            비투자/현금성 자산
+          </h2>
+          <p className="mt-1 text-xs text-[#687064]">투자 비중·드리프트 제외</p>
+        </div>
+        <p className="shrink-0 text-sm font-semibold">{formatKrw(totalValue)}</p>
+      </div>
+      <div className="mt-3 space-y-2">
+        {assets.map((asset) => (
+          <div
+            key={asset.id}
+            className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-sm"
+          >
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{asset.name}</p>
+              <p className="text-xs text-[#687064]">
+                {accountLabel(asset.account)} · {assetTypeLabel(asset.assetType)}
+              </p>
+            </div>
+            <p className="shrink-0 font-semibold">{formatKrw(asset.valueKrw)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -470,7 +524,9 @@ function CompactHolding({ holding }: { holding: DashboardHolding }) {
     <div className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{holding.name}</p>
-        <p className="text-xs text-[#687064]">{holding.ticker ?? "-"}</p>
+        <p className="text-xs text-[#687064]">
+          {holding.ticker ?? "-"} · {movementSourceLabel(holding.dailySource)}
+        </p>
       </div>
       <div className="text-right">
         <p
@@ -529,6 +585,30 @@ function DataPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+function movementHealthText(data: DashboardData) {
+  if (data.dataHealth.movementReady) {
+    const source =
+      data.dataHealth.movementSource === "asset_price_snapshot"
+        ? "전일종가 fallback"
+        : "포지션 스냅샷";
+    const coverage =
+      data.dataHealth.movementSource === "asset_price_snapshot"
+        ? data.dataHealth.previousCloseCoveragePct
+        : data.dataHealth.movementCurrentCoveragePct;
+    return `${source} 기준 · 커버리지 ${formatPct(coverage)}`;
+  }
+
+  return data.dataHealth.movementReason === "incomplete_baseline_snapshot"
+    ? "기준 스냅샷 커버리지가 낮아 오늘 변동을 보수적으로 숨김"
+    : "오늘 변동 기준 데이터 없음";
+}
+
+function movementSourceLabel(source: DashboardHolding["dailySource"]) {
+  if (source === "daily_position_snapshot") return "스냅샷";
+  if (source === "asset_price_snapshot") return "전일종가";
+  return "-";
+}
+
 function formatKrw(value: number | null) {
   if (value === null) return "-";
   return new Intl.NumberFormat("ko-KR", {
@@ -563,10 +643,10 @@ function compactKrw(value: number, signed: boolean) {
   const prefix = signed && cleanValue > 0 ? "+" : cleanValue < 0 ? "-" : "";
 
   if (absValue >= 100_000_000) {
-    return `${prefix}₩${(absValue / 100_000_000).toFixed(1)}억`;
+    return `${prefix}${(absValue / 100_000_000).toFixed(1)}억`;
   }
   if (absValue >= 10_000) {
-    return `${prefix}₩${Math.round(absValue / 10_000).toLocaleString("ko-KR")}만`;
+    return `${prefix}${Math.round(absValue / 10_000).toLocaleString("ko-KR")}만`;
   }
   return `${prefix}${formatKrw(absValue)}`;
 }
@@ -611,6 +691,13 @@ function accountLabel(value: string) {
   if (value === "brokerage") return "증권";
   if (value === "isa") return "ISA";
   if (value === "irp") return "IRP";
+  return value;
+}
+
+function assetTypeLabel(value: string) {
+  if (value === "housing_subscription") return "청약";
+  if (value === "savings") return "저축";
+  if (value === "fixed_deposit") return "예금";
   return value;
 }
 
