@@ -1,0 +1,22 @@
+CREATE TABLE "assets" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"ticker" varchar(50),
+	"asset_type" varchar(50) DEFAULT 'etf',
+	"category" varchar(100),
+	"market" varchar(20) NOT NULL,
+	"currency" varchar(10) NOT NULL,
+	"account" varchar(50) NOT NULL,
+	"quantity" numeric(20, 6) NOT NULL,
+	"current_price" numeric(20, 4) NOT NULL,
+	"average_cost" numeric(20, 4),
+	"target_weight" numeric(8, 4),
+	"group_id" uuid,
+	"memo" text,
+	"description" text,
+	"ma_rule_enabled" boolean DEFAULT true,
+	"days_above_ma" integer DEFAULT 0,
+	"created_by_id" varchar(255),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
