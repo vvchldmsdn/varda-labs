@@ -17,8 +17,8 @@ Sensitive Settings values are intentionally not included here. This document use
 
 | Status | Entities | Rows represented |
 | --- | ---: | ---: |
-| `migrated` | 9 | 13,786 |
-| `pending` | 9 | 14,629 |
+| `migrated` | 11 | 25,860 |
+| `pending` | 7 | 2,555 |
 | `intentionally_skipped` | 17 | 0 |
 | `needs_decision` | 11 | 284 plus 3 unavailable entities |
 
@@ -27,7 +27,7 @@ Inventory totals:
 - Entity definitions: 46
 - Fetch OK: 43
 - Fetch failed: 3 (`CompanyFundamentalSnapshot`, `MarketPriceDaily`, `SecurityMaster`, all 404)
-- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `FxRate`, `Settings`
+- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `FxRate`, `Settings`
 
 ## Coverage Matrix
 
@@ -47,9 +47,9 @@ Inventory totals:
 | `DailyPositionSnapshot` | `migrated` | 418 | 2026-03-24 to 2026-07-05 | `daily_position_snapshots` | Imported with nullable `asset_id`; `legacy_asset_id`, `ticker`, `asset_name`, and `snapshot_date` are preserved so the 52 unmatched rows are not dropped. |
 | `EngineContextSnapshot` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EtfCandidateRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `EtfHolding` | `pending` | 10,872 | 2026-04-19 to 2026-07-03 | proposed `etf_holdings` | High-priority next candidate after `EtfMaster`. Preserve `legacy_base44_id`, `legacy_etf_id`, `etf_ticker`, holding identity, sector/country/market, rank, weight, shares, market value, source, and `as_of_date`. |
+| `EtfHolding` | `migrated` | 10,872 | 2026-03-31 to 2026-07-03 | `etf_holdings` | Imported by `scripts/import-base44-etf-reference.mjs`. `legacy_etf_id`, `etf_ticker`, holding identity, sector/country/market, rank, weight, shares, market value, source, and `as_of_date` are preserved. |
 | `EtfLookthroughRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `EtfMaster` | `pending` | 1,202 | 2026-04-19 to 2026-04-20 | proposed `etf_masters` | High-priority next candidate. Import before `EtfHolding`; use JSONB for tag/exposure/substitute/top10 fields while keeping searchable scalar columns. |
+| `EtfMaster` | `migrated` | 1,202 | 2026-04-19 to 2026-04-20 | `etf_masters` | Imported by `scripts/import-base44-etf-reference.mjs`. JSON tag/exposure/substitute/top10 fields are stored as JSONB while searchable scalar columns remain separate. |
 | `EtfSyncJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EventLedger` | `pending` | 51 | 2026-04-28 to 2026-07-02 | proposed `event_ledger_entries` | High-priority next candidate before any write/rebalance UI. Preserve historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings. |
 | `FixedTransaction` | `pending` | 7 | 2026-02-18 to 2026-02-19 | proposed `fixed_transactions` | Clear cashflow table, lower priority than market/ETF/ledger data. |
@@ -122,7 +122,9 @@ Proposed columns:
 
 ### 3. `EtfMaster` to `etf_masters`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-etf-reference.mjs`.
+
+Why this was migrated next:
 
 - Parent/reference table for `EtfHolding`.
 - Needed before lookthrough, ETF search, diversification, and future recommendation work.
@@ -137,7 +139,9 @@ Proposed columns:
 
 ### 4. `EtfHolding` to `etf_holdings`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-etf-reference.mjs`.
+
+Why this was migrated next:
 
 - Enables ETF lookthrough and exposure analysis without bringing over Base44 functions.
 - Has a clear parent relation to `EtfMaster`.
@@ -207,29 +211,24 @@ Proposed columns:
 
 ## Recommended Next Migration Order
 
-1. Add ETF reference and lookthrough:
-   - Schema/import: `etf_masters`, then `etf_holdings`
-   - Script: `scripts/import-base44-etf-reference.mjs`
-   - Rationale: `EtfHolding` depends on `EtfMaster`; both unlock lookthrough/diversification views.
-
-2. Add event audit trail:
+1. Add event audit trail:
    - Schema/import: `event_ledger_entries`
    - Script: either separate `scripts/import-base44-events.mjs` or included with a future finance-ledger import.
    - Rationale: preserves historical decisions and corrections before any interactive write workflow.
 
-3. Add market context:
+2. Add market context:
    - Schema/import: `market_regime_daily`, `global_market_factors`
    - Script: `scripts/import-base44-market-context.mjs`
    - Rationale: useful for read-only explanations and future recommendation context, but less blocking than raw prices/ETF reference.
 
-4. Add goals and cashflow:
+3. Add goals and cashflow:
    - Schema/import: `goals`, `transactions`, `fixed_transactions`, `monthly_incomes`
    - Rationale: clear mappings, but not required for the initial read-only portfolio dashboard.
 
-5. Resolve `needs_decision` entities:
+4. Resolve `needs_decision` entities:
    - `PortfolioSnapshot`: import only if earlier account-total history is required.
    - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
-   - `AssetFactorProfile`: decide after ETF/reference data model is in place.
+   - `AssetFactorProfile`: decide now that the ETF/reference data model is in place.
    - `MacroSeries` and `MarketSignal`: decide whether to merge into market-factor/signal models.
    - Recommendation entities: decide whether legacy recommendations are audit history or should be regenerated by a varda-labs engine.
    - 404 entities: treat `MarketPriceDaily` as superseded by `AssetPriceSnapshot` unless a new source is found; treat `SecurityMaster` as superseded by `EtfMaster` unless generic securities are needed.

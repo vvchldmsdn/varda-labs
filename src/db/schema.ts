@@ -4,6 +4,7 @@ import {
   decimal,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -257,6 +258,143 @@ export const benchmarkSnapshots = pgTable(
     ),
     benchmarkDateIdx: index("benchmark_snapshots_date_idx").on(
       table.benchmarkDate,
+    ),
+  }),
+);
+
+export const etfMasters = pgTable(
+  "etf_masters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    ticker: varchar("ticker", { length: 50 }).notNull(),
+    name: text("name").notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    exchange: varchar("exchange", { length: 100 }),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    issuer: text("issuer"),
+    isin: varchar("isin", { length: 50 }),
+    assetClass: varchar("asset_class", { length: 100 }),
+    categoryLabel: text("category_label"),
+    benchmarkName: text("benchmark_name"),
+    overlapGroup: varchar("overlap_group", { length: 150 }),
+    riskLevel: varchar("risk_level", { length: 50 }),
+    regionFocus: varchar("region_focus", { length: 100 }),
+    currencyExposure: varchar("currency_exposure", { length: 50 }),
+    distributionFrequency: varchar("distribution_frequency", { length: 50 }),
+    etfStrategy: varchar("etf_strategy", { length: 100 }),
+    listingCountry: varchar("listing_country", { length: 10 }),
+    leverageType: varchar("leverage_type", { length: 50 }),
+    dataSource: text("data_source"),
+    officialUrl: text("official_url"),
+    notes: text("notes"),
+
+    isActive: boolean("is_active").default(true).notNull(),
+    isUniversePick: boolean("is_universe_pick"),
+    isCurrencyHedged: boolean("is_currency_hedged").default(false).notNull(),
+    isInverse: boolean("is_inverse").default(false).notNull(),
+    isLeveraged: boolean("is_leveraged").default(false).notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    constituentCount: integer("constituent_count"),
+    universePriority: integer("universe_priority"),
+    aum: decimal("aum", { precision: 28, scale: 6 }),
+    averageVolume: decimal("average_volume", { precision: 28, scale: 6 }),
+    expenseRatio: decimal("expense_ratio", { precision: 20, scale: 8 }),
+    dividendYield: decimal("dividend_yield", { precision: 20, scale: 8 }),
+    costScore: decimal("cost_score", { precision: 20, scale: 6 }),
+    liquidityScore: decimal("liquidity_score", { precision: 20, scale: 6 }),
+    leverageFactor: decimal("leverage_factor", { precision: 20, scale: 6 }),
+    rateSensitivity: decimal("rate_sensitivity", { precision: 20, scale: 6 }),
+
+    accountSuitabilityJson: jsonb("account_suitability_json"),
+    currencyExposureJson: jsonb("currency_exposure_json"),
+    regionExposureJson: jsonb("region_exposure_json"),
+    sectorExposureJson: jsonb("sector_exposure_json"),
+    regionTagsJson: jsonb("region_tags_json"),
+    sectorTagsJson: jsonb("sector_tags_json"),
+    styleTagsJson: jsonb("style_tags_json"),
+    themeTagsJson: jsonb("theme_tags_json"),
+    substitutesJson: jsonb("substitutes_json"),
+    top10HoldingsJson: jsonb("top10_holdings_json"),
+
+    inceptionDate: date("inception_date"),
+    exposureAsOfDate: date("exposure_as_of_date"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex("etf_masters_legacy_base44_id_unique").on(
+      table.legacyBase44Id,
+    ),
+    tickerMarketUnique: uniqueIndex("etf_masters_ticker_market_unique").on(
+      table.ticker,
+      table.market,
+    ),
+    tickerIdx: index("etf_masters_ticker_idx").on(table.ticker),
+    activeIdx: index("etf_masters_is_active_idx").on(table.isActive),
+  }),
+);
+
+export const etfHoldings = pgTable(
+  "etf_holdings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    etfMasterId: uuid("etf_master_id"),
+    legacyEtfId: varchar("legacy_etf_id", { length: 24 }),
+    etfTicker: varchar("etf_ticker", { length: 50 }).notNull(),
+    etfName: text("etf_name").notNull(),
+    asOfDate: date("as_of_date").notNull(),
+
+    holdingSymbol: varchar("holding_symbol", { length: 100 }),
+    holdingName: text("holding_name").notNull(),
+    holdingMarket: varchar("holding_market", { length: 20 }),
+    holdingCountry: varchar("holding_country", { length: 10 }),
+    currency: varchar("currency", { length: 10 }),
+    sector: varchar("sector", { length: 100 }),
+    industry: varchar("industry", { length: 150 }),
+    securityType: varchar("security_type", { length: 50 }),
+    source: varchar("source", { length: 100 }),
+    sourceUrl: text("source_url"),
+    notes: text("notes"),
+    isTop10: boolean("is_top10").default(false).notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    rank: integer("rank"),
+    weightPct: decimal("weight_pct", { precision: 20, scale: 8 }),
+    shares: decimal("shares", { precision: 28, scale: 8 }),
+    marketValue: decimal("market_value", { precision: 28, scale: 8 }),
+
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex("etf_holdings_legacy_base44_id_unique").on(
+      table.legacyBase44Id,
+    ),
+    etfTickerDateIdx: index("etf_holdings_ticker_date_idx").on(
+      table.etfTicker,
+      table.asOfDate,
+    ),
+    legacyEtfDateIdx: index("etf_holdings_legacy_etf_date_idx").on(
+      table.legacyEtfId,
+      table.asOfDate,
+    ),
+    etfMasterDateIdx: index("etf_holdings_master_date_idx").on(
+      table.etfMasterId,
+      table.asOfDate,
+    ),
+    holdingSymbolIdx: index("etf_holdings_holding_symbol_idx").on(
+      table.holdingSymbol,
     ),
   }),
 );
@@ -574,6 +712,12 @@ export type NewAssetPriceSnapshot = typeof assetPriceSnapshots.$inferInsert;
 
 export type BenchmarkSnapshot = typeof benchmarkSnapshots.$inferSelect;
 export type NewBenchmarkSnapshot = typeof benchmarkSnapshots.$inferInsert;
+
+export type EtfMaster = typeof etfMasters.$inferSelect;
+export type NewEtfMaster = typeof etfMasters.$inferInsert;
+
+export type EtfHolding = typeof etfHoldings.$inferSelect;
+export type NewEtfHolding = typeof etfHoldings.$inferInsert;
 
 export type AccountBalanceSnapshot = typeof accountBalanceSnapshots.$inferSelect;
 export type NewAccountBalanceSnapshot =
