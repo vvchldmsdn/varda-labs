@@ -49,8 +49,17 @@ const optionalUuid = z.preprocess((value) => {
   return value;
 }, z.string().uuid().nullable().optional());
 
+const optionalBase44Id = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string") return value.trim();
+  return value;
+}, z.string().regex(/^[0-9a-f]{24}$/i).nullable().optional());
+
 const createAssetSchema = z
   .object({
+    legacyBase44Id: optionalBase44Id,
+    legacy_base44_id: optionalBase44Id,
     name: z.string().trim().min(1),
     ticker: optionalText,
     assetType: optionalText,
@@ -116,6 +125,10 @@ export async function POST(request: Request) {
   const body = parsed.data;
   const currentPrice = body.currentPrice ?? body.current_price;
   const accountId = body.accountId ?? body.account_id ?? null;
+  const legacyBase44Id =
+    body.legacyBase44Id !== undefined
+      ? body.legacyBase44Id
+      : body.legacy_base44_id ?? null;
 
   if (currentPrice === undefined) {
     return NextResponse.json(
@@ -127,6 +140,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(assets)
     .values({
+      legacyBase44Id,
       name: body.name,
       ticker: body.ticker,
       assetType: body.assetType ?? body.asset_type ?? "etf",

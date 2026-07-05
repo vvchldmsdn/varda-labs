@@ -22,6 +22,13 @@
       "when": 1783250279075,
       "tag": "0002_conscious_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783253756196,
+      "tag": "0003_wealthy_warbound",
+      "breakpoints": true
     }
   ]
 }

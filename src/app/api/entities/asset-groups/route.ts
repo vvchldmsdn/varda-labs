@@ -33,7 +33,16 @@ const optionalInteger = z.preprocess((value) => {
   return Number(value);
 }, z.number().int().optional());
 
+const optionalBase44Id = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string") return value.trim();
+  return value;
+}, z.string().regex(/^[0-9a-f]{24}$/i).nullable().optional());
+
 const createAssetGroupSchema = z.object({
+  legacyBase44Id: optionalBase44Id,
+  legacy_base44_id: optionalBase44Id,
   name: z.string().trim().min(1),
   targetWeight: optionalDecimalString,
   target_weight: optionalDecimalString,
@@ -77,10 +86,15 @@ export async function POST(request: Request) {
   }
 
   const body = parsed.data;
+  const legacyBase44Id =
+    body.legacyBase44Id !== undefined
+      ? body.legacyBase44Id
+      : body.legacy_base44_id ?? null;
 
   const [created] = await db
     .insert(assetGroups)
     .values({
+      legacyBase44Id,
       name: body.name,
       targetWeight: body.targetWeight ?? body.target_weight ?? null,
       description: body.description,

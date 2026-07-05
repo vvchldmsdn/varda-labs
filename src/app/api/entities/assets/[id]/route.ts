@@ -56,8 +56,17 @@ const optionalUuid = z.preprocess((value) => {
   return value;
 }, z.string().uuid().nullable().optional());
 
+const optionalBase44Id = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string") return value.trim();
+  return value;
+}, z.string().regex(/^[0-9a-f]{24}$/i).nullable().optional());
+
 const updateAssetSchema = z
   .object({
+    legacyBase44Id: optionalBase44Id,
+    legacy_base44_id: optionalBase44Id,
     name: optionalRequiredText,
     ticker: optionalText,
     assetType: optionalText,
@@ -117,8 +126,13 @@ export async function PATCH(
   const daysAboveMa = body.daysAboveMa ?? body.days_above_ma;
   const createdById = body.createdById ?? body.created_by_id;
   const accountId = body.accountId !== undefined ? body.accountId : body.account_id;
+  const legacyBase44Id =
+    body.legacyBase44Id !== undefined
+      ? body.legacyBase44Id
+      : body.legacy_base44_id;
 
   const hasKnownUpdate = [
+    legacyBase44Id,
     body.name,
     body.ticker,
     assetType,
@@ -149,6 +163,7 @@ export async function PATCH(
   const [updated] = await db
     .update(assets)
     .set({
+      ...(legacyBase44Id !== undefined ? { legacyBase44Id } : {}),
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.ticker !== undefined ? { ticker: body.ticker } : {}),
       ...(assetType !== undefined ? { assetType } : {}),

@@ -5,6 +5,10 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { assetGroups } from "@/db/schema";
 
+type UpdateAssetGroup = Partial<typeof assetGroups.$inferInsert> & {
+  updatedAt: Date;
+};
+
 const optionalText = z.preprocess((value) => {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
@@ -41,7 +45,16 @@ const optionalInteger = z.preprocess((value) => {
   return Number(value);
 }, z.number().int().optional());
 
+const optionalBase44Id = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string") return value.trim();
+  return value;
+}, z.string().regex(/^[0-9a-f]{24}$/i).nullable().optional());
+
 const updateAssetGroupSchema = z.object({
+  legacyBase44Id: optionalBase44Id,
+  legacy_base44_id: optionalBase44Id,
   name: optionalRequiredText,
   targetWeight: optionalDecimalString,
   target_weight: optionalDecimalString,
@@ -88,8 +101,13 @@ export async function PATCH(
   const maExempt = body.maExempt ?? body.ma_exempt;
   const executionMode = body.executionMode ?? body.execution_mode;
   const ownerUserId = body.ownerUserId ?? body.owner_user_id;
+  const legacyBase44Id =
+    body.legacyBase44Id !== undefined
+      ? body.legacyBase44Id
+      : body.legacy_base44_id;
 
   const hasKnownUpdate = [
+    legacyBase44Id,
     body.name,
     targetWeight,
     body.description,
@@ -109,34 +127,23 @@ export async function PATCH(
     );
   }
 
-  const updateValues: {
-    name?: string;
-    targetWeight?: string | null;
-    description?: string | null;
-    color?: string | null;
-    isActive?: boolean;
-    sortOrder?: number;
-    fxExempt?: boolean;
-    maExempt?: boolean;
-    executionMode?: string;
-    ownerUserId?: string | null;
-    updatedAt: Date;
-    } = {
+  const updateValues: UpdateAssetGroup = {
     updatedAt: new Date(),
-    };
+  };
 
-    if (body.name !== undefined) updateValues.name = body.name;
-    if (targetWeight !== undefined) updateValues.targetWeight = targetWeight;
-    if (body.description !== undefined) updateValues.description = body.description;
-    if (body.color !== undefined) updateValues.color = body.color;
-    if (isActive !== undefined) updateValues.isActive = isActive;
-    if (sortOrder !== undefined) updateValues.sortOrder = sortOrder;
-    if (fxExempt !== undefined) updateValues.fxExempt = fxExempt;
-    if (maExempt !== undefined) updateValues.maExempt = maExempt;
-    if (executionMode !== undefined) updateValues.executionMode = executionMode;
-    if (ownerUserId !== undefined) updateValues.ownerUserId = ownerUserId;
+  if (legacyBase44Id !== undefined) updateValues.legacyBase44Id = legacyBase44Id;
+  if (body.name !== undefined) updateValues.name = body.name;
+  if (targetWeight !== undefined) updateValues.targetWeight = targetWeight;
+  if (body.description !== undefined) updateValues.description = body.description;
+  if (body.color !== undefined) updateValues.color = body.color;
+  if (isActive !== undefined) updateValues.isActive = isActive;
+  if (sortOrder !== undefined) updateValues.sortOrder = sortOrder;
+  if (fxExempt !== undefined) updateValues.fxExempt = fxExempt;
+  if (maExempt !== undefined) updateValues.maExempt = maExempt;
+  if (executionMode !== undefined) updateValues.executionMode = executionMode;
+  if (ownerUserId !== undefined) updateValues.ownerUserId = ownerUserId;
 
-    const [updated] = await db
+  const [updated] = await db
     .update(assetGroups)
     .set(updateValues)
     .where(eq(assetGroups.id, id))
