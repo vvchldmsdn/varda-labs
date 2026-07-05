@@ -81,10 +81,22 @@ const createAssetSchema = z
     group_id: optionalText,
     memo: optionalText,
     description: optionalText,
+    maAssetClass: optionalText,
+    ma_asset_class: optionalText,
     maRuleEnabled: optionalBoolean,
     ma_rule_enabled: optionalBoolean,
+    ma120: optionalDecimalString,
+    ma_120: optionalDecimalString,
     daysAboveMa: optionalInteger,
     days_above_ma: optionalInteger,
+    fractionalKrwValue: optionalDecimalString,
+    fractional_krw_value: optionalDecimalString,
+    fractionalAvgCost: optionalDecimalString,
+    fractional_avg_cost: optionalDecimalString,
+    monthlyContribution: optionalDecimalString,
+    monthly_contribution: optionalDecimalString,
+    contributionDay: optionalInteger,
+    contribution_day: optionalInteger,
     createdById: optionalText,
     created_by_id: optionalText,
   })
@@ -156,8 +168,17 @@ export async function POST(request: Request) {
       groupId: body.groupId ?? body.group_id ?? null,
       memo: body.memo,
       description: body.description,
+      maAssetClass: body.maAssetClass ?? body.ma_asset_class ?? null,
       maRuleEnabled: body.maRuleEnabled ?? body.ma_rule_enabled ?? false,
+      ma120: body.ma120 ?? body.ma_120 ?? null,
       daysAboveMa: body.daysAboveMa ?? body.days_above_ma ?? null,
+      fractionalKrwValue:
+        body.fractionalKrwValue ?? body.fractional_krw_value ?? null,
+      fractionalAvgCost:
+        body.fractionalAvgCost ?? body.fractional_avg_cost ?? null,
+      monthlyContribution:
+        body.monthlyContribution ?? body.monthly_contribution ?? null,
+      contributionDay: body.contributionDay ?? body.contribution_day ?? null,
       createdById: body.createdById ?? body.created_by_id ?? null,
     })
     .returning();

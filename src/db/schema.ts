@@ -35,8 +35,23 @@ export const assets = pgTable(
     memo: text("memo"),
     description: text("description"),
 
+    maAssetClass: varchar("ma_asset_class", { length: 50 }),
     maRuleEnabled: boolean("ma_rule_enabled").default(true),
+    ma120: decimal("ma_120", { precision: 20, scale: 4 }),
     daysAboveMa: integer("days_above_ma").default(0),
+    fractionalKrwValue: decimal("fractional_krw_value", {
+      precision: 20,
+      scale: 4,
+    }),
+    fractionalAvgCost: decimal("fractional_avg_cost", {
+      precision: 20,
+      scale: 4,
+    }),
+    monthlyContribution: decimal("monthly_contribution", {
+      precision: 20,
+      scale: 4,
+    }),
+    contributionDay: integer("contribution_day"),
 
     createdById: varchar("created_by_id", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

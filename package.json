@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "import:base44:core": "node scripts/import-base44-core.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

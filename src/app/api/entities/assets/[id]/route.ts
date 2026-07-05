@@ -88,10 +88,22 @@ const updateAssetSchema = z
     group_id: optionalText,
     memo: optionalText,
     description: optionalText,
+    maAssetClass: optionalText,
+    ma_asset_class: optionalText,
     maRuleEnabled: optionalBoolean,
     ma_rule_enabled: optionalBoolean,
+    ma120: optionalDecimalString,
+    ma_120: optionalDecimalString,
     daysAboveMa: optionalInteger,
     days_above_ma: optionalInteger,
+    fractionalKrwValue: optionalDecimalString,
+    fractional_krw_value: optionalDecimalString,
+    fractionalAvgCost: optionalDecimalString,
+    fractional_avg_cost: optionalDecimalString,
+    monthlyContribution: optionalDecimalString,
+    monthly_contribution: optionalDecimalString,
+    contributionDay: optionalInteger,
+    contribution_day: optionalInteger,
     createdById: optionalText,
     created_by_id: optionalText,
   })
@@ -117,14 +129,38 @@ export async function PATCH(
 
   const body = parsed.data;
 
-  const currentPrice = body.currentPrice ?? body.current_price;
-  const averageCost = body.averageCost ?? body.average_cost;
-  const targetWeight = body.targetWeight ?? body.target_weight;
-  const assetType = body.assetType ?? body.asset_type;
-  const groupId = body.groupId ?? body.group_id;
+  const currentPrice =
+    body.currentPrice !== undefined ? body.currentPrice : body.current_price;
+  const averageCost =
+    body.averageCost !== undefined ? body.averageCost : body.average_cost;
+  const targetWeight =
+    body.targetWeight !== undefined ? body.targetWeight : body.target_weight;
+  const assetType = body.assetType !== undefined ? body.assetType : body.asset_type;
+  const groupId = body.groupId !== undefined ? body.groupId : body.group_id;
+  const maAssetClass =
+    body.maAssetClass !== undefined ? body.maAssetClass : body.ma_asset_class;
   const maRuleEnabled = body.maRuleEnabled ?? body.ma_rule_enabled;
-  const daysAboveMa = body.daysAboveMa ?? body.days_above_ma;
-  const createdById = body.createdById ?? body.created_by_id;
+  const ma120 = body.ma120 !== undefined ? body.ma120 : body.ma_120;
+  const daysAboveMa =
+    body.daysAboveMa !== undefined ? body.daysAboveMa : body.days_above_ma;
+  const fractionalKrwValue =
+    body.fractionalKrwValue !== undefined
+      ? body.fractionalKrwValue
+      : body.fractional_krw_value;
+  const fractionalAvgCost =
+    body.fractionalAvgCost !== undefined
+      ? body.fractionalAvgCost
+      : body.fractional_avg_cost;
+  const monthlyContribution =
+    body.monthlyContribution !== undefined
+      ? body.monthlyContribution
+      : body.monthly_contribution;
+  const contributionDay =
+    body.contributionDay !== undefined
+      ? body.contributionDay
+      : body.contribution_day;
+  const createdById =
+    body.createdById !== undefined ? body.createdById : body.created_by_id;
   const accountId = body.accountId !== undefined ? body.accountId : body.account_id;
   const legacyBase44Id =
     body.legacyBase44Id !== undefined
@@ -148,8 +184,14 @@ export async function PATCH(
     groupId,
     body.memo,
     body.description,
+    maAssetClass,
     maRuleEnabled,
+    ma120,
     daysAboveMa,
+    fractionalKrwValue,
+    fractionalAvgCost,
+    monthlyContribution,
+    contributionDay,
     createdById,
   ].some((value) => value !== undefined);
 
@@ -179,8 +221,14 @@ export async function PATCH(
       ...(groupId !== undefined ? { groupId } : {}),
       ...(body.memo !== undefined ? { memo: body.memo } : {}),
       ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(maAssetClass !== undefined ? { maAssetClass } : {}),
       ...(maRuleEnabled !== undefined ? { maRuleEnabled } : {}),
+      ...(ma120 !== undefined ? { ma120 } : {}),
       ...(daysAboveMa !== undefined ? { daysAboveMa } : {}),
+      ...(fractionalKrwValue !== undefined ? { fractionalKrwValue } : {}),
+      ...(fractionalAvgCost !== undefined ? { fractionalAvgCost } : {}),
+      ...(monthlyContribution !== undefined ? { monthlyContribution } : {}),
+      ...(contributionDay !== undefined ? { contributionDay } : {}),
       ...(createdById !== undefined ? { createdById } : {}),
       updatedAt: new Date(),
     })
