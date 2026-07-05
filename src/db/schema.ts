@@ -467,6 +467,133 @@ export const eventLedgerEntries = pgTable(
   }),
 );
 
+export const marketRegimeDaily = pgTable(
+  "market_regime_daily",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    regimeDate: date("date").notNull(),
+    account: varchar("account", { length: 50 }).notNull(),
+    accountId: uuid("account_id"),
+    label: varchar("label", { length: 100 }).notNull(),
+    description: text("description"),
+    driversJson: jsonb("drivers_json").notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    macroStressScore: decimal("macro_stress_score", {
+      precision: 20,
+      scale: 6,
+    }),
+    regimeScore: decimal("regime_score", { precision: 20, scale: 6 }),
+    newsSentimentScore: decimal("news_sentiment_score", {
+      precision: 20,
+      scale: 6,
+    }),
+    avgCorrelation: decimal("avg_correlation", { precision: 20, scale: 6 }),
+    enb: decimal("enb", { precision: 20, scale: 6 }),
+    portfolioVolatility: decimal("portfolio_volatility", {
+      precision: 20,
+      scale: 6,
+    }),
+    yieldCurve: decimal("yield_curve", { precision: 20, scale: 6 }),
+    rateLevel: decimal("rate_level", { precision: 20, scale: 6 }),
+    stressBadgeCount: integer("stress_badge_count"),
+
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "market_regime_daily_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    dateAccountIdx: index("market_regime_daily_date_account_idx").on(
+      table.regimeDate,
+      table.account,
+    ),
+    accountDateIdx: index("market_regime_daily_account_date_idx").on(
+      table.account,
+      table.regimeDate,
+    ),
+  }),
+);
+
+export const globalMarketFactors = pgTable(
+  "global_market_factors",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+
+    factorDate: date("date").notNull(),
+    factorKey: varchar("factor_key", { length: 100 }).notNull(),
+    factorFamily: varchar("factor_family", { length: 100 }).notNull(),
+    factorName: text("factor_name").notNull(),
+    frequency: varchar("frequency", { length: 50 }).notNull(),
+    source: varchar("source", { length: 100 }).notNull(),
+    sourceSeriesId: varchar("source_series_id", { length: 150 }).notNull(),
+    benchmarkKey: varchar("benchmark_key", { length: 100 }),
+    countryCode: varchar("country_code", { length: 10 }).notNull(),
+    region: varchar("region", { length: 50 }).notNull(),
+    relatedCurrency: varchar("related_currency", { length: 10 }).notNull(),
+    tenor: varchar("tenor", { length: 50 }).notNull(),
+    description: text("description"),
+    derivedMetricsJson: jsonb("derived_metrics_json").notNull(),
+    isPreliminary: boolean("is_preliminary").default(false).notNull(),
+    isSample: boolean("is_sample").default(false).notNull(),
+
+    value: decimal("value", { precision: 28, scale: 12 }).notNull(),
+    prevValue: decimal("prev_value", { precision: 28, scale: 12 }).notNull(),
+    changePct: decimal("change_pct", { precision: 20, scale: 8 }),
+    change1mPct: decimal("change_1m_pct", { precision: 20, scale: 8 }),
+    change3mPct: decimal("change_3m_pct", { precision: 20, scale: 8 }),
+    change6mPct: decimal("change_6m_pct", { precision: 20, scale: 8 }),
+    changeSpeed20d: decimal("change_speed_20d", {
+      precision: 20,
+      scale: 8,
+    }),
+    percentile1y: decimal("percentile_1y", {
+      precision: 20,
+      scale: 8,
+    }).notNull(),
+    volatility20dPct: decimal("volatility_20d_pct", {
+      precision: 20,
+      scale: 8,
+    }).notNull(),
+    volatility60dPct: decimal("volatility_60d_pct", {
+      precision: 20,
+      scale: 8,
+    }).notNull(),
+    carrySpreadValue: decimal("carry_spread_value", {
+      precision: 28,
+      scale: 12,
+    }),
+
+    periodEndDate: date("period_end_date").notNull(),
+    releaseDate: date("release_date").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
+    base44UpdatedAt: timestamp("base44_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    legacyBase44IdUnique: uniqueIndex(
+      "global_market_factors_legacy_base44_id_unique",
+    ).on(table.legacyBase44Id),
+    factorDateIdx: index("global_market_factors_factor_date_idx").on(
+      table.factorKey,
+      table.factorDate,
+    ),
+    dateIdx: index("global_market_factors_date_idx").on(table.factorDate),
+    familyDateIdx: index("global_market_factors_family_date_idx").on(
+      table.factorFamily,
+      table.factorDate,
+    ),
+  }),
+);
+
 export const accountBalanceSnapshots = pgTable(
   "account_balance_snapshots",
   {
@@ -789,6 +916,12 @@ export type NewEtfHolding = typeof etfHoldings.$inferInsert;
 
 export type EventLedgerEntry = typeof eventLedgerEntries.$inferSelect;
 export type NewEventLedgerEntry = typeof eventLedgerEntries.$inferInsert;
+
+export type MarketRegimeDaily = typeof marketRegimeDaily.$inferSelect;
+export type NewMarketRegimeDaily = typeof marketRegimeDaily.$inferInsert;
+
+export type GlobalMarketFactor = typeof globalMarketFactors.$inferSelect;
+export type NewGlobalMarketFactor = typeof globalMarketFactors.$inferInsert;
 
 export type AccountBalanceSnapshot = typeof accountBalanceSnapshots.$inferSelect;
 export type NewAccountBalanceSnapshot =

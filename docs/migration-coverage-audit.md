@@ -17,8 +17,8 @@ Sensitive Settings values are intentionally not included here. This document use
 
 | Status | Entities | Rows represented |
 | --- | ---: | ---: |
-| `migrated` | 12 | 25,911 |
-| `pending` | 6 | 2,504 |
+| `migrated` | 14 | 28,381 |
+| `pending` | 4 | 34 |
 | `intentionally_skipped` | 17 | 0 |
 | `needs_decision` | 11 | 284 plus 3 unavailable entities |
 
@@ -27,7 +27,7 @@ Inventory totals:
 - Entity definitions: 46
 - Fetch OK: 43
 - Fetch failed: 3 (`CompanyFundamentalSnapshot`, `MarketPriceDaily`, `SecurityMaster`, all 404)
-- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `EventLedger`, `FxRate`, `Settings`
+- Already imported nonzero Base44 entities: `AccountBalance`, `Asset`, `AssetGroup`, `AssetPriceSnapshot`, `BenchmarkSnapshot`, `DailyPortfolioSnapshot`, `DailyPositionSnapshot`, `EtfHolding`, `EtfMaster`, `EventLedger`, `FxRate`, `GlobalMarketFactor`, `MarketRegimeDaily`, `Settings`
 
 ## Coverage Matrix
 
@@ -54,11 +54,11 @@ Inventory totals:
 | `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. |
 | `FixedTransaction` | `pending` | 7 | 2026-02-18 to 2026-02-19 | proposed `fixed_transactions` | Clear cashflow table, lower priority than market/ETF/ledger data. |
 | `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. |
-| `GlobalMarketFactor` | `pending` | 2,401 | 2025-06-01 to 2026-06-23 | proposed `global_market_factors` | Priority market-context candidate. Use scalar fields for key/date/value/change/volatility and JSONB for derived metrics. |
+| `GlobalMarketFactor` | `migrated` | 2,401 | 2025-06-01 to 2026-06-23 | `global_market_factors` | Imported by `scripts/import-base44-market-context.mjs`. Scalar factor keys/date/value/change fields are separated and `derived_metrics_json` is stored as JSONB. |
 | `Goal` | `pending` | 1 | 2026-03-18 | proposed `goals` | Clear mapping, but not required for read-only dashboard v1. |
 | `MacroSeries` | `needs_decision` | 20 | 2025-10-01 to 2026-06-22 | candidate `macro_series` or merge into `global_market_factors` | Overlaps with `GlobalMarketFactor`. Decide whether to keep a separate macro-source table or normalize both into one factor time-series model. |
 | `MarketPriceDaily` | `needs_decision` | unavailable | 404 | likely replaced by `asset_price_snapshots` | Base44 fetch failed. Decide whether this legacy entity is obsolete once `AssetPriceSnapshot` is imported. |
-| `MarketRegimeDaily` | `pending` | 69 | 2026-05-20 to 2026-07-05 | proposed `market_regime_daily` | Priority market-context candidate. Preserve `drivers_json`, scores, labels, and account/date. |
+| `MarketRegimeDaily` | `migrated` | 69 | 2026-05-20 to 2026-07-05 | `market_regime_daily` | Imported by `scripts/import-base44-market-context.mjs`. Preserves `drivers_json` as JSONB plus scores, labels, account/date, and nullable current account mapping. |
 | `MarketSignal` | `needs_decision` | 2 | 2026-04-20 to 2026-04-21 | candidate `market_signals` or generated insights | Only two rows. Decide whether historical signals are source-of-record data or derived/recomputed output. |
 | `MonthlyIncome` | `pending` | 12 | 2026-02-18 | proposed `monthly_incomes` | Clear cashflow table, lower priority than market/ETF/ledger data. |
 | `NewsSentimentDaily` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
@@ -180,49 +180,48 @@ Import note: all current UUID mappings are nullable. Historical events may refer
 
 ### 6. `MarketRegimeDaily` to `market_regime_daily`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-market-context.mjs`.
+
+Why this was migrated next:
 
 - Gives read-only dashboard context without porting `calcDiversification` or recommendation functions.
 - Aligns with fields already copied into `daily_portfolio_snapshots`.
 
-Proposed columns:
+Implemented columns:
 
 - Identity: `id uuid`, `legacy_base44_id varchar(24) unique`
-- Keys: `regime_date date`, `account varchar(50)`, nullable `account_id uuid`
+- Keys: `date`, `account varchar(50)`, nullable `account_id uuid`
 - Scores: `regime_score`, `macro_stress_score`, `news_sentiment_score`, `avg_correlation`, `enb`, `portfolio_volatility`, `stress_badge_count`
 - Labels: `label`, `yield_curve`, `rate_level`, `description`
 - JSONB: `drivers_json`
-- Indexes: `(regime_date, account)`, `regime_date`
+- Indexes: `(date, account)`, `(account, date)`
 
 ### 7. `GlobalMarketFactor` to `global_market_factors`
 
-Why next:
+Status: migrated on 2026-07-06 by `scripts/import-base44-market-context.mjs`.
+
+Why this was migrated next:
 
 - Provides macro/factor time series for market context.
 - Likely more complete than `MacroSeries` and should drive the first market-factor schema decision.
 
-Proposed columns:
+Implemented columns:
 
 - Identity: `id uuid`, `legacy_base44_id varchar(24) unique`
-- Keys: `factor_date`, `factor_key`, `factor_family`, `benchmark_key`, `source_series_id`, `frequency`
+- Keys: `date`, `factor_key`, `factor_family`, `benchmark_key`, `source_series_id`, `frequency`
 - Attributes: `factor_name`, `country_code`, `region`, `related_currency`, `tenor`, `source`, `description`, `is_preliminary`, `is_sample`
 - Values: `value`, `prev_value`, `change_pct`, `change_1m_pct`, `change_3m_pct`, `change_6m_pct`, `change_speed_20d`, `percentile_1y`, `volatility_20d_pct`, `volatility_60d_pct`, `carry_spread_value`
 - Dates/times: `period_end_date`, `release_date`, `observed_at`
 - JSONB: `derived_metrics_json`
-- Indexes: `(factor_key, factor_date)`, `factor_date`, `factor_family`
+- Indexes: `(factor_key, date)`, `date`, `(factor_family, date)`
 
 ## Recommended Next Migration Order
 
-1. Add market context:
-   - Schema/import: `market_regime_daily`, `global_market_factors`
-   - Script: `scripts/import-base44-market-context.mjs`
-   - Rationale: useful for read-only explanations and future recommendation context, but less blocking than raw prices/ETF reference.
-
-2. Add goals and cashflow:
+1. Add goals and cashflow:
    - Schema/import: `goals`, `transactions`, `fixed_transactions`, `monthly_incomes`
    - Rationale: clear mappings, but not required for the initial read-only portfolio dashboard.
 
-3. Resolve `needs_decision` entities:
+2. Resolve `needs_decision` entities:
    - `PortfolioSnapshot`: import only if earlier account-total history is required.
    - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
    - `AssetFactorProfile`: decide now that the ETF/reference data model is in place.
