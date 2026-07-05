@@ -15,6 +15,13 @@
       "when": 1783246454698,
       "tag": "0001_quiet_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783250279075,
+      "tag": "0002_conscious_gateway",
+      "breakpoints": true
     }
   ]
 }

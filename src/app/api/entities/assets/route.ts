@@ -42,6 +42,13 @@ const optionalInteger = z.preprocess((value) => {
   return Number(value);
 }, z.number().int().nonnegative().nullable().optional());
 
+const optionalUuid = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string") return value.trim();
+  return value;
+}, z.string().uuid().nullable().optional());
+
 const createAssetSchema = z
   .object({
     name: z.string().trim().min(1),
@@ -52,6 +59,8 @@ const createAssetSchema = z
     market: requiredText,
     currency: requiredText,
     account: requiredText,
+    accountId: optionalUuid,
+    account_id: optionalUuid,
     quantity: decimalString,
     currentPrice: decimalString.optional(),
     current_price: decimalString.optional(),
@@ -106,6 +115,7 @@ export async function POST(request: Request) {
 
   const body = parsed.data;
   const currentPrice = body.currentPrice ?? body.current_price;
+  const accountId = body.accountId ?? body.account_id ?? null;
 
   if (currentPrice === undefined) {
     return NextResponse.json(
@@ -124,6 +134,7 @@ export async function POST(request: Request) {
       market: body.market,
       currency: body.currency,
       account: body.account,
+      accountId,
       quantity: body.quantity,
       currentPrice,
       averageCost: body.averageCost ?? body.average_cost ?? null,

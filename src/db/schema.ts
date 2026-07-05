@@ -21,6 +21,7 @@ export const assets = pgTable("assets", {
   market: varchar("market", { length: 20 }).notNull(),
   currency: varchar("currency", { length: 10 }).notNull(),
   account: varchar("account", { length: 50 }).notNull(),
+  accountId: uuid("account_id"),
 
   quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
   currentPrice: decimal("current_price", { precision: 20, scale: 4 }).notNull(),

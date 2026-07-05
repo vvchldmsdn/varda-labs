@@ -49,6 +49,13 @@ const optionalInteger = z.preprocess((value) => {
   return Number(value);
 }, z.number().int().nonnegative().nullable().optional());
 
+const optionalUuid = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string") return value.trim();
+  return value;
+}, z.string().uuid().nullable().optional());
+
 const updateAssetSchema = z
   .object({
     name: optionalRequiredText,
@@ -59,6 +66,8 @@ const updateAssetSchema = z
     market: optionalRequiredText,
     currency: optionalRequiredText,
     account: optionalRequiredText,
+    accountId: optionalUuid,
+    account_id: optionalUuid,
     quantity: updateDecimalString,
     currentPrice: updateDecimalString,
     current_price: updateDecimalString,
@@ -107,6 +116,7 @@ export async function PATCH(
   const maRuleEnabled = body.maRuleEnabled ?? body.ma_rule_enabled;
   const daysAboveMa = body.daysAboveMa ?? body.days_above_ma;
   const createdById = body.createdById ?? body.created_by_id;
+  const accountId = body.accountId !== undefined ? body.accountId : body.account_id;
 
   const hasKnownUpdate = [
     body.name,
@@ -116,6 +126,7 @@ export async function PATCH(
     body.market,
     body.currency,
     body.account,
+    accountId,
     body.quantity,
     currentPrice,
     averageCost,
@@ -145,6 +156,7 @@ export async function PATCH(
       ...(body.market !== undefined ? { market: body.market } : {}),
       ...(body.currency !== undefined ? { currency: body.currency } : {}),
       ...(body.account !== undefined ? { account: body.account } : {}),
+      ...(accountId !== undefined ? { accountId } : {}),
       ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
       ...(currentPrice !== undefined ? { currentPrice } : {}),
       ...(averageCost !== undefined ? { averageCost } : {}),
