@@ -74,7 +74,7 @@ history.
 | `daily_portfolio_snapshots.account_id -> accounts.id` | no UUID orphans, `all` aggregate rows naturally have null account ids | Nullable FK is possible, but `account='all'` must remain valid without an account row. |
 | `transactions.account_id -> accounts.id` | no UUID orphans, 11 null account ids, 11 blank raw account rows | Nullable FK may be acceptable later, but raw account/payment text must remain. Do not infer required account ownership from this table yet. |
 | `market_regime_daily.account_id -> accounts.id` | no UUID orphans, no account string mismatches, 3 date/account duplicate groups | Nullable FK may be acceptable later, but duplicate date/account groups need product interpretation before unique constraints or UI assumptions. |
-| `etf_holdings.etf_master_id -> etf_masters.id` | no UUID orphans, no ticker or legacy ETF id unmatched groups, 10 sampled identity duplicates | Nullable FK is a stronger candidate after duplicate identity semantics are understood. Preserve `legacy_etf_id`, `etf_ticker`, and `etf_name`. |
+| `etf_holdings.etf_master_id -> etf_masters.id` | no UUID orphans, no ticker or legacy ETF id unmatched groups, 10 sampled identity duplicates | Nullable FK is a stronger candidate only after `docs/etf-holdings-readonly-semantics.md` is applied. Preserve `legacy_etf_id`, `etf_ticker`, and `etf_name`. |
 | `asset_price_snapshots.asset_id -> assets.id` | no UUID orphans, 1692 null asset ids, 7 tickers not matched to current assets | Keep nullable. Price history is operationally ticker/date keyed and may include historical or non-current tickers. |
 
 ## Relationships To Keep Without FK For Now

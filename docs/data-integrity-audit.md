@@ -59,6 +59,8 @@ data deletion.
 Do not add FK constraints, backfill rows, or alter snapshot write semantics from
 this audit alone. Use the audit output to decide the next small migration step.
 See `docs/fk-hardening-proposal.md` for the current FK decision proposal.
+See `docs/etf-holdings-readonly-semantics.md` for the ETF holdings duplicate
+display policy.
 
 ## Latest Observation
 
@@ -153,3 +155,7 @@ Later-candidate integrity:
 The asset price unmatched ticker finding is current-asset coverage evidence, not
 a reason to require `asset_price_snapshots.asset_id`. Keep asset price history
 usable by ticker/date and keep `asset_id` nullable.
+
+The ETF holding duplicate finding is a read-only display semantics question, not
+a cleanup target. Use `docs/etf-holdings-readonly-semantics.md` before building
+ETF holdings UI or constraints.
