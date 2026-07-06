@@ -22,6 +22,15 @@ import {
   portfolioEventAccount,
   type AssetReturnMetrics,
 } from "@/lib/portfolio-return-metrics";
+import {
+  convertToKrw,
+  diffDays,
+  normalizeTicker,
+  percentOrNull,
+  sumBy,
+  toNumber,
+  uniqueStrings,
+} from "@/lib/portfolio-math";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const NON_INVESTMENT_ASSET_TYPES = new Set([
@@ -1104,41 +1113,7 @@ function inferFxRateFromClose(row: AssetPriceSnapshotRow) {
   return closePriceKrw / closePrice;
 }
 
-function normalizeTicker(value: string | null | undefined) {
-  const normalized = value?.trim().toUpperCase();
-  return normalized || null;
-}
-
-function uniqueStrings(values: string[]) {
-  return [...new Set(values)];
-}
-
-function convertToKrw(value: number, currency: string, usdKrwRate: number) {
-  return currency === "USD" ? value * usdKrwRate : value;
-}
-
-function percentOrNull(numerator: number, denominator: number) {
-  return denominator > 0 ? (numerator / denominator) * 100 : null;
-}
-
 function deltaOrNull(left: number | null, right: number | null) {
   if (left === null || right === null) return null;
   return left - right;
-}
-
-function diffDays(laterDate: string, earlierDate: string) {
-  const later = Date.parse(`${laterDate}T00:00:00Z`);
-  const earlier = Date.parse(`${earlierDate}T00:00:00Z`);
-  if (!Number.isFinite(later) || !Number.isFinite(earlier)) return 0;
-  return Math.round((later - earlier) / 86_400_000);
-}
-
-function sumBy<T>(rows: T[], selector: (row: T) => number | null) {
-  return rows.reduce((sum, row) => sum + (selector(row) ?? 0), 0);
-}
-
-function toNumber(value: unknown) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }

@@ -1,5 +1,12 @@
 import "server-only";
 
+import {
+  convertToKrw,
+  normalizeTicker,
+  sumBy,
+  toNumber,
+} from "@/lib/portfolio-math";
+
 type ParsedObject = Record<string, unknown>;
 
 export type PortfolioReturnAccount = "brokerage" | "isa" | "irp";
@@ -468,25 +475,6 @@ function readStringField(source: ParsedObject | null, keys: string[]) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   return null;
-}
-
-function normalizeTicker(value: string | null | undefined) {
-  const normalized = value?.trim().toUpperCase();
-  return normalized || null;
-}
-
-function convertToKrw(value: number, currency: string, usdKrwRate: number) {
-  return currency === "USD" ? value * usdKrwRate : value;
-}
-
-function toNumber(value: unknown) {
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function sumBy<T>(items: T[], selector: (item: T) => number) {
-  return items.reduce((sum, item) => sum + selector(item), 0);
 }
 
 function timestampMs(value: Date | string | null) {
