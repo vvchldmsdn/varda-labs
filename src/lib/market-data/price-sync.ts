@@ -5,6 +5,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { assetPriceSnapshots, assets, marketDataSyncRuns } from "@/db/schema";
 import { createStubMarketDataProvider } from "@/lib/market-data/providers/stub";
+import { safeErrorMessage } from "@/lib/redaction";
 import type {
   ClosePrice,
   LiveQuote,
@@ -435,7 +436,7 @@ export async function runMarketPriceSync(options: {
     return result;
   } catch (error) {
     const finishedAt = new Date();
-    const safeError = toSafeErrorMessage(error);
+    const safeError = safeErrorMessage(error, "Unknown price sync error");
 
     await db
       .update(marketDataSyncRuns)
@@ -1342,15 +1343,6 @@ function getKisJobCooldownSeconds() {
 
 function toIsoString(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
-}
-
-function toSafeErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "Unknown price sync error";
-
-  return message
-    .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
-    .replace(/(secret|token|api[_-]?key)=([^&\s]+)/gi, "$1=[redacted]")
-    .slice(0, 1000);
 }
 
 export class PriceSyncError extends Error {

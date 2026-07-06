@@ -6,6 +6,12 @@ import {
 } from "@/lib/market-data/providers/kis";
 import { isAuthorizedAdminJob } from "@/lib/admin-auth";
 import {
+  parseBooleanQuery,
+  parseDateKeyQuery,
+  parseEnumQuery,
+  parseIntegerQuery,
+} from "@/lib/http-query";
+import {
   getKisPriceSyncCooldownStatus,
   isPriceSyncMode,
   PriceSyncError,
@@ -16,6 +22,9 @@ import type { PriceSyncTargetFilter } from "@/lib/market-data/price-sync";
 
 type PriceProviderName = "stub" | "kis";
 const KIS_WRITE_TARGET_LIMIT_MAX = 5;
+const PRICE_PROVIDER_NAMES = ["stub", "kis"] as const;
+const TARGET_MARKETS = ["korea", "us"] as const;
+const TARGET_ACCOUNTS = ["brokerage", "isa", "irp"] as const;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +37,7 @@ export async function POST(request: Request) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode");
   const dryRun = parseBooleanQuery(url.searchParams.get("dryRun"), true);
-  const priceDate = parsePriceDate(url.searchParams.get("date"));
+  const priceDate = parseDateKeyQuery(url.searchParams.get("date"));
   const providerName = parseProvider(url.searchParams.get("provider"));
   const targetLimit = parseTargetLimit(url.searchParams.get("limit"));
   const targetFilter = parseTargetFilter(url.searchParams);
@@ -228,35 +237,12 @@ export async function POST(request: Request) {
   }
 }
 
-function parseBooleanQuery(value: string | null, defaultValue: boolean) {
-  if (value === null) return defaultValue;
-
-  const normalized = value.trim().toLowerCase();
-  if (["true", "1", "yes"].includes(normalized)) return true;
-  if (["false", "0", "no"].includes(normalized)) return false;
-  return null;
-}
-
-function parsePriceDate(value: string | null) {
-  if (value === null) return undefined;
-  const normalized = value.trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
-}
-
 function parseProvider(value: string | null): PriceProviderName | null {
-  if (value === null || value.trim() === "") return "stub";
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "stub" || normalized === "kis") return normalized;
-  return null;
+  return parseEnumQuery(value, PRICE_PROVIDER_NAMES, "stub");
 }
 
 function parseTargetLimit(value: string | null) {
-  if (value === null || value.trim() === "") return undefined;
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 15) return null;
-  return parsed;
+  return parseIntegerQuery(value, { min: 1, max: 15 });
 }
 
 function parseTargetFilter(searchParams: URLSearchParams): {
@@ -321,11 +307,7 @@ function parseTickers(value: string | null) {
 }
 
 function parseMarketFilter(value: string | null) {
-  if (value === null || value.trim() === "") return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "korea" || normalized === "us") return normalized;
-  return null;
+  return parseEnumQuery(value, TARGET_MARKETS, undefined);
 }
 
 function parseAccountFilter(value: string | null) {
@@ -333,13 +315,5 @@ function parseAccountFilter(value: string | null) {
 
   const normalized = value.trim().toLowerCase();
   if (normalized === "all") return undefined;
-  if (
-    normalized === "brokerage" ||
-    normalized === "isa" ||
-    normalized === "irp"
-  ) {
-    return normalized;
-  }
-
-  return null;
+  return parseEnumQuery(normalized, TARGET_ACCOUNTS, undefined);
 }

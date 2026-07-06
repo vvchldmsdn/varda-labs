@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 
 import { isAuthorizedAdminJob } from "@/lib/admin-auth";
 import {
+  parseBooleanQuery,
+  parseDateKeyQuery,
+  parseEnumQuery,
+} from "@/lib/http-query";
+import {
   DailySnapshotRequestError,
   runDailySnapshot,
   type SnapshotAccount,
 } from "@/lib/snapshots/daily";
+
+const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"] as const;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +28,9 @@ export async function POST(request: Request) {
     url.searchParams.get("confirmWrite"),
     false,
   );
-  const snapshotDate = parseDate(url.searchParams.get("date"));
+  const snapshotDate = parseDateKeyQuery(url.searchParams.get("date"), {
+    emptyAsUndefined: true,
+  });
   const account = parseAccount(url.searchParams.get("account"));
 
   if (dryRun === null) {
@@ -88,33 +97,6 @@ export async function POST(request: Request) {
   }
 }
 
-function parseBooleanQuery(value: string | null, defaultValue: boolean) {
-  if (value === null) return defaultValue;
-
-  const normalized = value.trim().toLowerCase();
-  if (["true", "1", "yes"].includes(normalized)) return true;
-  if (["false", "0", "no"].includes(normalized)) return false;
-  return null;
-}
-
-function parseDate(value: string | null) {
-  if (value === null || value.trim() === "") return undefined;
-  const normalized = value.trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
-}
-
 function parseAccount(value: string | null): SnapshotAccount | null {
-  if (value === null || value.trim() === "") return "all";
-
-  const normalized = value.trim().toLowerCase();
-  if (
-    normalized === "brokerage" ||
-    normalized === "isa" ||
-    normalized === "irp" ||
-    normalized === "all"
-  ) {
-    return normalized;
-  }
-
-  return null;
+  return parseEnumQuery(value, SNAPSHOT_ACCOUNTS, "all");
 }

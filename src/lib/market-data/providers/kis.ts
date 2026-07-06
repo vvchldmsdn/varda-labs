@@ -8,6 +8,7 @@ import type {
   ProviderRequestContext,
   ProviderResult,
 } from "./types";
+import { redactSensitiveText } from "@/lib/redaction";
 
 export const KIS_REQUIRED_ENV_KEYS = ["KIS_APP_KEY", "KIS_APP_SECRET"] as const;
 export const KIS_OPTIONAL_ENV_KEYS = [
@@ -95,13 +96,6 @@ export function createKisMarketDataProvider(): MarketDataProvider {
   };
 }
 
-export function redactKisSensitiveText(value: string) {
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
-    .replace(/(KIS_APP_KEY|KIS_APP_SECRET|KIS_ACCESS_TOKEN)=([^&\s]+)/gi, "$1=[redacted]")
-    .replace(/(appkey|appsecret|authorization|access_token)([\"':=\s]+)([^,\"'\s]+)/gi, "$1$2[redacted]");
-}
-
 function buildSkeletonResult<TQuote extends LiveQuote | ClosePrice>(
   rows: TQuote[],
   context: ProviderRequestContext,
@@ -150,7 +144,7 @@ async function fetchKisClosePrices(
   try {
     token = await getKisAccessToken(config);
   } catch (error) {
-    const message = redactKisSensitiveText(toErrorMessage(error));
+    const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
       fetchedAt,
@@ -174,7 +168,7 @@ async function fetchKisClosePrices(
       rows.push({
         ...toSkippedClosePrice(target, context),
         status: "error",
-        error: redactKisSensitiveText(toErrorMessage(error)),
+        error: redactSensitiveText(toErrorMessage(error)),
       });
     }
 
@@ -339,7 +333,7 @@ async function fetchUsClose(
       }
       errors.push(`${exchange}:empty`);
     } catch (error) {
-      errors.push(`${exchange}:${redactKisSensitiveText(toErrorMessage(error))}`);
+      errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
     await sleep(180);
@@ -526,9 +520,9 @@ function kisErrorText(data: Record<string, unknown>) {
     optionalText(data.msg1) ??
     optionalText(data.message);
 
-  if (code && message) return `[${code}] ${redactKisSensitiveText(message)}`;
+  if (code && message) return `[${code}] ${redactSensitiveText(message)}`;
   if (code) return `[${code}]`;
-  if (message) return redactKisSensitiveText(message);
+  if (message) return redactSensitiveText(message);
   return "unknown_error";
 }
 
