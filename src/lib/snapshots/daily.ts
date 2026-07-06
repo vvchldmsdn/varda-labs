@@ -476,6 +476,7 @@ function buildAllAccountPlan({
           snapshotDate,
           account: "all",
           accountId: null,
+          source: SNAPSHOT_SOURCE,
           ruleVersion: SNAPSHOT_RULE_VERSION,
           description: [
             "snapshot_status=complete",
@@ -680,6 +681,7 @@ function computeAccountSnapshot({
       assetName: asset.name,
       account,
       accountId: context.accountRowsByCode.get(account) ?? null,
+      source: SNAPSHOT_SOURCE,
       market: asset.market,
       currency: asset.currency,
       assetStatus: "active",
@@ -790,6 +792,7 @@ function buildPortfolioSnapshot(
     snapshotDate: computed.positions[0]?.snapshotDate ?? "",
     account: computed.account,
     accountId: context.accountRowsByCode.get(computed.account) ?? null,
+    source: SNAPSHOT_SOURCE,
     ruleVersion: SNAPSHOT_RULE_VERSION,
     description: [
       "snapshot_status=complete",
@@ -1650,8 +1653,15 @@ function buildWarnings({
   return warnings;
 }
 
-function isVardaGeneratedRow(row: Pick<PortfolioRow | PositionRow, "legacyBase44Id" | "description">) {
-  return row.legacyBase44Id === null && (row.description ?? "").includes(`source=${SNAPSHOT_SOURCE}`);
+function isVardaGeneratedRow(
+  row: Pick<PortfolioRow | PositionRow, "legacyBase44Id" | "source" | "description">,
+) {
+  return (
+    row.legacyBase44Id === null &&
+    (row.source === SNAPSHOT_SOURCE ||
+      (row.source === null &&
+        (row.description ?? "").includes(`source=${SNAPSHOT_SOURCE}`)))
+  );
 }
 
 function positionKey(

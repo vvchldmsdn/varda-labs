@@ -12,6 +12,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const assets = pgTable(
   "assets",
@@ -824,6 +825,7 @@ export const dailyPortfolioSnapshots = pgTable(
     snapshotDate: date("snapshot_date").notNull(),
     account: varchar("account", { length: 50 }).notNull(),
     accountId: uuid("account_id"),
+    source: varchar("source", { length: 100 }).default("base44_import").notNull(),
     ruleVersion: varchar("rule_version", { length: 100 }),
     description: text("description"),
     isSample: boolean("is_sample").default(false).notNull(),
@@ -884,6 +886,9 @@ export const dailyPortfolioSnapshots = pgTable(
       table.snapshotDate,
       table.account,
     ),
+    snapshotAccountSourceUnique: uniqueIndex(
+      "daily_portfolio_snapshots_date_account_source_unique",
+    ).on(table.snapshotDate, table.account, table.source),
   }),
 );
 
@@ -900,6 +905,7 @@ export const dailyPositionSnapshots = pgTable(
     assetName: varchar("asset_name", { length: 255 }).notNull(),
     account: varchar("account", { length: 50 }).notNull(),
     accountId: uuid("account_id"),
+    source: varchar("source", { length: 100 }).default("base44_import").notNull(),
     market: varchar("market", { length: 20 }),
     currency: varchar("currency", { length: 10 }),
     assetStatus: varchar("asset_status", { length: 50 }),
@@ -1011,6 +1017,11 @@ export const dailyPositionSnapshots = pgTable(
     legacyAssetIdIdx: index("daily_position_snapshots_legacy_asset_id_idx").on(
       table.legacyAssetId,
     ),
+    snapshotAccountAssetSourceUnique: uniqueIndex(
+      "daily_position_snapshots_date_account_asset_source_unique",
+    )
+      .on(table.snapshotDate, table.account, table.assetId, table.source)
+      .where(sql`${table.assetId} is not null`),
   }),
 );
 

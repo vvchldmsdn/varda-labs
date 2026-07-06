@@ -212,11 +212,16 @@ Core rules:
   actual writes return `409` and do not write partial snapshots.
 - Imported Base44 rows are immutable. Rows with non-null `legacy_base44_id` block
   writes for the same `snapshot_date/account`.
-- varda-generated rows use `legacy_base44_id = null` and include
-  `source=varda_manual_daily_snapshot` in `description` for guarded re-runs.
-- Because the current schema does not have unique `(snapshot_date, account, ...)`
-  constraints, v1 performs preflight duplicate/unmanaged-row checks before using
-  Neon HTTP batch writes.
+- varda-generated rows use `legacy_base44_id = null` and
+  `source = 'varda_manual_daily_snapshot'`.
+- imported Base44 rows use `source = 'base44_import'`.
+- DB-level idempotency is enforced with:
+  - `daily_portfolio_snapshots(snapshot_date, account, source)`
+  - `daily_position_snapshots(snapshot_date, account, asset_id, source)` where
+    `asset_id is not null`
+- v1 still performs preflight duplicate/unmanaged-row checks before using Neon
+  HTTP batch writes, because imported unmatched position rows can have nullable
+  `asset_id`.
 
 Valuation basis:
 
