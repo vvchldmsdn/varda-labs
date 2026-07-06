@@ -120,6 +120,7 @@ export async function runMarketPriceSync(options: {
   fixture?: boolean;
   priceDate?: string;
   provider?: MarketDataProvider;
+  targetLimit?: number;
 }): Promise<PriceSyncRunResult> {
   const provider = options.provider ?? createStubMarketDataProvider();
   const dryRun = options.dryRun ?? true;
@@ -151,7 +152,11 @@ export async function runMarketPriceSync(options: {
 
   try {
     const assetRows = await getSyncableAssetRows();
-    const priceTargets = buildPriceLookupTargets(assetRows);
+    const allPriceTargets = buildPriceLookupTargets(assetRows);
+    const priceTargets =
+      options.targetLimit === undefined
+        ? allPriceTargets
+        : allPriceTargets.slice(0, options.targetLimit);
     const plannedWrites = buildPlannedWrites(
       options.mode,
       dryRun,
@@ -231,6 +236,8 @@ export async function runMarketPriceSync(options: {
           mode: options.mode,
           assetCount: assetRows.length,
           priceTargetCount: priceTargets.length,
+          totalPriceTargetCount: allPriceTargets.length,
+          targetLimit: options.targetLimit ?? null,
           insertedCount: result.insertedCount,
           updatedCount: result.updatedCount,
           plannedWrites,
@@ -387,7 +394,7 @@ async function buildDryRunProviderResult(options: {
   fixture: boolean,
   priceDate: string,
 }): Promise<ProviderResult<LiveQuote | ClosePrice>> {
-  if (options.mode === "close" && options.fixture) {
+  if (options.mode === "close" && (options.fixture || options.provider.name === "kis")) {
     return options.provider.fetchClosePrices(options.targets, {
       mode: options.mode,
       dryRun: true,

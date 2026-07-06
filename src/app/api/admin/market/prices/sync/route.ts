@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 
 import {
+  getKisProviderPolicy,
+  createKisMarketDataProvider,
+} from "@/lib/market-data/providers/kis";
+import {
   isPriceSyncMode,
   PriceSyncError,
   runMarketPriceSync,
 } from "@/lib/market-data/price-sync";
+
+type PriceProviderName = "stub" | "kis";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +24,8 @@ export async function POST(request: Request) {
   const mode = url.searchParams.get("mode");
   const dryRun = parseBooleanQuery(url.searchParams.get("dryRun"), true);
   const priceDate = parsePriceDate(url.searchParams.get("date"));
+  const providerName = parseProvider(url.searchParams.get("provider"));
+  const targetLimit = parseTargetLimit(url.searchParams.get("limit"));
 
   if (!isPriceSyncMode(mode)) {
     return NextResponse.json(
@@ -33,9 +41,23 @@ export async function POST(request: Request) {
     );
   }
 
+  if (providerName === null) {
+    return NextResponse.json(
+      { error: "provider must be one of: stub, kis" },
+      { status: 400 },
+    );
+  }
+
+  if (targetLimit === null) {
+    return NextResponse.json(
+      { error: "limit must be an integer between 1 and 15 when provided" },
+      { status: 400 },
+    );
+  }
+
   const fixture = parseBooleanQuery(
     url.searchParams.get("fixture"),
-    mode === "close" && dryRun,
+    providerName === "stub" && mode === "close" && dryRun,
   );
 
   if (fixture === null) {
@@ -59,6 +81,31 @@ export async function POST(request: Request) {
     );
   }
 
+  if (providerName === "kis") {
+    const kisPolicy = getKisProviderPolicy();
+
+    if (mode !== "close" || !dryRun || fixture) {
+      return NextResponse.json(
+        {
+          error:
+            "provider=kis is only enabled for mode=close, dryRun=true, fixture=false",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!kisPolicy.configured) {
+      return NextResponse.json(
+        {
+          error: "KIS provider is not configured",
+          provider: "kis",
+          missingEnvKeys: kisPolicy.missingEnvKeys,
+        },
+        { status: 503 },
+      );
+    }
+  }
+
   if (mode === "close" && !dryRun && (!fixture || priceDate === undefined)) {
     return NextResponse.json(
       {
@@ -70,11 +117,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    const provider =
+      providerName === "kis" ? createKisMarketDataProvider() : undefined;
     const result = await runMarketPriceSync({
       mode,
       dryRun,
       fixture,
       priceDate,
+      provider,
+      targetLimit: targetLimit ?? undefined,
     });
     return NextResponse.json(result);
   } catch (error) {
@@ -132,4 +183,20 @@ function parsePriceDate(value: string | null) {
   if (value === null) return undefined;
   const normalized = value.trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+}
+
+function parseProvider(value: string | null): PriceProviderName | null {
+  if (value === null || value.trim() === "") return "stub";
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "stub" || normalized === "kis") return normalized;
+  return null;
+}
+
+function parseTargetLimit(value: string | null) {
+  if (value === null || value.trim() === "") return undefined;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 15) return null;
+  return parsed;
 }
