@@ -58,6 +58,7 @@ export type DailySnapshotRunResult = {
   accounts: TrackedAccount[];
   cycle: SnapshotCycle;
   fx: ResolvedFxRate;
+  closeReferences: CloseReferenceSummary[];
   freshClose: FreshCloseSummary;
   plannedWrites: PlannedSnapshotWrites;
   results: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan>;
@@ -83,7 +84,38 @@ type FreshCloseSummary = {
   satisfiedCount: number;
   missingCount: number;
   rowsUsedCount: number;
+  closeReferences: CloseReferenceSummary[];
+  coverage: CloseCoverageAsset[];
   missing: MissingCloseAsset[];
+};
+
+type CloseReferenceSummary = {
+  market: string;
+  requiredCount: number;
+  requiredTickerCount: number;
+  calendarReferenceDate: string;
+  expectedCloseDate: string;
+  latestAvailableCloseDate: string | null;
+  exactReferenceRows: number;
+  selectedReferenceRows: number;
+  status: "ready" | "partial" | "missing";
+  reason: string;
+};
+
+type CloseCoverageAsset = {
+  id: string;
+  legacyBase44Id: string | null;
+  ticker: string | null;
+  name: string;
+  account: string;
+  market: string;
+  currency: string;
+  calendarReferenceDate: string;
+  expectedCloseDate: string;
+  selectedCloseDate: string | null;
+  selectedSource: string | null;
+  status: "satisfied" | "missing" | "stale";
+  reason: string;
 };
 
 type MissingCloseAsset = {
@@ -93,6 +125,7 @@ type MissingCloseAsset = {
   name: string;
   account: string;
   market: string;
+  calendarReferenceDate: string;
   expectedCloseDate: string;
   actualCloseDate: string | null;
   reason: string;
@@ -165,6 +198,8 @@ type PriceSelection = {
   price: number;
   source: string;
   referenceDate: string | null;
+  calendarReferenceDate: string | null;
+  expectedCloseDate: string | null;
   basis: "close" | "manual_current";
   fromCloseSnapshot: boolean;
 };
@@ -356,6 +391,7 @@ export async function runDailySnapshot(
       cycleEndAt: cycle.cycleEndAt.toISOString(),
     },
     fx,
+    closeReferences: closeContext.closeReferences,
     freshClose,
     plannedWrites,
     results: resultMap,
@@ -988,6 +1024,8 @@ async function resolveSnapshotFx(snapshotDate: string): Promise<ResolvedFxRate> 
 type CloseContext = {
   rowsByTicker: Map<string, PriceRow[]>;
   selectedByAssetId: Map<string, PriceSelection>;
+  referencesByMarket: Map<string, CloseReferenceSummary>;
+  closeReferences: CloseReferenceSummary[];
 };
 
 async function buildCloseContext({
@@ -1021,21 +1059,126 @@ async function buildCloseContext({
     rowsByTicker.set(ticker, rows);
   }
 
+  const closeReferences = buildCloseReferences(targetAssets, rowsByTicker, snapshotDate);
+  const referencesByMarket = new Map(
+    closeReferences.map((reference) => [reference.market, reference]),
+  );
   const selectedByAssetId = new Map<string, PriceSelection>();
   for (const asset of targetAssets) {
     selectedByAssetId.set(
       asset.id,
-      selectClosePriceForAsset(asset, snapshotDate, rowsByTicker),
+      selectClosePriceForAsset(asset, snapshotDate, rowsByTicker, referencesByMarket),
     );
   }
 
-  return { rowsByTicker, selectedByAssetId };
+  return { rowsByTicker, selectedByAssetId, referencesByMarket, closeReferences };
+}
+
+function buildCloseReferences(
+  targetAssets: AssetRow[],
+  rowsByTicker: Map<string, PriceRow[]>,
+  snapshotDate: string,
+): CloseReferenceSummary[] {
+  const requiredAssets = targetAssets.filter((asset) => normalizeTicker(asset.ticker));
+  const assetsByMarket = new Map<string, AssetRow[]>();
+
+  for (const asset of requiredAssets) {
+    const market = closeMarketKeyForAsset(asset);
+    const rows = assetsByMarket.get(market) ?? [];
+    rows.push(asset);
+    assetsByMarket.set(market, rows);
+  }
+
+  return Array.from(assetsByMarket.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([market, marketAssets]) => {
+      const calendarReferenceDate = closeCalendarReferenceDateForAsset(
+        marketAssets[0],
+        snapshotDate,
+      );
+      const requiredTickerCount = uniqueStrings(
+        marketAssets
+          .map((asset) => normalizeTicker(asset.ticker))
+          .filter((ticker): ticker is string => Boolean(ticker)),
+      ).length;
+      const availableTickersByDate = new Map<string, Set<string>>();
+
+      for (const asset of marketAssets) {
+        const ticker = normalizeTicker(asset.ticker);
+        if (!ticker) continue;
+
+        for (const row of rowsByTicker.get(ticker) ?? []) {
+          if (row.priceDate > calendarReferenceDate) continue;
+          if (!isPositiveCloseRow(row)) continue;
+          if (!isFreshCloseRow(row.priceDate, calendarReferenceDate)) continue;
+
+          const tickers = availableTickersByDate.get(row.priceDate) ?? new Set<string>();
+          tickers.add(ticker);
+          availableTickersByDate.set(row.priceDate, tickers);
+        }
+      }
+
+      const latestAvailableCloseDate =
+        Array.from(availableTickersByDate.keys()).sort((left, right) =>
+          right.localeCompare(left),
+        )[0] ?? null;
+      const exactReferenceRows =
+        availableTickersByDate.get(calendarReferenceDate)?.size ?? 0;
+      const selectedReferenceRows =
+        availableTickersByDate.get(calendarReferenceDate)?.size ?? 0;
+      const status =
+        exactReferenceRows >= requiredTickerCount
+          ? "ready"
+          : exactReferenceRows > 0
+            ? "partial"
+            : "missing";
+
+      return {
+        market,
+        requiredCount: marketAssets.length,
+        requiredTickerCount,
+        calendarReferenceDate,
+        expectedCloseDate: calendarReferenceDate,
+        latestAvailableCloseDate,
+        exactReferenceRows,
+        selectedReferenceRows,
+        status,
+        reason:
+          status === "ready"
+            ? "calendar_reference_has_close_rows"
+            : status === "partial"
+              ? "calendar_reference_has_partial_close_rows"
+            : "no_close_rows_on_expected_market_reference_date",
+      };
+    });
+}
+
+function fallbackCloseReferenceForAsset(
+  asset: Pick<AssetRow, "market" | "currency">,
+  snapshotDate: string,
+): CloseReferenceSummary {
+  const market = closeMarketKeyForAsset(asset);
+  const calendarReferenceDate = closeCalendarReferenceDateForAsset(asset, snapshotDate);
+
+  return {
+    market,
+    requiredCount: 1,
+    requiredTickerCount: 1,
+    calendarReferenceDate,
+    expectedCloseDate: calendarReferenceDate,
+    latestAvailableCloseDate: null,
+    exactReferenceRows: 0,
+    selectedReferenceRows: 0,
+    status: "missing",
+    reason: "no_close_reference_context",
+  };
 }
 
 function selectClosePriceForAsset(
   asset: AssetRow,
   snapshotDate: string,
   rowsByTicker: Map<string, PriceRow[]>,
+  referencesByMarket: Map<string, CloseReferenceSummary>,
 ): PriceSelection {
   const ticker = normalizeTicker(asset.ticker);
   const fallbackPrice = toNumber(asset.currentPrice) ?? 0;
@@ -1045,12 +1188,17 @@ function selectClosePriceForAsset(
       price: fallbackPrice,
       source: asset.priceSource ?? "asset_current_price",
       referenceDate: dateFromTimestamp(asset.priceAsOf),
+      calendarReferenceDate: null,
+      expectedCloseDate: null,
       basis: "manual_current",
       fromCloseSnapshot: false,
     };
   }
 
-  const referenceDate = closeReferenceDateForAsset(asset, snapshotDate);
+  const closeReference =
+    referencesByMarket.get(closeMarketKeyForAsset(asset)) ??
+    fallbackCloseReferenceForAsset(asset, snapshotDate);
+  const referenceDate = closeReference.expectedCloseDate;
   const row = (rowsByTicker.get(ticker) ?? [])
     .filter((item) => item.priceDate <= referenceDate)
     .filter((item) => (toNumber(item.adjustedClosePrice) ?? toNumber(item.closePrice) ?? 0) > 0)
@@ -1067,6 +1215,8 @@ function selectClosePriceForAsset(
       price: fallbackPrice,
       source: asset.priceSource ?? "asset_current_price",
       referenceDate: dateFromTimestamp(asset.priceAsOf),
+      calendarReferenceDate: closeReference.calendarReferenceDate,
+      expectedCloseDate: referenceDate,
       basis: "manual_current",
       fromCloseSnapshot: false,
     };
@@ -1077,6 +1227,8 @@ function selectClosePriceForAsset(
     price: toNumber(row.adjustedClosePrice) ?? toNumber(row.closePrice) ?? fallbackPrice,
     source: row.source ?? "asset_price_snapshots",
     referenceDate: row.priceDate,
+    calendarReferenceDate: closeReference.calendarReferenceDate,
+    expectedCloseDate: referenceDate,
     basis: "close",
     fromCloseSnapshot: true,
   };
@@ -1088,51 +1240,57 @@ function summarizeFreshClose(
   snapshotDate: string,
 ): FreshCloseSummary {
   const requiredAssets = targetAssets.filter((asset) => normalizeTicker(asset.ticker));
-  const markets = uniqueStrings(requiredAssets.map((asset) => asset.market));
-  const marketHasExpectedClose = new Map<string, boolean>();
-
-  for (const market of markets) {
-    marketHasExpectedClose.set(
-      market,
-      requiredAssets.some((asset) => {
-        if (asset.market !== market) return false;
-        const selected = closeContext.selectedByAssetId.get(asset.id);
-        return (
-          selected?.fromCloseSnapshot &&
-          selected.referenceDate === closeReferenceDateForAsset(asset, snapshotDate)
-        );
-      }),
-    );
-  }
-
   const missing: MissingCloseAsset[] = [];
+  const coverage: CloseCoverageAsset[] = [];
   let satisfiedCount = 0;
   const usedRows = new Set<string>();
 
   for (const asset of requiredAssets) {
     const selected = closeContext.selectedByAssetId.get(asset.id);
-    const expectedCloseDate = closeReferenceDateForAsset(asset, snapshotDate);
+    const fallbackReference = fallbackCloseReferenceForAsset(asset, snapshotDate);
+    const calendarReferenceDate =
+      selected?.calendarReferenceDate ?? fallbackReference.calendarReferenceDate;
+    const expectedCloseDate = selected?.expectedCloseDate ?? fallbackReference.expectedCloseDate;
     const actualCloseDate = selected?.referenceDate ?? null;
 
     if (selected?.row) usedRows.add(selected.row.id);
 
     if (selected?.fromCloseSnapshot && actualCloseDate === expectedCloseDate) {
       satisfiedCount += 1;
+      coverage.push({
+        id: asset.id,
+        legacyBase44Id: asset.legacyBase44Id,
+        ticker: asset.ticker,
+        name: asset.name,
+        account: asset.account,
+        market: asset.market,
+        currency: asset.currency,
+        calendarReferenceDate,
+        expectedCloseDate,
+        selectedCloseDate: actualCloseDate,
+        selectedSource: selected.source,
+        status: "satisfied",
+        reason: "selected_expected_close",
+      });
       continue;
     }
 
-    const marketClosed =
-      selected?.fromCloseSnapshot &&
-      actualCloseDate !== null &&
-      asset.market !== "us" &&
-      marketHasExpectedClose.get(asset.market) === false &&
-      isFreshCloseRow(actualCloseDate, expectedCloseDate);
-
-    if (marketClosed) {
-      satisfiedCount += 1;
-      continue;
-    }
-
+    const reason = selected?.fromCloseSnapshot ? "stale_close" : "missing_close";
+    coverage.push({
+      id: asset.id,
+      legacyBase44Id: asset.legacyBase44Id,
+      ticker: asset.ticker,
+      name: asset.name,
+      account: asset.account,
+      market: asset.market,
+      currency: asset.currency,
+      calendarReferenceDate,
+      expectedCloseDate,
+      selectedCloseDate: actualCloseDate,
+      selectedSource: selected?.source ?? null,
+      status: selected?.fromCloseSnapshot ? "stale" : "missing",
+      reason,
+    });
     missing.push({
       id: asset.id,
       legacyBase44Id: asset.legacyBase44Id,
@@ -1140,9 +1298,10 @@ function summarizeFreshClose(
       name: asset.name,
       account: asset.account,
       market: asset.market,
+      calendarReferenceDate,
       expectedCloseDate,
       actualCloseDate,
-      reason: selected?.fromCloseSnapshot ? "stale_close" : "missing_close",
+      reason,
     });
   }
 
@@ -1151,6 +1310,8 @@ function summarizeFreshClose(
     satisfiedCount,
     missingCount: missing.length,
     rowsUsedCount: usedRows.size,
+    closeReferences: closeContext.closeReferences,
+    coverage,
     missing,
   };
 }
@@ -1409,9 +1570,18 @@ function buildCycleForSnapshotDate(snapshotDate: string, now: Date): InternalCyc
   };
 }
 
-function closeReferenceDateForAsset(asset: Pick<AssetRow, "market" | "currency">, snapshotDate: string) {
+function closeMarketKeyForAsset(asset: Pick<AssetRow, "market" | "currency">) {
+  if (isUsdListedAsset(asset)) return "us";
+  return asset.market || "unknown";
+}
+
+function closeCalendarReferenceDateForAsset(
+  asset: Pick<AssetRow, "market" | "currency">,
+  snapshotDate: string,
+) {
   const candidate = shiftDate(snapshotDate, -1);
   if (isUsdListedAsset(asset)) return previousUsTradingDayOnOrBefore(candidate);
+  if (asset.market === "korea") return previousKoreaTradingDayOnOrBefore(candidate);
   return previousWeekdayOnOrBefore(candidate);
 }
 
@@ -1421,14 +1591,80 @@ function previousWeekdayOnOrBefore(date: string) {
   return current;
 }
 
+function previousKoreaTradingDayOnOrBefore(date: string) {
+  let current = date;
+  while (!isKoreaTradingDay(current)) current = shiftDate(current, -1);
+  return current;
+}
+
 function previousUsTradingDayOnOrBefore(date: string) {
   let current = date;
   while (!isUsTradingDay(current)) current = shiftDate(current, -1);
   return current;
 }
 
+function isKoreaTradingDay(date: string) {
+  return (
+    Boolean(date) &&
+    !isWeekend(date) &&
+    !koreaMarketHolidays(Number(date.slice(0, 4))).has(date)
+  );
+}
+
 function isUsTradingDay(date: string) {
   return Boolean(date) && !isWeekend(date) && !usMarketHolidays(Number(date.slice(0, 4))).has(date);
+}
+
+function koreaMarketHolidays(year: number) {
+  const holidays = new Set([
+    observedFixedHoliday(year, 1, 1),
+    observedFixedHoliday(year, 3, 1),
+    `${year}-05-01`,
+    observedFixedHoliday(year, 5, 5),
+    `${year}-06-06`,
+    observedFixedHoliday(year, 8, 15),
+    observedFixedHoliday(year, 10, 3),
+    `${year}-10-09`,
+    observedFixedHoliday(year, 12, 25),
+    koreaYearEndMarketHoliday(year),
+    ...(KOREA_LUNAR_AND_ELECTION_MARKET_HOLIDAYS_BY_YEAR[year] ?? []),
+  ]);
+
+  return holidays;
+}
+
+// Lunar and election holidays cannot be derived from Gregorian fixed-date rules.
+// Review this list before enabling Cron beyond the covered migration window.
+const KOREA_LUNAR_AND_ELECTION_MARKET_HOLIDAYS_BY_YEAR: Record<number, string[]> = {
+  2024: [
+    "2024-09-16",
+    "2024-09-17",
+    "2024-09-18",
+  ],
+  2025: [
+    "2025-01-28",
+    "2025-01-29",
+    "2025-01-30",
+    "2025-05-05",
+    "2025-05-06",
+    "2025-10-06",
+    "2025-10-07",
+    "2025-10-08",
+  ],
+  2026: [
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-05-25",
+    "2026-06-03",
+    "2026-09-24",
+    "2026-09-25",
+    "2026-09-28",
+  ],
+};
+
+function koreaYearEndMarketHoliday(year: number) {
+  return previousWeekdayOnOrBefore(`${year}-12-31`);
 }
 
 function usMarketHolidays(year: number) {
@@ -1521,6 +1757,8 @@ function selectPriceForAsset(asset: AssetRow, closeContext: CloseContext) {
       price: toNumber(asset.currentPrice) ?? 0,
       source: asset.priceSource ?? "asset_current_price",
       referenceDate: dateFromTimestamp(asset.priceAsOf),
+      calendarReferenceDate: null,
+      expectedCloseDate: null,
       basis: "manual_current" as const,
       fromCloseSnapshot: false,
     }
@@ -1568,6 +1806,10 @@ function isUsdListedAsset(asset: Pick<AssetRow, "market" | "currency">) {
 function isFreshCloseRow(actualDate: string, referenceDate: string) {
   const ageDays = diffDays(referenceDate, actualDate);
   return ageDays >= 0 && ageDays <= FRESH_CLOSE_MAX_AGE_DAYS;
+}
+
+function isPositiveCloseRow(row: PriceRow) {
+  return (toNumber(row.adjustedClosePrice) ?? toNumber(row.closePrice) ?? 0) > 0;
 }
 
 function closeSnapshotScore(row: PriceRow) {

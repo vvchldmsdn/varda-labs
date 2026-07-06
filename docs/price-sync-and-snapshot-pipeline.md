@@ -204,10 +204,20 @@ Core rules:
   At or after 07:00 KST, the snapshot date is today.
 - Before writing snapshots, require fresh close rows for every active investment
   asset with a ticker.
-- For KRW assets, expected close is the previous Korean trading day.
-- For USD assets, expected close is the previous US trading day.
-- If a whole market is closed, allow the latest fresh close within a small
-  freshness window.
+- `snapshotDate` is the portfolio cycle date. It is not assumed to be the same
+  as valuation close date.
+- For Korea-listed assets, `calendarReferenceDate` / `expectedCloseDate` is the
+  previous KRX trading day before the snapshot date. The rule excludes weekends,
+  KRX-specific Labor Day and year-end closure, fixed/substitute Korean holidays,
+  and explicit lunar/election holiday overrides currently needed for the
+  migration window.
+- For US-listed or USD-denominated assets, `calendarReferenceDate` /
+  `expectedCloseDate` is the previous US trading day before the snapshot date,
+  including standard NYSE/Nasdaq holidays.
+- The writer does not silently accept an older row when the expected market
+  reference date has no close. It reports ticker-level `freshClose.coverage`
+  with `calendarReferenceDate`, `expectedCloseDate`, `selectedCloseDate`, source,
+  status, and reason.
 - If required closes are missing, dry-run reports the missing ticker/date/reason;
   actual writes return `409` and do not write partial snapshots.
 - Imported Base44 rows are immutable. Rows with non-null `legacy_base44_id` block
