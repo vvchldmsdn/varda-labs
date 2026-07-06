@@ -92,6 +92,13 @@
       "when": 1783296427750,
       "tag": "0012_thick_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783296725536,
+      "tag": "0013_flowery_iron_monger",
+      "breakpoints": true
     }
   ]
 }

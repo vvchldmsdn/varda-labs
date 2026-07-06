@@ -218,7 +218,7 @@ export const assetPriceSnapshots = pgTable(
     legacyBase44IdUnique: uniqueIndex(
       "asset_price_snapshots_legacy_base44_id_unique",
     ).on(table.legacyBase44Id),
-    tickerDateIdx: index("asset_price_snapshots_ticker_date_idx").on(
+    tickerDateUnique: uniqueIndex("asset_price_snapshots_ticker_date_unique").on(
       table.ticker,
       table.priceDate,
     ),
