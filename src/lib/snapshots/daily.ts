@@ -208,7 +208,16 @@ type CloseSyncPlanBatch = {
   count: number;
   maxBatchSize: number;
   dryRunQuery: string;
-  actualWriteQuery: string;
+  manualWriteRequired: boolean;
+  writeRequiresConfirmWrite: boolean;
+  suggestedWriteParams: {
+    provider: "kis";
+    mode: "close";
+    market: string;
+    date: string;
+    tickers: string[];
+    limit: number;
+  };
 };
 
 type CloseSyncPlan = {
@@ -1712,10 +1721,6 @@ function buildSuggestedKisBatches(targets: CloseSyncPlanTarget[]) {
         tickers: batchTickers.join(","),
         limit: String(batchTickers.length),
       });
-      const actualParams = new URLSearchParams(params);
-      actualParams.set("dryRun", "false");
-      actualParams.set("confirmWrite", "true");
-
       batches.push({
         market,
         expectedCloseDate,
@@ -1723,7 +1728,16 @@ function buildSuggestedKisBatches(targets: CloseSyncPlanTarget[]) {
         count: batchTickers.length,
         maxBatchSize: 5,
         dryRunQuery: `/api/admin/market/prices/sync?${params.toString()}`,
-        actualWriteQuery: `/api/admin/market/prices/sync?${actualParams.toString()}`,
+        manualWriteRequired: true,
+        writeRequiresConfirmWrite: true,
+        suggestedWriteParams: {
+          provider: "kis",
+          mode: "close",
+          market,
+          date: expectedCloseDate,
+          tickers: batchTickers,
+          limit: batchTickers.length,
+        },
       });
     }
   }

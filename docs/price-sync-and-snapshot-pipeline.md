@@ -318,6 +318,12 @@ Coverage policy to settle before Cron:
   as already covered.
 - Write only missing or stale ticker/date rows when possible.
 - Keep manual KIS actual writes at `limit <= 5`.
+- `closeSyncPlan` may provide a `dryRunQuery` and non-executable
+  `suggestedWriteParams`, but it must not provide a ready-to-run
+  `dryRun=false&confirmWrite=true` URL.
+- Actual writes must be constructed deliberately by the operator after
+  reviewing the dry-run result and manually adding `dryRun=false` and
+  `confirmWrite=true`.
 - If an internal or Cron-only batch path is introduced later, give it a separate
   max target limit and guard it behind the same admin/Cron secret contract.
 - If any required ticker fails, let the daily snapshot actual write return 409
@@ -329,17 +335,20 @@ Manual runbook until Cron is implemented:
 1. Run KIS close dry-run for the intended target set.
 2. Inspect `targetFilterSummary`, `targetFilterResults`, `plannedWrites`, and
    `writeSummary`.
-3. Run KIS actual close writes only for missing or stale targets, in batches
-   that respect the manual `limit <= 5` cap and cooldown.
-4. Run `npm run audit:asset-price-duplicates`.
-5. Run `npm run audit:market-sync-metadata -- --limit 50`.
-6. Run production daily snapshot dry-run and confirm `writeReady=true`,
+3. Build KIS actual close write requests manually from the reviewed
+   `suggestedWriteParams`. The planner must not provide a ready-to-run
+   `confirmWrite=true` URL.
+4. Run actual close writes only for missing or stale targets, in batches that
+   respect the manual `limit <= 5` cap and cooldown.
+5. Run `npm run audit:asset-price-duplicates`.
+6. Run `npm run audit:market-sync-metadata -- --limit 50`.
+7. Run production daily snapshot dry-run and confirm `writeReady=true`,
    `freshClose.missingCount=0`, `closeSyncPlan.canProceedToSnapshotWrite=true`,
    no suggested KIS batches, and update-only `plannedWrites` when rerunning an
    existing varda snapshot.
-7. Run guarded daily snapshot actual write only for the current resolved cycle:
+8. Run guarded daily snapshot actual write only for the current resolved cycle:
    `dryRun=false&confirmWrite=true`.
-8. Re-run daily snapshot dry-run to confirm the path remains update-only.
+9. Re-run daily snapshot dry-run to confirm the path remains update-only.
 
 Pre-Cron verification checklist:
 
