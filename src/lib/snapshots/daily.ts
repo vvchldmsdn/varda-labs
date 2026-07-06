@@ -82,6 +82,7 @@ export type DailySnapshotRunResult = {
   fx: ResolvedFxRate;
   closeReferences: CloseReferenceSummary[];
   freshClose: FreshCloseSummary;
+  closeSyncPlan: CloseSyncPlan;
   realizedReturn: RealizedReturnRunSummary;
   plannedWrites: PlannedSnapshotWrites;
   results: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan>;
@@ -166,6 +167,61 @@ type MissingCloseAsset = {
   expectedCloseDate: string;
   actualCloseDate: string | null;
   reason: string;
+};
+
+type CloseSyncPlanAction =
+  | "covered"
+  | "missing"
+  | "stale"
+  | "manual_current_not_syncable";
+
+type CloseSyncPlanTarget = {
+  id: string;
+  legacyBase44Id: string | null;
+  ticker: string | null;
+  name: string;
+  account: string;
+  market: string;
+  currency: string;
+  expectedCloseDate: string | null;
+  selectedCloseDate: string | null;
+  selectedSource: string | null;
+  action: CloseSyncPlanAction;
+  reason: string;
+};
+
+type CloseSyncPlanMarket = {
+  market: string;
+  expectedCloseDate: string | null;
+  requiredCount: number;
+  requiredTickerCount: number;
+  coveredCount: number;
+  missingCount: number;
+  staleCount: number;
+  targets: CloseSyncPlanTarget[];
+};
+
+type CloseSyncPlanBatch = {
+  market: string;
+  expectedCloseDate: string;
+  tickers: string[];
+  count: number;
+  maxBatchSize: number;
+  dryRunQuery: string;
+  actualWriteQuery: string;
+};
+
+type CloseSyncPlan = {
+  snapshotDate: string;
+  canProceedToSnapshotWrite: boolean;
+  requiredCount: number;
+  coveredCount: number;
+  missingCount: number;
+  staleCount: number;
+  manualCurrentNotSyncableCount: number;
+  markets: CloseSyncPlanMarket[];
+  manualCurrentNotSyncable: CloseSyncPlanTarget[];
+  suggestedKisBatches: CloseSyncPlanBatch[];
 };
 
 type PlannedSnapshotWrites = {
@@ -351,6 +407,11 @@ export async function runDailySnapshot(
     assets: selectedAssets,
   });
   const freshClose = summarizeFreshClose(selectedAssets, closeContext, snapshotDate);
+  const closeSyncPlan = buildCloseSyncPlan({
+    snapshotDate,
+    selectedAssets,
+    freshClose,
+  });
   const warnings = buildWarnings({ selectedAssets, freshClose, fx });
   const plannedWrites = emptyPlannedWrites();
 
@@ -465,6 +526,7 @@ export async function runDailySnapshot(
     fx,
     closeReferences: closeContext.closeReferences,
     freshClose,
+    closeSyncPlan,
     realizedReturn,
     plannedWrites,
     results: resultMap,
@@ -1498,6 +1560,179 @@ function summarizeFreshClose(
     coverage,
     missing,
   };
+}
+
+function buildCloseSyncPlan({
+  snapshotDate,
+  selectedAssets,
+  freshClose,
+}: {
+  snapshotDate: string;
+  selectedAssets: AssetRow[];
+  freshClose: FreshCloseSummary;
+}): CloseSyncPlan {
+  const targets = freshClose.coverage.map(closeCoverageToSyncTarget);
+  const manualCurrentNotSyncable = selectedAssets
+    .filter((asset) => !normalizeTicker(asset.ticker))
+    .map((asset) => ({
+      id: asset.id,
+      legacyBase44Id: asset.legacyBase44Id,
+      ticker: null,
+      name: asset.name,
+      account: asset.account,
+      market: asset.market,
+      currency: asset.currency,
+      expectedCloseDate: null,
+      selectedCloseDate: dateFromTimestamp(asset.priceAsOf),
+      selectedSource: asset.priceSource ?? "asset_current_price",
+      action: "manual_current_not_syncable" as const,
+      reason: "tickerless_current_price_fallback",
+    }));
+
+  const markets = buildCloseSyncMarkets(targets, freshClose.closeReferences);
+  const suggestedKisBatches = buildSuggestedKisBatches(targets);
+  const missingCount = targets.filter((target) => target.action === "missing").length;
+  const staleCount = targets.filter((target) => target.action === "stale").length;
+
+  return {
+    snapshotDate,
+    canProceedToSnapshotWrite: missingCount === 0 && staleCount === 0,
+    requiredCount: targets.length,
+    coveredCount: targets.filter((target) => target.action === "covered").length,
+    missingCount,
+    staleCount,
+    manualCurrentNotSyncableCount: manualCurrentNotSyncable.length,
+    markets,
+    manualCurrentNotSyncable,
+    suggestedKisBatches,
+  };
+}
+
+function closeCoverageToSyncTarget(
+  coverage: CloseCoverageAsset,
+): CloseSyncPlanTarget {
+  const ticker = normalizeTicker(coverage.ticker);
+  const action: CloseSyncPlanAction =
+    coverage.status === "satisfied" &&
+    coverage.selectedCloseDate === coverage.expectedCloseDate
+      ? "covered"
+      : coverage.status === "stale"
+        ? "stale"
+        : "missing";
+
+  return {
+    id: coverage.id,
+    legacyBase44Id: coverage.legacyBase44Id,
+    ticker,
+    name: coverage.name,
+    account: coverage.account,
+    market: coverage.market,
+    currency: coverage.currency,
+    expectedCloseDate: coverage.expectedCloseDate,
+    selectedCloseDate: coverage.selectedCloseDate,
+    selectedSource: coverage.selectedSource,
+    action,
+    reason: coverage.reason,
+  };
+}
+
+function buildCloseSyncMarkets(
+  targets: CloseSyncPlanTarget[],
+  closeReferences: CloseReferenceSummary[],
+) {
+  const referencesByMarket = new Map(
+    closeReferences.map((reference) => [reference.market, reference]),
+  );
+  const markets = new Map<string, CloseSyncPlanMarket>();
+
+  for (const target of targets) {
+    const reference = referencesByMarket.get(target.market);
+    const market = markets.get(target.market) ?? {
+      market: target.market,
+      expectedCloseDate: reference?.expectedCloseDate ?? target.expectedCloseDate,
+      requiredCount: 0,
+      requiredTickerCount: 0,
+      coveredCount: 0,
+      missingCount: 0,
+      staleCount: 0,
+      targets: [],
+    };
+
+    market.requiredCount += 1;
+    if (target.action === "covered") market.coveredCount += 1;
+    if (target.action === "missing") market.missingCount += 1;
+    if (target.action === "stale") market.staleCount += 1;
+    market.targets.push(target);
+    markets.set(target.market, market);
+  }
+
+  return Array.from(markets.values())
+    .map((market) => ({
+      ...market,
+      requiredTickerCount: uniqueStrings(
+        market.targets
+          .map((target) => target.ticker)
+          .filter((ticker): ticker is string => Boolean(ticker)),
+      ).length,
+      targets: market.targets.sort((left, right) =>
+        `${left.account}:${left.ticker ?? left.name}`.localeCompare(
+          `${right.account}:${right.ticker ?? right.name}`,
+        ),
+      ),
+    }))
+    .sort((left, right) => left.market.localeCompare(right.market));
+}
+
+function buildSuggestedKisBatches(targets: CloseSyncPlanTarget[]) {
+  const pendingByMarketDate = new Map<string, Set<string>>();
+
+  for (const target of targets) {
+    if (target.action !== "missing" && target.action !== "stale") continue;
+    if (!target.ticker || !target.expectedCloseDate) continue;
+
+    const key = `${target.market}|${target.expectedCloseDate}`;
+    const tickers = pendingByMarketDate.get(key) ?? new Set<string>();
+    tickers.add(target.ticker);
+    pendingByMarketDate.set(key, tickers);
+  }
+
+  const batches: CloseSyncPlanBatch[] = [];
+  for (const [key, tickerSet] of pendingByMarketDate.entries()) {
+    const [market, expectedCloseDate] = key.split("|");
+    const tickers = Array.from(tickerSet).sort();
+
+    for (let index = 0; index < tickers.length; index += 5) {
+      const batchTickers = tickers.slice(index, index + 5);
+      const params = new URLSearchParams({
+        provider: "kis",
+        mode: "close",
+        dryRun: "true",
+        market,
+        date: expectedCloseDate,
+        tickers: batchTickers.join(","),
+        limit: String(batchTickers.length),
+      });
+      const actualParams = new URLSearchParams(params);
+      actualParams.set("dryRun", "false");
+      actualParams.set("confirmWrite", "true");
+
+      batches.push({
+        market,
+        expectedCloseDate,
+        tickers: batchTickers,
+        count: batchTickers.length,
+        maxBatchSize: 5,
+        dryRunQuery: `/api/admin/market/prices/sync?${params.toString()}`,
+        actualWriteQuery: `/api/admin/market/prices/sync?${actualParams.toString()}`,
+      });
+    }
+  }
+
+  return batches.sort((left, right) =>
+    `${left.market}:${left.expectedCloseDate}:${left.tickers.join(",")}`.localeCompare(
+      `${right.market}:${right.expectedCloseDate}:${right.tickers.join(",")}`,
+    ),
+  );
 }
 
 async function loadExistingRows({

@@ -312,6 +312,8 @@ Coverage policy to settle before Cron:
 
 - Derive the required ticker list from the daily snapshot dry-run
   `freshClose.coverage`, grouped by market and expected close date.
+- The daily snapshot response includes `closeSyncPlan` as the dry-run coverage
+  planner. It is derived from the same `freshClose.coverage` used by the writer.
 - Treat rows with `status=satisfied` and `selectedCloseDate=expectedCloseDate`
   as already covered.
 - Write only missing or stale ticker/date rows when possible.
@@ -332,8 +334,9 @@ Manual runbook until Cron is implemented:
 4. Run `npm run audit:asset-price-duplicates`.
 5. Run `npm run audit:market-sync-metadata -- --limit 50`.
 6. Run production daily snapshot dry-run and confirm `writeReady=true`,
-   `freshClose.missingCount=0`, and update-only `plannedWrites` when rerunning
-   an existing varda snapshot.
+   `freshClose.missingCount=0`, `closeSyncPlan.canProceedToSnapshotWrite=true`,
+   no suggested KIS batches, and update-only `plannedWrites` when rerunning an
+   existing varda snapshot.
 7. Run guarded daily snapshot actual write only for the current resolved cycle:
    `dryRun=false&confirmWrite=true`.
 8. Re-run daily snapshot dry-run to confirm the path remains update-only.
@@ -354,7 +357,8 @@ Pre-Cron verification checklist:
      admin-job auth.
    - Do not pass `confirmWrite=true` for this verification.
    - Verify HTTP 200, `writeReady`, `snapshotDate`, `closeReferences`,
-     `freshClose.coverage`, `realizedReturn`, and `plannedWrites`.
+     `freshClose.coverage`, `closeSyncPlan`, `realizedReturn`, and
+     `plannedWrites`.
    - Confirm route output and logs do not include raw secrets, tokens, request
      headers, or environment variable values.
 
