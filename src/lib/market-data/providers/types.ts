@@ -13,6 +13,8 @@ export type ProviderRequestContext = {
   mode: PriceSyncMode;
   dryRun: boolean;
   requestedAt: Date;
+  fixture: boolean;
+  priceDate: string;
 };
 
 export type ProviderQuoteStatus = "ok" | "empty" | "error" | "skipped";
@@ -43,6 +45,7 @@ export type ClosePrice = {
   source: string;
   quoteType: "close";
   status: ProviderQuoteStatus;
+  isSample?: boolean;
   error?: string;
 };
 

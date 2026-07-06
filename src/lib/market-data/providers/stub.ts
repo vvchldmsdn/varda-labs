@@ -23,6 +23,13 @@ export function createStubMarketDataProvider(): MarketDataProvider {
       );
     },
     async fetchClosePrices(targets, context) {
+      if (context.fixture) {
+        return buildStubResult(
+          targets.map((target) => toFixtureClosePrice(target, context)),
+          context,
+        );
+      }
+
       return buildStubResult(
         targets.map((target) => toSkippedClosePrice(target, context)),
         context,
@@ -74,7 +81,7 @@ function toSkippedClosePrice(
     ticker: target.ticker,
     market: target.market,
     currency: target.currency,
-    priceDate: toDateKey(context.requestedAt),
+    priceDate: context.priceDate,
     closePrice: null,
     adjustedClosePrice: null,
     closePriceKrw: null,
@@ -83,10 +90,44 @@ function toSkippedClosePrice(
     source: "stub",
     quoteType: "close",
     status: "skipped",
+    isSample: true,
     error: "provider_not_configured",
   };
 }
 
-function toDateKey(value: Date) {
-  return value.toISOString().slice(0, 10);
+function toFixtureClosePrice(
+  target: PriceLookupTarget,
+  context: ProviderRequestContext,
+): ClosePrice {
+  const closePrice = deterministicClosePrice(target);
+  const fxRate = target.currency.toLowerCase() === "usd" ? "1380.000000" : null;
+  const closePriceKrw =
+    fxRate === null
+      ? closePrice
+      : (Number(closePrice) * Number(fxRate)).toFixed(12);
+
+  return {
+    ticker: target.ticker,
+    market: target.market,
+    currency: target.currency,
+    priceDate: context.priceDate,
+    closePrice,
+    adjustedClosePrice: closePrice,
+    closePriceKrw,
+    fxRate,
+    fetchedAt: context.requestedAt,
+    source: "stub_fixture",
+    quoteType: "close",
+    status: "ok",
+    isSample: true,
+  };
+}
+
+function deterministicClosePrice(target: PriceLookupTarget) {
+  const seed = Array.from(`${target.market}:${target.ticker}:${target.currency}`)
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const currency = target.currency.toLowerCase();
+  const rawPrice = currency === "usd" ? 20 + (seed % 300) : 5000 + (seed % 90000);
+
+  return rawPrice.toFixed(12);
 }

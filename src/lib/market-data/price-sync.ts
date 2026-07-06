@@ -1,9 +1,9 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { assets, marketDataSyncRuns } from "@/db/schema";
+import { assetPriceSnapshots, assets, marketDataSyncRuns } from "@/db/schema";
 import { createStubMarketDataProvider } from "@/lib/market-data/providers/stub";
 import type {
   ClosePrice,
@@ -15,7 +15,7 @@ import type {
 } from "@/lib/market-data/providers/types";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
-const SKELETON_MARKET_DATA_WRITES_ENABLED = false;
+const LIVE_MARKET_DATA_WRITES_ENABLED = false;
 
 export const PRICE_SYNC_CONTRACT = {
   live: {
@@ -45,12 +45,17 @@ export type PriceSyncRunResult = {
   mode: PriceSyncMode;
   dryRun: boolean;
   provider: string;
+  fixture: boolean;
+  priceDate: string;
   requestedCount: number;
   assetCount: number;
   successCount: number;
   failedCount: number;
   skippedCount: number;
+  insertedCount: number;
+  updatedCount: number;
   plannedWrites: PlannedWrite[];
+  writeResults: ClosePriceWriteResult[];
   contract: (typeof PRICE_SYNC_CONTRACT)[PriceSyncMode];
   warnings: string[];
 };
@@ -77,6 +82,34 @@ type RunCounts = {
   skippedCount: number;
 };
 
+type ClosePriceWriteAction =
+  | "planned_insert"
+  | "planned_update"
+  | "planned_skip"
+  | "inserted"
+  | "updated"
+  | "skipped"
+  | "failed";
+
+type ClosePriceWriteResult = {
+  ticker: string;
+  priceDate: string;
+  source: string | null;
+  action: ClosePriceWriteAction;
+  reason?: string;
+  existingSource?: string | null;
+};
+
+type ClosePriceWriteSummary = {
+  insertedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  results: ClosePriceWriteResult[];
+};
+
+type AssetPriceSnapshotRow = typeof assetPriceSnapshots.$inferSelect;
+
 export function isPriceSyncMode(value: string | null): value is PriceSyncMode {
   return value === "live" || value === "close";
 }
@@ -84,10 +117,14 @@ export function isPriceSyncMode(value: string | null): value is PriceSyncMode {
 export async function runMarketPriceSync(options: {
   mode: PriceSyncMode;
   dryRun?: boolean;
+  fixture?: boolean;
+  priceDate?: string;
   provider?: MarketDataProvider;
 }): Promise<PriceSyncRunResult> {
   const provider = options.provider ?? createStubMarketDataProvider();
   const dryRun = options.dryRun ?? true;
+  const fixture = options.fixture ?? false;
+  const priceDate = options.priceDate ?? toDateKey(new Date());
   const startedAt = new Date();
 
   const [run] = await db
@@ -104,6 +141,8 @@ export async function runMarketPriceSync(options: {
       skippedCount: 0,
       metadataJson: {
         dryRun,
+        fixture,
+        priceDate,
         provider: provider.name,
         phase: "started",
       },
@@ -116,16 +155,41 @@ export async function runMarketPriceSync(options: {
     const plannedWrites = buildPlannedWrites(
       options.mode,
       dryRun,
+      fixture,
       assetRows.length,
       priceTargets.length,
     );
     const providerResult = dryRun
-      ? buildDryRunProviderResult(options.mode, provider.name, priceTargets, startedAt)
-      : await fetchProviderRows(provider, options.mode, priceTargets, startedAt);
+      ? await buildDryRunProviderResult({
+          mode: options.mode,
+          provider,
+          targets: priceTargets,
+          requestedAt: startedAt,
+          fixture,
+          priceDate,
+        })
+      : await fetchProviderRows(
+          provider,
+          options.mode,
+          priceTargets,
+          startedAt,
+          fixture,
+          priceDate,
+        );
     const counts = countProviderRows(providerResult.rows);
+    const closeWriteSummary =
+      options.mode === "close"
+        ? await applyClosePriceRows({
+            rows: providerResult.rows as ClosePrice[],
+            targets: priceTargets,
+            dryRun,
+            fixture,
+            allowWrite: !dryRun && fixture,
+          })
+        : emptyClosePriceWriteSummary();
     const warnings = [
       ...providerResult.warnings,
-      ...buildSkeletonWarnings(dryRun),
+      ...buildSkeletonWarnings(options.mode, dryRun, fixture),
     ];
     const finishedAt = new Date();
 
@@ -135,12 +199,17 @@ export async function runMarketPriceSync(options: {
       mode: options.mode,
       dryRun,
       provider: provider.name,
+      fixture,
+      priceDate,
       requestedCount: priceTargets.length,
       assetCount: assetRows.length,
       successCount: counts.successCount,
-      failedCount: counts.failedCount,
-      skippedCount: counts.skippedCount,
+      failedCount: counts.failedCount + closeWriteSummary.failedCount,
+      skippedCount: counts.skippedCount + closeWriteSummary.skippedCount,
+      insertedCount: closeWriteSummary.insertedCount,
+      updatedCount: closeWriteSummary.updatedCount,
       plannedWrites,
+      writeResults: closeWriteSummary.results,
       contract: PRICE_SYNC_CONTRACT[options.mode],
       warnings,
     };
@@ -156,13 +225,19 @@ export async function runMarketPriceSync(options: {
         skippedCount: result.skippedCount,
         metadataJson: {
           dryRun,
+          fixture,
+          priceDate,
           provider: provider.name,
           mode: options.mode,
           assetCount: assetRows.length,
           priceTargetCount: priceTargets.length,
+          insertedCount: result.insertedCount,
+          updatedCount: result.updatedCount,
           plannedWrites,
+          writeResults: summarizeWriteResults(result.writeResults),
           contract: PRICE_SYNC_CONTRACT[options.mode],
-          marketDataWritesEnabled: SKELETON_MARKET_DATA_WRITES_ENABLED,
+          marketDataWritesEnabled:
+            options.mode === "close" && !dryRun && fixture,
           targetSummary: summarizeTargets(priceTargets),
           warnings,
         },
@@ -182,9 +257,11 @@ export async function runMarketPriceSync(options: {
         error: safeError,
         metadataJson: {
           dryRun,
+          fixture,
+          priceDate,
           provider: provider.name,
           mode: options.mode,
-          marketDataWritesEnabled: SKELETON_MARKET_DATA_WRITES_ENABLED,
+          marketDataWritesEnabled: options.mode === "close" && !dryRun && fixture,
           error: safeError,
         },
       })
@@ -250,18 +327,17 @@ function buildPriceLookupTargets(rows: SyncableAssetRow[]): PriceLookupTarget[] 
 function buildPlannedWrites(
   mode: PriceSyncMode,
   dryRun: boolean,
+  fixture: boolean,
   assetCount: number,
   priceTargetCount: number,
 ): PlannedWrite[] {
-  const active = !dryRun && SKELETON_MARKET_DATA_WRITES_ENABLED;
-
   if (mode === "live") {
     return [
       {
         table: "assets",
         operation: "update_current_price_and_price_metadata",
         count: assetCount,
-        active,
+        active: !dryRun && LIVE_MARKET_DATA_WRITES_ENABLED,
       },
     ];
   }
@@ -271,7 +347,7 @@ function buildPlannedWrites(
       table: "asset_price_snapshots",
       operation: "upsert_close_price_by_ticker_date",
       count: priceTargetCount,
-      active,
+      active: !dryRun && fixture,
     },
   ];
 }
@@ -281,12 +357,16 @@ async function fetchProviderRows(
   mode: PriceSyncMode,
   targets: PriceLookupTarget[],
   requestedAt: Date,
+  fixture: boolean,
+  priceDate: string,
 ): Promise<ProviderResult<LiveQuote | ClosePrice>> {
   if (mode === "live") {
     return provider.fetchLiveQuotes(targets, {
       mode,
       dryRun: false,
       requestedAt,
+      fixture: false,
+      priceDate,
     });
   }
 
@@ -294,28 +374,42 @@ async function fetchProviderRows(
     mode,
     dryRun: false,
     requestedAt,
+    fixture,
+    priceDate,
   });
 }
 
-function buildDryRunProviderResult(
+async function buildDryRunProviderResult(options: {
   mode: PriceSyncMode,
-  providerName: string,
+  provider: MarketDataProvider,
   targets: PriceLookupTarget[],
   requestedAt: Date,
-): ProviderResult<LiveQuote | ClosePrice> {
+  fixture: boolean,
+  priceDate: string,
+}): Promise<ProviderResult<LiveQuote | ClosePrice>> {
+  if (options.mode === "close" && options.fixture) {
+    return options.provider.fetchClosePrices(options.targets, {
+      mode: options.mode,
+      dryRun: true,
+      requestedAt: options.requestedAt,
+      fixture: true,
+      priceDate: options.priceDate,
+    });
+  }
+
   return {
-    provider: providerName,
-    fetchedAt: requestedAt,
-    rows: targets.map((target) =>
-      mode === "live"
+    provider: options.provider.name,
+    fetchedAt: options.requestedAt,
+    rows: options.targets.map((target) =>
+      options.mode === "live"
         ? {
             ticker: target.ticker,
             market: target.market,
             currency: target.currency,
             price: null,
             priceAsOf: null,
-            fetchedAt: requestedAt,
-            source: providerName,
+            fetchedAt: options.requestedAt,
+            source: options.provider.name,
             quoteType: "live" as const,
             status: "skipped" as const,
             error: "dry_run",
@@ -324,20 +418,292 @@ function buildDryRunProviderResult(
             ticker: target.ticker,
             market: target.market,
             currency: target.currency,
-            priceDate: requestedAt.toISOString().slice(0, 10),
+            priceDate: options.priceDate,
             closePrice: null,
             adjustedClosePrice: null,
             closePriceKrw: null,
             fxRate: null,
-            fetchedAt: requestedAt,
-            source: providerName,
+            fetchedAt: options.requestedAt,
+            source: options.provider.name,
             quoteType: "close" as const,
             status: "skipped" as const,
+            isSample: true,
             error: "dry_run",
           },
     ),
     warnings: ["dry run: no provider fetch and no market data write"],
   };
+}
+
+async function applyClosePriceRows(options: {
+  rows: ClosePrice[];
+  targets: PriceLookupTarget[];
+  dryRun: boolean;
+  fixture: boolean;
+  allowWrite: boolean;
+}): Promise<ClosePriceWriteSummary> {
+  const targetByKey = new Map(
+    options.targets.map((target) => [target.key, target] as const),
+  );
+  const summary = emptyClosePriceWriteSummary();
+
+  for (const row of options.rows) {
+    const target = targetByKey.get(toTargetKey(row));
+    const result = await planOrApplyClosePriceRow({
+      row,
+      target,
+      dryRun: options.dryRun,
+      fixture: options.fixture,
+      allowWrite: options.allowWrite,
+    });
+
+    summary.results.push(result);
+
+    if (result.action === "inserted") summary.insertedCount += 1;
+    if (result.action === "updated") summary.updatedCount += 1;
+    if (result.action === "failed") summary.failedCount += 1;
+    if (
+      result.action === "skipped" ||
+      result.action === "planned_skip"
+    ) {
+      summary.skippedCount += 1;
+    }
+  }
+
+  return summary;
+}
+
+async function planOrApplyClosePriceRow(options: {
+  row: ClosePrice;
+  target: PriceLookupTarget | undefined;
+  dryRun: boolean;
+  fixture: boolean;
+  allowWrite: boolean;
+}): Promise<ClosePriceWriteResult> {
+  const rowKey = {
+    ticker: options.row.ticker,
+    priceDate: options.row.priceDate,
+    source: options.row.source,
+  };
+  const validationError = validateClosePriceRow(options.row, options.target);
+
+  if (validationError) {
+    return {
+      ...rowKey,
+      action: options.row.status === "error" ? "failed" : "skipped",
+      reason: validationError,
+    };
+  }
+
+  const snapshot = toSnapshotInsert(options.row, options.target);
+  const existing = await findExistingAssetPriceSnapshot(
+    snapshot.ticker,
+    snapshot.priceDate,
+  );
+  const protectedReason = getProtectedExistingReason(existing, snapshot.source);
+
+  if (protectedReason) {
+    return {
+      ...rowKey,
+      action: options.dryRun ? "planned_skip" : "skipped",
+      reason: protectedReason,
+      existingSource: existing?.source ?? null,
+    };
+  }
+
+  if (existing && snapshotMatches(existing, snapshot)) {
+    return {
+      ...rowKey,
+      action: options.dryRun ? "planned_skip" : "skipped",
+      reason: "unchanged",
+      existingSource: existing.source,
+    };
+  }
+
+  if (options.dryRun) {
+    return {
+      ...rowKey,
+      action: existing ? "planned_update" : "planned_insert",
+      existingSource: existing?.source ?? null,
+    };
+  }
+
+  if (!options.allowWrite || !options.fixture) {
+    return {
+      ...rowKey,
+      action: "skipped",
+      reason: "write_guard_not_satisfied",
+      existingSource: existing?.source ?? null,
+    };
+  }
+
+  const returned = await db
+    .insert(assetPriceSnapshots)
+    .values(snapshot)
+    .onConflictDoUpdate({
+      target: [assetPriceSnapshots.ticker, assetPriceSnapshots.priceDate],
+      set: {
+        assetId: sql`excluded.asset_id`,
+        market: sql`excluded.market`,
+        currency: sql`excluded.currency`,
+        closePrice: sql`excluded.close_price`,
+        adjustedClosePrice: sql`excluded.adjusted_close_price`,
+        closePriceKrw: sql`excluded.close_price_krw`,
+        fxRate: sql`excluded.fx_rate`,
+        source: sql`excluded.source`,
+        isSample: sql`excluded.is_sample`,
+        updatedAt: new Date(),
+      },
+      setWhere: sql`${assetPriceSnapshots.source} = ${snapshot.source}`,
+    })
+    .returning({ id: assetPriceSnapshots.id });
+
+  if (returned.length === 0) {
+    return {
+      ...rowKey,
+      action: "skipped",
+      reason: "protected_existing_source",
+      existingSource: existing?.source ?? null,
+    };
+  }
+
+  return {
+    ...rowKey,
+    action: existing ? "updated" : "inserted",
+    existingSource: existing?.source ?? null,
+  };
+}
+
+function validateClosePriceRow(
+  row: ClosePrice,
+  target: PriceLookupTarget | undefined,
+) {
+  if (row.status !== "ok") return row.error ?? `provider_status_${row.status}`;
+  if (!target) return "target_not_found";
+  if (!isDateKey(row.priceDate)) return "invalid_price_date";
+  if (!isDecimalString(row.closePrice)) return "invalid_close_price";
+  if (!isDecimalString(row.adjustedClosePrice)) {
+    return "invalid_adjusted_close_price";
+  }
+  if (row.closePriceKrw !== null && !isDecimalString(row.closePriceKrw)) {
+    return "invalid_close_price_krw";
+  }
+  if (row.fxRate !== null && !isDecimalString(row.fxRate)) return "invalid_fx_rate";
+  if (row.source !== "stub_fixture") return "unsupported_write_source";
+  return null;
+}
+
+function toSnapshotInsert(
+  row: ClosePrice,
+  target: PriceLookupTarget | undefined,
+) {
+  const closePrice = row.closePrice ?? "0";
+
+  return {
+    legacyBase44Id: null,
+    priceDate: row.priceDate,
+    ticker: row.ticker,
+    assetId: target?.assetIds[0] ?? null,
+    market: row.market,
+    currency: row.currency,
+    closePrice,
+    adjustedClosePrice: row.adjustedClosePrice ?? closePrice,
+    closePriceKrw: row.closePriceKrw,
+    fxRate: row.fxRate,
+    source: row.source,
+    isSample: row.isSample ?? true,
+    base44CreatedAt: null,
+    base44UpdatedAt: null,
+  };
+}
+
+async function findExistingAssetPriceSnapshot(ticker: string, priceDate: string) {
+  const [existing] = await db
+    .select()
+    .from(assetPriceSnapshots)
+    .where(
+      and(
+        eq(assetPriceSnapshots.ticker, ticker),
+        eq(assetPriceSnapshots.priceDate, priceDate),
+      ),
+    )
+    .limit(1);
+
+  return existing ?? null;
+}
+
+function getProtectedExistingReason(
+  existing: AssetPriceSnapshotRow | null,
+  incomingSource: string | null,
+) {
+  if (!existing) return null;
+  if (incomingSource !== "stub_fixture") return "unsupported_write_source";
+  if (existing.source !== "stub_fixture") return "protected_existing_source";
+  return null;
+}
+
+function snapshotMatches(
+  existing: AssetPriceSnapshotRow,
+  incoming: ReturnType<typeof toSnapshotInsert>,
+) {
+  return (
+    existing.assetId === incoming.assetId &&
+    existing.market === incoming.market &&
+    existing.currency === incoming.currency &&
+    sameDecimal(existing.closePrice, incoming.closePrice) &&
+    sameDecimal(existing.adjustedClosePrice, incoming.adjustedClosePrice) &&
+    sameNullableDecimal(existing.closePriceKrw, incoming.closePriceKrw) &&
+    sameNullableDecimal(existing.fxRate, incoming.fxRate) &&
+    existing.source === incoming.source &&
+    existing.isSample === incoming.isSample
+  );
+}
+
+function emptyClosePriceWriteSummary(): ClosePriceWriteSummary {
+  return {
+    insertedCount: 0,
+    updatedCount: 0,
+    skippedCount: 0,
+    failedCount: 0,
+    results: [],
+  };
+}
+
+function summarizeWriteResults(results: ClosePriceWriteResult[]) {
+  const actions = new Map<string, number>();
+  for (const result of results) {
+    actions.set(result.action, (actions.get(result.action) ?? 0) + 1);
+  }
+
+  return {
+    actions: Object.fromEntries(actions),
+    sample: results.slice(0, 10),
+  };
+}
+
+function isDateKey(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isDecimalString(value: string | null) {
+  if (value === null) return false;
+  return Number.isFinite(Number(value));
+}
+
+function sameDecimal(left: string, right: string) {
+  return Number(left) === Number(right);
+}
+
+function sameNullableDecimal(left: string | null, right: string | null) {
+  if (left === null || right === null) return left === right;
+  return sameDecimal(left, right);
+}
+
+function toTargetKey(row: Pick<ClosePrice, "market" | "ticker" | "currency">) {
+  const market = normalizeText(row.market) ?? "unknown";
+  const ticker = normalizeTicker(row.ticker) ?? "";
+  const currency = normalizeText(row.currency) ?? "unknown";
+  return `${market}:${ticker}:${currency}`;
 }
 
 function countProviderRows(rows: Array<LiveQuote | ClosePrice>): RunCounts {
@@ -356,14 +722,22 @@ function countProviderRows(rows: Array<LiveQuote | ClosePrice>): RunCounts {
   );
 }
 
-function buildSkeletonWarnings(dryRun: boolean): string[] {
+function buildSkeletonWarnings(
+  mode: PriceSyncMode,
+  dryRun: boolean,
+  fixture: boolean,
+): string[] {
   const warnings = [
-    "skeleton mode: external providers, asset updates, and snapshot upserts are not enabled yet",
+    "external market data providers and live asset updates are not enabled yet",
   ];
 
-  if (!dryRun) {
+  if (mode === "close" && !dryRun && fixture) {
     warnings.push(
-      "dryRun=false was accepted, but market data writes remain disabled in this skeleton",
+      "fixture close rows may write to asset_price_snapshots; source is stub_fixture and imported/non-stub rows are protected",
+    );
+  } else if (!dryRun) {
+    warnings.push(
+      "dryRun=false was accepted, but this mode has no market data write path enabled yet",
     );
   }
 
@@ -399,6 +773,10 @@ function normalizeText(value: string | null | undefined): string | null {
 function normalizeTicker(value: string | null | undefined): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
+}
+
+function toDateKey(value: Date) {
+  return value.toISOString().slice(0, 10);
 }
 
 function toSafeErrorMessage(error: unknown): string {
