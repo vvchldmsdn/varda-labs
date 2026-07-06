@@ -345,7 +345,7 @@ export async function runMarketPriceSync(options: {
             allowWrite: closeWriteEnabled,
           })
         : emptyClosePriceWriteSummary();
-    const warnings = [
+    const warnings = uniqueWarnings([
       ...providerResult.warnings,
       ...buildTargetFilterWarnings(targetFilterSummary, targetFilterResults),
       ...buildSkeletonWarnings({
@@ -355,7 +355,7 @@ export async function runMarketPriceSync(options: {
         writePolicy,
         closeWriteEnabled,
       }),
-    ];
+    ]);
     const finishedAt = new Date();
 
     const result: PriceSyncRunResult = {
@@ -1240,6 +1240,10 @@ function buildTargetFilterWarnings(
   }
 
   return warnings;
+}
+
+function uniqueWarnings(warnings: string[]) {
+  return [...new Set(warnings)];
 }
 
 function summarizeTargets(targets: PriceLookupTarget[]) {
