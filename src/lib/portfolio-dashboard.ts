@@ -147,6 +147,12 @@ export type DashboardData = {
     movementSnapshotCoveragePct: number | null;
     movementCountCoveragePct: number | null;
     previousCloseCoveragePct: number | null;
+    headlineBasis: "current_assets_plus_event_ledger";
+    trendBasis: "daily_portfolio_snapshots";
+    latestPortfolioSnapshotDate: string | null;
+    portfolioSnapshotValueDeltaKrw: number | null;
+    portfolioSnapshotPnlDeltaKrw: number | null;
+    portfolioSnapshotReturnPctDelta: number | null;
   };
 };
 
@@ -378,6 +384,14 @@ export async function getPortfolioDashboard(
     totalPnlKrw,
     costBasisKrw + realizedCostBasisKrw,
   );
+  const latestPortfolioSnapshot = recentPortfolioRows[0] ?? null;
+  const latestPortfolioSnapshotValue = toNumber(
+    latestPortfolioSnapshot?.totalMarketValue,
+  );
+  const latestPortfolioSnapshotPnl = toNumber(latestPortfolioSnapshot?.totalPnl);
+  const latestPortfolioSnapshotReturnPct = toNumber(
+    latestPortfolioSnapshot?.totalReturnPct,
+  );
   const latestAccountPositions = latestPositionRows.filter(
     (position) => selectedAccount === "all" || position.account === selectedAccount,
   );
@@ -442,6 +456,21 @@ export async function getPortfolioDashboard(
       movementSnapshotCoveragePct: movement.coverage.snapshotCoveragePct,
       movementCountCoveragePct: movement.coverage.countCoveragePct,
       previousCloseCoveragePct: previousCloseFallback.coverage.previousCloseCoveragePct,
+      headlineBasis: "current_assets_plus_event_ledger",
+      trendBasis: "daily_portfolio_snapshots",
+      latestPortfolioSnapshotDate: latestPortfolioSnapshot?.snapshotDate ?? null,
+      portfolioSnapshotValueDeltaKrw: deltaOrNull(
+        totalValueKrw,
+        latestPortfolioSnapshotValue,
+      ),
+      portfolioSnapshotPnlDeltaKrw: deltaOrNull(
+        totalPnlKrw,
+        latestPortfolioSnapshotPnl,
+      ),
+      portfolioSnapshotReturnPctDelta: deltaOrNull(
+        totalReturnPct,
+        latestPortfolioSnapshotReturnPct,
+      ),
     },
   };
 }
@@ -1090,6 +1119,11 @@ function convertToKrw(value: number, currency: string, usdKrwRate: number) {
 
 function percentOrNull(numerator: number, denominator: number) {
   return denominator > 0 ? (numerator / denominator) * 100 : null;
+}
+
+function deltaOrNull(left: number | null, right: number | null) {
+  if (left === null || right === null) return null;
+  return left - right;
 }
 
 function diffDays(laterDate: string, earlierDate: string) {

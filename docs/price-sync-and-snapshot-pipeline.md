@@ -266,6 +266,34 @@ Valuation basis:
 Start with manual admin triggers first. Add Vercel Cron after route handlers are
 stable.
 
+Pre-Cron verification checklist:
+
+1. Dashboard display
+   - The read-only dashboard headline is calculated from current `assets` plus
+     the shared event-ledger realized-return helper.
+   - The trend chart reads `daily_portfolio_snapshots`.
+   - Dashboard data health exposes the latest portfolio snapshot delta so the
+     current headline calculation can be compared against the latest stored
+     snapshot row before Cron is enabled.
+   - The top total PnL label should remain clear that realized PnL is included.
+
+2. Production daily snapshot dry-run
+   - Use `POST /api/admin/snapshots/daily?dryRun=true` on production only with
+     admin-job auth.
+   - Do not pass `confirmWrite=true` for this verification.
+   - Verify HTTP 200, `writeReady`, `snapshotDate`, `closeReferences`,
+     `freshClose.coverage`, `realizedReturn`, and `plannedWrites`.
+   - Confirm route output and logs do not include raw secrets, tokens, request
+     headers, or environment variable values.
+
+3. Cron design before enablement
+   - Keep Vercel Cron disabled until manual production dry-run is clean.
+   - Run close-price sync before the daily snapshot writer.
+   - If close sync is blocked or partial, the snapshot writer should stay
+     blocked with `409` on actual writes and show detailed coverage in dry-run.
+   - Use `ADMIN_JOB_SECRET` or `CRON_SECRET`; never store KIS tokens or provider
+     credentials in Postgres.
+
 Suggested initial cron schedule:
 
 - `07:10 UTC` / `16:10 KST`: `prices/sync?mode=close` for Korea close rows.

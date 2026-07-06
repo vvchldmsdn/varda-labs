@@ -113,12 +113,12 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                 label="총 손익"
                 value={formatSignedKrwCompact(data.totalPnlKrw)}
                 tone={moneyToneFor(data.totalPnlKrw)}
-                subValue={formatPct(data.totalReturnPct, true)}
+                subValue={`${formatPct(data.totalReturnPct, true)} · 실현 ${formatSignedKrwCompact(data.realizedPnlKrw)}`}
               />
               <MetricBlock
-                label="원금"
+                label="보유 원금"
                 value={formatKrw(data.costBasisKrw)}
-                subValue={`${data.holdings.length}개 보유`}
+                subValue={principalSubValue(data)}
               />
             </div>
           </header>
@@ -326,6 +326,16 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               <DataPill
                 label="미매칭"
                 value={String(data.dataHealth.unmatchedSnapshotRowsAllTime)}
+              />
+              <DataPill
+                label="헤드라인"
+                value={headlineBasisLabel(data.dataHealth.headlineBasis)}
+              />
+              <DataPill
+                label="손익차이"
+                value={formatSignedKrwCompact(
+                  data.dataHealth.portfolioSnapshotPnlDeltaKrw,
+                )}
               />
             </div>
           </section>
@@ -607,6 +617,19 @@ function movementSourceLabel(source: DashboardHolding["dailySource"]) {
   if (source === "daily_position_snapshot") return "스냅샷";
   if (source === "asset_price_snapshot") return "전일종가";
   return "-";
+}
+
+function principalSubValue(data: DashboardData) {
+  const parts = [`${data.holdings.length}개 보유`];
+  if (Math.abs(data.realizedCostBasisKrw) >= 0.5) {
+    parts.push(`실현원가 ${formatKrwCompact(data.realizedCostBasisKrw)}`);
+  }
+  return parts.join(" · ");
+}
+
+function headlineBasisLabel(value: DashboardData["dataHealth"]["headlineBasis"]) {
+  if (value === "current_assets_plus_event_ledger") return "현재+실현";
+  return value;
 }
 
 function formatKrw(value: number | null) {
