@@ -25,6 +25,7 @@ Optional:
 - `KIS_BASE_URL`
 - `KIS_IS_MOCK`
 - `KIS_TOKEN_POLICY`
+- `KIS_JOB_COOLDOWN_SECONDS`
 
 Admin route secrets remain separate:
 
@@ -57,9 +58,38 @@ Reasoning:
 - `per_request` is simplest and keeps the no-DB-token-storage rule strict.
 - `memory_cache` can reduce token calls later, but serverless cold starts must
   still tolerate token refetches.
+- Vercel serverless memory is not a global cache. Consecutive admin requests can
+  land on different instances and still trigger multiple token requests.
 - Vercel KV or a dedicated secret store can be considered later.
 - Postgres encrypted token cache is intentionally not part of the first
   implementation because it conflicts with the current migration rule.
+
+## KIS Job Cooldown
+
+Production dry-run testing showed that repeated KIS admin calls can trigger KIS
+token request failures even with `KIS_TOKEN_POLICY=memory_cache`. To avoid
+hammering the token endpoint, `provider=kis&mode=close` requests are guarded by a
+route-level cooldown.
+
+- Env: `KIS_JOB_COOLDOWN_SECONDS`
+- Default: `90`
+- Applies to dry-run requests too.
+- Uses `market_data_sync_runs` to find the latest KIS close run.
+- If the latest run is inside the cooldown window, the route returns HTTP `429`
+  with:
+  - `error: "kis_job_cooldown_active"`
+  - `retryAfterSeconds`
+  - `lastRunId`
+  - `lastRunStartedAt`
+  - `lastRunFinishedAt`
+- Cooldown rejections do not create `market_data_sync_runs` rows. This keeps
+  repeated manual retries from polluting the sync audit log.
+- The response must not include KIS app keys, app secrets, access tokens, or raw
+  KIS responses.
+
+Manual admin calls and future Cron jobs must respect this cooldown. A durable
+external token cache, such as Vercel KV, can be evaluated later if higher
+frequency KIS calls become necessary.
 
 ## Provider Contract
 

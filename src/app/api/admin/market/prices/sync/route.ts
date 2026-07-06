@@ -5,6 +5,7 @@ import {
   createKisMarketDataProvider,
 } from "@/lib/market-data/providers/kis";
 import {
+  getKisPriceSyncCooldownStatus,
   isPriceSyncMode,
   PriceSyncError,
   runMarketPriceSync,
@@ -102,6 +103,30 @@ export async function POST(request: Request) {
           missingEnvKeys: kisPolicy.missingEnvKeys,
         },
         { status: 503 },
+      );
+    }
+
+    const cooldown = await getKisPriceSyncCooldownStatus(mode);
+
+    if (cooldown.active) {
+      return NextResponse.json(
+        {
+          error: "kis_job_cooldown_active",
+          provider: cooldown.provider,
+          mode: cooldown.mode,
+          cooldownSeconds: cooldown.cooldownSeconds,
+          retryAfterSeconds: cooldown.retryAfterSeconds,
+          lastRunId: cooldown.lastRunId,
+          lastRunStatus: cooldown.lastRunStatus,
+          lastRunStartedAt: cooldown.lastRunStartedAt,
+          lastRunFinishedAt: cooldown.lastRunFinishedAt,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(cooldown.retryAfterSeconds),
+          },
+        },
       );
     }
   }

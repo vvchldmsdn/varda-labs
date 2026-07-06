@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshots, assets, marketDataSyncRuns } from "@/db/schema";
@@ -16,6 +16,7 @@ import type {
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const LIVE_MARKET_DATA_WRITES_ENABLED = false;
+const DEFAULT_KIS_JOB_COOLDOWN_SECONDS = 90;
 
 export const PRICE_SYNC_CONTRACT = {
   live: {
@@ -58,6 +59,18 @@ export type PriceSyncRunResult = {
   writeResults: ClosePriceWriteResult[];
   contract: (typeof PRICE_SYNC_CONTRACT)[PriceSyncMode];
   warnings: string[];
+};
+
+export type PriceSyncCooldownStatus = {
+  active: boolean;
+  provider: string;
+  mode: PriceSyncMode;
+  cooldownSeconds: number;
+  retryAfterSeconds: number;
+  lastRunId: string | null;
+  lastRunStatus: string | null;
+  lastRunStartedAt: string | null;
+  lastRunFinishedAt: string | null;
 };
 
 type PlannedWrite = {
@@ -112,6 +125,63 @@ type AssetPriceSnapshotRow = typeof assetPriceSnapshots.$inferSelect;
 
 export function isPriceSyncMode(value: string | null): value is PriceSyncMode {
   return value === "live" || value === "close";
+}
+
+export async function getKisPriceSyncCooldownStatus(
+  mode: PriceSyncMode,
+  now = new Date(),
+): Promise<PriceSyncCooldownStatus> {
+  const cooldownSeconds = getKisJobCooldownSeconds();
+  const [lastRun] = await db
+    .select({
+      id: marketDataSyncRuns.id,
+      status: marketDataSyncRuns.status,
+      startedAt: marketDataSyncRuns.startedAt,
+      finishedAt: marketDataSyncRuns.finishedAt,
+    })
+    .from(marketDataSyncRuns)
+    .where(
+      and(
+        eq(marketDataSyncRuns.jobType, "asset_price_sync"),
+        eq(marketDataSyncRuns.source, "kis"),
+        eq(marketDataSyncRuns.mode, mode),
+      ),
+    )
+    .orderBy(desc(marketDataSyncRuns.startedAt))
+    .limit(1);
+
+  if (!lastRun || cooldownSeconds <= 0) {
+    return {
+      active: false,
+      provider: "kis",
+      mode,
+      cooldownSeconds,
+      retryAfterSeconds: 0,
+      lastRunId: lastRun?.id ?? null,
+      lastRunStatus: lastRun?.status ?? null,
+      lastRunStartedAt: toIsoString(lastRun?.startedAt),
+      lastRunFinishedAt: toIsoString(lastRun?.finishedAt),
+    };
+  }
+
+  const lastActivityAt = lastRun.finishedAt ?? lastRun.startedAt;
+  const elapsedMs = Math.max(0, now.getTime() - lastActivityAt.getTime());
+  const retryAfterSeconds = Math.max(
+    0,
+    Math.ceil((cooldownSeconds * 1000 - elapsedMs) / 1000),
+  );
+
+  return {
+    active: retryAfterSeconds > 0,
+    provider: "kis",
+    mode,
+    cooldownSeconds,
+    retryAfterSeconds,
+    lastRunId: lastRun.id,
+    lastRunStatus: lastRun.status,
+    lastRunStartedAt: toIsoString(lastRun.startedAt),
+    lastRunFinishedAt: toIsoString(lastRun.finishedAt),
+  };
 }
 
 export async function runMarketPriceSync(options: {
@@ -784,6 +854,16 @@ function normalizeTicker(value: string | null | undefined): string | null {
 
 function toDateKey(value: Date) {
   return value.toISOString().slice(0, 10);
+}
+
+function getKisJobCooldownSeconds() {
+  const configured = Number(process.env.KIS_JOB_COOLDOWN_SECONDS);
+  if (Number.isFinite(configured) && configured >= 0) return Math.floor(configured);
+  return DEFAULT_KIS_JOB_COOLDOWN_SECONDS;
+}
+
+function toIsoString(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
 }
 
 function toSafeErrorMessage(error: unknown): string {
