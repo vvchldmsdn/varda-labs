@@ -1,8 +1,9 @@
 # Price Sync and Snapshot Pipeline Plan
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
-This is a design plan only. It does not implement cron jobs or provider calls yet.
+This document records the current manual market-data and daily snapshot pipeline
+plus the remaining Cron plan. Vercel Cron is not enabled yet.
 
 ## Decision
 
@@ -47,31 +48,33 @@ Useful behavior to preserve, without copying Base44 code:
 Already available:
 
 - `assets.current_price`, `assets.ma_120`, `assets.days_above_ma`
+- `assets.price_source`, `assets.price_fetched_at`, `assets.price_as_of`,
+  `assets.price_quote_type`, `assets.price_status`, `assets.price_error`
 - `fx_rates`
 - `asset_price_snapshots`
+- `market_data_sync_runs`
 - `daily_position_snapshots`
 - `daily_portfolio_snapshots`
 - `event_ledger_entries`
 - read-only dashboard calculation helper
+- manual admin route handlers under `src/app/api/admin/...`
 
-Gaps before operational sync:
+Remaining gaps before Cron:
 
-- `assets` lacks live price lineage columns such as `price_source`,
-  `price_fetched_at`, `price_as_of`, and `price_quote_type`.
-- `asset_price_snapshots` has indexes but no operational unique key for
-  idempotent ticker/date upsert.
-- No route handlers exist for admin/cron market jobs.
-- No job run table exists for provider errors, stale close reasons, or run
-  duration.
+- The KIS close sync path is manual and guarded by `limit <= 5`.
+- One production market cycle has been validated end to end; Cron should wait
+  for at least one more successful cycle.
+- Cron-safe batching, timeout, and cooldown behavior are not designed yet.
 - No Vercel Cron config exists.
 
-## Proposed Data Model Changes
+## Data Model Status
 
-Add these before implementing jobs.
+The first-pass market-data columns and run table exist. Keep the constraints
+below in mind before broadening writes.
 
 ### `assets`
 
-Add nullable live quote metadata:
+Nullable live quote metadata:
 
 - `price_source varchar(100)`
 - `price_fetched_at timestamp with time zone`
@@ -100,9 +103,9 @@ first using source priority:
 3. `quote_close`
 4. `latest_close_fallback`
 
-### Optional `market_data_sync_runs`
+### `market_data_sync_runs`
 
-Add a small observability table:
+Small observability table:
 
 - `id uuid`
 - `job_type varchar(100)` such as `fx_sync`, `live_price_sync`,
@@ -115,7 +118,8 @@ Add a small observability table:
 - `summary_json jsonb`
 - `error_json jsonb`
 
-This is more useful than only console logs once jobs run on Vercel Cron.
+This table is also used by the KIS close cooldown guard. Cooldown rejections do
+not create run rows.
 
 ## Route/Job Surfaces
 
@@ -350,6 +354,37 @@ Manual runbook until Cron is implemented:
    `dryRun=false&confirmWrite=true`.
 9. Re-run daily snapshot dry-run to confirm the path remains update-only.
 
+Observed manual market-cycle validation:
+
+- Validation date: 2026-07-07 KST cycle.
+- Initial production daily snapshot dry-run resolved `snapshotDate=2026-07-07`
+  with close coverage `6/15`, stale `9`, and `writeReady=false`.
+- `closeSyncPlan.suggestedKisBatches` produced three manual KIS batches:
+  - Korea, `2026-07-06`, 5 tickers:
+    `101280`, `133690`, `315960`, `360200`, `395160`.
+  - Korea, `2026-07-06`, 3 tickers:
+    `455850`, `475350`, `489250`.
+  - US, `2026-07-06`, 1 ticker: `SCHD`.
+- Guarded KIS actual close writes inserted 9 total rows into
+  `asset_price_snapshots`.
+- The route-level 90 second KIS cooldown blocked immediate retries as expected;
+  the operator waited between dry-run and actual write calls.
+- The close sync path did not update `assets.current_price`, which is the
+  intended current policy.
+- `npm run audit:asset-price-duplicates` reported duplicate groups `0`.
+- `npm run audit:market-sync-metadata -- --limit 50` reported match count `0`.
+- The final daily snapshot dry-run reported close coverage `15/15`, missing
+  `0`, stale `0`, suggested KIS batches `0`, and `writeReady=true`.
+- Guarded daily snapshot actual write succeeded for the current cycle:
+  - `daily_portfolio_snapshots`: 4 rows for `2026-07-07` with
+    `source='varda_manual_daily_snapshot'`.
+  - `daily_position_snapshots`: 17 rows for `2026-07-07` with
+    `source='varda_manual_daily_snapshot'`.
+  - Position rows with nullable `asset_id`: 0.
+- Post-write daily snapshot dry-run was update-only: portfolio update `4`,
+  position update `17`, insert `0`.
+- This validates the manual path once. It does not make Cron ready.
+
 Pre-Cron verification checklist:
 
 1. Dashboard display
@@ -374,11 +409,18 @@ Pre-Cron verification checklist:
 3. Cron design before enablement
    - Keep Vercel Cron disabled until manual production dry-run is clean.
    - Keep Cron disabled until the close sync coverage gate above is settled.
+   - Require at least two successful real market cycles through the manual
+     runbook before enabling Cron.
+   - Confirm each successful cycle has duplicate audit `0`, metadata secret
+     audit `0`, final `writeReady=true`, and post-write update-only dry-run.
    - Run close-price sync before the daily snapshot writer.
    - If close sync is blocked or partial, the snapshot writer should stay
      blocked with `409` on actual writes and show detailed coverage in dry-run.
    - Use `ADMIN_JOB_SECRET` or `CRON_SECRET`; never store KIS tokens or provider
      credentials in Postgres.
+   - Do not implement a Cron flow that waits through repeated 90 second cooldown
+     sleeps inside one serverless invocation until Vercel timeout behavior and a
+     separate Cron-safe cooldown policy are explicitly designed.
 
 Candidate cron schedule after the coverage gate is implemented:
 
@@ -432,8 +474,8 @@ Dashboard rules:
 ## Implementation Phases
 
 1. Schema and constraints
-   - add `assets.price_*` metadata
-   - add optional `market_data_sync_runs`
+   - `assets.price_*` metadata is present.
+   - `market_data_sync_runs` is present and used for KIS cooldown.
    - audit duplicates before adding operational unique constraints
 
 2. Provider layer
