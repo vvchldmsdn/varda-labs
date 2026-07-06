@@ -3,6 +3,7 @@ import Link from "next/link";
 import type {
   DashboardAccount,
   DashboardData,
+  DashboardEventActivity,
   DashboardHolding,
   NonInvestmentAsset,
   RecentPortfolioPoint,
@@ -259,6 +260,8 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
             />
           ) : null}
 
+          <EventActivityPanel activities={data.eventActivity} data={data} />
+
           <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
             <h2 className="text-base font-semibold tracking-normal">주요 변동 종목</h2>
             <div className="mt-3 space-y-2">
@@ -328,6 +331,14 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                 value={String(data.dataHealth.unmatchedSnapshotRowsAllTime)}
               />
               <DataPill
+                label="이벤트"
+                value={String(data.dataHealth.selectedEventLedgerCount)}
+              />
+              <DataPill
+                label="실현매도"
+                value={String(data.dataHealth.selectedRealizedSellEventCount)}
+              />
+              <DataPill
                 label="헤드라인"
                 value={headlineBasisLabel(data.dataHealth.headlineBasis)}
               />
@@ -342,6 +353,100 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
         </aside>
       </div>
     </main>
+  );
+}
+
+function EventActivityPanel({
+  activities,
+  data,
+}: {
+  activities: DashboardEventActivity[];
+  data: DashboardData;
+}) {
+  return (
+    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-normal">이벤트 활동</h2>
+          <p className="mt-1 text-xs text-[#687064]">
+            최근 {activities.length}건 · 전체 {data.dataHealth.selectedEventLedgerCount}건
+          </p>
+        </div>
+        {data.dataHealth.selectedUnmatchedSellEventCount > 0 ? (
+          <span className="rounded-md border border-[#eadfc7] bg-[#fff8e7] px-2 py-1 text-xs font-semibold text-[#7a5b16]">
+            보존 {data.dataHealth.selectedUnmatchedSellEventCount}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-3 space-y-2">
+        {activities.length > 0 ? (
+          activities.map((activity) => (
+            <EventActivityRow key={activity.id} activity={activity} />
+          ))
+        ) : (
+          <p className="rounded-md bg-[#eef2e8] px-3 py-2 text-sm text-[#687064]">
+            이벤트 없음
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EventActivityRow({ activity }: { activity: DashboardEventActivity }) {
+  return (
+    <div className="rounded-md bg-white px-3 py-2 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-medium text-[#687064]">
+              {formatDate(activity.eventDate)}
+            </span>
+            <span className="rounded-sm bg-[#edf1e8] px-1.5 py-0.5 text-[11px] font-semibold text-[#3d463b]">
+              {eventTypeLabel(activity.eventType)}
+            </span>
+            <span
+              className={cn(
+                "rounded-sm px-1.5 py-0.5 text-[11px] font-semibold",
+                mappingStatusClass(activity.mappingStatus),
+              )}
+            >
+              {mappingStatusLabel(activity.mappingStatus)}
+            </span>
+          </div>
+          <p className="mt-1 truncate font-semibold text-[#171916]">
+            {activity.ticker ? `${activity.ticker} · ` : ""}
+            {activity.assetName}
+          </p>
+          <p className="mt-1 truncate text-xs text-[#687064]">
+            {activity.accountLabel}
+            {activity.source ? ` · ${activity.source}` : ""}
+            {activity.ruleVersion ? ` · ${activity.ruleVersion}` : ""}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              moneyToneClass(activity.realizedPnlKrw ?? activity.amountKrw),
+            )}
+          >
+            {activity.realizedPnlKrw !== null
+              ? formatSignedKrw(activity.realizedPnlKrw)
+              : formatSignedKrw(activity.amountKrw)}
+          </p>
+          <p className="mt-1 text-[11px] font-medium text-[#737b70]">
+            {activity.realizedPnlKrw !== null
+              ? activity.missingCost
+                ? "실현·원가추정"
+                : "실현손익"
+              : activity.quantityDelta !== null
+                ? `수량 ${formatQuantity(activity.quantityDelta)}`
+                : "금액"}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -617,6 +722,28 @@ function movementSourceLabel(source: DashboardHolding["dailySource"]) {
   if (source === "daily_position_snapshot") return "스냅샷";
   if (source === "asset_price_snapshot") return "전일종가";
   return "-";
+}
+
+function eventTypeLabel(value: string) {
+  if (value === "buy") return "매수";
+  if (value === "sell") return "매도";
+  if (value === "dividend") return "배당";
+  if (value === "deposit") return "입금";
+  if (value === "withdrawal") return "출금";
+  if (value === "rebalance") return "리밸런싱";
+  return value;
+}
+
+function mappingStatusLabel(value: DashboardEventActivity["mappingStatus"]) {
+  if (value === "mapped") return "mapped";
+  if (value === "legacy_only") return "legacy only";
+  return "unmatched";
+}
+
+function mappingStatusClass(value: DashboardEventActivity["mappingStatus"]) {
+  if (value === "mapped") return "bg-[#edf6ec] text-[#25633f]";
+  if (value === "legacy_only") return "bg-[#fff8e7] text-[#7a5b16]";
+  return "bg-[#f8ecec] text-[#9a3439]";
 }
 
 function principalSubValue(data: DashboardData) {

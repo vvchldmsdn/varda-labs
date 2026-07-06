@@ -24,6 +24,7 @@ export type PortfolioReturnAssetRow = {
 };
 
 export type PortfolioReturnEventRow = {
+  id?: string;
   eventDate: string;
   eventType: string;
   account: string | null;
@@ -59,6 +60,12 @@ export type AssetReturnMetrics = {
 };
 
 export type RealizedReturnRow = {
+  eventId: string | null;
+  eventDate: string;
+  eventType: "sell";
+  legacyAssetId: string;
+  ticker: string | null;
+  assetName: string;
   assetKey: string | null;
   account: string | null;
   realizedPnlKrw: number;
@@ -176,6 +183,12 @@ export function buildReturnMetricsSummary(
     }
 
     realizedRows.push({
+      eventId: event.id ?? null,
+      eventDate: event.eventDate,
+      eventType: "sell",
+      legacyAssetId: event.legacyAssetId,
+      ticker: event.ticker,
+      assetName: event.assetName,
       assetKey,
       account,
       realizedPnlKrw,

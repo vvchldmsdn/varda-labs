@@ -48,6 +48,7 @@ describe("portfolio return metrics", () => {
     const summary = buildReturnMetricsSummary(
       [
         tradeEvent({
+          id: "sell-event-id",
           eventDate: "2026-02-01",
           eventType: "sell",
           amountKrw: "520000",
@@ -80,6 +81,9 @@ describe("portfolio return metrics", () => {
     assert.equal(summary.realizedSellEventCount, 1);
     assert.equal(summary.realizedCostBasisKrw, 400000);
     assert.equal(summary.realizedPnlKrw, 120000);
+    assert.equal(summary.realizedRows[0].eventId, "sell-event-id");
+    assert.equal(summary.realizedRows[0].eventDate, "2026-02-01");
+    assert.equal(summary.realizedRows[0].eventType, "sell");
 
     const metrics = getAssetReturnMetrics(summary, asset, 1300);
     assert.equal(metrics.costBasisKrw, 780000);

@@ -21,6 +21,7 @@ import {
   getSelectedRealizedRows,
   portfolioEventAccount,
   type AssetReturnMetrics,
+  type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
 import {
   convertToKrw,
@@ -116,6 +117,26 @@ export type RecentPortfolioPoint = {
   totalReturnPct: number | null;
 };
 
+export type EventActivityMappingStatus = "mapped" | "legacy_only" | "unmatched";
+
+export type DashboardEventActivity = {
+  id: string;
+  eventDate: string;
+  eventType: string;
+  account: string | null;
+  accountLabel: string;
+  ticker: string | null;
+  assetName: string;
+  source: string | null;
+  ruleVersion: string | null;
+  mappingStatus: EventActivityMappingStatus;
+  amountKrw: number | null;
+  quantityDelta: number | null;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
+  missingCost: boolean;
+};
+
 export type DashboardData = {
   selectedAccount: DashboardAccount;
   generatedAt: string;
@@ -140,12 +161,17 @@ export type DashboardData = {
   nonInvestmentAssets: NonInvestmentAsset[];
   nonInvestmentTotalKrw: number;
   recentSnapshots: RecentPortfolioPoint[];
+  eventActivity: DashboardEventActivity[];
   topMovers: DashboardHolding[];
   dataHealth: {
     importedAssetCount: number;
     investmentAssetCount: number;
     nonInvestmentAssetCount: number;
     assetCount: number;
+    eventLedgerCount: number;
+    selectedEventLedgerCount: number;
+    selectedRealizedSellEventCount: number;
+    selectedUnmatchedSellEventCount: number;
     latestSnapshotPositions: number;
     unmatchedSnapshotRows: number;
     unmatchedSnapshotRowsAllTime: number;
@@ -444,6 +470,13 @@ export async function getPortfolioDashboard(
       (asset) => asset.valueKrw,
     ),
     recentSnapshots: buildRecentSnapshots(recentPortfolioRows),
+    eventActivity: buildEventActivity({
+      eventRows,
+      assetRows: investmentAssetRows,
+      selectedAccount,
+      accountLabels,
+      returnSummary,
+    }),
     topMovers: [...holdings]
       .filter((holding) => holding.dailyChangeKrw !== null)
       .sort(
@@ -455,6 +488,15 @@ export async function getPortfolioDashboard(
       investmentAssetCount: investmentAssetRows.length,
       nonInvestmentAssetCount: nonInvestmentAssets.length,
       assetCount: holdings.length,
+      eventLedgerCount: eventRows.length,
+      selectedEventLedgerCount: filterEventRowsForAccount(
+        eventRows,
+        investmentAssetRows,
+        selectedAccount,
+      ).length,
+      selectedRealizedSellEventCount: realizedRows.length,
+      selectedUnmatchedSellEventCount: realizedRows.filter((row) => !row.assetKey)
+        .length,
       latestSnapshotPositions: latestAccountPositions.length,
       unmatchedSnapshotRows,
       unmatchedSnapshotRowsAllTime: Number(unmatchedSnapshotCountRows[0]?.count ?? 0),
@@ -1045,6 +1087,126 @@ function buildRecentSnapshots(rows: PortfolioSnapshotRow[]) {
       totalReturnPct: toNumber(row.totalReturnPct),
     }))
     .slice(-14);
+}
+
+function buildEventActivity({
+  eventRows,
+  assetRows,
+  selectedAccount,
+  accountLabels,
+  returnSummary,
+}: {
+  eventRows: EventLedgerRow[];
+  assetRows: AssetRow[];
+  selectedAccount: DashboardAccount;
+  accountLabels: Map<string, string>;
+  returnSummary: ReturnMetricsSummary;
+}): DashboardEventActivity[] {
+  const realizedByEventId = new Map(
+    returnSummary.realizedRows
+      .filter((row) => row.eventId)
+      .map((row) => [row.eventId as string, row]),
+  );
+
+  return filterEventRowsForAccount(eventRows, assetRows, selectedAccount)
+    .sort(compareEventsDescending)
+    .slice(0, 8)
+    .map((event) => {
+      const resolvedAsset = resolveEventActivityAsset(event, assetRows);
+      const account = portfolioEventAccount(event) ?? resolvedAsset?.account ?? null;
+      const realized = event.id ? realizedByEventId.get(event.id) : null;
+
+      return {
+        id: event.id,
+        eventDate: event.eventDate,
+        eventType: event.eventType,
+        account,
+        accountLabel: account ? accountLabels.get(account) ?? account : "계정 미상",
+        ticker: event.ticker ?? resolvedAsset?.ticker ?? null,
+        assetName: event.assetName || resolvedAsset?.name || "이름 없음",
+        source: event.source,
+        ruleVersion: event.ruleVersion,
+        mappingStatus: eventActivityMappingStatus(event, resolvedAsset),
+        amountKrw: toNumber(event.amountKrw),
+        quantityDelta: toNumber(event.quantityDelta),
+        realizedPnlKrw: realized?.realizedPnlKrw ?? null,
+        realizedCostBasisKrw: realized?.realizedCostBasisKrw ?? null,
+        missingCost: realized?.missingCost ?? false,
+      };
+    });
+}
+
+function filterEventRowsForAccount(
+  eventRows: EventLedgerRow[],
+  assetRows: AssetRow[],
+  selectedAccount: DashboardAccount,
+) {
+  if (selectedAccount === "all") return eventRows;
+
+  return eventRows.filter((event) => {
+    const resolvedAsset = resolveEventActivityAsset(event, assetRows);
+    return eventMatchesSelectedAccount(
+      event,
+      selectedAccount,
+      resolvedAsset?.account ?? null,
+    );
+  });
+}
+
+function resolveEventActivityAsset(event: EventLedgerRow, assetRows: AssetRow[]) {
+  if (event.assetId) {
+    const byId = assetRows.find((asset) => asset.id === event.assetId);
+    if (byId) return byId;
+  }
+
+  if (event.legacyAssetId) {
+    const byLegacyId = assetRows.find(
+      (asset) => asset.legacyBase44Id === event.legacyAssetId,
+    );
+    if (byLegacyId) return byLegacyId;
+  }
+
+  const eventAccount = portfolioEventAccount(event);
+  const accountsToTry = eventAccount ? [eventAccount] : ASSET_ACCOUNT_CODES;
+  const eventTicker = normalizeTicker(event.ticker);
+
+  for (const account of accountsToTry) {
+    if (eventTicker) {
+      const byTicker = assetRows.find(
+        (asset) =>
+          asset.account === account &&
+          normalizeTicker(asset.ticker) === eventTicker,
+      );
+      if (byTicker) return byTicker;
+    }
+
+    const byName = assetRows.find(
+      (asset) => asset.account === account && asset.name === event.assetName,
+    );
+    if (byName) return byName;
+  }
+
+  return null;
+}
+
+function eventActivityMappingStatus(
+  event: EventLedgerRow,
+  resolvedAsset: AssetRow | null,
+): EventActivityMappingStatus {
+  if (resolvedAsset) return "mapped";
+  if (event.legacyAssetId || event.ticker || event.assetName) return "legacy_only";
+  return "unmatched";
+}
+
+function compareEventsDescending(a: EventLedgerRow, b: EventLedgerRow) {
+  const dateCompare = b.eventDate.localeCompare(a.eventDate);
+  if (dateCompare !== 0) return dateCompare;
+  return eventTimestampMs(b) - eventTimestampMs(a);
+}
+
+function eventTimestampMs(event: EventLedgerRow) {
+  const timestamp = event.recordedAt ?? event.createdAt;
+  return new Date(timestamp).getTime();
 }
 
 function eventMatchesHolding(
