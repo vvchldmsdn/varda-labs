@@ -10,6 +10,7 @@ migration, update `src/db/schema.ts`, backfill data, or change write behavior.
 The 2026-07-07 read-only data integrity audit reported:
 
 - `severity="error"` checks: 0
+- total checks: 34
 - duplicate account code groups: 0
 - `assets.account_id` orphans: 0
 - `assets.group_id` orphans: 0
@@ -19,14 +20,25 @@ The 2026-07-07 read-only data integrity audit reported:
 - event ledger UUID orphans: 0
 - daily position `asset_id` / `account_id` orphans: 0
 - daily portfolio `account_id` orphans: 0
+- transaction `account_id` orphans: 0
+- market regime `account_id` orphans: 0
+- ETF holding `etf_master_id` orphans: 0
+- asset price `asset_id` orphans: 0
+- asset price `asset_id` / ticker mismatch groups: 0
 
-The only non-passing check was informational:
+The non-passing checks were informational:
 
 - `daily_position_snapshots.unmatched_legacy_asset_ids`: 5 legacy asset groups
   have no current `assets` match.
+- `market_regime_daily.duplicate_date_account_groups`: 3 brokerage
+  date/account duplicate groups.
+- `etf_holdings.duplicate_holding_identity_groups`: 10 sampled duplicate
+  identity groups.
+- `asset_price_snapshots.ticker_unmatched_current_assets`: 7 price tickers have
+  no current `assets.ticker` match.
 
-That informational finding is expected migration evidence. It is not a cleanup
-target and should not block read-only UI work.
+These informational findings are migration evidence or normalization questions.
+They are not cleanup targets by default and should not block read-only UI work.
 
 ## Safe Current-State FK Candidates
 
@@ -60,9 +72,10 @@ history.
 | `event_ledger_entries.group_id -> asset_groups.id` | no UUID orphans, mostly null group ids | Nullable FK may be acceptable, but group history should not be required. |
 | `event_ledger_entries.corrects_event_id -> event_ledger_entries.id` | no correction rows now | Add only when correction workflows are used. |
 | `daily_portfolio_snapshots.account_id -> accounts.id` | no UUID orphans, `all` aggregate rows naturally have null account ids | Nullable FK is possible, but `account='all'` must remain valid without an account row. |
-| `transactions.account_id -> accounts.id` | not covered by the latest audit | Audit first. Cashflow imports may intentionally preserve raw account/payment text. |
-| `market_regime_daily.account_id -> accounts.id` | not covered by the latest audit | Audit first. Market context can be account-scoped or aggregate-derived. |
-| `etf_holdings.etf_master_id -> etf_masters.id` | not covered by the latest audit | Audit first. `legacy_etf_id`, `etf_ticker`, and `etf_name` should remain preserved even if a parent row is missing. |
+| `transactions.account_id -> accounts.id` | no UUID orphans, 11 null account ids, 11 blank raw account rows | Nullable FK may be acceptable later, but raw account/payment text must remain. Do not infer required account ownership from this table yet. |
+| `market_regime_daily.account_id -> accounts.id` | no UUID orphans, no account string mismatches, 3 date/account duplicate groups | Nullable FK may be acceptable later, but duplicate date/account groups need product interpretation before unique constraints or UI assumptions. |
+| `etf_holdings.etf_master_id -> etf_masters.id` | no UUID orphans, no ticker or legacy ETF id unmatched groups, 10 sampled identity duplicates | Nullable FK is a stronger candidate after duplicate identity semantics are understood. Preserve `legacy_etf_id`, `etf_ticker`, and `etf_name`. |
+| `asset_price_snapshots.asset_id -> assets.id` | no UUID orphans, 1692 null asset ids, 7 tickers not matched to current assets | Keep nullable. Price history is operationally ticker/date keyed and may include historical or non-current tickers. |
 
 ## Relationships To Keep Without FK For Now
 
@@ -103,7 +116,8 @@ Next safe options:
 
 1. Review and approve a narrow current-state FK migration for `assets` and
    `asset_group_members`.
-2. Add read-only audits for possible later FK candidates such as transactions,
-   market regime rows, and ETF holdings.
+2. Decide whether the info-only findings need migration notes or UI handling,
+   especially market regime duplicates, ETF holding duplicate identity rows, and
+   asset price unmatched tickers.
 3. Move to read-only UI work, such as ETF/EventLedger sections, while keeping
    market-data automation frozen.

@@ -35,6 +35,14 @@ Current checks cover:
 - daily position snapshot nullable UUID mapping and account string coverage
 - daily portfolio snapshot account mapping and duplicate snapshot keys
 - imported versus varda-generated snapshot source distributions
+- transaction account UUID mapping, raw account/payment distributions, and
+  account string coverage
+- market regime account UUID mapping, account string coverage, and
+  date/account duplicate groups
+- ETF holding parent mapping through `etf_master_id`, `etf_ticker`, and
+  `legacy_etf_id`
+- asset price snapshot nullable asset mapping, asset/ticker consistency, and
+  ticker coverage against current assets
 
 ## Interpretation
 
@@ -54,7 +62,7 @@ See `docs/fk-hardening-proposal.md` for the current FK decision proposal.
 
 ## Latest Observation
 
-Generated at: 2026-07-06T22:54:12Z.
+Generated at: 2026-07-06T23:11:13Z.
 
 Command:
 
@@ -65,11 +73,19 @@ npm run audit:data-integrity
 Result:
 
 - `ok`: `true`
-- checks: 22
+- checks: 34
 - failed `severity="error"` checks: 0
-- failed `severity="info"` checks: 1
+- failed `severity="info"` checks: 4
 - info-only finding: `daily_position_snapshots.unmatched_legacy_asset_ids`
   reported 5 legacy asset id groups without current `assets` matches.
+- info-only finding: `market_regime_daily.duplicate_date_account_groups`
+  reported 3 brokerage date/account duplicate groups.
+- info-only finding: `etf_holdings.duplicate_holding_identity_groups`
+  reported 10 sample duplicate groups, all from `0001S0` on 2026-04-17 in
+  the returned sample.
+- info-only finding:
+  `asset_price_snapshots.ticker_unmatched_current_assets` reported 7 price
+  tickers that do not currently map to `assets.ticker`.
 
 Core row counts:
 
@@ -84,7 +100,9 @@ Core row counts:
 - `etf_masters`: 1202
 - `etf_holdings`: 10872
 - `fx_rates`: 467
+- `market_regime_daily`: 69
 - `settings`: 1
+- `transactions`: 14
 
 Current-state integrity:
 
@@ -113,3 +131,25 @@ Imported/generated history integrity:
 
 The unmatched daily position legacy assets are expected migration evidence, not
 a cleanup target. Keep `daily_position_snapshots.asset_id` nullable.
+
+Later-candidate integrity:
+
+- `transactions.account_id` orphans: 0
+- transaction account string mismatches: 0
+- transaction rows with null `account_id`: 11
+- transaction raw account distribution: 11 blank rows, 3 `cash` rows
+- `market_regime_daily.account_id` orphans: 0
+- market regime account string mismatches: 0
+- market regime duplicate date/account groups: 3, info only
+- `etf_holdings.etf_master_id` orphans: 0
+- ETF holding tickers unmatched to `etf_masters.ticker`: 0
+- ETF holding legacy ids unmatched to `etf_masters.legacy_base44_id`: 0
+- ETF holding identity duplicate groups: 10 in the sample, info only
+- `asset_price_snapshots.asset_id` orphans: 0
+- asset price `asset_id`/ticker mismatch groups: 0
+- asset price tickers unmatched to current `assets.ticker`: 7, info only
+- asset price ticker/date duplicate groups: 0
+
+The asset price unmatched ticker finding is current-asset coverage evidence, not
+a reason to require `asset_price_snapshots.asset_id`. Keep asset price history
+usable by ticker/date and keep `asset_id` nullable.
