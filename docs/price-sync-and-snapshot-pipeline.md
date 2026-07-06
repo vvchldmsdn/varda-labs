@@ -182,6 +182,7 @@ Initial provider order:
 ### `POST /api/admin/snapshots/daily`
 
 This is the varda-labs replacement for Base44 `saveDailyHistorySnapshot`.
+Implemented v1 is manual/admin-only and does not configure Cron.
 
 Writes:
 
@@ -190,10 +191,12 @@ Writes:
 
 Inputs:
 
-- optional `date`, but only allow the current resolved cycle date by default.
-- optional `skipSync` for repair/test usage only.
-- optional `force` should not overwrite complete snapshots unless explicitly
-  supported by a future repair mode.
+- `dryRun=true|false`; default is `true`.
+- `dryRun=false` requires `confirmWrite=true`.
+- optional `date=YYYY-MM-DD`; dry-run can inspect other dates, but actual writes
+  are limited to the current resolved cycle date.
+- optional `account=brokerage|isa|irp|all`; `all` writes the three account
+  snapshots plus the aggregate portfolio snapshot.
 
 Core rules:
 
@@ -205,11 +208,15 @@ Core rules:
 - For USD assets, expected close is the previous US trading day.
 - If a whole market is closed, allow the latest fresh close within a small
   freshness window.
-- If required closes are missing, return `409` and do not write partial
-  snapshots.
-- Upsert by `(snapshot_date, account, asset_id)` for positions and
-  `(snapshot_date, account)` for portfolio snapshots, after confirming there
-  are no duplicates or unexpected existing rows.
+- If required closes are missing, dry-run reports the missing ticker/date/reason;
+  actual writes return `409` and do not write partial snapshots.
+- Imported Base44 rows are immutable. Rows with non-null `legacy_base44_id` block
+  writes for the same `snapshot_date/account`.
+- varda-generated rows use `legacy_base44_id = null` and include
+  `source=varda_manual_daily_snapshot` in `description` for guarded re-runs.
+- Because the current schema does not have unique `(snapshot_date, account, ...)`
+  constraints, v1 performs preflight duplicate/unmanaged-row checks before using
+  Neon HTTP batch writes.
 
 Valuation basis:
 
@@ -222,6 +229,11 @@ Valuation basis:
 - `previous_*`: latest prior valid position snapshot for the same account/asset.
 - `market_value_change_*`, `price_change_krw`, `fx_change_krw`: derived from
   prior snapshot when available.
+- tickerless investment assets are allowed and use `assets.current_price` with
+  `price_basis=manual_current`.
+- v1 cost basis uses asset average cost/fractional average cost. Event-ledger
+  realized-return accounting can be tightened in a later pass if portfolio
+  snapshot return fields need to exactly match dashboard return metrics.
 
 ## Vercel Cron Order
 
