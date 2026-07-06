@@ -182,7 +182,9 @@ async function fetchKisClosePrices(
   }
 
   warnings.push(
-    "kis close dry-run preview only; no asset_price_snapshots or assets rows were written",
+    context.dryRun
+      ? "kis close dry-run preview only; no asset_price_snapshots or assets rows were written"
+      : "kis close prices fetched for guarded asset_price_snapshots write",
   );
 
   return {

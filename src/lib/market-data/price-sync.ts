@@ -273,7 +273,13 @@ export async function runMarketPriceSync(options: {
         : emptyClosePriceWriteSummary();
     const warnings = [
       ...providerResult.warnings,
-      ...buildSkeletonWarnings(options.mode, dryRun, fixture),
+      ...buildSkeletonWarnings({
+        mode: options.mode,
+        dryRun,
+        fixture,
+        writePolicy,
+        closeWriteEnabled,
+      }),
     ];
     const finishedAt = new Date();
 
@@ -931,20 +937,37 @@ function countProviderRows(rows: Array<LiveQuote | ClosePrice>): RunCounts {
   );
 }
 
-function buildSkeletonWarnings(
-  mode: PriceSyncMode,
-  dryRun: boolean,
-  fixture: boolean,
-): string[] {
-  const warnings = [
-    "external market data providers and live asset updates are not enabled yet",
-  ];
+function buildSkeletonWarnings(options: {
+  mode: PriceSyncMode;
+  dryRun: boolean;
+  fixture: boolean;
+  writePolicy: ClosePriceWritePolicy;
+  closeWriteEnabled: boolean;
+}): string[] {
+  const warnings = ["live asset price updates are not enabled yet"];
 
-  if (mode === "close" && !dryRun && fixture) {
+  if (options.mode === "close" && options.dryRun) {
+    warnings.push(
+      "close price run is dry-run only; no asset_price_snapshots rows were written",
+    );
+  } else if (
+    options.mode === "close" &&
+    !options.dryRun &&
+    options.fixture
+  ) {
     warnings.push(
       "fixture close rows may write to asset_price_snapshots; source is stub_fixture and imported/non-stub rows are protected",
     );
-  } else if (!dryRun) {
+  } else if (
+    options.mode === "close" &&
+    !options.dryRun &&
+    options.writePolicy === "kis" &&
+    options.closeWriteEnabled
+  ) {
+    warnings.push(
+      "kis close rows may write to asset_price_snapshots; assets.current_price is not updated",
+    );
+  } else if (!options.dryRun) {
     warnings.push(
       "dryRun=false was accepted, but this mode has no market data write path enabled yet",
     );
