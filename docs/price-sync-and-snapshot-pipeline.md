@@ -282,6 +282,62 @@ Valuation basis:
 Start with manual admin triggers first. Add Vercel Cron after route handlers are
 stable.
 
+### Close Sync Coverage Gate
+
+The production manual path is considered minimally verified once a KIS close
+write and a guarded daily snapshot write have both succeeded without creating
+duplicates. That does not make Cron ready by itself.
+
+Before adding `vercel.json` or enabling Vercel Cron, define and verify the close
+sync coverage policy. The daily snapshot writer requires full fresh-close
+coverage for active ticker-backed investment assets. At the current migration
+checkpoint that means 15 price targets:
+
+- Korea / brokerage: 7
+- Korea / ISA: 4
+- Korea / IRP: 1
+- US / brokerage: 3
+
+Current route constraints:
+
+- `provider=kis&mode=close` may run as `dryRun=true` across the selected target
+  set.
+- KIS actual close writes require `dryRun=false&confirmWrite=true`.
+- KIS actual close writes currently require `limit` and cap it at `limit <= 5`
+  for manual safety.
+- The daily snapshot route must remain blocked when close coverage is missing
+  or stale; partial snapshot writes are not allowed.
+
+Coverage policy to settle before Cron:
+
+- Derive the required ticker list from the daily snapshot dry-run
+  `freshClose.coverage`, grouped by market and expected close date.
+- Treat rows with `status=satisfied` and `selectedCloseDate=expectedCloseDate`
+  as already covered.
+- Write only missing or stale ticker/date rows when possible.
+- Keep manual KIS actual writes at `limit <= 5`.
+- If an internal or Cron-only batch path is introduced later, give it a separate
+  max target limit and guard it behind the same admin/Cron secret contract.
+- If any required ticker fails, let the daily snapshot actual write return 409
+  and keep the stored snapshot unchanged.
+- Do not update `assets.current_price` from this close-sync path.
+
+Manual runbook until Cron is implemented:
+
+1. Run KIS close dry-run for the intended target set.
+2. Inspect `targetFilterSummary`, `targetFilterResults`, `plannedWrites`, and
+   `writeSummary`.
+3. Run KIS actual close writes only for missing or stale targets, in batches
+   that respect the manual `limit <= 5` cap and cooldown.
+4. Run `npm run audit:asset-price-duplicates`.
+5. Run `npm run audit:market-sync-metadata -- --limit 50`.
+6. Run production daily snapshot dry-run and confirm `writeReady=true`,
+   `freshClose.missingCount=0`, and update-only `plannedWrites` when rerunning
+   an existing varda snapshot.
+7. Run guarded daily snapshot actual write only for the current resolved cycle:
+   `dryRun=false&confirmWrite=true`.
+8. Re-run daily snapshot dry-run to confirm the path remains update-only.
+
 Pre-Cron verification checklist:
 
 1. Dashboard display
@@ -304,13 +360,14 @@ Pre-Cron verification checklist:
 
 3. Cron design before enablement
    - Keep Vercel Cron disabled until manual production dry-run is clean.
+   - Keep Cron disabled until the close sync coverage gate above is settled.
    - Run close-price sync before the daily snapshot writer.
    - If close sync is blocked or partial, the snapshot writer should stay
      blocked with `409` on actual writes and show detailed coverage in dry-run.
    - Use `ADMIN_JOB_SECRET` or `CRON_SECRET`; never store KIS tokens or provider
      credentials in Postgres.
 
-Suggested initial cron schedule:
+Candidate cron schedule after the coverage gate is implemented:
 
 - `07:10 UTC` / `16:10 KST`: `prices/sync?mode=close` for Korea close rows.
 - `22:05 UTC` / `07:05 KST`: `fx/sync`.
