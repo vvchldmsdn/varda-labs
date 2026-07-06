@@ -14,6 +14,14 @@ import {
   fxRates,
   settings,
 } from "@/db/schema";
+import {
+  assetMetricKey,
+  buildReturnMetricsSummary,
+  getAssetReturnMetrics,
+  getSelectedRealizedRows,
+  portfolioEventAccount,
+  type AssetReturnMetrics,
+} from "@/lib/portfolio-return-metrics";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const NON_INVESTMENT_ASSET_TYPES = new Set([
@@ -140,37 +148,6 @@ export type DashboardData = {
     movementCountCoveragePct: number | null;
     previousCloseCoveragePct: number | null;
   };
-};
-
-type ParsedObject = Record<string, unknown>;
-
-type AssetMaps = {
-  byId: Map<string, AssetRow>;
-  byLegacyId: Map<string, AssetRow>;
-  byTickerAccount: Map<string, AssetRow>;
-  byNameAccount: Map<string, AssetRow>;
-};
-
-type AssetReturnMetrics = {
-  assetKey: string;
-  account: string;
-  costBasisKrw: number;
-  realizedCostBasisKrw: number;
-  realizedPnlKrw: number;
-  missingCost: boolean;
-};
-
-type RealizedReturnRow = {
-  assetKey: string | null;
-  account: string | null;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
-  missingCost: boolean;
-};
-
-type ReturnMetricsSummary = {
-  metricsByAssetKey: Map<string, AssetReturnMetrics>;
-  realizedRows: RealizedReturnRow[];
 };
 
 type HoldingDailyContribution = {
@@ -574,231 +551,6 @@ function attachDailyContribution(
     previousCloseValueKrw: contribution.previousValueKrw,
     fxDailyChangeKrw: contribution.fxChangeKrw,
   };
-}
-
-function buildReturnMetricsSummary(
-  events: EventLedgerRow[],
-  assetRows: AssetRow[],
-  usdKrwRate: number,
-): ReturnMetricsSummary {
-  const assetMaps = buildAssetMaps(assetRows);
-  const metricsByAssetKey = new Map<string, AssetReturnMetrics>();
-  const realizedRows: RealizedReturnRow[] = [];
-  const runningLedger = new Map<string, { quantity: number; costKrw: number }>();
-
-  for (const asset of assetRows) {
-    const key = assetMetricKey(asset);
-    metricsByAssetKey.set(key, {
-      assetKey: key,
-      account: asset.account,
-      costBasisKrw: fallbackCostBasisKrw(asset, usdKrwRate),
-      realizedCostBasisKrw: 0,
-      realizedPnlKrw: 0,
-      missingCost: false,
-    });
-  }
-
-  const tradeEvents = events
-    .filter((event) => event.eventType === "buy" || event.eventType === "sell")
-    .sort(compareEventsAscending);
-
-  for (const event of tradeEvents) {
-    const asset = resolveEventAsset(event, assetMaps);
-    const assetKey = asset ? assetMetricKey(asset) : null;
-    const ledgerKey = assetKey ?? event.legacyAssetId;
-    const account = portfolioEventAccount(event) ?? asset?.account ?? null;
-    const quantity = eventTradeQuantity(event);
-    const amountKrw = historyTradeAmountKrw(event, asset, usdKrwRate);
-
-    if (event.eventType === "buy") {
-      if (!ledgerKey || amountKrw <= 0) continue;
-      const row = runningLedger.get(ledgerKey) ?? { quantity: 0, costKrw: 0 };
-      row.quantity += quantity;
-      row.costKrw += amountKrw;
-      runningLedger.set(ledgerKey, row);
-      continue;
-    }
-
-    if (event.eventType !== "sell") continue;
-
-    const explicitMetrics = readExplicitTradeMetrics(event);
-    const ledgerRow = ledgerKey ? runningLedger.get(ledgerKey) : undefined;
-    const disposedCostKrw =
-      explicitMetrics.disposedCostKrw ??
-      estimateDisposedCostFromLedger(ledgerRow, quantity) ??
-      estimateDisposedCostFromEvent(event, asset, quantity, usdKrwRate);
-    const fallbackRealizedPnlKrw =
-      disposedCostKrw !== null && amountKrw > 0
-        ? amountKrw - disposedCostKrw
-        : parseRealizedPnl(event.memo);
-    const realizedPnlKrw =
-      explicitMetrics.realizedPnlKrw ?? fallbackRealizedPnlKrw;
-    const realizedCostBasisKrw = disposedCostKrw ?? 0;
-    const missingCost = disposedCostKrw === null;
-
-    if (ledgerRow && disposedCostKrw !== null) {
-      ledgerRow.quantity = Math.max(ledgerRow.quantity - quantity, 0);
-      ledgerRow.costKrw = Math.max(ledgerRow.costKrw - disposedCostKrw, 0);
-    }
-
-    if (assetKey) {
-      const metrics = metricsByAssetKey.get(assetKey);
-      if (metrics) {
-        metrics.realizedPnlKrw += realizedPnlKrw;
-        metrics.realizedCostBasisKrw += realizedCostBasisKrw;
-        metrics.missingCost = metrics.missingCost || missingCost;
-      }
-    }
-
-    realizedRows.push({
-      assetKey,
-      account,
-      realizedPnlKrw,
-      realizedCostBasisKrw,
-      missingCost,
-    });
-  }
-
-  return { metricsByAssetKey, realizedRows };
-}
-
-function getAssetReturnMetrics(
-  summary: ReturnMetricsSummary,
-  asset: AssetRow,
-  usdKrwRate: number,
-) {
-  const key = assetMetricKey(asset);
-  return (
-    summary.metricsByAssetKey.get(key) ?? {
-      assetKey: key,
-      account: asset.account,
-      costBasisKrw: fallbackCostBasisKrw(asset, usdKrwRate),
-      realizedCostBasisKrw: 0,
-      realizedPnlKrw: 0,
-      missingCost: false,
-    }
-  );
-}
-
-function getSelectedRealizedRows(
-  summary: ReturnMetricsSummary,
-  selectedAccount: DashboardAccount,
-  selectedAssetKeys: Set<string>,
-) {
-  if (selectedAccount === "all") return summary.realizedRows;
-
-  return summary.realizedRows.filter((row) => {
-    if (row.account) return row.account === selectedAccount;
-    if (row.assetKey) return selectedAssetKeys.has(row.assetKey);
-    return selectedAccount === "brokerage";
-  });
-}
-
-function readExplicitTradeMetrics(event: EventLedgerRow) {
-  const before = parseJsonObject(event.beforeValue);
-  const after = parseJsonObject(event.afterValue);
-  const metricObjects = [
-    pickNestedObject(after, "trade_metrics"),
-    pickNestedObject(after, "tradeMetrics"),
-    pickNestedObject(after, "realized_metrics"),
-    pickNestedObject(before, "trade_metrics"),
-    pickNestedObject(before, "tradeMetrics"),
-  ].filter((value): value is ParsedObject => Boolean(value));
-  const metricObject = metricObjects[0] ?? null;
-
-  if (!metricObject) {
-    return {
-      realizedPnlKrw: null,
-      disposedCostKrw: null,
-    };
-  }
-
-  return {
-    realizedPnlKrw: readNumberField(metricObject, [
-      "realized_pnl_krw",
-      "realizedPnlKrw",
-      "realized_pnl",
-      "realizedPnl",
-    ]),
-    disposedCostKrw: readNumberField(metricObject, [
-      "disposed_cost_krw",
-      "disposedCostKrw",
-      "cost_basis_krw",
-      "costBasisKrw",
-      "realized_cost_krw",
-      "realizedCostKrw",
-    ]),
-  };
-}
-
-function historyTradeAmountKrw(
-  event: EventLedgerRow,
-  asset: AssetRow | null,
-  usdKrwRate: number,
-) {
-  const amount = toNumber(event.amountKrw);
-  if (amount !== null && amount !== 0) return Math.abs(amount);
-
-  const quantity = eventTradeQuantity(event);
-  const price = toNumber(event.price) ?? 0;
-  const fxRate =
-    toNumber(event.fxRate) ?? (asset?.currency === "USD" ? usdKrwRate : 1);
-  return Math.abs(quantity * price * fxRate);
-}
-
-function eventTradeQuantity(event: EventLedgerRow) {
-  const quantityDelta = toNumber(event.quantityDelta);
-  if (quantityDelta !== null && quantityDelta !== 0) return Math.abs(quantityDelta);
-
-  const before = parseJsonObject(event.beforeValue);
-  const after = parseJsonObject(event.afterValue);
-  const beforeQuantity = readNumberField(before, ["quantity"]);
-  const afterQuantity = readNumberField(after, ["quantity"]);
-  if (beforeQuantity !== null && afterQuantity !== null) {
-    return Math.abs(beforeQuantity - afterQuantity);
-  }
-  return 0;
-}
-
-function estimateDisposedCostFromLedger(
-  ledgerRow: { quantity: number; costKrw: number } | undefined,
-  quantity: number,
-) {
-  if (!ledgerRow || quantity <= 0 || ledgerRow.quantity <= 0 || ledgerRow.costKrw <= 0) {
-    return null;
-  }
-  const ratio = Math.min(quantity / ledgerRow.quantity, 1);
-  return ledgerRow.costKrw * ratio;
-}
-
-function estimateDisposedCostFromEvent(
-  event: EventLedgerRow,
-  asset: AssetRow | null,
-  quantity: number,
-  usdKrwRate: number,
-) {
-  if (quantity <= 0) return null;
-
-  const before = parseJsonObject(event.beforeValue);
-  const averageCost =
-    readNumberField(before, ["average_cost", "averageCost", "avg_cost"]) ??
-    toNumber(asset?.averageCost);
-  if (averageCost === null || averageCost <= 0) return null;
-
-  const fxRate =
-    toNumber(event.fxRate) ?? (asset?.currency === "USD" ? usdKrwRate : 1);
-  return quantity * averageCost * fxRate;
-}
-
-function fallbackCostBasisKrw(asset: AssetRow, usdKrwRate: number) {
-  const quantity = toNumber(asset.quantity) ?? 0;
-  const averageCost =
-    toNumber(asset.averageCost) ?? toNumber(asset.currentPrice) ?? 0;
-  const localCostBasis = quantity * averageCost;
-  return (
-    convertToKrw(localCostBasis, asset.currency, usdKrwRate) +
-    (toNumber(asset.fractionalAvgCost) ?? 0)
-  );
 }
 
 function buildDailyPositionMovement({
@@ -1257,50 +1009,6 @@ function buildRecentSnapshots(rows: PortfolioSnapshotRow[]) {
     .slice(-14);
 }
 
-function buildAssetMaps(assetRows: AssetRow[]): AssetMaps {
-  const maps: AssetMaps = {
-    byId: new Map(),
-    byLegacyId: new Map(),
-    byTickerAccount: new Map(),
-    byNameAccount: new Map(),
-  };
-
-  for (const asset of assetRows) {
-    maps.byId.set(asset.id, asset);
-    if (asset.legacyBase44Id) maps.byLegacyId.set(asset.legacyBase44Id, asset);
-    const ticker = normalizeTicker(asset.ticker);
-    if (ticker) maps.byTickerAccount.set(accountKey(asset.account, ticker), asset);
-    maps.byNameAccount.set(accountKey(asset.account, asset.name), asset);
-  }
-
-  return maps;
-}
-
-function resolveEventAsset(event: EventLedgerRow, maps: AssetMaps) {
-  if (event.assetId && maps.byId.has(event.assetId)) {
-    return maps.byId.get(event.assetId) ?? null;
-  }
-  if (event.legacyAssetId && maps.byLegacyId.has(event.legacyAssetId)) {
-    return maps.byLegacyId.get(event.legacyAssetId) ?? null;
-  }
-
-  const eventAccount = portfolioEventAccount(event);
-  const accountsToTry = eventAccount ? [eventAccount] : ASSET_ACCOUNT_CODES;
-  const ticker = normalizeTicker(event.ticker);
-  for (const account of accountsToTry) {
-    if (ticker) {
-      const asset = maps.byTickerAccount.get(accountKey(account, ticker));
-      if (asset) return asset;
-    }
-    if (event.assetName) {
-      const asset = maps.byNameAccount.get(accountKey(account, event.assetName));
-      if (asset) return asset;
-    }
-  }
-
-  return null;
-}
-
 function eventMatchesHolding(
   event: EventLedgerRow,
   holding: DashboardHolding,
@@ -1351,23 +1059,6 @@ function eventMatchesSelectedAccount(
   return selectedAccount === "brokerage";
 }
 
-function portfolioEventAccount(event: EventLedgerRow) {
-  if (event.account) return event.account;
-  const before = parseJsonObject(event.beforeValue);
-  const after = parseJsonObject(event.afterValue);
-  const fromAfter = readStringField(after, ["account"]);
-  if (fromAfter) return fromAfter;
-  return readStringField(before, ["account"]);
-}
-
-function assetMetricKey(asset: AssetRow) {
-  return asset.legacyBase44Id ?? asset.id;
-}
-
-function accountKey(account: string, value: string) {
-  return `${account}:${value}`;
-}
-
 function snapshotMarketValue(row: PositionSnapshotRow) {
   return toNumber(row.marketValueKrw) ?? 0;
 }
@@ -1382,65 +1073,6 @@ function inferFxRateFromClose(row: AssetPriceSnapshotRow) {
   const closePrice = toNumber(row.closePrice);
   if (closePriceKrw === null || closePrice === null || closePrice <= 0) return null;
   return closePriceKrw / closePrice;
-}
-
-function compareEventsAscending(a: EventLedgerRow, b: EventLedgerRow) {
-  const dateCompare = a.eventDate.localeCompare(b.eventDate);
-  if (dateCompare !== 0) return dateCompare;
-  return timestampMs(a.recordedAt ?? a.createdAt) - timestampMs(b.recordedAt ?? b.createdAt);
-}
-
-function parseRealizedPnl(memo: string | null) {
-  if (!memo) return 0;
-  const match = memo.match(/realized_pnl_krw=([-+]?\d+(?:\.\d+)?)/i);
-  return match ? Number(match[1]) : 0;
-}
-
-function parseJsonObject(value: unknown): ParsedObject | null {
-  if (!value) return null;
-  if (typeof value === "object" && !Array.isArray(value)) {
-    return value as ParsedObject;
-  }
-  if (typeof value !== "string") return null;
-  try {
-    const parsed = JSON.parse(value);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as ParsedObject;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function pickNestedObject(
-  source: ParsedObject | null,
-  key: string,
-): ParsedObject | null {
-  if (!source) return null;
-  const value = source[key];
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as ParsedObject;
-  }
-  return null;
-}
-
-function readNumberField(source: ParsedObject | null, keys: string[]) {
-  if (!source) return null;
-  for (const key of keys) {
-    const value = toNumber(source[key]);
-    if (value !== null) return value;
-  }
-  return null;
-}
-
-function readStringField(source: ParsedObject | null, keys: string[]) {
-  if (!source) return null;
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
 }
 
 function normalizeTicker(value: string | null | undefined) {
@@ -1465,12 +1097,6 @@ function diffDays(laterDate: string, earlierDate: string) {
   const earlier = Date.parse(`${earlierDate}T00:00:00Z`);
   if (!Number.isFinite(later) || !Number.isFinite(earlier)) return 0;
   return Math.round((later - earlier) / 86_400_000);
-}
-
-function timestampMs(value: Date | string | null | undefined) {
-  if (!value) return 0;
-  const parsed = value instanceof Date ? value.getTime() : Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function sumBy<T>(rows: T[], selector: (row: T) => number | null) {

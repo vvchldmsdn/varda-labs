@@ -246,9 +246,20 @@ Valuation basis:
   prior snapshot when available.
 - tickerless investment assets are allowed and use `assets.current_price` with
   `price_basis=manual_current`.
-- v1 cost basis uses asset average cost/fractional average cost. Event-ledger
-  realized-return accounting can be tightened in a later pass if portfolio
-  snapshot return fields need to exactly match dashboard return metrics.
+- Position-level `pnl_krw` remains open-position unrealized PnL against asset
+  average cost/fractional average cost.
+- Portfolio-level `total_pnl` / `total_return_pct` use the shared
+  event-ledger realized-return helper also used by the read-only dashboard:
+  - unrealized PnL from current open positions
+  - realized PnL from sell events through `snapshotDate`
+  - denominator as open position cost plus realized disposed-cost basis
+- Realized PnL source priority is:
+  1. explicit `trade_metrics` / `realized_metrics` in event JSON
+  2. running buy/sell ledger disposed-cost estimate
+  3. before-value average cost fallback
+  4. memo `realized_pnl_krw=...` fallback
+- Dry-run response includes `realizedReturn` with event counts, account totals,
+  unmatched sell-event count, and missing-cost sell-event count.
 
 ## Vercel Cron Order
 

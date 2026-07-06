@@ -11,6 +11,7 @@ import {
   benchmarkSnapshots,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
+  eventLedgerEntries,
   fxRates,
   marketRegimeDaily,
   type Asset,
@@ -23,6 +24,13 @@ import {
   type NewDailyPortfolioSnapshot,
   type NewDailyPositionSnapshot,
 } from "@/db/schema";
+import {
+  assetMetricKey,
+  buildReturnMetricsSummary,
+  summarizeRealizedReturnForAccount,
+  type AccountRealizedReturnSummary,
+  type ReturnMetricsSummary,
+} from "@/lib/portfolio-return-metrics";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const ACCOUNT_CODES = ["brokerage", "isa", "irp"] as const;
@@ -60,6 +68,7 @@ export type DailySnapshotRunResult = {
   fx: ResolvedFxRate;
   closeReferences: CloseReferenceSummary[];
   freshClose: FreshCloseSummary;
+  realizedReturn: RealizedReturnRunSummary;
   plannedWrites: PlannedSnapshotWrites;
   results: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan>;
   warnings: string[];
@@ -77,6 +86,20 @@ type ResolvedFxRate = {
   referenceDate: string | null;
   source: string;
   status: string | null;
+};
+
+type RealizedReturnRunSummary = {
+  asOfDate: string;
+  tradeEventCount: number;
+  buyEventCount: number;
+  sellEventCount: number;
+  realizedSellEventCount: number;
+  skippedBuyEventCount: number;
+  unmatchedSellEventCount: number;
+  missingCostSellEventCount: number;
+  realizedPnlKrw: number;
+  realizedCostBasisKrw: number;
+  accounts: AccountRealizedReturnSummary[];
 };
 
 type FreshCloseSummary = {
@@ -155,6 +178,13 @@ type AccountSnapshotPlan = {
   positionActions: Record<SnapshotWriteAction, number>;
   totalMarketValue: number;
   totalCost: number;
+  openCostKrw: number;
+  unrealizedPnlKrw: number;
+  realizedPnlKrw: number;
+  realizedCostBasisKrw: number;
+  realizedSellEventCount: number;
+  unmatchedRealizedSellEventCount: number;
+  missingCostRealizedSellEventCount: number;
   totalPnl: number;
   totalReturnPct: number | null;
   usdKrw: number;
@@ -169,6 +199,13 @@ type AllAccountSnapshotPlan = {
   portfolioAction: SnapshotWriteAction;
   totalMarketValue: number;
   totalCost: number;
+  openCostKrw: number;
+  unrealizedPnlKrw: number;
+  realizedPnlKrw: number;
+  realizedCostBasisKrw: number;
+  realizedSellEventCount: number;
+  unmatchedRealizedSellEventCount: number;
+  missingCostRealizedSellEventCount: number;
   totalPnl: number;
   totalReturnPct: number | null;
   blockers: string[];
@@ -220,6 +257,13 @@ type AccountComputed = {
   topHoldingName: string | null;
   topHoldingWeight: number | null;
   groupCount: number;
+  openCostKrw: number;
+  unrealizedPnlKrw: number;
+  realizedPnlKrw: number;
+  realizedCostBasisKrw: number;
+  realizedSellEventCount: number;
+  unmatchedRealizedSellEventCount: number;
+  missingCostRealizedSellEventCount: number;
 };
 
 type ExistingRows = {
@@ -268,13 +312,26 @@ export async function runDailySnapshot(
   const targetAccounts = requestedAccount === "all" ? [...ACCOUNT_CODES] : [requestedAccount];
   const context = await loadAccountContext(snapshotDate);
   const allAssetRows = await db.select().from(assets).orderBy(assets.account, assets.name);
-  const openInvestmentAssets = allAssetRows.filter((asset) =>
+  const investmentAssetRows = allAssetRows.filter((asset) =>
+    INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
+  );
+  const openInvestmentAssets = investmentAssetRows.filter((asset) =>
     isOpenInvestmentAsset(asset, context.groupsById),
   );
   const selectedAssets = openInvestmentAssets.filter((asset) =>
     targetAccounts.includes(asset.account as TrackedAccount),
   );
   const fx = await resolveSnapshotFx(snapshotDate);
+  const eventRows = await loadEventRows(snapshotDate);
+  const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw, {
+    asOfDate: snapshotDate,
+  });
+  const realizedReturn = buildRealizedReturnRunSummary(
+    returnMetrics,
+    targetAccounts,
+    selectedAssets,
+    snapshotDate,
+  );
   const closeContext = await buildCloseContext({
     snapshotDate,
     assets: selectedAssets,
@@ -309,6 +366,7 @@ export async function runDailySnapshot(
       closeContext,
       cycle,
       snapshotDate,
+      returnMetrics,
       priorPositions: existingRows.priorPositions,
     });
     const build = buildAccountPlan({
@@ -393,6 +451,7 @@ export async function runDailySnapshot(
     fx,
     closeReferences: closeContext.closeReferences,
     freshClose,
+    realizedReturn,
     plannedWrites,
     results: resultMap,
     warnings,
@@ -446,6 +505,13 @@ function buildAccountPlan({
     positionActions,
     totalMarketValue: computed.totalMarketValue,
     totalCost: computed.totalCost,
+    openCostKrw: computed.openCostKrw,
+    unrealizedPnlKrw: computed.unrealizedPnlKrw,
+    realizedPnlKrw: computed.realizedPnlKrw,
+    realizedCostBasisKrw: computed.realizedCostBasisKrw,
+    realizedSellEventCount: computed.realizedSellEventCount,
+    unmatchedRealizedSellEventCount: computed.unmatchedRealizedSellEventCount,
+    missingCostRealizedSellEventCount: computed.missingCostRealizedSellEventCount,
     totalPnl: computed.totalPnl,
     totalReturnPct: computed.totalReturnPct,
     usdKrw: fx.usdKrw,
@@ -481,8 +547,27 @@ function buildAllAccountPlan({
   );
   const existingPortfolio = existingRows.find(isVardaGeneratedRow) ?? null;
   const totalMarketValue = sumBy(completed, (build) => build.totalMarketValue);
-  const totalCost = sumBy(completed, (build) => build.totalCost);
-  const totalPnl = sumBy(completed, (build) => build.totalPnl);
+  const openCostKrw = sumBy(completed, (build) => build.openCostKrw);
+  const unrealizedPnlKrw = sumBy(completed, (build) => build.unrealizedPnlKrw);
+  const realizedPnlKrw = sumBy(completed, (build) => build.realizedPnlKrw);
+  const realizedCostBasisKrw = sumBy(
+    completed,
+    (build) => build.realizedCostBasisKrw,
+  );
+  const realizedSellEventCount = sumBy(
+    completed,
+    (build) => build.realizedSellEventCount,
+  );
+  const unmatchedRealizedSellEventCount = sumBy(
+    completed,
+    (build) => build.unmatchedRealizedSellEventCount,
+  );
+  const missingCostRealizedSellEventCount = sumBy(
+    completed,
+    (build) => build.missingCostRealizedSellEventCount,
+  );
+  const totalCost = openCostKrw + realizedCostBasisKrw;
+  const totalPnl = unrealizedPnlKrw + realizedPnlKrw;
   const investedAmount = totalCost;
   const topHolding = findTopHolding(
     accountBuilds.flatMap((build) => build.positions),
@@ -521,6 +606,11 @@ function buildAllAccountPlan({
             `accounts=${completed.length}`,
             "valuation_basis=close_price",
             `fx_source=${fx.source}`,
+            "return_basis=unrealized_plus_event_ledger_realized_v1",
+            `open_cost_krw=${Math.round(openCostKrw)}`,
+            `realized_pnl_krw=${Math.round(realizedPnlKrw)}`,
+            `realized_cost_basis_krw=${Math.round(realizedCostBasisKrw)}`,
+            `realized_sell_events=${realizedSellEventCount}`,
           ].join("; "),
           isSample: false,
           cashValue: decimal(0),
@@ -569,6 +659,13 @@ function buildAllAccountPlan({
     portfolioAction,
     totalMarketValue,
     totalCost,
+    openCostKrw,
+    unrealizedPnlKrw,
+    realizedPnlKrw,
+    realizedCostBasisKrw,
+    realizedSellEventCount,
+    unmatchedRealizedSellEventCount,
+    missingCostRealizedSellEventCount,
     totalPnl,
     totalReturnPct: percentOrNull(totalPnl, investedAmount),
     blockers,
@@ -585,6 +682,7 @@ function computeAccountSnapshot({
   closeContext,
   cycle,
   snapshotDate,
+  returnMetrics,
   priorPositions,
 }: {
   account: TrackedAccount;
@@ -594,6 +692,7 @@ function computeAccountSnapshot({
   closeContext: CloseContext;
   cycle: InternalCycle;
   snapshotDate: string;
+  returnMetrics: ReturnMetricsSummary;
   priorPositions: PositionRow[];
 }): AccountComputed {
   const groupValueById = new Map<string, number>();
@@ -794,8 +893,18 @@ function computeAccountSnapshot({
     };
   });
 
-  const totalCost = sumBy(positions, (position) => toNumber(position.costKrw) ?? 0);
-  const totalPnl = sumBy(positions, (position) => toNumber(position.pnlKrw) ?? 0);
+  const selectedAssetKeys = new Set(assets.map((asset) => assetMetricKey(asset)));
+  const accountRealized = summarizeRealizedReturnForAccount(
+    returnMetrics,
+    account,
+    selectedAssetKeys,
+  );
+  const openCostKrw = sumBy(positions, (position) => toNumber(position.costKrw) ?? 0);
+  const unrealizedPnlKrw = sumBy(positions, (position) => toNumber(position.pnlKrw) ?? 0);
+  const realizedPnlKrw = accountRealized.realizedPnlKrw;
+  const realizedCostBasisKrw = accountRealized.realizedCostBasisKrw;
+  const totalCost = openCostKrw + realizedCostBasisKrw;
+  const totalPnl = unrealizedPnlKrw + realizedPnlKrw;
   const topHolding = findTopHolding(positions, totalMarketValue);
 
   return {
@@ -807,6 +916,13 @@ function computeAccountSnapshot({
     totalPnl,
     totalReturnPct: percentOrNull(totalPnl, totalCost),
     investedAmount: totalCost,
+    openCostKrw,
+    unrealizedPnlKrw,
+    realizedPnlKrw,
+    realizedCostBasisKrw,
+    realizedSellEventCount: accountRealized.realizedSellEventCount,
+    unmatchedRealizedSellEventCount: accountRealized.unmatchedSellEventCount,
+    missingCostRealizedSellEventCount: accountRealized.missingCostSellEventCount,
     krValue,
     usValue,
     thematicValue,
@@ -836,7 +952,11 @@ function buildPortfolioSnapshot(
       `expected_positions=${computed.positions.length}`,
       "valuation_basis=close_price",
       `fx_source=${fx.source}`,
-      "return_basis=unrealized_asset_average_cost_v1",
+      "return_basis=unrealized_plus_event_ledger_realized_v1",
+      `open_cost_krw=${Math.round(computed.openCostKrw)}`,
+      `realized_pnl_krw=${Math.round(computed.realizedPnlKrw)}`,
+      `realized_cost_basis_krw=${Math.round(computed.realizedCostBasisKrw)}`,
+      `realized_sell_events=${computed.realizedSellEventCount}`,
     ].join("; "),
     isSample: false,
     cashValue: decimal(0),
@@ -992,6 +1112,56 @@ async function loadAccountContext(snapshotDate: string): Promise<AccountContext>
         .filter((row): row is BenchmarkSnapshot => Boolean(row))
         .map((row) => [row.benchmarkTicker, row]),
     ),
+  };
+}
+
+async function loadEventRows(snapshotDate: string) {
+  return db
+    .select()
+    .from(eventLedgerEntries)
+    .where(lte(eventLedgerEntries.eventDate, snapshotDate))
+    .orderBy(eventLedgerEntries.eventDate);
+}
+
+function buildRealizedReturnRunSummary(
+  summary: ReturnMetricsSummary,
+  targetAccounts: TrackedAccount[],
+  selectedAssets: AssetRow[],
+  snapshotDate: string,
+): RealizedReturnRunSummary {
+  const assetsByAccount = new Map<TrackedAccount, Set<string>>();
+  for (const account of targetAccounts) {
+    assetsByAccount.set(account, new Set<string>());
+  }
+  for (const asset of selectedAssets) {
+    if (targetAccounts.includes(asset.account as TrackedAccount)) {
+      assetsByAccount.get(asset.account as TrackedAccount)?.add(assetMetricKey(asset));
+    }
+  }
+
+  const accountSummaries = targetAccounts.map((account) =>
+    summarizeRealizedReturnForAccount(
+      summary,
+      account,
+      assetsByAccount.get(account) ?? new Set<string>(),
+    ),
+  );
+
+  return {
+    asOfDate: summary.asOfDate ?? snapshotDate,
+    tradeEventCount: summary.tradeEventCount,
+    buyEventCount: summary.buyEventCount,
+    sellEventCount: summary.sellEventCount,
+    realizedSellEventCount: summary.realizedSellEventCount,
+    skippedBuyEventCount: summary.skippedBuyEventCount,
+    unmatchedSellEventCount: summary.unmatchedSellEventCount,
+    missingCostSellEventCount: summary.missingCostSellEventCount,
+    realizedPnlKrw: sumBy(accountSummaries, (account) => account.realizedPnlKrw),
+    realizedCostBasisKrw: sumBy(
+      accountSummaries,
+      (account) => account.realizedCostBasisKrw,
+    ),
+    accounts: accountSummaries,
   };
 }
 
@@ -1452,6 +1622,13 @@ function emptyAccountPlan(account: TrackedAccount): AccountSnapshotBuild {
     positionActions: { insert: 0, update: 0, skip: 0, blocked: 0 },
     totalMarketValue: 0,
     totalCost: 0,
+    openCostKrw: 0,
+    unrealizedPnlKrw: 0,
+    realizedPnlKrw: 0,
+    realizedCostBasisKrw: 0,
+    realizedSellEventCount: 0,
+    unmatchedRealizedSellEventCount: 0,
+    missingCostRealizedSellEventCount: 0,
     totalPnl: 0,
     totalReturnPct: null,
     usdKrw: 0,
@@ -1519,6 +1696,13 @@ function publicAccountPlan(build: AccountSnapshotBuild): AccountSnapshotPlan {
     positionActions: build.positionActions,
     totalMarketValue: build.totalMarketValue,
     totalCost: build.totalCost,
+    openCostKrw: build.openCostKrw,
+    unrealizedPnlKrw: build.unrealizedPnlKrw,
+    realizedPnlKrw: build.realizedPnlKrw,
+    realizedCostBasisKrw: build.realizedCostBasisKrw,
+    realizedSellEventCount: build.realizedSellEventCount,
+    unmatchedRealizedSellEventCount: build.unmatchedRealizedSellEventCount,
+    missingCostRealizedSellEventCount: build.missingCostRealizedSellEventCount,
     totalPnl: build.totalPnl,
     totalReturnPct: build.totalReturnPct,
     usdKrw: build.usdKrw,
@@ -1535,6 +1719,13 @@ function publicAllAccountPlan(build: AllAccountSnapshotBuild): AllAccountSnapsho
     portfolioAction: build.portfolioAction,
     totalMarketValue: build.totalMarketValue,
     totalCost: build.totalCost,
+    openCostKrw: build.openCostKrw,
+    unrealizedPnlKrw: build.unrealizedPnlKrw,
+    realizedPnlKrw: build.realizedPnlKrw,
+    realizedCostBasisKrw: build.realizedCostBasisKrw,
+    realizedSellEventCount: build.realizedSellEventCount,
+    unmatchedRealizedSellEventCount: build.unmatchedRealizedSellEventCount,
+    missingCostRealizedSellEventCount: build.missingCostRealizedSellEventCount,
     totalPnl: build.totalPnl,
     totalReturnPct: build.totalReturnPct,
     blockers: build.blockers,
