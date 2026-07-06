@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --no-warnings tests/run.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
     "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",
     "db:generate": "drizzle-kit generate",
