@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { accounts } from "@/db/schema";
+import { requireAdminJob } from "@/lib/api-guards";
 
 type NewAccount = typeof accounts.$inferInsert;
 
@@ -64,7 +65,10 @@ const createAccountSchema = z
     }
   });
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const rows = await db
     .select()
     .from(accounts)
@@ -74,6 +78,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const json = await request.json();
   const parsed = createAccountSchema.safeParse(json);
 

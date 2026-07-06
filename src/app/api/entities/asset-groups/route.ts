@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { assetGroups } from "@/db/schema";
+import { requireAdminJob } from "@/lib/api-guards";
 
 const optionalText = z.preprocess((value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -62,7 +63,10 @@ const createAssetGroupSchema = z.object({
   owner_user_id: optionalText,
 });
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const rows = await db
     .select()
     .from(assetGroups)
@@ -72,6 +76,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const json = await request.json();
   const parsed = createAssetGroupSchema.safeParse(json);
 

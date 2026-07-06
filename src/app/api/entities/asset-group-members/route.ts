@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { assetGroupMembers } from "@/db/schema";
+import { requireAdminJob } from "@/lib/api-guards";
 
 type NewAssetGroupMember = typeof assetGroupMembers.$inferInsert;
 
@@ -76,7 +77,10 @@ const createAssetGroupMemberSchema = z
     }
   });
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const rows = await db
     .select()
     .from(assetGroupMembers)
@@ -89,6 +93,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const json = await request.json();
   const parsed = createAssetGroupMemberSchema.safeParse(json);
 

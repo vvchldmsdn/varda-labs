@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { assetGroups } from "@/db/schema";
+import { requireAdminJob } from "@/lib/api-guards";
 
 type UpdateAssetGroup = Partial<typeof assetGroups.$inferInsert> & {
   updatedAt: Date;
@@ -78,6 +79,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const { id } = await params;
   const json = await request.json();
   const parsed = updateAssetGroupSchema.safeParse(json);
@@ -157,9 +161,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const unauthorized = requireAdminJob(request);
+  if (unauthorized) return unauthorized;
+
   const { id } = await params;
 
   const [deleted] = await db
