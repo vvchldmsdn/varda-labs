@@ -32,8 +32,10 @@ before expanding the migrated app surface.
 ## Pending Decisions
 
 - Add database foreign keys for core current-state tables such as assets,
-  accounts, asset groups, and asset group members after checking production rows
-  for orphan UUID references.
+  accounts, asset groups, and asset group members only after reviewing
+  `npm run audit:data-integrity`. The 2026-07-07 read-only audit found zero
+  `severity="error"` orphan or duplicate checks, but FK migrations should still
+  be proposed separately from the audit itself.
 - Revisit `asset_price_snapshots` uniqueness. Current writes use ticker/date,
   while lookup targets are market/ticker/currency. A future migration should
   decide whether the unique key should include market and currency.
