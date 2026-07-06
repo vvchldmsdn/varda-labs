@@ -50,6 +50,7 @@ data deletion.
 
 Do not add FK constraints, backfill rows, or alter snapshot write semantics from
 this audit alone. Use the audit output to decide the next small migration step.
+See `docs/fk-hardening-proposal.md` for the current FK decision proposal.
 
 ## Latest Observation
 
