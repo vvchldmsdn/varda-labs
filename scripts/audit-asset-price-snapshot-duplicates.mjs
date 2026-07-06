@@ -40,6 +40,15 @@ async function main() {
       count(*) filter (where row_count > 1 and source_variants > 1)::int as source_conflict_groups
     from keyed
   `);
+  const [indexSummary] = await sql.query(`
+    select exists (
+      select 1
+      from pg_indexes
+      where schemaname = current_schema()
+        and tablename = 'asset_price_snapshots'
+        and indexname = 'asset_price_snapshots_ticker_date_unique'
+    ) as ticker_date_unique_index_present
+  `);
 
   const sourceDistribution = await sql.query(`
     with duplicate_keys as (
@@ -111,15 +120,18 @@ async function main() {
       excessRows: Number(summary.excess_rows ?? 0),
       valueConflictGroups: Number(summary.value_conflict_groups ?? 0),
       sourceConflictGroups: Number(summary.source_conflict_groups ?? 0),
+      tickerDateUniqueIndexPresent:
+        indexSummary.ticker_date_unique_index_present === true,
       uniqueIndexReady: Number(summary.duplicate_groups ?? 0) === 0,
     },
     sourceDistribution,
     topDuplicateDates: dateDistribution,
     sampleDuplicateGroups: samples,
-    recommendation:
-      Number(summary.duplicate_groups ?? 0) === 0
-        ? "ticker/date unique index can be added after normal migration review."
-        : "do not add ticker/date unique index yet; decide source priority and clean duplicate groups first.",
+    recommendation: buildRecommendation({
+      duplicateGroups: Number(summary.duplicate_groups ?? 0),
+      tickerDateUniqueIndexPresent:
+        indexSummary.ticker_date_unique_index_present === true,
+    }),
   };
 
   console.log(JSON.stringify(result, null, 2));
@@ -129,3 +141,15 @@ main().catch((error) => {
   console.error(error.message);
   process.exit(1);
 });
+
+function buildRecommendation({ duplicateGroups, tickerDateUniqueIndexPresent }) {
+  if (duplicateGroups > 0) {
+    return "clean duplicates before relying on ticker/date uniqueness.";
+  }
+
+  if (tickerDateUniqueIndexPresent) {
+    return "ticker/date unique index is present and duplicate audit is clean.";
+  }
+
+  return "ticker/date unique index can be added after normal migration review.";
+}

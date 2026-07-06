@@ -18,6 +18,8 @@ const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"])
 const LIVE_MARKET_DATA_WRITES_ENABLED = false;
 const DEFAULT_KIS_JOB_COOLDOWN_SECONDS = 90;
 const DEFAULT_KIS_VALUE_CONFLICT_THRESHOLD_PCT = 3;
+const DECIMAL_COMPARE_ABSOLUTE_TOLERANCE = 1e-9;
+const DECIMAL_COMPARE_RELATIVE_TOLERANCE = 1e-10;
 
 export const PRICE_SYNC_CONTRACT = {
   live: {
@@ -1155,7 +1157,21 @@ function isDecimalString(value: string | null) {
 }
 
 function sameDecimal(left: string, right: string) {
-  return Number(left) === Number(right);
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+
+  if (!Number.isFinite(leftNumber) || !Number.isFinite(rightNumber)) {
+    return left === right;
+  }
+
+  const difference = Math.abs(leftNumber - rightNumber);
+  const tolerance = Math.max(
+    DECIMAL_COMPARE_ABSOLUTE_TOLERANCE,
+    Math.max(Math.abs(leftNumber), Math.abs(rightNumber)) *
+      DECIMAL_COMPARE_RELATIVE_TOLERANCE,
+  );
+
+  return difference <= tolerance;
 }
 
 function sameNullableDecimal(left: string | null, right: string | null) {
