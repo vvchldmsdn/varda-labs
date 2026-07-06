@@ -57,6 +57,8 @@ export type PriceSyncRunResult = {
   insertedCount: number;
   updatedCount: number;
   conflictCount: number;
+  targetFilterSummary: PriceSyncTargetFilterSummary;
+  targetFilterResults: PriceSyncTargetFilterResult[];
   plannedWrites: PlannedWrite[];
   writeResults: ClosePriceWriteResult[];
   contract: (typeof PRICE_SYNC_CONTRACT)[PriceSyncMode];
@@ -75,6 +77,37 @@ export type PriceSyncCooldownStatus = {
   lastRunFinishedAt: string | null;
 };
 
+export type PriceSyncTargetMarket = "korea" | "us";
+export type PriceSyncTargetAccount = "brokerage" | "isa" | "irp";
+
+export type PriceSyncTargetFilter = {
+  tickers?: string[];
+  market?: PriceSyncTargetMarket;
+  account?: PriceSyncTargetAccount;
+};
+
+export type PriceSyncTargetFilterResult = {
+  ticker: string;
+  action: "included" | "skipped";
+  reason?:
+    | "ticker_not_in_asset_universe"
+    | "ticker_not_syncable"
+    | "ticker_filtered_out"
+    | "ticker_limit_excluded";
+};
+
+export type PriceSyncTargetFilterSummary = {
+  requestedTickers: string[] | null;
+  requestedTickerCount: number;
+  market: PriceSyncTargetMarket | null;
+  account: PriceSyncTargetAccount | null;
+  totalSyncableAssetCount: number;
+  totalPriceTargetCount: number;
+  filteredAssetCount: number;
+  filteredPriceTargetCount: number;
+  limitedPriceTargetCount: number;
+};
+
 type PlannedWrite = {
   table: string;
   operation: string;
@@ -82,13 +115,14 @@ type PlannedWrite = {
   active: boolean;
 };
 
-type SyncableAssetRow = {
+type PriceSyncAssetRow = {
   id: string;
   name: string;
   ticker: string | null;
   assetType: string | null;
   market: string;
   currency: string;
+  account: string;
 };
 
 type RunCounts = {
@@ -197,6 +231,7 @@ export async function runMarketPriceSync(options: {
   priceDate?: string;
   provider?: MarketDataProvider;
   targetLimit?: number;
+  targetFilter?: PriceSyncTargetFilter;
 }): Promise<PriceSyncRunResult> {
   const provider = options.provider ?? createStubMarketDataProvider();
   const dryRun = options.dryRun ?? true;
@@ -205,6 +240,50 @@ export async function runMarketPriceSync(options: {
   const startedAt = new Date();
   const writePolicy = getClosePriceWritePolicy(provider.name, fixture);
   const closeWriteEnabled = !dryRun && writePolicy !== "none";
+  const targetFilter = normalizeTargetFilter(options.targetFilter);
+  const assetRows = await getAssetRowsForPriceSync();
+  const syncableAssetRows = assetRows.filter(isSyncableAssetRow);
+  const totalPriceTargets = buildPriceLookupTargets(syncableAssetRows);
+  const filteredAssetRows = applyTargetFilter(syncableAssetRows, targetFilter);
+  const filteredPriceTargets = orderPriceTargetsByFilter(
+    buildPriceLookupTargets(filteredAssetRows),
+    targetFilter,
+  );
+  const priceTargets =
+    options.targetLimit === undefined
+      ? filteredPriceTargets
+      : filteredPriceTargets.slice(0, options.targetLimit);
+  const targetFilterResults = buildTargetFilterResults({
+    targetFilter,
+    allAssetRows: assetRows,
+    syncableAssetRows,
+    filteredPriceTargets,
+    priceTargets,
+  });
+  const targetFilterSummary = summarizeTargetFilter({
+    targetFilter,
+    totalSyncableAssetCount: syncableAssetRows.length,
+    totalPriceTargetCount: totalPriceTargets.length,
+    filteredAssetCount: filteredAssetRows.length,
+    filteredPriceTargetCount: filteredPriceTargets.length,
+    limitedPriceTargetCount: priceTargets.length,
+  });
+
+  if (
+    !dryRun &&
+    options.mode === "close" &&
+    closeWriteEnabled &&
+    priceTargets.length === 0
+  ) {
+    throw new PriceSyncRequestError(
+      "no_write_targets",
+      "KIS close writes require at least one selected write target",
+      {
+        targetFilterSummary,
+        targetFilterResults,
+      },
+    );
+  }
 
   const [run] = await db
     .insert(marketDataSyncRuns)
@@ -224,22 +303,17 @@ export async function runMarketPriceSync(options: {
         priceDate,
         provider: provider.name,
         phase: "started",
+        targetFilter: targetFilterSummary,
       },
     })
     .returning({ id: marketDataSyncRuns.id });
 
   try {
-    const assetRows = await getSyncableAssetRows();
-    const allPriceTargets = buildPriceLookupTargets(assetRows);
-    const priceTargets =
-      options.targetLimit === undefined
-        ? allPriceTargets
-        : allPriceTargets.slice(0, options.targetLimit);
     const plannedWrites = buildPlannedWrites(
       options.mode,
       dryRun,
       writePolicy,
-      assetRows.length,
+      syncableAssetRows.length,
       priceTargets.length,
     );
     const providerResult = dryRun
@@ -273,6 +347,7 @@ export async function runMarketPriceSync(options: {
         : emptyClosePriceWriteSummary();
     const warnings = [
       ...providerResult.warnings,
+      ...buildTargetFilterWarnings(targetFilterSummary, targetFilterResults),
       ...buildSkeletonWarnings({
         mode: options.mode,
         dryRun,
@@ -292,13 +367,15 @@ export async function runMarketPriceSync(options: {
       fixture,
       priceDate,
       requestedCount: priceTargets.length,
-      assetCount: assetRows.length,
+      assetCount: syncableAssetRows.length,
       successCount: counts.successCount,
       failedCount: counts.failedCount + closeWriteSummary.failedCount,
       skippedCount: counts.skippedCount + closeWriteSummary.skippedCount,
       insertedCount: closeWriteSummary.insertedCount,
       updatedCount: closeWriteSummary.updatedCount,
       conflictCount: closeWriteSummary.conflictCount,
+      targetFilterSummary,
+      targetFilterResults,
       plannedWrites,
       writeResults: closeWriteSummary.results,
       contract: PRICE_SYNC_CONTRACT[options.mode],
@@ -320,10 +397,13 @@ export async function runMarketPriceSync(options: {
           priceDate,
           provider: provider.name,
           mode: options.mode,
-          assetCount: assetRows.length,
+          assetCount: syncableAssetRows.length,
           priceTargetCount: priceTargets.length,
-          totalPriceTargetCount: allPriceTargets.length,
+          totalPriceTargetCount: totalPriceTargets.length,
+          filteredPriceTargetCount: filteredPriceTargets.length,
           targetLimit: options.targetLimit ?? null,
+          targetFilter: targetFilterSummary,
+          targetFilterResults: summarizeTargetFilterResults(targetFilterResults),
           insertedCount: result.insertedCount,
           updatedCount: result.updatedCount,
           conflictCount: result.conflictCount,
@@ -360,6 +440,7 @@ export async function runMarketPriceSync(options: {
             options.mode === "close" && closeWriteEnabled,
           writePolicy,
           error: safeError,
+          targetFilter: targetFilterSummary,
         },
       })
       .where(eq(marketDataSyncRuns.id, run.id));
@@ -368,7 +449,7 @@ export async function runMarketPriceSync(options: {
   }
 }
 
-async function getSyncableAssetRows(): Promise<SyncableAssetRow[]> {
+async function getAssetRowsForPriceSync(): Promise<PriceSyncAssetRow[]> {
   const rows = await db
     .select({
       id: assets.id,
@@ -377,18 +458,21 @@ async function getSyncableAssetRows(): Promise<SyncableAssetRow[]> {
       assetType: assets.assetType,
       market: assets.market,
       currency: assets.currency,
+      account: assets.account,
     })
     .from(assets)
     .orderBy(assets.market, assets.ticker, assets.name);
 
-  return rows.filter((asset) => {
-    const ticker = normalizeTicker(asset.ticker);
-    const assetType = normalizeText(asset.assetType) ?? "etf";
-    return ticker !== null && INVESTMENT_ASSET_TYPES.has(assetType);
-  });
+  return rows;
 }
 
-function buildPriceLookupTargets(rows: SyncableAssetRow[]): PriceLookupTarget[] {
+function isSyncableAssetRow(row: PriceSyncAssetRow) {
+  const ticker = normalizeTicker(row.ticker);
+  const assetType = normalizeText(row.assetType) ?? "etf";
+  return ticker !== null && INVESTMENT_ASSET_TYPES.has(assetType);
+}
+
+function buildPriceLookupTargets(rows: PriceSyncAssetRow[]): PriceLookupTarget[] {
   const targetsByKey = new Map<string, PriceLookupTarget>();
 
   for (const row of rows) {
@@ -403,6 +487,7 @@ function buildPriceLookupTargets(rows: SyncableAssetRow[]): PriceLookupTarget[] 
     if (existing) {
       existing.assetIds.push(row.id);
       existing.assetNames.push(row.name);
+      existing.accounts.push(normalizeText(row.account) ?? "unknown");
       continue;
     }
 
@@ -411,6 +496,7 @@ function buildPriceLookupTargets(rows: SyncableAssetRow[]): PriceLookupTarget[] 
       ticker,
       market,
       currency,
+      accounts: [normalizeText(row.account) ?? "unknown"],
       assetIds: [row.id],
       assetNames: [row.name],
     });
@@ -419,6 +505,142 @@ function buildPriceLookupTargets(rows: SyncableAssetRow[]): PriceLookupTarget[] 
   return Array.from(targetsByKey.values()).sort((left, right) =>
     left.key.localeCompare(right.key),
   );
+}
+
+function normalizeTargetFilter(
+  filter: PriceSyncTargetFilter | undefined,
+): PriceSyncTargetFilter {
+  const tickers = filter?.tickers
+    ?.map((ticker) => normalizeTicker(ticker))
+    .filter((ticker): ticker is string => ticker !== null);
+
+  return {
+    tickers: tickers && tickers.length > 0 ? [...new Set(tickers)] : undefined,
+    market: filter?.market,
+    account: filter?.account,
+  };
+}
+
+function applyTargetFilter(
+  rows: PriceSyncAssetRow[],
+  filter: PriceSyncTargetFilter,
+) {
+  const tickerSet = filter.tickers ? new Set(filter.tickers) : null;
+
+  return rows.filter((row) => {
+    const ticker = normalizeTicker(row.ticker);
+    const market = normalizeText(row.market);
+    const account = normalizeText(row.account);
+
+    if (!ticker) return false;
+    if (tickerSet && !tickerSet.has(ticker)) return false;
+    if (filter.market && market !== filter.market) return false;
+    if (filter.account && account !== filter.account) return false;
+
+    return true;
+  });
+}
+
+function buildTargetFilterResults(options: {
+  targetFilter: PriceSyncTargetFilter;
+  allAssetRows: PriceSyncAssetRow[];
+  syncableAssetRows: PriceSyncAssetRow[];
+  filteredPriceTargets: PriceLookupTarget[];
+  priceTargets: PriceLookupTarget[];
+}): PriceSyncTargetFilterResult[] {
+  if (!options.targetFilter.tickers) return [];
+
+  const allTickers = new Set(
+    options.allAssetRows
+      .map((row) => normalizeTicker(row.ticker))
+      .filter((ticker): ticker is string => ticker !== null),
+  );
+  const syncableTickers = new Set(
+    options.syncableAssetRows
+      .map((row) => normalizeTicker(row.ticker))
+      .filter((ticker): ticker is string => ticker !== null),
+  );
+  const filteredTargetTickers = new Set(
+    options.filteredPriceTargets.map((target) => target.ticker),
+  );
+  const limitedTargetTickers = new Set(
+    options.priceTargets.map((target) => target.ticker),
+  );
+
+  return options.targetFilter.tickers.map((ticker) => {
+    if (!allTickers.has(ticker)) {
+      return {
+        ticker,
+        action: "skipped" as const,
+        reason: "ticker_not_in_asset_universe" as const,
+      };
+    }
+
+    if (!syncableTickers.has(ticker)) {
+      return {
+        ticker,
+        action: "skipped" as const,
+        reason: "ticker_not_syncable" as const,
+      };
+    }
+
+    if (!filteredTargetTickers.has(ticker)) {
+      return {
+        ticker,
+        action: "skipped" as const,
+        reason: "ticker_filtered_out" as const,
+      };
+    }
+
+    if (!limitedTargetTickers.has(ticker)) {
+      return {
+        ticker,
+        action: "skipped" as const,
+        reason: "ticker_limit_excluded" as const,
+      };
+    }
+
+    return { ticker, action: "included" as const };
+  });
+}
+
+function summarizeTargetFilter(options: {
+  targetFilter: PriceSyncTargetFilter;
+  totalSyncableAssetCount: number;
+  totalPriceTargetCount: number;
+  filteredAssetCount: number;
+  filteredPriceTargetCount: number;
+  limitedPriceTargetCount: number;
+}): PriceSyncTargetFilterSummary {
+  return {
+    requestedTickers: options.targetFilter.tickers ?? null,
+    requestedTickerCount: options.targetFilter.tickers?.length ?? 0,
+    market: options.targetFilter.market ?? null,
+    account: options.targetFilter.account ?? null,
+    totalSyncableAssetCount: options.totalSyncableAssetCount,
+    totalPriceTargetCount: options.totalPriceTargetCount,
+    filteredAssetCount: options.filteredAssetCount,
+    filteredPriceTargetCount: options.filteredPriceTargetCount,
+    limitedPriceTargetCount: options.limitedPriceTargetCount,
+  };
+}
+
+function orderPriceTargetsByFilter(
+  targets: PriceLookupTarget[],
+  targetFilter: PriceSyncTargetFilter,
+) {
+  if (!targetFilter.tickers) return targets;
+
+  const tickerOrder = new Map(
+    targetFilter.tickers.map((ticker, index) => [ticker, index] as const),
+  );
+
+  return [...targets].sort((left, right) => {
+    const leftIndex = tickerOrder.get(left.ticker) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = tickerOrder.get(right.ticker) ?? Number.MAX_SAFE_INTEGER;
+    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+    return left.key.localeCompare(right.key);
+  });
 }
 
 function buildPlannedWrites(
@@ -484,6 +706,15 @@ async function buildDryRunProviderResult(options: {
   fixture: boolean,
   priceDate: string,
 }): Promise<ProviderResult<LiveQuote | ClosePrice>> {
+  if (options.targets.length === 0) {
+    return {
+      provider: options.provider.name,
+      fetchedAt: options.requestedAt,
+      rows: [],
+      warnings: ["target filters matched no syncable price targets"],
+    };
+  }
+
   if (options.mode === "close" && (options.fixture || options.provider.name === "kis")) {
     return options.provider.fetchClosePrices(options.targets, {
       mode: options.mode,
@@ -896,6 +1127,24 @@ function summarizeWriteResults(results: ClosePriceWriteResult[]) {
   };
 }
 
+function summarizeTargetFilterResults(results: PriceSyncTargetFilterResult[]) {
+  const actions = new Map<string, number>();
+  const reasons = new Map<string, number>();
+
+  for (const result of results) {
+    actions.set(result.action, (actions.get(result.action) ?? 0) + 1);
+    if (result.reason) {
+      reasons.set(result.reason, (reasons.get(result.reason) ?? 0) + 1);
+    }
+  }
+
+  return {
+    actions: Object.fromEntries(actions),
+    reasons: Object.fromEntries(reasons),
+    sample: results.slice(0, 25),
+  };
+}
+
 function isDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
@@ -976,22 +1225,45 @@ function buildSkeletonWarnings(options: {
   return warnings;
 }
 
+function buildTargetFilterWarnings(
+  summary: PriceSyncTargetFilterSummary,
+  results: PriceSyncTargetFilterResult[],
+) {
+  const warnings: string[] = [];
+
+  if (summary.filteredPriceTargetCount === 0) {
+    warnings.push("target filters matched no syncable price targets");
+  }
+
+  if (results.some((result) => result.action === "skipped")) {
+    warnings.push("some requested tickers were not selected by target filters");
+  }
+
+  return warnings;
+}
+
 function summarizeTargets(targets: PriceLookupTarget[]) {
   const markets = new Map<string, number>();
   const currencies = new Map<string, number>();
+  const accounts = new Map<string, number>();
 
   for (const target of targets) {
     markets.set(target.market, (markets.get(target.market) ?? 0) + 1);
     currencies.set(target.currency, (currencies.get(target.currency) ?? 0) + 1);
+    for (const account of new Set(target.accounts)) {
+      accounts.set(account, (accounts.get(account) ?? 0) + 1);
+    }
   }
 
   return {
     markets: Object.fromEntries(markets),
     currencies: Object.fromEntries(currencies),
+    accounts: Object.fromEntries(accounts),
     sample: targets.slice(0, 5).map((target) => ({
       ticker: target.ticker,
       market: target.market,
       currency: target.currency,
+      accounts: [...new Set(target.accounts)],
       assetCount: target.assetIds.length,
     })),
   };
@@ -1003,7 +1275,7 @@ function normalizeText(value: string | null | undefined): string | null {
 }
 
 function normalizeTicker(value: string | null | undefined): string | null {
-  const normalized = value?.trim();
+  const normalized = value?.trim().toUpperCase();
   return normalized ? normalized : null;
 }
 
@@ -1037,5 +1309,20 @@ export class PriceSyncError extends Error {
   ) {
     super(message);
     this.name = "PriceSyncError";
+  }
+}
+
+export class PriceSyncRequestError extends Error {
+  readonly statusCode: number;
+
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly details: unknown,
+    statusCode = 400,
+  ) {
+    super(message);
+    this.name = "PriceSyncRequestError";
+    this.statusCode = statusCode;
   }
 }

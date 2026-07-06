@@ -8,8 +8,10 @@ import {
   getKisPriceSyncCooldownStatus,
   isPriceSyncMode,
   PriceSyncError,
+  PriceSyncRequestError,
   runMarketPriceSync,
 } from "@/lib/market-data/price-sync";
+import type { PriceSyncTargetFilter } from "@/lib/market-data/price-sync";
 
 type PriceProviderName = "stub" | "kis";
 const KIS_WRITE_TARGET_LIMIT_MAX = 5;
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
   const priceDate = parsePriceDate(url.searchParams.get("date"));
   const providerName = parseProvider(url.searchParams.get("provider"));
   const targetLimit = parseTargetLimit(url.searchParams.get("limit"));
+  const targetFilter = parseTargetFilter(url.searchParams);
   const confirmWrite = parseBooleanQuery(
     url.searchParams.get("confirmWrite"),
     false,
@@ -59,6 +62,10 @@ export async function POST(request: Request) {
       { error: "limit must be an integer between 1 and 15 when provided" },
       { status: 400 },
     );
+  }
+
+  if (targetFilter.error) {
+    return NextResponse.json({ error: targetFilter.error }, { status: 400 });
   }
 
   if (confirmWrite === null) {
@@ -190,9 +197,21 @@ export async function POST(request: Request) {
       priceDate,
       provider,
       targetLimit: targetLimit ?? undefined,
+      targetFilter: targetFilter.value,
     });
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof PriceSyncRequestError) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message,
+          details: error.details,
+        },
+        { status: error.statusCode },
+      );
+    }
+
     if (error instanceof PriceSyncError) {
       return NextResponse.json(
         {
@@ -263,4 +282,89 @@ function parseTargetLimit(value: string | null) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 15) return null;
   return parsed;
+}
+
+function parseTargetFilter(searchParams: URLSearchParams): {
+  value: PriceSyncTargetFilter;
+  error: string | null;
+} {
+  const tickerResult = parseTickers(searchParams.get("tickers"));
+  if (tickerResult === null) {
+    return {
+      value: {},
+      error:
+        "tickers must be a comma-separated list of ticker symbols using letters, numbers, dot, dash, or underscore",
+    };
+  }
+
+  const marketResult = parseMarketFilter(searchParams.get("market"));
+  if (marketResult === null) {
+    return {
+      value: {},
+      error: "market must be one of: korea, us",
+    };
+  }
+
+  const accountResult = parseAccountFilter(searchParams.get("account"));
+  if (accountResult === null) {
+    return {
+      value: {},
+      error: "account must be one of: brokerage, isa, irp, all",
+    };
+  }
+
+  return {
+    value: {
+      tickers: tickerResult,
+      market: marketResult,
+      account: accountResult,
+    },
+    error: null,
+  };
+}
+
+function parseTickers(value: string | null) {
+  if (value === null) return undefined;
+
+  const rawTickers = value.split(",");
+  const tickers: string[] = [];
+  const seen = new Set<string>();
+
+  for (const rawTicker of rawTickers) {
+    const ticker = rawTicker.trim().toUpperCase();
+    if (!ticker || ticker.length > 50 || !/^[A-Z0-9._-]+$/.test(ticker)) {
+      return null;
+    }
+
+    if (!seen.has(ticker)) {
+      seen.add(ticker);
+      tickers.push(ticker);
+    }
+  }
+
+  return tickers.length > 0 ? tickers : null;
+}
+
+function parseMarketFilter(value: string | null) {
+  if (value === null || value.trim() === "") return undefined;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "korea" || normalized === "us") return normalized;
+  return null;
+}
+
+function parseAccountFilter(value: string | null) {
+  if (value === null || value.trim() === "") return undefined;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "all") return undefined;
+  if (
+    normalized === "brokerage" ||
+    normalized === "isa" ||
+    normalized === "irp"
+  ) {
+    return normalized;
+  }
+
+  return null;
 }

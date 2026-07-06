@@ -5,6 +5,7 @@ export type PriceLookupTarget = {
   ticker: string;
   market: string;
   currency: string;
+  accounts: string[];
   assetIds: string[];
   assetNames: string[];
 };

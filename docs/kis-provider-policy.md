@@ -126,6 +126,36 @@ KIS write metadata may include count summaries, write action summaries, conflict
 counts, target summaries, and warnings. It must not include app keys, app
 secrets, tokens, or raw KIS responses.
 
+### Manual Target Control
+
+KIS manual close runs support query-only target filters. Request bodies are not
+used for target selection yet, which keeps manual calls reproducible from the
+URL alone.
+
+Supported filters:
+
+- `tickers=VOO,SCHD,069500`
+- `market=korea|us`
+- `account=brokerage|isa|irp|all`
+
+Filter policy:
+
+- `tickers` is comma-separated, trimmed, uppercased, de-duplicated, and matched
+  exactly against normalized asset tickers.
+- Fuzzy ticker matching is not allowed.
+- `account=all` is the same as no account filter.
+- `tickers`, `market`, and `account` compose with `AND` semantics.
+- Tickers outside the current syncable asset universe are not written.
+- `dryRun=false` KIS writes still require `confirmWrite=true`, cooldown pass,
+  and an explicit `limit` of at most `5`.
+- `dryRun=true` may return `200` with zero selected targets and a warning.
+- `dryRun=false` returns `400 no_write_targets` when filters select no write
+  targets.
+
+Target filter metadata may include normalized filter values, count summaries,
+and ticker-level include/skip reasons. It must not include raw KIS responses,
+tokens, secrets, request headers, or full provider payloads.
+
 ## Provider Contract
 
 KIS adapter work should proceed in this order:
