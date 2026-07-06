@@ -12,6 +12,7 @@ import {
 } from "@/lib/market-data/price-sync";
 
 type PriceProviderName = "stub" | "kis";
+const KIS_WRITE_TARGET_LIMIT_MAX = 5;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
   const priceDate = parsePriceDate(url.searchParams.get("date"));
   const providerName = parseProvider(url.searchParams.get("provider"));
   const targetLimit = parseTargetLimit(url.searchParams.get("limit"));
+  const confirmWrite = parseBooleanQuery(
+    url.searchParams.get("confirmWrite"),
+    false,
+  );
 
   if (!isPriceSyncMode(mode)) {
     return NextResponse.json(
@@ -52,6 +57,13 @@ export async function POST(request: Request) {
   if (targetLimit === null) {
     return NextResponse.json(
       { error: "limit must be an integer between 1 and 15 when provided" },
+      { status: 400 },
+    );
+  }
+
+  if (confirmWrite === null) {
+    return NextResponse.json(
+      { error: "confirmWrite must be true or false when provided" },
       { status: 400 },
     );
   }
@@ -85,11 +97,33 @@ export async function POST(request: Request) {
   if (providerName === "kis") {
     const kisPolicy = getKisProviderPolicy();
 
-    if (mode !== "close" || !dryRun || fixture) {
+    if (mode !== "close" || fixture) {
       return NextResponse.json(
         {
           error:
-            "provider=kis is only enabled for mode=close, dryRun=true, fixture=false",
+            "provider=kis is only enabled for mode=close and fixture=false",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!dryRun && !confirmWrite) {
+      return NextResponse.json(
+        {
+          error:
+            "KIS close writes require dryRun=false and confirmWrite=true",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (
+      !dryRun &&
+      (targetLimit === undefined || targetLimit > KIS_WRITE_TARGET_LIMIT_MAX)
+    ) {
+      return NextResponse.json(
+        {
+          error: `KIS close writes require limit between 1 and ${KIS_WRITE_TARGET_LIMIT_MAX}`,
         },
         { status: 400 },
       );
@@ -131,7 +165,12 @@ export async function POST(request: Request) {
     }
   }
 
-  if (mode === "close" && !dryRun && (!fixture || priceDate === undefined)) {
+  if (
+    providerName === "stub" &&
+    mode === "close" &&
+    !dryRun &&
+    (!fixture || priceDate === undefined)
+  ) {
     return NextResponse.json(
       {
         error:

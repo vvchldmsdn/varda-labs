@@ -26,6 +26,7 @@ Optional:
 - `KIS_IS_MOCK`
 - `KIS_TOKEN_POLICY`
 - `KIS_JOB_COOLDOWN_SECONDS`
+- `KIS_VALUE_CONFLICT_THRESHOLD_PCT`
 
 Admin route secrets remain separate:
 
@@ -90,6 +91,40 @@ route-level cooldown.
 Manual admin calls and future Cron jobs must respect this cooldown. A durable
 external token cache, such as Vercel KV, can be evaluated later if higher
 frequency KIS calls become necessary.
+
+## Guarded KIS Close Writes
+
+KIS close writes are intentionally manual and narrow until the full daily
+pipeline exists.
+
+Required route conditions:
+
+- `provider=kis`
+- `mode=close`
+- `dryRun=false`
+- `confirmWrite=true`
+- `fixture=false`
+- `limit` must be present and at most `5`
+- the KIS cooldown guard must pass
+
+Allowed KIS write sources:
+
+- `kis_domestic_itemchartprice`
+- `kis_overseas_dailyprice:<exchange>`
+
+Existing row policy for `asset_price_snapshots(ticker,date)`:
+
+- Existing KIS rows can be updated by KIS rows.
+- Existing non-KIS rows can be replaced by KIS only when the close price
+  relative difference is within the value conflict threshold.
+- Default threshold: `3%`
+- Env override: `KIS_VALUE_CONFLICT_THRESHOLD_PCT`
+- Rows above the threshold are skipped as `value_conflict`; they are not
+  overwritten.
+
+KIS write metadata may include count summaries, write action summaries, conflict
+counts, target summaries, and warnings. It must not include app keys, app
+secrets, tokens, or raw KIS responses.
 
 ## Provider Contract
 

@@ -17,6 +17,7 @@ import type {
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const LIVE_MARKET_DATA_WRITES_ENABLED = false;
 const DEFAULT_KIS_JOB_COOLDOWN_SECONDS = 90;
+const DEFAULT_KIS_VALUE_CONFLICT_THRESHOLD_PCT = 3;
 
 export const PRICE_SYNC_CONTRACT = {
   live: {
@@ -55,6 +56,7 @@ export type PriceSyncRunResult = {
   skippedCount: number;
   insertedCount: number;
   updatedCount: number;
+  conflictCount: number;
   plannedWrites: PlannedWrite[];
   writeResults: ClosePriceWriteResult[];
   contract: (typeof PRICE_SYNC_CONTRACT)[PriceSyncMode];
@@ -102,7 +104,10 @@ type ClosePriceWriteAction =
   | "inserted"
   | "updated"
   | "skipped"
-  | "failed";
+  | "failed"
+  | "conflict";
+
+type ClosePriceWritePolicy = "none" | "stub_fixture" | "kis";
 
 type ClosePriceWriteResult = {
   ticker: string;
@@ -118,6 +123,7 @@ type ClosePriceWriteSummary = {
   updatedCount: number;
   skippedCount: number;
   failedCount: number;
+  conflictCount: number;
   results: ClosePriceWriteResult[];
 };
 
@@ -197,6 +203,8 @@ export async function runMarketPriceSync(options: {
   const fixture = options.fixture ?? false;
   const priceDate = options.priceDate ?? toDateKey(new Date());
   const startedAt = new Date();
+  const writePolicy = getClosePriceWritePolicy(provider.name, fixture);
+  const closeWriteEnabled = !dryRun && writePolicy !== "none";
 
   const [run] = await db
     .insert(marketDataSyncRuns)
@@ -230,7 +238,7 @@ export async function runMarketPriceSync(options: {
     const plannedWrites = buildPlannedWrites(
       options.mode,
       dryRun,
-      fixture,
+      writePolicy,
       assetRows.length,
       priceTargets.length,
     );
@@ -259,7 +267,8 @@ export async function runMarketPriceSync(options: {
             targets: priceTargets,
             dryRun,
             fixture,
-            allowWrite: !dryRun && fixture,
+            writePolicy,
+            allowWrite: closeWriteEnabled,
           })
         : emptyClosePriceWriteSummary();
     const warnings = [
@@ -283,6 +292,7 @@ export async function runMarketPriceSync(options: {
       skippedCount: counts.skippedCount + closeWriteSummary.skippedCount,
       insertedCount: closeWriteSummary.insertedCount,
       updatedCount: closeWriteSummary.updatedCount,
+      conflictCount: closeWriteSummary.conflictCount,
       plannedWrites,
       writeResults: closeWriteSummary.results,
       contract: PRICE_SYNC_CONTRACT[options.mode],
@@ -310,11 +320,13 @@ export async function runMarketPriceSync(options: {
           targetLimit: options.targetLimit ?? null,
           insertedCount: result.insertedCount,
           updatedCount: result.updatedCount,
+          conflictCount: result.conflictCount,
           plannedWrites,
           writeResults: summarizeWriteResults(result.writeResults),
           contract: PRICE_SYNC_CONTRACT[options.mode],
           marketDataWritesEnabled:
-            options.mode === "close" && !dryRun && fixture,
+            options.mode === "close" && closeWriteEnabled,
+          writePolicy,
           targetSummary: summarizeTargets(priceTargets),
           warnings,
         },
@@ -338,7 +350,9 @@ export async function runMarketPriceSync(options: {
           priceDate,
           provider: provider.name,
           mode: options.mode,
-          marketDataWritesEnabled: options.mode === "close" && !dryRun && fixture,
+          marketDataWritesEnabled:
+            options.mode === "close" && closeWriteEnabled,
+          writePolicy,
           error: safeError,
         },
       })
@@ -404,7 +418,7 @@ function buildPriceLookupTargets(rows: SyncableAssetRow[]): PriceLookupTarget[] 
 function buildPlannedWrites(
   mode: PriceSyncMode,
   dryRun: boolean,
-  fixture: boolean,
+  writePolicy: ClosePriceWritePolicy,
   assetCount: number,
   priceTargetCount: number,
 ): PlannedWrite[] {
@@ -424,7 +438,7 @@ function buildPlannedWrites(
       table: "asset_price_snapshots",
       operation: "upsert_close_price_by_ticker_date",
       count: priceTargetCount,
-      active: !dryRun && fixture,
+      active: !dryRun && writePolicy !== "none",
     },
   ];
 }
@@ -517,6 +531,7 @@ async function applyClosePriceRows(options: {
   targets: PriceLookupTarget[];
   dryRun: boolean;
   fixture: boolean;
+  writePolicy: ClosePriceWritePolicy;
   allowWrite: boolean;
 }): Promise<ClosePriceWriteSummary> {
   const targetByKey = new Map(
@@ -531,6 +546,7 @@ async function applyClosePriceRows(options: {
       target,
       dryRun: options.dryRun,
       fixture: options.fixture,
+      writePolicy: options.writePolicy,
       allowWrite: options.allowWrite,
     });
 
@@ -539,6 +555,10 @@ async function applyClosePriceRows(options: {
     if (result.action === "inserted") summary.insertedCount += 1;
     if (result.action === "updated") summary.updatedCount += 1;
     if (result.action === "failed") summary.failedCount += 1;
+    if (result.action === "conflict") {
+      summary.conflictCount += 1;
+      summary.skippedCount += 1;
+    }
     if (
       result.action === "skipped" ||
       result.action === "planned_skip"
@@ -555,6 +575,7 @@ async function planOrApplyClosePriceRow(options: {
   target: PriceLookupTarget | undefined;
   dryRun: boolean;
   fixture: boolean;
+  writePolicy: ClosePriceWritePolicy;
   allowWrite: boolean;
 }): Promise<ClosePriceWriteResult> {
   const rowKey = {
@@ -562,7 +583,11 @@ async function planOrApplyClosePriceRow(options: {
     priceDate: options.row.priceDate,
     source: options.row.source,
   };
-  const validationError = validateClosePriceRow(options.row, options.target);
+  const validationError = validateClosePriceRow(
+    options.row,
+    options.target,
+    options.writePolicy,
+  );
 
   if (validationError) {
     return {
@@ -577,12 +602,20 @@ async function planOrApplyClosePriceRow(options: {
     snapshot.ticker,
     snapshot.priceDate,
   );
-  const protectedReason = getProtectedExistingReason(existing, snapshot.source);
+  const protectedReason = getProtectedExistingReason(
+    existing,
+    snapshot,
+    options.writePolicy,
+  );
 
   if (protectedReason) {
     return {
       ...rowKey,
-      action: options.dryRun ? "planned_skip" : "skipped",
+      action: protectedReason.startsWith("value_conflict")
+        ? "conflict"
+        : options.dryRun
+          ? "planned_skip"
+          : "skipped",
       reason: protectedReason,
       existingSource: existing?.source ?? null,
     };
@@ -605,7 +638,7 @@ async function planOrApplyClosePriceRow(options: {
     };
   }
 
-  if (!options.allowWrite || !options.fixture) {
+  if (!options.allowWrite || options.writePolicy === "none") {
     return {
       ...rowKey,
       action: "skipped",
@@ -631,7 +664,7 @@ async function planOrApplyClosePriceRow(options: {
         isSample: sql`excluded.is_sample`,
         updatedAt: new Date(),
       },
-      setWhere: sql`${assetPriceSnapshots.source} = ${snapshot.source}`,
+      setWhere: getClosePriceUpsertSetWhere(snapshot, options.writePolicy),
     })
     .returning({ id: assetPriceSnapshots.id });
 
@@ -639,7 +672,7 @@ async function planOrApplyClosePriceRow(options: {
     return {
       ...rowKey,
       action: "skipped",
-      reason: "protected_existing_source",
+      reason: "write_guard_not_satisfied_after_conflict_check",
       existingSource: existing?.source ?? null,
     };
   }
@@ -654,6 +687,7 @@ async function planOrApplyClosePriceRow(options: {
 function validateClosePriceRow(
   row: ClosePrice,
   target: PriceLookupTarget | undefined,
+  writePolicy: ClosePriceWritePolicy,
 ) {
   if (row.status !== "ok") return row.error ?? `provider_status_${row.status}`;
   if (!target) return "target_not_found";
@@ -666,7 +700,9 @@ function validateClosePriceRow(
     return "invalid_close_price_krw";
   }
   if (row.fxRate !== null && !isDecimalString(row.fxRate)) return "invalid_fx_rate";
-  if (row.source !== "stub_fixture") return "unsupported_write_source";
+  if (!isAllowedClosePriceSource(row.source, writePolicy)) {
+    return "unsupported_write_source";
+  }
   return null;
 }
 
@@ -711,12 +747,107 @@ async function findExistingAssetPriceSnapshot(ticker: string, priceDate: string)
 
 function getProtectedExistingReason(
   existing: AssetPriceSnapshotRow | null,
-  incomingSource: string | null,
+  incoming: ReturnType<typeof toSnapshotInsert>,
+  writePolicy: ClosePriceWritePolicy,
 ) {
   if (!existing) return null;
-  if (incomingSource !== "stub_fixture") return "unsupported_write_source";
-  if (existing.source !== "stub_fixture") return "protected_existing_source";
-  return null;
+
+  if (writePolicy === "stub_fixture") {
+    if (incoming.source !== "stub_fixture") return "unsupported_write_source";
+    if (existing.source !== "stub_fixture") return "protected_existing_source";
+    return null;
+  }
+
+  if (writePolicy === "kis") {
+    if (!isKisClosePriceSource(incoming.source)) return "unsupported_write_source";
+    if (isKisClosePriceSource(existing.source)) return null;
+
+    const conflictReason = getKisValueConflictReason(existing, incoming);
+    if (conflictReason) return conflictReason;
+
+    return null;
+  }
+
+  return "write_policy_disabled";
+}
+
+function getClosePriceUpsertSetWhere(
+  snapshot: ReturnType<typeof toSnapshotInsert>,
+  writePolicy: ClosePriceWritePolicy,
+) {
+  if (writePolicy === "stub_fixture") {
+    return sql`${assetPriceSnapshots.source} = ${snapshot.source}`;
+  }
+
+  if (writePolicy === "kis") {
+    const threshold = getKisValueConflictThresholdFraction();
+    return sql`
+      ${assetPriceSnapshots.source} like 'kis_%'
+      or (
+        abs(${assetPriceSnapshots.closePrice} - excluded.close_price)
+        / greatest(abs(${assetPriceSnapshots.closePrice}), 1)
+      ) <= ${threshold}
+    `;
+  }
+
+  return sql`false`;
+}
+
+function getClosePriceWritePolicy(
+  providerName: string,
+  fixture: boolean,
+): ClosePriceWritePolicy {
+  if (providerName === "kis") return "kis";
+  if (fixture) return "stub_fixture";
+  return "none";
+}
+
+function isAllowedClosePriceSource(
+  source: string | null,
+  writePolicy: ClosePriceWritePolicy,
+) {
+  if (writePolicy === "stub_fixture") return source === "stub_fixture";
+  if (writePolicy === "kis") return isKisClosePriceSource(source);
+  return false;
+}
+
+function isKisClosePriceSource(source: string | null) {
+  return (
+    source === "kis_domestic_itemchartprice" ||
+    /^kis_overseas_dailyprice:[A-Z]+$/.test(source ?? "")
+  );
+}
+
+function getKisValueConflictReason(
+  existing: AssetPriceSnapshotRow,
+  incoming: ReturnType<typeof toSnapshotInsert>,
+) {
+  const existingClose = Number(existing.closePrice);
+  const incomingClose = Number(incoming.closePrice);
+
+  if (!Number.isFinite(existingClose) || !Number.isFinite(incomingClose)) {
+    return "value_conflict_invalid_decimal";
+  }
+
+  const thresholdPct = getKisValueConflictThresholdPct();
+  const relativeDiffPct =
+    (Math.abs(existingClose - incomingClose) /
+      Math.max(Math.abs(existingClose), 1)) *
+    100;
+
+  if (relativeDiffPct <= thresholdPct) return null;
+
+  return `value_conflict:${relativeDiffPct.toFixed(4)}pct_gt_${thresholdPct}pct`;
+}
+
+function getKisValueConflictThresholdPct() {
+  const configured = Number(process.env.KIS_VALUE_CONFLICT_THRESHOLD_PCT);
+  if (Number.isFinite(configured) && configured >= 0) return configured;
+  return DEFAULT_KIS_VALUE_CONFLICT_THRESHOLD_PCT;
+}
+
+function getKisValueConflictThresholdFraction() {
+  return getKisValueConflictThresholdPct() / 100;
 }
 
 function snapshotMatches(
@@ -742,6 +873,7 @@ function emptyClosePriceWriteSummary(): ClosePriceWriteSummary {
     updatedCount: 0,
     skippedCount: 0,
     failedCount: 0,
+    conflictCount: 0,
     results: [],
   };
 }
