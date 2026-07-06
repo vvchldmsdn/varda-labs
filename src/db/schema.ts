@@ -31,6 +31,12 @@ export const assets = pgTable(
 
     quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
     currentPrice: decimal("current_price", { precision: 20, scale: 4 }).notNull(),
+    priceSource: varchar("price_source", { length: 100 }),
+    priceFetchedAt: timestamp("price_fetched_at", { withTimezone: true }),
+    priceAsOf: timestamp("price_as_of", { withTimezone: true }),
+    priceQuoteType: varchar("price_quote_type", { length: 50 }),
+    priceStatus: varchar("price_status", { length: 50 }),
+    priceError: text("price_error"),
     averageCost: decimal("average_cost", { precision: 20, scale: 4 }),
     targetWeight: decimal("target_weight", { precision: 8, scale: 4 }),
 
@@ -220,6 +226,40 @@ export const assetPriceSnapshots = pgTable(
     assetDateIdx: index("asset_price_snapshots_asset_date_idx").on(
       table.assetId,
       table.priceDate,
+    ),
+  }),
+);
+
+export const marketDataSyncRuns = pgTable(
+  "market_data_sync_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    jobType: varchar("job_type", { length: 100 }).notNull(),
+    mode: varchar("mode", { length: 50 }),
+    status: varchar("status", { length: 50 }).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    source: varchar("source", { length: 100 }),
+
+    requestedCount: integer("requested_count"),
+    successCount: integer("success_count"),
+    failedCount: integer("failed_count"),
+    skippedCount: integer("skipped_count"),
+
+    metadataJson: jsonb("metadata_json"),
+    error: text("error"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    jobStartedIdx: index("market_data_sync_runs_job_started_idx").on(
+      table.jobType,
+      table.startedAt,
+    ),
+    statusStartedIdx: index("market_data_sync_runs_status_started_idx").on(
+      table.status,
+      table.startedAt,
     ),
   }),
 );
@@ -1057,6 +1097,9 @@ export type NewFxRate = typeof fxRates.$inferInsert;
 
 export type AssetPriceSnapshot = typeof assetPriceSnapshots.$inferSelect;
 export type NewAssetPriceSnapshot = typeof assetPriceSnapshots.$inferInsert;
+
+export type MarketDataSyncRun = typeof marketDataSyncRuns.$inferSelect;
+export type NewMarketDataSyncRun = typeof marketDataSyncRuns.$inferInsert;
 
 export type BenchmarkSnapshot = typeof benchmarkSnapshots.$inferSelect;
 export type NewBenchmarkSnapshot = typeof benchmarkSnapshots.$inferInsert;

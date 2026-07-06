@@ -85,6 +85,13 @@
       "when": 1783291457979,
       "tag": "0011_first_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783296427750,
+      "tag": "0012_thick_william_stryker",
+      "breakpoints": true
     }
   ]
 }
