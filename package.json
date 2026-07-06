@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
+    "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",

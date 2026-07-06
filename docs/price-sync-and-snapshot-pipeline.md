@@ -163,6 +163,22 @@ Writes:
 - `asset_price_snapshots`
 - optionally `market_data_sync_runs`
 
+Production preflight and observability:
+
+- Start with `provider=kis&mode=close&dryRun=true` and narrow target filters
+  such as `tickers=...`, `market=korea|us`, `account=brokerage|isa|irp`.
+- Response should include provider, mode, dry-run state, target filter summary,
+  target filter include/skip results, requested/success/failed/skipped counts,
+  planned writes, write action/source/reason summaries, and warnings.
+- `market_data_sync_runs.metadata_json` stores summaries only: target filter
+  counts, target samples, write summaries, count summaries, and warnings.
+- It must not store KIS credentials, access tokens, authorization headers,
+  request headers, or raw KIS response bodies.
+- Use `npm run audit:market-sync-metadata` to scan recent run metadata for
+  secret-shaped keys or values.
+- Immediate repeated KIS runs may return `429 kis_job_cooldown_active`; the
+  response should include `Retry-After` plus retry timing fields.
+
 Provider adapter shape:
 
 ```ts

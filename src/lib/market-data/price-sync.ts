@@ -62,6 +62,7 @@ export type PriceSyncRunResult = {
   targetFilterSummary: PriceSyncTargetFilterSummary;
   targetFilterResults: PriceSyncTargetFilterResult[];
   plannedWrites: PlannedWrite[];
+  writeSummary: ClosePriceWriteResultSummary;
   writeResults: ClosePriceWriteResult[];
   contract: (typeof PRICE_SYNC_CONTRACT)[PriceSyncMode];
   warnings: string[];
@@ -161,6 +162,14 @@ type ClosePriceWriteSummary = {
   failedCount: number;
   conflictCount: number;
   results: ClosePriceWriteResult[];
+};
+
+type ClosePriceWriteResultSummary = {
+  actions: Record<string, number>;
+  sources: Record<string, number>;
+  reasons: Record<string, number>;
+  existingSources: Record<string, number>;
+  sample: ClosePriceWriteResult[];
 };
 
 type AssetPriceSnapshotRow = typeof assetPriceSnapshots.$inferSelect;
@@ -358,6 +367,7 @@ export async function runMarketPriceSync(options: {
         closeWriteEnabled,
       }),
     ]);
+    const writeSummary = summarizeWriteResults(closeWriteSummary.results);
     const finishedAt = new Date();
 
     const result: PriceSyncRunResult = {
@@ -379,6 +389,7 @@ export async function runMarketPriceSync(options: {
       targetFilterSummary,
       targetFilterResults,
       plannedWrites,
+      writeSummary,
       writeResults: closeWriteSummary.results,
       contract: PRICE_SYNC_CONTRACT[options.mode],
       warnings,
@@ -410,7 +421,7 @@ export async function runMarketPriceSync(options: {
           updatedCount: result.updatedCount,
           conflictCount: result.conflictCount,
           plannedWrites,
-          writeResults: summarizeWriteResults(result.writeResults),
+          writeSummary,
           contract: PRICE_SYNC_CONTRACT[options.mode],
           marketDataWritesEnabled:
             options.mode === "close" && closeWriteEnabled,
@@ -443,6 +454,8 @@ export async function runMarketPriceSync(options: {
           writePolicy,
           error: safeError,
           targetFilter: targetFilterSummary,
+          targetFilterResults: summarizeTargetFilterResults(targetFilterResults),
+          targetSummary: summarizeTargets(priceTargets),
         },
       })
       .where(eq(marketDataSyncRuns.id, run.id));
@@ -1119,12 +1132,30 @@ function emptyClosePriceWriteSummary(): ClosePriceWriteSummary {
 
 function summarizeWriteResults(results: ClosePriceWriteResult[]) {
   const actions = new Map<string, number>();
+  const sources = new Map<string, number>();
+  const reasons = new Map<string, number>();
+  const existingSources = new Map<string, number>();
+
   for (const result of results) {
     actions.set(result.action, (actions.get(result.action) ?? 0) + 1);
+    const sourceKey = result.source ?? "null";
+    sources.set(sourceKey, (sources.get(sourceKey) ?? 0) + 1);
+    if (result.reason) {
+      reasons.set(result.reason, (reasons.get(result.reason) ?? 0) + 1);
+    }
+    if (result.existingSource !== undefined) {
+      existingSources.set(
+        result.existingSource ?? "null",
+        (existingSources.get(result.existingSource ?? "null") ?? 0) + 1,
+      );
+    }
   }
 
   return {
     actions: Object.fromEntries(actions),
+    sources: Object.fromEntries(sources),
+    reasons: Object.fromEntries(reasons),
+    existingSources: Object.fromEntries(existingSources),
     sample: results.slice(0, 10),
   };
 }
