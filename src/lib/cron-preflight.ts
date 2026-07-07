@@ -128,6 +128,17 @@ type DailySnapshotLike = {
   warnings: string[];
 };
 
+type KisCooldownLike = {
+  active: boolean;
+  provider: string;
+  mode: string;
+  cooldownSeconds: number;
+  retryAfterSeconds: number;
+  lastRunStatus: string | null;
+  lastRunStartedAt: string | null;
+  lastRunFinishedAt: string | null;
+};
+
 export type CronPreflightResponse = {
   ok: boolean;
   routeMode: "preflight";
@@ -183,9 +194,11 @@ export type CronPreflightResponse = {
     plannedPortfolioWrites: SnapshotWriteCounts;
     plannedPositionWrites: SnapshotWriteCounts;
   };
+  kisCooldown: KisCooldownLike;
   blockingReasons: string[];
   nextRecommendedAction:
     | "no_action_required"
+    | "blocked_by_kis_cooldown"
     | "manual_kis_close_dry_run_required"
     | "manual_daily_snapshot_dry_run_required"
     | "blocked_by_missing_close_coverage"
@@ -249,12 +262,14 @@ export function parseCronPreflightQuery(
 
 export function buildCronPreflightResponse({
   snapshot,
+  kisCooldown,
   cronScheduleUtc,
 }: {
   snapshot: DailySnapshotLike;
+  kisCooldown: KisCooldownLike;
   cronScheduleUtc: string | null;
 }): CronPreflightResponse {
-  const blockingReasons = buildBlockingReasons(snapshot);
+  const blockingReasons = buildBlockingReasons(snapshot, kisCooldown);
 
   return {
     ok: snapshot.ok,
@@ -322,8 +337,22 @@ export function buildCronPreflightResponse({
       plannedPortfolioWrites: snapshot.plannedWrites.dailyPortfolioSnapshots,
       plannedPositionWrites: snapshot.plannedWrites.dailyPositionSnapshots,
     },
+    kisCooldown: {
+      active: kisCooldown.active,
+      provider: kisCooldown.provider,
+      mode: kisCooldown.mode,
+      cooldownSeconds: kisCooldown.cooldownSeconds,
+      retryAfterSeconds: kisCooldown.retryAfterSeconds,
+      lastRunStatus: kisCooldown.lastRunStatus,
+      lastRunStartedAt: kisCooldown.lastRunStartedAt,
+      lastRunFinishedAt: kisCooldown.lastRunFinishedAt,
+    },
     blockingReasons,
-    nextRecommendedAction: nextRecommendedAction(snapshot, blockingReasons),
+    nextRecommendedAction: nextRecommendedAction(
+      snapshot,
+      kisCooldown,
+      blockingReasons,
+    ),
     warnings: snapshot.warnings,
   };
 }
@@ -347,9 +376,15 @@ function safeDryRunQuery(query: string) {
   return query;
 }
 
-function buildBlockingReasons(snapshot: DailySnapshotLike) {
+function buildBlockingReasons(
+  snapshot: DailySnapshotLike,
+  kisCooldown: KisCooldownLike,
+) {
   const reasons = new Set<string>();
 
+  if (shouldBlockForKisCooldown(snapshot, kisCooldown)) {
+    reasons.add("blocked_by_kis_cooldown");
+  }
   if (snapshot.closeSyncPlan.missingCount > 0) {
     reasons.add("blocked_by_missing_close_coverage");
   }
@@ -373,8 +408,12 @@ function buildBlockingReasons(snapshot: DailySnapshotLike) {
 
 function nextRecommendedAction(
   snapshot: DailySnapshotLike,
+  kisCooldown: KisCooldownLike,
   blockingReasons: string[],
 ): CronPreflightResponse["nextRecommendedAction"] {
+  if (shouldBlockForKisCooldown(snapshot, kisCooldown)) {
+    return "blocked_by_kis_cooldown";
+  }
   if (snapshot.closeSyncPlan.suggestedKisBatches.length > 0) {
     return "manual_kis_close_dry_run_required";
   }
@@ -393,6 +432,13 @@ function nextRecommendedAction(
     return "manual_daily_snapshot_dry_run_required";
   }
   return "no_action_required";
+}
+
+function shouldBlockForKisCooldown(
+  snapshot: DailySnapshotLike,
+  kisCooldown: KisCooldownLike,
+) {
+  return kisCooldown.active && snapshot.closeSyncPlan.suggestedKisBatches.length > 0;
 }
 
 function hasSnapshotInserts(plannedWrites: DailySnapshotLike["plannedWrites"]) {

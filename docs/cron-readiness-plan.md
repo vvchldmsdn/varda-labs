@@ -122,7 +122,9 @@ The Phase 1 contract draft lives in
 This phase should not add `vercel.json`.
 
 Status: route skeleton implemented as
-`src/app/api/cron/market-cycle/preflight/route.ts`. Cron remains disabled.
+`src/app/api/cron/market-cycle/preflight/route.ts`. It reports read-only KIS
+close cooldown visibility from `market_data_sync_runs` when KIS batches are
+suggested. Cron remains disabled.
 
 ### Phase 2: Cron-safe close sync controller
 

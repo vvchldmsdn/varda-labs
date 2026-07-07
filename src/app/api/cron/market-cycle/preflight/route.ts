@@ -5,6 +5,7 @@ import {
   buildCronPreflightResponse,
   parseCronPreflightQuery,
 } from "@/lib/cron-preflight";
+import { getKisPriceSyncCooldownStatus } from "@/lib/market-data/price-sync";
 import {
   DailySnapshotRequestError,
   runDailySnapshot,
@@ -42,13 +43,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const snapshot = await runDailySnapshot({
-      dryRun: true,
-      snapshotDate: query.snapshotDate,
-      account: query.account as SnapshotAccount,
-    });
+    const [snapshot, kisCooldown] = await Promise.all([
+      runDailySnapshot({
+        dryRun: true,
+        snapshotDate: query.snapshotDate,
+        account: query.account as SnapshotAccount,
+      }),
+      getKisPriceSyncCooldownStatus("close"),
+    ]);
     const response = buildCronPreflightResponse({
       snapshot,
+      kisCooldown,
       cronScheduleUtc: request.headers.get("x-vercel-cron-schedule"),
     });
 

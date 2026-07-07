@@ -75,6 +75,7 @@ describe("cron preflight helpers", () => {
           },
         ],
       }),
+      kisCooldown: cooldownStatus({ active: false }),
       cronScheduleUtc: "10 22 * * 1-5",
     });
 
@@ -97,6 +98,36 @@ describe("cron preflight helpers", () => {
     assert.doesNotMatch(serialized, /targets/);
   });
 
+  it("reports KIS cooldown as a blocker when KIS batches are pending", () => {
+    const response = buildCronPreflightResponse({
+      snapshot: snapshotResult({
+        ok: false,
+        writeReady: false,
+        missingCount: 1,
+        suggestedKisBatches: [
+          {
+            market: "korea",
+            expectedCloseDate: "2026-07-07",
+            tickers: ["069500"],
+            count: 1,
+            maxBatchSize: 5,
+            dryRunQuery:
+              "/api/admin/market/prices/sync?provider=kis&mode=close&dryRun=true&market=korea&date=2026-07-07&tickers=069500&limit=1",
+            manualWriteRequired: true,
+            writeRequiresConfirmWrite: true,
+          },
+        ],
+      }),
+      kisCooldown: cooldownStatus({ active: true, retryAfterSeconds: 42 }),
+      cronScheduleUtc: null,
+    });
+
+    assert.equal(response.kisCooldown.active, true);
+    assert.equal(response.kisCooldown.retryAfterSeconds, 42);
+    assert.equal(response.nextRecommendedAction, "blocked_by_kis_cooldown");
+    assert.ok(response.blockingReasons.includes("blocked_by_kis_cooldown"));
+  });
+
   it("returns no_action_required for update-only covered snapshots", () => {
     const response = buildCronPreflightResponse({
       snapshot: snapshotResult({
@@ -105,6 +136,7 @@ describe("cron preflight helpers", () => {
         portfolioWrites: { insert: 0, update: 4, skip: 0, blocked: 0 },
         positionWrites: { insert: 0, update: 17, skip: 0, blocked: 0 },
       }),
+      kisCooldown: cooldownStatus({ active: true, retryAfterSeconds: 42 }),
       cronScheduleUtc: null,
     });
 
@@ -221,5 +253,19 @@ function snapshotResult(overrides = {}) {
       brokerage: { status: "planned", reason: null, blockers: [] },
     },
     warnings: [],
+  };
+}
+
+function cooldownStatus(overrides = {}) {
+  return {
+    active: false,
+    provider: "kis",
+    mode: "close",
+    cooldownSeconds: 90,
+    retryAfterSeconds: 0,
+    lastRunStatus: "completed",
+    lastRunStartedAt: "2026-07-08T00:00:00.000Z",
+    lastRunFinishedAt: "2026-07-08T00:00:05.000Z",
+    ...overrides,
   };
 }

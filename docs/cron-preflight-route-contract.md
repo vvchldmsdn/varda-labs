@@ -13,8 +13,9 @@ Implementation status:
 - read-only daily snapshot preflight only
 - no `vercel.json`
 - no KIS provider call
+- read-only KIS close cooldown visibility from `market_data_sync_runs`
 - no DB mutation beyond the existing `runDailySnapshot({ dryRun: true })`
-  read path
+  read path and cooldown status select
 
 ## Candidate Route
 
@@ -53,6 +54,9 @@ It should inspect readiness only. In Phase 1 it must not:
 - update `assets.current_price`
 - write `market_data_sync_runs`
 - trigger cleanup, delete, repair, or backfill work
+
+It may read the latest KIS close sync run from `market_data_sync_runs` to report
+cooldown visibility. That read must not create a run row.
 
 The route may reuse read-only calculation helpers that power manual dry-runs,
 but the first implementation should be reviewed before any code is added.
@@ -158,6 +162,14 @@ Candidate JSON response shape:
       "update": 0
     }
   },
+  "kisCooldown": {
+    "active": false,
+    "cooldownSeconds": 90,
+    "retryAfterSeconds": 0,
+    "lastRunStatus": "string-or-null",
+    "lastRunStartedAt": "ISO-8601-or-null",
+    "lastRunFinishedAt": "ISO-8601-or-null"
+  },
   "blockingReasons": [],
   "nextRecommendedAction": "string"
 }
@@ -184,7 +196,8 @@ Output rules:
 The route should be conservative:
 
 - Missing or stale close rows set `snapshot.writeReady=false`.
-- KIS cooldown state is reported as a blocking reason.
+- KIS cooldown state is reported as a blocking reason when KIS batches are
+  suggested.
 - Partial data is not reported as success.
 - Imported Base44 rows that block writes remain blocking evidence.
 - Duplicate or unmanaged generated rows remain blocking evidence.
