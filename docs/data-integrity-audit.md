@@ -61,6 +61,8 @@ this audit alone. Use the audit output to decide the next small migration step.
 See `docs/fk-hardening-proposal.md` for the current FK decision proposal.
 See `docs/etf-holdings-readonly-semantics.md` for the ETF holdings duplicate
 display policy.
+See `docs/market-context-readonly-plan.md` for the benchmark, market regime,
+and global factor read-only display policy.
 
 ## Latest Observation
 
