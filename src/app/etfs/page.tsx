@@ -53,7 +53,7 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
   return (
     <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
       <div className="mx-auto grid w-full max-w-[1500px] gap-4 px-4 py-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -125,7 +125,7 @@ function EtfMasterList({
         <h2 className="text-base font-semibold tracking-normal">ETF Masters</h2>
         <p className="text-xs text-[#687064]">{masters.length} shown</p>
       </div>
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1 sm:max-h-[560px]">
         {masters.length > 0 ? (
           masters.map((master) => (
             <Link
@@ -169,6 +169,11 @@ function EtfMasterList({
           </p>
         )}
       </div>
+      {masters.length >= 24 ? (
+        <p className="mt-3 text-xs text-[#687064]">
+          Showing the first 24 matches. Refine search to narrow results.
+        </p>
+      ) : null}
     </section>
   );
 }
