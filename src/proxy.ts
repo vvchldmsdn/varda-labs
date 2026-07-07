@@ -38,7 +38,14 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/portfolio/:path*", "/etfs", "/etfs/:path*"],
+  matcher: [
+    "/",
+    "/portfolio/:path*",
+    "/etfs",
+    "/etfs/:path*",
+    "/market",
+    "/market/:path*",
+  ],
 };
 
 function firstConfiguredEnv(keys: readonly string[]) {
