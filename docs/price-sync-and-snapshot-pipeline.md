@@ -383,7 +383,38 @@ Observed manual market-cycle validation:
   - Position rows with nullable `asset_id`: 0.
 - Post-write daily snapshot dry-run was update-only: portfolio update `4`,
   position update `17`, insert `0`.
-- This validates the manual path once. It does not make Cron ready.
+- Follow-up validation date: 2026-07-08 KST cycle.
+- Initial production daily snapshot dry-run resolved `snapshotDate=2026-07-08`
+  with required close rows missing/stale for 15 assets and `writeReady=false`.
+- `closeSyncPlan.suggestedKisBatches` produced four manual KIS batches:
+  - Korea, `2026-07-07`, 5 tickers:
+    `0092B0`, `0101N0`, `0139P0`, `069500`, `101280`.
+  - Korea, `2026-07-07`, 5 tickers:
+    `133690`, `315960`, `360200`, `395160`, `455850`.
+  - Korea, `2026-07-07`, 2 tickers: `475350`, `489250`.
+  - US, `2026-07-07`, 3 tickers: `QQQ`, `SCHD`, `VOO`.
+- All four KIS close dry-runs succeeded: 15 total planned inserts, failed `0`.
+- Guarded KIS actual close writes inserted 15 total rows into
+  `asset_price_snapshots`.
+- The route-level 90 second KIS cooldown also applied to KIS dry-runs; the
+  operator waited between KIS calls.
+- The post-close daily snapshot dry-run reported close coverage `15/15`,
+  missing `0`, suggested KIS batches `0`, and `writeReady=true`.
+- Guarded daily snapshot actual write succeeded for the current cycle:
+  - `daily_portfolio_snapshots`: 4 rows for `2026-07-08` with
+    `source='varda_manual_daily_snapshot'`.
+  - `daily_position_snapshots`: 17 rows for `2026-07-08` with
+    `source='varda_manual_daily_snapshot'`.
+- Post-write daily snapshot dry-run was update-only: portfolio update `4`,
+  position update `17`, insert `0`.
+- `npm run audit:asset-price-duplicates` reported duplicate groups `0`.
+- `npm run audit:data-integrity` reported `ok=true` and failed error checks `0`.
+- `npm run audit:market-sync-metadata` reported match count `0`.
+- Authenticated production dashboard HTML included the latest snapshot date and
+  no high-risk secret patterns.
+- This validates the manual path across two consecutive production cycles. It
+  still does not make Cron ready without an explicit Cron design and enablement
+  decision.
 
 Pre-Cron verification checklist:
 
