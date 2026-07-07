@@ -289,8 +289,9 @@ Start with manual admin triggers first. Add Vercel Cron after route handlers are
 stable.
 
 Detailed readiness design lives in `docs/cron-readiness-plan.md`. That document
-is the current gate before any Cron route implementation or `vercel.json`
-enablement.
+and the Phase 1 route contract lives in
+`docs/cron-preflight-route-contract.md`. These are the current gates before any
+Cron route implementation or `vercel.json` enablement.
 
 ### Close Sync Coverage Gate
 

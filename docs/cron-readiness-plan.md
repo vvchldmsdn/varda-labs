@@ -116,6 +116,9 @@ Design a `GET` route that reports what the next market cycle would need without
 performing writes. It should reuse the same calculation surfaces as manual
 dry-runs and preserve the current write guards.
 
+The Phase 1 contract draft lives in
+`docs/cron-preflight-route-contract.md`.
+
 This phase should not add `vercel.json`.
 
 ### Phase 2: Cron-safe close sync controller
@@ -148,6 +151,6 @@ separate approval.
 ## Current Recommendation
 
 Do not enable Cron yet. The next implementation step should be a reviewed
-cron-only `GET` preflight design, but only after this document is accepted.
-Until then, keep using the manual runbook in
-`docs/price-sync-and-snapshot-pipeline.md`.
+cron-only `GET` preflight route skeleton, but only after both this readiness
+plan and `docs/cron-preflight-route-contract.md` are accepted. Until then, keep
+using the manual runbook in `docs/price-sync-and-snapshot-pipeline.md`.
