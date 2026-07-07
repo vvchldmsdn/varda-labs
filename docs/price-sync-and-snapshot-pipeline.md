@@ -1,6 +1,6 @@
 # Price Sync and Snapshot Pipeline Plan
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 This document records the current manual market-data and daily snapshot pipeline
 plus the remaining Cron plan. Vercel Cron is not enabled yet.
@@ -62,8 +62,10 @@ Already available:
 Remaining gaps before Cron:
 
 - The KIS close sync path is manual and guarded by `limit <= 5`.
-- One production market cycle has been validated end to end; Cron should wait
-  for at least one more successful cycle.
+- Two production market cycles have been validated end to end, but Cron still
+  requires an explicit design and enablement decision.
+- Existing admin write routes are `POST`-only, while Vercel Cron invokes `GET`
+  paths from `vercel.json`.
 - Cron-safe batching, timeout, and cooldown behavior are not designed yet.
 - No Vercel Cron config exists.
 
@@ -286,6 +288,10 @@ Valuation basis:
 Start with manual admin triggers first. Add Vercel Cron after route handlers are
 stable.
 
+Detailed readiness design lives in `docs/cron-readiness-plan.md`. That document
+is the current gate before any Cron route implementation or `vercel.json`
+enablement.
+
 ### Close Sync Coverage Gate
 
 The production manual path is considered minimally verified once a KIS close
@@ -440,8 +446,10 @@ Pre-Cron verification checklist:
 3. Cron design before enablement
    - Keep Vercel Cron disabled until manual production dry-run is clean.
    - Keep Cron disabled until the close sync coverage gate above is settled.
-   - Require at least two successful real market cycles through the manual
-     runbook before enabling Cron.
+   - Two successful real market cycles through the manual runbook have been
+     observed, but this is a prerequisite rather than approval to enable Cron.
+   - Resolve the current route mismatch first: existing admin write routes are
+     `POST` routes, while Vercel Cron invokes `GET` paths from `vercel.json`.
    - Confirm each successful cycle has duplicate audit `0`, metadata secret
      audit `0`, final `writeReady=true`, and post-write update-only dry-run.
    - Run close-price sync before the daily snapshot writer.
