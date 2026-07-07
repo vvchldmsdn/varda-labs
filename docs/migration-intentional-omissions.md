@@ -31,6 +31,11 @@ before expanding the migrated app surface.
 
 ## Pending Decisions
 
+- Apply `docs/base44-structure-audit.md` and
+  `docs/migration-modeling-guidelines.md` before porting additional Base44
+  functions or expanding schema. Base44 fields should be classified as
+  source-of-truth, event, time-series source, snapshot fact, derived cache,
+  run artifact, UI state, legacy evidence, or obsolete before migration.
 - Add database foreign keys for core current-state tables such as assets,
   accounts, asset groups, and asset group members only after reviewing
   `npm run audit:data-integrity`. The 2026-07-07 read-only audit found zero

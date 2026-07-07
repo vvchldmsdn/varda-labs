@@ -220,6 +220,15 @@ Implemented columns:
 
 ## Recommended Next Migration Order
 
+0. Freeze the Base44 structure decisions before new feature work:
+   - Use `docs/base44-structure-audit.md` and
+     `docs/migration-modeling-guidelines.md` before adding schema or porting
+     functions.
+   - Treat Base44 as historical evidence and behavior reference, not as the
+     target Postgres model.
+   - Keep Cron/KIS/snapshot write paths unchanged until the next automation
+     validation gate is complete.
+
 1. Resolve `needs_decision` entities:
    - `PortfolioSnapshot`: import only if earlier account-total history is required.
    - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
