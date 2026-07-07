@@ -121,6 +121,9 @@ The Phase 1 contract draft lives in
 
 This phase should not add `vercel.json`.
 
+Status: route skeleton implemented as
+`src/app/api/cron/market-cycle/preflight/route.ts`. Cron remains disabled.
+
 ### Phase 2: Cron-safe close sync controller
 
 Design and manually test a controller that can process close sync work without
@@ -150,7 +153,7 @@ separate approval.
 
 ## Current Recommendation
 
-Do not enable Cron yet. The next implementation step should be a reviewed
-cron-only `GET` preflight route skeleton, but only after both this readiness
-plan and `docs/cron-preflight-route-contract.md` are accepted. Until then, keep
-using the manual runbook in `docs/price-sync-and-snapshot-pipeline.md`.
+Do not enable Cron yet. The Phase 1 route skeleton exists, but the next gate is
+deployment smoke verification. Until Cron write automation is separately
+approved, keep using the manual runbook in
+`docs/price-sync-and-snapshot-pipeline.md`.

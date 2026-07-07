@@ -2,8 +2,19 @@
 
 Last updated: 2026-07-08
 
-This is a contract draft only. It does not add a route, enable Vercel Cron,
-add `vercel.json`, change any admin route, or open any write path.
+This contract now has a Phase 1 read-only route skeleton. It does not enable
+Vercel Cron, add `vercel.json`, change any admin write route, or open any write
+path.
+
+Implementation status:
+
+- `src/app/api/cron/market-cycle/preflight/route.ts`
+- `GET` only
+- read-only daily snapshot preflight only
+- no `vercel.json`
+- no KIS provider call
+- no DB mutation beyond the existing `runDailySnapshot({ dryRun: true })`
+  read path
 
 ## Candidate Route
 
@@ -224,7 +235,8 @@ Before any route file is added:
 
 ## Next Approval Gate
 
-The next implementation step, if approved later, is a read-only route skeleton
-for `GET /api/cron/market-cycle/preflight`.
+The next step is deployment smoke verification for
+`GET /api/cron/market-cycle/preflight`.
 
-That future implementation still must not add `vercel.json` or perform writes.
+After smoke verification, implementation must stop again before any `vercel.json`
+or write automation work.
