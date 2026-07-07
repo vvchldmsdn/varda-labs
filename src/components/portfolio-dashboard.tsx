@@ -16,15 +16,15 @@ const accountTabs: { code: DashboardAccount; label: string }[] = [
   { code: "all", label: "전체" },
 ];
 
-const navItems = [
-  "홈",
-  "오늘 변동",
-  "추가 투입",
-  "포트 구조",
-  "히스토리",
-  "투자랩",
-  "시뮬레이션 검증",
-  "설정",
+const navItems: { label: string; href?: string }[] = [
+  { label: "홈", href: "/" },
+  { label: "오늘 변동" },
+  { label: "추가 투입" },
+  { label: "포트 구조" },
+  { label: "히스토리" },
+  { label: "투자랩", href: "/etfs" },
+  { label: "시뮬레이션 검증" },
+  { label: "설정" },
 ];
 
 export function PortfolioDashboard({ data }: { data: DashboardData }) {
@@ -47,19 +47,24 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {navItems.map((item, index) => (
-              <span
-                key={item}
-                className={cn(
-                  "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium",
-                  index === 0
-                    ? "bg-[#e5ece3] text-[#16211c]"
-                    : "text-[#697064] hover:bg-[#eef1e8]",
-                )}
-              >
-                {item}
-              </span>
-            ))}
+            {navItems.map((item, index) => {
+              const className = cn(
+                "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium",
+                index === 0
+                  ? "bg-[#e5ece3] text-[#16211c]"
+                  : "text-[#697064] hover:bg-[#eef1e8]",
+              );
+
+              return item.href ? (
+                <Link key={item.label} href={item.href} className={className}>
+                  {item.label}
+                </Link>
+              ) : (
+                <span key={item.label} className={className}>
+                  {item.label}
+                </span>
+              );
+            })}
           </nav>
           <div className="mt-5 rounded-md border border-[#e2e6da] bg-white p-3 text-xs text-[#687064]">
             <p className="font-medium text-[#2a2f29]">기준일</p>

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { etfHoldings, etfMasters, type EtfMaster } from "@/db/schema";
@@ -29,6 +29,78 @@ export type ReadOnlyEtfHoldingsResult = {
   duplicateGroupCount: number;
   groupedHoldings: GroupedEtfHoldingsResult["groups"];
 };
+
+export type ReadOnlyEtfMasterSearchResult = Pick<
+  EtfMaster,
+  | "id"
+  | "legacyBase44Id"
+  | "ticker"
+  | "name"
+  | "market"
+  | "currency"
+  | "issuer"
+  | "assetClass"
+  | "categoryLabel"
+  | "isActive"
+  | "isUniversePick"
+>;
+
+export async function searchReadOnlyEtfMasters({
+  query,
+  limit = 24,
+}: {
+  query?: string | null;
+  limit?: number;
+} = {}): Promise<ReadOnlyEtfMasterSearchResult[]> {
+  const searchQuery = normalizeSearchInput(query);
+  const rowLimit = Math.min(Math.max(limit, 1), 50);
+  const selectedColumns = {
+    id: etfMasters.id,
+    legacyBase44Id: etfMasters.legacyBase44Id,
+    ticker: etfMasters.ticker,
+    name: etfMasters.name,
+    market: etfMasters.market,
+    currency: etfMasters.currency,
+    issuer: etfMasters.issuer,
+    assetClass: etfMasters.assetClass,
+    categoryLabel: etfMasters.categoryLabel,
+    isActive: etfMasters.isActive,
+    isUniversePick: etfMasters.isUniversePick,
+  };
+
+  if (searchQuery) {
+    const pattern = containsPattern(searchQuery);
+    return db
+      .select(selectedColumns)
+      .from(etfMasters)
+      .where(
+        or(
+          ilike(etfMasters.ticker, pattern),
+          ilike(etfMasters.name, pattern),
+          ilike(etfMasters.issuer, pattern),
+          ilike(etfMasters.categoryLabel, pattern),
+        ),
+      )
+      .orderBy(
+        desc(etfMasters.isUniversePick),
+        desc(etfMasters.isActive),
+        asc(etfMasters.ticker),
+        asc(etfMasters.market),
+      )
+      .limit(rowLimit);
+  }
+
+  return db
+    .select(selectedColumns)
+    .from(etfMasters)
+    .orderBy(
+      desc(etfMasters.isUniversePick),
+      desc(etfMasters.isActive),
+      asc(etfMasters.ticker),
+      asc(etfMasters.market),
+    )
+    .limit(rowLimit);
+}
 
 export async function getReadOnlyEtfHoldings(
   selection: ReadOnlyEtfHoldingsSelection,
@@ -127,7 +199,28 @@ async function loadHoldingRows({
   asOfDate: string;
 }): Promise<EtfHoldingRawRow[]> {
   return db
-    .select()
+    .select({
+      id: etfHoldings.id,
+      legacyBase44Id: etfHoldings.legacyBase44Id,
+      etfMasterId: etfHoldings.etfMasterId,
+      legacyEtfId: etfHoldings.legacyEtfId,
+      etfTicker: etfHoldings.etfTicker,
+      etfName: etfHoldings.etfName,
+      asOfDate: etfHoldings.asOfDate,
+      holdingSymbol: etfHoldings.holdingSymbol,
+      holdingName: etfHoldings.holdingName,
+      holdingMarket: etfHoldings.holdingMarket,
+      holdingCountry: etfHoldings.holdingCountry,
+      currency: etfHoldings.currency,
+      sector: etfHoldings.sector,
+      industry: etfHoldings.industry,
+      securityType: etfHoldings.securityType,
+      source: etfHoldings.source,
+      rank: etfHoldings.rank,
+      weightPct: etfHoldings.weightPct,
+      shares: etfHoldings.shares,
+      marketValue: etfHoldings.marketValue,
+    })
     .from(etfHoldings)
     .where(
       and(
@@ -153,4 +246,14 @@ function etfHoldingSelector({
 function normalizeTickerInput(value: string | null | undefined) {
   const normalized = value?.trim().toUpperCase();
   return normalized || null;
+}
+
+function normalizeSearchInput(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized || null;
+}
+
+function containsPattern(value: string) {
+  const escaped = value.replace(/[\\%_]/g, "\\$&");
+  return `%${escaped}%`;
 }
