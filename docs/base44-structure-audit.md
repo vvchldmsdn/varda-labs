@@ -142,6 +142,11 @@ Use these categories before adding or expanding tables:
 
 Classify Base44 functions before porting:
 
+Detailed function-by-function classification lives in
+`docs/function-migration-audit.md`. Use that document as the routing layer
+before deciding whether a Base44 function should be rewritten, skipped, or kept
+as reference-only.
+
 | Function type | Migration treatment |
 | --- | --- |
 | product read helper | rewrite as server-only query/helper |
