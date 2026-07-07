@@ -293,7 +293,15 @@ export function buildCronPreflightResponse({
       staleCount: snapshot.closeSyncPlan.staleCount,
       manualCurrentNotSyncableCount:
         snapshot.closeSyncPlan.manualCurrentNotSyncableCount,
-      markets: snapshot.closeSyncPlan.markets,
+      markets: snapshot.closeSyncPlan.markets.map((market) => ({
+        market: market.market,
+        expectedCloseDate: market.expectedCloseDate,
+        requiredCount: market.requiredCount,
+        requiredTickerCount: market.requiredTickerCount,
+        coveredCount: market.coveredCount,
+        missingCount: market.missingCount,
+        staleCount: market.staleCount,
+      })),
       suggestedBatches: snapshot.closeSyncPlan.suggestedKisBatches.map(
         (batch) => ({
           market: batch.market,

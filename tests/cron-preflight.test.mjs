@@ -94,6 +94,7 @@ describe("cron preflight helpers", () => {
     assert.doesNotMatch(serialized, /confirmWrite=true/);
     assert.doesNotMatch(serialized, /dryRun=false/);
     assert.doesNotMatch(serialized, /suggestedWriteParams/);
+    assert.doesNotMatch(serialized, /targets/);
   });
 
   it("returns no_action_required for update-only covered snapshots", () => {
@@ -203,6 +204,11 @@ function snapshotResult(overrides = {}) {
           coveredCount: missingCount > 0 ? 0 : 1,
           missingCount,
           staleCount,
+          targets: [
+            {
+              ticker: "069500",
+            },
+          ],
         },
       ],
       suggestedKisBatches,
