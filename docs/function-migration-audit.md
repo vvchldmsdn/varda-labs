@@ -192,9 +192,8 @@ Migration treatment:
 
 1. Freeze this function inventory as the routing layer for future work.
 2. Do a recommendation model audit before implementing recommendation logic:
-   decide whether legacy `RebalanceRecommendation`, `RecommendationRun`, and
-   `RecommendationCandidate` rows are historical evidence or should be
-   regenerated.
+   `docs/recommendation-model-audit.md` records the current entity/function
+   split and target run/items direction.
 3. Add fixture tests around existing financial calculation helpers before any
    automated write path depends on them.
 4. Continue read-only UI/data work from existing imported tables:
