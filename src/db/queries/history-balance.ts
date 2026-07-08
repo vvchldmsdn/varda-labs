@@ -22,7 +22,6 @@ export type ReadOnlyBalanceHistoryRow = {
   brokerage: string | null;
   isa: string | null;
   irp: string | null;
-  legacyBase44Id: string | null;
 };
 
 export type ReadOnlyHistoryBalance = {
@@ -97,7 +96,6 @@ async function loadBalanceRows(): Promise<ReadOnlyBalanceHistoryRow[]> {
       brokerage: accountBalanceSnapshots.brokerage,
       isa: accountBalanceSnapshots.isa,
       irp: accountBalanceSnapshots.irp,
-      legacyBase44Id: accountBalanceSnapshots.legacyBase44Id,
     })
     .from(accountBalanceSnapshots)
     .orderBy(asc(accountBalanceSnapshots.balanceDate));
