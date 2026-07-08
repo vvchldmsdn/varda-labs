@@ -245,7 +245,8 @@ After this audit is reviewed, choose one narrow lane:
 
 1. Add fixture tests around existing financial calculation helpers, especially
    return metrics and daily movement inputs.
-2. Draft a recommendation schema proposal without migration.
+2. Draft a recommendation schema proposal without migration. The current
+   proposal lives in `docs/recommendation-schema-proposal.md`.
 3. Continue read-only product screens from already imported tables.
 
 Do not implement the recommendation engine until the schema proposal and test
