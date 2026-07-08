@@ -87,7 +87,7 @@ Each displayed holding row/detail should carry:
 | Field | Meaning |
 | --- | --- |
 | `assetId` | Current varda asset id when available. |
-| `legacyBase44Id` | Legacy asset id for traceability, not primary display text. |
+| `legacyBase44Id` | Internal trace/evidence id. It may be present in data but must not be primary default UI text. |
 | `ticker` | Current ticker, falling back to snapshot ticker only for evidence views. |
 | `assetName` | Current asset name, falling back to snapshot asset name only for evidence views. |
 | `account` | One of `brokerage`, `isa`, `irp`. |
@@ -203,6 +203,9 @@ The future surfaces should reuse or extract from:
 If extraction is needed later, extract a shared read-only movement builder first,
 then point both `/` and the new surface at the same builder. Do not fork the
 formula.
+
+The extraction plan is documented in
+`docs/shared-movement-builder-extraction-plan.md`.
 
 ## Verification Gate
 
