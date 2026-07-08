@@ -1,6 +1,6 @@
 # Base44 Migration Coverage Audit
 
-Last updated: 2026-07-06
+Last updated: 2026-07-08
 
 Source inventory: `C:\Users\Eunwoo_2\Desktop\gyeol-fin\migration-data\base44-full-entity-inventory.json`
 
@@ -12,6 +12,11 @@ This audit classifies every Base44 entity definition from the inventory into one
 - `needs_decision`: the source is unavailable, overlaps with migrated data, or depends on a product/engine decision before importing.
 
 Sensitive Settings values are intentionally not included here. This document uses entity names, counts, field names, and mapping decisions only.
+
+Resolution guidance for the remaining `needs_decision` entities lives in
+`docs/needs-decision-entity-resolution.md`. The coverage statuses below remain
+unchanged until a separate implementation step imports, skips, or replaces each
+entity.
 
 ## Summary
 
@@ -229,15 +234,23 @@ Implemented columns:
    - Keep Cron/KIS/snapshot write paths unchanged until the next automation
      validation gate is complete.
 
-1. Resolve `needs_decision` entities:
-   - `PortfolioSnapshot`: import only if earlier account-total history is required.
-   - `DailyGroupSnapshot`: import only if historical group-level drift/execution output must be preserved.
-   - `AssetFactorProfile`: decide now that the ETF/reference data model is in place.
-   - `MacroSeries` and `MarketSignal`: decide whether to merge into market-factor/signal models.
-   - Recommendation entities: use `docs/recommendation-model-audit.md` before
-     import or implementation. Current direction is future run/items modeling,
-     with old `RebalanceRecommendation.items_json` treated as legacy evidence.
-   - 404 entities: treat `MarketPriceDaily` as superseded by `AssetPriceSnapshot` unless a new source is found; treat `SecurityMaster` as superseded by `EtfMaster` unless generic securities are needed.
+1. Use `docs/needs-decision-entity-resolution.md` before adding any schema for
+   remaining `needs_decision` entities:
+   - `PortfolioSnapshot`: fold/defer into migrated portfolio/balance snapshots.
+   - `DailyGroupSnapshot`: derive/defer from position snapshots and group
+     membership unless exact historical group output becomes a product need.
+   - `MacroSeries`: fold into `global_market_factors` unless a diff proves
+     unique product value.
+   - `MarketSignal`: defer as recommendation evidence.
+   - `AssetFactorProfile`: defer until factor/read-model ownership and refresh
+     semantics are designed.
+   - 404 entities: treat `MarketPriceDaily` as replaced by
+     `asset_price_snapshots`; treat `SecurityMaster` as replaced by
+     `etf_masters` for the current ETF scope; treat
+     `CompanyFundamentalSnapshot` as an external-source decision.
+   - Recommendation entities: use `docs/recommendation-model-audit.md`,
+     `docs/recommendation-schema-proposal.md`, and
+     `docs/recommendation-implementation-plan.md`; do not resolve them here.
 
 2. Start read-only product work:
    - Build `Read-only Portfolio Dashboard v1` from imported varda-labs tables.
