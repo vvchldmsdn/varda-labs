@@ -71,6 +71,12 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
             <p className="mt-1">{formatDate(data.latestSnapshotDate)}</p>
             <p className="mt-3 font-medium text-[#2a2f29]">USD/KRW</p>
             <p className="mt-1">{formatNumber(data.usdKrwRate)}</p>
+            <p className="mt-1">
+              환율 기준 {formatDate(data.dataHealth.latestFxRateDate)}
+            </p>
+            <p className="mt-1 text-[#8a917f]">
+              {formatFxFreshness(data)} · {formatFxSource(data.dataHealth.latestFxSource)}
+            </p>
           </div>
         </aside>
 
@@ -360,6 +366,10 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                     ? `${data.dataHealth.unsupportedCurrencyCount} (${data.dataHealth.unsupportedCurrencies.join(", ")})`
                     : "0"
                 }
+              />
+              <DataPill
+                label="환율기준"
+                value={formatDate(data.dataHealth.latestFxRateDate)}
               />
             </div>
           </section>
@@ -778,6 +788,19 @@ function principalSubValue(data: DashboardData) {
 function headlineBasisLabel(value: DashboardData["dataHealth"]["headlineBasis"]) {
   if (value === "current_assets_plus_event_ledger") return "현재+실현";
   return value;
+}
+
+function formatFxFreshness(data: DashboardData) {
+  const state = data.dataHealth.fxFreshnessState;
+  if (state === "missing") return "저장 환율 없음";
+  if (data.dataHealth.latestFxAgeDays === null) return "저장 환율";
+  if (state === "fresh") return "저장 환율 최신";
+  return `저장 환율 ${data.dataHealth.latestFxAgeDays}일 전`;
+}
+
+function formatFxSource(value: string | null) {
+  if (!value) return "source 없음";
+  return value.length > 18 ? `${value.slice(0, 18)}...` : value;
 }
 
 function formatKrw(value: number | null) {

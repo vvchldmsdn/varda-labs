@@ -60,6 +60,7 @@ type EventLedgerRow = typeof eventLedgerEntries.$inferSelect;
 type AssetPriceSnapshotRow = typeof assetPriceSnapshots.$inferSelect;
 
 type MovementSource = "daily_position_snapshot" | "asset_price_snapshot" | null;
+type FxFreshnessState = "missing" | "fresh" | "stale";
 
 export type DashboardHolding = {
   id: string;
@@ -199,6 +200,11 @@ export type DashboardData = {
     portfolioSnapshotReturnPctDelta: number | null;
     unsupportedCurrencyCount: number;
     unsupportedCurrencies: string[];
+    latestFxRateDate: string | null;
+    latestFxSource: string | null;
+    latestFxFetchedAt: string | null;
+    latestFxAgeDays: number | null;
+    fxFreshnessState: FxFreshnessState;
   };
 };
 
@@ -317,8 +323,13 @@ export async function getPortfolioDashboard(
       : [];
 
   const setting = settingsRows[0] ?? null;
+  const latestFxRow = latestFxRows[0] ?? null;
   const usdKrwRate =
-    toNumber(latestFxRows[0]?.usdKrw) ?? toNumber(setting?.usdKrwRate) ?? 0;
+    toNumber(latestFxRow?.usdKrw) ?? toNumber(setting?.usdKrwRate) ?? 0;
+  const latestFxAgeDays = latestFxRow?.rateDate
+    ? diffDays(movementCycle.snapshotDate, latestFxRow.rateDate)
+    : null;
+  const fxFreshnessState = resolveFxFreshnessState(latestFxAgeDays, usdKrwRate);
   const trimDriftThreshold =
     toNumber(setting?.trimDriftThreshold) ?? DEFAULT_TRIM_DRIFT_THRESHOLD;
   const useTrendFilter = setting?.useTrendFilter ?? false;
@@ -552,8 +563,21 @@ export async function getPortfolioDashboard(
       unsupportedCurrencies: uniqueStrings(
         unsupportedCurrencyAssets.map((asset) => asset.currency),
       ).sort(),
+      latestFxRateDate: latestFxRow?.rateDate ?? null,
+      latestFxSource: latestFxRow?.source ?? null,
+      latestFxFetchedAt: latestFxRow?.fetchedAt?.toISOString() ?? null,
+      latestFxAgeDays,
+      fxFreshnessState,
     },
   };
+}
+
+function resolveFxFreshnessState(
+  latestFxAgeDays: number | null,
+  usdKrwRate: number,
+): FxFreshnessState {
+  if (usdKrwRate <= 0 || latestFxAgeDays === null) return "missing";
+  return latestFxAgeDays <= 1 ? "fresh" : "stale";
 }
 
 function getPositionSnapshotDateForCycle(
