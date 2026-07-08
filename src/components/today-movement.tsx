@@ -132,7 +132,7 @@ export function TodayMovement({ data }: { data: DashboardData }) {
                     return (
                       <tr key={row.holdingId} className="border-t border-[#e7eadf]">
                         <Td>
-                          <HoldingLabel holding={holding} fallback={row.holdingId} />
+                          <HoldingLabel holding={holding} />
                         </Td>
                         <Td>{holding?.account ?? "-"}</Td>
                         <Td>{sourceLabel(row.source)}</Td>
@@ -239,15 +239,13 @@ function MetricCard({
 
 function HoldingLabel({
   holding,
-  fallback,
 }: {
   holding: DashboardHolding | null;
-  fallback: string;
 }) {
   return (
     <div>
       <div className="font-semibold text-[#1f2722]">
-        {holding?.ticker ?? fallback}
+        {holding?.ticker ?? "Unknown holding"}
       </div>
       <div className="text-xs text-[#687064]">{holding?.name ?? "-"}</div>
     </div>
