@@ -49,8 +49,72 @@ Reason:
 - `recommendation_items` leaves room for candidate generation internals to
   exist later without becoming the persisted public run output.
 
-If later implementation prefers `recommendation_candidates`, keep the same
-fields and relationships. Do not support both names.
+Decision: use `recommendation_items` for the persisted output rows. Do not
+support both `recommendation_items` and `recommendation_candidates`.
+
+## Accepted Decisions
+
+These decisions are accepted for the next planning step. They still do not
+authorize schema, migration, import, route, UI, or engine implementation.
+
+### 1. Persisted item table naming
+
+Use `recommendation_items`.
+
+Reason:
+
+- The persisted row is an output item, not necessarily an internal generation
+  candidate.
+- Internal candidate generation can still exist later without becoming the
+  public persisted table.
+- Supporting both item and candidate table names would add avoidable migration
+  and query complexity.
+
+### 2. Briefing and generated content split
+
+Keep deterministic run data separate from generated narrative content.
+
+Preferred direction:
+
+- `recommendation_runs` stores deterministic run header, input snapshot,
+  counts, context, status, and legacy evidence.
+- `recommendation_explanations` remains optional and later-only for generated
+  summaries, briefing text, top changes, model metadata, and content status.
+- The first schema may omit `recommendation_explanations` if no content product
+  is ready.
+
+Rule: LLM or generated narrative must not be inside the critical calculation or
+write transaction.
+
+### 3. Legacy `RebalanceRecommendation.items_json`
+
+Preserve raw legacy evidence first. Do not normalize
+`RebalanceRecommendation.items_json` into the primary query model by default.
+
+If historical recommendation UI explicitly needs old item rows later:
+
+- create one legacy run row per Base44 `RebalanceRecommendation`;
+- best-effort normalize item JSON into `recommendation_items`;
+- keep the raw item JSON on each normalized row;
+- keep the original full `items_json` on the legacy run evidence.
+
+### 4. `MarketSignal`
+
+Defer import and modeling.
+
+Do not create `recommendation_signals` just to preserve the two existing
+Base44 `MarketSignal` rows. If historical recommendation runs need signal
+evidence later, store signal keys or raw evidence in run/item JSONB first.
+Normalize only when signals become a reusable read surface or a reusable input
+to multiple runs.
+
+### 5. `AssetFactorProfile`
+
+Defer factor profile modeling.
+
+Do not block the recommendation run/items schema on `AssetFactorProfile`.
+Treat it as a future factor evidence or read-model decision that needs its own
+source priority, ETF lookthrough dependency, ownership, and refresh semantics.
 
 ## Logical Tables
 
@@ -101,8 +165,9 @@ Layer: run artifact item.
 Base44 source mapping:
 
 - primary mapping from `RecommendationCandidate`
-- optional best-effort mapping from each legacy `RebalanceRecommendation.items_json`
-  element if old rows are imported
+- optional best-effort mapping from each legacy
+  `RebalanceRecommendation.items_json` element only if historical UI explicitly
+  needs normalized old rows
 
 Column groups:
 
@@ -157,9 +222,9 @@ Column groups:
 | Status | `status`, `warnings_json` | Allows failed/partial content generation without corrupting run. |
 | Timestamps | `created_at`, `updated_at` | Normal varda-labs timestamps. |
 
-Decision: do not put long LLM markdown in `recommendation_runs` unless the
-product chooses a small, single-table design. Keep deterministic run data and
-generated prose separable.
+Decision: do not put long LLM markdown in `recommendation_runs`. Keep
+deterministic run data and generated prose separable. This table can be omitted
+from the first implementation if no recommendation content surface is ready.
 
 ### `recommendation_signals` optional
 
@@ -292,7 +357,8 @@ If imported later:
 
 - create one legacy run row per Base44 row;
 - preserve `items_json` as raw legacy evidence;
-- optionally best-effort normalize each item into `recommendation_items`;
+- best-effort normalize each item into `recommendation_items` only if a
+  historical recommendation UI explicitly needs item-level old rows;
 - store raw item JSON on each normalized item;
 - mark `source` as `base44_rebalance_legacy`.
 
@@ -343,25 +409,42 @@ filter, or expand already-rendered data.
 
 ## Open Questions
 
-1. Should the persisted item table be named `recommendation_items` or
-   `recommendation_candidates`?
-2. Should `briefing_text` live on `recommendation_runs` for simplicity or in
-   `recommendation_explanations` for lifecycle separation?
-3. Should imported Base44 `RebalanceRecommendation` rows be normalized into
-   item rows, or preserved only as raw legacy run evidence?
-4. Should `MarketSignal` be imported before any recommendation UI exists?
-5. Should `AssetFactorProfile` be a product table or a recomputed scoring
-   artifact?
+1. What exact status strings and validation layer should the first
+   implementation use?
+2. Should the first implementation import historical `RecommendationRun` and
+   `RecommendationCandidate` rows, or start varda-native only?
+3. Should recommendation import happen before the first read-only
+   recommendation UI?
+4. What fixture coverage is required before the first recommendation migration?
+5. When should `AssetFactorProfile` get its own model, and should it be
+   sourced from ETF lookthrough, market factor data, or recomputed scoring
+   inputs?
 6. How should eventual execution connect to `event_ledger_entries` without
    turning recommendations into trade records?
 
+## Next Approval Gate
+
+The next approval gate is an implementation plan, not a migration.
+
+Before any Drizzle schema or SQL migration is created, write a short plan that
+confirms:
+
+- final table list for the first implementation;
+- final column set and nullable relationship rules;
+- whether historical Base44 rows are imported in the same phase;
+- dry-run default import behavior if import is included;
+- test fixtures required before recommendation generation or write paths;
+- explicit non-goals for LLM/provider calls, execution, and UI mutation.
+
 ## Recommended Next Step
 
-After this proposal is reviewed, the next safe step is still not migration.
+After these decisions are reviewed, the next safe step is still not migration.
 
 Recommended order:
 
-1. Decide naming: `recommendation_items` vs `recommendation_candidates`.
-2. Decide content split: run row field vs separate explanation table.
+1. Draft a docs-only recommendation implementation plan.
+2. Decide whether the first implementation imports historical rows or starts
+   varda-native only.
 3. Add more fixture tests for pure recommendation input calculations if needed.
-4. Only then draft an actual Drizzle schema change in a separate commit.
+4. Only after explicit approval, draft an actual Drizzle schema change in a
+   separate commit.
