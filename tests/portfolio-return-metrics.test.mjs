@@ -211,4 +211,100 @@ describe("portfolio return metrics", () => {
     assert.equal(metrics.realizedPnlKrw, 0);
     assert.equal(metrics.realizedCostBasisKrw, 0);
   });
+
+  it("summarizes realized rows across account filters and legacy asset mappings", () => {
+    const isaAsset = {
+      ...asset,
+      id: "isa-current-id",
+      legacyBase44Id: "isa-legacy-id",
+      account: "isa",
+      ticker: "069500",
+      name: "KODEX 200",
+      currency: "KRW",
+      quantity: "2",
+      averageCost: "100000",
+      currentPrice: "110000",
+    };
+    const irpAsset = {
+      ...asset,
+      id: "irp-current-id",
+      legacyBase44Id: "irp-legacy-id",
+      account: "irp",
+      ticker: "229200",
+      name: "KODEX KOFR",
+      currency: "KRW",
+      quantity: "3",
+      averageCost: "10000",
+      currentPrice: "10050",
+    };
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          eventDate: "2026-01-01",
+          eventType: "buy",
+          legacyAssetId: "isa-legacy-id",
+          ticker: "069500",
+          assetName: "KODEX 200",
+          account: "isa",
+          amountKrw: "300000",
+          quantityDelta: "3",
+        }),
+        tradeEvent({
+          eventDate: "2026-02-01",
+          eventType: "sell",
+          legacyAssetId: "isa-legacy-id",
+          ticker: "069500",
+          assetName: "KODEX 200",
+          account: "isa",
+          amountKrw: "115000",
+          quantityDelta: "-1",
+        }),
+        tradeEvent({
+          eventDate: "2026-01-02",
+          eventType: "buy",
+          legacyAssetId: "irp-legacy-id",
+          ticker: "229200",
+          assetName: "KODEX KOFR",
+          account: "irp",
+          amountKrw: "40000",
+          quantityDelta: "4",
+        }),
+        tradeEvent({
+          eventDate: "2026-02-02",
+          eventType: "sell",
+          legacyAssetId: "irp-legacy-id",
+          ticker: "229200",
+          assetName: "KODEX KOFR",
+          account: "irp",
+          amountKrw: "11000",
+          quantityDelta: "-1",
+        }),
+      ],
+      [asset, isaAsset, irpAsset],
+      1300,
+    );
+
+    const selectedKeys = new Set([
+      asset.legacyBase44Id,
+      isaAsset.legacyBase44Id,
+      irpAsset.legacyBase44Id,
+    ]);
+    const all = summarizeRealizedReturnForAccount(summary, "all", selectedKeys);
+    const brokerage = summarizeRealizedReturnForAccount(
+      summary,
+      "brokerage",
+      selectedKeys,
+    );
+    const isa = summarizeRealizedReturnForAccount(summary, "isa", selectedKeys);
+    const irp = summarizeRealizedReturnForAccount(summary, "irp", selectedKeys);
+
+    assert.equal(all.realizedPnlKrw, 16000);
+    assert.equal(all.realizedCostBasisKrw, 110000);
+    assert.equal(all.realizedSellEventCount, 2);
+    assert.equal(brokerage.realizedSellEventCount, 0);
+    assert.equal(isa.realizedPnlKrw, 15000);
+    assert.equal(isa.realizedCostBasisKrw, 100000);
+    assert.equal(irp.realizedPnlKrw, 1000);
+    assert.equal(irp.realizedCostBasisKrw, 10000);
+  });
 });

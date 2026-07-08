@@ -196,6 +196,65 @@ describe("cron preflight helpers", () => {
     assert.equal(response.nextRecommendedAction, "no_action_required");
     assert.deepEqual(response.blockingReasons, []);
   });
+
+  it("blocks stale close coverage without requiring a KIS cooldown blocker", () => {
+    const response = buildCronPreflightResponse({
+      snapshot: snapshotResult({
+        ok: false,
+        writeReady: false,
+        missingCount: 0,
+        staleCount: 1,
+        suggestedKisBatches: [],
+      }),
+      kisCooldown: cooldownStatus({ active: true, retryAfterSeconds: 42 }),
+      cronScheduleUtc: null,
+    });
+
+    assert.equal(response.closeCoverage.missingCount, 0);
+    assert.equal(response.closeCoverage.staleCount, 1);
+    assert.equal(
+      response.nextRecommendedAction,
+      "blocked_by_missing_close_coverage",
+    );
+    assert.ok(response.blockingReasons.includes("blocked_by_stale_close_coverage"));
+    assert.equal(
+      response.blockingReasons.includes("blocked_by_kis_cooldown"),
+      false,
+    );
+  });
+
+  it("surfaces account-level blockers without exposing nested write targets", () => {
+    const response = buildCronPreflightResponse({
+      snapshot: snapshotResult({
+        ok: false,
+        writeReady: false,
+        missingCount: 0,
+        suggestedKisBatches: [],
+        results: {
+          brokerage: {
+            status: "blocked",
+            reason: "duplicate",
+            blockers: ["duplicate_portfolio_snapshot"],
+          },
+        },
+      }),
+      kisCooldown: cooldownStatus({ active: false }),
+      cronScheduleUtc: null,
+    });
+    const serialized = JSON.stringify(response);
+
+    assert.equal(
+      response.nextRecommendedAction,
+      "blocked_by_duplicate_or_unmanaged_rows",
+    );
+    assert.ok(
+      response.blockingReasons.includes(
+        "account:brokerage:duplicate_portfolio_snapshot",
+      ),
+    );
+    assert.doesNotMatch(serialized, /targets/);
+    assert.doesNotMatch(serialized, /confirmWrite=true/);
+  });
 });
 
 function snapshotResult(overrides = {}) {
@@ -302,7 +361,7 @@ function snapshotResult(overrides = {}) {
       dailyPortfolioSnapshots: portfolioWrites,
       dailyPositionSnapshots: positionWrites,
     },
-    results: {
+    results: overrides.results ?? {
       brokerage: { status: "planned", reason: null, blockers: [] },
     },
     warnings: [],

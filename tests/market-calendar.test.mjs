@@ -4,6 +4,8 @@ import { describe, it } from "node:test";
 import {
   buildCycleForSnapshotDate,
   closeCalendarReferenceDateForAsset,
+  closeMarketKeyForAsset,
+  isUsdListedAsset,
   resolveSnapshotCycle,
 } from "../src/lib/snapshots/market-calendar.ts";
 
@@ -47,6 +49,34 @@ describe("market calendar", () => {
         "2026-04-04",
       ),
       "2026-04-02",
+    );
+  });
+
+  it("uses the previous trading day for the 2026-07-08 snapshot cycle", () => {
+    assert.equal(
+      closeCalendarReferenceDateForAsset(
+        { market: "korea", currency: "KRW" },
+        "2026-07-08",
+      ),
+      "2026-07-07",
+    );
+    assert.equal(
+      closeCalendarReferenceDateForAsset(
+        { market: "us", currency: "USD" },
+        "2026-07-08",
+      ),
+      "2026-07-07",
+    );
+  });
+
+  it("treats USD-denominated assets as US-listed for close coverage", () => {
+    const asset = { market: "korea", currency: "USD" };
+
+    assert.equal(isUsdListedAsset(asset), true);
+    assert.equal(closeMarketKeyForAsset(asset), "us");
+    assert.equal(
+      closeCalendarReferenceDateForAsset(asset, "2026-07-05"),
+      "2026-07-02",
     );
   });
 });

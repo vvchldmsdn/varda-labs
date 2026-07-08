@@ -174,6 +174,21 @@ Before any recommendation schema migration, add or confirm fixture coverage for:
 Tests should use deterministic fixtures and should not call production DB,
 providers, KIS, LLMs, admin routes, or Cron paths.
 
+### Not Yet Testable Without Helper Extraction
+
+These recommendation input areas should remain gaps until pure helper
+boundaries exist. Do not implement new recommendation logic just to satisfy
+tests:
+
+- MA/trend evidence selection from asset prices, snapshots, or latest caches;
+- cash allocation and contribution sizing;
+- guardrails such as minimum execution size, churn window, taxable account
+  penalty, minimum holding days, and blocked symbols;
+- ETF substitute/candidate scoring.
+
+The next step for these areas is a helper extraction plan with fixture inputs
+and expected outputs, not a direct port of Base44 recommendation functions.
+
 ## Explicit Non-Goals
 
 - no Drizzle schema or SQL migration
