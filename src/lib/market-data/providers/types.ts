@@ -28,7 +28,7 @@ export type LiveQuote = {
   priceAsOf: Date | null;
   fetchedAt: Date;
   source: string;
-  quoteType: "live";
+  quoteType: "live" | "delayed" | "realtime";
   status: ProviderQuoteStatus;
   error?: string;
 };

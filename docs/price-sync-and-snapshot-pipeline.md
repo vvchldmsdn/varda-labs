@@ -171,6 +171,8 @@ Writes:
 
 Production preflight and observability:
 
+- `mode=live` is admin-only in the current implementation. It is not connected
+  to a user-facing sync button, Cron, or high-frequency automation.
 - Start with `provider=kis&mode=close&dryRun=true` and narrow target filters
   such as `tickers=...`, `market=korea|us`, `account=brokerage|isa|irp`.
 - Response should include provider, mode, dry-run state, target filter summary,
@@ -311,6 +313,10 @@ checkpoint that means 15 price targets:
 
 Current route constraints:
 
+- `provider=kis&mode=live` defaults to `dryRun=true`. Actual live writes require
+  `dryRun=false&confirmWrite=true`, a reviewed target filter, and `limit <= 5`.
+- KIS live writes update only `assets.current_price` and `assets.price_*`
+  metadata. They must not insert or update `asset_price_snapshots`.
 - `provider=kis&mode=close` may run as `dryRun=true` across the selected target
   set.
 - KIS actual close writes require `dryRun=false&confirmWrite=true`.

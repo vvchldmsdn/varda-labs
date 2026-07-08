@@ -4,8 +4,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshots, assets, marketDataSyncRuns } from "@/db/schema";
+import {
+  LIVE_PRICE_WRITE_CONTRACT,
+  planLiveAssetPriceWrite,
+} from "@/lib/market-data/live-price-write";
 import { createStubMarketDataProvider } from "@/lib/market-data/providers/stub";
 import { safeErrorMessage } from "@/lib/redaction";
+import type {
+  LivePriceWritePolicy,
+  LivePriceWriteResult,
+} from "@/lib/market-data/live-price-write";
 import type {
   ClosePrice,
   LiveQuote,
@@ -16,7 +24,6 @@ import type {
 } from "@/lib/market-data/providers/types";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
-const LIVE_MARKET_DATA_WRITES_ENABLED = false;
 const DEFAULT_KIS_JOB_COOLDOWN_SECONDS = 90;
 const DEFAULT_KIS_VALUE_CONFLICT_THRESHOLD_PCT = 3;
 const DECIMAL_COMPARE_ABSOLUTE_TOLERANCE = 1e-9;
@@ -24,12 +31,12 @@ const DECIMAL_COMPARE_RELATIVE_TOLERANCE = 1e-10;
 
 export const PRICE_SYNC_CONTRACT = {
   live: {
-    updates: ["assets.current_price", "assets.price_* metadata"],
-    inserts: [],
-    snapshotWrites: false,
+    updates: [...LIVE_PRICE_WRITE_CONTRACT.updates],
+    inserts: [...LIVE_PRICE_WRITE_CONTRACT.inserts],
+    snapshotWrites: LIVE_PRICE_WRITE_CONTRACT.snapshotWrites,
     notes: [
-      "future implementation updates current asset prices and live price lineage",
-      "future implementation must not write asset_price_snapshots in live mode",
+      "updates current asset prices and live price lineage only after guarded actual write",
+      "live mode must not write asset_price_snapshots",
     ],
   },
   close: {
@@ -63,8 +70,8 @@ export type PriceSyncRunResult = {
   targetFilterSummary: PriceSyncTargetFilterSummary;
   targetFilterResults: PriceSyncTargetFilterResult[];
   plannedWrites: PlannedWrite[];
-  writeSummary: ClosePriceWriteResultSummary;
-  writeResults: ClosePriceWriteResult[];
+  writeSummary: MarketDataWriteResultSummary;
+  writeResults: MarketDataWriteResult[];
   contract: (typeof PRICE_SYNC_CONTRACT)[PriceSyncMode];
   warnings: string[];
 };
@@ -156,6 +163,8 @@ type ClosePriceWriteResult = {
   existingSource?: string | null;
 };
 
+type MarketDataWriteResult = ClosePriceWriteResult | LivePriceWriteResult;
+
 type ClosePriceWriteSummary = {
   insertedCount: number;
   updatedCount: number;
@@ -165,12 +174,21 @@ type ClosePriceWriteSummary = {
   results: ClosePriceWriteResult[];
 };
 
-type ClosePriceWriteResultSummary = {
+type LivePriceWriteSummary = {
+  insertedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  conflictCount: number;
+  results: LivePriceWriteResult[];
+};
+
+type MarketDataWriteResultSummary = {
   actions: Record<string, number>;
   sources: Record<string, number>;
   reasons: Record<string, number>;
   existingSources: Record<string, number>;
-  sample: ClosePriceWriteResult[];
+  sample: MarketDataWriteResult[];
 };
 
 type AssetPriceSnapshotRow = typeof assetPriceSnapshots.$inferSelect;
@@ -250,8 +268,10 @@ export async function runMarketPriceSync(options: {
   const fixture = options.fixture ?? false;
   const priceDate = options.priceDate ?? toDateKey(new Date());
   const startedAt = new Date();
-  const writePolicy = getClosePriceWritePolicy(provider.name, fixture);
-  const closeWriteEnabled = !dryRun && writePolicy !== "none";
+  const closeWritePolicy = getClosePriceWritePolicy(provider.name, fixture);
+  const liveWritePolicy = getLivePriceWritePolicy(provider.name);
+  const closeWriteEnabled = !dryRun && closeWritePolicy !== "none";
+  const liveWriteEnabled = !dryRun && liveWritePolicy !== "none";
   const targetFilter = normalizeTargetFilter(options.targetFilter);
   const assetRows = await getAssetRowsForPriceSync();
   const syncableAssetRows = assetRows.filter(isSyncableAssetRow);
@@ -265,6 +285,10 @@ export async function runMarketPriceSync(options: {
     options.targetLimit === undefined
       ? filteredPriceTargets
       : filteredPriceTargets.slice(0, options.targetLimit);
+  const selectedAssetWriteCount = priceTargets.reduce(
+    (count, target) => count + target.assetIds.length,
+    0,
+  );
   const targetFilterResults = buildTargetFilterResults({
     targetFilter,
     allAssetRows: assetRows,
@@ -290,6 +314,22 @@ export async function runMarketPriceSync(options: {
     throw new PriceSyncRequestError(
       "no_write_targets",
       "KIS close writes require at least one selected write target",
+      {
+        targetFilterSummary,
+        targetFilterResults,
+      },
+    );
+  }
+
+  if (
+    !dryRun &&
+    options.mode === "live" &&
+    liveWriteEnabled &&
+    priceTargets.length === 0
+  ) {
+    throw new PriceSyncRequestError(
+      "no_write_targets",
+      "KIS live writes require at least one selected write target",
       {
         targetFilterSummary,
         targetFilterResults,
@@ -324,8 +364,9 @@ export async function runMarketPriceSync(options: {
     const plannedWrites = buildPlannedWrites(
       options.mode,
       dryRun,
-      writePolicy,
-      syncableAssetRows.length,
+      closeWritePolicy,
+      liveWritePolicy,
+      selectedAssetWriteCount,
       priceTargets.length,
     );
     const providerResult = dryRun
@@ -353,10 +394,20 @@ export async function runMarketPriceSync(options: {
             targets: priceTargets,
             dryRun,
             fixture,
-            writePolicy,
+            writePolicy: closeWritePolicy,
             allowWrite: closeWriteEnabled,
           })
         : emptyClosePriceWriteSummary();
+    const liveWriteSummary =
+      options.mode === "live"
+        ? await applyLivePriceRows({
+            rows: providerResult.rows as LiveQuote[],
+            targets: priceTargets,
+            dryRun,
+            writePolicy: liveWritePolicy,
+            allowWrite: liveWriteEnabled,
+          })
+        : emptyLivePriceWriteSummary();
     const warnings = uniqueWarnings([
       ...providerResult.warnings,
       ...buildTargetFilterWarnings(targetFilterSummary, targetFilterResults),
@@ -364,11 +415,15 @@ export async function runMarketPriceSync(options: {
         mode: options.mode,
         dryRun,
         fixture,
-        writePolicy,
+        closeWritePolicy,
+        liveWritePolicy,
         closeWriteEnabled,
+        liveWriteEnabled,
       }),
     ]);
-    const writeSummary = summarizeWriteResults(closeWriteSummary.results);
+    const writeResults: MarketDataWriteResult[] =
+      options.mode === "live" ? liveWriteSummary.results : closeWriteSummary.results;
+    const writeSummary = summarizeWriteResults(writeResults);
     const finishedAt = new Date();
 
     const result: PriceSyncRunResult = {
@@ -382,16 +437,22 @@ export async function runMarketPriceSync(options: {
       requestedCount: priceTargets.length,
       assetCount: syncableAssetRows.length,
       successCount: counts.successCount,
-      failedCount: counts.failedCount + closeWriteSummary.failedCount,
-      skippedCount: counts.skippedCount + closeWriteSummary.skippedCount,
-      insertedCount: closeWriteSummary.insertedCount,
-      updatedCount: closeWriteSummary.updatedCount,
-      conflictCount: closeWriteSummary.conflictCount,
+      failedCount:
+        counts.failedCount +
+        closeWriteSummary.failedCount +
+        liveWriteSummary.failedCount,
+      skippedCount:
+        counts.skippedCount +
+        closeWriteSummary.skippedCount +
+        liveWriteSummary.skippedCount,
+      insertedCount: closeWriteSummary.insertedCount + liveWriteSummary.insertedCount,
+      updatedCount: closeWriteSummary.updatedCount + liveWriteSummary.updatedCount,
+      conflictCount: closeWriteSummary.conflictCount + liveWriteSummary.conflictCount,
       targetFilterSummary,
       targetFilterResults,
       plannedWrites,
       writeSummary,
-      writeResults: closeWriteSummary.results,
+      writeResults,
       contract: PRICE_SYNC_CONTRACT[options.mode],
       warnings,
     };
@@ -425,8 +486,9 @@ export async function runMarketPriceSync(options: {
           writeSummary,
           contract: PRICE_SYNC_CONTRACT[options.mode],
           marketDataWritesEnabled:
-            options.mode === "close" && closeWriteEnabled,
-          writePolicy,
+            options.mode === "close" ? closeWriteEnabled : liveWriteEnabled,
+          writePolicy:
+            options.mode === "close" ? closeWritePolicy : liveWritePolicy,
           targetSummary: summarizeTargets(priceTargets),
           warnings,
         },
@@ -451,8 +513,9 @@ export async function runMarketPriceSync(options: {
           provider: provider.name,
           mode: options.mode,
           marketDataWritesEnabled:
-            options.mode === "close" && closeWriteEnabled,
-          writePolicy,
+            options.mode === "close" ? closeWriteEnabled : liveWriteEnabled,
+          writePolicy:
+            options.mode === "close" ? closeWritePolicy : liveWritePolicy,
           error: safeError,
           targetFilter: targetFilterSummary,
           targetFilterResults: summarizeTargetFilterResults(targetFilterResults),
@@ -662,8 +725,9 @@ function orderPriceTargetsByFilter(
 function buildPlannedWrites(
   mode: PriceSyncMode,
   dryRun: boolean,
-  writePolicy: ClosePriceWritePolicy,
-  assetCount: number,
+  closeWritePolicy: ClosePriceWritePolicy,
+  liveWritePolicy: LivePriceWritePolicy,
+  selectedAssetWriteCount: number,
   priceTargetCount: number,
 ): PlannedWrite[] {
   if (mode === "live") {
@@ -671,20 +735,20 @@ function buildPlannedWrites(
       {
         table: "assets",
         operation: "update_current_price_and_price_metadata",
-        count: assetCount,
-        active: !dryRun && LIVE_MARKET_DATA_WRITES_ENABLED,
+        count: selectedAssetWriteCount,
+        active: !dryRun && liveWritePolicy !== "none",
       },
     ];
   }
 
   return [
-    {
-      table: "asset_price_snapshots",
-      operation: "upsert_close_price_by_ticker_date",
-      count: priceTargetCount,
-      active: !dryRun && writePolicy !== "none",
-    },
-  ];
+      {
+        table: "asset_price_snapshots",
+        operation: "upsert_close_price_by_ticker_date",
+        count: priceTargetCount,
+        active: !dryRun && closeWritePolicy !== "none",
+      },
+    ];
 }
 
 async function fetchProviderRows(
@@ -777,6 +841,69 @@ async function buildDryRunProviderResult(options: {
     ),
     warnings: ["dry run: no provider fetch and no market data write"],
   };
+}
+
+async function applyLivePriceRows(options: {
+  rows: LiveQuote[];
+  targets: PriceLookupTarget[];
+  dryRun: boolean;
+  writePolicy: LivePriceWritePolicy;
+  allowWrite: boolean;
+}): Promise<LivePriceWriteSummary> {
+  const targetByKey = new Map(
+    options.targets.map((target) => [target.key, target] as const),
+  );
+  const summary = emptyLivePriceWriteSummary();
+
+  for (const row of options.rows) {
+    const target = targetByKey.get(toTargetKey(row));
+    const planned = planLiveAssetPriceWrite({
+      row,
+      target,
+      dryRun: options.dryRun,
+      allowWrite: options.allowWrite,
+      writePolicy: options.writePolicy,
+    });
+    let result = planned.result;
+
+    if (planned.update && result.action === "updated") {
+      let updatedAssetCount = 0;
+
+      for (const assetId of result.assetIds) {
+        const returned = await db
+          .update(assets)
+          .set({
+            currentPrice: planned.update.currentPrice,
+            priceSource: planned.update.priceSource,
+            priceFetchedAt: planned.update.priceFetchedAt,
+            priceAsOf: planned.update.priceAsOf,
+            priceQuoteType: planned.update.priceQuoteType,
+            priceStatus: planned.update.priceStatus,
+            priceError: planned.update.priceError,
+            updatedAt: new Date(),
+          })
+          .where(eq(assets.id, assetId))
+          .returning({ id: assets.id });
+
+        updatedAssetCount += returned.length;
+      }
+
+      result = {
+        ...result,
+        updatedAssetCount,
+        action: updatedAssetCount > 0 ? "updated" : "skipped",
+        reason: updatedAssetCount > 0 ? undefined : "asset_rows_not_found",
+      };
+    }
+
+    summary.results.push(result);
+
+    if (result.action === "updated") summary.updatedCount += result.updatedAssetCount;
+    if (result.action === "failed") summary.failedCount += 1;
+    if (result.action === "skipped") summary.skippedCount += 1;
+  }
+
+  return summary;
 }
 
 async function applyClosePriceRows(options: {
@@ -1055,6 +1182,11 @@ function getClosePriceWritePolicy(
   return "none";
 }
 
+function getLivePriceWritePolicy(providerName: string): LivePriceWritePolicy {
+  if (providerName === "kis") return "kis";
+  return "none";
+}
+
 function isAllowedClosePriceSource(
   source: string | null,
   writePolicy: ClosePriceWritePolicy,
@@ -1131,7 +1263,18 @@ function emptyClosePriceWriteSummary(): ClosePriceWriteSummary {
   };
 }
 
-function summarizeWriteResults(results: ClosePriceWriteResult[]) {
+function emptyLivePriceWriteSummary(): LivePriceWriteSummary {
+  return {
+    insertedCount: 0,
+    updatedCount: 0,
+    skippedCount: 0,
+    failedCount: 0,
+    conflictCount: 0,
+    results: [],
+  };
+}
+
+function summarizeWriteResults(results: MarketDataWriteResult[]) {
   const actions = new Map<string, number>();
   const sources = new Map<string, number>();
   const reasons = new Map<string, number>();
@@ -1144,7 +1287,7 @@ function summarizeWriteResults(results: ClosePriceWriteResult[]) {
     if (result.reason) {
       reasons.set(result.reason, (reasons.get(result.reason) ?? 0) + 1);
     }
-    if (result.existingSource !== undefined) {
+    if ("existingSource" in result && result.existingSource !== undefined) {
       existingSources.set(
         result.existingSource ?? "null",
         (existingSources.get(result.existingSource ?? "null") ?? 0) + 1,
@@ -1211,7 +1354,9 @@ function sameNullableDecimal(left: string | null, right: string | null) {
   return sameDecimal(left, right);
 }
 
-function toTargetKey(row: Pick<ClosePrice, "market" | "ticker" | "currency">) {
+function toTargetKey(
+  row: Pick<LiveQuote | ClosePrice, "market" | "ticker" | "currency">,
+) {
   const market = normalizeText(row.market) ?? "unknown";
   const ticker = normalizeTicker(row.ticker) ?? "";
   const currency = normalizeText(row.currency) ?? "unknown";
@@ -1238,12 +1383,29 @@ function buildSkeletonWarnings(options: {
   mode: PriceSyncMode;
   dryRun: boolean;
   fixture: boolean;
-  writePolicy: ClosePriceWritePolicy;
+  closeWritePolicy: ClosePriceWritePolicy;
+  liveWritePolicy: LivePriceWritePolicy;
   closeWriteEnabled: boolean;
+  liveWriteEnabled: boolean;
 }): string[] {
-  const warnings = ["live asset price updates are not enabled yet"];
+  const warnings: string[] = [];
 
-  if (options.mode === "close" && options.dryRun) {
+  if (options.mode === "live" && options.dryRun) {
+    warnings.push("live price run is dry-run only; no assets rows were written");
+  } else if (
+    options.mode === "live" &&
+    !options.dryRun &&
+    options.liveWritePolicy === "kis" &&
+    options.liveWriteEnabled
+  ) {
+    warnings.push(
+      "kis live rows may update assets.current_price and price metadata only",
+    );
+  } else if (options.mode === "live" && !options.dryRun) {
+    warnings.push(
+      "dryRun=false was accepted, but this provider has no live asset write path enabled",
+    );
+  } else if (options.mode === "close" && options.dryRun) {
     warnings.push(
       "close price run is dry-run only; no asset_price_snapshots rows were written",
     );
@@ -1258,7 +1420,7 @@ function buildSkeletonWarnings(options: {
   } else if (
     options.mode === "close" &&
     !options.dryRun &&
-    options.writePolicy === "kis" &&
+    options.closeWritePolicy === "kis" &&
     options.closeWriteEnabled
   ) {
     warnings.push(

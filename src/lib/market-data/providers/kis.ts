@@ -40,6 +40,12 @@ type KisHistoryRow = {
   exchange: string | null;
 };
 
+type KisLiveRow = {
+  price: string;
+  source: string;
+  exchange: string | null;
+};
+
 export type KisProviderPolicy = {
   provider: "kis";
   configured: boolean;
@@ -85,10 +91,7 @@ export function createKisMarketDataProvider(): MarketDataProvider {
     name: "kis",
     supportedMarkets: ["korea", "us"],
     async fetchLiveQuotes(targets, context) {
-      return buildSkeletonResult(
-        targets.map((target) => toSkippedLiveQuote(target, context)),
-        context,
-      );
+      return fetchKisLiveQuotes(targets, context);
     },
     async fetchClosePrices(targets, context) {
       return fetchKisClosePrices(targets, context);
@@ -96,21 +99,73 @@ export function createKisMarketDataProvider(): MarketDataProvider {
   };
 }
 
-function buildSkeletonResult<TQuote extends LiveQuote | ClosePrice>(
-  rows: TQuote[],
+async function fetchKisLiveQuotes(
+  targets: PriceLookupTarget[],
   context: ProviderRequestContext,
-): ProviderResult<TQuote> {
-  const policy = getKisProviderPolicy();
+): Promise<ProviderResult<LiveQuote>> {
+  const fetchedAt = context.requestedAt;
+  const config = getKisConfig();
+
+  if (!config) {
+    const policy = getKisProviderPolicy();
+
+    return {
+      provider: "kis",
+      fetchedAt,
+      rows: targets.map((target) => ({
+        ...toSkippedLiveQuote(target, context),
+        status: "error",
+        error: `missing_env:${policy.missingEnvKeys.join(",")}`,
+      })),
+      warnings: [
+        "kis provider is not configured",
+        ...policy.missingEnvKeys.map((key) => `missing env: ${key}`),
+      ],
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getKisAccessToken(config);
+  } catch (error) {
+    const message = redactSensitiveText(toErrorMessage(error));
+    return {
+      provider: "kis",
+      fetchedAt,
+      rows: targets.map((target) => ({
+        ...toSkippedLiveQuote(target, context),
+        status: "error",
+        error: message,
+      })),
+      warnings: ["kis token request failed"],
+    };
+  }
+
+  const rows: LiveQuote[] = [];
+
+  for (const target of targets) {
+    try {
+      const liveRow = await fetchKisLiveRow(target, token, config);
+      rows.push(toLiveQuote(target, liveRow, fetchedAt));
+    } catch (error) {
+      rows.push({
+        ...toSkippedLiveQuote(target, context),
+        status: "error",
+        error: redactSensitiveText(toErrorMessage(error)),
+      });
+    }
+
+    await sleep(180);
+  }
 
   return {
     provider: "kis",
-    fetchedAt: context.requestedAt,
+    fetchedAt,
     rows,
     warnings: [
-      "kis provider skeleton only; no KIS HTTP request was performed",
-      `kis configured: ${policy.configured}`,
-      `kis token policy: ${policy.tokenPolicy}`,
-      ...policy.missingEnvKeys.map((key) => `missing env: ${key}`),
+      context.dryRun
+        ? "kis live dry-run preview only; no assets rows were written"
+        : "kis live prices fetched for guarded assets.current_price write",
     ],
   };
 }
@@ -241,6 +296,103 @@ async function fetchLatestCloseRow(
     : fetchUsClose(target, token, config, context);
 }
 
+async function fetchKisLiveRow(
+  target: PriceLookupTarget,
+  token: string,
+  config: KisConfig,
+): Promise<KisLiveRow> {
+  const market = classifyTargetMarket(target);
+  return market === "korea"
+    ? fetchKoreanLiveQuote(target, token, config)
+    : fetchUsLiveQuote(target, token, config);
+}
+
+async function fetchKoreanLiveQuote(
+  target: PriceLookupTarget,
+  token: string,
+  config: KisConfig,
+): Promise<KisLiveRow> {
+  const params = new URLSearchParams({
+    FID_COND_MRKT_DIV_CODE: "J",
+    FID_INPUT_ISCD: target.ticker,
+  });
+  const response = await fetch(
+    `${config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-price?${params}`,
+    {
+      headers: kisHeaders(config, token, "FHKST01010100"),
+      signal: AbortSignal.timeout(12_000),
+    },
+  );
+  const data = await readKisJson(response, `domestic-live:${target.ticker}`);
+
+  if (data.rt_cd !== "0") {
+    throw new Error(`KIS domestic live failed (${target.ticker}): ${kisErrorText(data)}`);
+  }
+
+  const output = objectRecord(data.output);
+  const price = normalizePositiveDecimal(output?.stck_prpr);
+
+  if (!price) {
+    throw new Error(`KIS domestic live returned no price (${target.ticker})`);
+  }
+
+  return {
+    price,
+    source: "kis_domestic_inquire_price",
+    exchange: null,
+  };
+}
+
+async function fetchUsLiveQuote(
+  target: PriceLookupTarget,
+  token: string,
+  config: KisConfig,
+): Promise<KisLiveRow> {
+  const errors: string[] = [];
+
+  for (const exchange of US_EXCHANGES) {
+    try {
+      const params = new URLSearchParams({
+        AUTH: "",
+        EXCD: exchange,
+        SYMB: target.ticker,
+      });
+      const response = await fetch(
+        `${config.baseUrl}/uapi/overseas-price/v1/quotations/price?${params}`,
+        {
+          headers: kisHeaders(config, token, "HHDFS00000300"),
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      const data = await readKisJson(response, `overseas-live:${target.ticker}:${exchange}`);
+
+      if (data.rt_cd !== "0") {
+        errors.push(`${exchange}:${kisErrorText(data)}`);
+        continue;
+      }
+
+      const output = objectRecord(data.output);
+      const price = normalizePositiveDecimal(output?.last);
+
+      if (price) {
+        return {
+          price,
+          source: `kis_overseas_price:${exchange}`,
+          exchange,
+        };
+      }
+
+      errors.push(`${exchange}:empty`);
+    } catch (error) {
+      errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
+    }
+
+    await sleep(180);
+  }
+
+  throw new Error(`KIS overseas live returned no price (${target.ticker}): ${errors.join(" / ")}`);
+}
+
 async function fetchKoreanClose(
   target: PriceLookupTarget,
   token: string,
@@ -340,6 +492,26 @@ async function fetchUsClose(
   }
 
   throw new Error(`KIS overseas returned no close (${target.ticker}): ${errors.join(" / ")}`);
+}
+
+function toLiveQuote(
+  target: PriceLookupTarget,
+  row: KisLiveRow,
+  fetchedAt: Date,
+): LiveQuote {
+  const market = classifyTargetMarket(target);
+
+  return {
+    ticker: target.ticker,
+    market,
+    currency: market === "korea" ? "KRW" : "USD",
+    price: row.price,
+    priceAsOf: fetchedAt,
+    fetchedAt,
+    source: row.source,
+    quoteType: "live",
+    status: "ok",
+  };
 }
 
 function toClosePrice(
@@ -492,6 +664,12 @@ function normalizePositiveDecimal(value: unknown) {
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue) || numberValue <= 0) return null;
   return String(value);
+}
+
+function objectRecord(value: unknown) {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function toCompactDate(value: string) {

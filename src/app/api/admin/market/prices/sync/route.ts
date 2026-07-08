@@ -114,11 +114,10 @@ export async function POST(request: Request) {
   if (providerName === "kis") {
     const kisPolicy = getKisProviderPolicy();
 
-    if (mode !== "close" || fixture) {
+    if (fixture) {
       return NextResponse.json(
         {
-          error:
-            "provider=kis is only enabled for mode=close and fixture=false",
+          error: "provider=kis requires fixture=false",
         },
         { status: 400 },
       );
@@ -127,8 +126,7 @@ export async function POST(request: Request) {
     if (!dryRun && !confirmWrite) {
       return NextResponse.json(
         {
-          error:
-            "KIS close writes require dryRun=false and confirmWrite=true",
+          error: `KIS ${mode} writes require dryRun=false and confirmWrite=true`,
         },
         { status: 400 },
       );
@@ -140,7 +138,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error: `KIS close writes require limit between 1 and ${KIS_WRITE_TARGET_LIMIT_MAX}`,
+          error: `KIS ${mode} writes require limit between 1 and ${KIS_WRITE_TARGET_LIMIT_MAX}`,
         },
         { status: 400 },
       );

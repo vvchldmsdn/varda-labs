@@ -5,3 +5,4 @@ import "./etf-holdings.test.mjs";
 import "./market-context.test.mjs";
 import "./history-balance.test.mjs";
 import "./cron-preflight.test.mjs";
+import "./live-price-write.test.mjs";
