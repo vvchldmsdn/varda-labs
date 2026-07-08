@@ -24,6 +24,7 @@ import {
   type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
 import {
+  calculateFxAwareSnapshotMovementKrw,
   calculateFxAwarePositionMovementKrw,
   convertToKrw,
   diffDays,
@@ -762,7 +763,8 @@ function buildDailyPositionMovement({
   let fxChangeKrw = 0;
 
   for (const holding of holdings) {
-    if (!resolveKrwFxRate(holding.currency, usdKrwRate).ok) continue;
+    const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
+    if (!currentFx.ok) continue;
     if (!hasFreshMovementPrice(holding, movementCycle)) continue;
 
     const snapshot = findPositionSnapshotForHolding(holding, accountRows);
@@ -776,18 +778,34 @@ function buildDailyPositionMovement({
       selectedAccount,
       baselineDate,
     );
-    const holdingFxChangeKrw = calculateSnapshotFxChange(
-      snapshot,
-      holding,
-      usdKrwRate,
-    );
-    const changeKrw = holding.valueKrw - previousValueKrw - holdingTradeFlowKrw;
+    const previousFxRate =
+      currentFx.requiresFx
+        ? toNumber(snapshot.fxRate) ?? toNumber(snapshot.previousFxRate)
+        : 1;
+    const hasSnapshotFxBasis =
+      !currentFx.requiresFx || (previousFxRate !== null && previousFxRate > 0);
+    const effectivePreviousFxRate =
+      previousFxRate !== null && previousFxRate > 0
+        ? previousFxRate
+        : currentFx.rate;
+    const movement = calculateFxAwareSnapshotMovementKrw({
+      quantity: holding.quantity,
+      currentPrice: holding.currentPrice,
+      currentValueKrw: holding.valueKrw,
+      previousPrice: snapshotPositionPrice(snapshot, holding.currentPrice),
+      previousValueKrw,
+      currentFxRate: currentFx.rate,
+      previousFxRate: effectivePreviousFxRate,
+      tradeFlowKrw: holdingTradeFlowKrw,
+    });
+    const holdingFxChangeKrw =
+      currentFx.requiresFx && hasSnapshotFxBasis ? movement.fxChangeKrw : 0;
 
     contributions.set(holding.id, {
       holdingId: holding.id,
       previousValueKrw,
-      changeKrw,
-      returnPct: percentOrNull(changeKrw, previousValueKrw),
+      changeKrw: movement.changeKrw,
+      returnPct: percentOrNull(movement.changeKrw, previousValueKrw),
       tradeFlowKrw: holdingTradeFlowKrw,
       fxChangeKrw: holdingFxChangeKrw,
       source: "daily_position_snapshot",
@@ -1063,31 +1081,6 @@ function calculateTradeFlowForSnapshot(
     }, 0);
 }
 
-function calculateSnapshotFxChange(
-  snapshot: PositionSnapshotRow,
-  holding: DashboardHolding,
-  usdKrwRate: number,
-) {
-  const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
-  if (!currentFx.ok || !currentFx.requiresFx) return 0;
-
-  const previousFxRate = toNumber(snapshot.fxRate) ?? toNumber(snapshot.previousFxRate);
-  if (previousFxRate === null || previousFxRate <= 0) return 0;
-
-  const previousPrice =
-    toNumber(snapshot.unitPrice) ??
-    toNumber(snapshot.closePrice) ??
-    toNumber(snapshot.currentPrice) ??
-    holding.currentPrice;
-  return calculateFxAwarePositionMovementKrw({
-    quantity: holding.quantity,
-    currentPrice: holding.currentPrice,
-    previousPrice,
-    currentFxRate: currentFx.rate,
-    previousFxRate,
-  }).fxChangeKrw;
-}
-
 function buildAccountLabels(accountRows: (typeof accounts.$inferSelect)[]) {
   const labels = new Map<string, string>();
   for (const account of accountRows) {
@@ -1358,6 +1351,15 @@ function eventMatchesSelectedAccount(
 
 function snapshotMarketValue(row: PositionSnapshotRow) {
   return toNumber(row.marketValueKrw) ?? 0;
+}
+
+function snapshotPositionPrice(row: PositionSnapshotRow, fallbackPrice: number) {
+  return (
+    toNumber(row.unitPrice) ??
+    toNumber(row.closePrice) ??
+    toNumber(row.currentPrice) ??
+    fallbackPrice
+  );
 }
 
 function isInvestmentSnapshot(row: PositionSnapshotRow) {

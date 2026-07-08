@@ -231,6 +231,18 @@ Current FX freshness policy:
 - Any FX refresh job must keep credentials and raw provider responses out of
   Postgres metadata and out of rendered HTML.
 
+Current production observation after the approved 2026-07-09 one-write smoke:
+
+- The latest stored USD/KRW row is service date `2026-07-08`, value
+  `1516.899940`, source `er-api_open_access`.
+- USD dashboard holdings with 2026-07-08 position snapshots used snapshot FX
+  `1531.722979` as their baseline FX.
+- With current prices held in `assets`, those USD holdings produced a negative
+  aggregate FX contribution of about `-91,178` KRW. This is expected because
+  current stored USD/KRW is lower than the baseline snapshot FX.
+- The matching pure fixture is covered by `portfolio-math` tests so a future
+  UI or query refactor does not silently turn this FX movement back into zero.
+
 ### `POST /api/admin/market/prices/sync`
 
 Modes:

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  calculateFxAwareSnapshotMovementKrw,
   calculateFxAwarePositionMovementKrw,
   convertToKrw,
   diffDays,
@@ -12,6 +13,13 @@ import {
   toNumber,
   uniqueStrings,
 } from "../src/lib/portfolio-math.ts";
+
+function assertClose(actual, expected, tolerance = 1e-6) {
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `expected ${actual} to be within ${tolerance} of ${expected}`,
+  );
+}
 
 describe("portfolio math helpers", () => {
   it("normalizes tickers without turning empty input into a value", () => {
@@ -58,6 +66,42 @@ describe("portfolio math helpers", () => {
     assert.equal(movement.changeKrw, 230_000);
     assert.equal(movement.priceChangeKrw, 120_000);
     assert.equal(movement.fxChangeKrw, 110_000);
+  });
+
+  it("separates a dashboard snapshot FX loss from unchanged USD price", () => {
+    const movement = calculateFxAwareSnapshotMovementKrw({
+      quantity: 10,
+      previousPrice: 100,
+      currentPrice: 100,
+      previousFxRate: 1531.722979,
+      currentFxRate: 1516.89994,
+      previousValueKrw: 1_531_722.979,
+      currentValueKrw: 1_516_899.94,
+    });
+
+    assertClose(movement.priceChangeKrw, 0);
+    assertClose(movement.fxChangeKrw, -14_823.039);
+    assertClose(movement.changeKrw, -14_823.039);
+  });
+
+  it("keeps dashboard snapshot movement equal to price plus FX effects", () => {
+    const movement = calculateFxAwareSnapshotMovementKrw({
+      quantity: 10,
+      previousPrice: 100,
+      currentPrice: 105,
+      previousFxRate: 1531.722979,
+      currentFxRate: 1516.89994,
+      previousValueKrw: 1_531_722.979,
+      currentValueKrw: 1_592_744.937,
+    });
+
+    assertClose(movement.priceChangeKrw, 76_586.14895);
+    assertClose(movement.fxChangeKrw, -15_564.19095);
+    assertClose(movement.changeKrw, 61_021.958);
+    assertClose(
+      movement.changeKrw,
+      movement.priceChangeKrw + movement.fxChangeKrw,
+    );
   });
 
   it("returns percentage only when denominator is positive", () => {

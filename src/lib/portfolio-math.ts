@@ -32,6 +32,17 @@ export type FxAwarePositionMovementInput = {
   previousMarketValueKrw?: number | null;
 };
 
+export type FxAwareSnapshotMovementInput = {
+  quantity: number;
+  currentPrice: number;
+  currentValueKrw: number;
+  previousPrice: number;
+  previousValueKrw: number;
+  currentFxRate: number;
+  previousFxRate: number;
+  tradeFlowKrw?: number;
+};
+
 export function normalizeCurrencyCode(value: string | null | undefined) {
   return value?.trim().toUpperCase() ?? "";
 }
@@ -95,6 +106,29 @@ export function calculateFxAwarePositionMovementKrw({
     changeKrw: currentValueKrw - previousValueKrw,
     priceChangeKrw,
     fxChangeKrw,
+  };
+}
+
+export function calculateFxAwareSnapshotMovementKrw({
+  quantity,
+  currentPrice,
+  currentValueKrw,
+  previousPrice,
+  previousValueKrw,
+  currentFxRate,
+  previousFxRate,
+  tradeFlowKrw = 0,
+}: FxAwareSnapshotMovementInput) {
+  const priceChangeKrw = quantity * (currentPrice - previousPrice) * previousFxRate;
+  const fxChangeKrw = quantity * currentPrice * (currentFxRate - previousFxRate);
+
+  return {
+    currentValueKrw,
+    previousValueKrw,
+    changeKrw: currentValueKrw - previousValueKrw - tradeFlowKrw,
+    priceChangeKrw,
+    fxChangeKrw,
+    tradeFlowKrw,
   };
 }
 

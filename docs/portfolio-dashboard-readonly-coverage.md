@@ -99,6 +99,11 @@ Daily movement:
   price metadata.
 - The UI displays whether movement came from position snapshots or previous
   close fallback.
+- For USD holdings, FX impact compares the latest stored USD/KRW rate with the
+  baseline snapshot FX rate. After the approved 2026-07-09 USD/KRW one-write,
+  the latest stored rate was lower than the 2026-07-08 snapshot FX baseline, so
+  USD holdings should show a negative FX contribution instead of `0` when
+  movement coverage is ready.
 
 ## Account Coverage
 
