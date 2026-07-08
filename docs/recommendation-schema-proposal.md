@@ -9,8 +9,10 @@ or LLM calls.
 ## Purpose
 
 This proposal turns `docs/recommendation-model-audit.md` into a logical
-database shape for a future recommendation system. The goal is to prevent a
-1:1 copy of the Base44 recommendation tables and JSON blobs.
+database shape for a future recommendation system. The current first-lane
+implementation gate lives in `docs/recommendation-implementation-plan.md`.
+The goal is to prevent a 1:1 copy of the Base44 recommendation tables and JSON
+blobs.
 
 The target model should support:
 
@@ -442,7 +444,7 @@ After these decisions are reviewed, the next safe step is still not migration.
 
 Recommended order:
 
-1. Draft a docs-only recommendation implementation plan.
+1. Review `docs/recommendation-implementation-plan.md`.
 2. Decide whether the first implementation imports historical rows or starts
    varda-native only.
 3. Add more fixture tests for pure recommendation input calculations if needed.
