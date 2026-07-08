@@ -155,6 +155,25 @@ Current valuation scope:
   multi-currency FX table is approved, unsupported currencies should surface as
   data-health/write blockers instead of silent valuation inputs.
 
+Current FX freshness policy:
+
+- `fx_rates` is a stored market-data source, not a real-time quote stream.
+- Dashboard today movement may combine fresh KIS latest prices with the latest
+  stored USD/KRW rate. Those two inputs can have different as-of times.
+- If the latest USD/KRW row is the same row used by the baseline daily position
+  snapshot, the displayed FX contribution can correctly be `0` even when live
+  prices have moved.
+- Dashboard copy must not call this "real-time FX" until an FX refresh route,
+  provider, as-of policy, and stale-warning threshold are approved.
+- The safe user-facing description is "latest stored USD/KRW", "stored FX",
+  or "baseline FX versus stored FX", depending on the view.
+- `daily_position_snapshots.fx_rate` is historical evidence for the snapshot
+  write. Dashboard live FX impact is a derived display value comparing current
+  stored FX with that baseline; it should not be treated as the same semantic
+  field as stored `daily_position_snapshots.fx_change_krw`.
+- Any FX refresh job must keep credentials and raw provider responses out of
+  Postgres metadata and out of rendered HTML.
+
 ### `POST /api/admin/market/prices/sync`
 
 Modes:
@@ -537,6 +556,42 @@ Dashboard rules:
   instead of showing partial movement as a portfolio-level number.
 - User-facing copy should describe this as fresh KIS latest quote plus latest
   stored FX. Do not imply real-time FX until an FX refresh/as-of policy exists.
+- Dashboard health should eventually expose the latest USD/KRW `rate_date`,
+  source, and freshness state separately from price freshness. A fresh price
+  with stale FX is a valid partial freshness state and should be visible to the
+  operator before a public sync button is introduced.
+
+## User-Facing Sync Button Boundary
+
+Do not implement a public or dashboard-facing sync button until the admin-only
+price and FX paths have separate, verified contracts.
+
+Terms to keep separate:
+
+- Price refresh: KIS live quote fetch that updates `assets.current_price` and
+  `assets.price_*` only.
+- Close refresh: KIS close/history fetch that upserts `asset_price_snapshots`.
+- FX refresh: USD/KRW provider fetch that upserts `fx_rates`.
+- Snapshot write: guarded daily evidence write into `daily_*_snapshots`.
+
+Button naming:
+
+- If a future button only runs KIS live quotes, call it "price refresh" or a
+  similarly narrow label. Do not call it "today movement refresh".
+- A "today movement refresh" label is only correct after both price freshness
+  and FX freshness are handled, or after the UI clearly states that FX comes
+  from the latest stored rate.
+- Do not expose `ADMIN_JOB_SECRET`, KIS credentials, provider headers, raw
+  responses, run ids, or executable write URLs in the browser.
+
+Implementation gate:
+
+1. Verify admin-only KIS live actual write on a tiny target set.
+2. Verify admin-only FX dry-run/write policy separately.
+3. Add data-health copy for price freshness and FX freshness as separate
+   states.
+4. Only then design a server-only dashboard action/route with rate limits,
+   cooldown display, loading/error states, and explicit partial-success copy.
 
 ## Implementation Phases
 
