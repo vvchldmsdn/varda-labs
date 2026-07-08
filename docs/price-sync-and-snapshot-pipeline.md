@@ -146,6 +146,56 @@ Output:
 - latest USD/KRW
 - source and status
 
+Status:
+
+- not implemented yet.
+- Do not connect this route to the public dashboard, a user-facing sync button,
+  or Cron before the admin-only contract below is implemented and smoke-tested.
+
+Admin-only contract before implementation:
+
+- Method: `POST`.
+- Auth: `ADMIN_JOB_SECRET` or `CRON_SECRET` only. Browser sessions must not be
+  enough to call it.
+- Default mode: `dryRun=true`.
+- Actual writes require `dryRun=false&confirmWrite=true`.
+- Supported pair in v1: USD/KRW only. Do not add JPY/EUR/HKD without an approved
+  multi-currency FX model.
+- Row identity: one canonical `fx_rates` row per `date`.
+- Dry-run response may show the candidate date, USD/KRW value, source, status,
+  and planned insert/update counts.
+- Dry-run should not write `fx_rates`. If it writes a `market_data_sync_runs`
+  observability row, the response and docs must say so explicitly.
+- Actual write may upsert only `fx_rates` and optional sanitized
+  `market_data_sync_runs` metadata. It must not touch `assets`,
+  `asset_price_snapshots`, `daily_position_snapshots`, or
+  `daily_portfolio_snapshots`.
+- Metadata may store provider name, pair, rate date, status, counts, stale
+  reason, and warning summaries.
+- Metadata must not store provider credentials, request headers, authorization
+  headers, raw response bodies, raw URLs with keys, environment variable names
+  used as secret keys, KIS credentials, or app secrets.
+- On provider failure or empty response, write nothing unless an explicit
+  stale-status row policy is separately approved.
+- Response copy must describe values as "stored FX" or "latest stored USD/KRW",
+  not "real-time FX".
+
+Implementation smoke before any dashboard button:
+
+1. No-auth request returns `401` and writes nothing.
+2. Authenticated dry-run returns candidate USD/KRW, source, date, planned
+   writes, and `dryRun=true`.
+3. Actual write with missing `confirmWrite=true` returns `400` or `409` before
+   provider/DB mutation.
+4. A tiny actual write/upsert is manually approved and run once.
+5. Confirm `fx_rates` changed only for the intended date/pair.
+6. Confirm `assets`, `asset_price_snapshots`, and daily snapshot tables did not
+   change.
+7. Run metadata secret audit or an equivalent scan covering
+   `market_data_sync_runs`.
+8. Run authenticated `/` smoke and confirm dashboard FX as-of text changed only
+   according to the new stored row.
+
 Current valuation scope:
 
 - varda-labs currently supports KRW assets and USD assets for KRW valuation.
