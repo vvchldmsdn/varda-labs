@@ -2,16 +2,18 @@
 
 Last updated: 2026-07-08
 
-Status: Phase 1 admin-only dry-run route skeleton implemented. This document
-does not approve schema migrations, Cron, dashboard buttons, or database writes.
+Status: Phase 1 admin-only dry-run route and guarded actual-write branch
+implemented. This document does not approve schema migrations, Cron, dashboard
+buttons, or production actual FX writes.
 
 ## Decision
 
 `POST /api/admin/market/fx/sync` now exists as an admin-only dry-run route for
-USD/KRW only. It returns a provider candidate and row-policy plan, but it does
-not write `fx_rates`, create run metadata, or support actual writes. Public sync
-buttons, Cron wiring, multi-currency FX, and snapshot writer changes remain out
-of scope.
+USD/KRW only. It returns a provider candidate and row-policy plan in dry-run
+mode. A guarded actual-write branch exists for `dryRun=false&confirmWrite=true`,
+but production actual calls remain prohibited until explicit one-write approval.
+The route does not create run metadata. Public sync buttons, Cron wiring,
+multi-currency FX, and snapshot writer changes remain out of scope.
 
 The current dashboard should continue to describe FX as latest stored USD/KRW,
 not real-time FX.
@@ -161,15 +163,18 @@ Current route:
 - `POST /api/admin/market/fx/sync`
 - Auth: `ADMIN_JOB_SECRET` or `CRON_SECRET`
 - Default: `dryRun=true`
-- Actual write: not implemented in Phase 1. `dryRun=false` requests are blocked
-  before provider fetch or database reads, even with `confirmWrite=true`.
-- Actual write preparation helper exists, but it is not connected to the
-  production route.
+- Actual write branch: implemented only for `dryRun=false&confirmWrite=true`.
+- Missing `confirmWrite=true` is blocked before provider fetch or database
+  reads.
+- Production actual calls are prohibited until explicit one-write approval.
 
-Allowed write tables in a future separately approved actual-write phase:
+Allowed write tables in the guarded actual-write branch:
 
 - `fx_rates`
-- optional `market_data_sync_runs` with sanitized metadata only
+
+Not written in v1:
+
+- `market_data_sync_runs`
 
 Current dry-run write behavior:
 
@@ -183,8 +188,7 @@ Actual write preparation behavior:
 - refuses `planned_skip`, `blocked`, imported legacy rows, duplicate date rows,
   invalid candidate values, and plan/candidate mismatches
 - writes no `market_data_sync_runs` rows
-- remains disconnected from production route execution until separately
-  approved
+- is connected to route execution only behind `dryRun=false&confirmWrite=true`
 
 Forbidden write tables:
 

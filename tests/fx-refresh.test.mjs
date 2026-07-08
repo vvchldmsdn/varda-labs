@@ -207,8 +207,8 @@ describe("FX refresh row policy", () => {
 describe("FX actual write preparation", () => {
   const now = new Date("2026-07-08T10:05:00.000Z");
 
-  it("keeps the actual route disconnected until a separate approval", () => {
-    assert.equal(FX_REFRESH_ACTUAL_WRITE_CONTRACT.routeActualWritesEnabled, false);
+  it("keeps actual route writes explicitly guarded and scoped", () => {
+    assert.equal(FX_REFRESH_ACTUAL_WRITE_CONTRACT.routeActualWritesEnabled, true);
     assert.equal(
       FX_REFRESH_ACTUAL_WRITE_CONTRACT.requiredGuard,
       "dryRun=false&confirmWrite=true",

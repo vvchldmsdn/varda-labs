@@ -13,7 +13,7 @@ export const FX_REFRESH_DRY_RUN_CONTRACT = {
 } as const;
 
 export const FX_REFRESH_ACTUAL_WRITE_CONTRACT = {
-  routeActualWritesEnabled: false,
+  routeActualWritesEnabled: true,
   requiredGuard: "dryRun=false&confirmWrite=true",
   writeTables: ["fx_rates"],
   runMetadataWrites: false,

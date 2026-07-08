@@ -152,9 +152,10 @@ Output:
 Status:
 
 - Phase 1 admin-only dry-run route skeleton is implemented.
-- Actual writes are not implemented.
-- Actual write preparation helper exists, but it is not connected to route
-  execution.
+- Guarded actual-write branch is implemented for
+  `dryRun=false&confirmWrite=true`.
+- Production actual FX write calls remain prohibited until explicit one-write
+  approval.
 - Do not connect this route to the public dashboard, a user-facing sync button,
   or Cron before the admin-only contract below is implemented and smoke-tested.
 
@@ -164,8 +165,8 @@ Admin-only contract before implementation:
 - Auth: `ADMIN_JOB_SECRET` or `CRON_SECRET` only. Browser sessions must not be
   enough to call it.
 - Default mode: `dryRun=true`.
-- Actual write is blocked in Phase 1. Future actual writes will require
-  `dryRun=false&confirmWrite=true` after separate approval.
+- Actual write requires `dryRun=false&confirmWrite=true` and separate operator
+  approval before the production call.
 - Supported pair in v1: USD/KRW only. Do not add JPY/EUR/HKD without an approved
   multi-currency FX model.
 - Row identity: one canonical `fx_rates` row per `date`.
