@@ -82,14 +82,18 @@ Trend values:
 
 Daily movement:
 
-- First preference is the stored movement evidence on the latest
-  `daily_position_snapshots` rows for the selected account. The dashboard uses
-  `market_value_change_krw`, `market_value_change_pct`,
-  `previous_market_value_krw`, and `fx_change_krw` when those fields exist.
-- This avoids treating stale `assets.current_price` values as live prices after
-  close-only snapshot writes.
+- The baseline is the `daily_position_snapshots` row for the current KST 07:00
+  service day. For example, from 2026-07-08 07:00 KST until 2026-07-09 07:00
+  KST, the dashboard uses the 2026-07-08 snapshot as the comparison baseline.
+- Current movement uses `assets.current_price` only when the asset price
+  metadata shows a fresh live/delayed/realtime quote updated inside the current
+  07:00-to-07:00 KST service window.
+- If live price freshness coverage is too low, the dashboard hides aggregate
+  today movement instead of showing stale imported or close-only values as
+  "today" movement.
 - If snapshot coverage is too low, the dashboard falls back to
-  `asset_price_snapshots` previous-close rows for the selected tickers.
+  `asset_price_snapshots` previous-close rows only for holdings with fresh live
+  price metadata.
 - The UI displays whether movement came from position snapshots or previous
   close fallback.
 

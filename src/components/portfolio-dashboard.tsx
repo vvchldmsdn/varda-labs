@@ -718,6 +718,10 @@ function movementHealthText(data: DashboardData) {
     return `${source} 기준 · 커버리지 ${formatPct(coverage)}`;
   }
 
+  if (data.dataHealth.movementReason === "missing_fresh_live_prices") {
+    return "실시간 가격 갱신 전이라 오늘 변동을 숨김";
+  }
+
   return data.dataHealth.movementReason === "incomplete_baseline_snapshot"
     ? "기준 스냅샷 커버리지가 낮아 오늘 변동을 보수적으로 숨김"
     : "오늘 변동 기준 데이터 없음";
