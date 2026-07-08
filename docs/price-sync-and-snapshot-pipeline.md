@@ -720,6 +720,21 @@ Admin UI guidance:
   provider headers, raw provider responses, or ready-to-run actual-write query
   strings.
 
+Implemented status-only v1:
+
+- `/admin/market-sync` is protected by the same Basic Auth proxy as the
+  dashboard routes.
+- The page is a Server Component that reads database state directly.
+- It does not call KIS, FX providers, dry-run routes, write routes, or snapshot
+  routes during render.
+- It does not insert `market_data_sync_runs`, refresh `fx_rates`, update
+  `assets`, upsert `asset_price_snapshots`, or write daily snapshots.
+- It displays live price metadata freshness, stored close coverage, stored
+  USD/KRW status, daily snapshot row presence, KIS cooldown state derived from
+  existing run rows, and recent sync runs.
+- It shows copyable parameter summaries only. It does not render executable
+  actual-write URLs or actual-write controls.
+
 Future display scope:
 
 - A per-holding detail view should be read-only first and should show the same

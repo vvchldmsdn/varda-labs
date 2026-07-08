@@ -40,6 +40,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
+    "/admin/:path*",
     "/portfolio/:path*",
     "/etfs",
     "/etfs/:path*",

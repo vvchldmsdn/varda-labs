@@ -7,3 +7,4 @@ import "./history-balance.test.mjs";
 import "./cron-preflight.test.mjs";
 import "./live-price-write.test.mjs";
 import "./fx-refresh.test.mjs";
+import "./admin-market-sync-status.test.mjs";
