@@ -151,7 +151,8 @@ Output:
 
 Status:
 
-- not implemented yet.
+- Phase 1 admin-only dry-run route skeleton is implemented.
+- Actual writes are not implemented.
 - Do not connect this route to the public dashboard, a user-facing sync button,
   or Cron before the admin-only contract below is implemented and smoke-tested.
 
@@ -161,14 +162,14 @@ Admin-only contract before implementation:
 - Auth: `ADMIN_JOB_SECRET` or `CRON_SECRET` only. Browser sessions must not be
   enough to call it.
 - Default mode: `dryRun=true`.
-- Actual writes require `dryRun=false&confirmWrite=true`.
+- Actual write is blocked in Phase 1. Future actual writes will require
+  `dryRun=false&confirmWrite=true` after separate approval.
 - Supported pair in v1: USD/KRW only. Do not add JPY/EUR/HKD without an approved
   multi-currency FX model.
 - Row identity: one canonical `fx_rates` row per `date`.
 - Dry-run response may show the candidate date, USD/KRW value, source, status,
   and planned insert/update counts.
-- Dry-run should not write `fx_rates`. If it writes a `market_data_sync_runs`
-  observability row, the response and docs must say so explicitly.
+- Dry-run does not write `fx_rates` or `market_data_sync_runs`.
 - Actual write may upsert only `fx_rates` and optional sanitized
   `market_data_sync_runs` metadata. It must not touch `assets`,
   `asset_price_snapshots`, `daily_position_snapshots`, or

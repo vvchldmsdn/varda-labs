@@ -2,15 +2,16 @@
 
 Last updated: 2026-07-08
 
-Status: docs-only provider/source audit. This document does not add routes,
-provider code, schema migrations, Cron, dashboard buttons, or database writes.
+Status: Phase 1 admin-only dry-run route skeleton implemented. This document
+does not approve schema migrations, Cron, dashboard buttons, or database writes.
 
 ## Decision
 
-Do not implement `/api/admin/market/fx/sync` yet. The next executable step,
-when approved, should be an admin-only dry-run route for USD/KRW only. Public
-sync buttons, Cron wiring, multi-currency FX, and snapshot writer changes remain
-out of scope.
+`POST /api/admin/market/fx/sync` now exists as an admin-only dry-run route for
+USD/KRW only. It returns a provider candidate and row-policy plan, but it does
+not write `fx_rates`, create run metadata, or support actual writes. Public sync
+buttons, Cron wiring, multi-currency FX, and snapshot writer changes remain out
+of scope.
 
 The current dashboard should continue to describe FX as latest stored USD/KRW,
 not real-time FX.
@@ -69,8 +70,7 @@ Do not use Frankfurter as proof of current intraday FX.
 
 ### ExchangeRate-API Open Access
 
-Use as the first candidate for latest stored USD/KRW fallback only after route
-implementation is approved.
+Use as the first candidate for latest stored USD/KRW dry-run planning.
 
 Current public docs describe the open endpoint as no-key, rate-limited, updated
 once per day, cacheable under its terms, and returning `time_last_update_utc`,
@@ -128,7 +128,7 @@ Current table:
 
 No schema change is part of this plan.
 
-Rules for a future admin-only route:
+Rules for the admin-only dry-run route and any future actual-write phase:
 
 - Supported v1 pair is USD/KRW only.
 - `date` must be the provider rate date, not simply the request date.
@@ -156,17 +156,23 @@ Future hardening candidate:
 
 ## Route Contract
 
-Future route:
+Current route:
 
 - `POST /api/admin/market/fx/sync`
 - Auth: `ADMIN_JOB_SECRET` or `CRON_SECRET`
 - Default: `dryRun=true`
-- Actual write: `dryRun=false&confirmWrite=true`
+- Actual write: not implemented in Phase 1. `dryRun=false` requests are blocked
+  before provider fetch or database reads, even with `confirmWrite=true`.
 
-Allowed write tables:
+Allowed write tables in a future separately approved actual-write phase:
 
 - `fx_rates`
 - optional `market_data_sync_runs` with sanitized metadata only
+
+Current dry-run write behavior:
+
+- writes no `fx_rates` rows
+- writes no `market_data_sync_runs` rows
 
 Forbidden write tables:
 
@@ -200,7 +206,7 @@ Response must not include:
 
 ## Implementation Gate
 
-Before writing route code:
+Phase 1 route implementation:
 
 1. Add pure parser fixtures for Frankfurter and ExchangeRate-API responses.
 2. Add row policy tests for insert, update, skip imported row, duplicate block,
@@ -208,8 +214,11 @@ Before writing route code:
 3. Implement dry-run first.
 4. Confirm no-auth and missing-confirm guards stop before provider and DB
    mutation.
-5. Smoke the dry-run route in production.
-6. Ask for explicit approval before one actual USD/KRW write.
+
+Before any actual write:
+
+1. Smoke the dry-run route in production.
+2. Ask for explicit approval before one actual USD/KRW write.
 
 Before public button design:
 
