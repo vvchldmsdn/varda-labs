@@ -131,6 +131,9 @@ public dashboard without authorization.
 
 ### `POST /api/admin/market/fx/sync`
 
+Detailed provider and row-policy planning lives in
+`docs/fx-refresh-provider-plan.md`.
+
 Writes:
 
 - upsert `fx_rates` by `date`
