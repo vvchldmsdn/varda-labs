@@ -1,6 +1,12 @@
 export const HISTORY_ACCOUNTS = ["all", "brokerage", "isa", "irp"] as const;
 export const HISTORY_LANES = ["all", "portfolio", "balance"] as const;
 
+const REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS = [
+  "brokerage",
+  "isa",
+  "irp",
+] as const;
+
 export type HistoryAccount = (typeof HISTORY_ACCOUNTS)[number];
 export type HistoryLane = (typeof HISTORY_LANES)[number];
 
@@ -80,6 +86,7 @@ export function buildPortfolioHistoryDisplayRows({
       if (storedAll) return storedPortfolioRow(storedAll, "all");
       return derivedAllPortfolioRow(groupRows);
     })
+    .filter((row): row is PortfolioHistoryDisplayRow => row !== null)
     .sort(comparePortfolioDisplayRows);
 }
 
@@ -105,14 +112,32 @@ function storedPortfolioRow(
 
 function derivedAllPortfolioRow(
   rows: PortfolioHistoryRawRow[],
-): PortfolioHistoryDisplayRow {
-  const sortedRows = [...rows]
-    .filter((row) => row.account !== "all")
-    .sort((left, right) => left.account.localeCompare(right.account));
-  const representative = sortedRows[0] ?? rows[0];
-  const totalMarketValue = sumNullable(sortedRows, (row) => row.totalMarketValue);
-  const totalCost = sumNullable(sortedRows, (row) => row.totalCost);
-  const totalPnl = sumNullable(sortedRows, (row) => row.totalPnl);
+): PortfolioHistoryDisplayRow | null {
+  const rowsByAccount = new Map<string, PortfolioHistoryRawRow>();
+
+  for (const row of rows) {
+    if (isRequiredPortfolioAggregateAccount(row.account)) {
+      rowsByAccount.set(row.account, row);
+    }
+  }
+
+  const sortedRows = REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.map((account) =>
+    rowsByAccount.get(account),
+  );
+
+  if (
+    sortedRows.some(
+      (row): row is undefined => row === undefined,
+    )
+  ) {
+    return null;
+  }
+
+  const completeRows = sortedRows as PortfolioHistoryRawRow[];
+  const representative = completeRows[0];
+  const totalMarketValue = sumNullable(completeRows, (row) => row.totalMarketValue);
+  const totalCost = sumNullable(completeRows, (row) => row.totalCost);
+  const totalPnl = sumNullable(completeRows, (row) => row.totalPnl);
 
   return {
     id: `derived:${representative.snapshotDate}:${representative.source}`,
@@ -120,9 +145,9 @@ function derivedAllPortfolioRow(
     account: "all",
     source: representative.source,
     rowKind: "derived",
-    derivedFromAccounts: sortedRows.map((row) => row.account),
-    cashValue: sumNullable(sortedRows, (row) => row.cashValue),
-    investedAmount: sumNullable(sortedRows, (row) => row.investedAmount),
+    derivedFromAccounts: completeRows.map((row) => row.account),
+    cashValue: sumNullable(completeRows, (row) => row.cashValue),
+    investedAmount: sumNullable(completeRows, (row) => row.investedAmount),
     totalCost,
     totalMarketValue,
     totalPnl,
@@ -170,4 +195,12 @@ function isHistoryAccount(value: string | null): value is HistoryAccount {
 
 function isHistoryLane(value: string | null): value is HistoryLane {
   return HISTORY_LANES.includes(value as HistoryLane);
+}
+
+function isRequiredPortfolioAggregateAccount(
+  value: string,
+): value is (typeof REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS)[number] {
+  return REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.includes(
+    value as (typeof REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS)[number],
+  );
 }

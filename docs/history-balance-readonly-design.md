@@ -188,9 +188,12 @@ Display rule:
 
 - If an `account = 'all'` row exists for a date/source, use it as the aggregate
   source.
-- If no `all` row exists but all required account rows exist, a future read-only
-  view may derive an aggregate display row, but it must label that row as
-  derived and keep the source rows inspectable.
+- If no `all` row exists but all required account rows exist
+  (`brokerage`, `isa`, and `irp`), the current read-only `/history` route may
+  derive an aggregate display row, but it must label that row as derived and
+  keep the source rows inspectable.
+- If the date/source group is partial, do not show it as an `all` aggregate.
+  Use the account-specific filters to inspect the underlying rows instead.
 - Do not write derived aggregate rows back to the database without a separate
   snapshot/backfill decision.
 

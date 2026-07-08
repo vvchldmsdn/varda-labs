@@ -93,9 +93,29 @@ describe("history balance helpers", () => {
     assert.equal(Math.round((rows[0].totalReturnPct ?? 0) * 100) / 100, 44.44);
     assert.deepEqual(rows[0].derivedFromAccounts, [
       "brokerage",
-      "irp",
       "isa",
+      "irp",
     ]);
+  });
+
+  it("does not derive all rows from partial account groups", () => {
+    const rows = buildPortfolioHistoryDisplayRows({
+      account: "all",
+      rows: [
+        portfolioRow({ id: "brokerage-row", account: "brokerage" }),
+        portfolioRow({
+          id: "isa-row",
+          account: "isa",
+          cashValue: "20",
+          investedAmount: "500",
+          totalCost: "400",
+          totalMarketValue: "700",
+          totalPnl: "300",
+        }),
+      ],
+    });
+
+    assert.equal(rows.length, 0);
   });
 
   it("filters exact account rows for account-specific views", () => {
