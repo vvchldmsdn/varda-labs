@@ -752,9 +752,11 @@ function buildDailyPositionMovement({
       selectedAccount,
       baselineDate,
     );
-    const holdingFxChangeKrw =
-      toNumber(snapshot.fxChangeKrw) ??
-      calculateSnapshotFxChange(snapshot, holding, usdKrwRate);
+    const holdingFxChangeKrw = calculateSnapshotFxChange(
+      snapshot,
+      holding,
+      usdKrwRate,
+    );
     const changeKrw = holding.valueKrw - previousValueKrw - holdingTradeFlowKrw;
 
     contributions.set(holding.id, {
@@ -1048,10 +1050,18 @@ function calculateSnapshotFxChange(
   const previousFxRate = toNumber(snapshot.fxRate) ?? toNumber(snapshot.previousFxRate);
   if (previousFxRate === null || previousFxRate <= 0) return 0;
 
-  const previousUsdNotional =
-    toNumber(snapshot.marketValueLocal) ??
-    snapshotMarketValue(snapshot) / previousFxRate;
-  return previousUsdNotional * (currentFx.rate - previousFxRate);
+  const previousPrice =
+    toNumber(snapshot.unitPrice) ??
+    toNumber(snapshot.closePrice) ??
+    toNumber(snapshot.currentPrice) ??
+    holding.currentPrice;
+  return calculateFxAwarePositionMovementKrw({
+    quantity: holding.quantity,
+    currentPrice: holding.currentPrice,
+    previousPrice,
+    currentFxRate: currentFx.rate,
+    previousFxRate,
+  }).fxChangeKrw;
 }
 
 function buildAccountLabels(accountRows: (typeof accounts.$inferSelect)[]) {
