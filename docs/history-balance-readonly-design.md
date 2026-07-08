@@ -269,7 +269,7 @@ group output for each date.
 
 ## Future Read-Only Page Shape
 
-If a history/balance route is later approved, keep it narrow:
+The current `/history` route should stay narrow:
 
 - account filter: `all`, `brokerage`, `isa`, `irp`;
 - source toggle: balance evidence, portfolio performance, or both;
@@ -277,16 +277,17 @@ If a history/balance route is later approved, keep it narrow:
 - table-first rendering before chart polish;
 - optional detail link for position snapshots on a date/account.
 
-Recommended first URL shape, if implemented later:
+Current URL shape:
 
-- `/history?account=all&source=portfolio`
-- `/history?account=brokerage&source=balance`
+- `/history?account=all&lane=portfolio`
+- `/history?account=brokerage&lane=balance`
 
-This is not implementation approval.
+This does not authorize writes, imports, or chart/polish expansion.
 
 ## Guardrails
 
-- No `/history` or `/balance` route yet.
+- Keep `/history` read-only and table-first.
+- No `/balance` route yet.
 - No schema or migration.
 - No import/backfill of `PortfolioSnapshot` or `DailyGroupSnapshot`.
 - No cleanup/delete/backfill.
