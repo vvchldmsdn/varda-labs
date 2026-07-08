@@ -91,6 +91,9 @@ Daily movement:
 - If live price freshness coverage is too low, the dashboard hides aggregate
   today movement instead of showing stale imported or close-only values as
   "today" movement.
+- Holding-level movement displays use the same rule. If a holding has no fresh
+  daily movement value, the UI shows a neutral `-` instead of falling back to
+  cumulative total return.
 - If snapshot coverage is too low, the dashboard falls back to
   `asset_price_snapshots` previous-close rows only for holdings with fresh live
   price metadata.

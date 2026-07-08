@@ -137,7 +137,7 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                 </h2>
                 <div className="grid w-full grid-cols-3 rounded-md border border-[#dce2d2] bg-white p-1 text-sm sm:w-[260px]">
                   <span className="whitespace-nowrap rounded-md bg-[#1e3a34] px-2 py-1.5 text-center font-semibold text-white">
-                    수익률
+                    오늘
                   </span>
                   <span className="whitespace-nowrap px-2 py-1.5 text-center font-semibold text-[#6c7469]">
                     위험
@@ -492,13 +492,15 @@ function HeatmapCell({
   holding: DashboardHolding;
   maxValue: number;
 }) {
-  const signal = holding.dailyReturnPct ?? holding.totalReturnPct ?? 0;
-  const intensity = Math.min(Math.abs(signal) / 4, 1);
+  const signal = holding.dailyReturnPct;
+  const hasSignal = signal !== null;
+  const intensity = hasSignal ? Math.min(Math.abs(signal) / 4, 1) : 0;
   const valueRatio = Math.max(holding.valueKrw / maxValue, 0.18);
-  const color =
-    signal >= 0
+  const color = hasSignal
+    ? signal >= 0
       ? `rgba(34, 128, 92, ${0.18 + intensity * 0.62})`
-      : `rgba(189, 68, 73, ${0.18 + intensity * 0.62})`;
+      : `rgba(189, 68, 73, ${0.18 + intensity * 0.62})`
+    : "#eef2e8";
 
   return (
     <div
@@ -517,7 +519,9 @@ function HeatmapCell({
               style={{ width: `${Math.min(valueRatio * 100, 100)}%` }}
             />
           </div>
-          <p className="text-xs font-semibold">{formatPct(signal, true)}</p>
+          <p className="text-xs font-semibold">
+            {hasSignal ? formatPct(signal, true) : "-"}
+          </p>
         </div>
       </div>
     </div>
