@@ -38,6 +38,8 @@ import {
   buildPreviousCloseMovement,
   type PortfolioMovementContribution,
   type PortfolioMovementCycle,
+  type PortfolioMovementCoverage,
+  type PortfolioMovementExclusion,
   type PortfolioMovementSource,
 } from "@/lib/portfolio-movement";
 import { buildCycleForSnapshotDate, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
@@ -172,6 +174,7 @@ export type DashboardData = {
   recentSnapshots: RecentPortfolioPoint[];
   eventActivity: DashboardEventActivity[];
   topMovers: DashboardHolding[];
+  todayMovement: DashboardTodayMovement;
   dataHealth: {
     importedAssetCount: number;
     investmentAssetCount: number;
@@ -208,6 +211,20 @@ export type DashboardData = {
 };
 
 type DashboardMovementCycle = PortfolioMovementCycle;
+
+export type DashboardTodayMovement = {
+  ready: boolean;
+  source: MovementSource;
+  reason: string | null;
+  previousTotalKrw: number;
+  changeKrw: number | null;
+  returnPct: number | null;
+  tradeFlowKrw: number;
+  fxChangeKrw: number | null;
+  contributionRows: PortfolioMovementContribution[];
+  exclusions: PortfolioMovementExclusion[];
+  coverage: PortfolioMovementCoverage;
+};
 
 export function normalizeDashboardAccount(value: string | string[] | undefined) {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -485,6 +502,19 @@ export async function getPortfolioDashboard(
         (a, b) => Math.abs(b.dailyChangeKrw ?? 0) - Math.abs(a.dailyChangeKrw ?? 0),
       )
       .slice(0, 5),
+    todayMovement: {
+      ready: movement.ready,
+      source: movement.source,
+      reason: movement.reason,
+      previousTotalKrw: movement.previousTotalKrw,
+      changeKrw: movement.changeKrw,
+      returnPct: movement.returnPct,
+      tradeFlowKrw: movement.tradeFlowKrw,
+      fxChangeKrw: movement.fxChangeKrw,
+      contributionRows: movement.contributionRows,
+      exclusions: movement.exclusions,
+      coverage: movement.coverage,
+    },
     dataHealth: {
       importedAssetCount: assetRows.length,
       investmentAssetCount: investmentAssetRows.length,

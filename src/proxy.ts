@@ -48,6 +48,8 @@ export const config = {
     "/history/:path*",
     "/market",
     "/market/:path*",
+    "/today",
+    "/today/:path*",
   ],
 };
 
