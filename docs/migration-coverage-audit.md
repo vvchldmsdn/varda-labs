@@ -21,6 +21,9 @@ entity.
 History/balance read-only source-of-truth guidance lives in
 `docs/history-balance-readonly-design.md`.
 
+Simulation and investment lab job/artifact guidance lives in
+`docs/simulation-investment-lab-model-audit.md`.
+
 ## Summary
 
 | Status | Entities | Rows represented |

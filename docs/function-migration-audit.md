@@ -137,6 +137,10 @@ Current pipeline status:
 
 ### Simulation, Optimization, and Backtesting
 
+Detailed simulation and investment lab model guidance lives in
+`docs/simulation-investment-lab-model-audit.md`. Use it before any schema,
+route, job, artifact, or UI work in this area.
+
 | Base44 function | Category | Base44 role | varda-labs mapping | Decision |
 | --- | --- | --- | --- | --- |
 | `calibratePortfolioFactorModel` | `simulation_or_job_artifact` | Creates simulation calibration artifacts | Future job/artifact subsystem | Defer. |

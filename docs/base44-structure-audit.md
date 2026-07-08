@@ -94,7 +94,8 @@ recommendation rows can be imported only if historical explainability is needed.
 Simulation entities behave more like job records, chunks, shards, or artifact
 storage than normalized finance tables. Do not migrate them into the core
 finance schema by default. Rebuild them later as a job/artifact subsystem with a
-small read model for UI summaries.
+small read model for UI summaries. Detailed routing guidance lives in
+`docs/simulation-investment-lab-model-audit.md`.
 
 ### Ownership fields
 
