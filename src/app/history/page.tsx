@@ -32,7 +32,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   return (
     <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
-        <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold text-[#687064]">
@@ -113,7 +113,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
               detail="balance / portfolio"
             />
           </div>
-        </header>
+        </section>
 
         {lane !== "portfolio" ? (
           <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
