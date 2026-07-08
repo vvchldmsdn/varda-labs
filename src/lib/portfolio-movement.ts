@@ -104,6 +104,28 @@ export type PortfolioMovementContribution = {
   source: Exclude<PortfolioMovementSource, null>;
 };
 
+export type PortfolioMovementExclusionReason =
+  | "missing_baseline_snapshot"
+  | "missing_fresh_live_prices"
+  | "missing_previous_close_fallback"
+  | "unsupported_currency"
+  | "missing_current_fx"
+  | "missing_baseline_fx"
+  | "coverage_below_threshold";
+
+export type PortfolioMovementExclusion = {
+  subject: "holding" | "snapshot" | "aggregate";
+  reason: PortfolioMovementExclusionReason;
+  source: PortfolioMovementSource;
+  holdingId: string | null;
+  snapshotId: string | null;
+  ticker: string | null;
+  assetName: string | null;
+  account: string | null;
+  currency: string | null;
+  valueKrw: number | null;
+};
+
 export type PortfolioMovementCoverage = {
   currentCoveragePct: number | null;
   snapshotCoveragePct: number | null;
@@ -121,6 +143,8 @@ export type PortfolioMovementResult = {
   tradeFlowKrw: number;
   fxChangeKrw: number | null;
   contributions: Map<string, PortfolioMovementContribution>;
+  contributionRows: PortfolioMovementContribution[];
+  exclusions: PortfolioMovementExclusion[];
   coverage: PortfolioMovementCoverage;
 };
 
@@ -149,7 +173,15 @@ export function buildDailyPositionMovement({
   };
 
   if (!baselineDate) {
-    return emptyMovement("missing_baseline_snapshot", emptyCoverage);
+    return emptyMovement("missing_baseline_snapshot", emptyCoverage, {
+      exclusions: holdings.map((holding) =>
+        holdingExclusion(
+          holding,
+          "missing_baseline_snapshot",
+          "daily_position_snapshot",
+        ),
+      ),
+    });
   }
 
   const accountRows = positionRows.filter(
@@ -161,10 +193,19 @@ export function buildDailyPositionMovement({
   const currentTotalValue = sumBy(holdings, (holding) => holding.valueKrw);
 
   if (accountRows.length === 0 || snapshotTotalValue <= 0 || currentTotalValue <= 0) {
-    return emptyMovement("missing_baseline_snapshot", emptyCoverage);
+    return emptyMovement("missing_baseline_snapshot", emptyCoverage, {
+      exclusions: holdings.map((holding) =>
+        holdingExclusion(
+          holding,
+          "missing_baseline_snapshot",
+          "daily_position_snapshot",
+        ),
+      ),
+    });
   }
 
   const contributions = new Map<string, PortfolioMovementContribution>();
+  const exclusions: PortfolioMovementExclusion[] = [];
   const matchedSnapshotIds = new Set<string>();
   let matchedCurrentValue = 0;
   let matchedSnapshotValue = 0;
@@ -174,14 +215,52 @@ export function buildDailyPositionMovement({
 
   for (const holding of holdings) {
     const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
-    if (!currentFx.ok) continue;
-    if (!hasFreshMovementPrice(holding, movementCycle)) continue;
+    if (!currentFx.ok) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          currentFx.reason === "unsupported_currency"
+            ? "unsupported_currency"
+            : "missing_current_fx",
+          "daily_position_snapshot",
+        ),
+      );
+      continue;
+    }
+    if (!hasFreshMovementPrice(holding, movementCycle)) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          "missing_fresh_live_prices",
+          "daily_position_snapshot",
+        ),
+      );
+      continue;
+    }
 
     const snapshot = findPositionSnapshotForHolding(holding, accountRows);
-    if (!snapshot) continue;
+    if (!snapshot) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          "missing_baseline_snapshot",
+          "daily_position_snapshot",
+        ),
+      );
+      continue;
+    }
 
     const previousValueKrw = snapshotMarketValue(snapshot);
-    if (previousValueKrw <= 0) continue;
+    if (previousValueKrw <= 0) {
+      exclusions.push(
+        snapshotExclusion(
+          snapshot,
+          "missing_baseline_snapshot",
+          "daily_position_snapshot",
+        ),
+      );
+      continue;
+    }
     const holdingTradeFlowKrw = calculateTradeFlowForHolding(
       eventRows,
       holding,
@@ -194,7 +273,12 @@ export function buildDailyPositionMovement({
         : 1;
     const hasSnapshotFxBasis =
       !currentFx.requiresFx || (previousFxRate !== null && previousFxRate > 0);
-    if (currentFx.requiresFx && !hasSnapshotFxBasis) continue;
+    if (currentFx.requiresFx && !hasSnapshotFxBasis) {
+      exclusions.push(
+        holdingExclusion(holding, "missing_baseline_fx", "daily_position_snapshot"),
+      );
+      continue;
+    }
     const effectivePreviousFxRate =
       previousFxRate !== null && previousFxRate > 0
         ? previousFxRate
@@ -248,7 +332,13 @@ export function buildDailyPositionMovement({
     matchedSnapshotCountCoverage >= DAILY_MOVEMENT_MIN_COUNT_COVERAGE;
 
   if (!hasEnoughCoverage) {
-    return emptyMovement("missing_fresh_live_prices", coverage);
+    return emptyMovement("missing_fresh_live_prices", coverage, {
+      contributionRows: [...contributions.values()],
+      exclusions: [
+        ...exclusions,
+        aggregateExclusion("coverage_below_threshold", "daily_position_snapshot"),
+      ],
+    });
   }
 
   let changeKrw = sumBy([...contributions.values()], (row) => row.changeKrw);
@@ -276,6 +366,8 @@ export function buildDailyPositionMovement({
     tradeFlowKrw,
     fxChangeKrw,
     contributions,
+    contributionRows: [...contributions.values()],
+    exclusions,
     coverage,
   };
 }
@@ -294,6 +386,7 @@ export function buildPreviousCloseMovement({
   movementCycle: PortfolioMovementCycle;
 }): PortfolioMovementResult {
   const contributions = new Map<string, PortfolioMovementContribution>();
+  const exclusions: PortfolioMovementExclusion[] = [];
   const currentTotalValue = sumBy(holdings, (holding) => holding.valueKrw);
   let matchedCurrentValue = 0;
   let matchedCount = 0;
@@ -302,8 +395,29 @@ export function buildPreviousCloseMovement({
   let fxChangeKrw = 0;
 
   for (const holding of holdings) {
-    if (!resolveKrwFxRate(holding.currency, usdKrwRate).ok) continue;
-    if (!hasFreshMovementPrice(holding, movementCycle)) continue;
+    const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
+    if (!currentFx.ok) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          currentFx.reason === "unsupported_currency"
+            ? "unsupported_currency"
+            : "missing_current_fx",
+          "asset_price_snapshot",
+        ),
+      );
+      continue;
+    }
+    if (!hasFreshMovementPrice(holding, movementCycle)) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          "missing_fresh_live_prices",
+          "asset_price_snapshot",
+        ),
+      );
+      continue;
+    }
 
     const previous = calculatePreviousCloseContribution(
       holding,
@@ -311,7 +425,16 @@ export function buildPreviousCloseMovement({
       referenceDate,
       usdKrwRate,
     );
-    if (!previous) continue;
+    if (!previous) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          "missing_previous_close_fallback",
+          "asset_price_snapshot",
+        ),
+      );
+      continue;
+    }
 
     contributions.set(holding.id, previous);
     matchedCurrentValue += holding.valueKrw;
@@ -346,6 +469,11 @@ export function buildPreviousCloseMovement({
       tradeFlowKrw: 0,
       fxChangeKrw: null,
       contributions,
+      contributionRows: [...contributions.values()],
+      exclusions: [
+        ...exclusions,
+        aggregateExclusion("coverage_below_threshold", "asset_price_snapshot"),
+      ],
       coverage,
     };
   }
@@ -360,6 +488,8 @@ export function buildPreviousCloseMovement({
     tradeFlowKrw: 0,
     fxChangeKrw,
     contributions,
+    contributionRows: [...contributions.values()],
+    exclusions,
     coverage,
   };
 }
@@ -445,6 +575,10 @@ function findPreviousClosePriceRow(
 function emptyMovement(
   reason: string,
   coverage: PortfolioMovementCoverage,
+  details: {
+    contributionRows?: PortfolioMovementContribution[];
+    exclusions?: PortfolioMovementExclusion[];
+  } = {},
 ): PortfolioMovementResult {
   return {
     ready: false,
@@ -456,7 +590,65 @@ function emptyMovement(
     tradeFlowKrw: 0,
     fxChangeKrw: null,
     contributions: new Map(),
+    contributionRows: details.contributionRows ?? [],
+    exclusions: details.exclusions ?? [],
     coverage,
+  };
+}
+
+function holdingExclusion(
+  holding: PortfolioMovementHoldingInput,
+  reason: PortfolioMovementExclusionReason,
+  source: Exclude<PortfolioMovementSource, null>,
+): PortfolioMovementExclusion {
+  return {
+    subject: "holding",
+    reason,
+    source,
+    holdingId: holding.id,
+    snapshotId: null,
+    ticker: holding.ticker,
+    assetName: holding.name,
+    account: holding.account,
+    currency: holding.currency,
+    valueKrw: holding.valueKrw,
+  };
+}
+
+function snapshotExclusion(
+  snapshot: PortfolioMovementPositionSnapshotInput,
+  reason: PortfolioMovementExclusionReason,
+  source: Exclude<PortfolioMovementSource, null>,
+): PortfolioMovementExclusion {
+  return {
+    subject: "snapshot",
+    reason,
+    source,
+    holdingId: snapshot.assetId,
+    snapshotId: snapshot.id,
+    ticker: snapshot.ticker,
+    assetName: snapshot.assetName,
+    account: snapshot.account,
+    currency: null,
+    valueKrw: snapshotMarketValue(snapshot),
+  };
+}
+
+function aggregateExclusion(
+  reason: PortfolioMovementExclusionReason,
+  source: Exclude<PortfolioMovementSource, null>,
+): PortfolioMovementExclusion {
+  return {
+    subject: "aggregate",
+    reason,
+    source,
+    holdingId: null,
+    snapshotId: null,
+    ticker: null,
+    assetName: null,
+    account: null,
+    currency: null,
+    valueKrw: null,
   };
 }
 

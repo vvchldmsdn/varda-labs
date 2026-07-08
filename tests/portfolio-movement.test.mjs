@@ -101,6 +101,9 @@ describe("portfolio movement builder", () => {
     assert.equal(result.coverage.snapshotCoveragePct, 100);
     assert.equal(contribution?.changeKrw, -50);
     assert.equal(contribution?.fxChangeKrw, 0);
+    assert.deepEqual(result.contributionRows, [contribution]);
+    assert.equal("legacyBase44Id" in result.contributionRows[0], false);
+    assert.deepEqual(result.exclusions, []);
   });
 
   it("separates USD FX-only movement from unchanged prices", () => {
@@ -189,6 +192,54 @@ describe("portfolio movement builder", () => {
     assert.equal(contribution?.changeKrw, 0);
   });
 
+  it("adds post-baseline sell trade flow back to holding movement", () => {
+    const result = buildDaily({
+      holdings: [holding({ currentPrice: 90, valueKrw: 900 })],
+      eventRows: [
+        tradeEvent({
+          eventType: "sell",
+          amountKrw: 50,
+        }),
+      ],
+    });
+    const contribution = result.contributions.get("asset-kr");
+
+    assert.equal(result.ready, true);
+    assert.equal(result.tradeFlowKrw, -50);
+    assert.equal(result.changeKrw, -50);
+    assert.equal(contribution?.tradeFlowKrw, -50);
+    assert.equal(contribution?.changeKrw, -50);
+  });
+
+  it("uses event account metadata when event.account is empty", () => {
+    const result = buildDaily({
+      holdings: [
+        holding({
+          account: "isa",
+          currentPrice: 120,
+          valueKrw: 1200,
+        }),
+      ],
+      positionRows: [
+        position({
+          account: "isa",
+        }),
+      ],
+      eventRows: [
+        tradeEvent({
+          account: null,
+          amountKrw: 200,
+          afterValue: { account: "isa" },
+        }),
+      ],
+      selectedAccount: "isa",
+    });
+
+    assert.equal(result.ready, true);
+    assert.equal(result.tradeFlowKrw, 200);
+    assert.equal(result.contributions.get("asset-kr")?.changeKrw, 0);
+  });
+
   it("excludes stale current prices from snapshot movement coverage", () => {
     const result = buildDaily({
       holdings: [
@@ -209,6 +260,11 @@ describe("portfolio movement builder", () => {
     assert.equal(result.ready, false);
     assert.equal(result.reason, "missing_fresh_live_prices");
     assert.equal(result.contributions.size, 0);
+    assert.equal(result.contributionRows.length, 0);
+    assert.deepEqual(
+      result.exclusions.map((exclusion) => exclusion.reason),
+      ["missing_fresh_live_prices", "coverage_below_threshold"],
+    );
     assert.equal(result.coverage.currentCoveragePct, 0);
   });
 
@@ -237,6 +293,10 @@ describe("portfolio movement builder", () => {
     assert.equal(result.ready, false);
     assert.equal(result.reason, "missing_fresh_live_prices");
     assert.equal(result.contributions.size, 0);
+    assert.equal(result.exclusions[0]?.reason, "unsupported_currency");
+    assert.equal(result.exclusions[0]?.ticker, "JPETF");
+    assert.equal(result.exclusions[0]?.assetName, "Japan ETF");
+    assert.equal("legacyBase44Id" in result.exclusions[0], false);
     assert.equal(result.changeKrw, null);
   });
 
@@ -273,6 +333,52 @@ describe("portfolio movement builder", () => {
     assert.equal(result.reason, "missing_fresh_live_prices");
     assert.equal(result.fxChangeKrw, null);
     assert.equal(result.contributions.has("asset-us"), false);
+    assert.equal(result.exclusions[0]?.reason, "missing_baseline_fx");
+    assert.equal(result.exclusions[0]?.ticker, "VOO");
+  });
+
+  it("keeps partial serializable contributions when aggregate coverage is blocked", () => {
+    const result = buildDaily({
+      holdings: [
+        holding({
+          id: "asset-a",
+          legacyBase44Id: "legacy-a",
+          name: "Asset A",
+          ticker: "A",
+          currentPrice: 95,
+          valueKrw: 950,
+        }),
+        holding({
+          id: "asset-b",
+          legacyBase44Id: "legacy-b",
+          name: "Asset B",
+          ticker: "B",
+          currentPrice: 200,
+          valueKrw: 2000,
+        }),
+      ],
+      positionRows: [
+        position({
+          id: "snap-a",
+          assetId: "asset-a",
+          legacyAssetId: "legacy-a",
+          ticker: "A",
+          assetName: "Asset A",
+          marketValueKrw: 1000,
+          unitPrice: 100,
+        }),
+      ],
+    });
+
+    assert.equal(result.ready, false);
+    assert.equal(result.reason, "missing_fresh_live_prices");
+    assert.equal(result.contributions.size, 0);
+    assert.equal(result.contributionRows.length, 1);
+    assert.equal(result.contributionRows[0].holdingId, "asset-a");
+    assert.deepEqual(
+      result.exclusions.map((exclusion) => exclusion.reason),
+      ["missing_baseline_snapshot", "coverage_below_threshold"],
+    );
   });
 
   it("accounts for removed baseline positions in aggregate movement", () => {
@@ -360,5 +466,44 @@ describe("portfolio movement builder", () => {
     assert.equal(result.previousTotalKrw, 1000);
     assert.equal(result.changeKrw, -50);
     assert.equal(contribution?.source, "asset_price_snapshot");
+  });
+
+  it("computes previous-close fallback USD price and FX movement", () => {
+    const result = buildPreviousCloseMovement({
+      holdings: [
+        holding({
+          id: "asset-us",
+          legacyBase44Id: "legacy-us",
+          name: "VOO",
+          ticker: "VOO",
+          currency: "USD",
+          quantity: 10,
+          currentPrice: 105,
+          valueKrw: 1_592_744.937,
+        }),
+      ],
+      priceRows: [
+        {
+          ticker: "VOO",
+          priceDate: "2026-07-07",
+          adjustedClosePrice: 100,
+          closePrice: 100,
+          closePriceKrw: 1_531_722.979,
+          fxRate: 1531.722979,
+        },
+      ],
+      referenceDate: "2026-07-08",
+      usdKrwRate: 1516.89994,
+      movementCycle,
+    });
+    const contribution = result.contributions.get("asset-us");
+
+    assert.equal(result.ready, true);
+    assert.equal(result.source, "asset_price_snapshot");
+    assertClose(result.changeKrw, 61_021.958);
+    assertClose(result.fxChangeKrw, -15_564.19095);
+    assertClose(contribution?.changeKrw, 61_021.958);
+    assertClose(contribution?.fxChangeKrw, -15_564.19095);
+    assert.deepEqual(result.contributionRows, [contribution]);
   });
 });
