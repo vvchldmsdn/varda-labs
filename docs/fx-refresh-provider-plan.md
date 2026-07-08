@@ -326,6 +326,57 @@ No-write checks:
 - Response scan found no secret-like terms and no raw URL with key-like query
   parameters.
 
+### 2026-07-09 Approved One-Write Smoke
+
+Commit under smoke: `a6b30d5 Document guarded FX branch smoke`.
+
+User approval:
+
+- The operator explicitly approved `one actual USD/KRW write`.
+
+Pre-write route checks:
+
+- `POST /api/admin/market/fx/sync` without auth returned `401`.
+- Authenticated `dryRun=false` without `confirmWrite=true` returned `400`
+  before write execution.
+- Authenticated `dryRun=true` returned `200`.
+- Dry-run provider: `er-api-open`.
+- Dry-run pair: `USD/KRW`.
+- Candidate row: `2026-07-08`, source `er-api_open_access`, status `ok`,
+  USD/KRW `1516.89994`.
+- Pre-write `existingRowCount` was `0`.
+- Planned action was `planned_insert` with reason `new_varda_row`.
+
+Approved actual write:
+
+- Authenticated `dryRun=false&confirmWrite=true` was called exactly once.
+- The route returned `200`.
+- A single `fx_rates` row for service date `2026-07-08` exists after the write.
+- The row has source `er-api_open_access`, status `ok`, USD/KRW
+  `1516.899940`, `legacy_base44_id = null`, and `is_sample = false`.
+
+Post-write checks:
+
+- Authenticated `dryRun=true` returned `200`.
+- Post-write `existingRowCount` was `1`.
+- Planned action changed to `planned_skip` with reason
+  `same_varda_row_value`.
+- Current row counts after the write were:
+  - `fx_rates`: `468`
+  - `market_data_sync_runs`: `50`
+  - `assets`: `19`
+  - `asset_price_snapshots`: `11314`
+  - `daily_position_snapshots`: `469`
+  - `daily_portfolio_snapshots`: `86`
+- Authenticated `/` returned `200`.
+- The rendered HTML included `USD/KRW` and the inserted rate rounded as
+  `1,516`.
+- Secret-value scan confirmed configured password, admin secret, KIS app key,
+  KIS app secret, and database URL values were not present in the rendered
+  HTML. A simple term scan matched the generic word `header`, so this smoke
+  should be read as value-level secret absence rather than zero sensitive words.
+- No raw URL with key-like query parameters was found.
+
 ## Open Questions
 
 - Should varda-labs ever overwrite imported Base44 FX rows, or should it only
