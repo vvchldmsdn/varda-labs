@@ -48,6 +48,9 @@ Interpretation:
 - This is a wide-row balance source.
 - It should not be treated as the same metric as portfolio market value,
   invested amount, total cost, PnL, or return.
+- `legacy_base44_id` is preserved in the database for audit and idempotent
+  imports, but the read-only `/history` page does not expose raw legacy ids in
+  the visible table.
 - It currently has no owner key. Per
   `docs/auth-and-tenant-model-design.md`, it is user-owned historical evidence
   and needs future initial-owner assignment before user-specific writes or RLS.

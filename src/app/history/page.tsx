@@ -161,7 +161,6 @@ function BalanceTable({
             <TableHeader align="right">Brokerage</TableHeader>
             <TableHeader align="right">ISA</TableHeader>
             <TableHeader align="right">IRP</TableHeader>
-            <TableHeader>Legacy id</TableHeader>
           </tr>
         </thead>
         <tbody>
@@ -175,7 +174,6 @@ function BalanceTable({
               <TableCell align="right">{formatMoney(row.brokerage)}</TableCell>
               <TableCell align="right">{formatMoney(row.isa)}</TableCell>
               <TableCell align="right">{formatMoney(row.irp)}</TableCell>
-              <TableCell>{row.legacyBase44Id ?? "n/a"}</TableCell>
             </tr>
           ))}
         </tbody>

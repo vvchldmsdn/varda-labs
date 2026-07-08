@@ -82,8 +82,12 @@ Trend values:
 
 Daily movement:
 
-- First preference is the latest `daily_position_snapshots` baseline for the
-  selected account, with trade-flow adjustment from `event_ledger_entries`.
+- First preference is the stored movement evidence on the latest
+  `daily_position_snapshots` rows for the selected account. The dashboard uses
+  `market_value_change_krw`, `market_value_change_pct`,
+  `previous_market_value_krw`, and `fx_change_krw` when those fields exist.
+- This avoids treating stale `assets.current_price` values as live prices after
+  close-only snapshot writes.
 - If snapshot coverage is too low, the dashboard falls back to
   `asset_price_snapshots` previous-close rows for the selected tickers.
 - The UI displays whether movement came from position snapshots or previous

@@ -371,7 +371,6 @@ export async function getPortfolioDashboard(
   const dailyPositionMovement = buildDailyPositionMovement({
     holdings: holdingsBase,
     positionRows: latestPositionRows,
-    eventRows,
     selectedAccount,
     baselineDate: latestSnapshotDate,
     usdKrwRate,
@@ -636,14 +635,12 @@ function attachDailyContribution(
 function buildDailyPositionMovement({
   holdings,
   positionRows,
-  eventRows,
   selectedAccount,
   baselineDate,
   usdKrwRate,
 }: {
   holdings: DashboardHolding[];
   positionRows: PositionSnapshotRow[];
-  eventRows: EventLedgerRow[];
   selectedAccount: DashboardAccount;
   baselineDate: string | null;
   usdKrwRate: number;
@@ -665,7 +662,8 @@ function buildDailyPositionMovement({
       isInvestmentSnapshot(row),
   );
   const snapshotTotalValue = sumBy(accountRows, snapshotMarketValue);
-  const currentTotalValue = sumBy(holdings, (holding) => holding.valueKrw);
+  const previousTotalValue = sumBy(accountRows, snapshotPreviousMarketValue);
+  const currentTotalValue = snapshotTotalValue;
 
   if (accountRows.length === 0 || snapshotTotalValue <= 0 || currentTotalValue <= 0) {
     return emptyMovement("missing_baseline_snapshot", emptyCoverage);
@@ -676,7 +674,7 @@ function buildDailyPositionMovement({
   let matchedCurrentValue = 0;
   let matchedSnapshotValue = 0;
   let matchedCount = 0;
-  let tradeFlowKrw = 0;
+  const tradeFlowKrw = 0;
   let fxChangeKrw = 0;
 
   for (const holding of holdings) {
@@ -685,34 +683,29 @@ function buildDailyPositionMovement({
 
     const previousValueKrw = snapshotMarketValue(snapshot);
     if (previousValueKrw <= 0) continue;
-
-    const holdingTradeFlowKrw = calculateTradeFlowForHolding(
-      eventRows,
-      holding,
-      selectedAccount,
-      baselineDate,
-    );
-    const holdingFxChangeKrw = calculateSnapshotFxChange(
-      snapshot,
-      holding,
-      usdKrwRate,
-    );
-    const changeKrw = holding.valueKrw - previousValueKrw - holdingTradeFlowKrw;
+    const storedPreviousValueKrw = snapshotPreviousMarketValue(snapshot);
+    const changeKrw = snapshotMarketValueChange(snapshot);
+    const holdingFxChangeKrw =
+      toNumber(snapshot.fxChangeKrw) ??
+      calculateSnapshotFxChange(snapshot, holding, usdKrwRate);
 
     contributions.set(holding.id, {
       holdingId: holding.id,
-      previousValueKrw,
+      previousValueKrw: storedPreviousValueKrw,
       changeKrw,
-      returnPct: percentOrNull(changeKrw, previousValueKrw),
-      tradeFlowKrw: holdingTradeFlowKrw,
+      returnPct: snapshotMarketValueChangePct(
+        snapshot,
+        changeKrw,
+        storedPreviousValueKrw,
+      ),
+      tradeFlowKrw: 0,
       fxChangeKrw: holdingFxChangeKrw,
       source: "daily_position_snapshot",
     });
     matchedSnapshotIds.add(snapshot.id);
-    matchedCurrentValue += holding.valueKrw;
+    matchedCurrentValue += previousValueKrw;
     matchedSnapshotValue += previousValueKrw;
     matchedCount += 1;
-    tradeFlowKrw += holdingTradeFlowKrw;
     fxChangeKrw += holdingFxChangeKrw;
   }
 
@@ -741,25 +734,18 @@ function buildDailyPositionMovement({
   let changeKrw = sumBy([...contributions.values()], (row) => row.changeKrw);
   for (const row of accountRows) {
     if (matchedSnapshotIds.has(row.id)) continue;
-    const previousValueKrw = snapshotMarketValue(row);
+    const previousValueKrw = snapshotPreviousMarketValue(row);
     if (previousValueKrw <= 0) continue;
-    const removedTradeFlowKrw = calculateTradeFlowForSnapshot(
-      eventRows,
-      row,
-      selectedAccount,
-      baselineDate,
-    );
-    changeKrw += -previousValueKrw - removedTradeFlowKrw;
-    tradeFlowKrw += removedTradeFlowKrw;
+    changeKrw += snapshotMarketValueChange(row);
   }
 
   return {
     ready: true,
     source: "daily_position_snapshot",
     reason: null,
-    previousTotalKrw: snapshotTotalValue,
+    previousTotalKrw: previousTotalValue,
     changeKrw,
-    returnPct: percentOrNull(changeKrw, snapshotTotalValue),
+    returnPct: percentOrNull(changeKrw, previousTotalValue),
     tradeFlowKrw,
     fxChangeKrw,
     contributions,
@@ -938,42 +924,6 @@ function findPositionSnapshotForHolding(
     if (holdingTicker && normalizeTicker(row.ticker) === holdingTicker) return true;
     return row.assetName === holding.name;
   });
-}
-
-function calculateTradeFlowForHolding(
-  events: EventLedgerRow[],
-  holding: DashboardHolding,
-  selectedAccount: DashboardAccount,
-  baselineDate: string,
-) {
-  return events
-    .filter((event) => event.eventDate > baselineDate)
-    .filter((event) => event.eventType === "buy" || event.eventType === "sell")
-    .filter((event) => eventMatchesHolding(event, holding, selectedAccount))
-    .reduce((sum, event) => {
-      const amount = toNumber(event.amountKrw) ?? 0;
-      if (event.eventType === "buy") return sum + Math.abs(amount);
-      if (event.eventType === "sell") return sum - Math.abs(amount);
-      return sum;
-    }, 0);
-}
-
-function calculateTradeFlowForSnapshot(
-  events: EventLedgerRow[],
-  snapshot: PositionSnapshotRow,
-  selectedAccount: DashboardAccount,
-  baselineDate: string,
-) {
-  return events
-    .filter((event) => event.eventDate > baselineDate)
-    .filter((event) => event.eventType === "buy" || event.eventType === "sell")
-    .filter((event) => eventMatchesSnapshot(event, snapshot, selectedAccount))
-    .reduce((sum, event) => {
-      const amount = toNumber(event.amountKrw) ?? 0;
-      if (event.eventType === "buy") return sum + Math.abs(amount);
-      if (event.eventType === "sell") return sum - Math.abs(amount);
-      return sum;
-    }, 0);
 }
 
 function calculateSnapshotFxChange(
@@ -1209,44 +1159,6 @@ function eventTimestampMs(event: EventLedgerRow) {
   return new Date(timestamp).getTime();
 }
 
-function eventMatchesHolding(
-  event: EventLedgerRow,
-  holding: DashboardHolding,
-  selectedAccount: DashboardAccount,
-) {
-  if (!eventMatchesSelectedAccount(event, selectedAccount, holding.account)) {
-    return false;
-  }
-  if (event.assetId && event.assetId === holding.id) return true;
-  if (event.legacyAssetId && event.legacyAssetId === holding.legacyBase44Id) {
-    return true;
-  }
-  const eventTicker = normalizeTicker(event.ticker);
-  const holdingTicker = normalizeTicker(holding.ticker);
-  if (eventTicker && holdingTicker && eventTicker === holdingTicker) return true;
-  return event.assetName === holding.name;
-}
-
-function eventMatchesSnapshot(
-  event: EventLedgerRow,
-  snapshot: PositionSnapshotRow,
-  selectedAccount: DashboardAccount,
-) {
-  if (!eventMatchesSelectedAccount(event, selectedAccount, snapshot.account)) {
-    return false;
-  }
-  if (event.assetId && snapshot.assetId && event.assetId === snapshot.assetId) {
-    return true;
-  }
-  if (event.legacyAssetId && event.legacyAssetId === snapshot.legacyAssetId) {
-    return true;
-  }
-  const eventTicker = normalizeTicker(event.ticker);
-  const snapshotTicker = normalizeTicker(snapshot.ticker);
-  if (eventTicker && snapshotTicker && eventTicker === snapshotTicker) return true;
-  return event.assetName === snapshot.assetName;
-}
-
 function eventMatchesSelectedAccount(
   event: EventLedgerRow,
   selectedAccount: DashboardAccount,
@@ -1261,6 +1173,27 @@ function eventMatchesSelectedAccount(
 
 function snapshotMarketValue(row: PositionSnapshotRow) {
   return toNumber(row.marketValueKrw) ?? 0;
+}
+
+function snapshotPreviousMarketValue(row: PositionSnapshotRow) {
+  return toNumber(row.previousMarketValueKrw) ?? snapshotMarketValue(row);
+}
+
+function snapshotMarketValueChange(row: PositionSnapshotRow) {
+  const storedChange = toNumber(row.marketValueChangeKrw);
+  if (storedChange !== null) return storedChange;
+  return snapshotMarketValue(row) - snapshotPreviousMarketValue(row);
+}
+
+function snapshotMarketValueChangePct(
+  row: PositionSnapshotRow,
+  changeKrw: number,
+  previousValueKrw: number,
+) {
+  return (
+    toNumber(row.marketValueChangePct) ??
+    percentOrNull(changeKrw, previousValueKrw)
+  );
 }
 
 function isInvestmentSnapshot(row: PositionSnapshotRow) {
