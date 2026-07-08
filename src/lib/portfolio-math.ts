@@ -7,8 +7,95 @@ export function uniqueStrings(values: string[]) {
   return [...new Set(values)];
 }
 
+export type KrwFxRateResolution =
+  | {
+      ok: true;
+      currency: "KRW" | "USD";
+      rate: number;
+      requiresFx: boolean;
+    }
+  | {
+      ok: false;
+      currency: string;
+      rate: null;
+      requiresFx: boolean;
+      reason: "missing_usd_krw_rate" | "unsupported_currency";
+    };
+
+export type FxAwarePositionMovementInput = {
+  quantity: number;
+  currentPrice: number;
+  previousPrice: number;
+  currentFxRate: number;
+  previousFxRate: number;
+  fractionalKrwValue?: number;
+  previousMarketValueKrw?: number | null;
+};
+
+export function normalizeCurrencyCode(value: string | null | undefined) {
+  return value?.trim().toUpperCase() ?? "";
+}
+
+export function resolveKrwFxRate(
+  currency: string | null | undefined,
+  usdKrwRate: number | null | undefined,
+): KrwFxRateResolution {
+  const code = normalizeCurrencyCode(currency);
+
+  if (code === "KRW") {
+    return { ok: true, currency: "KRW", rate: 1, requiresFx: false };
+  }
+
+  if (code === "USD") {
+    return typeof usdKrwRate === "number" && usdKrwRate > 0
+      ? { ok: true, currency: "USD", rate: usdKrwRate, requiresFx: true }
+      : {
+          ok: false,
+          currency: "USD",
+          rate: null,
+          requiresFx: true,
+          reason: "missing_usd_krw_rate",
+        };
+  }
+
+  return {
+    ok: false,
+    currency: code || "UNKNOWN",
+    rate: null,
+    requiresFx: true,
+    reason: "unsupported_currency",
+  };
+}
+
 export function convertToKrw(value: number, currency: string, usdKrwRate: number) {
-  return currency === "USD" ? value * usdKrwRate : value;
+  const resolved = resolveKrwFxRate(currency, usdKrwRate);
+  return resolved.ok ? value * resolved.rate : null;
+}
+
+export function calculateFxAwarePositionMovementKrw({
+  quantity,
+  currentPrice,
+  previousPrice,
+  currentFxRate,
+  previousFxRate,
+  fractionalKrwValue = 0,
+  previousMarketValueKrw = null,
+}: FxAwarePositionMovementInput) {
+  const currentBaseValueKrw = quantity * currentPrice * currentFxRate;
+  const currentValueKrw = currentBaseValueKrw + fractionalKrwValue;
+  const inferredPreviousValueKrw =
+    quantity * previousPrice * previousFxRate + fractionalKrwValue;
+  const previousValueKrw = previousMarketValueKrw ?? inferredPreviousValueKrw;
+  const priceChangeKrw = quantity * (currentPrice - previousPrice) * previousFxRate;
+  const fxChangeKrw = quantity * currentPrice * (currentFxRate - previousFxRate);
+
+  return {
+    currentValueKrw,
+    previousValueKrw,
+    changeKrw: currentValueKrw - previousValueKrw,
+    priceChangeKrw,
+    fxChangeKrw,
+  };
 }
 
 export function percentOrNull(

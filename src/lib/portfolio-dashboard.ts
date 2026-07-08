@@ -24,9 +24,11 @@ import {
   type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
 import {
+  calculateFxAwarePositionMovementKrw,
   convertToKrw,
   diffDays,
   normalizeTicker,
+  resolveKrwFxRate,
   percentOrNull,
   sumBy,
   toNumber,
@@ -195,6 +197,8 @@ export type DashboardData = {
     portfolioSnapshotValueDeltaKrw: number | null;
     portfolioSnapshotPnlDeltaKrw: number | null;
     portfolioSnapshotReturnPctDelta: number | null;
+    unsupportedCurrencyCount: number;
+    unsupportedCurrencies: string[];
   };
 };
 
@@ -320,6 +324,9 @@ export async function getPortfolioDashboard(
   const useTrendFilter = setting?.useTrendFilter ?? false;
   const accountLabels = buildAccountLabels(accountRows);
   const assetGroupNames = buildAssetGroupNames(assetGroupRows);
+  const unsupportedCurrencyAssets = investmentAssetRows.filter(
+    (asset) => !resolveKrwFxRate(asset.currency, usdKrwRate).ok,
+  );
   const returnSummary = buildReturnMetricsSummary(
     eventRows,
     investmentAssetRows,
@@ -541,6 +548,10 @@ export async function getPortfolioDashboard(
         totalReturnPct,
         latestPortfolioSnapshotReturnPct,
       ),
+      unsupportedCurrencyCount: unsupportedCurrencyAssets.length,
+      unsupportedCurrencies: uniqueStrings(
+        unsupportedCurrencyAssets.map((asset) => asset.currency),
+      ).sort(),
     },
   };
 }
@@ -604,7 +615,9 @@ function buildHolding({
   const ma120 = toNumber(asset.ma120);
   const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
   const localValue = quantity * currentPrice;
-  const valueKrw = convertToKrw(localValue, asset.currency, usdKrwRate) + fractionalKrwValue;
+  const valueKrw =
+    (convertToKrw(localValue, asset.currency, usdKrwRate) ?? 0) +
+    fractionalKrwValue;
   const costBasisKrw = returnMetrics.costBasisKrw;
   const unrealizedPnlKrw = valueKrw - costBasisKrw;
   const realizedPnlKrw = returnMetrics.realizedPnlKrw;
@@ -725,6 +738,7 @@ function buildDailyPositionMovement({
   let fxChangeKrw = 0;
 
   for (const holding of holdings) {
+    if (!resolveKrwFxRate(holding.currency, usdKrwRate).ok) continue;
     if (!hasFreshMovementPrice(holding, movementCycle)) continue;
 
     const snapshot = findPositionSnapshotForHolding(holding, accountRows);
@@ -833,6 +847,7 @@ function buildPreviousCloseMovement({
   let fxChangeKrw = 0;
 
   for (const holding of holdings) {
+    if (!resolveKrwFxRate(holding.currency, usdKrwRate).ok) continue;
     if (!hasFreshMovementPrice(holding, movementCycle)) continue;
 
     const previous = calculatePreviousCloseContribution(
@@ -910,33 +925,31 @@ function calculatePreviousCloseContribution(
     toNumber(previousRow.adjustedClosePrice) ?? toNumber(previousRow.closePrice);
   if (closePrice === null || closePrice <= 0) return null;
 
-  const previousFxRate =
-    holding.currency === "USD"
-      ? toNumber(previousRow.fxRate) ??
-        inferFxRateFromClose(previousRow) ??
-        usdKrwRate
-      : 1;
-  const currentFxRate = holding.currency === "USD" ? usdKrwRate : 1;
+  const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
+  if (!currentFx.ok) return null;
+
+  const previousFxRate = currentFx.requiresFx
+    ? toNumber(previousRow.fxRate) ?? inferFxRateFromClose(previousRow) ?? currentFx.rate
+    : 1;
   const currentBaseValueKrw =
-    holding.quantity * holding.currentPrice * currentFxRate;
+    holding.quantity * holding.currentPrice * currentFx.rate;
   const fractionalKrwValue = Math.max(holding.valueKrw - currentBaseValueKrw, 0);
-  const previousValueKrw =
-    holding.quantity * closePrice * previousFxRate + fractionalKrwValue;
-  const changeKrw = holding.valueKrw - previousValueKrw;
-  const previousUsdNotional =
-    holding.currency === "USD" ? holding.quantity * closePrice : 0;
-  const fxChangeKrw =
-    holding.currency === "USD"
-      ? previousUsdNotional * (currentFxRate - previousFxRate)
-      : 0;
+  const movement = calculateFxAwarePositionMovementKrw({
+    quantity: holding.quantity,
+    currentPrice: holding.currentPrice,
+    previousPrice: closePrice,
+    currentFxRate: currentFx.rate,
+    previousFxRate,
+    fractionalKrwValue,
+  });
 
   return {
     holdingId: holding.id,
-    previousValueKrw,
-    changeKrw,
-    returnPct: percentOrNull(changeKrw, previousValueKrw),
+    previousValueKrw: movement.previousValueKrw,
+    changeKrw: movement.changeKrw,
+    returnPct: percentOrNull(movement.changeKrw, movement.previousValueKrw),
     tradeFlowKrw: 0,
-    fxChangeKrw,
+    fxChangeKrw: currentFx.requiresFx ? movement.fxChangeKrw : 0,
     source: "asset_price_snapshot" as const,
   };
 }
@@ -1029,7 +1042,8 @@ function calculateSnapshotFxChange(
   holding: DashboardHolding,
   usdKrwRate: number,
 ) {
-  if (holding.currency !== "USD") return 0;
+  const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
+  if (!currentFx.ok || !currentFx.requiresFx) return 0;
 
   const previousFxRate = toNumber(snapshot.fxRate) ?? toNumber(snapshot.previousFxRate);
   if (previousFxRate === null || previousFxRate <= 0) return 0;
@@ -1037,7 +1051,7 @@ function calculateSnapshotFxChange(
   const previousUsdNotional =
     toNumber(snapshot.marketValueLocal) ??
     snapshotMarketValue(snapshot) / previousFxRate;
-  return previousUsdNotional * (usdKrwRate - previousFxRate);
+  return previousUsdNotional * (currentFx.rate - previousFxRate);
 }
 
 function buildAccountLabels(accountRows: (typeof accounts.$inferSelect)[]) {
@@ -1119,7 +1133,8 @@ function buildNonInvestmentAssets(
       assetType: asset.assetType ?? "cash_like",
       account: asset.account,
       valueKrw:
-        convertToKrw(toNumber(asset.currentPrice) ?? 0, asset.currency, usdKrwRate) +
+        (convertToKrw(toNumber(asset.currentPrice) ?? 0, asset.currency, usdKrwRate) ??
+          0) +
         (toNumber(asset.fractionalKrwValue) ?? 0),
     }))
     .sort((a, b) => b.valueKrw - a.valueKrw);

@@ -353,6 +353,14 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                   data.dataHealth.portfolioSnapshotPnlDeltaKrw,
                 )}
               />
+              <DataPill
+                label="미지원통화"
+                value={
+                  data.dataHealth.unsupportedCurrencyCount > 0
+                    ? `${data.dataHealth.unsupportedCurrencyCount} (${data.dataHealth.unsupportedCurrencies.join(", ")})`
+                    : "0"
+                }
+              />
             </div>
           </section>
         </aside>

@@ -1,6 +1,7 @@
 import {
   convertToKrw,
   normalizeTicker,
+  resolveKrwFxRate,
   sumBy,
   toNumber,
 } from "./portfolio-math.ts";
@@ -322,7 +323,9 @@ function historyTradeAmountKrw(
   const quantity = eventTradeQuantity(event);
   const price = toNumber(event.price) ?? 0;
   const fxRate =
-    toNumber(event.fxRate) ?? (asset?.currency === "USD" ? usdKrwRate : 1);
+    toNumber(event.fxRate) ??
+    resolveKrwFxRate(asset?.currency ?? "KRW", usdKrwRate).rate ??
+    0;
   return Math.abs(quantity * price * fxRate);
 }
 
@@ -366,7 +369,9 @@ function estimateDisposedCostFromEvent(
   if (averageCost === null || averageCost <= 0) return null;
 
   const fxRate =
-    toNumber(event.fxRate) ?? (asset?.currency === "USD" ? usdKrwRate : 1);
+    toNumber(event.fxRate) ??
+    resolveKrwFxRate(asset?.currency ?? "KRW", usdKrwRate).rate ??
+    0;
   return quantity * averageCost * fxRate;
 }
 
@@ -376,7 +381,7 @@ function fallbackCostBasisKrw(asset: PortfolioReturnAssetRow, usdKrwRate: number
     toNumber(asset.averageCost) ?? toNumber(asset.currentPrice) ?? 0;
   const localCostBasis = quantity * averageCost;
   return (
-    convertToKrw(localCostBasis, asset.currency, usdKrwRate) +
+    (convertToKrw(localCostBasis, asset.currency, usdKrwRate) ?? 0) +
     (toNumber(asset.fractionalAvgCost) ?? 0)
   );
 }

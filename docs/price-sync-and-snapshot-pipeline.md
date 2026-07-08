@@ -146,6 +146,15 @@ Output:
 - latest USD/KRW
 - source and status
 
+Current valuation scope:
+
+- varda-labs currently supports KRW assets and USD assets for KRW valuation.
+- USD positions use the latest stored USD/KRW row when calculating dashboard
+  movement and daily snapshots.
+- Other foreign currencies must not be treated as KRW by fallback. Until a
+  multi-currency FX table is approved, unsupported currencies should surface as
+  data-health/write blockers instead of silent valuation inputs.
+
 ### `POST /api/admin/market/prices/sync`
 
 Modes:
@@ -268,6 +277,12 @@ Valuation basis:
 - `previous_*`: latest prior valid position snapshot for the same account/asset.
 - `market_value_change_*`, `price_change_krw`, `fx_change_krw`: derived from
   prior snapshot when available.
+- For USD positions, `market_value_change_*` includes both local price movement
+  and USD/KRW movement. `fx_change_krw` preserves the FX contribution as
+  evidence.
+- KRW/USD are the only supported valuation currencies in the current writer.
+  Additional foreign currencies require an explicit FX model before snapshot
+  writes are enabled for those assets.
 - tickerless investment assets are allowed and use `assets.current_price` with
   `price_basis=manual_current`.
 - Position-level `pnl_krw` remains open-position unrealized PnL against asset
@@ -512,10 +527,16 @@ Dashboard rules:
 - If live asset prices are fresher than the latest daily snapshot, today movement
   compares live `assets.current_price` against the latest snapshot/close
   baseline.
+- For USD positions, today movement uses live/latest local price multiplied by
+  the latest stored USD/KRW rate, then compares that KRW value with the baseline
+  snapshot KRW value. This means FX movement is included in the displayed KRW
+  change.
 - If live prices are stale, prefer `asset_price_snapshots` previous-close
   fallback only when coverage passes threshold.
 - If coverage is low, hide aggregate today movement and show a data health badge
   instead of showing partial movement as a portfolio-level number.
+- User-facing copy should describe this as fresh KIS latest quote plus latest
+  stored FX. Do not imply real-time FX until an FX refresh/as-of policy exists.
 
 ## Implementation Phases
 

@@ -32,8 +32,12 @@ import {
   type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
 import {
+  calculateFxAwarePositionMovementKrw,
+  convertToKrw,
   normalizeTicker,
+  normalizeCurrencyCode,
   percentOrNull,
+  resolveKrwFxRate,
   sumBy,
   toNumber,
   uniqueStrings,
@@ -401,6 +405,9 @@ export async function runDailySnapshot(
     targetAccounts.includes(asset.account as TrackedAccount),
   );
   const fx = await resolveSnapshotFx(snapshotDate);
+  const unsupportedCurrencyAssets = selectedAssets.filter(
+    (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
+  );
   const eventRows = await loadEventRows(snapshotDate);
   const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw, {
     asOfDate: snapshotDate,
@@ -421,7 +428,12 @@ export async function runDailySnapshot(
     selectedAssets,
     freshClose,
   });
-  const warnings = buildWarnings({ selectedAssets, freshClose, fx });
+  const warnings = buildWarnings({
+    selectedAssets,
+    freshClose,
+    fx,
+    unsupportedCurrencyAssets,
+  });
   const plannedWrites = emptyPlannedWrites();
 
   if (!dryRun && freshClose.missing.length > 0) {
@@ -485,6 +497,10 @@ export async function runDailySnapshot(
   }
 
   const blockers = [
+    ...unsupportedCurrencyAssets.map(
+      (asset) =>
+        `unsupported_currency:${normalizeTicker(asset.ticker) ?? asset.name}:${normalizeCurrencyCode(asset.currency)}`,
+    ),
     ...freshClose.missing.map((asset) => `missing_close:${asset.ticker}`),
     ...accountBuilds.flatMap((build) => build.blockers),
     ...(allBuild?.blockers ?? []),
@@ -785,7 +801,7 @@ function computeAccountSnapshot({
 
   for (const asset of assets) {
     const price = selectPriceForAsset(asset, closeContext);
-    const fxRate = asset.currency === "USD" ? fx.usdKrw : 1;
+    const fxRate = assetFxRate(asset, fx);
     const value = assetValueKrw(asset, price.price, fxRate);
     if (asset.groupId) {
       groupValueById.set(asset.groupId, (groupValueById.get(asset.groupId) ?? 0) + value);
@@ -797,7 +813,7 @@ function computeAccountSnapshot({
 
   const totalMarketValue = sumBy(assets, (asset) => {
     const price = selectPriceForAsset(asset, closeContext);
-    const fxRate = asset.currency === "USD" ? fx.usdKrw : 1;
+    const fxRate = assetFxRate(asset, fx);
     return assetValueKrw(asset, price.price, fxRate);
   });
   const priorByAssetId = latestPriorPositionByAssetId(priorPositions, snapshotDate);
@@ -809,7 +825,8 @@ function computeAccountSnapshot({
   const positions = assets.map((asset) => {
     const selectedPrice = selectPriceForAsset(asset, closeContext);
     const closePrice = selectedPrice.price;
-    const fxRate = asset.currency === "USD" ? fx.usdKrw : 1;
+    const fxResolution = resolveKrwFxRate(asset.currency, fx.usdKrw);
+    const fxRate = fxResolution.ok ? fxResolution.rate : 0;
     const quantity = toNumber(asset.quantity) ?? 0;
     const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
     const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? 0;
@@ -835,7 +852,7 @@ function computeAccountSnapshot({
     const previousUnitPrice =
       toNumber(prior?.unitPrice) ?? toNumber(prior?.closePrice) ?? null;
     const previousFxRate =
-      toNumber(prior?.fxRate) ?? (asset.currency === "USD" ? null : 1);
+      toNumber(prior?.fxRate) ?? (fxResolution.ok && !fxResolution.requiresFx ? 1 : null);
     const previousUnitValueKrw =
       toNumber(prior?.unitValueKrw) ??
       (previousUnitPrice && previousFxRate
@@ -851,23 +868,31 @@ function computeAccountSnapshot({
       unitValueChangeKrw !== null && previousUnitValueKrw && previousUnitValueKrw > 0
         ? (unitValueChangeKrw / previousUnitValueKrw) * 100
         : null;
-    const marketValueChangeKrw =
-      previousMarketValueKrw && previousMarketValueKrw > 0
-        ? marketValueKrw - previousMarketValueKrw
+    const movement =
+      previousUnitPrice && previousUnitPrice > 0 && previousFxRate && previousFxRate > 0
+        ? calculateFxAwarePositionMovementKrw({
+            quantity: totalQuantity,
+            currentPrice: closePrice,
+            previousPrice: previousUnitPrice,
+            currentFxRate: fxRate,
+            previousFxRate,
+            fractionalKrwValue,
+            previousMarketValueKrw,
+          })
         : null;
+    const marketValueChangeKrw =
+      movement?.changeKrw ??
+      (previousMarketValueKrw && previousMarketValueKrw > 0
+        ? marketValueKrw - previousMarketValueKrw
+        : null);
     const marketValueChangePct =
       marketValueChangeKrw !== null && previousMarketValueKrw && previousMarketValueKrw > 0
         ? (marketValueChangeKrw / previousMarketValueKrw) * 100
         : null;
-    const priceChangeKrw =
-      previousUnitPrice && previousUnitPrice > 0
-        ? totalQuantity *
-          (closePrice - previousUnitPrice) *
-          (asset.currency === "USD" ? previousFxRate ?? fxRate : 1)
-        : null;
+    const priceChangeKrw = movement?.priceChangeKrw ?? null;
     const fxChangeKrw =
-      asset.currency === "USD" && previousFxRate && previousFxRate > 0
-        ? totalQuantity * closePrice * (fxRate - previousFxRate)
+      fxResolution.ok && fxResolution.requiresFx && movement
+        ? movement.fxChangeKrw
         : 0;
     const costKrw = costBasisKrw(asset, fx.usdKrw);
     const pnlKrw = marketValueKrw - costKrw;
@@ -966,7 +991,8 @@ function computeAccountSnapshot({
       fractionalAvgCost: decimal(fractionalAvgCost),
       priceDate: selectedPrice.referenceDate,
       referenceDate: selectedPrice.referenceDate,
-      fxReferenceDate: asset.currency === "USD" ? fx.referenceDate : null,
+      fxReferenceDate:
+        fxResolution.ok && fxResolution.requiresFx ? fx.referenceDate : null,
       previousReferenceDate: prior?.referenceDate ?? prior?.priceDate ?? null,
       previousSnapshotDate: prior?.snapshotDate ?? null,
       capturedAt: cycle.capturedAt,
@@ -2032,8 +2058,14 @@ function costBasisKrw(asset: AssetRow, usdKrw: number) {
   const quantity = toNumber(asset.quantity) ?? 0;
   const averageCost = toNumber(asset.averageCost) ?? toNumber(asset.currentPrice) ?? 0;
   const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? 0;
-  const fxRate = asset.currency === "USD" ? usdKrw : 1;
-  return quantity * averageCost * fxRate + fractionalAvgCost;
+  return (
+    (convertToKrw(quantity * averageCost, asset.currency, usdKrw) ?? 0) +
+    fractionalAvgCost
+  );
+}
+
+function assetFxRate(asset: AssetRow, fx: ResolvedFxRate) {
+  return resolveKrwFxRate(asset.currency, fx.usdKrw).rate ?? 0;
 }
 
 function getFxExposureType(asset: AssetRow) {
@@ -2123,10 +2155,12 @@ function buildWarnings({
   selectedAssets,
   freshClose,
   fx,
+  unsupportedCurrencyAssets,
 }: {
   selectedAssets: AssetRow[];
   freshClose: FreshCloseSummary;
   fx: ResolvedFxRate;
+  unsupportedCurrencyAssets: AssetRow[];
 }) {
   const warnings: string[] = [];
   const manualAssets = selectedAssets.filter((asset) => !normalizeTicker(asset.ticker));
@@ -2143,6 +2177,16 @@ function buildWarnings({
 
   if (fx.referenceDate === null) {
     warnings.push("fx reference date is missing");
+  }
+
+  if (unsupportedCurrencyAssets.length > 0) {
+    warnings.push(
+      `${unsupportedCurrencyAssets.length} assets use unsupported valuation currencies: ${uniqueStrings(
+        unsupportedCurrencyAssets.map((asset) => normalizeCurrencyCode(asset.currency)),
+      )
+        .sort()
+        .join(", ")}`,
+    );
   }
 
   return warnings;
