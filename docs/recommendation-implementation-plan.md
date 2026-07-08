@@ -159,6 +159,9 @@ If an import phase is approved later:
 
 ## Test Gate Before Schema Work
 
+Current calculation fixture gap guidance lives in
+`docs/calculation-fixture-gap-audit.md`.
+
 Before any recommendation schema migration, add or confirm fixture coverage for:
 
 - event-ledger cost basis and realized return inputs;

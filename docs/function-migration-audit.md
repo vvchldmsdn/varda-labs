@@ -54,7 +54,7 @@ Current pipeline status:
 | Portfolio dashboard reads | `src/lib/portfolio-dashboard.ts`, `src/db/queries/*`, Server Components | Keep read-only screens on server-side DB helpers, not Base44-style REST. |
 | ETF reference reads | `etf_masters`, `etf_holdings`, `src/db/queries/etf-holdings.ts`, `/etfs` | Imported data is usable without ETF sync functions. |
 | Market context reads | `benchmark_snapshots`, `market_regime_daily`, `global_market_factors`, `/market` | Imported data is usable without recomputing market context. |
-| Event/return calculations | `event_ledger_entries`, `src/lib/portfolio-return-metrics*.ts` | Needs fixture tests before automated writes depend on it. |
+| Event/return calculations | `event_ledger_entries`, `src/lib/portfolio-return-metrics*.ts` | Current fixture gap guidance lives in `docs/calculation-fixture-gap-audit.md`. |
 | Recommendation output | No final varda-labs recommendation model yet | Decide legacy import vs regeneration before implementation. |
 | Simulation output | No varda-labs simulation job subsystem yet | Defer; Base44 simulation code is job/artifact-heavy. |
 
@@ -198,8 +198,8 @@ Migration treatment:
 2. Do a recommendation model audit before implementing recommendation logic:
    `docs/recommendation-model-audit.md` records the current entity/function
    split and target run/items direction.
-3. Add fixture tests around existing financial calculation helpers before any
-   automated write path depends on them.
+3. Use `docs/calculation-fixture-gap-audit.md` to choose focused fixture tests
+   before any automated write path depends on existing financial calculations.
 4. Continue read-only UI/data work from existing imported tables:
    portfolio dashboard, ETF reference, market context, and event-ledger
    explainability.
