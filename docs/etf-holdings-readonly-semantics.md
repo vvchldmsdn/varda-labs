@@ -172,8 +172,10 @@ Do not add these yet:
 - ETF lookthrough exposure calculation in the portfolio dashboard
 - recommendation, diversification, or risk scoring based on ETF holdings
 
-## Next Safe Step
+## Current Coverage
 
-Before building ETF UI, add a read-only query helper that implements option D
-for one selected ETF/date and returns both grouped rows and raw row counts.
-Keep it server-side and read-only.
+The first read-only route and source-of-truth coverage are now tracked in
+`docs/etf-reference-readonly-coverage.md`.
+
+Keep future ETF work server-side and read-only until a separate factor,
+lookthrough, recommendation, or cleanup policy is approved.

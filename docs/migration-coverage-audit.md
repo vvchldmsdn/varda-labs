@@ -164,7 +164,8 @@ Proposed columns:
 Import note: preserve `legacy_etf_id` even if `etf_master_id` cannot be resolved.
 Read-only UI note: use `docs/etf-holdings-readonly-semantics.md` before
 displaying holdings. Duplicate holding identity rows are migration evidence and
-should not be cleaned up or hidden by default.
+should not be cleaned up or hidden by default. Current `/etfs` route coverage is
+tracked in `docs/etf-reference-readonly-coverage.md`.
 
 ### 5. `EventLedger` to `event_ledger_entries`
 
