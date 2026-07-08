@@ -662,6 +662,76 @@ Implementation gate:
 4. Only then design a server-only dashboard action/route with rate limits,
    cooldown display, loading/error states, and explicit partial-success copy.
 
+## Admin-Only Manual Sync Design
+
+This is the next design boundary before any public button or Cron wiring. It
+does not add a new route by itself; it documents how the existing admin-only
+routes should be operated and what must stay separate.
+
+Current surfaces:
+
+- `/` is a read-only dashboard rendered from server-side DB queries.
+- `POST /api/admin/market/prices/sync` is the KIS/stub price route.
+- `POST /api/admin/market/fx/sync` is the USD/KRW FX route.
+- `POST /api/admin/snapshots/daily` is the guarded daily snapshot writer.
+
+Keep these operations separate:
+
+- Live price sync updates `assets.current_price` and `assets.price_*`
+  metadata. It does not write `asset_price_snapshots` or daily snapshots.
+- FX sync writes only `fx_rates`, and only when `dryRun=false` plus
+  `confirmWrite=true` is intentionally supplied.
+- Close sync writes `asset_price_snapshots` for reviewed ticker/date targets.
+- Daily snapshot writes `daily_position_snapshots` and
+  `daily_portfolio_snapshots` only after close coverage is complete.
+
+Recommended operator order for an intraday dashboard check:
+
+1. Run a KIS live price dry-run for a small, explicit target set.
+2. If the dry-run is clean, run one small actual KIS live write batch with
+   `dryRun=false&confirmWrite=true&limit<=5`.
+3. Run FX dry-run separately.
+4. Run FX actual write only if the planned action is `planned_insert` or
+   `planned_update`, and only after explicit operator approval. Do not repeat
+   actual FX when the post-write dry-run is `planned_skip`.
+5. Re-open `/` and verify price freshness, FX freshness, movement coverage, and
+   secret-value absence.
+
+Recommended operator order for a daily evidence cycle:
+
+1. Run daily snapshot dry-run and inspect `closeSyncPlan`.
+2. Run KIS close dry-runs for missing or stale ticker/date groups.
+3. Run guarded KIS close actual writes in reviewed batches with `limit<=5`.
+4. Re-run daily snapshot dry-run until close coverage is complete.
+5. Run guarded daily snapshot actual write once for the resolved service date.
+6. Re-run dry-run to confirm update-only/no-action state and duplicate count
+   zero.
+
+Admin UI guidance:
+
+- The first admin UI should expose dry-run results and copyable parameter
+  summaries, not executable write URLs.
+- Any actual write control must be hidden behind server-side admin auth, an
+  explicit confirmation field, cooldown display, and a narrow target preview.
+- Price freshness and FX freshness must be shown as separate states. A fresh
+  price with stale FX is a valid partial state and should not be presented as a
+  fully fresh "today movement" refresh.
+- Public dashboard users should not receive `ADMIN_JOB_SECRET`, KIS credentials,
+  provider headers, raw provider responses, or ready-to-run actual-write query
+  strings.
+
+Future display scope:
+
+- A per-holding detail view should be read-only first and should show the same
+  movement components already used by `/`: current value, baseline value, price
+  contribution, FX contribution, trade-flow adjustment, source, and coverage.
+- A dedicated `오늘 변동` page/tab should be a display surface over the same
+  service-day movement model. It should not create a separate formula or a
+  separate write path.
+- Do not start a user-facing "sync" button until the admin-only flow above has
+  been operated enough times to define failure copy, cooldown behavior, and
+  partial-success semantics.
+
 ## Implementation Phases
 
 1. Schema and constraints

@@ -104,6 +104,20 @@ Daily movement:
   the latest stored rate was lower than the 2026-07-08 snapshot FX baseline, so
   USD holdings should show a negative FX contribution instead of `0` when
   movement coverage is ready.
+- The 2026-07-09 production visual smoke confirmed the first-screen dashboard
+  renders `USD/KRW 1,516.9`, FX basis `2026.07.08`, and `환율 영향 -91,177`
+  with movement coverage ready. A raw HTML smoke can miss Korean labels because
+  of the Next RSC payload shape, so use it for auth/status/secret-value checks
+  and rely on visual/browser smoke for label-level confirmation.
+
+Future display surfaces:
+
+- A holding detail view is not part of the first-screen read-only dashboard.
+  Build it later from the same movement contribution data plus per-asset price,
+  snapshot, and event evidence.
+- A dedicated `오늘 변동` tab/page is also later scope. It should reuse the same
+  07:00 KST service-day baseline and FX-aware movement helpers instead of
+  inventing a second daily-movement formula.
 
 ## Account Coverage
 
