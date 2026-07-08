@@ -298,6 +298,34 @@ No-write checks:
 - Response scan found no secret-like terms and no raw URL with key-like query
   parameters.
 
+### 2026-07-08 Guarded Branch Non-Write Smoke
+
+Commit under smoke: `00d4298 Open guarded FX actual write branch`.
+
+Production route smoke:
+
+- `POST /api/admin/market/fx/sync` without auth returned `401`.
+- Authenticated `dryRun=false` without `confirmWrite=true` returned `400`.
+- Authenticated `dryRun=false&confirmWrite=true` was intentionally not called.
+- Authenticated `dryRun=true` returned `200`.
+- Dry-run provider: `er-api-open`.
+- Dry-run pair: `USD/KRW`.
+- Candidate row: `2026-07-08`, source `er-api_open_access`, status `ok`,
+  USD/KRW `1516.89994`.
+- Planned action: `planned_insert` with reason `new_varda_row`.
+- Response reported `writesEnabled=false` and `runMetadataWritten=false`.
+
+No-write checks:
+
+- `fx_rates` row count unchanged.
+- `market_data_sync_runs` row count unchanged.
+- `assets` row count unchanged.
+- `asset_price_snapshots` row count unchanged.
+- `daily_position_snapshots` row count unchanged.
+- `daily_portfolio_snapshots` row count unchanged.
+- Response scan found no secret-like terms and no raw URL with key-like query
+  parameters.
+
 ## Open Questions
 
 - Should varda-labs ever overwrite imported Base44 FX rows, or should it only
