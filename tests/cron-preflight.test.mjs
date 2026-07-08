@@ -128,6 +128,59 @@ describe("cron preflight helpers", () => {
     assert.ok(response.blockingReasons.includes("blocked_by_kis_cooldown"));
   });
 
+  it("does not use cooldown as a blocker when no KIS batch is pending", () => {
+    const response = buildCronPreflightResponse({
+      snapshot: snapshotResult({
+        ok: false,
+        writeReady: false,
+        missingCount: 1,
+        suggestedKisBatches: [],
+      }),
+      kisCooldown: cooldownStatus({ active: true, retryAfterSeconds: 42 }),
+      cronScheduleUtc: null,
+    });
+
+    assert.equal(response.kisCooldown.active, true);
+    assert.equal(
+      response.nextRecommendedAction,
+      "blocked_by_missing_close_coverage",
+    );
+    assert.equal(
+      response.blockingReasons.includes("blocked_by_kis_cooldown"),
+      false,
+    );
+  });
+
+  it("nulls unsafe suggested dry-run URLs instead of returning write-shaped URLs", () => {
+    const response = buildCronPreflightResponse({
+      snapshot: snapshotResult({
+        ok: false,
+        writeReady: false,
+        missingCount: 1,
+        suggestedKisBatches: [
+          {
+            market: "korea",
+            expectedCloseDate: "2026-07-07",
+            tickers: ["069500"],
+            count: 1,
+            maxBatchSize: 5,
+            dryRunQuery:
+              "/api/admin/market/prices/sync?provider=kis&mode=close&dryRun=false&confirmWrite=true",
+            manualWriteRequired: true,
+            writeRequiresConfirmWrite: true,
+          },
+        ],
+      }),
+      kisCooldown: cooldownStatus({ active: false }),
+      cronScheduleUtc: null,
+    });
+    const serialized = JSON.stringify(response);
+
+    assert.equal(response.closeSyncPlan.suggestedBatches[0].dryRunQuery, null);
+    assert.doesNotMatch(serialized, /confirmWrite=true/);
+    assert.doesNotMatch(serialized, /dryRun=false/);
+  });
+
   it("returns no_action_required for update-only covered snapshots", () => {
     const response = buildCronPreflightResponse({
       snapshot: snapshotResult({

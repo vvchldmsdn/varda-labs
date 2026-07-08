@@ -92,6 +92,89 @@ describe("portfolio return metrics", () => {
     assert.equal(metrics.missingCost, false);
   });
 
+  it("prefers explicit trade metrics over running ledger estimates", () => {
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          eventDate: "2026-01-05",
+          eventType: "buy",
+          amountKrw: "1000000",
+          quantityDelta: "10",
+          createdAt: "2026-01-05T00:00:00.000Z",
+        }),
+        tradeEvent({
+          id: "explicit-sell-event-id",
+          eventDate: "2026-02-01",
+          eventType: "sell",
+          amountKrw: "520000",
+          quantityDelta: "-4",
+          afterValue: {
+            trade_metrics: {
+              disposed_cost_krw: 450000,
+              realized_pnl_krw: 125000,
+            },
+          },
+          createdAt: "2026-02-01T00:00:00.000Z",
+        }),
+      ],
+      [asset],
+      1300,
+    );
+
+    assert.equal(summary.realizedCostBasisKrw, 450000);
+    assert.equal(summary.realizedPnlKrw, 125000);
+
+    const metrics = getAssetReturnMetrics(summary, asset, 1300);
+    assert.equal(metrics.realizedCostBasisKrw, 450000);
+    assert.equal(metrics.realizedPnlKrw, 125000);
+    assert.equal(metrics.missingCost, false);
+  });
+
+  it("derives sell quantity, account, and USD KRW values from before/after fallback", () => {
+    const usdAsset = {
+      ...asset,
+      id: "isa-us-asset-id",
+      legacyBase44Id: "isa-us-legacy-id",
+      account: "isa",
+      quantity: "3",
+      averageCost: "100",
+      currentPrice: "120",
+    };
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          id: "fallback-sell-event-id",
+          eventDate: "2026-02-01",
+          eventType: "sell",
+          account: null,
+          legacyAssetId: "isa-us-legacy-id",
+          amountKrw: null,
+          quantityDelta: null,
+          price: "110",
+          fxRate: "1200",
+          beforeValue: JSON.stringify({
+            account: "isa",
+            quantity: 5,
+            average_cost: 100,
+          }),
+          afterValue: JSON.stringify({ quantity: 3 }),
+          createdAt: "2026-02-01T00:00:00.000Z",
+        }),
+      ],
+      [usdAsset],
+      1300,
+    );
+
+    assert.equal(summary.realizedCostBasisKrw, 240000);
+    assert.equal(summary.realizedPnlKrw, 24000);
+    assert.equal(summary.realizedRows[0].account, "isa");
+
+    const metrics = getAssetReturnMetrics(summary, usdAsset, 1300);
+    assert.equal(metrics.realizedCostBasisKrw, 240000);
+    assert.equal(metrics.realizedPnlKrw, 24000);
+    assert.equal(metrics.missingCost, false);
+  });
+
   it("preserves unmatched realized rows and filters them by account", () => {
     const summary = buildReturnMetricsSummary(
       [
@@ -117,10 +200,15 @@ describe("portfolio return metrics", () => {
 
     assert.equal(getSelectedRealizedRows(summary, "brokerage", new Set()).length, 0);
     assert.equal(getSelectedRealizedRows(summary, "isa", new Set()).length, 1);
+    assert.equal(getSelectedRealizedRows(summary, "all", new Set()).length, 1);
 
     const isaSummary = summarizeRealizedReturnForAccount(summary, "isa", new Set());
     assert.equal(isaSummary.realizedPnlKrw, 25000);
     assert.equal(isaSummary.unmatchedSellEventCount, 1);
     assert.equal(isaSummary.missingCostSellEventCount, 1);
+
+    const metrics = getAssetReturnMetrics(summary, asset, 1300);
+    assert.equal(metrics.realizedPnlKrw, 0);
+    assert.equal(metrics.realizedCostBasisKrw, 0);
   });
 });
