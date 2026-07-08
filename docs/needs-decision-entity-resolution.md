@@ -6,6 +6,7 @@ Status: docs-only resolution guidance. This document does not add schema,
 migrations, import scripts, routes, UI, cleanup, backfill, or provider calls.
 
 Source baseline: `docs/migration-coverage-audit.md`.
+History/balance read-only guidance: `docs/history-balance-readonly-design.md`.
 
 ## Purpose
 

@@ -18,6 +18,9 @@ Resolution guidance for the remaining `needs_decision` entities lives in
 unchanged until a separate implementation step imports, skips, or replaces each
 entity.
 
+History/balance read-only source-of-truth guidance lives in
+`docs/history-balance-readonly-design.md`.
+
 ## Summary
 
 | Status | Entities | Rows represented |
