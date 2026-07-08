@@ -205,7 +205,8 @@ Current recommendation stance:
 ## Current Read-Only Work Direction
 
 After this resolution pass, the next low-risk product work is read-only query
-coverage from already migrated tables:
+coverage from already migrated tables. The current `/` portfolio dashboard
+coverage is tracked in `docs/portfolio-dashboard-readonly-coverage.md`:
 
 - portfolio totals from `daily_portfolio_snapshots` and
   `account_balance_snapshots`;

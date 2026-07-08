@@ -252,9 +252,14 @@ Implemented columns:
      `docs/recommendation-schema-proposal.md`, and
      `docs/recommendation-implementation-plan.md`; do not resolve them here.
 
-2. Start read-only product work:
-   - Build `Read-only Portfolio Dashboard v1` from imported varda-labs tables.
-   - Do not port old Base44 `Portfolio.jsx` wholesale.
+2. Keep read-only product work tied to migrated source-of-truth tables:
+   - The existing `/` portfolio dashboard coverage is documented in
+     `docs/portfolio-dashboard-readonly-coverage.md`.
+   - Treat that route as a data-connection dashboard, not a fresh Base44
+     `Portfolio.jsx` port.
+   - Do not pull `PortfolioSnapshot`, `DailyGroupSnapshot`, `MacroSeries`,
+     `MarketSignal`, or `AssetFactorProfile` into the dashboard query path
+     without a separate product decision.
    - Keep legacy `Goal` data out of first-screen UI unless a new goal product model is defined.
 
 ## Import Rules To Carry Forward
