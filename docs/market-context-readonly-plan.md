@@ -1,9 +1,10 @@
 # Market Context Read-Only Plan
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 This document fixes the read-only display rules for imported market context
-data before any `/market` route or dashboard panel is implemented.
+data. The current `/market` route coverage and production smoke results are
+tracked in `docs/market-context-readonly-coverage.md`.
 
 ## Scope
 
@@ -123,9 +124,9 @@ Display rule:
 - Keep `derived_metrics_json` out of the first UI except for optional debug
   context.
 
-## Route Decision
+## Route Coverage
 
-First implementation candidate: separate `/market` read-only route.
+The first implementation is a separate `/market` read-only route.
 
 Reason:
 
@@ -134,13 +135,15 @@ Reason:
 - Keeping it separate avoids making the portfolio dashboard look more complete
   than the migrated calculations currently are.
 
-The first screen should be a data-connection check, not a final design:
+The current screen is still a data-connection check, not a final design:
 
 - latest benchmark table for `069500` and `VOO`
 - latest market regime by account
 - latest global factors grouped by family
 - explicit as-of dates and sources
 - small duplicate/context notice for `market_regime_daily`
+
+See `docs/market-context-readonly-coverage.md` before extending this route.
 
 ## Still Prohibited
 

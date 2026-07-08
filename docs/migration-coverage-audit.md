@@ -205,6 +205,9 @@ Implemented columns:
 - JSONB: `drivers_json`
 - Indexes: `(date, account)`, `(account, date)`
 
+Read-only UI note: current `/market` route coverage is tracked in
+`docs/market-context-readonly-coverage.md`.
+
 ### 7. `GlobalMarketFactor` to `global_market_factors`
 
 Status: migrated on 2026-07-06 by `scripts/import-base44-market-context.mjs`.
@@ -223,6 +226,9 @@ Implemented columns:
 - Dates/times: `period_end_date`, `release_date`, `observed_at`
 - JSONB: `derived_metrics_json`
 - Indexes: `(factor_key, date)`, `date`, `(factor_family, date)`
+
+Read-only UI note: current `/market` route coverage is tracked in
+`docs/market-context-readonly-coverage.md`.
 
 ## Recommended Next Migration Order
 
