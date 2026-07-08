@@ -118,6 +118,8 @@ Future display surfaces:
 - A dedicated `오늘 변동` tab/page is also later scope. It should reuse the same
   07:00 KST service-day baseline and FX-aware movement helpers instead of
   inventing a second daily-movement formula.
+- The read-only data contract for those future surfaces is
+  `docs/today-movement-readonly-data-contract.md`.
 
 ## Account Coverage
 
