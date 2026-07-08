@@ -12,6 +12,14 @@ export const FX_REFRESH_DRY_RUN_CONTRACT = {
   writesRunMetadataOnDryRun: false,
 } as const;
 
+export const FX_REFRESH_ACTUAL_WRITE_CONTRACT = {
+  routeActualWritesEnabled: false,
+  requiredGuard: "dryRun=false&confirmWrite=true",
+  writeTables: ["fx_rates"],
+  runMetadataWrites: false,
+  forbiddenWriteTables: FX_REFRESH_DRY_RUN_CONTRACT.forbiddenWriteTables,
+} as const;
+
 export const FX_REFRESH_PROVIDER_NAMES = ["er-api-open"] as const;
 
 export type FxRefreshProviderName =
@@ -63,6 +71,38 @@ export type FxRateWritePlan = {
     blocked: number;
   };
 };
+
+export type FxRateActualWrite =
+  | {
+      action: "insert";
+      table: "fx_rates";
+      values: {
+        legacyBase44Id: null;
+        rateDate: string;
+        usdKrw: string;
+        source: string;
+        status: "ok";
+        fetchedAt: Date;
+        isSample: false;
+        updatedAt: Date;
+      };
+    }
+  | {
+      action: "update";
+      table: "fx_rates";
+      id: string;
+      values: {
+        usdKrw: string;
+        source: string;
+        status: "ok";
+        fetchedAt: Date;
+        updatedAt: Date;
+      };
+    };
+
+export type FxRateActualWritePreparation =
+  | { ok: true; write: FxRateActualWrite }
+  | { ok: false; reason: string; planAction: FxRateWritePlanAction };
 
 export class FxRefreshRequestError extends Error {
   code: string;
@@ -306,6 +346,112 @@ export function planFxRateWrite(
   return toPlan(candidate, "planned_skip", "same_varda_row_value", existing.id);
 }
 
+export function prepareFxRateActualWrite(
+  candidate: FxRateCandidate,
+  plan: FxRateWritePlan,
+  options: { now?: Date | string } = {},
+): FxRateActualWritePreparation {
+  if (plan.action !== "planned_insert" && plan.action !== "planned_update") {
+    return {
+      ok: false,
+      reason: "plan_action_not_writable",
+      planAction: plan.action,
+    };
+  }
+
+  if (candidate.pair !== "USD/KRW") {
+    return {
+      ok: false,
+      reason: "unsupported_pair",
+      planAction: plan.action,
+    };
+  }
+
+  if (
+    plan.rateDate !== candidate.rateDate ||
+    plan.usdKrw !== candidate.usdKrw ||
+    plan.source !== candidate.source
+  ) {
+    return {
+      ok: false,
+      reason: "plan_candidate_mismatch",
+      planAction: plan.action,
+    };
+  }
+
+  if (!isDateKey(candidate.rateDate)) {
+    return {
+      ok: false,
+      reason: "invalid_candidate_rate_date",
+      planAction: plan.action,
+    };
+  }
+
+  const usdKrw = toPositiveDecimalString(candidate.usdKrw);
+  if (!usdKrw) {
+    return {
+      ok: false,
+      reason: "invalid_candidate_usdkrw",
+      planAction: plan.action,
+    };
+  }
+
+  const fetchedAt = toValidDate(candidate.fetchedAt);
+  const updatedAt = toValidDate(options.now);
+
+  if (!fetchedAt || !updatedAt) {
+    return {
+      ok: false,
+      reason: "invalid_write_timestamp",
+      planAction: plan.action,
+    };
+  }
+
+  if (plan.action === "planned_insert") {
+    return {
+      ok: true,
+      write: {
+        action: "insert",
+        table: "fx_rates",
+        values: {
+          legacyBase44Id: null,
+          rateDate: candidate.rateDate,
+          usdKrw,
+          source: candidate.source,
+          status: "ok",
+          fetchedAt,
+          isSample: false,
+          updatedAt,
+        },
+      },
+    };
+  }
+
+  if (!plan.existingRowId) {
+    return {
+      ok: false,
+      reason: "missing_existing_row_id",
+      planAction: plan.action,
+    };
+  }
+
+  return {
+    ok: true,
+    write: {
+      action: "update",
+      table: "fx_rates",
+      id: plan.existingRowId,
+      values: {
+        usdKrw,
+        source: candidate.source,
+        status: "ok",
+        fetchedAt,
+        updatedAt,
+      },
+    },
+  };
+}
+
 function toPlan(
   candidate: FxRateCandidate,
   action: FxRateWritePlanAction,
@@ -363,6 +509,11 @@ function toIsoString(value: Date | string | undefined) {
   return Number.isFinite(parsed.getTime())
     ? parsed.toISOString()
     : new Date().toISOString();
+}
+
+function toValidDate(value: Date | string | undefined) {
+  const parsed = value === undefined ? new Date() : new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
 function isDateKey(value: unknown): value is string {

@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  FX_REFRESH_ACTUAL_WRITE_CONTRACT,
   FX_REFRESH_DRY_RUN_CONTRACT,
   parseExchangeRateOpenAccessUsdKrwResponse,
   parseFrankfurterUsdKrwResponse,
   planFxRateWrite,
+  prepareFxRateActualWrite,
 } from "../src/lib/market-data/fx-refresh.ts";
 
 const fetchedAt = new Date("2026-07-08T10:00:00.000Z");
@@ -199,5 +201,114 @@ describe("FX refresh row policy", () => {
 
     assert.equal(parsed.ok, false);
     assert.equal(parsed.error, "provider_status_not_success");
+  });
+});
+
+describe("FX actual write preparation", () => {
+  const now = new Date("2026-07-08T10:05:00.000Z");
+
+  it("keeps the actual route disconnected until a separate approval", () => {
+    assert.equal(FX_REFRESH_ACTUAL_WRITE_CONTRACT.routeActualWritesEnabled, false);
+    assert.equal(
+      FX_REFRESH_ACTUAL_WRITE_CONTRACT.requiredGuard,
+      "dryRun=false&confirmWrite=true",
+    );
+    assert.deepEqual(FX_REFRESH_ACTUAL_WRITE_CONTRACT.writeTables, [
+      "fx_rates",
+    ]);
+    assert.equal(FX_REFRESH_ACTUAL_WRITE_CONTRACT.runMetadataWrites, false);
+    assert.ok(
+      FX_REFRESH_ACTUAL_WRITE_CONTRACT.forbiddenWriteTables.includes(
+        "asset_price_snapshots",
+      ),
+    );
+  });
+
+  it("prepares an insert for a new varda-generated FX row only", () => {
+    const rowCandidate = candidate({
+      rateDate: "2026-07-08",
+      usdKrw: "1516.89994",
+      fetchedAt: "2026-07-08T10:00:00.000Z",
+    });
+    const plan = planFxRateWrite(rowCandidate, []);
+    const prepared = prepareFxRateActualWrite(rowCandidate, plan, { now });
+
+    assert.equal(prepared.ok, true);
+    assert.equal(prepared.write.action, "insert");
+    assert.equal(prepared.write.table, "fx_rates");
+    assert.deepEqual(prepared.write.values, {
+      legacyBase44Id: null,
+      rateDate: "2026-07-08",
+      usdKrw: "1516.89994",
+      source: "er-api_open_access",
+      status: "ok",
+      fetchedAt: new Date("2026-07-08T10:00:00.000Z"),
+      isSample: false,
+      updatedAt: now,
+    });
+  });
+
+  it("prepares an update for the same-date varda-generated row", () => {
+    const rowCandidate = candidate({
+      usdKrw: "1532.00",
+      fetchedAt: "2026-07-08T10:00:00.000Z",
+    });
+    const plan = planFxRateWrite(rowCandidate, [
+      existingRow({ id: "fx-row-1", usdKrw: "1531.72" }),
+    ]);
+    const prepared = prepareFxRateActualWrite(rowCandidate, plan, { now });
+
+    assert.equal(prepared.ok, true);
+    assert.equal(prepared.write.action, "update");
+    assert.equal(prepared.write.table, "fx_rates");
+    assert.equal(prepared.write.id, "fx-row-1");
+    assert.deepEqual(prepared.write.values, {
+      usdKrw: "1532",
+      source: "er-api_open_access",
+      status: "ok",
+      fetchedAt: new Date("2026-07-08T10:00:00.000Z"),
+      updatedAt: now,
+    });
+  });
+
+  it("does not prepare writes for imported, skipped, or blocked plans", () => {
+    const importedSkip = planFxRateWrite(candidate({ usdKrw: "1532.00" }), [
+      existingRow({ legacyBase44Id: "69a30bcb124f6c24a3519588" }),
+    ]);
+    const duplicateBlock = planFxRateWrite(candidate(), [
+      existingRow({ id: "fx-row-1" }),
+      existingRow({ id: "fx-row-2" }),
+    ]);
+
+    const importedPrepared = prepareFxRateActualWrite(
+      candidate({ usdKrw: "1532.00" }),
+      importedSkip,
+      { now },
+    );
+    const blockedPrepared = prepareFxRateActualWrite(
+      candidate(),
+      duplicateBlock,
+      { now },
+    );
+
+    assert.equal(importedPrepared.ok, false);
+    assert.equal(importedPrepared.reason, "plan_action_not_writable");
+    assert.equal(blockedPrepared.ok, false);
+    assert.equal(blockedPrepared.reason, "plan_action_not_writable");
+  });
+
+  it("refuses mismatched plan and candidate values", () => {
+    const rowCandidate = candidate({ usdKrw: "1532.00" });
+    const plan = planFxRateWrite(rowCandidate, [
+      existingRow({ usdKrw: "1531.72" }),
+    ]);
+    const prepared = prepareFxRateActualWrite(
+      candidate({ usdKrw: "1532.50" }),
+      plan,
+      { now },
+    );
+
+    assert.equal(prepared.ok, false);
+    assert.equal(prepared.reason, "plan_candidate_mismatch");
   });
 });

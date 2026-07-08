@@ -153,6 +153,8 @@ Status:
 
 - Phase 1 admin-only dry-run route skeleton is implemented.
 - Actual writes are not implemented.
+- Actual write preparation helper exists, but it is not connected to route
+  execution.
 - Do not connect this route to the public dashboard, a user-facing sync button,
   or Cron before the admin-only contract below is implemented and smoke-tested.
 

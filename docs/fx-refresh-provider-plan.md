@@ -163,6 +163,8 @@ Current route:
 - Default: `dryRun=true`
 - Actual write: not implemented in Phase 1. `dryRun=false` requests are blocked
   before provider fetch or database reads, even with `confirmWrite=true`.
+- Actual write preparation helper exists, but it is not connected to the
+  production route.
 
 Allowed write tables in a future separately approved actual-write phase:
 
@@ -173,6 +175,16 @@ Current dry-run write behavior:
 
 - writes no `fx_rates` rows
 - writes no `market_data_sync_runs` rows
+
+Actual write preparation behavior:
+
+- prepares write payloads for `fx_rates` only
+- allows `planned_insert` and `planned_update` only
+- refuses `planned_skip`, `blocked`, imported legacy rows, duplicate date rows,
+  invalid candidate values, and plan/candidate mismatches
+- writes no `market_data_sync_runs` rows
+- remains disconnected from production route execution until separately
+  approved
 
 Forbidden write tables:
 
@@ -218,7 +230,10 @@ Phase 1 route implementation:
 Before any actual write:
 
 1. Smoke the dry-run route in production.
-2. Ask for explicit approval before one actual USD/KRW write.
+2. Add write preparation helper and tests without connecting route execution.
+3. Add a separately reviewed route actual-write branch.
+4. Re-run production dry-run smoke.
+5. Ask for explicit approval before one actual USD/KRW write.
 
 Before public button design:
 
