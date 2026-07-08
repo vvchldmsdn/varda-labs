@@ -668,6 +668,10 @@ This is the next design boundary before any public button or Cron wiring. It
 does not add a new route by itself; it documents how the existing admin-only
 routes should be operated and what must stay separate.
 
+Detailed action side effects, browser output rules, and promotion gates live in
+`docs/admin-manual-action-design.md`. Treat that file as the contract before
+adding any admin dry-run or write controls.
+
 Current surfaces:
 
 - `/` is a read-only dashboard rendered from server-side DB queries.
