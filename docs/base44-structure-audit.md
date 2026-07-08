@@ -101,7 +101,8 @@ small read model for UI summaries.
 Base44 ownership fields appear under mixed names such as `created_by_id`,
 `created_by`, `owner_id`, and `user_id`. varda-labs should not copy that shape.
 Use one future tenant/user key, and treat legacy ownership fields as sensitive
-data unless explicitly reviewed.
+data unless explicitly reviewed. See `docs/auth-and-tenant-model-design.md` for
+the current tenant/auth/RLS design gate.
 
 ### Client-side mutation flow
 

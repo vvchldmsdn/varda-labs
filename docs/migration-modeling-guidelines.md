@@ -44,7 +44,8 @@ Keep a field as JSONB or raw legacy evidence when:
 Do not import or persist:
 
 - app secrets, provider app keys, access tokens, authorization headers
-- owner/user ids until a varda-labs tenant model exists
+- owner/user ids until a varda-labs tenant model exists; see
+  `docs/auth-and-tenant-model-design.md`
 - one-off diagnostic payloads with no product value
 - transient UI state
 
