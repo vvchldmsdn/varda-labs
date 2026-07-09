@@ -26,6 +26,29 @@ side effects.
 - Default product UI must not use `holdingId`, `legacyBase44Id`, or similar
   internal identifiers as fallback labels.
 
+## Identifier Display Policy
+
+Legacy and internal identifiers are migration evidence, not user-facing
+portfolio labels.
+
+| Surface class | Policy |
+| --- | --- |
+| Default product UI | Do not display `holdingId`, `assetId`, `legacyBase44Id`, legacy Base44 object ids, provider request ids, raw headers, or secret-shaped metadata as labels, fallback text, table cells, or badges. Prefer ticker, asset name, account, market, source label, and status reason. |
+| Imported evidence data | Preserve legacy ids in database rows, query payloads, import scripts, matching logic, and idempotency checks where they are needed for reconciliation. Do not remove columns or query fields just to hide UI text. |
+| Admin/debug/data-quality surfaces | Internal ids may be shown only when they are necessary diagnostic evidence, preferably inside collapsed or clearly diagnostic sections. These surfaces still must not expose secrets, provider auth material, raw request headers, or raw provider responses. |
+| Product polish phase | Any diagnostic legacy/internal id still visible on a route must be re-reviewed and either hidden, moved to an admin/debug surface, or intentionally documented as operator-only evidence. |
+
+Current route decisions:
+
+| Route | Current identifier decision |
+| --- | --- |
+| `/` | Product dashboard. Internal and legacy ids must stay hidden. |
+| `/today` | Product/evidence hybrid, but default display hides internal and legacy ids. Contribution/exclusion rows should use ticker, name, account, source, and reason. |
+| `/history` | Product-facing history evidence. Legacy ids should stay hidden in the default table. |
+| `/etfs` | Product-facing ETF reference. Holdings raw-row details no longer display `legacyBase44Id`; future diagnostic legacy evidence belongs in admin/debug context. |
+| `/market` | Current read-only data-quality surface. Duplicate-regime selected legacy id is temporarily allowed as diagnostic evidence, but must be hidden or moved before product-facing polish. |
+| `/admin/market-sync` | Operator status surface. Operational ids and run metadata can be shown when useful, but secrets, auth headers, raw provider responses, and secret-shaped metadata remain prohibited. |
+
 ## Route Inventory
 
 | Route | Purpose | Data source and helpers | Protection | Write behavior | Current smoke status | Known gaps | Next candidate |
