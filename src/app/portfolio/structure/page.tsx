@@ -43,7 +43,7 @@ export default async function PortfolioStructurePage({
                 Varda Labs
               </p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                Portfolio Structure
+                자산 배분
               </h1>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
@@ -101,12 +101,12 @@ export default async function PortfolioStructurePage({
         </section>
 
         <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <SectionHeader title="Group Allocation" detail="current read model" />
+          <SectionHeader title="그룹 비중" detail="current read model" />
           <GroupTable rows={structure.groupRows} />
         </section>
 
         <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <SectionHeader title="Holding Allocation" detail="current holdings" />
+          <SectionHeader title="보유 종목 비중" detail="current holdings" />
           <HoldingTable rows={structure.holdingRows} />
         </section>
 

@@ -1,15 +1,21 @@
-# Portfolio Structure Read-Only Data Contract
+# Portfolio Allocation Read-Only Data Contract
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
-Status: docs-only contract. This does not add routes, UI, query helpers,
-provider calls, dry-runs, writes, Cron behavior, schema changes, migrations,
-cleanup, repair, or backfill work.
+Status: implemented allocation read-model contract. The existing route is
+`/portfolio/structure`; the legacy path and module names are retained for now.
+This document does not authorize provider calls, dry-runs, writes, Cron
+behavior, schema changes, migrations, cleanup, repair, or backfill work.
 
 ## Purpose
 
-Define the source-of-truth rules for a future read-only `포트 구조` surface
-before adding another dashboard page.
+Define the source-of-truth rules for the read-only `자산 배분` surface.
+
+This surface was initially exposed as `포트 구조`, but that label conflicts
+with the legacy gyeol-fin screen. In gyeol-fin, `포트 구조` means portfolio
+risk and diversification analytics such as ENB, correlation, Sharpe, and risk
+contribution. The current varda surface only explains allocation and target
+evidence, so its user-facing name is `자산 배분`.
 
 The first version should answer:
 
@@ -19,8 +25,9 @@ The first version should answer:
 - which rows are excluded because current valuation evidence is incomplete;
 - which group or target fields are display evidence versus canonical policy.
 
-It must not become a recommendation, rebalance, risk, simulation, or provider
-refresh surface.
+It must not silently become the legacy risk-structure screen. Portfolio risk
+analytics have a separate contract in
+`docs/portfolio-risk-structure-v1-contract.md`.
 
 ## Non-Goals
 
@@ -223,17 +230,11 @@ Use explicit states instead of silently showing misleading zeros:
 
 Aggregates should disclose excluded value/count when available.
 
-## Route Candidate
-
-Preferred first route:
+## Current Route
 
 - `/portfolio/structure`
 
-Acceptable alternative:
-
-- `/structure`
-
-Initial behavior:
+Current behavior:
 
 - Server Component route.
 - Search params for account and maybe view mode.
@@ -244,7 +245,7 @@ Initial behavior:
 
 ## Query Helper Boundary
 
-If implemented, add a helper such as:
+The implemented helper is:
 
 - `src/db/queries/portfolio-structure.ts`
 
@@ -261,9 +262,9 @@ It should not return legacy/internal ids unless a later operator-only diagnostic
 section explicitly needs them. Product components should not need to know those
 ids.
 
-## Verification Gate Before UI
+## Verification Gate
 
-Before adding the route, add focused tests for the pure read-model helper:
+The focused pure read-model tests cover:
 
 1. KRW holding current weight.
 2. USD holding valuation with FX.
@@ -274,7 +275,7 @@ Before adding the route, add focused tests for the pure read-model helper:
 7. Ungrouped holdings bucket.
 8. No legacy/internal id in display payload.
 
-Then verify:
+The implementation gate remains:
 
 - `npm run test`
 - `npm run lint`
@@ -296,7 +297,9 @@ them:
 - deciding whether group target overrides asset target;
 - deciding whether member allocation ratio is authoritative;
 - trend-filter adjusted target display for allocation structure;
-- recommendation/risk/scoring integration;
+- recommendation/scoring integration;
+- portfolio risk analytics, which belong to the separate risk-structure
+  contract;
 - public refresh button;
 - admin action button;
 - Cron or snapshot writer changes.
