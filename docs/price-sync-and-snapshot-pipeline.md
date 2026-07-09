@@ -665,14 +665,31 @@ Button naming:
 - Do not expose `ADMIN_JOB_SECRET`, KIS credentials, provider headers, raw
   responses, run ids, or executable write URLs in the browser.
 
+User-facing live refresh policy:
+
+- Product pages must not block on the admin KIS job cooldown. They should render
+  immediately from `live_price_quotes` and display quote freshness.
+- A user-facing refresh action must use ticker/provider TTL, stale-while-
+  revalidate behavior, and in-flight dedupe instead of making each user wait for
+  a global 90 second cooldown.
+- Multiple users holding the same ticker should share one cached quote and one
+  provider refresh attempt.
+- Provider concurrency/rate-limit controls still apply, but they belong behind a
+  server-side refresh layer and must not be exposed as KIS credentials,
+  executable admin URLs, or blocking page loads.
+- Close/history refresh remains a reviewed admin/evidence workflow and can keep
+  the stricter cooldown and `limit<=5` operating model.
+
 Implementation gate:
 
 1. Verify admin-only KIS live actual write on a tiny target set.
 2. Verify admin-only FX dry-run/write policy separately.
 3. Add data-health copy for price freshness and FX freshness as separate
    states.
-4. Only then design a server-only dashboard action/route with rate limits,
-   cooldown display, loading/error states, and explicit partial-success copy.
+4. Define product live-quote TTL, in-flight dedupe, and stale display behavior.
+5. Only then design a server-only dashboard action/route with rate limits,
+   non-blocking refresh states, loading/error states, and explicit
+   partial-success copy.
 
 ## Admin-Only Manual Sync Design
 
@@ -703,7 +720,9 @@ Keep these operations separate:
 
 Recommended operator order for an intraday dashboard check:
 
-1. Run a KIS live price dry-run for a small, explicit target set.
+1. Run a KIS live price dry-run for a small, explicit target set. This checks
+   route/auth/target/planned write behavior; it does not prove provider parsing
+   because live dry-run intentionally avoids the KIS live quote fetch.
 2. If the dry-run is clean, run one small actual KIS live write batch with
    `dryRun=false&confirmWrite=true&limit<=5`.
 3. Run FX dry-run separately.

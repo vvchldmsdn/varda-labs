@@ -50,6 +50,25 @@ Notes:
 - Daily snapshot dry-run is DB-read-only, but it can still be expensive and
   should remain explicit when exposed through an admin UI.
 
+## User-Facing Refresh Boundary
+
+The KIS job cooldown in this document protects admin/manual routes. It must not
+be reused as a product-page blocking wait. A dashboard page or future user-facing
+refresh button must render immediately from stored `live_price_quotes`, show the
+quote freshness, and never make a user wait for the global admin cooldown.
+
+Before adding a product refresh action, define a separate live quote policy:
+
+- ticker/provider TTL for `live_price_quotes`;
+- stale-while-revalidate behavior when cached quotes are old;
+- in-flight dedupe so multiple users requesting the same ticker share one
+  provider refresh;
+- provider concurrency/rate-limit controls that do not block page render;
+- separate copy for price freshness and FX freshness.
+
+The close/history sync path can keep the stricter admin cooldown because it is a
+reviewed evidence-write workflow, not an interactive product refresh.
+
 ## Future UI States
 
 The status console can later gain explicit action panels, but each panel must be
