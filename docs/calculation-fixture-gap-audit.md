@@ -1,6 +1,6 @@
 # Calculation Fixture Gap Audit
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 This audit is docs-only. It does not change helper logic, route handlers,
 database schema, migrations, imports, Cron behavior, KIS behavior, provider
@@ -107,6 +107,13 @@ new fixtures only when a real miss or new market scope appears:
 
 Reason: calendar fixtures should mirror operational requirements, not become a
 hand-maintained full exchange calendar.
+
+The 2026-07-10 portfolio-risk readiness audit found a real miss: the shared
+observed-fixed-holiday rule marks stored Korean close dates 2022-12-26,
+2023-01-02, and 2025-02-28 as closed. Historical Korean substitute-holiday
+fixtures are now an active prerequisite for portfolio-risk calendar work. Keep
+the correction separate from snapshot/Cron changes until its operational blast
+radius is reviewed.
 
 ### P2: Simulation / Investment Lab Math
 

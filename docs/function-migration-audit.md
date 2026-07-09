@@ -1,6 +1,6 @@
 # Base44 Function Migration Audit
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 Source scanned read-only:
 `C:\Users\Eunwoo_2\Desktop\gyeol-fin\base44\functions`
@@ -131,7 +131,7 @@ Current pipeline status:
 | `generateRecommendations` | `recommendation_engine_candidate` | Newer run/candidate recommendation engine | Future `recommendation_runs` and `recommendation_candidates` if approved | Defer. Needs model audit and fixture tests. |
 | `calcRebalanceRecommendation` | `recommendation_engine_candidate` | Older single-row rebalance output | Possible legacy import or reference-only | Do not port as final engine. |
 | `buildRecommendationBriefing` | `recommendation_engine_candidate` | AI narrative for recommendation run | Future content layer | Defer until recommendation model exists. |
-| `calcDiversification` | `recommendation_engine_candidate` | Diversification/risk analytics | Future pure calculation helper | Extract formulas only after fixture tests. |
+| `calcDiversification` | `portfolio_risk_read_model_candidate` | Descriptive diversification/risk analytics plus provider orchestration | `docs/portfolio-risk-structure-v1-contract.md`; future pure calculation helper | Keep separate from recommendations. Use the legacy function only as parity evidence after readiness and calendar fixtures. |
 | `generatePortfolioWeaknessCards` | `recommendation_engine_candidate` | UI cards for weaknesses | Future read model/content helper | Defer. |
 | `classifyPortfolioPersonality` | `recommendation_engine_candidate` | Classification/content layer | Future product decision | Defer. |
 

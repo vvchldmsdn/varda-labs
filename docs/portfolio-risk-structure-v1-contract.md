@@ -173,13 +173,15 @@ totals are KRW based.
 
 For each USD price date:
 
-1. Prefer a valid `asset_price_snapshots.fx_rate` from the same row when its
-   provenance is date-consistent.
-2. Otherwise use `fx_rates.usdkrw` for that date.
-3. If the exact date is unavailable, use the latest prior approved rate within
+1. Use the duplicate-free canonical `fx_rates.usdkrw` row for that date.
+2. If the exact date is unavailable, use the latest prior approved rate within
    the configured staleness limit and mark the row as carried forward.
-4. If no approved rate exists, exclude that observation or holding according
+3. If no approved rate exists, exclude that observation or holding according
    to the minimum-coverage rule. Never use a future rate.
+
+`asset_price_snapshots.fx_rate` and `close_price_krw` remain legacy parity
+evidence only. Their rows do not preserve enough independent FX source
+provenance to outrank `fx_rates` in canonical v1 calculations.
 
 KRW price for return calculation is `local close * date-specific USD/KRW`.
 This includes both security-price and FX movement. A future secondary
@@ -189,14 +191,21 @@ KRW investor view silently.
 ## Calendar Policy
 
 The legacy all-asset date intersection discards every date not shared by all
-included markets. V1 instead uses a portfolio reference-date calendar:
+included markets. V1 instead uses the existing KST 07:00 service-cycle
+semantics from `src/lib/snapshots/market-calendar.ts`:
 
-1. Build the sorted union of actual close dates for included markets.
-2. Remove dates on which no included market has a new close.
-3. For a holding whose market was closed, carry forward its last known close
+1. Map a market close row with `priceDate = D` to the service cycle dated
+   `D + 1`, when that close is available before 07:00 KST.
+2. Compare the mapping with the market-specific reference-date calendar as a
+   readiness check. A mismatch is a calendar-policy blocker; it must not cause
+   a stored positive close row to be silently deleted from the audit.
+3. Build the sorted union of mapped service dates for included markets.
+4. Remove dates on which no included market has a new close.
+5. For a holding whose market was closed, carry forward its last known close
    without looking ahead, subject to a bounded staleness rule.
-4. Apply date-specific FX after price carry-forward.
-5. Start the usable window only after every included holding has an initial
+6. Map FX date `D` to the same `D + 1` service cycle and apply the
+   date-specific rate after price carry-forward.
+7. Start the usable window only after every included instrument has an initial
    value.
 
 This preserves Korea-only and US-only sessions while making closed-market
@@ -206,6 +215,40 @@ materially change correlation and volatility.
 The portfolio service's 07:00 KST cycle still governs the meaning of the
 latest completed reference date. Risk calculations must not use an incomplete
 current market cycle as the analysis end date.
+
+The current readiness audit found historical Korean rows that disagree with
+the existing static holiday helper, including 2022-12-26, 2023-01-02, and
+2025-02-28. Those dates reflect incorrect historical substitute-holiday rules
+in the helper, not enough evidence to discard the stored closes. Risk runtime
+implementation remains blocked until the historical calendar policy is
+corrected and fixture-tested separately from the snapshot pipeline.
+
+## Instrument Aggregation Policy
+
+Risk math operates on instruments, not account rows. The canonical instrument
+key is normalized `market + currency + ticker`.
+
+- Within one account, duplicate holdings of the same instrument are summed.
+- For `account=all`, quantities and end values for the same instrument are
+  summed across brokerage, ISA, and IRP before weights and returns are built.
+- Account-level holdings remain drilldown evidence on the instrument result.
+- Do not create duplicate identical return columns for the same instrument;
+  doing so can inflate risk-contribution ENB.
+- A ticker mapped to more than one market/currency identity is a blocker until
+  resolved explicitly.
+
+## Uniqueness And Selection Blockers
+
+Before the server adapter is implemented:
+
+- `asset_price_snapshots(ticker, date)` duplicates must remain zero;
+- current assets must not map one ticker to conflicting market/currency pairs;
+- stored price history for a current ticker must not contain conflicting
+  market/currency identities;
+- duplicate `fx_rates.date` groups must block canonical FX selection rather
+  than relying on row order;
+- the lack of an FX date unique constraint is an audited condition, not
+  permission to guess a row.
 
 ## Return And Formula Policy
 
@@ -268,9 +311,30 @@ The result must return requested and actual observations. A window can be
 `ready`, `partial`, or `insufficient`; it must never appear complete merely
 because low-coverage holdings were dropped.
 
-Before runtime implementation, fixture work must approve exact minimum
-coverage thresholds and maximum price/FX carry-forward days. These are policy
-parameters, not incidental constants.
+Readiness-audit-backed v1 parameters:
+
+- maximum price carry-forward: 7 calendar days;
+- maximum FX carry-forward: 3 calendar days;
+- minimum return observation coverage: 80% of the requested window;
+- minimum instruments for correlation, ENB, and risk contribution: 2;
+- low-coverage eligible instruments are not silently dropped to improve a
+  window's status.
+
+Status rules:
+
+- `ready`: every requested return observation is usable under the carry
+  limits;
+- `partial`: at least 80% but less than 100% is usable, with actual observation
+  count and dates displayed;
+- `insufficient_coverage`: less than 80% is usable for the complete eligible
+  instrument universe;
+- `insufficient_instruments`: fewer than two eligible instruments; standalone
+  volatility/Sharpe evidence may still be shown, but multivariate portfolio
+  metrics are unavailable.
+
+Tickerless non-market holdings are outside the market-risk universe by
+definition and remain explicit exclusions. This is different from dropping a
+market instrument merely because its history is shorter.
 
 ## Legacy Parity Audit
 
@@ -348,7 +412,8 @@ one parity number.
 
 ## Runtime Sequence After Policy Approval
 
-1. Approve calendar, FX, risk-free rate, coverage, and asset-universe policies.
+1. Correct and fixture-test the historical Korean calendar policy, and define
+   deterministic selected-window handling for duplicate FX dates.
 2. Add normalized fixture files and pure calculation tests.
 3. Implement the pure helper.
 4. Add a server-only Drizzle adapter that reads stored data in parallel where
@@ -362,13 +427,10 @@ one parity number.
 
 ## Decisions Still Required
 
-- Maximum price carry-forward days.
-- Maximum FX carry-forward days.
-- Minimum observations and coverage percentage per window.
-- Whether `all` mixes account holdings into one covariance model or also shows
-  account-separated summaries.
-- Whether risk-free rate stays at explicit 0% or receives a versioned stored
-  source.
+- Whether the canonical combined `all` model also shows account-separated
+  summaries as secondary evidence.
+- Whether a later formula version replaces the explicit 0% risk-free rate with
+  a versioned stored source.
 - Final future route and whether allocation and risk share one tabbed surface.
 - Whether imported historical scalar evidence needs an operator-only audit
   view.

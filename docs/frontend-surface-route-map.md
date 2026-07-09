@@ -86,7 +86,8 @@ Closed enough for now:
 Do next only after user visual review or explicit direction:
 
 - Route/surface map updates for newly migrated features.
-- Canonical policy review for the separate portfolio risk-structure contract.
+- Resolve the historical Korean calendar blocker identified by
+  `docs/portfolio-risk-readiness-audit.md`, then add normalized risk fixtures.
 - Focused visual review for `/today`, `/history`, `/etfs`, and `/market`.
 - Product-facing identifier cleanup where legacy/internal ids still appear.
 
