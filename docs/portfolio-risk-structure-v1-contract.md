@@ -2,9 +2,10 @@
 
 Last updated: 2026-07-10
 
-Status: docs-only design and source audit. This document does not add a route,
-calculation helper, provider call, API, write path, Cron behavior, schema,
-migration, cleanup, backfill, recommendation, or score.
+Status: input-normalization contract implemented and fixture-tested. The pure
+risk-math helper, DB adapter, and route remain pending. This work does not add
+a provider call, API, write path, Cron behavior, schema, migration, cleanup,
+backfill, recommendation, or score.
 
 ## Decision
 
@@ -196,9 +197,9 @@ semantics from `src/lib/snapshots/market-calendar.ts`:
 
 1. Map a market close row with `priceDate = D` to the service cycle dated
    `D + 1`, when that close is available before 07:00 KST.
-2. Compare the mapping with the market-specific reference-date calendar as a
-   readiness check. A mismatch is a calendar-policy blocker; it must not cause
-   a stored positive close row to be silently deleted from the audit.
+2. Treat the stored positive close as historical market-open evidence. The
+   snapshot forecast calendar may be compared for diagnostics, but a mismatch
+   must not reject or delete the historical row.
 3. Build the sorted union of mapped service dates for included markets.
 4. Remove dates on which no included market has a new close.
 5. For a holding whose market was closed, carry forward its last known close
@@ -219,9 +220,13 @@ current market cycle as the analysis end date.
 The current readiness audit found historical Korean rows that disagree with
 the existing static holiday helper, including 2022-12-26, 2023-01-02, and
 2025-02-28. Those dates reflect incorrect historical substitute-holiday rules
-in the helper, not enough evidence to discard the stored closes. Risk runtime
-implementation remains blocked until the historical calendar policy is
-corrected and fixture-tested separately from the snapshot pipeline.
+in the helper, not enough evidence to discard the stored closes.
+
+`src/lib/portfolio-risk-calendar.ts` therefore implements a separate
+historical evidence calendar. It maps every valid stored close date `D` to
+service date `D + 1` without consulting the snapshot forecast helper. The
+snapshot/Cron calendar remains unchanged and requires its own fixture and
+no-write review before any correction.
 
 ## Instrument Aggregation Policy
 
@@ -369,9 +374,10 @@ Legacy sources inspected read-only:
 
 ## Pure Helper Boundary
 
-Future calculation code should be independent of Next.js, Drizzle, Neon, and
-provider clients. A helper such as `src/lib/portfolio-risk.ts` should accept a
-fully normalized input:
+Calculation code is independent of Next.js, Drizzle, Neon, and provider
+clients. `src/lib/portfolio-risk-input.ts` now builds the normalized boundary,
+and the future `src/lib/portfolio-risk.ts` math helper should accept its
+output:
 
 - formula policy and version;
 - selected account and window;
@@ -382,6 +388,11 @@ fully normalized input:
 It should return only the display-ready metrics and data-health metadata. A
 separate server-only DB adapter should load `assets`, price history, and FX,
 construct the aligned input, and call the helper.
+
+The input normalizer aggregates equal `market + currency + ticker`
+instruments, maps evidence to service dates, applies bounded price/FX carry,
+hard-blocks relevant duplicate FX dates, returns aligned simple KRW returns,
+and reports coverage/status. It does not compute covariance or risk metrics.
 
 Expected complexity for `n` holdings and `t` observations is `O(n^2 * t)` for
 covariance/correlation and `O(n^2)` memory. That is appropriate for the current
@@ -412,10 +423,12 @@ one parity number.
 
 ## Runtime Sequence After Policy Approval
 
-1. Correct and fixture-test the historical Korean calendar policy, and define
-   deterministic selected-window handling for duplicate FX dates.
-2. Add normalized fixture files and pure calculation tests.
-3. Implement the pure helper.
+1. Historical risk calendar normalization and relevant duplicate-FX blocking:
+   completed in `portfolio-risk-calendar.ts` and `portfolio-risk-input.ts`.
+2. Cross-market, FX movement, account aggregation, and duplicate-FX boundary
+   fixtures: completed in `tests/portfolio-risk-input.test.mjs`.
+3. Implement the window-agnostic pure covariance/correlation/volatility/risk
+   contribution/ENB/Sharpe helper with synthetic fixtures.
 4. Add a server-only Drizzle adapter that reads stored data in parallel where
    independent.
 5. Add a minimal read-only Server Component surface using URL search params

@@ -110,10 +110,10 @@ hand-maintained full exchange calendar.
 
 The 2026-07-10 portfolio-risk readiness audit found a real miss: the shared
 observed-fixed-holiday rule marks stored Korean close dates 2022-12-26,
-2023-01-02, and 2025-02-28 as closed. Historical Korean substitute-holiday
-fixtures are now an active prerequisite for portfolio-risk calendar work. Keep
-the correction separate from snapshot/Cron changes until its operational blast
-radius is reviewed.
+2023-01-02, and 2025-02-28 as closed. Historical risk fixtures now preserve
+those stored closes through a separate evidence calendar and do not reuse the
+snapshot forecast helper. Snapshot/Cron calendar correction remains open and
+must stay separate until its operational blast radius is reviewed.
 
 ### P2: Simulation / Investment Lab Math
 

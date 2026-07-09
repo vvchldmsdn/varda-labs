@@ -102,7 +102,7 @@ The price limit covers observed long cross-market holiday gaps in the latest
 252-date range. The FX maximum observed in all current windows is two calendar
 days, so three days provides a bounded weekend margin.
 
-## Calendar Blocker
+## Calendar Boundary
 
 The audit found 21 unique current-ticker price rows that disagree with the
 existing static Korean holiday helper. Repeated affected dates include:
@@ -116,16 +116,23 @@ US-style observed-fixed-holiday rule to historical Korean dates, including
 moving some Saturday holidays to the previous Friday. The audit preserves the
 rows and reports the mismatch.
 
-Do not modify the production snapshot calendar as part of this audit. Before
-portfolio-risk fixtures use the helper as canonical historical truth, correct
-the Korean holiday policy with focused historical fixtures and separately
-review its snapshot/Cron blast radius.
+Do not modify the production snapshot calendar as part of this audit. The
+historical risk path no longer uses that helper as canonical truth:
+`portfolio-risk-calendar.ts` maps valid stored close evidence directly from
+`D` to service date `D + 1`. Fixtures preserve the three mismatch examples.
+
+The snapshot/Cron forecast calendar remains a separate open issue because it
+predicts whether a close should exist rather than interpreting a close that is
+already stored. Correct it only with focused snapshot fixtures and no-write
+pipeline review.
 
 ## Next Gate
 
-Do not start the risk DB adapter or UI yet. The next safe slice is:
+Do not start the risk DB adapter or UI yet. Completed boundary work:
 
-1. focused Korean historical calendar correction plan and fixtures;
-2. selected-window duplicate FX policy fixture;
-3. normalized portfolio-risk input fixtures;
-4. pure calculation helper only after those boundaries pass.
+1. stored-close historical service-day normalizer;
+2. selected-window plus first-observation carry-range duplicate FX hard-fail;
+3. normalized cross-market portfolio-risk input fixtures.
+
+The next safe slice is the window-agnostic pure calculation helper and
+synthetic math fixtures. Snapshot/Cron calendar correction remains separate.

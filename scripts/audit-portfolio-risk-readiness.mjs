@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import { mapRiskEvidenceDateToServiceDate } from "../src/lib/portfolio-risk-calendar.ts";
 import { closeCalendarReferenceDateForAsset } from "../src/lib/snapshots/market-calendar.ts";
 
 config({ path: ".env.local", quiet: true });
@@ -70,6 +71,7 @@ async function main() {
     fx: fxAudit.summary,
     scopes: scopeAudits,
     blockers: buildBlockers(databaseChecks, fxAudit, scopeAudits),
+    snapshotCalendarDiagnostics: buildSnapshotCalendarDiagnostics(scopeAudits),
   };
 
   console.log(JSON.stringify(INCLUDE_DETAILS ? result : compactResult(result), null, 2));
@@ -329,7 +331,7 @@ function attachPriceSeries(instrument, tickerRows) {
       const localClose =
         positiveNumber(row.adjusted_close_price) || positiveNumber(row.close_price);
       if (!(localClose > 0)) return null;
-      const serviceDate = shiftDate(row.price_date, 1);
+      const serviceDate = mapRiskEvidenceDateToServiceDate(row.price_date);
       const expectedReferenceDate = closeCalendarReferenceDateForAsset(
         { market: instrument.market, currency: instrument.currency },
         serviceDate,
@@ -381,7 +383,7 @@ function buildFxAudit(rows) {
     .filter(([, group]) => group.length === 1)
     .map(([rateDate, [row]]) => ({
       rateDate,
-      serviceDate: shiftDate(rateDate, 1),
+      serviceDate: mapRiskEvidenceDateToServiceDate(rateDate),
       value: positiveNumber(row.usdkrw),
       source: row.source || "(blank)",
       status: row.status || "(blank)",
@@ -585,12 +587,6 @@ function observationAt(series, serviceDate) {
 }
 
 function buildBlockers(databaseChecks, fxAudit, scopeAudits) {
-  const calendarVerificationFailures = uniqueObjects(
-    Object.values(scopeAudits).flatMap(
-      (scope) => scope.serviceCalendar.calendarFailureSamples,
-    ),
-    (row) => `${row.market}|${row.currency}|${row.ticker}|${row.priceDate}`,
-  );
   return {
     priceTickerDateDuplicates: databaseChecks.priceDuplicateGroups.length,
     fxDuplicateDates: fxAudit.duplicateGroups.length,
@@ -598,15 +594,27 @@ function buildBlockers(databaseChecks, fxAudit, scopeAudits) {
       databaseChecks.currentTickerIdentityConflicts.length,
     priceTickerIdentityConflicts:
       databaseChecks.priceTickerIdentityConflicts.length,
-    serviceCalendarVerificationFailures: calendarVerificationFailures.length,
-    serviceCalendarVerificationFailureSamples:
-      calendarVerificationFailures.slice(0, 20),
     missingPriceSeriesByScope: Object.fromEntries(
       Object.entries(scopeAudits).map(([scope, audit]) => [
         scope,
         audit.missingPriceSeries.length,
       ]),
     ),
+  };
+}
+
+function buildSnapshotCalendarDiagnostics(scopeAudits) {
+  const mismatches = uniqueObjects(
+    Object.values(scopeAudits).flatMap(
+      (scope) => scope.serviceCalendar.calendarFailureSamples,
+    ),
+    (row) => `${row.market}|${row.currency}|${row.ticker}|${row.priceDate}`,
+  );
+  return {
+    historicalRiskInputBlocked: false,
+    snapshotCronReviewRequired: mismatches.length > 0,
+    mismatchRows: mismatches.length,
+    samples: mismatches.slice(0, 20),
   };
 }
 
@@ -673,6 +681,7 @@ function compactResult(result) {
       ]),
     ),
     blockers: result.blockers,
+    snapshotCalendarDiagnostics: result.snapshotCalendarDiagnostics,
     detailCommand:
       "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs --details",
   };
@@ -742,12 +751,6 @@ function countBy(rows, selector) {
 
 function uniqueSorted(values) {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
-}
-
-function shiftDate(date, deltaDays) {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + deltaDays);
-  return value.toISOString().slice(0, 10);
 }
 
 function dateDifferenceDays(earlier, later) {

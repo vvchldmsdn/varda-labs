@@ -86,8 +86,8 @@ Closed enough for now:
 Do next only after user visual review or explicit direction:
 
 - Route/surface map updates for newly migrated features.
-- Resolve the historical Korean calendar blocker identified by
-  `docs/portfolio-risk-readiness-audit.md`, then add normalized risk fixtures.
+- Add the window-agnostic pure risk-math helper and synthetic fixtures now that
+  historical service-day and duplicate-FX input normalization is complete.
 - Focused visual review for `/today`, `/history`, `/etfs`, and `/market`.
 - Product-facing identifier cleanup where legacy/internal ids still appear.
 
@@ -98,7 +98,7 @@ Still deferred:
 - Public sync buttons.
 - Admin action buttons.
 - Recommendation and composite risk-scoring integration.
-- Portfolio risk-structure runtime implementation until its calculation
-  policies and fixtures are approved.
+- Portfolio risk DB adapter and UI until the pure math helper and fixtures pass.
+- Snapshot/Cron forecast-calendar correction until a separate no-write review.
 - Cron automation changes.
 - Schema/migration changes for frontend-only work.
