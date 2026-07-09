@@ -1,7 +1,9 @@
 # Today Holding Detail Read-Only Design
 
-Status: docs-only design. This does not add a route, UI, provider call,
-dry-run execution, write path, Cron behavior, schema change, or migration.
+Status: design plus minimal v1 implementation. The v1 implementation uses the
+existing `/today` route with search params. It does not add a separate route,
+provider call, dry-run execution, write path, Cron behavior, schema change, or
+migration.
 
 ## Decision
 
@@ -19,6 +21,31 @@ The current `/today` page already shows:
 
 A future holding detail surface should therefore be an evidence drilldown, not a
 second contribution table.
+
+## Implemented V1
+
+The first implementation keeps the detail surface inside `/today`:
+
+- `/today?ticker=069500&market=korea`
+- `/today?account=all&ticker=VOO&market=us`
+
+The route remains a Server Component page. It still reads `searchParams`,
+normalizes the account selector, calls `getPortfolioDashboard(selectedAccount)`,
+and passes the resulting dashboard payload to `TodayMovement`.
+
+Selection is handled by `src/lib/today-holding-detail.ts`, a pure helper that:
+
+- resolves ticker and market from search params;
+- selects from `DashboardData.holdings`;
+- attaches matching `DashboardData.todayMovement.contributionRows`;
+- attaches matching `DashboardData.todayMovement.exclusions`;
+- returns sanitized display data without `assetId`, `holdingId`,
+  `legacyBase44Id`, or legacy Base44 object ids.
+
+The v1 panel displays current quote/value evidence, baseline/movement source
+evidence, movement breakdown, and matching exclusion evidence. It intentionally
+does not show charts, raw event JSON, provider controls, admin controls, or raw
+internal ids.
 
 ## Intended Job
 
@@ -233,9 +260,10 @@ It should not add:
 - admin write controls;
 - provider status controls.
 
-## Verification Gate Before Implementation
+## Verification Gate Before Further Implementation
 
-Before adding the route or UI:
+Before adding a separate route, richer event drilldown, or component
+abstraction:
 
 1. Add or confirm fixture coverage for the shared movement builder:
    - KRW snapshot movement;
@@ -258,7 +286,7 @@ Before adding the route or UI:
 
 ## Explicit Non-Goals
 
-- No route implementation in this step.
+- No separate route beyond the `/today` query-based v1 panel.
 - No visual polish.
 - No chart work.
 - No public refresh button.

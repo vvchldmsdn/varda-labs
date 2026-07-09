@@ -5,34 +5,43 @@ import {
   getPortfolioDashboard,
   normalizeDashboardAccount,
 } from "@/lib/portfolio-dashboard";
+import { normalizeTodayHoldingDetailQuery } from "@/lib/today-holding-detail";
 
 export const dynamic = "force-dynamic";
 
 type TodayPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    ticker?: string | string[];
+    market?: string | string[];
   }>;
 };
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
   const params = await searchParams;
   const selectedAccount = normalizeDashboardAccount(params.account);
+  const detailQuery = normalizeTodayHoldingDetailQuery(params);
   const dashboardPromise = getPortfolioDashboard(selectedAccount);
 
   return (
     <Suspense fallback={<TodaySkeleton />}>
-      <TodayContent dashboardPromise={dashboardPromise} />
+      <TodayContent
+        dashboardPromise={dashboardPromise}
+        detailQuery={detailQuery}
+      />
     </Suspense>
   );
 }
 
 async function TodayContent({
   dashboardPromise,
+  detailQuery,
 }: {
   dashboardPromise: ReturnType<typeof getPortfolioDashboard>;
+  detailQuery: ReturnType<typeof normalizeTodayHoldingDetailQuery>;
 }) {
   const dashboard = await dashboardPromise;
-  return <TodayMovement data={dashboard} />;
+  return <TodayMovement data={dashboard} detailQuery={detailQuery} />;
 }
 
 function TodaySkeleton() {
