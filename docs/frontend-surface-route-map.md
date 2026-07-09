@@ -1,0 +1,73 @@
+# Frontend Surface Route Map
+
+Last updated: 2026-07-09
+
+Status: docs-only route inventory. This document does not add routes, change UI
+components, call providers, execute dry-runs, write data, change Cron behavior,
+change schema, or change migrations.
+
+Purpose: keep the current Next.js App Router surfaces explicit before adding
+more migrated gyeol-fin screens. The immediate goal is to prevent premature
+component abstraction, duplicated financial formulas, and accidental render-time
+side effects.
+
+## Global Rules
+
+- All listed product/operator pages are protected by `src/proxy.ts` Basic Auth
+  in production.
+- Server-rendered read views should load DB-backed data directly through server
+  helpers. Do not introduce first-render browser REST refetching for these
+  surfaces.
+- Render paths must not call KIS, FX providers, dry-run routes, write routes, or
+  admin mutation routes.
+- `/`, `/today`, and later holding detail surfaces must share the movement
+  model from `src/lib/portfolio-movement.ts`; do not copy the formula into a
+  route-specific implementation.
+- Default product UI must not use `holdingId`, `legacyBase44Id`, or similar
+  internal identifiers as fallback labels.
+
+## Route Inventory
+
+| Route | Purpose | Data source and helpers | Protection | Write behavior | Current smoke status | Known gaps | Next candidate |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `/` | First-screen portfolio dashboard. Shows current portfolio summary, account tabs, holding heatmap, recent trend, return/event evidence, and side panels. | `src/app/page.tsx`, `getPortfolioDashboard`, `PortfolioDashboard`, `portfolio-return-metrics`, `portfolio-movement`. Reads `assets`, `accounts`, `asset_groups`, `settings`, `fx_rates`, `daily_portfolio_snapshots`, `daily_position_snapshots`, `asset_price_snapshots`, `event_ledger_entries`. | Basic Auth via `src/proxy.ts`. | Read-only render. No provider or write calls during render. | Latest route smoke: no-auth 401, auth 200, `/today` href present, key data markers present, DB counts unchanged. | Visual browser smoke remains partial because Basic Auth automation is blocked. Sidebar still contains placeholder nav items beyond `today`. | User visual review. Later, decide whether to route additional nav items only when their surfaces exist. |
+| `/today` | Minimal read-only today movement evidence surface. Shows aggregate movement, FX impact, trade flow, coverage, contribution rows, and exclusions. | `src/app/today/page.tsx`, `getPortfolioDashboard`, `TodayMovement`, shared `portfolio-movement` output. Reads the same dashboard payload rather than a second formula. | Basic Auth via `src/proxy.ts`. | Read-only render. No provider, dry-run, write, admin, or Cron calls. | Latest route smoke: no-auth 401, auth 200 for default and account params; markers present; no configured secret leak; no 24-char legacy-like ids in HTML; DB counts unchanged. | Visual browser smoke remains partial. UI is deliberately plain. No per-holding detail route yet. | User visual review first. If accepted, design a holding detail route before extracting shared presentational components. |
+| `/history` | Read-only imported balance and portfolio history evidence. Supports account/lane filters through URL search params and server-side form submit. | `src/app/history/page.tsx`, `getReadOnlyHistoryBalance`, `history-balance` helpers. Reads `account_balance_snapshots` and `daily_portfolio_snapshots`; can derive display-only `all` rows when stored rows are absent. | Basic Auth via `src/proxy.ts`. | Read-only render. | Earlier build/smoke covered this route as a protected read page; no recent visual smoke in the `/today` phase. | Current code no longer has obvious legacy-id text in `history` page, but user-facing history evidence still needs visual review for identifier leakage and table width. | Add a focused history smoke/review before expanding history charts or balance drilldown. |
+| `/etfs` | Read-only ETF reference and holdings lookthrough. Search/select ETF master and view grouped holdings. | `src/app/etfs/page.tsx`, `searchReadOnlyEtfMasters`, `getReadOnlyEtfHoldings`, `etf-holdings` grouping helpers. Reads `etf_masters` and `etf_holdings`. | Basic Auth via `src/proxy.ts`. | Read-only render. | Build/lint/test pass with current route. Earlier production smoke verified route access, but not after every dashboard-only change. | Page currently displays `legacy {row.legacyBase44Id ?? "-"}` for holdings. That is acceptable only if treated as diagnostic; otherwise it should be hidden before polishing product UI. | Decide whether ETF reference is operator/evidence or product-facing, then hide legacy ids if product-facing. |
+| `/market` | Read-only market context page for benchmarks, regime rows, duplicate regime groups, and global factors. | `src/app/market/page.tsx`, `getReadOnlyMarketContext`, `market-context` helpers. Reads `benchmark_snapshots`, `market_regime_daily`, and `global_market_factors`. | Basic Auth via `src/proxy.ts`. | Read-only render. | Prior smoke covered no-auth/auth, expected markers, and no side effects. | Duplicate regime diagnostics still expose selected legacy ids in the duplicate section. That is acceptable only as admin/evidence text, not polished product UI. | Keep read-only. If this becomes user-facing, hide legacy identifiers and add visual smoke. |
+| `/admin/market-sync` | Status-only operator console for market data freshness, close coverage, FX status, snapshot evidence, KIS cooldown, recent sync metadata, and manual boundary hints. | `src/app/admin/market-sync/page.tsx`, `getAdminMarketSyncStatus`, `admin-market-sync-status` helpers. Reads stored DB state including `assets`, `asset_price_snapshots`, `fx_rates`, `daily_position_snapshots`, `daily_portfolio_snapshots`, and `market_data_sync_runs`. | Basic Auth via `src/proxy.ts`; under `/admin/:path*`. | Read-only render. Must not call providers, dry-run routes, or write routes. | Prior status page checks showed status-only behavior and no render-time provider/write calls. | This is not an action console. Manual action buttons remain intentionally absent. | Keep as status-only until a separate reviewed admin action contract is approved. |
+
+## API And Operator Boundaries
+
+| Surface | Current role | Boundary |
+| --- | --- | --- |
+| `/api/entities/*` | Existing CRUD compatibility APIs for core entities. | Not part of first-render dashboard reads. Keep separate from Server Component read paths unless a client-side editing workflow is intentionally added. |
+| `/api/admin/market/prices/sync` | Guarded market price sync endpoint. | Must remain admin-only and explicit. Do not call during page render. |
+| `/api/admin/market/fx/sync` | Guarded FX refresh endpoint. | Dry-run by default; actual write requires explicit guard. Do not call during page render. |
+| `/api/admin/snapshots/daily` | Guarded daily snapshot endpoint. | Do not call from product pages. Preserve reviewed runbook boundaries. |
+| `/api/cron/market-cycle/preflight` | Read-only Cron/operator preflight contract. | Must not expose write-shaped or secret-shaped parameters. |
+
+## Current Sequencing Decision
+
+Closed enough for now:
+
+- `/` dashboard read path and smoke gates.
+- `/today` read-only movement surface, account route smoke, internal id fallback
+  hardening, and dashboard sidebar link.
+- `/admin/market-sync` as a status-only operator page.
+
+Do next only after user visual review or explicit direction:
+
+- Route/surface map updates for newly migrated features.
+- Focused visual review for `/today`, `/history`, `/etfs`, and `/market`.
+- Product-facing identifier cleanup where legacy/internal ids still appear.
+
+Still deferred:
+
+- Per-holding detail page.
+- Today/detail shared presentational component abstraction.
+- Public sync buttons.
+- Admin action buttons.
+- Recommendation/risk/scoring integration.
+- Cron automation changes.
+- Schema/migration changes for frontend-only work.
