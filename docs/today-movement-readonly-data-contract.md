@@ -210,6 +210,9 @@ formula.
 The extraction plan is documented in
 `docs/shared-movement-builder-extraction-plan.md`.
 
+The narrower holding-detail route and component boundary design is documented in
+`docs/today-holding-detail-readonly-design.md`.
+
 ## Verification Gate
 
 Before implementing a route:
