@@ -20,7 +20,7 @@ const navItems: { label: string; href?: string }[] = [
   { label: "홈", href: "/" },
   { label: "오늘 변동", href: "/today" },
   { label: "추가 투입" },
-  { label: "포트 구조" },
+  { label: "포트 구조", href: "/portfolio/structure" },
   { label: "히스토리" },
   { label: "투자랩", href: "/etfs" },
   { label: "시뮬레이션 검증" },
