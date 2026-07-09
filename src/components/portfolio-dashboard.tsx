@@ -18,7 +18,7 @@ const accountTabs: { code: DashboardAccount; label: string }[] = [
 
 const navItems: { label: string; href?: string }[] = [
   { label: "홈", href: "/" },
-  { label: "오늘 변동" },
+  { label: "오늘 변동", href: "/today" },
   { label: "추가 투입" },
   { label: "포트 구조" },
   { label: "히스토리" },
