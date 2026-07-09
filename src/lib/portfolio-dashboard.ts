@@ -155,6 +155,7 @@ export type DashboardData = {
   generatedAt: string;
   usdKrwRate: number;
   latestSnapshotDate: string | null;
+  latestSnapshotReferenceDate: string | null;
   totalValueKrw: number;
   costBasisKrw: number;
   realizedCostBasisKrw: number;
@@ -469,6 +470,12 @@ export async function getPortfolioDashboard(
   const latestAccountPositions = latestPositionRows.filter(
     (position) => selectedAccount === "all" || position.account === selectedAccount,
   );
+  const latestSnapshotReferenceDate =
+    latestDate(
+      latestAccountPositions
+        .map((position) => position.referenceDate ?? position.priceDate)
+        .filter((date): date is string => Boolean(date)),
+    ) ?? latestSnapshotDate;
   const unmatchedSnapshotRows = latestAccountPositions.filter(
     (position) => position.assetId === null,
   ).length;
@@ -483,6 +490,7 @@ export async function getPortfolioDashboard(
     generatedAt: new Date().toISOString(),
     usdKrwRate,
     latestSnapshotDate,
+    latestSnapshotReferenceDate,
     totalValueKrw,
     costBasisKrw,
     realizedCostBasisKrw,
@@ -858,6 +866,10 @@ function buildRecentSnapshots(rows: PortfolioSnapshotRow[]) {
       totalReturnPct: toNumber(row.totalReturnPct),
     }))
     .slice(-14);
+}
+
+function latestDate(values: string[]) {
+  return values.sort((left, right) => right.localeCompare(left))[0] ?? null;
 }
 
 function buildEventActivity({

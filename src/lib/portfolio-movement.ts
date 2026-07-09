@@ -207,6 +207,7 @@ export function buildDailyPositionMovement({
   const contributions = new Map<string, PortfolioMovementContribution>();
   const exclusions: PortfolioMovementExclusion[] = [];
   const matchedSnapshotIds = new Set<string>();
+  const currentHoldingSnapshotIds = new Set<string>();
   let matchedCurrentValue = 0;
   let matchedSnapshotValue = 0;
   let matchedCount = 0;
@@ -214,6 +215,9 @@ export function buildDailyPositionMovement({
   let fxChangeKrw = 0;
 
   for (const holding of holdings) {
+    const snapshot = findPositionSnapshotForHolding(holding, accountRows);
+    if (snapshot) currentHoldingSnapshotIds.add(snapshot.id);
+
     const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
     if (!currentFx.ok) {
       exclusions.push(
@@ -238,7 +242,6 @@ export function buildDailyPositionMovement({
       continue;
     }
 
-    const snapshot = findPositionSnapshotForHolding(holding, accountRows);
     if (!snapshot) {
       exclusions.push(
         holdingExclusion(
@@ -344,6 +347,7 @@ export function buildDailyPositionMovement({
   let changeKrw = sumBy([...contributions.values()], (row) => row.changeKrw);
   for (const row of accountRows) {
     if (matchedSnapshotIds.has(row.id)) continue;
+    if (currentHoldingSnapshotIds.has(row.id)) continue;
     const previousValueKrw = snapshotMarketValue(row);
     if (previousValueKrw <= 0) continue;
     const removedTradeFlowKrw = calculateTradeFlowForSnapshot(

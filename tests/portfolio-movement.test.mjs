@@ -442,6 +442,75 @@ describe("portfolio movement builder", () => {
     assert.equal(result.changeKrw, -200);
   });
 
+  it("does not treat an excluded current holding as a removed baseline position", () => {
+    const result = buildDaily({
+      holdings: [
+        holding({
+          id: "asset-a",
+          legacyBase44Id: "legacy-a",
+          name: "Asset A",
+          ticker: "A",
+          currentPrice: 95,
+          valueKrw: 950,
+        }),
+        holding({
+          id: "asset-b",
+          legacyBase44Id: "legacy-b",
+          name: "Asset B",
+          ticker: "B",
+          currentPrice: 105,
+          valueKrw: 1050,
+        }),
+        holding({
+          id: "asset-stale",
+          legacyBase44Id: "legacy-stale",
+          name: "Stale Asset",
+          ticker: "STALE",
+          currentPrice: 100,
+          valueKrw: 100,
+          priceFetchedAt: "2026-07-07T21:59:59.000Z",
+        }),
+      ],
+      positionRows: [
+        position({
+          id: "snap-a",
+          assetId: "asset-a",
+          legacyAssetId: "legacy-a",
+          ticker: "A",
+          assetName: "Asset A",
+          marketValueKrw: 1000,
+          unitPrice: 100,
+        }),
+        position({
+          id: "snap-b",
+          assetId: "asset-b",
+          legacyAssetId: "legacy-b",
+          ticker: "B",
+          assetName: "Asset B",
+          marketValueKrw: 1000,
+          unitPrice: 100,
+        }),
+        position({
+          id: "snap-stale",
+          assetId: "asset-stale",
+          legacyAssetId: "legacy-stale",
+          ticker: "STALE",
+          assetName: "Stale Asset",
+          marketValueKrw: 100,
+          unitPrice: 100,
+        }),
+      ],
+    });
+
+    assert.equal(result.ready, true);
+    assert.equal(result.changeKrw, 0);
+    assert.equal(result.contributionRows.length, 2);
+    assert.equal(result.exclusions.length, 1);
+    assert.equal(result.exclusions[0].reason, "missing_fresh_live_prices");
+    assertClose(result.coverage.currentCoveragePct, 95.23809523809523);
+    assertClose(result.coverage.snapshotCoveragePct, 95.23809523809523);
+  });
+
   it("computes previous-close fallback movement without snapshot rows", () => {
     const result = buildPreviousCloseMovement({
       holdings: [holding()],

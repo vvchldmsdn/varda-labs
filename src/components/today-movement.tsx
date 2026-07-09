@@ -41,10 +41,11 @@ export function TodayMovement({
                 {formatDate(data.generatedAt)}
               </p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal sm:text-3xl">
-                Today Movement
+                오늘 변동
               </h1>
               <p className="mt-2 text-sm text-[#687064]">
-                Baseline {formatDate(data.latestSnapshotDate)} · USD/KRW{" "}
+                기준일 {formatDate(data.latestSnapshotReferenceDate)} · 스냅샷{" "}
+                {formatDate(data.latestSnapshotDate)} · USD/KRW{" "}
                 {formatNumber(data.usdKrwRate)}
               </p>
             </div>
@@ -76,47 +77,48 @@ export function TodayMovement({
         </header>
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="Status" value={movement.ready ? "ready" : "not ready"} />
-          <MetricCard label="Source" value={sourceLabel(movement.source)} />
+          <MetricCard label="상태" value={movement.ready ? "준비됨" : "준비 안 됨"} />
+          <MetricCard label="기준 데이터" value={sourceLabel(movement.source)} />
           <MetricCard
-            label="Today change"
+            label="오늘 변동"
             value={formatSignedKrw(movement.changeKrw)}
             tone={toneFor(movement.changeKrw)}
           />
           <MetricCard
-            label="FX impact"
+            label="환율 영향"
             value={formatSignedKrw(movement.fxChangeKrw)}
             tone={toneFor(movement.fxChangeKrw)}
           />
           <MetricCard
-            label="Trade flow"
+            label="매매 흐름"
             value={formatSignedKrw(movement.tradeFlowKrw)}
             tone={toneFor(movement.tradeFlowKrw)}
           />
         </section>
 
         <section className="grid gap-3 lg:grid-cols-4">
-          <MetricCard label="Previous value" value={formatKrw(movement.previousTotalKrw)} />
-          <MetricCard label="Return" value={formatPct(movement.returnPct)} />
+          <MetricCard label="기준 평가액" value={formatKrw(movement.previousTotalKrw)} />
+          <MetricCard label="변동률" value={formatPct(movement.returnPct)} />
           <MetricCard
-            label="Current coverage"
-            value={formatPct(movement.coverage.currentCoveragePct)}
+            label="현재 보유 매칭률"
+            value={formatCoveragePct(movement.coverage.currentCoveragePct)}
           />
           <MetricCard
-            label="Snapshot coverage"
-            value={formatPct(movement.coverage.snapshotCoveragePct)}
+            label="기준 스냅샷 매칭률"
+            value={formatCoveragePct(movement.coverage.snapshotCoveragePct)}
           />
         </section>
 
         {!movement.ready ? (
           <section className="rounded-lg border border-[#e2d5a8] bg-[#fffaf0] p-4 text-sm text-[#5d4b1b]">
-            <p className="font-semibold">Reason: {reasonLabel(movement.reason)}</p>
+            <p className="font-semibold">사유: {reasonLabel(movement.reason)}</p>
           </section>
         ) : null}
 
         <HoldingDetailPanel
           detail={detail}
-          baselineDate={data.latestSnapshotDate}
+          baselineReferenceDate={data.latestSnapshotReferenceDate}
+          snapshotDate={data.latestSnapshotDate}
           usdKrwRate={data.usdKrwRate}
         />
 
@@ -242,11 +244,13 @@ export function TodayMovement({
 
 function HoldingDetailPanel({
   detail,
-  baselineDate,
+  baselineReferenceDate,
+  snapshotDate,
   usdKrwRate,
 }: {
   detail: TodayHoldingDetailResult;
-  baselineDate: string | null;
+  baselineReferenceDate: string | null;
+  snapshotDate: string | null;
   usdKrwRate: number | null;
 }) {
   if (detail.status === "empty") return null;
@@ -254,10 +258,11 @@ function HoldingDetailPanel({
   if (detail.status === "not_found") {
     return (
       <section className="rounded-lg border border-[#e2d5a8] bg-[#fffaf0] p-4 text-sm text-[#5d4b1b]">
-        <p className="font-semibold">Holding detail unavailable</p>
+        <p className="font-semibold">종목 상세를 찾을 수 없음</p>
         <p className="mt-1">
-          No current holding matched ticker {detail.query.ticker ?? "-"}
-          {detail.query.market ? ` in ${detail.query.market}` : ""}.
+          현재 보유 자산에서 {detail.query.ticker ?? "-"}
+          {detail.query.market ? ` / ${detail.query.market}` : ""}에 해당하는
+          종목을 찾지 못했습니다.
         </p>
       </section>
     );
@@ -266,9 +271,9 @@ function HoldingDetailPanel({
   if (detail.status === "ambiguous") {
     return (
       <section className="rounded-lg border border-[#e2d5a8] bg-[#fffaf0] p-4 text-sm text-[#5d4b1b]">
-        <p className="font-semibold">Narrow the holding detail</p>
+        <p className="font-semibold">계좌를 더 좁혀 선택 필요</p>
         <p className="mt-1">
-          More than one current holding matched ticker {detail.query.ticker ?? "-"}.
+          {detail.query.ticker ?? "-"}에 해당하는 현재 보유 자산이 여러 개입니다.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {detail.candidates.map((candidate) => (
@@ -292,7 +297,7 @@ function HoldingDetailPanel({
     <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
       <div className="flex flex-col gap-1 border-b border-[#e1e5d8] px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-[#687064]">Selected holding</p>
+          <p className="text-sm font-medium text-[#687064]">선택 종목</p>
           <h2 className="text-lg font-semibold">
             {holding.ticker ?? "-"} / {holding.name}
           </h2>
@@ -304,58 +309,59 @@ function HoldingDetailPanel({
           href={holding.account === "brokerage" ? "/today" : `/today?account=${holding.account}`}
           className="w-fit rounded-md border border-[#dce2d2] bg-white px-3 py-2 text-sm font-semibold text-[#334038]"
         >
-          Clear detail
+          선택 해제
         </Link>
       </div>
 
       <div className="grid gap-3 p-4 lg:grid-cols-3">
-        <DetailGroup title="Current evidence">
-          <DetailRow label="Quantity" value={formatNumber(holding.quantity)} />
-          <DetailRow label="Current price" value={formatNumber(holding.currentPrice)} />
-          <DetailRow label="Current value" value={formatKrw(holding.valueKrw)} />
-          <DetailRow label="Quote source" value={holding.priceSource ?? "-"} />
-          <DetailRow label="Quote type" value={holding.priceQuoteType ?? "-"} />
-          <DetailRow label="Quote status" value={holding.priceStatus ?? "-"} />
-          <DetailRow label="Fetched at" value={formatDateTime(holding.priceFetchedAt)} />
-          <DetailRow label="Price as-of" value={formatDateTime(holding.priceAsOf)} />
+        <DetailGroup title="현재 데이터">
+          <DetailRow label="수량" value={formatNumber(holding.quantity)} />
+          <DetailRow label="현재가" value={formatNumber(holding.currentPrice)} />
+          <DetailRow label="현재 평가액" value={formatKrw(holding.valueKrw)} />
+          <DetailRow label="가격 출처" value={holding.priceSource ?? "-"} />
+          <DetailRow label="가격 유형" value={quoteTypeLabel(holding.priceQuoteType)} />
+          <DetailRow label="가격 상태" value={statusLabel(holding.priceStatus)} />
+          <DetailRow label="가져온 시각" value={formatDateTime(holding.priceFetchedAt)} />
+          <DetailRow label="가격 시각" value={formatDateTime(holding.priceAsOf)} />
           {holding.currency === "USD" ? (
-            <DetailRow label="Stored USD/KRW" value={formatNumber(usdKrwRate)} />
+            <DetailRow label="저장 USD/KRW" value={formatNumber(usdKrwRate)} />
           ) : null}
         </DetailGroup>
 
-        <DetailGroup title="Baseline evidence">
-          <DetailRow label="Baseline date" value={formatDate(baselineDate)} />
+        <DetailGroup title="기준 데이터">
+          <DetailRow label="기준일" value={formatDate(baselineReferenceDate)} />
+          <DetailRow label="스냅샷 저장일" value={formatDate(snapshotDate)} />
           <DetailRow
-            label="Movement source"
+            label="변동 기준"
             value={sourceLabel(contribution?.source ?? holding.dailySource)}
           />
           <DetailRow
-            label="Previous value"
+            label="기준 평가액"
             value={formatKrw(contribution?.previousValueKrw ?? holding.previousCloseValueKrw)}
           />
           <DetailRow
-            label="Previous-close value"
+            label="전일종가 기준 평가액"
             value={formatKrw(holding.previousCloseValueKrw)}
           />
         </DetailGroup>
 
-        <DetailGroup title="Movement breakdown">
+        <DetailGroup title="변동 분해">
           <DetailRow
-            label="Today change"
+            label="오늘 변동"
             value={formatSignedKrw(contribution?.changeKrw ?? holding.dailyChangeKrw)}
             tone={toneFor(contribution?.changeKrw ?? holding.dailyChangeKrw)}
           />
           <DetailRow
-            label="Return"
+            label="변동률"
             value={formatPct(contribution?.returnPct ?? holding.dailyReturnPct)}
           />
           <DetailRow
-            label="FX impact"
+            label="환율 영향"
             value={formatSignedKrw(contribution?.fxChangeKrw ?? holding.fxDailyChangeKrw)}
             tone={toneFor(contribution?.fxChangeKrw ?? holding.fxDailyChangeKrw)}
           />
           <DetailRow
-            label="Trade flow"
+            label="매매 흐름"
             value={formatSignedKrw(contribution?.tradeFlowKrw ?? 0)}
             tone={toneFor(contribution?.tradeFlowKrw ?? 0)}
           />
@@ -364,7 +370,7 @@ function HoldingDetailPanel({
 
       {detail.exclusions.length > 0 ? (
         <div className="border-t border-[#e1e5d8] px-4 py-3">
-          <h3 className="text-sm font-semibold">Exclusion evidence</h3>
+          <h3 className="text-sm font-semibold">제외 사유</h3>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             {detail.exclusions.map((exclusion, index) => (
               <div
@@ -517,14 +523,33 @@ function Td({
 }
 
 function sourceLabel(source: string | null) {
-  if (source === "daily_position_snapshot") return "daily snapshot";
-  if (source === "asset_price_snapshot") return "previous close";
+  if (source === "daily_position_snapshot") return "일일 스냅샷";
+  if (source === "asset_price_snapshot") return "전일 종가";
   return "-";
 }
 
 function reasonLabel(reason: string | null) {
   if (!reason) return "-";
+  if (reason === "missing_baseline_snapshot") return "기준 스냅샷 없음";
+  if (reason === "missing_fresh_live_prices") return "실시간 가격 없음";
+  if (reason === "missing_previous_close_fallback") return "전일 종가 없음";
+  if (reason === "unsupported_currency") return "지원하지 않는 통화";
+  if (reason === "missing_current_fx") return "현재 환율 없음";
+  if (reason === "missing_baseline_fx") return "기준 환율 없음";
+  if (reason === "coverage_below_threshold") return "매칭률 부족";
   return reason.replaceAll("_", " ");
+}
+
+function quoteTypeLabel(value: string | null) {
+  if (value === "live") return "실시간";
+  if (value === "delayed") return "지연";
+  if (value === "realtime") return "실시간";
+  return value ?? "-";
+}
+
+function statusLabel(value: string | null) {
+  if (value === "ok") return "정상";
+  return value ?? "-";
 }
 
 function formatDate(value: string | null) {
@@ -558,6 +583,11 @@ function formatPct(value: number | null) {
   if (value === null || !Number.isFinite(value)) return "-";
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${value.toFixed(2)}%`;
+}
+
+function formatCoveragePct(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "-";
+  return `${value.toFixed(2)}%`;
 }
 
 function toneFor(value: number | null) {
