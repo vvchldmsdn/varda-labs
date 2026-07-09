@@ -265,6 +265,36 @@ export const marketDataSyncRuns = pgTable(
   }),
 );
 
+export const livePriceQuotes = pgTable(
+  "live_price_quotes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    ticker: varchar("ticker", { length: 50 }).notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    provider: varchar("provider", { length: 100 }).notNull(),
+    source: varchar("source", { length: 100 }).notNull(),
+    quoteType: varchar("quote_type", { length: 50 }).notNull(),
+    status: varchar("status", { length: 50 }).notNull(),
+    error: text("error"),
+
+    price: decimal("price", { precision: 28, scale: 12 }).notNull(),
+    priceAsOf: timestamp("price_as_of", { withTimezone: true }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    quoteIdentityUnique: uniqueIndex(
+      "live_price_quotes_market_ticker_provider_unique",
+    ).on(table.market, table.ticker, table.provider),
+    tickerIdx: index("live_price_quotes_ticker_idx").on(table.ticker),
+    fetchedAtIdx: index("live_price_quotes_fetched_at_idx").on(table.fetchedAt),
+  }),
+);
+
 export const benchmarkSnapshots = pgTable(
   "benchmark_snapshots",
   {

@@ -4,23 +4,16 @@ import type {
 } from "@/lib/market-data/providers/types";
 
 export const LIVE_PRICE_WRITE_CONTRACT = {
-  updates: [
-    "assets.current_price",
-    "assets.price_source",
-    "assets.price_fetched_at",
-    "assets.price_as_of",
-    "assets.price_quote_type",
-    "assets.price_status",
-    "assets.price_error",
-  ],
-  inserts: [],
+  updates: ["live_price_quotes by market/ticker/provider"],
+  inserts: ["live_price_quotes"],
   snapshotWrites: false,
 } as const;
 
 export type LivePriceWritePolicy = "none" | "kis";
 
 export type LivePriceWriteAction =
-  | "planned_update"
+  | "planned_upsert"
+  | "inserted"
   | "updated"
   | "skipped"
   | "failed";
@@ -31,15 +24,19 @@ export type LivePriceWriteResult = {
   action: LivePriceWriteAction;
   assetIds: string[];
   assetCount: number;
-  updatedAssetCount: number;
+  quoteCount: number;
   reason?: string;
 };
 
-export type LiveAssetUpdateValues = {
-  currentPrice: string;
-  priceSource: string;
-  priceFetchedAt: Date;
+export type LivePriceQuoteWriteValues = {
+  ticker: string;
+  market: string;
+  currency: string;
+  provider: string;
+  price: string;
+  source: string;
   priceAsOf: Date;
+  fetchedAt: Date;
   priceQuoteType: LiveQuote["quoteType"];
   priceStatus: "ok";
   priceError: null;
@@ -48,17 +45,18 @@ export type LiveAssetUpdateValues = {
 export function planLiveAssetPriceWrite(options: {
   row: LiveQuote;
   target: PriceLookupTarget | undefined;
+  provider: string;
   dryRun: boolean;
   allowWrite: boolean;
   writePolicy: LivePriceWritePolicy;
-}): { result: LivePriceWriteResult; update: LiveAssetUpdateValues | null } {
+}): { result: LivePriceWriteResult; write: LivePriceQuoteWriteValues | null } {
   const assetIds = options.target?.assetIds ?? [];
   const baseResult = {
     ticker: options.row.ticker,
     source: options.row.source,
     assetIds,
     assetCount: assetIds.length,
-    updatedAssetCount: 0,
+    quoteCount: 0,
   };
   const validationError = validateLiveQuoteRow(
     options.row,
@@ -73,7 +71,7 @@ export function planLiveAssetPriceWrite(options: {
         action: options.row.status === "error" ? "failed" : "skipped",
         reason: validationError,
       },
-      update: null,
+      write: null,
     };
   }
 
@@ -81,9 +79,10 @@ export function planLiveAssetPriceWrite(options: {
     return {
       result: {
         ...baseResult,
-        action: "planned_update",
+        action: "planned_upsert",
+        quoteCount: 1,
       },
-      update: toLiveAssetUpdateValues(options.row),
+      write: toLivePriceQuoteWriteValues(options.row, options.provider),
     };
   }
 
@@ -94,7 +93,7 @@ export function planLiveAssetPriceWrite(options: {
         action: "skipped",
         reason: "write_guard_not_satisfied",
       },
-      update: null,
+      write: null,
     };
   }
 
@@ -102,8 +101,9 @@ export function planLiveAssetPriceWrite(options: {
     result: {
       ...baseResult,
       action: "updated",
+      quoteCount: 1,
     },
-    update: toLiveAssetUpdateValues(options.row),
+    write: toLivePriceQuoteWriteValues(options.row, options.provider),
   };
 }
 
@@ -122,12 +122,19 @@ function validateLiveQuoteRow(
   return null;
 }
 
-function toLiveAssetUpdateValues(row: LiveQuote): LiveAssetUpdateValues {
+function toLivePriceQuoteWriteValues(
+  row: LiveQuote,
+  provider: string,
+): LivePriceQuoteWriteValues {
   return {
-    currentPrice: row.price ?? "0",
-    priceSource: row.source,
-    priceFetchedAt: row.fetchedAt,
+    ticker: row.ticker,
+    market: row.market,
+    currency: row.currency,
+    provider,
+    price: row.price ?? "0",
+    source: row.source,
     priceAsOf: row.priceAsOf ?? row.fetchedAt,
+    fetchedAt: row.fetchedAt,
     priceQuoteType: row.quoteType,
     priceStatus: "ok",
     priceError: null,

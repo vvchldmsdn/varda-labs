@@ -3,7 +3,12 @@ import "server-only";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { assetPriceSnapshots, assets, marketDataSyncRuns } from "@/db/schema";
+import {
+  assetPriceSnapshots,
+  assets,
+  livePriceQuotes,
+  marketDataSyncRuns,
+} from "@/db/schema";
 import {
   LIVE_PRICE_WRITE_CONTRACT,
   planLiveAssetPriceWrite,
@@ -35,7 +40,8 @@ export const PRICE_SYNC_CONTRACT = {
     inserts: [...LIVE_PRICE_WRITE_CONTRACT.inserts],
     snapshotWrites: LIVE_PRICE_WRITE_CONTRACT.snapshotWrites,
     notes: [
-      "updates current asset prices and live price lineage only after guarded actual write",
+      "upserts user-neutral live quote cache only after guarded actual write",
+      "live mode must not update user asset rows",
       "live mode must not write asset_price_snapshots",
     ],
   },
@@ -285,10 +291,6 @@ export async function runMarketPriceSync(options: {
     options.targetLimit === undefined
       ? filteredPriceTargets
       : filteredPriceTargets.slice(0, options.targetLimit);
-  const selectedAssetWriteCount = priceTargets.reduce(
-    (count, target) => count + target.assetIds.length,
-    0,
-  );
   const targetFilterResults = buildTargetFilterResults({
     targetFilter,
     allAssetRows: assetRows,
@@ -366,7 +368,6 @@ export async function runMarketPriceSync(options: {
       dryRun,
       closeWritePolicy,
       liveWritePolicy,
-      selectedAssetWriteCount,
       priceTargets.length,
     );
     const providerResult = dryRun
@@ -404,6 +405,7 @@ export async function runMarketPriceSync(options: {
             rows: providerResult.rows as LiveQuote[],
             targets: priceTargets,
             dryRun,
+            provider: provider.name,
             writePolicy: liveWritePolicy,
             allowWrite: liveWriteEnabled,
           })
@@ -727,15 +729,14 @@ function buildPlannedWrites(
   dryRun: boolean,
   closeWritePolicy: ClosePriceWritePolicy,
   liveWritePolicy: LivePriceWritePolicy,
-  selectedAssetWriteCount: number,
   priceTargetCount: number,
 ): PlannedWrite[] {
   if (mode === "live") {
     return [
       {
-        table: "assets",
-        operation: "update_current_price_and_price_metadata",
-        count: selectedAssetWriteCount,
+        table: "live_price_quotes",
+        operation: "upsert_live_quote_by_market_ticker_provider",
+        count: priceTargetCount,
         active: !dryRun && liveWritePolicy !== "none",
       },
     ];
@@ -847,6 +848,7 @@ async function applyLivePriceRows(options: {
   rows: LiveQuote[];
   targets: PriceLookupTarget[];
   dryRun: boolean;
+  provider: string;
   writePolicy: LivePriceWritePolicy;
   allowWrite: boolean;
 }): Promise<LivePriceWriteSummary> {
@@ -858,52 +860,95 @@ async function applyLivePriceRows(options: {
   for (const row of options.rows) {
     const target = targetByKey.get(toTargetKey(row));
     const planned = planLiveAssetPriceWrite({
-      row,
-      target,
-      dryRun: options.dryRun,
-      allowWrite: options.allowWrite,
-      writePolicy: options.writePolicy,
-    });
+        row,
+        target,
+        provider: options.provider,
+        dryRun: options.dryRun,
+        allowWrite: options.allowWrite,
+        writePolicy: options.writePolicy,
+      });
     let result = planned.result;
 
-    if (planned.update && result.action === "updated") {
-      let updatedAssetCount = 0;
-
-      for (const assetId of result.assetIds) {
-        const returned = await db
-          .update(assets)
-          .set({
-            currentPrice: planned.update.currentPrice,
-            priceSource: planned.update.priceSource,
-            priceFetchedAt: planned.update.priceFetchedAt,
-            priceAsOf: planned.update.priceAsOf,
-            priceQuoteType: planned.update.priceQuoteType,
-            priceStatus: planned.update.priceStatus,
-            priceError: planned.update.priceError,
+    if (planned.write && result.action === "updated") {
+      const existing = await findExistingLivePriceQuote(
+        planned.write.market,
+        planned.write.ticker,
+        planned.write.provider,
+      );
+      const returned = await db
+        .insert(livePriceQuotes)
+        .values({
+          ticker: planned.write.ticker,
+          market: planned.write.market,
+          currency: planned.write.currency,
+          provider: planned.write.provider,
+          source: planned.write.source,
+          quoteType: planned.write.priceQuoteType,
+          status: planned.write.priceStatus,
+          error: planned.write.priceError,
+          price: planned.write.price,
+          priceAsOf: planned.write.priceAsOf,
+          fetchedAt: planned.write.fetchedAt,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [
+            livePriceQuotes.market,
+            livePriceQuotes.ticker,
+            livePriceQuotes.provider,
+          ],
+          set: {
+            currency: sql`excluded.currency`,
+            source: sql`excluded.source`,
+            quoteType: sql`excluded.quote_type`,
+            status: sql`excluded.status`,
+            error: sql`excluded.error`,
+            price: sql`excluded.price`,
+            priceAsOf: sql`excluded.price_as_of`,
+            fetchedAt: sql`excluded.fetched_at`,
             updatedAt: new Date(),
-          })
-          .where(eq(assets.id, assetId))
-          .returning({ id: assets.id });
-
-        updatedAssetCount += returned.length;
-      }
+          },
+        })
+        .returning({ id: livePriceQuotes.id });
 
       result = {
         ...result,
-        updatedAssetCount,
-        action: updatedAssetCount > 0 ? "updated" : "skipped",
-        reason: updatedAssetCount > 0 ? undefined : "asset_rows_not_found",
+        quoteCount: returned.length,
+        action:
+          returned.length === 0 ? "skipped" : existing ? "updated" : "inserted",
+        reason: returned.length > 0 ? undefined : "quote_row_not_written",
       };
     }
 
     summary.results.push(result);
 
-    if (result.action === "updated") summary.updatedCount += result.updatedAssetCount;
+    if (result.action === "inserted") summary.insertedCount += result.quoteCount;
+    if (result.action === "updated") summary.updatedCount += result.quoteCount;
     if (result.action === "failed") summary.failedCount += 1;
     if (result.action === "skipped") summary.skippedCount += 1;
   }
 
   return summary;
+}
+
+async function findExistingLivePriceQuote(
+  market: string,
+  ticker: string,
+  provider: string,
+) {
+  const [existing] = await db
+    .select({ id: livePriceQuotes.id })
+    .from(livePriceQuotes)
+    .where(
+      and(
+        eq(livePriceQuotes.market, market),
+        eq(livePriceQuotes.ticker, ticker),
+        eq(livePriceQuotes.provider, provider),
+      ),
+    )
+    .limit(1);
+
+  return existing ?? null;
 }
 
 async function applyClosePriceRows(options: {
@@ -1391,7 +1436,9 @@ function buildSkeletonWarnings(options: {
   const warnings: string[] = [];
 
   if (options.mode === "live" && options.dryRun) {
-    warnings.push("live price run is dry-run only; no assets rows were written");
+    warnings.push(
+      "live price run is dry-run only; no live_price_quotes rows were written",
+    );
   } else if (
     options.mode === "live" &&
     !options.dryRun &&
@@ -1399,7 +1446,7 @@ function buildSkeletonWarnings(options: {
     options.liveWriteEnabled
   ) {
     warnings.push(
-      "kis live rows may update assets.current_price and price metadata only",
+      "kis live rows may upsert live_price_quotes only; user asset rows are not updated",
     );
   } else if (options.mode === "live" && !options.dryRun) {
     warnings.push(

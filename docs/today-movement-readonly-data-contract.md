@@ -54,12 +54,15 @@ Primary source:
 Fallback source:
 
 - `asset_price_snapshots` previous-close rows only when snapshot movement
-  coverage is insufficient and current holdings have fresh live price metadata.
+  coverage is insufficient and current holdings have fresh live quote metadata.
 
 Current source:
 
-- `assets.current_price` and `assets.price_*` metadata for current live/latest
-  holding values.
+- `live_price_quotes` for current live/latest market prices, keyed by market,
+  ticker, currency, and provider. The quote cache is user-neutral and must not
+  duplicate per-user holding rows.
+- `assets.current_price` remains a manual/fallback value, not the canonical live
+  quote source for today movement.
 - A current price can be used for today movement only when its quote type is
   live/delayed/realtime, status is ok, and fetched/as-of time is inside the
   current 07:00-to-07:00 KST service window.
@@ -105,7 +108,7 @@ Each displayed holding row/detail should carry:
 | `fxImpactKrw` | Currency movement contribution for non-KRW holdings. |
 | `tradeFlowKrw` | Post-baseline trade-flow adjustment. |
 | `movementSource` | `daily_position_snapshot` or `asset_price_snapshot`. |
-| `priceFetchedAt` | Current price metadata timestamp. |
+| `priceFetchedAt` | Current quote metadata timestamp. |
 | `priceAsOf` | Provider as-of timestamp when available. |
 | `priceSource` | Provider/source label only, never credentials or raw response. |
 | `coverageStatus` | Whether this row contributes to aggregate movement. |

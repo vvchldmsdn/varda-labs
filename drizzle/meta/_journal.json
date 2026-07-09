@@ -106,6 +106,13 @@
       "when": 1783341855770,
       "tag": "0014_flashy_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1783595620395,
+      "tag": "0015_far_eddie_brock",
+      "breakpoints": true
     }
   ]
 }

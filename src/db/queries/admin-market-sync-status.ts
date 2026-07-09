@@ -9,6 +9,7 @@ import {
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
   fxRates,
+  livePriceQuotes,
   marketDataSyncRuns,
 } from "@/db/schema";
 import {
@@ -97,6 +98,7 @@ export async function getAdminMarketSyncStatus(
   const [
     assetRows,
     latestFxRows,
+    liveQuoteRows,
     positionRows,
     portfolioRows,
     recentRunRows,
@@ -105,6 +107,7 @@ export async function getAdminMarketSyncStatus(
   ] = await Promise.all([
     getAssetRows(),
     getLatestFxRows(),
+    getLiveQuoteRows(),
     getRecentPositionSnapshotRows(),
     getRecentPortfolioSnapshotRows(),
     getRecentMarketDataSyncRuns(),
@@ -114,11 +117,15 @@ export async function getAdminMarketSyncStatus(
 
   const tickers = uniqueTickers(assetRows);
   const closeRows = tickers.length > 0 ? await getCloseRows(tickers) : [];
-  const livePrice = summarizeLivePriceStatus(assetRows, {
-    snapshotDate,
-    liveWindowStartAt,
-    liveWindowEndAt,
-  });
+  const livePrice = summarizeLivePriceStatus(
+    assetRows,
+    liveQuoteRows,
+    {
+      snapshotDate,
+      liveWindowStartAt,
+      liveWindowEndAt,
+    },
+  );
   const closeCoverage = summarizeCloseCoverageStatus(
     assetRows,
     closeRows,
@@ -161,14 +168,26 @@ async function getAssetRows(): Promise<AdminSyncAssetInput[]> {
       market: assets.market,
       currency: assets.currency,
       assetType: assets.assetType,
-      priceQuoteType: assets.priceQuoteType,
-      priceStatus: assets.priceStatus,
-      priceFetchedAt: assets.priceFetchedAt,
-      priceAsOf: assets.priceAsOf,
     })
     .from(assets);
 
   return rows;
+}
+
+async function getLiveQuoteRows() {
+  return db
+    .select({
+      ticker: livePriceQuotes.ticker,
+      market: livePriceQuotes.market,
+      currency: livePriceQuotes.currency,
+      quoteType: livePriceQuotes.quoteType,
+      status: livePriceQuotes.status,
+      fetchedAt: livePriceQuotes.fetchedAt,
+      priceAsOf: livePriceQuotes.priceAsOf,
+    })
+    .from(livePriceQuotes)
+    .orderBy(desc(livePriceQuotes.fetchedAt))
+    .limit(300);
 }
 
 async function getLatestFxRows() {

@@ -29,7 +29,7 @@ while rendering.
 | --- | --- | --- | --- | --- | --- | --- |
 | Status console render | `GET /admin/market-sync` | No | No | No | No | Not applicable |
 | KIS live price dry-run | `POST /api/admin/market/prices/sync?provider=kis&mode=live&dryRun=true` | No provider fetch; dry-run rows only | Run metadata only | Yes | Yes | Not applicable |
-| KIS live price write | `POST /api/admin/market/prices/sync?provider=kis&mode=live&dryRun=false` | Yes | `assets.current_price`, `assets.price_*` | Yes | Yes | `confirmWrite=true`, `limit<=5`, reviewed targets |
+| KIS live price write | `POST /api/admin/market/prices/sync?provider=kis&mode=live&dryRun=false` | Yes | `live_price_quotes` | Yes | Yes | `confirmWrite=true`, `limit<=5`, reviewed targets |
 | FX dry-run | `POST /api/admin/market/fx/sync?dryRun=true` | Yes | No | No | No | Not applicable |
 | FX write | `POST /api/admin/market/fx/sync?dryRun=false` | Yes | `fx_rates` only | No | No | `confirmWrite=true`, planned insert/update only |
 | KIS close dry-run | `POST /api/admin/market/prices/sync?provider=kis&mode=close&dryRun=true` | Yes | Run metadata only | Yes | Yes | Not applicable |

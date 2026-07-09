@@ -56,6 +56,35 @@ const baseAssets = [
 
 describe("admin market sync status helpers", () => {
   it("summarizes live price freshness without calling providers", () => {
+    const liveQuotes = [
+      {
+        ticker: "069500",
+        market: "korea",
+        currency: "KRW",
+        quoteType: "live",
+        status: "ok",
+        fetchedAt: "2026-07-08T01:00:00.000Z",
+        priceAsOf: null,
+      },
+      {
+        ticker: "VOO",
+        market: "us",
+        currency: "USD",
+        quoteType: "live",
+        status: "ok",
+        fetchedAt: "2026-07-08T03:00:00.000Z",
+        priceAsOf: null,
+      },
+      {
+        ticker: "QQQ",
+        market: "us",
+        currency: "USD",
+        quoteType: "live",
+        status: "ok",
+        fetchedAt: "2026-07-07T10:00:00.000Z",
+        priceAsOf: null,
+      },
+    ];
     const summary = summarizeLivePriceStatus(
       [
         ...baseAssets,
@@ -67,6 +96,7 @@ describe("admin market sync status helpers", () => {
           priceFetchedAt: "2026-07-07T10:00:00.000Z",
         },
       ],
+      liveQuotes,
       cycle,
     );
 

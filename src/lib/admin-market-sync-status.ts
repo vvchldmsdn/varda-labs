@@ -11,9 +11,15 @@ export type AdminSyncAssetInput = {
   market: string;
   currency: string;
   assetType: string | null;
-  priceQuoteType: string | null;
-  priceStatus: string | null;
-  priceFetchedAt: Date | string | null;
+};
+
+export type AdminSyncLiveQuoteInput = {
+  ticker: string;
+  market: string;
+  currency: string;
+  quoteType: string | null;
+  status: string | null;
+  fetchedAt: Date | string | null;
   priceAsOf: Date | string | null;
 };
 
@@ -63,20 +69,25 @@ export type CloseCoverageStatusSummary = {
 
 export function summarizeLivePriceStatus(
   assets: AdminSyncAssetInput[],
+  quotes: AdminSyncLiveQuoteInput[],
   cycle: AdminSyncCycleInput,
 ): LivePriceStatusSummary {
   const targets = syncableAssets(assets);
+  const latestQuotes = latestLiveQuotesByAssetKey(quotes);
   const staleOrMissingTargets: AdminSyncTarget[] = [];
   let freshCount = 0;
   let latestPriceTimestamp: string | null = null;
 
   for (const asset of targets) {
-    const priceTimestamp = latestTimestamp(asset.priceFetchedAt, asset.priceAsOf);
+    const quote = latestQuotes.get(assetLiveQuoteKey(asset)) ?? null;
+    const priceTimestamp = quote
+      ? latestTimestamp(quote.fetchedAt, quote.priceAsOf)
+      : null;
     if (priceTimestamp) {
       latestPriceTimestamp = maxIso(latestPriceTimestamp, priceTimestamp);
     }
 
-    if (hasFreshPriceMetadata(asset, cycle, priceTimestamp)) {
+    if (quote && hasFreshPriceMetadata(quote, cycle, priceTimestamp)) {
       freshCount += 1;
     } else {
       staleOrMissingTargets.push(assetTarget(asset));
@@ -157,13 +168,13 @@ function syncableAssets(assets: AdminSyncAssetInput[]) {
 }
 
 function hasFreshPriceMetadata(
-  asset: AdminSyncAssetInput,
+  quote: AdminSyncLiveQuoteInput,
   cycle: AdminSyncCycleInput,
   priceTimestamp: string | null,
 ) {
-  const quoteType = asset.priceQuoteType?.trim().toLowerCase() ?? "";
+  const quoteType = quote.quoteType?.trim().toLowerCase() ?? "";
   if (!FRESH_PRICE_QUOTE_TYPES.has(quoteType)) return false;
-  if (asset.priceStatus && asset.priceStatus !== "ok") return false;
+  if (quote.status && quote.status !== "ok") return false;
   if (!priceTimestamp) return false;
 
   const timestamp = Date.parse(priceTimestamp);
@@ -174,6 +185,25 @@ function hasFreshPriceMetadata(
   );
 }
 
+function latestLiveQuotesByAssetKey(rows: AdminSyncLiveQuoteInput[]) {
+  const sortedRows = [...rows].sort((left, right) => {
+    const timestampCompare =
+      latestTimestamp(right.fetchedAt, right.priceAsOf)?.localeCompare(
+        latestTimestamp(left.fetchedAt, left.priceAsOf) ?? "",
+      ) ?? 0;
+    if (timestampCompare !== 0) return timestampCompare;
+    return left.ticker.localeCompare(right.ticker);
+  });
+  const byKey = new Map<string, AdminSyncLiveQuoteInput>();
+
+  for (const row of sortedRows) {
+    const key = liveQuoteKey(row.market, row.ticker, row.currency);
+    if (!byKey.has(key)) byKey.set(key, row);
+  }
+
+  return byKey;
+}
+
 function latestTimestamp(
   left: Date | string | null,
   right: Date | string | null,
@@ -181,6 +211,14 @@ function latestTimestamp(
   const leftIso = timestampIso(left);
   const rightIso = timestampIso(right);
   return maxIso(leftIso, rightIso);
+}
+
+function assetLiveQuoteKey(asset: Pick<AdminSyncAssetInput, "market" | "ticker" | "currency">) {
+  return liveQuoteKey(asset.market, normalizeTicker(asset.ticker) ?? "", asset.currency);
+}
+
+function liveQuoteKey(market: string, ticker: string, currency: string) {
+  return `${market}:${normalizeTicker(ticker) ?? ""}:${currency}`;
 }
 
 function latestCloseRowsByTicker(rows: AdminSyncCloseRowInput[]) {

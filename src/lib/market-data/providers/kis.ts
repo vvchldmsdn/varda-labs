@@ -164,8 +164,8 @@ async function fetchKisLiveQuotes(
     rows,
     warnings: [
       context.dryRun
-        ? "kis live dry-run preview only; no assets rows were written"
-        : "kis live prices fetched for guarded assets.current_price write",
+        ? "kis live dry-run preview only; no live_price_quotes rows were written"
+        : "kis live prices fetched for guarded live_price_quotes write",
     ],
   };
 }

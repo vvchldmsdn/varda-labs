@@ -8,10 +8,9 @@ plus the remaining Cron plan. Vercel Cron is not enabled yet.
 ## Decision
 
 The next migration step should be the market-data freshness pipeline, not another
-dashboard panel. The read-only dashboard now has stronger calculations, but
-`assets.current_price` and the latest `daily_position_snapshots` currently come
-from the same imported state. In that state, today movement correctly renders as
-zero because there is no newer live price layer.
+dashboard panel. The read-only dashboard now has stronger calculations, but it
+needs a user-neutral live quote layer above the latest
+`daily_position_snapshots` before today movement can show intraday changes.
 
 ## Base44 Reference
 
@@ -50,6 +49,7 @@ Already available:
 - `assets.current_price`, `assets.ma_120`, `assets.days_above_ma`
 - `assets.price_source`, `assets.price_fetched_at`, `assets.price_as_of`,
   `assets.price_quote_type`, `assets.price_status`, `assets.price_error`
+- `live_price_quotes`
 - `fx_rates`
 - `asset_price_snapshots`
 - `market_data_sync_runs`
@@ -76,7 +76,7 @@ below in mind before broadening writes.
 
 ### `assets`
 
-Nullable live quote metadata:
+Manual/fallback price metadata:
 
 - `price_source varchar(100)`
 - `price_fetched_at timestamp with time zone`
@@ -87,7 +87,20 @@ Nullable live quote metadata:
 - `price_status varchar(50)` such as `ok`, `stale`, `failed`
 - `price_error text`
 
-Keep secrets out of this table.
+Keep secrets out of this table. Live market quotes for normal dashboard
+movement should use `live_price_quotes`, not per-user `assets` rows.
+
+### `live_price_quotes`
+
+Canonical user-neutral live/latest quote cache:
+
+- keyed by market, ticker, and provider
+- stores ticker, market, currency, provider, source, quote type, status, price,
+  `price_as_of`, and `fetched_at`
+- used by the dashboard movement path before falling back to
+  `assets.current_price`
+- does not store user/account/holding ids
+- does not store provider credentials, access tokens, headers, or raw responses
 
 ### `asset_price_snapshots`
 
@@ -249,8 +262,8 @@ Modes:
 
 - `mode=live`
   - fetch current quotes for active investment assets
-  - update `assets.current_price`
-  - update `assets.price_*` metadata
+  - upsert `live_price_quotes`
+  - do not update per-user `assets.current_price`
   - do not write a daily history snapshot
 - `mode=close`
   - fetch recent daily close rows
@@ -262,7 +275,7 @@ Modes:
 
 Writes:
 
-- `assets`
+- `live_price_quotes`
 - `asset_price_snapshots`
 - optionally `market_data_sync_runs`
 
@@ -418,8 +431,8 @@ Current route constraints:
 
 - `provider=kis&mode=live` defaults to `dryRun=true`. Actual live writes require
   `dryRun=false&confirmWrite=true`, a reviewed target filter, and `limit <= 5`.
-- KIS live writes update only `assets.current_price` and `assets.price_*`
-  metadata. They must not insert or update `asset_price_snapshots`.
+- KIS live writes upsert only `live_price_quotes`. They must not update
+  per-user `assets` rows and must not insert or update `asset_price_snapshots`.
 - `provider=kis&mode=close` may run as `dryRun=true` across the selected target
   set.
 - KIS actual close writes require `dryRun=false&confirmWrite=true`.
@@ -612,8 +625,8 @@ Extend dashboard health once jobs exist:
 
 Dashboard rules:
 
-- If live asset prices are fresher than the latest daily snapshot, today movement
-  compares live `assets.current_price` against the latest snapshot/close
+- If live quote cache rows are fresher than the latest daily snapshot, today movement
+  compares `live_price_quotes.price` against the latest snapshot/close
   baseline.
 - For USD positions, today movement uses live/latest local price multiplied by
   the latest stored USD/KRW rate, then compares that KRW value with the baseline
@@ -637,8 +650,7 @@ price and FX paths have separate, verified contracts.
 
 Terms to keep separate:
 
-- Price refresh: KIS live quote fetch that updates `assets.current_price` and
-  `assets.price_*` only.
+- Price refresh: KIS live quote fetch that upserts `live_price_quotes` only.
 - Close refresh: KIS close/history fetch that upserts `asset_price_snapshots`.
 - FX refresh: USD/KRW provider fetch that upserts `fx_rates`.
 - Snapshot write: guarded daily evidence write into `daily_*_snapshots`.
@@ -681,8 +693,8 @@ Current surfaces:
 
 Keep these operations separate:
 
-- Live price sync updates `assets.current_price` and `assets.price_*`
-  metadata. It does not write `asset_price_snapshots` or daily snapshots.
+- Live price sync upserts `live_price_quotes`. It does not update per-user
+  `assets` rows, write `asset_price_snapshots`, or write daily snapshots.
 - FX sync writes only `fx_rates`, and only when `dryRun=false` plus
   `confirmWrite=true` is intentionally supplied.
 - Close sync writes `asset_price_snapshots` for reviewed ticker/date targets.
@@ -733,7 +745,7 @@ Implemented status-only v1:
   routes during render.
 - It does not insert `market_data_sync_runs`, refresh `fx_rates`, update
   `assets`, upsert `asset_price_snapshots`, or write daily snapshots.
-- It displays live price metadata freshness, stored close coverage, stored
+- It displays live quote cache freshness, stored close coverage, stored
   USD/KRW status, daily snapshot row presence, KIS cooldown state derived from
   existing run rows, and recent sync runs.
 - It shows copyable parameter summaries only. It does not render executable

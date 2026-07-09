@@ -66,8 +66,8 @@ export default async function AdminMarketSyncPage() {
 
         <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
           <Panel
-            title="Live Price Metadata"
-            detail="assets.current_price freshness, DB only"
+            title="Live Quote Cache"
+            detail="live_price_quotes freshness, DB only"
           >
             <MetricGrid>
               <Metric label="Targets" value={status.livePrice.targetCount} />

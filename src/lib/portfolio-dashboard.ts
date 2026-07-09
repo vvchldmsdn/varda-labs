@@ -12,6 +12,7 @@ import {
   dailyPositionSnapshots,
   eventLedgerEntries,
   fxRates,
+  livePriceQuotes,
   settings,
 } from "@/db/schema";
 import {
@@ -57,6 +58,7 @@ export type DashboardAccount = "all" | AssetAccount;
 
 type AssetRow = typeof assets.$inferSelect;
 type AssetGroupRow = typeof assetGroups.$inferSelect;
+type LivePriceQuoteRow = typeof livePriceQuotes.$inferSelect;
 type PortfolioSnapshotRow = typeof dailyPortfolioSnapshots.$inferSelect;
 type EventLedgerRow = typeof eventLedgerEntries.$inferSelect;
 
@@ -286,7 +288,25 @@ export async function getPortfolioDashboard(
   const investmentAssetRows = assetRows.filter((asset) =>
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
   );
-  const selectedInvestmentAssetRows = investmentAssetRows.filter(
+  const quoteTickers = uniqueStrings(
+    investmentAssetRows
+      .map((asset) => normalizeTicker(asset.ticker))
+      .filter((ticker): ticker is string => Boolean(ticker)),
+  );
+  const liveQuoteRows =
+    quoteTickers.length > 0
+      ? await db
+          .select()
+          .from(livePriceQuotes)
+          .where(inArray(livePriceQuotes.ticker, quoteTickers))
+          .orderBy(desc(livePriceQuotes.fetchedAt))
+          .limit(Math.max(100, quoteTickers.length * 4))
+      : [];
+  const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
+  const valuationAssetRows = investmentAssetRows.map((asset) =>
+    applyLiveQuote(asset, liveQuotesByAssetKey.get(assetLiveQuoteKey(asset))),
+  );
+  const selectedInvestmentAssetRows = valuationAssetRows.filter(
     (asset) => selectedAccount === "all" || asset.account === selectedAccount,
   );
   const priceTickers = uniqueStrings(
@@ -317,7 +337,7 @@ export async function getPortfolioDashboard(
   const useTrendFilter = setting?.useTrendFilter ?? false;
   const accountLabels = buildAccountLabels(accountRows);
   const assetGroupNames = buildAssetGroupNames(assetGroupRows);
-  const unsupportedCurrencyAssets = investmentAssetRows.filter(
+  const unsupportedCurrencyAssets = valuationAssetRows.filter(
     (asset) => !resolveKrwFxRate(asset.currency, usdKrwRate).ok,
   );
   const returnSummary = buildReturnMetricsSummary(
@@ -326,7 +346,7 @@ export async function getPortfolioDashboard(
     usdKrwRate,
   );
 
-  const allHoldingsWithoutWeights = investmentAssetRows.map((asset) =>
+  const allHoldingsWithoutWeights = valuationAssetRows.map((asset) =>
     buildHolding({
       asset,
       accountTotalValueKrw: 0,
@@ -352,7 +372,7 @@ export async function getPortfolioDashboard(
     allHoldingsWithoutWeights.reduce((sum, holding) => sum + holding.valueKrw, 0),
   );
 
-  const allHoldings = investmentAssetRows.map((asset) =>
+  const allHoldings = valuationAssetRows.map((asset) =>
     buildHolding({
       asset,
       accountTotalValueKrw: accountTotals.get(asset.account as AssetAccount) ?? 0,
@@ -609,6 +629,40 @@ function buildDashboardMovementCycle(now: Date): DashboardMovementCycle {
     liveWindowStartAt,
     liveWindowEndAt: new Date(liveWindowStartAt.getTime() + 24 * 60 * 60 * 1000),
   };
+}
+
+function buildLiveQuotesByAssetKey(rows: LivePriceQuoteRow[]) {
+  const quotes = new Map<string, LivePriceQuoteRow>();
+
+  for (const row of rows) {
+    const key = liveQuoteKey(row.market, row.ticker, row.currency);
+    if (!quotes.has(key)) quotes.set(key, row);
+  }
+
+  return quotes;
+}
+
+function applyLiveQuote(asset: AssetRow, quote: LivePriceQuoteRow | undefined) {
+  if (!quote || quote.status !== "ok") return asset;
+
+  return {
+    ...asset,
+    currentPrice: quote.price,
+    priceSource: quote.source,
+    priceFetchedAt: quote.fetchedAt,
+    priceAsOf: quote.priceAsOf,
+    priceQuoteType: quote.quoteType,
+    priceStatus: quote.status,
+    priceError: quote.error,
+  };
+}
+
+function assetLiveQuoteKey(asset: Pick<AssetRow, "market" | "ticker" | "currency">) {
+  return liveQuoteKey(asset.market, normalizeTicker(asset.ticker) ?? "", asset.currency);
+}
+
+function liveQuoteKey(market: string, ticker: string, currency: string) {
+  return `${market}:${normalizeTicker(ticker) ?? ""}:${currency}`;
 }
 
 function buildHolding({
