@@ -69,6 +69,32 @@ Before adding a product refresh action, define a separate live quote policy:
 The close/history sync path can keep the stricter admin cooldown because it is a
 reviewed evidence-write workflow, not an interactive product refresh.
 
+## Live Quote Cache Validation Close-Out
+
+As of the 2026-07-09 production validation, the admin-only KIS live quote cache
+path is considered minimally verified:
+
+- syncable live quote coverage reached `15/15`;
+- Korea-listed targets reached `12/12`;
+- US-listed targets reached `3/3`;
+- actual KIS live writes upserted `live_price_quotes` only;
+- actual KIS live writes did not update `assets`, `asset_price_snapshots`, or
+  daily snapshot tables;
+- `market_data_sync_runs` recorded only sanitized admin operation metadata;
+- observed source labels were `kis_domestic_inquire_price` for Korea and
+  `kis_overseas_price:{EXCHANGE}` for US;
+- authenticated `/`, `/today`, and `/admin/market-sync` smoke checks returned
+  `200`;
+- unauthenticated `/`, `/today`, and `/admin/market-sync` smoke checks returned
+  `401`;
+- credential-term scans for `password`, `token`, `secret`, `api_key`,
+  `authorization`, and `env` returned zero occurrences in authenticated HTML;
+- read-only route smoke did not create provider calls or DB side effects.
+
+This close-out validates the manual admin live quote cache path only. It does
+not approve a public refresh button, admin write controls, Cron/live automation,
+close/snapshot writes, or `assets.current_price` cleanup.
+
 ## Future UI States
 
 The status console can later gain explicit action panels, but each panel must be

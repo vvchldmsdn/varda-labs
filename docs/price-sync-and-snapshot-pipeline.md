@@ -1,6 +1,6 @@
 # Price Sync and Snapshot Pipeline Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 This document records the current manual market-data and daily snapshot pipeline
 plus the remaining Cron plan. Vercel Cron is not enabled yet.
@@ -255,6 +255,38 @@ Current production observation after the approved 2026-07-09 one-write smoke:
   current stored USD/KRW is lower than the baseline snapshot FX.
 - The matching pure fixture is covered by `portfolio-math` tests so a future
   UI or query refactor does not silently turn this FX movement back into zero.
+
+Current production observation after the approved 2026-07-09 live quote cache
+validation:
+
+- Final syncable live quote coverage reached `15/15`:
+  - Korea-listed assets: `12/12`
+  - US-listed assets: `3/3`
+- Guarded KIS live actual writes upserted only `live_price_quotes`.
+- The live path did not update `assets`, `asset_price_snapshots`,
+  `daily_position_snapshots`, or `daily_portfolio_snapshots`.
+- `market_data_sync_runs` recorded the admin operation metadata for each manual
+  batch.
+- Provider/source evidence:
+  - Korea: `kis_domestic_inquire_price`
+  - US: `kis_overseas_price:{EXCHANGE}`
+- US quote rows were stored with `market='us'`, `currency='USD'`,
+  `provider='kis'`, and `status='ok'`.
+- Authenticated production smoke for `/`, `/today`, and `/admin/market-sync`
+  returned `200`; unauthenticated requests returned `401`.
+- `/admin/market-sync` showed the live quote cache full-coverage marker.
+- `/today` no longer reported a not-ready state after live quote cache coverage
+  reached `15/15`.
+- The rendered authenticated HTML had zero occurrences of the exact credential
+  terms `password`, `token`, `secret`, `api_key`, `authorization`, and `env`.
+  A broad scan for `header` can be a false positive because page/framework
+  output can contain that generic word.
+- Re-opening the read-only routes did not change `live_price_quotes`, `assets`,
+  `asset_price_snapshots`, `daily_position_snapshots`,
+  `daily_portfolio_snapshots`, or `market_data_sync_runs`.
+- This validates the admin-only KIS live quote cache write path. It does not
+  approve a public refresh button, admin action button, Cron/live automation,
+  close/snapshot writes, or cleanup of fallback `assets.current_price` data.
 
 ### `POST /api/admin/market/prices/sync`
 
