@@ -361,7 +361,6 @@ function RawRowsDetails({ holding }: { holding: GroupedEtfHoldingRow }) {
               shares {formatNullableNumber(row.shares)} / value{" "}
               {formatNullableNumber(row.marketValue)}
             </p>
-            <p className="truncate">legacy {row.legacyBase44Id ?? "-"}</p>
           </div>
         ))}
       </div>
