@@ -2,10 +2,10 @@
 
 Last updated: 2026-07-10
 
-Status: input normalization and the pure risk-math helper are implemented and
-fixture-tested. The DB adapter and route remain pending. This work does not
-add a provider call, API, write path, Cron behavior, schema, migration,
-cleanup, backfill, recommendation, or score.
+Status: input normalization, the pure risk-math helper, the read-model
+composer, and the server-only DB adapter are implemented and audited. The
+route remains pending. This work does not add a provider call, API, write path,
+Cron behavior, schema, migration, cleanup, backfill, recommendation, or score.
 
 ## Decision
 
@@ -36,6 +36,8 @@ Required portfolio metrics:
 
 - annualized portfolio volatility;
 - weighted average standalone volatility;
+- transparent diversification benefit, defined as
+  `1 - portfolio volatility / weighted standalone volatility`;
 - weighted average pairwise correlation;
 - full correlation matrix with display-safe ticker/name labels;
 - risk-contribution ENB;
@@ -409,9 +411,9 @@ return rows:
 - aligned KRW return series and dates;
 - risk-free rate.
 
-It returns only display-ready metrics and data-health metadata. A
-separate server-only DB adapter should load `assets`, price history, and FX,
-construct the aligned input, and call the helper.
+It returns only display-ready metrics and data-health metadata. The
+server-only DB adapter loads `assets` first, derives the selected tickers, then
+loads bounded price history and FX in parallel before calling the helper.
 
 The input normalizer aggregates equal `market + currency + ticker`
 instruments, maps evidence to service dates, applies bounded price/FX carry,
@@ -456,8 +458,8 @@ one parity number.
 3. Window-agnostic pure covariance/correlation/volatility/risk contribution,
    ENB, Sharpe, and stress helper: completed with synthetic and separated
    legacy/canonical parity fixtures.
-4. Add a server-only Drizzle adapter that reads stored data in parallel where
-   independent.
+4. Server-only Drizzle adapter, pure composer fixtures, and SELECT-only DB
+   smoke: completed. See `docs/portfolio-risk-read-model-audit.md`.
 5. Add a minimal read-only Server Component surface using URL search params
    for account and window.
 6. Add local client components only for matrix/table interaction that does not

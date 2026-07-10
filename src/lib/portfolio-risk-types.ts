@@ -62,6 +62,7 @@ export type PortfolioRiskPortfolioMetrics = {
   volatilityDaily: number;
   volatilityAnnualized: number;
   weightedAverageStandaloneVolatilityAnnualized: number;
+  diversificationBenefitPct: PortfolioRiskMetric;
   sharpe: PortfolioRiskMetric;
   correlationMatrix: Array<Array<number | null>>;
   weightedAverageCorrelation: PortfolioRiskMetric;

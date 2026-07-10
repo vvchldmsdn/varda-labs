@@ -86,8 +86,8 @@ Closed enough for now:
 Do next only after user visual review or explicit direction:
 
 - Route/surface map updates for newly migrated features.
-- Review a server-only risk DB adapter now that input normalization and the
-  window-agnostic pure risk-math helper both pass fixtures.
+- Add a minimal read-only portfolio-risk Server Component route after explicit
+  direction; the server-only adapter and SELECT-only audit now pass.
 - Focused visual review for `/today`, `/history`, `/etfs`, and `/market`.
 - Product-facing identifier cleanup where legacy/internal ids still appear.
 
@@ -98,7 +98,7 @@ Still deferred:
 - Public sync buttons.
 - Admin action buttons.
 - Recommendation and composite risk-scoring integration.
-- Portfolio risk UI until the server-only adapter has a read-only data audit.
+- Portfolio risk UI remains pending; its server-only adapter audit is complete.
 - Snapshot/Cron forecast-calendar correction until a separate no-write review.
 - Cron automation changes.
 - Schema/migration changes for frontend-only work.

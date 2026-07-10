@@ -13,6 +13,7 @@
     "audit:market-context": "node scripts/audit-market-context-readonly.mjs",
     "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",
     "audit:portfolio-risk": "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs",
+    "audit:portfolio-risk-read-model": "node --no-warnings scripts/audit-portfolio-risk-read-model.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",

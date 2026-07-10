@@ -57,6 +57,7 @@ describe("portfolio risk math", () => {
       [1, 1],
     ]);
     assert.equal(result.portfolio?.weightedAverageCorrelation.value, 1);
+    assertClose(result.portfolio?.diversificationBenefitPct.value, 0);
     assertClose(result.portfolio?.riskContributionEnb.value, 2);
     assertClose(result.instruments[0].signedRiskContributionPct, 50);
     assertClose(result.instruments[1].absoluteRiskSharePct, 50);
@@ -76,6 +77,7 @@ describe("portfolio risk math", () => {
     assertClose(result.portfolio?.correlationMatrix[0][1], 0);
     assertClose(result.portfolio?.weightedAverageCorrelation.value, 0);
     assertClose(result.portfolio?.volatilityDaily, Math.sqrt(0.0002 / 3));
+    assert.ok(result.portfolio?.diversificationBenefitPct.value > 0);
   });
 
   it("keeps negative signed hedge contribution separate from absolute ENB shares", () => {

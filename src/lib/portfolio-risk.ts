@@ -110,6 +110,11 @@ function completeResult(
   const annualizationScale = Math.sqrt(base.annualizationFactor);
   const portfolioReturns = weightedSeries(prepared.series, prepared.weights);
   const portfolioVolatilityDaily = Math.sqrt(portfolioVariance);
+  const weightedStandaloneVolatilityAnnualized = prepared.weights.reduce(
+    (sum, weight, index) =>
+      sum + weight * deviations[index] * annualizationScale,
+    0,
+  );
   const riskContribution = calculateRiskContribution({
     covariance,
     weights: prepared.weights,
@@ -142,11 +147,19 @@ function completeResult(
       meanReturnDaily: arithmeticMean(portfolioReturns),
       volatilityDaily: portfolioVolatilityDaily,
       volatilityAnnualized: portfolioVolatilityDaily * annualizationScale,
-      weightedAverageStandaloneVolatilityAnnualized: prepared.weights.reduce(
-        (sum, weight, index) =>
-          sum + weight * deviations[index] * annualizationScale,
-        0,
-      ),
+      weightedAverageStandaloneVolatilityAnnualized:
+        weightedStandaloneVolatilityAnnualized,
+      diversificationBenefitPct:
+        weightedStandaloneVolatilityAnnualized > 0
+          ? {
+              value:
+                (1 -
+                  (portfolioVolatilityDaily * annualizationScale) /
+                    weightedStandaloneVolatilityAnnualized) *
+                100,
+              reason: null,
+            }
+          : { value: null, reason: "zero_variance" },
       sharpe: annualizedSharpe({
         returns: portfolioReturns,
         dailyRiskFreeRate: base.dailyRiskFreeRate,
