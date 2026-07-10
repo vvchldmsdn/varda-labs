@@ -14,7 +14,9 @@ side effects.
 ## Global Rules
 
 - All listed product/operator pages are protected by `src/proxy.ts` Basic Auth
-  in production.
+  in production. Neon Auth is selected only as a future identity/session
+  boundary in `docs/auth-identity-session-strategy.md`; no route has switched
+  auth behavior yet.
 - Server-rendered read views should load DB-backed data directly through server
   helpers. Do not introduce first-render browser REST refetching for these
   surfaces.

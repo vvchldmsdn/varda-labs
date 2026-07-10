@@ -6,6 +6,9 @@ Status: completed read-only preflight. This document and the companion audit do
 not authorize an auth provider, schema migration, owner backfill, RLS policy,
 query behavior change, user write path, or recommendation implementation.
 
+The provider/session decision that follows this preflight is recorded in
+`docs/auth-identity-session-strategy.md`.
+
 ## Outcome
 
 The current deployment is still a single imported portfolio behind Basic Auth.
@@ -247,7 +250,8 @@ This is an ADR direction only, not executable migration SQL.
 ## Ordered Gates
 
 1. Approve this ownership classification and explicit initial-owner policy.
-2. Select an auth provider and session strategy.
+   Completed.
+2. Select an auth provider and session strategy. Completed in Phase 1A.
 3. Draft exact `app_users`/`auth_identities`/owner-column Drizzle schema and SQL,
    still without applying it.
 4. Add two-user application-level query/write fixtures.

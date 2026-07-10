@@ -10,6 +10,10 @@ The measured table inventory, row counts, owner migration plan, query/write
 inventory, two-user fixture plan, and RLS ADR direction are in
 `docs/auth-tenant-phase0-preflight.md`.
 
+The selected identity provider, session strategy, Next.js authorization
+boundaries, and Basic Auth transition are in
+`docs/auth-identity-session-strategy.md`.
+
 ## Current State
 
 varda-labs is a single imported portfolio protected by Basic Auth. It is not a
@@ -109,19 +113,33 @@ write in transactions. Admin/import routes remain separate.
 Recommendation runs and items must each require the canonical owner; account
 scope is not a substitute. Item owner must match parent run owner.
 
-## Auth Provider Gate
+## Phase 1A Identity And Session Decision
 
-No provider is selected. Compare candidates only after the owner contract is
-accepted, using:
+Neon Auth is selected for development/preview identity integration. Google is
+the only initial social method. Neon Auth database sessions are authoritative;
+a short-lived signed cookie cache is a performance layer only.
 
-- App Router server-session support;
-- Vercel deployment and local-development behavior;
-- provider-subject to internal-UUID mapping;
-- social account linking and lifecycle hooks;
-- Neon/Postgres integration;
-- operational burden and lock-in.
+The official quickstart currently labels Neon Auth Beta, so production
+multi-user cutover and Basic Auth removal remain blocked on a separate
+production-readiness review or an approved replacement provider.
 
-Provider selection does not change the internal UUID ownership contract.
+The current Neon project already has a managed `neon_auth` schema but no auth
+users, sessions, or linked accounts. varda-labs will not own or migrate those
+managed tables through `src/db/schema.ts`.
+
+Product identity remains provider-neutral:
+
+- Neon Auth user id is an external provider subject;
+- `auth_identities(provider = 'neon_auth', provider_subject)` resolves it to
+  `app_users.id`;
+- email, Google subject, Basic Auth username, and account code are never owner
+  keys;
+- missing mapping or inactive app user fails closed before financial queries;
+- v1 is multi-user individual ownership, with no organization/household
+  tenant model;
+- registration remains closed until owner isolation is proven.
+
+Provider selection does not change the canonical internal UUID contract.
 
 ## RLS Direction
 
@@ -142,14 +160,14 @@ Do not enable RLS until this behavior has integration tests.
 
 ## Ordered Approval Gates
 
-1. Phase 0 ownership/preflight review.
-2. Auth provider and session strategy.
-3. Exact identity/owner schema proposal, no migration.
+1. Phase 0 ownership/preflight review. Completed.
+2. Auth provider and session strategy. Completed in the Phase 1A ADR.
+3. Exact identity/owner schema and guarded backfill proposal, no migration.
 4. Two-user query/write fixtures.
 5. Reviewed migration and explicit initial-owner backfill.
 6. Owner-filtered application reads/writes and deployed isolation smoke.
 7. Optional RLS implementation in a separate gate.
 8. User-facing write workflows and recommendation persistence.
 
-The immediate next decision is whether to approve the Phase 0 ownership model,
-not whether to enable RLS or start recommendation migrations.
+The immediate next gate is the exact identity/owner migration and guarded
+backfill plan. It must not enable RLS or recommendation persistence.
