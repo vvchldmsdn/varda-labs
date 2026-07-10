@@ -2,8 +2,8 @@
 
 Last updated: 2026-07-11
 
-Status: database expansion applied and verified. Code commit/deployment smoke is
-pending before this gate is closed.
+Status: completed. The database-first expansion, schema deployment, and
+production smoke verification all passed.
 
 This phase adds only empty identity infrastructure and nullable transitional
 owner columns. It provisions no user, assigns no owner, changes no product
@@ -100,6 +100,17 @@ Observed after `npm run db:migrate`:
 The still-running previous production deployment passed authenticated and
 unauthenticated route smoke against the expanded DB before the new schema code
 was committed.
+
+Commit `68fccf5` then deployed successfully through Vercel. Post-deployment
+production smoke confirmed:
+
+- entity GET routes return 401 without auth and 200 with admin auth;
+- `/`, `/today`, `/history`, `/portfolio/structure`, `/portfolio/risk`,
+  `/market`, and `/etfs` return 200 with Basic Auth;
+- owner-key and configured-secret leaks are 0;
+- entity row counts are unchanged;
+- a repeated tenant-expand audit still reports empty identity tables and zero
+  non-null canonical owners.
 
 ## Next Gate
 
