@@ -3,6 +3,8 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import { isExcludedBase44AssetType } from "./lib/base44-asset-policy.mjs";
+
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const SENSITIVE_KEY_PATTERN = /(token|secret|password|api[_-]?key|created_by)/i;
 
@@ -198,7 +200,7 @@ function normalizeAsset(record) {
   };
 }
 
-function summarize(normalizedGroups, normalizedAssets) {
+function summarize(normalizedGroups, normalizedAssets, excludedAssets) {
   const accountCodes = new Set(normalizedAssets.map((asset) => asset.account));
   const groupIds = new Set(normalizedGroups.map((group) => group.legacyBase44Id));
   const groupedAssets = normalizedAssets.filter((asset) => asset.legacyGroupId);
@@ -209,6 +211,10 @@ function summarize(normalizedGroups, normalizedAssets) {
   return {
     assetGroups: normalizedGroups.length,
     assets: normalizedAssets.length,
+    excludedAssets: excludedAssets.length,
+    excludedAssetTypes: [
+      ...new Set(excludedAssets.map((asset) => asset.assetType)),
+    ].sort(),
     accountCodes: [...accountCodes].sort(),
     groupedAssets: groupedAssets.length,
     unmatchedGroupRefs: unmatchedGroups.map((asset) => ({
@@ -463,8 +469,14 @@ async function main() {
   const groups = assetGroupRecords.map((record, index) =>
     normalizeAssetGroup(record, index),
   );
-  const assets = assetRecords.map(normalizeAsset);
-  const summary = summarize(groups, assets);
+  const normalizedAssets = assetRecords.map(normalizeAsset);
+  const excludedAssets = normalizedAssets.filter((asset) =>
+    isExcludedBase44AssetType(asset.assetType),
+  );
+  const assets = normalizedAssets.filter(
+    (asset) => !isExcludedBase44AssetType(asset.assetType),
+  );
+  const summary = summarize(groups, assets, excludedAssets);
 
   console.log(
     JSON.stringify(

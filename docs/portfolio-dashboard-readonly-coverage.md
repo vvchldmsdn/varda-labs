@@ -188,6 +188,12 @@ Non-investment asset types:
 - `fixed_deposit`
 - `housing_subscription`
 
+The Base44 migration policy now intentionally excludes the legacy `savings`
+and `housing_subscription` rows. Their two current `assets` rows were removed
+on 2026-07-10, leaving 17 retained assets. The generic non-investment
+classification remains as a defensive boundary so a future explicitly created
+row cannot accidentally enter investment calculations.
+
 Non-investment assets are:
 
 - excluded from headline investment total, weights, drift, movement, and return

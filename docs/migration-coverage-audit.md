@@ -45,7 +45,7 @@ Inventory totals:
 | Base44 entity | Status | Rows | Date range | varda-labs mapping | Notes |
 | --- | --- | ---: | --- | --- | --- |
 | `AccountBalance` | `migrated` | 3 | 2026-02-18 to 2026-02-26 | `account_balance_snapshots` | Imported by `scripts/import-base44-history.mjs` with `legacy_base44_id`. |
-| `Asset` | `migrated` | 19 | 2026-02-18 to 2026-06-22 | `assets`, derived `accounts` | UUID primary keys are retained; Base44 ids are in `assets.legacy_base44_id`. |
+| `Asset` | `migrated` | 19 source / 17 retained | 2026-02-18 to 2026-06-22 | `assets`, derived `accounts` | UUID primary keys are retained; Base44 ids are in `assets.legacy_base44_id`. The legacy `savings` and `housing_subscription` rows were deliberately removed and are excluded from repeat core imports. |
 | `AssetFactorEstimate` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. Add only if future factor-estimate history appears. |
 | `AssetFactorProfile` | `needs_decision` | 27 | 2026-06-23 to 2026-07-01 | candidate: `asset_factor_profiles` or fold into ETF/factor analytics | Nonzero and useful for diversification, but overlaps with `EtfMaster`, `EtfHolding`, and future factor models. Decide whether this is imported source data or regenerated analysis output. |
 | `AssetGroup` | `migrated` | 1 | 2026-03-19 | `asset_groups`, derived `asset_group_members` | Imported by core import. Empty member priority/ratio JSON was not separately modeled. |
