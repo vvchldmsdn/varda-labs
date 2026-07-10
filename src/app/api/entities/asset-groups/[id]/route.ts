@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { assetGroupEntityApiSelection } from "@/db/entity-api-selections";
 import { assetGroups } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
 
@@ -151,7 +152,7 @@ export async function PATCH(
     .update(assetGroups)
     .set(updateValues)
     .where(eq(assetGroups.id, id))
-    .returning();
+    .returning(assetGroupEntityApiSelection);
 
   if (!updated) {
     return NextResponse.json({ error: "Asset group not found" }, { status: 404 });
@@ -172,7 +173,7 @@ export async function DELETE(
   const [deleted] = await db
     .delete(assetGroups)
     .where(eq(assetGroups.id, id))
-    .returning();
+    .returning(assetGroupEntityApiSelection);
 
   if (!deleted) {
     return NextResponse.json({ error: "Asset group not found" }, { status: 404 });

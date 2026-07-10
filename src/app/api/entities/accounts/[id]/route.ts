@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { accountEntityApiSelection } from "@/db/entity-api-selections";
 import { accounts } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
 
@@ -113,7 +114,7 @@ export async function PATCH(
     .update(accounts)
     .set(updateValues)
     .where(eq(accounts.id, id))
-    .returning();
+    .returning(accountEntityApiSelection);
 
   if (!updated) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -134,7 +135,7 @@ export async function DELETE(
   const [deleted] = await db
     .delete(accounts)
     .where(eq(accounts.id, id))
-    .returning();
+    .returning(accountEntityApiSelection);
 
   if (!deleted) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { assetGroupMemberEntityApiSelection } from "@/db/entity-api-selections";
 import { assetGroupMembers } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
 
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   const rows = await db
-    .select()
+    .select(assetGroupMemberEntityApiSelection)
     .from(assetGroupMembers)
     .orderBy(
       asc(assetGroupMembers.sortOrder),
@@ -139,7 +140,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(assetGroupMembers)
     .values(insertValues)
-    .returning();
+    .returning(assetGroupMemberEntityApiSelection);
 
   return NextResponse.json(created, { status: 201 });
 }

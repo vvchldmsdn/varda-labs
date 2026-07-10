@@ -5,7 +5,8 @@ import { config } from "dotenv";
 
 import {
   CANONICAL_OWNER_CONTRACT,
-  TENANT_TABLE_POLICIES,
+  EXPANDED_TENANT_TABLE_POLICIES,
+  resolveTenantTablePolicies,
   summarizeTenantClassifications,
 } from "./lib/tenant-ownership-policy.mjs";
 
@@ -18,7 +19,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
 
-for (const policy of TENANT_TABLE_POLICIES) {
+for (const policy of EXPANDED_TENANT_TABLE_POLICIES) {
   assert.match(policy.table, /^[a-z][a-z0-9_]*$/);
   if (policy.currentOwnerColumn) {
     assert.match(policy.currentOwnerColumn, /^[a-z][a-z0-9_]*$/);
@@ -26,7 +27,6 @@ for (const policy of TENANT_TABLE_POLICIES) {
 }
 
 const sql = neon(process.env.DATABASE_URL);
-const expectedTables = TENANT_TABLE_POLICIES.map((policy) => policy.table).sort();
 const publicTables = await sql.query(`
   select table_name
   from information_schema.tables
@@ -34,8 +34,11 @@ const publicTables = await sql.query(`
     and table_type = 'BASE TABLE'
   order by table_name
 `);
+const publicTableNames = publicTables.map((row) => row.table_name);
+const activePolicies = resolveTenantTablePolicies(publicTableNames);
+const expectedTables = activePolicies.map((policy) => policy.table).sort();
 assert.deepEqual(
-  publicTables.map((row) => row.table_name),
+  publicTableNames,
   expectedTables,
   "tenant policy must classify every public base table exactly once",
 );
@@ -57,13 +60,13 @@ const foreignKeys = await sql.query(`
 `);
 
 const rowCounts = await sql.query(
-  TENANT_TABLE_POLICIES.map(
+  activePolicies.map(
     ({ table }) =>
       `select '${table}'::text as table_name, count(*)::int as row_count from "${table}"`,
   ).join(" union all "),
 );
 
-const legacyOwnerPolicies = TENANT_TABLE_POLICIES.filter(
+const legacyOwnerPolicies = activePolicies.filter(
   (policy) => policy.currentOwnerColumn,
 );
 const ownerStats = await sql.query(
@@ -98,7 +101,7 @@ const ownerStatsByKey = new Map(
   ]),
 );
 
-const tables = TENANT_TABLE_POLICIES.map((policy) => {
+const tables = activePolicies.map((policy) => {
   const currentColumn = policy.currentOwnerColumn
     ? columnByKey.get(`${policy.table}:${policy.currentOwnerColumn}`)
     : null;
@@ -152,7 +155,7 @@ console.log(
       databaseSideEffects: false,
       selectCount: 5,
       canonicalOwnerContract: CANONICAL_OWNER_CONTRACT,
-      classificationCounts: summarizeTenantClassifications(),
+      classificationCounts: summarizeTenantClassifications(activePolicies),
       foreignKeyCount: foreignKeys.length,
       userOwnedRows,
       canonicalOwnerReadyRows,

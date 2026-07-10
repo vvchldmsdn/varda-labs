@@ -3,7 +3,10 @@ import { describe, it } from "node:test";
 
 import {
   CANONICAL_OWNER_CONTRACT,
+  EXPANDED_TENANT_TABLE_POLICIES,
+  IDENTITY_SYSTEM_TABLE_POLICIES,
   TENANT_TABLE_POLICIES,
+  resolveTenantTablePolicies,
   summarizeTenantClassifications,
 } from "../scripts/lib/tenant-ownership-policy.mjs";
 
@@ -17,8 +20,41 @@ describe("tenant ownership policy", () => {
       user_owned: 14,
       shared_reference: 7,
       admin_system: 1,
+      identity_system: 0,
       unresolved: 0,
     });
+  });
+
+  it("prepares an atomic identity-system expansion", () => {
+    const currentNames = TENANT_TABLE_POLICIES.map((policy) => policy.table);
+    const expandedNames = EXPANDED_TENANT_TABLE_POLICIES.map(
+      (policy) => policy.table,
+    );
+
+    assert.deepEqual(
+      IDENTITY_SYSTEM_TABLE_POLICIES.map((policy) => policy.table),
+      ["app_users", "auth_identities"],
+    );
+    assert.equal(expandedNames.length, 24);
+    assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
+    assert.deepEqual(
+      resolveTenantTablePolicies(expandedNames),
+      EXPANDED_TENANT_TABLE_POLICIES,
+    );
+    assert.throws(
+      () => resolveTenantTablePolicies([...currentNames, "app_users"]),
+      /expanded atomically/,
+    );
+    assert.deepEqual(
+      summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
+      {
+        user_owned: 14,
+        shared_reference: 7,
+        admin_system: 1,
+        identity_system: 2,
+        unresolved: 0,
+      },
+    );
   });
 
   it("keeps account labels separate from the tenant boundary", () => {
@@ -40,5 +76,11 @@ describe("tenant ownership policy", () => {
     assert.equal(classification("asset_price_snapshots"), "shared_reference");
     assert.equal(classification("live_price_quotes"), "shared_reference");
     assert.equal(classification("market_data_sync_runs"), "admin_system");
+    assert.equal(
+      EXPANDED_TENANT_TABLE_POLICIES.find(
+        (policy) => policy.table === "app_users",
+      )?.classification,
+      "identity_system",
+    );
   });
 });

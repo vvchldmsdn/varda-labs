@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { assetGroupEntityApiSelection } from "@/db/entity-api-selections";
 import { assetGroups } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   const rows = await db
-    .select()
+    .select(assetGroupEntityApiSelection)
     .from(assetGroups)
     .orderBy(asc(assetGroups.sortOrder), asc(assetGroups.name));
 
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
       executionMode: body.executionMode ?? body.execution_mode ?? "gap_first",
       ownerUserId: body.ownerUserId ?? body.owner_user_id ?? null,
     })
-    .returning();
+    .returning(assetGroupEntityApiSelection);
 
   return NextResponse.json(created, { status: 201 });
 }

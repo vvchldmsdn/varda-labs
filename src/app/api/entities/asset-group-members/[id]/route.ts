@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { assetGroupMemberEntityApiSelection } from "@/db/entity-api-selections";
 import { assetGroupMembers } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
 
@@ -126,7 +127,7 @@ export async function PATCH(
     .update(assetGroupMembers)
     .set(updateValues)
     .where(eq(assetGroupMembers.id, id))
-    .returning();
+    .returning(assetGroupMemberEntityApiSelection);
 
   if (!updated) {
     return NextResponse.json(
@@ -150,7 +151,7 @@ export async function DELETE(
   const [deleted] = await db
     .delete(assetGroupMembers)
     .where(eq(assetGroupMembers.id, id))
-    .returning();
+    .returning(assetGroupMemberEntityApiSelection);
 
   if (!deleted) {
     return NextResponse.json(

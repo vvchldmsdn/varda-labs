@@ -168,15 +168,17 @@ Do not enable RLS until this behavior has integration tests.
 2. Auth provider and session strategy. Completed in the Phase 1A ADR.
 3. Exact identity/owner schema and guarded backfill proposal, no migration.
    Completed in Phase 1B.
-4. Reviewed expand-only migration with no identity row or backfill.
-5. Writer-safety and two-user query/write fixtures.
-6. Explicit initial-owner backfill and staged constraints.
-7. Owner-filtered application reads/writes and deployed isolation smoke.
-8. Final owner-column contract rename.
-9. Optional RLS implementation in a separate gate.
-10. User-facing write workflows and recommendation persistence.
+4. Schema-evolution response boundary hardening with no database change.
+   Implemented in Phase 1C0; verification is recorded separately.
+5. Reviewed expand-only migration with no identity row or backfill.
+6. Writer-safety and two-user query/write fixtures.
+7. Explicit initial-owner backfill and staged constraints.
+8. Owner-filtered application reads/writes and deployed isolation smoke.
+9. Final owner-column contract rename.
+10. Optional RLS implementation in a separate gate.
+11. User-facing write workflows and recommendation persistence.
 
 The immediate next gate is the expand-only Phase 1C implementation described
-in `docs/auth-tenant-phase1b-migration-plan.md`. It must not create an owner,
-backfill rows, change product behavior, enable RLS, or add recommendation
-persistence.
+in `docs/auth-tenant-phase1b-migration-plan.md`, after Phase 1C0 verification.
+It must not create an owner, backfill rows, change product behavior, enable RLS,
+or add recommendation persistence.

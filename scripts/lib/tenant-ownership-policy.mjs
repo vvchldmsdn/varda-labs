@@ -2,6 +2,7 @@ export const TENANT_CLASSIFICATIONS = Object.freeze([
   "user_owned",
   "shared_reference",
   "admin_system",
+  "identity_system",
   "unresolved",
 ]);
 
@@ -41,6 +42,31 @@ export const TENANT_TABLE_POLICIES = Object.freeze([
   userOwned("settings"),
 ]);
 
+export const IDENTITY_SYSTEM_TABLE_POLICIES = Object.freeze([
+  identitySystem("app_users"),
+  identitySystem("auth_identities"),
+]);
+
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...TENANT_TABLE_POLICIES,
+  ...IDENTITY_SYSTEM_TABLE_POLICIES,
+]);
+
+export function resolveTenantTablePolicies(publicTableNames) {
+  const publicTableSet = new Set(publicTableNames);
+  const presentIdentityTables = IDENTITY_SYSTEM_TABLE_POLICIES.filter(
+    ({ table }) => publicTableSet.has(table),
+  );
+
+  if (presentIdentityTables.length === 0) return TENANT_TABLE_POLICIES;
+
+  if (presentIdentityTables.length !== IDENTITY_SYSTEM_TABLE_POLICIES.length) {
+    throw new Error("identity system tables must be expanded atomically");
+  }
+
+  return EXPANDED_TENANT_TABLE_POLICIES;
+}
+
 export function summarizeTenantClassifications(policies = TENANT_TABLE_POLICIES) {
   const summary = Object.fromEntries(
     TENANT_CLASSIFICATIONS.map((classification) => [classification, 0]),
@@ -75,6 +101,15 @@ function adminSystem(table) {
   return Object.freeze({
     table,
     classification: "admin_system",
+    currentOwnerColumn: null,
+    canonicalOwnerRequired: false,
+  });
+}
+
+function identitySystem(table) {
+  return Object.freeze({
+    table,
+    classification: "identity_system",
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
   });

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { accountEntityApiSelection } from "@/db/entity-api-selections";
 import { accounts } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
 
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   const rows = await db
-    .select()
+    .select(accountEntityApiSelection)
     .from(accounts)
     .orderBy(asc(accounts.sortOrder), asc(accounts.name));
 
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(accounts)
     .values(insertValues)
-    .returning();
+    .returning(accountEntityApiSelection);
 
   return NextResponse.json(created, { status: 201 });
 }

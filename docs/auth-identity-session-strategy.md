@@ -350,6 +350,10 @@ Phase 1B completed the plan-only exact identity/owner schema, transition matrix,
 staged SQL drafts, and guarded backfill contract in
 `docs/auth-tenant-phase1b-migration-plan.md`.
 
+Phase 1C0 hardens entity API and product response boundaries before the schema
+adds owner columns. Its contract is in
+`docs/auth-tenant-phase1c0-response-boundary.md`.
+
 The next narrow slice is:
 
 `Auth/Tenant Phase 1C: Identity Tables And Nullable Owner Expand Migration`

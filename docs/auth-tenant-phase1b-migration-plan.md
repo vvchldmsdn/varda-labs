@@ -304,7 +304,8 @@ No rollback uses `CASCADE`, row deletion, owner reassignment, or managed
 
 Phase 1B is complete only when reviewers confirm:
 
-- every current public table remains classified 14 / 7 / 1 / 0;
+- every current public table remains classified 14 user-owned / 7 shared / 1
+  admin / 0 identity-system / 0 unresolved;
 - every natural unique above is explicitly accepted or deliberately deferred;
 - all listed parent-child relationships reject a cross-owner fixture;
 - dry-run is the default and actual mode requires all confirmations;
@@ -316,7 +317,11 @@ Phase 1B is complete only when reviewers confirm:
 
 ## Next Narrow Slice
 
-After review, Phase 1C may implement only the expand step:
+Phase 1C0 first hardens the schema-evolution response boundary documented in
+`docs/auth-tenant-phase1c0-response-boundary.md`. It changes code and response
+projections only, with no schema or row write.
+
+After Phase 1C0 is verified, Phase 1C may implement only the expand step:
 
 - add `app_users` and `auth_identities` to the active Drizzle schema;
 - add nullable `canonical_owner_user_id` plus regular indexes to the 14
