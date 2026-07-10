@@ -321,7 +321,7 @@ Phase 1C0 first hardens the schema-evolution response boundary documented in
 `docs/auth-tenant-phase1c0-response-boundary.md`. It changes code and response
 projections only, with no schema or row write.
 
-After Phase 1C0 is verified, Phase 1C may implement only the expand step:
+Phase 1C implemented only the reviewed expand step:
 
 - add `app_users` and `auth_identities` to the active Drizzle schema;
 - add nullable `canonical_owner_user_id` plus regular indexes to the 14
@@ -330,4 +330,6 @@ After Phase 1C0 is verified, Phase 1C may implement only the expand step:
 - apply no owner row and run no backfill;
 - make no query, writer, auth UI, RLS, or Basic Auth change.
 
-Writer safety and guarded backfill remain separate approval gates.
+The applied scope and verification are recorded in
+`docs/auth-tenant-phase1c-expand.md`. Writer safety, initial owner provisioning,
+and guarded backfill remain separate approval gates.

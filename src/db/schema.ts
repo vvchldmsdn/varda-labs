@@ -1,7 +1,9 @@
 import {
   boolean,
+  check,
   date,
   decimal,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -14,11 +16,89 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+export const appUsers = pgTable(
+  "app_users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    status: varchar("status", { length: 20 })
+      .default("provisioning")
+      .notNull(),
+    role: varchar("role", { length: 20 }).default("user").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    statusCheck: check(
+      "app_users_status_check",
+      sql`${table.status} in ('provisioning', 'active', 'disabled')`,
+    ),
+    roleCheck: check(
+      "app_users_role_check",
+      sql`${table.role} in ('user', 'admin')`,
+    ),
+  }),
+);
+
+export const authIdentities = pgTable(
+  "auth_identities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    appUserId: uuid("app_user_id").notNull(),
+    provider: varchar("provider", { length: 50 }).notNull(),
+    providerSubject: varchar("provider_subject", { length: 255 }).notNull(),
+    status: varchar("status", { length: 20 }).default("active").notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    appUserFk: foreignKey({
+      name: "auth_identities_app_user_id_app_users_id_fk",
+      columns: [table.appUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    statusCheck: check(
+      "auth_identities_status_check",
+      sql`${table.status} in ('active', 'disabled')`,
+    ),
+    providerCheck: check(
+      "auth_identities_provider_check",
+      sql`${table.provider} = lower(btrim(${table.provider})) and char_length(${table.provider}) > 0`,
+    ),
+    providerSubjectCheck: check(
+      "auth_identities_provider_subject_check",
+      sql`${table.providerSubject} = btrim(${table.providerSubject}) and char_length(${table.providerSubject}) > 0`,
+    ),
+    disabledStateCheck: check(
+      "auth_identities_disabled_state_check",
+      sql`(${table.status} = 'active' and ${table.disabledAt} is null) or (${table.status} = 'disabled' and ${table.disabledAt} is not null)`,
+    ),
+    providerSubjectUnique: uniqueIndex(
+      "auth_identities_provider_subject_unique",
+    ).on(table.provider, table.providerSubject),
+    appUserIdx: index("auth_identities_app_user_id_idx").on(table.appUserId),
+    activeAppUserProviderUnique: uniqueIndex(
+      "auth_identities_active_app_user_provider_unique",
+    )
+      .on(table.appUserId, table.provider)
+      .where(sql`${table.status} = 'active'`),
+  }),
+);
+
 export const assets = pgTable(
   "assets",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     name: varchar("name", { length: 255 }).notNull(),
     ticker: varchar("ticker", { length: 50 }),
@@ -71,6 +151,9 @@ export const assets = pgTable(
     legacyBase44IdUnique: uniqueIndex("assets_legacy_base44_id_unique").on(
       table.legacyBase44Id,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "assets_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -83,6 +166,7 @@ export const accounts = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
 
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
     code: varchar("code", { length: 50 }).notNull(),
     name: varchar("name", { length: 100 }).notNull(),
     accountType: varchar("account_type", { length: 50 }).notNull(),
@@ -99,6 +183,9 @@ export const accounts = pgTable(
       table.ownerUserId,
       table.code,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "accounts_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -109,6 +196,7 @@ export const assetGroups = pgTable(
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
 
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
     name: varchar("name", { length: 100 }).notNull(),
     targetWeight: decimal("target_weight", { precision: 8, scale: 4 }),
 
@@ -135,6 +223,9 @@ export const assetGroups = pgTable(
       table.ownerUserId,
       table.name,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "asset_groups_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -144,6 +235,7 @@ export const assetGroupMembers = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
 
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
     groupId: uuid("group_id").notNull(),
     assetId: uuid("asset_id").notNull(),
 
@@ -160,6 +252,9 @@ export const assetGroupMembers = pgTable(
       table.groupId,
       table.assetId,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "asset_group_members_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -475,6 +570,7 @@ export const eventLedgerEntries = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     eventDate: date("event_date").notNull(),
     eventType: varchar("event_type", { length: 50 }).notNull(),
@@ -535,6 +631,9 @@ export const eventLedgerEntries = pgTable(
     legacyGroupIdIdx: index("event_ledger_entries_legacy_group_id_idx").on(
       table.legacyGroupId,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "event_ledger_entries_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -543,6 +642,7 @@ export const marketRegimeDaily = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     regimeDate: date("date").notNull(),
     account: varchar("account", { length: 50 }).notNull(),
@@ -588,6 +688,9 @@ export const marketRegimeDaily = pgTable(
       table.account,
       table.regimeDate,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "market_regime_daily_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -671,6 +774,7 @@ export const goals = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     title: text("title"),
     category: varchar("category", { length: 100 }).notNull(),
@@ -703,6 +807,9 @@ export const goals = pgTable(
       table.ownerUserId,
       table.targetDate,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "goals_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -712,6 +819,7 @@ export const transactions = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     transactionDate: date("date").notNull(),
     type: varchar("type", { length: 50 }).notNull(),
@@ -747,6 +855,9 @@ export const transactions = pgTable(
       table.account,
       table.transactionDate,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "transactions_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -756,6 +867,7 @@ export const fixedTransactions = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     name: text("name").notNull(),
     type: varchar("type", { length: 50 }).notNull(),
@@ -783,6 +895,9 @@ export const fixedTransactions = pgTable(
     dayOfMonthIdx: index("fixed_transactions_day_of_month_idx").on(
       table.dayOfMonth,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "fixed_transactions_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -792,6 +907,7 @@ export const monthlyIncomes = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
     ownerUserId: varchar("owner_user_id", { length: 255 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     year: integer("year").notNull(),
     month: integer("month").notNull(),
@@ -815,6 +931,9 @@ export const monthlyIncomes = pgTable(
       table.year,
       table.month,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "monthly_incomes_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -823,6 +942,7 @@ export const accountBalanceSnapshots = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     balanceDate: date("date").notNull(),
     cash: decimal("cash", { precision: 24, scale: 6 }),
@@ -843,6 +963,9 @@ export const accountBalanceSnapshots = pgTable(
     balanceDateIdx: index("account_balance_snapshots_date_idx").on(
       table.balanceDate,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "account_balance_snapshots_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -851,6 +974,7 @@ export const dailyPortfolioSnapshots = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     snapshotDate: date("snapshot_date").notNull(),
     account: varchar("account", { length: 50 }).notNull(),
@@ -919,6 +1043,9 @@ export const dailyPortfolioSnapshots = pgTable(
     snapshotAccountSourceUnique: uniqueIndex(
       "daily_portfolio_snapshots_date_account_source_unique",
     ).on(table.snapshotDate, table.account, table.source),
+    canonicalOwnerUserIdIdx: index(
+      "daily_portfolio_snapshots_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -927,6 +1054,7 @@ export const dailyPositionSnapshots = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     snapshotDate: date("snapshot_date").notNull(),
     assetId: uuid("asset_id"),
@@ -1052,6 +1180,9 @@ export const dailyPositionSnapshots = pgTable(
     )
       .on(table.snapshotDate, table.account, table.assetId, table.source)
       .where(sql`${table.assetId} is not null`),
+    canonicalOwnerUserIdIdx: index(
+      "daily_position_snapshots_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
@@ -1060,6 +1191,7 @@ export const settings = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     legacyBase44Id: varchar("legacy_base44_id", { length: 24 }),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id"),
 
     annualIncomeGrowth: decimal("annual_income_growth", {
       precision: 20,
@@ -1121,11 +1253,20 @@ export const settings = pgTable(
     legacyBase44IdUnique: uniqueIndex("settings_legacy_base44_id_unique").on(
       table.legacyBase44Id,
     ),
+    canonicalOwnerUserIdIdx: index(
+      "settings_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
   }),
 );
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
+
+export type AppUser = typeof appUsers.$inferSelect;
+export type NewAppUser = typeof appUsers.$inferInsert;
+
+export type AuthIdentity = typeof authIdentities.$inferSelect;
+export type NewAuthIdentity = typeof authIdentities.$inferInsert;
 
 export type AssetGroup = typeof assetGroups.$inferSelect;
 export type NewAssetGroup = typeof assetGroups.$inferInsert;

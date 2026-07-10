@@ -18,3 +18,4 @@ import "./admin-market-sync-status.test.mjs";
 import "./base44-asset-policy.test.mjs";
 import "./entity-api-response.test.mjs";
 import "./tenant-ownership-policy.test.mjs";
+import "./tenant-expand-migration.test.mjs";

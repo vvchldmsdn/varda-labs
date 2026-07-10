@@ -143,14 +143,6 @@ Verified on 2026-07-10:
 
 ## Next Gate
 
-After this slice is verified and deployed, Phase 1C may perform only the
-reviewed expand migration:
-
-- add empty `app_users` and `auth_identities`;
-- add nullable `canonical_owner_user_id` to the 14 user-owned tables;
-- add regular owner indexes;
-- add only the identity table's internal FK;
-- create no identity/owner row and run no backfill;
-- add no financial FK, default, or non-null constraint;
-- change no auth, query, writer, RLS, Basic Auth, Cron, KIS, or snapshot
-  behavior.
+The reviewed expand-only migration was implemented in Phase 1C. Its exact
+scope and verification are recorded in
+`docs/auth-tenant-phase1c-expand.md`.

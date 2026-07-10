@@ -350,16 +350,10 @@ Phase 1B completed the plan-only exact identity/owner schema, transition matrix,
 staged SQL drafts, and guarded backfill contract in
 `docs/auth-tenant-phase1b-migration-plan.md`.
 
-Phase 1C0 hardens entity API and product response boundaries before the schema
-adds owner columns. Its contract is in
-`docs/auth-tenant-phase1c0-response-boundary.md`.
+Phase 1C0 hardened entity API and product response boundaries. Phase 1C then
+applied the empty identity-table and nullable canonical-owner expansion recorded
+in `docs/auth-tenant-phase1c-expand.md`.
 
-The next narrow slice is:
-
-`Auth/Tenant Phase 1C: Identity Tables And Nullable Owner Expand Migration`
-
-It may add only `app_users`, `auth_identities`, and nullable
-`canonical_owner_user_id` plus regular indexes to the 14 user-owned tables. It
-must not create an app user or identity row, run backfill, add financial FKs or
-non-null constraints, install the auth SDK, change queries/writers, enable RLS,
-or alter Basic Auth. Managed auth tables remain outside `src/db/schema.ts`.
+No app user, identity link, owner backfill, auth SDK, query filter, writer
+dual-write, RLS policy, or Basic Auth change exists yet. The next narrow slice
+must be selected separately after Phase 1C deployment verification.

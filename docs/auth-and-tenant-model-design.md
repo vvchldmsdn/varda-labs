@@ -171,6 +171,7 @@ Do not enable RLS until this behavior has integration tests.
 4. Schema-evolution response boundary hardening with no database change.
    Implemented in Phase 1C0; verification is recorded separately.
 5. Reviewed expand-only migration with no identity row or backfill.
+   Completed in Phase 1C.
 6. Writer-safety and two-user query/write fixtures.
 7. Explicit initial-owner backfill and staged constraints.
 8. Owner-filtered application reads/writes and deployed isolation smoke.
@@ -178,7 +179,6 @@ Do not enable RLS until this behavior has integration tests.
 10. Optional RLS implementation in a separate gate.
 11. User-facing write workflows and recommendation persistence.
 
-The immediate next gate is the expand-only Phase 1C implementation described
-in `docs/auth-tenant-phase1b-migration-plan.md`, after Phase 1C0 verification.
-It must not create an owner, backfill rows, change product behavior, enable RLS,
-or add recommendation persistence.
+Phase 1C is recorded in `docs/auth-tenant-phase1c-expand.md`. The next gate must
+be chosen separately between writer safety and explicit initial-owner
+provisioning. Neither owner backfill nor user access is authorized yet.

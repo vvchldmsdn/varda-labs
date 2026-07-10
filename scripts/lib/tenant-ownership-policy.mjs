@@ -17,6 +17,8 @@ export const CANONICAL_OWNER_CONTRACT = Object.freeze({
   basicAuthProvidesIdentity: false,
 });
 
+export const TRANSITIONAL_OWNER_COLUMN = "canonical_owner_user_id";
+
 export const TENANT_TABLE_POLICIES = Object.freeze([
   userOwned("assets", "created_by_id"),
   userOwned("accounts", "owner_user_id"),
@@ -41,6 +43,12 @@ export const TENANT_TABLE_POLICIES = Object.freeze([
   userOwned("daily_position_snapshots"),
   userOwned("settings"),
 ]);
+
+export const USER_OWNED_TABLE_NAMES = Object.freeze(
+  TENANT_TABLE_POLICIES.filter(
+    ({ classification }) => classification === "user_owned",
+  ).map(({ table }) => table),
+);
 
 export const IDENTITY_SYSTEM_TABLE_POLICIES = Object.freeze([
   identitySystem("app_users"),
