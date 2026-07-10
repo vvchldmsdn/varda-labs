@@ -90,8 +90,12 @@ benchmark, live quote, and global factor data remains shared.
 
 - A future backfill must require an explicitly reviewed initial user UUID.
 - Never infer that UUID from current owner strings or access credentials.
-- Add/populate canonical owners while columns are nullable, validate all rows,
-  then apply UUID type, `NOT NULL`, FKs, and owner-aware unique indexes.
+- Add nullable `canonical_owner_user_id uuid` to all 14 user-owned tables while
+  preserving every existing varchar owner. Never cast or overwrite the legacy
+  owner in place.
+- Populate canonical owners only after writer safety, validate all rows, add
+  staged FKs/indexes, cut application reads/writes over, and only then set
+  non-null and rename columns in a final contract migration.
 - `assets.created_by_id` is legacy evidence and should be deprecated after a
   canonical asset owner exists.
 - Snapshot writers must propagate owner from the portfolio being snapshotted.
@@ -163,11 +167,16 @@ Do not enable RLS until this behavior has integration tests.
 1. Phase 0 ownership/preflight review. Completed.
 2. Auth provider and session strategy. Completed in the Phase 1A ADR.
 3. Exact identity/owner schema and guarded backfill proposal, no migration.
-4. Two-user query/write fixtures.
-5. Reviewed migration and explicit initial-owner backfill.
-6. Owner-filtered application reads/writes and deployed isolation smoke.
-7. Optional RLS implementation in a separate gate.
-8. User-facing write workflows and recommendation persistence.
+   Completed in Phase 1B.
+4. Reviewed expand-only migration with no identity row or backfill.
+5. Writer-safety and two-user query/write fixtures.
+6. Explicit initial-owner backfill and staged constraints.
+7. Owner-filtered application reads/writes and deployed isolation smoke.
+8. Final owner-column contract rename.
+9. Optional RLS implementation in a separate gate.
+10. User-facing write workflows and recommendation persistence.
 
-The immediate next gate is the exact identity/owner migration and guarded
-backfill plan. It must not enable RLS or recommendation persistence.
+The immediate next gate is the expand-only Phase 1C implementation described
+in `docs/auth-tenant-phase1b-migration-plan.md`. It must not create an owner,
+backfill rows, change product behavior, enable RLS, or add recommendation
+persistence.

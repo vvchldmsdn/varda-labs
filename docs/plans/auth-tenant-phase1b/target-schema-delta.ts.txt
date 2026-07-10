@@ -1,0 +1,376 @@
+/*
+ * PLAN ONLY. This file is not imported by the application or Drizzle config.
+ * It describes the exact final schema delta after expand, backfill,
+ * application cutover, and contract. It is not the Phase 1C expand patch.
+ *
+ * Merge these declarations with the existing fields and indexes. Do not copy
+ * this file over src/db/schema.ts. The final declaration order must place
+ * appUsers, accounts, assetGroups, and assets before tables whose composite
+ * foreign keys reference them.
+ */
+
+// Add to drizzle-orm/pg-core imports:
+// check, foreignKey
+
+export const appUsers = pgTable(
+  "app_users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    status: varchar("status", { length: 20 })
+      .default("provisioning")
+      .notNull(),
+    role: varchar("role", { length: 20 }).default("user").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "app_users_status_check",
+      sql`${table.status} in ('provisioning', 'active', 'disabled')`,
+    ),
+    check("app_users_role_check", sql`${table.role} in ('user', 'admin')`),
+  ],
+);
+
+export const authIdentities = pgTable(
+  "auth_identities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    appUserId: uuid("app_user_id").notNull(),
+    provider: varchar("provider", { length: 50 }).notNull(),
+    providerSubject: varchar("provider_subject", { length: 255 }).notNull(),
+    status: varchar("status", { length: 20 }).default("active").notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "auth_identities_app_user_id_app_users_id_fk",
+      columns: [table.appUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    check(
+      "auth_identities_status_check",
+      sql`${table.status} in ('active', 'disabled')`,
+    ),
+    uniqueIndex("auth_identities_provider_subject_unique").on(
+      table.provider,
+      table.providerSubject,
+    ),
+    index("auth_identities_app_user_id_idx").on(table.appUserId),
+    uniqueIndex("auth_identities_active_app_user_provider_unique")
+      .on(table.appUserId, table.provider)
+      .where(sql`${table.status} = 'active'`),
+  ],
+);
+
+/*
+ * Final owner columns.
+ *
+ * For accounts, assetGroups, assetGroupMembers, goals, transactions,
+ * fixedTransactions, and monthlyIncomes, preserve the current varchar as:
+ *
+ *   legacyOwnerUserId: varchar("legacy_owner_user_id", { length: 255 })
+ *
+ * For assets, keep createdById unchanged. For all 14 tables add:
+ *
+ *   ownerUserId: uuid("owner_user_id").notNull()
+ *
+ * Each table callback includes an explicit owner FK shown below.
+ */
+
+// accounts callback additions/replacements
+[
+  foreignKey({
+    name: "accounts_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  index("accounts_owner_user_id_idx").on(table.ownerUserId),
+  uniqueIndex("accounts_owner_id_unique").on(table.ownerUserId, table.id),
+  uniqueIndex("accounts_owner_code_unique").on(table.ownerUserId, table.code),
+];
+
+// assetGroups callback additions/replacements
+[
+  foreignKey({
+    name: "asset_groups_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  index("asset_groups_owner_user_id_idx").on(table.ownerUserId),
+  uniqueIndex("asset_groups_owner_id_unique").on(table.ownerUserId, table.id),
+  uniqueIndex("asset_groups_owner_name_unique").on(
+    table.ownerUserId,
+    table.name,
+  ),
+];
+
+// assets callback additions; keep legacy_base44_id unique
+[
+  foreignKey({
+    name: "assets_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "assets_owner_account_fk",
+    columns: [table.ownerUserId, table.accountId],
+    foreignColumns: [accounts.ownerUserId, accounts.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "assets_owner_group_fk",
+    columns: [table.ownerUserId, table.groupId],
+    foreignColumns: [assetGroups.ownerUserId, assetGroups.id],
+  }).onDelete("restrict"),
+  index("assets_owner_user_id_idx").on(table.ownerUserId),
+  uniqueIndex("assets_owner_id_unique").on(table.ownerUserId, table.id),
+];
+
+// assetGroupMembers callback additions/replacements
+[
+  foreignKey({
+    name: "asset_group_members_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "asset_group_members_owner_group_fk",
+    columns: [table.ownerUserId, table.groupId],
+    foreignColumns: [assetGroups.ownerUserId, assetGroups.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "asset_group_members_owner_asset_fk",
+    columns: [table.ownerUserId, table.assetId],
+    foreignColumns: [assets.ownerUserId, assets.id],
+  }).onDelete("restrict"),
+  index("asset_group_members_owner_user_id_idx").on(table.ownerUserId),
+  uniqueIndex("asset_group_members_owner_group_asset_unique").on(
+    table.ownerUserId,
+    table.groupId,
+    table.assetId,
+  ),
+];
+
+// eventLedgerEntries callback additions; keep all legacy evidence indexes
+[
+  foreignKey({
+    name: "event_ledger_entries_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "event_ledger_entries_owner_account_fk",
+    columns: [table.ownerUserId, table.accountId],
+    foreignColumns: [accounts.ownerUserId, accounts.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "event_ledger_entries_owner_asset_fk",
+    columns: [table.ownerUserId, table.assetId],
+    foreignColumns: [assets.ownerUserId, assets.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "event_ledger_entries_owner_group_fk",
+    columns: [table.ownerUserId, table.groupId],
+    foreignColumns: [assetGroups.ownerUserId, assetGroups.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "event_ledger_entries_owner_correction_fk",
+    columns: [table.ownerUserId, table.correctsEventId],
+    foreignColumns: [table.ownerUserId, table.id],
+  }).onDelete("restrict"),
+  index("event_ledger_entries_owner_user_id_idx").on(table.ownerUserId),
+  uniqueIndex("event_ledger_entries_owner_id_unique").on(
+    table.ownerUserId,
+    table.id,
+  ),
+  index("event_ledger_entries_owner_date_type_idx").on(
+    table.ownerUserId,
+    table.eventDate,
+    table.eventType,
+  ),
+  index("event_ledger_entries_owner_account_date_idx").on(
+    table.ownerUserId,
+    table.account,
+    table.eventDate,
+  ),
+];
+
+// marketRegimeDaily callback additions; no unique date/account constraint
+[
+  foreignKey({
+    name: "market_regime_daily_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "market_regime_daily_owner_account_fk",
+    columns: [table.ownerUserId, table.accountId],
+    foreignColumns: [accounts.ownerUserId, accounts.id],
+  }).onDelete("restrict"),
+  index("market_regime_daily_owner_date_account_idx").on(
+    table.ownerUserId,
+    table.regimeDate,
+    table.account,
+  ),
+];
+
+// goals callback additions/replacements
+[
+  foreignKey({
+    name: "goals_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  index("goals_owner_target_date_idx").on(
+    table.ownerUserId,
+    table.targetDate,
+  ),
+];
+
+// transactions callback additions/replacements
+[
+  foreignKey({
+    name: "transactions_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "transactions_owner_account_fk",
+    columns: [table.ownerUserId, table.accountId],
+    foreignColumns: [accounts.ownerUserId, accounts.id],
+  }).onDelete("restrict"),
+  index("transactions_owner_date_idx").on(
+    table.ownerUserId,
+    table.transactionDate,
+  ),
+];
+
+// fixedTransactions callback additions/replacements
+[
+  foreignKey({
+    name: "fixed_transactions_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  index("fixed_transactions_owner_active_idx").on(
+    table.ownerUserId,
+    table.isActive,
+  ),
+];
+
+// monthlyIncomes callback additions/replacements
+[
+  foreignKey({
+    name: "monthly_incomes_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  uniqueIndex("monthly_incomes_owner_year_month_unique").on(
+    table.ownerUserId,
+    table.year,
+    table.month,
+  ),
+];
+
+// accountBalanceSnapshots callback additions
+[
+  foreignKey({
+    name: "account_balance_snapshots_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  index("account_balance_snapshots_owner_date_idx").on(
+    table.ownerUserId,
+    table.balanceDate,
+  ),
+];
+
+// dailyPortfolioSnapshots callback additions/replacements
+[
+  foreignKey({
+    name: "daily_portfolio_snapshots_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "daily_portfolio_snapshots_owner_account_fk",
+    columns: [table.ownerUserId, table.accountId],
+    foreignColumns: [accounts.ownerUserId, accounts.id],
+  }).onDelete("restrict"),
+  index("daily_portfolio_snapshots_owner_date_account_idx").on(
+    table.ownerUserId,
+    table.snapshotDate,
+    table.account,
+  ),
+  uniqueIndex("daily_portfolio_snapshots_owner_date_account_source_unique").on(
+    table.ownerUserId,
+    table.snapshotDate,
+    table.account,
+    table.source,
+  ),
+];
+
+// dailyPositionSnapshots callback additions/replacements
+[
+  foreignKey({
+    name: "daily_position_snapshots_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "daily_position_snapshots_owner_account_fk",
+    columns: [table.ownerUserId, table.accountId],
+    foreignColumns: [accounts.ownerUserId, accounts.id],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "daily_position_snapshots_owner_asset_fk",
+    columns: [table.ownerUserId, table.assetId],
+    foreignColumns: [assets.ownerUserId, assets.id],
+  }).onDelete("restrict"),
+  index("daily_position_snapshots_owner_date_idx").on(
+    table.ownerUserId,
+    table.snapshotDate,
+  ),
+  uniqueIndex("daily_position_snapshots_owner_date_account_asset_source_unique")
+    .on(
+      table.ownerUserId,
+      table.snapshotDate,
+      table.account,
+      table.assetId,
+      table.source,
+    )
+    .where(sql`${table.assetId} is not null`),
+];
+
+// settings callback additions
+[
+  foreignKey({
+    name: "settings_owner_user_id_app_users_id_fk",
+    columns: [table.ownerUserId],
+    foreignColumns: [appUsers.id],
+  }).onDelete("restrict"),
+  uniqueIndex("settings_owner_user_id_unique").on(table.ownerUserId),
+];
+
+/*
+ * Important final-schema invariants:
+ *
+ * - dailyPositionSnapshots.assetId stays nullable.
+ * - dailyPositionSnapshots.legacyAssetId, ticker, assetName, and snapshotDate
+ *   stay intact.
+ * - accountId remains nullable wherever the current schema allows it.
+ * - all existing legacyBase44Id indexes stay.
+ * - no user-owned FK uses CASCADE.
+ * - shared-reference and admin/system tables receive no owner column.
+ * - there is no neon_auth table declaration or foreign key here.
+ */

@@ -339,20 +339,23 @@ The implementation phases must include:
 - Neon Auth organization/household support
 - open self-service registration
 - account-recovery/admin linking UI
-- exact `app_users` and `auth_identities` columns/indexes
-- owner migration SQL and guarded backfill command
+- actual owner row provisioning and identity linking operation
+- implementation of the reviewed guarded backfill command
 - RLS policies and Data API/JWT integration
 - recommendation persistence and user-facing mutations
 
 ## Next Approval Gate
 
+Phase 1B completed the plan-only exact identity/owner schema, transition matrix,
+staged SQL drafts, and guarded backfill contract in
+`docs/auth-tenant-phase1b-migration-plan.md`.
+
 The next narrow slice is:
 
-`Auth/Tenant Phase 1B: Exact Identity/Owner Migration And Guarded Backfill Plan`
+`Auth/Tenant Phase 1C: Identity Tables And Nullable Owner Expand Migration`
 
-It may draft exact Drizzle and SQL definitions plus a dry-run-first backfill
-contract, but must not apply a migration or change product queries yet. It must
-use Neon Auth only as an external identity source through `auth_identities` and
-must not map or migrate the managed `neon_auth` tables in `src/db/schema.ts`.
-The plan must preserve the provider-replacement path while the production hold
-is active.
+It may add only `app_users`, `auth_identities`, and nullable
+`canonical_owner_user_id` plus regular indexes to the 14 user-owned tables. It
+must not create an app user or identity row, run backfill, add financial FKs or
+non-null constraints, install the auth SDK, change queries/writers, enable RLS,
+or alter Basic Auth. Managed auth tables remain outside `src/db/schema.ts`.

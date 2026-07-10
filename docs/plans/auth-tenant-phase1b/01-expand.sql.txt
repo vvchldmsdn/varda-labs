@@ -1,0 +1,107 @@
+-- PLAN ONLY. NOT A CONFIGURED MIGRATION. DO NOT EXECUTE AS-IS.
+--
+-- Scope: identity tables plus nullable canonical owner columns and regular
+-- indexes. This draft creates no app_user row, performs no backfill, changes
+-- no reader/writer, and adds no financial-table owner FK or NOT NULL.
+-- The actual generated migration relies on the Drizzle migrator transaction.
+
+CREATE TABLE "app_users" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "status" varchar(20) DEFAULT 'provisioning' NOT NULL,
+  "role" varchar(20) DEFAULT 'user' NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  CONSTRAINT "app_users_status_check"
+    CHECK ("status" IN ('provisioning', 'active', 'disabled')),
+  CONSTRAINT "app_users_role_check"
+    CHECK ("role" IN ('user', 'admin'))
+);
+
+CREATE TABLE "auth_identities" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "app_user_id" uuid NOT NULL,
+  "provider" varchar(50) NOT NULL,
+  "provider_subject" varchar(255) NOT NULL,
+  "status" varchar(20) DEFAULT 'active' NOT NULL,
+  "disabled_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  CONSTRAINT "auth_identities_status_check"
+    CHECK ("status" IN ('active', 'disabled')),
+  CONSTRAINT "auth_identities_app_user_id_app_users_id_fk"
+    FOREIGN KEY ("app_user_id") REFERENCES "app_users"("id")
+    ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX "auth_identities_provider_subject_unique"
+  ON "auth_identities" ("provider", "provider_subject");
+CREATE INDEX "auth_identities_app_user_id_idx"
+  ON "auth_identities" ("app_user_id");
+CREATE UNIQUE INDEX "auth_identities_active_app_user_provider_unique"
+  ON "auth_identities" ("app_user_id", "provider")
+  WHERE "status" = 'active';
+
+ALTER TABLE "assets"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "accounts"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "asset_groups"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "asset_group_members"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "event_ledger_entries"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "market_regime_daily"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "goals"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "transactions"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "fixed_transactions"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "monthly_incomes"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "account_balance_snapshots"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "daily_portfolio_snapshots"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "daily_position_snapshots"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+ALTER TABLE "settings"
+  ADD COLUMN "canonical_owner_user_id" uuid;
+
+CREATE INDEX "assets_canonical_owner_user_id_idx"
+  ON "assets" ("canonical_owner_user_id");
+CREATE INDEX "accounts_canonical_owner_user_id_idx"
+  ON "accounts" ("canonical_owner_user_id");
+CREATE INDEX "asset_groups_canonical_owner_user_id_idx"
+  ON "asset_groups" ("canonical_owner_user_id");
+CREATE INDEX "asset_group_members_canonical_owner_user_id_idx"
+  ON "asset_group_members" ("canonical_owner_user_id");
+CREATE INDEX "event_ledger_entries_canonical_owner_user_id_idx"
+  ON "event_ledger_entries" ("canonical_owner_user_id");
+CREATE INDEX "market_regime_daily_canonical_owner_user_id_idx"
+  ON "market_regime_daily" ("canonical_owner_user_id");
+CREATE INDEX "goals_canonical_owner_user_id_idx"
+  ON "goals" ("canonical_owner_user_id");
+CREATE INDEX "transactions_canonical_owner_user_id_idx"
+  ON "transactions" ("canonical_owner_user_id");
+CREATE INDEX "fixed_transactions_canonical_owner_user_id_idx"
+  ON "fixed_transactions" ("canonical_owner_user_id");
+CREATE INDEX "monthly_incomes_canonical_owner_user_id_idx"
+  ON "monthly_incomes" ("canonical_owner_user_id");
+CREATE INDEX "account_balance_snapshots_canonical_owner_user_id_idx"
+  ON "account_balance_snapshots" ("canonical_owner_user_id");
+CREATE INDEX "daily_portfolio_snapshots_canonical_owner_user_id_idx"
+  ON "daily_portfolio_snapshots" ("canonical_owner_user_id");
+CREATE INDEX "daily_position_snapshots_canonical_owner_user_id_idx"
+  ON "daily_position_snapshots" ("canonical_owner_user_id");
+CREATE INDEX "settings_canonical_owner_user_id_idx"
+  ON "settings" ("canonical_owner_user_id");
+
+-- Mandatory post-expand assertions for the future migration runner:
+-- 1. exactly two new tables exist;
+-- 2. all 14 and only the 14 whitelisted tables have the nullable UUID column;
+-- 3. app_users and auth_identities each contain zero rows;
+-- 4. every pre-existing table row count is unchanged;
+-- 5. no src query or writer depends on canonical_owner_user_id yet.

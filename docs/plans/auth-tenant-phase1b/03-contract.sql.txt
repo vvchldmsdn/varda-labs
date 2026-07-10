@@ -1,0 +1,553 @@
+-- PLAN ONLY. NOT A CONFIGURED MIGRATION. DO NOT EXECUTE AS-IS.
+--
+-- Preconditions:
+-- - expand is deployed;
+-- - all 14 canonical owners are populated;
+-- - owner-aware writers or an approved writer freeze is active;
+-- - all relationship and uniqueness audits pass;
+-- - application cutover and final rename have separate approvals.
+--
+-- Sections 1, 2, 3, and 3b are separate reviewed custom migrations. After the
+-- stop gate, sections 4-7 form the final contract custom migration. The
+-- installed Drizzle PostgreSQL migrator supplies transaction boundaries, so
+-- this draft contains no explicit transaction statements and no concurrent
+-- index DDL.
+
+-- ---------------------------------------------------------------------------
+-- 1. Build composite parent keys and tenant-aware natural identities.
+-- ---------------------------------------------------------------------------
+
+CREATE UNIQUE INDEX "accounts_canonical_owner_id_unique"
+  ON "accounts" ("canonical_owner_user_id", "id");
+CREATE UNIQUE INDEX "asset_groups_canonical_owner_id_unique"
+  ON "asset_groups" ("canonical_owner_user_id", "id");
+CREATE UNIQUE INDEX "assets_canonical_owner_id_unique"
+  ON "assets" ("canonical_owner_user_id", "id");
+CREATE UNIQUE INDEX "event_ledger_entries_canonical_owner_id_unique"
+  ON "event_ledger_entries" ("canonical_owner_user_id", "id");
+
+CREATE UNIQUE INDEX "accounts_canonical_owner_code_unique"
+  ON "accounts" ("canonical_owner_user_id", "code");
+CREATE UNIQUE INDEX "asset_groups_canonical_owner_name_unique"
+  ON "asset_groups" ("canonical_owner_user_id", "name");
+CREATE UNIQUE INDEX "asset_group_members_canonical_owner_group_asset_unique"
+  ON "asset_group_members"
+  ("canonical_owner_user_id", "group_id", "asset_id");
+CREATE UNIQUE INDEX "monthly_incomes_canonical_owner_year_month_unique"
+  ON "monthly_incomes" ("canonical_owner_user_id", "year", "month");
+CREATE UNIQUE INDEX "daily_portfolio_snapshots_canonical_owner_date_account_source_unique"
+  ON "daily_portfolio_snapshots"
+  ("canonical_owner_user_id", "snapshot_date", "account", "source");
+CREATE UNIQUE INDEX "daily_position_snapshots_canonical_owner_date_account_asset_source_unique"
+  ON "daily_position_snapshots"
+  ("canonical_owner_user_id", "snapshot_date", "account", "asset_id", "source")
+  WHERE "asset_id" IS NOT NULL;
+CREATE UNIQUE INDEX "settings_canonical_owner_user_id_unique"
+  ON "settings" ("canonical_owner_user_id");
+
+CREATE INDEX "event_ledger_entries_canonical_owner_date_type_idx"
+  ON "event_ledger_entries"
+  ("canonical_owner_user_id", "event_date", "event_type");
+CREATE INDEX "event_ledger_entries_canonical_owner_account_date_idx"
+  ON "event_ledger_entries"
+  ("canonical_owner_user_id", "account", "event_date");
+CREATE INDEX "market_regime_daily_canonical_owner_date_account_idx"
+  ON "market_regime_daily"
+  ("canonical_owner_user_id", "date", "account");
+CREATE INDEX "goals_canonical_owner_target_date_idx"
+  ON "goals" ("canonical_owner_user_id", "target_date");
+CREATE INDEX "transactions_canonical_owner_date_idx"
+  ON "transactions" ("canonical_owner_user_id", "date");
+CREATE INDEX "fixed_transactions_canonical_owner_active_idx"
+  ON "fixed_transactions" ("canonical_owner_user_id", "is_active");
+CREATE INDEX "account_balance_snapshots_canonical_owner_date_idx"
+  ON "account_balance_snapshots" ("canonical_owner_user_id", "date");
+CREATE INDEX "daily_portfolio_snapshots_canonical_owner_date_account_idx"
+  ON "daily_portfolio_snapshots"
+  ("canonical_owner_user_id", "snapshot_date", "account");
+CREATE INDEX "daily_position_snapshots_canonical_owner_date_idx"
+  ON "daily_position_snapshots"
+  ("canonical_owner_user_id", "snapshot_date");
+
+-- Stop if any index is invalid in pg_index. Do not continue with a failed
+-- index build.
+
+-- ---------------------------------------------------------------------------
+-- 2. Add canonical-owner foreign keys without scanning existing rows yet.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE "assets" ADD CONSTRAINT
+  "assets_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "accounts" ADD CONSTRAINT
+  "accounts_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "asset_groups" ADD CONSTRAINT
+  "asset_groups_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "asset_group_members" ADD CONSTRAINT
+  "asset_group_members_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "event_ledger_entries" ADD CONSTRAINT
+  "event_ledger_entries_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "market_regime_daily" ADD CONSTRAINT
+  "market_regime_daily_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "goals" ADD CONSTRAINT
+  "goals_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "transactions" ADD CONSTRAINT
+  "transactions_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "fixed_transactions" ADD CONSTRAINT
+  "fixed_transactions_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "monthly_incomes" ADD CONSTRAINT
+  "monthly_incomes_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "account_balance_snapshots" ADD CONSTRAINT
+  "account_balance_snapshots_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "daily_portfolio_snapshots" ADD CONSTRAINT
+  "daily_portfolio_snapshots_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "daily_position_snapshots" ADD CONSTRAINT
+  "daily_position_snapshots_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "settings" ADD CONSTRAINT
+  "settings_canonical_owner_user_id_app_users_id_fk"
+  FOREIGN KEY ("canonical_owner_user_id") REFERENCES "app_users"("id")
+  ON DELETE RESTRICT NOT VALID;
+
+ALTER TABLE "assets" ADD CONSTRAINT "assets_owner_account_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "account_id")
+  REFERENCES "accounts"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "assets" ADD CONSTRAINT "assets_owner_group_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "group_id")
+  REFERENCES "asset_groups"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "asset_group_members" ADD CONSTRAINT
+  "asset_group_members_owner_group_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "group_id")
+  REFERENCES "asset_groups"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "asset_group_members" ADD CONSTRAINT
+  "asset_group_members_owner_asset_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "asset_id")
+  REFERENCES "assets"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "event_ledger_entries" ADD CONSTRAINT
+  "event_ledger_entries_owner_account_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "account_id")
+  REFERENCES "accounts"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "event_ledger_entries" ADD CONSTRAINT
+  "event_ledger_entries_owner_asset_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "asset_id")
+  REFERENCES "assets"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "event_ledger_entries" ADD CONSTRAINT
+  "event_ledger_entries_owner_group_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "group_id")
+  REFERENCES "asset_groups"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "event_ledger_entries" ADD CONSTRAINT
+  "event_ledger_entries_owner_correction_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "corrects_event_id")
+  REFERENCES "event_ledger_entries"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "market_regime_daily" ADD CONSTRAINT
+  "market_regime_daily_owner_account_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "account_id")
+  REFERENCES "accounts"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "transactions" ADD CONSTRAINT "transactions_owner_account_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "account_id")
+  REFERENCES "accounts"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "daily_portfolio_snapshots" ADD CONSTRAINT
+  "daily_portfolio_snapshots_owner_account_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "account_id")
+  REFERENCES "accounts"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "daily_position_snapshots" ADD CONSTRAINT
+  "daily_position_snapshots_owner_account_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "account_id")
+  REFERENCES "accounts"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+ALTER TABLE "daily_position_snapshots" ADD CONSTRAINT
+  "daily_position_snapshots_owner_asset_fk"
+  FOREIGN KEY ("canonical_owner_user_id", "asset_id")
+  REFERENCES "assets"("canonical_owner_user_id", "id")
+  ON DELETE RESTRICT NOT VALID;
+
+DO $$
+DECLARE
+  table_name text;
+  constraint_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'assets', 'accounts', 'asset_groups', 'asset_group_members',
+    'event_ledger_entries', 'market_regime_daily', 'goals', 'transactions',
+    'fixed_transactions', 'monthly_incomes', 'account_balance_snapshots',
+    'daily_portfolio_snapshots', 'daily_position_snapshots', 'settings'
+  ]
+  LOOP
+    constraint_name := table_name || '_canonical_owner_not_null_check';
+    EXECUTE format(
+      'ALTER TABLE %I ADD CONSTRAINT %I '
+      'CHECK (canonical_owner_user_id IS NOT NULL) NOT VALID',
+      table_name,
+      constraint_name
+    );
+  END LOOP;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 3. Validate foreign keys separately. Abort on the first failure.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE "assets" VALIDATE CONSTRAINT
+  "assets_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "accounts" VALIDATE CONSTRAINT
+  "accounts_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "asset_groups" VALIDATE CONSTRAINT
+  "asset_groups_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "asset_group_members" VALIDATE CONSTRAINT
+  "asset_group_members_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "event_ledger_entries" VALIDATE CONSTRAINT
+  "event_ledger_entries_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "market_regime_daily" VALIDATE CONSTRAINT
+  "market_regime_daily_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "goals" VALIDATE CONSTRAINT
+  "goals_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "transactions" VALIDATE CONSTRAINT
+  "transactions_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "fixed_transactions" VALIDATE CONSTRAINT
+  "fixed_transactions_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "monthly_incomes" VALIDATE CONSTRAINT
+  "monthly_incomes_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "account_balance_snapshots" VALIDATE CONSTRAINT
+  "account_balance_snapshots_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "daily_portfolio_snapshots" VALIDATE CONSTRAINT
+  "daily_portfolio_snapshots_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "daily_position_snapshots" VALIDATE CONSTRAINT
+  "daily_position_snapshots_canonical_owner_user_id_app_users_id_fk";
+ALTER TABLE "settings" VALIDATE CONSTRAINT
+  "settings_canonical_owner_user_id_app_users_id_fk";
+
+ALTER TABLE "assets" VALIDATE CONSTRAINT "assets_owner_account_fk";
+ALTER TABLE "assets" VALIDATE CONSTRAINT "assets_owner_group_fk";
+ALTER TABLE "asset_group_members" VALIDATE CONSTRAINT
+  "asset_group_members_owner_group_fk";
+ALTER TABLE "asset_group_members" VALIDATE CONSTRAINT
+  "asset_group_members_owner_asset_fk";
+ALTER TABLE "event_ledger_entries" VALIDATE CONSTRAINT
+  "event_ledger_entries_owner_account_fk";
+ALTER TABLE "event_ledger_entries" VALIDATE CONSTRAINT
+  "event_ledger_entries_owner_asset_fk";
+ALTER TABLE "event_ledger_entries" VALIDATE CONSTRAINT
+  "event_ledger_entries_owner_group_fk";
+ALTER TABLE "event_ledger_entries" VALIDATE CONSTRAINT
+  "event_ledger_entries_owner_correction_fk";
+ALTER TABLE "market_regime_daily" VALIDATE CONSTRAINT
+  "market_regime_daily_owner_account_fk";
+ALTER TABLE "transactions" VALIDATE CONSTRAINT
+  "transactions_owner_account_fk";
+ALTER TABLE "daily_portfolio_snapshots" VALIDATE CONSTRAINT
+  "daily_portfolio_snapshots_owner_account_fk";
+ALTER TABLE "daily_position_snapshots" VALIDATE CONSTRAINT
+  "daily_position_snapshots_owner_account_fk";
+ALTER TABLE "daily_position_snapshots" VALIDATE CONSTRAINT
+  "daily_position_snapshots_owner_asset_fk";
+
+DO $$
+DECLARE
+  table_name text;
+  constraint_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'assets', 'accounts', 'asset_groups', 'asset_group_members',
+    'event_ledger_entries', 'market_regime_daily', 'goals', 'transactions',
+    'fixed_transactions', 'monthly_incomes', 'account_balance_snapshots',
+    'daily_portfolio_snapshots', 'daily_position_snapshots', 'settings'
+  ]
+  LOOP
+    constraint_name := table_name || '_canonical_owner_not_null_check';
+    EXECUTE format(
+      'ALTER TABLE %I VALIDATE CONSTRAINT %I',
+      table_name,
+      constraint_name
+    );
+  END LOOP;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 3b. Replace superseded natural identities after new indexes and writer
+-- safety are verified. This must happen before colliding two-user fixtures.
+-- ---------------------------------------------------------------------------
+
+DROP INDEX "accounts_owner_code_unique";
+DROP INDEX "asset_groups_owner_name_unique";
+DROP INDEX "asset_group_members_group_asset_unique";
+DROP INDEX "monthly_incomes_owner_year_month_unique";
+DROP INDEX "daily_portfolio_snapshots_date_account_source_unique";
+DROP INDEX "daily_position_snapshots_date_account_asset_source_unique";
+
+-- STOP GATE: deploy and verify owner-filtered readers/writers plus two-user
+-- isolation before setting NOT NULL or renaming either owner column.
+
+-- ---------------------------------------------------------------------------
+-- 4. Set the column attribute using the already validated proof checks.
+-- Run only after the stop gate above is approved.
+-- ---------------------------------------------------------------------------
+
+DO $$
+DECLARE
+  table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'assets', 'accounts', 'asset_groups', 'asset_group_members',
+    'event_ledger_entries', 'market_regime_daily', 'goals', 'transactions',
+    'fixed_transactions', 'monthly_incomes', 'account_balance_snapshots',
+    'daily_portfolio_snapshots', 'daily_position_snapshots', 'settings'
+  ]
+  LOOP
+    EXECUTE format(
+      'ALTER TABLE %I ALTER COLUMN canonical_owner_user_id SET NOT NULL',
+      table_name
+    );
+  END LOOP;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 5. Contract rename. Preserve all legacy columns.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE "accounts" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+ALTER TABLE "asset_groups" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+ALTER TABLE "asset_group_members" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+ALTER TABLE "goals" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+ALTER TABLE "transactions" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+ALTER TABLE "fixed_transactions" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+ALTER TABLE "monthly_incomes" RENAME COLUMN "owner_user_id"
+  TO "legacy_owner_user_id";
+
+ALTER TABLE "assets" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "accounts" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "asset_groups" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "asset_group_members" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "event_ledger_entries" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "market_regime_daily" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "goals" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "transactions" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "fixed_transactions" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "monthly_incomes" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+ALTER TABLE "account_balance_snapshots" RENAME COLUMN
+  "canonical_owner_user_id" TO "owner_user_id";
+ALTER TABLE "daily_portfolio_snapshots" RENAME COLUMN
+  "canonical_owner_user_id" TO "owner_user_id";
+ALTER TABLE "daily_position_snapshots" RENAME COLUMN
+  "canonical_owner_user_id" TO "owner_user_id";
+ALTER TABLE "settings" RENAME COLUMN "canonical_owner_user_id"
+  TO "owner_user_id";
+
+-- ---------------------------------------------------------------------------
+-- 6. Remove superseded legacy/global natural identities, then normalize names.
+-- This is a later custom migration after the column rename.
+-- ---------------------------------------------------------------------------
+
+DROP INDEX "goals_owner_target_date_idx";
+DROP INDEX "transactions_owner_date_idx";
+DROP INDEX "fixed_transactions_owner_active_idx";
+
+ALTER INDEX "accounts_canonical_owner_code_unique"
+  RENAME TO "accounts_owner_code_unique";
+ALTER INDEX "asset_groups_canonical_owner_name_unique"
+  RENAME TO "asset_groups_owner_name_unique";
+ALTER INDEX "asset_group_members_canonical_owner_group_asset_unique"
+  RENAME TO "asset_group_members_owner_group_asset_unique";
+ALTER INDEX "monthly_incomes_canonical_owner_year_month_unique"
+  RENAME TO "monthly_incomes_owner_year_month_unique";
+ALTER INDEX "daily_portfolio_snapshots_canonical_owner_date_account_source_unique"
+  RENAME TO "daily_portfolio_snapshots_owner_date_account_source_unique";
+ALTER INDEX "daily_position_snapshots_canonical_owner_date_account_asset_source_unique"
+  RENAME TO "daily_position_snapshots_owner_date_account_asset_source_unique";
+ALTER INDEX "settings_canonical_owner_user_id_unique"
+  RENAME TO "settings_owner_user_id_unique";
+
+ALTER INDEX "accounts_canonical_owner_id_unique"
+  RENAME TO "accounts_owner_id_unique";
+ALTER INDEX "asset_groups_canonical_owner_id_unique"
+  RENAME TO "asset_groups_owner_id_unique";
+ALTER INDEX "assets_canonical_owner_id_unique"
+  RENAME TO "assets_owner_id_unique";
+ALTER INDEX "event_ledger_entries_canonical_owner_id_unique"
+  RENAME TO "event_ledger_entries_owner_id_unique";
+
+ALTER INDEX "event_ledger_entries_canonical_owner_date_type_idx"
+  RENAME TO "event_ledger_entries_owner_date_type_idx";
+ALTER INDEX "event_ledger_entries_canonical_owner_account_date_idx"
+  RENAME TO "event_ledger_entries_owner_account_date_idx";
+ALTER INDEX "market_regime_daily_canonical_owner_date_account_idx"
+  RENAME TO "market_regime_daily_owner_date_account_idx";
+ALTER INDEX "goals_canonical_owner_target_date_idx"
+  RENAME TO "goals_owner_target_date_idx";
+ALTER INDEX "transactions_canonical_owner_date_idx"
+  RENAME TO "transactions_owner_date_idx";
+ALTER INDEX "fixed_transactions_canonical_owner_active_idx"
+  RENAME TO "fixed_transactions_owner_active_idx";
+ALTER INDEX "account_balance_snapshots_canonical_owner_date_idx"
+  RENAME TO "account_balance_snapshots_owner_date_idx";
+ALTER INDEX "daily_portfolio_snapshots_canonical_owner_date_account_idx"
+  RENAME TO "daily_portfolio_snapshots_owner_date_account_idx";
+ALTER INDEX "daily_position_snapshots_canonical_owner_date_idx"
+  RENAME TO "daily_position_snapshots_owner_date_idx";
+
+-- Rename the 14 single-column indexes created by expand.
+ALTER INDEX "assets_canonical_owner_user_id_idx"
+  RENAME TO "assets_owner_user_id_idx";
+ALTER INDEX "accounts_canonical_owner_user_id_idx"
+  RENAME TO "accounts_owner_user_id_idx";
+ALTER INDEX "asset_groups_canonical_owner_user_id_idx"
+  RENAME TO "asset_groups_owner_user_id_idx";
+ALTER INDEX "asset_group_members_canonical_owner_user_id_idx"
+  RENAME TO "asset_group_members_owner_user_id_idx";
+ALTER INDEX "event_ledger_entries_canonical_owner_user_id_idx"
+  RENAME TO "event_ledger_entries_owner_user_id_idx";
+ALTER INDEX "market_regime_daily_canonical_owner_user_id_idx"
+  RENAME TO "market_regime_daily_owner_user_id_idx";
+ALTER INDEX "goals_canonical_owner_user_id_idx"
+  RENAME TO "goals_owner_user_id_idx";
+ALTER INDEX "transactions_canonical_owner_user_id_idx"
+  RENAME TO "transactions_owner_user_id_idx";
+ALTER INDEX "fixed_transactions_canonical_owner_user_id_idx"
+  RENAME TO "fixed_transactions_owner_user_id_idx";
+ALTER INDEX "monthly_incomes_canonical_owner_user_id_idx"
+  RENAME TO "monthly_incomes_owner_user_id_idx";
+ALTER INDEX "account_balance_snapshots_canonical_owner_user_id_idx"
+  RENAME TO "account_balance_snapshots_owner_user_id_idx";
+ALTER INDEX "daily_portfolio_snapshots_canonical_owner_user_id_idx"
+  RENAME TO "daily_portfolio_snapshots_owner_user_id_idx";
+ALTER INDEX "daily_position_snapshots_canonical_owner_user_id_idx"
+  RENAME TO "daily_position_snapshots_owner_user_id_idx";
+ALTER INDEX "settings_canonical_owner_user_id_idx"
+  RENAME TO "settings_owner_user_id_idx";
+
+-- ---------------------------------------------------------------------------
+-- 7. Normalize owner-FK names and remove temporary non-null proof checks.
+-- Run after pg_attribute confirms every final owner_user_id is attnotnull.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE "assets" RENAME CONSTRAINT
+  "assets_canonical_owner_user_id_app_users_id_fk"
+  TO "assets_owner_user_id_app_users_id_fk";
+ALTER TABLE "accounts" RENAME CONSTRAINT
+  "accounts_canonical_owner_user_id_app_users_id_fk"
+  TO "accounts_owner_user_id_app_users_id_fk";
+ALTER TABLE "asset_groups" RENAME CONSTRAINT
+  "asset_groups_canonical_owner_user_id_app_users_id_fk"
+  TO "asset_groups_owner_user_id_app_users_id_fk";
+ALTER TABLE "asset_group_members" RENAME CONSTRAINT
+  "asset_group_members_canonical_owner_user_id_app_users_id_fk"
+  TO "asset_group_members_owner_user_id_app_users_id_fk";
+ALTER TABLE "event_ledger_entries" RENAME CONSTRAINT
+  "event_ledger_entries_canonical_owner_user_id_app_users_id_fk"
+  TO "event_ledger_entries_owner_user_id_app_users_id_fk";
+ALTER TABLE "market_regime_daily" RENAME CONSTRAINT
+  "market_regime_daily_canonical_owner_user_id_app_users_id_fk"
+  TO "market_regime_daily_owner_user_id_app_users_id_fk";
+ALTER TABLE "goals" RENAME CONSTRAINT
+  "goals_canonical_owner_user_id_app_users_id_fk"
+  TO "goals_owner_user_id_app_users_id_fk";
+ALTER TABLE "transactions" RENAME CONSTRAINT
+  "transactions_canonical_owner_user_id_app_users_id_fk"
+  TO "transactions_owner_user_id_app_users_id_fk";
+ALTER TABLE "fixed_transactions" RENAME CONSTRAINT
+  "fixed_transactions_canonical_owner_user_id_app_users_id_fk"
+  TO "fixed_transactions_owner_user_id_app_users_id_fk";
+ALTER TABLE "monthly_incomes" RENAME CONSTRAINT
+  "monthly_incomes_canonical_owner_user_id_app_users_id_fk"
+  TO "monthly_incomes_owner_user_id_app_users_id_fk";
+ALTER TABLE "account_balance_snapshots" RENAME CONSTRAINT
+  "account_balance_snapshots_canonical_owner_user_id_app_users_id_fk"
+  TO "account_balance_snapshots_owner_user_id_app_users_id_fk";
+ALTER TABLE "daily_portfolio_snapshots" RENAME CONSTRAINT
+  "daily_portfolio_snapshots_canonical_owner_user_id_app_users_id_fk"
+  TO "daily_portfolio_snapshots_owner_user_id_app_users_id_fk";
+ALTER TABLE "daily_position_snapshots" RENAME CONSTRAINT
+  "daily_position_snapshots_canonical_owner_user_id_app_users_id_fk"
+  TO "daily_position_snapshots_owner_user_id_app_users_id_fk";
+ALTER TABLE "settings" RENAME CONSTRAINT
+  "settings_canonical_owner_user_id_app_users_id_fk"
+  TO "settings_owner_user_id_app_users_id_fk";
+
+ALTER TABLE "assets" DROP CONSTRAINT
+  "assets_canonical_owner_not_null_check";
+ALTER TABLE "accounts" DROP CONSTRAINT
+  "accounts_canonical_owner_not_null_check";
+ALTER TABLE "asset_groups" DROP CONSTRAINT
+  "asset_groups_canonical_owner_not_null_check";
+ALTER TABLE "asset_group_members" DROP CONSTRAINT
+  "asset_group_members_canonical_owner_not_null_check";
+ALTER TABLE "event_ledger_entries" DROP CONSTRAINT
+  "event_ledger_entries_canonical_owner_not_null_check";
+ALTER TABLE "market_regime_daily" DROP CONSTRAINT
+  "market_regime_daily_canonical_owner_not_null_check";
+ALTER TABLE "goals" DROP CONSTRAINT
+  "goals_canonical_owner_not_null_check";
+ALTER TABLE "transactions" DROP CONSTRAINT
+  "transactions_canonical_owner_not_null_check";
+ALTER TABLE "fixed_transactions" DROP CONSTRAINT
+  "fixed_transactions_canonical_owner_not_null_check";
+ALTER TABLE "monthly_incomes" DROP CONSTRAINT
+  "monthly_incomes_canonical_owner_not_null_check";
+ALTER TABLE "account_balance_snapshots" DROP CONSTRAINT
+  "account_balance_snapshots_canonical_owner_not_null_check";
+ALTER TABLE "daily_portfolio_snapshots" DROP CONSTRAINT
+  "daily_portfolio_snapshots_canonical_owner_not_null_check";
+ALTER TABLE "daily_position_snapshots" DROP CONSTRAINT
+  "daily_position_snapshots_canonical_owner_not_null_check";
+ALTER TABLE "settings" DROP CONSTRAINT
+  "settings_canonical_owner_not_null_check";
+
+-- Final assertions:
+-- - all 14 final owner_user_id columns are uuid NOT NULL;
+-- - all seven legacy_owner_user_id columns remain varchar and unchanged;
+-- - assets.created_by_id remains unchanged;
+-- - all owner and same-owner FKs are validated and use RESTRICT;
+-- - no regime natural unique exists;
+-- - nullable daily position asset_id and its 52 legacy-only rows remain;
+-- - this DDL performs no financial/shared/admin row mutation;
+-- - RLS is still disabled/deferred.
