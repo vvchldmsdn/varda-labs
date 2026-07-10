@@ -61,6 +61,8 @@ describe("portfolio risk math", () => {
     assertClose(result.portfolio?.riskContributionEnb.value, 2);
     assertClose(result.instruments[0].signedRiskContributionPct, 50);
     assertClose(result.instruments[1].absoluteRiskSharePct, 50);
+    assert.equal(result.instruments[0].riskContributionReason, null);
+    assert.equal(result.instruments[1].riskContributionReason, null);
   });
 
   it("computes zero correlation for orthogonal synthetic returns", () => {

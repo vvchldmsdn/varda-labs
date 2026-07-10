@@ -27,9 +27,9 @@ export function RiskDataHealth({
     >
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <RiskSummaryCard
-          label="보유 종목 선택"
-          value={`${provenance.eligibleHoldingCount}/${provenance.selectedHoldingCount}`}
-          detail={`${provenance.excludedHoldingCount} excluded`}
+          label="리스크 계산 대상"
+          value={`${provenance.eligibleHoldingCount} / ${provenance.selectedHoldingCount}`}
+          detail={`${provenance.excludedHoldingCount}개 제외 · 아래 목록 참조`}
         />
         <RiskSummaryCard
           label="가격 행"

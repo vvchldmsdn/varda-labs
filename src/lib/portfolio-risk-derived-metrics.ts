@@ -54,7 +54,9 @@ export function buildRiskInstrumentMetrics({
       riskContribution?.absoluteRiskContributionDaily ?? null,
     absoluteRiskSharePct: riskContribution?.absoluteRiskSharePct ?? null,
     riskContributionReason:
-      riskContribution?.reason ?? "insufficient_instruments",
+      riskContribution === null
+        ? "insufficient_instruments"
+        : riskContribution.reason,
   };
 }
 

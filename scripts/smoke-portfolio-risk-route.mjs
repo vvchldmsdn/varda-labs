@@ -27,6 +27,8 @@ const scenarios = [
     path: "/portfolio/risk",
     expectedSections: FULL_SECTIONS,
     absentSections: ["standalone-summary"],
+    expectedText: [],
+    absentText: ["종목 수 부족"],
     minimumOverflowContainers: 4,
   },
   {
@@ -40,6 +42,8 @@ const scenarios = [
       "correlation-matrix",
       "stress-correlation",
     ],
+    expectedText: [],
+    absentText: [],
     minimumOverflowContainers: 1,
   },
   {
@@ -56,6 +60,8 @@ const scenarios = [
       "correlation-matrix",
       "stress-correlation",
     ],
+    expectedText: ["종목 수 부족"],
+    absentText: [],
     minimumOverflowContainers: 2,
   },
   {
@@ -63,6 +69,8 @@ const scenarios = [
     path: "/portfolio/risk?account=isa&window=252",
     expectedSections: FULL_SECTIONS,
     absentSections: ["standalone-summary"],
+    expectedText: [],
+    absentText: ["종목 수 부족"],
     minimumOverflowContainers: 3,
   },
 ];
@@ -84,6 +92,8 @@ async function main() {
     assert.equal(response.status, 200, `${scenario.label} must return 200`);
     assert.match(response.body, /data-page="portfolio-risk"/);
     assert.match(response.body, /포트폴리오 위험·분산/);
+    assert.match(response.body, /리스크 계산 대상/);
+    assert.match(response.body, /무위험 수익률 \(가정\)/);
     assert.match(response.body, /overflow-x-hidden/);
     assert.doesNotMatch(response.body, LEAK_PATTERN);
 
@@ -99,6 +109,18 @@ async function main() {
         response.body,
         new RegExp(`data-risk-section="${section}"`),
         `${scenario.label} unexpectedly rendered ${section}`,
+      );
+    }
+    for (const expectedText of scenario.expectedText) {
+      assert.ok(
+        response.body.includes(expectedText),
+        `${scenario.label} is missing expected text: ${expectedText}`,
+      );
+    }
+    for (const absentText of scenario.absentText) {
+      assert.ok(
+        !response.body.includes(absentText),
+        `${scenario.label} unexpectedly rendered text: ${absentText}`,
       );
     }
     const overflowContainers =

@@ -64,6 +64,15 @@ source evidence through `2026-07-09`.
 | all | 90 | ready | complete | 90 / 90 | 15 |
 | all | 252 | insufficient_coverage | unavailable | 142 / 252 | 15 |
 
+For brokerage, `10 / 13` means ten risk-eligible instruments out of thirteen
+selected asset rows. `금현물`, `적금`, and `청약` are excluded because they
+have no ticker and therefore no canonical historical price series. The route
+labels this as `리스크 계산 대상`, not a total portfolio holding count.
+
+The v1 Sharpe calculation intentionally uses an explicit annual risk-free-rate
+assumption of 0% until a canonical KRW-investor source is approved. The route
+labels this value as an assumption; it is not a fetched current policy rate.
+
 The audit made 32 SELECTs. Relevant row counts were unchanged before and
 after: 19 assets, 11,329 asset price snapshots, and 468 FX rows. The compact
 audit output passed the internal-id and secret-pattern scan.

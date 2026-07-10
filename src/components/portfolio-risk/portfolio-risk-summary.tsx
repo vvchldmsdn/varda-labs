@@ -60,9 +60,9 @@ export function RiskAnalysisBasis({
           detail={`${provenance.returnType} returns`}
         />
         <RiskSummaryCard
-          label="무위험 수익률"
+          label="무위험 수익률 (가정)"
           value={formatRiskRatioPercent(provenance.annualRiskFreeRate)}
-          detail={`daily ${formatRiskRatioPercent(provenance.dailyRiskFreeRate)}`}
+          detail={`canonical source 미확정 · daily ${formatRiskRatioPercent(provenance.dailyRiskFreeRate)}`}
         />
         <RiskSummaryCard
           label="연환산 기준"
