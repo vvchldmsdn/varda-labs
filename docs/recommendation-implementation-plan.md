@@ -1,6 +1,6 @@
 # Recommendation Implementation Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 Status: docs-only implementation plan. This document does not create Drizzle
 schema, SQL migrations, import scripts, routes, UI, recommendation execution,
@@ -15,6 +15,9 @@ Base44 recommendation stack wholesale.
 
 The first implementation lane is persistence planning for future varda-native
 recommendation runs. It is not a historical import lane and not an engine lane.
+
+This lane is blocked on the canonical user/owner migration described in
+`docs/auth-tenant-phase0-preflight.md`. Account scope is not a tenant boundary.
 
 ## First Lane Table List
 
@@ -66,7 +69,7 @@ a Drizzle schema and does not authorize a migration.
 
 | Group | Candidate columns | Nullability rule |
 | --- | --- | --- |
-| Identity | `id`, `legacy_base44_id` | `legacy_base44_id` nullable; used only for approved legacy import. |
+| Identity | `id`, `owner_user_id`, `legacy_base44_id` | `owner_user_id uuid NOT NULL` for every run. `legacy_base44_id` nullable; used only for approved legacy import. |
 | Run key | `run_date`, `account`, `account_id` | `account` preserved as raw text. `account_id` nullable for `all` runs or legacy mismatch. |
 | Source/status | `source`, `engine_version`, `status` | Required for varda-native rows. |
 | Context | `regime_label`, `regime_score`, `fx_buy_multiplier` | Nullable; only scalar fields needed for display/filtering. |
@@ -79,7 +82,7 @@ a Drizzle schema and does not authorize a migration.
 
 | Group | Candidate columns | Nullability rule |
 | --- | --- | --- |
-| Identity | `id`, `legacy_base44_id`, `legacy_item_key` | Legacy fields nullable; only for approved import. |
+| Identity | `id`, `owner_user_id`, `legacy_base44_id`, `legacy_item_key` | `owner_user_id uuid NOT NULL` and must match the parent run owner. Legacy fields nullable; only for approved import. |
 | Parent | `recommendation_run_id`, `legacy_run_id` | `recommendation_run_id` required for varda-native rows. |
 | Run key copy | `run_date`, `account`, `account_id` | Duplicated for read efficiency; run remains source of truth. |
 | Action | `candidate_type`, `status`, `suggested_amount_krw` | Type/status required for varda-native rows. Amount nullable for observation rows. |
@@ -122,6 +125,8 @@ Import-only item status, if historical import is approved later:
 
 Validation rules:
 
+- `owner_user_id` must come from trusted server context, not request input.
+- an item owner must equal its parent run owner;
 - `source` must identify the engine or import source.
 - `candidate_type` must be one of `include`, `replace`, `trim`, or `watch`.
 - `executable` does not mean trade permission; it means the recommendation
@@ -132,7 +137,8 @@ Validation rules:
 
 | Relationship | First-lane rule |
 | --- | --- |
-| Run to items | One run has many items. varda-native items require a parent run. |
+| Run/item to owner | Both require canonical owner. Account cannot substitute for owner identity. |
+| Run to items | One run has many items. varda-native items require a parent run; a future composite FK should enforce item/run owner equality. |
 | Run to account | Preserve raw `account`. `account_id` can be nullable for `all` or legacy mismatch. |
 | Item to asset | `asset_id` can be nullable. Preserve `ticker`, `name`, `market`, and legacy asset id where available. |
 | Item to replacement source | Optional. Preserve raw source ticker/name even when no current asset maps. |
@@ -150,7 +156,8 @@ If an import phase is approved later:
 2. Add an import script with dry-run default.
 3. Write only with `--write`.
 4. Preserve `legacy_base44_id`.
-5. Exclude owner/user ids until tenant modeling exists.
+5. Require the approved canonical owner; imported rows use the explicit initial
+   owner and never raw Base44 owner/user fields.
 6. Exclude provider credentials, raw auth headers, tokens, and secrets.
 7. Use nullable refs for historical account/asset mismatches.
 8. Preserve raw legacy JSON as evidence.
@@ -164,6 +171,9 @@ Current calculation fixture gap guidance lives in
 
 Before any recommendation schema migration, add or confirm fixture coverage for:
 
+- two users with colliding account codes/tickers cannot read or write each
+  other's runs/items;
+- missing owner and parent/item owner mismatch are rejected;
 - event-ledger cost basis and realized return inputs;
 - account filter behavior for all/brokerage/isa/irp;
 - USD to KRW conversion evidence used by recommendation inputs;
@@ -209,11 +219,13 @@ and expected outputs, not a direct port of Base44 recommendation functions.
 
 ## Next Approval Gate
 
-After this plan is reviewed, choose one of these narrow lanes:
+After this plan is reviewed and the canonical owner migration is approved,
+choose one of these narrow lanes:
 
 1. Add fixture tests for recommendation input calculations.
 2. Draft a schema implementation plan that converts this document into exact
    Drizzle table definitions, still without migration.
 3. Return to read-only product screens that use already imported data.
 
-Do not create a migration until the selected lane is explicitly approved.
+Do not create a recommendation migration until the selected lane and canonical
+owner prerequisite are explicitly approved.

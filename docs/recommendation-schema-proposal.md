@@ -1,6 +1,6 @@
 # Recommendation Schema Proposal
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 Status: proposal only. This document does not create Drizzle schema, SQL
 migrations, import scripts, routes, UI, recommendation execution, provider calls,
@@ -23,6 +23,10 @@ The target model should support:
 - optional post-run explanation/content
 - future user review/execution records
 - legacy Base44 evidence if imported later
+
+The canonical owner prerequisite is defined in
+`docs/auth-tenant-phase0-preflight.md`. Recommendation persistence must not be
+implemented before that owner migration is approved.
 
 ## Non-Goals
 
@@ -136,7 +140,7 @@ Column groups:
 
 | Group | Candidate fields | Notes |
 | --- | --- | --- |
-| Identity | `id`, `legacy_base44_id` | `legacy_base44_id` only for imported Base44 rows. |
+| Identity | `id`, `owner_user_id`, `legacy_base44_id` | `owner_user_id uuid NOT NULL` for every row. `legacy_base44_id` only for imported Base44 rows. |
 | Run key | `run_date`, `account`, `account_id` | `account_id` nullable because imported rows may not map. |
 | Source | `source`, `engine_version`, `status` | `source` examples: `varda_engine`, `base44_import`. |
 | Context | `regime_label`, `regime_score`, `fx_buy_multiplier` | Scalar fields only for common display/filter needs. |
@@ -175,7 +179,7 @@ Column groups:
 
 | Group | Candidate fields | Notes |
 | --- | --- | --- |
-| Identity | `id`, `legacy_base44_id`, `legacy_item_key` | `legacy_item_key` is useful for item JSON that has no Base44 row id. |
+| Identity | `id`, `owner_user_id`, `legacy_base44_id`, `legacy_item_key` | `owner_user_id uuid NOT NULL` and must equal the parent run owner. `legacy_item_key` is useful for item JSON that has no Base44 row id. |
 | Parent | `recommendation_run_id`, `legacy_run_id` | `recommendation_run_id` nullable only during import staging. |
 | Run key copy | `run_date`, `account`, `account_id` | Duplicated for simpler read queries; run remains source of truth. |
 | Action | `candidate_type`, `status`, `suggested_amount_krw` | Mirrors Base44 include/replace/trim/watch direction. |
@@ -287,8 +291,9 @@ semantics need their own model decision.
 
 | Relationship | Rule |
 | --- | --- |
+| Run/item to owner | Both require canonical `owner_user_id`; item owner must equal its parent run owner. |
 | Run to items | One run has many items. Items should not exist without a run after import staging. |
-| Run to account | `account_id` nullable; keep raw `account` string. |
+| Run to account | `account_id` nullable; keep raw `account` string. Account is portfolio scope, never tenant identity. |
 | Item to asset | `asset_id` nullable; keep raw `legacy_asset_id`, `ticker`, and `name`. |
 | Item to replacement source | nullable; keep `from_ticker` and `from_name`. |
 | Run to explanation | optional one-to-many or one-to-one, depending on content lifecycle. |
@@ -302,13 +307,15 @@ Proposal only. Do not create these until the implementation step.
 | Table | Candidate index/constraint | Purpose |
 | --- | --- | --- |
 | `recommendation_runs` | unique `legacy_base44_id` where not null | Idempotent Base44 import. |
-| `recommendation_runs` | `(run_date, account, source)` | Find latest/current run by account. |
-| `recommendation_runs` | `(account_id, run_date)` | Current-account lookup when mapped. |
-| `recommendation_runs` | `(status, run_date)` | Operational filtering. |
+| `recommendation_runs` | unique `(owner_user_id, id)` | Composite parent key for enforcing item/run owner equality. |
+| `recommendation_runs` | `(owner_user_id, run_date, account, source)` | Find latest/current run inside one owner boundary. |
+| `recommendation_runs` | `(owner_user_id, account_id, run_date)` | Current-account lookup when mapped. |
+| `recommendation_runs` | `(owner_user_id, status, run_date)` | User-scoped operational filtering. |
 | `recommendation_items` | unique `legacy_base44_id` where not null | Idempotent Base44 item import. |
-| `recommendation_items` | `(recommendation_run_id, candidate_type)` | Render grouped run items. |
-| `recommendation_items` | `(ticker, run_date)` | Ticker history lookup. |
-| `recommendation_items` | `(account, run_date)` | Account-level recommendation history. |
+| `recommendation_items` | FK `(owner_user_id, recommendation_run_id)` to run `(owner_user_id, id)` | Reject parent/item owner mismatch. |
+| `recommendation_items` | `(owner_user_id, recommendation_run_id, candidate_type)` | Render grouped run items and preserve owner locality. |
+| `recommendation_items` | `(owner_user_id, ticker, run_date)` | User-scoped ticker history lookup. |
+| `recommendation_items` | `(owner_user_id, account, run_date)` | User/account recommendation history. |
 | `recommendation_signals` | unique `(signal_date, signal_key, source)` | Avoid duplicate generated signals. |
 | `recommendation_explanations` | `(recommendation_run_id, source)` | Fetch content for a run. |
 
@@ -390,7 +397,8 @@ If import is approved later:
 2. Add import scripts with dry-run default.
 3. Write only with `--write`.
 4. Preserve `legacy_base44_id`.
-5. Exclude owner/user ids until tenant/user modeling exists.
+5. Require the approved canonical `owner_user_id`; imported rows must use the
+   explicit initial owner and never a raw Base44 owner value.
 6. Exclude provider credentials, raw auth headers, tokens, and secrets.
 7. Use nullable account/asset/run references for historical rows.
 8. Store raw legacy JSON as JSONB evidence.
@@ -400,14 +408,16 @@ If import is approved later:
 
 First read-only recommendation UI should query:
 
+- current canonical owner from trusted server context;
 - latest ready run for selected account;
 - item rows grouped by `candidate_type`;
 - item headline fields for table/card display;
 - JSONB reasons only for detail expansion;
 - optional explanation row if content exists.
 
-Do not compute recommendations in the browser. Client components may only sort,
-filter, or expand already-rendered data.
+Owner filtering must precede account/date filters. Do not compute
+recommendations in the browser. Client components may only sort, filter, or
+expand already-rendered data.
 
 ## Open Questions
 

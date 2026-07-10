@@ -1,273 +1,155 @@
 # Auth And Tenant Model Design
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 Status: docs-only design gate. This document does not authorize installing an
-auth provider, changing schema, enabling RLS, adding policies, changing API
-behavior, backfilling rows, or changing Cron/KIS/snapshot/admin write paths.
+auth provider, changing schema, enabling RLS, backfilling rows, changing query
+behavior, or enabling user-facing writes.
 
-## Decision Summary
+The measured table inventory, row counts, owner migration plan, query/write
+inventory, two-user fixture plan, and RLS ADR direction are in
+`docs/auth-tenant-phase0-preflight.md`.
 
-The current varda-labs app is protected as a single-user migration verification
-surface. It is not yet a social-login or multi-tenant product.
+## Current State
 
-Before user-facing writes, settings edits, event-ledger writes, recommendation
-run storage, simulation job storage, or balance/history write paths are
-enabled, varda-labs needs an explicit auth and tenant boundary.
+varda-labs is a single imported portfolio protected by Basic Auth. It is not a
+multi-user identity system.
 
-The next implementation gate should be:
+- `VARDA_APP_PASSWORD` / `APP_ACCESS_PASSWORD` protect product pages.
+- `ADMIN_JOB_SECRET` / `CRON_SECRET` protect admin and scheduled operations.
+- `brokerage`, `isa`, `irp`, and `all` are account partitions, not tenants.
+- Existing varchar `owner_user_id` and `created_by_id` values are legacy
+  evidence, not canonical user UUIDs.
+- Existing entity APIs are admin/import compatibility routes, not user CRUD.
 
-1. choose an auth provider;
-2. define the app user model;
-3. classify every table by ownership;
-4. decide the canonical owner key;
-5. plan how imported Base44 rows attach to the initial owner;
-6. add app-level user filtering;
-7. only then evaluate optional Postgres RLS policies.
+Basic Auth and admin job auth must remain separate from future user sessions.
+Neither supplies a product owner identity.
 
-## Current Auth Surface
+## Phase 0 Decision
 
-### UI Routes
+The canonical future ownership contract is fixed for planning:
 
-Current protected UI routes:
-
-| Route | Current protection | Notes |
-| --- | --- | --- |
-| `/` | Basic Auth in `src/proxy.ts` | Read-only portfolio dashboard. |
-| `/portfolio/:path*` | Basic Auth in `src/proxy.ts` | Reserved route family. |
-| `/etfs` and `/etfs/:path*` | Basic Auth in `src/proxy.ts` | ETF reference read-only surface. |
-| `/market` and `/market/:path*` | Basic Auth in `src/proxy.ts` | Market context read-only surface. |
-
-Current UI auth environment contract:
-
-| Env key | Role |
+| Concern | Decision |
 | --- | --- |
-| `VARDA_APP_PASSWORD` | Preferred dashboard access password. |
-| `APP_ACCESS_PASSWORD` | Compatibility dashboard access password. |
-| `VARDA_APP_USER` | Optional username. Defaults to `varda`. |
+| Internal user table | `app_users` |
+| Internal user key | `id uuid` |
+| External account map | `auth_identities` with unique `(provider, provider_subject)` |
+| User-owned row key | `owner_user_id uuid NOT NULL REFERENCES app_users(id)` |
+| Initial imported portfolio | One explicitly approved initial app user |
+| Shared market/reference data | No owner column; one shared copy |
+| Account scope | Secondary filter inside an owner boundary |
 
-This is an access gate for a private deployment. It is not a user identity
-system and must not be treated as social login.
+`auth_identities` is provider-neutral. The server resolves an external provider
+subject to an internal app user UUID. Provider IDs, emails, Basic Auth names,
+Base44 owner strings, and import labels must not be used as row owners.
 
-### Admin And Job Routes
+## Complete Ownership Summary
 
-Current admin/job auth uses `src/lib/admin-auth.ts` through
-`ADMIN_JOB_SECRET` or `CRON_SECRET`.
+The policy classifies all 22 current public tables:
 
-| Route | Method | Current protection | Product role |
-| --- | --- | --- | --- |
-| `/api/admin/market/prices/sync` | `POST` | Admin job secret | Admin market-data operation. |
-| `/api/admin/snapshots/daily` | `POST` | Admin job secret | Admin snapshot operation. |
-| `/api/cron/market-cycle/preflight` | `GET` | Admin job secret | Cron/preflight diagnostic. |
+### User-owned
 
-These routes are not user session routes. Keep them separate from future
-social-login authorization.
+- `assets`
+- `accounts`
+- `asset_groups`
+- `asset_group_members`
+- `event_ledger_entries`
+- `market_regime_daily`
+- `goals`
+- `transactions`
+- `fixed_transactions`
+- `monthly_incomes`
+- `account_balance_snapshots`
+- `daily_portfolio_snapshots`
+- `daily_position_snapshots`
+- `settings`
 
-### Entity API Routes
+### Shared reference
 
-The current `src/app/api/entities/*` routes are protected by
-`requireAdminJob`, which delegates to `isAuthorizedAdminJob`.
+- `fx_rates`
+- `asset_price_snapshots`
+- `live_price_quotes`
+- `benchmark_snapshots`
+- `etf_masters`
+- `etf_holdings`
+- `global_market_factors`
 
-| Route family | Methods observed | Current classification |
-| --- | --- | --- |
-| `/api/entities/accounts` | `GET`, `POST` | Admin/import compatibility surface. |
-| `/api/entities/accounts/[id]` | `PATCH`, `DELETE` | Admin/import compatibility surface. |
-| `/api/entities/assets` | `GET`, `POST` | Admin/import compatibility surface. |
-| `/api/entities/assets/[id]` | `PATCH`, `DELETE` | Admin/import compatibility surface. |
-| `/api/entities/asset-groups` | `GET`, `POST` | Admin/import compatibility surface. |
-| `/api/entities/asset-groups/[id]` | `PATCH`, `DELETE` | Admin/import compatibility surface. |
-| `/api/entities/asset-group-members` | `GET`, `POST` | Admin/import compatibility surface. |
-| `/api/entities/asset-group-members/[id]` | `PATCH`, `DELETE` | Admin/import compatibility surface. |
+### Admin/system
 
-Do not expose these as user CRUD without reworking authorization, ownership
-filters, transactions, and product-specific command semantics.
+- `market_data_sync_runs`
 
-## Current Non-Goals
+There are no unresolved tables. `market_regime_daily` is user-owned because its
+rows are account-specific portfolio-derived evidence. Price, FX, ETF,
+benchmark, live quote, and global factor data remains shared.
 
-- Do not treat Basic Auth as social login.
-- Do not treat admin secret routes as user session authorization.
-- Do not treat existing `owner_user_id` or `created_by_id` columns as the final
-  tenant model.
-- Do not copy Base44 `created_by`, `created_by_id`, `owner_id`, or `user_id`
-  fields into the product model without review.
-- Do not put provider credentials, tokens, raw auth headers, app keys, or app
-  secrets in user-owned Postgres rows.
+## Owner Migration Rules
 
-## Auth Provider Decision Matrix
+- A future backfill must require an explicitly reviewed initial user UUID.
+- Never infer that UUID from current owner strings or access credentials.
+- Add/populate canonical owners while columns are nullable, validate all rows,
+  then apply UUID type, `NOT NULL`, FKs, and owner-aware unique indexes.
+- `assets.created_by_id` is legacy evidence and should be deprecated after a
+  canonical asset owner exists.
+- Snapshot writers must propagate owner from the portfolio being snapshotted.
+- Shared provider data must not be duplicated per user.
 
-No provider is selected yet. The first auth decision should compare candidates
-against the same criteria.
-
-| Candidate | Strengths to evaluate | Risks to evaluate |
-| --- | --- | --- |
-| Auth.js / NextAuth | Good Next.js fit, app-controlled tables, flexible providers. | More app-owned session and adapter decisions. RLS context is still custom work. |
-| Clerk | Managed user lifecycle, fast social-login setup, good App Router support. | Vendor lock-in and mapping external user ids to internal owner ids. |
-| Supabase Auth | Integrated auth and Postgres/RLS model. | varda-labs already uses Neon; adopting Supabase Auth only may add split-platform complexity. |
-| Other managed identity | May fit future organization/login needs. | Needs explicit Next.js, Neon, webhook, and local-dev validation. |
-
-Selection criteria:
-
-- server-side session access in Next.js App Router;
-- compatibility with Vercel deployment;
-- stable internal app user id separate from provider id;
-- social provider account mapping;
-- user lifecycle hooks or webhooks;
-- local development ergonomics;
-- Neon/Postgres RLS integration path;
-- operational burden and lock-in.
-
-## App User Model Proposal
-
-Use an internal app user id as the owner key. External social provider ids
-should map to that internal id instead of being used directly as row ownership.
-
-Candidate tables:
-
-| Table | Purpose |
-| --- | --- |
-| `app_users` | Internal user identity and lifecycle state. |
-| `auth_accounts` | Social provider account mapping to `app_users.id`. |
-| `auth_sessions` | Optional only if the chosen provider stores sessions in the app DB. |
-
-Candidate `app_users` fields:
-
-| Field | Purpose |
-| --- | --- |
-| `id uuid` | Stable internal owner id. |
-| `email text` | Login/contact identifier. |
-| `display_name text` | Optional display name. |
-| `is_active boolean` | Soft user lifecycle control. |
-| `created_at timestamptz` | Internal creation time. |
-| `updated_at timestamptz` | Internal update time. |
-
-Candidate `auth_accounts` fields:
-
-| Field | Purpose |
-| --- | --- |
-| `id uuid` | Row id. |
-| `user_id uuid` | FK to `app_users.id`. |
-| `provider text` | Example: `google`, `github`, `kakao`. |
-| `provider_account_id text` | External provider subject/account id. |
-| `created_at timestamptz` | Mapping creation time. |
-| `updated_at timestamptz` | Mapping update time. |
-
-Initial imported Base44 data should be assigned to one explicit initial owner,
-not left as implicit global state. The exact owner id should be created by a
-future migration after the provider and app user model are approved.
-
-## Table Ownership Matrix
-
-This matrix is the proposed target classification. It is not a migration.
-
-| Table | Current owner state | Proposed classification | Notes |
-| --- | --- | --- | --- |
-| `accounts` | Has `owner_user_id`. | User-owned config. | Should eventually require canonical owner. |
-| `asset_groups` | Has `owner_user_id`. | User-owned config. | Group names and target policy are user-specific. |
-| `asset_group_members` | Has `owner_user_id`. | User-owned config join. | Should follow both group and asset ownership. |
-| `assets` | Has `created_by_id`, no canonical owner. | User-owned current state. | Needs canonical owner before user CRUD. |
-| `settings` | No owner. | User-owned policy/settings. | Current single row should attach to initial owner later. |
-| `event_ledger_entries` | No owner. | User-owned historical evidence. | Append-only user financial events. |
-| `account_balance_snapshots` | No owner. | User-owned historical evidence. | Imported balance facts need initial owner assignment. |
-| `daily_portfolio_snapshots` | No owner. | User-owned historical evidence. | Account string is not enough for tenant isolation. |
-| `daily_position_snapshots` | No owner. | User-owned historical evidence. | Must retain nullable asset FK and legacy ids. |
-| `goals` | Has `owner_user_id`. | User-owned config/history. | Keep separate from old Goal UI assumptions. |
-| `transactions` | Has `owner_user_id`. | User-owned event/input. | Future write path needs command semantics. |
-| `fixed_transactions` | Has `owner_user_id`. | User-owned recurring input. | Future write path needs validation and ownership. |
-| `monthly_incomes` | Has `owner_user_id`. | User-owned income input. | Unique constraints should include canonical owner. |
-| `etf_masters` | No owner. | Public/reference. | Shared reference universe. |
-| `etf_holdings` | No owner. | Public/reference evidence. | Shared ETF lookthrough history, not user portfolio exposure. |
-| `benchmark_snapshots` | No owner. | Shared market data. | Imported benchmark time series. |
-| `global_market_factors` | No owner. | Shared market data. | Macro/factor series shared across users. |
-| `market_regime_daily` | No owner, has account string/id. | Unresolved user-derived market evidence. | Account-specific rows should likely attach to owner or be recomputed per user. |
-| `asset_price_snapshots` | No owner. | Shared market data. | Ticker price series are shared unless user-specific overrides appear. |
-| `market_data_sync_runs` | No owner. | Admin/system job artifact. | Belongs to operations, not user data. |
-| `fx_rates` | No owner. | Shared market data. | FX series are shared. |
-
-## Owner Key Policy
-
-Recommended canonical name: `owner_user_id` if the current schema is evolved
-incrementally, or `user_id` if the auth migration is allowed to rename toward a
-cleaner model.
-
-Pragmatic recommendation:
-
-- keep `owner_user_id` as the public schema name for the migration to reduce
-  churn;
-- define it as a FK to future `app_users.id` once app users exist;
-- deprecate `created_by_id` as a legacy compatibility column;
-- keep Base44 legacy owner fields out of imported data unless a specific audit
-  need is approved;
-- do not add owner keys to public/reference market tables;
-- split account-derived market rows from shared market rows before enforcing
-  ownership on `market_regime_daily`.
+No migration or backfill is approved by this document.
 
 ## Query And Write Boundary
 
-Future app-level authorization should be enforced before optional RLS.
+Every user-facing server query must derive an internal user UUID from trusted
+server session context, filter user-owned tables by that UUID, and only then
+apply account/search/date filters. URL search params may select account scope,
+but may not select an owner.
 
-Read rules:
+Browser-provided owner IDs are untrusted. Future user commands must derive
+ownership from the session, validate referenced rows belong to that owner, and
+write in transactions. Admin/import routes remain separate.
 
-- Server Component query helpers must accept or derive the current internal
-  user id.
-- User-owned tables must filter by canonical owner.
-- Historical snapshot queries must preserve legacy ids and denormalized labels
-  while filtering by owner.
-- Public/reference tables may be read without owner filters.
-- Admin/system job tables should remain outside user session reads unless a
-  specific admin UI is approved.
+Recommendation runs and items must each require the canonical owner; account
+scope is not a substitute. Item owner must match parent run owner.
 
-Write rules:
+## Auth Provider Gate
 
-- Browser-side multi-step mutation remains forbidden.
-- User writes should use route handlers or server actions with authorization,
-  validation, transactions, idempotency where needed, and event-ledger append
-  where applicable.
-- Admin/import write routes should stay separate from user writes.
-- Existing entity APIs should be reclassified before being exposed as product
-  CRUD.
+No provider is selected. Compare candidates only after the owner contract is
+accepted, using:
 
-## RLS Decision Section
+- App Router server-session support;
+- Vercel deployment and local-development behavior;
+- provider-subject to internal-UUID mapping;
+- social account linking and lifecycle hooks;
+- Neon/Postgres integration;
+- operational burden and lock-in.
 
-Do not enable RLS yet. RLS should be evaluated only after the app user model and
-owner backfill plan are approved.
+Provider selection does not change the internal UUID ownership contract.
 
-RLS questions to resolve:
+## RLS Direction
 
-- How will the current request user id reach Postgres for each query?
-- With Neon serverless and Drizzle, should the app use a transaction-scoped
-  local setting such as `SET LOCAL app.current_user_id = ...`?
-- Which DB role will application traffic use?
-- Which DB role will migrations and import/admin jobs use?
-- Will app-level authorization and RLS both be required?
-- How will public/reference tables remain readable?
-- How will historical nullable owner rows be handled during transition?
-- How will test fixtures prove cross-user isolation?
+App-level owner filters are required before RLS. RLS is defense in depth, not a
+replacement for query authorization.
 
-Potential policy shape after approval:
+Before enabling RLS, prove:
 
-- user-owned tables: `owner_user_id = current_setting('app.current_user_id',
-  true)::uuid`;
-- public/reference tables: read-only to the app role;
-- admin/system job artifacts: not visible to normal user role;
-- import/migration role: separate path with explicit operational controls.
+- a non-owner, non-`BYPASSRLS` application role;
+- separate migration and admin-job roles;
+- transaction-local request identity in the same Neon/Drizzle transaction as
+  the protected query;
+- `USING` and `WITH CHECK` policies for all user-owned tables;
+- shared reference read grants and no app-role access to admin tables;
+- two synthetic users cannot read or write each other's data.
 
-This is only a direction. It is not an implementation plan until provider,
-schema, and owner backfill decisions are approved.
+Do not enable RLS until this behavior has integration tests.
 
-## Approval Gates
+## Ordered Approval Gates
 
-| Gate | Required decision | Output |
-| --- | --- | --- |
-| 1 | Auth provider | Provider choice and session strategy. |
-| 2 | App user schema | `app_users` and account mapping proposal. |
-| 3 | Ownership/backfill | Table-by-table owner migration plan. |
-| 4 | App-level filtering | Query helper/API/server action changes. |
-| 5 | Optional RLS | Policy design, roles, tests, migration. |
-| 6 | User-facing writes | Product command routes and UI enablement. |
+1. Phase 0 ownership/preflight review.
+2. Auth provider and session strategy.
+3. Exact identity/owner schema proposal, no migration.
+4. Two-user query/write fixtures.
+5. Reviewed migration and explicit initial-owner backfill.
+6. Owner-filtered application reads/writes and deployed isolation smoke.
+7. Optional RLS implementation in a separate gate.
+8. User-facing write workflows and recommendation persistence.
 
-## Immediate Next Step
-
-After this document is reviewed, the next docs-only step can be
-`account_balance_snapshots` plus `daily_portfolio_snapshots` history/balance
-read-only design. That document should reference this tenant model and state
-that owner assignment is a prerequisite before any user-facing writes.
+The immediate next decision is whether to approve the Phase 0 ownership model,
+not whether to enable RLS or start recommendation migrations.
