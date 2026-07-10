@@ -3,9 +3,10 @@
 Last updated: 2026-07-10
 
 Status: input normalization, the pure risk-math helper, the read-model
-composer, and the server-only DB adapter are implemented and audited. The
-route remains pending. This work does not add a provider call, API, write path,
-Cron behavior, schema, migration, cleanup, backfill, recommendation, or score.
+composer, the server-only DB adapter, and the minimal `/portfolio/risk` Server
+Component route are implemented and locally audited. This work does not add a
+provider call, API, write path, Cron behavior, schema, migration, cleanup,
+backfill, recommendation, or score.
 
 ## Decision
 
@@ -13,9 +14,9 @@ The existing `/portfolio/structure` page is an allocation evidence surface and
 is user-facing as `자산 배분`. It is not a migration of the gyeol-fin screen
 named `포트 구조`.
 
-The legacy `포트 구조` capability remains pending. Its first varda slice will
-be a separate read-only portfolio risk model with transparent calculations.
-The Base44 function is evidence, not the canonical implementation.
+The legacy `포트 구조` capability is represented by a separate read-only
+portfolio risk model with transparent calculations at `/portfolio/risk`.
+The Base44 function remains evidence, not the canonical implementation.
 
 ## V1 Questions
 
@@ -460,8 +461,8 @@ one parity number.
    legacy/canonical parity fixtures.
 4. Server-only Drizzle adapter, pure composer fixtures, and SELECT-only DB
    smoke: completed. See `docs/portfolio-risk-read-model-audit.md`.
-5. Add a minimal read-only Server Component surface using URL search params
-   for account and window.
+5. Minimal read-only `/portfolio/risk` Server Component surface using URL
+   search params for account and window: completed with local protected smoke.
 6. Add local client components only for matrix/table interaction that does not
    refetch first-render data.
 7. Run lint, tests, build, read-only DB count checks, auth/render/leak smoke,
@@ -473,6 +474,7 @@ one parity number.
   summaries as secondary evidence.
 - Whether a later formula version replaces the explicit 0% risk-free rate with
   a versioned stored source.
-- Final future route and whether allocation and risk share one tabbed surface.
+- Whether a later product design links allocation and risk more closely while
+  preserving their separate route and calculation meanings.
 - Whether imported historical scalar evidence needs an operator-only audit
   view.

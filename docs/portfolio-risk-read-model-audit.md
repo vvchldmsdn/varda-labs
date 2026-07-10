@@ -5,8 +5,8 @@ Last updated: 2026-07-10
 ## Scope
 
 This slice connects the existing portfolio-risk input normalizer and pure math
-core to stored Postgres evidence. It remains read-only and is not connected to
-a route or UI.
+core to stored Postgres evidence. It remains read-only and now feeds the
+minimal `/portfolio/risk` Server Component route.
 
 Implemented boundaries:
 
@@ -68,10 +68,24 @@ The audit made 32 SELECTs. Relevant row counts were unchanged before and
 after: 19 assets, 11,329 asset price snapshots, and 468 FX rows. The compact
 audit output passed the internal-id and secret-pattern scan.
 
+## Route Smoke
+
+Local production-mode smoke covered:
+
+- no auth `/portfolio/risk` -> 401;
+- brokerage/90 -> complete sections;
+- brokerage/252 -> unavailable provenance and data health only;
+- IRP/90 -> standalone volatility/Sharpe and instrument table only;
+- ISA/252 -> complete sections;
+- authenticated responses -> 200 with no internal-id or secret-pattern match;
+- relevant DB counts unchanged before and after all renders.
+
+The route uses server links for account/window changes and has no client-side
+first-render refetch. Tables and matrices own their horizontal overflow.
+
 ## Next Gate
 
-The next eligible slice is a minimal read-only Server Component route with
-`account` and `window` URL search params. It should call the server-only query
-helper directly, render explicit unavailable/standalone states, and defer
-client components to matrix/table-only interaction. It must not add a provider
-refresh, API mutation, recommendation, composite score, schema, or Cron change.
+Run the same protected smoke against the deployed URL and complete a responsive
+visual check. Add the dashboard sidebar link only after that gate. Provider
+refresh, API mutation, recommendation, composite score, schema, and Cron work
+remain outside this slice.
