@@ -86,8 +86,8 @@ Closed enough for now:
 Do next only after user visual review or explicit direction:
 
 - Route/surface map updates for newly migrated features.
-- Add the window-agnostic pure risk-math helper and synthetic fixtures now that
-  historical service-day and duplicate-FX input normalization is complete.
+- Review a server-only risk DB adapter now that input normalization and the
+  window-agnostic pure risk-math helper both pass fixtures.
 - Focused visual review for `/today`, `/history`, `/etfs`, and `/market`.
 - Product-facing identifier cleanup where legacy/internal ids still appear.
 
@@ -98,7 +98,7 @@ Still deferred:
 - Public sync buttons.
 - Admin action buttons.
 - Recommendation and composite risk-scoring integration.
-- Portfolio risk DB adapter and UI until the pure math helper and fixtures pass.
+- Portfolio risk UI until the server-only adapter has a read-only data audit.
 - Snapshot/Cron forecast-calendar correction until a separate no-write review.
 - Cron automation changes.
 - Schema/migration changes for frontend-only work.

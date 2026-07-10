@@ -3,6 +3,7 @@ import "./portfolio-math.test.mjs";
 import "./portfolio-movement.test.mjs";
 import "./portfolio-structure.test.mjs";
 import "./portfolio-risk-input.test.mjs";
+import "./portfolio-risk.test.mjs";
 import "./today-holding-detail.test.mjs";
 import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";

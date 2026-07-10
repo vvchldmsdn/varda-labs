@@ -131,7 +131,7 @@ Current pipeline status:
 | `generateRecommendations` | `recommendation_engine_candidate` | Newer run/candidate recommendation engine | Future `recommendation_runs` and `recommendation_candidates` if approved | Defer. Needs model audit and fixture tests. |
 | `calcRebalanceRecommendation` | `recommendation_engine_candidate` | Older single-row rebalance output | Possible legacy import or reference-only | Do not port as final engine. |
 | `buildRecommendationBriefing` | `recommendation_engine_candidate` | AI narrative for recommendation run | Future content layer | Defer until recommendation model exists. |
-| `calcDiversification` | `portfolio_risk_read_model_candidate` | Descriptive diversification/risk analytics plus provider orchestration | `docs/portfolio-risk-structure-v1-contract.md`; future pure calculation helper | Keep separate from recommendations. Use the legacy function only as parity evidence after readiness and calendar fixtures. |
+| `calcDiversification` | `portfolio_risk_core_migrated_adapter_pending` | Descriptive diversification/risk analytics plus provider orchestration | `portfolio-risk-input*`, `portfolio-risk-statistics.ts`, `portfolio-risk-derived-metrics.ts`, `portfolio-risk.ts`; contract and fixtures | Canonical pure input/math core is implemented. DB adapter and read-only UI remain pending; provider orchestration, composite scores, recommendation, beta/alpha/MDD, and legacy rounding are not ported. |
 | `generatePortfolioWeaknessCards` | `recommendation_engine_candidate` | UI cards for weaknesses | Future read model/content helper | Defer. |
 | `classifyPortfolioPersonality` | `recommendation_engine_candidate` | Classification/content layer | Future product decision | Defer. |
 

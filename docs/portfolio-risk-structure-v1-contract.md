@@ -2,10 +2,10 @@
 
 Last updated: 2026-07-10
 
-Status: input-normalization contract implemented and fixture-tested. The pure
-risk-math helper, DB adapter, and route remain pending. This work does not add
-a provider call, API, write path, Cron behavior, schema, migration, cleanup,
-backfill, recommendation, or score.
+Status: input normalization and the pure risk-math helper are implemented and
+fixture-tested. The DB adapter and route remain pending. This work does not
+add a provider call, API, write path, Cron behavior, schema, migration,
+cleanup, backfill, recommendation, or score.
 
 ## Decision
 
@@ -261,7 +261,7 @@ Use simple KRW returns:
 
 `r(i,t) = value(i,t) / value(i,t-1) - 1`
 
-For `n` included holdings, weight vector `w`, and sample covariance matrix
+For `n` included instruments, weight vector `w`, and sample covariance matrix
 `Sigma`:
 
 - portfolio return: `r(p,t) = sum(w(i) * r(i,t))`;
@@ -278,11 +278,28 @@ For `n` included holdings, weight vector `w`, and sample covariance matrix
   contribution;
 - risk-contribution ENB: `1 / sum(ENB share(i)^2)`.
 
+Sample covariance and standard deviation use denominator `observations - 1`.
+The helper returns full-precision values. Display rounding belongs to the UI
+and must not feed back into risk contribution, ENB, Sharpe, or correlation.
+
+Portfolio variance is clamped to zero only when a negative value is within
+`max(1e-18, absolute weighted covariance scale * 1e-12)`. A more-negative
+value returns `invalid_covariance` instead of taking its square root.
+
+Signed risk-contribution percent and absolute risk-share percent are separate
+outputs. Signed percentages may be negative or exceed 100%; only absolute
+risk shares feed risk-contribution ENB. If portfolio volatility is zero,
+Sharpe, risk contributions, and ENB are `null`. There is no weights-based ENB
+fallback.
+
 The UI must call this `risk-contribution ENB`. Correlation-matrix effective
 rank is a different metric and must not be presented under the same label.
 
 Zero-variance rows make correlation undefined. Return `null` with a
-data-health reason; do not convert undefined correlation to `0`.
+data-health reason; do not convert undefined correlation to `0`. The diagonal
+for a zero-variance instrument is also `null`. If any positive-weight pair has
+undefined correlation, weighted average correlation is `null` with reason
+`undefined_pair_correlation`.
 
 ## Sharpe Policy
 
@@ -290,9 +307,10 @@ V1 uses an explicit annual risk-free rate parameter. Until a canonical
 risk-free data source is approved, the supported default is `0` and the UI
 must disclose `risk-free rate 0% assumption`.
 
-Convert the annual assumption to a daily rate before calculating annualized
-Sharpe from simple returns. Never describe the result as risk-free-adjusted
-without showing the assumption.
+Convert the annual assumption to a daily rate as
+`(1 + annualRf)^(1 / 252) - 1` before calculating annualized Sharpe from
+simple returns. Never describe the result as risk-free-adjusted without
+showing the assumption.
 
 ## Stress Correlation Policy
 
@@ -303,6 +321,8 @@ those dates only.
 - minimum down-day observations: 10;
 - below the minimum: return `null` and the observed count;
 - do not substitute zeros for missing holding returns.
+- recompute variance and nullability on the down-day subset rather than
+  reusing the full-window correlation validity.
 
 ## Window And Coverage Policy
 
@@ -336,6 +356,10 @@ Status rules:
 - `insufficient_instruments`: fewer than two eligible instruments; standalone
   volatility/Sharpe evidence may still be shown, but multivariate portfolio
   metrics are unavailable.
+
+Only `ready` and `partial` input may enter full multivariate calculation.
+`insufficient_instruments` permits one-instrument volatility and Sharpe only.
+`blocked` and `insufficient_coverage` return no calculated risk metrics.
 
 Tickerless non-market holdings are outside the market-risk universe by
 definition and remain explicit exclusions. This is different from dropping a
@@ -375,9 +399,9 @@ Legacy sources inspected read-only:
 ## Pure Helper Boundary
 
 Calculation code is independent of Next.js, Drizzle, Neon, and provider
-clients. `src/lib/portfolio-risk-input.ts` now builds the normalized boundary,
-and the future `src/lib/portfolio-risk.ts` math helper should accept its
-output:
+clients. `src/lib/portfolio-risk-input.ts` builds the normalized boundary and
+`src/lib/portfolio-risk.ts` consumes its status, instruments, weights, and
+return rows:
 
 - formula policy and version;
 - selected account and window;
@@ -385,14 +409,16 @@ output:
 - aligned KRW return series and dates;
 - risk-free rate.
 
-It should return only the display-ready metrics and data-health metadata. A
+It returns only display-ready metrics and data-health metadata. A
 separate server-only DB adapter should load `assets`, price history, and FX,
 construct the aligned input, and call the helper.
 
 The input normalizer aggregates equal `market + currency + ticker`
 instruments, maps evidence to service dates, applies bounded price/FX carry,
 hard-blocks relevant duplicate FX dates, returns aligned simple KRW returns,
-and reports coverage/status. It does not compute covariance or risk metrics.
+and reports coverage/status. The math layer is split into statistics,
+derived-metric, type, and orchestration modules so formula primitives are not
+coupled to input selection or UI formatting.
 
 Expected complexity for `n` holdings and `t` observations is `O(n^2 * t)` for
 covariance/correlation and `O(n^2)` memory. That is appropriate for the current
@@ -427,8 +453,9 @@ one parity number.
    completed in `portfolio-risk-calendar.ts` and `portfolio-risk-input.ts`.
 2. Cross-market, FX movement, account aggregation, and duplicate-FX boundary
    fixtures: completed in `tests/portfolio-risk-input.test.mjs`.
-3. Implement the window-agnostic pure covariance/correlation/volatility/risk
-   contribution/ENB/Sharpe helper with synthetic fixtures.
+3. Window-agnostic pure covariance/correlation/volatility/risk contribution,
+   ENB, Sharpe, and stress helper: completed with synthetic and separated
+   legacy/canonical parity fixtures.
 4. Add a server-only Drizzle adapter that reads stored data in parallel where
    independent.
 5. Add a minimal read-only Server Component surface using URL search params
