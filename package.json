@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "node --no-warnings tests/run.mjs",
     "smoke:portfolio-risk-route": "node --no-warnings scripts/smoke-portfolio-risk-route.mjs",
+    "smoke:history-route": "node --no-warnings scripts/smoke-history-route.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
     "audit:data-integrity": "node scripts/audit-data-integrity.mjs",
     "audit:market-context": "node scripts/audit-market-context-readonly.mjs",

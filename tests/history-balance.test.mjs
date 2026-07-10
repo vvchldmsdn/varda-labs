@@ -9,7 +9,6 @@ import {
 
 function portfolioRow(overrides) {
   return {
-    id: "row-1",
     snapshotDate: "2026-05-20",
     account: "brokerage",
     source: "base44_import",
@@ -40,9 +39,8 @@ describe("history balance helpers", () => {
     const rows = buildPortfolioHistoryDisplayRows({
       account: "all",
       rows: [
-        portfolioRow({ id: "brokerage-row", account: "brokerage" }),
+        portfolioRow({ account: "brokerage" }),
         portfolioRow({
-          id: "all-row",
           account: "all",
           totalMarketValue: "3300",
           totalPnl: "300",
@@ -51,7 +49,6 @@ describe("history balance helpers", () => {
     });
 
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].id, "all-row");
     assert.equal(rows[0].rowKind, "stored");
     assert.equal(rows[0].totalMarketValue, 3300);
     assert.deepEqual(rows[0].derivedFromAccounts, []);
@@ -61,9 +58,8 @@ describe("history balance helpers", () => {
     const rows = buildPortfolioHistoryDisplayRows({
       account: "all",
       rows: [
-        portfolioRow({ id: "brokerage-row", account: "brokerage" }),
+        portfolioRow({ account: "brokerage" }),
         portfolioRow({
-          id: "isa-row",
           account: "isa",
           cashValue: "20",
           investedAmount: "500",
@@ -72,7 +68,6 @@ describe("history balance helpers", () => {
           totalPnl: "300",
         }),
         portfolioRow({
-          id: "irp-row",
           account: "irp",
           cashValue: "30",
           investedAmount: "600",
@@ -102,9 +97,8 @@ describe("history balance helpers", () => {
     const rows = buildPortfolioHistoryDisplayRows({
       account: "all",
       rows: [
-        portfolioRow({ id: "brokerage-row", account: "brokerage" }),
+        portfolioRow({ account: "brokerage" }),
         portfolioRow({
-          id: "isa-row",
           account: "isa",
           cashValue: "20",
           investedAmount: "500",
@@ -122,14 +116,37 @@ describe("history balance helpers", () => {
     const rows = buildPortfolioHistoryDisplayRows({
       account: "isa",
       rows: [
-        portfolioRow({ id: "brokerage-row", account: "brokerage" }),
-        portfolioRow({ id: "isa-row", account: "isa" }),
+        portfolioRow({ account: "brokerage" }),
+        portfolioRow({ account: "isa" }),
       ],
     });
 
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].id, "isa-row");
     assert.equal(rows[0].account, "isa");
     assert.equal(rows[0].rowKind, "stored");
+  });
+
+  it("keeps public display rows free of internal identifiers", () => {
+    const [row] = buildPortfolioHistoryDisplayRows({
+      account: "brokerage",
+      rows: [portfolioRow({ account: "brokerage" })],
+    });
+
+    assert.ok(row);
+    assert.equal(Object.hasOwn(row, "id"), false);
+    assert.equal(Object.hasOwn(row, "legacyBase44Id"), false);
+    assert.deepEqual(Object.keys(row).sort(), [
+      "account",
+      "cashValue",
+      "derivedFromAccounts",
+      "investedAmount",
+      "rowKind",
+      "snapshotDate",
+      "source",
+      "totalCost",
+      "totalMarketValue",
+      "totalPnl",
+      "totalReturnPct",
+    ]);
   });
 });

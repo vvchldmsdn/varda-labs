@@ -1,10 +1,33 @@
 # History Balance Read-Only Design
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
-Status: docs-only source-of-truth design. This document does not add routes,
-UI, schema, migrations, imports, backfills, cleanup, RLS policies, auth provider
-setup, Cron/KIS/snapshot/admin write-path changes, or recommendation logic.
+Status: the read-only `/history` route and its v1 close-out are implemented.
+The route remains a Server Component with direct server-side DB reads and URL
+filters. This work does not add schema, migrations, imports, backfills,
+cleanup, RLS policies, auth provider setup, Cron/KIS/snapshot/admin write-path
+changes, or recommendation logic.
+
+## V1 Close-Out
+
+The 2026-07-10 close-out fixed the route boundary without changing stored
+history:
+
+- public balance and portfolio DTOs no longer select or carry DB UUIDs;
+- React row keys use visible date/account/source/kind evidence plus list order;
+- `잔액 기준일` and `스냅샷 저장일` are labeled separately;
+- stored aggregate rows and display-only derived aggregate rows are explicit;
+- the page states that historical values are not recomputed under the current
+  asset policy;
+- balance and portfolio lanes are not joined, interpolated, or presented as
+  one continuous total series;
+- wide tables own horizontal scrolling while the page prevents horizontal
+  overflow;
+- the dashboard sidebar links `히스토리` to `/history`.
+
+The current post-close-out DB baseline is 3 balance rows and 90 portfolio
+snapshot rows across 27 portfolio dates. Eighteen `all` rows remain display-only
+derived aggregates. No derived row is written back to the database.
 
 ## Decision Summary
 
@@ -302,8 +325,9 @@ This does not authorize writes, imports, or chart/polish expansion.
 - No user-facing write path before the auth/tenant gates in
   `docs/auth-and-tenant-model-design.md`.
 
-## Next Step
+## Closure
 
-After review, the next safe implementation step could be a small read-only
-history query helper and table-first page. That should still avoid
-`PortfolioSnapshot` unless this document's revisit trigger is met.
+History Read-only v1 is closed after local and deployed route smoke. Further
+work requires a separate decision for charts, position drilldown, or a third
+legacy history source. `PortfolioSnapshot` remains deferred unless the revisit
+trigger above is met.

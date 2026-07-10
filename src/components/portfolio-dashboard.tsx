@@ -22,7 +22,7 @@ const navItems: { label: string; href?: string }[] = [
   { label: "추가 투입" },
   { label: "자산 배분", href: "/portfolio/structure" },
   { label: "위험·분산", href: "/portfolio/risk" },
-  { label: "히스토리" },
+  { label: "히스토리", href: "/history" },
   { label: "투자랩", href: "/etfs" },
   { label: "시뮬레이션 검증" },
   { label: "설정" },

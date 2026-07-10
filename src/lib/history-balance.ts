@@ -11,7 +11,6 @@ export type HistoryAccount = (typeof HISTORY_ACCOUNTS)[number];
 export type HistoryLane = (typeof HISTORY_LANES)[number];
 
 export type PortfolioHistoryRawRow = {
-  id: string;
   snapshotDate: string;
   account: string;
   source: string;
@@ -24,12 +23,11 @@ export type PortfolioHistoryRawRow = {
 };
 
 export type PortfolioHistoryDisplayRow = {
-  id: string;
   snapshotDate: string;
   account: HistoryAccount;
   source: string;
   rowKind: "stored" | "derived";
-  derivedFromAccounts: string[];
+  derivedFromAccounts: HistoryAccount[];
   cashValue: number | null;
   investedAmount: number | null;
   totalCost: number | null;
@@ -95,7 +93,6 @@ function storedPortfolioRow(
   account: HistoryAccount,
 ): PortfolioHistoryDisplayRow {
   return {
-    id: row.id,
     snapshotDate: row.snapshotDate,
     account,
     source: row.source,
@@ -140,12 +137,11 @@ function derivedAllPortfolioRow(
   const totalPnl = sumNullable(completeRows, (row) => row.totalPnl);
 
   return {
-    id: `derived:${representative.snapshotDate}:${representative.source}`,
     snapshotDate: representative.snapshotDate,
     account: "all",
     source: representative.source,
     rowKind: "derived",
-    derivedFromAccounts: completeRows.map((row) => row.account),
+    derivedFromAccounts: [...REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS],
     cashValue: sumNullable(completeRows, (row) => row.cashValue),
     investedAmount: sumNullable(completeRows, (row) => row.investedAmount),
     totalCost,

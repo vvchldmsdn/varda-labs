@@ -16,8 +16,7 @@ import {
 } from "@/lib/history-balance";
 
 export type ReadOnlyBalanceHistoryRow = {
-  id: string;
-  date: string;
+  balanceDate: string;
   cash: string | null;
   brokerage: string | null;
   isa: string | null;
@@ -74,13 +73,16 @@ export async function getReadOnlyHistoryBalance({
       derivedPortfolioRowCount: portfolioRows.filter(
         (row) => row.rowKind === "derived",
       ).length,
-      balanceDateRange: summarizeDateRange(balanceRows, (row) => row.date),
+      balanceDateRange: summarizeDateRange(
+        balanceRows,
+        (row) => row.balanceDate,
+      ),
       portfolioDateRange: summarizeDateRange(
         portfolioRows,
         (row) => row.snapshotDate,
       ),
       overlappingDateCount: countOverlappingDates(
-        balanceRows.map((row) => row.date),
+        balanceRows.map((row) => row.balanceDate),
         portfolioRows.map((row) => row.snapshotDate),
       ),
     },
@@ -90,8 +92,7 @@ export async function getReadOnlyHistoryBalance({
 async function loadBalanceRows(): Promise<ReadOnlyBalanceHistoryRow[]> {
   return db
     .select({
-      id: accountBalanceSnapshots.id,
-      date: accountBalanceSnapshots.balanceDate,
+      balanceDate: accountBalanceSnapshots.balanceDate,
       cash: accountBalanceSnapshots.cash,
       brokerage: accountBalanceSnapshots.brokerage,
       isa: accountBalanceSnapshots.isa,
@@ -104,7 +105,6 @@ async function loadBalanceRows(): Promise<ReadOnlyBalanceHistoryRow[]> {
 async function loadPortfolioRows(): Promise<PortfolioHistoryRawRow[]> {
   return db
     .select({
-      id: dailyPortfolioSnapshots.id,
       snapshotDate: dailyPortfolioSnapshots.snapshotDate,
       account: dailyPortfolioSnapshots.account,
       source: dailyPortfolioSnapshots.source,
@@ -147,5 +147,5 @@ function compareBalanceRowsDesc(
   left: ReadOnlyBalanceHistoryRow,
   right: ReadOnlyBalanceHistoryRow,
 ) {
-  return right.date.localeCompare(left.date);
+  return right.balanceDate.localeCompare(left.balanceDate);
 }
