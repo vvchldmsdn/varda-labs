@@ -5,8 +5,10 @@ Last updated: 2026-07-10
 Status: input normalization, the pure risk-math helper, the read-model
 composer, the server-only DB adapter, and the minimal `/portfolio/risk` Server
 Component route are implemented and protected local/deployed HTTP smoke is
-complete. This work does not add a provider call, API, write path, Cron
-behavior, schema, migration, cleanup, backfill, recommendation, or score.
+complete. The dashboard keeps `자산 배분` and adds a separate `위험·분산`
+link. Portfolio Risk v1 is closed. This work does not add a provider call, API,
+write path, Cron behavior, schema, migration, cleanup, backfill,
+recommendation, or score.
 
 ## Decision
 

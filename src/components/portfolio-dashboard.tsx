@@ -21,6 +21,7 @@ const navItems: { label: string; href?: string }[] = [
   { label: "오늘 변동", href: "/today" },
   { label: "추가 투입" },
   { label: "자산 배분", href: "/portfolio/structure" },
+  { label: "위험·분산", href: "/portfolio/risk" },
   { label: "히스토리" },
   { label: "투자랩", href: "/etfs" },
   { label: "시뮬레이션 검증" },
@@ -155,9 +156,9 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               </div>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-4">
-                {heatmapHoldings.map((holding) => (
+                {heatmapHoldings.map((holding, index) => (
                   <HeatmapCell
-                    key={holding.id}
+                    key={holdingPresentationKey(holding, index)}
                     holding={holding}
                     maxValue={maxHeatmapValue}
                   />
@@ -218,8 +219,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.holdings.map((holding) => (
-                    <HoldingRow key={holding.id} holding={holding} />
+                  {data.holdings.map((holding, index) => (
+                    <HoldingRow
+                      key={holdingPresentationKey(holding, index)}
+                      holding={holding}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -277,8 +281,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
             <h2 className="text-base font-semibold tracking-normal">주요 변동 종목</h2>
             <div className="mt-3 space-y-2">
               {data.topMovers.length > 0 ? (
-                data.topMovers.map((holding) => (
-                  <CompactHolding key={holding.id} holding={holding} />
+                data.topMovers.map((holding, index) => (
+                  <CompactHolding
+                    key={holdingPresentationKey(holding, index)}
+                    holding={holding}
+                  />
                 ))
               ) : (
                 <p className="rounded-md bg-[#eef2e8] px-3 py-2 text-sm text-[#687064]">
@@ -301,8 +308,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
           <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
             <h2 className="text-base font-semibold tracking-normal">보유 자산 상위</h2>
             <div className="mt-3 space-y-2">
-              {topHoldings.map((holding) => (
-                <div key={holding.id} className="space-y-1">
+              {topHoldings.map((holding, index) => (
+                <div
+                  key={holdingPresentationKey(holding, index)}
+                  className="space-y-1"
+                >
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="truncate font-medium">{holding.name}</span>
                     <span className="shrink-0 font-semibold">
@@ -403,8 +413,11 @@ function EventActivityPanel({
       </div>
       <div className="mt-3 space-y-2">
         {activities.length > 0 ? (
-          activities.map((activity) => (
-            <EventActivityRow key={activity.id} activity={activity} />
+          activities.map((activity, index) => (
+            <EventActivityRow
+              key={eventActivityPresentationKey(activity, index)}
+              activity={activity}
+            />
           ))
         ) : (
           <p className="rounded-md bg-[#eef2e8] px-3 py-2 text-sm text-[#687064]">
@@ -618,9 +631,9 @@ function NonInvestmentCard({
         <p className="shrink-0 text-sm font-semibold">{formatKrw(totalValue)}</p>
       </div>
       <div className="mt-3 space-y-2">
-        {assets.map((asset) => (
+        {assets.map((asset, index) => (
           <div
-            key={asset.id}
+            key={nonInvestmentPresentationKey(asset, index)}
             className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-sm"
           >
             <div className="min-w-0">
@@ -724,6 +737,37 @@ function DataPill({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-[#687064]">{label}</p>
       <p className="mt-1 font-semibold tabular-nums">{value}</p>
     </div>
+  );
+}
+
+function holdingPresentationKey(holding: DashboardHolding, index: number) {
+  return [
+    holding.account,
+    holding.market,
+    holding.ticker ?? holding.name,
+    index,
+  ].join(":");
+}
+
+function eventActivityPresentationKey(
+  activity: DashboardEventActivity,
+  index: number,
+) {
+  return [
+    activity.eventDate,
+    activity.eventType,
+    activity.account ?? "unknown",
+    activity.ticker ?? activity.assetName,
+    index,
+  ].join(":");
+}
+
+function nonInvestmentPresentationKey(
+  asset: NonInvestmentAsset,
+  index: number,
+) {
+  return [asset.account, asset.assetType, asset.ticker ?? asset.name, index].join(
+    ":",
   );
 }
 

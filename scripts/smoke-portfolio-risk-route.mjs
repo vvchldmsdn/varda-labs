@@ -83,8 +83,31 @@ const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("
 
 async function main() {
   const countsBefore = await readCounts();
-  const unauthorized = await request("/portfolio/risk");
-  assert.equal(unauthorized.status, 401, "no-auth request must return 401");
+  const unauthorizedRisk = await request("/portfolio/risk");
+  const unauthorizedDashboard = await request("/");
+  assert.equal(
+    unauthorizedRisk.status,
+    401,
+    "no-auth risk request must return 401",
+  );
+  assert.equal(
+    unauthorizedDashboard.status,
+    401,
+    "no-auth dashboard request must return 401",
+  );
+
+  const dashboard = await request("/", true);
+  assert.equal(dashboard.status, 200, "authenticated dashboard must return 200");
+  assert.match(dashboard.body, /href="\/portfolio\/structure"/);
+  assert.match(dashboard.body, /href="\/portfolio\/risk"/);
+  assert.match(dashboard.body, /자산 배분/);
+  assert.match(dashboard.body, /위험·분산/);
+  assert.ok(
+    dashboard.body.indexOf('href="/portfolio/structure"') <
+      dashboard.body.indexOf('href="/portfolio/risk"'),
+    "risk navigation must follow allocation navigation",
+  );
+  assert.doesNotMatch(dashboard.body, LEAK_PATTERN);
 
   const routeResults = [];
   for (const scenario of scenarios) {
@@ -148,7 +171,16 @@ async function main() {
       {
         smoke: "portfolio_risk_route",
         baseUrl: BASE_URL,
-        noAuthStatus: unauthorized.status,
+        noAuthStatus: {
+          dashboard: unauthorizedDashboard.status,
+          portfolioRisk: unauthorizedRisk.status,
+        },
+        dashboard: {
+          status: dashboard.status,
+          allocationLink: true,
+          riskLink: true,
+          navigationOrder: "allocation_then_risk",
+        },
         authenticatedRoutes: routeResults,
         databaseSideEffects: false,
         counts: countsAfter,

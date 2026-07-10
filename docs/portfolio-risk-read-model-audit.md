@@ -97,8 +97,12 @@ contracts.
 The route uses server links for account/window changes and has no client-side
 first-render refetch. Tables and matrices own their horizontal overflow.
 
-## Next Gate
+## V1 Closure
 
-Complete the user responsive visual review, then add the dashboard sidebar
-link. Provider refresh, API mutation, recommendation, composite score, schema,
-and Cron work remain outside this slice.
+After user mobile review, the dashboard sidebar keeps `자산 배분` linked to
+`/portfolio/structure` and adds a separate `위험·분산` link to
+`/portfolio/risk`. Protected smoke verifies both links and their order.
+
+Portfolio Risk v1 is closed. Gold proxy mapping, historical risk-free data,
+provider refresh, API mutation, recommendation, composite score, schema, and
+Cron work remain separate future decisions.
