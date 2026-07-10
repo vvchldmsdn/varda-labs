@@ -80,12 +80,16 @@ Local production-mode smoke covered:
 - authenticated responses -> 200 with no internal-id or secret-pattern match;
 - relevant DB counts unchanged before and after all renders.
 
+The same smoke passed against `https://varda-labs.vercel.app` after commit
+`3299d98` deployed. The in-app browser blocked both protected targets, so a
+responsive visual review remains separate from the verified HTTP and overflow
+contracts.
+
 The route uses server links for account/window changes and has no client-side
 first-render refetch. Tables and matrices own their horizontal overflow.
 
 ## Next Gate
 
-Run the same protected smoke against the deployed URL and complete a responsive
-visual check. Add the dashboard sidebar link only after that gate. Provider
-refresh, API mutation, recommendation, composite score, schema, and Cron work
-remain outside this slice.
+Complete the user responsive visual review, then add the dashboard sidebar
+link. Provider refresh, API mutation, recommendation, composite score, schema,
+and Cron work remain outside this slice.

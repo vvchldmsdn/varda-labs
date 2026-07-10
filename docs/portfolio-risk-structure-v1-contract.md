@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 Status: input normalization, the pure risk-math helper, the read-model
 composer, the server-only DB adapter, and the minimal `/portfolio/risk` Server
-Component route are implemented and locally audited. This work does not add a
-provider call, API, write path, Cron behavior, schema, migration, cleanup,
-backfill, recommendation, or score.
+Component route are implemented and protected local/deployed HTTP smoke is
+complete. This work does not add a provider call, API, write path, Cron
+behavior, schema, migration, cleanup, backfill, recommendation, or score.
 
 ## Decision
 
@@ -462,7 +462,8 @@ one parity number.
 4. Server-only Drizzle adapter, pure composer fixtures, and SELECT-only DB
    smoke: completed. See `docs/portfolio-risk-read-model-audit.md`.
 5. Minimal read-only `/portfolio/risk` Server Component surface using URL
-   search params for account and window: completed with local protected smoke.
+   search params for account and window: completed with local and deployed
+   protected HTTP smoke.
 6. Add local client components only for matrix/table interaction that does not
    refetch first-render data.
 7. Run lint, tests, build, read-only DB count checks, auth/render/leak smoke,
