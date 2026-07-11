@@ -192,7 +192,7 @@ Classification:
 | Base44 function | Observed role | Classification | varda-labs treatment |
 | --- | --- | --- | --- |
 | `calibratePortfolioFactorModel` | Reads assets, price history, factor rows, and factor profiles; upserts `SimulationCalibration`. | `run_artifact` | Future calibration job. Do not import empty rows. Extract math only with fixtures. |
-| `normalizeReturnMatrix` | Builds aligned KRW return matrix from prices and factor observations. | pure helper candidate | Future simulation helper, read-only and fixture-backed. |
+| `normalizeReturnMatrix` | Builds aligned KRW return matrix from prices and factor observations. | replace with bounded pure contract | Phase 0A implemented as strict adjusted-close and date-specific FX normalization in `docs/simulation-return-matrix-phase0a-contract.md`; no runtime adapter or factor coupling. |
 
 ### Direct Simulation Engines
 
@@ -266,7 +266,8 @@ payload store.
 
 These areas may become pure, fixture-tested helpers before any persistence:
 
-- KRW return matrix normalization;
+- KRW return matrix normalization (Phase 0A pure helper implemented; runtime
+  adapter and stochastic consumers remain pending);
 - weight normalization and rebalancing calendar logic;
 - simple historical weight backtests;
 - risk contribution and effective-number-of-bets calculations;

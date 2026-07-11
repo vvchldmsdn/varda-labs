@@ -235,7 +235,8 @@ The following still require replacement or proof before migration:
    allocator connection.
 8. MA120 evidence-only/no-overlay validation completed 2026-07-11; multiplier,
    buy blocking, and redistribution policy remain unapproved.
-9. Build the Simulation Validation normalized return-matrix contract.
+9. Simulation Validation normalized return-matrix Phase 0A completed
+   2026-07-11 without DB/provider/runtime or stochastic-engine integration.
 10. Add bootstrap and parametric engines as pure seeded helpers.
 11. Add walk-forward validation before any optimizer is labeled useful.
 12. Design user-owned job/artifact persistence only after auth and ownership
