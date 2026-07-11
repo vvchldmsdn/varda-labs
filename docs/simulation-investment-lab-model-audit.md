@@ -274,9 +274,9 @@ These areas may become pure, fixture-tested helpers before any persistence:
 - per-instrument gross growth-factor materialization (Phase 1B pure helper
   implemented; portfolio aggregation, summaries, and artifacts remain
   pending);
-- normalized buy-and-hold portfolio-path semantics (Gate 0 docs-only proposal
-  recorded; explicit policy approval and a separate scenario vector remain
-  pending);
+- normalized buy-and-hold portfolio-path semantics (Gate 0 approved against
+  commit `652b9ea`; pure Scenario Vector Review Packet implemented but no
+  numeric vector approved);
 - weight normalization and rebalancing calendar logic;
 - simple historical weight backtests;
 - risk contribution and effective-number-of-bets calculations;

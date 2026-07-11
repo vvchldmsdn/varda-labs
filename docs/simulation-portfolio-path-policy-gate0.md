@@ -2,12 +2,13 @@
 
 Last updated: 2026-07-12
 
-Status: proposed and unapproved. This docs-only gate records a reviewable
-portfolio-path model. It does not approve a scenario vector or authorize a
-helper, runtime adapter, route, UI, database read/write, job, artifact, or
-simulation result.
+Status: policy model approved by explicit user decision on 2026-07-12 against
+commit `652b9ea`. Approval evidence is recorded in
+`docs/simulation-portfolio-path-gate0-approval.md`. No actual scenario vector,
+runtime adapter, route, UI, database read/write, job, artifact, or simulation
+result is approved.
 
-Proposed policy id:
+Approved policy id:
 
 ```text
 gross_normalized_buy_and_hold_v1
@@ -23,9 +24,9 @@ Phase 1B deliberately stops before portfolio aggregation. Gate 0 defines one
 possible normalized path semantics and keeps its numeric scenario vector under
 a separate later approval.
 
-## Proposed Semantics
+## Approved Semantics
 
-The proposed v1 model is:
+The approved v1 model is:
 
 1. Every path starts at dimensionless `NAV[0] = 1`.
 2. For each execution, one explicit scenario vector covers the exact canonical
@@ -103,8 +104,10 @@ document also change.
 
 ## Separate Scenario Vector Gate
 
-Gate 0 contains no numeric vector. Only after explicit Gate 0 policy approval
-may a Scenario Vector Review Packet be implemented or reviewed.
+Gate 0 contains no numeric vector. After explicit Gate 0 policy approval, the
+pure review boundary documented in
+`docs/simulation-scenario-vector-review-phase0-contract.md` is implemented. It
+always remains unapproved and does not grant runtime authority.
 
 Its minimum explicit input is:
 
@@ -125,10 +128,9 @@ matrix hash, and draw-plan hash are not scenario-vector approval fields. The
 last two are attached only when an approved vector is executed against one
 specific evidence set.
 
-## Gate 0 Approval Boundary
+## Gate 0 Approval Record
 
-Creating or editing this document does not approve the policy. Approval must
-explicitly name:
+The user explicitly approved commit `652b9ea` and named:
 
 - `gross_normalized_buy_and_hold_v1`;
 - normalized `NAV[0] = 1`;
@@ -138,14 +140,15 @@ explicitly name:
   model;
 - strategic target and Simulation scenario separation.
 
-An instruction to "continue migration" or "use the ISA targets" is not policy
-approval.
+The approval does not extend to an actual scenario vector. Any semantic change
+to this document requires review and a new explicit Gate 0 approval.
 
 ## Not Authorized
 
 Gate 0 does not authorize:
 
-- a scenario vector, vector hash, or production default;
+- an approved, hard-coded, persisted, or runtime scenario vector or production
+  default;
 - Phase 1C NAV aggregation code;
 - KRW wealth or current-portfolio adapters;
 - rebalancing, cash, fee, tax, or transaction-cost variants;
@@ -158,8 +161,9 @@ Gate 0 does not authorize:
 
 ## Ordered Follow-On Gates
 
-1. Explicit user approval of this Gate 0 policy model.
-2. Pure Scenario Vector Review Packet that always remains unapproved.
+1. Explicit user approval of this Gate 0 policy model (completed 2026-07-12).
+2. Pure Scenario Vector Review Packet that always remains unapproved
+   (implemented 2026-07-12).
 3. Explicit approval of one complete scenario vector and hash.
 4. Pure Phase 1C normalized NAV aggregation bound to the approved vector,
    matrix, and draw-plan hashes.

@@ -241,15 +241,18 @@ The following still require replacement or proof before migration:
     2026-07-11 without portfolio aggregation or runtime integration.
 11. Per-instrument gross growth-factor materialization Phase 1B completed
     2026-07-12 without initial capital, weights, aggregation, or summaries.
-12. `gross_normalized_buy_and_hold_v1` Portfolio Path Policy Gate 0 documented
-    2026-07-12 as proposed and unapproved; it uses normalized NAV and does not
+12. `gross_normalized_buy_and_hold_v1` Portfolio Path Policy Gate 0 approved
+    2026-07-12 against commit `652b9ea`; it uses normalized NAV and does not
     require initial KRW capital.
-13. After explicit Gate 0 approval, add a separate unapproved Scenario Vector
-    Review Packet. Do not reuse ISA `isa-v1` automatically.
-14. After explicit scenario-vector approval, add pure Phase 1C normalized NAV
+13. Pure Scenario Vector Review Packet Phase 0 completed 2026-07-12; every
+    packet remains unapproved and excludes execution hashes and target-policy
+    reuse.
+14. Obtain explicit approval for one complete scenario vector and hash. Do not
+    reuse ISA `isa-v1` automatically.
+15. After explicit scenario-vector approval, add pure Phase 1C normalized NAV
     aggregation without distribution summaries.
-15. Add distribution summaries only after an approved portfolio path.
-16. Add the separate parametric factor engine.
-17. Add walk-forward validation before any optimizer is labeled useful.
-18. Design user-owned job/artifact persistence only after auth and ownership
+16. Add distribution summaries only after an approved portfolio path.
+17. Add the separate parametric factor engine.
+18. Add walk-forward validation before any optimizer is labeled useful.
+19. Design user-owned job/artifact persistence only after auth and ownership
     gates permit writes.
