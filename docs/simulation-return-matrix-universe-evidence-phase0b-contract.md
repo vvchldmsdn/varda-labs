@@ -21,11 +21,16 @@ the result to human-readable coverage evidence.
 
 ## Input Boundary
 
-The caller supplies only:
+The low-level read adapter receives only:
 
 - the exact ordered service dates to review;
 - candidate `market/currency/ticker` identities;
 - optional display labels.
+
+The exact date list is a resolved internal input, not a user-facing form
+contract. A later resolver may accept an end service date plus return-step
+count, or an explicit start and end date, and produce the exact date axis. That
+resolver is not implemented in Phase 0B.
 
 There is no default 90/120/252-day window. The adapter does not discover a
 universe from current holdings, account balances, ISA policy `isa-v1`, equal
@@ -69,7 +74,8 @@ The read model returns:
 - rectangular return-cell coverage counts;
 - missing/stale reasons, exclusions, and blockers;
 - source row counts, without source row contents;
-- `matrixUniverseHash` only when the complete matrix is `ready`.
+- `scenarioUniverseHash` for a valid non-empty exact instrument set;
+- `matrixRequestHash` when that universe and exact service-date axis are valid.
 
 FX coverage is calculated independently from price coverage. Missing USD price
 history cannot incorrectly make existing FX evidence look missing.
@@ -77,38 +83,67 @@ history cannot incorrectly make existing FX evidence look missing.
 The DTO does not expose prices, returns, the numerical matrix, weights,
 quantities, values, ids, row sources, or approval state.
 
-## Matrix Universe Hash
+Hash existence does not mean source evidence is ready. The separate
+`vectorReviewStatus` remains blocked unless the complete Phase 0A matrix is
+`ready`.
 
-Hash version: `simulation_return_matrix_universe_hash_v1`.
+## Scenario Universe Hash
+
+Hash version: `simulation_scenario_universe_hash_v1`.
 
 The canonical SHA-256 input contains:
 
+- identity policy `market_currency_ticker_identity_v1`;
+- KRW-investor simple-return basis;
+- adjusted-close-only price basis;
+- date-specific USD/KRW basis;
+- supported currencies KRW and USD;
+- sorted canonical `market/currency/ticker` identities.
+
+It intentionally excludes service dates, Phase 0A/0B carry and window policy,
+display labels, prices, returns, and Gate 0 approval revision. The same exact
+scenario universe can therefore be reused across multiple historical windows.
+
+Changing an instrument changes the hash. Reordering candidate inputs, changing
+a display label, or changing only the historical window does not.
+
+## Matrix Request Hash
+
+Hash version: `simulation_return_matrix_request_hash_v1`.
+
+The canonical SHA-256 input contains:
+
+- `scenarioUniverseHash`;
 - Phase 0B evidence policy version;
 - Phase 0A return-matrix policy version;
-- approved `gross_normalized_buy_and_hold_v1` policy id;
-- full Gate 0 approval commit;
-- the exact requested service-date list;
-- the sorted canonical `market/currency/ticker` identities.
+- the exact resolved service-date list.
 
-The hash intentionally does not contain display labels, weights, price values,
-return values, `inputMatrixHash`, or `drawPlanHash`. It identifies the reviewed
-universe and window under a fixed policy revision; it is not execution-data
-provenance.
+The hash intentionally excludes display labels, weights, price values, return
+values, Gate 0 approval revision, `inputMatrixHash`, and `drawPlanHash`. It
+identifies a matrix request under fixed read policies; it is not source-data or
+execution provenance.
 
-Changing a date or instrument changes the hash. Reordering candidate inputs or
-renaming a display label does not.
+Changing a date, instrument, or Phase 0A/0B policy changes the hash. Reordering
+candidate inputs or renaming a display label does not.
 
 ## Fail-Closed Gate
 
-`matrixUniverseHash` is `null` and scenario vector review remains blocked when:
+`scenarioUniverseHash` is `null` when the candidate set is empty, excluded,
+malformed, or duplicated. `matrixRequestHash` is also `null` when the resolved
+date axis is malformed.
+
+Valid hashes may still be returned with incomplete or blocked source evidence
+so a failed request can be identified without pretending it succeeded.
+Scenario vector review remains blocked when:
 
 - any requested instrument is excluded;
 - any price or required FX service date is missing or stale;
 - any rectangular return cell is incomplete;
 - Phase 0A reports a malformed or ambiguous source row blocker.
 
-No partial universe is silently hashed. No common-history intersection, zero
-fill, automatic normalization, or fallback to raw close is allowed.
+No partial universe is silently hashed. Hash presence never overrides matrix
+status. No common-history intersection, zero fill, automatic normalization, or
+fallback to raw close is allowed.
 
 ## Explicit Non-Scope
 
@@ -118,6 +153,7 @@ Phase 0B does not authorize:
 - an actual scenario id, version, or 10,000bps vector;
 - current/equal/target/ISA weight reuse;
 - Scenario Vector Resolver or Phase 1C NAV aggregation;
+- user-facing date-axis resolution;
 - `inputMatrixHash` or draw-plan execution binding;
 - DB schema changes, writes, API routes, pages, forms, or admin actions;
 - provider fetches, cron jobs, recommendations, optimizer, fan charts,
@@ -125,17 +161,23 @@ Phase 0B does not authorize:
 
 ## Next Gate
 
-The next review artifact must use a user-chosen candidate set and date list to
-produce this Phase 0B table and a non-null `matrixUniverseHash`. Only then can
-the user explicitly approve:
+The next review input should ask the user for a candidate scenario definition,
+not a raw date array or numeric weights:
 
 ```text
-scenarioId / scenarioVersion
-matrixUniverseHash
-one exact integer weightBps row per displayed instrument
-total 10,000bps
+scenarioId:
+scenarioVersion:
+purpose: control / research basket / benchmark comparison
+candidate instruments: market / currency / ticker / display name
+period: end service date plus return-step count, or start service date
 ```
 
-After that approval, a separate pure resolver must revalidate the Gate 0
-revision, universe hash, scenario-vector hash, exact identities, and weight
-total before Phase 1C can be considered.
+Varda must resolve that period into an exact date axis and present the
+instrument table, coverage, blockers, `scenarioUniverseHash`, and
+`matrixRequestHash` together. A hash alone is not a review artifact.
+
+Only after a ready matrix may the user separately approve scenario id/version,
+`scenarioUniverseHash`, and one exact 10,000bps vector. A later pure Scenario
+Vector Resolver must bind the approved Gate 0 revision there, then revalidate
+the universe hash, vector hash, exact identities, and weight total before Phase
+1C can be considered.

@@ -3,9 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
-  canonicalizeSimulationReturnMatrixUniverse,
+  canonicalizeSimulationReturnMatrixRequest,
+  canonicalizeSimulationScenarioUniverse,
   composeSimulationReturnMatrixUniverseEvidence,
-  hashSimulationReturnMatrixUniverse,
+  hashSimulationReturnMatrixRequest,
+  hashSimulationScenarioUniverse,
   planSimulationReturnMatrixUniverseRead,
 } from "../src/lib/simulation-return-matrix-universe-evidence.ts";
 import { loadSimulationReturnMatrixUniverseEvidence } from "../src/lib/simulation-return-matrix-read-loader.ts";
@@ -39,8 +41,12 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
       "eligible_for_scenario_vector_review",
     );
     assert.equal(
-      result.matrixUniverseHash,
-      "sha256:5358855d5efa82f3e71b47464e2888d03777b30958cf6260fe370c9aa86c8249",
+      result.scenarioUniverseHash,
+      "sha256:1293274db83ef61de03f397dbbbc7eb3639dab4b372ce7b15c7120ed7c0618a6",
+    );
+    assert.equal(
+      result.matrixRequestHash,
+      "sha256:88553aad4265e2eb6a107930cadb02aea948fb7e5a2cc4130ea51d3dfede40d3",
     );
     assert.deepEqual(
       result.instruments.map((row) => [
@@ -72,7 +78,8 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
     const voo = result.instruments.find((row) => row.ticker === "VOO");
 
     assert.equal(result.status, "incomplete");
-    assert.equal(result.matrixUniverseHash, null);
+    assert.match(result.scenarioUniverseHash, /^sha256:[0-9a-f]{64}$/);
+    assert.match(result.matrixRequestHash, /^sha256:[0-9a-f]{64}$/);
     assert.equal(result.vectorReviewStatus, "blocked_until_matrix_ready");
     assert.equal(voo?.priceCoverage.coveredServiceDateCount, 0);
     assert.deepEqual(voo?.priceCoverage.reasons, ["missing_price"]);
@@ -101,7 +108,8 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
     assert.equal(callCount, 0);
     assert.equal(result.status, "blocked");
     assert.equal(result.queryRange, null);
-    assert.equal(result.matrixUniverseHash, null);
+    assert.match(result.scenarioUniverseHash, /^sha256:[0-9a-f]{64}$/);
+    assert.equal(result.matrixRequestHash, null);
     assert.ok(
       result.blockers.some(
         (blocker) => blocker.reason === "unsorted_service_dates",
@@ -133,6 +141,60 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
     assert.equal(result.instruments[0].fxCoverage.status, "not_required");
   });
 
+  it("does not hash a partial or duplicate candidate universe", () => {
+    const fixture = crossMarketSimulationFixture();
+    const partial = composeSimulationReturnMatrixUniverseEvidence({
+      request: {
+        ...request(),
+        instruments: [
+          ...request().instruments,
+          { displayName: "Invalid", market: null, currency: "KRW", ticker: "X" },
+        ],
+      },
+      queryRange: null,
+      priceRows: fixture.priceRows,
+      fxRows: fixture.fxRows,
+    });
+    const duplicateRequest = {
+      ...request(),
+      instruments: [request().instruments[0], request().instruments[0]],
+    };
+    const duplicate = composeSimulationReturnMatrixUniverseEvidence({
+      request: duplicateRequest,
+      queryRange: null,
+      priceRows: fixture.priceRows,
+      fxRows: fixture.fxRows,
+    });
+
+    assert.equal(partial.status, "incomplete");
+    assert.equal(partial.scenarioUniverseHash, null);
+    assert.equal(partial.matrixRequestHash, null);
+    assert.equal(duplicate.status, "blocked");
+    assert.equal(duplicate.scenarioUniverseHash, null);
+    assert.equal(duplicate.matrixRequestHash, null);
+  });
+
+  it("keeps request hashes while blocking ambiguous source evidence", () => {
+    const fixture = crossMarketSimulationFixture();
+    fixture.priceRows.push({ ...fixture.priceRows[0] });
+    const result = composeSimulationReturnMatrixUniverseEvidence({
+      request: request(),
+      queryRange: planSimulationReturnMatrixUniverseRead(request()).queryRange,
+      priceRows: fixture.priceRows,
+      fxRows: fixture.fxRows,
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.vectorReviewStatus, "blocked_until_matrix_ready");
+    assert.match(result.scenarioUniverseHash, /^sha256:[0-9a-f]{64}$/);
+    assert.match(result.matrixRequestHash, /^sha256:[0-9a-f]{64}$/);
+    assert.ok(
+      result.blockers.some(
+        (blocker) => blocker.reason === "duplicate_price_date",
+      ),
+    );
+  });
+
   it("keeps the universe hash independent of labels and candidate input order", () => {
     const fixture = crossMarketSimulationFixture();
     const first = composeSimulationReturnMatrixUniverseEvidence({
@@ -157,10 +219,11 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
 
     assert.equal(first.status, "ready");
     assert.equal(second.status, "ready");
-    assert.equal(second.matrixUniverseHash, first.matrixUniverseHash);
+    assert.equal(second.scenarioUniverseHash, first.scenarioUniverseHash);
+    assert.equal(second.matrixRequestHash, first.matrixRequestHash);
   });
 
-  it("binds the hash to exact service dates and canonical identities, not matrix values", () => {
+  it("keeps universe identity reusable while binding matrix requests to exact service dates", () => {
     const instruments = [
       {
         instrumentKey: "korea|KRW|069500",
@@ -168,20 +231,36 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
         currency: "KRW",
         ticker: "069500",
       },
+      {
+        instrumentKey: "us|USD|VOO",
+        market: "us",
+        currency: "USD",
+        ticker: "VOO",
+      },
     ];
-    const first = hashSimulationReturnMatrixUniverse(
-      canonicalizeSimulationReturnMatrixUniverse({
-        requestedServiceDates: ["2026-07-04", "2026-07-07"],
-        instruments,
+    const scenarioUniverseHash = hashSimulationScenarioUniverse(
+      canonicalizeSimulationScenarioUniverse({ instruments }),
+    );
+    const reorderedUniverseHash = hashSimulationScenarioUniverse(
+      canonicalizeSimulationScenarioUniverse({
+        instruments: [...instruments].reverse(),
       }),
     );
-    const second = hashSimulationReturnMatrixUniverse(
-      canonicalizeSimulationReturnMatrixUniverse({
+    const first = hashSimulationReturnMatrixRequest(
+      canonicalizeSimulationReturnMatrixRequest({
+        scenarioUniverseHash,
+        requestedServiceDates: ["2026-07-04", "2026-07-07"],
+      }),
+    );
+    const second = hashSimulationReturnMatrixRequest(
+      canonicalizeSimulationReturnMatrixRequest({
+        scenarioUniverseHash,
         requestedServiceDates: ["2026-07-04", "2026-07-08"],
-        instruments,
       }),
     );
 
+    assert.match(scenarioUniverseHash, /^sha256:[0-9a-f]{64}$/);
+    assert.equal(reorderedUniverseHash, scenarioUniverseHash);
     assert.notEqual(first, second);
   });
 
@@ -207,7 +286,7 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
 
     assert.doesNotMatch(
       serialized,
-      /private-price|private-fx|legacyBase44|weightBps|quantity|currentValue|inputMatrixHash|drawPlanHash/i,
+      /private-price|private-fx|legacyBase44|weightBps|quantity|currentValue|matrixUniverseHash|inputMatrixHash|drawPlanHash|652b9ea/i,
     );
     assert.doesNotMatch(serialized, /"matrix"|"value"|adjustedClosePrice/i);
   });
@@ -215,6 +294,10 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
   it("keeps the production adapter server-only, read-only, and projection-minimized", () => {
     const source = readFileSync(
       "src/db/queries/simulation-return-matrix.ts",
+      "utf8",
+    );
+    const evidenceSource = readFileSync(
+      "src/lib/simulation-return-matrix-universe-evidence.ts",
       "utf8",
     );
 
@@ -227,6 +310,10 @@ describe("Simulation return-matrix Universe Evidence Phase 0B", () => {
     assert.doesNotMatch(
       source,
       /\.insert\(|\.update\(|\.delete\(|\.returning\(|fetch\s*\(|livePriceQuotes|assets\b|weights|target/i,
+    );
+    assert.doesNotMatch(
+      evidenceSource,
+      /SIMULATION_PORTFOLIO_PATH_GATE0_APPROVAL_COMMIT|652b9ea/i,
     );
   });
 });

@@ -19,23 +19,27 @@ import type {
   SimulationReturnMatrixInstrument,
   SimulationReturnMatrixPriceInput,
 } from "./simulation-return-matrix-types.ts";
-import {
-  SIMULATION_PORTFOLIO_PATH_GATE0_APPROVAL_COMMIT,
-  SIMULATION_PORTFOLIO_PATH_POLICY_ID,
-} from "./simulation-scenario-vector-review-serialization.ts";
 
 export const SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY = Object.freeze({
   version: "simulation_return_matrix_universe_evidence_v1",
-  hashVersion: "simulation_return_matrix_universe_hash_v1",
+  scenarioUniverseHashVersion: "simulation_scenario_universe_hash_v1",
+  matrixRequestHashVersion: "simulation_return_matrix_request_hash_v1",
+  identityPolicyVersion: "market_currency_ticker_identity_v1",
   returnMatrixPolicyVersion: SIMULATION_RETURN_MATRIX_POLICY.version,
-  portfolioPathPolicyId: SIMULATION_PORTFOLIO_PATH_POLICY_ID,
-  gate0ApprovalCommit: SIMULATION_PORTFOLIO_PATH_GATE0_APPROVAL_COMMIT,
+  basisPolicy: Object.freeze({
+    returnKind: SIMULATION_RETURN_MATRIX_POLICY.returnKind,
+    priceField: SIMULATION_RETURN_MATRIX_POLICY.priceField,
+    fxPolicy: SIMULATION_RETURN_MATRIX_POLICY.fxPolicy,
+    supportedCurrencies: Object.freeze(["KRW", "USD"] as const),
+  }),
   priceSource: "asset_price_snapshots",
   fxSource: "fx_rates",
   sampleRows: "excluded",
   fxStatus: "ok_only",
-  matrixUniverseHashContent:
-    "policy_revision_exact_service_dates_and_canonical_instrument_identities",
+  scenarioUniverseHashContent:
+    "identity_basis_policy_and_canonical_instrument_identities",
+  matrixRequestHashContent:
+    "scenario_universe_hash_exact_service_dates_and_matrix_policies",
 } as const);
 
 export type SimulationReturnMatrixUniverseCandidate = Readonly<{
@@ -66,17 +70,7 @@ export type SimulationReturnMatrixUniverseReadPlan = Readonly<{
 export function planSimulationReturnMatrixUniverseRead(
   request: SimulationReturnMatrixUniverseRequest,
 ): SimulationReturnMatrixUniverseReadPlan {
-  const preflight = buildSimulationReturnMatrix({
-    requestedServiceDates: request.requestedServiceDates,
-    instruments: request.instruments.map((row) => ({
-      market: row.market,
-      currency: row.currency,
-      ticker: row.ticker,
-      historyStatus: "instrument_keyed" as const,
-    })),
-    priceRows: [],
-    fxRows: [],
-  });
+  const preflight = buildRequestPreflight(request);
   if (preflight.status === "blocked") {
     return Object.freeze({
       status: "blocked",
@@ -126,6 +120,7 @@ export function composeSimulationReturnMatrixUniverseEvidence(input: {
   priceRows: readonly SimulationReturnMatrixPriceInput[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
 }) {
+  const preflight = buildRequestPreflight(input.request);
   const matrix = buildSimulationReturnMatrix({
     requestedServiceDates: input.request.requestedServiceDates,
     instruments: input.request.instruments.map((row) => ({
@@ -220,12 +215,19 @@ export function composeSimulationReturnMatrixUniverseEvidence(input: {
       reasons: Object.freeze([...reasons].sort()),
     });
   });
-  const matrixUniverseHash =
-    matrix.status === "ready"
-      ? hashSimulationReturnMatrixUniverse(
-          canonicalizeSimulationReturnMatrixUniverse({
-            requestedServiceDates: matrix.requestedServiceDates,
-            instruments: matrix.instruments,
+  const scenarioUniverseHash = isScenarioUniverseHashable(preflight)
+    ? hashSimulationScenarioUniverse(
+        canonicalizeSimulationScenarioUniverse({
+          instruments: preflight.instruments,
+        }),
+      )
+    : null;
+  const matrixRequestHash =
+    scenarioUniverseHash && preflight.requestedServiceDates.length >= 2
+      ? hashSimulationReturnMatrixRequest(
+          canonicalizeSimulationReturnMatrixRequest({
+            scenarioUniverseHash,
+            requestedServiceDates: preflight.requestedServiceDates,
           }),
         )
       : null;
@@ -258,37 +260,91 @@ export function composeSimulationReturnMatrixUniverseEvidence(input: {
     instruments: Object.freeze(instruments),
     exclusions: matrix.exclusions,
     blockers: matrix.blockers,
-    matrixUniverseHash,
+    scenarioUniverseHash,
+    matrixRequestHash,
   });
 }
 
-export function canonicalizeSimulationReturnMatrixUniverse(input: {
-  requestedServiceDates: readonly string[];
+export function canonicalizeSimulationScenarioUniverse(input: {
   instruments: readonly SimulationReturnMatrixInstrument[];
 }) {
   return JSON.stringify({
     hashVersion:
-      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY.hashVersion,
+      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY
+        .scenarioUniverseHashVersion,
+    identityPolicyVersion:
+      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY
+        .identityPolicyVersion,
+    basisPolicy:
+      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY.basisPolicy,
+    instruments: [...input.instruments]
+      .sort((left, right) =>
+        left.instrumentKey.localeCompare(right.instrumentKey),
+      )
+      .map((row) => ({
+        market: row.market,
+        currency: row.currency,
+        ticker: row.ticker,
+      })),
+  });
+}
+
+export function hashSimulationScenarioUniverse(serialized: string) {
+  return `sha256:${createHash("sha256").update(serialized).digest("hex")}`;
+}
+
+export function canonicalizeSimulationReturnMatrixRequest(input: {
+  scenarioUniverseHash: string;
+  requestedServiceDates: readonly string[];
+}) {
+  return JSON.stringify({
+    hashVersion:
+      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY
+        .matrixRequestHashVersion,
     evidencePolicyVersion:
       SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY.version,
     returnMatrixPolicyVersion:
       SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY
         .returnMatrixPolicyVersion,
-    portfolioPathPolicyId:
-      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY.portfolioPathPolicyId,
-    gate0ApprovalCommit:
-      SIMULATION_RETURN_MATRIX_UNIVERSE_EVIDENCE_POLICY.gate0ApprovalCommit,
+    scenarioUniverseHash: input.scenarioUniverseHash,
     requestedServiceDates: [...input.requestedServiceDates],
-    instruments: input.instruments.map((row) => ({
-      market: row.market,
-      currency: row.currency,
-      ticker: row.ticker,
-    })),
   });
 }
 
-export function hashSimulationReturnMatrixUniverse(serialized: string) {
+export function hashSimulationReturnMatrixRequest(serialized: string) {
   return `sha256:${createHash("sha256").update(serialized).digest("hex")}`;
+}
+
+function buildRequestPreflight(
+  request: SimulationReturnMatrixUniverseRequest,
+) {
+  return buildSimulationReturnMatrix({
+    requestedServiceDates: request.requestedServiceDates,
+    instruments: request.instruments.map((row) => ({
+      market: row.market,
+      currency: row.currency,
+      ticker: row.ticker,
+      historyStatus: "instrument_keyed" as const,
+    })),
+    priceRows: [],
+    fxRows: [],
+  });
+}
+
+function isScenarioUniverseHashable(
+  preflight: ReturnType<typeof buildRequestPreflight>,
+) {
+  return (
+    preflight.instruments.length > 0 &&
+    preflight.exclusions.length === 0 &&
+    preflight.summary.requestedInstrumentCount ===
+      preflight.instruments.length &&
+    !preflight.blockers.some(
+      (blocker) =>
+        blocker.reason === "duplicate_instrument" ||
+        blocker.reason === "invalid_instrument_history_status",
+    )
+  );
 }
 
 function summarizeObservationCoverage({
