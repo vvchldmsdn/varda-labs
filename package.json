@@ -21,6 +21,7 @@
     "audit:runtime-writer-convergence": "node --no-warnings scripts/audit-runtime-writer-convergence.mjs",
     "audit:session-resolver-contract": "node --no-warnings scripts/audit-session-resolver-contract.mjs",
     "audit:initial-identity-link-planner": "node --no-warnings scripts/audit-initial-identity-link-planner.mjs",
+    "audit:preview-auth-readiness": "node --no-warnings scripts/audit-preview-auth-readiness.mjs",
     "audit:tenant-ownership": "node --no-warnings scripts/audit-tenant-ownership-preflight.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",
     "cleanup:base44:nonportfolio-assets": "node --no-warnings scripts/remove-base44-nonportfolio-assets.mjs",

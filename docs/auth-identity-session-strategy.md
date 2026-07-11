@@ -1,6 +1,6 @@
 # Auth/Tenant Phase 1A: Identity And Session Strategy ADR
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 Status: accepted pre-production planning decision with a production-readiness
 hold. The current official Neon Auth quickstart labels the product Beta. This
@@ -371,3 +371,9 @@ approval gates.
 Phase 1G1-A also freezes the reviewed initial identity-link planner as a pure
 contract. It accepts no real provider subject transport and performs no
 identity or app-user write.
+
+Phase 1G1-B0 records the current preview integration readiness in
+`docs/auth-tenant-phase1g1b0-preview-auth-readiness.md`. The safety audit passes,
+but G1-B1 is blocked because preview/production environment isolation and a
+trusted reviewed-operator target handoff are not available. Auth runtime remains
+frozen and Basic Auth remains unchanged.
