@@ -81,6 +81,11 @@ canonical shadow path.
 That slice is now completed in
 `docs/auth-tenant-phase1e-c1-event-writer-shadow.md` without enabling writes.
 
+The next in-scope mixed writer, `base44_history_import`, is now split and
+validated as a read-only owner/FX shadow in
+`docs/auth-tenant-phase1e-d-history-writer-shadow.md`. Shared FX diagnostics do
+not act as snapshot owner evidence and do not enable any write.
+
 ## Regression Gate
 
 Tests enforce all of the following:

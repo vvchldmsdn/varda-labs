@@ -3,6 +3,26 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import {
+  CoreImportArgumentError,
+  buildBase44CoreCanonicalPlan,
+} from "./lib/base44-core-canonical-plan.mjs";
+import { readBase44CoreCanonicalState } from "./lib/base44-core-canonical-state.mjs";
+import {
+  CoreShadowSourceError,
+  readBase44CoreShadowSource,
+} from "./lib/base44-core-shadow-source.mjs";
+import {
+  HistoryImportArgumentError,
+  buildBase44HistoryCanonicalPlan,
+  parseBase44HistoryArgs,
+} from "./lib/base44-history-canonical-plan.mjs";
+import { readBase44HistoryCanonicalState } from "./lib/base44-history-canonical-state.mjs";
+import {
+  HistoryShadowSourceError,
+  normalizeBase44HistoryShadowSource,
+} from "./lib/base44-history-shadow-source.mjs";
+
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const SENSITIVE_KEY_PATTERN =
   /(token|secret|password|api[_-]?key|created_by|user_id|owner_user_id)/i;
@@ -13,45 +33,6 @@ async function runInBatches(items, handler) {
     const batch = items.slice(index, index + UPSERT_BATCH_SIZE);
     await Promise.all(batch.map(handler));
   }
-}
-
-function parseArgs(argv) {
-  const args = {
-    dataDir:
-      process.env.BASE44_MIGRATION_DATA_DIR ??
-      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
-    write: false,
-    ownerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-
-    if (arg === "--write") {
-      args.write = true;
-      continue;
-    }
-
-    if (arg === "--data-dir") {
-      args.dataDir = path.resolve(argv[index + 1] ?? "");
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--owner-user-id") {
-      args.ownerUserId = argv[index + 1] ?? "";
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  if (!args.ownerUserId.trim()) {
-    throw new Error("--owner-user-id cannot be empty");
-  }
-
-  return args;
 }
 
 function assertNoSensitiveKeys(value, sourceName, keyPath = []) {
@@ -974,7 +955,12 @@ async function upsertPositionSnapshots(sql, positions, accountMap, assetMap) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseBase44HistoryArgs(process.argv.slice(2), {
+    defaultDataDir:
+      process.env.BASE44_MIGRATION_DATA_DIR ??
+      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
+    legacyOwnerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
+  });
   const files = {
     balances: "base44-account-balances.export.json",
     portfolios: "base44-daily-portfolio-snapshots.export.json",
@@ -990,6 +976,80 @@ async function main() {
       readJsonArray(path.join(args.dataDir, files.fxRates), files.fxRates),
     ]);
 
+  if (args.canonicalOwnerId !== null) {
+    const source = normalizeBase44HistoryShadowSource({
+      balanceRecords,
+      portfolioRecords,
+      positionRecords,
+      fxRateRecords,
+    });
+    const coreSource = await readBase44CoreShadowSource(args.dataDir);
+
+    config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set");
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const [historyState, coreState] = await Promise.all([
+      readBase44HistoryCanonicalState(sql, {
+        canonicalOwnerId: args.canonicalOwnerId,
+        legacyOwnerUserId: args.ownerUserId,
+        source,
+      }),
+      readBase44CoreCanonicalState(sql, {
+        canonicalOwnerId: args.canonicalOwnerId,
+        legacyOwnerUserId: args.ownerUserId,
+        accountCodes: coreSource.accountCodes,
+        groups: coreSource.groups,
+        assets: coreSource.assets,
+      }),
+    ]);
+    const corePlan = buildBase44CoreCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: coreState.appUser,
+      tables: coreState.tables,
+    });
+    const canonicalOwnerPlan = buildBase44HistoryCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: historyState.appUser,
+      source,
+      state: historyState,
+      coreProof: {
+        result: corePlan.result,
+        actualWriteAllowed: corePlan.actualWriteAllowed,
+        canonicalOwnerWriteEnabled: corePlan.canonicalOwnerWriteEnabled,
+        databaseSideEffects: corePlan.databaseSideEffects,
+        accountCodes: coreSource.accountCodes,
+        assetLegacyIds: coreSource.assets.map(
+          ({ legacyBase44Id }) => legacyBase44Id,
+        ),
+      },
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          mode: "dry-run",
+          ownerMode: "canonical-shadow",
+          selectCount: historyState.selectCount + coreState.selectCount,
+          canonicalOwnerPlan,
+        },
+        null,
+        2,
+      ),
+    );
+    if (canonicalOwnerPlan.result === "blocked") {
+      console.error("History canonical owner shadow plan is blocked");
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   const balances = balanceRecords.map(normalizeAccountBalance);
   const portfolios = portfolioRecords.map(normalizePortfolioSnapshot);
   const positions = positionRecords.map(normalizePositionSnapshot);
@@ -1000,8 +1060,7 @@ async function main() {
     JSON.stringify(
       {
         mode: args.write ? "write" : "dry-run",
-        dataDir: args.dataDir,
-        ownerUserId: args.ownerUserId,
+        ownerMode: "legacy-evidence",
         ...summary,
       },
       null,
@@ -1014,7 +1073,7 @@ async function main() {
     return;
   }
 
-  config({ path: path.resolve(process.cwd(), ".env.local") });
+  config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
 
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set");
@@ -1051,6 +1110,22 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(
+    JSON.stringify({
+      operation: "base44_history_import",
+      result: "failed",
+      error: safeErrorCode(error),
+    }),
+  );
   process.exitCode = 1;
 });
+
+function safeErrorCode(error) {
+  if (error instanceof HistoryImportArgumentError) return error.code;
+  if (error instanceof HistoryShadowSourceError) return error.code;
+  if (error instanceof CoreImportArgumentError) return error.code;
+  if (error instanceof CoreShadowSourceError) return error.code;
+  if (error instanceof SyntaxError) return "invalid_json_export";
+  if (error?.code === "ENOENT") return "migration_data_unavailable";
+  return "history_import_failed";
+}

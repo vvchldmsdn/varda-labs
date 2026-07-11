@@ -61,7 +61,7 @@ Inventory totals:
 
 | Base44 entity | Status | Rows | Date range | varda-labs mapping | Notes |
 | --- | --- | ---: | --- | --- | --- |
-| `AccountBalance` | `migrated` | 3 | 2026-02-18 to 2026-02-26 | `account_balance_snapshots` | Imported by `scripts/import-base44-history.mjs` with `legacy_base44_id`. |
+| `AccountBalance` | `migrated` | 3 | 2026-02-18 to 2026-02-26 | `account_balance_snapshots` | Imported by `scripts/import-base44-history.mjs` with `legacy_base44_id`. Phase 1E-D plans one explicit canonical owner per whole row without using balance component columns as owner evidence. |
 | `Asset` | `migrated` | 19 source / 17 retained | 2026-02-18 to 2026-06-22 | `assets`, derived `accounts` | UUID primary keys are retained; Base44 ids are in `assets.legacy_base44_id`. The legacy `savings` and `housing_subscription` rows were deliberately removed and are excluded from repeat core imports. |
 | `AssetFactorEstimate` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. Add only if future factor-estimate history appears. |
 | `AssetFactorProfile` | `needs_decision` | 27 | 2026-06-23 to 2026-07-01 | candidate: `asset_factor_profiles` or fold into ETF/factor analytics | Nonzero and useful for diversification, but overlaps with `EtfMaster`, `EtfHolding`, and future factor models. Decide whether this is imported source data or regenerated analysis output. |
@@ -71,8 +71,8 @@ Inventory totals:
 | `BenchmarkSnapshot` | `migrated` | 1,519 | 2022-10-17 to 2026-06-24 | `benchmark_snapshots` | Imported by `scripts/import-base44-market-data.mjs`. This is raw benchmark history; the benchmark columns in `daily_portfolio_snapshots` remain aggregate output. |
 | `CompanyFundamentalSnapshot` | `needs_decision` | unavailable | 404 | candidate external source or skip | Base44 fetch failed. Decide whether varda-labs needs company fundamentals independently of Base44. |
 | `DailyGroupSnapshot` | `needs_decision` | 23 | 2026-03-24 to 2026-07-05 | candidate `daily_group_snapshots` or derive from `daily_position_snapshots` | Contains group-level weights/drift/execution flags. It may be recomputable, but importing preserves historical audit output. |
-| `DailyPortfolioSnapshot` | `migrated` | 74 | 2026-05-20 to 2026-07-05 | `daily_portfolio_snapshots` | Imported by history import. |
-| `DailyPositionSnapshot` | `migrated` | 418 | 2026-03-24 to 2026-07-05 | `daily_position_snapshots` | Imported with nullable `asset_id`; `legacy_asset_id`, `ticker`, `asset_name`, and `snapshot_date` are preserved so the 52 unmatched rows are not dropped. |
+| `DailyPortfolioSnapshot` | `migrated` | 74 | 2026-05-20 to 2026-07-05 | `daily_portfolio_snapshots` | Imported by history import. Phase 1E-D treats `account=all` as a parent-less aggregate and validates account-specific rows against a fresh core owner shadow. |
+| `DailyPositionSnapshot` | `migrated` | 418 | 2026-03-24 to 2026-07-05 | `daily_position_snapshots` | Imported with nullable `asset_id`; `legacy_asset_id`, `ticker`, `asset_name`, and `snapshot_date` are preserved so the 52 unmatched rows are not dropped. The Phase 1E-D shadow keeps those rows as legacy-only evidence rather than inferring a relation from ticker/name. |
 | `EngineContextSnapshot` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EtfCandidateRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EtfHolding` | `migrated` | 10,872 | 2026-03-31 to 2026-07-03 | `etf_holdings` | Imported by `scripts/import-base44-etf-reference.mjs`. `legacy_etf_id`, `etf_ticker`, holding identity, sector/country/market, rank, weight, shares, market value, source, and `as_of_date` are preserved. |
@@ -81,7 +81,7 @@ Inventory totals:
 | `EtfSyncJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. Phase 1E-C1 adds a read-only canonical-owner and relationship shadow; it performs no owner or correction write. |
 | `FixedTransaction` | `migrated` | 7 | 2026-02-18 to 2026-02-19 | `fixed_transactions` | Historical import retained, but the legacy cashflow/calendar feature is outside product and canonical-owner rollout scope. |
-| `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. |
+| `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. Phase 1E-D classifies FX as shared reference with zero owner actions and reports date/status health independently from snapshot ownership. |
 | `GlobalMarketFactor` | `migrated` | 2,401 | 2025-06-01 to 2026-06-23 | `global_market_factors` | Imported by `scripts/import-base44-market-context.mjs`. Scalar factor keys/date/value/change fields are separated and `derived_metrics_json` is stored as JSONB. |
 | `Goal` | `migrated` | 1 | 2026-03-18 | `goals` | Historical import retained. Goal-setting is explicitly outside the new product and canonical-owner rollout scope. |
 | `MacroSeries` | `needs_decision` | 20 | 2025-10-01 to 2026-06-22 | candidate `macro_series` or merge into `global_market_factors` | Overlaps with `GlobalMarketFactor`. Decide whether to keep a separate macro-source table or normalize both into one factor time-series model. |

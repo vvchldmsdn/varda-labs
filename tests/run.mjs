@@ -25,3 +25,4 @@ import "./initial-app-user-provisioning.test.mjs";
 import "./base44-core-canonical-plan.test.mjs";
 import "./base44-settings-canonical-plan.test.mjs";
 import "./base44-event-canonical-plan.test.mjs";
+import "./base44-history-canonical-plan.test.mjs";
