@@ -237,7 +237,11 @@ The following still require replacement or proof before migration:
    buy blocking, and redistribution policy remain unapproved.
 9. Simulation Validation normalized return-matrix Phase 0A completed
    2026-07-11 without DB/provider/runtime or stochastic-engine integration.
-10. Add bootstrap and parametric engines as pure seeded helpers.
-11. Add walk-forward validation before any optimizer is labeled useful.
-12. Design user-owned job/artifact persistence only after auth and ownership
+10. Seeded stationary-bootstrap whole-row draw-plan Phase 1A completed
+    2026-07-11; wealth paths, fan summaries, and parametric models remain
+    pending.
+11. Add pure wealth compounding and distribution summaries without resampling.
+12. Add the separate parametric factor engine.
+13. Add walk-forward validation before any optimizer is labeled useful.
+14. Design user-owned job/artifact persistence only after auth and ownership
    gates permit writes.

@@ -199,7 +199,7 @@ Classification:
 | Base44 function | Observed role | Classification | varda-labs treatment |
 | --- | --- | --- | --- |
 | `runPortfolioMonteCarlo` | Reads `SimulationCalibration`, estimates, snapshots, assets, and settings; may create `PortfolioSimulationRun`. | `run_artifact` | Future simulation run command, not a page query. |
-| `runRegimeBootstrapSimulation` | Uses calibration, prices, benchmark, factors, and snapshots; may create `PortfolioSimulationRun`. | `run_artifact` | Future simulation run command. |
+| `runRegimeBootstrapSimulation` | Uses calibration, prices, benchmark, factors, and snapshots; may create `PortfolioSimulationRun`. | replace rather than port | Pure whole-row stationary draw-plan Phase 1A implemented without regime conditioning, wealth math, or writes; any future run command remains separate. |
 | `runHybridPortfolioSimulation` | Large hybrid engine; writes chunks, sample shards, and `PortfolioSimulationRun`. | `job_control` plus `shard/blob_artifact` | Do not port wholesale. Split math, orchestration, and artifact storage. |
 
 ### Chunked Job Pipeline
@@ -267,7 +267,10 @@ payload store.
 These areas may become pure, fixture-tested helpers before any persistence:
 
 - KRW return matrix normalization (Phase 0A pure helper implemented; runtime
-  adapter and stochastic consumers remain pending);
+  adapter remains pending and the only approved pure consumer is Phase 1A draw
+  planning);
+- seeded whole-row stationary-bootstrap draw planning (Phase 1A pure helper
+  implemented; wealth paths and artifacts remain pending);
 - weight normalization and rebalancing calendar logic;
 - simple historical weight backtests;
 - risk contribution and effective-number-of-bets calculations;

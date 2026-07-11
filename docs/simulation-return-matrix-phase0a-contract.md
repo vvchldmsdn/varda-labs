@@ -172,9 +172,9 @@ Synthetic fixtures cover:
 
 ## Next Gate
 
-The next possible step is a separately reviewed pure historical-resampling
-contract. It must consume only a `ready` matrix, preserve same-date
-cross-instrument dependence, use reproducible explicit seeds, and remain
-separate from factor Monte Carlo, optimization, UI, jobs, and persistence.
+The separately reviewed pure historical-resampling draw-plan core is now
+implemented in `docs/simulation-stationary-bootstrap-phase1a-contract.md`. It
+consumes only a `ready` matrix and remains separate from wealth compounding,
+factor Monte Carlo, optimization, UI, jobs, and persistence.
 
-Phase 0A does not authorize bootstrap or Monte Carlo implementation by itself.
+Phase 0A by itself still does not authorize any stochastic consumer.

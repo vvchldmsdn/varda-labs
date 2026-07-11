@@ -12,6 +12,7 @@ import "./investment-lab-counterfactual-path.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./simulation-return-matrix.test.mjs";
+import "./simulation-stationary-bootstrap.test.mjs";
 import "./target-policy-evidence.test.mjs";
 import "./target-policy-review-packet.test.mjs";
 import "./target-policy-holding-universe.test.mjs";
