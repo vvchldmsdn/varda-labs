@@ -144,6 +144,10 @@ numeric vector.
 The implemented review-only packet boundary is documented in
 `docs/target-policy-gate-b0-review-packet-contract.md`.
 
+The separately implemented read-only production holding-universe boundary is
+documented in `docs/target-policy-gate-b1-holding-universe-contract.md`. It
+does not supply or approve any numeric vector.
+
 ## Follow-On Gate
 
 Only after both gates pass may a separate **Target Policy Resolver Phase 1**

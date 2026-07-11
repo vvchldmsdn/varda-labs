@@ -12,6 +12,7 @@ import "./investment-lab-counterfactual-path.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./target-policy-evidence.test.mjs";
 import "./target-policy-review-packet.test.mjs";
+import "./target-policy-holding-universe.test.mjs";
 import "./today-holding-detail.test.mjs";
 import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";

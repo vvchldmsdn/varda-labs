@@ -6,6 +6,10 @@ Status: pure review-packet contract implemented. Gate A is approved. No Gate B
 numeric vector is supplied or approved. This phase has no database read/write,
 provider call, route, UI, schema, migration, resolver, or allocator connection.
 
+The production holding-universe evidence boundary is now documented separately
+in `docs/target-policy-gate-b1-holding-universe-contract.md`. B0 is not yet
+composed with that adapter, so its production-approval prohibition remains.
+
 ## Product Question
 
 > How can one complete, user-supplied account vector be validated and bound to
@@ -112,8 +116,8 @@ Statements such as "use current targets", one approval for `all`, or approval
 of only a hash without the full visible vector are insufficient.
 
 No production packet exists yet because no account's numeric vector has been
-provided and no reviewed production-universe adapter exists. B0 fixtures use
-synthetic values only.
+provided and B0 has not yet been bound to the reviewed production-universe
+adapter. B0 fixtures use synthetic values only.
 
 ## Verification
 
