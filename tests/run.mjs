@@ -23,3 +23,4 @@ import "./tenant-expand-phase.test.mjs";
 import "./tenant-writer-readiness.test.mjs";
 import "./initial-app-user-provisioning.test.mjs";
 import "./base44-core-canonical-plan.test.mjs";
+import "./base44-settings-canonical-plan.test.mjs";

@@ -1,12 +1,11 @@
 import path from "node:path";
 
 import {
-  TenantWritePolicyError,
-  prepareMigrationOwnerContext,
-} from "../../src/lib/tenant-write-context.ts";
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  classifyCanonicalOwnerAction,
+  isCanonicalUuid,
+  prepareCanonicalMigrationShadowOwner,
+  summarizeCanonicalOwnerActions,
+} from "./migration-canonical-owner-shadow.mjs";
 
 export const CORE_CANONICAL_TABLES = Object.freeze([
   "accounts",
@@ -78,7 +77,7 @@ export function parseBase44CoreArgs(
   }
   if (
     args.canonicalOwnerId !== null &&
-    !UUID_PATTERN.test(args.canonicalOwnerId)
+    !isCanonicalUuid(args.canonicalOwnerId)
   ) {
     throw new CoreImportArgumentError("invalid_canonical_owner_id");
   }
@@ -100,35 +99,30 @@ export function buildBase44CoreCanonicalPlan({
   tables,
 }) {
   const normalizedTables = normalizeTables(tables);
-  const blockers = [];
-  let context = null;
-
-  if (appUser === null) {
-    blockers.push("canonical_owner_not_found");
-  } else if (appUser.role !== "user") {
-    blockers.push("canonical_owner_role_not_allowed");
-  } else {
-    try {
-      context = prepareMigrationOwnerContext({
-        mode: "shadow",
-        legacyOwnerUserId,
-        canonicalOwnerUserId: canonicalOwnerId,
-        canonicalOwnerStatus: appUser.status,
-        canonicalOwnerVerified: true,
-        provisioningOwnerApproved: approveProvisioningOwner,
-      });
-    } catch (error) {
-      if (!(error instanceof TenantWritePolicyError)) throw error;
-      blockers.push(`canonical_owner_context_${error.code}`);
-    }
-  }
+  const ownerPreparation = prepareCanonicalMigrationShadowOwner({
+    canonicalOwnerId,
+    approveProvisioningOwner,
+    legacyOwnerUserId,
+    appUser,
+  });
+  const blockers = [...ownerPreparation.blockers];
 
   const globalBlock = blockers.length > 0;
   const accountActions = normalizedTables.accounts.map((row) =>
-    classifyRow(row, canonicalOwnerId, globalBlock),
+    classifyCanonicalOwnerAction({
+      exists: row.exists,
+      existingCanonicalOwnerId: row.canonicalOwnerUserId,
+      canonicalOwnerId,
+      blocked: globalBlock,
+    }),
   );
   const groupActions = normalizedTables.asset_groups.map((row) =>
-    classifyRow(row, canonicalOwnerId, globalBlock),
+    classifyCanonicalOwnerAction({
+      exists: row.exists,
+      existingCanonicalOwnerId: row.canonicalOwnerUserId,
+      canonicalOwnerId,
+      blocked: globalBlock,
+    }),
   );
   const relationshipChecks = {
     assetAccount: 0,
@@ -139,7 +133,12 @@ export function buildBase44CoreCanonicalPlan({
   };
 
   const assetActions = normalizedTables.assets.map((row) => {
-    let action = classifyRow(row, canonicalOwnerId, globalBlock);
+    let action = classifyCanonicalOwnerAction({
+      exists: row.exists,
+      existingCanonicalOwnerId: row.canonicalOwnerUserId,
+      canonicalOwnerId,
+      blocked: globalBlock,
+    });
     relationshipChecks.assetAccount += 1;
     if (
       !globalBlock &&
@@ -169,7 +168,12 @@ export function buildBase44CoreCanonicalPlan({
   });
 
   const memberActions = normalizedTables.asset_group_members.map((row) => {
-    let action = classifyRow(row, canonicalOwnerId, globalBlock);
+    let action = classifyCanonicalOwnerAction({
+      exists: row.exists,
+      existingCanonicalOwnerId: row.canonicalOwnerUserId,
+      canonicalOwnerId,
+      blocked: globalBlock,
+    });
     relationshipChecks.memberGroup += 1;
     relationshipChecks.memberAsset += 1;
 
@@ -194,10 +198,10 @@ export function buildBase44CoreCanonicalPlan({
   });
 
   const tablePlans = Object.freeze({
-    accounts: summarizeActions(accountActions),
-    asset_groups: summarizeActions(groupActions),
-    assets: summarizeActions(assetActions),
-    asset_group_members: summarizeActions(memberActions),
+    accounts: summarizeCanonicalOwnerActions(accountActions),
+    asset_groups: summarizeCanonicalOwnerActions(groupActions),
+    assets: summarizeCanonicalOwnerActions(assetActions),
+    asset_group_members: summarizeCanonicalOwnerActions(memberActions),
   });
   const blockedRows = Object.values(tablePlans).reduce(
     (sum, plan) => sum + plan.block,
@@ -227,7 +231,8 @@ export function buildBase44CoreCanonicalPlan({
       blockers.length === 0 && blockedRows === 0 ? "planned" : "blocked",
     actualWriteAllowed: false,
     canonicalOwnerWriteEnabled:
-      context?.tenantWriteContext.writesCanonicalOwner === true,
+      ownerPreparation.context?.tenantWriteContext.writesCanonicalOwner ===
+      true,
     databaseSideEffects: false,
     tables: tablePlans,
     relationships: Object.freeze(relationshipChecks),
@@ -245,20 +250,6 @@ function normalizeTables(tables) {
     normalized[table] = tables[table];
   }
   return normalized;
-}
-
-function classifyRow(row, canonicalOwnerId, globalBlock) {
-  if (globalBlock) return "block";
-  if (!row.exists) return "insert";
-  if (row.canonicalOwnerUserId === null) return "update";
-  if (row.canonicalOwnerUserId === canonicalOwnerId) return "skip";
-  return "block";
-}
-
-function summarizeActions(actions) {
-  const counts = { insert: 0, update: 0, skip: 0, block: 0 };
-  for (const action of actions) counts[action] += 1;
-  return Object.freeze(counts);
 }
 
 function parentActionAllowed(actions, index) {

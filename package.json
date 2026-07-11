@@ -31,7 +31,7 @@
     "import:base44:history": "node scripts/import-base44-history.mjs",
     "import:base44:market-data": "node scripts/import-base44-market-data.mjs",
     "import:base44:market-context": "node scripts/import-base44-market-context.mjs",
-    "import:base44:settings": "node scripts/import-base44-settings.mjs"
+    "import:base44:settings": "node --no-warnings scripts/import-base44-settings.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

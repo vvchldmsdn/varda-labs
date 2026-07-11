@@ -22,6 +22,10 @@ const DB_IMPORT_PATTERN =
   /import\s+\{[^}]*\bdb\b[^}]*\}\s+from\s+["'][^"']+["']/s;
 const RAW_SQL_DML_PATTERN =
   /\b(?:insert\s+into|update\s+[a-z_\"]+\s+set|delete\s+from|truncate)\b/i;
+const RAW_CANONICAL_OWNER_DML_PATTERN =
+  /insert\s+into\s+[^()]+\([^)]*canonical_owner_user_id|update\s+[a-z_\"]+\s+set[\s\S]{0,2000}canonical_owner_user_id\s*=|canonical_owner_user_id\s*=\s*excluded\.canonical_owner_user_id/i;
+const DRIZZLE_CANONICAL_OWNER_DML_PATTERN =
+  /\.(?:values|set)\s*\(\s*\{[\s\S]{0,2000}canonicalOwnerUserId\s*:/i;
 
 describe("tenant writer Phase 1D-A readiness", () => {
   it("registers every current DML implementation exactly once by path", () => {
@@ -116,6 +120,24 @@ describe("tenant writer Phase 1D-A readiness", () => {
       for (const path of writer.implementationPaths) {
         const source = readFileSync(join(ROOT, path), "utf8");
         assert.doesNotMatch(source, /tenant-write-context/);
+      }
+    }
+  });
+
+  it("keeps every registered writer free of canonical owner DML", () => {
+    for (const writer of TENANT_WRITER_REGISTRY) {
+      for (const path of writer.implementationPaths) {
+        const source = readFileSync(join(ROOT, path), "utf8");
+        assert.doesNotMatch(
+          source,
+          RAW_CANONICAL_OWNER_DML_PATTERN,
+          `${writer.id}:${path} raw canonical owner DML`,
+        );
+        assert.doesNotMatch(
+          source,
+          DRIZZLE_CANONICAL_OWNER_DML_PATTERN,
+          `${writer.id}:${path} Drizzle canonical owner DML`,
+        );
       }
     }
   });

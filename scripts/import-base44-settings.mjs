@@ -3,6 +3,13 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import {
+  SettingsImportArgumentError,
+  buildBase44SettingsCanonicalPlan,
+  parseBase44SettingsArgs,
+} from "./lib/base44-settings-canonical-plan.mjs";
+import { readBase44SettingsCanonicalState } from "./lib/base44-settings-canonical-state.mjs";
+
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/i;
 
 const ALLOWED_FIELDS = new Set([
@@ -31,34 +38,6 @@ const ALLOWED_FIELDS = new Set([
   "is_sample",
   "description",
 ]);
-
-function parseArgs(argv) {
-  const args = {
-    dataDir:
-      process.env.BASE44_MIGRATION_DATA_DIR ??
-      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
-    write: false,
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-
-    if (arg === "--write") {
-      args.write = true;
-      continue;
-    }
-
-    if (arg === "--data-dir") {
-      args.dataDir = path.resolve(argv[index + 1] ?? "");
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  return args;
-}
 
 async function readJsonArray(filePath, sourceName) {
   const raw = await readFile(filePath, "utf8");
@@ -212,11 +191,9 @@ function normalizeSettings(record, sourceName) {
 function summarize(rows) {
   return {
     settingsRows: rows.length,
-    legacyBase44Ids: rows.map((row) => row.legacyBase44Id),
-    populatedFields: Object.entries(rows[0] ?? {})
-      .filter(([, value]) => value !== null && value !== undefined)
-      .map(([key]) => key)
-      .sort(),
+    populatedFieldCount: Object.values(rows[0] ?? {}).filter(
+      (value) => value !== null && value !== undefined,
+    ).length,
   };
 }
 
@@ -305,31 +282,69 @@ async function upsertSettings(sql, rows) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseBase44SettingsArgs(process.argv.slice(2), {
+    defaultDataDir:
+      process.env.BASE44_MIGRATION_DATA_DIR ??
+      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
+  });
   const fileName = "base44-settings.export.json";
   const filePath = path.join(args.dataDir, fileName);
   const records = await readJsonArray(filePath, fileName);
   const rows = records.map((record) => normalizeSettings(record, fileName));
   const summary = summarize(rows);
+  const baseOutput = {
+    mode: args.write ? "write" : "dry-run",
+    ownerMode:
+      args.canonicalOwnerId === null ? "legacy-evidence" : "canonical-shadow",
+    ...summary,
+  };
 
-  console.log(
-    JSON.stringify(
-      {
-        mode: args.write ? "write" : "dry-run",
-        dataDir: args.dataDir,
-        ...summary,
-      },
-      null,
-      2,
-    ),
-  );
+  if (args.canonicalOwnerId !== null) {
+    config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
+
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set");
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const state = await readBase44SettingsCanonicalState(sql, {
+      canonicalOwnerId: args.canonicalOwnerId,
+    });
+    const canonicalOwnerPlan = buildBase44SettingsCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      appUser: state.appUser,
+      sourceRows: rows,
+      databaseRows: state.databaseRows,
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          ...baseOutput,
+          selectCount: state.selectCount,
+          canonicalOwnerPlan,
+        },
+        null,
+        2,
+      ),
+    );
+
+    if (canonicalOwnerPlan.result === "blocked") {
+      console.error("Settings canonical owner shadow plan is blocked");
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  console.log(JSON.stringify(baseOutput, null, 2));
 
   if (!args.write) {
     console.log("Dry run only. Re-run with --write to import into DATABASE_URL.");
     return;
   }
 
-  config({ path: path.resolve(process.cwd(), ".env.local") });
+  config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
 
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set");
@@ -350,6 +365,19 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(
+    JSON.stringify({
+      operation: "base44_settings_import",
+      result: "failed",
+      error: safeErrorCode(error),
+    }),
+  );
   process.exitCode = 1;
 });
+
+function safeErrorCode(error) {
+  if (error instanceof SettingsImportArgumentError) return error.code;
+  if (error instanceof SyntaxError) return "invalid_json_export";
+  if (error?.code === "ENOENT") return "migration_data_unavailable";
+  return "settings_import_failed";
+}
