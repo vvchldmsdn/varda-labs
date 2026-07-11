@@ -2,9 +2,11 @@
 
 Last updated: 2026-07-11
 
-Status: pure review-packet contract implemented. Gate A is approved. No Gate B
-numeric vector is supplied or approved. This phase has no database read/write,
-provider call, route, UI, schema, migration, resolver, or allocator connection.
+Status: pure review-packet contract implemented. Gate A is approved. B0 always
+returns `unapproved` and cannot grant approval. An external ISA `isa-v1` Gate B
+approval is recorded in `docs/target-policy-isa-v1-gate-b-approval.md`. This
+phase has no database read/write, provider call, route, UI, schema, migration,
+resolver, or allocator connection.
 
 The production holding-universe evidence boundary is now documented separately
 in `docs/target-policy-gate-b1-holding-universe-contract.md`. B0 is not yet
@@ -115,9 +117,11 @@ Approval remains account-specific. A valid approval must name all of these:
 Statements such as "use current targets", one approval for `all`, or approval
 of only a hash without the full visible vector are insufficient.
 
-No production packet exists yet because no account's numeric vector has been
-provided and B0 has not yet been bound to the reviewed production-universe
-adapter. B0 fixtures use synthetic values only.
+The ISA `isa-v1` production packet was recomputed from explicit user input and
+approved after its B0 `vectorHash` matched fresh B1 production-universe
+evidence. B0 still reports `unapproved` by design; the external approval
+artifact records the user decision and both hashes. B0 is not connected to the
+B1 adapter or any runtime path.
 
 ## Verification
 

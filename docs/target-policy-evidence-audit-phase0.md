@@ -103,4 +103,7 @@ It must emit an explicit 10,000-bps vector before the existing allocator can
 run. Phase 0 does not choose that policy.
 
 The policy model in `docs/target-policy-decision-contract-v1.md` passed Gate A
-on 2026-07-11. Its numeric vectors remain separately gated and unapproved.
+on 2026-07-11. Numeric vectors remain account-specific gates. ISA `isa-v1`
+later passed Gate B and is recorded in
+`docs/target-policy-isa-v1-gate-b-approval.md`; brokerage and IRP remain
+unapproved.

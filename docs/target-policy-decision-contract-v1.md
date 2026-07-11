@@ -2,10 +2,12 @@
 
 Last updated: 2026-07-11
 
-Status: Gate A policy model approved by the user on 2026-07-11. Gate B numeric
-vectors remain unapproved. This document does not approve any account vector,
-make legacy target evidence canonical, authorize a resolver, or allow UI, API,
-provider, schema, migration, database write, or allocator integration.
+Status: Gate A policy model approved by the user on 2026-07-11. The ISA
+`isa-v1` vector passed Gate B on 2026-07-11 and is recorded in
+`docs/target-policy-isa-v1-gate-b-approval.md`. Brokerage and IRP vectors remain
+unapproved. This document does not make legacy target evidence canonical,
+authorize a resolver, or allow UI, API, provider, schema, migration, database
+write, or allocator integration.
 
 Approved policy id:
 
@@ -138,15 +140,21 @@ After Gate A, each account still needs an explicit approval packet:
 | total | exactly 10,000 bps |
 | buyability | explicit for every positive target |
 
-No current account has passed Gate B. This draft intentionally contains no
-numeric vector.
+ISA `isa-v1` passed Gate B on 2026-07-11 with a complete 10,000-bps vector and
+matching production `universeHash` and B0 `vectorHash`. The immutable approval
+evidence is recorded in
+`docs/target-policy-isa-v1-gate-b-approval.md`.
+
+Brokerage and IRP have not passed Gate B. Their incomplete instrument identities
+remain explicit blockers and must not be inferred, proxied, or silently
+excluded.
 
 The implemented review-only packet boundary is documented in
 `docs/target-policy-gate-b0-review-packet-contract.md`.
 
 The separately implemented read-only production holding-universe boundary is
 documented in `docs/target-policy-gate-b1-holding-universe-contract.md`. It
-does not supply or approve any numeric vector.
+does not itself supply or approve any numeric vector.
 
 ## Follow-On Gate
 

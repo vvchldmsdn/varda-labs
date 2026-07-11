@@ -3,9 +3,10 @@
 Last updated: 2026-07-11
 
 Status: read-only production evidence adapter implemented. Gate A remains
-approved. No Gate B numeric vector is supplied or approved. The adapter is not
-connected to a route, UI, resolver, allocator, provider, persistence path, or
-schema change.
+approved. The adapter does not supply or approve numeric vectors. Its fresh ISA
+evidence was bound to the separately approved `isa-v1` vector recorded in
+`docs/target-policy-isa-v1-gate-b-approval.md`. The adapter is not connected to
+a route, UI, resolver, allocator, provider, persistence path, or schema change.
 
 ## Purpose
 
@@ -96,7 +97,11 @@ correctly `blocked`; that is product evidence, not an audit failure.
 
 ## Next Gate
 
-If an account is reviewable, the next step is user-supplied
+For ISA, the user-supplied `isa-v1` vector passed Gate B after a fresh
+`universeHash` match. Its next allowed step is a separate pure resolver
+validation phase; runtime and allocator connections remain forbidden.
+
+For any other reviewable account, the next step is user-supplied
 `policyVersion`, `effectiveServiceDate`, and a complete integer-bps vector that
 is reviewed together with the fresh `universeHash`.
 

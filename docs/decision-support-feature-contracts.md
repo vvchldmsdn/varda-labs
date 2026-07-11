@@ -221,15 +221,17 @@ The following still require replacement or proof before migration:
    (completed 2026-07-11), without tactical overlays or sells.
 3. Target Policy Evidence Audit Phase 0 (completed 2026-07-11): raw evidence
    remains unresolved and no target vector or resolver is approved.
-4. Target Policy Gate A model approved 2026-07-11; numeric vectors remain
-   separately unapproved.
-5. Gate B0 review-packet validation and deterministic vector hashing completed
-   without generating a production vector.
-6. Approve one account-specific Gate B packet before implementing a pure
-   resolver validation phase.
-7. Add MA120 as an optional isolated overlay and validate it against no-overlay.
-8. Build the Simulation Validation normalized return-matrix contract.
-9. Add bootstrap and parametric engines as pure seeded helpers.
-10. Add walk-forward validation before any optimizer is labeled useful.
-11. Design user-owned job/artifact persistence only after auth and ownership
+4. Target Policy Gate A model approved 2026-07-11; account vectors remain
+   separately gated.
+5. Gate B0 review-packet validation and deterministic vector hashing completed;
+   the helper remains pure and externally unapproved by design.
+6. ISA `isa-v1` Gate B packet approved 2026-07-11 with full vector,
+   `universeHash`, and `vectorHash`; brokerage and IRP remain unapproved.
+7. Implement a pure ISA resolver validation phase without persistence or
+   allocator connection.
+8. Add MA120 as an optional isolated overlay and validate it against no-overlay.
+9. Build the Simulation Validation normalized return-matrix contract.
+10. Add bootstrap and parametric engines as pure seeded helpers.
+11. Add walk-forward validation before any optimizer is labeled useful.
+12. Design user-owned job/artifact persistence only after auth and ownership
    gates permit writes.
