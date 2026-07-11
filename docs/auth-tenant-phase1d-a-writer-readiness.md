@@ -31,10 +31,12 @@ database row.
 ## Writer Registry
 
 `src/lib/tenant-writer-registry.ts` is the machine-readable inventory. It
-contains 16 logical writers backed by 20 DML implementation files.
+contains 17 logical writers backed by 21 DML implementation files, including
+the initial app-user provisioning writer added after the original audit.
 
 | Writer | Class | User-owned targets | Shared/admin targets |
 | --- | --- | --- | --- |
+| Initial app-user provisioning | identity | - | app_users |
 | Base44 core import | user | accounts, asset_groups, assets, asset_group_members | - |
 | Base44 history import | mixed | account_balance_snapshots, daily_portfolio_snapshots, daily_position_snapshots | fx_rates |
 | Base44 settings import | user | settings | - |
@@ -42,7 +44,7 @@ contains 16 logical writers backed by 20 DML implementation files.
 | Base44 ETF-reference import | shared | - | etf_masters, etf_holdings |
 | Base44 event import | user | event_ledger_entries | - |
 | Base44 market-context import | mixed | market_regime_daily | global_market_factors |
-| Base44 cashflow/goal import | user | goals, transactions, fixed_transactions, monthly_incomes | - |
+| Base44 cashflow/goal import | user, legacy excluded | goals, transactions, fixed_transactions, monthly_incomes | - |
 | Base44 nonportfolio cleanup | user | assets delete | - |
 | Accounts compatibility API | user | accounts | - |
 | Assets compatibility API | user | assets | - |
@@ -55,6 +57,11 @@ contains 16 logical writers backed by 20 DML implementation files.
 The registry is checked against both source-code DML discovery and
 `scripts/lib/tenant-ownership-policy.mjs`. Adding a writer without registering
 it, or assigning a target a conflicting class, fails the test suite.
+
+Product rollout scope is a second dimension added in Phase 1E-C0. The
+cashflow/goal importer remains registered for DML safety but is marked
+`intentionally_skipped_legacy` and frozen outside canonical-owner activation.
+See `docs/auth-tenant-phase1e-c0-product-scope-writer-audit.md`.
 
 ## Prepare, Activate, Freeze
 

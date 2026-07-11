@@ -11,6 +11,22 @@ more migrated gyeol-fin screens. The immediate goal is to prevent premature
 component abstraction, duplicated financial formulas, and accidental render-time
 side effects.
 
+## Product Scope Lock
+
+The primary product is limited to Home, Today movement, Additional
+contribution, Portfolio structure, History, Investment lab, and Simulation
+validation. Legacy cashflow, goal-setting, and calendar screens are not future
+route candidates.
+
+Current route coverage is Home (`/`), Today movement (`/today`), Portfolio
+structure (`/portfolio/structure` and `/portfolio/risk`), and History
+(`/history`). Additional contribution, Investment lab, and Simulation
+validation are still placeholders and require independent data/calculation
+contracts. They must not be inferred from the old Goal/Cashflow schema.
+
+ETF reference, Market Context, and Market Sync are supporting reference or
+operator surfaces rather than additional primary product flows.
+
 ## Global Rules
 
 - All listed product/operator pages are protected by `src/proxy.ts` Basic Auth

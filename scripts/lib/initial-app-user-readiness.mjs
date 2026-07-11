@@ -134,11 +134,21 @@ export function readWriterReadiness(root = process.cwd()) {
 
   const userWriterPrepareContract = TENANT_WRITER_REGISTRY.filter((writer) =>
     writer.targets.some(({ classification }) => classification === "user_owned"),
-  ).every(({ transition }) =>
-    ["shadow_trusted_context", "split_target_classes"].includes(
-      transition.prepare,
-    ),
-  );
+  ).every(({ canonicalOwnerRolloutScope, transition }) => {
+    if (canonicalOwnerRolloutScope === "in_scope") {
+      return ["shadow_trusted_context", "split_target_classes"].includes(
+        transition.prepare,
+      );
+    }
+    if (canonicalOwnerRolloutScope === "intentionally_skipped_legacy") {
+      return (
+        transition.prepare === "dry_run_only" &&
+        transition.activate === "keep_frozen_legacy" &&
+        transition.freeze === "freeze_legacy_writer"
+      );
+    }
+    return false;
+  });
 
   return {
     registryShadow:

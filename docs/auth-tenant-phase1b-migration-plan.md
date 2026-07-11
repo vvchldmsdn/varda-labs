@@ -7,6 +7,13 @@ in this document authorizes a schema change, migration generation/application,
 identity row, data backfill, writer change, auth SDK, login UI, RLS policy, or
 Basic Auth removal.
 
+Scope correction on 2026-07-11: the future backfill/contract drafts referenced
+below are superseded for `goals`, `transactions`, `fixed_transactions`, and
+`monthly_incomes`. Those tables are preserved legacy evidence and must remain
+outside canonical-owner backfill/activation. Do not execute the old drafts
+as-is; a later reviewed plan must use the Phase 1E-C0 in-scope table set and
+keep the excluded writer frozen.
+
 The non-active implementation drafts are under
 `docs/plans/auth-tenant-phase1b/`. `drizzle.config.ts` reads only
 `src/db/schema.ts` and writes only to `drizzle/`; therefore these drafts cannot

@@ -1,4 +1,7 @@
 -- PLAN ONLY. NOT A CONFIGURED MIGRATION. DO NOT EXECUTE AS-IS.
+-- SUPERSEDED IN PART BY PHASE 1E-C0: this draft still contains contract work
+-- for legacy goals/cashflow tables that are outside product owner rollout. A
+-- replacement contract plan is required before any execution.
 --
 -- Preconditions:
 -- - expand is deployed;

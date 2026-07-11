@@ -19,6 +19,12 @@ export const CANONICAL_OWNER_CONTRACT = Object.freeze({
 
 export const TRANSITIONAL_OWNER_COLUMN = "canonical_owner_user_id";
 
+export const CANONICAL_OWNER_ROLLOUT_SCOPES = Object.freeze([
+  "in_scope",
+  "intentionally_skipped_legacy",
+  "not_applicable",
+]);
+
 export const TENANT_TABLE_POLICIES = Object.freeze([
   userOwned("assets", "created_by_id"),
   userOwned("accounts", "owner_user_id"),
@@ -34,10 +40,18 @@ export const TENANT_TABLE_POLICIES = Object.freeze([
   userOwned("event_ledger_entries"),
   userOwned("market_regime_daily"),
   sharedReference("global_market_factors"),
-  userOwned("goals", "owner_user_id"),
-  userOwned("transactions", "owner_user_id"),
-  userOwned("fixed_transactions", "owner_user_id"),
-  userOwned("monthly_incomes", "owner_user_id"),
+  userOwned("goals", "owner_user_id", "intentionally_skipped_legacy"),
+  userOwned("transactions", "owner_user_id", "intentionally_skipped_legacy"),
+  userOwned(
+    "fixed_transactions",
+    "owner_user_id",
+    "intentionally_skipped_legacy",
+  ),
+  userOwned(
+    "monthly_incomes",
+    "owner_user_id",
+    "intentionally_skipped_legacy",
+  ),
   userOwned("account_balance_snapshots"),
   userOwned("daily_portfolio_snapshots"),
   userOwned("daily_position_snapshots"),
@@ -47,6 +61,21 @@ export const TENANT_TABLE_POLICIES = Object.freeze([
 export const USER_OWNED_TABLE_NAMES = Object.freeze(
   TENANT_TABLE_POLICIES.filter(
     ({ classification }) => classification === "user_owned",
+  ).map(({ table }) => table),
+);
+
+export const CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES = Object.freeze(
+  TENANT_TABLE_POLICIES.filter(
+    ({ classification, canonicalOwnerRolloutScope }) =>
+      classification === "user_owned" &&
+      canonicalOwnerRolloutScope === "in_scope",
+  ).map(({ table }) => table),
+);
+
+export const LEGACY_EXCLUDED_USER_TABLE_NAMES = Object.freeze(
+  TENANT_TABLE_POLICIES.filter(
+    ({ canonicalOwnerRolloutScope }) =>
+      canonicalOwnerRolloutScope === "intentionally_skipped_legacy",
   ).map(({ table }) => table),
 );
 
@@ -87,12 +116,17 @@ export function summarizeTenantClassifications(policies = TENANT_TABLE_POLICIES)
   return summary;
 }
 
-function userOwned(table, currentOwnerColumn = null) {
+function userOwned(
+  table,
+  currentOwnerColumn = null,
+  canonicalOwnerRolloutScope = "in_scope",
+) {
   return Object.freeze({
     table,
     classification: "user_owned",
     currentOwnerColumn,
     canonicalOwnerRequired: true,
+    canonicalOwnerRolloutScope,
   });
 }
 
@@ -102,6 +136,7 @@ function sharedReference(table) {
     classification: "shared_reference",
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
+    canonicalOwnerRolloutScope: "not_applicable",
   });
 }
 
@@ -111,6 +146,7 @@ function adminSystem(table) {
     classification: "admin_system",
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
+    canonicalOwnerRolloutScope: "not_applicable",
   });
 }
 
@@ -120,5 +156,6 @@ function identitySystem(table) {
     classification: "identity_system",
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
+    canonicalOwnerRolloutScope: "not_applicable",
   });
 }

@@ -1,5 +1,7 @@
 /*
  * PLAN ONLY. This file is not imported by the application or Drizzle config.
+ * SUPERSEDED IN PART BY PHASE 1E-C0: declarations for legacy goals/cashflow
+ * owner enforcement are not part of the product canonical-owner rollout.
  * It describes the exact final schema delta after expand, backfill,
  * application cutover, and contract. It is not the Phase 1C expand patch.
  *

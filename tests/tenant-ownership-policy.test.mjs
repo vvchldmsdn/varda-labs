@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES,
   CANONICAL_OWNER_CONTRACT,
+  CANONICAL_OWNER_ROLLOUT_SCOPES,
   EXPANDED_TENANT_TABLE_POLICIES,
   IDENTITY_SYSTEM_TABLE_POLICIES,
+  LEGACY_EXCLUDED_USER_TABLE_NAMES,
   TENANT_TABLE_POLICIES,
   resolveTenantTablePolicies,
   summarizeTenantClassifications,
@@ -82,5 +85,40 @@ describe("tenant ownership policy", () => {
       )?.classification,
       "identity_system",
     );
+  });
+
+  it("separates product owner rollout from preserved legacy tables", () => {
+    assert.deepEqual(CANONICAL_OWNER_ROLLOUT_SCOPES, [
+      "in_scope",
+      "intentionally_skipped_legacy",
+      "not_applicable",
+    ]);
+    assert.deepEqual(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES, [
+      "assets",
+      "accounts",
+      "asset_groups",
+      "asset_group_members",
+      "event_ledger_entries",
+      "market_regime_daily",
+      "account_balance_snapshots",
+      "daily_portfolio_snapshots",
+      "daily_position_snapshots",
+      "settings",
+    ]);
+    assert.deepEqual(LEGACY_EXCLUDED_USER_TABLE_NAMES, [
+      "goals",
+      "transactions",
+      "fixed_transactions",
+      "monthly_incomes",
+    ]);
+
+    for (const policy of TENANT_TABLE_POLICIES) {
+      assert.ok(
+        CANONICAL_OWNER_ROLLOUT_SCOPES.includes(
+          policy.canonicalOwnerRolloutScope,
+        ),
+        policy.table,
+      );
+    }
   });
 });

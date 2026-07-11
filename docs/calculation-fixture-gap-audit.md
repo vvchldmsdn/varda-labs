@@ -125,7 +125,8 @@ approved later, start with pure helpers and fixtures for:
 - simple historical weight backtest;
 - scenario metric summaries;
 - risk contribution or effective-number-of-bets calculations;
-- legacy cashflow projection formulas, if the planning screen is selected.
+- legacy cashflow projection formulas; that screen is outside the product
+  scope and is not a future fixture candidate.
 
 Keep job state, shards, dense paths, provider reads, and artifact writes outside
 these pure helper tests.

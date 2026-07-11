@@ -12,7 +12,11 @@ import {
   prepareSnapshotWriteScope,
   prepareTenantWriteContext,
 } from "../src/lib/tenant-write-context.ts";
-import { EXPANDED_TENANT_TABLE_POLICIES } from "../scripts/lib/tenant-ownership-policy.mjs";
+import {
+  CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES,
+  EXPANDED_TENANT_TABLE_POLICIES,
+  LEGACY_EXCLUDED_USER_TABLE_NAMES,
+} from "../scripts/lib/tenant-ownership-policy.mjs";
 
 const ROOT = process.cwd();
 const OWNER_A = "11111111-1111-4111-8111-111111111111";
@@ -26,6 +30,14 @@ const RAW_CANONICAL_OWNER_DML_PATTERN =
   /insert\s+into\s+[^()]+\([^)]*canonical_owner_user_id|update\s+[a-z_\"]+\s+set[\s\S]{0,2000}canonical_owner_user_id\s*=|canonical_owner_user_id\s*=\s*excluded\.canonical_owner_user_id/i;
 const DRIZZLE_CANONICAL_OWNER_DML_PATTERN =
   /\.(?:values|set)\s*\(\s*\{[\s\S]{0,2000}canonicalOwnerUserId\s*:/i;
+const DB_SCHEMA_IMPORT_PATTERN =
+  /import\s*\{([\s\S]*?)\}\s*from\s*["']@\/db\/schema["']/g;
+const LEGACY_SCHEMA_IDENTIFIER_PATTERN =
+  /\b(?:goals|transactions|fixedTransactions|monthlyIncomes)\b/;
+const LEGACY_TABLE_LITERAL_PATTERN =
+  /["'](?:goals|transactions|fixed_transactions|monthly_incomes)["']/;
+const LEGACY_RAW_SQL_TABLE_PATTERN =
+  /\b(?:from|join|into|update|delete\s+from)\s+["']?(?:goals|transactions|fixed_transactions|monthly_incomes)\b/i;
 
 describe("tenant writer Phase 1D-A readiness", () => {
   it("registers every current DML implementation exactly once by path", () => {
@@ -74,6 +86,113 @@ describe("tenant writer Phase 1D-A readiness", () => {
             : "owner_forbidden",
         );
       }
+    }
+  });
+
+  it("keeps legacy cashflow and goal writers frozen outside owner rollout", () => {
+    const policyByTable = new Map(
+      EXPANDED_TENANT_TABLE_POLICIES.map((policy) => [policy.table, policy]),
+    );
+    const scopeCounts = Object.fromEntries(
+      ["in_scope", "intentionally_skipped_legacy", "not_applicable"].map(
+        (scope) => [scope, 0],
+      ),
+    );
+
+    for (const writer of TENANT_WRITER_REGISTRY) {
+      scopeCounts[writer.canonicalOwnerRolloutScope] += 1;
+      const userTargets = writer.targets.filter(
+        ({ classification }) => classification === "user_owned",
+      );
+
+      if (writer.canonicalOwnerRolloutScope === "not_applicable") {
+        assert.equal(userTargets.length, 0, writer.id);
+        continue;
+      }
+
+      const expectedTableScope = writer.canonicalOwnerRolloutScope;
+      for (const target of userTargets) {
+        assert.equal(
+          policyByTable.get(target.table)?.canonicalOwnerRolloutScope,
+          expectedTableScope,
+          `${writer.id}:${target.table}`,
+        );
+      }
+    }
+
+    assert.deepEqual(scopeCounts, {
+      in_scope: 11,
+      intentionally_skipped_legacy: 1,
+      not_applicable: 5,
+    });
+
+    const legacyWriter = TENANT_WRITER_REGISTRY.find(
+      ({ id }) => id === "base44_cashflow_goal_import",
+    );
+    assert.equal(
+      legacyWriter?.canonicalOwnerRolloutScope,
+      "intentionally_skipped_legacy",
+    );
+    assert.deepEqual(legacyWriter?.transition, {
+      prepare: "dry_run_only",
+      activate: "keep_frozen_legacy",
+      freeze: "freeze_legacy_writer",
+    });
+    assert.deepEqual(
+      legacyWriter?.targets.map(({ table }) => table),
+      LEGACY_EXCLUDED_USER_TABLE_NAMES,
+    );
+
+    const inScopeTargetTables = new Set(
+      TENANT_WRITER_REGISTRY.filter(
+        ({ canonicalOwnerRolloutScope }) =>
+          canonicalOwnerRolloutScope === "in_scope",
+      ).flatMap(({ targets }) =>
+        targets
+          .filter(({ classification }) => classification === "user_owned")
+          .map(({ table }) => table),
+      ),
+    );
+    for (const table of CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES) {
+      assert.equal(inScopeTargetTables.has(table), true, table);
+    }
+    for (const table of LEGACY_EXCLUDED_USER_TABLE_NAMES) {
+      assert.equal(inScopeTargetTables.has(table), false, table);
+    }
+  });
+
+  it("keeps legacy cashflow and goal tables out of product runtime paths", () => {
+    const runtimePaths = [
+      join(ROOT, "src", "app"),
+      join(ROOT, "src", "components"),
+      join(ROOT, "src", "db", "queries"),
+      join(ROOT, "src", "lib"),
+    ]
+      .flatMap(walkProductRuntimeFiles)
+      .filter(
+        (path) =>
+          relativePath(path) !== "src/lib/tenant-writer-registry.ts",
+      );
+
+    for (const path of runtimePaths) {
+      const source = readFileSync(path, "utf8");
+      for (const match of source.matchAll(DB_SCHEMA_IMPORT_PATTERN)) {
+        assert.doesNotMatch(
+          match[1],
+          LEGACY_SCHEMA_IDENTIFIER_PATTERN,
+          relativePath(path),
+        );
+      }
+      assert.doesNotMatch(
+        source,
+        LEGACY_TABLE_LITERAL_PATTERN,
+        relativePath(path),
+      );
+      assert.doesNotMatch(
+        source,
+        LEGACY_RAW_SQL_TABLE_PATTERN,
+        relativePath(path),
+      );
     }
   });
 
@@ -409,6 +528,19 @@ function walkFiles(root) {
     if (statSync(path).isDirectory()) {
       files.push(...walkFiles(path));
     } else if (path.endsWith(".ts") || path.endsWith(".mjs")) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+function walkProductRuntimeFiles(root) {
+  const files = [];
+  for (const entry of readdirSync(root)) {
+    const path = join(root, entry);
+    if (statSync(path).isDirectory()) {
+      files.push(...walkProductRuntimeFiles(path));
+    } else if (path.endsWith(".ts") || path.endsWith(".tsx")) {
       files.push(path);
     }
   }

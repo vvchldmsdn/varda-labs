@@ -11,6 +11,11 @@ export type WriterOperation = "insert" | "update" | "delete";
 
 export type OwnerWritePolicy = "trusted_context_required" | "owner_forbidden";
 
+export type CanonicalOwnerRolloutScope =
+  | "in_scope"
+  | "intentionally_skipped_legacy"
+  | "not_applicable";
+
 export type WriterTarget = Readonly<{
   table: string;
   classification: Exclude<WriterClassification, "mixed">;
@@ -29,11 +34,13 @@ export type WriterTransitionPolicy = Readonly<{
     | "owner_aware_repository_or_freeze"
     | "owner_scoped_delete"
     | "keep_owner_absent"
+    | "keep_frozen_legacy"
     | "single_identity_insert";
   freeze:
     | "freeze_without_verified_owner"
     | "freeze_user_targets_only"
     | "freeze_until_owner_scoped_delete"
+    | "freeze_legacy_writer"
     | "not_required"
     | "freeze_after_initial_user";
 }>;
@@ -46,6 +53,7 @@ export type TenantWriterDefinition = Readonly<{
   implementationPaths: readonly string[];
   targets: readonly WriterTarget[];
   transition: WriterTransitionPolicy;
+  canonicalOwnerRolloutScope: CanonicalOwnerRolloutScope;
   canonicalOwnerHttpInput: "forbidden";
   legacyOwnerEvidence: "separate" | "not_applicable";
 }>;
@@ -74,6 +82,12 @@ const MIXED_TRANSITION = {
   freeze: "freeze_user_targets_only",
 } as const;
 
+const LEGACY_EXCLUDED_TRANSITION = {
+  prepare: "dry_run_only",
+  activate: "keep_frozen_legacy",
+  freeze: "freeze_legacy_writer",
+} as const;
+
 export const TENANT_WRITER_REGISTRY = [
   {
     id: "initial_app_user_provisioning",
@@ -87,6 +101,7 @@ export const TENANT_WRITER_REGISTRY = [
       activate: "single_identity_insert",
       freeze: "freeze_after_initial_user",
     },
+    canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
   },
@@ -103,6 +118,7 @@ export const TENANT_WRITER_REGISTRY = [
       userTarget("asset_group_members", "insert", "update"),
     ],
     transition: USER_IMPORT_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -119,6 +135,7 @@ export const TENANT_WRITER_REGISTRY = [
       userTarget("daily_position_snapshots", "insert", "update"),
     ],
     transition: MIXED_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -130,6 +147,7 @@ export const TENANT_WRITER_REGISTRY = [
     implementationPaths: ["scripts/import-base44-settings.mjs"],
     targets: [userTarget("settings", "insert", "update")],
     transition: USER_IMPORT_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -144,6 +162,7 @@ export const TENANT_WRITER_REGISTRY = [
       sharedTarget("benchmark_snapshots", "insert", "update"),
     ],
     transition: SHARED_TRANSITION,
+    canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
   },
@@ -158,6 +177,7 @@ export const TENANT_WRITER_REGISTRY = [
       sharedTarget("etf_holdings", "insert", "update"),
     ],
     transition: SHARED_TRANSITION,
+    canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
   },
@@ -169,6 +189,7 @@ export const TENANT_WRITER_REGISTRY = [
     implementationPaths: ["scripts/import-base44-events.mjs"],
     targets: [userTarget("event_ledger_entries", "insert", "update")],
     transition: USER_IMPORT_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -183,6 +204,7 @@ export const TENANT_WRITER_REGISTRY = [
       sharedTarget("global_market_factors", "insert", "update"),
     ],
     transition: MIXED_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -198,7 +220,8 @@ export const TENANT_WRITER_REGISTRY = [
       userTarget("fixed_transactions", "insert", "update"),
       userTarget("monthly_incomes", "insert", "update"),
     ],
-    transition: USER_IMPORT_TRANSITION,
+    transition: LEGACY_EXCLUDED_TRANSITION,
+    canonicalOwnerRolloutScope: "intentionally_skipped_legacy",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -214,6 +237,7 @@ export const TENANT_WRITER_REGISTRY = [
       activate: "owner_scoped_delete",
       freeze: "freeze_until_owner_scoped_delete",
     },
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -228,6 +252,7 @@ export const TENANT_WRITER_REGISTRY = [
     ],
     targets: [userTarget("accounts", "insert", "update", "delete")],
     transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -242,6 +267,7 @@ export const TENANT_WRITER_REGISTRY = [
     ],
     targets: [userTarget("assets", "insert", "update", "delete")],
     transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -256,6 +282,7 @@ export const TENANT_WRITER_REGISTRY = [
     ],
     targets: [userTarget("asset_groups", "insert", "update", "delete")],
     transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -275,6 +302,7 @@ export const TENANT_WRITER_REGISTRY = [
       userTarget("asset_group_members", "insert", "update", "delete"),
     ],
     transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
   },
@@ -294,6 +322,7 @@ export const TENANT_WRITER_REGISTRY = [
       activate: "keep_owner_absent",
       freeze: "not_required",
     },
+    canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
   },
@@ -305,6 +334,7 @@ export const TENANT_WRITER_REGISTRY = [
     implementationPaths: ["src/app/api/admin/market/fx/sync/route.ts"],
     targets: [sharedTarget("fx_rates", "insert", "update")],
     transition: SHARED_TRANSITION,
+    canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
   },
@@ -319,6 +349,7 @@ export const TENANT_WRITER_REGISTRY = [
       userTarget("daily_position_snapshots", "insert", "update"),
     ],
     transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
   },

@@ -1,6 +1,6 @@
 # Base44 Migration Coverage Audit
 
-Last updated: 2026-07-08
+Last updated: 2026-07-11
 
 Source inventory: `C:\Users\Eunwoo_2\Desktop\gyeol-fin\migration-data\base44-full-entity-inventory.json`
 
@@ -23,6 +23,23 @@ History/balance read-only source-of-truth guidance lives in
 
 Simulation and investment lab job/artifact guidance lives in
 `docs/simulation-investment-lab-model-audit.md`.
+
+## Product Scope Overlay
+
+Migration coverage and product scope are intentionally separate. A `migrated`
+status below records that source rows were preserved in Postgres; it does not
+require the corresponding legacy feature to remain in the new product.
+
+As of 2026-07-11, `Goal`, `Transaction`, `FixedTransaction`, and
+`MonthlyIncome` remain historically migrated but are classified as
+`intentionally_skipped_legacy` for product runtime and canonical-owner
+rollout. Their rows, schema, and importer remain untouched until a separate
+dependency-reviewed cleanup is approved. `EventLedger` is not part of that
+legacy set because Home, Today movement, return metrics, and daily snapshots
+currently depend on it.
+
+The authoritative product/writer scope is documented in
+`docs/auth-tenant-phase1e-c0-product-scope-writer-audit.md`.
 
 ## Summary
 
@@ -63,15 +80,15 @@ Inventory totals:
 | `EtfMaster` | `migrated` | 1,202 | 2026-04-19 to 2026-04-20 | `etf_masters` | Imported by `scripts/import-base44-etf-reference.mjs`. JSON tag/exposure/substitute/top10 fields are stored as JSONB while searchable scalar columns remain separate. |
 | `EtfSyncJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. |
-| `FixedTransaction` | `migrated` | 7 | 2026-02-18 to 2026-02-19 | `fixed_transactions` | Imported by `scripts/import-base44-cashflow-goals.mjs` with recurrence day, holiday shift, active flag, type/category/name, and amount. |
+| `FixedTransaction` | `migrated` | 7 | 2026-02-18 to 2026-02-19 | `fixed_transactions` | Historical import retained, but the legacy cashflow/calendar feature is outside product and canonical-owner rollout scope. |
 | `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. |
 | `GlobalMarketFactor` | `migrated` | 2,401 | 2025-06-01 to 2026-06-23 | `global_market_factors` | Imported by `scripts/import-base44-market-context.mjs`. Scalar factor keys/date/value/change fields are separated and `derived_metrics_json` is stored as JSONB. |
-| `Goal` | `migrated` | 1 | 2026-03-18 | `goals` | Imported by `scripts/import-base44-cashflow-goals.mjs` for source preservation. The source title is empty, so UI usage should remain opt-in until a new goal model is designed. |
+| `Goal` | `migrated` | 1 | 2026-03-18 | `goals` | Historical import retained. Goal-setting is explicitly outside the new product and canonical-owner rollout scope. |
 | `MacroSeries` | `needs_decision` | 20 | 2025-10-01 to 2026-06-22 | candidate `macro_series` or merge into `global_market_factors` | Overlaps with `GlobalMarketFactor`. Decide whether to keep a separate macro-source table or normalize both into one factor time-series model. |
 | `MarketPriceDaily` | `needs_decision` | unavailable | 404 | likely replaced by `asset_price_snapshots` | Base44 fetch failed. Decide whether this legacy entity is obsolete once `AssetPriceSnapshot` is imported. |
 | `MarketRegimeDaily` | `migrated` | 69 | 2026-05-20 to 2026-07-05 | `market_regime_daily` | Imported by `scripts/import-base44-market-context.mjs`. Preserves `drivers_json` as JSONB plus scores, labels, account/date, and nullable current account mapping. |
 | `MarketSignal` | `needs_decision` | 2 | 2026-04-20 to 2026-04-21 | candidate `market_signals` or generated insights | Only two rows. Decide whether historical signals are source-of-record data or derived/recomputed output. |
-| `MonthlyIncome` | `migrated` | 12 | 2026-02-18 | `monthly_incomes` | Imported by `scripts/import-base44-cashflow-goals.mjs` with year/month/pay day and nullable actual amount. |
+| `MonthlyIncome` | `migrated` | 12 | 2026-02-18 | `monthly_incomes` | Historical import retained, but recurring income/cashflow is outside product and canonical-owner rollout scope. |
 | `NewsSentimentDaily` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `PortfolioOptimizationRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `PortfolioSimulationRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
@@ -89,7 +106,7 @@ Inventory totals:
 | `SimulationJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `SimulationRunResult` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `SimulationSampleShard` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `Transaction` | `migrated` | 14 | 2026-02-11 to 2026-03-01 | `transactions` | Imported by `scripts/import-base44-cashflow-goals.mjs`. Raw account is preserved and `account_id` is nullable because most rows have no account. |
+| `Transaction` | `migrated` | 14 | 2026-02-11 to 2026-03-01 | `transactions` | Historical import retained, but this legacy cashflow model is outside product and canonical-owner rollout scope. It is not the portfolio event ledger. |
 
 ## Priority Candidate Review
 
@@ -273,7 +290,8 @@ Read-only UI note: current `/market` route coverage is tracked in
    - Do not pull `PortfolioSnapshot`, `DailyGroupSnapshot`, `MacroSeries`,
      `MarketSignal`, or `AssetFactorProfile` into the dashboard query path
      without a separate product decision.
-   - Keep legacy `Goal` data out of first-screen UI unless a new goal product model is defined.
+   - Keep legacy Goal/Cashflow data out of every product runtime path. The
+     product scope no longer includes a future goal-setting screen.
 
 ## Import Rules To Carry Forward
 

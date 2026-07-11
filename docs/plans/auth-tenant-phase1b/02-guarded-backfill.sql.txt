@@ -1,4 +1,7 @@
 -- PLAN ONLY. NOT A CONFIGURED MIGRATION. DO NOT EXECUTE AS-IS.
+-- SUPERSEDED IN PART BY PHASE 1E-C0: this draft still includes legacy
+-- goals/cashflow tables that are now outside canonical-owner rollout. A future
+-- reviewed backfill must omit those tables and keep their writer frozen.
 --
 -- This is the reviewed transaction body for a future parameterized Node
 -- command. The runner binds $1 = initial owner UUID and $2 = reviewed writer

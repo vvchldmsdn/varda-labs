@@ -1,6 +1,6 @@
 # Simulation and Investment Lab Model Audit
 
-Last updated: 2026-07-08
+Last updated: 2026-07-11
 
 Source scanned read-only:
 
@@ -83,8 +83,8 @@ Classification:
 - UI surface: legacy / secondary.
 - Data model: cashflow projection, not portfolio Monte Carlo.
 - Persistence: none required for first varda-labs migration.
-- Future treatment: extract only the income split and projection formulas if a
-  new planning screen is approved.
+- Future treatment: intentionally skipped legacy. The product scope no longer
+  includes this cashflow projection or a goal-planning replacement.
 
 Do not use this page as the target for the investment lab or simulation job
 subsystem.
@@ -224,7 +224,6 @@ These areas may become pure, fixture-tested helpers before any persistence:
 - simple historical weight backtests;
 - risk contribution and effective-number-of-bets calculations;
 - scenario metric summaries;
-- projection formulas from the legacy finance simulation page.
 
 Provider reads, Base44 entity reads, job status updates, and artifact writes
 must stay outside pure helpers.
@@ -265,7 +264,6 @@ This audit does not reopen that model. The only boundary to carry forward is:
 ## Proposed Future Implementation Gates
 
 1. Product gate: decide which surface comes first:
-   - legacy cashflow projection;
    - simulation validation;
    - insight lab timemachine/parallel-world comparison;
    - scenario command.
@@ -284,6 +282,7 @@ This audit does not reopen that model. The only boundary to carry forward is:
 - no simulation import script;
 - no simulation route, API route, or server action;
 - no simulation UI in varda-labs;
+- no legacy cashflow projection or goal-planning migration;
 - no job queue implementation;
 - no dense path or shard storage implementation;
 - no provider, KIS, market-data, or LLM calls;
