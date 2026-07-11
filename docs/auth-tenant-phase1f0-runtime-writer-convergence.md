@@ -112,3 +112,7 @@ Runtime owner activation remains blocked. The next decision must choose between
 keeping all user-owned runtime writers frozen or separately opening identity
 link plus active server-side session context. Machine snapshot targeting needs
 its own later approval even after interactive session identity exists.
+
+The provider-neutral resolver prerequisite is now executable, without any
+production integration, in
+`docs/auth-tenant-phase1g0-session-resolver-contract.md`.

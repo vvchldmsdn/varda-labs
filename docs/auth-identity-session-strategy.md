@@ -244,6 +244,13 @@ type TenantContext = {
 };
 ```
 
+Phase 1G0 implements this as a provider-neutral pure state-machine contract in
+`src/lib/session-resolver-contract.ts`, with source and credential policy in
+`src/lib/session-resolver-policy.ts`. The internal context necessarily keeps the
+canonical UUID for DAL predicates, while its explicit public projection
+contains no UUID or provider/session material. No production code imports
+either contract in Phase 1G0.
+
 ## Next.js Responsibility Boundaries
 
 | Boundary | Responsibility |
@@ -339,7 +346,7 @@ The implementation phases must include:
 - Neon Auth organization/household support
 - open self-service registration
 - account-recovery/admin linking UI
-- actual owner row provisioning and identity linking operation
+- identity linking operation and future-user provisioning flows
 - implementation of the reviewed guarded backfill command
 - RLS policies and Data API/JWT integration
 - recommendation persistence and user-facing mutations
@@ -354,6 +361,9 @@ Phase 1C0 hardened entity API and product response boundaries. Phase 1C then
 applied the empty identity-table and nullable canonical-owner expansion recorded
 in `docs/auth-tenant-phase1c-expand.md`.
 
-No app user, identity link, owner backfill, auth SDK, query filter, writer
-dual-write, RLS policy, or Basic Auth change exists yet. The next narrow slice
-must be selected separately after Phase 1C deployment verification.
+A separately approved one-row operation later created one provisioning app
+user. There is still no identity link, active app user, canonical owner
+assignment, auth SDK, query filter, writer dual-write, RLS policy, or Basic Auth
+change. Phase 1G0 now freezes the provider-neutral resolver state machine as a
+pure contract; production integration and any identity write remain separate
+approval gates.
