@@ -2,12 +2,12 @@
 
 Last updated: 2026-07-11
 
-Status: draft awaiting explicit user approval. This document proposes product
-semantics only. It does not approve any account vector, make legacy target
-evidence canonical, authorize a resolver, or allow UI, API, provider, schema,
-migration, database write, or allocator integration.
+Status: Gate A policy model approved by the user on 2026-07-11. Gate B numeric
+vectors remain unapproved. This document does not approve any account vector,
+make legacy target evidence canonical, authorize a resolver, or allow UI, API,
+provider, schema, migration, database write, or allocator integration.
 
-Candidate policy id:
+Approved policy id:
 
 ```text
 account_scoped_explicit_instrument_targets_v1
@@ -24,7 +24,7 @@ numeric vector therefore require separate approval.
 
 ## Proposed Product Semantics
 
-If approved, v1 uses these rules:
+Approved v1 semantics:
 
 1. Targets are user-owned and independently scoped to one named account:
    `brokerage`, `isa`, or `irp`.
@@ -118,9 +118,12 @@ group ratios, previous policy versions, or partial vectors.
 
 ### Gate A: policy-model approval
 
-The user must explicitly approve or reject the proposed
-`account_scoped_explicit_instrument_targets_v1` semantics in this document.
-Proceeding with migration work in general is not approval of this policy.
+Approved on 2026-07-11 when the user explicitly named
+`account_scoped_explicit_instrument_targets_v1`, approved Gate A, and kept the
+account numeric vectors under a separate Gate B review.
+
+This approval covers the model only and cannot be reused as numeric-vector
+approval.
 
 ### Gate B: numeric-vector approval
 
@@ -137,6 +140,9 @@ After Gate A, each account still needs an explicit approval packet:
 
 No current account has passed Gate B. This draft intentionally contains no
 numeric vector.
+
+The implemented review-only packet boundary is documented in
+`docs/target-policy-gate-b0-review-packet-contract.md`.
 
 ## Follow-On Gate
 

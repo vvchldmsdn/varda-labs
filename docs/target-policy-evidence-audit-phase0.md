@@ -102,6 +102,5 @@ Any approved resolver must be a new pure, versioned, fixture-backed boundary.
 It must emit an explicit 10,000-bps vector before the existing allocator can
 run. Phase 0 does not choose that policy.
 
-The non-authoritative policy proposal is documented in
-`docs/target-policy-decision-contract-v1.md`. Its model and numeric vectors
-remain separately gated and unapproved.
+The policy model in `docs/target-policy-decision-contract-v1.md` passed Gate A
+on 2026-07-11. Its numeric vectors remain separately gated and unapproved.
