@@ -35,14 +35,17 @@ simulation job is approved by this document.
 This is a constrained allocation calculator. It is not a market forecast, an
 LLM recommendation, or an automatic sell-and-rebalance command.
 
+The executable Phase 1 details live in
+`docs/additional-contribution-phase1-contract.md`.
+
 ### Canonical v1 behavior
 
 1. Read current holdings, live/as-of prices, date-specific FX, and strategic
    target policy.
 2. Calculate target value after adding the new cash.
 3. Calculate each eligible holding's positive target deficit.
-4. Allocate cash with capped proportional water filling so no holding receives
-   more than its deficit.
+4. Allocate integer KRW in proportion to positive post-top-up deficits, capped
+   so no holding receives more than its deficit.
 5. Apply optional tactical overlays as separately reported constraints or
    multipliers. They must not rewrite strategic targets.
 6. Convert KRW allocations to executable units using market lot and fractional
@@ -214,8 +217,8 @@ The following still require replacement or proof before migration:
 ## Implementation Order
 
 1. Investment Lab aggregate deterministic path fixture (completed 2026-07-11).
-2. Build Additional Contribution input and strategic water-filling fixtures,
-   without tactical overlays or sells.
+2. Additional Contribution explicit-target strategic allocator fixtures
+   (completed 2026-07-11), without tactical overlays or sells.
 3. Add MA120 as an optional isolated overlay and validate it against no-overlay.
 4. Build the Simulation Validation normalized return-matrix contract.
 5. Add bootstrap and parametric engines as pure seeded helpers.
