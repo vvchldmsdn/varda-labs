@@ -123,15 +123,15 @@ Synthetic fixtures cover:
 
 ## Next Gate
 
-Portfolio aggregation remains a separate policy decision. Before it is
-implemented, the contract must explicitly choose:
+The docs-only `gross_normalized_buy_and_hold_v1` proposal is recorded in
+`docs/simulation-portfolio-path-policy-gate0.md`. It uses normalized `NAV[0] =
+1`, so an initial KRW amount is not a prerequisite. The proposal remains
+unapproved and supplies no scenario vector.
 
-- initial capital semantics;
-- reviewed portfolio-weight source;
-- buy-and-hold or constant-mix behavior;
-- rebalancing timing;
-- cash treatment;
-- fees, taxes, and transaction-cost assumptions.
+Before aggregation code is implemented, Gate 0 needs explicit user approval
+and one complete Simulation-specific 10,000-bps vector must pass its own later
+review and approval gate. Strategic target vectors, including ISA `isa-v1`,
+must not be reused automatically.
 
 Fan bands, terminal distributions, drawdown, and probability summaries remain
 later consumers of an approved portfolio path. Phase 1B does not authorize
