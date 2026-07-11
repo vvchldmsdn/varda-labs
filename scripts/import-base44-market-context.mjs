@@ -3,6 +3,26 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import {
+  CoreImportArgumentError,
+  buildBase44CoreCanonicalPlan,
+} from "./lib/base44-core-canonical-plan.mjs";
+import { readBase44CoreCanonicalState } from "./lib/base44-core-canonical-state.mjs";
+import {
+  CoreShadowSourceError,
+  readBase44CoreShadowSource,
+} from "./lib/base44-core-shadow-source.mjs";
+import {
+  MarketContextImportArgumentError,
+  buildBase44MarketContextCanonicalPlan,
+  parseBase44MarketContextArgs,
+} from "./lib/base44-market-context-canonical-plan.mjs";
+import { readBase44MarketContextCanonicalState } from "./lib/base44-market-context-canonical-state.mjs";
+import {
+  MarketContextShadowSourceError,
+  normalizeBase44MarketContextShadowSource,
+} from "./lib/base44-market-context-shadow-source.mjs";
+
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const SENSITIVE_PATTERN =
   /(token|secret|password|api[_-]?key|created_by|user_id|owner_user_id)/i;
@@ -65,50 +85,36 @@ const GLOBAL_MARKET_FACTOR_FIELDS = new Set([
   "updated_date",
 ]);
 
+const GLOBAL_MARKET_FACTOR_SHADOW_FIELDS = new Set([
+  ...GLOBAL_MARKET_FACTOR_FIELDS,
+  "factor_type",
+  "sector",
+  "available_at",
+  "unit",
+  "change_1d",
+  "change_1m",
+  "change_3m",
+  "change_6m",
+  "rate_velocity_3m",
+  "rate_velocity_6m",
+  "return_1d_pct",
+  "return_1m_pct",
+  "return_3m_pct",
+  "return_6m_pct",
+  "percentile_252d",
+  "base_currency",
+  "quote_currency",
+  "source_url",
+  "status",
+  "is_estimated",
+  "fetched_at",
+]);
+
 async function runInBatches(items, handler) {
   for (let index = 0; index < items.length; index += UPSERT_BATCH_SIZE) {
     const batch = items.slice(index, index + UPSERT_BATCH_SIZE);
     await Promise.all(batch.map(handler));
   }
-}
-
-function parseArgs(argv) {
-  const args = {
-    dataDir:
-      process.env.BASE44_MIGRATION_DATA_DIR ??
-      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
-    write: false,
-    ownerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-
-    if (arg === "--write") {
-      args.write = true;
-      continue;
-    }
-
-    if (arg === "--data-dir") {
-      args.dataDir = path.resolve(argv[index + 1] ?? "");
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--owner-user-id") {
-      args.ownerUserId = argv[index + 1] ?? "";
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  if (!args.ownerUserId.trim()) {
-    throw new Error("--owner-user-id cannot be empty");
-  }
-
-  return args;
 }
 
 function assertNoSensitiveContent(value, sourceName, keyPath = []) {
@@ -644,7 +650,12 @@ function summarizeMatches(marketRegimes, accountMap) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseBase44MarketContextArgs(process.argv.slice(2), {
+    defaultDataDir:
+      process.env.BASE44_MIGRATION_DATA_DIR ??
+      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
+    legacyOwnerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
+  });
   const files = {
     marketRegimes: "base44-market-regime-daily.export.json",
     globalFactors: "base44-global-market-factors.export.json",
@@ -659,9 +670,83 @@ async function main() {
     readJsonArray(
       path.join(args.dataDir, files.globalFactors),
       files.globalFactors,
-      GLOBAL_MARKET_FACTOR_FIELDS,
+      args.canonicalOwnerId === null
+        ? GLOBAL_MARKET_FACTOR_FIELDS
+        : GLOBAL_MARKET_FACTOR_SHADOW_FIELDS,
     ),
   ]);
+
+  if (args.canonicalOwnerId !== null) {
+    const source = normalizeBase44MarketContextShadowSource({
+      marketRegimeRecords,
+      globalFactorRecords,
+    });
+    const coreSource = await readBase44CoreShadowSource(args.dataDir);
+
+    config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set");
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const [marketContextState, coreState] = await Promise.all([
+      readBase44MarketContextCanonicalState(sql, {
+        canonicalOwnerId: args.canonicalOwnerId,
+        legacyOwnerUserId: args.ownerUserId,
+        source,
+      }),
+      readBase44CoreCanonicalState(sql, {
+        canonicalOwnerId: args.canonicalOwnerId,
+        legacyOwnerUserId: args.ownerUserId,
+        accountCodes: coreSource.accountCodes,
+        groups: coreSource.groups,
+        assets: coreSource.assets,
+      }),
+    ]);
+    const corePlan = buildBase44CoreCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: coreState.appUser,
+      tables: coreState.tables,
+    });
+    const canonicalOwnerPlan = buildBase44MarketContextCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: marketContextState.appUser,
+      source,
+      state: marketContextState,
+      coreProof: {
+        result: corePlan.result,
+        actualWriteAllowed: corePlan.actualWriteAllowed,
+        canonicalOwnerWriteEnabled: corePlan.canonicalOwnerWriteEnabled,
+        databaseSideEffects: corePlan.databaseSideEffects,
+        accountCodes: coreSource.accountCodes,
+      },
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          mode: "dry-run",
+          ownerMode: "canonical-shadow",
+          selectCount: marketContextState.selectCount + coreState.selectCount,
+          canonicalOwnerPlan,
+        },
+        null,
+        2,
+      ),
+    );
+    if (
+      canonicalOwnerPlan.result === "blocked" ||
+      canonicalOwnerPlan.globalFactorDiagnostic.result === "blocked"
+    ) {
+      console.error("Market context canonical shadow plan is blocked");
+      process.exitCode = 1;
+    }
+    return;
+  }
 
   const marketRegimes = marketRegimeRecords.map(normalizeMarketRegime);
   const globalFactors = globalFactorRecords.map(normalizeGlobalMarketFactor);
@@ -671,8 +756,7 @@ async function main() {
     JSON.stringify(
       {
         mode: args.write ? "write" : "dry-run",
-        dataDir: args.dataDir,
-        ownerUserId: args.ownerUserId,
+        ownerMode: "legacy-evidence",
         ...summary,
       },
       null,
@@ -685,7 +769,7 @@ async function main() {
     return;
   }
 
-  config({ path: path.resolve(process.cwd(), ".env.local") });
+  config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
 
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set");
@@ -711,6 +795,22 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(
+    JSON.stringify({
+      operation: "base44_market_context_import",
+      result: "failed",
+      error: safeErrorCode(error),
+    }),
+  );
   process.exitCode = 1;
 });
+
+function safeErrorCode(error) {
+  if (error instanceof MarketContextImportArgumentError) return error.code;
+  if (error instanceof MarketContextShadowSourceError) return error.code;
+  if (error instanceof CoreImportArgumentError) return error.code;
+  if (error instanceof CoreShadowSourceError) return error.code;
+  if (error instanceof SyntaxError) return "invalid_json_export";
+  if (error?.code === "ENOENT") return "migration_data_unavailable";
+  return "market_context_import_failed";
+}

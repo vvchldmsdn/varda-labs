@@ -86,6 +86,12 @@ validated as a read-only owner/FX shadow in
 `docs/auth-tenant-phase1e-d-history-writer-shadow.md`. Shared FX diagnostics do
 not act as snapshot owner evidence and do not enable any write.
 
+The next mixed writer, `base44_market_context_import`, is now split into a
+read-only regime owner plan and shared factor diagnostic in
+`docs/auth-tenant-phase1e-e-market-context-writer-shadow.md`. Existing regime
+duplicates are preserved as data-health evidence and no factor owner action is
+created.
+
 ## Regression Gate
 
 Tests enforce all of the following:
