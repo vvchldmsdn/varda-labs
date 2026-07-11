@@ -16,6 +16,7 @@
     "audit:data-integrity": "node scripts/audit-data-integrity.mjs",
     "audit:market-context": "node scripts/audit-market-context-readonly.mjs",
     "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",
+    "audit:target-policy-evidence": "node --no-warnings scripts/audit-target-policy-evidence.mjs",
     "audit:investment-lab-counterfactual": "node --no-warnings scripts/audit-investment-lab-counterfactual-readiness.mjs",
     "audit:investment-lab-counterfactual-path": "node --no-warnings scripts/audit-investment-lab-counterfactual-path.mjs",
     "audit:investment-lab-event-flow": "node --no-warnings scripts/audit-investment-lab-event-flow.mjs",

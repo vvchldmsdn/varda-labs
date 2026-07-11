@@ -145,30 +145,25 @@ Recommended v1 target display:
 - `rawAssetTargetPct`: from `assets.target_weight`.
 - `groupTargetPct`: from `asset_groups.target_weight`.
 - `memberAllocationRatioPct`: from `asset_group_members.allocation_ratio`.
-- `effectiveTargetPct`: optional derived display value, only if the route
-  labels the derivation and tests it.
+- `effectiveTargetPct`: unavailable until a separate versioned resolver policy
+  is approved.
 
-The daily snapshot writer already derives a point-in-time
-`target_weight_effective` when a group target exists. A structure route may use
-that as historical evidence, but it should not treat snapshot-derived effective
-weight as the editable current policy.
+The daily snapshot writer contains a legacy point-in-time
+`target_weight_effective` derivation. That stored field remains historical
+evidence only and does not establish current policy or authorize the same
+derivation in a read model. Phase 0 neither approves nor changes the writer.
 
-## Suggested Effective Target Derivation
+## Effective Target Derivation Is Deferred
 
-If v1 needs a single effective target for drift display, use this conservative
-order and label it as derived:
+This read-only surface must not derive a single effective target. In
+particular, it must not normalize member ratios, equal-split a group target,
+or distribute a group target by current market value. Those operations would
+silently select a target policy that the stored evidence does not establish.
 
-1. If an active group has a group target and active member allocation ratios
-   that sum to a usable positive value, allocate group target by normalized
-   member ratio.
-2. Else if an active group has a group target, distribute the group target by
-   current member market value share.
-3. Else use `assets.target_weight`.
-4. If no target evidence exists, show `n/a` and do not compute drift.
-
-This is stricter than the current dashboard holding card, which mostly uses
-`assets.target_weight` plus trend-filter adjustment. The structure page should
-not imply a more exact policy than the stored data supports.
+`docs/target-policy-evidence-audit-phase0.md` defines the implemented evidence
+classifier. Until a separate versioned resolver policy is approved, raw asset,
+group, ratio, and priority fields remain separately labeled evidence and drift
+must remain unavailable when it would require combining them.
 
 ## Group Rows
 
@@ -181,7 +176,7 @@ A group row should show:
 | Current value KRW | Sum of included member current values |
 | Current weight | Group value divided by selected account total |
 | Group target | `asset_groups.target_weight` |
-| Drift | Current weight minus derived/effective target only when target is available |
+| Drift | Unavailable when it would require a derived/effective target policy |
 | Member count | Active current member holdings |
 | Excluded count | Members excluded from valuation because price/FX evidence is missing |
 

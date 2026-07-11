@@ -219,9 +219,13 @@ The following still require replacement or proof before migration:
 1. Investment Lab aggregate deterministic path fixture (completed 2026-07-11).
 2. Additional Contribution explicit-target strategic allocator fixtures
    (completed 2026-07-11), without tactical overlays or sells.
-3. Add MA120 as an optional isolated overlay and validate it against no-overlay.
-4. Build the Simulation Validation normalized return-matrix contract.
-5. Add bootstrap and parametric engines as pure seeded helpers.
-6. Add walk-forward validation before any optimizer is labeled useful.
-7. Design user-owned job/artifact persistence only after auth and ownership
+3. Target Policy Evidence Audit Phase 0 (completed 2026-07-11): raw evidence
+   remains unresolved and no target vector or resolver is approved.
+4. Approve a versioned per-account target-policy contract before connecting
+   any resolver to the allocator.
+5. Add MA120 as an optional isolated overlay and validate it against no-overlay.
+6. Build the Simulation Validation normalized return-matrix contract.
+7. Add bootstrap and parametric engines as pure seeded helpers.
+8. Add walk-forward validation before any optimizer is labeled useful.
+9. Design user-owned job/artifact persistence only after auth and ownership
    gates permit writes.

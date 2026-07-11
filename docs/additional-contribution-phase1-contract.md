@@ -29,9 +29,11 @@ policy, forecast returns, or recommend trades.
 - the new cash amount is a positive safe integer KRW value;
 - buyability is explicit evidence, not inferred from prices or providers.
 
-The helper must not read raw asset, group, or member targets. A future
-`TargetPolicyResolver` must turn reviewed raw evidence into this explicit input
-under a separate contract.
+The helper must not read raw asset, group, or member targets. The read-only
+Phase 0 classifier in `docs/target-policy-evidence-audit-phase0.md` audits that
+evidence but deliberately emits no vector. A future `TargetPolicyResolver`
+may turn reviewed evidence into this explicit input only under a separate,
+versioned, user-approved contract.
 
 ## Calculation
 
