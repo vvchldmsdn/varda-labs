@@ -35,6 +35,9 @@ evidence but deliberately emits no vector. A future `TargetPolicyResolver`
 may turn reviewed evidence into this explicit input only under a separate,
 versioned, user-approved contract.
 
+`docs/target-policy-decision-contract-v1.md` is the current docs-only proposal.
+It is not approved and supplies no runtime vector.
+
 ## Calculation
 
 For each holding `i`:

@@ -221,8 +221,9 @@ The following still require replacement or proof before migration:
    (completed 2026-07-11), without tactical overlays or sells.
 3. Target Policy Evidence Audit Phase 0 (completed 2026-07-11): raw evidence
    remains unresolved and no target vector or resolver is approved.
-4. Approve a versioned per-account target-policy contract before connecting
-   any resolver to the allocator.
+4. Review the docs-only per-account target-policy proposal. Its policy model
+   and each numeric vector require separate explicit approval before any
+   resolver can connect to the allocator.
 5. Add MA120 as an optional isolated overlay and validate it against no-overlay.
 6. Build the Simulation Validation normalized return-matrix contract.
 7. Add bootstrap and parametric engines as pure seeded helpers.
