@@ -73,10 +73,13 @@ runtime code uses it for event activity, realized return, cost basis, and
 post-baseline trade-flow adjustments. It is distinct from the excluded legacy
 cashflow planning tables.
 
-The next writer shadow slice may target `base44_event_import`, but it must
+The next writer shadow slice targets `base44_event_import`, but it must
 validate account, asset, group, and self-correction ownership relationships.
 It must not copy the importer's global correction repair update into the
 canonical shadow path.
+
+That slice is now completed in
+`docs/auth-tenant-phase1e-c1-event-writer-shadow.md` without enabling writes.
 
 ## Regression Gate
 

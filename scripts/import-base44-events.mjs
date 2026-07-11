@@ -3,6 +3,23 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import {
+  CoreImportArgumentError,
+  buildBase44CoreCanonicalPlan,
+} from "./lib/base44-core-canonical-plan.mjs";
+import { readBase44CoreCanonicalState } from "./lib/base44-core-canonical-state.mjs";
+import {
+  CoreShadowSourceError,
+  readBase44CoreShadowSource,
+} from "./lib/base44-core-shadow-source.mjs";
+import {
+  EventImportArgumentError,
+  buildBase44EventCanonicalPlan,
+  normalizeBase44EventShadowSource,
+  parseBase44EventArgs,
+} from "./lib/base44-event-canonical-plan.mjs";
+import { readBase44EventCanonicalState } from "./lib/base44-event-canonical-state.mjs";
+
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const SENSITIVE_PATTERN =
   /(token|secret|password|api[_-]?key|created_by|user_id|owner_user_id)/i;
@@ -40,45 +57,6 @@ async function runInBatches(items, handler) {
     const batch = items.slice(index, index + UPSERT_BATCH_SIZE);
     await Promise.all(batch.map(handler));
   }
-}
-
-function parseArgs(argv) {
-  const args = {
-    dataDir:
-      process.env.BASE44_MIGRATION_DATA_DIR ??
-      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
-    write: false,
-    ownerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-
-    if (arg === "--write") {
-      args.write = true;
-      continue;
-    }
-
-    if (arg === "--data-dir") {
-      args.dataDir = path.resolve(argv[index + 1] ?? "");
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--owner-user-id") {
-      args.ownerUserId = argv[index + 1] ?? "";
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  if (!args.ownerUserId.trim()) {
-    throw new Error("--owner-user-id cannot be empty");
-  }
-
-  return args;
 }
 
 function assertNoSensitiveContent(value, sourceName, keyPath = []) {
@@ -476,13 +454,92 @@ function summarizeMatches(events, accountMap, assetMap, assetGroupMap) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseBase44EventArgs(process.argv.slice(2), {
+    defaultDataDir:
+      process.env.BASE44_MIGRATION_DATA_DIR ??
+      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
+    legacyOwnerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
+  });
   const fileName = "base44-event-ledger.export.json";
   const records = await readJsonArray(
     path.join(args.dataDir, fileName),
     fileName,
     EVENT_LEDGER_FIELDS,
   );
+
+  if (args.canonicalOwnerId !== null) {
+    const sourceEvents = records.map(normalizeBase44EventShadowSource);
+    const coreSource = await readBase44CoreShadowSource(args.dataDir);
+
+    config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set");
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const [eventState, coreState] = await Promise.all([
+      readBase44EventCanonicalState(sql, {
+        canonicalOwnerId: args.canonicalOwnerId,
+        legacyOwnerUserId: args.ownerUserId,
+        sourceEvents,
+      }),
+      readBase44CoreCanonicalState(sql, {
+        canonicalOwnerId: args.canonicalOwnerId,
+        legacyOwnerUserId: args.ownerUserId,
+        accountCodes: coreSource.accountCodes,
+        groups: coreSource.groups,
+        assets: coreSource.assets,
+      }),
+    ]);
+    const corePlan = buildBase44CoreCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: coreState.appUser,
+      tables: coreState.tables,
+    });
+    const canonicalOwnerPlan = buildBase44EventCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: eventState.appUser,
+      sourceEvents,
+      state: eventState,
+      coreProof: {
+        result: corePlan.result,
+        actualWriteAllowed: corePlan.actualWriteAllowed,
+        canonicalOwnerWriteEnabled: corePlan.canonicalOwnerWriteEnabled,
+        databaseSideEffects: corePlan.databaseSideEffects,
+        accountCodes: coreSource.accountCodes,
+        assetLegacyIds: coreSource.assets.map(
+          ({ legacyBase44Id }) => legacyBase44Id,
+        ),
+        groupLegacyIds: coreSource.groups.map(
+          ({ legacyBase44Id }) => legacyBase44Id,
+        ),
+      },
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          mode: "dry-run",
+          ownerMode: "canonical-shadow",
+          eventLedgerEntries: sourceEvents.length,
+          selectCount: eventState.selectCount + coreState.selectCount,
+          canonicalOwnerPlan,
+        },
+        null,
+        2,
+      ),
+    );
+    if (canonicalOwnerPlan.result === "blocked") {
+      console.error("Event canonical owner shadow plan is blocked");
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   const events = records.map(normalizeEvent);
   const summary = summarize(events);
 
@@ -490,8 +547,7 @@ async function main() {
     JSON.stringify(
       {
         mode: args.write ? "write" : "dry-run",
-        dataDir: args.dataDir,
-        ownerUserId: args.ownerUserId,
+        ownerMode: "legacy-evidence",
         ...summary,
       },
       null,
@@ -532,6 +588,21 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(
+    JSON.stringify({
+      operation: "base44_event_import",
+      result: "failed",
+      error: safeErrorCode(error),
+    }),
+  );
   process.exitCode = 1;
 });
+
+function safeErrorCode(error) {
+  if (error instanceof EventImportArgumentError) return error.code;
+  if (error instanceof CoreImportArgumentError) return error.code;
+  if (error instanceof CoreShadowSourceError) return error.code;
+  if (error instanceof SyntaxError) return "invalid_json_export";
+  if (error?.code === "ENOENT") return "migration_data_unavailable";
+  return "event_import_failed";
+}

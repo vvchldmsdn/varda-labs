@@ -79,7 +79,7 @@ Inventory totals:
 | `EtfLookthroughRun` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
 | `EtfMaster` | `migrated` | 1,202 | 2026-04-19 to 2026-04-20 | `etf_masters` | Imported by `scripts/import-base44-etf-reference.mjs`. JSON tag/exposure/substitute/top10 fields are stored as JSONB while searchable scalar columns remain separate. |
 | `EtfSyncJob` | `intentionally_skipped` | 0 | none | none for now | No Base44 rows. |
-| `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. |
+| `EventLedger` | `migrated` | 51 | 2026-04-28 to 2026-07-02 | `event_ledger_entries` | Imported by `scripts/import-base44-events.mjs`. Preserves historical `asset_id`/`group_id` as legacy ids plus nullable current UUID mappings and raw before/after values. Phase 1E-C1 adds a read-only canonical-owner and relationship shadow; it performs no owner or correction write. |
 | `FixedTransaction` | `migrated` | 7 | 2026-02-18 to 2026-02-19 | `fixed_transactions` | Historical import retained, but the legacy cashflow/calendar feature is outside product and canonical-owner rollout scope. |
 | `FxRate` | `migrated` | 467 | 2024-10-07 to 2026-07-05 | `fx_rates` | Imported by history import. |
 | `GlobalMarketFactor` | `migrated` | 2,401 | 2025-06-01 to 2026-06-23 | `global_market_factors` | Imported by `scripts/import-base44-market-context.mjs`. Scalar factor keys/date/value/change fields are separated and `derived_metrics_json` is stored as JSONB. |
