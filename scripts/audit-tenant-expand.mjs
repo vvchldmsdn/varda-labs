@@ -8,6 +8,7 @@ import {
   TRANSITIONAL_OWNER_COLUMN,
   USER_OWNED_TABLE_NAMES,
 } from "./lib/tenant-ownership-policy.mjs";
+import { classifyTenantExpandPhase } from "./lib/tenant-expand-phase.mjs";
 
 config({ path: ".env.local", quiet: true });
 
@@ -93,16 +94,23 @@ for (const ownerIndex of ownerIndexes) {
 const [identityRows] = await sql.query(`
   select
     (select count(*)::int from app_users) as app_users,
+    (
+      select count(*)::int from app_users where status = 'provisioning'
+    ) as provisioning_users,
+    (
+      select count(*)::int from app_users where status = 'active'
+    ) as active_users,
+    (
+      select count(*)::int from app_users where status = 'disabled'
+    ) as disabled_users,
+    (
+      select count(*)::int from app_users where role = 'user'
+    ) as user_role_users,
+    (
+      select count(*)::int from app_users where role = 'admin'
+    ) as admin_users,
     (select count(*)::int from auth_identities) as auth_identities
 `);
-assert.deepEqual(
-  {
-    appUsers: Number(identityRows.app_users),
-    authIdentities: Number(identityRows.auth_identities),
-  },
-  { appUsers: 0, authIdentities: 0 },
-  "Phase 1C must not provision identity rows",
-);
 
 const ownerStats = await sql.query(
   expectedOwnerTables
@@ -126,6 +134,21 @@ for (const ownerStat of ownerStats) {
     `${ownerStat.table_name} was unexpectedly backfilled`,
   );
 }
+
+const canonicalOwnerNonNullRows = ownerStats.reduce(
+  (sum, row) => sum + Number(row.non_null_owner_rows),
+  0,
+);
+const tenantPhase = classifyTenantExpandPhase({
+  appUsers: identityRows.app_users,
+  provisioningUsers: identityRows.provisioning_users,
+  activeUsers: identityRows.active_users,
+  disabledUsers: identityRows.disabled_users,
+  userRoleUsers: identityRows.user_role_users,
+  adminUsers: identityRows.admin_users,
+  authIdentities: identityRows.auth_identities,
+  canonicalOwnerNonNullRows,
+});
 
 const identityConstraints = await sql.query(`
   select c.conname, c.contype, c.confdeltype
@@ -167,7 +190,8 @@ assert.deepEqual(
 console.log(
   JSON.stringify(
     {
-      audit: "tenant_expand_phase_1c",
+      audit: "tenant_expand_phase_aware",
+      tenantPhase,
       readOnly: true,
       databaseSideEffects: false,
       selectCount: 7,
@@ -176,12 +200,16 @@ console.log(
         appUsers: Number(identityRows.app_users),
         authIdentities: Number(identityRows.auth_identities),
       },
+      appUserState: {
+        provisioning: Number(identityRows.provisioning_users),
+        active: Number(identityRows.active_users),
+        disabled: Number(identityRows.disabled_users),
+        userRole: Number(identityRows.user_role_users),
+        adminRole: Number(identityRows.admin_users),
+      },
       canonicalOwnerColumns: ownerColumns.length,
       canonicalOwnerIndexes: ownerIndexes.length,
-      canonicalOwnerNonNullRows: ownerStats.reduce(
-        (sum, row) => sum + Number(row.non_null_owner_rows),
-        0,
-      ),
+      canonicalOwnerNonNullRows,
       userOwnedRows: ownerStats.reduce(
         (sum, row) => sum + Number(row.row_count),
         0,

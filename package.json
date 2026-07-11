@@ -25,7 +25,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "import:base44:cashflow-goals": "node scripts/import-base44-cashflow-goals.mjs",
-    "import:base44:core": "node scripts/import-base44-core.mjs",
+    "import:base44:core": "node --no-warnings scripts/import-base44-core.mjs",
     "import:base44:etf-reference": "node scripts/import-base44-etf-reference.mjs",
     "import:base44:events": "node scripts/import-base44-events.mjs",
     "import:base44:history": "node scripts/import-base44-history.mjs",

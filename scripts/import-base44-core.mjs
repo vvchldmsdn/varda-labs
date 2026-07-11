@@ -4,6 +4,12 @@ import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
 import { isExcludedBase44AssetType } from "./lib/base44-asset-policy.mjs";
+import {
+  CoreImportArgumentError,
+  buildBase44CoreCanonicalPlan,
+  parseBase44CoreArgs,
+} from "./lib/base44-core-canonical-plan.mjs";
+import { readBase44CoreCanonicalState } from "./lib/base44-core-canonical-state.mjs";
 
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const SENSITIVE_KEY_PATTERN = /(token|secret|password|api[_-]?key|created_by)/i;
@@ -20,45 +26,6 @@ const ACCOUNT_DEFINITIONS = [
   { code: "isa", name: "ISA", accountType: "isa", currency: "KRW", sortOrder: 20 },
   { code: "irp", name: "IRP", accountType: "irp", currency: "KRW", sortOrder: 30 },
 ];
-
-function parseArgs(argv) {
-  const args = {
-    dataDir:
-      process.env.BASE44_MIGRATION_DATA_DIR ??
-      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
-    write: false,
-    ownerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-
-    if (arg === "--write") {
-      args.write = true;
-      continue;
-    }
-
-    if (arg === "--data-dir") {
-      args.dataDir = path.resolve(argv[index + 1] ?? "");
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--owner-user-id") {
-      args.ownerUserId = argv[index + 1] ?? "";
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  if (!args.ownerUserId.trim()) {
-    throw new Error("--owner-user-id cannot be empty");
-  }
-
-  return args;
-}
 
 function assertNoSensitiveKeys(value, sourceName, keyPath = []) {
   if (Array.isArray(value)) {
@@ -217,11 +184,7 @@ function summarize(normalizedGroups, normalizedAssets, excludedAssets) {
     ].sort(),
     accountCodes: [...accountCodes].sort(),
     groupedAssets: groupedAssets.length,
-    unmatchedGroupRefs: unmatchedGroups.map((asset) => ({
-      legacyBase44Id: asset.legacyBase44Id,
-      name: asset.name,
-      legacyGroupId: asset.legacyGroupId,
-    })),
+    unmatchedGroupRefCount: unmatchedGroups.length,
   };
 }
 
@@ -322,15 +285,13 @@ async function upsertAssets(sql, accountMap, groupMap, assets) {
   for (const asset of assets) {
     const accountId = accountMap.get(asset.account);
     if (!accountId) {
-      throw new Error(`No account id found for account "${asset.account}"`);
+      throw new Error("No account id found for a normalized asset account");
     }
 
     const groupId = asset.legacyGroupId ? groupMap.get(asset.legacyGroupId) : null;
 
     if (asset.legacyGroupId && !groupId) {
-      throw new Error(
-        `No asset group id found for legacy group "${asset.legacyGroupId}"`,
-      );
+      throw new Error("No asset group id found for a normalized asset");
     }
 
     const [row] = await sql`
@@ -454,7 +415,12 @@ async function upsertAssetGroupMembers(sql, ownerUserId, assets, assetMap, group
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseBase44CoreArgs(process.argv.slice(2), {
+    defaultDataDir:
+      process.env.BASE44_MIGRATION_DATA_DIR ??
+      path.resolve(process.cwd(), "..", "gyeol-fin", "migration-data"),
+    legacyOwnerUserId: process.env.IMPORT_OWNER_USER_ID ?? "base44-import",
+  });
   const assetsPath = path.join(args.dataDir, "base44-assets.export.json");
   const assetGroupsPath = path.join(
     args.dataDir,
@@ -477,42 +443,80 @@ async function main() {
     (asset) => !isExcludedBase44AssetType(asset.assetType),
   );
   const summary = summarize(groups, assets, excludedAssets);
-
-  console.log(
-    JSON.stringify(
-      {
-        mode: args.write ? "write" : "dry-run",
-        dataDir: args.dataDir,
-        ownerUserId: args.ownerUserId,
-        ...summary,
-      },
-      null,
-      2,
-    ),
-  );
-
-  if (summary.unmatchedGroupRefs.length > 0) {
-    throw new Error("Cannot import assets with unmatched Base44 group references");
-  }
-
-  if (!args.write) {
-    console.log("Dry run only. Re-run with --write to import into DATABASE_URL.");
-    return;
-  }
-
-  config({ path: path.resolve(process.cwd(), ".env.local") });
-
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not set");
-  }
-
-  const sql = neon(process.env.DATABASE_URL);
   const accountCodes = new Set([
     "cash",
     ...ACCOUNT_DEFINITIONS.map((account) => account.code).filter((code) =>
       summary.accountCodes.includes(code),
     ),
   ]);
+
+  if (summary.unmatchedGroupRefCount > 0) {
+    throw new Error("Cannot import assets with unmatched Base44 group references");
+  }
+
+  const baseOutput = {
+    mode: args.write ? "write" : "dry-run",
+    ownerMode:
+      args.canonicalOwnerId === null ? "legacy-evidence" : "canonical-shadow",
+    ...summary,
+  };
+
+  if (args.canonicalOwnerId !== null) {
+    config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
+
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set");
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const state = await readBase44CoreCanonicalState(sql, {
+      canonicalOwnerId: args.canonicalOwnerId,
+      legacyOwnerUserId: args.ownerUserId,
+      accountCodes: [...accountCodes],
+      groups,
+      assets,
+    });
+    const canonicalOwnerPlan = buildBase44CoreCanonicalPlan({
+      canonicalOwnerId: args.canonicalOwnerId,
+      approveProvisioningOwner: args.approveProvisioningOwner,
+      legacyOwnerUserId: args.ownerUserId,
+      appUser: state.appUser,
+      tables: state.tables,
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          ...baseOutput,
+          selectCount: state.selectCount,
+          canonicalOwnerPlan,
+        },
+        null,
+        2,
+      ),
+    );
+
+    if (canonicalOwnerPlan.result === "blocked") {
+      console.error("Core canonical owner shadow plan is blocked");
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  console.log(JSON.stringify(baseOutput, null, 2));
+
+  if (!args.write) {
+    console.log("Dry run only. Re-run with --write to import into DATABASE_URL.");
+    return;
+  }
+
+  config({ path: path.resolve(process.cwd(), ".env.local"), quiet: true });
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set");
+  }
+
+  const sql = neon(process.env.DATABASE_URL);
 
   const accountMap = await upsertAccounts(sql, args.ownerUserId, accountCodes);
   const groupMap = await upsertAssetGroups(sql, args.ownerUserId, groups);
@@ -540,6 +544,19 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(
+    JSON.stringify({
+      operation: "base44_core_import",
+      result: "failed",
+      error: safeErrorCode(error),
+    }),
+  );
   process.exitCode = 1;
 });
+
+function safeErrorCode(error) {
+  if (error instanceof CoreImportArgumentError) return error.code;
+  if (error instanceof SyntaxError) return "invalid_json_export";
+  if (error?.code === "ENOENT") return "migration_data_unavailable";
+  return "core_import_failed";
+}
