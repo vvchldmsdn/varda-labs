@@ -37,6 +37,31 @@ tables do we import", but "which product surface needs which run summary, which
 artifact payload belongs outside relational tables, and which formulas deserve
 fixture-backed pure helpers."
 
+## Primary Investment Lab Intent Correction
+
+The primary Investment Lab is now defined by
+`docs/investment-lab-historical-counterfactual-contract.md`.
+
+It is not a static before/after weight card. It compares the user's observed
+portfolio-value history with a hypothetical portfolio that receives the same
+dated buy and sell schedule and the same KRW amounts. "All KODEX 200" is the
+first fixed scenario.
+
+Read-only inspection found that legacy parity would be incorrect:
+
+- `simulatePortfolioTimemachine` backcasts current holdings and current weights
+  instead of replaying the user's actual historical transaction schedule;
+- `comparePortfolioParallelWorlds` flow-adjusts the actual path but funds its
+  reference worlds only at inception;
+- `portfolioBackcast` can stitch a synthetic path to the actual continuation;
+- full-window maximum-Sharpe and minimum-drawdown results use future
+  information when presented as historical strategies.
+
+Those formulas and orchestration paths must not be copied. The canonical
+replacement is a server-loaded, date- and FX-aware evidence model feeding a
+pure transaction-schedule counterfactual engine with no provider calls or
+writes.
+
 ## Current Row Coverage
 
 The current Base44 inventory has no persisted rows for the simulation and
