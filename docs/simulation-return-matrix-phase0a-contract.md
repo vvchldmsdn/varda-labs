@@ -1,6 +1,6 @@
 # Simulation Return Matrix Phase 0A Contract
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 Status: versioned pure helper and synthetic fixtures implemented. No database
 adapter, provider call, route, UI, stochastic engine, optimizer, persistence,
@@ -174,7 +174,9 @@ Synthetic fixtures cover:
 
 The separately reviewed pure historical-resampling draw-plan core is now
 implemented in `docs/simulation-stationary-bootstrap-phase1a-contract.md`. It
-consumes only a `ready` matrix and remains separate from wealth compounding,
-factor Monte Carlo, optimization, UI, jobs, and persistence.
+consumes only a `ready` matrix. The separately reviewed Phase 1B consumer in
+`docs/simulation-gross-growth-phase1b-contract.md` materializes only
+per-instrument gross growth factors from that plan.
 
-Phase 0A by itself still does not authorize any stochastic consumer.
+Neither phase authorizes portfolio aggregation, factor Monte Carlo,
+optimization, UI, jobs, or persistence.

@@ -1,6 +1,6 @@
 # Simulation Stationary Bootstrap Phase 1A Contract
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 Status: pure seeded stationary-bootstrap draw-plan core and synthetic fixtures
 implemented. No wealth path, distribution summary, factor model, optimizer,
@@ -161,11 +161,10 @@ Fixtures cover:
 
 ## Next Gate
 
-The next possible phase may combine a reviewed draw plan with explicit initial
-wealth and a reviewed portfolio-weight vector to calculate wealth paths. That
-phase must remain pure, use the exact plan without resampling again, define
-rebalancing and transaction-cost assumptions, and keep fan/distribution
-summaries separate from factor Monte Carlo and optimization.
+The separately reviewed per-instrument gross growth materializer is implemented
+in `docs/simulation-gross-growth-phase1b-contract.md`. It consumes the exact
+plan without resampling and still does not aggregate a portfolio.
 
-Phase 1A itself does not authorize wealth compounding or user-facing
-simulation output.
+Initial capital, portfolio weights, rebalancing, cash, costs, terminal
+distribution summaries, and user-facing simulation output remain later gates.
+Phase 1A itself authorizes none of them.

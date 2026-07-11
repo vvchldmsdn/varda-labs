@@ -1,4 +1,8 @@
-import { createMulberry32, isUint32 } from "./simulation-prng.ts";
+import { createMulberry32 } from "./simulation-prng.ts";
+import {
+  STATIONARY_BOOTSTRAP_POLICY,
+  isUint32,
+} from "./simulation-stationary-bootstrap-policy.ts";
 import {
   hashStationaryBootstrapDrawPlan,
   validateAndHashReadyReturnMatrix,
@@ -18,19 +22,7 @@ export type {
   StationaryBootstrapPath,
 } from "./simulation-stationary-bootstrap-types.ts";
 
-export const STATIONARY_BOOTSTRAP_POLICY = Object.freeze({
-  version: "stationary_bootstrap_v1",
-  inputMatrixVersion: "simulation_return_matrix_v1",
-  samplingUnit: "whole_return_row",
-  startIndex: "uniform",
-  restartProbability: "one_over_expected_block_length",
-  continuation: "circular_next_index",
-  prng: "mulberry32_v1",
-  seedSource: "explicit_uint32_only",
-  productionDefaults: "forbidden",
-  outputKind: "draw_plan_only",
-  maxPlannedDraws: 1_000_000,
-} as const);
+export { STATIONARY_BOOTSTRAP_POLICY } from "./simulation-stationary-bootstrap-policy.ts";
 
 export function buildStationaryBootstrapDrawPlan(
   input: StationaryBootstrapDrawPlanInput,

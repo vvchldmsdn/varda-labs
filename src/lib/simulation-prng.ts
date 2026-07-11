@@ -15,12 +15,3 @@ export function createMulberry32(seed: number) {
     return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
   };
 }
-
-export function isUint32(value: unknown): value is number {
-  return (
-    typeof value === "number" &&
-    Number.isInteger(value) &&
-    value >= 0 &&
-    value <= 0xffff_ffff
-  );
-}

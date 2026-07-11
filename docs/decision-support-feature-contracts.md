@@ -1,6 +1,6 @@
 # Decision-Support Feature Contracts
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 This document defines the intended product behavior for Additional
 Contribution, Investment Lab, and Simulation Validation before their remaining
@@ -238,10 +238,13 @@ The following still require replacement or proof before migration:
 9. Simulation Validation normalized return-matrix Phase 0A completed
    2026-07-11 without DB/provider/runtime or stochastic-engine integration.
 10. Seeded stationary-bootstrap whole-row draw-plan Phase 1A completed
-    2026-07-11; wealth paths, fan summaries, and parametric models remain
-    pending.
-11. Add pure wealth compounding and distribution summaries without resampling.
-12. Add the separate parametric factor engine.
-13. Add walk-forward validation before any optimizer is labeled useful.
-14. Design user-owned job/artifact persistence only after auth and ownership
-   gates permit writes.
+    2026-07-11 without portfolio aggregation or runtime integration.
+11. Per-instrument gross growth-factor materialization Phase 1B completed
+    2026-07-12 without initial capital, weights, aggregation, or summaries.
+12. Review initial-capital, weight, rebalance, cash, and cost policy before
+    adding pure portfolio aggregation.
+13. Add distribution summaries only after an approved portfolio path.
+14. Add the separate parametric factor engine.
+15. Add walk-forward validation before any optimizer is labeled useful.
+16. Design user-owned job/artifact persistence only after auth and ownership
+    gates permit writes.
