@@ -28,8 +28,9 @@ a separate later approval.
 The proposed v1 model is:
 
 1. Every path starts at dimensionless `NAV[0] = 1`.
-2. One explicit scenario vector covers the exact canonical instrument set in
-   the Phase 1B result.
+2. For each execution, one explicit scenario vector covers the exact canonical
+   instrument set of that execution's input matrix. The Phase 1B result must
+   expose the same set and order.
 3. Each weight is an integer `weightBps`; the complete vector totals exactly
    `10,000` bps.
 4. Portfolio NAV is calculated as:
@@ -94,6 +95,12 @@ Changing any scenario identity or weight requires a new scenario version and
 hash. Changing the matrix or draw plan does not mutate the scenario vector; it
 creates a different execution binding.
 
+A matrix with the same canonical instrument set may reuse an approved scenario
+vector under a new execution binding. A matrix whose instrument set changes
+requires a new Scenario Vector Review Packet and vector approval, but it does
+not require Gate 0 model reapproval unless the policy semantics in this
+document also change.
+
 ## Separate Scenario Vector Gate
 
 Gate 0 contains no numeric vector. Only after explicit Gate 0 policy approval
@@ -105,7 +112,7 @@ Its minimum explicit input is:
 | --- | --- |
 | `scenarioId` | nonempty stable scenario identity |
 | `scenarioVersion` | nonempty immutable version |
-| instrument rows | exact market, currency, ticker for the full Phase 1B instrument set |
+| instrument rows | exact market, currency, ticker for one reviewed execution-matrix instrument set |
 | `weightBps` | integer from 0 through 10,000 for every row |
 | total | exactly 10,000 bps |
 

@@ -129,9 +129,10 @@ The docs-only `gross_normalized_buy_and_hold_v1` proposal is recorded in
 unapproved and supplies no scenario vector.
 
 Before aggregation code is implemented, Gate 0 needs explicit user approval
-and one complete Simulation-specific 10,000-bps vector must pass its own later
-review and approval gate. Strategic target vectors, including ISA `isa-v1`,
-must not be reused automatically.
+and one complete execution-matrix-specific 10,000-bps vector must pass its own
+later review and approval gate. A changed matrix universe needs a new vector
+approval, not automatic normalization or Gate 0 model reapproval. Strategic
+target vectors, including ISA `isa-v1`, must not be reused automatically.
 
 Fan bands, terminal distributions, drawdown, and probability summaries remain
 later consumers of an approved portfolio path. Phase 1B does not authorize
