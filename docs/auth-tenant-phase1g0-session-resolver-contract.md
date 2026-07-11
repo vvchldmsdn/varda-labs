@@ -123,3 +123,7 @@ G0 does not authorize an identity write. The next optional gate may design and
 dry-run exactly one reviewed identity-link operation, but actual link creation
 requires explicit approval. Provisioning-to-active remains a separate later
 gate even after a link exists.
+
+That pure reviewed-link prerequisite is now implemented without provider or DB
+integration in
+`docs/auth-tenant-phase1g1a-initial-identity-link-planner.md`.

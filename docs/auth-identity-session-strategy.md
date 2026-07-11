@@ -367,3 +367,7 @@ assignment, auth SDK, query filter, writer dual-write, RLS policy, or Basic Auth
 change. Phase 1G0 now freezes the provider-neutral resolver state machine as a
 pure contract; production integration and any identity write remain separate
 approval gates.
+
+Phase 1G1-A also freezes the reviewed initial identity-link planner as a pure
+contract. It accepts no real provider subject transport and performs no
+identity or app-user write.
