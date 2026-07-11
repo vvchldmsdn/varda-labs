@@ -227,7 +227,7 @@ The following still require replacement or proof before migration:
    the helper remains pure and externally unapproved by design.
 6. ISA `isa-v1` Gate B packet approved 2026-07-11 with full vector,
    `universeHash`, and `vectorHash`; brokerage and IRP remain unapproved.
-7. Implement a pure ISA resolver validation phase without persistence or
+7. Pure ISA resolver validation completed 2026-07-11 without persistence or
    allocator connection.
 8. Add MA120 as an optional isolated overlay and validate it against no-overlay.
 9. Build the Simulation Validation normalized return-matrix contract.

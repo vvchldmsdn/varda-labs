@@ -94,9 +94,10 @@ group ratios, partial vectors, or an older policy version.
 
 ## Authorized Next Gate
 
-This approval permits only a separate pure Target Policy Resolver validation
-phase. That phase may consume this immutable artifact as a fixture and prove
-fail-closed matching against a fresh holding universe.
+This approval permitted the separate pure Target Policy Resolver Phase 1A
+validation documented in `docs/target-policy-resolver-phase1a-contract.md`.
+That phase consumes explicit trusted-port input, not this Markdown file, and
+proves fail-closed matching against a fresh holding universe.
 
 Persistence, runtime activation, allocator connection, product UI/API,
 tenant-scoped storage, and order execution remain separate approval gates.

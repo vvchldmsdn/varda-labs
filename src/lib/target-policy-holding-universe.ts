@@ -80,7 +80,7 @@ export function buildTargetPolicyHoldingUniverse(input: {
         (row) => row.buyability !== "buyable",
       ).length,
     }),
-    rows: Object.freeze(safeRows.map(Object.freeze)),
+    rows: Object.freeze(safeRows.map((row) => Object.freeze(row))),
     canonicalSerialization,
     universeHash: canonicalSerialization
       ? hashTargetPolicyHoldingUniverse(canonicalSerialization)

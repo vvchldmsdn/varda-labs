@@ -158,9 +158,10 @@ does not itself supply or approve any numeric vector.
 
 ## Follow-On Gate
 
-Only after both gates pass may a separate **Target Policy Resolver Phase 1**
-implement a pure, fixture-backed adapter from one approved account vector to
-the existing Additional Contribution allocator input.
+After both gates passed for ISA, **Target Policy Resolver Phase 1A** implemented
+pure, fixture-backed approval-evidence validation. It is documented in
+`docs/target-policy-resolver-phase1a-contract.md` and remains disconnected from
+approved-policy persistence and the Additional Contribution allocator.
 
-That later phase must still exclude persistence, UI, routes, providers,
+Phase 1A excludes persistence, UI, routes, providers,
 recommendation language, MA120 or market overlays, order sizing, and sells.

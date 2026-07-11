@@ -130,8 +130,10 @@ export function buildTargetPolicyReviewPacket(input: {
       excludedCount: rows.filter((row) => row.decision === "excluded").length,
       targetTotalBps,
     }),
-    rows: Object.freeze(rows.map(Object.freeze)),
-    canonicalVector: reviewable ? Object.freeze(vector.map(Object.freeze)) : null,
+    rows: Object.freeze(rows.map((row) => Object.freeze(row))),
+    canonicalVector: reviewable
+      ? Object.freeze(vector.map((row) => Object.freeze(row)))
+      : null,
     canonicalSerialization,
     vectorHash: canonicalSerialization
       ? hashTargetPolicyVector(canonicalSerialization)
