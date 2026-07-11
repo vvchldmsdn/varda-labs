@@ -120,13 +120,33 @@ and fail-closed long-only solvency.
 
 ### Question it should answer
 
-> For a specified portfolio or strategy, how uncertain are future outcomes, how
-> sensitive are they to model assumptions, and did earlier forecast ranges and
-> strategy choices remain calibrated out of sample?
+> What plausible future paths can this portfolio take, what do their outcome
+> ranges look like, and can a constrained alternative allocation improve a
+> clearly chosen objective without hiding downside or model uncertainty?
 
-Simulation Validation is not primarily a weight finder. Optimization may
-produce candidate strategies, but validation must judge them on information
-that was unavailable during fitting.
+The first product experience should preserve the original exploratory intent:
+show a reproducible sample of Monte Carlo paths as a spaghetti chart, then the
+full distribution as fan bands such as p10, p50, and p90. The chart is not only
+decoration; it should help the user see path dispersion, drawdowns, loss
+probability, and terminal-outcome uncertainty.
+
+Optimization is a linked but separate decision-support layer. Quantiles alone
+cannot be uniquely "reversed" into portfolio weights. Instead, the optimizer
+must search candidate weights under the same simulation model using an
+explicit objective and explicit constraints, then compare the candidate with
+the current portfolio under identical seeds and assumptions.
+
+Possible user-visible objectives include:
+
+- maximize expected or median terminal wealth;
+- maximize expected wealth subject to a p10 or loss-probability floor;
+- improve downside utility or expected shortfall;
+- reduce drawdown while preserving a minimum return target.
+
+Every objective must also enforce concentration, turnover, FX exposure,
+transaction-cost, and long-only constraints as applicable. No optimized weight
+is a recommendation until walk-forward validation judges information that was
+unavailable during fitting.
 
 ### Canonical subsystem split
 
@@ -138,8 +158,9 @@ that was unavailable during fitting.
 3. **Parametric simulation**: heavy-tailed factor/residual model with shrinkage,
    reproducible seeds, covariance diagnostics, and explicit regime assumptions.
 4. **Optimizer**: optional long-only constrained candidate generator using only
-   training-window data, with concentration, turnover, FX, and transaction-cost
-   constraints.
+   training-window data. It evaluates explicit distribution objectives rather
+   than attempting to invert p10/p50/p90 directly, and includes concentration,
+   turnover, FX, and transaction-cost constraints.
 5. **Validator**: walk-forward scoring of interval coverage, median error,
    downside calibration, weight stability, and realized benchmark comparison.
 6. **Artifact layer**: server-owned idempotent jobs, small relational summaries,
@@ -177,6 +198,10 @@ The following still require replacement or proof before migration:
 
 ### Optimization policy
 
+- Always show the current portfolio as the baseline under the same samples,
+  seed, horizon, and model assumptions as an optimized candidate.
+- Treat sampled spaghetti paths and p10/p50/p90 bands as distribution evidence,
+  not promises or direct optimizer inputs with a unique inverse.
 - Maximum Sharpe is unstable because expected return estimates dominate the
   answer. Use shrinkage, turnover limits, and walk-forward validation.
 - Minimum variance and related quadratic objectives should use an established
@@ -188,7 +213,7 @@ The following still require replacement or proof before migration:
 
 ## Implementation Order
 
-1. Finish the Investment Lab aggregate deterministic path fixture.
+1. Investment Lab aggregate deterministic path fixture (completed 2026-07-11).
 2. Build Additional Contribution input and strategic water-filling fixtures,
    without tactical overlays or sells.
 3. Add MA120 as an optional isolated overlay and validate it against no-overlay.

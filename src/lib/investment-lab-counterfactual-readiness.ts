@@ -18,7 +18,7 @@ export const HISTORICAL_COUNTERFACTUAL_CONTRACT = Object.freeze({
 } as const);
 
 export const HISTORICAL_COUNTERFACTUAL_POLICY_GATES = Object.freeze([
-  "deterministic_path_engine_fixture",
+  "cashflow_adjusted_return_fixture",
 ] as const);
 
 export const LEGACY_COUNTERFACTUAL_PARITY_REJECTIONS = Object.freeze([

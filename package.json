@@ -17,6 +17,7 @@
     "audit:market-context": "node scripts/audit-market-context-readonly.mjs",
     "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",
     "audit:investment-lab-counterfactual": "node --no-warnings scripts/audit-investment-lab-counterfactual-readiness.mjs",
+    "audit:investment-lab-counterfactual-path": "node --no-warnings scripts/audit-investment-lab-counterfactual-path.mjs",
     "audit:investment-lab-event-flow": "node --no-warnings scripts/audit-investment-lab-event-flow.mjs",
     "audit:portfolio-risk": "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs",
     "audit:portfolio-risk-read-model": "node --no-warnings scripts/audit-portfolio-risk-read-model.mjs",

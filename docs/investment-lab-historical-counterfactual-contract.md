@@ -2,8 +2,9 @@
 
 Last updated: 2026-07-11
 
-Status: Phase 0 semantic and data-readiness contract. No engine, route, UI,
-provider call, schema change, or database write is approved by this document.
+Status: Phase 1 aggregate KODEX200 deterministic path engine implemented and
+read-only audited. No route, UI, provider call, schema change, or database
+write is approved by this document.
 
 ## Product Decision
 
@@ -168,9 +169,17 @@ The 2026-07-11 read-only production audit found:
 - all 46 buy/sell rows have resolvable KRW notionals;
 - 41 KODEX 200 executions map to a same-day close and 5 wait for a later valid
   close within the bounded policy.
+- the pure aggregate path engine produced all 27 actual service-cycle rows,
+  replayed 38 post-anchor flows, preserved pending evidence on 5 comparison
+  rows, used at most 3 calendar days of valuation carry, and ended with no
+  pending flow or blocker;
+- 8 flows on or before the anchor are intentionally treated as already
+  represented by the anchor snapshot.
 
 Run `npm run audit:investment-lab-counterfactual` to refresh this evidence.
 Run `npm run audit:investment-lab-event-flow` to refresh event-flow evidence.
+Run `npm run audit:investment-lab-counterfactual-path` to execute the pure path
+engine against read-only production evidence.
 
 ## Execution Policy
 
@@ -189,8 +198,10 @@ Phase 1A fixes `eod_adjusted_close_on_or_after_v1`:
 8. Block a sell that the long-only scenario cannot fund. Do not partially fill,
    borrow, short, or reduce the requested amount.
 
-The remaining gate is the aggregate deterministic path-engine fixture. The
-policy harness does not yet produce a user-facing valuation series.
+The deterministic aggregate KODEX200 path fixture and read-only production
+audit are complete. Cashflow-adjusted TWR remains deferred until a separate
+fixture proves its pending-flow denominator semantics. No user-facing read
+model or valuation series is enabled yet.
 
 ## Architecture Boundary
 

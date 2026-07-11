@@ -212,6 +212,9 @@ describe("investment lab event-flow semantics", () => {
       deposit: 1,
       sell: 1,
     });
+    assert.deepEqual(result.events.amountProvenanceDistribution, {
+      explicit_amount_krw: 2,
+    });
     assert.equal(result.kodex200Execution.scheduledRows, 2);
     assert.equal(result.kodex200Execution.pendingRows, 1);
 
@@ -246,7 +249,13 @@ describe("investment lab event-flow semantics", () => {
 });
 
 function flow(eventDate, sequence, direction, amountKrw) {
-  return { eventDate, sequence, direction, amountKrw };
+  return {
+    eventDate,
+    sequence,
+    direction,
+    amountKrw,
+    amountProvenance: "explicit_amount_krw",
+  };
 }
 
 function close(priceDate, adjustedClose) {
@@ -279,6 +288,7 @@ function eventRow(eventType, eventDate, sequence, amount) {
     event_date: eventDate,
     sequence,
     resolved_amount_krw: amount,
+    amount_provenance: amount === null ? null : "explicit_amount_krw",
     amount_resolved: amount !== null,
     is_correction: false,
   };

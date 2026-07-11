@@ -21,6 +21,17 @@ export const INVESTMENT_LAB_EVENT_FLOW_SQL = `
           then abs(e.quantity_delta) * e.price * e.fx_rate
         else null
       end as resolved_amount_krw,
+      case
+        when abs(coalesce(e.amount_krw, 0)) > 0
+          then 'explicit_amount_krw'
+        when abs(coalesce(e.quantity_delta, 0)) * coalesce(e.price, 0) > 0
+          and upper(coalesce(a.currency, '')) = 'KRW'
+          then 'derived_quantity_price_krw'
+        when abs(coalesce(e.quantity_delta, 0)) * coalesce(e.price, 0) > 0
+          and coalesce(e.fx_rate, 0) > 0
+          then 'derived_quantity_price_fx'
+        else null
+      end as amount_provenance,
       (
         e.corrects_event_id is not null
         or e.legacy_corrects_event_id is not null
@@ -34,10 +45,23 @@ export const INVESTMENT_LAB_EVENT_FLOW_SQL = `
     event_date,
     sequence,
     resolved_amount_krw,
+    amount_provenance,
     (resolved_amount_krw is not null and resolved_amount_krw > 0) as amount_resolved,
     is_correction
   from event_evidence
   order by sequence
+`;
+
+export const INVESTMENT_LAB_DERIVED_ALL_PATH_SQL = `
+  select
+    snapshot_date::text as service_date,
+    sum(total_market_value) as total_market_value_krw
+  from daily_portfolio_snapshots
+  where is_sample = false
+    and account in ('brokerage', 'isa', 'irp')
+  group by snapshot_date
+  having count(distinct account) = 3
+  order by snapshot_date
 `;
 
 export const INVESTMENT_LAB_KODEX_CLOSE_SQL = `

@@ -66,6 +66,24 @@ The product-level decisions for Additional Contribution, Investment Lab, and
 Simulation Validation are consolidated in
 `docs/decision-support-feature-contracts.md`.
 
+## Simulation Validation Intent Correction
+
+The intended first interaction is an exploratory Monte Carlo experience: show
+a bounded, reproducible sample of individual paths as a spaghetti chart and
+summarize the full sample with p10/p50/p90 fan bands, drawdown, loss
+probability, and terminal-value distributions. This interaction should remain
+useful and engaging even before optimization is enabled.
+
+The later allocation optimizer is related but not a literal inversion of those
+quantiles. Multiple weight vectors can produce similar p10/p50/p90 summaries,
+and model error can be amplified by optimization. varda-labs should search
+candidate weights against an explicit objective such as expected terminal
+wealth with a p10, expected-shortfall, loss-probability, turnover, or
+concentration constraint. Current and candidate weights must be evaluated with
+the same paths or common random numbers, horizon, costs, and model assumptions.
+Walk-forward validation remains required before presenting a candidate as
+decision support rather than an in-sample illustration.
+
 ## Current Row Coverage
 
 The current Base44 inventory has no persisted rows for the simulation and

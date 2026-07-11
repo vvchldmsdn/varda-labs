@@ -17,11 +17,17 @@ export const INVESTMENT_LAB_EXECUTION_POLICY = Object.freeze({
   insolvency: "fail_closed_long_only",
 } as const);
 
+export type InvestmentLabAmountProvenance =
+  | "explicit_amount_krw"
+  | "derived_quantity_price_krw"
+  | "derived_quantity_price_fx";
+
 export type InvestmentLabBoundaryFlow = Readonly<{
   eventDate: string;
   sequence: number;
   direction: InvestmentLabFlowDirection;
   amountKrw: number;
+  amountProvenance: InvestmentLabAmountProvenance;
 }>;
 
 export type InvestmentLabAdjustedClose = Readonly<{
@@ -49,6 +55,7 @@ export type InvestmentLabScheduleBlocker = Readonly<{
     | "invalid_event_sequence"
     | "invalid_event_direction"
     | "invalid_event_amount"
+    | "invalid_amount_provenance"
     | "event_after_window_end"
     | "unexecutable_trade_before_window_end"
     | "pending_limit_exceeded";
@@ -245,6 +252,10 @@ function normalizeEvents(
       blockers.push({ reason: "invalid_event_amount", sourceIndex });
       return;
     }
+    if (!isAmountProvenance(row.amountProvenance)) {
+      blockers.push({ reason: "invalid_amount_provenance", sourceIndex });
+      return;
+    }
     normalized.push({ ...row, sourceIndex });
   });
 
@@ -253,6 +264,16 @@ function normalizeEvents(
       left.eventDate.localeCompare(right.eventDate) ||
       left.sequence - right.sequence ||
       left.sourceIndex - right.sourceIndex,
+  );
+}
+
+function isAmountProvenance(
+  value: string,
+): value is InvestmentLabAmountProvenance {
+  return (
+    value === "explicit_amount_krw" ||
+    value === "derived_quantity_price_krw" ||
+    value === "derived_quantity_price_fx"
   );
 }
 

@@ -34,6 +34,7 @@ export function auditInvestmentLabEventFlowEvidence({
       sequence: number(row.sequence),
       direction: classification.direction,
       amountKrw: number(row.resolved_amount_krw),
+      amountProvenance: row.amount_provenance,
     })),
     closes,
     windowEndPriceDate,
@@ -54,6 +55,9 @@ export function auditInvestmentLabEventFlowEvidence({
         ({ classification }) => classification.reason === "amount_unresolved",
       ).length,
       correctionRows: classified.filter(({ row }) => row.is_correction).length,
+      amountProvenanceDistribution: distribution(
+        eligible.map(({ row }) => row.amount_provenance ?? "unresolved"),
+      ),
     },
     snapshots: {
       rowCount: number(snapshot.row_count),
@@ -102,6 +106,16 @@ function countReasons(rows) {
   const counts = {};
   for (const row of rows) counts[row.reason] = (counts[row.reason] ?? 0) + 1;
   return counts;
+}
+
+function distribution(values) {
+  const counts = new Map();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return Object.fromEntries(
+    [...counts].sort(([left], [right]) => left.localeCompare(right)),
+  );
 }
 
 function number(value) {

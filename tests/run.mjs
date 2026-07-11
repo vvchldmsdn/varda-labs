@@ -8,6 +8,7 @@ import "./portfolio-risk-read-model.test.mjs";
 import "./portfolio-risk-route.test.mjs";
 import "./investment-lab-counterfactual-readiness.test.mjs";
 import "./investment-lab-event-flow.test.mjs";
+import "./investment-lab-counterfactual-path.test.mjs";
 import "./today-holding-detail.test.mjs";
 import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";
