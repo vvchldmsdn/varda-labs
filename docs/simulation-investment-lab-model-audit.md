@@ -62,6 +62,10 @@ replacement is a server-loaded, date- and FX-aware evidence model feeding a
 pure transaction-schedule counterfactual engine with no provider calls or
 writes.
 
+The product-level decisions for Additional Contribution, Investment Lab, and
+Simulation Validation are consolidated in
+`docs/decision-support-feature-contracts.md`.
+
 ## Current Row Coverage
 
 The current Base44 inventory has no persisted rows for the simulation and

@@ -18,6 +18,22 @@ show its hypothetical valuation path next to the user's actual observed path.
 Static current-weight risk adjustment can be a later secondary card; it is not
 the primary Investment Lab model.
 
+## Measurement Boundary
+
+The v1 path measures invested positions, not the user's entire financial
+account. Current varda daily snapshots store `cash_value = 0` and calculate
+`total_market_value` from positions. Therefore:
+
+- `buy` crosses into the measured path as an invested-boundary inflow;
+- `sell` crosses out of the measured path as an invested-boundary outflow;
+- `deposit` and `withdrawal` belong to a cash ledger outside this v1 path;
+- `asset_added` and `asset_removed` are position metadata, not trade notionals.
+
+This does not claim that buy and sell are external cash flows for the user's
+whole brokerage account. It defines how they cross this specific measurement
+boundary. Replaying both cash-ledger events and buy/sell events would double
+count capital unless a future model includes cash explicitly.
+
 ## Canonical Paths
 
 ### Actual path
@@ -35,17 +51,15 @@ the primary Investment Lab model.
 ### Hypothetical path
 
 - Allocate the anchor value to the requested scenario weights.
-- Replay every post-anchor buy as the same positive KRW invested amount.
-- Replay every post-anchor sell as the same positive KRW withdrawal amount.
+- Replay every post-anchor buy as the same KRW invested-boundary inflow.
+- Replay every post-anchor sell as the same KRW invested-boundary outflow.
 - Preserve gross buy and sell evidence, even when same-day events net to zero.
 - Use adjusted closes from `asset_price_snapshots` and date-specific FX from
   `fx_rates` for non-KRW instruments.
 - Value the scenario on the actual path's snapshot dates.
 
-The daily-close engine may aggregate same-day events for valuation math because
-it has no intraday prices. It must retain gross event counts and amounts in its
-diagnostics. Transaction costs are zero in v1 unless reliable fee evidence is
-added later.
+Same-day events must retain source order and must not be netted. Transaction
+costs are zero in v1 unless reliable fee evidence is added later.
 
 ## Date Semantics
 
@@ -149,22 +163,34 @@ The 2026-07-11 read-only production audit found:
 - KODEX 200 has 911 adjusted-close dates from 2022-10-17 through 2026-07-08;
 - the aggregate KODEX 200 case is ready for a pure engine fixture, but not for a
   production engine or user-facing route.
+- the event ledger contains 31 buys, 15 sells, 2 asset-added rows, and 3
+  asset-removed rows; there are no deposit or withdrawal rows;
+- all 46 buy/sell rows have resolvable KRW notionals;
+- 41 KODEX 200 executions map to a same-day close and 5 wait for a later valid
+  close within the bounded policy.
 
 Run `npm run audit:investment-lab-counterfactual` to refresh this evidence.
+Run `npm run audit:investment-lab-event-flow` to refresh event-flow evidence.
 
-## Policy Gates Before Engine Work
+## Execution Policy
 
-Two rules remain explicit and unresolved:
+Phase 1A fixes `eod_adjusted_close_on_or_after_v1`:
 
-1. `closed_market_trade_execution`: what happens when an event date is not a
-   trading day for the hypothetical instrument. No stale or future execution
-   price may be selected silently.
-2. `long_only_scenario_insolvency`: a withdrawal larger than scenario value
-   must fail closed; negative units, implicit borrowing, and short selling are
-   forbidden unless a future product contract explicitly enables them.
+1. Use a valid adjusted close on the event date when one exists.
+2. Otherwise keep the event pending until the first later valid close, for at
+   most seven calendar days.
+3. Pending buy capital is zero-return KRW cash from the event date.
+4. A pending sell is a KRW withdrawal obligation from the event date.
+5. Never execute at a prior close or rewrite the event date with a future
+   price.
+6. Never net multiple pending events; preserve event and recorded order.
+7. Block an event with no executable close inside the window or beyond the
+   seven-day limit.
+8. Block a sell that the long-only scenario cannot fund. Do not partially fill,
+   borrow, short, or reduce the requested amount.
 
-The next implementation slice may build fixtures for both alternatives, but a
-production engine must not select a policy implicitly.
+The remaining gate is the aggregate deterministic path-engine fixture. The
+policy harness does not yet produce a user-facing valuation series.
 
 ## Architecture Boundary
 
