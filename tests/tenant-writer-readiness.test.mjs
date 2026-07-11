@@ -12,13 +12,16 @@ import {
   prepareSnapshotWriteScope,
   prepareTenantWriteContext,
 } from "../src/lib/tenant-write-context.ts";
-import { TENANT_TABLE_POLICIES } from "../scripts/lib/tenant-ownership-policy.mjs";
+import { EXPANDED_TENANT_TABLE_POLICIES } from "../scripts/lib/tenant-ownership-policy.mjs";
 
 const ROOT = process.cwd();
 const OWNER_A = "11111111-1111-4111-8111-111111111111";
 const OWNER_B = "22222222-2222-4222-8222-222222222222";
-const DML_PATTERN =
-  /\.(?:insert|update|delete)\s*\(|\b(?:insert\s+into|update\s+[a-z_\"]+\s+set|delete\s+from|truncate)\b/i;
+const DRIZZLE_DML_PATTERN = /\.(?:insert|update|delete)\s*\(/i;
+const DB_IMPORT_PATTERN =
+  /import\s+\{[^}]*\bdb\b[^}]*\}\s+from\s+["'][^"']+["']/s;
+const RAW_SQL_DML_PATTERN =
+  /\b(?:insert\s+into|update\s+[a-z_\"]+\s+set|delete\s+from|truncate)\b/i;
 
 describe("tenant writer Phase 1D-A readiness", () => {
   it("registers every current DML implementation exactly once by path", () => {
@@ -32,8 +35,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 16);
-    assert.equal(registeredPaths.length, 20);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 17);
+    assert.equal(registeredPaths.length, 21);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -46,7 +49,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
   it("keeps writer target classes aligned with the table ownership policy", () => {
     const policyByTable = new Map(
-      TENANT_TABLE_POLICIES.map(({ table, classification }) => [
+      EXPANDED_TENANT_TABLE_POLICIES.map(({ table, classification }) => [
         table,
         classification,
       ]),
@@ -146,7 +149,9 @@ describe("tenant writer Phase 1D-A readiness", () => {
       mode: "active",
       legacyOwnerUserId: "base44-import",
       canonicalOwnerUserId: OWNER_A,
+      canonicalOwnerStatus: "provisioning",
       canonicalOwnerVerified: true,
+      provisioningOwnerApproved: true,
     });
     assert.deepEqual(canonicalOwnerAssignment(active.tenantWriteContext), {
       canonicalOwnerUserId: OWNER_A,
@@ -171,6 +176,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
           source: "session",
           targetClassification: "user_owned",
           canonicalOwnerUserId: OWNER_A,
+          canonicalOwnerStatus: "active",
         }),
       "unverified_canonical_owner",
     );
@@ -181,9 +187,73 @@ describe("tenant writer Phase 1D-A readiness", () => {
           source: "machine_job",
           targetClassification: "shared_reference",
           canonicalOwnerUserId: OWNER_A,
+          canonicalOwnerStatus: "active",
           canonicalOwnerVerified: true,
         }),
       "owner_forbidden_for_target",
+    );
+  });
+
+  it("enforces app-user status by trusted writer source", () => {
+    assertPolicyError(
+      () =>
+        prepareTenantWriteContext({
+          mode: "active",
+          source: "session",
+          targetClassification: "user_owned",
+          canonicalOwnerUserId: OWNER_A,
+          canonicalOwnerStatus: "provisioning",
+          canonicalOwnerVerified: true,
+          provisioningOwnerApproved: true,
+        }),
+      "owner_status_not_allowed",
+    );
+    assertPolicyError(
+      () =>
+        prepareTenantWriteContext({
+          mode: "active",
+          source: "session",
+          targetClassification: "user_owned",
+          canonicalOwnerUserId: OWNER_A,
+          canonicalOwnerStatus: "unknown",
+          canonicalOwnerVerified: true,
+        }),
+      "owner_status_not_allowed",
+    );
+    assertPolicyError(
+      () =>
+        prepareTenantWriteContext({
+          mode: "active",
+          source: "migration_cli",
+          targetClassification: "user_owned",
+          canonicalOwnerUserId: OWNER_A,
+          canonicalOwnerStatus: "provisioning",
+          canonicalOwnerVerified: true,
+        }),
+      "provisioning_owner_not_approved",
+    );
+    assertPolicyError(
+      () =>
+        prepareTenantWriteContext({
+          mode: "active",
+          source: "machine_job",
+          targetClassification: "user_owned",
+          canonicalOwnerUserId: OWNER_A,
+          canonicalOwnerStatus: "disabled",
+          canonicalOwnerVerified: true,
+        }),
+      "owner_status_not_allowed",
+    );
+    assert.doesNotThrow(() =>
+      prepareTenantWriteContext({
+        mode: "active",
+        source: "migration_cli",
+        targetClassification: "user_owned",
+        canonicalOwnerUserId: OWNER_A,
+        canonicalOwnerStatus: "provisioning",
+        canonicalOwnerVerified: true,
+        provisioningOwnerApproved: true,
+      }),
     );
   });
 
@@ -273,6 +343,7 @@ function activeUserContext(ownerUserId) {
     source: "session",
     targetClassification: "user_owned",
     canonicalOwnerUserId: ownerUserId,
+    canonicalOwnerStatus: "active",
     canonicalOwnerVerified: true,
   });
 }
@@ -299,7 +370,13 @@ function discoverDmlPaths() {
   return [join(ROOT, "src"), join(ROOT, "scripts")]
     .flatMap(walkFiles)
     .filter((path) => !path.endsWith("rehearse-tenant-expand.mjs"))
-    .filter((path) => DML_PATTERN.test(readFileSync(path, "utf8")))
+    .filter((path) => {
+      const source = readFileSync(path, "utf8");
+      return (
+        RAW_SQL_DML_PATTERN.test(source) ||
+        (DB_IMPORT_PATTERN.test(source) && DRIZZLE_DML_PATTERN.test(source))
+      );
+    })
     .map(relativePath);
 }
 

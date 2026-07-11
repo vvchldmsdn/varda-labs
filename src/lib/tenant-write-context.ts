@@ -10,6 +10,8 @@ export type TenantWriteTargetClassification =
   | "shared_reference"
   | "admin_system";
 
+export type AppUserStatus = "provisioning" | "active" | "disabled";
+
 export type UntrustedOwnerInputLocation =
   | "url"
   | "query"
@@ -22,6 +24,7 @@ export type TenantWriteContext = Readonly<{
   source: TenantWriteSource;
   targetClassification: TenantWriteTargetClassification;
   canonicalOwnerUserId: string | null;
+  canonicalOwnerStatus: AppUserStatus | null;
   ownerVerified: boolean;
   writesCanonicalOwner: boolean;
 }>;
@@ -38,6 +41,9 @@ export type TenantWriteRejection =
   | "invalid_canonical_owner"
   | "unverified_canonical_owner"
   | "missing_canonical_owner"
+  | "missing_owner_status"
+  | "owner_status_not_allowed"
+  | "provisioning_owner_not_approved"
   | "cross_owner_existing_row"
   | "cross_owner_reference"
   | "unowned_reference"
@@ -51,7 +57,9 @@ type PrepareTenantWriteContextInput = Readonly<{
   source: TenantWriteSource;
   targetClassification: TenantWriteTargetClassification;
   canonicalOwnerUserId?: string | null;
+  canonicalOwnerStatus?: AppUserStatus | null;
   canonicalOwnerVerified?: boolean;
+  provisioningOwnerApproved?: boolean;
   untrustedOwnerInputLocations?: readonly UntrustedOwnerInputLocation[];
 }>;
 
@@ -103,6 +111,7 @@ export function prepareTenantWriteContext(
       source: input.source,
       targetClassification: input.targetClassification,
       canonicalOwnerUserId: null,
+      canonicalOwnerStatus: null,
       ownerVerified: false,
       writesCanonicalOwner: false,
     });
@@ -119,6 +128,42 @@ export function prepareTenantWriteContext(
     throw new TenantWritePolicyError("unverified_canonical_owner");
   }
 
+  const canonicalOwnerStatus = input.canonicalOwnerStatus ?? null;
+  if (
+    canonicalOwnerStatus !== null &&
+    !["provisioning", "active", "disabled"].includes(canonicalOwnerStatus)
+  ) {
+    throw new TenantWritePolicyError("owner_status_not_allowed");
+  }
+  if (canonicalOwnerUserId !== null && canonicalOwnerStatus === null) {
+    throw new TenantWritePolicyError("missing_owner_status");
+  }
+
+  if (
+    canonicalOwnerUserId === null &&
+    (canonicalOwnerStatus !== null || input.provisioningOwnerApproved === true)
+  ) {
+    throw new TenantWritePolicyError("missing_canonical_owner");
+  }
+
+  if (canonicalOwnerStatus === "disabled") {
+    throw new TenantWritePolicyError("owner_status_not_allowed");
+  }
+
+  if (
+    canonicalOwnerStatus === "provisioning" &&
+    input.source !== "migration_cli"
+  ) {
+    throw new TenantWritePolicyError("owner_status_not_allowed");
+  }
+
+  if (
+    canonicalOwnerStatus === "provisioning" &&
+    input.provisioningOwnerApproved !== true
+  ) {
+    throw new TenantWritePolicyError("provisioning_owner_not_approved");
+  }
+
   if (input.mode === "active" && canonicalOwnerUserId === null) {
     throw new TenantWritePolicyError("missing_canonical_owner");
   }
@@ -128,6 +173,7 @@ export function prepareTenantWriteContext(
     source: input.source,
     targetClassification: input.targetClassification,
     canonicalOwnerUserId,
+    canonicalOwnerStatus,
     ownerVerified,
     writesCanonicalOwner:
       input.mode === "active" && canonicalOwnerUserId !== null,
@@ -204,7 +250,9 @@ type PrepareMigrationOwnerContextInput = Readonly<{
   mode: TenantWriteMode;
   legacyOwnerUserId?: string | null;
   canonicalOwnerUserId?: string | null;
+  canonicalOwnerStatus?: AppUserStatus | null;
   canonicalOwnerVerified?: boolean;
+  provisioningOwnerApproved?: boolean;
 }>;
 
 export type MigrationOwnerContext = Readonly<{
@@ -222,7 +270,9 @@ export function prepareMigrationOwnerContext(
       source: "migration_cli",
       targetClassification: "user_owned",
       canonicalOwnerUserId: input.canonicalOwnerUserId,
+      canonicalOwnerStatus: input.canonicalOwnerStatus,
       canonicalOwnerVerified: input.canonicalOwnerVerified,
+      provisioningOwnerApproved: input.provisioningOwnerApproved,
     }),
   });
 }

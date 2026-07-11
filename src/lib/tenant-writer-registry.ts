@@ -2,6 +2,7 @@ export type WriterClassification =
   | "user_owned"
   | "shared_reference"
   | "admin_system"
+  | "identity_system"
   | "mixed";
 
 export type WriterAuthorization = "migration_cli" | "machine_admin";
@@ -21,17 +22,20 @@ export type WriterTransitionPolicy = Readonly<{
   prepare:
     | "shadow_trusted_context"
     | "split_target_classes"
-    | "owner_not_applicable";
+    | "owner_not_applicable"
+    | "dry_run_only";
   activate:
     | "dual_write_user_targets"
     | "owner_aware_repository_or_freeze"
     | "owner_scoped_delete"
-    | "keep_owner_absent";
+    | "keep_owner_absent"
+    | "single_identity_insert";
   freeze:
     | "freeze_without_verified_owner"
     | "freeze_user_targets_only"
     | "freeze_until_owner_scoped_delete"
-    | "not_required";
+    | "not_required"
+    | "freeze_after_initial_user";
 }>;
 
 export type TenantWriterDefinition = Readonly<{
@@ -71,6 +75,21 @@ const MIXED_TRANSITION = {
 } as const;
 
 export const TENANT_WRITER_REGISTRY = [
+  {
+    id: "initial_app_user_provisioning",
+    classification: "identity_system",
+    authorization: "migration_cli",
+    entrypoints: ["scripts/provision-initial-app-user.mjs"],
+    implementationPaths: ["scripts/lib/initial-app-user-write.mjs"],
+    targets: [identityTarget("app_users", "insert")],
+    transition: {
+      prepare: "dry_run_only",
+      activate: "single_identity_insert",
+      freeze: "freeze_after_initial_user",
+    },
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
   {
     id: "base44_core_import",
     classification: "user_owned",
@@ -336,6 +355,18 @@ function adminTarget(
   return {
     table,
     classification: "admin_system",
+    operations,
+    ownerPolicy: "owner_forbidden",
+  };
+}
+
+function identityTarget(
+  table: string,
+  ...operations: readonly WriterOperation[]
+): WriterTarget {
+  return {
+    table,
+    classification: "identity_system",
     operations,
     ownerPolicy: "owner_forbidden",
   };

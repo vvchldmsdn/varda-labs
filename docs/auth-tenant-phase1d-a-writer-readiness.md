@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-11
 
-Status: shadow-only implementation. Production writer behavior is unchanged.
+Status: completed. Production writer behavior remains unchanged.
 
 This phase inventories every current database writer and freezes the trusted
 canonical-owner contract before any owner value is written. It adds no user,
@@ -105,9 +105,10 @@ Phase 1D-A must leave all Phase 1C production invariants unchanged:
 
 ## Next Gate
 
-Stop after code, test, deployment, and invariant verification. The next phase
-is explicit initial app-user provisioning. It must not be combined with owner
-backfill, reader filtering, social-login cutover, RLS, or Basic Auth removal.
+Phase 1D-B adds a dry-run-only initial app-user provisioning command. It does
+not create a real user and does not activate canonical owner writes. It must
+not be combined with owner backfill, reader filtering, social-login cutover,
+RLS, or Basic Auth removal.
 
 Future backfill and constraint work requires a real preview/branch rehearsal;
 the production transaction rollback technique used for the small additive
