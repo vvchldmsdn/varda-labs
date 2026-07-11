@@ -92,6 +92,11 @@ read-only regime owner plan and shared factor diagnostic in
 duplicates are preserved as data-health evidence and no factor owner action is
 created.
 
+The remaining destructive cleanup, compatibility CRUD, and machine snapshot
+writers are now classified and held behind the static Phase 1F0 freeze matrix
+in `docs/auth-tenant-phase1f0-runtime-writer-convergence.md`. That audit does
+not connect a tenant context to any production route or writer.
+
 ## Regression Gate
 
 Tests enforce all of the following:

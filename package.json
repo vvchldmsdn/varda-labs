@@ -18,6 +18,7 @@
     "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",
     "audit:portfolio-risk": "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs",
     "audit:portfolio-risk-read-model": "node --no-warnings scripts/audit-portfolio-risk-read-model.mjs",
+    "audit:runtime-writer-convergence": "node --no-warnings scripts/audit-runtime-writer-convergence.mjs",
     "audit:tenant-ownership": "node --no-warnings scripts/audit-tenant-ownership-preflight.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",
     "cleanup:base44:nonportfolio-assets": "node --no-warnings scripts/remove-base44-nonportfolio-assets.mjs",
