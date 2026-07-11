@@ -36,7 +36,9 @@ may turn reviewed evidence into this explicit input only under a separate,
 versioned, user-approved contract.
 
 The policy model in `docs/target-policy-decision-contract-v1.md` passed Gate A,
-but no account vector has passed Gate B and no runtime vector is available.
+and ISA `isa-v1` passed Gate B. The pure resolver still has no trusted runtime
+adapter, persistence, or allocator connection, so no runtime vector is
+available. Phase 1 fixtures continue to receive an explicit vector directly.
 
 ## Calculation
 
@@ -103,3 +105,7 @@ other residual reasons.
 - no recommendation wording or persistence;
 - no `all`-account actionable allocation;
 - no UI, API route, server action, schema, migration, or database write.
+
+The separate MA120 evidence-only Phase 2A contract is documented in
+`docs/additional-contribution-ma120-phase2a-contract.md`. It does not change
+this baseline allocator.

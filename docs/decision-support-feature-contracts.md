@@ -38,6 +38,10 @@ LLM recommendation, or an automatic sell-and-rebalance command.
 The executable Phase 1 details live in
 `docs/additional-contribution-phase1-contract.md`.
 
+The optional MA120 evidence-only Phase 2A boundary lives in
+`docs/additional-contribution-ma120-phase2a-contract.md`. It does not alter the
+Phase 1 allocation.
+
 ### Canonical v1 behavior
 
 1. Read current holdings, live/as-of prices, date-specific FX, and strategic
@@ -229,7 +233,8 @@ The following still require replacement or proof before migration:
    `universeHash`, and `vectorHash`; brokerage and IRP remain unapproved.
 7. Pure ISA resolver validation completed 2026-07-11 without persistence or
    allocator connection.
-8. Add MA120 as an optional isolated overlay and validate it against no-overlay.
+8. MA120 evidence-only/no-overlay validation completed 2026-07-11; multiplier,
+   buy blocking, and redistribution policy remain unapproved.
 9. Build the Simulation Validation normalized return-matrix contract.
 10. Add bootstrap and parametric engines as pure seeded helpers.
 11. Add walk-forward validation before any optimizer is labeled useful.
