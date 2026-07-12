@@ -241,6 +241,57 @@ reconstructed_position_evidence_v1
 Their names and eligibility remain proposed, not approved. Missing, unknown, or
 unversioned position provenance blocks observed-baseline admission.
 
+### Temporal Admissibility
+
+Recording reference dates is not enough to prevent look-ahead. A future
+`valuationBasisPolicyId` must define one exact service-date mapping for position,
+price, and FX evidence and must validate each component against
+`asOfServiceDate` before evidence hashing or weight derivation.
+
+The policy must satisfy all of the following:
+
+1. the mapped service date for each admitted position, price, and FX reference
+   is on or before `asOfServiceDate`;
+2. any prior-date carry is explicit, records the original reference date, and
+   is within a finite source-specific maximum carry selected by the policy;
+3. no future reference, nearest-neighbor interpolation, or latest-row fallback
+   can satisfy an unavailable as-of boundary;
+4. `stored_current_position_valuation_v1` is eligible only when its captured
+   service-cycle identity exactly satisfies the admitted as-of policy; it can
+   never be reused as evidence for an earlier as-of request merely because it
+   is the newest stored row;
+5. position, price, and FX evidence are evaluated independently, so one valid
+   reference date cannot make another source temporally admissible; and
+6. changing the date mapping, maximum carry, or admitted evidence kind requires
+   a new versioned valuation-basis policy and changes the evidence binding.
+
+The historical return-matrix price and FX carry policy is not automatically the
+observed-baseline valuation policy. A later review may deliberately reuse its
+values, but this draft does not do so. Until an exact mapping and finite carry
+limits are approved, observed-baseline admission remains blocked. Candidate
+safe blockers distinguish `position_asof_mismatch`, `price_asof_mismatch`, and
+`fx_asof_mismatch`; their exact runtime names and ordering remain unapproved.
+
+### Future Repair Lineage
+
+Provider-backfilled and reconstructed position evidence remain ineligible in
+this draft. A future policy cannot admit them by changing the evidence-kind
+label alone. It must introduce a new canonical observed-evidence hash version
+that binds, at minimum:
+
+- for provider-backfilled evidence: the provider/source policy identity,
+  provider as-of or observation date, retrieval/freshness evidence, and the
+  repair reason;
+- for reconstructed evidence: the reconstruction method and version, every
+  source-evidence binding and source reference date, and the reconstruction
+  reason; and
+- for either kind: the consumer-specific eligibility policy that admitted it.
+
+Presentation-only estimates and missing, ambiguous, invalid, unknown, or
+unversioned evidence remain blockers, not position-evidence kinds. Repair
+lineage must not expose raw provider payloads, credentials, owner identifiers,
+or secret-shaped values in product projections.
+
 Every decimal is a canonical finite base-10 string: no exponent, no sign for a
 nonnegative field, no leading zero except before a decimal point, and no
 trailing fractional zero. Quantity, local price, and KRW market value must be
@@ -571,6 +622,9 @@ observed_evidence_binding_invalid
 observed_derivation_binding_invalid
 position_provenance_invalid
 decimal_bounds_exceeded
+position_asof_mismatch
+price_asof_mismatch
+fx_asof_mismatch
 unsupported_instrument
 cash_policy_unavailable
 valuation_evidence_incomplete
@@ -595,7 +649,8 @@ Blockers must not reflect owner ids, hashes, raw values, or secret-shaped input.
 This draft does not:
 
 - approve the candidate position-evidence enum or eligibility policy, decimal
-  bounds, observed derivation binding, or quantization policy;
+  bounds, temporal-admissibility or repair-lineage policy, observed derivation
+  binding, or quantization policy;
 - select a current portfolio read table or query;
 - select production horizon, path count, seed, block length, or resource limits;
 - approve all VOO or any multi-instrument Investment Lab scenario as currently
@@ -613,7 +668,8 @@ This draft does not:
 The next review should approve, reject, or amend:
 
 1. the four-source authority taxonomy;
-2. the observed-baseline as-of and complete-universe requirements;
+2. the observed-baseline as-of, temporal-admissibility, and complete-universe
+   requirements;
 3. the observed valuation-evidence binding and proposed exact-decimal
    bounds, versioned derivation binding, and largest-remainder quantization;
 4. the source-preserving joint-universe execution projection and
@@ -627,7 +683,8 @@ meaning:
 
 1. source taxonomy plus observed complete-universe/as-of policy;
 2. observed valuation-evidence binding plus deterministic exact-decimal
-   bounds, position provenance, quantization, and derivation binding;
+   bounds, position provenance and repair lineage, temporal admissibility,
+   quantization, and derivation binding;
 3. source-preserving joint-universe projection plus common-random-number policy;
 4. partial eligibility, parameter authority, and logical persistence
    separation.
