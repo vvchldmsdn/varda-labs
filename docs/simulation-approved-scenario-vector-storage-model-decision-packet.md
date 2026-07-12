@@ -2,9 +2,10 @@
 
 Last updated: 2026-07-12
 
-Status: `docs_only_approved_storage_model_decision`.
+Status: `docs_only_storage_basis_approved_schema_semantics_pending`.
 
-Decision status: `approved_by_explicit_user_decision_2026-07-12`.
+Decision status:
+`storage_basis_approved_by_explicit_user_decision_2026-07-12`.
 
 Approved storage basis:
 `normalized_immutable_approval_header_and_vector_rows_preserving_zero_weights_with_same_transaction_lifecycle_audit_no_duplicate_json_no_is_current`.
