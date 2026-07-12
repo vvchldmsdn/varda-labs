@@ -6,8 +6,11 @@ Status: `docs_only_approved_storage_model_decision`.
 
 Decision status: `approved_by_explicit_user_decision_2026-07-12`.
 
-Approved model:
-`normalized_immutable_approval_header_and_vector_rows_with_transactional_terminal_state_and_append_only_lifecycle_audit`.
+Approved storage basis:
+`normalized_immutable_approval_header_and_vector_rows_preserving_zero_weights_with_same_transaction_lifecycle_audit_no_duplicate_json_no_is_current`.
+
+Full schema-semantics recommendation, pending separate approval:
+`transactional_terminal_state_exact_identity_serialization_and_database_enforced_single_current_approval`.
 
 ## Approval Record
 
@@ -21,10 +24,10 @@ this packet:
 - no duplicate JSON vector authority;
 - no `is_current` column.
 
-The approval explicitly excludes schema, migration, database writes,
-repository code, auth, runtime execution, API, and UI implementation. It does
-not create an approved vector, approve a vector seed or import, or establish
-runtime trust.
+The approval explicitly excludes schema, migration, DDL, constraints, RLS,
+database reads and writes, repository code, auth and session integration,
+runtime execution, API, UI, jobs, Cron, vector seed, import, and backfill. It
+does not create an approved vector or establish runtime trust.
 
 ## Purpose
 
@@ -44,21 +47,31 @@ Postgres without confusing approval state with simulation execution state.
 
 ## Decision Boundary
 
-The approved decision carries the following model into a later, separately
-reviewed schema-design gate:
+The approved decision carries only the following storage basis into a later,
+separately reviewed schema-design gate:
 
 1. one normalized approval-revision header for immutable approval metadata;
 2. one normalized child row per canonical instrument weight;
-3. one controlled lifecycle state on the header for efficient current-record
-   enforcement;
-4. one append-only audit event for every lifecycle transition;
-5. one transaction for approval creation, supersession, reapproval, and their
-   lifecycle audit evidence;
-6. no duplicate JSON vector authority and no `is_current` boolean.
+3. preservation of every explicit zero-weight canonical row;
+4. lifecycle audit evidence recorded in the same transaction as the lifecycle
+   change it describes;
+5. no duplicate JSON vector authority;
+6. no `is_current` boolean.
 
 This approves only the storage-model basis. Exact table names, column types,
 DDL, index names, SQL, Drizzle declarations, and RLS policies remain outside
 this approval.
+
+The following parts of the broader varda-labs recommendation remain pending
+separate approval and must not be inferred from the six approved items:
+
+- a controlled `approved -> revoked | superseded` state stored on the header;
+- exact-identity transaction serialization for approval, supersession, and
+  reapproval;
+- a later database-enforced zero-or-one current-approval invariant.
+
+They remain valid design candidates and existing logical-contract constraints,
+but this approval record does not select their physical schema semantics.
 
 ## Existing Invariants
 
@@ -533,6 +546,12 @@ pure event fold because current-record atomicity is a first-class runtime
 requirement. It is preferred over mutable state without events because approval
 history must remain auditable.
 
+The summary above remains the varda-labs technical recommendation. The current
+user approval covers only the narrower six-item storage basis recorded in
+`Approval Record` and `Decision Boundary`. Controlled terminal header state,
+exact-identity serialization, and database-enforced zero-or-one current
+approval remain pending a separate semantic decision.
+
 ## Explicit Non-Actions
 
 This packet does not authorize or implement:
@@ -553,14 +572,22 @@ This packet does not authorize or implement:
 
 ## Next Approval Boundary
 
-The storage-model decision is approved. The next optional gate is a docs-only
-schema contract with exact candidate table and column shapes, constraints,
-transaction boundaries, explicit projections, migration ordering, rollback
-behavior, and a no-data dry-run rehearsal plan.
+The six-item storage basis is approved. Before a docs-only schema contract can
+treat the full recommendation as selected, a separate semantic gate must decide
+whether to approve:
 
-That schema-contract gate is not approved by this record. DDL, Drizzle schema
-changes, migrations, repository code, database reads or writes, and runtime
-behavior remain closed until separately reviewed and explicitly approved.
+- controlled terminal lifecycle state on the header;
+- exact-identity transaction serialization;
+- database-enforced zero-or-one current approval.
+
+The later schema contract would then need exact candidate table and column
+shapes, constraints, transaction boundaries, explicit projections, migration
+ordering, rollback behavior, and a no-data dry-run rehearsal plan.
+
+Neither the three pending semantics nor that schema-contract gate is approved
+by this record. DDL, Drizzle schema changes, migrations, repository code,
+database reads or writes, and runtime behavior remain closed until separately
+reviewed and explicitly approved.
 
 Auth runtime remains frozen. The later schema contract must continue to consume
 a future `TenantContext` and must not invent a temporary singleton or Basic Auth
