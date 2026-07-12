@@ -100,7 +100,18 @@ percentage string.
 
 ## Pure Input Boundary
 
-The future helper may accept only two explicit in-memory inputs.
+The future helper may accept one in-memory wrapper object with exactly these
+two own keys:
+
+```text
+pathMaxDrawdown
+expectedBinding
+```
+
+An extra wrapper key is `input_drawdown_shape_invalid`. A missing wrapper key
+is classified through the corresponding artifact or binding rule below. The
+wrapper is a transport boundary only and must not carry owner, approval,
+runtime, database, or provider context.
 
 ### 1. Ready per-path maximum-drawdown artifact
 
@@ -124,6 +135,36 @@ pathDrawdowns:
     maxDrawdown
 ```
 
+The artifact must be a non-array record with exactly these top-level own keys:
+
+```text
+drawdownStatus
+runtimeTrustStatus
+policy
+scenarioId
+scenarioVersion
+scenarioVectorHash
+inputMatrixHash
+drawPlanHash
+horizon
+pathCount
+totalPointCount
+pathDrawdowns
+blockers
+```
+
+Every `pathDrawdowns` row must be a non-array record with exactly these own
+keys:
+
+```text
+pathIndex
+maxDrawdown
+```
+
+Extra top-level or row keys are not ignored. They make the artifact
+`input_drawdown_shape_invalid` even when every required field is otherwise
+valid.
+
 The complete Phase 1F0 maximum-drawdown policy object must match exactly,
 including its running-peak algorithm, step-zero treatment, numeric domain,
 path cardinality, and resource limits.
@@ -141,6 +182,11 @@ expectedScenarioVectorHash
 expectedInputMatrixHash
 expectedDrawPlanHash
 ```
+
+The binding must be a non-array record with exactly those three own keys. A
+missing key, extra key, non-string value, or noncanonical hash makes it
+`expected_binding_invalid`. No hash-mismatch reason may be evaluated from an
+invalid binding.
 
 All three values must use canonical lowercase `sha256:` form and exactly equal
 the corresponding fields carried by the ready drawdown artifact.
@@ -188,6 +234,50 @@ a separate temporary array containing the already-validated drawdown values.
 Any malformed status, policy, identity, hash, count, row, or drawdown value
 blocks the whole result. The helper must not remove a bad path and summarize
 the remaining paths.
+
+### Malformed prerequisite classification
+
+Binding validation is independent and occurs before an early return caused by
+a malformed drawdown artifact.
+
+If `pathMaxDrawdown` is absent, null, an array, a primitive, or otherwise not a
+record, the exact safely established artifact reasons are:
+
+```text
+input_drawdown_not_ready
+input_drawdown_shape_invalid
+```
+
+If the artifact is a record but lacks any required top-level own key, the same
+two reasons apply. Validation then stops for that artifact. It must not
+fabricate runtime-trust, policy, hash-mismatch, count, row, or drawdown-value
+reasons from unavailable prerequisites.
+
+An independently malformed or missing `expectedBinding` additionally yields:
+
+```text
+expected_binding_invalid
+```
+
+Therefore a missing artifact and missing binding produce exactly these
+ordered reasons:
+
+```text
+input_drawdown_not_ready
+expected_binding_invalid
+input_drawdown_shape_invalid
+```
+
+If all required artifact keys exist, safely evaluable status, trust, policy,
+hash, count, and row checks proceed independently. An extra artifact or row
+key adds `input_drawdown_shape_invalid`; it does not suppress other reasons
+that are safely established from present prerequisites.
+
+If the expected binding is structurally valid, each carried artifact hash is
+compared independently. A missing or malformed carried hash is a safely
+established mismatch for that hash only after the artifact has passed the
+required-key prerequisite. If the binding is invalid, no carried-hash mismatch
+is fabricated.
 
 ## Source-Provenance Non-Consumption
 
@@ -379,6 +469,16 @@ authorize production execution or establish a production request limit.
 - out-of-order rows and mismatched `pathIndex` values remaining blocked
   without sorting or relabeling input;
 - a missing, duplicate, or extra row blocking the entire result;
+- exact wrapper, artifact, row, and expected-binding own-key sets;
+- an extra wrapper, artifact, or row key mapping to
+  `input_drawdown_shape_invalid`;
+- an extra or missing expected-binding key mapping to exactly
+  `expected_binding_invalid` when the artifact is otherwise valid;
+- a non-record or required-key-missing artifact producing exactly
+  `input_drawdown_not_ready` and `input_drawdown_shape_invalid` when the
+  binding is valid;
+- a missing artifact and missing binding producing exactly the three ordered
+  prerequisite reasons without fabricated trust, policy, or hash mismatch;
 - ready-status or nonempty input blockers mapping to
   `input_drawdown_not_ready`;
 - top-level runtime-trust mismatch mapping to exactly
