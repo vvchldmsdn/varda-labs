@@ -225,8 +225,11 @@ This contract does not add or change:
 
 ## Next Gate
 
-Before resolver implementation, one actual manifest instance must be reviewed
-for one lane and one account. The safest first candidate is a balance
-`observed_only` manifest because it makes no missing-date or coverage claim.
-An explicit portfolio schedule must not be inferred from the four recent
-generated snapshots or imported legacy history.
+The first review candidate is documented at
+`history-manifests/portfolio-brokerage-observed-v1.review.md`. It is
+`observed_only` and makes no missing-date or coverage claim. It remains
+unapproved.
+
+After explicit review of that candidate's exact identity fields, the next code
+gate is a pure manifest validator. An explicit portfolio schedule must not be
+inferred from the four recent generated snapshots or imported legacy history.
