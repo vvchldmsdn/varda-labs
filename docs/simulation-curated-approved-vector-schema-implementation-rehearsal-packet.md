@@ -31,7 +31,7 @@ This implementation packet does not choose or simulate:
 
 - a maximum vector-row count;
 - advisory-lock serialization SQL;
-- retry, timeout, or typed-conflict policy;
+- future approval-writer retry, transaction-timeout, or typed-conflict policy;
 - database role, trigger, function, or stored-procedure immutability controls;
 - RLS or child-row policy behavior;
 - a writer, repository, runtime resolver adapter, or approval source; or
@@ -41,6 +41,12 @@ This implementation packet does not choose or simulate:
 The rollback rehearsal validates empty-schema atomicity only. It must not claim
 to validate future write-contract lock, retry, conflict, hash, lifecycle, or
 tenant behavior.
+
+The later Stage II candidate `lock_timeout` and `statement_timeout` values are
+rollback-only DDL session safety guards. They do not select, constrain, or
+provide defaults for a future approval writer's advisory-lock, retry,
+transaction-timeout, or conflict policy. Stage II review may amend those
+rehearsal-only values before any DB connection.
 
 ## Staged Approval Model
 
@@ -371,15 +377,16 @@ Stage I review.
 
 Before starting the transaction, the script must prove:
 
-- the current tenant phase is one of the separately approved existing states;
-- `app_users` exists, without requiring an active identity or changing a user;
+- the owner-reference target `app_users.id` exists in the catalog with the
+  expected UUID primary-key shape;
 - none of the three candidate tables exists;
 - the generated migration still passes the same statement allowlist; and
-- existing public table names and selected row-count evidence are captured for
-  exact before/after comparison.
+- a target-scoped catalog signature is captured for exact before/after
+  comparison.
 
-It must not require `app_users` to be empty, infer a canonical owner, or inspect
-legacy owner strings.
+It must not read or classify `app_users` rows, auth identities, owner
+assignments, TenantContext, active sessions, RLS, or tenant readiness. It does
+not infer a canonical owner or inspect legacy owner strings.
 
 ### Transaction
 
@@ -390,13 +397,19 @@ The transaction performs only:
 3. each allowlisted generated DDL statement;
 4. catalog assertions for exact tables, columns, nullability, types, defaults,
    PKs, checks, FKs, indexes, and partial-index predicate;
-5. assertions that all three new tables have zero rows and existing selected
-   row counts did not change; and
+5. assertions that all three new tables have zero rows and the owner-reference
+   target catalog shape remains unchanged; and
 6. an expected exception with a unique rollback marker.
 
 There is no approval, owner, vector, event, auth, product, or fixture DML.
 Constraint behavior fixtures remain local/static until a later separately
 approved isolated-database test gate.
+
+The equality claim is intentionally narrow: the three candidate table names
+remain absent after rollback and the `app_users.id` reference-target catalog
+signature is unchanged. It does not enumerate every public table, read product
+or user row counts, prove global database equality, or establish tenant/data
+readiness.
 
 ### Postflight
 
@@ -409,8 +422,8 @@ committed: false
 expectedRollbackObserved: true
 databaseSideEffects: false
 statementsExercised
-catalogBefore
-catalogAfter
+targetCatalogBefore
+targetCatalogAfter
 ```
 
 It must not print a database URL, owner UUID, environment value, raw SQL error,
@@ -459,7 +472,8 @@ After separate Stage II approval:
 2. rerun local static tests against the exact committed migration;
 3. run the rehearsal once with the exact confirmation argument;
 4. verify expected rollback and exact before/after equality;
-5. rerun production read-only health and row-count audits; and
+5. rerun production read-only product health checks without a tenant-readiness
+   or global-data-equality claim; and
 6. stop and report evidence.
 
 Do not run `db:migrate` or deploy a writer in Stage II.
@@ -475,8 +489,8 @@ After separate Stage III approval:
 4. run `npm run db:migrate` once against the reviewed target;
 5. verify all three tables, constraints, and indexes and prove all three tables
    have zero rows;
-6. verify existing product table counts, auth/tenant state, and product route
-   behavior are unchanged;
+6. verify the implementation diff contains no auth/session coupling and product
+   route behavior remains healthy without reading tenant state;
 7. push the already-tested local implementation commit to the deployment
    branch and wait for deployment;
 8. verify no API/RSC/product projection exposes new owner or approval fields;
@@ -499,7 +513,8 @@ connect to a DB to diagnose a static mismatch.
 
 Only the expected forced rollback is success. Stop on a lock timeout,
 unexpected SQL error, catalog mismatch, preexisting candidate table, row-count
-drift, tenant-state drift, or failure to prove exact postflight equality.
+drift inside a candidate table, owner-reference catalog drift, or failure to
+prove exact target-scoped postflight equality.
 
 ### Stage III Before Any Authority Row
 
@@ -553,9 +568,10 @@ The user should approve, amend, reject, or defer:
 3. the Drizzle fields and exact constraint/index name candidates;
 4. the generated SQL allowlist and hard rejections;
 5. the static schema/migration/boundary tests;
-6. the rollback-rehearsal preflight, transaction, output, and confirmation
-   guard;
-7. the Stage I, II, and III command/deployment ordering; and
+6. the rollback-rehearsal preflight, target-scoped read boundary, transaction,
+   output, confirmation guard, and rehearsal-only session timeouts;
+7. the Stage I, II, and III command/deployment ordering plus the explicit
+   non-claims for tenant readiness and global database equality; and
 8. rollback, stop, legacy, and projection-leakage conditions.
 
 Approval of this packet would approve the implementation and rehearsal plan
