@@ -243,6 +243,11 @@ The first review candidate is documented at
 `observed_only` and makes no missing-date or coverage claim. It remains
 unapproved.
 
-After explicit review of that candidate's exact identity fields, the next code
-gate is a pure manifest validator. An explicit portfolio schedule must not be
-inferred from the four recent generated snapshots or imported legacy history.
+The exact observed-only candidate was approved at artifact commit
+`689abe0fb69e04a562843b7eb69de65668723490`. The pure validator is documented
+in `history-manifest-validator-v1.md`. Its result does not establish runtime
+trust.
+
+Any resolver or `/history` integration remains a separate approval gate. An
+explicit portfolio schedule must not be inferred from the four recent
+generated snapshots or imported legacy history.
