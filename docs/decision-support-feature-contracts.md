@@ -1,6 +1,6 @@
 # Decision-Support Feature Contracts
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This document defines the intended product behavior for Additional
 Contribution, Investment Lab, and Simulation Validation before their remaining
@@ -123,6 +123,43 @@ The varda replacement uses observed actual snapshots, explicit boundary-flow
 classification, adjusted closes, date-specific FX, bounded pending execution,
 and fail-closed long-only solvency.
 
+### Product surface coverage
+
+The historical counterfactual remains the primary Investment Lab surface, but
+the product plan must not collapse every legacy card into that one calculation.
+The following scenario families have different transaction and cash semantics:
+
+| Scenario family | Examples | Product treatment |
+| --- | --- | --- |
+| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1. Replay the same dated KRW buy/sell notionals under one fixed composition and compare against the observed actual path. |
+| Scheduled rebalance strategy | equal weight, maintain target weights, maintain a selected weight vector | Later independent model. It introduces additional trades, turnover, costs, and rebalance-date policy, so it is not the same-flow v1 model. |
+| Recommendation-following strategy | legacy recommended rebalance | Blocked until the recommendation boundary and point-in-time recommendation evidence are separately approved. |
+| Cash-ledger baseline | all cash | Blocked while the measured path excludes account cash. It requires a cash balance, cash-flow, and cash-return policy rather than a zero-volatility shortcut. |
+| Hindsight research | full-window maximum return, maximum Sharpe, minimum volatility, minimum MDD | Research-only unless implemented as a no-look-ahead walk-forward strategy. Full-window results must be labeled hindsight and never presented as investable historical performance. |
+
+The v1 comparison read model should eventually expose:
+
+- account, service-date window, scenario identity, and calculation status;
+- observed and hypothetical KRW valuation paths on the same display dates;
+- end-value difference and cashflow-adjusted time-weighted return;
+- downstream maximum drawdown and volatility with explicit definitions;
+- price, FX, event, and snapshot coverage plus pending/excluded evidence;
+- no hidden interpolation, current-FX fallback, or synthetic continuation.
+
+Secondary Investment Lab modules remain separate read models with independent
+readiness and provenance:
+
+- predefined stress windows and observed best/worst rolling windows;
+- a static small-adjustment sandbox showing concentration, effective number of
+  bets, risk-contribution, currency-exposure, and target-gap deltas;
+- ETF look-through, hidden single-name exposure, and explicitly parameterized
+  single-name shock analysis using shared ETF reference data.
+
+Personality labels, weakness cards, portfolio-similarity scores, weekly replay,
+and generated narrative are optional explanation/content features. They are not
+calculation prerequisites. Today-movement discovery cards belong primarily to
+Home or Today Movement and should not be duplicated as Investment Lab authority.
+
 ## Simulation Validation
 
 ### Question it should answer
@@ -218,6 +255,59 @@ The following still require replacement or proof before migration:
 - Reverse optimization must state its implied assumptions and constraints. It
   must not infer a user's desired return from future outcomes.
 
+### Product surface coverage
+
+The first Simulation Validation surface should eventually include:
+
+- account selection within the authenticated owner boundary and bounded horizon
+  controls, initially 63 and 126 trading steps when supported by the execution
+  policy;
+- a server-owned run action with explicit queued, running, partial, failed, and
+  completed states rather than a browser-orchestrated function chain;
+- a bounded reproducible spaghetti-path sample plus full-sample p10/p50/p90 fan
+  bands, with optional inner p25/p75 bands;
+- terminal median and tail outcomes, terminal loss probability, and explicitly
+  named maximum-drawdown distribution statistics;
+- concrete data diagnostics such as source window, excluded instruments,
+  price/FX coverage, model version, parameter version, and replay seed instead
+  of one opaque data-fitness score;
+- current-versus-candidate comparison under common random numbers and identical
+  model, horizon, costs, and assumptions;
+- point-in-time walk-forward history showing predicted median/band, realized
+  outcome, band hit/miss, coverage, median error, and weight stability.
+
+`Expected MDD` is not a sufficient metric name. The UI must state whether it is
+mean, median, p90, or another statistic over per-path maximum drawdown. CVaR or
+expected shortfall remains unavailable until its tail, sign, denominator, and
+aggregation semantics are separately fixed. Expected turnover and improvement
+must appear only for an actual candidate strategy; they are not meaningful
+fallbacks for the current no-rebalance normalized buy-and-hold path.
+
+### Scenario source authority
+
+The existing approved-scenario-vector model covers curated fixed assumptions.
+It is not by itself the product authority for every user's current portfolio.
+Future runtime design must distinguish at least these sources:
+
+1. **Observed current baseline**: the server derives owner-scoped instrument
+   weights from the selected account at one admitted as-of point, canonicalizes
+   them, and pins the exact rows, hash, valuation/FX evidence, and source time to
+   the run. This is observed input evidence, not an approved research vector, a
+   target policy, or a recommendation. A browser cannot supply or override it.
+2. **Curated approved scenario**: a separately owner-scoped immutable approval
+   revision loaded through the approved-vector repository boundary.
+3. **Explicit user scenario**: a bounded user command that the server validates,
+   canonicalizes, and pins as run input. It must not silently become a durable
+   target or approved research scenario.
+4. **Optimizer candidate**: a derived artifact linked to its training evidence,
+   objective, constraints, and seed. It is never a recommendation merely because
+   it exists and cannot replace the observed-current baseline.
+
+Each source needs a distinct provenance label and admission rule. Sharing a
+canonical row/hash format does not make their authorities interchangeable. The
+exact persistence, repository, transaction, auth, and schema mechanisms remain
+separate future contracts.
+
 ## Implementation Order
 
 1. Investment Lab aggregate deterministic path fixture (completed 2026-07-11).
@@ -247,12 +337,27 @@ The following still require replacement or proof before migration:
 13. Pure Scenario Vector Review Packet Phase 0 completed 2026-07-12; every
     packet remains unapproved and excludes execution hashes and target-policy
     reuse.
-14. Obtain explicit approval for one complete scenario vector and hash. Do not
-    reuse ISA `isa-v1` automatically.
-15. After explicit scenario-vector approval, add pure Phase 1C normalized NAV
-    aggregation without distribution summaries.
-16. Add distribution summaries only after an approved portfolio path.
-17. Add the separate parametric factor engine.
-18. Add walk-forward validation before any optimizer is labeled useful.
-19. Design user-owned job/artifact persistence only after auth and ownership
-    gates permit writes.
+14. One complete research scenario vector and hash was explicitly approved on
+    2026-07-12 without runtime binding or target-policy reuse.
+15. Pure Phase 1C normalized NAV aggregation was completed without production
+    execution, initial KRW capital, or runtime trust.
+16. Pure Phase 1D0 distribution summaries and Phase 1E0 spaghetti-path sampling
+    were completed without chart or product integration.
+17. Pure terminal-loss, per-path maximum-drawdown, and drawdown-distribution
+    summaries were completed without expected-shortfall semantics.
+18. Runtime Execution Readiness Gate 0 recorded that auth/session adaptation,
+    parameter authority, orchestration, and runtime trust remain blocked.
+19. The approved-vector storage basis and lifecycle semantics are docs-only
+    approved; the physical schema contract remains pending and unimplemented.
+20. The Investment Lab and Simulation product-surface coverage above was
+    clarified on 2026-07-13 after direct legacy-screen and code review.
+21. Next define a docs-only execution-input authority contract for observed
+    current baselines, curated scenarios, explicit user scenarios, and optimizer
+    candidates plus bounded server-owned execution parameters.
+22. Only then choose whether approved-vector persistence or immutable run-input
+    capture is the first physical storage slice; do not assume one table family
+    covers both authorities.
+23. Add server-owned orchestration and the first read-only result UI only after
+    auth, ownership, admission, resource, and persistence gates permit it.
+24. Add the separate parametric factor engine and point-in-time walk-forward
+    validation before any optimizer is labeled useful.
