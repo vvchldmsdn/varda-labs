@@ -2,15 +2,15 @@
 
 Last updated: 2026-07-12
 
-Status: `docs_only_storage_basis_approved_schema_semantics_pending`.
+Status: `docs_only_storage_model_semantics_approved_schema_contract_pending`.
 
 Decision status:
-`storage_basis_approved_by_explicit_user_decision_2026-07-12`.
+`storage_basis_and_semantics_approved_by_explicit_user_decisions_2026-07-12`.
 
 Approved storage basis:
 `normalized_immutable_approval_header_and_vector_rows_preserving_zero_weights_with_same_transaction_lifecycle_audit_no_duplicate_json_no_is_current`.
 
-Full schema-semantics recommendation, pending separate approval:
+Approved schema-semantics package:
 `transactional_terminal_state_exact_identity_serialization_and_database_enforced_single_current_approval`.
 
 ## Approval Record
@@ -29,6 +29,26 @@ The approval explicitly excludes schema, migration, DDL, constraints, RLS,
 database reads and writes, repository code, auth and session integration,
 runtime execution, API, UI, jobs, Cron, vector seed, import, and backfill. It
 does not create an approved vector or establish runtime trust.
+
+## Schema-Semantics Approval Record
+
+On 2026-07-12, the user separately approved the following three semantics as
+one indivisible package:
+
+1. an approval header may transition only from `approved` to `revoked` or from
+   `approved` to `superseded`; a terminal revision is never reactivated,
+   rewritten, or deleted;
+2. initial approval, supersession, and reapproval are serialized per exact
+   approval identity; concurrent attempts produce one committed winner and
+   typed conflicts for the rest without changing owner, selector, revision, or
+   vector;
+3. each exact identity has zero or one current approved revision, and a future
+   database schema must enforce that cardinality.
+
+This approval is semantic only. It explicitly excludes table and column
+design, DDL, constraints, indexes, transaction SQL, migrations, database reads
+and writes, repository code, auth and session integration, runtime execution,
+API, UI, jobs, Cron, seed, import, backfill, and RLS implementation.
 
 ## Purpose
 
@@ -63,16 +83,17 @@ This approves only the storage-model basis. Exact table names, column types,
 DDL, index names, SQL, Drizzle declarations, and RLS policies remain outside
 this approval.
 
-The following parts of the broader varda-labs recommendation remain pending
-separate approval and must not be inferred from the six approved items:
+The following parts of the broader varda-labs recommendation were approved
+later as the separate schema-semantics package recorded above:
 
 - a controlled `approved -> revoked | superseded` state stored on the header;
 - exact-identity transaction serialization for approval, supersession, and
   reapproval;
 - a later database-enforced zero-or-one current-approval invariant.
 
-They remain valid design candidates and existing logical-contract constraints,
-but this approval record does not select their physical schema semantics.
+Their semantic requirements are approved, but no physical schema mechanism is
+selected. The approval does not choose columns, constraints, indexes, locking,
+transaction SQL, or repository code.
 
 ## Existing Invariants
 
@@ -547,11 +568,10 @@ pure event fold because current-record atomicity is a first-class runtime
 requirement. It is preferred over mutable state without events because approval
 history must remain auditable.
 
-The summary above remains the varda-labs technical recommendation. The current
-user approval covers only the narrower six-item storage basis recorded in
-`Approval Record` and `Decision Boundary`. Controlled terminal header state,
-exact-identity serialization, and database-enforced zero-or-one current
-approval remain pending a separate semantic decision.
+The summary above is now covered by the two explicit user decisions recorded in
+`Approval Record` and `Schema-Semantics Approval Record`. Those decisions
+approve storage and semantic requirements only; they do not approve any schema
+or implementation mechanism.
 
 ## Explicit Non-Actions
 
@@ -573,22 +593,16 @@ This packet does not authorize or implement:
 
 ## Next Approval Boundary
 
-The six-item storage basis is approved. Before a docs-only schema contract can
-treat the full recommendation as selected, a separate semantic gate must decide
-whether to approve:
+The six-item storage basis and three-item semantic package are approved. The
+next optional gate is a separately approved docs-only schema contract covering
+candidate table and column shapes, constraints, transaction boundaries,
+explicit projections, migration ordering, rollback behavior, and a no-data
+dry-run rehearsal plan.
 
-- controlled terminal lifecycle state on the header;
-- exact-identity transaction serialization;
-- database-enforced zero-or-one current approval.
-
-The later schema contract would then need exact candidate table and column
-shapes, constraints, transaction boundaries, explicit projections, migration
-ordering, rollback behavior, and a no-data dry-run rehearsal plan.
-
-Neither the three pending semantics nor that schema-contract gate is approved
-by this record. DDL, Drizzle schema changes, migrations, repository code,
-database reads or writes, and runtime behavior remain closed until separately
-reviewed and explicitly approved.
+That schema-contract gate is not approved by either decision recorded here.
+DDL, Drizzle schema changes, migrations, repository code, database reads or
+writes, and runtime behavior remain closed until separately reviewed and
+explicitly approved.
 
 Auth runtime remains frozen. The later schema contract must continue to consume
 a future `TenantContext` and must not invent a temporary singleton or Basic Auth
