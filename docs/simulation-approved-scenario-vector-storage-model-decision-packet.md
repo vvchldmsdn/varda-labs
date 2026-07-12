@@ -82,6 +82,11 @@ Canonical ordering is derived by the existing
 `compareSimulationScenarioVectorRows` comparator. Stored array position or a
 client-provided ordinal is not an authority.
 
+Every `weightBps` value is an integer from 0 through 10,000, inclusive. An
+explicit zero-weight row remains part of the exact canonical instrument set.
+It must be persisted exactly once and must not be dropped as an optimization,
+because removing it changes the vector universe and `scenarioVectorHash`.
+
 ## Legacy Meaning To Preserve
 
 The legacy Base44 simulation flow does not contain a canonical approved-vector
@@ -310,6 +315,28 @@ Actor/provider/session details remain a separate auth-audit decision. They must
 not be inferred from Basic Auth, email, legacy owner data, or a machine secret,
 and this packet does not select an actor schema.
 
+## Prospective Admission And Artifact Non-Retroactivity
+
+`revoked` and `superseded` affect admission of new executions prospectively.
+Once a future orchestrator admits an execution, that execution must pin the
+exact `approvalRevision` and `scenarioVectorHash` that were current at its
+admission boundary.
+
+A later lifecycle transition must not:
+
+- mutate the vector or approval binding of an already committed execution
+  artifact;
+- reclassify a previously committed artifact as if it used a different
+  approval revision;
+- delete or rewrite historical execution evidence;
+- cause a repository to substitute a newer approval into a replay.
+
+Whether an execution that is already in flight should continue, cancel, or
+finish without publication after its approval is revoked or superseded remains
+a later orchestration-policy decision. This storage packet does not infer that
+behavior. It fixes only that committed artifacts and their pinned provenance
+are immutable and that terminal approval state blocks new admission.
+
 ## Atomicity Requirements
 
 Future writes must be serialized per exact approval identity. The SQL mechanism
@@ -367,7 +394,7 @@ Candidate database invariants:
 - unique exact identity plus revision;
 - zero-or-one approved revision per exact identity;
 - unique instrument identity per approval revision;
-- positive bounded row weights;
+- integer row weights from 0 through 10,000 bps, inclusive;
 - child ownership through one approval revision;
 - terminal timestamps coherent with lifecycle state.
 
@@ -459,6 +486,7 @@ The later implementation must not:
 - use Basic Auth or a machine secret to choose an owner;
 - make `asset_id` membership mandatory for vector rows;
 - trust stored JSON order or a client ordinal as canonical order;
+- omit or prune an explicit zero-weight canonical vector row;
 - use `scenarioVectorHash` as a unique owner or execution identifier;
 - expose approval rows before all vector rows commit;
 - retain partial vectors as current approvals;
