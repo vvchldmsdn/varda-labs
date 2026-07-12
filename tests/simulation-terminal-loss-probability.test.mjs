@@ -325,6 +325,8 @@ describe("Simulation terminal loss probability Phase 1F0", () => {
 
   it("keeps the implementation pure and outside later risk phases", () => {
     const sourcePaths = [
+      "src/lib/simulation-path-risk-input-policy.ts",
+      "src/lib/simulation-path-risk-input-validation.ts",
       "src/lib/simulation-terminal-loss-probability-policy.ts",
       "src/lib/simulation-terminal-loss-probability-types.ts",
       "src/lib/simulation-terminal-loss-probability-validation.ts",
