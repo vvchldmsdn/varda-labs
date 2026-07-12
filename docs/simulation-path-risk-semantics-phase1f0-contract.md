@@ -76,8 +76,17 @@ pathTreatment: all_paths_or_block
 resultTreatment: per_path_only
 runtimeTrustStatus: not_established
 maxInputNavPoints: 1,000,000
+maxPathDrawdownRows: 500,000
+pathDrawdownCardinality: exactly_one_per_validated_path_v1
+pathDrawdownLimitBehavior: exact_or_block
 outputKind: dimensionless_per_path_max_drawdown
 ```
+
+`maxPathDrawdownRows` is a derived structural ceiling, not a separate claim
+that allocating 500,000 result objects is safe in every runtime. It follows
+from the positive-horizon rule and the one-million input-point cap. A future
+runtime execution policy may impose a smaller separately versioned limit, but
+this pure contract must not silently reduce a valid request.
 
 The input NAV policy's `distributionSummary=forbidden` field means that Phase
 1C does not embed risk summaries. It does not prevent separately versioned
@@ -379,8 +388,16 @@ blockers: []
 ```
 
 `pathDrawdowns` contains exactly `pathCount` rows in canonical ascending
-`pathIndex` order. It does not contain raw NAV points, peak or trough values,
-indices, source dates, terminal-loss flags, or aggregate statistics.
+`pathIndex` order:
+
+```text
+pathDrawdowns.length === pathCount
+```
+
+The output must never contain a truncated prefix, selected subset, reduced
+row set, replacement row, or partial path result. It does not contain raw NAV
+points, peak or trough values, indices, source dates, terminal-loss flags, or
+aggregate statistics.
 
 A blocked result has one exact projection:
 
@@ -472,11 +489,23 @@ Both policies inherit the Phase 1C exact input bound:
 ```text
 maxInputNavPoints: 1,000,000
 totalInputNavPoints = pathCount * (horizon + 1)
+
+derivedMaxPathDrawdownRows = floor(1,000,000 / (horizon + 1))
+pathCount <= derivedMaxPathDrawdownRows <= 500,000
+pathDrawdowns.length = pathCount
 ```
 
 Safe integer arithmetic and the input-point cap must be checked before metric
-output allocation. No path subset, denominator reduction, output truncation,
-or silent fallback is allowed to satisfy the bound.
+output allocation. The maximum-drawdown helper must also check the validated
+`pathCount` against the derived row bound before allocating `pathDrawdowns`.
+Because `horizon >= 1`, the largest possible derived row bound is 500,000 at
+`horizon = 1`.
+
+No path subset, denominator reduction, output truncation, output-row
+reduction, partial output, or silent fallback is allowed to satisfy the
+bound. An input that exceeds the point-derived bound is already classified by
+`input_nav_too_large` or `input_nav_shape_invalid`; this amendment introduces
+no separate drawdown-output blocker.
 
 Expected direct costs are:
 
@@ -529,14 +558,21 @@ Terminal-loss fixtures:
 
 Maximum-drawdown fixtures:
 
+- an exact derived-bound artifact with `pathCount=500,000`, `horizon=1`, and
+  `totalPointCount=1,000,000`;
+- a one-row-over artifact with `pathCount=500,001`, `horizon=1`, and
+  `totalPointCount=1,000,002` mapping to `input_nav_too_large` and an empty
+  blocked output;
+- a ready result containing exactly `pathCount` rows in sequential canonical
+  `pathIndex` order with no partial, truncated, selected, or reduced row set;
 - a nondecreasing path producing literal `0` rather than negative zero;
 - a decline from the step-zero baseline before any new high;
 - a new running peak followed by a larger decline;
 - recovery after a trough not erasing the earlier maximum;
 - multiple paths preserving separate canonical per-path results;
 - the exact arithmetic order and nonnegative fraction sign convention;
-- extreme positive finite inputs whose division underflows to zero mapping to
-  `invalid_drawdown` rather than clamping to `1`;
+- `1 -> Number.MAX_VALUE -> Number.MIN_VALUE` whose division underflows to
+  zero mapping to `invalid_drawdown` rather than clamping to `1`;
 - no aggregate mean, percentile, expected shortfall, peak/trough metadata,
   duration, recovery, or formatted percentage in output.
 
