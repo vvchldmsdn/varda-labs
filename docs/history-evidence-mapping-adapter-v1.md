@@ -3,7 +3,9 @@
 Last updated: 2026-07-12
 
 Status: pure mapping adapter and fixtures implemented. The existing History
-query, read model, route, and UI are unchanged.
+query, read model, route, and UI are unchanged. Product integration is blocked
+until the History Date-Axis and Coverage Manifest Contract has an approved
+manifest and resolver.
 
 ## Purpose
 
@@ -59,9 +61,12 @@ evidence, not a missing value.
 - duplicate named-account evidence or source mismatch: `ambiguous`
 - invalid source or non-finite value: `invalid`
 
-The only reconstruction method in V1 is
-`history_all_account_sum_v1`. It is display-derived evidence and does not gain
-calculation eligibility.
+The only reconstruction method in this fixture adapter is
+`history_all_account_sum_v1`. Its fixed three-account component set is not an
+approved permanent product policy. A future manifest-aware adapter must use the
+date-specific active component set from the History Date-Axis and Coverage
+Manifest Contract. The reconstruction remains display-derived evidence and
+does not gain calculation eligibility.
 
 ## Date Semantics
 
@@ -105,7 +110,8 @@ V1 does not:
 
 ## Next Gate
 
-The next step may connect this metadata to `/history` as a read-only coverage
-surface. That integration first needs an explicit reviewed source for the
-balance and portfolio required-date axes. Provider repair and display
+Do not connect this metadata to `/history` yet. The next step is a separately
+reviewed manifest instance and pure resolver under
+`history-date-axis-coverage-manifest-v1.md`. That contract must supply the exact
+lane-specific date axis and active components. Provider repair and display
 interpolation remain later, separate gates.
