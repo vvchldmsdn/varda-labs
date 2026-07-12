@@ -2,12 +2,29 @@
 
 Last updated: 2026-07-12
 
-Status: `docs_only_unapproved_decision_packet`.
+Status: `docs_only_approved_storage_model_decision`.
 
-Decision status: `awaiting_explicit_approval`.
+Decision status: `approved_by_explicit_user_decision_2026-07-12`.
 
-Recommended model:
+Approved model:
 `normalized_immutable_approval_header_and_vector_rows_with_transactional_terminal_state_and_append_only_lifecycle_audit`.
+
+## Approval Record
+
+On 2026-07-12, the user explicitly approved only the storage-model decision in
+this packet:
+
+- immutable approval-revision header;
+- normalized canonical vector child rows;
+- lifecycle audit evidence recorded in the same transaction;
+- preservation of every explicit zero-weight row;
+- no duplicate JSON vector authority;
+- no `is_current` column.
+
+The approval explicitly excludes schema, migration, database writes,
+repository code, auth, runtime execution, API, and UI implementation. It does
+not create an approved vector, approve a vector seed or import, or establish
+runtime trust.
 
 ## Purpose
 
@@ -27,8 +44,8 @@ Postgres without confusing approval state with simulation execution state.
 
 ## Decision Boundary
 
-The decision requested by this packet is whether to carry the following model
-into a later schema-design gate:
+The approved decision carries the following model into a later, separately
+reviewed schema-design gate:
 
 1. one normalized approval-revision header for immutable approval metadata;
 2. one normalized child row per canonical instrument weight;
@@ -39,9 +56,9 @@ into a later schema-design gate:
    lifecycle audit evidence;
 6. no duplicate JSON vector authority and no `is_current` boolean.
 
-This is a recommendation, not an approval. Exact table names, column types,
+This approves only the storage-model basis. Exact table names, column types,
 DDL, index names, SQL, Drizzle declarations, and RLS policies remain outside
-this packet.
+this approval.
 
 ## Existing Invariants
 
@@ -536,13 +553,14 @@ This packet does not authorize or implement:
 
 ## Next Approval Boundary
 
-The immediate next decision is whether to approve the recommendation in this
-packet as the storage-model basis for a later schema contract.
+The storage-model decision is approved. The next optional gate is a docs-only
+schema contract with exact candidate table and column shapes, constraints,
+transaction boundaries, explicit projections, migration ordering, rollback
+behavior, and a no-data dry-run rehearsal plan.
 
-Approval of this packet would still not approve DDL or runtime code. A later
-schema-contract gate would need exact candidate table/column shapes,
-constraints, transaction boundaries, explicit projections, migration ordering,
-rollback behavior, and a no-data dry-run rehearsal before any implementation.
+That schema-contract gate is not approved by this record. DDL, Drizzle schema
+changes, migrations, repository code, database reads or writes, and runtime
+behavior remain closed until separately reviewed and explicitly approved.
 
 Auth runtime remains frozen. The later schema contract must continue to consume
 a future `TenantContext` and must not invent a temporary singleton or Basic Auth
