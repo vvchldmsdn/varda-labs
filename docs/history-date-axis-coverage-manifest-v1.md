@@ -38,6 +38,7 @@ The conceptual V1 shape is:
 ```text
 manifestVersion
 sourceAuthority
+validationEvidence
 lane: balance | portfolio
 account: brokerage | isa | irp | all
 mode: observed_only | explicit_date_list | declared_service_schedule
@@ -65,6 +66,18 @@ holdings, or account labels are not authority for coverage inception.
 
 Until a durable source exists, the only honest candidate is an explicitly
 reviewed manual manifest. This document does not approve an actual manifest.
+
+### `validationEvidence`
+
+Non-authoritative references used to review the candidate, such as a dated
+read-only row-count, duplicate, or null-value audit. Validation evidence does
+not define which rows are display evidence and does not become cadence,
+inception, schedule, or coverage authority.
+
+This field is provenance for review and is not one of the five manifest
+identity fields. Changing the source authority requires a new candidate;
+refreshing a read-only validation reference does not silently approve that
+candidate.
 
 ### `coverageStartDate` and `coverageEndDate`
 

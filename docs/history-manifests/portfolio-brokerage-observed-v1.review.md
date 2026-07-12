@@ -12,7 +12,7 @@ coverage declaration, schedule, or permission to change `/history`.
 
 ```text
 manifestVersion: portfolio-brokerage-observed-v1
-sourceAuthority: stored_daily_portfolio_snapshots_read_audit_v1
+sourceAuthority: stored_daily_portfolio_snapshots_display_evidence_v1
 lane: portfolio
 account: brokerage
 mode: observed_only
@@ -32,8 +32,8 @@ The following fields are deliberately absent and forbidden in this mode:
 
 ## Source-Authority Meaning
 
-`stored_daily_portfolio_snapshots_read_audit_v1` authorizes only a read-only
-review of stored brokerage portfolio snapshot rows as display evidence.
+`stored_daily_portfolio_snapshots_display_evidence_v1` identifies stored daily
+portfolio snapshot rows as display evidence for this observed-only candidate.
 
 It does not make those rows authoritative for:
 
@@ -46,7 +46,20 @@ It does not make those rows authoritative for:
 - provider backfill or repair.
 
 The authority name is local to this candidate. It is not an approved global
-enum or database value.
+enum or database value. A read-only audit is validation provenance, not the
+source authority.
+
+## Validation Evidence
+
+```text
+validationEvidence:
+- repository_data_integrity_audit_2026-07-12T00:47:06.560Z
+- portfolio_named_account_source_summary_read_2026-07-12
+```
+
+These references support human review of the candidate. They are not manifest
+identity fields and do not authorize stored-row cadence, coverage, or
+inception semantics.
 
 ## Read-Only Evidence Review
 
