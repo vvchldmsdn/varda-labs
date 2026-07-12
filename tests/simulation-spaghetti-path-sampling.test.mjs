@@ -190,32 +190,29 @@ describe("Simulation deterministic spaghetti path sampling Phase 1E0", () => {
   });
 
   it("keeps the input cap inclusive and blocks a safely calculated overage", () => {
-    const atCap = syntheticSpaghettiPathSampleInput({ sampleCount: 1 });
-    atCap.normalizedNav.horizon = 15_624;
-    atCap.normalizedNav.pathCount = 64;
-    atCap.normalizedNav.totalPointCount = 1_000_000;
-    atCap.normalizedNav.totalNavCells = 1_000_000;
-    atCap.normalizedNav.paths = Array.from({ length: 64 }, (_, pathIndex) => ({
-      pathIndex,
-      points: new Array(15_625),
-    }));
-
-    const overCap = syntheticSpaghettiPathSampleInput({ sampleCount: 1 });
-    overCap.normalizedNav.horizon = 15_384;
-    overCap.normalizedNav.pathCount = 65;
-    overCap.normalizedNav.totalPointCount = 1_000_025;
-    overCap.normalizedNav.totalNavCells = 1_000_025;
-    overCap.normalizedNav.paths = [];
+    const atCap = syntheticCapSizedSpaghettiPathSampleInput({
+      pathCount: 64,
+      pointCount: 15_625,
+      sampleCount: 1,
+    });
+    const overCap = syntheticCapSizedSpaghettiPathSampleInput({
+      pathCount: 65,
+      pointCount: 15_385,
+      sampleCount: 1,
+    });
 
     assert.equal(
       SIMULATION_SPAGHETTI_PATH_SAMPLE_POLICY.maxInputNavPoints,
       1_000_000,
     );
-    assertBlocked(sampleSimulationSpaghettiPaths(atCap), [
-      "input_nav_shape_invalid",
-    ]);
+    const validCap = sampleSimulationSpaghettiPaths(atCap);
+    assert.equal(validCap.sampleStatus, "ready");
+    assert.equal(validCap.inputPathCount, 64);
+    assert.equal(validCap.horizon, 15_624);
+    assert.equal(validCap.totalInputPointCount, 1_000_000);
+    assert.equal(validCap.totalOutputPointCount, 15_625);
+    assert.deepEqual(selectedIndices(validCap), [31]);
     assertBlocked(sampleSimulationSpaghettiPaths(overCap), [
-      "input_nav_shape_invalid",
       "input_nav_too_large",
     ]);
   });
@@ -497,4 +494,28 @@ function assertBlockedProjection(result) {
   assert.deepEqual(result.selectedPaths, []);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.selectedPaths), true);
+}
+
+function syntheticCapSizedSpaghettiPathSampleInput({
+  pathCount,
+  pointCount,
+  sampleCount,
+}) {
+  const input = syntheticSpaghettiPathSampleInput({ sampleCount });
+  const points = Array.from({ length: pointCount }, (_, stepIndex) => ({
+    stepIndex,
+    nav: stepIndex === 0 ? 1 : 1 + stepIndex / 1_000_000,
+  }));
+  const totalPointCount = pathCount * pointCount;
+
+  input.normalizedNav.horizon = pointCount - 1;
+  input.normalizedNav.pathCount = pathCount;
+  input.normalizedNav.totalPointCount = totalPointCount;
+  input.normalizedNav.totalNavCells = totalPointCount;
+  input.normalizedNav.paths = Array.from({ length: pathCount }, (_, pathIndex) => ({
+    pathIndex,
+    points,
+  }));
+
+  return input;
 }
