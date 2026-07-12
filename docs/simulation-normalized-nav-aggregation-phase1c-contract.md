@@ -17,14 +17,27 @@ Phase 1C answers one narrow pure-calculation question:
 It does not decide whether a vector is approved at runtime. It does not read an
 approval Markdown file or establish artifact ownership or trust.
 
-## Approved Portfolio Meaning
+## Versioned Policy
 
-The calculation follows the separately approved policy:
+The proposed Phase 1C policy is:
 
 ```text
+policy.version: simulation_normalized_nav_v1
+policy.inputGrossGrowthVersion: simulation_gross_growth_v1
 portfolioPathPolicyId: gross_normalized_buy_and_hold_v1
 Gate0ApprovalCommit: 652b9ea9c9b48f51dc4c68e8f148132ca8893d7e
+weightedSumAlgorithm: neumaier_compensated_sum_v1
+weightedSumOrder: canonical_instrument_order
+baseline: literal_one_at_step_zero
+runtimeTrustStatus: not_established
+maxNavPoints: 1,000,000
 ```
+
+The portfolio-path policy and Gate 0 commit were separately approved. This
+docs-only contract proposes the Phase 1C version and engineering details; it
+does not approve an implementation or execution.
+
+## Approved Portfolio Meaning
 
 For every path:
 
@@ -41,6 +54,9 @@ NAV[path, step] =
 Weights describe the initial allocation only. The per-instrument gross-growth
 factors already represent buy-and-hold compounding, so Phase 1C does not
 rebalance or update the weights at later steps.
+
+The exact algorithm is part of the Phase 1C policy so the same valid input does
+not produce implementation-dependent summation drift.
 
 Output is dimensionless normalized NAV. It is not KRW wealth, a forecast
 calendar, a probability summary, or a recommendation.
@@ -168,7 +184,9 @@ derived from a matching hash.
 - the recalculated vector hash matches the supplied hash.
 
 Zero weight is explicit and valid. Missing rows must not be converted to zero,
-and valid rows must not be renormalized.
+and valid rows must not be renormalized. A zero-weight row still requires a
+valid matching gross-growth factor at every point; zero weight must not hide
+missing, malformed, non-finite, or non-positive evidence.
 
 ### Gross-growth artifact
 
@@ -197,10 +215,31 @@ increasing `stepIndex`, and factors in canonical instrument order.
 
 - Step zero is emitted as literal `NAV=1` after baseline and total-weight
   validation. It is not obtained by a potentially rounded floating-point sum.
-- Later steps use the approved weighted-sum formula with full JavaScript number
-  precision and no presentation rounding.
+- Before summation, every factor is validated, including factors whose vector
+  weight is zero.
+- Later steps use the approved weighted-sum formula with Neumaier compensated
+  summation in canonical instrument order and no presentation rounding.
 - Any non-finite or non-positive computed NAV blocks the whole result.
 - No partial path output is returned after a blocker.
+
+For each weighted term, the future helper must apply this exact recurrence:
+
+```text
+term = (weightBps / 10,000) * grossGrowth
+next = sum + term
+
+if abs(sum) >= abs(term):
+  compensation += (sum - next) + term
+else:
+  compensation += (term - next) + sum
+
+sum = next
+NAV = sum + compensation
+```
+
+The helper must validate that `term`, `sum`, `compensation`, and final `NAV`
+remain finite. It must not replace this policy with native unordered reduction,
+rounding, decimal formatting, or a different compensated-sum variant.
 
 Each output point may contain only:
 
@@ -222,7 +261,8 @@ A ready result may contain only:
 
 - `calculationStatus=ready`;
 - `runtimeTrustStatus=not_established`;
-- Phase 1C policy and approved portfolio-path policy revisions;
+- Phase 1C policy, weighted-sum algorithm, and approved portfolio-path policy
+  revisions;
 - scenario id and version;
 - `scenarioVectorHash`, `inputMatrixHash`, and `drawPlanHash` as separate
   fields;
@@ -268,7 +308,8 @@ than relying on that incidental relationship.
 - scenario vector hash mismatch;
 - missing or mismatched expected matrix or draw-plan hash;
 - invalid baseline, path, point, factor, count, or provenance shape;
-- non-finite or non-positive factor or NAV;
+- non-finite factor, weighted term, sum, compensation, or NAV;
+- non-positive factor or NAV;
 - unsafe or over-limit NAV output size.
 
 Blocked output must use deterministic reason codes and contain no partial NAV
@@ -277,8 +318,10 @@ paths.
 ## Required Synthetic Fixtures Before Implementation
 
 - deterministic two-instrument weighted NAV calculation;
+- pinned magnitude-skew fixture for `neumaier_compensated_sum_v1`;
 - exact literal baseline one;
 - one-instrument and explicit zero-weight operation;
+- invalid factor on a zero-weight instrument remaining blocked;
 - out-of-order vector or gross-growth instruments remaining blocked;
 - scenario id, version, weight, and vector-hash sensitivity;
 - policy id and Gate 0 revision mismatch;
