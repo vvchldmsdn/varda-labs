@@ -330,17 +330,34 @@ This Gate 0 does not authorize or implement:
 
 Runtime implementation is not ready for approval.
 
-The next safe non-auth slice is a docs-only design for the server-owned
-approved-scenario persistence and repository boundary. It should define the
-normalized owner relationship, lifecycle/current-record invariants, exact
-projection, collision behavior, and repository port mapping without creating a
-table or reading current production data.
+The logical owner relationship, immutable lifecycle, current-record invariant,
+owner-first lookup, collision behavior, six repository port states, and
+minimized vector projection are already defined in
+`docs/simulation-scenario-vector-resolver-approval-source-trust-boundary-contract.md`.
+The corresponding pure resolver state machine is closed out in
+`docs/simulation-scenario-vector-resolver-implementation-close-out.md`.
+Repeating those decisions in another persistence-boundary document is not a
+new migration slice.
 
-That design must continue to consume a future `TenantContext` rather than
-inventing a temporary singleton or Basic Auth tenant. Schema/migration work,
-repository code, and any production read or write require later separate
-approval.
+The next unresolved non-auth candidate is a separately approved docs-only
+storage-model decision. It would need to choose, without writing DDL:
+
+- normalized header/vector-row storage versus an immutable JSON vector;
+- append-only lifecycle events versus another audited terminal-transition
+  representation;
+- how exact identity, revision uniqueness, and zero-or-one current approval
+  could be enforced atomically;
+- how supersession and identical-vector reapproval would remain transactional;
+- the exact server-only projection used by a future repository adapter;
+- which protections belong to application DAL checks and which require a
+  later independent RLS gate.
+
+This Gate 0 does not approve that storage decision. Any later design must
+consume a future `TenantContext` rather than inventing a temporary singleton or
+Basic Auth tenant. Schema, migration, repository code, current production-data
+reads, and writes require still later separate approval.
 
 Execution-parameter authority and orchestration remain separate gates after the
-approved-vector authority is designed. Expected shortfall and product UI also
-remain closed until their own meaning and runtime prerequisites are approved.
+approved-vector storage model is decided and implemented through its own gates.
+Expected shortfall and product UI also remain closed until their own meaning and
+runtime prerequisites are approved.
