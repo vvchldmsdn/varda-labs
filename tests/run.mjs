@@ -14,6 +14,7 @@ import "./additional-contribution-ma120-evidence.test.mjs";
 import "./simulation-return-matrix.test.mjs";
 import "./simulation-return-matrix-universe-evidence.test.mjs";
 import "./simulation-period-request-resolver.test.mjs";
+import "./simulation-period-preflight.test.mjs";
 import "./simulation-stationary-bootstrap.test.mjs";
 import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";

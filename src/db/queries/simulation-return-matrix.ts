@@ -5,6 +5,10 @@ import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { assetPriceSnapshots, fxRates } from "@/db/schema";
 import {
+  loadSimulationPeriodPreflight,
+  type SimulationPeriodPreflightRequest,
+} from "@/lib/simulation-period-preflight-loader";
+import {
   loadSimulationReturnMatrixUniverseEvidence,
   type SimulationReturnMatrixReadRepository,
 } from "@/lib/simulation-return-matrix-read-loader";
@@ -68,6 +72,15 @@ export async function getReadOnlySimulationReturnMatrixUniverseEvidence(
   request: SimulationReturnMatrixUniverseRequest,
 ) {
   return loadSimulationReturnMatrixUniverseEvidence(
+    drizzleSimulationReturnMatrixRepository,
+    request,
+  );
+}
+
+export async function getReadOnlySimulationPeriodPreflight(
+  request: SimulationPeriodPreflightRequest,
+) {
+  return loadSimulationPeriodPreflight(
     drizzleSimulationReturnMatrixRepository,
     request,
   );
