@@ -6,6 +6,8 @@ const CONTRACT_PATHS = [
   "src/lib/session-resolver-policy.ts",
 ];
 const CONTRACT_IMPORT_PATTERN = /session-resolver-(?:contract|policy)/;
+const IMPORT_FROM_PATTERN =
+  /^\s*import\s+([\s\S]*?)\s+from\s+["']([^"']+)["'];?[ \t]*(?:\r?\n|$)/gm;
 const PURE_CONTRACT_FORBIDDEN_PATTERN =
   /^\s*import\s|@neondatabase|drizzle|DATABASE_URL|process\.env|\bfetch\s*\(|\bcookies\s*\(|\bheaders\s*\(|next\/server|from\s+["']react["']|\bcache\s*\(/m;
 const IDENTITY_DML_PATTERN =
@@ -48,7 +50,10 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
   for (const path of productionPaths) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) continue;
-    if (CONTRACT_IMPORT_PATTERN.test(readFileSync(absolutePath, "utf8"))) {
+    const sourceWithoutTypeOnlyImports = stripTypeOnlyContractImports(
+      readFileSync(absolutePath, "utf8"),
+    );
+    if (CONTRACT_IMPORT_PATTERN.test(sourceWithoutTypeOnlyImports)) {
       productionImports += 1;
     }
   }
@@ -91,6 +96,17 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
       cacheImplementations: 0,
     },
   };
+}
+
+function stripTypeOnlyContractImports(source) {
+  return source.replace(
+    IMPORT_FROM_PATTERN,
+    (statement, importClause, specifier) =>
+      CONTRACT_IMPORT_PATTERN.test(specifier) &&
+      /^type\b/.test(importClause.trim())
+        ? ""
+        : statement,
+  );
 }
 
 function failedResult(findings, inspectedProductionFiles) {

@@ -19,6 +19,7 @@ import "./simulation-period-preflight.test.mjs";
 import "./simulation-stationary-bootstrap.test.mjs";
 import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";
+import "./simulation-scenario-vector-resolver.test.mjs";
 import "./simulation-normalized-nav.test.mjs";
 import "./target-policy-evidence.test.mjs";
 import "./target-policy-review-packet.test.mjs";

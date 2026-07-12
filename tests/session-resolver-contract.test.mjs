@@ -273,7 +273,7 @@ describe("provider-neutral session resolver Phase 1G0", () => {
     });
   });
 
-  it("has no production import, SDK, DB, route, identity write, or cache implementation", () => {
+  it("has no production runtime import, SDK, DB, route, identity write, or cache implementation", () => {
     const result = auditSessionResolverContract({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
