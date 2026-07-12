@@ -53,12 +53,16 @@ export function validateSimulationPathMaxDrawdownDistributionSummaryInput(
     reasons.add("input_drawdown_shape_invalid");
   }
 
-  const pathMaxDrawdown = wrapperKeys.has("pathMaxDrawdown")
-    ? wrapper.pathMaxDrawdown
-    : undefined;
-  const expectedBinding = wrapperKeys.has("expectedBinding")
-    ? wrapper.expectedBinding
-    : undefined;
+  const pathMaxDrawdown = readDeclaredValue(
+    wrapper,
+    wrapperKeys,
+    "pathMaxDrawdown",
+  );
+  const expectedBinding = readDeclaredValue(
+    wrapper,
+    wrapperKeys,
+    "expectedBinding",
+  );
   const validatedBinding = validateExpectedBinding(expectedBinding, reasons);
 
   if (!isRecord(pathMaxDrawdown)) {
@@ -73,22 +77,38 @@ export function validateSimulationPathMaxDrawdownDistributionSummaryInput(
     return blocked(reasons);
   }
 
+  const artifactHasExactKeys = hasExactKeys(
+    pathMaxDrawdown,
+    PATH_MAX_DRAWDOWN_RESULT_KEYS,
+  );
+  const artifact = snapshotOwnEnumerableValues(
+    pathMaxDrawdown,
+    PATH_MAX_DRAWDOWN_RESULT_KEYS,
+  );
+  if (!artifact) {
+    reasons.add("input_drawdown_not_ready");
+    reasons.add("input_drawdown_shape_invalid");
+    return blocked(reasons);
+  }
+
+  const inputBlockerCount = readArrayLength(artifact.blockers);
+
   if (
-    pathMaxDrawdown.drawdownStatus !== "ready" ||
-    !Array.isArray(pathMaxDrawdown.blockers) ||
-    pathMaxDrawdown.blockers.length !== 0
+    artifact.drawdownStatus !== "ready" ||
+    inputBlockerCount === null ||
+    inputBlockerCount !== 0
   ) {
     reasons.add("input_drawdown_not_ready");
   }
   if (
-    pathMaxDrawdown.runtimeTrustStatus !==
+    artifact.runtimeTrustStatus !==
     SIMULATION_PATH_MAX_DRAWDOWN_DISTRIBUTION_SUMMARY_POLICY.runtimeTrustStatus
   ) {
     reasons.add("input_drawdown_runtime_trust_invalid");
   }
   if (
     !isExactPolicy(
-      pathMaxDrawdown.policy,
+      artifact.policy,
       SIMULATION_PATH_MAX_DRAWDOWN_POLICY,
     )
   ) {
@@ -97,28 +117,33 @@ export function validateSimulationPathMaxDrawdownDistributionSummaryInput(
 
   if (validatedBinding) {
     compareHash(
-      pathMaxDrawdown.scenarioVectorHash,
+      artifact.scenarioVectorHash,
       validatedBinding.expectedScenarioVectorHash,
       "scenario_vector_hash_mismatch",
       reasons,
     );
     compareHash(
-      pathMaxDrawdown.inputMatrixHash,
+      artifact.inputMatrixHash,
       validatedBinding.expectedInputMatrixHash,
       "input_matrix_hash_mismatch",
       reasons,
     );
     compareHash(
-      pathMaxDrawdown.drawPlanHash,
+      artifact.drawPlanHash,
       validatedBinding.expectedDrawPlanHash,
       "draw_plan_hash_mismatch",
       reasons,
     );
   }
 
-  const shape = validatePathMaxDrawdownShape(pathMaxDrawdown, reasons);
-  const scenarioId = pathMaxDrawdown.scenarioId;
-  const scenarioVersion = pathMaxDrawdown.scenarioVersion;
+  const shape = validatePathMaxDrawdownShape(
+    artifact,
+    artifactHasExactKeys,
+    inputBlockerCount,
+    reasons,
+  );
+  const scenarioId = artifact.scenarioId;
+  const scenarioVersion = artifact.scenarioVersion;
   if (
     typeof scenarioId !== "string" ||
     typeof scenarioVersion !== "string" ||
@@ -134,9 +159,9 @@ export function validateSimulationPathMaxDrawdownDistributionSummaryInput(
     !shape ||
     typeof scenarioId !== "string" ||
     typeof scenarioVersion !== "string" ||
-    !isSha256(pathMaxDrawdown.scenarioVectorHash) ||
-    !isSha256(pathMaxDrawdown.inputMatrixHash) ||
-    !isSha256(pathMaxDrawdown.drawPlanHash)
+    !isSha256(artifact.scenarioVectorHash) ||
+    !isSha256(artifact.inputMatrixHash) ||
+    !isSha256(artifact.drawPlanHash)
   ) {
     return blocked(reasons);
   }
@@ -145,9 +170,9 @@ export function validateSimulationPathMaxDrawdownDistributionSummaryInput(
     validated: Object.freeze({
       scenarioId,
       scenarioVersion,
-      scenarioVectorHash: pathMaxDrawdown.scenarioVectorHash,
-      inputMatrixHash: pathMaxDrawdown.inputMatrixHash,
-      drawPlanHash: pathMaxDrawdown.drawPlanHash,
+      scenarioVectorHash: artifact.scenarioVectorHash,
+      inputMatrixHash: artifact.inputMatrixHash,
+      drawPlanHash: artifact.drawPlanHash,
       horizon: shape.horizon,
       pathCount: shape.pathCount,
       totalPointCount: shape.totalPointCount,
@@ -161,21 +186,26 @@ function validateExpectedBinding(
   value: unknown,
   reasons: Set<SimulationPathMaxDrawdownDistributionSummaryBlockerReason>,
 ) {
+  if (!isRecord(value) || !hasExactKeys(value, EXPECTED_BINDING_KEYS)) {
+    reasons.add("expected_binding_invalid");
+    return null;
+  }
+
+  const binding = snapshotOwnEnumerableValues(value, EXPECTED_BINDING_KEYS);
   if (
-    !isRecord(value) ||
-    !hasExactKeys(value, EXPECTED_BINDING_KEYS) ||
-    !isSha256(value.expectedScenarioVectorHash) ||
-    !isSha256(value.expectedInputMatrixHash) ||
-    !isSha256(value.expectedDrawPlanHash)
+    !binding ||
+    !isSha256(binding.expectedScenarioVectorHash) ||
+    !isSha256(binding.expectedInputMatrixHash) ||
+    !isSha256(binding.expectedDrawPlanHash)
   ) {
     reasons.add("expected_binding_invalid");
     return null;
   }
 
   return Object.freeze({
-    expectedScenarioVectorHash: value.expectedScenarioVectorHash,
-    expectedInputMatrixHash: value.expectedInputMatrixHash,
-    expectedDrawPlanHash: value.expectedDrawPlanHash,
+    expectedScenarioVectorHash: binding.expectedScenarioVectorHash,
+    expectedInputMatrixHash: binding.expectedInputMatrixHash,
+    expectedDrawPlanHash: binding.expectedDrawPlanHash,
   });
 }
 
@@ -195,6 +225,8 @@ function compareHash(
 
 function validatePathMaxDrawdownShape(
   pathMaxDrawdown: Record<string, unknown>,
+  artifactHasExactKeys: boolean,
+  inputBlockerCount: number | null,
   reasons: Set<SimulationPathMaxDrawdownDistributionSummaryBlockerReason>,
 ): {
   horizon: number;
@@ -202,10 +234,7 @@ function validatePathMaxDrawdownShape(
   totalPointCount: number;
   drawdownValues: number[];
 } | null {
-  let shapeInvalid = !hasExactKeys(
-    pathMaxDrawdown,
-    PATH_MAX_DRAWDOWN_RESULT_KEYS,
-  );
+  let shapeInvalid = !artifactHasExactKeys;
   let invalidDrawdown = false;
   const horizon = pathMaxDrawdown.horizon;
   const pathCount = pathMaxDrawdown.pathCount;
@@ -234,23 +263,25 @@ function validatePathMaxDrawdownShape(
         SIMULATION_PATH_MAX_DRAWDOWN_POLICY.maxInputNavPoints);
   if (tooLarge) reasons.add("input_drawdown_too_large");
 
-  if (!Array.isArray(pathMaxDrawdown.blockers)) shapeInvalid = true;
-  if (!Array.isArray(pathDrawdowns) || pathDrawdowns.length !== pathCount) {
+  if (inputBlockerCount === null) shapeInvalid = true;
+  const pathDrawdownCount = readArrayLength(pathDrawdowns);
+  if (pathDrawdownCount === null || pathDrawdownCount !== pathCount) {
     shapeInvalid = true;
   }
 
   let drawdownValues: number[] | null = null;
   if (
     Array.isArray(pathDrawdowns) &&
-    pathDrawdowns.length === pathCount &&
+    pathDrawdownCount !== null &&
+    pathDrawdownCount === pathCount &&
     validHorizon &&
     validPathCount &&
     Number.isSafeInteger(calculatedPointCount) &&
     !tooLarge
   ) {
     drawdownValues = new Array<number>(pathCount);
-    for (let pathIndex = 0; pathIndex < pathDrawdowns.length; pathIndex += 1) {
-      const row = pathDrawdowns[pathIndex];
+    for (let pathIndex = 0; pathIndex < pathDrawdownCount; pathIndex += 1) {
+      const row = readArrayValue(pathDrawdowns, pathIndex);
       if (
         !isRecord(row) ||
         !hasExactKeys(row, PATH_DRAWDOWN_ROW_KEYS)
@@ -259,13 +290,17 @@ function validatePathMaxDrawdownShape(
         continue;
       }
 
-      const rowKeys = new Set(Object.keys(row));
-      const rowPathIndex = rowKeys.has("pathIndex")
-        ? row.pathIndex
-        : undefined;
-      const maxDrawdown = rowKeys.has("maxDrawdown")
-        ? row.maxDrawdown
-        : undefined;
+      const rowSnapshot = snapshotOwnEnumerableValues(
+        row,
+        PATH_DRAWDOWN_ROW_KEYS,
+      );
+      if (!rowSnapshot) {
+        shapeInvalid = true;
+        continue;
+      }
+
+      const rowPathIndex = rowSnapshot.pathIndex;
+      const maxDrawdown = rowSnapshot.maxDrawdown;
       if (rowPathIndex !== pathIndex) shapeInvalid = true;
       if (
         typeof maxDrawdown !== "number" ||
@@ -306,10 +341,62 @@ function isExactPolicy(
   actual: unknown,
   expected: Readonly<Record<string, unknown>>,
 ) {
-  if (!isRecord(actual)) return false;
-  const expectedKeys = Object.keys(expected);
-  if (!hasExactKeys(actual, expectedKeys)) return false;
-  return expectedKeys.every((key) => actual[key] === expected[key]);
+  try {
+    if (!isRecord(actual)) return false;
+    const expectedKeys = Object.keys(expected);
+    if (!hasExactKeys(actual, expectedKeys)) return false;
+    const policy = snapshotOwnEnumerableValues(actual, expectedKeys);
+    return (
+      policy !== null &&
+      expectedKeys.every((key) => policy[key] === expected[key])
+    );
+  } catch {
+    return false;
+  }
+}
+
+function readDeclaredValue(
+  value: Record<string, unknown>,
+  enumerableKeys: ReadonlySet<string>,
+  key: string,
+) {
+  if (!enumerableKeys.has(key)) return undefined;
+  try {
+    return value[key];
+  } catch {
+    return undefined;
+  }
+}
+
+function snapshotOwnEnumerableValues(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+) {
+  const snapshot: Record<string, unknown> = {};
+  try {
+    for (const key of keys) snapshot[key] = value[key];
+  } catch {
+    return null;
+  }
+  return snapshot;
+}
+
+function readArrayLength(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  try {
+    const length = value.length;
+    return Number.isSafeInteger(length) ? length : null;
+  } catch {
+    return null;
+  }
+}
+
+function readArrayValue(value: unknown[], index: number) {
+  try {
+    return value[index];
+  } catch {
+    return undefined;
+  }
 }
 
 function hasExactKeys(value: Record<string, unknown>, expected: string[]) {

@@ -253,6 +253,104 @@ describe("Simulation path maximum drawdown distribution Phase 1F1", () => {
     ]);
   });
 
+  it("binds and returns the same one-read artifact hash snapshot", () => {
+    const input = syntheticPathMaxDrawdownDistributionSummaryInput();
+    const expectedHash = input.expectedBinding.expectedScenarioVectorHash;
+    const changedHash = `sha256:${"d".repeat(64)}`;
+    let reads = 0;
+    Object.defineProperty(input.pathMaxDrawdown, "scenarioVectorHash", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? expectedHash : changedHash;
+      },
+    });
+
+    const result = summarizeSimulationPathMaxDrawdownDistribution(input);
+
+    assert.equal(result.summaryStatus, "ready");
+    assert.equal(result.scenarioVectorHash, expectedHash);
+    assert.equal(reads, 1);
+  });
+
+  it("compares a mutable expected binding from one snapshot", () => {
+    const input = syntheticPathMaxDrawdownDistributionSummaryInput();
+    const expectedHash = input.pathMaxDrawdown.scenarioVectorHash;
+    const changedHash = `sha256:${"d".repeat(64)}`;
+    let reads = 0;
+    Object.defineProperty(
+      input.expectedBinding,
+      "expectedScenarioVectorHash",
+      {
+        configurable: true,
+        enumerable: true,
+        get() {
+          reads += 1;
+          return reads === 1 ? expectedHash : changedHash;
+        },
+      },
+    );
+
+    const result = summarizeSimulationPathMaxDrawdownDistribution(input);
+
+    assert.equal(result.summaryStatus, "ready");
+    assert.equal(result.scenarioVectorHash, expectedHash);
+    assert.equal(reads, 1);
+  });
+
+  it("fail-closes throwing artifact and binding getters", () => {
+    const artifact = syntheticPathMaxDrawdownDistributionSummaryInput();
+    Object.defineProperty(artifact.pathMaxDrawdown, "scenarioVectorHash", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        throw new Error("artifact getter failure");
+      },
+    });
+    const binding = syntheticPathMaxDrawdownDistributionSummaryInput();
+    Object.defineProperty(
+      binding.expectedBinding,
+      "expectedScenarioVectorHash",
+      {
+        configurable: true,
+        enumerable: true,
+        get() {
+          throw new Error("binding getter failure");
+        },
+      },
+    );
+
+    assertBlocked(summarizeSimulationPathMaxDrawdownDistribution(artifact), [
+      "input_drawdown_not_ready",
+      "input_drawdown_shape_invalid",
+    ]);
+    assertBlocked(summarizeSimulationPathMaxDrawdownDistribution(binding), [
+      "expected_binding_invalid",
+    ]);
+  });
+
+  it("consumes each maxDrawdown getter exactly once", () => {
+    const input = syntheticPathMaxDrawdownDistributionSummaryInput();
+    const row = input.pathMaxDrawdown.pathDrawdowns[2];
+    let reads = 0;
+    Object.defineProperty(row, "maxDrawdown", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? 0.2 : Number.NaN;
+      },
+    });
+
+    const result = summarizeSimulationPathMaxDrawdownDistribution(input);
+
+    assert.equal(result.summaryStatus, "ready");
+    assert.equal(reads, 1);
+    assertClose(result.maxDrawdownQuantiles.p50, 0.2);
+    assertClose(result.maxDrawdownQuantiles.p90, 0.36);
+  });
+
   it("keeps status, trust, policy, and binding failures distinct", () => {
     const status = syntheticPathMaxDrawdownDistributionSummaryInput();
     status.pathMaxDrawdown.drawdownStatus = "blocked";
