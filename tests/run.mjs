@@ -29,6 +29,7 @@ import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";
 import "./market-context.test.mjs";
 import "./history-balance.test.mjs";
+import "./history-evidence-mapping.test.mjs";
 import "./cron-preflight.test.mjs";
 import "./live-price-write.test.mjs";
 import "./fx-refresh.test.mjs";
