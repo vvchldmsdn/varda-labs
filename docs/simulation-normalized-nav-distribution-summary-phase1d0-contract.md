@@ -133,6 +133,17 @@ shape rather than trusting TypeScript types alone:
 - every step-zero NAV is exactly literal `1`;
 - no point, path, or step is missing, duplicated, reordered, or extra.
 
+Status classification is explicit:
+
+- `calculationStatus` other than `ready` or a nonempty input blocker list adds
+  `input_nav_not_ready`;
+- top-level `runtimeTrustStatus` other than `not_established` adds
+  `input_nav_runtime_trust_invalid`;
+- drift in the separate Phase 1C policy object adds
+  `input_nav_policy_mismatch`.
+
+These checks remain distinct even if more than one reason applies.
+
 An out-of-order path array or a path whose `pathIndex` does not equal its
 canonical array position is `input_nav_shape_invalid`. Phase 1D0 must not sort,
 relabel, or otherwise repair path input. Numeric sorting is allowed only for
@@ -306,6 +317,7 @@ The future implementation should use a fixed deduplicated blocker order:
 
 ```text
 input_nav_not_ready
+input_nav_runtime_trust_invalid
 input_nav_policy_mismatch
 expected_binding_invalid
 scenario_vector_hash_mismatch
@@ -364,7 +376,10 @@ This complexity statement does not authorize production execution.
   identical bands, without mutating either input;
 - identical summaries when only ignored draw/source/date provenance fields
   differ, proving those fields are not consumed;
-- policy, ready-status, blocker, runtime-trust, and hash-binding mismatch;
+- ready-status or nonempty input blockers mapping to `input_nav_not_ready`;
+- a top-level runtime-trust mismatch mapping to exactly
+  `input_nav_runtime_trust_invalid` when every other input is valid;
+- Phase 1C policy and hash-binding mismatch remaining separately classified;
 - missing, duplicate, reordered, and extra path or step;
 - invalid counts and unsafe count multiplication;
 - non-finite, zero, and negative NAV at baseline and later steps;
