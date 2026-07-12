@@ -135,12 +135,24 @@ permission.
 
 A future product may allow a user to select among that user's own reviewed
 scenarios. The only request-derived fields that may eventually be considered
-are normalized selectors such as:
+are canonical selectors such as:
 
 ```text
 scenarioId
 scenarioVersion
 ```
+
+Both values must already match the exact descriptor rule used by the existing
+Scenario Vector Review Packet:
+
+```text
+^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$
+```
+
+Selector equality is case-sensitive. The resolver must not coerce a non-string
+value, trim whitespace, change case, infer `latest`, insert a default, or roll
+to another version. Missing, empty, noncanonical, or malformed selectors are
+typed failures before repository access.
 
 These values are untrusted lookup selectors, not authority. They may narrow an
 already owner-scoped repository query, but they cannot:
@@ -171,10 +183,12 @@ canonicalVector[]:
   ticker
   weightBps
 scenarioVectorHash
-approvalRevision
 lifecycleStatus: approved | revoked | superseded
-approvedAt
-serverAuditMetadata
+auditEnvelope:
+  version: scenario_vector_approval_audit_v1
+  decisionKind: explicit_approval
+  approvalRevision
+  approvedAt
 ```
 
 The scenario identity, policy revision, vector, and hash for one approval
@@ -183,9 +197,59 @@ fields into a different vector. A future persistence contract must define an
 append-only lifecycle event or another audited transition model before any
 schema is created.
 
-Changing an instrument, weight, policy revision, scenario id, or scenario
-version requires a new exact approval record and hash. A changed matrix or draw
-plan does not mutate the vector approval record.
+`approvalRevision` must be a positive safe integer. Revisions for one exact
+approval identity are unique and strictly increasing, but they need not be
+contiguous. `approvedAt` must be a canonical valid UTC ISO instant rather than
+a locale string. The audit envelope contains no actor profile, email, provider
+subject, note, request payload, token, or raw audit document.
+
+Changing an instrument, weight, policy revision, Gate 0 revision, scenario id,
+or scenario version requires a new exact approval record and hash. Any policy,
+Gate 0, or vector change also requires a new `scenarioVersion`; it cannot be
+hidden behind a new approval revision of the same selector. A changed matrix or
+draw plan does not mutate the vector approval record.
+
+## Current Approval And Lifecycle Invariants
+
+The exact approval identity is:
+
+```text
+(canonicalOwnerUserId,
+ portfolioPathPolicyId,
+ gate0ApprovalCommit,
+ scenarioId,
+ scenarioVersion)
+```
+
+For each identity, there may be zero or one current `approved` record, never
+more than one. Resolver success requires exactly one. The absence of a current
+record is a typed blocked result, not a reason to select a terminal or older
+revision.
+
+Only these lifecycle transitions are permitted:
+
+```text
+approved -> revoked
+approved -> superseded
+```
+
+`revoked` and `superseded` are terminal. Neither can be reactivated or changed
+to the other terminal state. A new approval creates a new immutable revision;
+it never rewrites or reactivates an old revision.
+
+When a new revision replaces a currently approved revision of the same exact
+identity, the previous approved revision becomes `superseded`. The new revision
+must preserve the same policy, Gate 0 revision, scenario identity, canonical
+vector, and hash. If those fields change, the caller must use a new
+`scenarioVersion` and obtain a separate approval.
+
+A new identical approval after a revocation may create a higher revision, but
+the revoked record remains terminal. Multiple scenario versions may remain
+independently approved because selection always requires an exact version;
+there is no implicit latest-version policy.
+
+The repository must not fall back to a revoked, superseded, older, newest, or
+otherwise inferred revision.
 
 ## Repository Port Boundary
 
@@ -198,7 +262,7 @@ type ScenarioSelector = Readonly<{
 }>;
 
 interface ApprovedScenarioVectorRepository {
-  findExactCurrentForTenant(input: Readonly<{
+  findExactForTenant(input: Readonly<{
     tenantContext: TenantContext;
     selector: ScenarioSelector;
   }>): Promise<OwnerScopedApprovalRecordResult>;
@@ -212,6 +276,36 @@ The repository must not accept a standalone owner UUID from a public or job
 payload. Internal extraction of `tenantContext.ownerUserId` belongs inside the
 server-only data-access boundary.
 
+The future pure resolver must consume a normalized repository port result, not
+a database row list:
+
+```ts
+type ApprovalAuditStatus = "verified" | "invalid" | "unavailable";
+
+type OwnerScopedApprovalRecordResult =
+  | Readonly<{ state: "not_found" }>
+  | Readonly<{ state: "not_current" }>
+  | Readonly<{ state: "unavailable" }>
+  | Readonly<{ state: "collision" }>
+  | Readonly<{
+      state: "loaded";
+      record: OwnerScopedApprovalRecord;
+      auditStatus: ApprovalAuditStatus;
+    }>;
+```
+
+`not_found` means no exact owner-scoped selector identity exists.
+`not_current` means matching history exists but no current approved revision is
+eligible. `collision` represents ambiguous cardinality or lifecycle lineage.
+The repository, not the pure resolver, performs owner-first retrieval and
+reduces storage evidence to one of these states.
+
+The pure resolver validates a `loaded` record and requires
+`auditStatus=verified`. It does not receive or parse raw audit metadata and
+does not claim to verify the authority of an actor, provider session, database
+transaction, or audit document. Establishing `auditStatus` is a later
+server-repository responsibility.
+
 ## Resolver Validation
 
 Before producing vector evidence, a future resolver must fail closed unless:
@@ -219,17 +313,19 @@ Before producing vector evidence, a future resolver must fail closed unless:
 - the tenant context came from the existing verified active mapping contract;
 - exactly one record matches owner, scenario id, and scenario version;
 - the record lifecycle is currently `approved`;
+- the repository audit-status port is `verified`;
 - no revoked, superseded, duplicate, or conflicting current record is
   eligible;
 - `portfolioPathPolicyId` and the Gate 0 revision match the supported policy;
-- scenario id and version are valid exact descriptors;
+- scenario id and version are strings that already match the exact canonical
+  descriptor rule and equal the selector without coercion or normalization;
 - canonical vector rows are complete, unique, already ordered, and use
   supported identity rules;
 - every weight is an integer from 0 through 10,000 basis points;
 - the complete vector totals exactly 10,000 basis points;
 - the recalculated `scenarioVectorHash` matches the stored hash;
-- record revision, lifecycle, timestamp, and server audit evidence are
-  structurally valid;
+- record revision, lifecycle, timestamp, and minimal immutable audit envelope
+  are structurally valid;
 - no owner, identity, vector, or lifecycle ambiguity remains.
 
 The resolver must not sort an out-of-order trusted record into validity,
@@ -246,6 +342,7 @@ must distinguish:
 - owner-scoped scenario not found;
 - approval not current;
 - approval-record collision or ambiguity;
+- approval audit invalid or unavailable;
 - policy or Gate 0 mismatch;
 - invalid canonical vector or total;
 - scenario-vector hash mismatch;
@@ -253,9 +350,9 @@ must distinguish:
 - repository unavailable.
 
 Public responses and logs must not include owner UUIDs, provider subjects,
-vector rows, hashes, approval metadata, database ids, or raw repository
-errors. Internal diagnostics may retain reviewed identifiers only under a
-separate server audit policy.
+vector rows, hashes, approval revisions, audit envelopes, database ids, or raw
+repository errors. Internal diagnostics may retain reviewed identifiers only
+under a separate server audit policy.
 
 ## ScenarioVectorEvidencePort Projection
 
@@ -335,9 +432,12 @@ This contract must be reviewed before any resolver or repository code is
 approved.
 
 The next narrow candidate is a pure approval-record validator and resolver
-state-machine contract using synthetic owner, lifecycle, selector, and vector
-fixtures only. It must perform no auth, database, provider, file, environment,
-network, route, or production-vector access.
+state machine using synthetic `TenantContext`, exact selectors, normalized
+repository port results, lifecycle records, audit-status values, and vector
+fixtures only. It must consume `not_found | not_current | unavailable |
+collision | loaded` port states rather than selecting from a database-row list,
+and it must perform no auth, database, provider, file, environment, network,
+route, or production-vector access.
 
 Schema design, repository I/O, session integration, production execution
 orchestration, and product presentation remain later independent gates.
