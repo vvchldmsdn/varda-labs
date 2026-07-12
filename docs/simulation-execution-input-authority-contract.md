@@ -63,7 +63,7 @@ share authority, lifecycle, provenance, or persistence semantics.
 
 | Source kind | Authority | Required pinned provenance | Must not imply |
 | --- | --- | --- | --- |
-| `observed_current_baseline` | Server-derived owner/account portfolio evidence at one admitted as-of point | observed-evidence hash, as-of service date, complete position universe, valuation and FX evidence, canonical source rows | approval, target policy, recommendation |
+| `observed_current_baseline` | Server-derived owner/account portfolio evidence at one admitted as-of point | raw observed-evidence hash, versioned derivation hash, as-of service date, complete position universe, valuation and FX provenance, canonical source rows | approval, target policy, recommendation |
 | `curated_approved_scenario` | Owner-first approved-vector repository result | exact scenario selector, approval revision, lifecycle/audit status, original approved `scenarioVectorHash` and rows | current holdings or a product default |
 | `explicit_user_scenario` | Authenticated bounded command after server validation and canonicalization | sanitized command digest, admitted source universe, canonical submitted rows, command time and policy version | durable target, curated approval, recommendation |
 | `optimizer_candidate` | Complete derived optimizer artifact | optimizer artifact binding, training window, as-of boundary, objective, constraints, costs, seed/draw binding and candidate rows | out-of-sample validity, recommendation, order authority |
@@ -202,6 +202,8 @@ componentPositions:
     market
     currency
     ticker
+    positionReferenceDate
+    positionEvidenceKind
     quantityDecimal
     localPriceDecimal
     priceReferenceDate
@@ -218,6 +220,27 @@ ticker. For `all`, per-account components remain in the evidence binding even
 when the execution vector later aggregates the same instrument across accounts.
 No database row id or legacy id participates in canonical order.
 
+`positionReferenceDate` and `positionEvidenceKind` are required provenance, not
+labels inferred from matching numbers. Candidate evidence kinds must distinguish
+at least stored daily-position evidence, stored current-position valuation,
+provider-backfilled position evidence, and reconstructed position evidence. A
+future `valuationBasisPolicyId` must explicitly allow one or more exact kinds;
+provider-backfilled or reconstructed evidence is blocked unless a separate
+repair/provenance policy admits it. Equal quantities or values never allow one
+kind or reference date to be substituted for another.
+
+The candidate versioned values are:
+
+```text
+stored_daily_position_snapshot_v1
+stored_current_position_valuation_v1
+provider_backfilled_position_evidence_v1
+reconstructed_position_evidence_v1
+```
+
+Their names and eligibility remain proposed, not approved. Missing, unknown, or
+unversioned position provenance blocks observed-baseline admission.
+
 Every decimal is a canonical finite base-10 string: no exponent, no sign for a
 nonnegative field, no leading zero except before a decimal point, and no
 trailing fractional zero. Quantity, local price, and KRW market value must be
@@ -233,6 +256,22 @@ and never a product projection.
 `valuationBasisPolicyId` must eventually fix price selection, FX selection,
 date carry, multiplication, and rounding semantics. This draft does not choose
 live versus close evidence or silently tolerate a recomputation mismatch.
+
+The candidate decimal resource policy is
+`observed_baseline_decimal_bounds_v1`:
+
+| Field | Maximum precision | Maximum fractional scale |
+| --- | ---: | ---: |
+| `quantityDecimal` | 24 | 8 |
+| `localPriceDecimal` | 24 | 6 |
+| `fxRateDecimal` | 20 | 6 |
+| `marketValueKrwDecimal` | 24 | 6 |
+
+Precision counts digits only. Scale counts digits after the decimal point.
+Canonical input exceeding either limit is blocked before hashing or arbitrary-
+precision conversion. The valuation resource policy must also define a finite
+maximum component-position count before runtime admission; this draft does not
+select that count.
 
 Changing account scope, service date, component quantity, valuation, price or FX
 reference date, evidence kind, or valuation policy changes the observed-evidence
@@ -265,6 +304,34 @@ The candidate deterministic quantization policy is
 This produces a deterministic 10,000bps vector without changing the admitted
 universe. The quantization policy is proposed for review, not approved or
 implemented by this draft.
+
+### Observed Derivation Binding
+
+Raw evidence and derived source weights remain separately identifiable. The
+candidate `observedBaselineDerivationHash` canonical serialization is:
+
+```text
+hashVersion: simulation_observed_baseline_derivation_hash_v1
+observedBaselineEvidenceHash
+instrumentIdentityPolicyId
+decimalBoundsPolicyId: observed_baseline_decimal_bounds_v1
+quantizationPolicyId: largest_remainder_exact_decimal_v1
+sourceVectorRows:
+  - market
+    currency
+    ticker
+    weightBps
+```
+
+Source rows are sorted by canonical instrument identity. The derivation hash is
+the observed source's `sourceEvidenceBindingHash`; the immutable run input must
+also preserve the raw `observedBaselineEvidenceHash`. Changing raw evidence,
+decimal bounds, quantization policy, instrument policy, or any resulting row
+changes the derivation hash.
+
+The derivation hash proves only the deterministic transformation from pinned
+raw evidence to source rows. It does not establish tenant authorization,
+historical matrix readiness, stochastic execution, or product recommendation.
 
 ## Curated Approved Scenario
 
@@ -501,6 +568,9 @@ source_not_admitted
 source_ambiguous
 baseline_universe_empty
 observed_evidence_binding_invalid
+observed_derivation_binding_invalid
+position_provenance_invalid
+decimal_bounds_exceeded
 unsupported_instrument
 cash_policy_unavailable
 valuation_evidence_incomplete
@@ -524,7 +594,8 @@ Blockers must not reflect owner ids, hashes, raw values, or secret-shaped input.
 
 This draft does not:
 
-- approve the candidate observed-baseline quantization policy;
+- approve the candidate position-evidence enum or eligibility policy, decimal
+  bounds, observed derivation binding, or quantization policy;
 - select a current portfolio read table or query;
 - select production horizon, path count, seed, block length, or resource limits;
 - approve all VOO or any multi-instrument Investment Lab scenario as currently
@@ -544,7 +615,7 @@ The next review should approve, reject, or amend:
 1. the four-source authority taxonomy;
 2. the observed-baseline as-of and complete-universe requirements;
 3. the observed valuation-evidence binding and proposed exact-decimal
-   largest-remainder quantization;
+   bounds, versioned derivation binding, and largest-remainder quantization;
 4. the source-preserving joint-universe execution projection and
    common-random-number comparison rule;
 5. the diagnostics-only partial-result boundary;
@@ -556,7 +627,7 @@ meaning:
 
 1. source taxonomy plus observed complete-universe/as-of policy;
 2. observed valuation-evidence binding plus deterministic exact-decimal
-   quantization;
+   bounds, position provenance, quantization, and derivation binding;
 3. source-preserving joint-universe projection plus common-random-number policy;
 4. partial eligibility, parameter authority, and logical persistence
    separation.
