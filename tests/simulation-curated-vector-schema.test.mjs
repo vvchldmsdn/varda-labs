@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -7,6 +8,8 @@ const ROOT = process.cwd();
 const SCHEMA_PATH = join(ROOT, "src", "db", "schema.ts");
 const META_PATH = join(ROOT, "drizzle", "meta", "0017_snapshot.json");
 const MIGRATION_NAME = "0017_workable_jimmy_woo.sql";
+const EXPECTED_MIGRATION_SHA256 =
+  "8f736749953d3c5f1f814a87a803729be1eb91932eb1694d64feb69e728930b8";
 const REHEARSAL_PATH = join(
   ROOT,
   "scripts",
@@ -133,6 +136,20 @@ const REGULAR_INDEXES = [
   "sim_scenario_approval_events_replacement_idx",
 ];
 
+const STATEMENT_SIGNATURES = [
+  "create_table:simulation_scenario_approval_lifecycle_events",
+  "create_table:simulation_scenario_approval_revisions",
+  "create_table:simulation_scenario_approval_vector_rows",
+  "foreign_key:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_revision_fk",
+  "foreign_key:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_replacement_fk",
+  "foreign_key:simulation_scenario_approval_revisions:sim_scenario_approval_revisions_owner_user_fk",
+  "foreign_key:simulation_scenario_approval_vector_rows:sim_scenario_approval_vector_rows_revision_fk",
+  "index:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_replacement_idx",
+  "unique_index:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_revision_sequence_unique",
+  "unique_index:simulation_scenario_approval_revisions:sim_scenario_approval_revisions_current_unique",
+  "unique_index:simulation_scenario_approval_revisions:sim_scenario_approval_revisions_identity_revision_unique",
+].sort();
+
 const EXPORTS = [
   "simulationScenarioApprovalRevisions",
   "simulationScenarioApprovalVectorRows",
@@ -239,6 +256,8 @@ describe("curated approved-vector Stage I schema", () => {
   });
 
   it("contains no DML, destructive DDL, existing-table alteration, or authority leakage", () => {
+    assertPinnedMigration(migration);
+
     for (const statement of statements) {
       assert.doesNotMatch(
         statement,
@@ -259,6 +278,31 @@ describe("curated approved-vector Stage I schema", () => {
       /"(?:legacy[^" ]*|created_by_id|account|asset_id|weights_json|is_current|email|provider_subject|token|password|secret|api_key|job|result|path|seed|horizon|price|fx|target|current_weight)"/i,
     );
     assert.equal(countMatches(migration, /CREATE TABLE /g), 3);
+  });
+
+  it("rejects every adversarial statement outside the exact allowlist", () => {
+    for (const unapprovedStatement of [
+      "CREATE EXTENSION pgcrypto;",
+      'COMMENT ON TABLE "simulation_scenario_approval_revisions" IS \'drift\';',
+      'CREATE VIEW "simulation_scenario_approval_current" AS SELECT 1;',
+      'WITH injected AS (INSERT INTO "simulation_scenario_approval_revisions" DEFAULT VALUES RETURNING 1) SELECT 1;',
+      'ALTER TABLE "simulation_scenario_approval_revisions" ADD COLUMN "drift" text;',
+    ]) {
+      assert.throws(() =>
+        assertPinnedMigration(
+          `${migration}\n--> statement-breakpoint\n${unapprovedStatement}`,
+        ),
+      );
+    }
+
+    assert.throws(() =>
+      assertPinnedMigration(
+        migration.replace(
+          "CREATE TABLE \"simulation_scenario_approval_revisions\" (",
+          'CREATE TABLE "simulation_scenario_approval_revisions" (; COMMENT ON TABLE "simulation_scenario_approval_revisions" IS \'drift\'',
+        ),
+      ),
+    );
   });
 
   it("keeps Drizzle metadata and product imports inside the Stage I boundary", () => {
@@ -297,6 +341,8 @@ describe("curated approved-vector Stage I schema", () => {
       rehearsal,
       /^import .* from ["'](?:dotenv|@neondatabase\/serverless)["'];$/m,
     );
+    assert.match(rehearsal, new RegExp(EXPECTED_MIGRATION_SHA256));
+    assert.match(rehearsal, /\.map\(statementSignature\)/);
     assert.equal(
       packageJson.scripts["rehearse:curated-vector-schema"],
       "node --no-warnings scripts/rehearse-curated-vector-schema.mjs",
@@ -308,6 +354,45 @@ function createdTableNames() {
   return [...migration.matchAll(/CREATE TABLE "([^"]+)"/g)]
     .map((match) => match[1])
     .sort();
+}
+
+function assertPinnedMigration(candidateMigration) {
+  const candidateStatements = candidateMigration
+    .split("--> statement-breakpoint")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  assert.deepEqual(
+    candidateStatements.map(statementSignature).sort(),
+    STATEMENT_SIGNATURES,
+  );
+  assert.equal(
+    createHash("sha256")
+      .update(candidateMigration.replace(/\r\n/g, "\n"))
+      .digest("hex"),
+    EXPECTED_MIGRATION_SHA256,
+  );
+}
+
+function statementSignature(statement) {
+  const createTable = statement.match(/^CREATE TABLE "([^"]+)" \(/);
+  if (createTable) return `create_table:${createTable[1]}`;
+
+  const foreignKey = statement.match(
+    /^ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" FOREIGN KEY/,
+  );
+  if (foreignKey) return `foreign_key:${foreignKey[1]}:${foreignKey[2]}`;
+
+  const uniqueIndex = statement.match(
+    /^CREATE UNIQUE INDEX "([^"]+)" ON "([^"]+)"/,
+  );
+  if (uniqueIndex) return `unique_index:${uniqueIndex[2]}:${uniqueIndex[1]}`;
+
+  const regularIndex = statement.match(
+    /^CREATE INDEX "([^"]+)" ON "([^"]+)"/,
+  );
+  if (regularIndex) return `index:${regularIndex[2]}:${regularIndex[1]}`;
+
+  throw new Error("statement is outside the exact curated-vector allowlist");
 }
 
 function migrationColumnNames(tableName) {

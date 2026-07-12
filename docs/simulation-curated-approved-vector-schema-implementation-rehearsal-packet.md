@@ -108,8 +108,10 @@ simulation calculation file is in the allowlist.
 ## Exact Drizzle Declaration Candidate
 
 The declarations belong in `src/db/schema.ts` after the identity tables and
-before product data tables. They are not imported by any runtime module in this
-slice.
+before product data tables. The existing server-only DB client imports the
+whole schema namespace, so the declarations are registered in Drizzle schema
+metadata. No runtime module directly imports these table exports or uses them
+in a query, repository, route, product projection, or writer in this slice.
 
 ### Import Delta
 
@@ -352,9 +354,10 @@ no network or DB access.
 
 ### Boundary Assertions
 
-The test also scans product/API/query files to prove Stage I adds no import of
-the three new table exports. This prevents an empty schema change from silently
-becoming a read or write path.
+The test also scans product/API/query files to prove Stage I adds no direct
+reference to the three new table exports. Generic registration through the
+existing server-only DB client's whole-schema namespace import is expected and
+does not itself create a read or write path.
 
 `tests/run.mjs` receives one import for this test and no other change.
 
@@ -499,8 +502,9 @@ After separate Stage III approval:
 
 Vercel auto-deploys on the deployment-branch push, so the exact migration must
 be applied and verified before that push. The previously deployed code ignores
-the new empty tables, and the new declarations remain unimported by runtime
-code.
+the new empty tables. The new declarations are present in generic Drizzle
+schema registration but have no direct runtime table reference, query,
+repository, route, product projection, or writer.
 
 ## Rollback And Stop Conditions
 

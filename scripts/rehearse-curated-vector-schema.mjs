@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 const CONFIRMATION = "--confirm-rollback-rehearsal";
@@ -12,6 +13,21 @@ const MIGRATION_PATH = new URL(
   "../drizzle/0017_workable_jimmy_woo.sql",
   import.meta.url,
 );
+const EXPECTED_MIGRATION_SHA256 =
+  "8f736749953d3c5f1f814a87a803729be1eb91932eb1694d64feb69e728930b8";
+const EXPECTED_STATEMENT_SIGNATURES = [
+  "create_table:simulation_scenario_approval_lifecycle_events",
+  "create_table:simulation_scenario_approval_revisions",
+  "create_table:simulation_scenario_approval_vector_rows",
+  "foreign_key:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_revision_fk",
+  "foreign_key:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_replacement_fk",
+  "foreign_key:simulation_scenario_approval_revisions:sim_scenario_approval_revisions_owner_user_fk",
+  "foreign_key:simulation_scenario_approval_vector_rows:sim_scenario_approval_vector_rows_revision_fk",
+  "index:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_replacement_idx",
+  "unique_index:simulation_scenario_approval_lifecycle_events:sim_scenario_approval_events_revision_sequence_unique",
+  "unique_index:simulation_scenario_approval_revisions:sim_scenario_approval_revisions_current_unique",
+  "unique_index:simulation_scenario_approval_revisions:sim_scenario_approval_revisions_identity_revision_unique",
+].sort();
 const BLOCKED_DML_STATEMENT = new RegExp(
   `^(?:${["INSERT", "UPDATE", "DELETE", "MERGE", "COPY", "TRUN" + "CATE"].join("|")})\\b`,
   "i",
@@ -256,6 +272,18 @@ async function readBoundaryState() {
 
 function assertMigrationAllowlist(candidateStatements, candidateMigration) {
   const targetSet = new Set(TARGET_TABLES);
+  const statementSignatures = candidateStatements
+    .map(statementSignature)
+    .sort();
+  assert.deepEqual(statementSignatures, EXPECTED_STATEMENT_SIGNATURES);
+  assert.equal(
+    createHash("sha256")
+      .update(candidateMigration.replace(/\r\n/g, "\n"))
+      .digest("hex"),
+    EXPECTED_MIGRATION_SHA256,
+    "migration content differs from the reviewed Stage I artifact",
+  );
+
   const createdTables = [...candidateMigration.matchAll(
     /CREATE TABLE "([^"]+)"/g,
   )].map((match) => match[1]);
@@ -275,4 +303,26 @@ function assertMigrationAllowlist(candidateStatements, candidateMigration) {
     /\b(?:DROP|RENAME|ALTER COLUMN|SET DEFAULT|SET NOT NULL|CASCADE|CREATE TYPE|CREATE TRIGGER|CREATE FUNCTION|CREATE PROCEDURE|CREATE POLICY|ENABLE ROW LEVEL SECURITY|GRANT|REVOKE)\b/i,
   );
   assert.doesNotMatch(candidateMigration, /neon_auth/i);
+}
+
+function statementSignature(statement) {
+  const createTable = statement.match(/^CREATE TABLE "([^"]+)" \(/);
+  if (createTable) return `create_table:${createTable[1]}`;
+
+  const foreignKey = statement.match(
+    /^ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" FOREIGN KEY/,
+  );
+  if (foreignKey) return `foreign_key:${foreignKey[1]}:${foreignKey[2]}`;
+
+  const uniqueIndex = statement.match(
+    /^CREATE UNIQUE INDEX "([^"]+)" ON "([^"]+)"/,
+  );
+  if (uniqueIndex) return `unique_index:${uniqueIndex[2]}:${uniqueIndex[1]}`;
+
+  const regularIndex = statement.match(
+    /^CREATE INDEX "([^"]+)" ON "([^"]+)"/,
+  );
+  if (regularIndex) return `index:${regularIndex[2]}:${regularIndex[1]}`;
+
+  throw new Error("migration statement is outside the exact Stage II allowlist");
 }
