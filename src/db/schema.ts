@@ -8,6 +8,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -90,6 +91,179 @@ export const authIdentities = pgTable(
     )
       .on(table.appUserId, table.provider)
       .where(sql`${table.status} = 'active'`),
+  }),
+);
+
+export const simulationScenarioApprovalRevisions = pgTable(
+  "simulation_scenario_approval_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ownerUserId: uuid("owner_user_id").notNull(),
+    portfolioPathPolicyId: varchar("portfolio_path_policy_id", {
+      length: 100,
+    }).notNull(),
+    gate0ApprovalCommit: varchar("gate0_approval_commit", {
+      length: 40,
+    }).notNull(),
+    scenarioId: varchar("scenario_id", { length: 100 }).notNull(),
+    scenarioVersion: varchar("scenario_version", { length: 100 }).notNull(),
+    approvalRevision: integer("approval_revision").notNull(),
+    scenarioVectorHash: varchar("scenario_vector_hash", {
+      length: 71,
+    }).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+    lifecycleStatus: varchar("lifecycle_status", { length: 20 }).notNull(),
+    terminalAt: timestamp("terminal_at", { withTimezone: true }),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "sim_scenario_approval_revisions_owner_user_fk",
+      columns: [table.ownerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    policyIdCheck: check(
+      "sim_scenario_approval_revisions_policy_id_check",
+      sql`${table.portfolioPathPolicyId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'`,
+    ),
+    gate0CommitCheck: check(
+      "sim_scenario_approval_revisions_gate0_commit_check",
+      sql`${table.gate0ApprovalCommit} ~ '^[0-9a-f]{40}$'`,
+    ),
+    scenarioIdCheck: check(
+      "sim_scenario_approval_revisions_scenario_id_check",
+      sql`${table.scenarioId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'`,
+    ),
+    scenarioVersionCheck: check(
+      "sim_scenario_approval_revisions_scenario_version_check",
+      sql`${table.scenarioVersion} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'`,
+    ),
+    revisionCheck: check(
+      "sim_scenario_approval_revisions_revision_check",
+      sql`${table.approvalRevision} > 0`,
+    ),
+    vectorHashCheck: check(
+      "sim_scenario_approval_revisions_vector_hash_check",
+      sql`${table.scenarioVectorHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    lifecycleStatusCheck: check(
+      "sim_scenario_approval_revisions_lifecycle_status_check",
+      sql`${table.lifecycleStatus} in ('approved', 'revoked', 'superseded')`,
+    ),
+    terminalStateCheck: check(
+      "sim_scenario_approval_revisions_terminal_state_check",
+      sql`(${table.lifecycleStatus} = 'approved' and ${table.terminalAt} is null) or (${table.lifecycleStatus} in ('revoked', 'superseded') and ${table.terminalAt} is not null and ${table.terminalAt} >= ${table.approvedAt})`,
+    ),
+    identityRevisionUnique: uniqueIndex(
+      "sim_scenario_approval_revisions_identity_revision_unique",
+    ).on(
+      table.ownerUserId,
+      table.portfolioPathPolicyId,
+      table.gate0ApprovalCommit,
+      table.scenarioId,
+      table.scenarioVersion,
+      table.approvalRevision,
+    ),
+    currentUnique: uniqueIndex(
+      "sim_scenario_approval_revisions_current_unique",
+    )
+      .on(
+        table.ownerUserId,
+        table.portfolioPathPolicyId,
+        table.gate0ApprovalCommit,
+        table.scenarioId,
+        table.scenarioVersion,
+      )
+      .where(sql`${table.lifecycleStatus} = 'approved'`),
+  }),
+);
+
+export const simulationScenarioApprovalVectorRows = pgTable(
+  "simulation_scenario_approval_vector_rows",
+  {
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    ticker: varchar("ticker", { length: 50 }).notNull(),
+    weightBps: integer("weight_bps").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      name: "sim_scenario_approval_vector_rows_pk",
+      columns: [
+        table.approvalRevisionId,
+        table.market,
+        table.currency,
+        table.ticker,
+      ],
+    }),
+    revisionFk: foreignKey({
+      name: "sim_scenario_approval_vector_rows_revision_fk",
+      columns: [table.approvalRevisionId],
+      foreignColumns: [simulationScenarioApprovalRevisions.id],
+    }).onDelete("restrict"),
+    marketCheck: check(
+      "sim_scenario_approval_vector_rows_market_check",
+      sql`${table.market} = lower(btrim(${table.market})) and char_length(${table.market}) > 0`,
+    ),
+    currencyCheck: check(
+      "sim_scenario_approval_vector_rows_currency_check",
+      sql`${table.currency} = upper(btrim(${table.currency})) and char_length(${table.currency}) > 0`,
+    ),
+    tickerCheck: check(
+      "sim_scenario_approval_vector_rows_ticker_check",
+      sql`${table.ticker} = upper(btrim(${table.ticker})) and char_length(${table.ticker}) > 0`,
+    ),
+    weightCheck: check(
+      "sim_scenario_approval_vector_rows_weight_check",
+      sql`${table.weightBps} between 0 and 10000`,
+    ),
+  }),
+);
+
+export const simulationScenarioApprovalLifecycleEvents = pgTable(
+  "simulation_scenario_approval_lifecycle_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    eventSequence: integer("event_sequence").notNull(),
+    auditVersion: varchar("audit_version", { length: 50 }).notNull(),
+    transitionKind: varchar("transition_kind", { length: 32 }).notNull(),
+    previousStatus: varchar("previous_status", { length: 20 }),
+    resultingStatus: varchar("resulting_status", { length: 20 }).notNull(),
+    transitionedAt: timestamp("transitioned_at", {
+      withTimezone: true,
+    }).notNull(),
+    replacementRevisionId: uuid("replacement_revision_id"),
+  },
+  (table) => ({
+    revisionFk: foreignKey({
+      name: "sim_scenario_approval_events_revision_fk",
+      columns: [table.approvalRevisionId],
+      foreignColumns: [simulationScenarioApprovalRevisions.id],
+    }).onDelete("restrict"),
+    replacementFk: foreignKey({
+      name: "sim_scenario_approval_events_replacement_fk",
+      columns: [table.replacementRevisionId],
+      foreignColumns: [simulationScenarioApprovalRevisions.id],
+    }).onDelete("restrict"),
+    revisionSequenceUnique: uniqueIndex(
+      "sim_scenario_approval_events_revision_sequence_unique",
+    ).on(table.approvalRevisionId, table.eventSequence),
+    replacementIdx: index("sim_scenario_approval_events_replacement_idx").on(
+      table.replacementRevisionId,
+    ),
+    sequenceCheck: check(
+      "sim_scenario_approval_events_sequence_check",
+      sql`${table.eventSequence} in (1, 2)`,
+    ),
+    auditVersionCheck: check(
+      "sim_scenario_approval_events_audit_version_check",
+      sql`${table.auditVersion} = 'scenario_vector_approval_audit_v1'`,
+    ),
+    transitionShapeCheck: check(
+      "sim_scenario_approval_events_transition_shape_check",
+      sql`(${table.eventSequence} = 1 and ${table.transitionKind} = 'explicit_approval' and ${table.previousStatus} is null and ${table.resultingStatus} = 'approved' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'revocation' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'revoked' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'supersession' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'superseded' and ${table.replacementRevisionId} is not null and ${table.replacementRevisionId} <> ${table.approvalRevisionId})`,
+    ),
   }),
 );
 
@@ -1267,6 +1441,21 @@ export type NewAppUser = typeof appUsers.$inferInsert;
 
 export type AuthIdentity = typeof authIdentities.$inferSelect;
 export type NewAuthIdentity = typeof authIdentities.$inferInsert;
+
+export type SimulationScenarioApprovalRevision =
+  typeof simulationScenarioApprovalRevisions.$inferSelect;
+export type NewSimulationScenarioApprovalRevision =
+  typeof simulationScenarioApprovalRevisions.$inferInsert;
+
+export type SimulationScenarioApprovalVectorRow =
+  typeof simulationScenarioApprovalVectorRows.$inferSelect;
+export type NewSimulationScenarioApprovalVectorRow =
+  typeof simulationScenarioApprovalVectorRows.$inferInsert;
+
+export type SimulationScenarioApprovalLifecycleEvent =
+  typeof simulationScenarioApprovalLifecycleEvents.$inferSelect;
+export type NewSimulationScenarioApprovalLifecycleEvent =
+  typeof simulationScenarioApprovalLifecycleEvents.$inferInsert;
 
 export type AssetGroup = typeof assetGroups.$inferSelect;
 export type NewAssetGroup = typeof assetGroups.$inferInsert;
