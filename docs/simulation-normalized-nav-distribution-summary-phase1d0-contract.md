@@ -133,6 +133,11 @@ shape rather than trusting TypeScript types alone:
 - every step-zero NAV is exactly literal `1`;
 - no point, path, or step is missing, duplicated, reordered, or extra.
 
+An out-of-order path array or a path whose `pathIndex` does not equal its
+canonical array position is `input_nav_shape_invalid`. Phase 1D0 must not sort,
+relabel, or otherwise repair path input. Numeric sorting is allowed only for
+the temporary per-step NAV buffer used by the quantile algorithm.
+
 After validating the top-level policy, identity, hashes, and counts, Phase
 1D0 consumes only these path-level fields:
 
@@ -352,7 +357,11 @@ This complexity statement does not authorize production execution.
 - duplicate values retained in the empirical sample;
 - exact literal-one step-zero band;
 - terminal summary exactly matching the final step band;
-- input path-order independence without mutating input;
+- out-of-order paths and mismatched `pathIndex` values remaining blocked
+  without sorting or relabeling input;
+- two separately valid canonical artifacts with the same per-step NAV
+  multisets but values assigned to different canonical path indices producing
+  identical bands, without mutating either input;
 - identical summaries when only ignored draw/source/date provenance fields
   differ, proving those fields are not consumed;
 - policy, ready-status, blocker, runtime-trust, and hash-binding mismatch;
