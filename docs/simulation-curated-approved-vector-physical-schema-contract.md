@@ -206,6 +206,20 @@ the sequence-1 `transitioned_at` to equal the parent's `approved_at`. A terminal
 event time must equal the parent's `terminal_at`. This retains the logical audit
 envelope without creating independently drifting duplicate authority columns.
 
+One supersession transaction uses one server-owned canonical effective instant:
+
+```text
+old.terminal_at
+= old sequence-2 transitioned_at
+= replacement.approved_at
+= replacement sequence-1 transitioned_at
+```
+
+The replacement is created in that transaction, has the same exact identity
+and approved content, has a higher revision, and is the one current approved
+revision at commit. This equality does not apply to a later reapproval after
+revocation; that revision uses its own new approval instant.
+
 ## Database And Application Enforcement
 
 ### Database-Enforceable Candidates
@@ -234,6 +248,8 @@ envelope without creating independently drifting duplicate authority columns.
 - creation-event time equals `approved_at`, terminal-event time equals
   `terminal_at`, and a supersession replacement has the same exact identity
   with a higher revision;
+- one supersession effective instant is shared by the old terminal state, old
+  terminal event, replacement approval, and replacement creation event;
 - terminal rows and all approval content are never rewritten or deleted;
 - repository states are classified without fallback; and
 - only explicit minimized projections cross into pure resolver code.
@@ -281,18 +297,22 @@ revocation event, and commit. A failure leaves the approval unchanged.
 ### Identical-Vector Supersession
 
 One transaction must prove identical policy, Gate 0 commit, selector, rows,
-and hash; terminalize the old current header; insert the higher approved header;
-append the old header's supersession event referencing that new header; insert
-all new rows and the new creation event; and commit. The old partial-current
-predicate must be released before the new approved header is inserted, while
-the replacement header must exist before the old event can reference it. Any
-failure rolls back both sides.
+and hash; allocate one server-owned canonical effective instant; terminalize
+the old current header at that instant; insert the higher approved header with
+the same `approved_at`; append the old header's supersession event referencing
+that new header at the same instant; insert all new rows and the new creation
+event at the same instant; and commit. The old partial-current predicate must be
+released before the new approved header is inserted, while the replacement
+header must exist before the old event can reference it. Any failure rolls back
+both sides.
 
 ### Reapproval After Revocation
 
 The revoked record remains terminal. One transaction may insert a higher
 immutable revision with the same approved content and a new creation event. It
-never updates or reactivates the revoked revision.
+never updates or reactivates the revoked revision. This is a separate approval
+decision, so its `approved_at` is not required to equal the earlier
+revocation's `terminal_at`.
 
 No failed writer may retry with a different owner, selector, revision, vector,
 or lifecycle intent.
