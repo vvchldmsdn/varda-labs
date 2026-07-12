@@ -40,8 +40,12 @@ export function validateSimulationNormalizedNavDistributionSummaryInput(
 
   if (!isRecord(normalizedNav)) {
     reasons.add("input_nav_not_ready");
-    reasons.add("input_nav_runtime_trust_invalid");
-    reasons.add("input_nav_policy_mismatch");
+    reasons.add("input_nav_shape_invalid");
+    return blocked(reasons);
+  }
+
+  if (!hasRequiredKeys(normalizedNav, NORMALIZED_NAV_RESULT_KEYS)) {
+    reasons.add("input_nav_not_ready");
     reasons.add("input_nav_shape_invalid");
     return blocked(reasons);
   }
@@ -281,6 +285,12 @@ function hasExactKeys(value: Record<string, unknown>, expected: string[]) {
   return (
     actual.length === sortedExpected.length &&
     actual.every((key, index) => key === sortedExpected[index])
+  );
+}
+
+function hasRequiredKeys(value: Record<string, unknown>, required: string[]) {
+  return required.every((key) =>
+    Object.prototype.hasOwnProperty.call(value, key),
   );
 }
 

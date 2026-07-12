@@ -150,6 +150,38 @@ describe("Simulation normalized NAV distribution summary Phase 1D0", () => {
     );
   });
 
+  it("does not fabricate semantic blockers before top-level shape exists", () => {
+    const missingArtifact = syntheticDistributionSummaryInput();
+    missingArtifact.normalizedNav = null;
+    const emptyArtifact = syntheticDistributionSummaryInput();
+    emptyArtifact.normalizedNav = {};
+    const missingRequiredKey = syntheticDistributionSummaryInput();
+    delete missingRequiredKey.normalizedNav.runtimeTrustStatus;
+
+    for (const input of [
+      missingArtifact,
+      emptyArtifact,
+      missingRequiredKey,
+    ]) {
+      assertBlocked(summarizeSimulationNormalizedNavDistribution(input), [
+        "input_nav_not_ready",
+        "input_nav_shape_invalid",
+      ]);
+    }
+  });
+
+  it("retains independently evaluable binding errors for malformed NAV input", () => {
+    const input = syntheticDistributionSummaryInput();
+    input.normalizedNav = null;
+    delete input.expectedBinding.expectedDrawPlanHash;
+
+    assertBlocked(summarizeSimulationNormalizedNavDistribution(input), [
+      "input_nav_not_ready",
+      "expected_binding_invalid",
+      "input_nav_shape_invalid",
+    ]);
+  });
+
   it("keeps ready status, input blockers, and policy drift distinct", () => {
     const status = syntheticDistributionSummaryInput();
     status.normalizedNav.calculationStatus = "blocked";
