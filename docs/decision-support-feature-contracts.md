@@ -131,7 +131,7 @@ The following scenario families have different transaction and cash semantics:
 
 | Scenario family | Examples | Product treatment |
 | --- | --- | --- |
-| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1. Replay the same dated KRW buy/sell notionals under one fixed composition and compare against the observed actual path. |
+| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 is the first read-only audited engine candidate, not a production-ready route. VOO additionally needs complete historical FX/price and US execution-calendar evidence. Multi-instrument vectors also need an approved flow-allocation, cross-market pending-execution, and solvency policy. |
 | Scheduled rebalance strategy | equal weight, maintain target weights, maintain a selected weight vector | Later independent model. It introduces additional trades, turnover, costs, and rebalance-date policy, so it is not the same-flow v1 model. |
 | Recommendation-following strategy | legacy recommended rebalance | Blocked until the recommendation boundary and point-in-time recommendation evidence are separately approved. |
 | Cash-ledger baseline | all cash | Blocked while the measured path excludes account cash. It requires a cash balance, cash-flow, and cash-return policy rather than a zero-volatility shortcut. |
@@ -262,8 +262,9 @@ The first Simulation Validation surface should eventually include:
 - account selection within the authenticated owner boundary and bounded horizon
   controls, initially 63 and 126 trading steps when supported by the execution
   policy;
-- a server-owned run action with explicit queued, running, partial, failed, and
-  completed states rather than a browser-orchestrated function chain;
+- a server-owned run action with explicit queued, running,
+  `partial_diagnostics_only`, failed, and completed states rather than a
+  browser-orchestrated function chain;
 - a bounded reproducible spaghetti-path sample plus full-sample p10/p50/p90 fan
   bands, with optional inner p25/p75 bands;
 - terminal median and tail outcomes, terminal loss probability, and explicitly
@@ -282,6 +283,11 @@ expected shortfall remains unavailable until its tail, sign, denominator, and
 aggregation semantics are separately fixed. Expected turnover and improvement
 must appear only for an actual candidate strategy; they are not meaningful
 fallbacks for the current no-rebalance normalized buy-and-hold path.
+
+A partial job may expose progress, missing chunk count, and failure diagnostics
+only. It must not emit distribution bands, comparison metrics, optimizer input,
+or a reusable calculation artifact. Product calculation eligibility requires a
+complete run whose full path denominator and all hash bindings validate.
 
 ### Scenario source authority
 
@@ -351,13 +357,17 @@ separate future contracts.
     approved; the physical schema contract remains pending and unimplemented.
 20. The Investment Lab and Simulation product-surface coverage above was
     clarified on 2026-07-13 after direct legacy-screen and code review.
-21. Next define a docs-only execution-input authority contract for observed
-    current baselines, curated scenarios, explicit user scenarios, and optimizer
-    candidates plus bounded server-owned execution parameters.
-22. Only then choose whether approved-vector persistence or immutable run-input
+21. A docs-only execution-input authority contract for observed current
+    baselines, curated scenarios, explicit user scenarios, optimizer candidates,
+    and bounded server-owned parameters was drafted for review on 2026-07-13.
+    It remains unapproved and unimplemented.
+22. Next obtain explicit review of its source taxonomy, complete-universe and
+    as-of rules, weight quantization, joint comparison, partial-result boundary,
+    parameter authority, and logical persistence separation.
+23. Only then choose whether approved-vector persistence or immutable run-input
     capture is the first physical storage slice; do not assume one table family
     covers both authorities.
-23. Add server-owned orchestration and the first read-only result UI only after
+24. Add server-owned orchestration and the first read-only result UI only after
     auth, ownership, admission, resource, and persistence gates permit it.
-24. Add the separate parametric factor engine and point-in-time walk-forward
+25. Add the separate parametric factor engine and point-in-time walk-forward
     validation before any optimizer is labeled useful.
