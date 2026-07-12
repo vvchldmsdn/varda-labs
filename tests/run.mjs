@@ -25,6 +25,7 @@ import "./simulation-normalized-nav-distribution-summary.test.mjs";
 import "./simulation-spaghetti-path-sampling.test.mjs";
 import "./simulation-terminal-loss-probability.test.mjs";
 import "./simulation-path-max-drawdown.test.mjs";
+import "./simulation-path-max-drawdown-distribution-summary.test.mjs";
 import "./target-policy-evidence.test.mjs";
 import "./target-policy-review-packet.test.mjs";
 import "./target-policy-holding-universe.test.mjs";
