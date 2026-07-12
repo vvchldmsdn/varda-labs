@@ -101,17 +101,27 @@ percentage string.
 ## Pure Input Boundary
 
 The future helper may accept one in-memory wrapper object with exactly these
-two own keys:
+two own enumerable string keys:
 
 ```text
 pathMaxDrawdown
 expectedBinding
 ```
 
-An extra wrapper key is `input_drawdown_shape_invalid`. A missing wrapper key
-is classified through the corresponding artifact or binding rule below. The
-wrapper is a transport boundary only and must not carry owner, approval,
-runtime, database, or provider context.
+An extra own enumerable string key is `input_drawdown_shape_invalid`. A
+missing wrapper key is classified through the corresponding artifact or
+binding rule below. The wrapper is a transport boundary only and must not
+carry owner, approval, runtime, database, or provider context.
+
+If the wrapper itself is absent, null, an array, a primitive, or otherwise not
+a record, both declared inputs are treated as absent and the exact ordered
+blockers are:
+
+```text
+input_drawdown_not_ready
+expected_binding_invalid
+input_drawdown_shape_invalid
+```
 
 ### 1. Ready per-path maximum-drawdown artifact
 
@@ -135,7 +145,8 @@ pathDrawdowns:
     maxDrawdown
 ```
 
-The artifact must be a non-array record with exactly these top-level own keys:
+The artifact must be a non-array record with exactly these top-level own
+enumerable string keys:
 
 ```text
 drawdownStatus
@@ -154,16 +165,16 @@ blockers
 ```
 
 Every `pathDrawdowns` row must be a non-array record with exactly these own
-keys:
+enumerable string keys:
 
 ```text
 pathIndex
 maxDrawdown
 ```
 
-Extra top-level or row keys are not ignored. They make the artifact
-`input_drawdown_shape_invalid` even when every required field is otherwise
-valid.
+Extra top-level or row enumerable string keys are not ignored. They make the
+artifact `input_drawdown_shape_invalid` even when every required field is
+otherwise valid.
 
 The complete Phase 1F0 maximum-drawdown policy object must match exactly,
 including its running-peak algorithm, step-zero treatment, numeric domain,
@@ -183,10 +194,10 @@ expectedInputMatrixHash
 expectedDrawPlanHash
 ```
 
-The binding must be a non-array record with exactly those three own keys. A
-missing key, extra key, non-string value, or noncanonical hash makes it
-`expected_binding_invalid`. No hash-mismatch reason may be evaluated from an
-invalid binding.
+The binding must be a non-array record with exactly those three own enumerable
+string keys. A missing key, extra enumerable string key, non-string value, or
+noncanonical hash makes it `expected_binding_invalid`. No hash-mismatch reason
+may be evaluated from an invalid binding.
 
 All three values must use canonical lowercase `sha256:` form and exactly equal
 the corresponding fields carried by the ready drawdown artifact.
@@ -217,6 +228,16 @@ rather than trusting TypeScript types alone:
 - zero drawdown is literal positive zero, not negative zero;
 - no path row is missing, duplicated, reordered, relabeled, or extra.
 
+For wrapper, artifact, row, and binding shape checks, "exact keys" means the
+own enumerable string keys returned by `Object.keys`. This matches the
+JSON-equivalent plain-data artifact boundary used by the existing Phase 1D0
+and Phase 1F0 validators.
+
+Symbol properties and non-enumerable properties are outside the contract.
+They do not satisfy a required key, and extra hidden properties are ignored.
+The helper must not read, validate, compare, copy, reflect, or emit them. This
+is a non-consumption rule, not an alternate metadata channel.
+
 Status classification is explicit:
 
 - `drawdownStatus` other than `ready` or a nonempty input blocker list adds
@@ -240,8 +261,9 @@ the remaining paths.
 Binding validation is independent and occurs before an early return caused by
 a malformed drawdown artifact.
 
-If `pathMaxDrawdown` is absent, null, an array, a primitive, or otherwise not a
-record, the exact safely established artifact reasons are:
+If the wrapper is a record but `pathMaxDrawdown` is absent, null, an array, a
+primitive, or otherwise not a record, the exact safely established artifact
+reasons are:
 
 ```text
 input_drawdown_not_ready
@@ -469,11 +491,16 @@ authorize production execution or establish a production request limit.
 - out-of-order rows and mismatched `pathIndex` values remaining blocked
   without sorting or relabeling input;
 - a missing, duplicate, or extra row blocking the entire result;
-- exact wrapper, artifact, row, and expected-binding own-key sets;
-- an extra wrapper, artifact, or row key mapping to
+- exact wrapper, artifact, row, and expected-binding own enumerable string-key
+  sets;
+- a null, primitive, or array wrapper producing exactly the three ordered
+  prerequisite reasons;
+- an extra enumerable string key on the wrapper, artifact, or row mapping to
   `input_drawdown_shape_invalid`;
-- an extra or missing expected-binding key mapping to exactly
+- an extra or missing enumerable string expected-binding key mapping to exactly
   `expected_binding_invalid` when the artifact is otherwise valid;
+- ignored symbol and non-enumerable extra properties proving they are not
+  consumed, copied, reflected, or emitted;
 - a non-record or required-key-missing artifact producing exactly
   `input_drawdown_not_ready` and `input_drawdown_shape_invalid` when the
   binding is valid;
