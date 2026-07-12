@@ -133,13 +133,34 @@ shape rather than trusting TypeScript types alone:
 - every step-zero NAV is exactly literal `1`;
 - no point, path, or step is missing, duplicated, reordered, or extra.
 
-Sampled source dates in the Phase 1C points are historical provenance. Phase
-1D0 does not aggregate them into a forecast date because different paths may
-carry different sampled dates at the same step.
+After validating the top-level policy, identity, hashes, and counts, Phase
+1D0 consumes only these path-level fields:
 
-Any malformed count, path, point, NAV, hash, policy, or status blocks the
-whole result. The helper must not drop a bad path and summarize the remaining
-paths.
+```text
+path.pathIndex
+point.stepIndex
+point.nav
+```
+
+It must not read, validate, compare, copy, aggregate, or emit these Phase 1C
+point-provenance fields:
+
+```text
+drawStepIndex
+sourceRowIndex
+previousServiceDate
+serviceDate
+```
+
+Those fields belong to upstream historical sampling provenance. Omitting them
+from Phase 1D0 is deliberate: different paths can carry different sampled
+dates at the same step, and the three hash comparisons establish binding
+consistency only. They do not revalidate upstream provenance or authorize
+relabeling any sampled date as a future forecast date.
+
+Any malformed count, path, summary-relevant point field, NAV, hash, policy, or
+status blocks the whole result. The helper must not drop a bad path and
+summarize the remaining paths.
 
 ## Exact Quantile Algorithm
 
@@ -246,9 +267,30 @@ The result must not include:
 - mean, variance, loss probability, confidence label, drawdown, expected
   shortfall, representative path, or optimization result.
 
-A blocked result contains no step bands and no terminal summary. It may carry
-only already-validated safe scenario/hash/count metadata and deterministic
-blocker reasons. It must never return a partial summary.
+A blocked result has one exact projection regardless of which validation stage
+failed:
+
+```text
+summaryStatus: blocked
+runtimeTrustStatus: not_established
+policy: SIMULATION_NORMALIZED_NAV_DISTRIBUTION_SUMMARY_POLICY
+scenarioId: null
+scenarioVersion: null
+scenarioVectorHash: null
+inputMatrixHash: null
+drawPlanHash: null
+horizon: 0
+pathCount: 0
+totalPointCount: 0
+stepBands: []
+terminalSummary: null
+blockers:
+  - reason
+```
+
+Blocked output never reflects caller-supplied scenario, hash, count, path, or
+NAV values, even if some fields passed earlier validation. It must never
+return a partial band or terminal summary.
 
 All ready and blocked outputs, nested bands, terminal summary, policy, and
 blockers must be immutable.
@@ -270,9 +312,14 @@ invalid_nav
 invalid_quantile
 ```
 
-Validation may collect all applicable reasons in that order, but any blocker
-must produce no bands and no terminal summary. Caller-supplied values and raw
-input fragments must not be reflected inside blocker payloads.
+Validation returns every safely evaluable applicable reason, deduplicated and
+ordered only by the list above. A later check whose prerequisites are not
+structurally available is not fabricated as an additional reason. A blocked
+result must have at least one blocker, and a ready result must have none.
+
+Blocker objects contain only the fixed `reason` value. Caller-supplied values,
+field names, indices, hashes, counts, and raw input fragments must not be
+reflected inside blocker payloads.
 
 ## Resource Bound
 
@@ -306,6 +353,8 @@ This complexity statement does not authorize production execution.
 - exact literal-one step-zero band;
 - terminal summary exactly matching the final step band;
 - input path-order independence without mutating input;
+- identical summaries when only ignored draw/source/date provenance fields
+  differ, proving those fields are not consumed;
 - policy, ready-status, blocker, runtime-trust, and hash-binding mismatch;
 - missing, duplicate, reordered, and extra path or step;
 - invalid counts and unsafe count multiplication;
