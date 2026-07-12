@@ -21,6 +21,7 @@ import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";
 import "./simulation-scenario-vector-resolver.test.mjs";
 import "./simulation-normalized-nav.test.mjs";
+import "./simulation-normalized-nav-distribution-summary.test.mjs";
 import "./target-policy-evidence.test.mjs";
 import "./target-policy-review-packet.test.mjs";
 import "./target-policy-holding-universe.test.mjs";
