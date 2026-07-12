@@ -152,7 +152,8 @@ Scenario Vector Review Packet:
 Selector equality is case-sensitive. The resolver must not coerce a non-string
 value, trim whitespace, change case, infer `latest`, insert a default, or roll
 to another version. Missing, empty, noncanonical, or malformed selectors are
-typed failures before repository access.
+typed failures before repository access. For those inputs, the normalized
+repository port state must be `not_requested`.
 
 These values are untrusted lookup selectors, not authority. They may narrow an
 already owner-scoped repository query, but they cannot:
@@ -183,6 +184,8 @@ canonicalVector[]:
   ticker
   weightBps
 scenarioVectorHash
+approvalRevision
+approvedAt
 lifecycleStatus: approved | revoked | superseded
 auditEnvelope:
   version: scenario_vector_approval_audit_v1
@@ -197,11 +200,15 @@ fields into a different vector. A future persistence contract must define an
 append-only lifecycle event or another audited transition model before any
 schema is created.
 
-`approvalRevision` must be a positive safe integer. Revisions for one exact
-approval identity are unique and strictly increasing, but they need not be
-contiguous. `approvedAt` must be a canonical valid UTC ISO instant rather than
-a locale string. The audit envelope contains no actor profile, email, provider
-subject, note, request payload, token, or raw audit document.
+The record-level and audit-envelope `approvalRevision` values must match
+exactly. The record-level and audit-envelope `approvedAt` values must also
+match exactly. `approvalRevision` must be a positive safe integer. Revisions
+for one exact approval identity are unique and strictly increasing, but they
+need not be contiguous. `approvedAt` must be a canonical valid UTC ISO instant
+rather than a locale string. Both values are server-owned and cannot come from
+the selector or another client-controlled field. The audit envelope contains
+no actor profile, email, provider subject, note, request payload, token, or raw
+audit document.
 
 Changing an instrument, weight, policy revision, Gate 0 revision, scenario id,
 or scenario version requires a new exact approval record and hash. Any policy,
@@ -283,6 +290,7 @@ a database row list:
 type ApprovalAuditStatus = "verified" | "invalid" | "unavailable";
 
 type OwnerScopedApprovalRecordResult =
+  | Readonly<{ state: "not_requested" }>
   | Readonly<{ state: "not_found" }>
   | Readonly<{ state: "not_current" }>
   | Readonly<{ state: "unavailable" }>
@@ -294,7 +302,9 @@ type OwnerScopedApprovalRecordResult =
     }>;
 ```
 
-`not_found` means no exact owner-scoped selector identity exists.
+`not_requested` proves that no repository lookup was performed because a
+prerequisite failed. `not_found` means no exact owner-scoped selector identity
+exists.
 `not_current` means matching history exists but no current approved revision is
 eligible. `collision` represents ambiguous cardinality or lifecycle lineage.
 The repository, not the pure resolver, performs owner-first retrieval and
@@ -306,12 +316,71 @@ does not claim to verify the authority of an actor, provider session, database
 transaction, or audit document. Establishing `auditStatus` is a later
 server-repository responsibility.
 
+## State Coherence
+
+Selector validation must complete before a repository lookup can be
+represented as requested:
+
+- malformed or absent selector with `not_requested` produces the typed
+  selector failure when the tenant-context shape is otherwise valid;
+- malformed or absent tenant context with `not_requested` produces the typed
+  tenant-context failure when the selector is otherwise canonical;
+- if both prerequisite shapes are malformed, `not_requested` remains required
+  and the tenant-context failure takes precedence over the selector failure;
+- any malformed prerequisite with a repository state other than
+  `not_requested` is an invalid resolver-state combination;
+- valid canonical selector plus valid tenant-context shape plus
+  `not_requested` is also an invalid resolver-state combination.
+
+Resolver failure precedence is deterministic:
+
+```text
+tenant-context shape
+  -> selector shape and canonical equality
+  -> repository request-state coherence
+  -> normalized repository outcome
+  -> loaded record, lifecycle, audit, and vector validation
+```
+
+The pure helper accepts `TenantContext` only as the opaque downstream
+capability defined by the existing session-resolver contract. It must not
+repeat provider-session, identity-mapping, app-user-status, cookie, or auth
+checks. It may reject a malformed `TenantContext` shape, and a malformed or
+absent context requires `not_requested`, but shape validation does not
+establish that a real session was authenticated.
+
+For a `loaded` state:
+
+- `record.canonicalOwnerUserId` must exactly equal
+  `tenantContext.ownerUserId`;
+- record scenario id and version must exactly equal the canonical selector;
+- policy and Gate 0 fields must match the supported policy revision;
+- lifecycle must be `approved`;
+- audit status must be `verified`;
+- record and audit-envelope revision and timestamp values must match exactly.
+
+An owner or selector mismatch is a repository integrity failure, not
+`not_found`. A loaded terminal record is an invalid normalized port state;
+terminal history without a current approval must be represented by
+`not_current`.
+
+Terminal historical revisions may coexist with exactly one current approved
+revision. That normal history is not a collision. `collision` is limited to
+ambiguous evidence such as multiple current approved records, duplicate
+revisions, or malformed lifecycle lineage. The pure resolver receives the
+normalized collision state and does not select among raw records.
+
 ## Resolver Validation
 
 Before producing vector evidence, a future resolver must fail closed unless:
 
-- the tenant context came from the existing verified active mapping contract;
+- a structurally valid `TenantContext` capability was supplied through the
+  existing session-resolver boundary, without the pure helper claiming to
+  authenticate its source;
+- selector and repository-request state are coherent;
 - exactly one record matches owner, scenario id, and scenario version;
+- loaded owner and selector fields exactly match the supplied context and
+  canonical selector;
 - the record lifecycle is currently `approved`;
 - the repository audit-status port is `verified`;
 - no revoked, superseded, duplicate, or conflicting current record is
@@ -339,9 +408,11 @@ must distinguish:
 
 - tenant context unavailable or not active;
 - invalid scenario selector;
+- invalid resolver or repository-request state combination;
 - owner-scoped scenario not found;
 - approval not current;
 - approval-record collision or ambiguity;
+- loaded owner or selector integrity mismatch;
 - approval audit invalid or unavailable;
 - policy or Gate 0 mismatch;
 - invalid canonical vector or total;
@@ -434,10 +505,10 @@ approved.
 The next narrow candidate is a pure approval-record validator and resolver
 state machine using synthetic `TenantContext`, exact selectors, normalized
 repository port results, lifecycle records, audit-status values, and vector
-fixtures only. It must consume `not_found | not_current | unavailable |
-collision | loaded` port states rather than selecting from a database-row list,
-and it must perform no auth, database, provider, file, environment, network,
-route, or production-vector access.
+fixtures only. It must consume `not_requested | not_found | not_current |
+unavailable | collision | loaded` port states rather than selecting from a
+database-row list, and it must perform no auth, database, provider, file,
+environment, network, route, or production-vector access.
 
 Schema design, repository I/O, session integration, production execution
 orchestration, and product presentation remain later independent gates.
