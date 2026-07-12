@@ -178,7 +178,8 @@ or an actual owner identifier.
 The focused suite records:
 
 - one minimized, deeply immutable resolved result;
-- all five non-loaded terminal outcomes and `not_requested` coherence;
+- all four requested non-loaded outcomes and the separate `not_requested`
+  prerequisite-coherence sentinel;
 - invalid-prerequisite lookup prevention;
 - malformed repository-port rejection;
 - exact minimal `TenantContext` and selector validation;
