@@ -27,7 +27,8 @@ This draft does not change these existing contracts:
 
 - canonical instrument identity is `(market, currency, ticker)`;
 - `scenarioUniverseHash`, `matrixRequestHash`, `inputMatrixHash`,
-  `drawPlanHash`, and `scenarioVectorHash` remain distinct bindings;
+  `drawPlanHash`, and the existing curated `scenarioVectorHash` remain distinct
+  bindings;
 - the normalized buy-and-hold path begins at literal NAV `1`, has no
   rebalancing or cash, and does not model investor-level fees or taxes;
 - matrix consumers fail closed on incomplete rectangular evidence;
@@ -40,6 +41,11 @@ This draft does not change these existing contracts:
 
 Calculation readiness and runtime trust remain separate. A pure helper may be
 ready while production execution remains unauthorized.
+
+The existing `scenarioVectorHash` is not a source-neutral weight hash. Its v1
+serialization includes `scenarioId`, `scenarioVersion`, portfolio-path policy,
+Gate 0 approval commit, and canonical rows. This draft preserves that meaning
+and never relabels a joint-universe projection as the original approved hash.
 
 ## Source Taxonomy
 
@@ -57,15 +63,26 @@ share authority, lifecycle, provenance, or persistence semantics.
 
 | Source kind | Authority | Required pinned provenance | Must not imply |
 | --- | --- | --- | --- |
-| `observed_current_baseline` | Server-derived owner/account portfolio evidence at one admitted as-of point | owner/account capability, as-of service date, complete position universe, valuation and FX evidence, canonical vector rows and hash | approval, target policy, recommendation |
-| `curated_approved_scenario` | Owner-first approved-vector repository result | exact scenario selector, approval revision, lifecycle/audit status, vector rows and hash | current holdings or a product default |
-| `explicit_user_scenario` | Authenticated bounded command after server validation and canonicalization | sanitized command digest, admitted universe, canonical rows and hash, command time and policy version | durable target, curated approval, recommendation |
-| `optimizer_candidate` | Complete derived optimizer artifact | training window, as-of boundary, objective, constraints, costs, seed/draw binding, candidate rows and hash | out-of-sample validity, recommendation, order authority |
+| `observed_current_baseline` | Server-derived owner/account portfolio evidence at one admitted as-of point | observed-evidence hash, as-of service date, complete position universe, valuation and FX evidence, canonical source rows | approval, target policy, recommendation |
+| `curated_approved_scenario` | Owner-first approved-vector repository result | exact scenario selector, approval revision, lifecycle/audit status, original approved `scenarioVectorHash` and rows | current holdings or a product default |
+| `explicit_user_scenario` | Authenticated bounded command after server validation and canonicalization | sanitized command digest, admitted source universe, canonical submitted rows, command time and policy version | durable target, curated approval, recommendation |
+| `optimizer_candidate` | Complete derived optimizer artifact | optimizer artifact binding, training window, as-of boundary, objective, constraints, costs, seed/draw binding and candidate rows | out-of-sample validity, recommendation, order authority |
 
 No source can silently fall back to another source kind. A blocked curated
 scenario cannot use current holdings; a blocked observed baseline cannot use a
 target vector; an invalid explicit command cannot use equal weights; and an
 optimizer failure cannot return the current vector under an optimizer label.
+
+`sourceIdentity` is a routing descriptor, not replay evidence by itself:
+
+- observed baseline: source kind, selected account, as-of service date, and
+  valuation-basis policy;
+- curated scenario: exact scenario id, version, and portfolio-path policy;
+- explicit scenario: server command policy and admitted command identity;
+- optimizer candidate: exact optimizer artifact identity and version.
+
+Replay also requires the source-specific evidence binding below. No descriptor,
+newest row, or internal id can substitute for that binding.
 
 ## Common Admission Envelope
 
@@ -77,9 +94,13 @@ selectedAccount
 sourceKind
 sourceIdentity
 asOfServiceDate
-canonicalInstrumentUniverse
-canonicalVectorRows
-scenarioVectorHash
+sourceUniverse
+sourceVectorRows
+sourceEvidenceBindingKind
+sourceEvidenceBindingHash
+executionProjectionUniverse
+executionVectorProjectionRows
+executionVectorProjectionHash
 enginePolicyId
 portfolioPathPolicyId
 returnBasisPolicyId
@@ -101,17 +122,31 @@ Admission requires:
 1. a valid future `TenantContext` produced by an active identity/session path;
 2. an allowed account selected within that owner boundary;
 3. exactly one valid source-kind result;
-4. a non-empty canonical instrument universe with no duplicate identity;
-5. one canonical vector row for every universe instrument, including explicit
-   zero-weight rows, with an exact integer total of 10,000bps;
-6. a complete eligible return matrix and required FX evidence;
-7. server-authorized execution parameters within explicit resource bounds;
-8. exact vector, matrix, and draw bindings without substitution;
-9. no unsupported cash, instrument, cost, or calculation semantic hidden by a
-   fallback.
+4. a non-empty canonical source universe with no duplicate identity;
+5. one canonical source vector row for every source-universe instrument,
+   including explicit zero-weight rows, with an exact integer total of
+   10,000bps;
+6. one valid source-specific evidence binding that cannot be substituted by a
+   hash from another source kind;
+7. one separately derived execution projection for each admitted side; a
+   standalone projection uses the source universe, while a joint comparison
+   uses the exact union comparison universe for both sides;
+8. one execution projection row for every projection-universe instrument,
+   including explicit zero-weight rows, with an exact integer total of
+   10,000bps;
+9. a complete eligible return matrix and required FX evidence;
+10. server-authorized execution parameters within explicit resource bounds;
+11. exact source, projection, matrix, and draw bindings without substitution;
+12. no unsupported cash, instrument, cost, or calculation semantic hidden by a
+    fallback.
 
 Basic Auth, a singleton database, a legacy owner string, an account code, or an
 environment variable cannot stand in for `TenantContext`.
+
+Candidate new bindings in this draft use lowercase `sha256:` over UTF-8
+canonical JSON with fixed keys, fixed policy/version identifiers, canonical
+decimal strings, and canonical row order. Unknown or extra fields are rejected;
+objects are not hashed through runtime-dependent property enumeration.
 
 ## Observed Current Baseline
 
@@ -149,17 +184,82 @@ Such evidence produces an admission preflight blocker. A future user-reviewed
 repair, backfill, or explicit exclusion workflow may resolve it, but provider
 calls and repair are never hidden inside execution.
 
+### Observed Evidence Binding
+
+An observed baseline needs a separate server-only
+`observedBaselineEvidenceHash`. It is not `scenarioVectorHash` and cannot be
+supplied by a browser. Its candidate canonical serialization is:
+
+```text
+hashVersion: simulation_observed_baseline_evidence_hash_v1
+canonicalOwnerUserId
+selectedAccount
+asOfServiceDate
+valuationBasisPolicyId
+instrumentIdentityPolicyId
+componentPositions:
+  - account
+    market
+    currency
+    ticker
+    quantityDecimal
+    localPriceDecimal
+    priceReferenceDate
+    priceEvidenceKind
+    fxRateDecimal
+    fxReferenceDate
+    fxEvidenceKind
+    marketValueKrwDecimal
+```
+
+Component positions are aggregated before serialization by account plus
+canonical instrument identity and sorted by account, market, currency, and
+ticker. For `all`, per-account components remain in the evidence binding even
+when the execution vector later aggregates the same instrument across accounts.
+No database row id or legacy id participates in canonical order.
+
+Every decimal is a canonical finite base-10 string: no exponent, no sign for a
+nonnegative field, no leading zero except before a decimal point, and no
+trailing fractional zero. Quantity, local price, and KRW market value must be
+strictly positive. Non-KRW FX must also be strictly positive. A malformed,
+non-finite, zero, or negative required value blocks the evidence binding before
+quantization.
+
+For KRW instruments, `fxRateDecimal`, `fxReferenceDate`, and `fxEvidenceKind`
+are literal JSON `null`; they are never inferred as numeric `1`. For non-KRW
+instruments those fields are required. The owner UUID is server-only hash input
+and never a product projection.
+
+`valuationBasisPolicyId` must eventually fix price selection, FX selection,
+date carry, multiplication, and rounding semantics. This draft does not choose
+live versus close evidence or silently tolerate a recomputation mismatch.
+
+Changing account scope, service date, component quantity, valuation, price or FX
+reference date, evidence kind, or valuation policy changes the observed-evidence
+hash. The source vector and later execution projection pin this hash as their
+origin; neither one can prove the underlying evidence without it.
+
 ### Candidate Weight Quantization
 
 The candidate deterministic quantization policy is
-`largest_remainder_canonical_identity_v1`:
+`largest_remainder_exact_decimal_v1`:
 
-1. aggregate positive KRW market value by canonical instrument identity;
-2. calculate each exact share against the complete admitted investment value;
-3. assign `floor(exactShare * 10,000)` basis points;
-4. distribute the remaining basis points by descending fractional remainder;
-5. break equal remainders by ascending canonical instrument identity;
-6. retain every admitted identity exactly once, including a positive holding
+1. consume only pinned canonical `marketValueKrwDecimal` evidence; never read
+   `currentWeight`, target fields, legacy `weights_json`, or binary floating
+   point values;
+2. reject a malformed, non-finite, negative, or zero component valuation, an
+   empty admitted universe, or a non-positive total;
+3. aggregate positive KRW valuation by canonical instrument identity using exact
+   decimal arithmetic;
+4. align all canonical decimal values to their maximum fractional scale and
+   convert them to nonnegative arbitrary-precision integers without rounding;
+5. for each instrument calculate
+   `scaledValue * 10,000 / totalScaledValue` using integer quotient and
+   remainder;
+6. assign the quotient as the initial basis-point weight;
+7. distribute the remaining basis points by descending integer remainder;
+8. break equal remainders by ascending canonical instrument identity;
+9. retain every admitted identity exactly once, including a positive holding
    that receives an explicit zero-bps row.
 
 This produces a deterministic 10,000bps vector without changing the admitted
@@ -177,7 +277,8 @@ boundary. Admission requires:
 - exactly one current approved revision or an explicit blocked result;
 - lifecycle state `approved` and verified audit evidence;
 - canonical rows whose recomputed hash matches the stored vector hash;
-- pinning the exact approval revision and vector hash to the execution.
+- pinning the exact approval revision and original approved
+  `scenarioVectorHash` as the curated source binding.
 
 Revocation or supersession affects future admission only. It does not mutate a
 committed historical run. No approved research vector becomes an automatic
@@ -195,8 +296,11 @@ must:
    universe;
 4. validate integer `0..10,000` basis-point rows and exact 10,000bps total;
 5. preserve explicit zero rows and reject duplicates or inferred weights;
-6. calculate the canonical vector hash and a separate sanitized command digest;
-7. pin the admitted command policy and vector to the run.
+6. calculate one `explicitUserCommandDigest` over the normalized command policy,
+   source universe, and canonical submitted rows without calling it the existing
+   `scenarioVectorHash`;
+7. use that digest as the explicit source binding and pin the admitted command
+   policy and source rows to the run.
 
 This is one execution instruction. It does not create a durable target policy,
 curated approval revision, optimizer result, recommendation, or order.
@@ -213,6 +317,8 @@ when it pins:
 - long-only, concentration, turnover, FX, and cost constraints;
 - optimizer algorithm/version and deterministic seed policy;
 - complete candidate rows and candidate hash;
+- one immutable optimizer artifact binding that covers those rows and all
+  preceding optimizer evidence;
 - the baseline, matrix, and stochastic draw evidence used for evaluation;
 - completion and validation status with no partial artifact.
 
@@ -224,15 +330,55 @@ evidence and a separate recommendation boundary remain required.
 Current-versus-candidate comparison requires common random numbers and one
 joint experiment:
 
-1. form the sorted union of both canonical instrument sets;
-2. represent each vector over that exact joint universe, preserving explicit
+1. preserve each side's original source universe, source rows, and
+   source-specific evidence binding unchanged;
+2. form the sorted union of both canonical instrument sets as a separate
+   execution projection universe;
+3. represent each vector over that exact joint universe, preserving explicit
    zero-bps rows;
-3. require complete price/FX matrix evidence for every joint-universe cell;
-4. use the same return basis, matrix hash, stochastic engine, draw plan or shock
+4. require complete price/FX matrix evidence for every joint-universe cell;
+5. use the same return basis, matrix hash, stochastic engine, draw plan or shock
    artifact, seed policy, horizon, path count, and resource policy;
-5. use the same path and cost semantics;
-6. calculate separate vector hashes while keeping matrix/draw bindings equal;
-7. compare only complete eligible artifacts.
+6. use the same path and cost semantics;
+7. calculate one separate execution-vector projection hash per side while
+   keeping projection-universe, matrix, and draw bindings equal;
+8. compare only complete eligible artifacts.
+
+The candidate projection serialization is:
+
+```text
+hashVersion: simulation_execution_vector_projection_hash_v1
+instrumentIdentityPolicyId
+portfolioPathPolicyId
+projectionUniverseHash
+vectorRows:
+  - market
+    currency
+    ticker
+    weightBps
+```
+
+Rows are sorted by canonical instrument identity. The projection hash is a
+derived execution/comparison binding only. It does not include or replace the
+source-specific observed evidence hash, approved `scenarioVectorHash`, explicit
+command digest, or optimizer artifact binding.
+
+`projectionUniverseHash` is not a new competing universe hash. It must be the
+exact Phase 0B `scenarioUniverseHash` produced for the projection's instrument
+set and return-basis policy. If Phase 0B cannot produce that ready binding, no
+execution projection is eligible.
+
+Adding joint-universe zero rows to a curated scenario would change the existing
+scenario-vector serialization. Therefore the original approved rows and
+`scenarioVectorHash` remain untouched, and only the separate execution
+projection receives the added zero rows. The projection must never be written
+back as an approval revision or presented as the approved vector hash.
+
+The current pure normalized-NAV contract expects its existing scenario-vector
+binding. It is not automatically authorized to consume this new projection
+hash. A later separately approved adapter/hash-binding contract must define how
+an admitted execution projection enters the pure calculation without
+reinterpreting the curated approval hash.
 
 Common-history intersection, row dropping, zero-filled returns, independent
 draws, different horizons, different costs, or different model versions block
@@ -320,6 +466,11 @@ approval. Job state is mutable operational metadata, while admitted inputs and
 committed results are immutable evidence. Physical relation, blob, transaction,
 retention, and cleanup choices remain unapproved.
 
+An admitted run input must preserve both the source-specific evidence binding
+and any derived execution projection binding. Keeping only the projection hash
+would lose source provenance; keeping only the source hash would not prove the
+joint-universe comparison vector.
+
 ## Projection And Leakage Boundary
 
 Future server loaders and repositories use explicit projections. Product DTOs
@@ -349,12 +500,15 @@ account_not_allowed
 source_not_admitted
 source_ambiguous
 baseline_universe_empty
+observed_evidence_binding_invalid
 unsupported_instrument
 cash_policy_unavailable
 valuation_evidence_incomplete
 fx_evidence_incomplete
 vector_shape_invalid
 vector_total_invalid
+source_binding_mismatch
+execution_projection_invalid
 execution_parameters_unapproved
 matrix_incomplete
 comparison_universe_incompatible
@@ -389,11 +543,23 @@ The next review should approve, reject, or amend:
 
 1. the four-source authority taxonomy;
 2. the observed-baseline as-of and complete-universe requirements;
-3. the proposed largest-remainder basis-point quantization;
-4. the joint-universe/common-random-number comparison rule;
+3. the observed valuation-evidence binding and proposed exact-decimal
+   largest-remainder quantization;
+4. the source-preserving joint-universe execution projection and
+   common-random-number comparison rule;
 5. the diagnostics-only partial-result boundary;
 6. the execution-parameter authority table;
 7. the logical persistence-category separation.
+
+For review, those seven decisions should be grouped without merging their
+meaning:
+
+1. source taxonomy plus observed complete-universe/as-of policy;
+2. observed valuation-evidence binding plus deterministic exact-decimal
+   quantization;
+3. source-preserving joint-universe projection plus common-random-number policy;
+4. partial eligibility, parameter authority, and logical persistence
+   separation.
 
 Only after those decisions should varda-labs choose whether the first physical
 slice is curated approved-vector persistence or immutable admitted run-input
