@@ -88,8 +88,8 @@ The rehearsal performed no approval, vector, lifecycle-event, owner, auth,
 product, or fixture DML. It did not run `db:migrate`, apply migration journal
 state, push a branch, or trigger deployment.
 
-The persistent database schema therefore remained unchanged by the successful
-rehearsal. The three candidate tables remained absent after rollback.
+The successful rehearsal left no persistent change to the reviewed target
+objects. The three candidate tables remained absent after rollback.
 
 ## Explicit Non-Claims
 
