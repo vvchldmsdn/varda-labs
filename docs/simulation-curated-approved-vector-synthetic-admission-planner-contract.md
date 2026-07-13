@@ -1,4 +1,4 @@
-# Curated Approved-Vector Synthetic Would-Admit Planner Contract
+# Curated Approved-Vector Synthetic Admission Planner Contract
 
 Last updated: 2026-07-13
 
@@ -33,11 +33,11 @@ Neither name creates runtime authority.
 
 ## Canonical Result Terminology
 
-The planner must not return plain `would_admit`. Its only top-level decisions
-are:
+The planner must not return plain `would_admit` or generic `eligible`. Its only
+top-level decisions are:
 
 ```text
-synthetic_eligible
+synthetic_preconditions_satisfied
 blocked
 ```
 
@@ -45,10 +45,11 @@ Every result also contains:
 
 ```text
 mode: synthetic_only
-runtimeTrustStatus: not_ready
+runtimeTrustStatus: not_established
+readinessStatus: not_ready
 ```
 
-`synthetic_eligible` means only:
+`synthetic_preconditions_satisfied` means only:
 
 > the caller-supplied normalized synthetic snapshot passed this pure static
 > policy.
@@ -89,7 +90,8 @@ A later implementation must pin, as immutable policy constants:
 - the approved approval-envelope digest version;
 - write-safety contract commit
   `c0a2f584e167f153db0dedb6cfc418d76b2fc5bd`; and
-- runtime trust `not_ready`.
+- runtime trust `not_established`; and
+- readiness `not_ready`.
 
 The planner may compare input labels to pinned constants. It cannot prove that
 the labels came from an authoritative source.
@@ -155,24 +157,51 @@ renormalize, or repair rows.
 - state label;
 - synthetic owner-binding match;
 - exact envelope-digest match;
-- synthetic `issuedAt`, `expiresAt`, and evaluation instant; and
+- synthetic `issuedAt`, `expiresAt`, and `syntheticEvaluationTime`; and
 - a safe challenge-instance label used only for equality checks inside the
   fixture.
 
-The evaluation instant is caller-supplied synthetic evidence. The helper must
-not call `Date.now()` or claim server time.
+All three synthetic instants use the exact canonical UTC form:
+
+```text
+YYYY-MM-DDTHH:mm:ss.sssZ
+```
+
+Offsets, omitted milliseconds, local time, leap-second text, invalid calendar
+values, and implementation-dependent date parsing are rejected. The planner
+checks only:
+
+```text
+issuedAt <= syntheticEvaluationTime < expiresAt
+```
+
+`syntheticEvaluationTime` is caller-supplied synthetic evidence. The helper
+must not call `Date.now()`, read a clock, replace the supplied value, or claim
+server time.
 
 The input must not contain a raw production challenge handle, handle digest,
 receipt, provider/session value, or secret.
 
 ### Synthetic Durable-State Snapshot
 
-For `initial_approval`, the snapshot may state:
+For `initial_approval`, the snapshot contains only these bounded assumptions:
 
-- exact-identity current approved count;
-- existing revision count;
-- highest existing revision, if any; and
-- whether a different live synthetic challenge is competing.
+```text
+approvalRevisionAssumption:
+  no_prior_revision
+  current_approval_exists
+  prior_revision_exists
+  unknown
+
+competingChallengeAssumption:
+  none
+  live_competitor_present
+  unknown
+```
+
+Only `no_prior_revision` plus `none` can satisfy v1 preconditions. No row,
+count, revision number, timestamp, receipt, lifecycle event, physical id, or
+database-shaped object is accepted.
 
 These are unverified assumptions. The planner does not query, lock, or prove
 database state and does not allocate a revision.
@@ -193,11 +222,12 @@ A later pure helper must use one deterministic fail-closed order:
    10,000 bps;
 10. recompute and compare the scenario-vector hash;
 11. recompute and compare the exact approval-envelope digest;
-12. validate synthetic confirmation policy, owner binding, exact challenge
-    instance, `pending` state, and `[issuedAt, expiresAt)` interval;
-13. require a synthetic durable-state snapshot consistent with no current or
-    prior revision for this first initial approval; and
-14. return `synthetic_eligible` only when no blocker remains.
+12. validate canonical synthetic instants, confirmation policy, owner binding,
+    exact challenge instance, `pending` state, and
+    `[issuedAt, expiresAt)` using `syntheticEvaluationTime`;
+13. require the minimal synthetic durable-state assumptions
+    `no_prior_revision` and `none`; and
+14. return `synthetic_preconditions_satisfied` only when no blocker remains.
 
 No later step repairs or hides an earlier blocker. In particular, the planner
 must not use hash equality to bypass row validation, actor assumptions, expiry,
@@ -227,6 +257,7 @@ invalid_weight_bps
 source_vector_total_not_10000_bps
 scenario_vector_hash_mismatch
 approval_envelope_digest_mismatch
+invalid_synthetic_instant
 confirmation_policy_mismatch
 confirmation_owner_binding_mismatch
 confirmation_instance_mismatch
@@ -236,6 +267,7 @@ confirmation_expired
 synthetic_current_approval_exists
 synthetic_prior_revision_exists
 synthetic_competing_challenge
+synthetic_durable_state_unproven
 ```
 
 The result includes every applicable blocker in this fixed order. It does not
@@ -250,8 +282,9 @@ The proposed output is bounded to semantics equivalent to:
 policyId
 policyVersion
 mode = synthetic_only
-runtimeTrustStatus = not_ready
-decision = synthetic_eligible | blocked
+runtimeTrustStatus = not_established
+readinessStatus = not_ready
+decision = synthetic_preconditions_satisfied | blocked
 intent = initial_approval
 blockers[]
 rowCount
@@ -312,11 +345,13 @@ A later pure-only implementation packet must require fixtures for at least:
 - duplicate and out-of-order instruments;
 - invalid, negative, non-integer, over-10,000, and wrong-total weights;
 - scenario-vector hash and envelope-digest mismatch;
-- future-issued, boundary-expired, terminal, and owner-mismatched challenge
-  assumptions;
+- strict canonical UTC instant parsing, caller-supplied
+  `syntheticEvaluationTime`, future-issued, exact-boundary-expired, terminal,
+  and owner-mismatched challenge assumptions;
 - inactive session, ambiguous identity, provisioning/disabled user, and actor
   mismatch assumptions;
-- current approval, prior revision, and competing challenge assumptions;
+- every minimal approval-revision and competing-challenge assumption enum,
+  including both `unknown` states;
 - deterministic blocker ordering and immutable bounded output;
 - input mutation resistance and repeated-field getter safety;
 - no DB, network, filesystem, environment, clock, randomness, logging, API,
@@ -331,7 +366,8 @@ Even if this contract is approved and later implemented, current runtime
 remains:
 
 ```text
-not_ready
+runtimeTrustStatus = not_established
+readinessStatus = not_ready
 ```
 
 No synthetic result may be persisted, returned from a product API or Server
@@ -342,7 +378,7 @@ translated into `would_admit` or `committed`.
 
 This candidate rejects:
 
-- returning plain `would_admit` from a synthetic helper;
+- returning plain `would_admit` or generic `eligible` from a synthetic helper;
 - accepting a browser-supplied owner UUID as authority;
 - passing a real `TenantContext`, session, challenge, receipt, or DB row into
   synthetic fixtures;
@@ -377,16 +413,19 @@ bundle:
 
 1. v1 is a pure synthetic-only planner for `initial_approval` static
    conditions only;
-2. canonical decisions are `synthetic_eligible` and `blocked`, always paired
-   with `mode=synthetic_only` and `runtimeTrustStatus=not_ready`;
-3. normalized synthetic actor, exact identity, vector, confirmation, and
-   durable-state snapshots remain caller-supplied assumptions, never runtime
-   authority;
-4. validation is deterministic, fail-closed, bounded by 64 rows before hash
+2. canonical decisions are `synthetic_preconditions_satisfied` and `blocked`,
+   always paired with `mode=synthetic_only`,
+   `runtimeTrustStatus=not_established`, and `readinessStatus=not_ready`;
+3. expiry uses only strict canonical UTC `issuedAt`, `expiresAt`, and the
+   caller-supplied `syntheticEvaluationTime`; no clock is read;
+4. normalized synthetic actor, exact identity, vector, confirmation, and the
+   minimal durable-state assumption enums remain caller-supplied assumptions,
+   never runtime authority or persisted-row projections;
+5. validation is deterministic, fail-closed, bounded by 64 rows before hash
    work, and returns the ordered blocker vocabulary above;
-5. output is bounded and excludes owner, provider/session, challenge, hash,
+6. output is bounded and excludes owner, provider/session, challenge, hash,
    vector-row, physical, SQL, approval, and committed evidence; and
-6. the helper performs no I/O, runtime trust resolution, lock, receipt
+7. the helper performs no I/O, runtime trust resolution, lock, receipt
    recovery, revision allocation, transaction, or write.
 
 Approval of this bundle would approve planner semantics only. It would not
