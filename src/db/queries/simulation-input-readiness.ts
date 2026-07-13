@@ -1,12 +1,14 @@
 import "server-only";
 
-import { getReadOnlySimulationPeriodPreflight } from "@/db/queries/simulation-return-matrix";
+import { getReadOnlySimulationPeriodPreflightBatch } from "@/db/queries/simulation-return-matrix";
 import {
   buildSimulationInputReadiness,
+  buildSimulationInputReadinessDates,
+  buildSimulationInputReadinessPageModel,
+  resolveSimulationEndServiceDateSelection,
   SIMULATION_INPUT_READINESS_POLICY,
   type SimulationInputReadinessDescriptor,
 } from "@/lib/simulation-input-readiness";
-import { isRiskDate } from "@/lib/portfolio-risk-calendar";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const KODEX_200 = Object.freeze({
@@ -31,36 +33,53 @@ const VOO = Object.freeze({
   fxBasisLabel: "기준일별 저장 USD/KRW",
 }) satisfies SimulationInputReadinessDescriptor;
 
+const INPUTS = Object.freeze([KODEX_200, VOO]);
+
 export async function getReadOnlySimulationInputReadiness(options?: {
-  endServiceDate?: string | null;
+  endServiceDate?: string | string[];
   now?: Date;
 }) {
   const now = options?.now ?? new Date();
-  const requestedEndServiceDate =
-    options?.endServiceDate?.trim() || resolveSnapshotCycle(now).snapshotDate;
+  const selection = resolveSimulationEndServiceDateSelection({
+    suppliedValue: options?.endServiceDate,
+    defaultEndServiceDate: resolveSnapshotCycle(now).snapshotDate,
+  });
+  const requestedEndServiceDate = selection.endServiceDate;
+  const historyDates = buildSimulationInputReadinessDates(
+    requestedEndServiceDate,
+  );
+  const dates = historyDates.length > 0 ? historyDates : [""];
   const returnStepCount = SIMULATION_INPUT_READINESS_POLICY.returnStepCount;
-  const [kodex200, voo] = await Promise.all([
-    getReadOnlySimulationPeriodPreflight({
-      candidates: [candidate(KODEX_200)],
-      endServiceDate: requestedEndServiceDate,
-      returnStepCount,
+  const preflights = await getReadOnlySimulationPeriodPreflightBatch(
+    dates.flatMap((endServiceDate) =>
+      INPUTS.map((descriptor) => ({
+        candidates: [candidate(descriptor)],
+        endServiceDate,
+        returnStepCount,
+      })),
+    ),
+  );
+  const generatedAt = now.toISOString();
+  const models = dates.map((endServiceDate, dateIndex) =>
+    buildSimulationInputReadiness({
+      requestedEndServiceDate:
+        selection.status === "valid" ? endServiceDate : "",
+      generatedAt,
+      inputs: INPUTS.map((descriptor, inputIndex) => ({
+        descriptor,
+        preflight: preflights[dateIndex * INPUTS.length + inputIndex],
+      })),
     }),
-    getReadOnlySimulationPeriodPreflight({
-      candidates: [candidate(VOO)],
-      endServiceDate: requestedEndServiceDate,
-      returnStepCount,
-    }),
-  ]);
+  );
+  const selected = models[0];
+  if (!selected) {
+    throw new Error("Simulation input readiness projection is empty");
+  }
 
-  return buildSimulationInputReadiness({
-    requestedEndServiceDate: isRiskDate(requestedEndServiceDate)
-      ? requestedEndServiceDate
-      : "",
-    generatedAt: now.toISOString(),
-    inputs: [
-      { descriptor: KODEX_200, preflight: kodex200 },
-      { descriptor: VOO, preflight: voo },
-    ],
+  return buildSimulationInputReadinessPageModel({
+    selection,
+    selected,
+    history: selection.status === "valid" ? models : [],
   });
 }
 

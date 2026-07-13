@@ -1,18 +1,20 @@
 import Link from "next/link";
 
-import type { SimulationInputReadinessModel } from "@/lib/simulation-input-readiness";
+import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
-type InputReadiness = SimulationInputReadinessModel["inputs"][number];
+type InputReadiness = SimulationInputReadinessPageModel["inputs"][number];
+type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 
 export function SimulationInputReadinessView({
   model,
 }: {
-  model: SimulationInputReadinessModel;
+  model: SimulationInputReadinessPageModel;
 }) {
   return (
     <main
       data-page="simulation-input-readiness"
       data-runtime-trust-status={model.runtimeTrustStatus}
+      data-end-query-status={model.endServiceDateSelection.status}
       className="min-h-screen overflow-x-hidden bg-[#f3f4ef] text-[#171916]"
     >
       <div className="mx-auto w-full max-w-[1400px] px-4 py-5">
@@ -38,6 +40,16 @@ export function SimulationInputReadinessView({
             시뮬레이션 실행, 미래 예측, 비중 추천 결과가 아닙니다.
           </div>
         </header>
+
+        {model.endServiceDateSelection.status === "invalid" ? (
+          <section
+            data-invalid-end-query
+            className="border-b border-[#d7ddcf] py-4 text-sm text-[#7a5117]"
+          >
+            기준일은 하나의 <code>YYYY-MM-DD</code> 값으로 입력해야 합니다. 빈 값,
+            공백이 포함된 값, 중복된 값은 데이터 조회 전에 차단합니다.
+          </section>
+        ) : null}
 
         <section
           aria-label="검사 요약"
@@ -73,6 +85,13 @@ export function SimulationInputReadinessView({
           ))}
         </section>
 
+        {model.history.length > 0 ? (
+          <ReadinessHistory
+            rows={model.history}
+            selectedServiceDate={model.requestedEndServiceDate}
+          />
+        ) : null}
+
         <footer className="border-t border-[#d7ddcf] pt-4 text-sm leading-6 text-[#687064]">
           두 종목은 서로 독립적으로 검사합니다. 현재 보유 종목, 기본 포트폴리오,
           목표 비중 또는 승인된 실행 벡터로 해석하지 않습니다. 결손이 있으면 과거
@@ -83,6 +102,126 @@ export function SimulationInputReadinessView({
       </div>
     </main>
   );
+}
+
+function ReadinessHistory({
+  rows,
+  selectedServiceDate,
+}: {
+  rows: readonly HistoryRow[];
+  selectedServiceDate: string;
+}) {
+  return (
+    <section
+      data-simulation-readiness-history
+      aria-labelledby="simulation-readiness-history-title"
+      className="border-t border-[#d7ddcf] py-5"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2
+            id="simulation-readiness-history-title"
+            className="text-lg font-semibold"
+          >
+            최근 기준일 검사
+          </h2>
+          <p className="mt-1 text-sm text-[#687064]">
+            저장된 실행 기록이 아니라, 최근 7개 기준일을 현재 저장 증거로 다시
+            검사한 결과입니다.
+          </p>
+        </div>
+        <p className="text-xs text-[#7a8175]">날짜 자동 대체 없음</p>
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <tr>
+              <th className="px-3 py-3 font-semibold">기준일</th>
+              <th className="px-3 py-3 font-semibold">KODEX 200</th>
+              <th className="px-3 py-3 font-semibold">VOO</th>
+              <th className="px-3 py-3 text-right font-semibold">검사</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const kodex200 = row.inputs.find((input) => input.id === "kodex200");
+              const voo = row.inputs.find((input) => input.id === "voo");
+              const selected = row.serviceDate === selectedServiceDate;
+
+              return (
+                <tr
+                  key={row.serviceDate}
+                  data-readiness-history-row={row.serviceDate}
+                  data-kodex200-status={kodex200?.status ?? "unavailable"}
+                  data-voo-status={voo?.status ?? "unavailable"}
+                  className="border-b border-[#e1e5da] align-top"
+                >
+                  <td className="whitespace-nowrap px-3 py-3 font-semibold">
+                    {formatDate(row.serviceDate)}
+                    {selected ? (
+                      <span className="ml-2 text-xs font-medium text-[#47624d]">
+                        선택됨
+                      </span>
+                    ) : null}
+                  </td>
+                  <HistoryStatusCell input={kodex200} />
+                  <HistoryStatusCell input={voo} />
+                  <td className="whitespace-nowrap px-3 py-3 text-right">
+                    {selected ? (
+                      <span className="text-xs font-semibold text-[#687064]">
+                        현재 결과
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/simulation?end=${row.serviceDate}`}
+                        className="inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-xs font-semibold text-[#253029] hover:bg-[#eef1e8]"
+                      >
+                        이 날짜 검사
+                      </Link>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function HistoryStatusCell({
+  input,
+}: {
+  input: HistoryRow["inputs"][number] | undefined;
+}) {
+  const ready = input?.status === "matrix_ready";
+  return (
+    <td className="px-3 py-3">
+      <p className={ready ? "font-semibold text-[#226039]" : "font-semibold text-[#7a5117]"}>
+        {ready ? "준비됨" : "사용 불가"}
+      </p>
+      <p className="mt-1 text-xs text-[#687064]">
+        {formatHistoryCoverage(input)}
+      </p>
+      {!ready && input?.issueLabels[0] ? (
+        <p className="mt-1 max-w-[300px] text-xs leading-5 text-[#7a6b4e]">
+          {input.issueLabels[0]}
+        </p>
+      ) : null}
+    </td>
+  );
+}
+
+function formatHistoryCoverage(
+  input: HistoryRow["inputs"][number] | undefined,
+) {
+  if (!input) return "커버리지 없음";
+  if (input.returnCoverage) {
+    return `${input.returnCoverage.readyReturnCount}/${input.returnCoverage.requiredReturnCount} 수익률 행`;
+  }
+  return `${input.resolvedPointCount}/${input.requiredPointCount ?? "-"} 관측점`;
 }
 
 function InputPanel({ input }: { input: InputReadiness }) {

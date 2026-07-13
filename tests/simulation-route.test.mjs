@@ -14,14 +14,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(view, /["']use client["']/);
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
     assert.match(query, /^import "server-only";/);
-    assert.match(query, /Promise\.all\s*\(/);
-    assert.equal(
-      query.match(/getReadOnlySimulationPeriodPreflight\s*\(/g)?.length,
-      2,
-    );
+    assert.match(page, /endServiceDate: params\.end/);
+    assert.doesNotMatch(page, /params\.end\[0\]/);
+    assert.match(query, /resolveSimulationEndServiceDateSelection/);
+    assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
+    assert.doesNotMatch(query, /endServiceDate\?\.trim\(\)/);
     assert.match(query, /ticker: "069500"/);
     assert.match(query, /ticker: "VOO"/);
-    assert.match(query, /isRiskDate\(requestedEndServiceDate\)/);
     assert.doesNotMatch(
       query,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
@@ -37,6 +36,12 @@ describe("Simulation input readiness route boundary", () => {
 
     assert.match(view, /data-page="simulation-input-readiness"/);
     assert.match(view, /data-readiness-status/);
+    assert.match(view, /data-end-query-status/);
+    assert.match(view, /data-invalid-end-query/);
+    assert.match(view, /data-simulation-readiness-history/);
+    assert.match(view, /최근 7개 기준일/);
+    assert.match(view, /저장된 실행 기록이 아니라/);
+    assert.match(view, /수익률 행/);
     assert.match(view, /시뮬레이션 실행, 미래 예측, 비중 추천 결과가 아닙니다/);
     assert.match(view, /과거\s*날짜로 자동 대체/);
     assert.doesNotMatch(

@@ -7,7 +7,9 @@ config({ path: ".env.local", quiet: true });
 
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3100";
 const END_SERVICE_DATE = readArgument("--end");
+const RAW_QUERY = readArgument("--raw-query");
 const EXPECT_READY = numberArgument("--expect-ready");
+const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -20,9 +22,12 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
 const sql = neon(process.env.DATABASE_URL);
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
-const simulationPath = END_SERVICE_DATE
-  ? `/simulation?end=${encodeURIComponent(END_SERVICE_DATE)}`
-  : "/simulation";
+const simulationPath =
+  RAW_QUERY !== null
+    ? `/simulation?${RAW_QUERY}`
+    : END_SERVICE_DATE
+      ? `/simulation?end=${encodeURIComponent(END_SERVICE_DATE)}`
+      : "/simulation";
 
 async function main() {
   const countsBefore = await readCounts();
@@ -42,6 +47,13 @@ async function main() {
   assert.match(dashboard.body, /href="\/simulation"/);
   assert.match(simulation.body, /data-page="simulation-input-readiness"/);
   assert.match(simulation.body, /data-runtime-trust-status="not_established"/);
+  if (EXPECT_INVALID_QUERY) {
+    assert.match(simulation.body, /data-end-query-status="invalid"/);
+    assert.match(simulation.body, /data-invalid-end-query/);
+  } else {
+    assert.match(simulation.body, /data-end-query-status="valid"/);
+    assert.match(simulation.body, /data-simulation-readiness-history/);
+  }
   assert.match(simulation.body, /연구 입력 증거 준비도/);
   assert.match(simulation.body, /069500/);
   assert.match(simulation.body, /VOO/);
@@ -60,8 +72,16 @@ async function main() {
     ),
   ].map((match) => match[1]);
   const readyCount = statuses.filter((status) => status === "matrix_ready").length;
+  const historyRowCount =
+    simulation.body.match(/data-readiness-history-row="\d{4}-\d{2}-\d{2}"/g)
+      ?.length ?? 0;
   assert.equal(inputCount, 2, "simulation must render two independent inputs");
   assert.equal(statuses.length, 2, "simulation must render two readiness states");
+  assert.equal(
+    historyRowCount,
+    EXPECT_INVALID_QUERY ? 0 : 7,
+    "simulation rendered an unexpected history row count",
+  );
   if (EXPECT_READY !== null) {
     assert.equal(readyCount, EXPECT_READY, "unexpected ready input count");
   }
@@ -86,6 +106,7 @@ async function main() {
         inputCount,
         statuses,
         readyCount,
+        historyRowCount,
         databaseSideEffects: false,
         counts: countsAfter,
       },

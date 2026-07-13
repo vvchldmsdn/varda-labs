@@ -13,10 +13,9 @@ export default async function SimulationPage({
   searchParams,
 }: SimulationPageProps) {
   const params = await searchParams;
-  const endServiceDate = Array.isArray(params.end)
-    ? params.end[0]
-    : params.end;
-  const modelPromise = getReadOnlySimulationInputReadiness({ endServiceDate });
+  const modelPromise = getReadOnlySimulationInputReadiness({
+    endServiceDate: params.end,
+  });
 
   return (
     <Suspense fallback={<SimulationSkeleton />}>

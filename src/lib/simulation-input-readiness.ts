@@ -1,9 +1,12 @@
 import type { loadSimulationPeriodPreflight } from "./simulation-period-preflight-loader.ts";
+import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
 
 export const SIMULATION_INPUT_READINESS_POLICY = Object.freeze({
   version: "simulation_input_readiness_v1",
   displayMode: "independent_single_instrument_market_evidence",
   returnStepCount: 90,
+  historyDayCount: 7,
+  historyMode: "request_time_recheck_not_persisted_run_history",
   resultStates: Object.freeze(["matrix_ready", "unavailable"] as const),
   runtimeTrustStatus: "not_established",
   executionStatus: "not_executed",
@@ -28,6 +31,69 @@ export type SimulationInputReadinessDescriptor = Readonly<{
 export type SimulationInputReadinessModel = ReturnType<
   typeof buildSimulationInputReadiness
 >;
+
+export type SimulationEndServiceDateSelection =
+  | Readonly<{
+      status: "valid";
+      source: "server_default" | "query";
+      endServiceDate: string;
+    }>
+  | Readonly<{
+      status: "invalid";
+      source: "query";
+      endServiceDate: "";
+    }>;
+
+export type SimulationInputReadinessPageModel = ReturnType<
+  typeof buildSimulationInputReadinessPageModel
+>;
+
+export function resolveSimulationEndServiceDateSelection(input: {
+  suppliedValue: string | string[] | undefined;
+  defaultEndServiceDate: string;
+}): SimulationEndServiceDateSelection {
+  if (input.suppliedValue === undefined) {
+    return isRiskDate(input.defaultEndServiceDate)
+      ? Object.freeze({
+          status: "valid" as const,
+          source: "server_default" as const,
+          endServiceDate: input.defaultEndServiceDate,
+        })
+      : Object.freeze({
+          status: "invalid" as const,
+          source: "query" as const,
+          endServiceDate: "" as const,
+        });
+  }
+
+  if (
+    Array.isArray(input.suppliedValue) ||
+    !isRiskDate(input.suppliedValue)
+  ) {
+    return Object.freeze({
+      status: "invalid" as const,
+      source: "query" as const,
+      endServiceDate: "" as const,
+    });
+  }
+
+  return Object.freeze({
+    status: "valid" as const,
+    source: "query" as const,
+    endServiceDate: input.suppliedValue,
+  });
+}
+
+export function buildSimulationInputReadinessDates(endServiceDate: string) {
+  if (!isRiskDate(endServiceDate)) return Object.freeze([] as string[]);
+
+  return Object.freeze(
+    Array.from(
+      { length: SIMULATION_INPUT_READINESS_POLICY.historyDayCount },
+      (_, index) => shiftRiskDate(endServiceDate, -index),
+    ),
+  );
+}
 
 export function buildSimulationInputReadiness(input: {
   requestedEndServiceDate: string;
@@ -59,6 +125,47 @@ export function buildSimulationInputReadiness(input: {
         SIMULATION_INPUT_READINESS_POLICY.returnStepCount + 1,
     }),
     inputs: Object.freeze(items),
+  });
+}
+
+export function buildSimulationInputReadinessPageModel(input: {
+  selection: SimulationEndServiceDateSelection;
+  selected: SimulationInputReadinessModel;
+  history: readonly SimulationInputReadinessModel[];
+}) {
+  const history = input.history.map((model) =>
+    Object.freeze({
+      serviceDate: model.requestedEndServiceDate,
+      readyInputCount: model.summary.readyInputCount,
+      totalInputCount: model.summary.totalInputCount,
+      inputs: Object.freeze(
+        model.inputs.map((item) =>
+          Object.freeze({
+            id: item.id,
+            ticker: item.ticker,
+            status: item.status,
+            resolvedPointCount: item.resolvedPointCount,
+            requiredPointCount: item.requiredPointCount,
+            returnCoverage: item.returnCoverage
+              ? Object.freeze({
+                  readyReturnCount: item.returnCoverage.readyReturnCount,
+                  requiredReturnCount:
+                    item.returnCoverage.requiredReturnCount,
+                })
+              : null,
+            issueLabels: Object.freeze(
+              item.issues.map((issue) => issue.label),
+            ),
+          }),
+        ),
+      ),
+    }),
+  );
+
+  return Object.freeze({
+    ...input.selected,
+    endServiceDateSelection: input.selection,
+    history: Object.freeze(history),
   });
 }
 

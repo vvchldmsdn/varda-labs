@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { assetPriceSnapshots, fxRates } from "@/db/schema";
 import {
   loadSimulationPeriodPreflight,
+  loadSimulationPeriodPreflightBatch,
   type SimulationPeriodPreflightRequest,
 } from "@/lib/simulation-period-preflight-loader";
 import {
@@ -83,5 +84,14 @@ export async function getReadOnlySimulationPeriodPreflight(
   return loadSimulationPeriodPreflight(
     drizzleSimulationReturnMatrixRepository,
     request,
+  );
+}
+
+export async function getReadOnlySimulationPeriodPreflightBatch(
+  requests: readonly SimulationPeriodPreflightRequest[],
+) {
+  return loadSimulationPeriodPreflightBatch(
+    drizzleSimulationReturnMatrixRepository,
+    requests,
   );
 }

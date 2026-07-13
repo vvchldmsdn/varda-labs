@@ -1,3 +1,4 @@
+import { shiftRiskDate } from "./portfolio-risk-calendar.ts";
 import {
   planSimulationPeriodPreflightScan,
   type SimulationPeriodPreflightRequest,
@@ -10,6 +11,7 @@ import type {
   SimulationPeriodCandidateAvailability,
   SimulationPeriodIssue,
 } from "./simulation-period-request-types.ts";
+import { SIMULATION_RETURN_MATRIX_POLICY } from "./simulation-return-matrix.ts";
 import {
   loadSimulationReturnMatrixUniverseEvidence,
   type SimulationReturnMatrixReadRepository,
@@ -93,6 +95,124 @@ export async function loadSimulationPeriodPreflight(
     matrixEvidence,
     scanOutcome: "axis_resolved",
   });
+}
+
+export async function loadSimulationPeriodPreflightBatch(
+  repository: SimulationReturnMatrixReadRepository,
+  requests: readonly SimulationPeriodPreflightRequest[],
+) {
+  if (requests.length === 0) return Object.freeze([]);
+
+  const plans = requests.map(planSimulationPeriodPreflightScan);
+  const queryablePlans = plans.filter(
+    (plan) => plan.status === "queryable" && plan.queryRange,
+  );
+  if (queryablePlans.length === 0) {
+    return Promise.all(
+      requests.map((request) =>
+        loadSimulationPeriodPreflight(EMPTY_READ_REPOSITORY, request),
+      ),
+    );
+  }
+
+  const axisSourceDateFrom = queryablePlans.reduce(
+    (earliest, plan) =>
+      plan.queryRange!.sourceDateFrom < earliest
+        ? plan.queryRange!.sourceDateFrom
+        : earliest,
+    queryablePlans[0].queryRange!.sourceDateFrom,
+  );
+  const sourceDateFrom = shiftRiskDate(
+    axisSourceDateFrom,
+    -SIMULATION_RETURN_MATRIX_POLICY.maxPriceCarryDays,
+  );
+  const sourceDateTo = queryablePlans.reduce(
+    (latest, plan) =>
+      plan.queryRange!.sourceDateTo > latest
+        ? plan.queryRange!.sourceDateTo
+        : latest,
+    queryablePlans[0].queryRange!.sourceDateTo,
+  );
+  const instruments = uniqueCandidates(
+    queryablePlans.flatMap((plan) => plan.candidates),
+  );
+  const requiresFx = queryablePlans.some((plan) => plan.requiresFx);
+  const [priceRows, fxRows] = await Promise.all([
+    repository.loadPriceRows({
+      instruments,
+      sourceDateFrom,
+      sourceDateTo,
+    }),
+    requiresFx
+      ? repository.loadFxRows({ sourceDateFrom, sourceDateTo })
+      : Promise.resolve([]),
+  ]);
+  const snapshotRepository = createSnapshotRepository(priceRows, fxRows);
+
+  return Promise.all(
+    requests.map((request) =>
+      loadSimulationPeriodPreflight(snapshotRepository, request),
+    ),
+  );
+}
+
+const EMPTY_READ_REPOSITORY: SimulationReturnMatrixReadRepository = {
+  async loadPriceRows() {
+    return [];
+  },
+  async loadFxRows() {
+    return [];
+  },
+};
+
+function createSnapshotRepository(
+  priceRows: Awaited<
+    ReturnType<SimulationReturnMatrixReadRepository["loadPriceRows"]>
+  >,
+  fxRows: Awaited<
+    ReturnType<SimulationReturnMatrixReadRepository["loadFxRows"]>
+  >,
+): SimulationReturnMatrixReadRepository {
+  return {
+    async loadPriceRows({ instruments, sourceDateFrom, sourceDateTo }) {
+      const identities = new Set(
+        instruments.map(
+          (row) =>
+            `${row.market.toLowerCase()}|${row.currency.toUpperCase()}|${row.ticker.toUpperCase()}`,
+        ),
+      );
+      return priceRows.filter(
+        (row) =>
+          identities.has(
+            `${row.market.toLowerCase()}|${row.currency.toUpperCase()}|${row.ticker.toUpperCase()}`,
+          ) &&
+          row.priceDate >= sourceDateFrom &&
+          row.priceDate <= sourceDateTo,
+      );
+    },
+    async loadFxRows({ sourceDateFrom, sourceDateTo }) {
+      return fxRows.filter(
+        (row) =>
+          row.rateDate >= sourceDateFrom && row.rateDate <= sourceDateTo,
+      );
+    },
+  };
+}
+
+function uniqueCandidates(
+  candidates: readonly Readonly<{
+    displayName?: string | null;
+    market: string;
+    currency: "KRW" | "USD";
+    ticker: string;
+  }>[],
+) {
+  const unique = new Map<string, (typeof candidates)[number]>();
+  for (const candidate of candidates) {
+    const key = `${candidate.market}|${candidate.currency}|${candidate.ticker}`;
+    if (!unique.has(key)) unique.set(key, candidate);
+  }
+  return Object.freeze([...unique.values()]);
 }
 
 function buildPreflightResult({
