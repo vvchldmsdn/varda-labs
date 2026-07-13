@@ -38,9 +38,17 @@ statement timeout:
 automatic writer retries:
 0
 
-timeout result:
-retryable sanitized busy outcome; rollback; pending challenge remains pending
+lock-timeout result:
+approval_identity_busy; confirmed rollback; pending challenge remains pending
 only if it is otherwise still valid
+
+confirmed statement-timeout or deadlock result:
+approval_transaction_rolled_back; pending challenge remains pending only if it
+is otherwise still valid
+
+unknown commit-visibility result:
+approval_temporarily_unavailable; receipt/state recovery reads only; no new
+write or inferred challenge transition
 
 state race result:
 typed conflict; no partial approval authority
@@ -94,21 +102,31 @@ scenarioId
 scenarioVersion
 ```
 
-The canonical lock text recommendation is:
+The canonical lock input recommendation is a versioned, length-prefixed tuple:
 
 ```text
-varda:simulation-curated-approval-lock:v1
-|ownerUserId=<canonical uuid>
-|portfolioPathPolicyId=<validated exact value>
-|gate0ApprovalCommit=<validated lowercase 40-hex commit>
-|scenarioId=<validated exact value>
-|scenarioVersion=<validated exact value>
+domain = varda:simulation-curated-approval-lock:v1
+fields in fixed order:
+  ownerUserId
+  portfolioPathPolicyId
+  gate0ApprovalCommit
+  scenarioId
+  scenarioVersion
+
+encoded field = <base-10 UTF-8 byte length>:<exact validated UTF-8 bytes>
+canonical lock input =
+  <domain>|<encoded ownerUserId>|<encoded portfolioPathPolicyId>
+  |<encoded gate0ApprovalCommit>|<encoded scenarioId>
+  |<encoded scenarioVersion>
 ```
 
-The physical value is one compact string with no line breaks. The displayed
-line breaks above are explanatory only. Every component must first pass the
-already-approved schema-compatible validation. The allowed selector alphabet
-does not contain `|` or `=`, so the labelled representation is unambiguous.
+The physical value is one compact UTF-8 byte sequence with no line breaks or
+whitespace insertion. The displayed line breaks above are explanatory only.
+Every component must first pass the already-approved schema-compatible
+validation. Field order, domain/version prefix, byte-length encoding, exact
+validated bytes, and separators are fixed; implementations must not use JSON,
+locale-sensitive formatting, implicit Unicode normalization, delimiter-only
+concatenation, or platform-default string encoding.
 
 The owner is derived only from the verified active `TenantContext`. It is
 never accepted from a browser field, search parameter, form, body, header,
@@ -127,9 +145,9 @@ The candidate lock derivation is PostgreSQL-owned:
 select pg_advisory_xact_lock(hashtextextended($1, 0));
 ```
 
-`$1` is the validated canonical lock text supplied as a bound parameter. The
+`$1` is the validated canonical lock input supplied as a bound parameter. The
 seed is exactly zero and the lock namespace/version prefix is part of the
-canonical text.
+canonical input.
 
 The lock is transaction-scoped. It is acquired after authentication,
 canonicalization, row-cap validation, vector validation, hash recomputation,
@@ -192,6 +210,11 @@ These are writer candidates, not the 5-second/30-second DDL-rehearsal values
 used by the earlier empty-schema migration. They are also unrelated to the
 10-minute confirmation lifetime.
 
+`statement_timeout = 8 seconds` is a per-SQL-statement guard. It does not cap
+the total transaction duration at 8 seconds and is not an end-to-end admission
+deadline or runtime SLA. An end-to-end admission deadline remains unselected
+and requires a later review before implementation planning.
+
 Timeouts are set with `SET LOCAL` inside the transaction. A lock or statement
 timeout rolls back the complete transaction. It must not leave:
 
@@ -234,6 +257,35 @@ confirmation boundary while it remains valid:
 This is request-level outcome recovery under the approved challenge contract,
 not an internal transaction retry loop.
 
+### Definite Rollback Versus Unknown Commit Outcome
+
+A lock timeout, statement timeout, or deadlock for which PostgreSQL confirms
+transaction rollback leaves the challenge in its pre-transaction `pending`
+state. It does not create a receipt or a terminal challenge transition. While
+the challenge remains unexpired, the same owner may explicitly submit that
+same challenge again. The server does not schedule or perform that submission
+automatically.
+
+A transport or connection failure after a commit request may leave commit
+visibility unknown to the caller. In that case:
+
+1. no automatic write attempt is allowed;
+2. the only immediate recovery operation is an authenticated same-owner read
+   for the exact challenge's committed receipt and durable challenge state;
+3. a found receipt yields `committed_replay` and no write;
+4. a conclusively terminal non-commit state yields
+   `confirmation_not_usable`; and
+5. an absent or inconclusive result yields
+   `approval_temporarily_unavailable`, performs no challenge mutation, and
+   must not be translated into success or failure.
+
+A later explicit same-owner resubmission must first repeat receipt/state
+recovery. Only if the exact challenge is then durably proven `pending`, still
+valid, and eligible may it enter the normal exact-identity serialized path.
+The path must acquire the same advisory lock and revalidate state before any
+write, so a late original commit converges on receipt recovery rather than a
+second approval.
+
 ## Decision 7: Typed Outcomes
 
 The proposed server-internal normalized outcomes are:
@@ -242,10 +294,11 @@ The proposed server-internal normalized outcomes are:
 | --- | --- | --- | --- |
 | `committed` | This exact challenge committed the complete approval evidence. | `consumed` with receipt | committed |
 | `committed_replay` | The same consumed challenge and same active owner recovered the prior sanitized outcome. | unchanged | read only |
-| `approval_identity_busy` | The exact-identity lock was not acquired before timeout. | unchanged if still pending | rolled back |
+| `approval_identity_busy` | The exact-identity lock was not acquired before timeout and rollback is confirmed. | remains `pending` if otherwise valid | rolled back |
+| `approval_transaction_rolled_back` | A statement timeout or deadlock produced a confirmed rollback after lock acquisition. | remains `pending` if otherwise valid | rolled back |
 | `approval_state_conflict` | A different live challenge won or transaction-time exact-identity state no longer matches the reviewed intent. | `conflicted` only under the approved challenge lifecycle | conflict transition only or rolled back |
 | `confirmation_not_usable` | The challenge is expired, invalidated, conflicted, mismatched, or otherwise terminal. | terminal or unchanged | no approval commit |
-| `approval_temporarily_unavailable` | Statement timeout, deadlock, connection ambiguity, or infrastructure failure prevented a trustworthy result. | no inferred terminal mutation | rolled back or outcome re-read required |
+| `approval_temporarily_unavailable` | Commit visibility or durable state could not be established after authenticated receipt/state recovery. | no inferred terminal mutation | no new write; outcome remains unresolved |
 | `rejected` | Actor, owner, vector, policy, row cap, hash, envelope, or lifecycle validation failed. | no unauthorized mutation | not started or rolled back |
 
 Public projections may collapse these into fewer sanitized categories. They
@@ -319,15 +372,17 @@ The user may approve, reject, or revise this package only as one docs-only
 bundle:
 
 1. maximum 64 canonical source-vector rows, including explicit zero-bps rows;
-2. full exact-identity canonical lock text and PostgreSQL
+2. full exact-identity versioned, fixed-order, UTF-8 byte-length-prefixed
+   canonical lock input and PostgreSQL
    `hashtextextended(..., 0)` transaction advisory serialization;
 3. `READ COMMITTED` plus mandatory transaction-time revalidation and existing
    database constraints;
-4. 2-second local lock timeout and 8-second local statement timeout;
+4. 2-second local lock timeout and per-statement 8-second local statement
+   timeout, with the end-to-end admission deadline still unselected;
 5. zero automatic writer retries, with same-challenge outcome recovery only
    through the approved receipt semantics; and
-6. the typed busy, conflict, unusable, temporarily unavailable, rejected,
-   committed, and committed-replay meanings above.
+6. the typed busy, confirmed-rollback, conflict, unusable, temporarily
+   unavailable, rejected, committed, and committed-replay meanings above.
 
 Approval of this bundle would approve semantics only. It would not approve a
 schema, migration, database operation, planner, repository, writer,
