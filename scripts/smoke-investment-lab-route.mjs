@@ -48,6 +48,14 @@ async function main() {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
   assert.match(route.body, /data-return-status="ready"/);
+  assert.ok(
+    route.body.includes("과거 추가 투입 효과 실험"),
+    "route is missing the historical contribution experiment",
+  );
+  assert.match(
+    route.body,
+    /data-contribution-experiment="ephemeral_client_only"/,
+  );
   assert.match(
     route.body,
     /data-return-method="modified_dietz_daily_weighted_eod_v1"/,
@@ -125,12 +133,20 @@ async function main() {
     route.body,
     "data-voo-return-method",
   );
+  const contributionScenarioCount = readIntegerAttribute(
+    route.body,
+    "data-contribution-scenarios",
+  );
 
   assert.ok(comparisonDates >= 2, "comparison path needs at least two dates");
   assert.ok(appliedFlows >= 0, "applied flow count must be non-negative");
   assert.ok(delayedExecutions >= 0, "delayed count must be non-negative");
   assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
   assert.equal(pendingAtEnd, 0, "route must not publish an unfinished path");
+  assert.ok(
+    contributionScenarioCount >= 1 && contributionScenarioCount <= 2,
+    "contribution experiment must expose only complete fixed scenarios",
+  );
   assert.ok(
     vooReadiness === "ready" || vooReadiness === "unavailable",
     "VOO readiness must be explicit",
@@ -151,6 +167,7 @@ async function main() {
     assert.ok(vooDelayedExecutions >= 0);
     assert.equal(vooReturnStatus, "ready");
     assert.equal(vooReturnMethod, "modified_dietz_daily_weighted_eod_v1");
+    assert.equal(contributionScenarioCount, 2);
   }
 
   console.log(
@@ -181,6 +198,7 @@ async function main() {
         vooDelayedExecutions,
         vooReturnStatus,
         vooReturnMethod,
+        contributionScenarioCount,
         leakPatternMatches: 0,
         databaseSideEffects: false,
         counts: countsAfter,

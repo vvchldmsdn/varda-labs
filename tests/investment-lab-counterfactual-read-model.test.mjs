@@ -40,6 +40,20 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.vooComparison.rows.length, 4);
     assert.equal(result.vooComparison.coverage.appliedFlowRows, 3);
     assert.equal(result.vooComparison.returnEstimate.status, "ready");
+    assert.deepEqual(
+      result.contributionExperimentScenarios.map((scenario) =>
+        scenario.scenarioId,
+      ),
+      ["kodex200", "voo"],
+    );
+    assert.equal(
+      result.contributionExperimentScenarios[0].points[0].unitValueKrw,
+      100,
+    );
+    assert.equal(
+      result.contributionExperimentScenarios[1].points[0].unitValueKrw,
+      130_000,
+    );
   });
 
   it("blocks duplicate snapshot evidence without returning partial values", () => {
@@ -52,6 +66,7 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.status, "blocked");
     assert.equal(result.summary, null);
     assert.deepEqual(result.rows, []);
+    assert.deepEqual(result.contributionExperimentScenarios, []);
     assert.deepEqual(result.blockers, ["snapshot_evidence_invalid"]);
   });
 
@@ -146,6 +161,12 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.returnEstimate.status, "ready");
     assert.equal(result.vooReadiness.status, "unavailable");
     assert.equal(result.vooComparison.status, "unavailable");
+    assert.deepEqual(
+      result.contributionExperimentScenarios.map((scenario) =>
+        scenario.scenarioId,
+      ),
+      ["kodex200"],
+    );
     assert.deepEqual(result.vooReadiness.blockers, [
       "missing_execution_fx",
     ]);
@@ -163,6 +184,10 @@ describe("investment lab counterfactual read model", () => {
   it("keeps the route server-rendered, read-only, and Basic Auth protected", () => {
     const query = readFileSync("src/db/queries/investment-lab.ts", "utf8");
     const page = readFileSync("src/app/investment-lab/page.tsx", "utf8");
+    const contribution = readFileSync(
+      "src/components/investment-lab/investment-lab-contribution-experiment.tsx",
+      "utf8",
+    );
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
     assert.match(query, /^import "server-only";/);
@@ -174,6 +199,12 @@ describe("investment lab counterfactual read model", () => {
     );
     assert.doesNotMatch(page, /["']use client["']|\bfetch\s*\(/);
     assert.match(page, /getReadOnlyInvestmentLabCounterfactual/);
+    assert.match(contribution, /^["']use client["'];/);
+    assert.match(contribution, /calculateInvestmentLabContributionExperiment/);
+    assert.doesNotMatch(
+      contribution,
+      /\bfetch\s*\(|\/api\/|localStorage|sessionStorage|URLSearchParams|console\./,
+    );
     assert.match(proxy, /"\/investment-lab"/);
   });
 });

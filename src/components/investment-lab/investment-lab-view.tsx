@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
+import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 
 export function InvestmentLabView({
@@ -94,6 +95,10 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
       <ReturnEstimateSection model={model} />
 
       <VooComparisonSection model={model} />
+
+      <InvestmentLabContributionExperiment
+        scenarios={model.contributionExperimentScenarios}
+      />
 
       <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

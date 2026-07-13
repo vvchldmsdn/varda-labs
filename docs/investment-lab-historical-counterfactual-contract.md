@@ -6,7 +6,9 @@ Status: Phase 1 aggregate KODEX200 and VOO deterministic path engines are
 implemented and read-only audited. The aggregate read model and Server
 Component route are implemented without provider calls, schema changes, or
 database writes. Separate Modified Dietz cashflow-adjusted return estimates are
-implemented as non-authoritative secondary projections.
+implemented as non-authoritative secondary projections. The route also exposes
+an ephemeral historical contribution-impact experiment over the two fixed
+scenario paths.
 
 ## Product Decision
 
@@ -259,6 +261,34 @@ read-only scenario:
 The current production evidence passes this contract. The route renders the
 VOO valuation path and a separately guarded Modified Dietz estimate. Transaction
 costs and user-selectable scenario routing remain separate work.
+
+## Historical Contribution-Impact Experiment
+
+`historical_fixed_scenario_contribution_v1` answers a narrower hypothetical
+question than the actionable Additional Contribution allocator: if one positive
+integer KRW amount had been added at an existing observed valuation boundary,
+what would that additional fractional lot and the fixed scenario have been worth
+at the final observed date?
+
+1. The only selectable paths are the complete all-KODEX-200 and all-VOO paths
+   already admitted by this read model. It does not infer an account, target,
+   recommended vector, or current holding allocation.
+2. KODEX 200 uses its observed adjusted-close KRW unit evidence. VOO uses raw
+   close times the exact stored snapshot USD/KRW valuation evidence, so its
+   result remains dividend-excluded price return.
+3. The amount buys fractional units at the selected observed valuation boundary.
+   Residual cash, fees, and taxes are zero in this narrow experiment.
+4. The existing actual and fixed-scenario paths are immutable inputs. The helper
+   creates only an in-memory additional-lot projection and reports principal,
+   end value, profit, and simple price return separately.
+5. The selected date must be one of the exact observed service dates. Missing or
+   mismatched unit evidence blocks that scenario; there is no interpolation,
+   nearest/latest fallback, or partial result.
+6. Amount, date, and result remain in Client Component memory only. They are not
+   sent to an API, URL, shared cache, log, database, provider, or job.
+
+This experiment is not a target-gap allocator, order preview, recommendation,
+or account-specific Additional Contribution workflow.
 
 ## Execution Policy
 

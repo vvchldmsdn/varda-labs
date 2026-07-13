@@ -35,6 +35,10 @@ simulation job is approved by this document.
 This is a constrained allocation calculator. It is not a market forecast, an
 LLM recommendation, or an automatic sell-and-rebalance command.
 
+The historical contribution-impact experiment under `/investment-lab` is not
+this feature. It changes no account state and applies one ephemeral hypothetical
+amount only to an already complete fixed KODEX 200 or VOO path.
+
 The executable Phase 1 details live in
 `docs/additional-contribution-phase1-contract.md`.
 
@@ -147,6 +151,13 @@ items stay incremental:
 - downstream maximum drawdown and volatility with explicit definitions;
 - price, FX, event, and snapshot coverage plus pending/excluded evidence;
 - no hidden interpolation, current-FX fallback, or synthetic continuation.
+
+The route also includes a separate ephemeral historical contribution-impact
+experiment. A user selects one observed service date, one positive integer KRW
+amount, and either the fixed KODEX 200 or fixed VOO path. It reports the
+additional lot's principal, final value, profit, and simple price return without
+changing the actual path. The input is Client Component memory only and carries
+no target, recommendation, order, account-selection, or persistence authority.
 
 Secondary Investment Lab modules remain separate read models with independent
 readiness and provenance:

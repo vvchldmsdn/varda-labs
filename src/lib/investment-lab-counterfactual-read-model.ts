@@ -17,6 +17,12 @@ import {
   buildInvestmentLabVooComparison,
   type InvestmentLabVooComparison,
 } from "./investment-lab-voo-comparison.ts";
+import {
+  buildInvestmentLabContributionScenarioEvidence,
+} from "./investment-lab-contribution-evidence.ts";
+import type {
+  InvestmentLabContributionScenarioEvidence,
+} from "./investment-lab-contribution-experiment.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
 
 const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
@@ -98,6 +104,8 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
   returnEstimate: InvestmentLabReturnEstimate | null;
   vooReadiness: InvestmentLabVooReadiness | null;
   vooComparison: InvestmentLabVooComparison | null;
+  contributionExperimentScenarios:
+    readonly InvestmentLabContributionScenarioEvidence[];
   rows: readonly InvestmentLabCounterfactualDisplayRow[];
   coverage: Readonly<{
     snapshotSourceRows: number;
@@ -212,6 +220,12 @@ export function buildInvestmentLabCounterfactualReadModel(
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,
   });
+  const contributionExperimentScenarios =
+    buildInvestmentLabContributionScenarioEvidence({
+      kodexRows: path.rows,
+      vooComparison,
+      vooValuations: vooEvidence.valuations,
+    });
 
   return Object.freeze({
     status: "ready",
@@ -227,6 +241,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     returnEstimate,
     vooReadiness,
     vooComparison,
+    contributionExperimentScenarios,
     rows,
     coverage: Object.freeze({
       ...initialCoverage,
@@ -434,6 +449,7 @@ function blockedReadModel(
     returnEstimate: null,
     vooReadiness: null,
     vooComparison: null,
+    contributionExperimentScenarios: Object.freeze([]),
     rows: Object.freeze([]),
     coverage: Object.freeze({ ...coverageValue }),
     blockers: Object.freeze([...blockers].sort()),

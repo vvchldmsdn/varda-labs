@@ -15,6 +15,7 @@ import "./investment-lab-return-evidence.test.mjs";
 import "./investment-lab-voo-readiness.test.mjs";
 import "./investment-lab-voo-path.test.mjs";
 import "./investment-lab-counterfactual-read-model.test.mjs";
+import "./investment-lab-contribution-experiment.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./simulation-return-matrix.test.mjs";
