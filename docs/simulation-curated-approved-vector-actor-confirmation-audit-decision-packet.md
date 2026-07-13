@@ -172,6 +172,12 @@ reactivated, refreshed, or reused for approval, supersession, revocation, or
 reapproval. Only `consumed` has a matching immutable committed receipt.
 `expired`, `invalidated`, and `conflicted` never create an approval receipt.
 
+The `pending -> consumed` transition is part of the same approval transaction
+as the receipt, approval header, complete vector rows, and initial lifecycle
+event. If that transaction rolls back, no `consumed` state and no committed
+receipt remain. The challenge is not consumed before the approval transaction
+begins.
+
 The challenge lifecycle is coordination state, not a substitute for the
 append-only approval lifecycle. Its physical storage, retention, and cleanup
 remain deferred.
@@ -277,6 +283,22 @@ minted earlier while another state was observed. No raw provider subject,
 session token, or cookie needs to be copied into the challenge or receipt to
 enforce this request-time revalidation.
 
+### Limited Invalidation Authority
+
+A pending challenge may become terminal `invalidated` only for one of these
+server-verified reasons:
+
+- the exact canonical envelope is no longer eligible because its supported
+  policy or Gate 0 binding changed;
+- the same canonical owner explicitly cancels the challenge through an active
+  verified session; or
+- a separately reviewed server security policy invalidates the challenge.
+
+Malformed input, an unknown handle, a cross-owner request, failed Basic Auth,
+or another unauthorized caller must not invalidate or otherwise mutate a
+legitimate pending challenge. No current route, job, or operator implements
+any invalidation reason.
+
 ## Replay And Idempotent Outcome Semantics
 
 One issued confirmation challenge instance may cause at most one committed
@@ -291,6 +313,9 @@ competing admission:
 - If the client loses the response and resubmits the same consumed challenge,
   the server may return the same sanitized committed outcome from the
   immutable receipt.
+- Receipt lookup must first resolve an active verified session to the same
+  canonical owner recorded by the parent approval. The high-entropy handle is
+  lookup material only and is never bearer read authority.
 - The replay performs no new approval, supersession, revision allocation,
   confirmation consumption, or timestamp allocation.
 - Concurrent requests for the same challenge instance converge on the one
@@ -330,11 +355,19 @@ state visibility and without consuming another actor's challenge.
 
 ### Different Challenge Instances For The Same Exact Approval Identity
 
-Different challenge-instance identities are competing admission attempts even
-when their vectors match. They enter the separately reviewed exact-identity
-concurrency policy. One may commit; the others become terminal `conflicted`
-and receive typed conflicts. They must not be converted automatically into
-supersession, reapproval, latest revision, or idempotent success.
+Different challenge-instance identities are competing admission attempts only
+while they are simultaneously live `pending` challenges for the same exact
+identity or their approval transactions overlap. They enter the separately
+reviewed exact-identity concurrency policy. One may commit; the other live
+attempts become terminal `conflicted` and receive typed conflicts. They must
+not be converted automatically into supersession, reapproval, latest revision,
+or idempotent success.
+
+Historical `expired`, `invalidated`, or `conflicted` challenges do not block a
+later canonical review or newly issued challenge. A later reapproval after
+revocation is likewise eligible to request a new challenge under the then-
+current policy. Only live pending or overlapping admission attempts enter the
+conflict rule described here.
 
 This packet does not select transaction isolation, advisory-lock SQL, lock
 timeouts, or general retry policy. It fixes only the distinction between
@@ -379,8 +412,9 @@ the actor by policy. The receipt therefore must not duplicate email, provider
 subject, profile data, Basic Auth identity, session token, cookie, role, raw
 challenge, vector rows, or owner UUID in a second free-standing actor field.
 
-The future receipt, complete approval header, vector rows, and initial
-lifecycle event must become visible atomically in one database transaction.
+The future `pending -> consumed` transition, receipt, complete approval header,
+vector rows, and initial lifecycle event must become visible atomically in one
+database transaction.
 If a proposed confirmation store cannot participate in that atomic boundary,
 it is ineligible for the committed receipt. Pending challenge mechanics may be
 designed separately, but they cannot weaken committed receipt atomicity. If
@@ -467,12 +501,15 @@ The user may approve, reject, or revise this package only as one review bundle:
 4. `curated_vector_self_confirmation_v1` uses one 10-minute server-owned
    challenge instance bound to the exact actor, owner, and canonical approval
    envelope, valid only over `[issuedAt, expiresAt)`;
-5. one challenge instance commits at most once; only a consumed challenge with
-   a committed receipt may return the same sanitized committed outcome;
+5. one challenge instance commits at most once; `pending -> consumed`, the
+   receipt, approval header, complete vector rows, and initial lifecycle event
+   are one atomic transaction, and only a consumed challenge with a committed
+   receipt may return the same sanitized committed outcome after a new active
+   session check resolves to the same canonical owner;
 6. expired, invalidated, or conflicted challenges create no receipt, cannot be
-   reused, and require a newly issued challenge, while different challenge
-   instances for one exact identity remain conflicts under the later
-   concurrency policy; and
+   reused, and require a newly issued challenge; only simultaneously live
+   pending or overlapping attempts for one exact identity conflict, while
+   historical terminal challenges do not block later review; and
 7. one minimal immutable self-confirmation receipt commits atomically with the
    approval revision and excludes PII, provider data, session data, and raw
    confirmation material.
