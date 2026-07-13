@@ -4,6 +4,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { describe, it } from "node:test";
 
+import {
+  classifyCuratedVectorRehearsalError,
+  CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER,
+} from "../scripts/lib/curated-vector-rehearsal-error.mjs";
+
 const ROOT = process.cwd();
 const SCHEMA_PATH = join(ROOT, "src", "db", "schema.ts");
 const META_PATH = join(ROOT, "drizzle", "meta", "0017_snapshot.json");
@@ -348,6 +353,77 @@ describe("curated approved-vector Stage I schema", () => {
       "node --no-warnings scripts/rehearse-curated-vector-schema.mjs",
     );
   });
+
+  it("classifies only the exact top-level Neon driver marker as expected", () => {
+    const expected = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
+    assert.deepEqual(classifyCuratedVectorRehearsalError(expected), {
+      outcome: "expected_rollback",
+      reason: "exact_driver_marker",
+    });
+
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(
+        neonError(`prefix:${CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER}`),
+      ),
+      { outcome: "unexpected_failure", reason: "database_error" },
+    );
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(neonError("catalog assertion failed")),
+      { outcome: "unexpected_failure", reason: "database_error" },
+    );
+
+    const transport = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
+    transport.sourceError = new Error("synthetic transport detail");
+    assert.deepEqual(classifyCuratedVectorRehearsalError(transport), {
+      outcome: "unexpected_failure",
+      reason: "transport_error",
+    });
+
+    const nested = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
+    nested.cause = new Error(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
+    assert.deepEqual(classifyCuratedVectorRehearsalError(nested), {
+      outcome: "unexpected_failure",
+      reason: "unknown_error_envelope",
+    });
+
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError({
+        message: CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER,
+      }),
+      { outcome: "unexpected_failure", reason: "opaque_error" },
+    );
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(
+        new Error(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER),
+      ),
+      { outcome: "unexpected_failure", reason: "opaque_error" },
+    );
+  });
+
+  it("pins rehearsal catalog assertions to generated constraint evidence", () => {
+    for (const constraintName of [...CHECKS, ...FOREIGN_KEYS]) {
+      assert.match(rehearsal, new RegExp(`'${constraintName}'`));
+    }
+
+    for (const [variable, expected] of [
+      ["target_table_count", 3],
+      ["target_column_count", 25],
+      ["target_check_count", CHECKS.length],
+      ["target_fk_count", FOREIGN_KEYS.length],
+      ["target_pk_count", 3],
+      ["target_index_count", UNIQUE_INDEXES.length + REGULAR_INDEXES.length],
+      ["target_row_count", 0],
+      ["owner_reference_count", 1],
+    ]) {
+      assert.match(
+        rehearsal,
+        new RegExp(`if ${variable} <> ${expected} then`),
+      );
+    }
+
+    assert.doesNotMatch(rehearsal, /information_schema\.table_constraints/);
+    assert.match(rehearsal, /pg_catalog\.pg_constraint/);
+  });
 });
 
 function createdTableNames() {
@@ -433,4 +509,11 @@ function sourceFiles(directory) {
 
 function countMatches(value, pattern) {
   return [...value.matchAll(pattern)].length;
+}
+
+function neonError(message) {
+  const error = new Error(message);
+  error.name = "NeonDbError";
+  error.sourceError = undefined;
+  return error;
 }

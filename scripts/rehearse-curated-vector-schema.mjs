@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
+import {
+  classifyCuratedVectorRehearsalError,
+  CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER,
+} from "./lib/curated-vector-rehearsal-error.mjs";
+
 const CONFIRMATION = "--confirm-rollback-rehearsal";
-const ROLLBACK_MARKER = "curated_vector_schema_rehearsal_rollback";
 const TARGET_TABLES = [
   "simulation_scenario_approval_revisions",
   "simulation_scenario_approval_vector_rows",
@@ -100,13 +104,46 @@ const assertionBlock = `
          'simulation_scenario_approval_lifecycle_events'
        );
 
-    select count(*) filter (where constraint_type = 'CHECK')::integer,
-           count(*) filter (where constraint_type = 'FOREIGN KEY')::integer,
-           count(*) filter (where constraint_type = 'PRIMARY KEY')::integer
+    select count(*) filter (
+             where constraint_definition.contype = 'c'
+               and constraint_definition.conname in (
+                 'sim_scenario_approval_revisions_policy_id_check',
+                 'sim_scenario_approval_revisions_gate0_commit_check',
+                 'sim_scenario_approval_revisions_scenario_id_check',
+                 'sim_scenario_approval_revisions_scenario_version_check',
+                 'sim_scenario_approval_revisions_revision_check',
+                 'sim_scenario_approval_revisions_vector_hash_check',
+                 'sim_scenario_approval_revisions_lifecycle_status_check',
+                 'sim_scenario_approval_revisions_terminal_state_check',
+                 'sim_scenario_approval_vector_rows_market_check',
+                 'sim_scenario_approval_vector_rows_currency_check',
+                 'sim_scenario_approval_vector_rows_ticker_check',
+                 'sim_scenario_approval_vector_rows_weight_check',
+                 'sim_scenario_approval_events_sequence_check',
+                 'sim_scenario_approval_events_audit_version_check',
+                 'sim_scenario_approval_events_transition_shape_check'
+               )
+           )::integer,
+           count(*) filter (
+             where constraint_definition.contype = 'f'
+               and constraint_definition.conname in (
+                 'sim_scenario_approval_revisions_owner_user_fk',
+                 'sim_scenario_approval_vector_rows_revision_fk',
+                 'sim_scenario_approval_events_revision_fk',
+                 'sim_scenario_approval_events_replacement_fk'
+               )
+           )::integer,
+           count(*) filter (
+             where constraint_definition.contype = 'p'
+           )::integer
       into target_check_count, target_fk_count, target_pk_count
-      from information_schema.table_constraints
-     where table_schema = 'public'
-       and table_name in (
+      from pg_catalog.pg_constraint constraint_definition
+      join pg_catalog.pg_class target_relation
+        on target_relation.oid = constraint_definition.conrelid
+      join pg_catalog.pg_namespace target_namespace
+        on target_namespace.oid = target_relation.relnamespace
+     where target_namespace.nspname = 'public'
+       and target_relation.relname in (
          'simulation_scenario_approval_revisions',
          'simulation_scenario_approval_vector_rows',
          'simulation_scenario_approval_lifecycle_events'
@@ -175,7 +212,7 @@ const assertionBlock = `
       raise exception 'curated_vector_schema_check_failed:owner_reference';
     end if;
 
-    raise exception '${ROLLBACK_MARKER}';
+    raise exception '${CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER}';
   end
   $curated_vector_schema$;
 `;
@@ -191,9 +228,11 @@ try {
   ]);
   assert.fail("rollback rehearsal unexpectedly committed");
 } catch (error) {
-  const message = error instanceof Error ? error.message : "";
-  if (!message.includes(ROLLBACK_MARKER)) {
-    throw new Error("Curated vector schema rollback rehearsal failed");
+  const classification = classifyCuratedVectorRehearsalError(error);
+  if (classification.outcome !== "expected_rollback") {
+    throw new Error(
+      `Curated vector schema rollback rehearsal failed (${classification.reason})`,
+    );
   }
   expectedRollbackObserved = true;
 }
