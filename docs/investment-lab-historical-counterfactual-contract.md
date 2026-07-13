@@ -1,13 +1,12 @@
 # Investment Lab Historical Counterfactual Contract
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
-Status: Phase 1 aggregate KODEX200 deterministic path engine implemented and
-read-only audited. The aggregate read model and Server Component route are
-implemented without provider calls, schema changes, or database writes. A
-separate Modified Dietz cashflow-adjusted return estimate is implemented as a
-non-authoritative secondary projection. VOO remains path-disabled, but its
-raw-close, US-calendar, and FX evidence readiness is now visible.
+Status: Phase 1 aggregate KODEX200 and VOO deterministic path engines are
+implemented and read-only audited. The aggregate read model and Server
+Component route are implemented without provider calls, schema changes, or
+database writes. Separate Modified Dietz cashflow-adjusted return estimates are
+implemented as non-authoritative secondary projections.
 
 ## Product Decision
 
@@ -188,8 +187,9 @@ The 2026-07-11 read-only production audit found:
 - the 5 in-window `asset_added` / `asset_removed` rows have no amount,
   quantity, price, or FX payload and remain position metadata; a future row
   with any such payload blocks only the return estimate;
-- VOO readiness covers 27 of 27 valuation dates, 27 of 27 snapshot FX dates,
-  and 38 of 38 relevant execution FX dates without displaying a partial path.
+- VOO covers 27 of 27 valuation dates, 27 of 27 snapshot FX dates, and 38 of 38
+  relevant execution FX dates. Its path applies all 38 flows, including 5
+  delayed executions, with no unfinished flow.
 
 Run `npm run audit:investment-lab-counterfactual` to refresh this evidence.
 Run `npm run audit:investment-lab-event-flow` to refresh event-flow evidence.
@@ -229,10 +229,11 @@ The methodology follows the Modified Dietz daily-weighted cash-flow structure
 described by the [GIPS Standards Handbook for Firms](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/),
 while retaining the narrower evidence and labeling boundaries above.
 
-## VOO Evidence Readiness
+## VOO Same-Flow Policy
 
-`investment_lab_voo_evidence_v1` is a readiness projection, not a VOO path or
-performance result:
+`investment_lab_voo_evidence_v2` and
+`position_flow_counterfactual_usd_raw_close_v1` define the second fixed
+read-only scenario:
 
 1. VOO uses raw close for a price-return comparison. Adjusted-close dividend
    reinvestment is intentionally excluded because the actual portfolio path
@@ -241,16 +242,23 @@ performance result:
    close using the explicit US market calendar. A nearest or latest quote is
    not substituted.
 3. Valuation FX comes from exact stored snapshot-date USD/KRW evidence and
-   requires brokerage, ISA, and IRP consensus.
+   requires brokerage, ISA, and IRP value, source, and rule-version consensus.
+   Legacy provider dates are not inferred from evidence that did not preserve
+   them.
 4. Each relevant flow maps to the first observed US close on or after the event
    date within seven calendar days. Its FX must be one valid row on that exact
    execution price date.
-5. Missing, duplicate, invalid, look-ahead, late, or post-window evidence makes
-   VOO unavailable. No partial VOO path or estimated value is rendered.
+5. KRW notionals buy and sell fractional VOO units at raw close times the exact
+   execution-date FX. Residual cash, transaction costs, and event netting are
+   zero or excluded in this narrow model.
+6. A sell that would make units negative blocks the whole scenario. The engine
+   never scales a sell, borrows, shorts, or consumes a future buy.
+7. Missing, duplicate, invalid, look-ahead, late, post-window, or unfinished
+   evidence makes VOO unavailable. No partial VOO path is rendered.
 
-The current production evidence passes this readiness contract, but path
-generation, VOO Modified Dietz output, transaction costs, and user-selectable
-scenario routing remain separate work.
+The current production evidence passes this contract. The route renders the
+VOO valuation path and a separately guarded Modified Dietz estimate. Transaction
+costs and user-selectable scenario routing remain separate work.
 
 ## Execution Policy
 

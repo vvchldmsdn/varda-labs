@@ -1,4 +1,9 @@
-import type { InvestmentLabCounterfactualDisplayRow } from "@/lib/investment-lab-counterfactual-read-model";
+type InvestmentLabComparisonChartRow = Readonly<{
+  serviceDate: string;
+  actualMarketValueKrw: number;
+  scenarioMarketValueKrw: number;
+  hasPendingExecution: boolean;
+}>;
 
 const WIDTH = 1000;
 const HEIGHT = 340;
@@ -6,9 +11,17 @@ const PADDING_X = 48;
 const PADDING_Y = 34;
 
 export function InvestmentLabComparisonChart({
+  chartId,
+  description,
   rows,
+  scenarioLabel,
+  title,
 }: {
-  rows: readonly InvestmentLabCounterfactualDisplayRow[];
+  chartId: string;
+  description: string;
+  rows: readonly InvestmentLabComparisonChartRow[];
+  scenarioLabel: string;
+  title: string;
 }) {
   const values = rows.flatMap((row) => [
     row.actualMarketValueKrw,
@@ -37,19 +50,17 @@ export function InvestmentLabComparisonChart({
     <div>
       <div className="mb-3 flex flex-wrap gap-4 text-sm text-[#5f665d]">
         <Legend color="#1e3a34" label="실제 포트폴리오" />
-        <Legend color="#e05b49" label="전액 KODEX 200" />
+        <Legend color="#e05b49" label={scenarioLabel} />
         <span>원 표시는 지연 체결 비교일</span>
       </div>
       <svg
-        aria-labelledby="investment-lab-chart-title investment-lab-chart-description"
+        aria-labelledby={`${chartId}-title ${chartId}-description`}
         className="block h-auto w-full"
         role="img"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       >
-        <title id="investment-lab-chart-title">실제 포트폴리오와 KODEX 200 시나리오 비교</title>
-        <desc id="investment-lab-chart-description">
-          저장된 평가일마다 실제 평가액과 동일 거래금액을 KODEX 200에 적용한 가상 평가액을 비교합니다.
-        </desc>
+        <title id={`${chartId}-title`}>{title}</title>
+        <desc id={`${chartId}-description`}>{description}</desc>
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const lineY = PADDING_Y + ratio * (HEIGHT - PADDING_Y * 2);
           return (

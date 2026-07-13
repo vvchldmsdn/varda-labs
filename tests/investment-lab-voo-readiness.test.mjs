@@ -15,6 +15,7 @@ describe("investment lab VOO evidence readiness", () => {
     assert.equal(result.serviceDateCount, 3);
     assert.equal(result.valuationPriceReadyCount, 3);
     assert.equal(result.snapshotFxReadyCount, 3);
+    assert.equal(result.snapshotFxProvenanceReadyCount, 3);
     assert.equal(result.relevantFlowCount, 2);
     assert.equal(result.executionPriceReadyCount, 2);
     assert.equal(result.executionFxReadyCount, 2);
@@ -83,6 +84,41 @@ describe("investment lab VOO evidence readiness", () => {
     );
   });
 
+  it("requires stored source provenance without inferring provider dates", () => {
+    const missingSnapshotSource = fixture();
+    missingSnapshotSource.snapshotRows[0] = {
+      ...missingSnapshotSource.snapshotRows[0],
+      source: null,
+    };
+    assert.ok(
+      assessInvestmentLabVooReadiness(
+        missingSnapshotSource,
+      ).blockers.includes("missing_snapshot_fx_provenance"),
+    );
+
+    const mixedSnapshotRule = fixture();
+    mixedSnapshotRule.snapshotRows[0] = {
+      ...mixedSnapshotRule.snapshotRows[0],
+      ruleVersion: "different-rule",
+    };
+    assert.ok(
+      assessInvestmentLabVooReadiness(
+        mixedSnapshotRule,
+      ).blockers.includes("ambiguous_snapshot_fx_provenance"),
+    );
+
+    const missingPriceSource = fixture();
+    missingPriceSource.priceRows[0] = {
+      ...missingPriceSource.priceRows[0],
+      source: null,
+    };
+    assert.ok(
+      assessInvestmentLabVooReadiness(
+        missingPriceSource,
+      ).blockers.includes("missing_valuation_price_provenance"),
+    );
+  });
+
   it("requires one exact valid FX row on each execution price date", () => {
     const missing = fixture();
     missing.fxRows = missing.fxRows.filter(
@@ -109,11 +145,19 @@ describe("investment lab VOO evidence readiness", () => {
         "invalid_execution_fx",
       ),
     );
+
+    const missingSource = fixture();
+    missingSource.fxRows[0] = { ...missingSource.fxRows[0], source: null };
+    assert.ok(
+      assessInvestmentLabVooReadiness(missingSource).blockers.includes(
+        "missing_execution_fx_provenance",
+      ),
+    );
   });
 
   it("does not silently extend an execution beyond the measured window", () => {
     const input = fixture();
-    input.boundaryFlows.push({ eventDate: "2026-07-07", sequence: 3 });
+    input.boundaryFlows.push(flow("2026-07-07", 3, "inflow", 100));
     input.priceRows = input.priceRows.filter(
       (row) => row.priceDate !== "2026-07-07",
     );
@@ -125,25 +169,32 @@ describe("investment lab VOO evidence readiness", () => {
 
   it("publishes raw-close price-return semantics and no fallback", () => {
     assert.deepEqual(INVESTMENT_LAB_VOO_READINESS_POLICY, {
-      version: "investment_lab_voo_evidence_v1",
+      version: "investment_lab_voo_evidence_v2",
       instrumentKey: "us:USD:VOO",
       valuationPriceBasis: "raw_close_price_return",
       distributionTreatment: "excluded_not_reinvested",
       valuationPriceDate:
         "previous_us_trading_day_on_or_before_service_date_minus_one",
-      valuationFx: "stored_snapshot_usdkrw_named_account_consensus",
+      valuationPriceProvenance: "stored_price_source_required",
+      valuationFx: "exact_service_date_snapshot_source_rule_consensus",
+      valuationFxProviderDate:
+        "not_inferred_from_legacy_snapshot_evidence",
       executionPrice: "first_observed_raw_close_on_or_after_event_date",
+      executionPriceProvenance: "stored_price_source_required",
       executionFx: "exact_usdkrw_rate_on_execution_price_date",
+      executionFxProvenance: "stored_fx_source_and_ok_status_required",
       maxExecutionDelayDays: 7,
       lookAhead: "forbidden",
       latestSpotNearestFallback: "forbidden",
       incompleteOutput: "readiness_only_no_partial_path",
     });
 
-    const source = readFileSync(
+    const source = [
+      "src/lib/investment-lab-voo-evidence.ts",
       "src/lib/investment-lab-voo-readiness.ts",
-      "utf8",
-    );
+    ]
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
     assert.doesNotMatch(source, /server-only|@\/db|process\.env|\bfetch\s*\(/);
     assert.doesNotMatch(
       source,
@@ -166,20 +217,37 @@ function fixture() {
         snapshotDate,
         account,
         usdKrw: 1_300,
+        source: "snapshot_fixture",
+        ruleVersion: "snapshot-fixture-v1",
       })),
     ),
     fxRows: [fx("2026-07-06", 1_300), fx("2026-07-07", 1_301)],
     boundaryFlows: [
-      { eventDate: "2026-07-03", sequence: 1 },
-      { eventDate: "2026-07-07", sequence: 2 },
+      flow("2026-07-03", 1, "inflow", 100),
+      flow("2026-07-07", 2, "outflow", 50),
     ],
   };
 }
 
 function price(priceDate, closePrice, adjustedClosePrice) {
-  return { priceDate, closePrice, adjustedClosePrice };
+  return {
+    priceDate,
+    closePrice,
+    adjustedClosePrice,
+    source: "price_fixture",
+  };
 }
 
 function fx(rateDate, usdKrw, status = "ok") {
-  return { rateDate, usdKrw, status };
+  return { rateDate, usdKrw, source: "fx_fixture", status };
+}
+
+function flow(eventDate, sequence, direction, amountKrw) {
+  return {
+    eventDate,
+    sequence,
+    direction,
+    amountKrw,
+    amountProvenance: "explicit_amount_krw",
+  };
 }

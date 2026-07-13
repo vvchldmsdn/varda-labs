@@ -35,6 +35,11 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.vooReadiness.status, "ready");
     assert.equal(result.vooReadiness.valuationPriceReadyCount, 4);
     assert.equal(result.vooReadiness.snapshotFxReadyCount, 4);
+    assert.equal(result.vooReadiness.snapshotFxProvenanceReadyCount, 4);
+    assert.equal(result.vooComparison.status, "ready");
+    assert.equal(result.vooComparison.rows.length, 4);
+    assert.equal(result.vooComparison.coverage.appliedFlowRows, 3);
+    assert.equal(result.vooComparison.returnEstimate.status, "ready");
   });
 
   it("blocks duplicate snapshot evidence without returning partial values", () => {
@@ -140,6 +145,7 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.status, "ready");
     assert.equal(result.returnEstimate.status, "ready");
     assert.equal(result.vooReadiness.status, "unavailable");
+    assert.equal(result.vooComparison.status, "unavailable");
     assert.deepEqual(result.vooReadiness.blockers, [
       "missing_execution_fx",
     ]);
@@ -187,19 +193,29 @@ function fixture() {
       event("2026-01-04", 3, "asset_added", null),
     ],
     closeRows: [
-      { priceDate: "2026-01-01", closePrice: 100, adjustedClosePrice: 100 },
-      { priceDate: "2026-01-05", closePrice: 110, adjustedClosePrice: 110 },
-      { priceDate: "2026-01-06", closePrice: 121, adjustedClosePrice: 121 },
+      price("2026-01-01", 100, 100),
+      price("2026-01-05", 110, 110),
+      price("2026-01-06", 121, 121),
     ],
     vooCloseRows: [
-      { priceDate: "2025-12-31", closePrice: 100, adjustedClosePrice: 101 },
-      { priceDate: "2026-01-02", closePrice: 101, adjustedClosePrice: 102 },
-      { priceDate: "2026-01-05", closePrice: 102, adjustedClosePrice: 103 },
-      { priceDate: "2026-01-06", closePrice: 103, adjustedClosePrice: 104 },
+      price("2025-12-31", 100, 101),
+      price("2026-01-02", 101, 102),
+      price("2026-01-05", 102, 103),
+      price("2026-01-06", 103, 104),
     ],
     fxRows: [
-      { rateDate: "2026-01-05", usdKrw: 1_300, status: "ok" },
-      { rateDate: "2026-01-06", usdKrw: 1_301, status: "ok" },
+      {
+        rateDate: "2026-01-05",
+        usdKrw: 1_300,
+        source: "fx_fixture",
+        status: "ok",
+      },
+      {
+        rateDate: "2026-01-06",
+        usdKrw: 1_301,
+        source: "fx_fixture",
+        status: "ok",
+      },
     ],
   };
 }
@@ -212,6 +228,8 @@ function snapshotDate(snapshotDate, total) {
       cashValue: 0,
       totalMarketValue: total * 0.5,
       usdKrw: 1_300,
+      source: "snapshot_fixture",
+      ruleVersion: "snapshot-fixture-v1",
     },
     {
       snapshotDate,
@@ -219,6 +237,8 @@ function snapshotDate(snapshotDate, total) {
       cashValue: 0,
       totalMarketValue: total * 0.3,
       usdKrw: 1_300,
+      source: "snapshot_fixture",
+      ruleVersion: "snapshot-fixture-v1",
     },
     {
       snapshotDate,
@@ -226,6 +246,8 @@ function snapshotDate(snapshotDate, total) {
       cashValue: 0,
       totalMarketValue: total * 0.2,
       usdKrw: 1_300,
+      source: "snapshot_fixture",
+      ruleVersion: "snapshot-fixture-v1",
     },
   ];
 }
@@ -241,6 +263,15 @@ function event(eventDate, sequence, eventType, amountKrw) {
     fxRate: null,
     assetCurrency: "KRW",
     isCorrection: false,
+  };
+}
+
+function price(priceDate, closePrice, adjustedClosePrice) {
+  return {
+    priceDate,
+    closePrice,
+    adjustedClosePrice,
+    source: "price_fixture",
   };
 }
 

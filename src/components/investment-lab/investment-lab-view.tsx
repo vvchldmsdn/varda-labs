@@ -18,6 +18,9 @@ export function InvestmentLabView({
       data-pending-at-end={model.coverage.pendingAtEndRows}
       data-return-status={model.returnEstimate?.status ?? "unavailable"}
       data-scenario-close-rows={model.coverage.scenarioCloseRows}
+      data-voo-comparison-status={
+        model.vooComparison?.status ?? "unavailable"
+      }
       data-voo-readiness={model.vooReadiness?.status ?? "unavailable"}
     >
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
@@ -90,7 +93,7 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
 
       <ReturnEstimateSection model={model} />
 
-      <VooReadinessSection model={model} />
+      <VooComparisonSection model={model} />
 
       <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -104,7 +107,13 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
             KODEX 200 종가 최대 이월 {model.coverage.maxValuationCarryDays ?? 0}일
           </p>
         </div>
-        <InvestmentLabComparisonChart rows={model.rows} />
+        <InvestmentLabComparisonChart
+          chartId="investment-lab-kodex200-chart"
+          description="저장된 평가일마다 실제 평가액과 동일 거래금액을 KODEX 200에 적용한 가상 평가액을 비교합니다."
+          rows={model.rows}
+          scenarioLabel="전액 KODEX 200"
+          title="실제 포트폴리오와 KODEX 200 시나리오 비교"
+        />
         {model.coverage.pendingComparisonRows > 0 ? (
           <p className="mt-3 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-3 py-2 text-sm text-[#725f2d]">
             지연 체결 표시가 있는 {model.coverage.pendingComparisonRows}개 평가일은 가상 경로의 대기 현금 또는 매도 의무를 평가액에 포함하지 않습니다.
@@ -249,13 +258,115 @@ function ReturnEstimateSection({
   );
 }
 
-function VooReadinessSection({
+function VooComparisonSection({
   model,
 }: {
   model: InvestmentLabCounterfactualReadModel;
 }) {
   const readiness = model.vooReadiness;
-  if (!readiness) return null;
+  const comparison = model.vooComparison;
+  if (!readiness || !comparison) return null;
+
+  if (comparison.status === "ready") {
+    const summary = comparison.summary;
+    const estimate = comparison.returnEstimate;
+    return (
+      <section
+        className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+        data-voo-applied-flows={comparison.coverage.appliedFlowRows}
+        data-voo-comparison-dates={summary.comparisonDateCount}
+        data-voo-delayed-executions={
+          comparison.coverage.delayedExecutionRows
+        }
+        data-voo-execution-fx-ready={readiness.executionFxReadyCount}
+        data-voo-relevant-flows={readiness.relevantFlowCount}
+        data-voo-return-method={estimate.method.version}
+        data-voo-return-status={estimate.status}
+        data-voo-service-dates={readiness.serviceDateCount}
+        data-voo-snapshot-fx-provenance-ready={
+          readiness.snapshotFxProvenanceReadyCount
+        }
+        data-voo-snapshot-fx-ready={readiness.snapshotFxReadyCount}
+        data-voo-valuation-price-ready={readiness.valuationPriceReadyCount}
+      >
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">전액 VOO 비교</h2>
+            <p className="mt-1 text-sm text-[#687064]">
+              실제와 같은 원화 매수·매도 금액을 VOO에 적용한 가격수익 경로
+            </p>
+          </div>
+          <p className="text-sm font-semibold text-[#087f4f]">
+            계산 완료
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <ReadinessMetric
+            label="VOO 종료 평가액"
+            value={formatKrw(summary.scenarioEndValueKrw)}
+            detail={`${summary.comparisonDateCount}개 평가일`}
+          />
+          <ReadinessMetric
+            label="실제 대비 차이"
+            value={formatSignedKrw(summary.endDifferenceKrw)}
+            detail="VOO - 실제"
+          />
+          <ReadinessMetric
+            label="체결 증거"
+            value={`${comparison.coverage.appliedFlowRows}/${readiness.relevantFlowCount}`}
+            detail={`지연 체결 ${comparison.coverage.delayedExecutionRows}건`}
+          />
+        </div>
+
+        {estimate.status === "ready" ? (
+          <div className="mt-4 grid gap-3 border-t border-[#e1e6dc] pt-4 sm:grid-cols-3">
+            <ReturnMetricCell
+              label="실제 추정수익률"
+              value={formatSignedPercent(estimate.actualReturn)}
+              detail={`${estimate.periodCount}개 구간`}
+              tone={estimate.actualReturn >= 0 ? "positive" : "negative"}
+            />
+            <ReturnMetricCell
+              label="전액 VOO 추정수익률"
+              value={formatSignedPercent(estimate.scenarioReturn)}
+              detail={`체결 ${estimate.scenarioFlowCount}건`}
+              tone={estimate.scenarioReturn >= 0 ? "positive" : "negative"}
+            />
+            <ReturnMetricCell
+              label="수익률 차이"
+              value={formatSignedPercentagePoints(
+                estimate.differencePercentagePoints,
+              )}
+              detail="VOO - 실제"
+              tone={
+                estimate.differencePercentagePoints >= 0
+                  ? "positive"
+                  : "negative"
+              }
+            />
+          </div>
+        ) : (
+          <p className="mt-4 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-3 py-2 text-sm text-[#725f2d]">
+            경로는 계산됐지만 현금·이벤트 근거가 불충분해 추정수익률은 표시하지 않습니다.
+          </p>
+        )}
+
+        <div className="mt-5 border-t border-[#e1e6dc] pt-4">
+          <InvestmentLabComparisonChart
+            chartId="investment-lab-voo-chart"
+            description="저장된 평가일마다 실제 평가액과 동일한 원화 거래금액을 VOO raw close와 당시 저장 환율에 적용한 가상 평가액을 비교합니다."
+            rows={comparison.rows}
+            scenarioLabel="전액 VOO"
+            title="실제 포트폴리오와 VOO 시나리오 비교"
+          />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[#777e73]">
+          소수점 수량을 허용해 잔여 현금을 만들지 않으며, 보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다. VOO raw close와 같은 서비스 날짜에 저장된 환율을 사용하고 배당 재투자는 제외합니다.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -264,6 +375,9 @@ function VooReadinessSection({
       data-voo-relevant-flows={readiness.relevantFlowCount}
       data-voo-service-dates={readiness.serviceDateCount}
       data-voo-snapshot-fx-ready={readiness.snapshotFxReadyCount}
+      data-voo-snapshot-fx-provenance-ready={
+        readiness.snapshotFxProvenanceReadyCount
+      }
       data-voo-valuation-price-ready={readiness.valuationPriceReadyCount}
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -292,7 +406,7 @@ function VooReadinessSection({
         <ReadinessMetric
           label="평가 환율"
           value={`${readiness.snapshotFxReadyCount}/${readiness.serviceDateCount}`}
-          detail="저장 snapshot USD/KRW"
+          detail={`출처 합의 ${readiness.snapshotFxProvenanceReadyCount}/${readiness.serviceDateCount}`}
         />
         <ReadinessMetric
           label="체결 환율"

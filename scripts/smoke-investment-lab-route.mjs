@@ -41,8 +41,9 @@ async function main() {
     "현금흐름 조정 추정수익률",
     "Modified Dietz",
     "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
-    "전액 VOO 비교 준비도",
-    "준비 전에는 부분 경로나 추정값을 표시하지 않습니다",
+    "전액 VOO 비교",
+    "소수점 수량을 허용해 잔여 현금을 만들지 않으며",
+    "보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다",
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
@@ -76,6 +77,10 @@ async function main() {
   );
   const pendingAtEnd = readIntegerAttribute(route.body, "data-pending-at-end");
   const vooReadiness = readStringAttribute(route.body, "data-voo-readiness");
+  const vooComparisonStatus = readStringAttribute(
+    route.body,
+    "data-voo-comparison-status",
+  );
   const vooServiceDates = readIntegerAttribute(
     route.body,
     "data-voo-service-dates",
@@ -88,6 +93,10 @@ async function main() {
     route.body,
     "data-voo-snapshot-fx-ready",
   );
+  const vooSnapshotFxProvenance = readIntegerAttribute(
+    route.body,
+    "data-voo-snapshot-fx-provenance-ready",
+  );
   const vooRelevantFlows = readIntegerAttribute(
     route.body,
     "data-voo-relevant-flows",
@@ -95,6 +104,26 @@ async function main() {
   const vooExecutionFx = readIntegerAttribute(
     route.body,
     "data-voo-execution-fx-ready",
+  );
+  const vooComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-voo-comparison-dates",
+  );
+  const vooAppliedFlows = readIntegerAttribute(
+    route.body,
+    "data-voo-applied-flows",
+  );
+  const vooDelayedExecutions = readIntegerAttribute(
+    route.body,
+    "data-voo-delayed-executions",
+  );
+  const vooReturnStatus = readStringAttribute(
+    route.body,
+    "data-voo-return-status",
+  );
+  const vooReturnMethod = readStringAttribute(
+    route.body,
+    "data-voo-return-method",
   );
 
   assert.ok(comparisonDates >= 2, "comparison path needs at least two dates");
@@ -109,11 +138,19 @@ async function main() {
   assert.equal(vooServiceDates, comparisonDates);
   assert.ok(vooValuationPrices <= vooServiceDates);
   assert.ok(vooSnapshotFx <= vooServiceDates);
+  assert.ok(vooSnapshotFxProvenance <= vooServiceDates);
   assert.ok(vooExecutionFx <= vooRelevantFlows);
   if (vooReadiness === "ready") {
     assert.equal(vooValuationPrices, vooServiceDates);
     assert.equal(vooSnapshotFx, vooServiceDates);
+    assert.equal(vooSnapshotFxProvenance, vooServiceDates);
     assert.equal(vooExecutionFx, vooRelevantFlows);
+    assert.equal(vooComparisonStatus, "ready");
+    assert.equal(vooComparisonDates, comparisonDates);
+    assert.equal(vooAppliedFlows, vooRelevantFlows);
+    assert.ok(vooDelayedExecutions >= 0);
+    assert.equal(vooReturnStatus, "ready");
+    assert.equal(vooReturnMethod, "modified_dietz_daily_weighted_eod_v1");
   }
 
   console.log(
@@ -132,11 +169,18 @@ async function main() {
         returnStatus: "ready",
         returnMethod: "modified_dietz_daily_weighted_eod_v1",
         vooReadiness,
+        vooComparisonStatus,
         vooServiceDates,
         vooValuationPrices,
         vooSnapshotFx,
+        vooSnapshotFxProvenance,
         vooRelevantFlows,
         vooExecutionFx,
+        vooComparisonDates,
+        vooAppliedFlows,
+        vooDelayedExecutions,
+        vooReturnStatus,
+        vooReturnMethod,
         leakPatternMatches: 0,
         databaseSideEffects: false,
         counts: countsAfter,
@@ -179,7 +223,7 @@ function readIntegerAttribute(html, name) {
 }
 
 function readStringAttribute(html, name) {
-  const match = html.match(new RegExp(`${name}="([a-z_]+)"`));
+  const match = html.match(new RegExp(`${name}="([a-z0-9_]+)"`));
   assert.ok(match, `route is missing string attribute: ${name}`);
   return match[1];
 }

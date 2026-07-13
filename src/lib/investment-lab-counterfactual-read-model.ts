@@ -9,10 +9,14 @@ import {
   type InvestmentLabReturnEstimate,
 } from "./investment-lab-return-estimate.ts";
 import {
-  assessInvestmentLabVooReadiness,
+  resolveInvestmentLabVooEvidence,
   type InvestmentLabVooFxRow,
   type InvestmentLabVooReadiness,
-} from "./investment-lab-voo-readiness.ts";
+} from "./investment-lab-voo-evidence.ts";
+import {
+  buildInvestmentLabVooComparison,
+  type InvestmentLabVooComparison,
+} from "./investment-lab-voo-comparison.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
 
 const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
@@ -35,12 +39,15 @@ export type InvestmentLabSourceSnapshotRow = Readonly<{
   cashValue: string | number | null;
   totalMarketValue: string | number | null;
   usdKrw: string | number | null;
+  source: string | null;
+  ruleVersion: string | null;
 }>;
 
 export type InvestmentLabSourceCloseRow = Readonly<{
   priceDate: string;
   closePrice: string | number | null;
   adjustedClosePrice: string | number | null;
+  source: string | null;
 }>;
 
 export type InvestmentLabCounterfactualReadInput = Readonly<{
@@ -90,6 +97,7 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
   }> | null;
   returnEstimate: InvestmentLabReturnEstimate | null;
   vooReadiness: InvestmentLabVooReadiness | null;
+  vooComparison: InvestmentLabVooComparison | null;
   rows: readonly InvestmentLabCounterfactualDisplayRow[];
   coverage: Readonly<{
     snapshotSourceRows: number;
@@ -189,12 +197,20 @@ export function buildInvestmentLabCounterfactualReadModel(
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,
   });
-  const vooReadiness = assessInvestmentLabVooReadiness({
+  const vooEvidence = resolveInvestmentLabVooEvidence({
     serviceDates: actual.rows.map((row) => row.serviceDate),
     priceRows: input.vooCloseRows,
     snapshotRows: input.snapshotRows,
     fxRows: input.fxRows,
     boundaryFlows: events,
+  });
+  const vooReadiness = vooEvidence.readiness;
+  const vooComparison = buildInvestmentLabVooComparison({
+    actualPath: actual.rows,
+    boundaryFlows: events,
+    evidence: vooEvidence,
+    snapshotRows: input.snapshotRows,
+    eventRows: input.eventRows,
   });
 
   return Object.freeze({
@@ -210,6 +226,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     }),
     returnEstimate,
     vooReadiness,
+    vooComparison,
     rows,
     coverage: Object.freeze({
       ...initialCoverage,
@@ -416,6 +433,7 @@ function blockedReadModel(
     summary: null,
     returnEstimate: null,
     vooReadiness: null,
+    vooComparison: null,
     rows: Object.freeze([]),
     coverage: Object.freeze({ ...coverageValue }),
     blockers: Object.freeze([...blockers].sort()),

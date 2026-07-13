@@ -66,6 +66,8 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         cashValue: dailyPortfolioSnapshots.cashValue,
         totalMarketValue: dailyPortfolioSnapshots.totalMarketValue,
         usdKrw: dailyPortfolioSnapshots.usdKrw,
+        source: dailyPortfolioSnapshots.source,
+        ruleVersion: dailyPortfolioSnapshots.ruleVersion,
       })
       .from(dailyPortfolioSnapshots)
       .where(
@@ -93,6 +95,7 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       .select({
         rateDate: fxRates.rateDate,
         usdKrw: fxRates.usdKrw,
+        source: fxRates.source,
         status: fxRates.status,
       })
       .from(fxRates)
@@ -111,6 +114,7 @@ function loadScenarioCloseRows(
       priceDate: assetPriceSnapshots.priceDate,
       closePrice: assetPriceSnapshots.closePrice,
       adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+      source: assetPriceSnapshots.source,
     })
     .from(assetPriceSnapshots)
     .where(

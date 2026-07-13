@@ -120,8 +120,8 @@ The main legacy implementations do not answer the question reliably:
 - one path uses a fixed FX fallback.
 
 The varda replacement uses observed actual snapshots, explicit boundary-flow
-classification, adjusted closes, date-specific FX, bounded pending execution,
-and fail-closed long-only solvency.
+classification, scenario-specific close bases, date-specific FX, bounded
+pending execution, and fail-closed long-only solvency.
 
 ### Product surface coverage
 
@@ -131,7 +131,7 @@ The following scenario families have different transaction and cash semantics:
 
 | Scenario family | Examples | Product treatment |
 | --- | --- | --- |
-| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 is the first deployed read-only route and includes a separately labeled Modified Dietz estimate when price-basis and cash/event guards pass. VOO now exposes evidence readiness only: raw-close price-return basis, US calendar mapping, snapshot FX consensus, and exact execution FX pass current production evidence, but no VOO path or performance result is rendered yet. Multi-instrument vectors also need an approved flow-allocation, cross-market pending-execution, and solvency policy. |
+| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 and VOO are deployed read-only paths with separately guarded Modified Dietz estimates. VOO uses fractional units, zero residual cash, raw-close price-return, exact stored valuation FX provenance, exact execution-date FX, and fail-closed no-short solvency. Multi-instrument vectors still need an approved flow-allocation, cross-market pending-execution, and solvency policy. |
 | Scheduled rebalance strategy | equal weight, maintain target weights, maintain a selected weight vector | Later independent model. It introduces additional trades, turnover, costs, and rebalance-date policy, so it is not the same-flow v1 model. |
 | Recommendation-following strategy | legacy recommended rebalance | Blocked until the recommendation boundary and point-in-time recommendation evidence are separately approved. |
 | Cash-ledger baseline | all cash | Blocked while the measured path excludes account cash. It requires a cash balance, cash-flow, and cash-return policy rather than a zero-volatility shortcut. |
