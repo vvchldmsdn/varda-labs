@@ -338,8 +338,37 @@ zero-bps rows, with property order:
 market, currency, ticker, weightBps
 ```
 
-`JSON.stringify()` over an object constructed in exactly that order and UTF-8
-SHA-256 produces:
+The v2 hash input and approval-envelope digest must derive from the same
+planner-owned immutable full snapshot. The planner must not reread caller
+objects between the two operations. The full snapshot is not passed directly to
+the public v2 helper.
+
+For the v2 call, the planner projects the full snapshot into a separate input
+with exactly these own fields:
+
+```text
+scenarioId
+scenarioVersion
+vector
+```
+
+That v2-compatible projection uses newly allocated ordinary plain records for
+the root and rows plus a dense ordinary vector array. It contains no other full
+planner fields and is the only planner-created object passed to
+`createSimulationScenarioVectorHashV2`.
+
+For approval-envelope serialization only, the serialization module projects
+that snapshot into a separate canonical graph. The canonical root and every
+canonical vector row are new null-prototype records with properties inserted in
+the exact orders above. `vector` is a new dense ordinary array with an own,
+non-enumerable, non-writable, and non-configurable `toJSON` data property whose
+value is `undefined`. This own shadow prevents an inherited
+`Array.prototype.toJSON` from affecting serialization; the null-prototype
+records prevent inherited `Object.prototype.toJSON` lookup.
+
+Caller-owned objects and arrays are never passed to `JSON.stringify()`
+directly. `JSON.stringify()` over the canonical graph and UTF-8 SHA-256
+produces:
 
 ```text
 sha256:<64 lowercase hexadecimal characters>
@@ -399,12 +428,28 @@ server time.
 Before validation, the implementation takes one bounded snapshot of each
 allowed scalar and each of at most 64 vector rows. It must:
 
-- read an allowed getter at most once;
-- reject missing, extra, accessor-induced invalid, or unsupported shape;
+- accept required fields and vector indices only through own enumerable data
+  descriptors and copy `descriptor.value` without property access;
+- reject missing fields, extra string or symbol keys, accessor descriptors,
+  sparse or accessor-backed indices, nonstandard prototypes, and unsupported
+  shapes without invoking a getter or setter;
+- inspect row count before copying rows and inspect every caller-owned record,
+  array, and index through guarded reflective operations;
 - never retain references to mutable input arrays or row objects;
 - never invoke `toJSON`, `valueOf`, custom iteration, or user callbacks;
-- construct new plain internal records; and
+- construct one newly allocated, deeply frozen full planner snapshot from
+  ordinary plain records and a dense ordinary vector array;
+- derive from that full snapshot a distinct v2-compatible ordinary input
+  projection containing exactly `scenarioId`, `scenarioVersion`, and `vector`;
+- pass only that v2-compatible projection to the public v2 hash helper;
+- derive the separate null-prototype approval-envelope projection from that same
+  full snapshot, without rereading caller input; and
 - deep-freeze policy, checks, blockers, and output.
+
+If a Proxy trap throws during prototype, key, or descriptor inspection, the
+input is blocked with `invalid_synthetic_input`; the exception and trap details
+are not returned. This boundary does not claim complete detection of hostile
+Proxies whose traps return deceptive but non-throwing reflective results.
 
 Business-invalid input returns `blocked`; it does not throw. A programming
 defect or impossible internal invariant may throw and must not be translated
@@ -451,10 +496,21 @@ Focused tests must cover:
     remaining below 32 KiB, and the forward-compatibility cap remaining pinned;
 12. input arrays/rows unchanged after success and failure;
 13. output and nested arrays/objects frozen;
-14. getter values read once and dangerous coercion hooks never invoked;
-15. no owner, provider/session, challenge, hash, vector row, SQL, physical id,
+14. outer, nested, and vector-index accessors rejected with getter and setter
+    call counts remaining zero, and dangerous coercion hooks never invoked;
+15. the full planner snapshot, exact three-field v2-compatible ordinary input
+    projection, and null-prototype envelope projection remaining distinct, with
+    both projections derived from one immutable full snapshot and caller
+    mutation after snapshot creation unable to alter either digest input;
+16. temporary `Object.prototype.toJSON` and `Array.prototype.toJSON` pollution
+    leaving exact approval-envelope bytes and digest unchanged, with original
+    descriptors restored in `finally` and the test kept non-concurrent;
+17. throwing Proxy traps producing `blocked` with
+    `invalid_synthetic_input`, no digest work, and no claim of complete hostile
+    Proxy detection;
+18. no owner, provider/session, challenge, hash, vector row, SQL, physical id,
     approval, receipt, or committed evidence in output; and
-16. no imports or calls for DB, filesystem, network, environment, clock,
+19. no imports or calls for DB, filesystem, network, environment, clock,
     random, cache, logger, route, Server Action, React, or Next.js behavior.
 
 The test file must not connect to production or load `.env.local`.
@@ -506,6 +562,16 @@ Implementation must stop without widening scope if:
   need to change;
 - a valid planner input requires more than the approved caps;
 - the envelope digest cannot be defined without changing approved semantics;
+- an accessor cannot be rejected before its getter or setter is invoked;
+- the v2 input and envelope projection require different full planner snapshots
+  or a second read from caller input;
+- the full planner snapshot or null-prototype envelope graph would need to be
+  passed directly to the public v2 helper;
+- the v2 projection cannot be limited to the exact ordinary-root
+  `scenarioId`, `scenarioVersion`, and `vector` shape required by that helper;
+- caller-owned objects or arrays must be passed directly to `JSON.stringify()`;
+- inherited `Object.prototype.toJSON` or `Array.prototype.toJSON` can change
+  canonical envelope bytes or digest;
 - any real tenant, owner, challenge, vector, DB row, env value, or secret is
   required;
 - a DB, auth, lock, receipt, runtime, API, UI, provider, or job import appears;
