@@ -21,6 +21,7 @@ import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";
 import "./simulation-scenario-vector-hash-v2.test.mjs";
 import "./simulation-curated-admission-planner.test.mjs";
+import "./simulation-curated-approved-vector-record.test.mjs";
 import "./simulation-scenario-vector-resolver.test.mjs";
 import "./simulation-curated-vector-hash-version-schema.test.mjs";
 import "./simulation-normalized-nav.test.mjs";
