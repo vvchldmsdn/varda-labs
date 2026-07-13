@@ -41,16 +41,13 @@ No production adapter or product surface is part of this slice.
 ## Blocking Hash Dependency
 
 This implementation plan is blocked by
-`docs/simulation-scenario-vector-hash-v1-determinism-decision-packet.md`.
+`docs/simulation-scenario-vector-hash-versioning-decision-packet.md`.
 
-The current v1 serializer uses locale-sensitive sorting that is not equivalent
-to the ASCII canonical order required below. Planner source and tests must not
-start until either:
+The current v1 serializer uses locale-sensitive sorting and is frozen as
+legacy provenance. Planner source and tests must not start until:
 
 ```text
-the separately approved v1 ASCII correction is implemented and compatibility-verified
-or
-a separately approved deterministic v2 hash policy is implemented
+a separately approved simulation_scenario_vector_hash_v2 pure helper is implemented and verified
 ```
 
 The hash correction is not part of the eight-file planner allowlist. It needs
@@ -89,7 +86,7 @@ readinessStatus = not_ready
 supportedIntent = initial_approval
 supportedActorMode = tenant_self_approval_v1
 confirmationPolicyId = curated_vector_self_confirmation_v1
-vectorHashVersion = simulation_scenario_vector_hash_v1
+vectorHashVersion = simulation_scenario_vector_hash_v2
 approvalEnvelopeDigestVersion = curated_vector_approval_envelope_digest_v1
 writeSafetyApprovalCommit = c0a2f584e167f153db0dedb6cfc418d76b2fc5bd
 contractApprovalCommit = 38e7981cc2c2e61b9ce50c2e52edc09770b0d70a
@@ -101,9 +98,9 @@ maxCanonicalInputBytes = 32768
 `maxCanonicalInputBytes` is an in-memory serialization bound, not an HTTP body,
 database, execution-universe, or UI limit.
 
-`vectorHashVersion=simulation_scenario_vector_hash_v1` remains a conditional
-candidate. It may be pinned by the planner only after the blocking hash gate
-above completes without changing any approved or durable evidence.
+`vectorHashVersion=simulation_scenario_vector_hash_v2` remains a conditional
+candidate. It may be pinned by the planner only after the versioning decision
+and separate v2 pure implementation gates complete without changing v1.
 
 ## Exact Input Types
 
@@ -265,36 +262,21 @@ error payload.
 
 ## Vector Hash Compatibility
 
-The planner may later reuse these existing pure exports without editing their
-files:
+The planner must not call, wrap, edit, or reinterpret
+`simulation_scenario_vector_hash_v1`. V1 remains legacy provenance with its
+existing serializer semantics.
 
-```text
-canonicalizeSimulationScenarioVector
-hashSimulationScenarioVector
-SIMULATION_PORTFOLIO_PATH_POLICY_ID
-SIMULATION_PORTFOLIO_PATH_GATE0_APPROVAL_COMMIT
-```
-
-from `src/lib/simulation-scenario-vector-review-serialization.ts`.
-
-It must not reuse them in their current form. The serializer currently sorts
-with `localeCompare()`, and allowed punctuation can produce a different order
-from this packet's exact ASCII comparator. ASCII pre-validation does not make
-that internal locale sort a no-op.
-
-Reuse becomes eligible only after the separate hash gate either:
-
-- corrects v1 to exact ASCII ordering and proves all pinned and durable
-  evidence compatible; or
-- establishes a separately approved deterministic v2 helper and updates this
-  packet's version binding through a new review.
+The planner may later import only the separately approved pure v2 exports from
+the new v2 module defined by its own implementation gate. Exact export and file
+names remain unselected until that packet is approved.
 
 The planner still validates that input rows are already canonical before
-calling any approved serializer. Hash canonicalization must not repair or hide
-an out-of-order planner input.
+calling v2. V2 canonicalization must not repair or hide an out-of-order planner
+input at this boundary, even though the standalone hash function remains
+input-order independent for its own canonical hash contract.
 
 The fixture must pin at least one expected `scenarioVectorHash` produced by the
-post-gate approved helper. No approved production vector or currently stored
+approved synthetic-only v2 helper. No approved production vector or stored
 database row may be used.
 
 ## Approval-Envelope Digest Candidate
@@ -339,9 +321,9 @@ tenant_self_approval_v1
 The shorter `tenant_self` text in an earlier candidate receipt example is not
 a digest alias and must not be accepted or normalized. The digest also binds
 `intent=initial_approval` and
-`vectorHashVersion=simulation_scenario_vector_hash_v1` so a different action or
-hash policy cannot reuse the same confirmation envelope. The vector hash
-version remains conditional on the blocking hash gate above.
+`vectorHashVersion=simulation_scenario_vector_hash_v2` so a different action or
+hash policy cannot reuse the same confirmation envelope. The v2 binding
+remains conditional on the blocking versioning and pure implementation gates.
 
 `writeSafetyApprovalCommit`, `contractApprovalCommit`, Markdown paths, and Git
 review provenance are deliberately excluded. They document review history;
@@ -424,7 +406,7 @@ Focused tests must cover:
 5. duplicate, reversed, and punctuation-sensitive ASCII instrument order;
 6. invalid numeric weights, overflow-safe integer total, and no
    renormalization;
-7. post-gate scenario-vector hash compatibility and independent envelope hash
+7. approved v2 scenario-vector hash compatibility and independent envelope hash
    sensitivity to actor mode, confirmation policy, intent, owner, policy,
    scenario, vector-hash version, scenario-vector hash, and complete vector;
 8. exact UTC boundaries, leap-year dates, invalid dates, offsets, missing
@@ -449,12 +431,13 @@ The proposed source import graph is allowlisted to:
 
 ```text
 node:crypto
-simulation-scenario-vector-review-serialization.ts
+the separately approved simulation_scenario_vector_hash_v2 pure module
 the five new planner modules
 ```
 
-Only the new serialization module may import `node:crypto`. No planner source
-may import from:
+Within the planner slice, only the new envelope serialization module may import
+`node:crypto`; the already approved v2 module keeps its separately reviewed
+dependency boundary. No planner source may import from:
 
 - `src/db`, Drizzle, Neon, schema, query, repository, or migration code;
 - Next.js, React, routes, Server Actions, middleware, or components;
@@ -483,8 +466,10 @@ slice.
 
 Implementation must stop without widening scope if:
 
-- the separate deterministic vector-hash gate is not completed;
-- existing scenario hash fixtures would change;
+- the separate v2 deterministic vector-hash implementation gate is not
+  completed;
+- any v1 source, fixture, hash, approval evidence, or durable evidence would
+  need to change;
 - a valid planner input requires more than the approved caps;
 - the envelope digest cannot be defined without changing approved semantics;
 - any real tenant, owner, challenge, vector, DB row, env value, or secret is
@@ -519,21 +504,22 @@ implementation plan:
 3. closed readonly synthetic input and bounded immutable output types;
 4. deterministic ASCII canonical order, `O(n)` bounded validation, and ordered
    blockers;
-5. existing scenario-vector serializer/hash compatibility;
+5. the separately approved v2 scenario-vector hash binding;
 6. the proposed approval-envelope digest serialization;
 7. strict synthetic UTC parser and caller-supplied evaluation time;
 8. snapshot-once, no-coercion, mutation, and freeze rules;
 9. synthetic-only fixture and full focused-test matrix; and
 10. the forbidden dependency, verification, and stop boundaries.
 
-This packet should not receive implementation approval before the separate
-vector-hash determinism decision and its compatibility-verified implementation
-are complete. Review may accept the remaining planner design while keeping the
-source/test gate blocked.
+This packet is not currently requesting implementation approval. After the
+versioning decision and separate v2 pure implementation complete, this packet
+must be revised to pin the exact approved v2 module, exports, version constant,
+and synthetic expected hash before returning for planner implementation
+approval.
 
-Approval would authorize only the listed local source/test implementation and
-verification commands. It would not authorize schema, DB, auth, repository,
-writer, runtime binding, API, UI, production data, deployment, or operator
-mode.
+Any later approval may authorize only the listed local source/test
+implementation and verification commands. It would not authorize schema, DB,
+auth, repository, writer, runtime binding, API, UI, production data,
+deployment, or operator mode.
 
 This Markdown packet is not imported by code and is not a runtime trust source.
