@@ -13,6 +13,7 @@
     "smoke:entity-api-boundary": "node --no-warnings scripts/smoke-entity-api-boundary.mjs",
     "rehearse:tenant-expand": "node --no-warnings scripts/rehearse-tenant-expand.mjs",
     "rehearse:curated-vector-schema": "node --no-warnings scripts/rehearse-curated-vector-schema.mjs",
+    "rehearse:curated-vector-hash-version": "node --no-warnings scripts/rehearse-curated-vector-hash-version.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
     "audit:data-integrity": "node scripts/audit-data-integrity.mjs",
     "audit:market-context": "node scripts/audit-market-context-readonly.mjs",

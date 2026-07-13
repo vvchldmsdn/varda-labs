@@ -108,6 +108,9 @@ export const simulationScenarioApprovalRevisions = pgTable(
     scenarioId: varchar("scenario_id", { length: 100 }).notNull(),
     scenarioVersion: varchar("scenario_version", { length: 100 }).notNull(),
     approvalRevision: integer("approval_revision").notNull(),
+    scenarioVectorHashVersion: varchar("scenario_vector_hash_version", {
+      length: 64,
+    }).notNull(),
     scenarioVectorHash: varchar("scenario_vector_hash", {
       length: 71,
     }).notNull(),
@@ -140,6 +143,10 @@ export const simulationScenarioApprovalRevisions = pgTable(
     revisionCheck: check(
       "sim_scenario_approval_revisions_revision_check",
       sql`${table.approvalRevision} > 0`,
+    ),
+    vectorHashVersionCheck: check(
+      "sim_scenario_approval_revisions_vector_hash_version_check",
+      sql`${table.scenarioVectorHashVersion} = 'simulation_scenario_vector_hash_v2'`,
     ),
     vectorHashCheck: check(
       "sim_scenario_approval_revisions_vector_hash_check",

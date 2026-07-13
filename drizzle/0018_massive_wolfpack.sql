@@ -1,0 +1,2 @@
+ALTER TABLE "simulation_scenario_approval_revisions" ADD COLUMN "scenario_vector_hash_version" varchar(64) NOT NULL;--> statement-breakpoint
+ALTER TABLE "simulation_scenario_approval_revisions" ADD CONSTRAINT "sim_scenario_approval_revisions_vector_hash_version_check" CHECK ("simulation_scenario_approval_revisions"."scenario_vector_hash_version" = 'simulation_scenario_vector_hash_v2');

@@ -82,6 +82,7 @@ const SCHEMA_FIELDS = {
     "scenarioId",
     "scenarioVersion",
     "approvalRevision",
+    "scenarioVectorHashVersion",
     "scenarioVectorHash",
     "approvedAt",
     "lifecycleStatus",
@@ -162,8 +163,8 @@ const EXPORTS = [
   "simulationScenarioApprovalLifecycleEvents",
 ];
 
-describe("curated approved-vector Stage I schema", () => {
-  it("declares the exact three tables, columns, and inferred types", () => {
+describe("curated approved-vector schema", () => {
+  it("declares the exact current tables, columns, and inferred types", () => {
     for (const [tableName, columns] of Object.entries(SCHEMA_FIELDS)) {
       const exportName = EXPORTS.find((name) =>
         schema.includes(`export const ${name} = pgTable(\n  "${tableName}"`),
