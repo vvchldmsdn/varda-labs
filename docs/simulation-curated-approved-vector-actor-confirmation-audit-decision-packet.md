@@ -393,7 +393,7 @@ Its candidate logical evidence is:
 
 ```text
 confirmationPolicyId
-actorMode = tenant_self
+actorMode = tenant_self_approval_v1
 approvalRevisionReference
 confirmationChallengeDigest
 approvalEnvelopeDigest
@@ -403,6 +403,10 @@ confirmedAt
 committedAt
 outcome = committed
 ```
+
+`tenant_self_approval_v1` is the only canonical v1 actor-mode value. The
+shorter `tenant_self` text in an earlier revision of this receipt example was
+a documentation typo, not an accepted alias or normalization rule.
 
 This is not a table or column proposal. Physical names, keys, retention,
 indexes, and DDL remain deferred.

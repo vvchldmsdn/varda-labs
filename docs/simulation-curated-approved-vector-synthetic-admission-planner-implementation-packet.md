@@ -38,6 +38,24 @@ readinessStatus = not_ready
 
 No production adapter or product surface is part of this slice.
 
+## Blocking Hash Dependency
+
+This implementation plan is blocked by
+`docs/simulation-scenario-vector-hash-v1-determinism-decision-packet.md`.
+
+The current v1 serializer uses locale-sensitive sorting that is not equivalent
+to the ASCII canonical order required below. Planner source and tests must not
+start until either:
+
+```text
+the separately approved v1 ASCII correction is implemented and compatibility-verified
+or
+a separately approved deterministic v2 hash policy is implemented
+```
+
+The hash correction is not part of the eight-file planner allowlist. It needs
+its own approval, changed-file allowlist, tests, and compatibility evidence.
+
 ## Proposed File Allowlist
 
 Only these files may be created or changed after a separate implementation
@@ -82,6 +100,10 @@ maxCanonicalInputBytes = 32768
 
 `maxCanonicalInputBytes` is an in-memory serialization bound, not an HTTP body,
 database, execution-universe, or UI limit.
+
+`vectorHashVersion=simulation_scenario_vector_hash_v1` remains a conditional
+candidate. It may be pinned by the planner only after the blocking hash gate
+above completes without changing any approved or durable evidence.
 
 ## Exact Input Types
 
@@ -209,6 +231,14 @@ The 32-KiB cap is deliberately above the maximum valid fixed-shape payload but
 still bounds future accidental field expansion. It must not be silently raised
 because a new field appears.
 
+Under the current closed shape, 64-row cap, and per-field caps, a valid input
+cannot independently reach 32 KiB. The cap is therefore a forward-compatibility
+assertion, not a separately reachable v1 business-invalid case. Tests should
+prove that a maximum-shape valid synthetic fixture remains below the cap and
+that future field expansion cannot remove or silently raise the guard. They
+must not fabricate an otherwise-valid 32-KiB rejection case that the approved
+field rules cannot produce.
+
 ## Canonical Order And Complexity
 
 Canonical instrument order is ascending by exact ASCII code unit over:
@@ -235,7 +265,7 @@ error payload.
 
 ## Vector Hash Compatibility
 
-The implementation reuses these existing pure exports without editing their
+The planner may later reuse these existing pure exports without editing their
 files:
 
 ```text
@@ -247,14 +277,25 @@ SIMULATION_PORTFOLIO_PATH_GATE0_APPROVAL_COMMIT
 
 from `src/lib/simulation-scenario-vector-review-serialization.ts`.
 
-The planner first proves that input rows are already canonical under this
-packet's deterministic ASCII comparator. Only then may it call the existing
-serializer and hash helper. Its internal sort therefore cannot hide an
-out-of-order planner input.
+It must not reuse them in their current form. The serializer currently sorts
+with `localeCompare()`, and allowed punctuation can produce a different order
+from this packet's exact ASCII comparator. ASCII pre-validation does not make
+that internal locale sort a no-op.
+
+Reuse becomes eligible only after the separate hash gate either:
+
+- corrects v1 to exact ASCII ordering and proves all pinned and durable
+  evidence compatible; or
+- establishes a separately approved deterministic v2 helper and updates this
+  packet's version binding through a new review.
+
+The planner still validates that input rows are already canonical before
+calling any approved serializer. Hash canonicalization must not repair or hide
+an out-of-order planner input.
 
 The fixture must pin at least one expected `scenarioVectorHash` produced by the
-existing helper. No approved production vector or currently stored database
-row may be used.
+post-gate approved helper. No approved production vector or currently stored
+database row may be used.
 
 ## Approval-Envelope Digest Candidate
 
@@ -264,11 +305,13 @@ The new serialization module proposes this canonical JSON property order:
 approvalEnvelopeDigestVersion
 actorMode
 confirmationPolicyId
+intent
 ownerUserId
 portfolioPathPolicyId
 gate0ApprovalCommit
 scenarioId
 scenarioVersion
+vectorHashVersion
 scenarioVectorHash
 vector
 ```
@@ -286,6 +329,23 @@ SHA-256 produces:
 ```text
 sha256:<64 lowercase hexadecimal characters>
 ```
+
+`actorMode` has exactly one canonical v1 value:
+
+```text
+tenant_self_approval_v1
+```
+
+The shorter `tenant_self` text in an earlier candidate receipt example is not
+a digest alias and must not be accepted or normalized. The digest also binds
+`intent=initial_approval` and
+`vectorHashVersion=simulation_scenario_vector_hash_v1` so a different action or
+hash policy cannot reuse the same confirmation envelope. The vector hash
+version remains conditional on the blocking hash gate above.
+
+`writeSafetyApprovalCommit`, `contractApprovalCommit`, Markdown paths, and Git
+review provenance are deliberately excluded. They document review history;
+they are not runtime approval-envelope authority.
 
 The envelope digest includes owner and vector evidence internally but is not
 returned. It is distinct from `scenarioVectorHash`, challenge identity, lock
@@ -364,13 +424,15 @@ Focused tests must cover:
 5. duplicate, reversed, and punctuation-sensitive ASCII instrument order;
 6. invalid numeric weights, overflow-safe integer total, and no
    renormalization;
-7. existing scenario-vector hash compatibility and independent envelope hash
-   sensitivity to owner, policy, scenario, vector, and confirmation policy;
+7. post-gate scenario-vector hash compatibility and independent envelope hash
+   sensitivity to actor mode, confirmation policy, intent, owner, policy,
+   scenario, vector-hash version, scenario-vector hash, and complete vector;
 8. exact UTC boundaries, leap-year dates, invalid dates, offsets, missing
    milliseconds, year bounds, and no current-clock read;
 9. every actor and minimal durable-state enum, including `unknown`;
 10. challenge state, synthetic instance, owner binding, and envelope mismatch;
-11. oversized strings and 32-KiB canonical input rejection before hashing;
+11. oversized per-field rejection before hashing, a maximum-shape valid input
+    remaining below 32 KiB, and the forward-compatibility cap remaining pinned;
 12. input arrays/rows unchanged after success and failure;
 13. output and nested arrays/objects frozen;
 14. getter values read once and dangerous coercion hooks never invoked;
@@ -421,6 +483,7 @@ slice.
 
 Implementation must stop without widening scope if:
 
+- the separate deterministic vector-hash gate is not completed;
 - existing scenario hash fixtures would change;
 - a valid planner input requires more than the approved caps;
 - the envelope digest cannot be defined without changing approved semantics;
@@ -462,6 +525,11 @@ implementation plan:
 8. snapshot-once, no-coercion, mutation, and freeze rules;
 9. synthetic-only fixture and full focused-test matrix; and
 10. the forbidden dependency, verification, and stop boundaries.
+
+This packet should not receive implementation approval before the separate
+vector-hash determinism decision and its compatibility-verified implementation
+are complete. Review may accept the remaining planner design while keeping the
+source/test gate blocked.
 
 Approval would authorize only the listed local source/test implementation and
 verification commands. It would not authorize schema, DB, auth, repository,
