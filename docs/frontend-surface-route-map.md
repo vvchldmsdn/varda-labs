@@ -1,6 +1,6 @@
 # Frontend Surface Route Map
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 Status: route inventory and verification log. This document does not itself
 call providers, execute dry-runs, write data, change Cron behavior, change
@@ -20,11 +20,12 @@ route candidates.
 
 Current route coverage is Home (`/`), Today movement (`/today`), Portfolio
 structure (`/portfolio/structure` and `/portfolio/risk`), History
-(`/history`), and aggregate KODEX 200 and VOO Investment Lab comparisons
-(`/investment-lab`). Investment Lab also has an ephemeral historical
+(`/history`), aggregate KODEX 200 and VOO Investment Lab comparisons
+(`/investment-lab`), and read-only Simulation Validation market-input readiness
+(`/simulation`). Investment Lab also has an ephemeral historical
 contribution-impact experiment over those fixed scenarios. The actionable,
-account-specific Additional contribution flow and Simulation validation remain
-placeholders and require independent runtime authority. They must not be
+account-specific Additional contribution flow and actual simulation execution
+remain deferred and require independent runtime authority. They must not be
 inferred from the old Goal/Cashflow schema.
 
 ETF reference, Market Context, and Market Sync are supporting reference or
@@ -68,6 +69,7 @@ Current route decisions:
 | `/portfolio/structure` | Product/evidence hybrid labeled `자산 배분`. It is allocation-only, not the legacy ENB/Sharpe/correlation screen. Internal and legacy ids must stay hidden. |
 | `/portfolio/risk` | Product/evidence hybrid labeled `포트폴리오 위험·분산`. Internal and legacy ids stay hidden; nullable metrics retain `n/a` and an explicit reason. |
 | `/history` | Product-facing history evidence. Legacy ids should stay hidden in the default table. |
+| `/simulation` | Product-facing market-input readiness evidence. Hashes, internal ids, raw prices, and FX values stay outside the UI DTO. |
 | `/etfs` | Product-facing ETF reference. Holdings raw-row details no longer display `legacyBase44Id`; future diagnostic legacy evidence belongs in admin/debug context. |
 | `/market` | Current read-only data-quality surface. Duplicate-regime selected legacy id is temporarily allowed as diagnostic evidence, but must be hidden or moved before product-facing polish. |
 | `/admin/market-sync` | Operator status surface. Operational ids and run metadata can be shown when useful, but secrets, auth headers, raw provider responses, and secret-shaped metadata remain prohibited. |
@@ -82,6 +84,7 @@ Current route decisions:
 | `/portfolio/risk` | Minimal read-only current-portfolio risk and diversification surface. Supports account and 30/90/252-day URL filters, explicit complete/standalone/unavailable states, portfolio metrics, per-instrument risk, current/stress correlation matrices, and data health. | `src/app/portfolio/risk/page.tsx`, `getReadOnlyPortfolioRisk`, `PortfolioRiskView`, pure portfolio-risk input/math/read-model modules. Reads `assets`, `asset_price_snapshots`, and `fx_rates`. | Basic Auth via `src/proxy.ts` `/portfolio/:path*`. | Server Component direct DB read. No browser REST refetch, provider call, mutation, schema, snapshot, or Cron change. | Local and deployed production smoke: dashboard and route no-auth 401; dashboard and four risk states auth 200; sidebar keeps `자산 배분` then adds `위험·분산`; leak and overflow-contract checks pass; DB counts unchanged. Build/test/lint pass. | Gold proxy and historical risk-free source remain separate future data-policy decisions. | Portfolio Risk v1 is closed; choose the next migration slice separately. |
 | `/history` | Read-only balance and portfolio history evidence. Supports account/lane URL filters, explicitly separates balance dates from snapshot dates, and labels stored versus display-only derived aggregates. Historical values are not recomputed under the current asset policy. | `src/app/history/page.tsx`, `getReadOnlyHistoryBalance`, `history-balance` helpers, and `src/components/history/*`. Reads `account_balance_snapshots` and `daily_portfolio_snapshots`; can derive display-only `all` rows when stored rows are absent. | Basic Auth via `src/proxy.ts`. | Server Component direct DB read. No browser refetch or write. Public DTOs do not select DB UUIDs. | Dedicated local and production smoke covers dashboard/history 401/200, account/lane section states, stored/derived markers, full-response ID/secret leakage, table overflow ownership, and DB counts unchanged. | No chart, interpolation, position drilldown, third history source, or historical rewrite. | History Read-only v1 is closed; choose the next product boundary separately. |
 | `/investment-lab` | Read-only aggregate counterfactual comparing the observed all-account invested-position path with all-KODEX-200 and all-VOO paths under the same dated KRW buy/sell amounts. Shows separately guarded Modified Dietz estimates and an ephemeral historical contribution-impact experiment over those two fixed paths. | `src/app/investment-lab/page.tsx`, `getReadOnlyInvestmentLabCounterfactual`, read loader/model, return-evidence guard, return-estimate composers, pure Modified Dietz helper, VOO evidence resolver, deterministic KODEX/VOO path engines, contribution evidence projector, pure contribution calculator, and a narrow Client Component for local input. Reads event, account snapshot/cash/FX, KODEX/VOO close, and FX projections in parallel. | Basic Auth via `src/proxy.ts`. | Server Component direct DB read and pure calculation. Only amount/date/scenario interaction is client-side and remains in memory. No browser refetch, URL persistence, provider, mutation, schema, job, or persistence. | Build/test/lint pass. Production-mode smoke additionally requires at least one complete fixed contribution scenario and two when VOO is ready, while retaining leak and DB side-effect checks. | Aggregate `all` only. The contribution experiment is not the actionable account-specific Additional Contribution allocator. Account-specific paths remain blocked by three unattributed events. Exact flow-time TWR, total-return parity, fixed vectors, scheduled rebalancing, optimization, and transaction costs remain deferred. | Run local and deployed route smoke, then choose the next product slice without widening to runtime vector authority. |
+| `/simulation` | Read-only Simulation Validation market-input readiness. Checks KODEX 200 and VOO independently for an exact end service date and 90 return steps. | `src/app/simulation/page.tsx`, `getReadOnlySimulationInputReadiness`, existing server-only period preflight, pure readiness projection, and `SimulationInputReadinessView`. Reads adjusted-close and required USD/KRW evidence with explicit projections. | Basic Auth via `src/proxy.ts`. | Server Component direct DB read. No browser refetch, provider, mutation, simulation execution, vector resolver, job, or persistence. | Pure model and route-boundary tests plus dedicated local/production smoke. The smoke accepts only `matrix_ready` or `unavailable`, scans for leaks, and compares DB row counts. | Market-data readiness only. It does not expose fan paths, percentiles, initial capital, account selection, target weights, recommendation, or optimization. Exact-endpoint misses are not rolled back automatically; the user can explicitly re-run a prior observed date through `?end=YYYY-MM-DD`. | Verify deployed readiness for both the current service cycle and one explicit observed endpoint before designing execution runtime. |
 | `/etfs` | Read-only ETF reference and holdings lookthrough. Search/select ETF master and view grouped holdings. | `src/app/etfs/page.tsx`, `searchReadOnlyEtfMasters`, `getReadOnlyEtfHoldings`, `etf-holdings` grouping helpers. Reads `etf_masters` and `etf_holdings`. | Basic Auth via `src/proxy.ts`. | Read-only render. | Build/lint/test pass with current route. Earlier production smoke verified route access, but not after every dashboard-only change. | Holdings raw-row details no longer display `legacyBase44Id`. If diagnostic legacy evidence is needed later, expose it only in an admin/debug context. | Focused `/etfs` visual smoke and product-facing table review. |
 | `/market` | Read-only market context page for benchmarks, regime rows, duplicate regime groups, and global factors. | `src/app/market/page.tsx`, `getReadOnlyMarketContext`, `market-context` helpers. Reads `benchmark_snapshots`, `market_regime_daily`, and `global_market_factors`. | Basic Auth via `src/proxy.ts`. | Read-only render. | Prior smoke covered no-auth/auth, expected markers, and no side effects. | Duplicate regime diagnostics still expose selected legacy ids in the duplicate section. That is acceptable only as admin/evidence text, not polished product UI. | Keep read-only. If this becomes user-facing, hide legacy identifiers and add visual smoke. |
 | `/admin/market-sync` | Status-only operator console for market data freshness, close coverage, FX status, snapshot evidence, KIS cooldown, recent sync metadata, and manual boundary hints. | `src/app/admin/market-sync/page.tsx`, `getAdminMarketSyncStatus`, `admin-market-sync-status` helpers. Reads stored DB state including `assets`, `asset_price_snapshots`, `fx_rates`, `daily_position_snapshots`, `daily_portfolio_snapshots`, and `market_data_sync_runs`. | Basic Auth via `src/proxy.ts`; under `/admin/:path*`. | Read-only render. Must not call providers, dry-run routes, or write routes. | Prior status page checks showed status-only behavior and no render-time provider/write calls. | This is not an action console. Manual action buttons remain intentionally absent. | Keep as status-only until a separate reviewed admin action contract is approved. |
@@ -108,6 +111,8 @@ Closed enough for now:
 - `/portfolio/risk` pure input/math/read model, server-only DB adapter, minimal
   Server Component route, and local protected render smoke.
 - `/admin/market-sync` as a status-only operator page.
+- `/simulation` as a read-only independent KODEX 200/VOO market-input
+  readiness surface, without execution or recommendation authority.
 
 Do next only after user visual review or explicit direction:
 
@@ -127,3 +132,5 @@ Still deferred:
 - Snapshot/Cron forecast-calendar correction until a separate no-write review.
 - Cron automation changes.
 - Schema/migration changes for frontend-only work.
+- Simulation fan charts, percentile results, initial-KRW scaling, optimizer,
+  recommendation, and persisted run artifacts until runtime trust is established.

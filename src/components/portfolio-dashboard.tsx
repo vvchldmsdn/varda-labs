@@ -24,7 +24,7 @@ const navItems: { label: string; href?: string }[] = [
   { label: "위험·분산", href: "/portfolio/risk" },
   { label: "히스토리", href: "/history" },
   { label: "투자랩", href: "/investment-lab" },
-  { label: "시뮬레이션 검증" },
+  { label: "시뮬레이션 검증", href: "/simulation" },
   { label: "설정" },
 ];
 

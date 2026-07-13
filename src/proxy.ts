@@ -50,6 +50,8 @@ export const config = {
     "/investment-lab/:path*",
     "/market",
     "/market/:path*",
+    "/simulation",
+    "/simulation/:path*",
     "/today",
     "/today/:path*",
   ],

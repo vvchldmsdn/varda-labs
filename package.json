@@ -11,6 +11,7 @@
     "smoke:portfolio-risk-route": "node --no-warnings scripts/smoke-portfolio-risk-route.mjs",
     "smoke:history-route": "node --no-warnings scripts/smoke-history-route.mjs",
     "smoke:investment-lab-route": "node --no-warnings scripts/smoke-investment-lab-route.mjs",
+    "smoke:simulation-route": "node --no-warnings scripts/smoke-simulation-route.mjs",
     "smoke:entity-api-boundary": "node --no-warnings scripts/smoke-entity-api-boundary.mjs",
     "rehearse:tenant-expand": "node --no-warnings scripts/rehearse-tenant-expand.mjs",
     "rehearse:curated-vector-schema": "node --no-warnings scripts/rehearse-curated-vector-schema.mjs",
