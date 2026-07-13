@@ -269,20 +269,43 @@ This docs-only Gate 0 does not:
   behavior; or
 - make the existing research vector a runtime source.
 
-## Review Questions Before Implementation Planning
+## Resolved Semantics And Remaining Runtime Preconditions
 
-The next review must explicitly decide:
+The following docs-only semantics are already resolved and must not be
+reopened by this Gate 0:
 
-1. whether the first supported actor mode is tenant self-approval, reviewed
-   operator approval, or neither;
-2. the exact explicit-confirmation evidence and expiry boundary;
-3. the finite maximum vector-row count;
-4. exact-identity lock-key derivation and transaction isolation behavior;
-5. timeout, no-retry or bounded-retry policy, and typed conflict semantics;
-6. whether actor audit requires a separate persistence model; and
-7. whether a pure, I/O-free `would_admit` planner is useful before any writer
-   contract is drafted.
+1. the first actor mode is `tenant_self_approval_v1`, while reviewed operator
+   approval remains disabled without a fallback path;
+2. explicit confirmation uses a server-minted exact challenge valid for 10
+   minutes over `[issuedAt, expiresAt)`, with atomic consumption and committed
+   receipt semantics;
+3. the complete source vector contains 1 through 64 rows, including explicit
+   zero-bps rows;
+4. write safety uses the approved exact-identity lock input, PostgreSQL
+   `READ COMMITTED`, a 2-second lock timeout, an 8-second statement timeout,
+   zero automatic retries, and typed conflict and recovery meanings; and
+5. the pure I/O-free synthetic planner is implemented, but reports only
+   `synthetic_only` precondition evidence with runtime trust `not_established`
+   and readiness `not_ready`.
 
-Only a later explicit approval may select those decisions. After that, a
-separate implementation packet must still precede any source, database,
-runtime, API, UI, auth, or data-row change.
+Those decisions grant no runtime authority. The following physical and runtime
+preconditions still require separate contracts, implementation scopes, and
+verification before approval admission can become ready:
+
+1. a production session adapter that resolves one verified active provider
+   identity to one active app user and an internal `TenantContext`;
+2. a physical durable challenge and committed-receipt model with owner,
+   envelope, lifecycle, uniqueness, retention, and terminal-state invariants;
+3. a concrete repository and transaction writer, including advisory-lock SQL,
+   transaction-time revalidation, revision allocation, atomic lifecycle
+   writes, rollback behavior, and receipt recovery;
+4. sanitized runtime result projections and same-owner authorization without
+   exposing owner ids, provider subjects, challenge material, hashes, rows,
+   advisory keys, or raw database errors;
+5. concurrency, replay, cross-owner, timeout, rollback, unknown-commit, and
+   two-user integration tests; and
+6. a separate actor-audit and authentication review before any operator mode
+   can be considered.
+
+No source, schema, database, auth, runtime, API, UI, or data-row change is
+authorized by this factual status correction.
