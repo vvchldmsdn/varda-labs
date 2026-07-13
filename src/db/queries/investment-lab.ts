@@ -8,6 +8,7 @@ import {
   assets,
   dailyPortfolioSnapshots,
   eventLedgerEntries,
+  fxRates,
 } from "@/db/schema";
 import {
   loadInvestmentLabCounterfactualReadModel,
@@ -62,7 +63,9 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       .select({
         snapshotDate: dailyPortfolioSnapshots.snapshotDate,
         account: dailyPortfolioSnapshots.account,
+        cashValue: dailyPortfolioSnapshots.cashValue,
         totalMarketValue: dailyPortfolioSnapshots.totalMarketValue,
+        usdKrw: dailyPortfolioSnapshots.usdKrw,
       })
       .from(dailyPortfolioSnapshots)
       .where(
@@ -78,24 +81,57 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
   },
 
   async loadScenarioCloses() {
+    return loadScenarioCloseRows("069500", "korea", "KRW");
+  },
+
+  async loadVooCloses() {
+    return loadScenarioCloseRows("VOO", "us", "USD");
+  },
+
+  async loadFxRows() {
     return db
       .select({
-        priceDate: assetPriceSnapshots.priceDate,
-        closePrice: assetPriceSnapshots.closePrice,
-        adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+        rateDate: fxRates.rateDate,
+        usdKrw: fxRates.usdKrw,
+        status: fxRates.status,
       })
-      .from(assetPriceSnapshots)
-      .where(
-        and(
-          eq(assetPriceSnapshots.isSample, false),
-          eq(sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`, "069500"),
-          eq(sql<string>`lower(trim(${assetPriceSnapshots.market}))`, "korea"),
-          eq(sql<string>`upper(trim(${assetPriceSnapshots.currency}))`, "KRW"),
-        ),
-      )
-      .orderBy(asc(assetPriceSnapshots.priceDate));
+      .from(fxRates)
+      .where(eq(fxRates.isSample, false))
+      .orderBy(asc(fxRates.rateDate));
   },
 };
+
+function loadScenarioCloseRows(
+  ticker: string,
+  market: string,
+  currency: string,
+) {
+  return db
+    .select({
+      priceDate: assetPriceSnapshots.priceDate,
+      closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+    })
+    .from(assetPriceSnapshots)
+    .where(
+      and(
+        eq(assetPriceSnapshots.isSample, false),
+        eq(
+          sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+          ticker.toUpperCase(),
+        ),
+        eq(
+          sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
+          market.toLowerCase(),
+        ),
+        eq(
+          sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
+          currency.toUpperCase(),
+        ),
+      ),
+    )
+    .orderBy(asc(assetPriceSnapshots.priceDate));
+}
 
 export async function getReadOnlyInvestmentLabCounterfactual() {
   return loadInvestmentLabCounterfactualReadModel(

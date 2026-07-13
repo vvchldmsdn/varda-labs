@@ -18,6 +18,7 @@ export function InvestmentLabView({
       data-pending-at-end={model.coverage.pendingAtEndRows}
       data-return-status={model.returnEstimate?.status ?? "unavailable"}
       data-scenario-close-rows={model.coverage.scenarioCloseRows}
+      data-voo-readiness={model.vooReadiness?.status ?? "unavailable"}
     >
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
         <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
@@ -88,6 +89,8 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
       </section>
 
       <ReturnEstimateSection model={model} />
+
+      <VooReadinessSection model={model} />
 
       <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -246,6 +249,71 @@ function ReturnEstimateSection({
   );
 }
 
+function VooReadinessSection({
+  model,
+}: {
+  model: InvestmentLabCounterfactualReadModel;
+}) {
+  const readiness = model.vooReadiness;
+  if (!readiness) return null;
+
+  return (
+    <section
+      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      data-voo-execution-fx-ready={readiness.executionFxReadyCount}
+      data-voo-relevant-flows={readiness.relevantFlowCount}
+      data-voo-service-dates={readiness.serviceDateCount}
+      data-voo-snapshot-fx-ready={readiness.snapshotFxReadyCount}
+      data-voo-valuation-price-ready={readiness.valuationPriceReadyCount}
+    >
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">전액 VOO 비교 준비도</h2>
+          <p className="mt-1 text-sm text-[#687064]">
+            미국 종가·환율·체결일 증거가 모두 맞을 때만 다음 단계에서 경로를 계산합니다.
+          </p>
+        </div>
+        <p
+          className={
+            readiness.status === "ready"
+              ? "text-sm font-semibold text-[#087f4f]"
+              : "text-sm font-semibold text-[#9a6b18]"
+          }
+        >
+          {readiness.status === "ready" ? "계산 입력 준비" : "증거 보완 필요"}
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ReadinessMetric
+          label="VOO 평가 종가"
+          value={`${readiness.valuationPriceReadyCount}/${readiness.serviceDateCount}`}
+          detail="미국 거래일 raw close"
+        />
+        <ReadinessMetric
+          label="평가 환율"
+          value={`${readiness.snapshotFxReadyCount}/${readiness.serviceDateCount}`}
+          detail="저장 snapshot USD/KRW"
+        />
+        <ReadinessMetric
+          label="체결 환율"
+          value={`${readiness.executionFxReadyCount}/${readiness.relevantFlowCount}`}
+          detail="체결 가격일 exact FX"
+        />
+      </div>
+      <p className="mt-3 text-xs leading-5 text-[#777e73]">
+        실제 포트폴리오와 같은 가격수익 기준을 위해 VOO raw close를 사용하고 배당 재투자는 제외합니다. 준비 전에는 부분 경로나 추정값을 표시하지 않습니다.
+      </p>
+      {readiness.blockers.length > 0 ? (
+        <ul className="mt-3 space-y-1 text-sm text-[#725f2d]">
+          {readiness.blockers.map((blocker) => (
+            <li key={blocker}>{vooReadinessBlockerLabel(blocker)}</li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 function BlockedView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
   return (
     <section className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-5">
@@ -346,6 +414,24 @@ function ReturnMetricCell({
   );
 }
 
+function ReadinessMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="border-l-2 border-[#cfd7c7] pl-3">
+      <p className="text-sm text-[#687064]">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-[#777e73]">{detail}</p>
+    </div>
+  );
+}
+
 function blockerLabel(blocker: string) {
   const labels: Record<string, string> = {
     snapshot_evidence_invalid: "평가 스냅샷 형식 또는 중복을 확인해야 합니다.",
@@ -367,8 +453,34 @@ function returnBlockerLabel(blocker: string) {
     price_basis_mismatch: "종가와 조정종가 기준이 섞여 있어 동일 기준 비교가 아닙니다.",
     actual_return_calculation_blocked: "실제 포트폴리오 수익률 입력을 확인해야 합니다.",
     scenario_return_calculation_blocked: "KODEX 200 수익률 입력을 확인해야 합니다.",
+    cash_evidence_unavailable: "평가일별 현금 제외 근거를 확인할 수 없습니다.",
+    nonzero_cash_evidence: "현금이 있는 구간의 수익률 정책이 아직 확정되지 않았습니다.",
+    ambiguous_position_metadata_event:
+      "자산 추가·제외 이벤트에 재무 값이 섞여 있어 별도 분류가 필요합니다.",
+    unmodeled_return_event: "수익률에 영향을 줄 수 있는 미분류 이벤트가 있습니다.",
   };
   return labels[blocker] ?? "수익률 계산 입력을 확인해야 합니다.";
+}
+
+function vooReadinessBlockerLabel(blocker: string) {
+  const labels: Record<string, string> = {
+    invalid_service_date_axis: "비교 평가일 축을 확인해야 합니다.",
+    missing_valuation_price: "일부 평가일의 미국 거래일 종가가 없습니다.",
+    duplicate_valuation_price: "같은 날짜의 VOO 종가가 중복되어 있습니다.",
+    invalid_valuation_price: "사용할 수 없는 VOO 종가가 있습니다.",
+    missing_snapshot_fx: "일부 평가일의 저장 환율이 없습니다.",
+    ambiguous_snapshot_fx: "같은 평가일의 계좌별 환율이 일치하지 않습니다.",
+    invalid_flow_date: "거래 기준일을 확인해야 합니다.",
+    missing_execution_price: "거래 이후 체결 가능한 VOO 종가가 없습니다.",
+    duplicate_execution_price: "체결 기준일의 VOO 종가가 중복되어 있습니다.",
+    invalid_execution_price: "체결 기준일의 VOO 종가를 사용할 수 없습니다.",
+    execution_price_too_late: "거래와 체결 가능일 간격이 허용 범위를 넘었습니다.",
+    execution_after_window: "비교 종료일까지 체결되지 않는 거래가 있습니다.",
+    missing_execution_fx: "일부 체결 가격일의 USD/KRW가 없습니다.",
+    duplicate_execution_fx: "일부 체결 가격일의 USD/KRW가 중복되어 있습니다.",
+    invalid_execution_fx: "일부 체결 가격일의 USD/KRW를 사용할 수 없습니다.",
+  };
+  return labels[blocker] ?? "VOO 비교 입력을 확인해야 합니다.";
 }
 
 function formatDate(value: string) {

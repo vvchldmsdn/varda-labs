@@ -31,6 +31,10 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.returnEstimate.periodCount, 3);
     assert.equal(result.returnEstimate.actualFlowCount, 3);
     assert.equal(result.returnEstimate.scenarioFlowCount, 3);
+    assert.equal(result.returnEstimate.evidence.status, "ready");
+    assert.equal(result.vooReadiness.status, "ready");
+    assert.equal(result.vooReadiness.valuationPriceReadyCount, 4);
+    assert.equal(result.vooReadiness.snapshotFxReadyCount, 4);
   });
 
   it("blocks duplicate snapshot evidence without returning partial values", () => {
@@ -100,6 +104,47 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.returnEstimate.basisMismatchRows, 1);
   });
 
+  it("blocks only the return estimate when cash evidence is nonzero", () => {
+    const source = fixture();
+    source.snapshotRows[0] = { ...source.snapshotRows[0], cashValue: 1 };
+    const result = buildInvestmentLabCounterfactualReadModel(source);
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.rows.length, 4);
+    assert.equal(result.returnEstimate.status, "blocked");
+    assert.deepEqual(result.returnEstimate.blockers, [
+      "nonzero_cash_evidence",
+    ]);
+  });
+
+  it("blocks only the return estimate for financial lifecycle payload", () => {
+    const source = fixture();
+    const index = source.eventRows.findIndex(
+      (row) => row.eventType === "asset_added",
+    );
+    source.eventRows[index] = { ...source.eventRows[index], amountKrw: 1 };
+    const result = buildInvestmentLabCounterfactualReadModel(source);
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.returnEstimate.status, "blocked");
+    assert.deepEqual(result.returnEstimate.blockers, [
+      "ambiguous_position_metadata_event",
+    ]);
+  });
+
+  it("keeps KODEX results while VOO evidence is unavailable", () => {
+    const source = fixture();
+    source.fxRows = [];
+    const result = buildInvestmentLabCounterfactualReadModel(source);
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.returnEstimate.status, "ready");
+    assert.equal(result.vooReadiness.status, "unavailable");
+    assert.deepEqual(result.vooReadiness.blockers, [
+      "missing_execution_fx",
+    ]);
+  });
+
   it("keeps internal identifiers and secret-shaped fields out of the model", () => {
     const serialized = JSON.stringify(
       buildInvestmentLabCounterfactualReadModel(fixture()),
@@ -139,21 +184,49 @@ function fixture() {
       event("2026-01-03", 0, "buy", 220),
       event("2026-01-04", 1, "sell", 110),
       event("2026-01-06", 2, "buy", 121),
-      event("2026-01-06", 3, "asset_added", null),
+      event("2026-01-04", 3, "asset_added", null),
     ],
     closeRows: [
       { priceDate: "2026-01-01", closePrice: 100, adjustedClosePrice: 100 },
       { priceDate: "2026-01-05", closePrice: 110, adjustedClosePrice: 110 },
       { priceDate: "2026-01-06", closePrice: 121, adjustedClosePrice: 121 },
     ],
+    vooCloseRows: [
+      { priceDate: "2025-12-31", closePrice: 100, adjustedClosePrice: 101 },
+      { priceDate: "2026-01-02", closePrice: 101, adjustedClosePrice: 102 },
+      { priceDate: "2026-01-05", closePrice: 102, adjustedClosePrice: 103 },
+      { priceDate: "2026-01-06", closePrice: 103, adjustedClosePrice: 104 },
+    ],
+    fxRows: [
+      { rateDate: "2026-01-05", usdKrw: 1_300, status: "ok" },
+      { rateDate: "2026-01-06", usdKrw: 1_301, status: "ok" },
+    ],
   };
 }
 
 function snapshotDate(snapshotDate, total) {
   return [
-    { snapshotDate, account: "brokerage", totalMarketValue: total * 0.5 },
-    { snapshotDate, account: "isa", totalMarketValue: total * 0.3 },
-    { snapshotDate, account: "irp", totalMarketValue: total * 0.2 },
+    {
+      snapshotDate,
+      account: "brokerage",
+      cashValue: 0,
+      totalMarketValue: total * 0.5,
+      usdKrw: 1_300,
+    },
+    {
+      snapshotDate,
+      account: "isa",
+      cashValue: 0,
+      totalMarketValue: total * 0.3,
+      usdKrw: 1_300,
+    },
+    {
+      snapshotDate,
+      account: "irp",
+      cashValue: 0,
+      totalMarketValue: total * 0.2,
+      usdKrw: 1_300,
+    },
   ];
 }
 

@@ -2,6 +2,13 @@ import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
 } from "./investment-lab-modified-dietz.ts";
+import {
+  validateInvestmentLabReturnEvidence,
+  type InvestmentLabReturnEvidenceBlocker,
+  type InvestmentLabReturnEvidenceEvent,
+  type InvestmentLabReturnEvidenceResult,
+  type InvestmentLabReturnEvidenceSnapshot,
+} from "./investment-lab-return-evidence.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
 
 export const INVESTMENT_LAB_RETURN_BASIS_POLICY = Object.freeze({
@@ -45,6 +52,7 @@ type PriceBasisRow = Readonly<{
 }>;
 
 export type InvestmentLabReturnEstimateBlocker =
+  | InvestmentLabReturnEvidenceBlocker
   | "valuation_axis_mismatch"
   | "price_basis_unavailable"
   | "price_basis_mismatch"
@@ -65,6 +73,7 @@ export type InvestmentLabReturnEstimate =
       basisRowCount: number;
       basisMismatchRows: 0;
       basisUnavailableRows: 0;
+      evidence: InvestmentLabReturnEvidenceResult;
       blockers: readonly [];
     }>
   | Readonly<{
@@ -80,6 +89,7 @@ export type InvestmentLabReturnEstimate =
       basisRowCount: number;
       basisMismatchRows: number;
       basisUnavailableRows: number;
+      evidence: InvestmentLabReturnEvidenceResult | null;
       blockers: readonly InvestmentLabReturnEstimateBlocker[];
     }>;
 
@@ -89,6 +99,8 @@ export function buildInvestmentLabReturnEstimate(input: {
   boundaryFlows: readonly BoundaryFlow[];
   appliedFlows: readonly AppliedFlow[];
   priceRows: readonly PriceBasisRow[];
+  snapshotRows: readonly InvestmentLabReturnEvidenceSnapshot[];
+  eventRows: readonly InvestmentLabReturnEvidenceEvent[];
 }): InvestmentLabReturnEstimate {
   const axisMatches =
     input.actualRows.length === input.scenarioRows.length &&
@@ -137,20 +149,39 @@ export function buildInvestmentLabReturnEstimate(input: {
   }
 
   const actualFlows = input.boundaryFlows
-    .filter((flow) => flow.eventDate > startServiceDate)
     .map((flow) => ({
       effectiveServiceDate: mapRiskEvidenceDateToServiceDate(flow.eventDate),
       sequence: flow.sequence,
       direction: flow.direction,
       amountKrw: flow.amountKrw,
     }))
-    .filter((flow) => flow.effectiveServiceDate <= endServiceDate);
+    .filter(
+      (flow) =>
+        flow.effectiveServiceDate > startServiceDate &&
+        flow.effectiveServiceDate <= endServiceDate,
+    );
   const scenarioFlows = input.appliedFlows.map((flow) => ({
     effectiveServiceDate: flow.executionServiceDate,
     sequence: flow.sourceIndex,
     direction: flow.direction,
     amountKrw: flow.amountKrw,
   }));
+  const evidence = validateInvestmentLabReturnEvidence({
+    serviceDates: input.actualRows.map((row) => row.serviceDate),
+    snapshotRows: input.snapshotRows,
+    eventRows: input.eventRows,
+  });
+  if (evidence.status !== "ready") {
+    return blockedEstimate({
+      blockers: evidence.blockers,
+      actualFlowCount: actualFlows.length,
+      scenarioFlowCount: scenarioFlows.length,
+      basisRowCount: basisRows.length,
+      basisMismatchRows,
+      basisUnavailableRows,
+      evidence,
+    });
+  }
 
   const basisBlockers: InvestmentLabReturnEstimateBlocker[] = [];
   if (basisRows.length === 0 || basisUnavailableRows > 0) {
@@ -167,6 +198,7 @@ export function buildInvestmentLabReturnEstimate(input: {
       basisRowCount: basisRows.length,
       basisMismatchRows,
       basisUnavailableRows,
+      evidence,
     });
   }
 
@@ -199,6 +231,7 @@ export function buildInvestmentLabReturnEstimate(input: {
       basisRowCount: basisRows.length,
       basisMismatchRows,
       basisUnavailableRows,
+      evidence,
     });
   }
 
@@ -216,6 +249,7 @@ export function buildInvestmentLabReturnEstimate(input: {
     basisRowCount: basisRows.length,
     basisMismatchRows: 0,
     basisUnavailableRows: 0,
+    evidence,
     blockers: [] as const,
   });
 }
@@ -227,6 +261,7 @@ function blockedEstimate(input: {
   basisRowCount: number;
   basisMismatchRows: number;
   basisUnavailableRows: number;
+  evidence?: InvestmentLabReturnEvidenceResult | null;
 }): InvestmentLabReturnEstimate {
   return Object.freeze({
     status: "blocked",
@@ -241,6 +276,7 @@ function blockedEstimate(input: {
     basisRowCount: input.basisRowCount,
     basisMismatchRows: input.basisMismatchRows,
     basisUnavailableRows: input.basisUnavailableRows,
+    evidence: input.evidence ?? null,
     blockers: Object.freeze([...input.blockers]),
   });
 }

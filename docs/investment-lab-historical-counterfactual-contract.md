@@ -6,7 +6,8 @@ Status: Phase 1 aggregate KODEX200 deterministic path engine implemented and
 read-only audited. The aggregate read model and Server Component route are
 implemented without provider calls, schema changes, or database writes. A
 separate Modified Dietz cashflow-adjusted return estimate is implemented as a
-non-authoritative secondary projection.
+non-authoritative secondary projection. VOO remains path-disabled, but its
+raw-close, US-calendar, and FX evidence readiness is now visible.
 
 ## Product Decision
 
@@ -184,6 +185,11 @@ The 2026-07-11 read-only production audit found:
   window;
 - all 90 stored portfolio snapshot rows have zero cash value, and the event
   ledger has no dividend, fee, tax, deposit, or withdrawal rows.
+- the 5 in-window `asset_added` / `asset_removed` rows have no amount,
+  quantity, price, or FX payload and remain position metadata; a future row
+  with any such payload blocks only the return estimate;
+- VOO readiness covers 27 of 27 valuation dates, 27 of 27 snapshot FX dates,
+  and 38 of 38 relevant execution FX dates without displaying a partial path.
 
 Run `npm run audit:investment-lab-counterfactual` to refresh this evidence.
 Run `npm run audit:investment-lab-event-flow` to refresh event-flow evidence.
@@ -212,10 +218,39 @@ separately from path generation:
 8. Cash, distributions, transaction fees, and taxes are not separately
    modeled. The current output is therefore a price-basis estimate and makes
    no GIPS compliance claim.
+9. Each named-account snapshot date must carry explicit zero cash evidence.
+   Missing, duplicate, or nonzero cash blocks only the return estimate until a
+   versioned cash policy exists.
+10. `asset_added` and `asset_removed` are metadata only when amount, quantity,
+    price, and FX payloads are all absent or zero. Other economic event types,
+    corrections, or financial lifecycle payloads fail closed.
 
 The methodology follows the Modified Dietz daily-weighted cash-flow structure
 described by the [GIPS Standards Handbook for Firms](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/),
 while retaining the narrower evidence and labeling boundaries above.
+
+## VOO Evidence Readiness
+
+`investment_lab_voo_evidence_v1` is a readiness projection, not a VOO path or
+performance result:
+
+1. VOO uses raw close for a price-return comparison. Adjusted-close dividend
+   reinvestment is intentionally excluded because the actual portfolio path
+   does not yet model distributions.
+2. Every valuation service date maps to the expected prior US trading-date
+   close using the explicit US market calendar. A nearest or latest quote is
+   not substituted.
+3. Valuation FX comes from exact stored snapshot-date USD/KRW evidence and
+   requires brokerage, ISA, and IRP consensus.
+4. Each relevant flow maps to the first observed US close on or after the event
+   date within seven calendar days. Its FX must be one valid row on that exact
+   execution price date.
+5. Missing, duplicate, invalid, look-ahead, late, or post-window evidence makes
+   VOO unavailable. No partial VOO path or estimated value is rendered.
+
+The current production evidence passes this readiness contract, but path
+generation, VOO Modified Dietz output, transaction costs, and user-selectable
+scenario routing remain separate work.
 
 ## Execution Policy
 

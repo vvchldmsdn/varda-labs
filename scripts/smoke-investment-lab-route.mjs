@@ -41,6 +41,8 @@ async function main() {
     "현금흐름 조정 추정수익률",
     "Modified Dietz",
     "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
+    "전액 VOO 비교 준비도",
+    "준비 전에는 부분 경로나 추정값을 표시하지 않습니다",
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
@@ -73,12 +75,46 @@ async function main() {
     "data-scenario-close-rows",
   );
   const pendingAtEnd = readIntegerAttribute(route.body, "data-pending-at-end");
+  const vooReadiness = readStringAttribute(route.body, "data-voo-readiness");
+  const vooServiceDates = readIntegerAttribute(
+    route.body,
+    "data-voo-service-dates",
+  );
+  const vooValuationPrices = readIntegerAttribute(
+    route.body,
+    "data-voo-valuation-price-ready",
+  );
+  const vooSnapshotFx = readIntegerAttribute(
+    route.body,
+    "data-voo-snapshot-fx-ready",
+  );
+  const vooRelevantFlows = readIntegerAttribute(
+    route.body,
+    "data-voo-relevant-flows",
+  );
+  const vooExecutionFx = readIntegerAttribute(
+    route.body,
+    "data-voo-execution-fx-ready",
+  );
 
   assert.ok(comparisonDates >= 2, "comparison path needs at least two dates");
   assert.ok(appliedFlows >= 0, "applied flow count must be non-negative");
   assert.ok(delayedExecutions >= 0, "delayed count must be non-negative");
   assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
   assert.equal(pendingAtEnd, 0, "route must not publish an unfinished path");
+  assert.ok(
+    vooReadiness === "ready" || vooReadiness === "unavailable",
+    "VOO readiness must be explicit",
+  );
+  assert.equal(vooServiceDates, comparisonDates);
+  assert.ok(vooValuationPrices <= vooServiceDates);
+  assert.ok(vooSnapshotFx <= vooServiceDates);
+  assert.ok(vooExecutionFx <= vooRelevantFlows);
+  if (vooReadiness === "ready") {
+    assert.equal(vooValuationPrices, vooServiceDates);
+    assert.equal(vooSnapshotFx, vooServiceDates);
+    assert.equal(vooExecutionFx, vooRelevantFlows);
+  }
 
   console.log(
     JSON.stringify(
@@ -95,6 +131,12 @@ async function main() {
         pendingAtEnd,
         returnStatus: "ready",
         returnMethod: "modified_dietz_daily_weighted_eod_v1",
+        vooReadiness,
+        vooServiceDates,
+        vooValuationPrices,
+        vooSnapshotFx,
+        vooRelevantFlows,
+        vooExecutionFx,
         leakPatternMatches: 0,
         databaseSideEffects: false,
         counts: countsAfter,
@@ -134,6 +176,12 @@ function readIntegerAttribute(html, name) {
   const match = html.match(new RegExp(`${name}="(\\d+)"`));
   assert.ok(match, `route is missing numeric attribute: ${name}`);
   return Number(match[1]);
+}
+
+function readStringAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="([a-z_]+)"`));
+  assert.ok(match, `route is missing string attribute: ${name}`);
+  return match[1];
 }
 
 await main();
