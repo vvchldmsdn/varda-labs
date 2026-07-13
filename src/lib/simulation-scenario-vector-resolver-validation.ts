@@ -107,6 +107,12 @@ export function validateLoadedSimulationApproval(input: {
   ) {
     return blocked("approval_policy_mismatch");
   }
+  if (
+    record.scenarioVectorHashVersion !==
+    SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY.scenarioVectorHashVersion
+  ) {
+    return blocked("scenario_vector_hash_version_mismatch");
+  }
   if (record.lifecycleStatus !== "approved") {
     return blocked("approval_lifecycle_invalid");
   }
@@ -163,6 +169,8 @@ export function validateLoadedSimulationApproval(input: {
         scenarioId: record.scenarioId,
         scenarioVersion: record.scenarioVersion,
         canonicalVector: vectorResult.vector,
+        scenarioVectorHashVersion:
+          SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY.scenarioVectorHashVersion,
         scenarioVectorHash: vectorResult.scenarioVectorHash,
       }),
     }),

@@ -11,6 +11,7 @@ export const SIMULATION_APPROVAL_AUDIT_ENVELOPE_VERSION =
 
 export const SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY = Object.freeze({
   version: "simulation_scenario_vector_resolver_v1",
+  scenarioVectorHashVersion: "simulation_scenario_vector_hash_v1",
   portfolioPathPolicyId: SIMULATION_PORTFOLIO_PATH_POLICY_ID,
   gate0ApprovalCommit: SIMULATION_PORTFOLIO_PATH_GATE0_APPROVAL_COMMIT,
   selectorEquality: "exact_case_sensitive_canonical",

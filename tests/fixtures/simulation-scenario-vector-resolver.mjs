@@ -62,6 +62,8 @@ export function syntheticScenarioVectorResolverInput(options = {}) {
         scenarioId,
         scenarioVersion,
         canonicalVector,
+        scenarioVectorHashVersion:
+          SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY.scenarioVectorHashVersion,
         scenarioVectorHash,
         approvalRevision,
         approvedAt,

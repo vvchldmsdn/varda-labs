@@ -30,6 +30,7 @@ export type SimulationOwnerScopedApprovalRecord = Readonly<{
   scenarioId: string;
   scenarioVersion: string;
   canonicalVector: readonly SimulationScenarioVectorRow[];
+  scenarioVectorHashVersion: string;
   scenarioVectorHash: string;
   approvalRevision: number;
   approvedAt: string;
@@ -61,6 +62,7 @@ export type SimulationScenarioVectorEvidencePort = Readonly<{
   scenarioId: string;
   scenarioVersion: string;
   canonicalVector: readonly SimulationScenarioVectorRow[];
+  scenarioVectorHashVersion: "simulation_scenario_vector_hash_v1";
   scenarioVectorHash: string;
 }>;
 
@@ -81,6 +83,7 @@ export type SimulationScenarioVectorResolverBlockerReason =
   | "approval_revision_invalid"
   | "approval_audit_envelope_invalid"
   | "scenario_vector_invalid"
+  | "scenario_vector_hash_version_mismatch"
   | "scenario_vector_hash_mismatch";
 
 export type SimulationScenarioVectorResolverBlocker = Readonly<{

@@ -32,6 +32,7 @@ describe("Simulation scenario vector approval resolver", () => {
       "portfolioPathPolicyId",
       "scenarioId",
       "scenarioVectorHash",
+      "scenarioVectorHashVersion",
       "scenarioVersion",
     ]);
     assert.deepEqual(result.evidence.canonicalVector, [
@@ -252,6 +253,21 @@ describe("Simulation scenario vector approval resolver", () => {
     );
   });
 
+  it("rejects missing or non-v1 vector hash versions before hash validation", () => {
+    const missing = syntheticScenarioVectorResolverInput();
+    delete missing.repositoryResult.record.scenarioVectorHashVersion;
+    const v2 = syntheticScenarioVectorResolverInput();
+    v2.repositoryResult.record.scenarioVectorHashVersion =
+      "simulation_scenario_vector_hash_v2";
+
+    for (const input of [missing, v2]) {
+      assertBlocked(
+        resolveSimulationScenarioVectorApproval(input),
+        "scenario_vector_hash_version_mismatch",
+      );
+    }
+  });
+
   it("rejects terminal or unknown lifecycle values in a loaded state", () => {
     for (const lifecycleStatus of ["revoked", "superseded", "unknown"]) {
       const input = syntheticScenarioVectorResolverInput();
@@ -415,6 +431,10 @@ describe("Simulation scenario vector approval resolver", () => {
     assert.equal(
       SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY.repositoryAccess,
       "forbidden_in_pure_helper",
+    );
+    assert.equal(
+      SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY.scenarioVectorHashVersion,
+      "simulation_scenario_vector_hash_v1",
     );
     assert.equal(
       SIMULATION_SCENARIO_VECTOR_RESOLVER_POLICY.productionVectorAccess,

@@ -192,6 +192,7 @@ A future confirmation challenge must be server-minted and bound to:
 - `gate0ApprovalCommit`;
 - exact `scenarioId` and `scenarioVersion`;
 - the complete canonical vector row set, including zero-bps rows;
+- `scenarioVectorHashVersion`;
 - `scenarioVectorHash`;
 - a distinct canonical approval-envelope digest;
 - the confirmation policy id;
@@ -199,9 +200,12 @@ A future confirmation challenge must be server-minted and bound to:
 - a high-entropy single-use challenge-instance identity.
 
 The approval-envelope digest is distinct from `scenarioVectorHash`. It binds
-the owner-scoped approval context and confirmation policy as well as the vector
-content. It must not be reused as a vector hash, approval identity, runtime
-input hash, or public authorization token.
+the owner-scoped approval context, confirmation policy,
+`scenarioVectorHashVersion`, and vector content. Missing or different hash
+versions are different envelopes and may not be inferred from the digest text,
+policy, Gate 0 commit, or scenario version. The envelope digest must not be
+reused as a vector hash, approval identity, runtime input hash, or public
+authorization token.
 
 The raw challenge handle may be returned to the browser only as an opaque short-
 lived confirmation handle. It must contain no owner UUID, provider subject,

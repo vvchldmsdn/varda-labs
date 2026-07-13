@@ -33,17 +33,26 @@ Current approval admission is unconditionally:
 not_ready
 ```
 
-The three approval tables exist and are empty, but an empty schema is not a
-write capability. Current blockers are:
+The Stage III close-out recorded that the three approval tables existed and
+were empty at deployment. This docs-only gate does not perform a current
+database or provider read, so a future writer must reverify that state before
+any transaction. An empty schema is not a write capability. Current code and
+contract blockers are:
 
-- the only app user remains `provisioning`;
-- no active provider identity is linked to that user;
+- the latest reviewed identity baseline recorded one `provisioning` app user
+  and no active provider identity, but current durable state remains unverified
+  by this gate;
 - no production request adapter can produce a verified active
   `TenantContext`;
 - Basic Auth is a shared outer access gate, not a user or operator identity;
 - admin and Cron secrets authorize machine boundaries but cannot select or
   impersonate a tenant;
 - no independently authenticated operator handoff exists;
+- the approval header has no durable `scenario_vector_hash_version`, so v2
+  approval persistence must remain blocked until the separate additive schema
+  amendment is approved and deployed;
+- the existing scenario-vector resolver is v1-only and no version-aware v2
+  repository/resolver path exists;
 - no runtime-trusted approval-admission planner, writer, repository
   transaction, or production confirmation adapter exists;
 - the implemented pure planner is fixed to `synthetic_only`, runtime trust
@@ -138,6 +147,7 @@ gate0ApprovalCommit
 scenarioId
 scenarioVersion
 canonicalVector[]
+scenarioVectorHashVersion
 scenarioVectorHash
 explicit confirmation evidence
 ```
@@ -166,14 +176,16 @@ A future runtime planner and writer must preserve this order:
 6. validate canonical instrument identities, exact order, uniqueness, integer
    weights, explicit zero-bps rows, non-empty rows, and an exact 10,000-bps
    total;
-7. recompute the canonical vector hash and compare it to the reviewed server
-   envelope;
-8. verify explicit confirmation for the exact canonical envelope and actor;
-9. enter one transaction serialized on the full exact approval identity;
-10. re-read current lifecycle evidence inside that transaction and validate
+7. require an explicitly supported durable vector-hash version without
+   inferring it from the digest, policy, commit, or scenario version;
+8. recompute the canonical vector hash with that exact implementation and
+   compare it to the reviewed server envelope;
+9. verify explicit confirmation for the exact canonical envelope and actor;
+10. enter one transaction serialized on the full exact approval identity;
+11. re-read current lifecycle evidence inside that transaction and validate
     the intended initial approval, supersession, revocation, or reapproval;
-11. allocate revision numbers and timestamps on the server; and
-12. commit the header, complete vector rows, and lifecycle event atomically.
+12. allocate revision numbers and timestamps on the server; and
+13. commit the header, complete vector rows, and lifecycle event atomically.
 
 No later validation may repair an earlier failure. The writer must not trim,
 sort, renormalize, fill missing rows, infer zero rows, choose the newest
