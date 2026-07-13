@@ -18,7 +18,8 @@ export const INVESTMENT_LAB_PATH_POLICY = Object.freeze({
   fractionalUnits: true,
   transactionCostsKrw: 0,
   maxValuationCarryDays: 7,
-  cashflowAdjustedReturn: "deferred_until_cashflow_fixture",
+  cashflowAdjustedReturn:
+    "separate_modified_dietz_daily_weighted_eod_v1",
 } as const);
 
 export type InvestmentLabActualPathPoint = Readonly<{

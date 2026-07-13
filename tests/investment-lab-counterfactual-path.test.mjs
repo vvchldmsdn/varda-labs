@@ -218,8 +218,11 @@ describe("investment lab deterministic counterfactual path", () => {
     );
   });
 
-  it("keeps TWR and execution costs outside this first path fixture", () => {
-    assert.equal(INVESTMENT_LAB_PATH_POLICY.cashflowAdjustedReturn, "deferred_until_cashflow_fixture");
+  it("keeps the return estimate separate from path generation", () => {
+    assert.equal(
+      INVESTMENT_LAB_PATH_POLICY.cashflowAdjustedReturn,
+      "separate_modified_dietz_daily_weighted_eod_v1",
+    );
     assert.equal(INVESTMENT_LAB_PATH_POLICY.transactionCostsKrw, 0);
     assert.equal(INVESTMENT_LAB_PATH_POLICY.fractionalUnits, true);
   });

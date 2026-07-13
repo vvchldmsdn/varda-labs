@@ -11,7 +11,13 @@ export function InvestmentLabView({
   return (
     <main
       className="min-h-screen bg-[#f3f4ef] text-[#171916]"
+      data-applied-flows={model.coverage.appliedFlowRows}
+      data-comparison-dates={model.coverage.completeComparisonDates}
+      data-delayed-executions={model.coverage.delayedExecutionRows}
       data-page="investment-lab"
+      data-pending-at-end={model.coverage.pendingAtEndRows}
+      data-return-status={model.returnEstimate?.status ?? "unavailable"}
+      data-scenario-close-rows={model.coverage.scenarioCloseRows}
     >
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
         <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
@@ -81,6 +87,8 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
         />
       </section>
 
+      <ReturnEstimateSection model={model} />
+
       <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -106,7 +114,7 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
           <div>
             <h2 className="text-lg font-semibold">비교 데이터</h2>
             <p className="mt-1 text-sm text-[#687064]">
-              현금흐름 조정 수익률은 아직 표시하지 않습니다.
+              평가액과 해당 시점에 사용된 KODEX 200 가격 기준일을 함께 확인합니다.
             </p>
           </div>
           <p className="text-sm text-[#687064]">
@@ -160,6 +168,81 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
         </div>
       </section>
     </>
+  );
+}
+
+function ReturnEstimateSection({
+  model,
+}: {
+  model: InvestmentLabCounterfactualReadModel;
+}) {
+  const estimate = model.returnEstimate;
+  if (!estimate || estimate.status === "blocked") {
+    return (
+      <section className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-4">
+        <h2 className="text-lg font-semibold text-[#5f5027]">
+          현금흐름 조정 추정수익률
+        </h2>
+        <p className="mt-2 text-sm text-[#725f2d]">
+          평가액 비교는 유지하지만 가격 기준 또는 계산 입력이 불충분해 수익률 추정치는 표시하지 않습니다.
+        </p>
+        {estimate ? (
+          <ul className="mt-3 space-y-1 text-sm text-[#725f2d]">
+            {estimate.blockers.map((blocker) => (
+              <li key={blocker}>{returnBlockerLabel(blocker)}</li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      data-return-method={estimate.method.version}
+    >
+      <div className="flex flex-col gap-1 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">현금흐름 조정 추정수익률</h2>
+          <p className="mt-1 text-sm text-[#687064]">
+            관측 평가일 사이의 일별 가중 현금흐름을 반영한 Modified Dietz 추정치
+          </p>
+        </div>
+        <p className="text-xs text-[#777e73]">
+          가격수익 기준 · 배당·수수료·세금 별도 반영 안 함
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ReturnMetricCell
+          label="실제 포트폴리오"
+          value={formatSignedPercent(estimate.actualReturn)}
+          detail={`${estimate.periodCount}개 구간 · 거래 ${estimate.actualFlowCount}건`}
+          tone={estimate.actualReturn >= 0 ? "positive" : "negative"}
+        />
+        <ReturnMetricCell
+          label="전액 KODEX 200"
+          value={formatSignedPercent(estimate.scenarioReturn)}
+          detail={`${estimate.periodCount}개 구간 · 체결 ${estimate.scenarioFlowCount}건`}
+          tone={estimate.scenarioReturn >= 0 ? "positive" : "negative"}
+        />
+        <ReturnMetricCell
+          label="수익률 차이"
+          value={formatSignedPercentagePoints(
+            estimate.differencePercentagePoints,
+          )}
+          detail="KODEX 200 - 실제"
+          tone={
+            estimate.differencePercentagePoints >= 0
+              ? "positive"
+              : "negative"
+          }
+        />
+      </div>
+      <p className="mt-3 text-xs leading-5 text-[#777e73]">
+        현금흐름 직전 전체 평가액이 없는 구간을 날짜 가중 방식으로 추정한 값이며, 정확한 일별 TWR 또는 총수익률을 의미하지 않습니다.
+      </p>
+    </section>
   );
 }
 
@@ -237,6 +320,32 @@ function EvidenceCell({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ReturnMetricCell({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: "positive" | "negative";
+}) {
+  return (
+    <div className="border-l-2 border-[#cfd7c7] pl-3">
+      <p className="text-sm text-[#687064]">{label}</p>
+      <p
+        className={`mt-1 text-xl font-semibold tabular-nums ${
+          tone === "positive" ? "text-[#087f4f]" : "text-[#c43d39]"
+        }`}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-xs text-[#777e73]">{detail}</p>
+    </div>
+  );
+}
+
 function blockerLabel(blocker: string) {
   const labels: Record<string, string> = {
     snapshot_evidence_invalid: "평가 스냅샷 형식 또는 중복을 확인해야 합니다.",
@@ -251,6 +360,17 @@ function blockerLabel(blocker: string) {
   return labels[blocker] ?? "입력 증거를 확인해야 합니다.";
 }
 
+function returnBlockerLabel(blocker: string) {
+  const labels: Record<string, string> = {
+    valuation_axis_mismatch: "실제 경로와 가상 경로의 평가일이 일치하지 않습니다.",
+    price_basis_unavailable: "비교 구간의 종가 기준을 확인할 수 없습니다.",
+    price_basis_mismatch: "종가와 조정종가 기준이 섞여 있어 동일 기준 비교가 아닙니다.",
+    actual_return_calculation_blocked: "실제 포트폴리오 수익률 입력을 확인해야 합니다.",
+    scenario_return_calculation_blocked: "KODEX 200 수익률 입력을 확인해야 합니다.",
+  };
+  return labels[blocker] ?? "수익률 계산 입력을 확인해야 합니다.";
+}
+
 function formatDate(value: string) {
   return value.replaceAll("-", ".");
 }
@@ -262,6 +382,16 @@ function formatKrw(value: number) {
 function formatSignedKrw(value: number) {
   if (Math.abs(value) < 0.5) return "₩0";
   return `${value > 0 ? "+" : "-"}₩${Math.round(Math.abs(value)).toLocaleString("ko-KR")}`;
+}
+
+function formatSignedPercent(value: number) {
+  if (Math.abs(value) < 0.0000005) return "0.00%";
+  return `${value > 0 ? "+" : "-"}${(Math.abs(value) * 100).toFixed(2)}%`;
+}
+
+function formatSignedPercentagePoints(value: number) {
+  if (Math.abs(value) < 0.0005) return "0.00%p";
+  return `${value > 0 ? "+" : "-"}${Math.abs(value).toFixed(2)}%p`;
 }
 
 function moneyTone(value: number) {

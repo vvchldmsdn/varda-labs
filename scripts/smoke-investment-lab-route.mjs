@@ -36,21 +36,18 @@ async function main() {
     "투자 랩",
     "전액 KODEX 200",
     "평가액 경로 비교",
-    "27개 평가일",
     "KODEX 200 종가",
-    "911행",
     "종료 시 대기 거래",
-    "0건",
+    "현금흐름 조정 추정수익률",
+    "Modified Dietz",
+    "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
+  assert.match(route.body, /data-return-status="ready"/);
   assert.match(
     route.body,
-    /기간 내 반영 거래(?:\s|<!-- -->)*38(?:\s|<!-- -->)*건/,
-  );
-  assert.match(
-    route.body,
-    /지연 체결(?:\s|<!-- -->)*5(?:\s|<!-- -->)*건/,
+    /data-return-method="modified_dietz_daily_weighted_eod_v1"/,
   );
   assert.match(route.body, /overflow-x-auto/);
   assert.match(route.body, /viewBox="0 0 1000 340"/);
@@ -62,6 +59,26 @@ async function main() {
 
   const countsAfter = await readCounts();
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
+  const comparisonDates = readIntegerAttribute(
+    route.body,
+    "data-comparison-dates",
+  );
+  const appliedFlows = readIntegerAttribute(route.body, "data-applied-flows");
+  const delayedExecutions = readIntegerAttribute(
+    route.body,
+    "data-delayed-executions",
+  );
+  const scenarioCloseRows = readIntegerAttribute(
+    route.body,
+    "data-scenario-close-rows",
+  );
+  const pendingAtEnd = readIntegerAttribute(route.body, "data-pending-at-end");
+
+  assert.ok(comparisonDates >= 2, "comparison path needs at least two dates");
+  assert.ok(appliedFlows >= 0, "applied flow count must be non-negative");
+  assert.ok(delayedExecutions >= 0, "delayed count must be non-negative");
+  assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
+  assert.equal(pendingAtEnd, 0, "route must not publish an unfinished path");
 
   console.log(
     JSON.stringify(
@@ -71,11 +88,13 @@ async function main() {
         noAuthStatus: unauthorized.status,
         authenticatedStatus: route.status,
         dashboardLink: true,
-        comparisonDates: 27,
-        appliedFlows: 38,
-        delayedExecutions: 5,
-        scenarioCloseRows: 911,
-        pendingAtEnd: 0,
+        comparisonDates,
+        appliedFlows,
+        delayedExecutions,
+        scenarioCloseRows,
+        pendingAtEnd,
+        returnStatus: "ready",
+        returnMethod: "modified_dietz_daily_weighted_eod_v1",
         leakPatternMatches: 0,
         databaseSideEffects: false,
         counts: countsAfter,
@@ -109,6 +128,12 @@ async function readCounts() {
 function readArgument(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : null;
+}
+
+function readIntegerAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="(\\d+)"`));
+  assert.ok(match, `route is missing numeric attribute: ${name}`);
+  return Number(match[1]);
 }
 
 await main();

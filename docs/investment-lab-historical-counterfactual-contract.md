@@ -4,7 +4,9 @@ Last updated: 2026-07-13
 
 Status: Phase 1 aggregate KODEX200 deterministic path engine implemented and
 read-only audited. The aggregate read model and Server Component route are
-implemented without provider calls, schema changes, or database writes.
+implemented without provider calls, schema changes, or database writes. A
+separate Modified Dietz cashflow-adjusted return estimate is implemented as a
+non-authoritative secondary projection.
 
 ## Product Decision
 
@@ -113,13 +115,15 @@ The lab should eventually expose two distinct answers:
 
 - valuation-path difference: actual KRW value versus hypothetical KRW value,
   valid because both paths receive the same transaction schedule;
-- cashflow-adjusted time-weighted return: performance isolated from the size
-  and timing of those transactions.
+- cashflow-adjusted Modified Dietz estimate: an approximation that reduces the
+  effect of transaction size and timing when exact flow-time valuations are
+  unavailable.
 
 Do not substitute money-weighted return, raw end/start return, or a single
 latest-price comparison without labeling it. Risk metrics such as volatility,
 Sharpe, maximum drawdown, and correlation are downstream summaries, not the
-path-generation algorithm.
+path-generation algorithm. The Modified Dietz output must not be labeled an
+exact daily TWR or a total-return, net-of-fee, or tax-adjusted result.
 
 ## Legacy Behaviors Rejected
 
@@ -175,11 +179,43 @@ The 2026-07-11 read-only production audit found:
   pending flow or blocker;
 - 8 flows on or before the anchor are intentionally treated as already
   represented by the anchor snapshot.
+- all 911 stored KODEX 200 rows currently have `close_price` equal to
+  `adjusted_close_price`, including all 34 rows in the observed comparison
+  window;
+- all 90 stored portfolio snapshot rows have zero cash value, and the event
+  ledger has no dividend, fee, tax, deposit, or withdrawal rows.
 
 Run `npm run audit:investment-lab-counterfactual` to refresh this evidence.
 Run `npm run audit:investment-lab-event-flow` to refresh event-flow evidence.
 Run `npm run audit:investment-lab-counterfactual-path` to execute the pure path
 engine against read-only production evidence.
+
+## Return Estimate Policy
+
+`modified_dietz_daily_weighted_eod_v1` is a secondary estimate, calculated
+separately from path generation:
+
+1. Each pair of consecutive observed service-date valuations is one
+   sub-period.
+2. External invested-boundary flows use signed KRW amounts: buy is positive
+   and sell is negative.
+3. Actual flows become effective on the service date after the stored event
+   date. Scenario flows use their scheduled execution service date.
+4. Date-only flows use an end-of-day assumption. Their denominator weight is
+   the remaining calendar-day fraction in the sub-period.
+5. Sub-period Modified Dietz returns are geometrically linked.
+6. Missing, duplicate, out-of-window, non-finite, or non-positive-denominator
+   evidence blocks the estimate without hiding the valuation path.
+7. The estimate is available only when the KODEX 200 close and adjusted-close
+   values are equal throughout the used price window. A mixed basis blocks the
+   estimate without rewriting evidence.
+8. Cash, distributions, transaction fees, and taxes are not separately
+   modeled. The current output is therefore a price-basis estimate and makes
+   no GIPS compliance claim.
+
+The methodology follows the Modified Dietz daily-weighted cash-flow structure
+described by the [GIPS Standards Handbook for Firms](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/),
+while retaining the narrower evidence and labeling boundaries above.
 
 ## Execution Policy
 
@@ -199,9 +235,9 @@ Phase 1A fixes `eod_adjusted_close_on_or_after_v1`:
    borrow, short, or reduce the requested amount.
 
 The deterministic aggregate KODEX200 path fixture, read-only production audit,
-safe read model, and Server Component route are complete. Cashflow-adjusted
-TWR remains deferred until a separate fixture proves its pending-flow
-denominator semantics.
+safe read model, Server Component route, and separate Modified Dietz return
+estimate are complete. Exact flow-time TWR, total-return parity, and explicit
+fee, tax, distribution, and cash treatment remain deferred.
 
 ## Architecture Boundary
 

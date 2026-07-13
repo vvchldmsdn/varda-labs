@@ -81,6 +81,7 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
     return db
       .select({
         priceDate: assetPriceSnapshots.priceDate,
+        closePrice: assetPriceSnapshots.closePrice,
         adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
       })
       .from(assetPriceSnapshots)

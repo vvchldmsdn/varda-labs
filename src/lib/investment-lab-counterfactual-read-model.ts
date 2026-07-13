@@ -4,6 +4,10 @@ import {
   type InvestmentLabAmountProvenance,
 } from "./investment-lab-execution-schedule.ts";
 import { buildInvestmentLabCounterfactualPath } from "./investment-lab-counterfactual-path.ts";
+import {
+  buildInvestmentLabReturnEstimate,
+  type InvestmentLabReturnEstimate,
+} from "./investment-lab-return-estimate.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
 
 const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
@@ -28,6 +32,7 @@ export type InvestmentLabSourceSnapshotRow = Readonly<{
 
 export type InvestmentLabSourceCloseRow = Readonly<{
   priceDate: string;
+  closePrice: string | number | null;
   adjustedClosePrice: string | number | null;
 }>;
 
@@ -74,6 +79,7 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
     endDifferenceKrw: number;
     comparisonDateCount: number;
   }> | null;
+  returnEstimate: InvestmentLabReturnEstimate | null;
   rows: readonly InvestmentLabCounterfactualDisplayRow[];
   coverage: Readonly<{
     snapshotSourceRows: number;
@@ -164,6 +170,13 @@ export function buildInvestmentLabCounterfactualReadModel(
     ),
   );
   const latest = rows.at(-1)!;
+  const returnEstimate = buildInvestmentLabReturnEstimate({
+    actualRows: actual.rows,
+    scenarioRows: path.rows,
+    boundaryFlows: events,
+    appliedFlows: path.appliedFlows,
+    priceRows: input.closeRows,
+  });
 
   return Object.freeze({
     status: "ready",
@@ -176,6 +189,7 @@ export function buildInvestmentLabCounterfactualReadModel(
       endDifferenceKrw: latest.differenceKrw,
       comparisonDateCount: rows.length,
     }),
+    returnEstimate,
     rows,
     coverage: Object.freeze({
       ...initialCoverage,
@@ -380,6 +394,7 @@ function blockedReadModel(
     status: "blocked",
     scenario: scenario(),
     summary: null,
+    returnEstimate: null,
     rows: Object.freeze([]),
     coverage: Object.freeze({ ...coverageValue }),
     blockers: Object.freeze([...blockers].sort()),

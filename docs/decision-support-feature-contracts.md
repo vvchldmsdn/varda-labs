@@ -131,17 +131,19 @@ The following scenario families have different transaction and cash semantics:
 
 | Scenario family | Examples | Product treatment |
 | --- | --- | --- |
-| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 is the first read-only audited engine candidate, not a production-ready route. VOO additionally needs complete historical FX/price and US execution-calendar evidence. Multi-instrument vectors also need an approved flow-allocation, cross-market pending-execution, and solvency policy. |
+| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 is the first deployed read-only route and includes a separately labeled Modified Dietz estimate when price-basis checks pass. VOO additionally needs complete historical FX/price and US execution-calendar evidence. Multi-instrument vectors also need an approved flow-allocation, cross-market pending-execution, and solvency policy. |
 | Scheduled rebalance strategy | equal weight, maintain target weights, maintain a selected weight vector | Later independent model. It introduces additional trades, turnover, costs, and rebalance-date policy, so it is not the same-flow v1 model. |
 | Recommendation-following strategy | legacy recommended rebalance | Blocked until the recommendation boundary and point-in-time recommendation evidence are separately approved. |
 | Cash-ledger baseline | all cash | Blocked while the measured path excludes account cash. It requires a cash balance, cash-flow, and cash-return policy rather than a zero-volatility shortcut. |
 | Hindsight research | full-window maximum return, maximum Sharpe, minimum volatility, minimum MDD | Research-only unless implemented as a no-look-ahead walk-forward strategy. Full-window results must be labeled hindsight and never presented as investable historical performance. |
 
-The v1 comparison read model should eventually expose:
+The v1 comparison read model exposes the first three items below. The remaining
+items stay incremental:
 
 - account, service-date window, scenario identity, and calculation status;
 - observed and hypothetical KRW valuation paths on the same display dates;
-- end-value difference and cashflow-adjusted time-weighted return;
+- end-value difference and a clearly labeled cashflow-adjusted Modified Dietz
+  estimate, not an exact flow-time TWR;
 - downstream maximum drawdown and volatility with explicit definitions;
 - price, FX, event, and snapshot coverage plus pending/excluded evidence;
 - no hidden interpolation, current-FX fallback, or synthetic continuation.

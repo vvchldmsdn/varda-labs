@@ -26,6 +26,11 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.coverage.pendingAtEndRows, 0);
     assert.equal(result.rows[1].hasPendingExecution, true);
     assert.equal(result.rows.at(-1).scenarioMarketValueKrw, 1_452);
+    assert.equal(result.returnEstimate.status, "ready");
+    assert.ok(closeTo(result.returnEstimate.scenarioReturn, 0.21));
+    assert.equal(result.returnEstimate.periodCount, 3);
+    assert.equal(result.returnEstimate.actualFlowCount, 3);
+    assert.equal(result.returnEstimate.scenarioFlowCount, 3);
   });
 
   it("blocks duplicate snapshot evidence without returning partial values", () => {
@@ -77,6 +82,24 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.coverage.completeComparisonDates, 4);
   });
 
+  it("blocks only the return estimate when close bases diverge", () => {
+    const source = fixture();
+    const result = buildInvestmentLabCounterfactualReadModel({
+      ...source,
+      closeRows: source.closeRows.map((row, index) =>
+        index === 0 ? { ...row, closePrice: 99 } : row,
+      ),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.rows.length, 4);
+    assert.equal(result.returnEstimate.status, "blocked");
+    assert.deepEqual(result.returnEstimate.blockers, [
+      "price_basis_mismatch",
+    ]);
+    assert.equal(result.returnEstimate.basisMismatchRows, 1);
+  });
+
   it("keeps internal identifiers and secret-shaped fields out of the model", () => {
     const serialized = JSON.stringify(
       buildInvestmentLabCounterfactualReadModel(fixture()),
@@ -119,9 +142,9 @@ function fixture() {
       event("2026-01-06", 3, "asset_added", null),
     ],
     closeRows: [
-      { priceDate: "2026-01-01", adjustedClosePrice: 100 },
-      { priceDate: "2026-01-05", adjustedClosePrice: 110 },
-      { priceDate: "2026-01-06", adjustedClosePrice: 121 },
+      { priceDate: "2026-01-01", closePrice: 100, adjustedClosePrice: 100 },
+      { priceDate: "2026-01-05", closePrice: 110, adjustedClosePrice: 110 },
+      { priceDate: "2026-01-06", closePrice: 121, adjustedClosePrice: 121 },
     ],
   };
 }
@@ -146,4 +169,8 @@ function event(eventDate, sequence, eventType, amountKrw) {
     assetCurrency: "KRW",
     isCorrection: false,
   };
+}
+
+function closeTo(actual, expected, epsilon = 1e-12) {
+  return Math.abs(actual - expected) <= epsilon;
 }
