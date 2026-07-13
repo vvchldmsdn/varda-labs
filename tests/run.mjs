@@ -20,6 +20,7 @@ import "./simulation-stationary-bootstrap.test.mjs";
 import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";
 import "./simulation-scenario-vector-hash-v2.test.mjs";
+import "./simulation-curated-admission-planner.test.mjs";
 import "./simulation-scenario-vector-resolver.test.mjs";
 import "./simulation-normalized-nav.test.mjs";
 import "./simulation-normalized-nav-distribution-summary.test.mjs";
