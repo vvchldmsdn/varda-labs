@@ -52,6 +52,10 @@ write or inferred challenge transition
 
 state race result:
 typed conflict; no partial approval authority
+
+challenge terminal-state race:
+consume, expiry, cancellation, invalidation, and conflict use the same
+exact-identity serialization boundary; exactly one terminal state wins
 ```
 
 These values are candidates only. They require explicit user approval before
@@ -154,6 +158,21 @@ canonicalization, row-cap validation, vector validation, hash recomputation,
 and challenge validation have succeeded, but before reading or allocating any
 approval revision or terminal challenge state that determines the write.
 
+Every authorized transition from `pending` to a terminal challenge state must
+acquire this same exact-identity lock, including:
+
+- approval consumption;
+- server-time expiry;
+- same-owner cancellation;
+- policy or Gate 0 drift invalidation;
+- separately approved server-security invalidation; and
+- conflict after another live challenge wins admission.
+
+No cancellation, invalidation, expiry, cleanup, support path, or future job may
+use a weaker or separate serialization namespace. Physical challenge-row
+locking and compare-and-set mechanics remain deferred, but they must operate
+inside this exact-identity serialization boundary rather than replace it.
+
 After acquiring the lock, the transaction must re-read and revalidate:
 
 - the active app-user and same-owner capability required by the approved actor
@@ -164,6 +183,19 @@ After acquiring the lock, the transaction must re-read and revalidate:
   exact identity;
 - the requested lifecycle intent; and
 - the next immutable revision number and event sequence.
+
+Only a re-read `pending` challenge may transition. The first committed
+terminal transition wins. Every later contender observes the committed
+terminal state, performs no challenge or approval mutation, and returns only
+the same-owner sanitized outcome allowed by the approved challenge policy.
+For an approval attempt, any non-`pending` state yields
+`confirmation_not_usable`; a consumed same challenge may instead use its
+committed receipt under the approved replay rules.
+
+If terminal-transition lock acquisition times out, that transition rolls back
+and must not be inferred. The challenge remains in its prior durable state.
+Malformed, cross-owner, or unauthorized callers never enter this transition
+competition and cannot mutate the challenge.
 
 A 64-bit advisory-key collision may serialize two unrelated identities, but
 must never merge their database predicates, approvals, ownership, or results.
@@ -311,6 +343,10 @@ without a same-owner receipt read proving the commit. It is also never retried
 with a different challenge, vector, owner, selector, revision, or lifecycle
 intent.
 
+Cancellation, expiry, invalidation, and conflict are not background overrides
+of `consumed`. They are competing terminal transitions from `pending` and
+cannot rewrite a terminal state after it commits.
+
 ## Current Runtime Result
 
 Even if this packet is approved, current code remains:
@@ -347,7 +383,9 @@ This candidate rejects:
 - translating a timeout, unknown outcome, or constraint error into success;
   and
 - provider calls, simulations, or optimizer calculations inside the approval
-  transaction.
+  transaction; and
+- cancellation, expiry, invalidation, cleanup, or conflict transitions that do
+  not acquire the same exact-identity serialization lock as consumption.
 
 ## Explicit Non-Actions
 
@@ -377,11 +415,15 @@ bundle:
    `hashtextextended(..., 0)` transaction advisory serialization;
 3. `READ COMMITTED` plus mandatory transaction-time revalidation and existing
    database constraints;
-4. 2-second local lock timeout and per-statement 8-second local statement
+4. every authorized `pending -> terminal` challenge transition, including
+   consume, expiry, same-owner cancellation, policy/Gate 0 invalidation,
+   reviewed security invalidation, and conflict, uses the same exact-identity
+   serialization boundary and only the first committed terminal state wins;
+5. 2-second local lock timeout and per-statement 8-second local statement
    timeout, with the end-to-end admission deadline still unselected;
-5. zero automatic writer retries, with same-challenge outcome recovery only
+6. zero automatic writer retries, with same-challenge outcome recovery only
    through the approved receipt semantics; and
-6. the typed busy, confirmed-rollback, conflict, unusable, temporarily
+7. the typed busy, confirmed-rollback, conflict, unusable, temporarily
    unavailable, rejected, committed, and committed-replay meanings above.
 
 Approval of this bundle would approve semantics only. It would not approve a
