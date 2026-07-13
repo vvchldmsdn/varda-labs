@@ -56,16 +56,18 @@ write capability. Current blockers are:
 No Markdown or Git approval may be copied into the tables to work around these
 blockers.
 
-## Eligible Future Actor Modes
+## Actor Mode Semantics
 
-A later review may approve one or both of these modes. Neither runtime actor
-mode exists today.
+The docs-only semantics approve `tenant_self_approval_v1` as the first future
+actor mode, but no production session adapter, admission runtime, or writer
+implements it. Reviewed operator approval remains deferred and disabled, with
+no fallback from unavailable tenant self-approval.
 
 ### Tenant Self-Approval
 
-A user may approve a vector only when a server-verified active provider
-session resolves through exactly one active identity mapping to the same
-active `app_users` row and yields:
+Under the approved future tenant-self semantics, a user may approve a vector
+only when a server-verified active provider session resolves through exactly
+one active identity mapping to the same active `app_users` row and yields:
 
 ```text
 TenantContext { ownerUserId, role }
@@ -79,10 +81,11 @@ confirmation.
 
 ### Reviewed Operator Approval
 
-An operator may approve for another owner only through a separately approved,
-independently authenticated operator capability plus a server-side reviewed
-target handoff. Shared Basic Auth, `ADMIN_JOB_SECRET`, `CRON_SECRET`, an email,
-the only app-user row, or a transported owner UUID is not that capability.
+Operator mode is not approved or implemented. A future operator could approve
+for another owner only through a separately approved, independently
+authenticated operator capability plus a server-side reviewed target handoff.
+Shared Basic Auth, `ADMIN_JOB_SECRET`, `CRON_SECRET`, an email, the only
+app-user row, or a transported owner UUID is not that capability.
 
 The operator path must preserve two distinct facts:
 
