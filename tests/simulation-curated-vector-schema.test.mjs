@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { describe, it } from "node:test";
+import { NeonDbError } from "@neondatabase/serverless";
 
 import {
   classifyCuratedVectorRehearsalError,
@@ -356,7 +357,7 @@ describe("curated approved-vector Stage I schema", () => {
 
   it("classifies only the exact top-level Neon driver marker as expected", () => {
     const expected = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
-    assert.deepEqual(classifyCuratedVectorRehearsalError(expected), {
+    assert.deepEqual(classifyCuratedVectorRehearsalError(expected, NeonDbError), {
       outcome: "expected_rollback",
       reason: "exact_driver_marker",
     });
@@ -364,37 +365,90 @@ describe("curated approved-vector Stage I schema", () => {
     assert.deepEqual(
       classifyCuratedVectorRehearsalError(
         neonError(`prefix:${CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER}`),
+        NeonDbError,
       ),
       { outcome: "unexpected_failure", reason: "database_error" },
     );
     assert.deepEqual(
-      classifyCuratedVectorRehearsalError(neonError("catalog assertion failed")),
+      classifyCuratedVectorRehearsalError(
+        neonError("catalog assertion failed"),
+        NeonDbError,
+      ),
       { outcome: "unexpected_failure", reason: "database_error" },
     );
 
     const transport = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
     transport.sourceError = new Error("synthetic transport detail");
-    assert.deepEqual(classifyCuratedVectorRehearsalError(transport), {
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(transport, NeonDbError),
+      {
       outcome: "unexpected_failure",
       reason: "transport_error",
-    });
+      },
+    );
 
     const nested = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
-    nested.cause = new Error(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
-    assert.deepEqual(classifyCuratedVectorRehearsalError(nested), {
+    Object.defineProperty(nested, "cause", {
+      configurable: true,
+      enumerable: false,
+      value: new Error(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER),
+    });
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(nested, NeonDbError),
+      {
       outcome: "unexpected_failure",
       reason: "unknown_error_envelope",
+      },
+    );
+
+    const symbolEnvelope = neonError(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
+    symbolEnvelope[Symbol("nested")] = "synthetic";
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(symbolEnvelope, NeonDbError),
+      { outcome: "unexpected_failure", reason: "unknown_error_envelope" },
+    );
+
+    const accessorEnvelope = neonError(
+      CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER,
+    );
+    Object.defineProperty(accessorEnvelope, "cause", {
+      configurable: true,
+      enumerable: false,
+      get() {
+        throw new Error("accessor must not be evaluated");
+      },
     });
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(accessorEnvelope, NeonDbError),
+      { outcome: "unexpected_failure", reason: "unknown_error_envelope" },
+    );
+
+    const spoofedName = new Error(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER);
+    spoofedName.name = "NeonDbError";
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(spoofedName, NeonDbError),
+      { outcome: "unexpected_failure", reason: "opaque_error" },
+    );
+
+    class NeonDbErrorSubclass extends NeonDbError {}
+    assert.deepEqual(
+      classifyCuratedVectorRehearsalError(
+        new NeonDbErrorSubclass(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER),
+        NeonDbError,
+      ),
+      { outcome: "unexpected_failure", reason: "opaque_error" },
+    );
 
     assert.deepEqual(
       classifyCuratedVectorRehearsalError({
         message: CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER,
-      }),
+      }, NeonDbError),
       { outcome: "unexpected_failure", reason: "opaque_error" },
     );
     assert.deepEqual(
       classifyCuratedVectorRehearsalError(
         new Error(CURATED_VECTOR_REHEARSAL_ROLLBACK_MARKER),
+        NeonDbError,
       ),
       { outcome: "unexpected_failure", reason: "opaque_error" },
     );
@@ -512,8 +566,5 @@ function countMatches(value, pattern) {
 }
 
 function neonError(message) {
-  const error = new Error(message);
-  error.name = "NeonDbError";
-  error.sourceError = undefined;
-  return error;
+  return new NeonDbError(message);
 }

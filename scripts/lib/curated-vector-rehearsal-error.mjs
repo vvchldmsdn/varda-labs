@@ -45,13 +45,24 @@ const KNOWN_NEON_ERROR_KEYS = new Set([
   "sourceError",
 ]);
 
-export function classifyCuratedVectorRehearsalError(error) {
-  if (!(error instanceof Error) || error.name !== "NeonDbError") {
+export function classifyCuratedVectorRehearsalError(error, NeonDbErrorClass) {
+  if (
+    typeof NeonDbErrorClass !== "function" ||
+    !(error instanceof NeonDbErrorClass) ||
+    Object.getPrototypeOf(error) !== NeonDbErrorClass.prototype
+  ) {
     return OPAQUE_ERROR;
   }
 
-  if (Object.keys(error).some((key) => !KNOWN_NEON_ERROR_KEYS.has(key))) {
-    return UNKNOWN_ENVELOPE;
+  for (const key of Reflect.ownKeys(error)) {
+    if (typeof key !== "string" || !KNOWN_NEON_ERROR_KEYS.has(key)) {
+      return UNKNOWN_ENVELOPE;
+    }
+
+    const descriptor = Object.getOwnPropertyDescriptor(error, key);
+    if (!descriptor) return UNKNOWN_ENVELOPE;
+    if (key === "stack" && "get" in descriptor) continue;
+    if (!("value" in descriptor)) return UNKNOWN_ENVELOPE;
   }
 
   if (error.sourceError !== undefined) return TRANSPORT_ERROR;

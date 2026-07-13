@@ -43,7 +43,7 @@ if (process.argv.slice(2).length !== 1 || process.argv.slice(2)[0] !== CONFIRMAT
   );
 }
 
-const [{ neon }, { config }] = await Promise.all([
+const [{ neon, NeonDbError }, { config }] = await Promise.all([
   import("@neondatabase/serverless"),
   import("dotenv"),
 ]);
@@ -228,7 +228,10 @@ try {
   ]);
   assert.fail("rollback rehearsal unexpectedly committed");
 } catch (error) {
-  const classification = classifyCuratedVectorRehearsalError(error);
+  const classification = classifyCuratedVectorRehearsalError(
+    error,
+    NeonDbError,
+  );
   if (classification.outcome !== "expected_rollback") {
     throw new Error(
       `Curated vector schema rollback rehearsal failed (${classification.reason})`,
