@@ -38,20 +38,25 @@ readinessStatus = not_ready
 
 No production adapter or product surface is part of this slice.
 
-## Blocking Hash Dependency
+## Pinned Pure Hash Dependency
 
-This implementation plan is blocked by
-`docs/simulation-scenario-vector-hash-versioning-decision-packet.md`.
+The separate deterministic v2 hash gate is complete and remains outside the
+eight-file planner allowlist:
 
-The current v1 serializer uses locale-sensitive sorting and is frozen as
-legacy provenance. Planner source and tests must not start until:
+| Evidence | Pinned value |
+| --- | --- |
+| v2 pure implementation | `07dae7a8289ff403d6583506ae05034ec8c68df9` |
+| v2 implementation close-out | `a6a9f56b132b2ea9222ccf325f16f4c05b107754` |
+| public module | `src/lib/simulation-scenario-vector-hash-v2.ts` |
+| value export | `createSimulationScenarioVectorHashV2` |
+| hash version | `simulation_scenario_vector_hash_v2` |
+| portfolio path policy | `gross_normalized_buy_and_hold_v1` |
+| Gate 0 approval commit | `652b9ea9c9b48f51dc4c68e8f148132ca8893d7e` |
 
-```text
-a separately approved simulation_scenario_vector_hash_v2 pure helper is implemented and verified
-```
-
-The hash correction is not part of the eight-file planner allowlist. It needs
-its own approval, changed-file allowlist, tests, and compatibility evidence.
+The current v1 serializer remains frozen as locale-sensitive legacy
+provenance. Planner source must not import, call, wrap, edit, or reinterpret
+v1. Completing the pure v2 dependency does not approve this planner packet or
+authorize planner source, tests, runtime trust, persistence, or product use.
 
 ## Proposed File Allowlist
 
@@ -98,9 +103,10 @@ maxCanonicalInputBytes = 32768
 `maxCanonicalInputBytes` is an in-memory serialization bound, not an HTTP body,
 database, execution-universe, or UI limit.
 
-`vectorHashVersion=simulation_scenario_vector_hash_v2` remains a conditional
-candidate. It may be pinned by the planner only after the versioning decision
-and separate v2 pure implementation gates complete without changing v1.
+`vectorHashVersion=simulation_scenario_vector_hash_v2` is now pinned to the
+separately completed pure implementation above. This pin is a dependency for
+the proposed planner only. It does not make the planner approved, ready, or
+trusted at runtime.
 
 ## Exact Input Types
 
@@ -266,18 +272,45 @@ The planner must not call, wrap, edit, or reinterpret
 `simulation_scenario_vector_hash_v1`. V1 remains legacy provenance with its
 existing serializer semantics.
 
-The planner may later import only the separately approved pure v2 exports from
-the new v2 module defined by its own implementation gate. Exact export and file
-names remain unselected until that packet is approved.
+The planner may import the value export below only from the public v2 module:
+
+```text
+src/lib/simulation-scenario-vector-hash-v2.ts
+createSimulationScenarioVectorHashV2
+```
+
+Type-only imports from that public module are limited to:
+
+```text
+SimulationScenarioVectorHashV2Input
+SimulationScenarioVectorHashV2Result
+```
+
+Planner source must not import v2 policy, validation, or internal type modules
+directly. It must not import any v1 module.
 
 The planner still validates that input rows are already canonical before
 calling v2. V2 canonicalization must not repair or hide an out-of-order planner
 input at this boundary, even though the standalone hash function remains
 input-order independent for its own canonical hash contract.
 
-The fixture must pin at least one expected `scenarioVectorHash` produced by the
-approved synthetic-only v2 helper. No approved production vector or stored
-database row may be used.
+The planner accepts the v2 call only when the result is `status=hashable` and
+its public result evidence retains the exact v2 hash version, portfolio-path
+policy, Gate 0 approval commit, scenario identity, row count, zero-row count,
+and 10,000-bps total expected from the already validated planner input. An
+invalid v2 result blocks planning.
+
+The planner may consume `scenarioVectorHash` from that matched hashable result.
+It must not copy, return, expose, log, persist, or include
+`canonicalSerialization` in the planner result or approval-envelope evidence.
+
+The synthetic compatibility fixture pins this separately verified v2 digest:
+
+```text
+sha256:80282313cbdf944335ad0136fe9fa7120bacd8e95dcc159fd8472f215d9aabc1
+```
+
+No approved production vector or stored database row may be used.
 
 ## Approval-Envelope Digest Candidate
 
@@ -322,8 +355,9 @@ The shorter `tenant_self` text in an earlier candidate receipt example is not
 a digest alias and must not be accepted or normalized. The digest also binds
 `intent=initial_approval` and
 `vectorHashVersion=simulation_scenario_vector_hash_v2` so a different action or
-hash policy cannot reuse the same confirmation envelope. The v2 binding
-remains conditional on the blocking versioning and pure implementation gates.
+hash policy cannot reuse the same confirmation envelope. The pure v2 binding
+is pinned above, while this planner packet and its proposed implementation
+remain unapproved.
 
 `writeSafetyApprovalCommit`, `contractApprovalCommit`, Markdown paths, and Git
 review provenance are deliberately excluded. They document review history;
@@ -431,7 +465,7 @@ The proposed source import graph is allowlisted to:
 
 ```text
 node:crypto
-the separately approved simulation_scenario_vector_hash_v2 pure module
+src/lib/simulation-scenario-vector-hash-v2.ts
 the five new planner modules
 ```
 
@@ -466,8 +500,8 @@ slice.
 
 Implementation must stop without widening scope if:
 
-- the separate v2 deterministic vector-hash implementation gate is not
-  completed;
+- the pinned v2 commits, public module, value/type exports, hash version,
+  fixed policy/Gate 0 binding, or synthetic digest differ from this packet;
 - any v1 source, fixture, hash, approval evidence, or durable evidence would
   need to change;
 - a valid planner input requires more than the approved caps;
@@ -511,11 +545,11 @@ implementation plan:
 9. synthetic-only fixture and full focused-test matrix; and
 10. the forbidden dependency, verification, and stop boundaries.
 
-This packet is not currently requesting implementation approval. After the
-versioning decision and separate v2 pure implementation complete, this packet
-must be revised to pin the exact approved v2 module, exports, version constant,
-and synthetic expected hash before returning for planner implementation
-approval.
+This packet is not currently requesting implementation approval. This revision
+pins the completed v2 module, exports, version constant, policy binding, result
+boundary, and synthetic expected hash. The revised packet must return for a
+separate semantic review before any planner source or test implementation may
+be approved.
 
 Any later approval may authorize only the listed local source/test
 implementation and verification commands. It would not authorize schema, DB,
