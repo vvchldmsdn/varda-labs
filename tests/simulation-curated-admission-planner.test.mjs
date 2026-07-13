@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
@@ -660,6 +661,57 @@ describe("synthetic curated admission planner", () => {
     }
   });
 
+  it("pins the static module graph and forbids runtime or I/O dependencies", () => {
+    const sourceExpectations = [
+      ["src/lib/simulation-curated-admission-planner-policy.ts", []],
+      [
+        "src/lib/simulation-curated-admission-planner-serialization.ts",
+        [
+          "node:crypto",
+          "./simulation-curated-admission-planner-policy.ts",
+          "./simulation-curated-admission-planner-types.ts",
+        ],
+      ],
+      [
+        "src/lib/simulation-curated-admission-planner-types.ts",
+        ["./simulation-curated-admission-planner-policy.ts"],
+      ],
+      [
+        "src/lib/simulation-curated-admission-planner-validation.ts",
+        [
+          "./simulation-curated-admission-planner-policy.ts",
+          "./simulation-curated-admission-planner-serialization.ts",
+          "./simulation-curated-admission-planner-types.ts",
+          "./simulation-scenario-vector-hash-v2.ts",
+        ],
+      ],
+      [
+        "src/lib/simulation-curated-admission-planner.ts",
+        [
+          "./simulation-curated-admission-planner-policy.ts",
+          "./simulation-curated-admission-planner-types.ts",
+          "./simulation-curated-admission-planner-validation.ts",
+        ],
+      ],
+    ];
+    const forbiddenPatterns = [
+      /@\/db|src\/db|drizzle|neon|postgres|node:(?:fs|http|https|net|tls|dns|child_process|worker_threads)|next\/|from\s+["']react(?:\/|["'])|server-only/i,
+      /DATABASE_URL|process\.env|Deno\.env/i,
+      /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b/,
+      /\bDate\.now\s*\(|\bperformance\.now\s*\(|\bMath\.random\s*\(|\bcrypto\.randomUUID\s*\(|\bset(?:Timeout|Interval|Immediate)\s*\(/,
+      /\bimport\s*\(|\brequire\s*\(|\bconsole\.\w+\s*\(|\b(?:unstable_)?cache\s*\(/,
+      /\b(?:KIS|provider|optimizer|recommendation|rebalance|logger|job)\s*(?:\.|\()/i,
+    ];
+
+    for (const [path, expectedImports] of sourceExpectations) {
+      const source = readFileSync(path, "utf8");
+      assert.deepEqual(extractStaticModuleSpecifiers(source), expectedImports, path);
+      for (const pattern of forbiddenPatterns) {
+        assert.doesNotMatch(source, pattern, `${path}: ${pattern}`);
+      }
+    }
+  });
+
   it("keeps the maximum valid canonical envelope below the fixed byte cap", () => {
     const input = bindInput(
       createSyntheticCuratedAdmissionPlannerInput({
@@ -927,4 +979,14 @@ function restorePropertyDescriptor(target, property, descriptor) {
   } else {
     delete target[property];
   }
+}
+
+function extractStaticModuleSpecifiers(source) {
+  return [
+    ...new Set(
+      [...source.matchAll(/\bfrom\s+["']([^"']+)["']|^\s*import\s+["']([^"']+)["']/gm)].map(
+        (match) => match[1] ?? match[2],
+      ),
+    ),
+  ];
 }

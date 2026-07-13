@@ -44,17 +44,22 @@ write capability. Current blockers are:
 - admin and Cron secrets authorize machine boundaries but cannot select or
   impersonate a tenant;
 - no independently authenticated operator handoff exists;
-- no approval-admission planner, writer, repository transaction, or audited
-  confirmation mechanism exists; and
-- the finite vector-row resource cap and exact writer serialization policy are
-  still deferred.
+- no runtime-trusted approval-admission planner, writer, repository
+  transaction, or production confirmation adapter exists;
+- the implemented pure planner is fixed to `synthetic_only`, runtime trust
+  `not_established`, and readiness `not_ready`, so it cannot admit or persist
+  a vector; and
+- the approved 64-row cap and docs-only write-safety semantics have no concrete
+  repository, transaction, challenge/receipt persistence, or writer
+  implementation.
 
 No Markdown or Git approval may be copied into the tables to work around these
 blockers.
 
 ## Eligible Future Actor Modes
 
-A later review may approve one or both of these modes. Neither exists today.
+A later review may approve one or both of these modes. Neither runtime actor
+mode exists today.
 
 ### Tenant Self-Approval
 
@@ -119,8 +124,8 @@ permission to write.
 
 ## Candidate Admission Envelope
 
-A future server-owned planner may receive only capabilities and normalized
-evidence equivalent to:
+A future server-owned runtime planner may receive only capabilities and
+normalized evidence equivalent to:
 
 ```text
 actor mode capability
@@ -147,14 +152,14 @@ client.
 
 ## Fail-Closed Validation Order
 
-A future planner and writer must preserve this order:
+A future runtime planner and writer must preserve this order:
 
 1. verify that the selected actor mode is implemented and enabled;
 2. verify the actor capability and derive the canonical owner capability;
 3. require an active owner and reject provisioning, disabled, missing,
    ambiguous, or cross-owner state;
 4. validate exact policy, Gate 0 commit, scenario id, and scenario version;
-5. enforce the separately approved finite vector-row cap before hashing;
+5. enforce the approved 64-row vector cap before hashing;
 6. validate canonical instrument identities, exact order, uniqueness, integer
    weights, explicit zero-bps rows, non-empty rows, and an exact 10,000-bps
    total;
@@ -187,9 +192,12 @@ not the complete concurrency protocol. A future writer transaction must also:
 - turn concurrent admission into one commit and explicit conflicts for the
   other contenders.
 
-Exact advisory-lock SQL, lock key derivation, timeout, retry count, and maximum
-vector-row count remain deferred. Until those values are reviewed, the writer
-is `not_ready` even if authentication later becomes available.
+The approved docs-only write-safety semantics pin the 64-row cap, versioned
+lock input, `READ COMMITTED`, 2-second lock timeout, 8-second statement
+timeout, and zero automatic retries. Concrete advisory-lock SQL, challenge and
+receipt persistence, repository transaction code, and the writer remain
+unimplemented. Until those runtime pieces are separately reviewed and built,
+the writer is `not_ready` even if authentication later becomes available.
 
 ## Candidate Gate Outcomes
 
@@ -205,8 +213,11 @@ errors:
 | `would_admit` | A future dry-run planner found the envelope eligible under pinned evidence. | not started |
 | `committed` | A separately approved writer atomically persisted the complete revision. | committed |
 
-This draft does not authorize implementation of any outcome. In current code,
-only the policy conclusion `not_ready` is valid; there is no planner call.
+This draft does not authorize implementation of any outcome. In current
+product and runtime code, only the policy conclusion `not_ready` is valid and
+there is no runtime planner call. The pure synthetic helper can report only
+untrusted synthetic precondition evidence; it cannot produce `would_admit`,
+`committed`, or any runtime authority.
 
 `would_admit` is not permission to execute a simulation and is not authority
 to perform a later write without repeating all transaction-time checks.

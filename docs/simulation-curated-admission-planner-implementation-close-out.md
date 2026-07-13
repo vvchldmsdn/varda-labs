@@ -138,6 +138,22 @@ No npm command was rerun for this docs-only close-out. This change creates only
 this evidence record and requires one-file diff and whitespace review before a
 separate docs commit may be considered.
 
+## Follow-Up Coherence Correction
+
+A later migration review found that the implementation packet's exact source
+import and forbidden I/O boundary was supported by a manual scan but was not
+pinned as a regression test. The follow-up test reads the five planner source
+modules, asserts their complete static module graph, and fails on DB,
+filesystem, network, environment, ambient clock, random, timer, logger, cache,
+framework, provider, optimizer, recommendation, rebalance, or job coupling.
+The follow-up slice passed the focused planner test `23/23`, the full suite
+`640/640`, `npm run lint`, `npm run build`, and `git diff --check`.
+
+The same review aligns the Gate 0 document with the implemented state: a pure
+`synthetic_only` helper and approved docs-only write-safety semantics exist,
+while every runtime trust, actor, repository, transaction, writer, API, UI,
+and persistence boundary remains `not_ready` and unimplemented.
+
 ## Local And Deployment State
 
 The implementation exists in local commit
