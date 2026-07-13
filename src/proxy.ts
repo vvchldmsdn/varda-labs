@@ -46,6 +46,8 @@ export const config = {
     "/etfs/:path*",
     "/history",
     "/history/:path*",
+    "/investment-lab",
+    "/investment-lab/:path*",
     "/market",
     "/market/:path*",
     "/today",

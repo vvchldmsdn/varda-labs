@@ -1,10 +1,10 @@
 # Investment Lab Historical Counterfactual Contract
 
-Last updated: 2026-07-11
+Last updated: 2026-07-13
 
 Status: Phase 1 aggregate KODEX200 deterministic path engine implemented and
-read-only audited. No route, UI, provider call, schema change, or database
-write is approved by this document.
+read-only audited. The aggregate read model and Server Component route are
+implemented without provider calls, schema changes, or database writes.
 
 ## Product Decision
 
@@ -162,8 +162,8 @@ The 2026-07-11 read-only production audit found:
 - 3 in-window events still lack an account after canonical fallback, so
   account-specific scenarios remain blocked;
 - KODEX 200 has 911 adjusted-close dates from 2022-10-17 through 2026-07-08;
-- the aggregate KODEX 200 case is ready for a pure engine fixture, but not for a
-  production engine or user-facing route.
+- the aggregate KODEX 200 case is available through the read-only
+  `/investment-lab` route;
 - the event ledger contains 31 buys, 15 sells, 2 asset-added rows, and 3
   asset-removed rows; there are no deposit or withdrawal rows;
 - all 46 buy/sell rows have resolvable KRW notionals;
@@ -198,14 +198,14 @@ Phase 1A fixes `eod_adjusted_close_on_or_after_v1`:
 8. Block a sell that the long-only scenario cannot fund. Do not partially fill,
    borrow, short, or reduce the requested amount.
 
-The deterministic aggregate KODEX200 path fixture and read-only production
-audit are complete. Cashflow-adjusted TWR remains deferred until a separate
-fixture proves its pending-flow denominator semantics. No user-facing read
-model or valuation series is enabled yet.
+The deterministic aggregate KODEX200 path fixture, read-only production audit,
+safe read model, and Server Component route are complete. Cashflow-adjusted
+TWR remains deferred until a separate fixture proves its pending-flow
+denominator semantics.
 
 ## Architecture Boundary
 
-Future implementation should keep four layers separate:
+The implementation keeps four layers separate:
 
 1. server-only evidence loader for snapshots, events, prices, and FX;
 2. pure deterministic path engine with fixture tests;
