@@ -98,7 +98,7 @@ The proposed v2 domain rejects rather than repairs:
 | `market` | 1-20 lowercase ASCII characters matching `[a-z][a-z0-9._:-]*` |
 | `currency` | exactly three uppercase ASCII letters matching `[A-Z]{3}` |
 | `ticker` | 1-50 uppercase ASCII characters matching `[A-Z0-9][A-Z0-9._:-]*` |
-| `weightBps` | finite integer from 0 through 10,000 |
+| `weightBps` | finite integer from 0 through 10,000, excluding JavaScript negative zero |
 | vector row count | 1 through 64, including explicit zero-bps rows |
 | total weight | exactly 10,000 bps |
 
@@ -110,6 +110,9 @@ changing v2 canonicalization.
 Every exact `(market, currency, ticker)` identity must be unique. Explicit
 zero-bps rows remain present and affect the hash.
 
+`Object.is(weightBps, -0)` is always invalid and produces
+`invalid_weight_bps`. V2 does not allow `-0` to collapse to JSON numeric `0`.
+
 The fixed field and row caps bound the canonical payload; v2 does not add an
 independent unreachable byte-limit policy.
 
@@ -119,9 +122,14 @@ Validation must fail closed before hashing:
 
 - the outer value and every row must have exactly `Object.prototype` as their
   prototype; null-prototype records and class instances are rejected;
-- `vector` must be a real array;
+- `vector` must be a dense ordinary array whose prototype is exactly
+  `Array.prototype`;
 - outer and row own keys must exactly match the approved fields;
 - symbol, accessor, inherited replacement, and extra fields are rejected;
+- the vector's only own keys are `length` plus every decimal index from `0`
+  through `length - 1`; extra named keys and symbol keys are rejected;
+- every vector index must be an own enumerable data property; sparse holes,
+  inherited indices, and index accessors are rejected;
 - vector length is checked before row snapshots, sorting, or hashing;
 - allowed scalar data properties are copied once into new plain records;
 - custom iteration, `toJSON`, `valueOf`, coercion hooks, and callbacks are not
@@ -218,7 +226,12 @@ Input row order therefore does not affect v2 canonical JSON or the digest.
 
 ## Canonical Serialization
 
-The main module constructs a new plain object in exactly this property order:
+The main module constructs the canonical root and every canonical row as new
+null-prototype records in exactly these property orders. Null-prototype records
+prevent inherited `Object.prototype.toJSON` or other prototype properties from
+changing serialization bytes.
+
+The root property order is:
 
 ```text
 hashVersion
@@ -229,7 +242,7 @@ scenarioVersion
 vector
 ```
 
-Each sorted row is constructed in exactly this property order:
+Each sorted row property order is:
 
 ```text
 market
@@ -238,15 +251,26 @@ ticker
 weightBps
 ```
 
-`JSON.stringify()` is called only on these newly constructed plain records.
-The exact returned string is encoded as UTF-8. Local `node:crypto` SHA-256 is
-represented as:
+The canonical vector remains a dense ordinary array so JSON uses array syntax.
+Before serialization it receives an own non-enumerable data property named
+`toJSON` whose value is `undefined`. This shadows inherited
+`Array.prototype.toJSON` and `Object.prototype.toJSON` without adding a JSON
+array element or named output property.
+
+`JSON.stringify()` is called only on this newly constructed protected graph.
+No input object or array is stringified directly. The exact returned string is
+encoded as UTF-8. Local `node:crypto` SHA-256 is represented as:
 
 ```text
 sha256:<64 lowercase hexadecimal characters>
 ```
 
 No v1 source, serialized value, digest, comparator, or helper participates.
+
+The v2 contract assumes the standard ECMAScript `JSON.stringify` intrinsic; it
+does not claim to recover from replacement of the global `JSON.stringify`
+function itself. Inherited `toJSON` hooks are explicitly neutralized and
+covered by regression tests.
 
 ## Pinned Synthetic Fixture Candidate
 
@@ -306,19 +330,29 @@ The proposed tests cover:
    currencies;
 8. invalid scenario strings, field casing, punctuation, lengths, and
    unsupported shapes;
-9. non-number, non-finite, negative, fractional, above-10,000, and wrong-total
-   weights;
+9. non-number, non-finite, negative, negative-zero, fractional, above-10,000,
+   and wrong-total weights;
 10. exact three-letter currency acceptance independent of planner support;
 11. fixed blocker order and no duplicate blockers;
 12. no hash or canonical string on invalid input;
 13. input and rows unchanged after success and failure;
-14. frozen success and invalid results plus nested blocker arrays;
-15. accessor and extra-key rejection without coercion hooks; and
-16. no DB, filesystem, network, environment, clock, random, locale, logging,
+14. dense ordinary vector-array enforcement, including sparse holes, inherited
+    indices, index accessors, extra named keys, symbols, and nonstandard array
+    prototypes;
+15. frozen success and invalid results plus nested blocker arrays;
+16. outer/row accessor and extra-key rejection without coercion hooks;
+17. unchanged canonical JSON and digest while temporary inherited
+    `Object.prototype.toJSON` and `Array.prototype.toJSON` hooks exist, with
+    original descriptors restored in `finally`; and
+18. no DB, filesystem, network, environment, clock, random, locale, logging,
    cache, provider, Next.js, React, route, auth, or runtime behavior.
 
 The existing full test suite must continue to prove all v1 fixtures and hashes
 unchanged. No existing v1 test is edited for v2.
+
+The inherited-`toJSON` regression runs as one non-concurrent focused test and
+restores the exact prior property descriptors even when an assertion fails. It
+must not leave process-global prototype changes for another test.
 
 ## Forbidden Dependency Boundary
 
@@ -363,6 +397,10 @@ Implementation stops and returns for review if:
 - any v1 source, fixture, test, hash, approval evidence, or durable evidence
   would change;
 - the exact synthetic canonical JSON or digest differs from this packet;
+- `-0` reaches canonical serialization or inherited `toJSON` changes canonical
+  bytes;
+- sparse, accessor-backed, extra-keyed, symbol-keyed, or nonstandard-prototype
+  vector arrays cannot be rejected before row copying;
 - v2 requires importing or calling v1;
 - any input requires normalization, inference, fallback, or repair;
 - any file outside the seven-file allowlist must change;
@@ -392,10 +430,11 @@ plan:
 
 1. the seven-file changed-file allowlist;
 2. frozen v2 constants, exact input domain, and 64-row/10,000-bps bounds;
-3. closed no-normalization validation and ordered invalid blockers;
+3. closed no-normalization validation, dense ordinary vector arrays,
+   negative-zero rejection, and ordered invalid blockers;
 4. exact ASCII comparator and input-order-independent canonical sorting;
-5. exact JSON/row property order, UTF-8, local SHA-256, and pinned synthetic
-   fixture/digest;
+5. exact JSON/row property order, inherited-`toJSON` isolation, UTF-8, local
+   SHA-256, and pinned synthetic fixture/digest;
 6. immutable bounded result and no-hash-on-invalid behavior;
 7. focused test, complexity, dependency, verification, and stop boundaries;
    and
