@@ -5,6 +5,7 @@ import {
   InvestmentLabEtfXraySkeleton,
   InvestmentLabEtfXrayUnavailable,
 } from "@/components/investment-lab/investment-lab-etf-xray";
+import { InvestmentLabFixedMix } from "@/components/investment-lab/investment-lab-fixed-mix";
 import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
 import {
   InvestmentLabSmallAdjustment,
@@ -16,6 +17,8 @@ import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-
 import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
 import { getReadOnlyAllPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { buildInvestmentLabSmallAdjustmentModel } from "@/lib/investment-lab-small-adjustment";
+import { resolveInvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
+import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,7 @@ type InvestmentLabPageProps = {
   searchParams: Promise<{
     start?: string | string[];
     end?: string | string[];
+    kodexWeight?: string | string[];
   }>;
 };
 
@@ -32,6 +36,9 @@ export default async function InvestmentLabPage({
   const portfolioStructurePromise = getReadOnlyAllPortfolioStructure();
   const etfXrayPromise = getReadOnlyInvestmentLabEtfXray();
   const params = await searchParams;
+  const fixedMixSelection = resolveInvestmentLabFixedMixSelection(
+    params.kodexWeight,
+  );
   const modelPromise = getReadOnlyInvestmentLabCounterfactual(
     params.start === undefined && params.end === undefined
       ? undefined
@@ -39,12 +46,16 @@ export default async function InvestmentLabPage({
           startServiceDate: params.start,
           endServiceDate: params.end,
         },
+    fixedMixSelection,
   );
 
   return (
     <div className="min-h-screen bg-[#f3f4ef] text-[#171916]">
       <Suspense fallback={<InvestmentLabSkeleton />}>
-        <InvestmentLabContent modelPromise={modelPromise} />
+        <InvestmentLabContent
+          fixedMixSelection={fixedMixSelection}
+          modelPromise={modelPromise}
+        />
       </Suspense>
       <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
         <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
@@ -59,14 +70,21 @@ export default async function InvestmentLabPage({
 }
 
 async function InvestmentLabContent({
+  fixedMixSelection,
   modelPromise,
 }: {
+  fixedMixSelection: InvestmentLabFixedMixSelection;
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
 }) {
   const { model, period, rollingComparison } = await modelPromise;
   return (
     <>
       <InvestmentLabView model={model} period={period} />
+      <InvestmentLabFixedMix
+        model={model.fixedMixScenario}
+        period={period}
+        selection={fixedMixSelection}
+      />
       <InvestmentLabRollingComparisonView model={rollingComparison} />
     </>
   );

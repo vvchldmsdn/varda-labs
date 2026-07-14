@@ -17,6 +17,12 @@ import {
   buildInvestmentLabVooComparison,
   type InvestmentLabVooComparison,
 } from "./investment-lab-voo-comparison.ts";
+import { buildInvestmentLabVooPath } from "./investment-lab-voo-path.ts";
+import {
+  buildInvestmentLabFixedMixScenario,
+  type InvestmentLabFixedMixScenario,
+} from "./investment-lab-fixed-mix.ts";
+import type { InvestmentLabFixedMixSelection } from "./investment-lab-fixed-mix-selection.ts";
 import {
   buildInvestmentLabContributionScenarioEvidence,
 } from "./investment-lab-contribution-evidence.ts";
@@ -104,6 +110,7 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
   returnEstimate: InvestmentLabReturnEstimate | null;
   vooReadiness: InvestmentLabVooReadiness | null;
   vooComparison: InvestmentLabVooComparison | null;
+  fixedMixScenario: InvestmentLabFixedMixScenario | null;
   contributionExperimentScenarios:
     readonly InvestmentLabContributionScenarioEvidence[];
   rows: readonly InvestmentLabCounterfactualDisplayRow[];
@@ -126,6 +133,9 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
 
 export function buildInvestmentLabCounterfactualReadModel(
   input: InvestmentLabCounterfactualReadInput,
+  options: Readonly<{
+    fixedMixSelection?: InvestmentLabFixedMixSelection;
+  }> = {},
 ): InvestmentLabCounterfactualReadModel {
   const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
   const actual = buildAggregateActualPath(input.snapshotRows, blockers);
@@ -220,6 +230,22 @@ export function buildInvestmentLabCounterfactualReadModel(
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,
   });
+  const fixedMixScenario = options.fixedMixSelection
+    ? buildInvestmentLabFixedMixScenario({
+        selection: options.fixedMixSelection,
+        actualPath: actual.rows,
+        kodexPath: path,
+        vooPath: buildInvestmentLabVooPath({
+          actualPath: actual.rows,
+          evidence: vooEvidence,
+        }),
+        kodexReturnEvidence: returnEstimate,
+        vooReturnEvidence:
+          vooComparison.status === "ready"
+            ? vooComparison.returnEstimate
+            : null,
+      })
+    : null;
   const contributionExperimentScenarios =
     buildInvestmentLabContributionScenarioEvidence({
       kodexRows: path.rows,
@@ -241,6 +267,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     returnEstimate,
     vooReadiness,
     vooComparison,
+    fixedMixScenario,
     contributionExperimentScenarios,
     rows,
     coverage: Object.freeze({
@@ -449,6 +476,7 @@ function blockedReadModel(
     returnEstimate: null,
     vooReadiness: null,
     vooComparison: null,
+    fixedMixScenario: null,
     contributionExperimentScenarios: Object.freeze([]),
     rows: Object.freeze([]),
     coverage: Object.freeze({ ...coverageValue }),

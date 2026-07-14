@@ -15,6 +15,7 @@ import {
   type InvestmentLabCounterfactualReadRepository,
 } from "@/lib/investment-lab-counterfactual-read-loader";
 import type { InvestmentLabPeriodRequest } from "@/lib/investment-lab-period-selection";
+import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 
 const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 
@@ -140,9 +141,11 @@ function loadScenarioCloseRows(
 
 export async function getReadOnlyInvestmentLabCounterfactual(
   request?: InvestmentLabPeriodRequest,
+  fixedMixSelection?: InvestmentLabFixedMixSelection,
 ) {
   return loadInvestmentLabCounterfactualReadModel(
     drizzleInvestmentLabRepository,
     request,
+    fixedMixSelection,
   );
 }

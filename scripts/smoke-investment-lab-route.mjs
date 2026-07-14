@@ -8,9 +8,18 @@ config({ path: ".env.local", quiet: true });
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3107";
 const START_SERVICE_DATE = readArgument("--start");
 const END_SERVICE_DATE = readArgument("--end");
+const KODEX_WEIGHT = readArgument("--kodex-weight");
 const EXPECTED_PERIOD_STATUS =
   readArgument("--expect-period-status") ??
   (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "full");
+const EXPECTED_FIXED_MIX_SELECTION_STATUS = fixedMixSelectionStatus();
+const EXPECTED_FIXED_MIX_STATUS =
+  readArgument("--expect-fixed-mix-status") ??
+  ((EXPECTED_PERIOD_STATUS === "full" ||
+    EXPECTED_PERIOD_STATUS === "selected") &&
+  EXPECTED_FIXED_MIX_SELECTION_STATUS !== "invalid"
+    ? "ready"
+    : "unavailable");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -43,6 +52,66 @@ async function main() {
   }
   const periodStatus = readStringAttribute(route.body, "data-period-status");
   assert.equal(periodStatus, EXPECTED_PERIOD_STATUS);
+  assert.match(route.body, /data-section="investment-lab-fixed-mix"/);
+  const fixedMixStatus = readStringAttribute(
+    route.body,
+    "data-fixed-mix-status",
+  );
+  const fixedMixSelectionStatus = readStringAttribute(
+    route.body,
+    "data-fixed-mix-selection-status",
+  );
+  const fixedMixKodexWeightBps = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-kodex-weight-bps",
+  );
+  const fixedMixVooWeightBps = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-voo-weight-bps",
+  );
+  const fixedMixComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-comparison-dates",
+  );
+  const fixedMixFlowSources = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-flow-sources",
+  );
+  const fixedMixScenarioFlowLegs = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-scenario-flow-legs",
+  );
+  const fixedMixSplitExecutionDateRows = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-split-execution-date-rows",
+  );
+  const fixedMixReturnStatus = readStringAttribute(
+    route.body,
+    "data-fixed-mix-return-status",
+  );
+  assert.equal(fixedMixStatus, EXPECTED_FIXED_MIX_STATUS);
+  assert.equal(
+    fixedMixSelectionStatus,
+    EXPECTED_FIXED_MIX_SELECTION_STATUS,
+  );
+  if (fixedMixStatus === "ready") {
+    assert.equal(fixedMixReturnStatus, "ready");
+    assert.equal(fixedMixKodexWeightBps + fixedMixVooWeightBps, 10_000);
+    assert.ok(fixedMixKodexWeightBps > 0 && fixedMixVooWeightBps > 0);
+    assert.ok(fixedMixComparisonDates >= 2);
+    assert.equal(fixedMixScenarioFlowLegs, fixedMixFlowSources * 2);
+    assert.ok(fixedMixSplitExecutionDateRows >= 0);
+    for (const marker of [
+      "KODEX 200·VOO 고정 배분 실험",
+      "중간 재리밸런싱은 하지 않습니다",
+      "과거 연구 비교",
+    ]) {
+      assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+    }
+  } else {
+    assert.equal(fixedMixReturnStatus, "unavailable");
+    assert.equal(fixedMixComparisonDates, 0);
+  }
   assert.match(
     route.body,
     /data-section="investment-lab-rolling-comparison"/,
@@ -222,6 +291,15 @@ async function main() {
           baseUrl: BASE_URL,
           routePath,
           periodStatus,
+          fixedMixStatus,
+          fixedMixSelectionStatus,
+          fixedMixKodexWeightBps,
+          fixedMixVooWeightBps,
+          fixedMixComparisonDates,
+          fixedMixFlowSources,
+          fixedMixScenarioFlowLegs,
+          fixedMixSplitExecutionDateRows,
+          fixedMixReturnStatus,
           rollingStatus,
           rollingCandidateWindows,
           rollingCompleteWindows,
@@ -412,6 +490,15 @@ async function main() {
         pendingAtEnd,
         returnStatus: "ready",
         returnMethod: "modified_dietz_daily_weighted_eod_v1",
+        fixedMixStatus,
+        fixedMixSelectionStatus,
+        fixedMixKodexWeightBps,
+        fixedMixVooWeightBps,
+        fixedMixComparisonDates,
+        fixedMixFlowSources,
+        fixedMixScenarioFlowLegs,
+        fixedMixSplitExecutionDateRows,
+        fixedMixReturnStatus,
         vooReadiness,
         vooComparisonStatus,
         vooServiceDates,
@@ -472,11 +559,19 @@ async function request(path, authenticated = false) {
 }
 
 function investmentLabRoutePath() {
-  if (!START_SERVICE_DATE && !END_SERVICE_DATE) return "/investment-lab";
   const params = new URLSearchParams();
   if (START_SERVICE_DATE) params.set("start", START_SERVICE_DATE);
   if (END_SERVICE_DATE) params.set("end", END_SERVICE_DATE);
-  return `/investment-lab?${params}`;
+  if (KODEX_WEIGHT !== null) params.set("kodexWeight", KODEX_WEIGHT);
+  const query = params.toString();
+  return query ? `/investment-lab?${query}` : "/investment-lab";
+}
+
+function fixedMixSelectionStatus() {
+  if (KODEX_WEIGHT === null) return "default";
+  if (!/^(?:0|[1-9][0-9]{0,2})$/.test(KODEX_WEIGHT)) return "invalid";
+  const weight = Number(KODEX_WEIGHT);
+  return weight >= 1 && weight <= 99 ? "selected" : "invalid";
 }
 
 async function readCounts() {

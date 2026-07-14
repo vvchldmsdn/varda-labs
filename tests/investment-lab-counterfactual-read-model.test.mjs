@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { buildInvestmentLabCounterfactualReadModel } from "../src/lib/investment-lab-counterfactual-read-model.ts";
+import { resolveInvestmentLabFixedMixSelection } from "../src/lib/investment-lab-fixed-mix-selection.ts";
 
 describe("investment lab counterfactual read model", () => {
   it("builds a minimized aggregate KODEX 200 comparison", () => {
@@ -54,6 +55,30 @@ describe("investment lab counterfactual read model", () => {
       result.contributionExperimentScenarios[1].points[0].unitValueKrw,
       130_000,
     );
+  });
+
+  it("builds the fixed mix only when an explicit selection is requested", () => {
+    const withoutSelection = buildInvestmentLabCounterfactualReadModel(
+      fixture(),
+    );
+    const withSelection = buildInvestmentLabCounterfactualReadModel(
+      fixture(),
+      {
+        fixedMixSelection: resolveInvestmentLabFixedMixSelection("25"),
+      },
+    );
+
+    assert.equal(withoutSelection.fixedMixScenario, null);
+    assert.equal(withSelection.fixedMixScenario.status, "ready");
+    assert.equal(withSelection.fixedMixScenario.weights.kodexWeightBps, 2500);
+    assert.equal(withSelection.fixedMixScenario.weights.vooWeightBps, 7500);
+    assert.equal(withSelection.fixedMixScenario.rows.length, 4);
+    assert.equal(
+      withSelection.fixedMixScenario.coverage.scenarioFlowLegCount,
+      6,
+    );
+    assert.equal(withSelection.fixedMixScenario.returnEstimate.method.version,
+      "modified_dietz_daily_weighted_eod_v1");
   });
 
   it("blocks duplicate snapshot evidence without returning partial values", () => {

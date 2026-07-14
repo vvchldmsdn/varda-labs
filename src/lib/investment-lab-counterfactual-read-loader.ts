@@ -6,6 +6,7 @@ import {
   type InvestmentLabSourceSnapshotRow,
 } from "./investment-lab-counterfactual-read-model.ts";
 import type { InvestmentLabVooFxRow } from "./investment-lab-voo-readiness.ts";
+import type { InvestmentLabFixedMixSelection } from "./investment-lab-fixed-mix-selection.ts";
 import {
   buildInvestmentLabRollingComparison,
   type InvestmentLabRollingComparison,
@@ -29,6 +30,7 @@ export interface InvestmentLabCounterfactualReadRepository {
 export async function loadInvestmentLabCounterfactualReadModel(
   repository: InvestmentLabCounterfactualReadRepository,
   request?: InvestmentLabPeriodRequest,
+  fixedMixSelection?: InvestmentLabFixedMixSelection,
 ): Promise<Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
@@ -50,7 +52,9 @@ export async function loadInvestmentLabCounterfactualReadModel(
     vooCloseRows,
     fxRows,
   });
-  const fullModel = buildInvestmentLabCounterfactualReadModel(input);
+  const fullModel = buildInvestmentLabCounterfactualReadModel(input, {
+    fixedMixSelection,
+  });
   const rollingComparison = buildInvestmentLabRollingComparison({
     source: input,
     availableServiceDates: fullModel.rows.map((row) => row.serviceDate),
@@ -66,6 +70,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
 
   const model = buildInvestmentLabCounterfactualReadModel(
     sliceInvestmentLabCounterfactualInput(input, period),
+    { fixedMixSelection },
   );
   const complete =
     model.status === "ready" &&
