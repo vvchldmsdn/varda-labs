@@ -65,6 +65,21 @@ describe("investment lab period selection", () => {
     }
   });
 
+  it("rejects padded dates instead of silently canonicalizing the URL", () => {
+    const result = resolveInvestmentLabPeriodSelection({
+      request: {
+        startServiceDate: " 2026-01-02 ",
+        endServiceDate: "2026-01-05",
+      },
+      availableServiceDates: ["2026-01-02", "2026-01-05"],
+    });
+
+    assert.equal(result.status, "invalid");
+    assert.equal(result.reason, "invalid_date");
+    assert.equal(result.selectedStartServiceDate, null);
+    assert.equal(result.selectedEndServiceDate, null);
+  });
+
   it("slices source evidence around the selected anchor instead of trimming output rows", () => {
     const source = fixture();
     const selection = resolveInvestmentLabPeriodSelection({

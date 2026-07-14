@@ -43,6 +43,70 @@ async function main() {
   }
   const periodStatus = readStringAttribute(route.body, "data-period-status");
   assert.equal(periodStatus, EXPECTED_PERIOD_STATUS);
+  assert.match(route.body, /data-section="investment-lab-etf-xray"/);
+  const xrayStatus = readStringAttribute(route.body, "data-xray-status");
+  const heldEtfs = readIntegerAttribute(route.body, "data-held-etfs");
+  const matchedEtfs = readIntegerAttribute(route.body, "data-matched-etfs");
+  const missingEtfReferences = readIntegerAttribute(
+    route.body,
+    "data-missing-etf-references",
+  );
+  const ambiguousEtfReferences = readIntegerAttribute(
+    route.body,
+    "data-ambiguous-etf-references",
+  );
+  const xrayAsOfDateCount = readIntegerAttribute(
+    route.body,
+    "data-xray-as-of-date-count",
+  );
+  const xrayComponentCount = readIntegerAttribute(
+    route.body,
+    "data-xray-component-count",
+  );
+  const xrayOverlapCount = readIntegerAttribute(
+    route.body,
+    "data-xray-overlap-count",
+  );
+  const xrayMixedAsOf = readStringAttribute(
+    route.body,
+    "data-xray-mixed-as-of",
+  );
+  const etfPortfolioWeight = readNumberAttribute(
+    route.body,
+    "data-etf-portfolio-weight",
+  );
+  const observedEtfExposure = readNumberAttribute(
+    route.body,
+    "data-observed-etf-exposure",
+  );
+  const uncoveredEtfExposure = readNumberAttribute(
+    route.body,
+    "data-uncovered-etf-exposure",
+  );
+  assert.ok(
+    [
+      "complete_common_date",
+      "complete_mixed_dates",
+      "partial",
+      "unavailable",
+    ].includes(xrayStatus),
+    "ETF X-ray status must be explicit",
+  );
+  assert.ok(heldEtfs > 0, "ETF X-ray needs at least one held ETF");
+  assert.equal(
+    matchedEtfs + missingEtfReferences + ambiguousEtfReferences,
+    heldEtfs,
+    "every held ETF must have an explicit reference mapping state",
+  );
+  assert.ok(xrayAsOfDateCount >= 1, "ETF X-ray needs dated evidence");
+  assert.ok(xrayComponentCount >= xrayOverlapCount);
+  assert.ok(xrayMixedAsOf === "true" || xrayMixedAsOf === "false");
+  assert.ok(
+    Math.abs(
+      etfPortfolioWeight - observedEtfExposure - uncoveredEtfExposure,
+    ) < 0.00001,
+    "observed and uncovered ETF exposure must reconcile without normalization",
+  );
   assert.doesNotMatch(route.body, LEAK_PATTERN);
   assert.doesNotMatch(
     route.body,
@@ -62,6 +126,18 @@ async function main() {
           baseUrl: BASE_URL,
           routePath,
           periodStatus,
+          xrayStatus,
+          heldEtfs,
+          matchedEtfs,
+          missingEtfReferences,
+          ambiguousEtfReferences,
+          xrayAsOfDateCount,
+          xrayComponentCount,
+          xrayOverlapCount,
+          xrayMixedAsOf,
+          etfPortfolioWeight,
+          observedEtfExposure,
+          uncoveredEtfExposure,
           noAuthStatus: unauthorized.status,
           authenticatedStatus: route.status,
           dashboardLink: true,
@@ -240,6 +316,18 @@ async function main() {
         vooReturnStatus,
         vooReturnMethod,
         contributionScenarioCount,
+        xrayStatus,
+        heldEtfs,
+        matchedEtfs,
+        missingEtfReferences,
+        ambiguousEtfReferences,
+        xrayAsOfDateCount,
+        xrayComponentCount,
+        xrayOverlapCount,
+        xrayMixedAsOf,
+        etfPortfolioWeight,
+        observedEtfExposure,
+        uncoveredEtfExposure,
         leakPatternMatches: 0,
         databaseSideEffects: false,
         counts: countsAfter,
@@ -273,7 +361,9 @@ async function readCounts() {
       (select count(*)::int from assets) as assets,
       (select count(*)::int from event_ledger_entries) as event_ledger_entries,
       (select count(*)::int from daily_portfolio_snapshots) as portfolio_snapshots,
-      (select count(*)::int from asset_price_snapshots) as price_snapshots
+      (select count(*)::int from asset_price_snapshots) as price_snapshots,
+      (select count(*)::int from etf_masters) as etf_masters,
+      (select count(*)::int from etf_holdings) as etf_holdings
   `);
   return row;
 }
@@ -293,6 +383,12 @@ function readStringAttribute(html, name) {
   const match = html.match(new RegExp(`${name}="([a-z0-9_]+)"`));
   assert.ok(match, `route is missing string attribute: ${name}`);
   return match[1];
+}
+
+function readNumberAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="(-?\\d+(?:\\.\\d+)?)"`));
+  assert.ok(match, `route is missing numeric attribute: ${name}`);
+  return Number(match[1]);
 }
 
 await main();

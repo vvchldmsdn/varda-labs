@@ -167,7 +167,7 @@ function normalizeRequestValue(
   if (typeof value !== "string") {
     return { value: null, ambiguous: false } as const;
   }
-  return { value: value.trim() || null, ambiguous: false } as const;
+  return { value: value || null, ambiguous: false } as const;
 }
 
 function uniqueSortedRiskDates(values: readonly string[]) {

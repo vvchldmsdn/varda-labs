@@ -15,6 +15,7 @@ export type PortfolioStructureAssetInput = {
   account: string;
   market: string;
   currency: string;
+  assetType?: string | null;
   quantity: string | number | null;
   currentPrice: string | number | null;
   fractionalKrwValue?: string | number | null;
@@ -76,6 +77,7 @@ export type PortfolioStructureHoldingRow = {
   account: string;
   market: string;
   currency: string;
+  assetType: string | null;
   groupName: string;
   quantity: number;
   currentPrice: number;
@@ -267,6 +269,7 @@ function buildHoldingCandidate({
     account: asset.account,
     market: asset.market,
     currency: normalizeCurrency(asset.currency),
+    assetType: normalizeAssetType(asset.assetType),
     groupName,
     quantity,
     currentPrice,
@@ -326,6 +329,11 @@ function buildHoldingCandidate({
       priceAsOf: timestampString(quote?.priceAsOf ?? asset.priceAsOf),
     },
   };
+}
+
+function normalizeAssetType(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || null;
 }
 
 function buildGroupRows(

@@ -1,7 +1,13 @@
 import { Suspense } from "react";
 
+import {
+  InvestmentLabEtfXray,
+  InvestmentLabEtfXraySkeleton,
+  InvestmentLabEtfXrayUnavailable,
+} from "@/components/investment-lab/investment-lab-etf-xray";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
 import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
+import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +21,7 @@ type InvestmentLabPageProps = {
 export default async function InvestmentLabPage({
   searchParams,
 }: InvestmentLabPageProps) {
+  const etfXrayPromise = getReadOnlyInvestmentLabEtfXray();
   const params = await searchParams;
   const modelPromise = getReadOnlyInvestmentLabCounterfactual(
     params.start === undefined && params.end === undefined
@@ -26,9 +33,14 @@ export default async function InvestmentLabPage({
   );
 
   return (
-    <Suspense fallback={<InvestmentLabSkeleton />}>
-      <InvestmentLabContent modelPromise={modelPromise} />
-    </Suspense>
+    <div className="min-h-screen bg-[#f3f4ef] text-[#171916]">
+      <Suspense fallback={<InvestmentLabSkeleton />}>
+        <InvestmentLabContent modelPromise={modelPromise} />
+      </Suspense>
+      <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
+        <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
+      </Suspense>
+    </div>
   );
 }
 
@@ -39,6 +51,20 @@ async function InvestmentLabContent({
 }) {
   const { model, period } = await modelPromise;
   return <InvestmentLabView model={model} period={period} />;
+}
+
+async function InvestmentLabEtfXrayContent({
+  modelPromise,
+}: {
+  modelPromise: ReturnType<typeof getReadOnlyInvestmentLabEtfXray>;
+}) {
+  let model;
+  try {
+    model = await modelPromise;
+  } catch {
+    return <InvestmentLabEtfXrayUnavailable />;
+  }
+  return <InvestmentLabEtfXray model={model} />;
 }
 
 function InvestmentLabSkeleton() {
