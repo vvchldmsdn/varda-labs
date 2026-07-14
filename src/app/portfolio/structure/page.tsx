@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-baseline";
+import { PortfolioFxShock } from "@/components/portfolio/portfolio-fx-shock";
 import { SpecialHoldingsCoverage } from "@/components/portfolio/special-holdings-coverage";
 import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
@@ -42,7 +43,10 @@ export default async function PortfolioStructurePage({
     buildPortfolioSpecialHoldingsModel(structure);
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
+    <main
+      className="min-h-screen bg-[#f3f4ef] text-[#171916]"
+      data-page="portfolio-structure"
+    >
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
         <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -109,6 +113,11 @@ export default async function PortfolioStructurePage({
         </section>
 
         <DirectHoldingsBaseline model={directHoldingsBaseline} />
+
+        <PortfolioFxShock
+          baseline={directHoldingsBaseline}
+          currentUsdKrwRate={structure.usdKrwRate}
+        />
 
         <SpecialHoldingsCoverage model={specialHoldingsCoverage} />
 

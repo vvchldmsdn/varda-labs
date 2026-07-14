@@ -26,6 +26,7 @@ export type PortfolioDirectHolding = Readonly<{
 
 export type PortfolioDirectHoldingCurrencyExposure = Readonly<{
   currency: string;
+  holdingCount: number;
   currentValueKrw: number;
   currentWeightPct: number;
 }>;
@@ -204,15 +205,22 @@ export function calculatePortfolioDirectHoldingMetrics(
 
   let largestHoldingWeightPct = 0;
   let sumSquaredWeights = 0;
-  const currencyValues = new Map<string, number>();
+  const currencyValues = new Map<
+    string,
+    { currentValueKrw: number; holdingCount: number }
+  >();
   const holdingWeights = holdings.map((holding) => {
     const weight = holding.currentValueKrw / totalValueKrw;
     largestHoldingWeightPct = Math.max(largestHoldingWeightPct, weight * 100);
     sumSquaredWeights += weight * weight;
-    currencyValues.set(
-      holding.currency,
-      (currencyValues.get(holding.currency) ?? 0) + holding.currentValueKrw,
-    );
+    const currencyValue = currencyValues.get(holding.currency);
+    currencyValues.set(holding.currency, {
+      currentValueKrw:
+        (currencyValue?.currentValueKrw ?? 0) + holding.currentValueKrw,
+      holdingCount:
+        (currencyValue?.holdingCount ?? 0) +
+        (holding.currentValueKrw > 0 ? 1 : 0),
+    });
     return weight;
   });
   if (!Number.isFinite(sumSquaredWeights) || sumSquaredWeights <= 0) {
@@ -225,9 +233,10 @@ export function calculatePortfolioDirectHoldingMetrics(
     .reduce((total, weight) => total + weight * 100, 0);
   const currencyExposures = [...currencyValues]
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([currency, currentValueKrw]) =>
+    .map(([currency, { currentValueKrw, holdingCount }]) =>
       Object.freeze({
         currency,
+        holdingCount,
         currentValueKrw,
         currentWeightPct: percentage(currentValueKrw, totalValueKrw),
       }),

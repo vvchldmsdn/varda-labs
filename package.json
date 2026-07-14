@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --no-warnings tests/run.mjs",
+    "smoke:portfolio-structure-route": "node --no-warnings scripts/smoke-portfolio-structure-route.mjs",
     "smoke:portfolio-risk-route": "node --no-warnings scripts/smoke-portfolio-risk-route.mjs",
     "smoke:history-route": "node --no-warnings scripts/smoke-history-route.mjs",
     "smoke:investment-lab-route": "node --no-warnings scripts/smoke-investment-lab-route.mjs",

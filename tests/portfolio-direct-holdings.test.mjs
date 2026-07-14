@@ -33,11 +33,13 @@ describe("portfolio direct holdings baseline", () => {
     assert.deepEqual(model.metrics.currencyExposures, [
       {
         currency: "KRW",
+        holdingCount: 1,
         currentValueKrw: 600_000,
         currentWeightPct: 60,
       },
       {
         currency: "USD",
+        holdingCount: 2,
         currentValueKrw: 400_000,
         currentWeightPct: 40,
       },

@@ -92,7 +92,7 @@ export function DirectHoldingsBaseline({
                     </span>
                   </div>
                   <p className="mt-1 text-xs tabular-nums text-[#687064]">
-                    {formatKrw(row.currentValueKrw)}
+                    {formatKrw(row.currentValueKrw)} · {row.holdingCount}개
                   </p>
                 </div>
               ))}
