@@ -54,6 +54,23 @@ describe("Simulation input readiness read model", () => {
       ],
     );
     assert.ok(model.inputs.every((row) => row.issues.length === 0));
+    for (const input of model.inputs) {
+      assert.equal(input.observedReturns?.length, RETURN_STEP_COUNT);
+      assert.ok(
+        input.observedReturns.every(
+          (row, index, series) =>
+            Number.isFinite(row.value) &&
+            (index === 0 ||
+              series[index - 1].serviceDate === row.previousServiceDate),
+        ),
+      );
+    }
+    const vooLastReturn = model.inputs[1].observedReturns.at(-1).value;
+    const expectedVooLastReturn = (290 * 1_390) / (289 * 1_389) - 1;
+    assert.ok(
+      Math.abs(vooLastReturn - expectedVooLastReturn) < 1e-12,
+      "VOO KRW returns must include the date-specific FX ratio",
+    );
   });
 
   it("keeps an exact missing endpoint unavailable and exposes only the prior date as review evidence", async () => {
@@ -70,6 +87,7 @@ describe("Simulation input readiness read model", () => {
 
     assert.equal(model.inputs[0].status, "unavailable");
     assert.equal(model.inputs[0].resolvedEndServiceDate, null);
+    assert.equal(model.inputs[0].observedReturns, null);
     assert.equal(
       model.inputs[0].nearestPriorObservedServiceDate,
       END_SERVICE_DATE,
@@ -97,7 +115,7 @@ describe("Simulation input readiness read model", () => {
 
     assert.doesNotMatch(
       serialized,
-      /scenarioUniverseHash|matrixRequestHash|inputMatrixHash|drawPlanHash|adjustedClosePrice|usdKrw|instrumentKey|legacyBase44|ownerUser|assetId|holdingId/i,
+      /scenarioUniverseHash|matrixRequestHash|inputMatrixHash|drawPlanHash|adjustedClosePrice|usdKrw|instrumentKey|sourcePriceDate|sourceFxDate|legacyBase44|ownerUser|assetId|holdingId/i,
     );
   });
 

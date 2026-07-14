@@ -42,11 +42,15 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /최근 7개 기준일/);
     assert.match(view, /저장된 실행 기록이 아니라/);
     assert.match(view, /수익률 행/);
+    assert.match(view, /data-observed-return-series/);
+    assert.match(view, /\{rows\.length\}개 관측 수익률/);
+    assert.match(view, /전체 \{rows\.length\}개 수익률 표 보기/);
+    assert.match(view, /예측·시뮬레이션 경로 아님/);
     assert.match(view, /시뮬레이션 실행, 미래 예측, 비중 추천 결과가 아닙니다/);
     assert.match(view, /과거\s*날짜로 자동 대체/);
     assert.doesNotMatch(
       view,
-      /scenarioVectorHash|matrixRequestHash|inputMatrixHash|drawPlanHash|initialKrw|pathCount|optimizer/i,
+      /scenarioVectorHash|matrixRequestHash|inputMatrixHash|drawPlanHash|initialKrw|pathCount|optimizer|adjustedClosePrice|usdKrw|sourcePriceDate|sourceFxDate/i,
     );
     assert.match(proxy, /"\/simulation"/);
     assert.match(proxy, /"\/simulation\/:path\*"/);

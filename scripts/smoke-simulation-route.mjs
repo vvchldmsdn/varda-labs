@@ -75,6 +75,10 @@ async function main() {
   const historyRowCount =
     simulation.body.match(/data-readiness-history-row="\d{4}-\d{2}-\d{2}"/g)
       ?.length ?? 0;
+  const observedReturnSeriesCount =
+    simulation.body.match(
+      /data-observed-return-series="(?:kodex200|voo)"/g,
+    )?.length ?? 0;
   assert.equal(inputCount, 2, "simulation must render two independent inputs");
   assert.equal(statuses.length, 2, "simulation must render two readiness states");
   assert.equal(
@@ -82,6 +86,16 @@ async function main() {
     EXPECT_INVALID_QUERY ? 0 : 7,
     "simulation rendered an unexpected history row count",
   );
+  assert.equal(
+    observedReturnSeriesCount,
+    readyCount,
+    "only ready inputs may render a complete observed return series",
+  );
+  if (observedReturnSeriesCount > 0) {
+    assert.match(simulation.body, /90개 관측 수익률/);
+    assert.match(simulation.body, /data-return-row-count="90"/);
+    assert.match(simulation.body, /예측·시뮬레이션 경로 아님/);
+  }
   if (EXPECT_READY !== null) {
     assert.equal(readyCount, EXPECT_READY, "unexpected ready input count");
   }
@@ -107,6 +121,7 @@ async function main() {
         statuses,
         readyCount,
         historyRowCount,
+        observedReturnSeriesCount,
         databaseSideEffects: false,
         counts: countsAfter,
       },

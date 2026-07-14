@@ -11,6 +11,8 @@ export const SIMULATION_INPUT_READINESS_POLICY = Object.freeze({
   runtimeTrustStatus: "not_established",
   executionStatus: "not_executed",
   automaticEndpointRollback: "forbidden",
+  observedReturnDisplay: "complete_ready_series_only",
+  observedReturnBasis: "krw_investor_simple_return",
 } as const);
 
 type SimulationPeriodPreflight = Awaited<
@@ -185,6 +187,12 @@ function projectInputReadiness(
       instrument.currency === descriptor.currency &&
       instrument.ticker === descriptor.ticker,
   );
+  const matrixReturnSeries = preflight.matrixReturnSeries.find(
+    (series) =>
+      series.market === descriptor.market &&
+      series.currency === descriptor.currency &&
+      series.ticker === descriptor.ticker,
+  );
   const issues = new Map<string, Readonly<{ code: string; label: string; dates: readonly string[] }>>();
 
   for (const issue of preflight.axis.issues) {
@@ -204,11 +212,26 @@ function projectInputReadiness(
     addIssue(issues, "missing_matrix_instrument", []);
   }
 
+  const hasCompleteReturnSeries = isCompleteReturnSeries({
+    rows: matrixReturnSeries?.rows ?? [],
+    status: matrixReturnSeries?.status ?? "unavailable",
+    resolvedServiceDates: preflight.axis.resolvedServiceDates,
+    returnStepCount: preflight.axis.request.returnStepCount ?? 0,
+  });
+  if (
+    preflight.status === "matrix_ready" &&
+    matrixInstrument?.status === "ready" &&
+    !hasCompleteReturnSeries
+  ) {
+    addIssue(issues, "missing_observed_return_series", []);
+  }
+
   const status =
     preflight.status === "matrix_ready" &&
     preflight.matrixStatus === "ready" &&
     axisCandidate?.status === "observed" &&
-    matrixInstrument?.status === "ready"
+    matrixInstrument?.status === "ready" &&
+    hasCompleteReturnSeries
       ? ("matrix_ready" as const)
       : ("unavailable" as const);
 
@@ -272,8 +295,46 @@ function projectInputReadiness(
           coveragePct: matrixInstrument.returnCoverage.coveragePct,
         })
       : null,
+    observedReturns:
+      status === "matrix_ready" && matrixReturnSeries
+        ? Object.freeze(
+            matrixReturnSeries.rows.map((row) =>
+              Object.freeze({
+                previousServiceDate: row.previousServiceDate,
+                serviceDate: row.serviceDate,
+                value: row.value,
+              }),
+            ),
+          )
+        : null,
     issues: Object.freeze([...issues.values()]),
   });
+}
+
+function isCompleteReturnSeries(input: {
+  rows: readonly Readonly<{
+    previousServiceDate: string;
+    serviceDate: string;
+    value: number;
+  }>[];
+  status: "ready" | "unavailable";
+  resolvedServiceDates: readonly string[];
+  returnStepCount: number;
+}) {
+  if (
+    input.status !== "ready" ||
+    input.rows.length !== input.returnStepCount ||
+    input.resolvedServiceDates.length !== input.returnStepCount + 1
+  ) {
+    return false;
+  }
+
+  return input.rows.every(
+    (row, index) =>
+      Number.isFinite(row.value) &&
+      row.previousServiceDate === input.resolvedServiceDates[index] &&
+      row.serviceDate === input.resolvedServiceDates[index + 1],
+  );
 }
 
 function addIssue(
@@ -336,6 +397,8 @@ function issueLabel(code: string) {
     missing_preflight_candidate: "검사 대상 종목의 축 증거가 없습니다.",
     missing_matrix_instrument: "검사 대상 종목의 행렬 증거가 없습니다.",
     matrix_not_ready: "수익률 행렬 준비 조건을 충족하지 못했습니다.",
+    missing_observed_return_series:
+      "완전한 관측 수익률 상세를 만들 수 없습니다.",
   };
   return labels[code] ?? "확인되지 않은 데이터 결손이 있습니다.";
 }

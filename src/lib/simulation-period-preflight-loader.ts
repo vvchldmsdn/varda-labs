@@ -13,7 +13,8 @@ import type {
 } from "./simulation-period-request-types.ts";
 import { SIMULATION_RETURN_MATRIX_POLICY } from "./simulation-return-matrix.ts";
 import {
-  loadSimulationReturnMatrixUniverseEvidence,
+  loadSimulationReturnMatrixUniverseBundle,
+  type SimulationObservedReturnSeries,
   type SimulationReturnMatrixReadRepository,
 } from "./simulation-return-matrix-read-loader.ts";
 
@@ -30,6 +31,7 @@ export async function loadSimulationPeriodPreflight(
       plan,
       axis: blockedAxisProjection(plan),
       matrixEvidence: null,
+      matrixReturnSeries: Object.freeze([]),
       scanOutcome: "request_blocked",
     });
   }
@@ -70,19 +72,21 @@ export async function loadSimulationPeriodPreflight(
       plan,
       axis,
       matrixEvidence: null,
+      matrixReturnSeries: Object.freeze([]),
       scanOutcome: insufficientWithinBound
         ? "insufficient_axis_within_scan_bound"
         : "axis_not_resolved",
     });
   }
 
-  const matrixEvidence = await loadSimulationReturnMatrixUniverseEvidence(
+  const matrixBundle = await loadSimulationReturnMatrixUniverseBundle(
     repository,
     {
       requestedServiceDates: resolution.resolvedServiceDates,
       instruments: request.candidates,
     },
   );
+  const matrixEvidence = matrixBundle.evidence;
   return buildPreflightResult({
     status:
       matrixEvidence.status === "ready"
@@ -93,6 +97,7 @@ export async function loadSimulationPeriodPreflight(
     plan,
     axis,
     matrixEvidence,
+    matrixReturnSeries: matrixBundle.returnSeries,
     scanOutcome: "axis_resolved",
   });
 }
@@ -220,6 +225,7 @@ function buildPreflightResult({
   plan,
   axis,
   matrixEvidence,
+  matrixReturnSeries,
   scanOutcome,
 }: {
   status:
@@ -231,8 +237,9 @@ function buildPreflightResult({
   plan: ReturnType<typeof planSimulationPeriodPreflightScan>;
   axis: ReturnType<typeof projectAxisResolution>;
   matrixEvidence: Awaited<
-    ReturnType<typeof loadSimulationReturnMatrixUniverseEvidence>
-  > | null;
+    ReturnType<typeof loadSimulationReturnMatrixUniverseBundle>
+  >["evidence"] | null;
+  matrixReturnSeries: readonly SimulationObservedReturnSeries[];
   scanOutcome:
     | "request_blocked"
     | "axis_not_resolved"
@@ -267,6 +274,7 @@ function buildPreflightResult({
     }),
     axis,
     matrixEvidence,
+    matrixReturnSeries,
   });
 }
 
