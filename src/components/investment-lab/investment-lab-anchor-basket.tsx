@@ -1,5 +1,8 @@
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
-import type { InvestmentLabAnchorBlocker } from "@/lib/investment-lab-anchor-basket-anchor";
+import type {
+  InvestmentLabAnchorBlocker,
+  InvestmentLabAnchorSpecialHoldingEvidence,
+} from "@/lib/investment-lab-anchor-basket-anchor";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
@@ -88,6 +91,8 @@ export function InvestmentLabAnchorBasket({
           <UnavailableResult model={model} />
         )}
 
+        <SpecialHoldingEvidence rows={anchor.specialHoldingEvidence} />
+
         <p className="text-xs leading-5 text-[#73786c]">
           현재 보유 종목을 더 오래된 과거로 소급하지 않습니다. ticker·시장·통화,
           종가, USD/KRW 근거가 한 종목이라도 없으면 일부 종목만 제외한 그래프를
@@ -96,6 +101,76 @@ export function InvestmentLabAnchorBasket({
         </p>
       </div>
     </section>
+  );
+}
+
+function SpecialHoldingEvidence({
+  rows,
+}: {
+  rows: readonly InvestmentLabAnchorSpecialHoldingEvidence[];
+}) {
+  if (rows.length === 0) return null;
+  const resolvedCount = rows.filter(
+    (row) => row.identityStatus === "resolved",
+  ).length;
+  return (
+    <div
+      className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      data-anchor-special-holding-resolved={resolvedCount}
+      data-anchor-special-holding-rows={rows.length}
+      data-anchor-special-holding-unavailable={rows.length - resolvedCount}
+      data-section="investment-lab-anchor-special-holding-evidence"
+    >
+      <div className="border-b border-[#e1e6dc] px-4 py-3">
+        <h3 className="font-semibold">ticker 없는 저장 포지션 근거</h3>
+        <p className="mt-1 text-xs leading-5 text-[#687064]">
+          이름으로 종목을 추론하지 않습니다. 보존된 legacy asset 연결과 저장
+          메타데이터가 모두 일치할 때만 listed ticker를 복구합니다.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
+          <thead>
+            <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+              <th className="px-4 py-3">저장 포지션</th>
+              <th className="px-3 py-3">계좌·축</th>
+              <th className="px-3 py-3">identity 상태</th>
+              <th className="px-4 py-3">판정 근거</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                className="border-t border-[#e1e6dc] align-top"
+                data-special-holding-status={row.identityStatus}
+                key={`${row.account}:${row.name}:${row.source ?? "unknown"}`}
+              >
+                <td className="px-4 py-3 font-semibold">{row.name}</td>
+                <td className="px-3 py-3 text-[#5f685d]">
+                  {row.account} · {row.market ?? "-"}/{row.currency ?? "-"}
+                </td>
+                <td className="px-3 py-3">
+                  <span
+                    className={
+                      row.identityStatus === "resolved"
+                        ? "font-semibold text-[#08784d]"
+                        : "font-semibold text-[#9a6b18]"
+                    }
+                  >
+                    {row.identityStatus === "resolved"
+                      ? `listed ${row.resolvedTicker}`
+                      : "사용 불가"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-[#5f685d]">
+                  {specialHoldingReasonLabel(row.reason)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -289,6 +364,23 @@ function evidenceBlockerLabel(reason: string) {
   if (reason.includes("fx")) return "필요 환율 근거 누락 또는 중복";
   if (reason.includes("execution")) return "매수·매도 체결 근거 불완전";
   return "계산 근거 불완전";
+}
+
+function specialHoldingReasonLabel(
+  reason: InvestmentLabAnchorSpecialHoldingEvidence["reason"],
+) {
+  const labels: Record<
+    InvestmentLabAnchorSpecialHoldingEvidence["reason"],
+    string
+  > = {
+    linked_ticker_recovered: "exact imported asset link와 저장 메타데이터 일치",
+    physical_commodity_history_unavailable:
+      "실물 commodity용 instrument-keyed 공식 종가 이력 없음",
+    linked_asset_metadata_mismatch: "연결 자산과 저장 메타데이터 불일치",
+    linked_asset_ticker_missing: "연결 자산에도 listed ticker 없음",
+    linked_asset_unavailable: "검증 가능한 imported asset link 없음",
+  };
+  return labels[reason];
 }
 
 function formatDate(value: string | null) {

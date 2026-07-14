@@ -115,7 +115,7 @@ is no new comparison period; it is not evidence of a zero return.
 | Gate B1 | `(market,currency,ticker)` makes brokerage fail closed | keep blocked until explicit instrument identity and policy treatment are reviewed |
 | Additional Contribution | allocation identity is ticker based | do not include gold in a positive vector before a separate allocator decision |
 | portfolio risk | tickerless holdings are excluded and price history is ticker keyed | require instrument-keyed close history before risk inclusion |
-| Investment Lab | ticker-only identity is an explicit readiness blocker | require instrument identity and historical close coverage before inclusion |
+| Investment Lab | stored ticker or an exact imported listed-asset link can establish listed identity; tickerless commodity remains blocked | require a bound gold instrument identity and instrument-keyed official-close history before inclusion |
 | event and movement matching | asset UUID and legacy asset id are primary fallbacks | no fake ticker is needed for historical event matching |
 
 ## Deferred Additive Sequence

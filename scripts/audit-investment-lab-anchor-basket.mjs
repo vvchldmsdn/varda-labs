@@ -6,6 +6,7 @@ config({ path: ".env.local", quiet: true });
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
 const sql = neon(process.env.DATABASE_URL);
+const compactOutput = process.argv.includes("--compact");
 
 const ANCHOR_SQL = `
   with named_portfolio_rows as (
@@ -42,20 +43,51 @@ const ANCHOR_SQL = `
     select
       p.account,
       p.source,
-      upper(nullif(btrim(p.ticker), '')) as ticker,
+      p.legacy_asset_id,
+      upper(nullif(btrim(p.ticker), '')) as stored_ticker,
       lower(nullif(btrim(p.market), '')) as market,
       upper(nullif(btrim(p.currency), '')) as currency,
       nullif(btrim(p.asset_name), '') as asset_name,
       lower(nullif(btrim(p.asset_type), '')) as asset_type,
       lower(nullif(btrim(p.category), '')) as category,
       p.quantity,
-      p.market_value_krw
+      p.market_value_krw,
+      case
+        when linked.legacy_base44_id = p.legacy_asset_id
+          and nullif(btrim(linked.ticker), '') is not null
+          and lower(btrim(linked.name)) = lower(btrim(p.asset_name))
+          and lower(btrim(linked.account)) = lower(btrim(p.account))
+          and lower(btrim(linked.market)) = lower(btrim(p.market))
+          and upper(btrim(linked.currency)) = upper(btrim(p.currency))
+          and lower(coalesce(btrim(linked.asset_type), '')) =
+            lower(coalesce(btrim(p.asset_type), ''))
+        then upper(btrim(linked.ticker))
+        else null
+      end as linked_ticker
     from daily_position_snapshots p
     join anchor_portfolios a
       on a.snapshot_date = p.snapshot_date
       and a.account = p.account
       and a.source = p.source
+    left join assets linked on linked.id = p.asset_id
     where p.is_sample = false
+  ),
+  resolved_anchor_positions as (
+    select
+      *,
+      coalesce(stored_ticker, linked_ticker) as ticker,
+      case
+        when stored_ticker is not null then 'stored_snapshot_ticker'
+        when linked_ticker is not null then 'exact_imported_asset_link'
+        when asset_type = 'commodity' then 'explicit_snapshot_asset_type'
+        else 'none'
+      end as identity_authority,
+      case
+        when stored_ticker is not null or linked_ticker is not null
+          then 'resolved'
+        else 'unavailable'
+      end as identity_status
+    from anchor_positions
   ),
   price_summary as (
     select
@@ -90,14 +122,32 @@ const ANCHOR_SQL = `
     ) rows
     group by ticker, market, currency
   ),
+  stored_series_summary as (
+    select
+      legacy_asset_id,
+      count(*)::int as stored_series_rows,
+      count(*) filter (where price_date is not null)::int as price_date_rows,
+      count(*) filter (
+        where lower(coalesce(price_basis, '')) like '%fallback%'
+          or lower(coalesce(price_source, '')) like '%fallback%'
+      )::int as fallback_price_rows,
+      count(distinct nullif(btrim(price_basis), ''))::int as price_basis_count
+    from daily_position_snapshots
+    where is_sample = false
+    group by legacy_asset_id
+  ),
   anchor_instruments as (
     select
       ticker,
       market,
       currency,
+      min(legacy_asset_id) as legacy_asset_id,
       min(asset_name) as asset_name,
       min(asset_type) as asset_type,
       min(category) as category,
+      min(identity_authority) as identity_authority,
+      min(identity_status) as identity_status,
+      bool_or(stored_ticker is null) as stored_ticker_missing,
       count(*)::int as source_rows,
       count(distinct account)::int as account_count,
       count(distinct source)::int as source_count,
@@ -108,8 +158,15 @@ const ANCHOR_SQL = `
       count(*) filter (
         where market_value_krw is null or market_value_krw < 0
       )::int as invalid_value_rows
-    from anchor_positions
-    group by ticker, market, currency
+    from resolved_anchor_positions
+    group by
+      coalesce(
+        'listed:' || market || ':' || currency || ':' || ticker,
+        'legacy:' || legacy_asset_id
+      ),
+      ticker,
+      market,
+      currency
   )
   select
     (select snapshot_date::text from anchor) as anchor_date,
@@ -119,6 +176,16 @@ const ANCHOR_SQL = `
     i.asset_name,
     i.asset_type,
     i.category,
+    i.identity_authority,
+    i.identity_status,
+    i.stored_ticker_missing,
+    case
+      when i.ticker is not null then 'listed_instrument'
+      when i.asset_type = 'commodity' then 'physical_commodity_position'
+      else 'unresolved'
+    end as classification,
+    case when i.currency = 'USD' then 'stored_usdkrw_required' else 'none' end
+      as fx_requirement,
     i.source_rows,
     i.account_count,
     i.source_count,
@@ -130,7 +197,21 @@ const ANCHOR_SQL = `
     p.price_start_date,
     p.price_end_date,
     coalesce(p.invalid_price_rows, 0)::int as invalid_price_rows,
-    coalesce(d.duplicate_date_groups, 0)::int as duplicate_price_date_groups
+    coalesce(d.duplicate_date_groups, 0)::int as duplicate_price_date_groups,
+    coalesce(s.stored_series_rows, 0)::int as stored_series_rows,
+    coalesce(s.price_date_rows, 0)::int as stored_price_date_rows,
+    coalesce(s.fallback_price_rows, 0)::int as stored_fallback_price_rows,
+    coalesce(s.price_basis_count, 0)::int as stored_price_basis_count,
+    case
+      when i.ticker is not null
+        and coalesce(p.price_rows, 0) > 0
+        and coalesce(p.invalid_price_rows, 0) = 0
+        and coalesce(d.duplicate_date_groups, 0) = 0
+        then 'ticker_price_series_present_coverage_not_evaluated'
+      when i.asset_type = 'commodity'
+        then 'instrument_keyed_official_close_required'
+      else 'historical_price_authority_unavailable'
+    end as historical_price_authority
   from anchor_instruments i
   left join price_summary p
     on p.ticker = i.ticker
@@ -140,7 +221,12 @@ const ANCHOR_SQL = `
     on d.ticker = i.ticker
     and d.market = i.market
     and d.currency = i.currency
-  order by i.market nulls last, i.currency nulls last, i.ticker nulls last
+  left join stored_series_summary s on s.legacy_asset_id = i.legacy_asset_id
+  order by
+    i.market nulls last,
+    i.currency nulls last,
+    i.ticker nulls last,
+    i.asset_name
 `;
 
 const SUMMARY_SQL = `
@@ -175,12 +261,28 @@ const SUMMARY_SQL = `
     join anchor a on a.snapshot_date = p.snapshot_date
   ),
   anchor_positions as (
-    select p.*
+    select
+      p.*,
+      case
+        when nullif(btrim(p.ticker), '') is not null
+          then upper(btrim(p.ticker))
+        when linked.legacy_base44_id = p.legacy_asset_id
+          and nullif(btrim(linked.ticker), '') is not null
+          and lower(btrim(linked.name)) = lower(btrim(p.asset_name))
+          and lower(btrim(linked.account)) = lower(btrim(p.account))
+          and lower(btrim(linked.market)) = lower(btrim(p.market))
+          and upper(btrim(linked.currency)) = upper(btrim(p.currency))
+          and lower(coalesce(btrim(linked.asset_type), '')) =
+            lower(coalesce(btrim(p.asset_type), ''))
+        then upper(btrim(linked.ticker))
+        else null
+      end as resolved_ticker
     from daily_position_snapshots p
     join anchor_portfolios a
       on a.snapshot_date = p.snapshot_date
       and a.account = p.account
       and a.source = p.source
+    left join assets linked on linked.id = p.asset_id
     where p.is_sample = false
   ),
   date_account_positions as (
@@ -202,6 +304,13 @@ const SUMMARY_SQL = `
       where ticker is null or btrim(ticker) = ''
     )::int as tickerless_rows,
     count(*) filter (
+      where (ticker is null or btrim(ticker) = '')
+        and resolved_ticker is not null
+    )::int as linked_ticker_recovered_rows,
+    count(*) filter (
+      where resolved_ticker is null
+    )::int as unresolved_identity_rows,
+    count(*) filter (
       where lower(coalesce(market, '')) not in ('korea', 'us')
         or upper(coalesce(currency, '')) not in ('KRW', 'USD')
     )::int as unsupported_axis_rows,
@@ -212,8 +321,9 @@ const SUMMARY_SQL = `
     count(distinct (
       lower(coalesce(market, '')),
       upper(coalesce(currency, '')),
-      upper(coalesce(ticker, ''))
-    ))::int as economic_instruments
+      resolved_ticker
+    )) filter (where resolved_ticker is not null)::int
+      as recognized_economic_instruments
   from anchor_positions
 `;
 
@@ -297,7 +407,7 @@ const CANDIDATE_SQL = `
       lower(coalesce(h.market, '')),
       upper(coalesce(h.currency, '')),
       upper(coalesce(h.ticker, ''))
-    ))::int as economic_instruments
+    ))::int as stored_identity_groups
   from portfolio_rows p
   left join daily_position_snapshots h
     on h.snapshot_date = p.snapshot_date
@@ -331,8 +441,23 @@ if (
 ) {
   blockers.push("anchor_position_source_mismatch");
 }
-if (Number(summary?.tickerless_rows ?? 0) > 0) {
+const unavailableIdentityRows = instrumentRows.filter(
+  (row) => row.identity_status !== "resolved",
+);
+if (unavailableIdentityRows.length > 0) {
   blockers.push("tickerless_anchor_holding");
+}
+if (
+  unavailableIdentityRows.some(
+    (row) => row.classification === "physical_commodity_position",
+  )
+) {
+  blockers.push("physical_anchor_holding_history_unavailable");
+}
+if (
+  unavailableIdentityRows.some((row) => row.classification === "unresolved")
+) {
+  blockers.push("anchor_holding_classification_unresolved");
 }
 if (Number(summary?.unsupported_axis_rows ?? 0) > 0) {
   blockers.push("unsupported_anchor_holding_axis");
@@ -352,29 +477,47 @@ for (const row of instrumentRows) {
   }
 }
 
+const report = {
+  audit: "investment_lab_anchor_basket_readiness",
+  status: blockers.length === 0 ? "ready_for_path" : "unavailable",
+  readOnly: true,
+  policy: {
+    anchor: "first_complete_exact_source_portfolio_and_position_intersection",
+    identity:
+      "stored_ticker_or_exact_imported_asset_link_then_market_currency_ticker",
+    linkedIdentity:
+      "asset_id_and_legacy_id_and_snapshot_metadata_must_all_match",
+    nameInference: "forbidden",
+    exclusions: "forbidden_whole_scenario_unavailable",
+  },
+  summary,
+  sourceEvidence: sourceRows,
+  candidateAnchors: candidateRows,
+  instruments: instrumentRows,
+  specialHoldingAuthority: instrumentRows.filter(
+    (row) => row.stored_ticker_missing,
+  ),
+  blockers: [...new Set(blockers)].sort(),
+  boundaries: {
+    providerCalls: 0,
+    databaseWrites: 0,
+    schemaChanges: 0,
+  },
+};
+
 console.log(
   JSON.stringify(
-    {
-      audit: "investment_lab_anchor_basket_readiness",
-      status: blockers.length === 0 ? "ready_for_path" : "unavailable",
-      readOnly: true,
-      policy: {
-        anchor:
-          "first_complete_exact_source_portfolio_and_position_intersection",
-        identity: "market_currency_ticker_aggregated_across_accounts",
-        exclusions: "forbidden_whole_scenario_unavailable",
-      },
-      summary,
-      sourceEvidence: sourceRows,
-      candidateAnchors: candidateRows,
-      instruments: instrumentRows,
-      blockers: [...new Set(blockers)].sort(),
-      boundaries: {
-        providerCalls: 0,
-        databaseWrites: 0,
-        schemaChanges: 0,
-      },
-    },
+    compactOutput
+      ? {
+          audit: report.audit,
+          status: report.status,
+          readOnly: report.readOnly,
+          summary: report.summary,
+          specialHoldingAuthority: report.specialHoldingAuthority,
+          blockers: report.blockers,
+          boundaries: report.boundaries,
+        }
+      : report,
     null,
     2,
   ),

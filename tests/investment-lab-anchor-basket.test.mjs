@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { resolveInvestmentLabAnchorSelection } from "../src/lib/investment-lab-anchor-basket-anchor.ts";
@@ -94,6 +95,126 @@ describe("investment lab anchor-date observed basket", () => {
       "physical_anchor_holding",
       "tickerless_anchor_holding",
     ]);
+    assert.deepEqual(anchor.specialHoldingEvidence, [
+      {
+        name: "stored physical holding",
+        account: "brokerage",
+        source: "stored",
+        market: "korea",
+        currency: "KRW",
+        assetType: "commodity",
+        classification: "physical_commodity_position",
+        identityStatus: "unavailable",
+        resolvedTicker: null,
+        identityAuthority: "explicit_snapshot_asset_type",
+        reason: "physical_commodity_history_unavailable",
+      },
+    ]);
+  });
+
+  it("recovers a listed ticker only from an exact imported asset link", () => {
+    const input = fixture();
+    input.positionRows.push({
+      snapshotDate: "2026-01-06",
+      account: "irp",
+      source: "stored",
+      ticker: null,
+      assetName: "Linked listed ETF",
+      market: "korea",
+      currency: "KRW",
+      assetType: "etf",
+      quantity: 1,
+      marketValueKrw: 100,
+      linkedAsset: {
+        name: "Linked listed ETF",
+        ticker: "315960",
+        account: "irp",
+        market: "korea",
+        currency: "KRW",
+        assetType: "etf",
+      },
+    });
+    const anchor = resolveInvestmentLabAnchorSelection({
+      serviceDates: input.serviceDates,
+      snapshotRows: input.snapshotRows,
+      positionRows: input.positionRows,
+    });
+
+    assert.equal(anchor.status, "ready");
+    assert.ok(
+      anchor.instruments.some((row) => row.key === "korea:KRW:315960"),
+    );
+    assert.equal(anchor.coverage.recognizedPositionRows, 4);
+    assert.equal(anchor.coverage.unresolvedPositionRows, 0);
+    assert.deepEqual(anchor.specialHoldingEvidence, [
+      {
+        name: "Linked listed ETF",
+        account: "irp",
+        source: "stored",
+        market: "korea",
+        currency: "KRW",
+        assetType: "etf",
+        classification: "linked_listed_instrument",
+        identityStatus: "resolved",
+        resolvedTicker: "315960",
+        identityAuthority: "exact_imported_asset_link",
+        reason: "linked_ticker_recovered",
+      },
+    ]);
+  });
+
+  it("does not infer a ticker when linked metadata conflicts", () => {
+    const input = fixture();
+    input.positionRows.push({
+      snapshotDate: "2026-01-06",
+      account: "irp",
+      source: "stored",
+      ticker: null,
+      assetName: "Stored name",
+      market: "korea",
+      currency: "KRW",
+      assetType: "etf",
+      quantity: 1,
+      marketValueKrw: 100,
+      linkedAsset: {
+        name: "Different current name",
+        ticker: "315960",
+        account: "irp",
+        market: "korea",
+        currency: "KRW",
+        assetType: "etf",
+      },
+    });
+    const anchor = resolveInvestmentLabAnchorSelection({
+      serviceDates: input.serviceDates,
+      snapshotRows: input.snapshotRows,
+      positionRows: input.positionRows,
+    });
+
+    assert.equal(anchor.status, "unavailable");
+    assert.equal(anchor.coverage.unresolvedPositionRows, 1);
+    assert.equal(
+      anchor.specialHoldingEvidence[0].reason,
+      "linked_asset_metadata_mismatch",
+    );
+    assert.equal(anchor.specialHoldingEvidence[0].resolvedTicker, null);
+  });
+
+  it("does not classify a ticker-bearing commodity ETF as physical", () => {
+    const input = fixture();
+    input.positionRows.push({
+      ...position("brokerage", "GLD", "Listed gold ETF", "us", "USD", 100),
+      assetType: "commodity",
+    });
+    const anchor = resolveInvestmentLabAnchorSelection({
+      serviceDates: input.serviceDates,
+      snapshotRows: input.snapshotRows,
+      positionRows: input.positionRows,
+    });
+
+    assert.equal(anchor.status, "ready");
+    assert.ok(anchor.instruments.some((row) => row.key === "us:USD:GLD"));
+    assert.ok(!anchor.blockers.includes("physical_anchor_holding"));
   });
 
   it("does not return a partial path when one component price is missing", () => {
@@ -170,6 +291,35 @@ describe("investment lab anchor-date observed basket", () => {
         detail: null,
       },
     ]);
+  });
+
+  it("keeps linked identity recovery server-only and legacy-id exact", () => {
+    const querySource = readFileSync(
+      new URL("../src/db/queries/investment-lab.ts", import.meta.url),
+      "utf8",
+    );
+    const componentSource = readFileSync(
+      new URL(
+        "../src/components/investment-lab/investment-lab-anchor-basket.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    assert.match(
+      querySource,
+      /leftJoin\(assets, eq\(dailyPositionSnapshots\.assetId, assets\.id\)\)/,
+    );
+    assert.match(
+      querySource,
+      /snapshotLegacyAssetId === linkedLegacyAssetId/,
+    );
+    assert.doesNotMatch(componentSource, /^"use client";/);
+    assert.doesNotMatch(componentSource, /legacyAssetId|legacyBase44Id|assetId/);
+    assert.match(
+      componentSource,
+      /data-section="investment-lab-anchor-special-holding-evidence"/,
+    );
   });
 });
 

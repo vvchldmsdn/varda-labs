@@ -108,7 +108,7 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
 
   async loadAnchorPositionRows(serviceDates) {
     if (serviceDates.length === 0) return [];
-    return db
+    const rows = await db
       .select({
         snapshotDate: dailyPositionSnapshots.snapshotDate,
         account: dailyPositionSnapshots.account,
@@ -120,8 +120,17 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         assetType: dailyPositionSnapshots.assetType,
         quantity: dailyPositionSnapshots.quantity,
         marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+        snapshotLegacyAssetId: dailyPositionSnapshots.legacyAssetId,
+        linkedLegacyAssetId: assets.legacyBase44Id,
+        linkedAssetName: assets.name,
+        linkedAssetTicker: assets.ticker,
+        linkedAssetAccount: assets.account,
+        linkedAssetMarket: assets.market,
+        linkedAssetCurrency: assets.currency,
+        linkedAssetType: assets.assetType,
       })
       .from(dailyPositionSnapshots)
+      .leftJoin(assets, eq(dailyPositionSnapshots.assetId, assets.id))
       .where(
         and(
           eq(dailyPositionSnapshots.isSample, false),
@@ -139,6 +148,38 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         asc(dailyPositionSnapshots.source),
         sql`${dailyPositionSnapshots.ticker} asc nulls last`,
       );
+
+    return rows.map(
+      ({
+        snapshotLegacyAssetId,
+        linkedLegacyAssetId,
+        linkedAssetName,
+        linkedAssetTicker,
+        linkedAssetAccount,
+        linkedAssetMarket,
+        linkedAssetCurrency,
+        linkedAssetType,
+        ...row
+      }) => ({
+        ...row,
+        linkedAsset:
+          linkedLegacyAssetId !== null &&
+          snapshotLegacyAssetId === linkedLegacyAssetId &&
+          linkedAssetName !== null &&
+          linkedAssetAccount !== null &&
+          linkedAssetMarket !== null &&
+          linkedAssetCurrency !== null
+            ? Object.freeze({
+                name: linkedAssetName,
+                ticker: linkedAssetTicker,
+                account: linkedAssetAccount,
+                market: linkedAssetMarket,
+                currency: linkedAssetCurrency,
+                assetType: linkedAssetType,
+              })
+            : null,
+      }),
+    );
   },
 
   async loadAnchorPriceRows({

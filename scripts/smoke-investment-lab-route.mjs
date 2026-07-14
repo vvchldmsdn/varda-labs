@@ -94,6 +94,40 @@ async function main() {
   } else {
     assert.equal(anchorBasketComparisonDates, 0);
   }
+  let anchorSpecialHoldingRows = 0;
+  let anchorSpecialHoldingResolved = 0;
+  let anchorSpecialHoldingUnavailable = 0;
+  if (
+    route.body.includes(
+      'data-section="investment-lab-anchor-special-holding-evidence"',
+    )
+  ) {
+    anchorSpecialHoldingRows = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-rows",
+    );
+    anchorSpecialHoldingResolved = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-resolved",
+    );
+    anchorSpecialHoldingUnavailable = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-unavailable",
+    );
+    assert.equal(
+      anchorSpecialHoldingResolved + anchorSpecialHoldingUnavailable,
+      anchorSpecialHoldingRows,
+    );
+    assert.equal(
+      anchorSpecialHoldingUnavailable,
+      anchorBasketUnresolvedRows,
+    );
+    assert.match(route.body, /data-special-holding-status="unavailable"/);
+    if (anchorSpecialHoldingResolved > 0) {
+      assert.match(route.body, /data-special-holding-status="resolved"/);
+      assert.ok(route.body.includes("exact imported asset link"));
+    }
+  }
   const matrixExpected =
     periodStatus === "full" || periodStatus === "selected";
   let scenarioMatrixStatus = "not_rendered";
@@ -472,6 +506,9 @@ async function main() {
           anchorBasketEconomicInstruments,
           anchorBasketUnresolvedRows,
           anchorBasketComparisonDates,
+          anchorSpecialHoldingRows,
+          anchorSpecialHoldingResolved,
+          anchorSpecialHoldingUnavailable,
           scenarioMatrixStatus,
           scenarioMatrixRows,
           scenarioMatrixReadyRows,
@@ -724,6 +761,9 @@ async function main() {
         anchorBasketEconomicInstruments,
         anchorBasketUnresolvedRows,
         anchorBasketComparisonDates,
+        anchorSpecialHoldingRows,
+        anchorSpecialHoldingResolved,
+        anchorSpecialHoldingUnavailable,
         scenarioMatrixStatus,
         scenarioMatrixRows,
         scenarioMatrixReadyRows,

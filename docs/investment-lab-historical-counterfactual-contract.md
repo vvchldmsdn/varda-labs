@@ -201,6 +201,45 @@ Run `npm run audit:investment-lab-anchor-basket` to inspect the exact stored
 portfolio/position anchor intersection and whole-basket instrument evidence
 without provider calls or writes.
 
+## Anchor Special-Holding Identity Authority
+
+`exact_imported_asset_link_v1` is a narrow read-time identity recovery rule,
+not a current-metadata fallback or snapshot backfill:
+
+1. A stored snapshot ticker remains the primary authority.
+2. A missing ticker may be recovered only when the snapshot `asset_id` joins
+   one asset row, the snapshot and asset preserve the same non-null Base44
+   legacy id, and name, account, market, currency, and asset type all match.
+3. The recovered ticker is used only as listed-instrument identity evidence.
+   No snapshot row or asset row is written or relabeled.
+4. Display-name inference, proxy instruments, interpolation, zero return, and
+   current-price reverse projection are forbidden.
+5. A ticker-bearing commodity ETF remains a listed instrument. A tickerless
+   explicit commodity remains unavailable until instrument-keyed official
+   close history is bound and coverage is separately validated.
+6. A tickerless product with no explicit managed-product classification stays
+   unresolved. A name such as `Fount 일임서비스` is not classification
+   authority.
+
+The production SELECT-only audit on 2026-07-15 found three tickerless rows at
+the default 2026-05-21 anchor:
+
+- `RISE 대형고배당10TotalReturn` passes the exact imported asset-link rule and
+  resolves to listed ticker `315960`. A clean ticker-keyed price series is
+  present, but this row-level audit does not claim full scenario-date coverage.
+- `금현물` has explicit commodity evidence but no bound instrument-keyed
+  official-close history. Stored fallback/current-price rows are not promoted
+  to official close authority.
+- `Fount 일임서비스` has neither a listed ticker nor explicit managed-sleeve
+  classification. It remains unresolved even though stored valuation rows
+  exist.
+
+The whole all-account anchor path therefore remains unavailable: 17 economic
+instruments are identified and two special positions remain unresolved or
+unsupported. The UI exposes all three row-level decisions without displaying
+asset ids or legacy ids. The bounded anchor price read still does not execute
+until every row is identified.
+
 ## Return Estimate Policy
 
 `modified_dietz_daily_weighted_eod_v1` is a secondary estimate, calculated
