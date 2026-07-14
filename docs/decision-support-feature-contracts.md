@@ -154,7 +154,8 @@ items stay incremental:
 
 The route also includes a separate ephemeral historical contribution-impact
 experiment. A user selects one observed service date, one positive integer KRW
-amount, and either the fixed KODEX 200 or fixed VOO path. It reports the
+amount, and either the fixed KODEX 200, fixed VOO, or currently selected explicit
+KODEX 200/VOO fixed-mix path. It reports the
 additional lot's principal, final value, profit, and simple price return without
 changing the actual path. The input is Client Component memory only and carries
 no target, recommendation, order, account-selection, or persistence authority.
@@ -166,7 +167,11 @@ readiness and provenance:
 - a static small-adjustment sandbox showing concentration, effective number of
   bets, risk-contribution, currency-exposure, and target-gap deltas;
 - ETF look-through, hidden single-name exposure, and explicitly parameterized
-  single-name shock analysis using shared ETF reference data.
+  single-name shock analysis using shared ETF reference data. The deployed
+  shock experiment combines exact-identity direct exposure with observed ETF
+  look-through exposure without renormalizing uncovered weight. Its browser-only
+  input changes no persisted portfolio state and is not a forecast, VaR,
+  recommendation, or order model.
 
 Personality labels, weakness cards, portfolio-similarity scores, weekly replay,
 and generated narrative are optional explanation/content features. They are not

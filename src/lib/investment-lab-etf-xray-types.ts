@@ -60,6 +60,7 @@ export type InvestmentLabEtfXrayModel = Readonly<{
   summary: Readonly<{
     basePortfolioCoverageStatus: "complete" | "partial";
     exposureScope: "whole_portfolio" | "valued_subset";
+    valuedSubsetCurrentValueKrw: number;
     valuedHoldingCount: number;
     excludedHoldingCount: number;
     excludedEtfHoldingCount: number;

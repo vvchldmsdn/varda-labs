@@ -46,6 +46,7 @@ describe("investment lab ETF X-ray", () => {
     assert.equal(model.status, "partial");
     assert.equal(model.summary.basePortfolioCoverageStatus, "complete");
     assert.equal(model.summary.exposureScope, "whole_portfolio");
+    assert.equal(model.summary.valuedSubsetCurrentValueKrw, 100_000);
     assert.equal(model.summary.valuedEtfCount, 3);
     assert.equal(model.summary.matchedValuedEtfCount, 2);
     assert.equal(model.summary.missingReferenceValuedEtfCount, 1);

@@ -262,6 +262,44 @@ async function main() {
     ) < 0.00001,
     "observed and uncovered ETF exposure must reconcile without normalization",
   );
+  assert.match(route.body, /data-section="investment-lab-etf-shock"/);
+  const shockStatus = readStringAttribute(route.body, "data-shock-status");
+  const shockPolicy = readStringAttribute(route.body, "data-shock-policy");
+  const shockPersistence = readStringAttribute(
+    route.body,
+    "data-shock-persistence",
+  );
+  const shockSelectedSymbol = readStringAttribute(
+    route.body,
+    "data-shock-selected-symbol",
+  );
+  const shockThroughExposure = readNumberAttribute(
+    route.body,
+    "data-shock-through-etf-exposure",
+  );
+  const shockDirectExposure = readNumberAttribute(
+    route.body,
+    "data-shock-direct-exposure",
+  );
+  const shockCoveredExposure = readNumberAttribute(
+    route.body,
+    "data-shock-covered-exposure",
+  );
+  const shockEstimatedChangeKrw = readNumberAttribute(
+    route.body,
+    "data-shock-estimated-change-krw",
+  );
+  assert.equal(shockStatus, "ready");
+  assert.equal(shockPolicy, "static_single_name_linear_shock_v1");
+  assert.equal(shockPersistence, "none_client_memory_only");
+  assert.ok(shockSelectedSymbol.length > 0);
+  assert.ok(shockThroughExposure > 0);
+  assert.ok(shockDirectExposure >= 0);
+  assert.ok(
+    Math.abs(shockCoveredExposure - shockThroughExposure - shockDirectExposure) <
+      0.00001,
+  );
+  assert.ok(shockEstimatedChangeKrw < 0, "default -10% shock must be negative");
   assert.doesNotMatch(route.body, LEAK_PATTERN);
   assert.doesNotMatch(
     route.body,
@@ -564,6 +602,14 @@ async function main() {
         etfPortfolioWeight,
         observedEtfExposure,
         uncoveredEtfExposure,
+        shockStatus,
+        shockPolicy,
+        shockPersistence,
+        shockSelectedSymbol,
+        shockThroughExposure,
+        shockDirectExposure,
+        shockCoveredExposure,
+        shockEstimatedChangeKrw,
         adjustmentAccountCount,
         adjustmentReadyAccounts,
         adjustmentPolicy,

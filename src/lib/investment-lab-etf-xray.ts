@@ -54,6 +54,11 @@ export function buildInvestmentLabEtfXray(input: {
     input.portfolioHoldings,
     input.masters,
   );
+  const valuedSubsetCurrentValueKrw = sum(
+    input.portfolioHoldings.map((holding) =>
+      Number.isFinite(holding.currentValueKrw) ? holding.currentValueKrw : 0,
+    ),
+  );
   const directWeights = buildDirectPortfolioWeights(input.portfolioHoldings);
   const evidenceByMaster = groupEvidenceByMaster(input.holdingEvidence);
   const mutableComponents = new Map<string, MutableComponent>();
@@ -106,6 +111,7 @@ export function buildInvestmentLabEtfXray(input: {
     summary: Object.freeze({
       basePortfolioCoverageStatus,
       exposureScope,
+      valuedSubsetCurrentValueKrw,
       valuedHoldingCount: input.portfolioHoldings.length,
       excludedHoldingCount: portfolioExclusions.length,
       excludedEtfHoldingCount,

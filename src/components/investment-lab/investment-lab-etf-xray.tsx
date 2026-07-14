@@ -2,6 +2,7 @@ import type {
   InvestmentLabEtfXrayEtfRow,
   InvestmentLabEtfXrayModel,
 } from "@/lib/investment-lab-etf-xray";
+import { InvestmentLabEtfShock } from "@/components/investment-lab/investment-lab-etf-shock";
 
 export function InvestmentLabEtfXray({
   model,
@@ -121,6 +122,14 @@ export function InvestmentLabEtfXray({
           시점 포트폴리오로 해석하지 않습니다.
         </p>
       ) : null}
+
+      <InvestmentLabEtfShock
+        components={model.componentRows}
+        excludedHoldingCount={summary.excludedHoldingCount}
+        exposureScope={summary.exposureScope}
+        uncoveredEtfExposurePct={summary.uncoveredValuedSubsetExposurePct}
+        valuedSubsetCurrentValueKrw={summary.valuedSubsetCurrentValueKrw}
+      />
 
       <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
         <div className="border-b border-[#e1e6dc] px-4 py-3">
