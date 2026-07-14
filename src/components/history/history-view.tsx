@@ -9,6 +9,7 @@ import {
 
 import { HistoryControls } from "./history-controls";
 import { formatHistoryDateRange } from "./history-format";
+import { HistoryPositionDetail } from "./history-position-detail";
 import { HistoryTrajectoryChart } from "./history-trajectory-chart";
 import {
   BalanceHistoryTable,
@@ -110,7 +111,12 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
               detail="저장값과 표시용 합산을 구분"
             />
             <HistoryTrajectoryChart model={portfolioTrajectory} />
-            <PortfolioHistoryTable rows={history.portfolioRows} />
+            <HistoryPositionDetail model={history.positionDetail} />
+            <PortfolioHistoryTable
+              rows={history.portfolioRows}
+              lane={history.lane}
+              positionDetail={history.positionDetail}
+            />
           </section>
         ) : null}
       </div>

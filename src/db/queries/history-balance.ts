@@ -1,11 +1,12 @@
 import "server-only";
 
-import { asc } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
   accountBalanceSnapshots,
   dailyPortfolioSnapshots,
+  dailyPositionSnapshots,
 } from "@/db/schema";
 import {
   buildPortfolioHistoryDisplayRows,
@@ -14,6 +15,13 @@ import {
   type PortfolioHistoryDisplayRow,
   type PortfolioHistoryRawRow,
 } from "@/lib/history-balance";
+import {
+  buildHistoryPositionDetail,
+  HISTORY_POSITION_DETAIL_QUERY_LIMIT,
+  type HistoryPositionDetailModel,
+  type HistoryPositionRawRow,
+  type HistoryPositionSelection,
+} from "@/lib/history-position-detail";
 
 export type ReadOnlyBalanceHistoryRow = {
   balanceDate: string;
@@ -28,6 +36,7 @@ export type ReadOnlyHistoryBalance = {
   lane: HistoryLane;
   balanceRows: ReadOnlyBalanceHistoryRow[];
   portfolioRows: PortfolioHistoryDisplayRow[];
+  positionDetail: HistoryPositionDetailModel;
   summary: {
     balanceRowCount: number;
     portfolioRowCount: number;
@@ -46,13 +55,18 @@ export type DateRangeSummary = {
 export async function getReadOnlyHistoryBalance({
   account,
   lane,
+  positionSelection,
 }: {
   account: HistoryAccount;
   lane: HistoryLane;
+  positionSelection: HistoryPositionSelection;
 }): Promise<ReadOnlyHistoryBalance> {
-  const [balanceRows, portfolioRawRows] = await Promise.all([
+  const [balanceRows, portfolioRawRows, positionRows] = await Promise.all([
     loadBalanceRows(),
     loadPortfolioRows(),
+    positionSelection.status === "requested"
+      ? loadPositionRows(positionSelection)
+      : Promise.resolve([]),
   ]);
   const portfolioRows = buildPortfolioHistoryDisplayRows({
     rows: portfolioRawRows,
@@ -61,12 +75,20 @@ export async function getReadOnlyHistoryBalance({
   const visibleBalanceRows =
     lane === "portfolio" ? [] : [...balanceRows].sort(compareBalanceRowsDesc);
   const visiblePortfolioRows = lane === "balance" ? [] : portfolioRows;
+  const positionDetail = buildHistoryPositionDetail({
+    account,
+    lane,
+    selection: positionSelection,
+    portfolioRows,
+    positionRows,
+  });
 
   return {
     account,
     lane,
     balanceRows: visibleBalanceRows,
     portfolioRows: visiblePortfolioRows,
+    positionDetail,
     summary: {
       balanceRowCount: balanceRows.length,
       portfolioRowCount: portfolioRows.length,
@@ -87,6 +109,49 @@ export async function getReadOnlyHistoryBalance({
       ),
     },
   };
+}
+
+async function loadPositionRows(
+  selection: Extract<HistoryPositionSelection, { status: "requested" }>,
+): Promise<HistoryPositionRawRow[]> {
+  return db
+    .select({
+      snapshotDate: dailyPositionSnapshots.snapshotDate,
+      account: dailyPositionSnapshots.account,
+      source: dailyPositionSnapshots.source,
+      assetId: dailyPositionSnapshots.assetId,
+      legacyAssetId: dailyPositionSnapshots.legacyAssetId,
+      ticker: dailyPositionSnapshots.ticker,
+      assetName: dailyPositionSnapshots.assetName,
+      market: dailyPositionSnapshots.market,
+      currency: dailyPositionSnapshots.currency,
+      quantity: dailyPositionSnapshots.quantity,
+      currentPrice: dailyPositionSnapshots.currentPrice,
+      marketValueLocal: dailyPositionSnapshots.marketValueLocal,
+      marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+      costKrw: dailyPositionSnapshots.costKrw,
+      pnlKrw: dailyPositionSnapshots.pnlKrw,
+      pnlPct: dailyPositionSnapshots.pnlPct,
+      currentWeight: dailyPositionSnapshots.currentWeight,
+      fxRate: dailyPositionSnapshots.fxRate,
+      priceSource: dailyPositionSnapshots.priceSource,
+      priceBasis: dailyPositionSnapshots.priceBasis,
+    })
+    .from(dailyPositionSnapshots)
+    .where(
+      and(
+        eq(dailyPositionSnapshots.snapshotDate, selection.snapshotDate),
+        eq(dailyPositionSnapshots.account, selection.account),
+        eq(dailyPositionSnapshots.source, selection.source),
+        eq(dailyPositionSnapshots.isSample, false),
+      ),
+    )
+    .orderBy(
+      desc(dailyPositionSnapshots.marketValueKrw),
+      asc(dailyPositionSnapshots.assetName),
+      asc(dailyPositionSnapshots.legacyAssetId),
+    )
+    .limit(HISTORY_POSITION_DETAIL_QUERY_LIMIT);
 }
 
 async function loadBalanceRows(): Promise<ReadOnlyBalanceHistoryRow[]> {

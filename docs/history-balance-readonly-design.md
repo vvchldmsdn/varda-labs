@@ -39,8 +39,8 @@ read-only history lanes.
 - `daily_portfolio_snapshots` is investment portfolio performance and trend
   evidence imported from Base44 `DailyPortfolioSnapshot`, plus later
   varda-generated daily snapshots.
-- `daily_position_snapshots` can support future date/account drilldowns, but it
-  is not the first source for high-level balance history.
+- `daily_position_snapshots` supports the bounded named-account/date/source
+  drilldown, but it is not the first source for high-level balance history.
 - Do not add or import `PortfolioSnapshot` now.
 - Do not add or import `DailyGroupSnapshot` now.
 
@@ -106,16 +106,21 @@ Interpretation:
 
 ### `daily_position_snapshots`
 
-Role: future detail drilldown candidate.
+Role: named-account, exact-date position detail evidence.
 
-Use it for:
+The read-only `/history` route now uses it for:
 
-- per-date holdings detail;
+- exact `snapshot_date` + named account + compatible source holdings detail;
 - account-specific position rows;
 - removed-position or unmatched legacy-row inspection;
 - future group exposure views when exact group snapshot rows are not required.
 
-Do not use it as the first source for high-level balance totals.
+The route does not join current `assets`, fetch live prices, or replace stored
+ticker/name/value evidence. `account = 'all'` display rows are not valid
+drilldown authority in v1. Position sums, stored cash, and portfolio totals stay
+separate, and reconciliation is claimed only when every selected position has a
+stored KRW market value. Do not use this table as the first source for
+high-level balance totals.
 
 ## Read-Only Data Smoke
 
