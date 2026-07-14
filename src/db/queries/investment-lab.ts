@@ -14,6 +14,7 @@ import {
   loadInvestmentLabCounterfactualReadModel,
   type InvestmentLabCounterfactualReadRepository,
 } from "@/lib/investment-lab-counterfactual-read-loader";
+import type { InvestmentLabPeriodRequest } from "@/lib/investment-lab-period-selection";
 
 const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 
@@ -137,8 +138,11 @@ function loadScenarioCloseRows(
     .orderBy(asc(assetPriceSnapshots.priceDate));
 }
 
-export async function getReadOnlyInvestmentLabCounterfactual() {
+export async function getReadOnlyInvestmentLabCounterfactual(
+  request?: InvestmentLabPeriodRequest,
+) {
   return loadInvestmentLabCounterfactualReadModel(
     drizzleInvestmentLabRepository,
+    request,
   );
 }

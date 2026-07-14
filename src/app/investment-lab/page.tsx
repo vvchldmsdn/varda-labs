@@ -5,8 +5,25 @@ import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-
 
 export const dynamic = "force-dynamic";
 
-export default function InvestmentLabPage() {
-  const modelPromise = getReadOnlyInvestmentLabCounterfactual();
+type InvestmentLabPageProps = {
+  searchParams: Promise<{
+    start?: string | string[];
+    end?: string | string[];
+  }>;
+};
+
+export default async function InvestmentLabPage({
+  searchParams,
+}: InvestmentLabPageProps) {
+  const params = await searchParams;
+  const modelPromise = getReadOnlyInvestmentLabCounterfactual(
+    params.start === undefined && params.end === undefined
+      ? undefined
+      : {
+          startServiceDate: params.start,
+          endServiceDate: params.end,
+        },
+  );
 
   return (
     <Suspense fallback={<InvestmentLabSkeleton />}>
@@ -20,8 +37,8 @@ async function InvestmentLabContent({
 }: {
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
 }) {
-  const model = await modelPromise;
-  return <InvestmentLabView model={model} />;
+  const { model, period } = await modelPromise;
+  return <InvestmentLabView model={model} period={period} />;
 }
 
 function InvestmentLabSkeleton() {

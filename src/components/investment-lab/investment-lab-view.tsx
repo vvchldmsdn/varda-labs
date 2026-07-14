@@ -2,27 +2,50 @@ import Link from "next/link";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
+import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
+import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 
 export function InvestmentLabView({
   model,
+  period,
 }: {
   model: InvestmentLabCounterfactualReadModel;
+  period: InvestmentLabPeriodSelection;
 }) {
+  const periodReady = period.status === "full" || period.status === "selected";
+
   return (
     <main
       className="min-h-screen bg-[#f3f4ef] text-[#171916]"
-      data-applied-flows={model.coverage.appliedFlowRows}
-      data-comparison-dates={model.coverage.completeComparisonDates}
-      data-delayed-executions={model.coverage.delayedExecutionRows}
-      data-page="investment-lab"
-      data-pending-at-end={model.coverage.pendingAtEndRows}
-      data-return-status={model.returnEstimate?.status ?? "unavailable"}
-      data-scenario-close-rows={model.coverage.scenarioCloseRows}
-      data-voo-comparison-status={
-        model.vooComparison?.status ?? "unavailable"
+      data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
+      data-comparison-dates={
+        periodReady ? model.coverage.completeComparisonDates : 0
       }
-      data-voo-readiness={model.vooReadiness?.status ?? "unavailable"}
+      data-delayed-executions={
+        periodReady ? model.coverage.delayedExecutionRows : 0
+      }
+      data-page="investment-lab"
+      data-pending-at-end={periodReady ? model.coverage.pendingAtEndRows : 0}
+      data-period-status={period.status}
+      data-return-status={
+        periodReady
+          ? (model.returnEstimate?.status ?? "unavailable")
+          : "unavailable"
+      }
+      data-scenario-close-rows={
+        periodReady ? model.coverage.scenarioCloseRows : 0
+      }
+      data-voo-comparison-status={
+        periodReady
+          ? (model.vooComparison?.status ?? "unavailable")
+          : "unavailable"
+      }
+      data-voo-readiness={
+        periodReady
+          ? (model.vooReadiness?.status ?? "unavailable")
+          : "unavailable"
+      }
     >
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
         <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
@@ -48,12 +71,20 @@ export function InvestmentLabView({
             <StatusPill label="시나리오" value="전액 KODEX 200" />
             <StatusPill
               label="상태"
-              value={model.status === "ready" ? "계산 가능" : "계산 차단"}
+              value={
+                !periodReady
+                  ? "구간 확인 필요"
+                  : model.status === "ready"
+                    ? "계산 가능"
+                    : "계산 차단"
+              }
             />
           </div>
         </header>
 
-        {model.status === "ready" && model.summary ? (
+        <InvestmentLabPeriodSelector period={period} />
+
+        {!periodReady ? null : model.status === "ready" && model.summary ? (
           <ReadyView model={model} />
         ) : (
           <BlockedView model={model} />

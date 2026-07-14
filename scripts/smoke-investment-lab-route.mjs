@@ -6,6 +6,11 @@ import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3107";
+const START_SERVICE_DATE = readArgument("--start");
+const END_SERVICE_DATE = readArgument("--end");
+const EXPECTED_PERIOD_STATUS =
+  readArgument("--expect-period-status") ??
+  (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "full");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -29,11 +34,49 @@ async function main() {
   assert.match(dashboard.body, /href="\/investment-lab"/);
   assert.doesNotMatch(dashboard.body, LEAK_PATTERN);
 
-  const route = await request("/investment-lab", true);
+  const routePath = investmentLabRoutePath();
+  const route = await request(routePath, true);
   assert.equal(route.status, 200, "authenticated route must return 200");
   assert.match(route.body, /data-page="investment-lab"/);
+  for (const marker of ["투자 랩", "과거 비교 구간", "구간 적용"]) {
+    assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+  }
+  const periodStatus = readStringAttribute(route.body, "data-period-status");
+  assert.equal(periodStatus, EXPECTED_PERIOD_STATUS);
+  assert.doesNotMatch(route.body, LEAK_PATTERN);
+  assert.doesNotMatch(
+    route.body,
+    /event_ledger_entries|daily_portfolio_snapshots|asset_price_snapshots/i,
+  );
+
+  const countsAfter = await readCounts();
+  assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
+  if (periodStatus === "invalid" || periodStatus === "unavailable") {
+    assert.match(route.body, /data-return-status="unavailable"/);
+    assert.match(route.body, /data-period-reason="[a-z_]+"/);
+    assert.doesNotMatch(route.body, /평가액 경로 비교/);
+    console.log(
+      JSON.stringify(
+        {
+          smoke: "investment_lab_route",
+          baseUrl: BASE_URL,
+          routePath,
+          periodStatus,
+          noAuthStatus: unauthorized.status,
+          authenticatedStatus: route.status,
+          dashboardLink: true,
+          leakPatternMatches: 0,
+          databaseSideEffects: false,
+          counts: countsAfter,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
   for (const marker of [
-    "투자 랩",
     "전액 KODEX 200",
     "평가액 경로 비교",
     "KODEX 200 종가",
@@ -48,6 +91,10 @@ async function main() {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
   assert.match(route.body, /data-return-status="ready"/);
+  if (periodStatus === "selected") {
+    assert.ok(route.body.includes("선택 구간"));
+    assert.ok(route.body.includes("다시 계산했습니다"));
+  }
   assert.ok(
     route.body.includes("과거 추가 투입 효과 실험"),
     "route is missing the historical contribution experiment",
@@ -62,14 +109,6 @@ async function main() {
   );
   assert.match(route.body, /overflow-x-auto/);
   assert.match(route.body, /viewBox="0 0 1000 340"/);
-  assert.doesNotMatch(route.body, LEAK_PATTERN);
-  assert.doesNotMatch(
-    route.body,
-    /event_ledger_entries|daily_portfolio_snapshots|asset_price_snapshots/i,
-  );
-
-  const countsAfter = await readCounts();
-  assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
   const comparisonDates = readIntegerAttribute(
     route.body,
     "data-comparison-dates",
@@ -175,6 +214,8 @@ async function main() {
       {
         smoke: "investment_lab_route",
         baseUrl: BASE_URL,
+        routePath,
+        periodStatus,
         noAuthStatus: unauthorized.status,
         authenticatedStatus: route.status,
         dashboardLink: true,
@@ -216,6 +257,14 @@ async function request(path, authenticated = false) {
     signal: AbortSignal.timeout(30_000),
   });
   return { status: response.status, body: await response.text() };
+}
+
+function investmentLabRoutePath() {
+  if (!START_SERVICE_DATE && !END_SERVICE_DATE) return "/investment-lab";
+  const params = new URLSearchParams();
+  if (START_SERVICE_DATE) params.set("start", START_SERVICE_DATE);
+  if (END_SERVICE_DATE) params.set("end", END_SERVICE_DATE);
+  return `/investment-lab?${params}`;
 }
 
 async function readCounts() {
