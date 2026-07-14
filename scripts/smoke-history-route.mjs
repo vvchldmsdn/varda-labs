@@ -19,6 +19,8 @@ const scenarios = [
     path: "/history",
     expectedSections: ["balance", "portfolio"],
     absentSections: [],
+    expectedCharts: ["balance", "portfolio"],
+    absentCharts: [],
     expectedText: [
       "히스토리",
       "잔액 기준일",
@@ -33,6 +35,8 @@ const scenarios = [
     path: "/history?account=brokerage&lane=balance",
     expectedSections: ["balance"],
     absentSections: ["portfolio"],
+    expectedCharts: ["balance"],
+    absentCharts: ["portfolio"],
     expectedText: ["증권", "잔액 기준일"],
     minimumOverflowContainers: 1,
   },
@@ -41,6 +45,8 @@ const scenarios = [
     path: "/history?account=isa&lane=portfolio",
     expectedSections: ["portfolio"],
     absentSections: ["balance"],
+    expectedCharts: ["portfolio"],
+    absentCharts: ["balance"],
     expectedText: ["ISA", "스냅샷 저장일", "저장값"],
     minimumOverflowContainers: 1,
   },
@@ -49,6 +55,8 @@ const scenarios = [
     path: "/history?account=all&lane=portfolio",
     expectedSections: ["portfolio"],
     absentSections: ["balance"],
+    expectedCharts: ["portfolio"],
+    absentCharts: ["balance"],
     expectedText: ["표시용 합산", 'data-history-row-kind="derived"'],
     minimumOverflowContainers: 1,
   },
@@ -117,6 +125,42 @@ async function main() {
         `${scenario.label} unexpectedly rendered ${section}`,
       );
     }
+    for (const lane of scenario.expectedCharts) {
+      const chartTag = readChartTag(response.body, lane);
+      assert.equal(
+        readStringAttribute(chartTag, "data-history-chart-status"),
+        "ready",
+      );
+      const pointCount = readIntegerAttribute(
+        chartTag,
+        "data-history-chart-points",
+      );
+      const segmentCount = readIntegerAttribute(
+        chartTag,
+        "data-history-chart-segments",
+      );
+      const sourceCount = readIntegerAttribute(
+        chartTag,
+        "data-history-chart-sources",
+      );
+      assert.ok(pointCount > 0, `${scenario.label} ${lane} needs points`);
+      assert.ok(
+        segmentCount > 0 && segmentCount <= pointCount,
+        `${scenario.label} ${lane} has invalid segment count`,
+      );
+      assert.ok(sourceCount > 0, `${scenario.label} ${lane} needs a source`);
+    }
+    for (const lane of scenario.absentCharts) {
+      assert.doesNotMatch(
+        response.body,
+        new RegExp(`data-history-chart-lane="${lane}"`),
+        `${scenario.label} unexpectedly rendered ${lane} chart`,
+      );
+    }
+    assert.ok(
+      response.body.includes("보간하거나 평평한 값으로 채우지 않습니다"),
+      `${scenario.label} is missing no-interpolation disclosure`,
+    );
     for (const expectedText of scenario.expectedText) {
       assert.ok(
         response.body.includes(expectedText),
@@ -190,6 +234,26 @@ async function readCounts() {
 function readArgument(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : null;
+}
+
+function readChartTag(html, lane) {
+  const match = html.match(
+    new RegExp(`<figure[^>]*data-history-chart-lane="${lane}"[^>]*>`),
+  );
+  assert.ok(match, `route is missing ${lane} history chart`);
+  return match[0];
+}
+
+function readIntegerAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="(\\d+)"`));
+  assert.ok(match, `chart is missing numeric attribute: ${name}`);
+  return Number(match[1]);
+}
+
+function readStringAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="([a-z0-9_]+)"`));
+  assert.ok(match, `chart is missing string attribute: ${name}`);
+  return match[1];
 }
 
 await main();

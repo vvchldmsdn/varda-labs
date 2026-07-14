@@ -10,6 +10,14 @@ const REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS = [
 export type HistoryAccount = (typeof HISTORY_ACCOUNTS)[number];
 export type HistoryLane = (typeof HISTORY_LANES)[number];
 
+export type BalanceHistoryValueRow = {
+  balanceDate: string;
+  cash: string | null;
+  brokerage: string | null;
+  isa: string | null;
+  irp: string | null;
+};
+
 export type PortfolioHistoryRawRow = {
   snapshotDate: string;
   account: string;
@@ -50,6 +58,22 @@ export function normalizeHistoryLane(
   const input = firstParam(value)?.toLowerCase() ?? null;
   if (isHistoryLane(input)) return input;
   return "all";
+}
+
+export function historyBalanceValueForAccount(
+  row: BalanceHistoryValueRow,
+  account: HistoryAccount,
+) {
+  if (account === "brokerage") return numberOrNull(row.brokerage);
+  if (account === "isa") return numberOrNull(row.isa);
+  if (account === "irp") return numberOrNull(row.irp);
+
+  const values = [row.cash, row.brokerage, row.isa, row.irp]
+    .map(numberOrNull)
+    .filter((value): value is number => value !== null);
+
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0);
 }
 
 export function buildPortfolioHistoryDisplayRows({

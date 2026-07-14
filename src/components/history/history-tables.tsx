@@ -5,6 +5,7 @@ import type {
   HistoryAccount,
   PortfolioHistoryDisplayRow,
 } from "@/lib/history-balance";
+import { historyBalanceValueForAccount } from "@/lib/history-balance";
 
 import {
   formatHistoryKrw,
@@ -46,7 +47,9 @@ export function BalanceHistoryTable({
             >
               <TableCell strong>{row.balanceDate}</TableCell>
               <TableCell align="right">
-                {formatHistoryKrw(balanceValueForAccount(row, account))}
+                {formatHistoryKrw(
+                  historyBalanceValueForAccount(row, account),
+                )}
               </TableCell>
               <TableCell align="right">{formatHistoryKrw(row.cash)}</TableCell>
               <TableCell align="right">
@@ -179,22 +182,6 @@ function TableCell({
       {children}
     </td>
   );
-}
-
-function balanceValueForAccount(
-  row: ReadOnlyBalanceHistoryRow,
-  account: HistoryAccount,
-) {
-  if (account === "brokerage") return row.brokerage;
-  if (account === "isa") return row.isa;
-  if (account === "irp") return row.irp;
-
-  const values = [row.cash, row.brokerage, row.isa, row.irp]
-    .map((value) => (value === null ? null : Number(value)))
-    .filter((value): value is number => value !== null && Number.isFinite(value));
-
-  if (values.length === 0) return null;
-  return values.reduce((sum, value) => sum + value, 0);
 }
 
 function cn(...classes: Array<string | false | null | undefined>) {

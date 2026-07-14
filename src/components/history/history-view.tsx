@@ -2,15 +2,29 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
+import {
+  buildBalanceHistoryTrajectory,
+  buildPortfolioHistoryTrajectory,
+} from "@/lib/history-trajectory";
 
 import { HistoryControls } from "./history-controls";
 import { formatHistoryDateRange } from "./history-format";
+import { HistoryTrajectoryChart } from "./history-trajectory-chart";
 import {
   BalanceHistoryTable,
   PortfolioHistoryTable,
 } from "./history-tables";
 
 export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
+  const balanceTrajectory = buildBalanceHistoryTrajectory({
+    rows: history.balanceRows,
+    account: history.account,
+  });
+  const portfolioTrajectory = buildPortfolioHistoryTrajectory({
+    rows: history.portfolioRows,
+    account: history.account,
+  });
+
   return (
     <main
       data-page="history"
@@ -78,6 +92,7 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
             className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
           >
             <SectionHeader title="잔액 기록" detail="저장된 잔액 증거" />
+            <HistoryTrajectoryChart model={balanceTrajectory} />
             <BalanceHistoryTable
               rows={history.balanceRows}
               account={history.account}
@@ -94,6 +109,7 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
               title="포트폴리오 성과"
               detail="저장값과 표시용 합산을 구분"
             />
+            <HistoryTrajectoryChart model={portfolioTrajectory} />
             <PortfolioHistoryTable rows={history.portfolioRows} />
           </section>
         ) : null}
