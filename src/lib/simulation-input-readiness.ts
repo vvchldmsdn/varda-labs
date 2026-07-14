@@ -1,4 +1,5 @@
 import type { loadSimulationPeriodPreflight } from "./simulation-period-preflight-loader.ts";
+import { buildSimulationObservedReturnComparison } from "./simulation-observed-return-comparison.ts";
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
 
 export const SIMULATION_INPUT_READINESS_POLICY = Object.freeze({
@@ -133,6 +134,7 @@ export function buildSimulationInputReadiness(input: {
 export function buildSimulationInputReadinessPageModel(input: {
   selection: SimulationEndServiceDateSelection;
   selected: SimulationInputReadinessModel;
+  comparisonSource: SimulationInputReadinessModel;
   history: readonly SimulationInputReadinessModel[];
 }) {
   const history = input.history.map((model) =>
@@ -167,6 +169,9 @@ export function buildSimulationInputReadinessPageModel(input: {
   return Object.freeze({
     ...input.selected,
     endServiceDateSelection: input.selection,
+    observedReturnComparison: buildSimulationObservedReturnComparison(
+      input.comparisonSource.inputs,
+    ),
     history: Object.freeze(history),
   });
 }

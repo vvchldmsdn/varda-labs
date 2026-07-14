@@ -50,14 +50,20 @@ export async function getReadOnlySimulationInputReadiness(options?: {
   );
   const dates = historyDates.length > 0 ? historyDates : [""];
   const returnStepCount = SIMULATION_INPUT_READINESS_POLICY.returnStepCount;
+  const independentRequests = dates.flatMap((endServiceDate) =>
+    INPUTS.map((descriptor) => ({
+      candidates: [candidate(descriptor)],
+      endServiceDate,
+      returnStepCount,
+    })),
+  );
+  const comparisonRequest = {
+    candidates: INPUTS.map(candidate),
+    endServiceDate: requestedEndServiceDate,
+    returnStepCount,
+  };
   const preflights = await getReadOnlySimulationPeriodPreflightBatch(
-    dates.flatMap((endServiceDate) =>
-      INPUTS.map((descriptor) => ({
-        candidates: [candidate(descriptor)],
-        endServiceDate,
-        returnStepCount,
-      })),
-    ),
+    [...independentRequests, comparisonRequest],
   );
   const generatedAt = now.toISOString();
   const models = dates.map((endServiceDate, dateIndex) =>
@@ -75,10 +81,23 @@ export async function getReadOnlySimulationInputReadiness(options?: {
   if (!selected) {
     throw new Error("Simulation input readiness projection is empty");
   }
+  const comparisonPreflight = preflights[independentRequests.length];
+  if (!comparisonPreflight) {
+    throw new Error("Simulation comparison preflight is empty");
+  }
+  const comparisonSource = buildSimulationInputReadiness({
+    requestedEndServiceDate,
+    generatedAt,
+    inputs: INPUTS.map((descriptor) => ({
+      descriptor,
+      preflight: comparisonPreflight,
+    })),
+  });
 
   return buildSimulationInputReadinessPageModel({
     selection,
     selected,
+    comparisonSource,
     history: selection.status === "valid" ? models : [],
   });
 }

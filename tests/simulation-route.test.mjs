@@ -6,9 +6,7 @@ describe("Simulation input readiness route boundary", () => {
   it("keeps the page server-rendered and the database adapter server-only", () => {
     const page = read("src/app/simulation/page.tsx");
     const query = read("src/db/queries/simulation-input-readiness.ts");
-    const view = read(
-      "src/components/simulation/simulation-input-readiness-view.tsx",
-    );
+    const view = readSimulationView();
 
     assert.doesNotMatch(page, /["']use client["']/);
     assert.doesNotMatch(view, /["']use client["']/);
@@ -18,6 +16,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(page, /params\.end\[0\]/);
     assert.match(query, /resolveSimulationEndServiceDateSelection/);
     assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
+    assert.match(query, /candidates: INPUTS\.map\(candidate\)/);
+    assert.match(query, /\.\.\.independentRequests, comparisonRequest/);
     assert.doesNotMatch(query, /endServiceDate\?\.trim\(\)/);
     assert.match(query, /ticker: "069500"/);
     assert.match(query, /ticker: "VOO"/);
@@ -28,9 +28,7 @@ describe("Simulation input readiness route boundary", () => {
   });
 
   it("exposes only readiness and protects the route with the existing access gate", () => {
-    const view = read(
-      "src/components/simulation/simulation-input-readiness-view.tsx",
-    );
+    const view = readSimulationView();
     const proxy = read("src/proxy.ts");
     const dashboard = read("src/components/portfolio-dashboard.tsx");
 
@@ -43,6 +41,12 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /저장된 실행 기록이 아니라/);
     assert.match(view, /수익률 행/);
     assert.match(view, /data-observed-return-series/);
+    assert.match(view, /data-observed-return-comparison/);
+    assert.match(view, /data-comparison-axis-status/);
+    assert.match(view, /data-comparison-point-count/);
+    assert.match(view, /90개 관측구간 누적지수 비교/);
+    assert.match(view, /시작 100으로 누적/);
+    assert.match(view, /두 입력 공통/);
     assert.match(view, /\{rows\.length\}개 관측 수익률/);
     assert.match(view, /전체 \{rows\.length\}개 수익률 표 보기/);
     assert.match(view, /예측·시뮬레이션 경로 아님/);
@@ -60,4 +64,14 @@ describe("Simulation input readiness route boundary", () => {
 
 function read(path) {
   return readFileSync(path, "utf8");
+}
+
+function readSimulationView() {
+  return [
+    "src/components/simulation/simulation-input-readiness-view.tsx",
+    "src/components/simulation/observed-return-comparison-panel.tsx",
+    "src/components/simulation/observed-return-series-panel.tsx",
+  ]
+    .map(read)
+    .join("\n");
 }

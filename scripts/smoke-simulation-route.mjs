@@ -79,6 +79,9 @@ async function main() {
     simulation.body.match(
       /data-observed-return-series="(?:kodex200|voo)"/g,
     )?.length ?? 0;
+  const observedReturnComparisonStatus = simulation.body.match(
+    /data-observed-return-comparison="(ready|unavailable)"/,
+  )?.[1];
   assert.equal(inputCount, 2, "simulation must render two independent inputs");
   assert.equal(statuses.length, 2, "simulation must render two readiness states");
   assert.equal(
@@ -94,6 +97,17 @@ async function main() {
   if (observedReturnSeriesCount > 0) {
     assert.match(simulation.body, /data-return-row-count="90"/);
     assert.match(simulation.body, /예측·시뮬레이션 경로 아님/);
+  }
+  assert.equal(
+    observedReturnComparisonStatus,
+    readyCount === 2 ? "ready" : "unavailable",
+    "comparison must render only when both independent inputs are ready",
+  );
+  if (observedReturnComparisonStatus === "ready") {
+    assert.match(simulation.body, /data-comparison-axis-status="aligned"/);
+    assert.match(simulation.body, /data-comparison-point-count="91"/);
+    assert.match(simulation.body, /data-comparison-series-count="2"/);
+    assert.match(simulation.body, /data-return-scale-mode="shared"/);
   }
   if (EXPECT_READY !== null) {
     assert.equal(readyCount, EXPECT_READY, "unexpected ready input count");
@@ -121,6 +135,7 @@ async function main() {
         readyCount,
         historyRowCount,
         observedReturnSeriesCount,
+        observedReturnComparisonStatus,
         databaseSideEffects: false,
         counts: countsAfter,
       },

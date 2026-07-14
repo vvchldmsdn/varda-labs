@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   buildSimulationInputReadiness,
   buildSimulationInputReadinessDates,
+  buildSimulationInputReadinessPageModel,
   resolveSimulationEndServiceDateSelection,
 } from "../src/lib/simulation-input-readiness.ts";
 import {
@@ -70,6 +71,25 @@ describe("Simulation input readiness read model", () => {
     assert.ok(
       Math.abs(vooLastReturn - expectedVooLastReturn) < 1e-12,
       "VOO KRW returns must include the date-specific FX ratio",
+    );
+
+    const pageModel = buildSimulationInputReadinessPageModel({
+      selection: {
+        status: "valid",
+        source: "query",
+        endServiceDate: END_SERVICE_DATE,
+      },
+      selected: model,
+      comparisonSource: model,
+      history: [model],
+    });
+    assert.equal(pageModel.observedReturnComparison.status, "ready");
+    assert.equal(pageModel.observedReturnComparison.pointCount, 91);
+    assert.equal(pageModel.observedReturnComparison.series.length, 2);
+    assert.ok(
+      pageModel.observedReturnComparison.series.every(
+        (series) => series.points.length === 91,
+      ),
     );
   });
 
@@ -224,6 +244,64 @@ describe("Simulation input readiness read model", () => {
       ["matrix_ready", "matrix_ready"],
     );
   });
+
+  it("resolves a shared cross-market axis from the same batch snapshot", async () => {
+    const calls = { price: 0, fx: 0, priceInputs: [] };
+    const fixture = crossMarketHolidayFixture();
+    const kodexRequest = request(descriptors.kodex200);
+    const vooRequest = request(descriptors.voo);
+    const [kodex200, voo, combined] = await loadSimulationPeriodPreflightBatch(
+      countingRepository(fixture, calls),
+      [
+        kodexRequest,
+        vooRequest,
+        {
+          candidates: [
+            kodexRequest.candidates[0],
+            vooRequest.candidates[0],
+          ],
+          endServiceDate: END_SERVICE_DATE,
+          returnStepCount: RETURN_STEP_COUNT,
+        },
+      ],
+    );
+    const independent = buildSimulationInputReadiness({
+      requestedEndServiceDate: END_SERVICE_DATE,
+      generatedAt: "2026-07-09T07:00:00.000Z",
+      inputs: [
+        { descriptor: descriptors.kodex200, preflight: kodex200 },
+        { descriptor: descriptors.voo, preflight: voo },
+      ],
+    });
+    const comparisonSource = buildSimulationInputReadiness({
+      requestedEndServiceDate: END_SERVICE_DATE,
+      generatedAt: "2026-07-09T07:00:00.000Z",
+      inputs: [
+        { descriptor: descriptors.kodex200, preflight: combined },
+        { descriptor: descriptors.voo, preflight: combined },
+      ],
+    });
+    const pageModel = buildSimulationInputReadinessPageModel({
+      selection: {
+        status: "valid",
+        source: "query",
+        endServiceDate: END_SERVICE_DATE,
+      },
+      selected: independent,
+      comparisonSource,
+      history: [independent],
+    });
+
+    assert.notDeepEqual(
+      independent.inputs[0].observedReturns.map((row) => row.serviceDate),
+      independent.inputs[1].observedReturns.map((row) => row.serviceDate),
+      "independent KR and US axes should preserve their different holidays",
+    );
+    assert.equal(pageModel.observedReturnComparison.status, "ready");
+    assert.equal(pageModel.observedReturnComparison.pointCount, 91);
+    assert.equal(calls.price, 1);
+    assert.equal(calls.fx, 1);
+  });
 });
 
 const descriptors = {
@@ -283,6 +361,41 @@ function completeFixture() {
         adjustedClosePrice: 200 + index,
       },
     ]),
+    fxRows: sourceDates.map((rateDate, index) => ({
+      rateDate,
+      usdKrw: 1_300 + index,
+      status: "ok",
+    })),
+  };
+}
+
+function crossMarketHolidayFixture() {
+  const sourceDates = calendarDates("2026-04-07", 94);
+  const koreaHoliday = sourceDates[45];
+  const usHoliday = sourceDates[44];
+  return {
+    priceRows: sourceDates.flatMap((priceDate, index) => {
+      const rows = [];
+      if (priceDate !== koreaHoliday) {
+        rows.push({
+          market: "korea",
+          currency: "KRW",
+          ticker: "069500",
+          priceDate,
+          adjustedClosePrice: 100 + index,
+        });
+      }
+      if (priceDate !== usHoliday) {
+        rows.push({
+          market: "us",
+          currency: "USD",
+          ticker: "VOO",
+          priceDate,
+          adjustedClosePrice: 200 + index,
+        });
+      }
+      return rows;
+    }),
     fxRows: sourceDates.map((rateDate, index) => ({
       rateDate,
       usdKrw: 1_300 + index,
