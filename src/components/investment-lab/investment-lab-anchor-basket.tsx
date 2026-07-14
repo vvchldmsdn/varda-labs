@@ -42,7 +42,7 @@ export function InvestmentLabAnchorBasket({
               Historical research
             </p>
             <h2 className="mt-1 text-xl font-semibold tracking-normal">
-              기준일 보유 종목 동일비중 비교
+              기준일 바스켓: 초기 동일비중·흐름 균등배분
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
               선택한 과거 기준일에 실제로 저장된 종목만 사용합니다. 기준일에만
@@ -141,7 +141,7 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
           chartId="investment-lab-anchor-basket-chart"
           description="실제 포트폴리오와 기준일 저장 보유 종목을 동일비중으로 시작한 same-flow 경로를 비교합니다."
           rows={model.rows}
-          scenarioLabel="기준일 보유 종목 동일비중"
+          scenarioLabel="기준일 바스켓"
           title="실제 포트폴리오와 기준일 보유 바스켓 비교"
         />
       </div>

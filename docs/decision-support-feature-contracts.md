@@ -135,7 +135,7 @@ The following scenario families have different transaction and cash semantics:
 
 | Scenario family | Examples | Product treatment |
 | --- | --- | --- |
-| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 and VOO are deployed read-only paths with separately guarded Modified Dietz estimates. VOO uses fractional units, zero residual cash, raw-close price-return, exact stored valuation FX provenance, exact execution-date FX, and fail-closed no-short solvency. The anchor-date observed-basket research path additionally supports equal allocation once at a stored historical anchor, equal-split later boundary flows, independent cross-market execution dates, no automatic rebalance, and whole-scenario unavailability when any anchor holding or price/FX evidence is unresolved. |
+| Same-flow fixed composition | all KODEX 200, all VOO, an explicit fixed user vector | Investment Lab v1 scenario family. KODEX 200 and VOO are deployed read-only paths with separately guarded Modified Dietz estimates. VOO uses fractional units, zero residual cash, raw-close price-return, exact stored valuation FX provenance, exact execution-date FX, and fail-closed no-short solvency. The anchor-date observed-basket research path uses equal allocation once at a stored historical anchor and a continuing fixed equal-flow allocation for later boundary flows. It is not a simple buy-and-hold equal-weight path or an automatic rebalance. Independent cross-market execution dates remain visible, and any unresolved holding or price/FX evidence makes the whole scenario unavailable. |
 | Scheduled rebalance strategy | equal weight, maintain target weights, maintain a selected weight vector | Later independent model. It introduces additional trades, turnover, costs, and rebalance-date policy, so it is not the same-flow v1 model. |
 | Recommendation-following strategy | legacy recommended rebalance | Blocked until the recommendation boundary and point-in-time recommendation evidence are separately approved. |
 | Zero-return same-flow counterfactual | no-return investment-boundary comparison | Deployed as `zero_return_same_flow_cash_v1`. It starts from the observed invested-position value and applies the same buy/sell KRW boundary flows with zero return. It is not an account cash ledger and does not claim to include deposits, withdrawals, interest, tax, fees, or current cash balances. |
@@ -152,6 +152,13 @@ items stay incremental:
 - downstream maximum drawdown and volatility with explicit definitions;
 - price, FX, event, and snapshot coverage plus pending/excluded evidence;
 - no hidden interpolation, current-FX fallback, or synthetic continuation.
+
+The deployed scenario matrix is a projection over those existing read models,
+not another path engine. It requires the exact same start date, end date, and
+comparison-date count before placing a scenario value in the common table. It
+keeps path readiness separate from Modified Dietz readiness, preserves an
+unavailable anchor basket as unavailable, and never derives a best scenario,
+ranking, recommendation, target, or order from the displayed numbers.
 
 The route also includes a separate ephemeral historical contribution-impact
 experiment. A user selects one observed service date, one positive integer KRW

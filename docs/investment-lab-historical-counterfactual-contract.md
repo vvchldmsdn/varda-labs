@@ -315,6 +315,14 @@ safe read model, Server Component route, and separate Modified Dietz return
 estimate are complete. Exact flow-time TWR, total-return parity, and explicit
 fee, tax, distribution, and cash treatment remain deferred.
 
+The Scenario Comparison Matrix v1 only projects existing Actual, KODEX 200,
+VOO, selected fixed-mix, zero-return, and anchor-basket read results. Every
+numeric row must match the actual path's exact start service date, end service
+date, and comparison-date count. Price and FX bases remain scenario-specific,
+and an unavailable or period-mismatched source stays unavailable without a
+partial substitute. The matrix has no ranking or recommendation authority and
+does not issue an additional database read.
+
 ## Architecture Boundary
 
 The implementation keeps four layers separate:

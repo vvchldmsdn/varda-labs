@@ -83,7 +83,11 @@ async function InvestmentLabContent({
     await modelPromise;
   return (
     <>
-      <InvestmentLabView model={model} period={period} />
+      <InvestmentLabView
+        anchorBasketScenario={anchorBasketScenario}
+        model={model}
+        period={period}
+      />
       <InvestmentLabFixedMix
         model={model.fixedMixScenario}
         period={period}

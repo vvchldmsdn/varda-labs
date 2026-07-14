@@ -4,13 +4,17 @@ import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart"
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
+import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
+import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 
 export function InvestmentLabView({
+  anchorBasketScenario,
   model,
   period,
 }: {
+  anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
 }) {
@@ -91,7 +95,10 @@ export function InvestmentLabView({
         <InvestmentLabPeriodSelector period={period} />
 
         {!periodReady ? null : model.status === "ready" && model.summary ? (
-          <ReadyView model={model} />
+          <ReadyView
+            anchorBasketScenario={anchorBasketScenario}
+            model={model}
+          />
         ) : (
           <BlockedView model={model} />
         )}
@@ -100,7 +107,13 @@ export function InvestmentLabView({
   );
 }
 
-function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
+function ReadyView({
+  anchorBasketScenario,
+  model,
+}: {
+  anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  model: InvestmentLabCounterfactualReadModel;
+}) {
   const summary = model.summary!;
   const fixedMixWeights = model.fixedMixScenario?.weights ?? null;
 
@@ -129,6 +142,11 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
           detail={`${formatDate(summary.startServiceDate)} ~ ${formatDate(summary.endServiceDate)}`}
         />
       </section>
+
+      <InvestmentLabScenarioMatrix
+        anchorBasketScenario={anchorBasketScenario}
+        model={model}
+      />
 
       <ReturnEstimateSection model={model} />
 

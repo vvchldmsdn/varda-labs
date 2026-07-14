@@ -94,6 +94,64 @@ async function main() {
   } else {
     assert.equal(anchorBasketComparisonDates, 0);
   }
+  const matrixExpected =
+    periodStatus === "full" || periodStatus === "selected";
+  let scenarioMatrixStatus = "not_rendered";
+  let scenarioMatrixRows = 0;
+  let scenarioMatrixReadyRows = 0;
+  let scenarioMatrixUnavailableRows = 0;
+  if (matrixExpected) {
+    assert.match(
+      route.body,
+      /data-section="investment-lab-scenario-matrix"/,
+    );
+    scenarioMatrixStatus = readStringAttribute(
+      route.body,
+      "data-scenario-matrix-status",
+    );
+    scenarioMatrixRows = readIntegerAttribute(
+      route.body,
+      "data-scenario-matrix-rows",
+    );
+    scenarioMatrixReadyRows = readIntegerAttribute(
+      route.body,
+      "data-scenario-matrix-ready-rows",
+    );
+    scenarioMatrixUnavailableRows = readIntegerAttribute(
+      route.body,
+      "data-scenario-matrix-unavailable-rows",
+    );
+    assert.equal(scenarioMatrixStatus, "ready");
+    assert.equal(scenarioMatrixRows, 6);
+    assert.equal(
+      scenarioMatrixReadyRows + scenarioMatrixUnavailableRows,
+      scenarioMatrixRows,
+    );
+    for (const scenarioId of [
+      "actual",
+      "kodex200",
+      "voo",
+      "fixed_mix",
+      "zero_return",
+      "anchor_basket",
+    ]) {
+      assert.match(route.body, new RegExp(`data-scenario-row="${scenarioId}"`));
+    }
+    for (const marker of [
+      "시나리오 한눈에 비교",
+      "순위나 추천이 아니라",
+      "KODEX 200 adjusted close",
+      "VOO raw close",
+      "초기 동일비중·이후 흐름 균등배분",
+    ]) {
+      assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+    }
+  } else {
+    assert.doesNotMatch(
+      route.body,
+      /data-section="investment-lab-scenario-matrix"/,
+    );
+  }
   const fixedMixStatus = readStringAttribute(
     route.body,
     "data-fixed-mix-status",
@@ -414,6 +472,10 @@ async function main() {
           anchorBasketEconomicInstruments,
           anchorBasketUnresolvedRows,
           anchorBasketComparisonDates,
+          scenarioMatrixStatus,
+          scenarioMatrixRows,
+          scenarioMatrixReadyRows,
+          scenarioMatrixUnavailableRows,
           rollingStatus,
           rollingCandidateWindows,
           rollingCompleteWindows,
@@ -580,6 +642,17 @@ async function main() {
   assert.equal(cashComparisonDates, comparisonDates);
   assert.equal(cashAppliedFlows, appliedFlows);
   assert.equal(cashReturnStatus, "ready");
+  const expectedScenarioMatrixReadyRows =
+    2 +
+    (vooComparisonStatus === "ready" ? 1 : 0) +
+    (fixedMixStatus === "ready" ? 1 : 0) +
+    (cashComparisonStatus === "ready" ? 1 : 0) +
+    (anchorBasketStatus === "ready" ? 1 : 0);
+  assert.equal(scenarioMatrixReadyRows, expectedScenarioMatrixReadyRows);
+  assert.equal(
+    scenarioMatrixUnavailableRows,
+    scenarioMatrixRows - expectedScenarioMatrixReadyRows,
+  );
   assert.ok(appliedFlows >= 0, "applied flow count must be non-negative");
   assert.ok(delayedExecutions >= 0, "delayed count must be non-negative");
   assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
@@ -651,6 +724,10 @@ async function main() {
         anchorBasketEconomicInstruments,
         anchorBasketUnresolvedRows,
         anchorBasketComparisonDates,
+        scenarioMatrixStatus,
+        scenarioMatrixRows,
+        scenarioMatrixReadyRows,
+        scenarioMatrixUnavailableRows,
         fixedMixContributionStatus,
         fixedMixContributionKodexWeightBps,
         fixedMixContributionVooWeightBps,
