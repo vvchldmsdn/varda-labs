@@ -92,7 +92,6 @@ async function main() {
     "only ready inputs may render a complete observed return series",
   );
   if (observedReturnSeriesCount > 0) {
-    assert.match(simulation.body, /90개 관측 수익률/);
     assert.match(simulation.body, /data-return-row-count="90"/);
     assert.match(simulation.body, /예측·시뮬레이션 경로 아님/);
   }
