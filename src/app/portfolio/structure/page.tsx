@@ -2,8 +2,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-baseline";
+import { SpecialHoldingsCoverage } from "@/components/portfolio/special-holdings-coverage";
 import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
+import { buildPortfolioSpecialHoldingsModel } from "@/lib/portfolio-special-holdings";
 import type {
   PortfolioStructureAccount,
   PortfolioStructureExclusion,
@@ -36,6 +38,8 @@ export default async function PortfolioStructurePage({
   });
   const directHoldingsBaseline =
     buildPortfolioDirectHoldingsBaseline(structure);
+  const specialHoldingsCoverage =
+    buildPortfolioSpecialHoldingsModel(structure);
 
   return (
     <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
@@ -105,6 +109,8 @@ export default async function PortfolioStructurePage({
         </section>
 
         <DirectHoldingsBaseline model={directHoldingsBaseline} />
+
+        <SpecialHoldingsCoverage model={specialHoldingsCoverage} />
 
         <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
           <SectionHeader title="그룹 비중" detail="current read model" />

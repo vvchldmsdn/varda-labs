@@ -5,8 +5,9 @@ import type {
 import { normalizeTicker } from "./portfolio-math.ts";
 
 export const PORTFOLIO_DIRECT_HOLDINGS_BASELINE_POLICY = Object.freeze({
-  version: "direct_holdings_concentration_currency_v1",
-  identity: "account_market_currency_ticker",
+  version: "direct_holdings_concentration_currency_v2",
+  accountIdentity: "account_market_currency_ticker",
+  allAccountExposureIdentity: "market_currency_ticker",
   valuationBasis: "current_portfolio_structure_read_model",
   lookThrough: "excluded",
   targetRecommendationOrOrderAuthority: "excluded",
@@ -46,6 +47,10 @@ export type PortfolioDirectHoldingsAnalysis = Readonly<{
   metrics: PortfolioDirectHoldingMetrics | null;
 }>;
 
+export type PortfolioDirectHoldingIdentityScope =
+  | "account_scoped"
+  | "cross_account_exposure";
+
 export type PortfolioDirectHoldingsBaseline = Readonly<{
   policy: typeof PORTFOLIO_DIRECT_HOLDINGS_BASELINE_POLICY;
   selectedAccount: PortfolioStructureResult["selectedAccount"];
@@ -67,6 +72,9 @@ type DirectHoldingInput = Pick<
 
 export function analyzePortfolioDirectHoldings(
   rows: readonly DirectHoldingInput[],
+  {
+    identityScope = "account_scoped",
+  }: { identityScope?: PortfolioDirectHoldingIdentityScope } = {},
 ): PortfolioDirectHoldingsAnalysis {
   const grouped = new Map<
     string,
@@ -82,7 +90,7 @@ export function analyzePortfolioDirectHoldings(
       continue;
     }
 
-    const identity = canonicalDirectHoldingIdentity(row);
+    const identity = canonicalDirectHoldingIdentity(row, identityScope);
     if (!identity) {
       unresolvedIdentityCount += 1;
       continue;
@@ -99,6 +107,7 @@ export function analyzePortfolioDirectHoldings(
       }
       grouped.set(identity.key, {
         ...existing,
+        name: stableDisplayName(existing.name, row.name, identity.ticker),
         currentValueKrw: combinedValueKrw,
       });
       continue;
@@ -142,7 +151,12 @@ export function buildPortfolioDirectHoldingsBaseline(
     "selectedAccount" | "holdingRows" | "exclusions"
   >,
 ): PortfolioDirectHoldingsBaseline {
-  const analysis = analyzePortfolioDirectHoldings(portfolio.holdingRows);
+  const analysis = analyzePortfolioDirectHoldings(portfolio.holdingRows, {
+    identityScope:
+      portfolio.selectedAccount === "all"
+        ? "cross_account_exposure"
+        : "account_scoped",
+  });
   const excludedHoldingCount = portfolio.exclusions.length;
   const hasIncompleteEvidence =
     excludedHoldingCount > 0 ||
@@ -229,7 +243,16 @@ export function calculatePortfolioDirectHoldingMetrics(
   });
 }
 
-function canonicalDirectHoldingIdentity(row: DirectHoldingInput) {
+export function hasCanonicalPortfolioInstrumentIdentity(
+  row: Pick<DirectHoldingInput, "account" | "market" | "currency" | "ticker">,
+) {
+  return canonicalDirectHoldingIdentity(row, "account_scoped") !== null;
+}
+
+function canonicalDirectHoldingIdentity(
+  row: Pick<DirectHoldingInput, "account" | "market" | "currency" | "ticker">,
+  identityScope: PortfolioDirectHoldingIdentityScope,
+) {
   const account = row.account.trim().toLowerCase();
   const market = row.market.trim().toLowerCase();
   const currency = row.currency.trim().toUpperCase();
@@ -245,14 +268,26 @@ function canonicalDirectHoldingIdentity(row: DirectHoldingInput) {
   }
 
   return {
-    key: [account, market, currency, ticker]
+    key: [
+      ...(identityScope === "account_scoped" ? [account] : []),
+      market,
+      currency,
+      ticker,
+    ]
       .map((part) => encodeURIComponent(part))
       .join("|"),
-    account,
+    account: identityScope === "account_scoped" ? account : "all",
     market,
     currency,
     ticker,
   };
+}
+
+function stableDisplayName(current: string, candidate: string, ticker: string) {
+  const normalizedCandidate = candidate.trim() || ticker;
+  return current.localeCompare(normalizedCandidate) <= 0
+    ? current
+    : normalizedCandidate;
 }
 
 function compareDirectHoldings(

@@ -21,6 +21,7 @@ import "./investment-lab-rolling-comparison.test.mjs";
 import "./investment-lab-contribution-experiment.test.mjs";
 import "./investment-lab-small-adjustment.test.mjs";
 import "./portfolio-direct-holdings.test.mjs";
+import "./portfolio-special-holdings.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./simulation-return-matrix.test.mjs";

@@ -44,7 +44,7 @@ describe("portfolio direct holdings baseline", () => {
     ]);
   });
 
-  it("does not merge the same ticker across account, market, or currency", () => {
+  it("keeps account-scoped adjustment identities separate", () => {
     const analysis = analyzePortfolioDirectHoldings([
       holding("Asset A", "SAME", "korea", "KRW", 100),
       holding("Asset B", "SAME", "us", "USD", 200),
@@ -53,6 +53,38 @@ describe("portfolio direct holdings baseline", () => {
 
     assert.equal(analysis.holdings.length, 3);
     assert.equal(new Set(analysis.holdings.map((row) => row.key)).size, 3);
+  });
+
+  it("merges the same economic exposure across accounts in the all baseline", () => {
+    const rows = [
+      holding("Asset A brokerage", "SAME", "korea", "KRW", 60),
+      holding("Asset A ISA", "SAME", "korea", "KRW", 40, "isa"),
+      holding("Asset B", "OTHER", "korea", "KRW", 100),
+      holding("US SAME", "SAME", "us", "USD", 50),
+    ];
+    const model = buildPortfolioDirectHoldingsBaseline({
+      selectedAccount: "all",
+      holdingRows: rows,
+      exclusions: [],
+    });
+    const analysis = analyzePortfolioDirectHoldings(rows, {
+      identityScope: "cross_account_exposure",
+    });
+
+    assert.equal(model.status, "complete");
+    assert.equal(model.directHoldingCount, 3);
+    assert.equal(
+      model.metrics.currencyExposures.find((row) => row.currency === "KRW")
+        .currentValueKrw,
+      200,
+    );
+    const koreaSame = analysis.holdings.find(
+      (row) => row.market === "korea" && row.ticker === "SAME",
+    );
+    assert.equal(koreaSame.currentValueKrw, 100);
+    assert.equal(koreaSame.account, "all");
+    assertClose(model.metrics.hhiPoints, 3600);
+    assertClose(model.metrics.effectiveHoldingCount, 1 / 0.36);
   });
 
   it("shows partial metrics without treating unresolved identity as a holding", () => {
