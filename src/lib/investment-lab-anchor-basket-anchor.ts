@@ -1,0 +1,358 @@
+import type { InvestmentLabSourceSnapshotRow } from "./investment-lab-counterfactual-read-model.ts";
+import { isRiskDate } from "./portfolio-risk-calendar.ts";
+
+const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
+const MAX_INSTRUMENTS = 64;
+
+export const INVESTMENT_LAB_ANCHOR_BASKET_POLICY = Object.freeze({
+  version: "anchor_observed_equal_weight_same_flow_v1",
+  account: "all",
+  anchorAuthority: "exact_stored_portfolio_and_position_source",
+  identity: "market_currency_ticker_aggregated_across_accounts",
+  anchorAllocation: "equal_weight_once_at_anchor",
+  subsequentFlowAllocation: "equal_split_across_anchor_instruments",
+  rebalancing: "none",
+  unresolvedHoldingHandling: "whole_scenario_unavailable",
+  maximumInstrumentCount: MAX_INSTRUMENTS,
+} as const);
+
+export type InvestmentLabAnchorPositionRow = Readonly<{
+  snapshotDate: string;
+  account: string;
+  source: string | null;
+  ticker: string | null;
+  assetName: string | null;
+  market: string | null;
+  currency: string | null;
+  assetType: string | null;
+  quantity: string | number | null;
+  marketValueKrw: string | number | null;
+}>;
+
+export type InvestmentLabAnchorInstrument = Readonly<{
+  key: string;
+  ticker: string;
+  label: string;
+  market: "korea" | "us";
+  currency: "KRW" | "USD";
+  sourceRows: number;
+  accountCount: number;
+  storedMarketValueKrw: number;
+}>;
+
+export type InvestmentLabAnchorBlocker =
+  | "invalid_service_date_axis"
+  | "no_complete_anchor_evidence"
+  | "requested_anchor_unavailable"
+  | "ambiguous_portfolio_source"
+  | "tickerless_anchor_holding"
+  | "unsupported_anchor_holding_axis"
+  | "physical_anchor_holding"
+  | "invalid_anchor_position_evidence"
+  | "duplicate_anchor_identity"
+  | "ambiguous_anchor_identity_metadata"
+  | "instrument_limit_exceeded";
+
+export type InvestmentLabAnchorSelection = Readonly<{
+  status: "ready" | "unavailable";
+  policy: typeof INVESTMENT_LAB_ANCHOR_BASKET_POLICY;
+  selectedAnchorDate: string | null;
+  candidateAnchorDates: readonly string[];
+  instruments: readonly InvestmentLabAnchorInstrument[];
+  coverage: Readonly<{
+    sourcePositionRows: number;
+    recognizedPositionRows: number;
+    unresolvedPositionRows: number;
+    economicInstrumentCount: number;
+  }>;
+  blockers: readonly InvestmentLabAnchorBlocker[];
+}>;
+
+export function resolveInvestmentLabAnchorSelection(input: Readonly<{
+  serviceDates: readonly string[];
+  snapshotRows: readonly InvestmentLabSourceSnapshotRow[];
+  positionRows: readonly InvestmentLabAnchorPositionRow[];
+  requestedAnchorDate?: string | null;
+}>): InvestmentLabAnchorSelection {
+  const blockers = new Set<InvestmentLabAnchorBlocker>();
+  const serviceDates = [...input.serviceDates];
+  if (!isOrderedDateAxis(serviceDates)) {
+    blockers.add("invalid_service_date_axis");
+    return unavailable(null, [], [], 0, 0, blockers);
+  }
+
+  const sourceByDateAccount = portfolioSourceIndex(input.snapshotRows);
+  const positionsByDateAccountSource = positionIndex(input.positionRows);
+  const candidateAnchorDates = serviceDates.filter((date) =>
+    TRACKED_ACCOUNTS.every((account) => {
+      const source = sourceByDateAccount.get(date)?.get(account);
+      return (
+        source !== undefined &&
+        source !== null &&
+        (positionsByDateAccountSource.get(positionGroupKey(date, account, source))
+          ?.length ?? 0) > 0
+      );
+    }),
+  );
+
+  if (candidateAnchorDates.length === 0) {
+    blockers.add("no_complete_anchor_evidence");
+    return unavailable(null, [], [], 0, 0, blockers);
+  }
+
+  const requested = normalizeText(input.requestedAnchorDate);
+  const selectedAnchorDate = requested ?? candidateAnchorDates[0];
+  if (
+    !isRiskDate(selectedAnchorDate) ||
+    !candidateAnchorDates.includes(selectedAnchorDate)
+  ) {
+    blockers.add("requested_anchor_unavailable");
+    return unavailable(
+      selectedAnchorDate,
+      candidateAnchorDates,
+      [],
+      0,
+      0,
+      blockers,
+    );
+  }
+
+  const anchorRows: InvestmentLabAnchorPositionRow[] = [];
+  for (const account of TRACKED_ACCOUNTS) {
+    const source = sourceByDateAccount.get(selectedAnchorDate)?.get(account);
+    if (!source) {
+      blockers.add("ambiguous_portfolio_source");
+      continue;
+    }
+    anchorRows.push(
+      ...(positionsByDateAccountSource.get(
+        positionGroupKey(selectedAnchorDate, account, source),
+      ) ?? []),
+    );
+  }
+
+  const grouped = new Map<
+    string,
+    {
+      ticker: string;
+      market: "korea" | "us";
+      currency: "KRW" | "USD";
+      labels: Set<string>;
+      accounts: Set<string>;
+      sourceRows: number;
+      storedMarketValueKrw: number;
+    }
+  >();
+  let recognizedPositionRows = 0;
+
+  for (const row of anchorRows) {
+    const ticker = normalizeText(row.ticker)?.toUpperCase() ?? null;
+    const market = normalizeText(row.market)?.toLowerCase() ?? null;
+    const currency = normalizeText(row.currency)?.toUpperCase() ?? null;
+    const axis = supportedAxis(market, currency);
+    const assetType = normalizeText(row.assetType)?.toLowerCase() ?? null;
+    const account = normalizeText(row.account)?.toLowerCase() ?? null;
+    const source = normalizeText(row.source);
+    const quantity = positiveNumber(row.quantity);
+    const marketValueKrw = nonNegativeNumber(row.marketValueKrw);
+    const label = normalizeText(row.assetName);
+
+    if (!ticker) blockers.add("tickerless_anchor_holding");
+    if (assetType === "commodity") blockers.add("physical_anchor_holding");
+    if (!axis) {
+      blockers.add("unsupported_anchor_holding_axis");
+    }
+    if (
+      !account ||
+      !TRACKED_ACCOUNTS.includes(account as (typeof TRACKED_ACCOUNTS)[number]) ||
+      !source ||
+      !label ||
+      quantity === null ||
+      marketValueKrw === null
+    ) {
+      blockers.add("invalid_anchor_position_evidence");
+    }
+    if (
+      !ticker ||
+      !axis ||
+      assetType === "commodity" ||
+      !account ||
+      !source ||
+      !label ||
+      quantity === null ||
+      marketValueKrw === null
+    ) {
+      continue;
+    }
+
+    const key = instrumentKey(axis.market, axis.currency, ticker);
+    const existing = grouped.get(key) ?? {
+      ticker,
+      market: axis.market,
+      currency: axis.currency,
+      labels: new Set<string>(),
+      accounts: new Set<string>(),
+      sourceRows: 0,
+      storedMarketValueKrw: 0,
+    };
+    if (existing.accounts.has(account)) {
+      blockers.add("duplicate_anchor_identity");
+    }
+    existing.labels.add(label);
+    existing.accounts.add(account);
+    existing.sourceRows += 1;
+    existing.storedMarketValueKrw += marketValueKrw;
+    grouped.set(key, existing);
+    recognizedPositionRows += 1;
+  }
+
+  const instruments = [...grouped]
+    .map(([key, row]) => {
+      if (row.labels.size !== 1) {
+        blockers.add("ambiguous_anchor_identity_metadata");
+      }
+      return Object.freeze({
+        key,
+        ticker: row.ticker,
+        label: [...row.labels].sort()[0] ?? row.ticker,
+        market: row.market,
+        currency: row.currency,
+        sourceRows: row.sourceRows,
+        accountCount: row.accounts.size,
+        storedMarketValueKrw: row.storedMarketValueKrw,
+      });
+    })
+    .sort((left, right) => left.key.localeCompare(right.key));
+
+  if (instruments.length > MAX_INSTRUMENTS) {
+    blockers.add("instrument_limit_exceeded");
+  }
+  if (instruments.length === 0) {
+    blockers.add("no_complete_anchor_evidence");
+  }
+
+  const unresolvedPositionRows = anchorRows.length - recognizedPositionRows;
+  return Object.freeze({
+    status: blockers.size === 0 ? "ready" : "unavailable",
+    policy: INVESTMENT_LAB_ANCHOR_BASKET_POLICY,
+    selectedAnchorDate,
+    candidateAnchorDates: Object.freeze(candidateAnchorDates),
+    instruments:
+      blockers.size === 0 ? Object.freeze(instruments) : Object.freeze([]),
+    coverage: Object.freeze({
+      sourcePositionRows: anchorRows.length,
+      recognizedPositionRows,
+      unresolvedPositionRows,
+      economicInstrumentCount: instruments.length,
+    }),
+    blockers: Object.freeze([...blockers].sort()),
+  });
+}
+
+function portfolioSourceIndex(
+  rows: readonly InvestmentLabSourceSnapshotRow[],
+) {
+  const index = new Map<string, Map<string, string | null>>();
+  for (const row of rows) {
+    const account = normalizeText(row.account)?.toLowerCase() ?? "";
+    if (!TRACKED_ACCOUNTS.includes(account as (typeof TRACKED_ACCOUNTS)[number])) {
+      continue;
+    }
+    const byAccount = index.get(row.snapshotDate) ?? new Map();
+    const source = normalizeText(row.source);
+    if (byAccount.has(account)) byAccount.set(account, null);
+    else byAccount.set(account, source);
+    index.set(row.snapshotDate, byAccount);
+  }
+  return index;
+}
+
+function positionIndex(rows: readonly InvestmentLabAnchorPositionRow[]) {
+  const index = new Map<string, InvestmentLabAnchorPositionRow[]>();
+  for (const row of rows) {
+    const account = normalizeText(row.account)?.toLowerCase() ?? "";
+    const source = normalizeText(row.source) ?? "";
+    const key = positionGroupKey(row.snapshotDate, account, source);
+    const group = index.get(key) ?? [];
+    group.push(row);
+    index.set(key, group);
+  }
+  return index;
+}
+
+function positionGroupKey(date: string, account: string, source: string) {
+  return `${date}\u0000${account}\u0000${source}`;
+}
+
+function instrumentKey(
+  market: "korea" | "us",
+  currency: "KRW" | "USD",
+  ticker: string,
+) {
+  return `${market}:${currency}:${ticker}`;
+}
+
+function supportedAxis(
+  market: string | null,
+  currency: string | null,
+) {
+  if (market === "korea" && currency === "KRW") {
+    return { market, currency } as const;
+  }
+  if (market === "us" && currency === "USD") {
+    return { market, currency } as const;
+  }
+  return null;
+}
+
+function isOrderedDateAxis(dates: readonly string[]) {
+  return (
+    dates.length >= 2 &&
+    new Set(dates).size === dates.length &&
+    dates.every(
+      (date, index) =>
+        isRiskDate(date) && (index === 0 || dates[index - 1] < date),
+    )
+  );
+}
+
+function normalizeText(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function positiveNumber(value: string | number | null) {
+  if (value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function nonNegativeNumber(value: string | number | null) {
+  if (value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function unavailable(
+  selectedAnchorDate: string | null,
+  candidateAnchorDates: readonly string[],
+  instruments: readonly InvestmentLabAnchorInstrument[],
+  sourcePositionRows: number,
+  recognizedPositionRows: number,
+  blockers: Set<InvestmentLabAnchorBlocker>,
+): InvestmentLabAnchorSelection {
+  return Object.freeze({
+    status: "unavailable",
+    policy: INVESTMENT_LAB_ANCHOR_BASKET_POLICY,
+    selectedAnchorDate,
+    candidateAnchorDates: Object.freeze([...candidateAnchorDates]),
+    instruments: Object.freeze([...instruments]),
+    coverage: Object.freeze({
+      sourcePositionRows,
+      recognizedPositionRows,
+      unresolvedPositionRows: sourcePositionRows - recognizedPositionRows,
+      economicInstrumentCount: instruments.length,
+    }),
+    blockers: Object.freeze([...blockers].sort()),
+  });
+}

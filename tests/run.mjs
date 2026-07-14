@@ -12,6 +12,7 @@ import "./investment-lab-event-flow.test.mjs";
 import "./investment-lab-counterfactual-path.test.mjs";
 import "./investment-lab-modified-dietz.test.mjs";
 import "./investment-lab-cash-comparison.test.mjs";
+import "./investment-lab-anchor-basket.test.mjs";
 import "./investment-lab-return-evidence.test.mjs";
 import "./investment-lab-voo-readiness.test.mjs";
 import "./investment-lab-voo-path.test.mjs";

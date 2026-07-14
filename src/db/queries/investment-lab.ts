@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
   assetPriceSnapshots,
   assets,
   dailyPortfolioSnapshots,
+  dailyPositionSnapshots,
   eventLedgerEntries,
   fxRates,
 } from "@/db/schema";
@@ -104,6 +105,78 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       .where(eq(fxRates.isSample, false))
       .orderBy(asc(fxRates.rateDate));
   },
+
+  async loadAnchorPositionRows(serviceDates) {
+    if (serviceDates.length === 0) return [];
+    return db
+      .select({
+        snapshotDate: dailyPositionSnapshots.snapshotDate,
+        account: dailyPositionSnapshots.account,
+        source: dailyPositionSnapshots.source,
+        ticker: dailyPositionSnapshots.ticker,
+        assetName: dailyPositionSnapshots.assetName,
+        market: dailyPositionSnapshots.market,
+        currency: dailyPositionSnapshots.currency,
+        assetType: dailyPositionSnapshots.assetType,
+        quantity: dailyPositionSnapshots.quantity,
+        marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+      })
+      .from(dailyPositionSnapshots)
+      .where(
+        and(
+          eq(dailyPositionSnapshots.isSample, false),
+          inArray(dailyPositionSnapshots.account, [
+            "brokerage",
+            "isa",
+            "irp",
+          ]),
+          inArray(dailyPositionSnapshots.snapshotDate, [...serviceDates]),
+        ),
+      )
+      .orderBy(
+        asc(dailyPositionSnapshots.snapshotDate),
+        asc(dailyPositionSnapshots.account),
+        asc(dailyPositionSnapshots.source),
+        sql`${dailyPositionSnapshots.ticker} asc nulls last`,
+      );
+  },
+
+  async loadAnchorPriceRows({
+    instruments,
+    startServiceDate,
+    endServiceDate,
+  }) {
+    const tickers = [...new Set(instruments.map((row) => row.ticker))];
+    if (tickers.length === 0) return [];
+    return db
+      .select({
+        ticker: assetPriceSnapshots.ticker,
+        market: assetPriceSnapshots.market,
+        currency: assetPriceSnapshots.currency,
+        priceDate: assetPriceSnapshots.priceDate,
+        closePrice: assetPriceSnapshots.closePrice,
+        source: assetPriceSnapshots.source,
+      })
+      .from(assetPriceSnapshots)
+      .where(
+        and(
+          eq(assetPriceSnapshots.isSample, false),
+          inArray(
+            sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+            tickers,
+          ),
+          gte(
+            assetPriceSnapshots.priceDate,
+            shiftIsoDate(startServiceDate, -10),
+          ),
+          lte(assetPriceSnapshots.priceDate, endServiceDate),
+        ),
+      )
+      .orderBy(
+        asc(assetPriceSnapshots.priceDate),
+        asc(assetPriceSnapshots.ticker),
+      );
+  },
 };
 
 function loadScenarioCloseRows(
@@ -142,10 +215,18 @@ function loadScenarioCloseRows(
 export async function getReadOnlyInvestmentLabCounterfactual(
   request?: InvestmentLabPeriodRequest,
   fixedMixSelection?: InvestmentLabFixedMixSelection,
+  requestedAnchorDate?: string | null,
 ) {
   return loadInvestmentLabCounterfactualReadModel(
     drizzleInvestmentLabRepository,
     request,
     fixedMixSelection,
+    requestedAnchorDate,
   );
+}
+
+function shiftIsoDate(value: string, days: number) {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
 }

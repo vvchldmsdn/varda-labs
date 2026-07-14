@@ -171,6 +171,12 @@ function repository(source) {
     async loadFxRows() {
       return source.fxRows;
     },
+    async loadAnchorPositionRows() {
+      return [];
+    },
+    async loadAnchorPriceRows() {
+      throw new Error("price rows must not load without anchor positions");
+    },
   };
 }
 

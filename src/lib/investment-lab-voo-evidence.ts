@@ -5,8 +5,8 @@ import {
   riskCalendarDayDistance,
 } from "./portfolio-risk-calendar.ts";
 import type { InvestmentLabAmountProvenance } from "./investment-lab-execution-schedule.ts";
+import { resolveInvestmentLabSnapshotFx } from "./investment-lab-snapshot-fx.ts";
 
-const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
 const MAX_EXECUTION_DELAY_DAYS = 7;
 
 export const INVESTMENT_LAB_VOO_READINESS_POLICY = Object.freeze({
@@ -186,10 +186,10 @@ export function resolveInvestmentLabVooEvidence(
       }
     }
 
-    const snapshot = resolveSnapshotFx(
+    const snapshot = resolveInvestmentLabSnapshotFx(
       snapshotGroups.get(serviceDate) ?? [],
-      blockers,
     );
+    for (const blocker of snapshot.blockers) blockers.add(blocker);
     if (snapshot.rate !== null) snapshotFxReadyCount += 1;
     if (snapshot.provenanceReady) snapshotFxProvenanceReadyCount += 1;
 
@@ -340,83 +340,6 @@ function resolveValuationPrice(
     rawClose,
     adjustedClose: positiveNumber(rows[0].adjustedClosePrice),
   };
-}
-
-function resolveSnapshotFx(
-  rows: readonly InvestmentLabVooSnapshotFxRow[],
-  blockers: Set<InvestmentLabVooReadinessBlocker>,
-) {
-  const namedRates: number[] = [];
-  const namedSources: string[] = [];
-  const namedRules: string[] = [];
-  let missing = false;
-
-  for (const account of TRACKED_ACCOUNTS) {
-    const matches = rows.filter(
-      (row) => String(row.account).trim().toLowerCase() === account,
-    );
-    if (matches.length !== 1) {
-      missing = true;
-      continue;
-    }
-    const rate = positiveNumber(matches[0].usdKrw);
-    if (rate === null) missing = true;
-    else namedRates.push(rate);
-    const source = nonEmptyString(matches[0].source);
-    const rule = nonEmptyString(matches[0].ruleVersion);
-    if (!source || !rule) {
-      blockers.add("missing_snapshot_fx_provenance");
-    } else {
-      namedSources.push(source);
-      namedRules.push(rule);
-    }
-  }
-
-  if (missing || namedRates.length !== TRACKED_ACCOUNTS.length) {
-    blockers.add("missing_snapshot_fx");
-    return { rate: null, provenanceReady: false } as const;
-  }
-  if (namedRates.some((rate) => !sameNumber(rate, namedRates[0]))) {
-    blockers.add("ambiguous_snapshot_fx");
-    return { rate: null, provenanceReady: false } as const;
-  }
-  if (
-    namedSources.length !== TRACKED_ACCOUNTS.length ||
-    namedRules.length !== TRACKED_ACCOUNTS.length
-  ) {
-    return { rate: namedRates[0], provenanceReady: false } as const;
-  }
-  if (
-    namedSources.some((source) => source !== namedSources[0]) ||
-    namedRules.some((rule) => rule !== namedRules[0])
-  ) {
-    blockers.add("ambiguous_snapshot_fx_provenance");
-    return { rate: namedRates[0], provenanceReady: false } as const;
-  }
-
-  const allRows = rows.filter(
-    (row) => String(row.account).trim().toLowerCase() === "all",
-  );
-  if (allRows.length > 1) {
-    blockers.add("ambiguous_snapshot_fx");
-    return { rate: null, provenanceReady: false } as const;
-  }
-  if (allRows.length === 1) {
-    const allRate = positiveNumber(allRows[0].usdKrw);
-    if (!sameNumber(allRate, namedRates[0])) {
-      blockers.add("ambiguous_snapshot_fx");
-      return { rate: null, provenanceReady: false } as const;
-    }
-    if (
-      nonEmptyString(allRows[0].source) !== namedSources[0] ||
-      nonEmptyString(allRows[0].ruleVersion) !== namedRules[0]
-    ) {
-      blockers.add("ambiguous_snapshot_fx_provenance");
-      return { rate: namedRates[0], provenanceReady: false } as const;
-    }
-  }
-
-  return { rate: namedRates[0], provenanceReady: true } as const;
 }
 
 function resolveExecutionPrice(

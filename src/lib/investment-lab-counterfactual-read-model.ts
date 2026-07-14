@@ -144,7 +144,9 @@ export function buildInvestmentLabCounterfactualReadModel(
 ): InvestmentLabCounterfactualReadModel {
   const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
   const actual = buildAggregateActualPath(input.snapshotRows, blockers);
-  const events = buildBoundaryFlows(input.eventRows, blockers);
+  const flowResolution = resolveInvestmentLabBoundaryFlows(input.eventRows);
+  for (const blocker of flowResolution.blockers) blockers.add(blocker);
+  const events = flowResolution.flows;
   const closes = buildScenarioCloses(input.closeRows, blockers);
 
   const initialCoverage = coverage({
@@ -390,6 +392,18 @@ function buildBoundaryFlows(
   }
 
   return flows;
+}
+
+export function resolveInvestmentLabBoundaryFlows(
+  sourceRows: readonly InvestmentLabSourceEventRow[],
+) {
+  const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
+  const flows = buildBoundaryFlows(sourceRows, blockers);
+  return Object.freeze({
+    status: blockers.size === 0 ? "ready" : "blocked",
+    flows: Object.freeze(flows),
+    blockers: Object.freeze([...blockers].sort()),
+  });
 }
 
 function buildScenarioCloses(

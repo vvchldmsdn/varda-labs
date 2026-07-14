@@ -9,6 +9,7 @@ const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3107";
 const START_SERVICE_DATE = readArgument("--start");
 const END_SERVICE_DATE = readArgument("--end");
 const KODEX_WEIGHT = readArgument("--kodex-weight");
+const BASKET_ANCHOR = readArgument("--basket-anchor");
 const EXPECTED_PERIOD_STATUS =
   readArgument("--expect-period-status") ??
   (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "full");
@@ -57,6 +58,42 @@ async function main() {
     "data-cash-comparison-status",
   );
   assert.match(route.body, /data-section="investment-lab-fixed-mix"/);
+  assert.match(route.body, /data-section="investment-lab-anchor-basket"/);
+  const anchorBasketStatus = readStringAttribute(
+    route.body,
+    "data-anchor-basket-status",
+  );
+  const anchorBasketCandidateDates = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-candidate-dates",
+  );
+  const anchorBasketSourceRows = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-source-rows",
+  );
+  const anchorBasketEconomicInstruments = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-economic-instruments",
+  );
+  const anchorBasketUnresolvedRows = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-unresolved-rows",
+  );
+  const anchorBasketComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-comparison-dates",
+  );
+  assert.ok(
+    anchorBasketStatus === "ready" || anchorBasketStatus === "unavailable",
+  );
+  assert.ok(anchorBasketCandidateDates >= 0);
+  assert.ok(anchorBasketSourceRows >= anchorBasketEconomicInstruments);
+  if (anchorBasketStatus === "ready") {
+    assert.equal(anchorBasketUnresolvedRows, 0);
+    assert.ok(anchorBasketComparisonDates >= 2);
+  } else {
+    assert.equal(anchorBasketComparisonDates, 0);
+  }
   const fixedMixStatus = readStringAttribute(
     route.body,
     "data-fixed-mix-status",
@@ -371,6 +408,12 @@ async function main() {
           fixedMixScenarioFlowLegs,
           fixedMixSplitExecutionDateRows,
           fixedMixReturnStatus,
+          anchorBasketStatus,
+          anchorBasketCandidateDates,
+          anchorBasketSourceRows,
+          anchorBasketEconomicInstruments,
+          anchorBasketUnresolvedRows,
+          anchorBasketComparisonDates,
           rollingStatus,
           rollingCandidateWindows,
           rollingCompleteWindows,
@@ -602,6 +645,12 @@ async function main() {
         fixedMixScenarioFlowLegs,
         fixedMixSplitExecutionDateRows,
         fixedMixReturnStatus,
+        anchorBasketStatus,
+        anchorBasketCandidateDates,
+        anchorBasketSourceRows,
+        anchorBasketEconomicInstruments,
+        anchorBasketUnresolvedRows,
+        anchorBasketComparisonDates,
         fixedMixContributionStatus,
         fixedMixContributionKodexWeightBps,
         fixedMixContributionVooWeightBps,
@@ -677,6 +726,7 @@ function investmentLabRoutePath() {
   if (START_SERVICE_DATE) params.set("start", START_SERVICE_DATE);
   if (END_SERVICE_DATE) params.set("end", END_SERVICE_DATE);
   if (KODEX_WEIGHT !== null) params.set("kodexWeight", KODEX_WEIGHT);
+  if (BASKET_ANCHOR !== null) params.set("basketAnchor", BASKET_ANCHOR);
   const query = params.toString();
   return query ? `/investment-lab?${query}` : "/investment-lab";
 }
@@ -694,7 +744,9 @@ async function readCounts() {
       (select count(*)::int from assets) as assets,
       (select count(*)::int from event_ledger_entries) as event_ledger_entries,
       (select count(*)::int from daily_portfolio_snapshots) as portfolio_snapshots,
+      (select count(*)::int from daily_position_snapshots) as position_snapshots,
       (select count(*)::int from asset_price_snapshots) as price_snapshots,
+      (select count(*)::int from fx_rates) as fx_rates,
       (select count(*)::int from etf_masters) as etf_masters,
       (select count(*)::int from etf_holdings) as etf_holdings
   `);

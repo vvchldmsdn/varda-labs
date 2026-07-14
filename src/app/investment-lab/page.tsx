@@ -6,6 +6,7 @@ import {
   InvestmentLabEtfXrayUnavailable,
 } from "@/components/investment-lab/investment-lab-etf-xray";
 import { InvestmentLabFixedMix } from "@/components/investment-lab/investment-lab-fixed-mix";
+import { InvestmentLabAnchorBasket } from "@/components/investment-lab/investment-lab-anchor-basket";
 import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
 import {
   InvestmentLabSmallAdjustment,
@@ -27,6 +28,7 @@ type InvestmentLabPageProps = {
     start?: string | string[];
     end?: string | string[];
     kodexWeight?: string | string[];
+    basketAnchor?: string | string[];
   }>;
 };
 
@@ -47,6 +49,7 @@ export default async function InvestmentLabPage({
           endServiceDate: params.end,
         },
     fixedMixSelection,
+    normalizeSingleParam(params.basketAnchor),
   );
 
   return (
@@ -76,7 +79,8 @@ async function InvestmentLabContent({
   fixedMixSelection: InvestmentLabFixedMixSelection;
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
 }) {
-  const { model, period, rollingComparison } = await modelPromise;
+  const { anchorBasketScenario, model, period, rollingComparison } =
+    await modelPromise;
   return (
     <>
       <InvestmentLabView model={model} period={period} />
@@ -85,9 +89,19 @@ async function InvestmentLabContent({
         period={period}
         selection={fixedMixSelection}
       />
+      <InvestmentLabAnchorBasket
+        fixedMixSelection={fixedMixSelection}
+        model={anchorBasketScenario}
+        period={period}
+      />
       <InvestmentLabRollingComparisonView model={rollingComparison} />
     </>
   );
+}
+
+function normalizeSingleParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return "__ambiguous__";
+  return value ?? null;
 }
 
 async function InvestmentLabEtfXrayContent({

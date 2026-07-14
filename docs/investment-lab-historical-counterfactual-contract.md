@@ -197,6 +197,9 @@ Run `npm run audit:investment-lab-counterfactual` to refresh this evidence.
 Run `npm run audit:investment-lab-event-flow` to refresh event-flow evidence.
 Run `npm run audit:investment-lab-counterfactual-path` to execute the pure path
 engine against read-only production evidence.
+Run `npm run audit:investment-lab-anchor-basket` to inspect the exact stored
+portfolio/position anchor intersection and whole-basket instrument evidence
+without provider calls or writes.
 
 ## Return Estimate Policy
 
