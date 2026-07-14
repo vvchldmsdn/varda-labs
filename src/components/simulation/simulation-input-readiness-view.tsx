@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
+import { ObservedReturnAlignmentEvidencePanel } from "./observed-return-alignment-evidence-panel";
 import { ObservedReturnComparisonPanel } from "./observed-return-comparison-panel";
 import {
   ObservedReturnSeriesPanel,
@@ -87,6 +88,9 @@ export function SimulationInputReadinessView({
 
         <ObservedReturnComparisonPanel
           comparison={model.observedReturnComparison}
+        />
+        <ObservedReturnAlignmentEvidencePanel
+          evidence={model.observedReturnAlignmentEvidence}
         />
 
         <section

@@ -57,6 +57,15 @@ describe("Simulation input readiness read model", () => {
     assert.ok(model.inputs.every((row) => row.issues.length === 0));
     for (const input of model.inputs) {
       assert.equal(input.observedReturns?.length, RETURN_STEP_COUNT);
+      assert.equal(input.alignmentEvidence?.serviceDateCount, 91);
+      assert.equal(
+        input.alignmentEvidence?.price.exactObservationCount,
+        91,
+      );
+      assert.equal(
+        input.alignmentEvidence?.price.carriedObservationCount,
+        0,
+      );
       assert.ok(
         input.observedReturns.every(
           (row, index, series) =>
@@ -86,10 +95,52 @@ describe("Simulation input readiness read model", () => {
     assert.equal(pageModel.observedReturnComparison.status, "ready");
     assert.equal(pageModel.observedReturnComparison.pointCount, 91);
     assert.equal(pageModel.observedReturnComparison.series.length, 2);
+    assert.equal(pageModel.observedReturnAlignmentEvidence.status, "ready");
+    assert.equal(
+      pageModel.observedReturnAlignmentEvidence.serviceDateCount,
+      91,
+    );
     assert.ok(
       pageModel.observedReturnComparison.series.every(
         (series) => series.points.length === 91,
       ),
+    );
+
+    const invalidAlignmentSource = {
+      ...model,
+      inputs: model.inputs.map((item, index) =>
+        index === 0
+          ? {
+              ...item,
+              alignmentEvidence: {
+                ...item.alignmentEvidence,
+                price: {
+                  ...item.alignmentEvidence.price,
+                  exactObservationCount: 90,
+                },
+              },
+            }
+          : item,
+      ),
+    };
+    const invalidAlignmentPage = buildSimulationInputReadinessPageModel({
+      selection: {
+        status: "valid",
+        source: "query",
+        endServiceDate: END_SERVICE_DATE,
+      },
+      selected: model,
+      comparisonSource: invalidAlignmentSource,
+      history: [model],
+    });
+    assert.equal(invalidAlignmentPage.observedReturnComparison.status, "ready");
+    assert.equal(
+      invalidAlignmentPage.observedReturnAlignmentEvidence.status,
+      "unavailable",
+    );
+    assert.equal(
+      invalidAlignmentPage.observedReturnAlignmentEvidence.reason,
+      "invalid_alignment_evidence",
     );
   });
 
@@ -299,6 +350,45 @@ describe("Simulation input readiness read model", () => {
     );
     assert.equal(pageModel.observedReturnComparison.status, "ready");
     assert.equal(pageModel.observedReturnComparison.pointCount, 91);
+    assert.equal(pageModel.observedReturnAlignmentEvidence.status, "ready");
+    assert.deepEqual(
+      pageModel.observedReturnAlignmentEvidence.instruments.map((item) => ({
+        id: item.id,
+        priceExact: item.price.exactObservationCount,
+        priceCarried: item.price.carriedObservationCount,
+        priceMaxCarry: item.price.maxCarryDaysUsed,
+        fxExact:
+          item.fx.status === "required"
+            ? item.fx.exactObservationCount
+            : null,
+        fxCarried:
+          item.fx.status === "required"
+            ? item.fx.carriedObservationCount
+            : null,
+        fxMaxCarry:
+          item.fx.status === "required" ? item.fx.maxCarryDaysUsed : null,
+      })),
+      [
+        {
+          id: "kodex200",
+          priceExact: 90,
+          priceCarried: 1,
+          priceMaxCarry: 1,
+          fxExact: null,
+          fxCarried: null,
+          fxMaxCarry: null,
+        },
+        {
+          id: "voo",
+          priceExact: 90,
+          priceCarried: 1,
+          priceMaxCarry: 1,
+          fxExact: 91,
+          fxCarried: 0,
+          fxMaxCarry: 0,
+        },
+      ],
+    );
     assert.equal(calls.price, 1);
     assert.equal(calls.fx, 1);
   });

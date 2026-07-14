@@ -1,5 +1,6 @@
 import type { loadSimulationPeriodPreflight } from "./simulation-period-preflight-loader.ts";
 import { buildSimulationObservedReturnComparison } from "./simulation-observed-return-comparison.ts";
+import { buildSimulationObservedReturnAlignment } from "./simulation-observed-return-alignment.ts";
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
 
 export const SIMULATION_INPUT_READINESS_POLICY = Object.freeze({
@@ -137,6 +138,9 @@ export function buildSimulationInputReadinessPageModel(input: {
   comparisonSource: SimulationInputReadinessModel;
   history: readonly SimulationInputReadinessModel[];
 }) {
+  const observedReturnComparison = buildSimulationObservedReturnComparison(
+    input.comparisonSource.inputs,
+  );
   const history = input.history.map((model) =>
     Object.freeze({
       serviceDate: model.requestedEndServiceDate,
@@ -169,9 +173,14 @@ export function buildSimulationInputReadinessPageModel(input: {
   return Object.freeze({
     ...input.selected,
     endServiceDateSelection: input.selection,
-    observedReturnComparison: buildSimulationObservedReturnComparison(
-      input.comparisonSource.inputs,
-    ),
+    observedReturnComparison,
+    observedReturnAlignmentEvidence:
+      buildSimulationObservedReturnAlignment({
+        comparisonStatus: observedReturnComparison.status,
+        inputs: input.comparisonSource.inputs,
+        expectedReturnStepCount:
+          SIMULATION_INPUT_READINESS_POLICY.returnStepCount,
+      }),
     history: Object.freeze(history),
   });
 }
@@ -311,6 +320,10 @@ function projectInputReadiness(
               }),
             ),
           )
+        : null,
+    alignmentEvidence:
+      status === "matrix_ready" && matrixReturnSeries?.alignmentEvidence
+        ? matrixReturnSeries.alignmentEvidence
         : null,
     issues: Object.freeze([...issues.values()]),
   });

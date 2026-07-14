@@ -93,7 +93,8 @@ export function ObservedReturnComparisonPanel({
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
             두 독립 연구 입력의 과거 KRW 수익률을 각각 시작 100으로 누적했습니다.
-            포트폴리오 조합·예측·시뮬레이션 경로가 아닙니다.
+            휴장일에는 아래 정렬 근거의 허용 범위 안에서 직전 저장값이 적용될 수
+            있습니다. 포트폴리오 조합·예측·시뮬레이션 경로가 아닙니다.
           </p>
         </div>
         <p className="text-xs text-[#687064]">
@@ -255,6 +256,8 @@ function formatUnavailableReason(
       return "두 연구 입력이 모두 준비되지 않아 비교하지 않습니다.";
     case "axis_mismatch":
       return "두 연구 입력의 관측 날짜축이 일치하지 않아 비교하지 않습니다.";
+    case "invalid_return_count":
+      return "정확히 90개 수익률과 91개 관측점이 확인되지 않아 비교하지 않습니다.";
     case "invalid_return_series":
       return "완전하고 유효한 누적 관측지수를 만들 수 없어 비교하지 않습니다.";
     case "invalid_input_set":

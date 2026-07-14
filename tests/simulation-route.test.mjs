@@ -44,7 +44,16 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-observed-return-comparison/);
     assert.match(view, /data-comparison-axis-status/);
     assert.match(view, /data-comparison-point-count/);
+    assert.match(view, /data-cross-market-alignment/);
+    assert.match(view, /data-alignment-service-date-count/);
+    assert.match(view, /data-price-carry-count/);
+    assert.match(view, /data-fx-carry-count/);
     assert.match(view, /90개 관측구간 누적지수 비교/);
+    assert.match(view, /교차시장 정렬 근거/);
+    assert.match(view, /가격은 최대 7일/);
+    assert.match(view, /USD\/KRW는\s*최대 3일/);
+    assert.match(view, /가격 직전값 적용/);
+    assert.match(view, /환율 직전값 적용/);
     assert.match(view, /시작 100으로 누적/);
     assert.match(view, /두 입력 공통/);
     assert.match(view, /\{rows\.length\}개 관측 수익률/);
@@ -69,6 +78,7 @@ function read(path) {
 function readSimulationView() {
   return [
     "src/components/simulation/simulation-input-readiness-view.tsx",
+    "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",
     "src/components/simulation/observed-return-series-panel.tsx",
   ]

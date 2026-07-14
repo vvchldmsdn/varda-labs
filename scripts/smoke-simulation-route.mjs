@@ -82,6 +82,15 @@ async function main() {
   const observedReturnComparisonStatus = simulation.body.match(
     /data-observed-return-comparison="(ready|unavailable)"/,
   )?.[1];
+  const crossMarketAlignmentStatus = simulation.body.match(
+    /data-cross-market-alignment="(ready|unavailable)"/,
+  )?.[1];
+  const priceCarryCounts = [
+    ...simulation.body.matchAll(/data-price-carry-count="(\d+)"/g),
+  ].map((match) => Number(match[1]));
+  const fxCarryCounts = [
+    ...simulation.body.matchAll(/data-fx-carry-count="(\d+)"/g),
+  ].map((match) => Number(match[1]));
   assert.equal(inputCount, 2, "simulation must render two independent inputs");
   assert.equal(statuses.length, 2, "simulation must render two readiness states");
   assert.equal(
@@ -103,11 +112,34 @@ async function main() {
     readyCount === 2 ? "ready" : "unavailable",
     "comparison must render only when both independent inputs are ready",
   );
+  assert.equal(
+    crossMarketAlignmentStatus,
+    observedReturnComparisonStatus,
+    "alignment evidence must follow the complete comparison boundary",
+  );
   if (observedReturnComparisonStatus === "ready") {
     assert.match(simulation.body, /data-comparison-axis-status="aligned"/);
     assert.match(simulation.body, /data-comparison-point-count="91"/);
     assert.match(simulation.body, /data-comparison-series-count="2"/);
     assert.match(simulation.body, /data-return-scale-mode="shared"/);
+    assert.match(simulation.body, /data-alignment-service-date-count="91"/);
+    assert.equal(
+      simulation.body.match(
+        /data-alignment-instrument="(?:kodex200|voo)"/g,
+      )?.length ?? 0,
+      2,
+      "alignment evidence must contain two minimized instrument rows",
+    );
+    assert.equal(
+      priceCarryCounts.length,
+      2,
+      "alignment evidence must summarize price carry for both inputs",
+    );
+    assert.equal(
+      fxCarryCounts.length,
+      2,
+      "alignment evidence must summarize FX carry without raw values",
+    );
   }
   if (EXPECT_READY !== null) {
     assert.equal(readyCount, EXPECT_READY, "unexpected ready input count");
@@ -136,6 +168,9 @@ async function main() {
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,
+        crossMarketAlignmentStatus,
+        priceCarryCounts,
+        fxCarryCounts,
         databaseSideEffects: false,
         counts: countsAfter,
       },

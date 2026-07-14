@@ -1,45 +1,50 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildSimulationObservedReturnComparison } from "../src/lib/simulation-observed-return-comparison.ts";
+import {
+  buildSimulationObservedReturnComparison,
+  SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY,
+} from "../src/lib/simulation-observed-return-comparison.ts";
+
+const RETURN_COUNT =
+  SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY.expectedReturnCount;
 
 describe("Simulation observed return comparison", () => {
-  it("compounds two aligned complete return series from a shared index of 100", () => {
+  it("compounds two aligned 90-return series from a shared index of 100", () => {
+    const kodexReturns = returnValues();
+    kodexReturns[0] = 0.1;
+    kodexReturns[1] = -0.1;
+    const vooReturns = returnValues();
+    vooReturns[0] = 0.2;
+    vooReturns[1] = 0.05;
+
     const result = buildSimulationObservedReturnComparison([
-      readyInput("kodex200", "069500", [0.1, -0.1]),
-      readyInput("voo", "VOO", [0.2, 0.05]),
+      readyInput("kodex200", "069500", kodexReturns),
+      readyInput("voo", "VOO", vooReturns),
     ]);
 
     assert.equal(result.status, "ready");
-    assert.equal(result.pointCount, 3);
-    assert.equal(result.baselineServiceDate, "2026-07-07");
+    assert.equal(result.pointCount, 91);
+    assert.equal(result.baselineServiceDate, "2026-04-10");
     assert.equal(result.endServiceDate, "2026-07-09");
     assert.deepEqual(
       result.series.map((series) => [
         series.id,
-        series.points.map((point) => point.serviceDate),
-        series.points.map((point) => point.value),
+        series.points.slice(0, 3).map((point) => point.value),
+        series.points.at(-1).value,
       ]),
       [
-        [
-          "kodex200",
-          ["2026-07-07", "2026-07-08", "2026-07-09"],
-          [100, 110.00000000000001, 99.00000000000001],
-        ],
-        [
-          "voo",
-          ["2026-07-07", "2026-07-08", "2026-07-09"],
-          [100, 120, 126],
-        ],
+        ["kodex200", [100, 110.00000000000001, 99.00000000000001], 99.00000000000001],
+        ["voo", [100, 120, 126], 126],
       ],
     );
   });
 
   it("blocks the whole comparison when either input is unavailable", () => {
     const result = buildSimulationObservedReturnComparison([
-      readyInput("kodex200", "069500", [0.01, 0.02]),
+      readyInput("kodex200", "069500", returnValues(0.01)),
       {
-        ...readyInput("voo", "VOO", [0.03, 0.04]),
+        ...readyInput("voo", "VOO", returnValues(0.02)),
         status: "unavailable",
         observedReturns: null,
       },
@@ -51,17 +56,23 @@ describe("Simulation observed return comparison", () => {
     assert.deepEqual(result.series, []);
   });
 
-  it("blocks the whole comparison when the service-date axes differ", () => {
-    const shifted = readyInput("voo", "VOO", [0.03, 0.04]);
-    shifted.observedReturns[1] = {
-      previousServiceDate: "2026-07-08",
-      serviceDate: "2026-07-10",
-      value: 0.04,
-    };
+  it("requires exactly 90 returns at the helper boundary", () => {
+    for (const count of [89, 91]) {
+      const result = buildSimulationObservedReturnComparison([
+        readyInput("kodex200", "069500", returnValues(0.01, count)),
+        readyInput("voo", "VOO", returnValues(0.02, count)),
+      ]);
 
+      assert.equal(result.status, "unavailable");
+      assert.equal(result.reason, "invalid_return_count");
+      assert.equal(result.pointCount, 0);
+    }
+  });
+
+  it("blocks the whole comparison when complete service-date axes differ", () => {
     const result = buildSimulationObservedReturnComparison([
-      readyInput("kodex200", "069500", [0.01, 0.02]),
-      shifted,
+      readyInput("kodex200", "069500", returnValues(0.01)),
+      readyInput("voo", "VOO", returnValues(0.02), "2026-04-11"),
     ]);
 
     assert.equal(result.status, "unavailable");
@@ -70,9 +81,11 @@ describe("Simulation observed return comparison", () => {
 
   it("rejects non-finite and below-minus-one returns", () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, -1.01]) {
+      const invalidReturns = returnValues(0.01);
+      invalidReturns[45] = value;
       const result = buildSimulationObservedReturnComparison([
-        readyInput("kodex200", "069500", [0.01, value]),
-        readyInput("voo", "VOO", [0.03, 0.04]),
+        readyInput("kodex200", "069500", invalidReturns),
+        readyInput("voo", "VOO", returnValues(0.02)),
       ]);
 
       assert.equal(result.status, "unavailable");
@@ -81,8 +94,8 @@ describe("Simulation observed return comparison", () => {
   });
 });
 
-function readyInput(id, ticker, values) {
-  const dates = ["2026-07-07", "2026-07-08", "2026-07-09"];
+function readyInput(id, ticker, values, startDate = "2026-04-10") {
+  const dates = calendarDates(startDate, values.length + 1);
   return {
     id,
     ticker,
@@ -94,4 +107,18 @@ function readyInput(id, ticker, values) {
       value,
     })),
   };
+}
+
+function returnValues(value = 0, count = RETURN_COUNT) {
+  return Array.from({ length: count }, () => value);
+}
+
+function calendarDates(startDate, count) {
+  const dates = [];
+  const cursor = new Date(`${startDate}T00:00:00.000Z`);
+  for (let index = 0; index < count; index += 1) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
 }

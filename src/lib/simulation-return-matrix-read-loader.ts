@@ -2,6 +2,10 @@ import type {
   SimulationReturnMatrixFxInput,
   SimulationReturnMatrixPriceInput,
 } from "./simulation-return-matrix-types.ts";
+import {
+  projectSimulationObservedAlignmentEvidence,
+  type SimulationObservedAlignmentEvidence,
+} from "./simulation-return-matrix-alignment-evidence.ts";
 import { buildSimulationReturnMatrix } from "./simulation-return-matrix.ts";
 import {
   composeSimulationReturnMatrixUniverseEvidence,
@@ -38,6 +42,7 @@ export type SimulationObservedReturnSeries = Readonly<{
   ticker: string;
   status: "ready" | "unavailable";
   rows: readonly SimulationObservedReturnSeriesRow[];
+  alignmentEvidence: SimulationObservedAlignmentEvidence | null;
 }>;
 
 export async function loadSimulationReturnMatrixUniverseEvidence(
@@ -154,6 +159,9 @@ function projectObservedReturnSeries(
         ticker: instrument.ticker,
         status: ready ? ("ready" as const) : ("unavailable" as const),
         rows: ready ? Object.freeze(rows) : Object.freeze([]),
+        alignmentEvidence: ready
+          ? projectSimulationObservedAlignmentEvidence(matrix, instrument)
+          : null,
       });
     }),
   );

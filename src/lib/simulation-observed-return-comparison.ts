@@ -1,6 +1,8 @@
 export const SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY = Object.freeze({
   version: "simulation_observed_return_comparison_v1",
   expectedInputCount: 2,
+  expectedReturnCount: 90,
+  expectedPointCount: 91,
   initialIndexValue: 100,
   mode: "aligned_complete_krw_observed_returns_only",
 } as const);
@@ -43,6 +45,16 @@ export function buildSimulationObservedReturnComparison(
     )
   ) {
     return unavailable("input_unavailable");
+  }
+
+  if (
+    inputs.some(
+      (input) =>
+        input.observedReturns?.length !==
+        SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY.expectedReturnCount,
+    )
+  ) {
+    return unavailable("invalid_return_count");
   }
 
   const referenceRows = inputs[0].observedReturns;
@@ -105,12 +117,24 @@ export function buildSimulationObservedReturnComparison(
   const completeSeries = series.filter(
     (item): item is NonNullable<typeof item> => item !== null,
   );
+  if (
+    completeSeries.length !==
+      SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY.expectedInputCount ||
+    completeSeries.some(
+      (item) =>
+        item.points.length !==
+        SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY.expectedPointCount,
+    )
+  ) {
+    return unavailable("invalid_return_count");
+  }
   return Object.freeze({
     status: "ready" as const,
     reason: null,
     baselineServiceDate,
     endServiceDate: referenceRows.at(-1)?.serviceDate ?? baselineServiceDate,
-    pointCount: referenceRows.length + 1,
+    pointCount:
+      SIMULATION_OBSERVED_RETURN_COMPARISON_POLICY.expectedPointCount,
     series: Object.freeze(completeSeries),
   });
 }
@@ -147,6 +171,7 @@ function unavailable(
   reason:
     | "invalid_input_set"
     | "input_unavailable"
+    | "invalid_return_count"
     | "invalid_return_series"
     | "axis_mismatch",
 ) {
