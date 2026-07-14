@@ -224,6 +224,11 @@ function AccountUnavailable({
           {account.exclusionReasonCounts.unsupportedCurrency}
         </p>
       ) : null}
+      {account?.unresolvedInstrumentCount ? (
+        <p className="mt-2 text-xs">
+          식별 불가 직접 보유 {account.unresolvedInstrumentCount}개
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -257,6 +262,8 @@ function accountBlockerLabel(
   switch (blocker) {
     case "incomplete_valuation_coverage":
       return "가격·환율 근거가 없는 보유자산이 있어 계정 전체 비교가 불완전합니다.";
+    case "unresolved_holding_identity":
+      return "계정·시장·통화·티커 중 식별 정보가 없는 보유자산이 있어 계산을 차단했습니다.";
     case "insufficient_holdings":
       return "평가 가능한 직접 보유자산이 두 개보다 적습니다.";
     case "invalid_portfolio_values":

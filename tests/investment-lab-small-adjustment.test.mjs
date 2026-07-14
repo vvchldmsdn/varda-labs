@@ -108,6 +108,34 @@ describe("investment lab small adjustment", () => {
     assert.deepEqual(result.blockers, ["account_unavailable"]);
   });
 
+  it("fails closed instead of merging holdings with unresolved canonical identity", () => {
+    const model = buildInvestmentLabSmallAdjustmentModel({
+      holdingRows: [
+        holding("KODEX 200", "069500", "KRW", 600_000),
+        holding("VOO", "VOO", "USD", 400_000),
+        holding("Shared name", null, "KRW", 10_000),
+        { ...holding("Shared name", "UNKNOWN-FX", "KRW", 10_000), currency: "UNKNOWN" },
+        { ...holding("Missing market", "NO-MARKET", "KRW", 10_000), market: "" },
+      ],
+      exclusions: [],
+    });
+    const brokerage = account(model, "brokerage");
+
+    assert.equal(brokerage.status, "unavailable");
+    assert.equal(brokerage.unresolvedInstrumentCount, 3);
+    assert.ok(brokerage.blockers.includes("unresolved_holding_identity"));
+    assert.equal(brokerage.holdings.length, 2);
+    assert.doesNotMatch(JSON.stringify(brokerage.holdings), /Shared name/);
+
+    const result = calculateInvestmentLabSmallAdjustment({
+      account: brokerage,
+      sourceKey: brokerage.holdings[0].key,
+      destinationKey: brokerage.holdings[1].key,
+      transferAmountKrw: 10_000,
+    });
+    assert.deepEqual(result.blockers, ["account_unavailable"]);
+  });
+
   it("blocks invalid, same-holding, unknown, and overdrawn transfers", () => {
     const model = buildInvestmentLabSmallAdjustmentModel({
       holdingRows: [

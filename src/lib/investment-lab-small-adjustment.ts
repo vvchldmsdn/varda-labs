@@ -3,7 +3,10 @@ import type {
   PortfolioStructureHoldingRow,
   PortfolioStructureResult,
 } from "./portfolio-structure.ts";
-import { normalizeTicker } from "./portfolio-math.ts";
+import {
+  analyzePortfolioDirectHoldings,
+  calculatePortfolioDirectHoldingMetrics,
+} from "./portfolio-direct-holdings.ts";
 import {
   INVESTMENT_LAB_SMALL_ADJUSTMENT_POLICY,
   type InvestmentLabSmallAdjustmentAccount,
@@ -158,42 +161,32 @@ function buildAccountModel(
   exclusions: readonly PortfolioStructureExclusion[],
 ): InvestmentLabSmallAdjustmentAccountModel {
   const blockers: InvestmentLabSmallAdjustmentAccountBlocker[] = [];
-  const invalidPortfolioValues = holdings.some(
-    (row) => !validNonnegativeValue(row.currentValueKrw),
+  const analysis = analyzePortfolioDirectHoldings(holdings);
+  const grouped: InvestmentLabSmallAdjustmentHolding[] = analysis.holdings.map(
+    (row) => ({
+      ...row,
+      account,
+    }),
   );
-  const grouped = groupHoldings(account, holdings);
-  const totalValueKrw = grouped.reduce(
-    (total, row) => total + row.currentValueKrw,
-    0,
-  );
+  const totalValueKrw = analysis.metrics?.totalValueKrw ?? 0;
 
   if (
-    invalidPortfolioValues ||
-    !Number.isFinite(totalValueKrw) ||
-    totalValueKrw <= 0 ||
-    totalValueKrw > Number.MAX_SAFE_INTEGER
+    analysis.invalidValueCount > 0 ||
+    (analysis.resolvedInputHoldingCount > 0 && !analysis.metrics)
   ) {
     blockers.push("invalid_portfolio_values");
   }
   if (exclusions.length > 0) {
     blockers.push("incomplete_valuation_coverage");
   }
+  if (analysis.unresolvedIdentityCount > 0) {
+    blockers.push("unresolved_holding_identity");
+  }
   if (grouped.length < 2) {
     blockers.push("insufficient_holdings");
   }
 
-  const weightedHoldings = grouped
-    .map((row) =>
-      Object.freeze({
-        ...row,
-        currentWeightPct: weightPct(row.currentValueKrw, totalValueKrw),
-      }),
-    )
-    .sort(
-      (left, right) =>
-        right.currentValueKrw - left.currentValueKrw ||
-        left.key.localeCompare(right.key),
-    );
+  const weightedHoldings = grouped.map((row) => Object.freeze(row));
 
   return Object.freeze({
     account,
@@ -201,6 +194,7 @@ function buildAccountModel(
     totalValueKrw,
     holdings: Object.freeze(weightedHoldings),
     excludedHoldingCount: exclusions.length,
+    unresolvedInstrumentCount: analysis.unresolvedIdentityCount,
     exclusionReasonCounts: Object.freeze({
       missingPrice: exclusions.filter((row) => row.reason === "missing_price")
         .length,
@@ -211,45 +205,6 @@ function buildAccountModel(
     }),
     blockers: Object.freeze(blockers),
   });
-}
-
-function groupHoldings(
-  account: InvestmentLabSmallAdjustmentAccount,
-  holdings: readonly PortfolioStructureHoldingRow[],
-) {
-  const grouped = new Map<
-    string,
-    Omit<InvestmentLabSmallAdjustmentHolding, "currentWeightPct">
-  >();
-  for (const holding of holdings) {
-    if (!validNonnegativeValue(holding.currentValueKrw)) continue;
-    const ticker = normalizeTicker(holding.ticker);
-    const market = holding.market.trim().toLowerCase();
-    const currency = holding.currency.trim().toUpperCase() || "UNKNOWN";
-    const name = holding.name.trim() || "-";
-    const identity = ticker ? `ticker:${ticker}` : `name:${name.toLowerCase()}`;
-    const key = [account, market, currency, identity]
-      .map((part) => encodeURIComponent(part))
-      .join("|");
-    const existing = grouped.get(key);
-    if (existing) {
-      grouped.set(key, {
-        ...existing,
-        currentValueKrw: existing.currentValueKrw + holding.currentValueKrw,
-      });
-      continue;
-    }
-    grouped.set(key, {
-      key,
-      account,
-      name,
-      ticker,
-      market,
-      currency,
-      currentValueKrw: holding.currentValueKrw,
-    });
-  }
-  return [...grouped.values()];
 }
 
 type AdjustmentSnapshot = Readonly<{
@@ -264,42 +219,22 @@ function createSnapshot(
     "currency" | "currentValueKrw"
   >[],
 ): AdjustmentSnapshot | null {
-  if (
-    holdings.length < 2 ||
-    holdings.some((row) => !validNonnegativeValue(row.currentValueKrw))
-  ) {
-    return null;
-  }
-  const totalValueKrw = holdings.reduce(
-    (total, row) => total + row.currentValueKrw,
-    0,
-  );
-  if (
-    !Number.isFinite(totalValueKrw) ||
-    totalValueKrw <= 0 ||
-    totalValueKrw > Number.MAX_SAFE_INTEGER
-  ) {
-    return null;
-  }
-
-  let largestHoldingWeightPct = 0;
-  let hhiPoints = 0;
-  const currencyValues = new Map<string, number>();
-  for (const holding of holdings) {
-    const weight = holding.currentValueKrw / totalValueKrw;
-    largestHoldingWeightPct = Math.max(largestHoldingWeightPct, weight * 100);
-    hhiPoints += weight * weight * 10_000;
-    currencyValues.set(
-      holding.currency,
-      (currencyValues.get(holding.currency) ?? 0) + holding.currentValueKrw,
-    );
-  }
-  if (!Number.isFinite(hhiPoints)) return null;
+  if (holdings.length < 2) return null;
+  const metrics = calculatePortfolioDirectHoldingMetrics(holdings);
+  if (!metrics) return null;
 
   return Object.freeze({
-    totalValueKrw,
-    concentration: Object.freeze({ largestHoldingWeightPct, hhiPoints }),
-    currencyValues,
+    totalValueKrw: metrics.totalValueKrw,
+    concentration: Object.freeze({
+      largestHoldingWeightPct: metrics.largestHoldingWeightPct,
+      hhiPoints: metrics.hhiPoints,
+    }),
+    currencyValues: new Map(
+      metrics.currencyExposures.map((row) => [
+        row.currency,
+        row.currentValueKrw,
+      ]),
+    ),
   });
 }
 
@@ -343,14 +278,6 @@ function blocked(
 
 function weightPct(value: number, total: number) {
   return total > 0 && Number.isFinite(value) ? (value / total) * 100 : 0;
-}
-
-function validNonnegativeValue(value: number) {
-  return (
-    Number.isFinite(value) &&
-    value >= 0 &&
-    value <= Number.MAX_SAFE_INTEGER
-  );
 }
 
 function approximatelyEqual(left: number, right: number) {

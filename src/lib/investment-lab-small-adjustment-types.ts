@@ -26,6 +26,7 @@ export type InvestmentLabSmallAdjustmentHolding = Readonly<{
 
 export type InvestmentLabSmallAdjustmentAccountBlocker =
   | "incomplete_valuation_coverage"
+  | "unresolved_holding_identity"
   | "insufficient_holdings"
   | "invalid_portfolio_values";
 
@@ -35,6 +36,7 @@ export type InvestmentLabSmallAdjustmentAccountModel = Readonly<{
   totalValueKrw: number;
   holdings: readonly InvestmentLabSmallAdjustmentHolding[];
   excludedHoldingCount: number;
+  unresolvedInstrumentCount: number;
   exclusionReasonCounts: Readonly<{
     missingPrice: number;
     missingFx: number;
