@@ -97,6 +97,12 @@ export function InvestmentLabFixedMix({
           현금을 만들지 않으며, 이 결과는 목표비중·추천·주문 근거가 아닌
           과거 연구 비교입니다.
         </p>
+        <p className="text-xs leading-5 text-[#73786c]">
+          KODEX 200은 조정종가, VOO는 원종가 × 저장 USD/KRW로 합산하며
+          VOO 배당은 반영하지 않습니다. 서로 다른 가격 기준을 결합한
+          현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을
+          의미하지 않습니다.
+        </p>
       </div>
     </section>
   );

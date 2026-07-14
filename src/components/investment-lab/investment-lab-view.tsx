@@ -96,6 +96,7 @@ export function InvestmentLabView({
 
 function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
   const summary = model.summary!;
+  const fixedMixWeights = model.fixedMixScenario?.weights ?? null;
 
   return (
     <>
@@ -128,6 +129,8 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
       <VooComparisonSection model={model} />
 
       <InvestmentLabContributionExperiment
+        fixedMixWeights={fixedMixWeights}
+        key={`${summary.startServiceDate}:${summary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
         scenarios={model.contributionExperimentScenarios}
       />
 

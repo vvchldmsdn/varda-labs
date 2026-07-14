@@ -89,6 +89,18 @@ async function main() {
     route.body,
     "data-fixed-mix-return-status",
   );
+  const fixedMixContributionStatus = readStringAttribute(
+    route.body,
+    "data-contribution-fixed-mix-status",
+  );
+  const fixedMixContributionKodexWeightBps = readIntegerAttribute(
+    route.body,
+    "data-contribution-fixed-mix-kodex-weight-bps",
+  );
+  const fixedMixContributionVooWeightBps = readIntegerAttribute(
+    route.body,
+    "data-contribution-fixed-mix-voo-weight-bps",
+  );
   assert.equal(fixedMixStatus, EXPECTED_FIXED_MIX_STATUS);
   assert.equal(
     fixedMixSelectionStatus,
@@ -101,16 +113,27 @@ async function main() {
     assert.ok(fixedMixComparisonDates >= 2);
     assert.equal(fixedMixScenarioFlowLegs, fixedMixFlowSources * 2);
     assert.ok(fixedMixSplitExecutionDateRows >= 0);
+    assert.equal(fixedMixContributionStatus, "ready");
+    assert.equal(
+      fixedMixContributionKodexWeightBps,
+      fixedMixKodexWeightBps,
+    );
+    assert.equal(fixedMixContributionVooWeightBps, fixedMixVooWeightBps);
     for (const marker of [
       "KODEX 200·VOO 고정 배분 실험",
       "중간 재리밸런싱은 하지 않습니다",
       "과거 연구 비교",
+      "VOO 배당은 반영하지 않습니다",
+      "정확한 일별 TWR 또는 총수익률을",
     ]) {
       assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
     }
   } else {
     assert.equal(fixedMixReturnStatus, "unavailable");
     assert.equal(fixedMixComparisonDates, 0);
+    assert.equal(fixedMixContributionStatus, "unavailable");
+    assert.equal(fixedMixContributionKodexWeightBps, 0);
+    assert.equal(fixedMixContributionVooWeightBps, 0);
   }
   assert.match(
     route.body,
@@ -447,7 +470,7 @@ async function main() {
   assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
   assert.equal(pendingAtEnd, 0, "route must not publish an unfinished path");
   assert.ok(
-    contributionScenarioCount >= 1 && contributionScenarioCount <= 2,
+    contributionScenarioCount >= 1 && contributionScenarioCount <= 3,
     "contribution experiment must expose only complete fixed scenarios",
   );
   assert.ok(
@@ -470,7 +493,10 @@ async function main() {
     assert.ok(vooDelayedExecutions >= 0);
     assert.equal(vooReturnStatus, "ready");
     assert.equal(vooReturnMethod, "modified_dietz_daily_weighted_eod_v1");
-    assert.equal(contributionScenarioCount, 2);
+    assert.equal(
+      contributionScenarioCount,
+      fixedMixContributionStatus === "ready" ? 3 : 2,
+    );
   }
 
   console.log(
@@ -499,6 +525,9 @@ async function main() {
         fixedMixScenarioFlowLegs,
         fixedMixSplitExecutionDateRows,
         fixedMixReturnStatus,
+        fixedMixContributionStatus,
+        fixedMixContributionKodexWeightBps,
+        fixedMixContributionVooWeightBps,
         vooReadiness,
         vooComparisonStatus,
         vooServiceDates,

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { buildInvestmentLabFixedMixScenario } from "../src/lib/investment-lab-fixed-mix.ts";
+import { resolveInvestmentLabFixedMixFlows } from "../src/lib/investment-lab-fixed-mix-flows.ts";
 import { resolveInvestmentLabFixedMixSelection } from "../src/lib/investment-lab-fixed-mix-selection.ts";
 
 describe("investment lab KODEX 200 and VOO fixed allocation", () => {
@@ -104,6 +105,50 @@ describe("investment lab KODEX 200 and VOO fixed allocation", () => {
     assert.deepEqual(
       buildInvestmentLabFixedMixScenario(mismatch).blockers,
       ["actual_return_mismatch"],
+    );
+  });
+
+  it("preserves an outflow direction, amount, and each leg execution date", () => {
+    const resolved = resolveInvestmentLabFixedMixFlows(
+      [
+        {
+          sourceIndex: 7,
+          executionServiceDate: "2026-01-05",
+          direction: "outflow",
+          amountKrw: 80,
+        },
+      ],
+      [
+        {
+          sourceIndex: 7,
+          executionServiceDate: "2026-01-06",
+          direction: "outflow",
+          amountKrw: 80,
+        },
+      ],
+      { kodexWeightBps: 2500, vooWeightBps: 7500 },
+    );
+
+    assert.ok(resolved);
+    assert.equal(resolved.sourceCount, 1);
+    assert.equal(resolved.splitExecutionDateRows, 1);
+    assert.deepEqual(resolved.scenarioFlows, [
+      {
+        effectiveServiceDate: "2026-01-05",
+        sequence: 14,
+        direction: "outflow",
+        amountKrw: 20,
+      },
+      {
+        effectiveServiceDate: "2026-01-06",
+        sequence: 15,
+        direction: "outflow",
+        amountKrw: 60,
+      },
+    ]);
+    assert.equal(
+      resolved.scenarioFlows.reduce((sum, flow) => sum + flow.amountKrw, 0),
+      80,
     );
   });
 

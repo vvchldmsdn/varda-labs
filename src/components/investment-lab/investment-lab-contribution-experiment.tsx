@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
 import {
   calculateInvestmentLabContributionExperiment,
@@ -10,26 +10,54 @@ import {
   type InvestmentLabContributionScenarioId,
   type InvestmentLabContributionPriceBasis,
 } from "@/lib/investment-lab-contribution-experiment";
+import {
+  calculateInvestmentLabFixedMixContribution,
+  createInvestmentLabFixedMixContributionEvidence,
+  INVESTMENT_LAB_FIXED_MIX_CONTRIBUTION_POLICY,
+  type InvestmentLabFixedMixContributionResult,
+} from "@/lib/investment-lab-fixed-mix-contribution";
+import type { InvestmentLabFixedMixWeights } from "@/lib/investment-lab-fixed-mix-types";
+
+type ContributionSelectionId = InvestmentLabContributionScenarioId | "fixed_mix";
+type ContributionResult =
+  | InvestmentLabContributionExperimentResult
+  | InvestmentLabFixedMixContributionResult;
 
 export function InvestmentLabContributionExperiment({
+  fixedMixWeights,
   scenarios,
 }: {
+  fixedMixWeights: InvestmentLabFixedMixWeights | null;
   scenarios: readonly InvestmentLabContributionScenarioEvidence[];
 }) {
-  const [scenarioId, setScenarioId] =
-    useState<InvestmentLabContributionScenarioId | null>(
-      scenarios[0]?.scenarioId ?? null,
-    );
+  const fixedMixEvidence = useMemo(
+    () =>
+      fixedMixWeights
+        ? createInvestmentLabFixedMixContributionEvidence({
+            scenarios,
+            weights: fixedMixWeights,
+          })
+        : null,
+    [fixedMixWeights, scenarios],
+  );
+  const [scenarioId, setScenarioId] = useState<ContributionSelectionId | null>(
+    fixedMixEvidence ? "fixed_mix" : (scenarios[0]?.scenarioId ?? null),
+  );
   const [serviceDate, setServiceDate] = useState(
-    scenarios[0]?.points[0]?.serviceDate ?? "",
+    fixedMixEvidence?.points[0]?.serviceDate ??
+      scenarios[0]?.points[0]?.serviceDate ??
+      "",
   );
   const [amount, setAmount] = useState("");
-  const [result, setResult] =
-    useState<InvestmentLabContributionExperimentResult | null>(null);
+  const [result, setResult] = useState<ContributionResult | null>(null);
   const scenario =
-    scenarios.find((candidate) => candidate.scenarioId === scenarioId) ??
-    scenarios[0] ??
-    null;
+    scenarioId === "fixed_mix"
+      ? null
+      : (scenarios.find((candidate) => candidate.scenarioId === scenarioId) ??
+        scenarios[0] ??
+        null);
+  const points =
+    scenarioId === "fixed_mix" ? fixedMixEvidence?.points : scenario?.points;
 
   function selectScenario(
     selected: InvestmentLabContributionScenarioEvidence,
@@ -39,8 +67,26 @@ export function InvestmentLabContributionExperiment({
     setResult(null);
   }
 
+  function selectFixedMix() {
+    if (!fixedMixEvidence) return;
+    setScenarioId("fixed_mix");
+    setServiceDate(fixedMixEvidence.points[0]?.serviceDate ?? "");
+    setResult(null);
+  }
+
   function calculate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (scenarioId === "fixed_mix") {
+      if (!fixedMixEvidence) return;
+      setResult(
+        calculateInvestmentLabFixedMixContribution({
+          evidence: fixedMixEvidence,
+          contributionServiceDate: serviceDate,
+          contributionAmountKrw: Number(amount),
+        }),
+      );
+      return;
+    }
     if (!scenario) return;
     setResult(
       calculateInvestmentLabContributionExperiment({
@@ -58,7 +104,21 @@ export function InvestmentLabContributionExperiment({
       data-contribution-policy={
         INVESTMENT_LAB_CONTRIBUTION_EXPERIMENT_POLICY.version
       }
-      data-contribution-scenarios={scenarios.length}
+      data-contribution-fixed-mix-kodex-weight-bps={
+        fixedMixEvidence?.weights.kodexWeightBps ?? 0
+      }
+      data-contribution-fixed-mix-policy={
+        INVESTMENT_LAB_FIXED_MIX_CONTRIBUTION_POLICY.version
+      }
+      data-contribution-fixed-mix-status={
+        fixedMixEvidence ? "ready" : "unavailable"
+      }
+      data-contribution-fixed-mix-voo-weight-bps={
+        fixedMixEvidence?.weights.vooWeightBps ?? 0
+      }
+      data-contribution-scenarios={
+        scenarios.length + (fixedMixEvidence ? 1 : 0)
+      }
       id="investment-lab-contribution-experiment"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -74,7 +134,7 @@ export function InvestmentLabContributionExperiment({
         </p>
       </div>
 
-      {scenario ? (
+      {points && points.length > 0 ? (
         <>
           <form
             className="mt-5 grid items-end gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto]"
@@ -85,10 +145,26 @@ export function InvestmentLabContributionExperiment({
                 고정 시나리오
               </legend>
               <div className="flex min-h-10 rounded-md border border-[#d7dccf] bg-white p-1">
+                {fixedMixWeights ? (
+                  <button
+                    className={
+                      scenarioId === "fixed_mix"
+                        ? "min-w-0 flex-1 rounded bg-[#173f38] px-3 py-2 text-sm font-semibold text-white"
+                        : "min-w-0 flex-1 rounded px-3 py-2 text-sm font-semibold text-[#4f594d] hover:bg-[#eef1e9] disabled:cursor-not-allowed disabled:text-[#9ca397]"
+                    }
+                    disabled={!fixedMixEvidence}
+                    onClick={selectFixedMix}
+                    type="button"
+                  >
+                    {fixedMixEvidence
+                      ? `선택 배분 ${fixedMixEvidence.weights.kodexWeightBps / 100}:${fixedMixEvidence.weights.vooWeightBps / 100}`
+                      : "선택 배분 준비 안 됨"}
+                  </button>
+                ) : null}
                 {scenarios.map((candidate) => (
                   <button
                     className={
-                      candidate.scenarioId === scenario.scenarioId
+                      candidate.scenarioId === scenarioId
                         ? "min-w-0 flex-1 rounded px-3 py-2 text-sm font-semibold text-white bg-[#173f38]"
                         : "min-w-0 flex-1 rounded px-3 py-2 text-sm font-semibold text-[#4f594d] hover:bg-[#eef1e9]"
                     }
@@ -112,7 +188,7 @@ export function InvestmentLabContributionExperiment({
                 }}
                 value={serviceDate}
               >
-                {scenario.points.map((point) => (
+                {points.map((point) => (
                   <option key={point.serviceDate} value={point.serviceDate}>
                     {formatDate(point.serviceDate)}
                   </option>
@@ -146,8 +222,11 @@ export function InvestmentLabContributionExperiment({
           </form>
 
           <p className="mt-3 text-xs leading-5 text-[#777e73]">
-            {priceBasisLabel(scenario.priceBasis)} · 분수 수량 허용 · 수수료,
-            세금, 잔여 현금 0 가정
+            {scenarioId === "fixed_mix" && fixedMixEvidence
+              ? fixedMixPriceBasisLabel(fixedMixEvidence.weights)
+              : scenario
+                ? priceBasisLabel(scenario.priceBasis)
+                : null} · 분수 수량 허용 · 수수료, 세금, 잔여 현금 0 가정
           </p>
 
           <ContributionResult result={result} />
@@ -161,6 +240,7 @@ export function InvestmentLabContributionExperiment({
       <p className="mt-5 border-t border-[#e1e6dc] pt-3 text-xs leading-5 text-[#777e73]">
         실제 보유 자산, 현금, 거래 기록은 변경하지 않습니다. 이 결과는 목표
         비중이나 매수 추천이 아니며 브라우저를 벗어나 저장되지 않습니다.
+        실제 추가 투입 분배 화면과도 연결되지 않는 과거 연구 실험입니다.
       </p>
     </section>
   );
@@ -169,9 +249,12 @@ export function InvestmentLabContributionExperiment({
 function ContributionResult({
   result,
 }: {
-  result: InvestmentLabContributionExperimentResult | null;
+  result: ContributionResult | null;
 }) {
   if (!result) return null;
+  if (isFixedMixResult(result)) {
+    return <FixedMixContributionResult result={result} />;
+  }
   if (result.status === "blocked") {
     return (
       <p className="mt-4 border-t border-[#eadfbe] pt-4 text-sm text-[#725f2d]">
@@ -215,6 +298,67 @@ function ContributionResult({
   );
 }
 
+function FixedMixContributionResult({
+  result,
+}: {
+  result: InvestmentLabFixedMixContributionResult;
+}) {
+  if (result.status === "blocked") {
+    return (
+      <p className="mt-4 border-t border-[#eadfbe] pt-4 text-sm text-[#725f2d]">
+        {fixedMixBlockerLabel(result.blockers[0])}
+      </p>
+    );
+  }
+
+  const kodexWeightPct = result.weights.kodexWeightBps / 100;
+  const vooWeightPct = result.weights.vooWeightBps / 100;
+  return (
+    <div
+      className="mt-5 border-t border-[#e1e6dc] pt-4"
+      data-fixed-mix-contribution-result="ready"
+    >
+      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
+        <ResultMetric
+          label="추가 원금"
+          value={formatKrw(result.contributionAmountKrw)}
+        />
+        <ResultMetric
+          label="기존 배분 경로 종료 평가액"
+          value={formatKrw(result.baseEndValueKrw)}
+        />
+        <ResultMetric
+          label="투입 후 종료 평가액"
+          value={formatKrw(result.projectedEndValueKrw)}
+        />
+        <ResultMetric
+          label="추가 원금 종료 평가액"
+          value={formatKrw(result.additionalEndValueKrw)}
+        />
+        <ResultMetric
+          label="추가 원금 손익"
+          tone={result.additionalProfitKrw >= 0 ? "positive" : "negative"}
+          value={`${formatSignedKrw(result.additionalProfitKrw)} · ${formatSignedPercent(result.additionalReturn)}`}
+        />
+      </div>
+      <p className="mt-4 text-xs leading-5 text-[#687064]">
+        관측일 {formatDate(result.contributionServiceDate)} · KODEX 가격 근거일{" "}
+        {formatDate(result.kodexContributionPriceDate)} · VOO 가격 근거일{" "}
+        {formatDate(result.vooContributionPriceDate)} · USD/KRW 기준일{" "}
+        {formatDate(result.contributionServiceDate)} · 종료일{" "}
+        {formatDate(result.endServiceDate)}
+      </p>
+      <p className="mt-2 text-xs leading-5 text-[#687064]">
+        KODEX {kodexWeightPct}% {formatKrw(result.allocation.kodexAmountKrw)} ·{" "}
+        {formatUnits(result.allocation.kodexUnits)}주 / VOO {vooWeightPct}%{" "}
+        {formatKrw(result.allocation.vooAmountKrw)} ·{" "}
+        {formatUnits(result.allocation.vooUnits)}주. 투입 뒤에는 비중을 다시 맞추지
+        않습니다.
+      </p>
+    </div>
+  );
+}
+
 function ResultMetric({
   label,
   value,
@@ -252,6 +396,10 @@ function priceBasisLabel(priceBasis: InvestmentLabContributionPriceBasis) {
     : "VOO 원종가 × 저장 USD/KRW 기준(배당 미반영)";
 }
 
+function fixedMixPriceBasisLabel(weights: InvestmentLabFixedMixWeights) {
+  return `KODEX 200 조정종가 ${weights.kodexWeightBps / 100}% + VOO 원종가 × 저장 USD/KRW ${weights.vooWeightBps / 100}% 기준(VOO 배당 미반영)`;
+}
+
 function blockerLabel(
   blocker: InvestmentLabContributionExperimentResult["blockers"][number],
 ) {
@@ -262,6 +410,27 @@ function blockerLabel(
     return "선택한 관측일의 가격 근거를 사용할 수 없습니다.";
   }
   return "입력 또는 가격 근거를 검증하지 못해 계산을 중단했습니다.";
+}
+
+function fixedMixBlockerLabel(
+  blocker: InvestmentLabFixedMixContributionResult["blockers"][number],
+) {
+  if (blocker === "invalid_contribution_amount") {
+    return "추가 원금은 1원 이상의 정수로 입력해 주세요.";
+  }
+  if (blocker === "contribution_date_unavailable") {
+    return "선택한 관측일에 두 종목의 가격·환율 근거가 모두 존재하지 않습니다.";
+  }
+  return "두 종목의 비중 또는 가격·환율 근거를 검증하지 못해 전체 계산을 중단했습니다.";
+}
+
+function isFixedMixResult(
+  result: ContributionResult,
+): result is InvestmentLabFixedMixContributionResult {
+  return (
+    result.policy.version ===
+    INVESTMENT_LAB_FIXED_MIX_CONTRIBUTION_POLICY.version
+  );
 }
 
 function formatKrw(value: number) {
