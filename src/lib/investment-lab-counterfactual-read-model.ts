@@ -26,6 +26,10 @@ import type { InvestmentLabFixedMixSelection } from "./investment-lab-fixed-mix-
 import {
   buildInvestmentLabContributionScenarioEvidence,
 } from "./investment-lab-contribution-evidence.ts";
+import {
+  buildInvestmentLabCashComparison,
+  type InvestmentLabCashComparison,
+} from "./investment-lab-cash-comparison.ts";
 import type {
   InvestmentLabContributionScenarioEvidence,
 } from "./investment-lab-contribution-experiment.ts";
@@ -110,6 +114,7 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
   returnEstimate: InvestmentLabReturnEstimate | null;
   vooReadiness: InvestmentLabVooReadiness | null;
   vooComparison: InvestmentLabVooComparison | null;
+  cashComparison: InvestmentLabCashComparison | null;
   fixedMixScenario: InvestmentLabFixedMixScenario | null;
   contributionExperimentScenarios:
     readonly InvestmentLabContributionScenarioEvidence[];
@@ -230,6 +235,11 @@ export function buildInvestmentLabCounterfactualReadModel(
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,
   });
+  const cashComparison = buildInvestmentLabCashComparison({
+    actualPath: actual.rows,
+    boundaryFlows: events,
+    actualReturnEstimate: returnEstimate,
+  });
   const fixedMixScenario = options.fixedMixSelection
     ? buildInvestmentLabFixedMixScenario({
         selection: options.fixedMixSelection,
@@ -267,6 +277,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     returnEstimate,
     vooReadiness,
     vooComparison,
+    cashComparison,
     fixedMixScenario,
     contributionExperimentScenarios,
     rows,
@@ -476,6 +487,7 @@ function blockedReadModel(
     returnEstimate: null,
     vooReadiness: null,
     vooComparison: null,
+    cashComparison: null,
     fixedMixScenario: null,
     contributionExperimentScenarios: Object.freeze([]),
     rows: Object.freeze([]),

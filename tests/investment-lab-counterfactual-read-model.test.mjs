@@ -41,6 +41,15 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.vooComparison.rows.length, 4);
     assert.equal(result.vooComparison.coverage.appliedFlowRows, 3);
     assert.equal(result.vooComparison.returnEstimate.status, "ready");
+    assert.equal(result.cashComparison.status, "ready");
+    assert.deepEqual(
+      result.cashComparison.rows.map((row) => row.scenarioMarketValueKrw),
+      [1_000, 1_110, 1_110, 1_231],
+    );
+    assert.equal(result.cashComparison.summary.endDifferenceKrw, 81);
+    assert.equal(result.cashComparison.coverage.appliedFlowRows, 3);
+    assert.equal(result.cashComparison.returnComparison.status, "ready");
+    assert.equal(result.cashComparison.returnComparison.cashReturn, 0);
     assert.deepEqual(
       result.contributionExperimentScenarios.map((scenario) =>
         scenario.scenarioId,
@@ -91,6 +100,7 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.status, "blocked");
     assert.equal(result.summary, null);
     assert.deepEqual(result.rows, []);
+    assert.equal(result.cashComparison, null);
     assert.deepEqual(result.contributionExperimentScenarios, []);
     assert.deepEqual(result.blockers, ["snapshot_evidence_invalid"]);
   });
@@ -147,6 +157,11 @@ describe("investment lab counterfactual read model", () => {
       "price_basis_mismatch",
     ]);
     assert.equal(result.returnEstimate.basisMismatchRows, 1);
+    assert.equal(result.cashComparison.status, "ready");
+    assert.equal(
+      result.cashComparison.returnComparison.status,
+      "unavailable",
+    );
   });
 
   it("blocks only the return estimate when cash evidence is nonzero", () => {
@@ -213,6 +228,14 @@ describe("investment lab counterfactual read model", () => {
       "src/components/investment-lab/investment-lab-contribution-experiment.tsx",
       "utf8",
     );
+    const cashComparison = readFileSync(
+      "src/components/investment-lab/investment-lab-cash-comparison.tsx",
+      "utf8",
+    );
+    const view = readFileSync(
+      "src/components/investment-lab/investment-lab-view.tsx",
+      "utf8",
+    );
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
     assert.match(query, /^import "server-only";/);
@@ -230,6 +253,12 @@ describe("investment lab counterfactual read model", () => {
       contribution,
       /\bfetch\s*\(|\/api\/|localStorage|sessionStorage|URLSearchParams|console\./,
     );
+    assert.doesNotMatch(cashComparison, /["']use client["']/);
+    assert.doesNotMatch(
+      cashComparison,
+      /\bfetch\s*\(|\/api\/|localStorage|sessionStorage|URLSearchParams|console\./,
+    );
+    assert.match(view, /InvestmentLabCashComparisonView/);
     assert.match(proxy, /"\/investment-lab"/);
   });
 });

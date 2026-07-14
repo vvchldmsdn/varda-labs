@@ -52,6 +52,10 @@ async function main() {
   }
   const periodStatus = readStringAttribute(route.body, "data-period-status");
   assert.equal(periodStatus, EXPECTED_PERIOD_STATUS);
+  const cashComparisonStatus = readStringAttribute(
+    route.body,
+    "data-cash-comparison-status",
+  );
   assert.match(route.body, /data-section="investment-lab-fixed-mix"/);
   const fixedMixStatus = readStringAttribute(
     route.body,
@@ -343,8 +347,13 @@ async function main() {
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
   if (periodStatus === "invalid" || periodStatus === "unavailable") {
     assert.match(route.body, /data-return-status="unavailable"/);
+    assert.equal(cashComparisonStatus, "unavailable");
     assert.match(route.body, /data-period-reason="[a-z_]+"/);
     assert.doesNotMatch(route.body, /평가액 경로 비교/);
+    assert.doesNotMatch(
+      route.body,
+      /data-section="investment-lab-cash-comparison"/,
+    );
     console.log(
       JSON.stringify(
         {
@@ -352,6 +361,7 @@ async function main() {
           baseUrl: BASE_URL,
           routePath,
           periodStatus,
+          cashComparisonStatus,
           fixedMixStatus,
           fixedMixSelectionStatus,
           fixedMixKodexWeightBps,
@@ -409,6 +419,8 @@ async function main() {
     "현금흐름 조정 추정수익률",
     "Modified Dietz",
     "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
+    "전액 현금 기준선",
+    "현재 현금 잔액이나 추가투입 분배 계산이 아닙니다",
     "전액 VOO 비교",
     "소수점 수량을 허용해 잔여 현금을 만들지 않으며",
     "보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다",
@@ -437,6 +449,23 @@ async function main() {
   const comparisonDates = readIntegerAttribute(
     route.body,
     "data-comparison-dates",
+  );
+  assert.match(
+    route.body,
+    /data-section="investment-lab-cash-comparison"/,
+  );
+  const cashPolicy = readStringAttribute(route.body, "data-cash-policy");
+  const cashComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-cash-comparison-dates",
+  );
+  const cashAppliedFlows = readIntegerAttribute(
+    route.body,
+    "data-cash-applied-flows",
+  );
+  const cashReturnStatus = readStringAttribute(
+    route.body,
+    "data-cash-return-status",
   );
   const appliedFlows = readIntegerAttribute(route.body, "data-applied-flows");
   const delayedExecutions = readIntegerAttribute(
@@ -503,6 +532,11 @@ async function main() {
   );
 
   assert.ok(comparisonDates >= 2, "comparison path needs at least two dates");
+  assert.equal(cashComparisonStatus, "ready");
+  assert.equal(cashPolicy, "zero_return_same_flow_cash_v1");
+  assert.equal(cashComparisonDates, comparisonDates);
+  assert.equal(cashAppliedFlows, appliedFlows);
+  assert.equal(cashReturnStatus, "ready");
   assert.ok(appliedFlows >= 0, "applied flow count must be non-negative");
   assert.ok(delayedExecutions >= 0, "delayed count must be non-negative");
   assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
@@ -548,6 +582,11 @@ async function main() {
         authenticatedStatus: route.status,
         dashboardLink: true,
         comparisonDates,
+        cashComparisonStatus,
+        cashPolicy,
+        cashComparisonDates,
+        cashAppliedFlows,
+        cashReturnStatus,
         appliedFlows,
         delayedExecutions,
         scenarioCloseRows,

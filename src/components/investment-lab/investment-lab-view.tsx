@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
+import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
@@ -21,6 +22,11 @@ export function InvestmentLabView({
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-comparison-dates={
         periodReady ? model.coverage.completeComparisonDates : 0
+      }
+      data-cash-comparison-status={
+        periodReady
+          ? (model.cashComparison?.status ?? "unavailable")
+          : "unavailable"
       }
       data-delayed-executions={
         periodReady ? model.coverage.delayedExecutionRows : 0
@@ -127,6 +133,8 @@ function ReadyView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
       <ReturnEstimateSection model={model} />
 
       <VooComparisonSection model={model} />
+
+      <InvestmentLabCashComparisonView comparison={model.cashComparison} />
 
       <InvestmentLabContributionExperiment
         fixedMixWeights={fixedMixWeights}
