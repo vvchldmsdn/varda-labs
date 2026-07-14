@@ -5,6 +5,7 @@ import {
   InvestmentLabEtfXraySkeleton,
   InvestmentLabEtfXrayUnavailable,
 } from "@/components/investment-lab/investment-lab-etf-xray";
+import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
 import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
 import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
@@ -49,8 +50,13 @@ async function InvestmentLabContent({
 }: {
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
 }) {
-  const { model, period } = await modelPromise;
-  return <InvestmentLabView model={model} period={period} />;
+  const { model, period, rollingComparison } = await modelPromise;
+  return (
+    <>
+      <InvestmentLabView model={model} period={period} />
+      <InvestmentLabRollingComparisonView model={rollingComparison} />
+    </>
+  );
 }
 
 async function InvestmentLabEtfXrayContent({

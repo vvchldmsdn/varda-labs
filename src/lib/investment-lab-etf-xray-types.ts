@@ -1,3 +1,5 @@
+import type { PortfolioStructureExclusionReason } from "./portfolio-structure.ts";
+
 export type InvestmentLabEtfXrayMasterInput = Readonly<{
   referenceId: string;
   ticker: string;
@@ -19,7 +21,7 @@ export type InvestmentLabEtfXrayEtfRow = Readonly<{
   market: string;
   currency: string;
   currentValueKrw: number;
-  portfolioWeightPct: number;
+  valuedSubsetWeightPct: number;
   mappingStatus:
     | "matched"
     | "missing_reference"
@@ -44,8 +46,8 @@ export type InvestmentLabEtfXrayComponentRow = Readonly<{
   symbol: string;
   market: string;
   currency: string;
-  portfolioExposurePct: number;
-  directPortfolioWeightPct: number;
+  valuedSubsetExposurePct: number;
+  directValuedSubsetWeightPct: number;
   throughEtfCount: number;
   throughEtfs: readonly string[];
   asOfDates: readonly string[];
@@ -56,15 +58,23 @@ export type InvestmentLabEtfXrayComponentRow = Readonly<{
 export type InvestmentLabEtfXrayModel = Readonly<{
   status: InvestmentLabEtfXrayStatus;
   summary: Readonly<{
-    heldEtfCount: number;
-    matchedEtfCount: number;
-    missingReferenceCount: number;
-    ambiguousReferenceCount: number;
+    basePortfolioCoverageStatus: "complete" | "partial";
+    exposureScope: "whole_portfolio" | "valued_subset";
+    valuedHoldingCount: number;
+    excludedHoldingCount: number;
+    excludedEtfHoldingCount: number;
+    exclusionReasonCounts: Readonly<
+      Record<PortfolioStructureExclusionReason, number>
+    >;
+    valuedEtfCount: number;
+    matchedValuedEtfCount: number;
+    missingReferenceValuedEtfCount: number;
+    ambiguousReferenceValuedEtfCount: number;
     evidenceAvailableEtfCount: number;
     completeEvidenceEtfCount: number;
-    etfPortfolioWeightPct: number;
-    observedPortfolioExposurePct: number;
-    uncoveredPortfolioExposurePct: number;
+    valuedSubsetEtfWeightPct: number;
+    observedValuedSubsetExposurePct: number;
+    uncoveredValuedSubsetExposurePct: number;
     componentCount: number;
     overlapCount: number;
     directOverlapCount: number;

@@ -26,6 +26,7 @@ export async function getReadOnlyInvestmentLabEtfXray(): Promise<InvestmentLabEt
 
   return buildInvestmentLabEtfXray({
     portfolioHoldings: portfolio.holdingRows,
+    portfolioExclusions: portfolio.exclusions,
     masters,
     holdingEvidence,
   });

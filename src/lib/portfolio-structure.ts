@@ -113,6 +113,7 @@ export type PortfolioStructureExclusion = {
   account: string;
   market: string;
   currency: string;
+  assetType: string | null;
   groupName: string;
   quantity: number;
   currentPrice: number | null;

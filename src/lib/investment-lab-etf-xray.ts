@@ -2,10 +2,14 @@ import {
   groupEtfHoldingRows,
   type EtfHoldingRawRow,
 } from "./etf-holdings.ts";
-import type { PortfolioStructureHoldingRow } from "./portfolio-structure.ts";
+import type {
+  PortfolioStructureExclusion,
+  PortfolioStructureHoldingRow,
+} from "./portfolio-structure.ts";
 import { toNumber } from "./portfolio-math.ts";
 import {
   buildDirectPortfolioWeights,
+  countExcludedInvestmentLabEtfHoldings,
   instrumentIdentityKey,
   resolveInvestmentLabEtfCandidates as resolveEtfCandidates,
   type ResolvedInvestmentLabEtfCandidate as ResolvedEtfCandidate,
@@ -31,9 +35,21 @@ const COVERAGE_EPSILON = 0.000001;
 
 export function buildInvestmentLabEtfXray(input: {
   portfolioHoldings: readonly PortfolioStructureHoldingRow[];
+  portfolioExclusions?: readonly PortfolioStructureExclusion[];
   masters: readonly InvestmentLabEtfXrayMasterInput[];
   holdingEvidence: readonly EtfHoldingRawRow[];
 }): InvestmentLabEtfXrayModel {
+  const portfolioExclusions = input.portfolioExclusions ?? [];
+  const basePortfolioCoverageStatus =
+    portfolioExclusions.length === 0 ? "complete" : "partial";
+  const exposureScope =
+    basePortfolioCoverageStatus === "complete"
+      ? "whole_portfolio"
+      : "valued_subset";
+  const excludedEtfHoldingCount = countExcludedInvestmentLabEtfHoldings(
+    portfolioExclusions,
+    input.masters,
+  );
   const candidates = resolveEtfCandidates(
     input.portfolioHoldings,
     input.masters,
@@ -48,35 +64,36 @@ export function buildInvestmentLabEtfXray(input: {
     .map(([key, component]) =>
       finalizeComponentRow(key, component, directWeights),
     )
-    .filter((row) => row.portfolioExposurePct > COVERAGE_EPSILON)
+    .filter((row) => row.valuedSubsetExposurePct > COVERAGE_EPSILON)
     .sort(compareComponentRows);
-  const etfPortfolioWeightPct = sum(
-    etfRows.map((row) => row.portfolioWeightPct),
+  const valuedSubsetEtfWeightPct = sum(
+    etfRows.map((row) => row.valuedSubsetWeightPct),
   );
-  const observedPortfolioExposurePct = sum(
-    componentRows.map((row) => row.portfolioExposurePct),
+  const observedValuedSubsetExposurePct = sum(
+    componentRows.map((row) => row.valuedSubsetExposurePct),
   );
-  const uncoveredPortfolioExposurePct = Math.max(
+  const uncoveredValuedSubsetExposurePct = Math.max(
     0,
-    etfPortfolioWeightPct - observedPortfolioExposurePct,
+    valuedSubsetEtfWeightPct - observedValuedSubsetExposurePct,
   );
   const asOfDates = Object.freeze(
     [...new Set(etfRows.flatMap((row) => (row.asOfDate ? [row.asOfDate] : [])))].sort(),
   );
-  const missingReferenceCount = etfRows.filter(
+  const missingReferenceValuedEtfCount = etfRows.filter(
     (row) => row.mappingStatus === "missing_reference",
   ).length;
-  const ambiguousReferenceCount = etfRows.filter(
+  const ambiguousReferenceValuedEtfCount = etfRows.filter(
     (row) => row.mappingStatus === "ambiguous_reference",
   ).length;
   const hasCoverageGaps =
-    missingReferenceCount > 0 ||
-    ambiguousReferenceCount > 0 ||
+    basePortfolioCoverageStatus === "partial" ||
+    missingReferenceValuedEtfCount > 0 ||
+    ambiguousReferenceValuedEtfCount > 0 ||
     etfRows.some((row) => row.evidenceStatus !== "complete") ||
-    uncoveredPortfolioExposurePct > COVERAGE_EPSILON;
+    uncoveredValuedSubsetExposurePct > COVERAGE_EPSILON;
   const mixedAsOfDates = asOfDates.length > 1;
   const status: InvestmentLabEtfXrayStatus =
-    etfRows.length === 0
+    etfRows.length === 0 && excludedEtfHoldingCount === 0
       ? "unavailable"
       : hasCoverageGaps
         ? "partial"
@@ -87,20 +104,36 @@ export function buildInvestmentLabEtfXray(input: {
   return Object.freeze({
     status,
     summary: Object.freeze({
-      heldEtfCount: etfRows.length,
-      matchedEtfCount: etfRows.filter(
+      basePortfolioCoverageStatus,
+      exposureScope,
+      valuedHoldingCount: input.portfolioHoldings.length,
+      excludedHoldingCount: portfolioExclusions.length,
+      excludedEtfHoldingCount,
+      exclusionReasonCounts: Object.freeze({
+        missing_price: portfolioExclusions.filter(
+          (row) => row.reason === "missing_price",
+        ).length,
+        missing_fx: portfolioExclusions.filter(
+          (row) => row.reason === "missing_fx",
+        ).length,
+        unsupported_currency: portfolioExclusions.filter(
+          (row) => row.reason === "unsupported_currency",
+        ).length,
+      }),
+      valuedEtfCount: etfRows.length,
+      matchedValuedEtfCount: etfRows.filter(
         (row) => row.mappingStatus === "matched",
       ).length,
-      missingReferenceCount,
-      ambiguousReferenceCount,
+      missingReferenceValuedEtfCount,
+      ambiguousReferenceValuedEtfCount,
       evidenceAvailableEtfCount: etfRows.filter((row) => row.asOfDate !== null)
         .length,
       completeEvidenceEtfCount: etfRows.filter(
         (row) => row.evidenceStatus === "complete",
       ).length,
-      etfPortfolioWeightPct,
-      observedPortfolioExposurePct,
-      uncoveredPortfolioExposurePct,
+      valuedSubsetEtfWeightPct,
+      observedValuedSubsetExposurePct,
+      uncoveredValuedSubsetExposurePct,
       componentCount: componentRows.length,
       overlapCount: componentRows.filter(
         (row) => row.hasDirectOverlap || row.hasMultiEtfOverlap,
@@ -123,7 +156,7 @@ type MutableComponent = {
   symbol: string;
   market: string;
   currency: string;
-  portfolioExposurePct: number;
+  valuedSubsetExposurePct: number;
   sourceCandidateKeys: Set<string>;
   sourceInstrumentKeys: Set<string>;
   throughEtfs: Set<string>;
@@ -142,7 +175,7 @@ function buildEtfRow(
     market: candidate.market,
     currency: candidate.currency,
     currentValueKrw: candidate.currentValueKrw,
-    portfolioWeightPct: candidate.portfolioWeightPct,
+    valuedSubsetWeightPct: candidate.valuedSubsetWeightPct,
   } as const;
 
   if (candidate.masterMatches.length !== 1) {
@@ -267,8 +300,8 @@ function buildEtfRow(
       sourceCandidateKey: candidate.candidateKey,
       sourceInstrumentKey: candidate.instrumentKey,
       sourceEtf: candidate.ticker ?? candidate.name,
-      portfolioExposurePct:
-        (candidate.portfolioWeightPct * component.weightPct) / 100,
+      valuedSubsetExposurePct:
+        (candidate.valuedSubsetWeightPct * component.weightPct) / 100,
     });
   }
   const evidenceStatus =
@@ -301,7 +334,7 @@ function addComponentExposure(
     symbol: string;
     market: string;
     currency: string;
-    portfolioExposurePct: number;
+    valuedSubsetExposurePct: number;
     sourceCandidateKey: string;
     sourceInstrumentKey: string | null;
     sourceEtf: string;
@@ -310,7 +343,7 @@ function addComponentExposure(
 ) {
   const existing = components.get(input.key);
   if (existing) {
-    existing.portfolioExposurePct += input.portfolioExposurePct;
+    existing.valuedSubsetExposurePct += input.valuedSubsetExposurePct;
     existing.sourceCandidateKeys.add(input.sourceCandidateKey);
     if (input.sourceInstrumentKey) {
       existing.sourceInstrumentKeys.add(input.sourceInstrumentKey);
@@ -325,7 +358,7 @@ function addComponentExposure(
     symbol: input.symbol,
     market: input.market,
     currency: input.currency,
-    portfolioExposurePct: input.portfolioExposurePct,
+    valuedSubsetExposurePct: input.valuedSubsetExposurePct,
     sourceCandidateKeys: new Set([input.sourceCandidateKey]),
     sourceInstrumentKeys: new Set(
       input.sourceInstrumentKey ? [input.sourceInstrumentKey] : [],
@@ -340,7 +373,7 @@ function finalizeComponentRow(
   component: MutableComponent,
   directWeights: Map<string, number>,
 ): InvestmentLabEtfXrayComponentRow {
-  const directPortfolioWeightPct = component.sourceInstrumentKeys.has(key)
+  const directValuedSubsetWeightPct = component.sourceInstrumentKeys.has(key)
     ? 0
     : (directWeights.get(key) ?? 0);
   const throughEtfs = Object.freeze([...component.throughEtfs].sort());
@@ -351,12 +384,12 @@ function finalizeComponentRow(
     symbol: component.symbol,
     market: component.market,
     currency: component.currency,
-    portfolioExposurePct: component.portfolioExposurePct,
-    directPortfolioWeightPct,
+    valuedSubsetExposurePct: component.valuedSubsetExposurePct,
+    directValuedSubsetWeightPct,
     throughEtfCount: component.sourceCandidateKeys.size,
     throughEtfs,
     asOfDates,
-    hasDirectOverlap: directPortfolioWeightPct > COVERAGE_EPSILON,
+    hasDirectOverlap: directValuedSubsetWeightPct > COVERAGE_EPSILON,
     hasMultiEtfOverlap: component.sourceCandidateKeys.size > 1,
   });
 }
@@ -384,7 +417,7 @@ function compareComponentRows(
   right: InvestmentLabEtfXrayComponentRow,
 ) {
   return (
-    right.portfolioExposurePct - left.portfolioExposurePct ||
+    right.valuedSubsetExposurePct - left.valuedSubsetExposurePct ||
     left.symbol.localeCompare(right.symbol)
   );
 }

@@ -9,6 +9,10 @@ export function InvestmentLabEtfXray({
   model: InvestmentLabEtfXrayModel;
 }) {
   const summary = model.summary;
+  const exposureScopeLabel =
+    summary.exposureScope === "whole_portfolio"
+      ? "전체 포트폴리오"
+      : "평가 가능한 하위집합";
   const topComponents = model.componentRows.slice(0, 15);
   const overlapRows = model.componentRows
     .filter((row) => row.hasDirectOverlap || row.hasMultiEtfOverlap)
@@ -18,18 +22,27 @@ export function InvestmentLabEtfXray({
     <section
       aria-labelledby="investment-lab-etf-xray-title"
       className="mx-auto w-full max-w-[1500px] space-y-4 px-4 pb-4"
-      data-ambiguous-etf-references={summary.ambiguousReferenceCount}
-      data-etf-portfolio-weight={summary.etfPortfolioWeightPct.toFixed(6)}
-      data-held-etfs={summary.heldEtfCount}
-      data-matched-etfs={summary.matchedEtfCount}
-      data-missing-etf-references={summary.missingReferenceCount}
-      data-observed-etf-exposure={summary.observedPortfolioExposurePct.toFixed(
-        6,
-      )}
+      data-ambiguous-valued-etf-references={
+        summary.ambiguousReferenceValuedEtfCount
+      }
+      data-base-portfolio-coverage={summary.basePortfolioCoverageStatus}
+      data-excluded-etf-holdings={summary.excludedEtfHoldingCount}
+      data-excluded-holdings={summary.excludedHoldingCount}
+      data-exposure-scope={summary.exposureScope}
+      data-matched-valued-etfs={summary.matchedValuedEtfCount}
+      data-missing-valued-etf-references={
+        summary.missingReferenceValuedEtfCount
+      }
+      data-observed-valued-subset-exposure={
+        summary.observedValuedSubsetExposurePct.toFixed(6)
+      }
       data-section="investment-lab-etf-xray"
-      data-uncovered-etf-exposure={summary.uncoveredPortfolioExposurePct.toFixed(
-        6,
-      )}
+      data-uncovered-valued-subset-exposure={
+        summary.uncoveredValuedSubsetExposurePct.toFixed(6)
+      }
+      data-valued-etf-weight={summary.valuedSubsetEtfWeightPct.toFixed(6)}
+      data-valued-etfs={summary.valuedEtfCount}
+      data-valued-holdings={summary.valuedHoldingCount}
       data-xray-as-of-date-count={summary.asOfDates.length}
       data-xray-component-count={summary.componentCount}
       data-xray-mixed-as-of={String(summary.mixedAsOfDates)}
@@ -58,28 +71,48 @@ export function InvestmentLabEtfXray({
         </div>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCell
-          label="보유 ETF"
-          value={`${summary.heldEtfCount}개`}
-          detail={`reference 일치 ${summary.matchedEtfCount}개`}
+          label="기초 포트폴리오"
+          value={
+            summary.basePortfolioCoverageStatus === "complete"
+              ? "평가 완전"
+              : "평가 부분"
+          }
+          detail={`평가 가능 ${summary.valuedHoldingCount} · 제외 ${summary.excludedHoldingCount}`}
+        />
+        <SummaryCell
+          label="평가된 보유 ETF"
+          value={`${summary.valuedEtfCount}개`}
+          detail={`reference 일치 ${summary.matchedValuedEtfCount}개`}
         />
         <SummaryCell
           label="구성종목 근거"
-          value={`${summary.evidenceAvailableEtfCount}/${summary.heldEtfCount}`}
+          value={`${summary.evidenceAvailableEtfCount}/${summary.valuedEtfCount}`}
           detail={`완전 커버 ${summary.completeEvidenceEtfCount}개`}
         />
         <SummaryCell
           label="관측된 ETF 경유 노출"
-          value={formatPercent(summary.observedPortfolioExposurePct)}
-          detail="전체 포트폴리오 비중, 재정규화 안 함"
+          value={formatPercent(summary.observedValuedSubsetExposurePct)}
+          detail={`${exposureScopeLabel} 기준, 재정규화 안 함`}
         />
         <SummaryCell
           label="미커버 ETF 노출"
-          value={formatPercent(summary.uncoveredPortfolioExposurePct)}
-          detail={`reference 누락 ${summary.missingReferenceCount}개`}
+          value={formatPercent(summary.uncoveredValuedSubsetExposurePct)}
+          detail={`reference 누락 ${summary.missingReferenceValuedEtfCount}개`}
         />
       </div>
+
+      {summary.basePortfolioCoverageStatus === "partial" ? (
+        <p className="rounded-md border border-[#d8c7a1] bg-[#fff8e6] px-4 py-3 text-sm leading-6 text-[#725f2d]">
+          가격·환율 근거가 없어 평가에서 제외된 자산이 {summary.excludedHoldingCount}
+          개이며, 그중 ETF 후보는 {summary.excludedEtfHoldingCount}개입니다. 따라서
+          아래 비중은 전체 포트폴리오가 아니라 평가 가능한 하위집합 기준입니다.
+          제외 사유: 가격 {summary.exclusionReasonCounts.missing_price} · 환율 {" "}
+          {summary.exclusionReasonCounts.missing_fx} · 미지원 통화 {" "}
+          {summary.exclusionReasonCounts.unsupported_currency}.
+        </p>
+      ) : null}
 
       {summary.mixedAsOfDates ? (
         <p className="rounded-md border border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-sm leading-6 text-[#725f2d]">
@@ -103,7 +136,7 @@ export function InvestmentLabEtfXray({
                 <th className="px-4 py-3">ETF</th>
                 <th className="px-3 py-3">계정</th>
                 <th className="px-3 py-3">구성 기준일</th>
-                <th className="px-3 py-3 text-right">포트 비중</th>
+                <th className="px-3 py-3 text-right">평가 하위집합 비중</th>
                 <th className="px-3 py-3 text-right">구성종목</th>
                 <th className="px-3 py-3 text-right">관측 비중</th>
                 <th className="px-3 py-3 text-right">미커버</th>
@@ -208,7 +241,7 @@ function EtfCoverageRow({ row }: { row: InvestmentLabEtfXrayEtfRow }) {
         {row.asOfDate ? formatDate(row.asOfDate) : "n/a"}
       </td>
       <td className="px-3 py-3 text-right tabular-nums">
-        {formatPercent(row.portfolioWeightPct)}
+        {formatPercent(row.valuedSubsetWeightPct)}
       </td>
       <td className="px-3 py-3 text-right tabular-nums">
         {row.componentCount}
@@ -267,10 +300,10 @@ function ComponentTable({
                 {row.market} · {row.currency}
               </td>
               <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                {formatPercent(row.portfolioExposurePct)}
+                {formatPercent(row.valuedSubsetExposurePct)}
               </td>
               <td className="px-3 py-3 text-right tabular-nums">
-                {formatPercent(row.directPortfolioWeightPct)}
+                {formatPercent(row.directValuedSubsetWeightPct)}
               </td>
               <td className="px-3 py-3">
                 {row.throughEtfs.join(", ")}

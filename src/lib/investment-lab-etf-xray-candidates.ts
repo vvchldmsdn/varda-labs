@@ -1,4 +1,7 @@
-import type { PortfolioStructureHoldingRow } from "./portfolio-structure.ts";
+import type {
+  PortfolioStructureExclusion,
+  PortfolioStructureHoldingRow,
+} from "./portfolio-structure.ts";
 import type { InvestmentLabEtfXrayMasterInput } from "./investment-lab-etf-xray-types.ts";
 
 export type ResolvedInvestmentLabEtfCandidate = {
@@ -10,7 +13,7 @@ export type ResolvedInvestmentLabEtfCandidate = {
   market: string;
   currency: string;
   currentValueKrw: number;
-  portfolioWeightPct: number;
+  valuedSubsetWeightPct: number;
   masterMatches: InvestmentLabEtfXrayMasterInput[];
 };
 
@@ -40,21 +43,7 @@ export function resolveInvestmentLabEtfCandidates(
   portfolioHoldings: readonly PortfolioStructureHoldingRow[],
   masters: readonly InvestmentLabEtfXrayMasterInput[],
 ) {
-  const mastersByInstrument = new Map<
-    string,
-    InvestmentLabEtfXrayMasterInput[]
-  >();
-  for (const master of masters) {
-    const key = instrumentIdentityKey(
-      master.market,
-      master.currency,
-      master.ticker,
-    );
-    if (!key) continue;
-    const existing = mastersByInstrument.get(key);
-    if (existing) existing.push(master);
-    else mastersByInstrument.set(key, [master]);
-  }
+  const mastersByInstrument = indexMastersByInstrument(masters);
 
   const candidatesByKey = new Map<
     string,
@@ -82,7 +71,7 @@ export function resolveInvestmentLabEtfCandidates(
     if (existing) {
       existing.accounts.add(holding.account);
       existing.currentValueKrw += finiteOrZero(holding.currentValueKrw);
-      existing.portfolioWeightPct += finiteOrZero(holding.currentWeightPct);
+      existing.valuedSubsetWeightPct += finiteOrZero(holding.currentWeightPct);
       return;
     }
 
@@ -95,16 +84,32 @@ export function resolveInvestmentLabEtfCandidates(
       market: canonicalLower(holding.market) ?? "unknown",
       currency: canonicalUpper(holding.currency) ?? "unknown",
       currentValueKrw: finiteOrZero(holding.currentValueKrw),
-      portfolioWeightPct: finiteOrZero(holding.currentWeightPct),
+      valuedSubsetWeightPct: finiteOrZero(holding.currentWeightPct),
       masterMatches,
     });
   });
 
   return [...candidatesByKey.values()].sort(
     (left, right) =>
-      right.portfolioWeightPct - left.portfolioWeightPct ||
+      right.valuedSubsetWeightPct - left.valuedSubsetWeightPct ||
       left.name.localeCompare(right.name),
   );
+}
+
+export function countExcludedInvestmentLabEtfHoldings(
+  exclusions: readonly PortfolioStructureExclusion[],
+  masters: readonly InvestmentLabEtfXrayMasterInput[],
+) {
+  const mastersByInstrument = indexMastersByInstrument(masters);
+  return exclusions.filter((exclusion) => {
+    if (exclusion.assetType?.trim().toLowerCase() === "etf") return true;
+    const key = instrumentIdentityKey(
+      exclusion.market,
+      exclusion.currency,
+      exclusion.ticker,
+    );
+    return key ? (mastersByInstrument.get(key)?.length ?? 0) > 0 : false;
+  }).length;
 }
 
 export function buildDirectPortfolioWeights(
@@ -136,6 +141,24 @@ export function instrumentIdentityKey(
   const normalizedTicker = canonicalUpper(ticker);
   if (!normalizedMarket || !normalizedCurrency || !normalizedTicker) return null;
   return `${normalizedMarket}|${normalizedCurrency}|${normalizedTicker}`;
+}
+
+function indexMastersByInstrument(
+  masters: readonly InvestmentLabEtfXrayMasterInput[],
+) {
+  const result = new Map<string, InvestmentLabEtfXrayMasterInput[]>();
+  for (const master of masters) {
+    const key = instrumentIdentityKey(
+      master.market,
+      master.currency,
+      master.ticker,
+    );
+    if (!key) continue;
+    const existing = result.get(key);
+    if (existing) existing.push(master);
+    else result.set(key, [master]);
+  }
+  return result;
 }
 
 function canonicalUpper(value: string | null | undefined) {

@@ -43,17 +43,71 @@ async function main() {
   }
   const periodStatus = readStringAttribute(route.body, "data-period-status");
   assert.equal(periodStatus, EXPECTED_PERIOD_STATUS);
+  assert.match(
+    route.body,
+    /data-section="investment-lab-rolling-comparison"/,
+  );
+  const rollingStatus = readStringAttribute(route.body, "data-rolling-status");
+  const rollingCandidateWindows = readIntegerAttribute(
+    route.body,
+    "data-rolling-candidate-windows",
+  );
+  const rollingCompleteWindows = readIntegerAttribute(
+    route.body,
+    "data-rolling-complete-windows",
+  );
+  const rollingExcludedWindows = readIntegerAttribute(
+    route.body,
+    "data-rolling-excluded-windows",
+  );
+  const rollingObservationCount = readIntegerAttribute(
+    route.body,
+    "data-rolling-observation-count",
+  );
+  assert.ok(rollingStatus === "ready" || rollingStatus === "unavailable");
+  assert.equal(rollingObservationCount, 10);
+  assert.equal(
+    rollingCompleteWindows + rollingExcludedWindows,
+    rollingCandidateWindows,
+  );
+  if (rollingStatus === "ready") {
+    assert.ok(rollingCompleteWindows >= 2);
+    for (const marker of [
+      "과거 최고·최저 rolling 구간",
+      "최저 구간",
+      "최고 구간",
+    ]) {
+      assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+    }
+  }
   assert.match(route.body, /data-section="investment-lab-etf-xray"/);
   const xrayStatus = readStringAttribute(route.body, "data-xray-status");
-  const heldEtfs = readIntegerAttribute(route.body, "data-held-etfs");
-  const matchedEtfs = readIntegerAttribute(route.body, "data-matched-etfs");
+  const basePortfolioCoverage = readStringAttribute(
+    route.body,
+    "data-base-portfolio-coverage",
+  );
+  const exposureScope = readStringAttribute(route.body, "data-exposure-scope");
+  const valuedHoldings = readIntegerAttribute(route.body, "data-valued-holdings");
+  const excludedHoldings = readIntegerAttribute(
+    route.body,
+    "data-excluded-holdings",
+  );
+  const excludedEtfHoldings = readIntegerAttribute(
+    route.body,
+    "data-excluded-etf-holdings",
+  );
+  const valuedEtfs = readIntegerAttribute(route.body, "data-valued-etfs");
+  const matchedValuedEtfs = readIntegerAttribute(
+    route.body,
+    "data-matched-valued-etfs",
+  );
   const missingEtfReferences = readIntegerAttribute(
     route.body,
-    "data-missing-etf-references",
+    "data-missing-valued-etf-references",
   );
   const ambiguousEtfReferences = readIntegerAttribute(
     route.body,
-    "data-ambiguous-etf-references",
+    "data-ambiguous-valued-etf-references",
   );
   const xrayAsOfDateCount = readIntegerAttribute(
     route.body,
@@ -73,15 +127,15 @@ async function main() {
   );
   const etfPortfolioWeight = readNumberAttribute(
     route.body,
-    "data-etf-portfolio-weight",
+    "data-valued-etf-weight",
   );
   const observedEtfExposure = readNumberAttribute(
     route.body,
-    "data-observed-etf-exposure",
+    "data-observed-valued-subset-exposure",
   );
   const uncoveredEtfExposure = readNumberAttribute(
     route.body,
-    "data-uncovered-etf-exposure",
+    "data-uncovered-valued-subset-exposure",
   );
   assert.ok(
     [
@@ -92,11 +146,20 @@ async function main() {
     ].includes(xrayStatus),
     "ETF X-ray status must be explicit",
   );
-  assert.ok(heldEtfs > 0, "ETF X-ray needs at least one held ETF");
+  assert.ok(
+    basePortfolioCoverage === "complete" || basePortfolioCoverage === "partial",
+  );
   assert.equal(
-    matchedEtfs + missingEtfReferences + ambiguousEtfReferences,
-    heldEtfs,
-    "every held ETF must have an explicit reference mapping state",
+    exposureScope,
+    basePortfolioCoverage === "complete" ? "whole_portfolio" : "valued_subset",
+  );
+  assert.ok(valuedHoldings >= valuedEtfs);
+  assert.ok(excludedHoldings >= excludedEtfHoldings);
+  assert.ok(valuedEtfs > 0, "ETF X-ray needs at least one valued ETF");
+  assert.equal(
+    matchedValuedEtfs + missingEtfReferences + ambiguousEtfReferences,
+    valuedEtfs,
+    "every valued ETF must have an explicit reference mapping state",
   );
   assert.ok(xrayAsOfDateCount >= 1, "ETF X-ray needs dated evidence");
   assert.ok(xrayComponentCount >= xrayOverlapCount);
@@ -126,9 +189,19 @@ async function main() {
           baseUrl: BASE_URL,
           routePath,
           periodStatus,
+          rollingStatus,
+          rollingCandidateWindows,
+          rollingCompleteWindows,
+          rollingExcludedWindows,
+          rollingObservationCount,
           xrayStatus,
-          heldEtfs,
-          matchedEtfs,
+          basePortfolioCoverage,
+          exposureScope,
+          valuedHoldings,
+          excludedHoldings,
+          excludedEtfHoldings,
+          valuedEtfs,
+          matchedValuedEtfs,
           missingEtfReferences,
           ambiguousEtfReferences,
           xrayAsOfDateCount,
@@ -316,9 +389,19 @@ async function main() {
         vooReturnStatus,
         vooReturnMethod,
         contributionScenarioCount,
+        rollingStatus,
+        rollingCandidateWindows,
+        rollingCompleteWindows,
+        rollingExcludedWindows,
+        rollingObservationCount,
         xrayStatus,
-        heldEtfs,
-        matchedEtfs,
+        basePortfolioCoverage,
+        exposureScope,
+        valuedHoldings,
+        excludedHoldings,
+        excludedEtfHoldings,
+        valuedEtfs,
+        matchedValuedEtfs,
         missingEtfReferences,
         ambiguousEtfReferences,
         xrayAsOfDateCount,

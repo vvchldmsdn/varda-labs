@@ -7,6 +7,10 @@ import {
 } from "./investment-lab-counterfactual-read-model.ts";
 import type { InvestmentLabVooFxRow } from "./investment-lab-voo-readiness.ts";
 import {
+  buildInvestmentLabRollingComparison,
+  type InvestmentLabRollingComparison,
+} from "./investment-lab-rolling-comparison.ts";
+import {
   markInvestmentLabPeriodUnavailable,
   resolveInvestmentLabPeriodSelection,
   sliceInvestmentLabCounterfactualInput,
@@ -28,6 +32,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
 ): Promise<Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
+  rollingComparison: InvestmentLabRollingComparison;
 }>> {
   const [eventRows, snapshotRows, closeRows, vooCloseRows, fxRows] =
     await Promise.all([
@@ -46,13 +51,17 @@ export async function loadInvestmentLabCounterfactualReadModel(
     fxRows,
   });
   const fullModel = buildInvestmentLabCounterfactualReadModel(input);
+  const rollingComparison = buildInvestmentLabRollingComparison({
+    source: input,
+    availableServiceDates: fullModel.rows.map((row) => row.serviceDate),
+  });
   const period = resolveInvestmentLabPeriodSelection({
     request,
     availableServiceDates: fullModel.rows.map((row) => row.serviceDate),
   });
 
   if (period.status !== "selected") {
-    return Object.freeze({ model: fullModel, period });
+    return Object.freeze({ model: fullModel, period, rollingComparison });
   }
 
   const model = buildInvestmentLabCounterfactualReadModel(
@@ -68,6 +77,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
 
   return Object.freeze({
     model,
+    rollingComparison,
     period: complete
       ? period
       : markInvestmentLabPeriodUnavailable(period),

@@ -44,14 +44,16 @@ describe("investment lab ETF X-ray", () => {
     });
 
     assert.equal(model.status, "partial");
-    assert.equal(model.summary.heldEtfCount, 3);
-    assert.equal(model.summary.matchedEtfCount, 2);
-    assert.equal(model.summary.missingReferenceCount, 1);
+    assert.equal(model.summary.basePortfolioCoverageStatus, "complete");
+    assert.equal(model.summary.exposureScope, "whole_portfolio");
+    assert.equal(model.summary.valuedEtfCount, 3);
+    assert.equal(model.summary.matchedValuedEtfCount, 2);
+    assert.equal(model.summary.missingReferenceValuedEtfCount, 1);
     assert.deepEqual(model.summary.asOfDates, ["2026-07-01", "2026-07-02"]);
     assert.equal(model.summary.mixedAsOfDates, true);
-    assert.equal(model.summary.etfPortfolioWeightPct, 75);
-    assert.equal(model.summary.observedPortfolioExposurePct, 66);
-    assert.equal(model.summary.uncoveredPortfolioExposurePct, 9);
+    assert.equal(model.summary.valuedSubsetEtfWeightPct, 75);
+    assert.equal(model.summary.observedValuedSubsetExposurePct, 66);
+    assert.equal(model.summary.uncoveredValuedSubsetExposurePct, 9);
 
     const etfA = model.etfRows.find((row) => row.ticker === "A");
     assert.equal(etfA.evidenceStatus, "partial");
@@ -60,8 +62,8 @@ describe("investment lab ETF X-ray", () => {
     assert.equal(etfA.uncoveredWeightPct, 10);
 
     const x = model.componentRows.find((row) => row.symbol === "X");
-    assert.equal(x.portfolioExposurePct, 35);
-    assert.equal(x.directPortfolioWeightPct, 10);
+    assert.equal(x.valuedSubsetExposurePct, 35);
+    assert.equal(x.directValuedSubsetWeightPct, 10);
     assert.equal(x.throughEtfCount, 2);
     assert.equal(x.hasDirectOverlap, true);
     assert.equal(x.hasMultiEtfOverlap, true);
@@ -85,8 +87,8 @@ describe("investment lab ETF X-ray", () => {
     assert.equal(model.status, "partial");
     assert.equal(model.etfRows[0].evidenceStatus, "invalid_weight_total");
     assert.equal(model.etfRows[0].observedWeightPct, null);
-    assert.equal(model.summary.observedPortfolioExposurePct, 0);
-    assert.equal(model.summary.uncoveredPortfolioExposurePct, 40);
+    assert.equal(model.summary.observedValuedSubsetExposurePct, 0);
+    assert.equal(model.summary.uncoveredValuedSubsetExposurePct, 40);
     assert.equal(model.componentRows.length, 0);
   });
 
@@ -106,12 +108,40 @@ describe("investment lab ETF X-ray", () => {
 
     assert.equal(model.status, "complete_common_date");
     assert.deepEqual(model.summary.asOfDates, ["2026-07-01"]);
-    assert.equal(model.summary.uncoveredPortfolioExposurePct, 0);
+    assert.equal(model.summary.uncoveredValuedSubsetExposurePct, 0);
     assert.deepEqual(
       model.componentRows.map((row) => row.symbol),
       ["X", "Y"],
     );
   });
+
+  for (const reason of [
+    "missing_price",
+    "missing_fx",
+    "unsupported_currency",
+  ]) {
+    it(`marks ${reason} ETF exclusions as valued-subset-only exposure`, () => {
+      const model = buildInvestmentLabEtfXray({
+        portfolioHoldings: [holding("ETF A", "A", "etf", 100)],
+        portfolioExclusions: [exclusion("ETF B", "B", reason)],
+        masters: [master("master-a", "A"), master("master-b", "B")],
+        holdingEvidence: [
+          evidence("row-a", "master-a", "A", "2026-07-01", "X", 100),
+        ],
+      });
+
+      assert.equal(model.status, "partial");
+      assert.equal(model.summary.basePortfolioCoverageStatus, "partial");
+      assert.equal(model.summary.exposureScope, "valued_subset");
+      assert.equal(model.summary.valuedHoldingCount, 1);
+      assert.equal(model.summary.excludedHoldingCount, 1);
+      assert.equal(model.summary.excludedEtfHoldingCount, 1);
+      assert.equal(model.summary.exclusionReasonCounts[reason], 1);
+      assert.equal(model.summary.valuedSubsetEtfWeightPct, 100);
+      assert.equal(model.summary.observedValuedSubsetExposurePct, 100);
+      assert.equal(model.summary.uncoveredValuedSubsetExposurePct, 0);
+    });
+  }
 
   it("keeps the production adapter server-only, read-only, and separately suspended", () => {
     const querySource = readFileSync(
@@ -168,6 +198,21 @@ function master(referenceId, ticker) {
     name: `ETF ${ticker}`,
     market: "us",
     currency: "USD",
+  };
+}
+
+function exclusion(name, ticker, reason) {
+  return {
+    reason,
+    name,
+    ticker,
+    account: "brokerage",
+    market: "us",
+    currency: "USD",
+    assetType: "etf",
+    groupName: "Ungrouped",
+    quantity: 1,
+    currentPrice: reason === "missing_price" ? null : 1,
   };
 }
 
