@@ -79,13 +79,16 @@ const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("
 
 async function main() {
   const countsBefore = await readCounts();
-  const [detailCandidates, brokerageEventStats] = await Promise.all([
+  const [detailCandidates, brokerageEventStats, comparisonCandidate] =
+    await Promise.all([
     readDetailCandidates(),
     readEventStats("brokerage"),
-  ]);
+      readComparisonCandidate(),
+    ]);
   const routeScenarios = [
     ...scenarios,
     eventScenario(brokerageEventStats),
+    comparisonScenario(comparisonCandidate),
     detailScenario("generated_position_detail", detailCandidates.generated, {
       allowedStatuses: ["ready"],
       allowedReconciliation: ["matched"],
@@ -298,6 +301,62 @@ async function main() {
       };
     }
 
+    let comparison = null;
+    if (scenario.expectedComparison) {
+      const comparisonTag = readComparisonTag(response.body);
+      const status = readStringAttribute(
+        comparisonTag,
+        "data-history-position-comparison-status",
+      );
+      const rowCount = readIntegerAttribute(
+        comparisonTag,
+        "data-history-position-comparison-count",
+      );
+      const addedCount = readIntegerAttribute(
+        comparisonTag,
+        "data-history-position-comparison-added",
+      );
+      const removedCount = readIntegerAttribute(
+        comparisonTag,
+        "data-history-position-comparison-removed",
+      );
+      const changedCount = readIntegerAttribute(
+        comparisonTag,
+        "data-history-position-comparison-changed",
+      );
+      const unchangedCount = readIntegerAttribute(
+        comparisonTag,
+        "data-history-position-comparison-unchanged",
+      );
+      const unresolvedCount = readIntegerAttribute(
+        comparisonTag,
+        "data-history-position-comparison-unresolved",
+      );
+      assert.equal(status, scenario.expectedComparison.status);
+      assert.equal(rowCount, scenario.expectedComparison.rowCount);
+      assert.equal(addedCount, scenario.expectedComparison.addedCount);
+      assert.equal(removedCount, scenario.expectedComparison.removedCount);
+      assert.equal(changedCount, scenario.expectedComparison.changedCount);
+      assert.equal(unchangedCount, scenario.expectedComparison.unchangedCount);
+      assert.equal(unresolvedCount, 0);
+      assert.equal(
+        response.body.match(
+          /data-history-position-comparison-row="true"/g,
+        )?.length ?? 0,
+        rowCount,
+        `${scenario.label} rendered comparison row count drifted`,
+      );
+      comparison = {
+        status,
+        rowCount,
+        addedCount,
+        removedCount,
+        changedCount,
+        unchangedCount,
+        unresolvedCount,
+      };
+    }
+
     const overflowContainers =
       response.body.match(/overflow-x-auto/g)?.length ?? 0;
     assert.ok(
@@ -314,6 +373,7 @@ async function main() {
       leakPatternMatches: 0,
       detail,
       event,
+      comparison,
     });
   }
 
@@ -342,6 +402,158 @@ async function main() {
       2,
     ),
   );
+}
+
+async function readComparisonCandidate() {
+  const endpointRows = await sql.query(`
+    select p.snapshot_date::text as snapshot_date,
+      p.account,
+      p.source,
+      count(*)::int as position_count
+    from daily_position_snapshots p
+    where p.account in ('brokerage', 'isa', 'irp')
+      and p.is_sample = false
+      and exists (
+        select 1
+        from daily_portfolio_snapshots d
+        where d.snapshot_date = p.snapshot_date
+          and d.account = p.account
+          and d.source = p.source
+          and d.is_sample = false
+        group by d.snapshot_date, d.account, d.source
+        having count(*) = 1
+      )
+    group by p.snapshot_date, p.account, p.source
+    having count(*) <= 200
+      and count(*) = count(distinct p.legacy_asset_id)
+      and count(p.quantity) = count(*)
+      and count(p.market_value_krw) = count(*)
+    order by
+      case when p.source = 'varda_manual_daily_snapshot' then 0 else 1 end,
+      case when p.account = 'brokerage' then 0 else 1 end,
+      p.snapshot_date desc
+  `);
+  const grouped = new Map();
+  for (const row of endpointRows) {
+    const key = `${row.account}|${row.source}`;
+    const group = grouped.get(key) ?? [];
+    group.push(row);
+    grouped.set(key, group);
+  }
+  const endpoints = [...grouped.values()].find((group) => group.length >= 2);
+  assert.ok(endpoints, "history smoke needs two comparable stored endpoints");
+  const to = endpoints[0];
+  const from = endpoints[1];
+  const [stats] = await sql.query(`
+    with from_rows as (
+      select legacy_asset_id, asset_id, ticker, asset_name, market, currency,
+        quantity, market_value_krw
+      from daily_position_snapshots
+      where snapshot_date = $1::date
+        and account = $2
+        and source = $3
+        and is_sample = false
+    ),
+    to_rows as (
+      select legacy_asset_id, asset_id, ticker, asset_name, market, currency,
+        quantity, market_value_krw
+      from daily_position_snapshots
+      where snapshot_date = $4::date
+        and account = $2
+        and source = $3
+        and is_sample = false
+    ),
+    compared as (
+      select f.legacy_asset_id as from_identity,
+        t.legacy_asset_id as to_identity,
+        f.asset_id as from_asset_id,
+        t.asset_id as to_asset_id,
+        f.ticker as from_ticker,
+        t.ticker as to_ticker,
+        f.asset_name as from_name,
+        t.asset_name as to_name,
+        f.market as from_market,
+        t.market as to_market,
+        f.currency as from_currency,
+        t.currency as to_currency,
+        f.quantity as from_quantity,
+        t.quantity as to_quantity,
+        f.market_value_krw as from_value,
+        t.market_value_krw as to_value
+      from from_rows f
+      full outer join to_rows t using (legacy_asset_id)
+    )
+    select count(*)::int as row_count,
+      count(*) filter (where from_identity is null)::int as added_count,
+      count(*) filter (where to_identity is null)::int as removed_count,
+      count(*) filter (
+        where from_identity is not null and to_identity is not null and (
+          from_asset_id is distinct from to_asset_id
+          or from_ticker is distinct from to_ticker
+          or from_name is distinct from to_name
+          or from_market is distinct from to_market
+          or from_currency is distinct from to_currency
+          or from_quantity is distinct from to_quantity
+          or from_value is distinct from to_value
+        )
+      )::int as changed_count,
+      count(*) filter (
+        where from_identity is not null and to_identity is not null and not (
+          from_asset_id is distinct from to_asset_id
+          or from_ticker is distinct from to_ticker
+          or from_name is distinct from to_name
+          or from_market is distinct from to_market
+          or from_currency is distinct from to_currency
+          or from_quantity is distinct from to_quantity
+          or from_value is distinct from to_value
+        )
+      )::int as unchanged_count
+    from compared
+  `, [from.snapshot_date, from.account, from.source, to.snapshot_date]);
+  return {
+    account: from.account,
+    source: from.source,
+    fromDate: from.snapshot_date,
+    toDate: to.snapshot_date,
+    rowCount: Number(stats.row_count),
+    addedCount: Number(stats.added_count),
+    removedCount: Number(stats.removed_count),
+    changedCount: Number(stats.changed_count),
+    unchangedCount: Number(stats.unchanged_count),
+  };
+}
+
+function comparisonScenario(candidate) {
+  const params = new URLSearchParams({
+    account: candidate.account,
+    lane: "portfolio",
+    comparisonFrom: `${candidate.fromDate}~${candidate.source}`,
+    comparisonTo: `${candidate.toDate}~${candidate.source}`,
+  });
+  return {
+    label: "stored_position_comparison",
+    path: `/history?${params.toString()}`,
+    expectedSections: ["portfolio"],
+    absentSections: ["balance", "events"],
+    expectedCharts: ["portfolio"],
+    absentCharts: ["balance"],
+    expectedText: [
+      "두 시점 보유 변화",
+      "이전 저장점",
+      "이후 저장점",
+      "저장 평가액 변화",
+      "이벤트 기록은 별도 연대기로 보기",
+    ],
+    minimumOverflowContainers: 2,
+    expectedComparison: {
+      status: "ready",
+      rowCount: candidate.rowCount,
+      addedCount: candidate.addedCount,
+      removedCount: candidate.removedCount,
+      changedCount: candidate.changedCount,
+      unchangedCount: candidate.unchangedCount,
+    },
+  };
 }
 
 async function request(path, authenticated = false) {
@@ -519,6 +731,14 @@ function readEventTag(html) {
     /<div[^>]*data-history-event-timeline[^>]*>/,
   );
   assert.ok(match, "route is missing history event timeline");
+  return match[0];
+}
+
+function readComparisonTag(html) {
+  const match = html.match(
+    /<section[^>]*data-history-position-comparison[^>]*>/,
+  );
+  assert.ok(match, "route is missing history position comparison");
   return match[0];
 }
 

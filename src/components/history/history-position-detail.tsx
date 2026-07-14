@@ -7,6 +7,7 @@ import type {
 
 import {
   formatHistoryKrw,
+  formatHistoryNumber,
   historyAccountLabel,
   historySourceLabel,
 } from "./history-format";
@@ -16,9 +17,6 @@ import {
   HistoryTableHeader as TableHeader,
 } from "./history-evidence-primitives";
 
-const NUMBER_FORMATTER = new Intl.NumberFormat("ko-KR", {
-  maximumFractionDigits: 8,
-});
 const PERCENT_FORMATTER = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 2,
 });
@@ -179,10 +177,12 @@ function PositionRow({ row }: { row: HistoryPositionDisplayRow }) {
       <TableCell>
         {[row.market, row.currency].filter(Boolean).join(" / ") || "n/a"}
       </TableCell>
-      <TableCell align="right">{formatNumber(row.quantity)}</TableCell>
-      <TableCell align="right">{formatNumber(row.currentPrice)}</TableCell>
+      <TableCell align="right">{formatHistoryNumber(row.quantity)}</TableCell>
       <TableCell align="right">
-        {formatNumber(row.marketValueLocal)}
+        {formatHistoryNumber(row.currentPrice)}
+      </TableCell>
+      <TableCell align="right">
+        {formatHistoryNumber(row.marketValueLocal)}
       </TableCell>
       <TableCell align="right">{formatHistoryKrw(row.marketValueKrw)}</TableCell>
       <TableCell align="right">{formatHistoryKrw(row.costKrw)}</TableCell>
@@ -251,12 +251,6 @@ function evidenceLabel(row: HistoryPositionDisplayRow) {
   if (row.evidenceStatus === "invalid_identity") return "식별 근거 불완전";
   if (row.valuationStatus === "missing_market_value") return "평가액 없음";
   return "저장값";
-}
-
-function formatNumber(value: number | null) {
-  return value === null || !Number.isFinite(value)
-    ? "n/a"
-    : NUMBER_FORMATTER.format(value);
 }
 
 function formatPercent(value: number | null) {

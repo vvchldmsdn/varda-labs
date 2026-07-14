@@ -12,6 +12,12 @@ The stored event timeline extension is also implemented. It adds an `events`
 lane for exact named-account evidence without changing the earlier balance,
 portfolio, or position-history semantics.
 
+The stored position comparison extension is implemented as a separate
+portfolio-lane tool. It compares two exact named-account snapshots only when
+their stored source is identical. It reports saved presence, quantity, display
+metadata, reference-status, and KRW valuation changes without treating those
+changes as return, PnL, or event attribution.
+
 ## V1 Close-Out
 
 The 2026-07-10 close-out fixed the route boundary without changing stored
@@ -44,7 +50,8 @@ Use `account_balance_snapshots`, `daily_portfolio_snapshots`, and
   evidence imported from Base44 `DailyPortfolioSnapshot`, plus later
   varda-generated daily snapshots.
 - `daily_position_snapshots` supports the bounded named-account/date/source
-  drilldown, but it is not the first source for high-level balance history.
+  drilldown and exact two-endpoint comparison, but it is not the first source
+  for high-level balance history.
 - `event_ledger_entries` supports a bounded, exact named-account event
   timeline. It is stored evidence, not performance attribution.
 - Do not add or import `PortfolioSnapshot` now.
@@ -119,6 +126,8 @@ The read-only `/history` route now uses it for:
 - exact `snapshot_date` + named account + compatible source holdings detail;
 - account-specific position rows;
 - removed-position or unmatched legacy-row inspection;
+- exact two-endpoint added, removed, quantity-change, and stored KRW
+  value-change evidence for one named account and one stored source;
 - future group exposure views when exact group snapshot rows are not required.
 
 The route does not join current `assets`, fetch live prices, or replace stored
@@ -127,6 +136,14 @@ drilldown authority in v1. Position sums, stored cash, and portfolio totals stay
 separate, and reconciliation is claimed only when every selected position has a
 stored KRW market value. Do not use this table as the first source for
 high-level balance totals.
+
+The two-endpoint comparison uses stored `legacy_asset_id` as its private,
+stable identity because a row's current UUID reference can change after the
+snapshot was saved. That legacy value is never copied into the UI model or
+HTML. Duplicate or missing identities remain unresolved rows. Each endpoint is
+limited to 200 displayed rows, and the comparison becomes partial rather than
+silently dropping excess or incomplete evidence. The endpoint's position sum,
+stored cash, and stored portfolio total are displayed separately.
 
 ### `event_ledger_entries`
 
@@ -349,6 +366,7 @@ Current URL shape:
 - `/history?account=all&lane=portfolio`
 - `/history?account=brokerage&lane=balance`
 - `/history?account=brokerage&lane=events`
+- `/history?account=brokerage&lane=portfolio&comparisonFrom=2026-07-08~varda_manual_daily_snapshot&comparisonTo=2026-07-09~varda_manual_daily_snapshot`
 
 This does not authorize writes, imports, or chart/polish expansion.
 
@@ -357,6 +375,11 @@ This does not authorize writes, imports, or chart/polish expansion.
 - Keep `/history` read-only and table-first.
 - Keep the event lane account-exact, bounded, provider-free, and independent
   from snapshot causality or return calculations.
+- Keep position comparison named-account-only, chronological, same-source,
+  bounded, and based exclusively on the two selected stored endpoints.
+- Do not join current assets or fetch live prices/FX for comparison. Do not
+  interpolate missing rows, re-normalize endpoint totals, or infer that an
+  event caused a position/value change.
 - No `/balance` route yet.
 - No schema or migration.
 - No import/backfill of `PortfolioSnapshot` or `DailyGroupSnapshot`.

@@ -5,6 +5,7 @@ import {
   normalizeHistoryLane,
 } from "@/lib/history-balance";
 import { normalizeHistoryPositionSelection } from "@/lib/history-position-detail";
+import { normalizeHistoryPositionComparisonSelection } from "@/lib/history-position-comparison";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ type HistoryPageProps = {
     lane?: string | string[];
     positionDate?: string | string[];
     positionSource?: string | string[];
+    comparisonFrom?: string | string[];
+    comparisonTo?: string | string[];
   }>;
 };
 
@@ -27,10 +30,18 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     positionDate: params.positionDate,
     positionSource: params.positionSource,
   });
+  const positionComparisonSelection =
+    normalizeHistoryPositionComparisonSelection({
+      account,
+      lane,
+      comparisonFrom: params.comparisonFrom,
+      comparisonTo: params.comparisonTo,
+    });
   const history = await getReadOnlyHistoryBalance({
     account,
     lane,
     positionSelection,
+    positionComparisonSelection,
   });
 
   return <HistoryView history={history} />;

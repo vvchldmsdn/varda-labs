@@ -24,6 +24,13 @@ import {
   type HistoryPositionSelection,
 } from "@/lib/history-position-detail";
 import {
+  buildHistoryPositionComparison,
+  HISTORY_POSITION_COMPARISON_QUERY_LIMIT,
+  type HistoryPositionComparisonModel,
+  type HistoryPositionComparisonRawRow,
+  type HistoryPositionComparisonSelection,
+} from "@/lib/history-position-comparison";
+import {
   buildHistoryEventTimeline,
   HISTORY_EVENT_QUERY_LIMIT,
   shouldLoadHistoryEvents,
@@ -45,6 +52,7 @@ export type ReadOnlyHistoryBalance = {
   balanceRows: ReadOnlyBalanceHistoryRow[];
   portfolioRows: PortfolioHistoryDisplayRow[];
   positionDetail: HistoryPositionDetailModel;
+  positionComparison: HistoryPositionComparisonModel;
   eventTimeline: HistoryEventTimelineModel;
   summary: {
     balanceRowCount: number;
@@ -65,18 +73,29 @@ export async function getReadOnlyHistoryBalance({
   account,
   lane,
   positionSelection,
+  positionComparisonSelection,
 }: {
   account: HistoryAccount;
   lane: HistoryLane;
   positionSelection: HistoryPositionSelection;
+  positionComparisonSelection: HistoryPositionComparisonSelection;
 }): Promise<ReadOnlyHistoryBalance> {
-  const [balanceRows, portfolioRawRows, positionRows, eventRows] =
+  const [
+    balanceRows,
+    portfolioRawRows,
+    positionRows,
+    positionComparisonRows,
+    eventRows,
+  ] =
     await Promise.all([
       lane === "events" ? Promise.resolve([]) : loadBalanceRows(),
       lane === "events" ? Promise.resolve([]) : loadPortfolioRows(),
       positionSelection.status === "requested"
         ? loadPositionRows(positionSelection)
         : Promise.resolve([]),
+      positionComparisonSelection.status === "requested"
+        ? loadPositionComparisonRows(positionComparisonSelection)
+        : Promise.resolve({ fromRows: [], toRows: [] }),
       shouldLoadHistoryEvents(account, lane) && account !== "all"
         ? loadEventRows(account)
         : Promise.resolve([]),
@@ -98,6 +117,14 @@ export async function getReadOnlyHistoryBalance({
     portfolioRows,
     positionRows,
   });
+  const positionComparison = buildHistoryPositionComparison({
+    account,
+    lane,
+    selection: positionComparisonSelection,
+    portfolioRows,
+    fromRows: positionComparisonRows.fromRows,
+    toRows: positionComparisonRows.toRows,
+  });
   const eventTimeline = buildHistoryEventTimeline({
     account,
     lane,
@@ -110,6 +137,7 @@ export async function getReadOnlyHistoryBalance({
     balanceRows: visibleBalanceRows,
     portfolioRows: visiblePortfolioRows,
     positionDetail,
+    positionComparison,
     eventTimeline,
     summary: {
       balanceRowCount: balanceRows.length,
@@ -131,6 +159,66 @@ export async function getReadOnlyHistoryBalance({
       ),
     },
   };
+}
+
+async function loadPositionComparisonRows(
+  selection: Extract<
+    HistoryPositionComparisonSelection,
+    { status: "requested" }
+  >,
+) {
+  const [fromRows, toRows] = await Promise.all([
+    loadPositionComparisonEndpointRows({
+      account: selection.account,
+      snapshotDate: selection.from.snapshotDate,
+      source: selection.from.source,
+    }),
+    loadPositionComparisonEndpointRows({
+      account: selection.account,
+      snapshotDate: selection.to.snapshotDate,
+      source: selection.to.source,
+    }),
+  ]);
+  return { fromRows, toRows };
+}
+
+async function loadPositionComparisonEndpointRows({
+  account,
+  snapshotDate,
+  source,
+}: {
+  account: Exclude<HistoryAccount, "all">;
+  snapshotDate: string;
+  source: string;
+}): Promise<HistoryPositionComparisonRawRow[]> {
+  return db
+    .select({
+      snapshotDate: dailyPositionSnapshots.snapshotDate,
+      account: dailyPositionSnapshots.account,
+      source: dailyPositionSnapshots.source,
+      assetId: dailyPositionSnapshots.assetId,
+      legacyAssetId: dailyPositionSnapshots.legacyAssetId,
+      ticker: dailyPositionSnapshots.ticker,
+      assetName: dailyPositionSnapshots.assetName,
+      market: dailyPositionSnapshots.market,
+      currency: dailyPositionSnapshots.currency,
+      quantity: dailyPositionSnapshots.quantity,
+      marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+    })
+    .from(dailyPositionSnapshots)
+    .where(
+      and(
+        eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
+        eq(dailyPositionSnapshots.account, account),
+        eq(dailyPositionSnapshots.source, source),
+        eq(dailyPositionSnapshots.isSample, false),
+      ),
+    )
+    .orderBy(
+      asc(dailyPositionSnapshots.assetName),
+      asc(dailyPositionSnapshots.legacyAssetId),
+    )
+    .limit(HISTORY_POSITION_COMPARISON_QUERY_LIMIT);
 }
 
 async function loadEventRows(

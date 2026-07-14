@@ -12,6 +12,9 @@ const KRW_FORMATTER = new Intl.NumberFormat("ko-KR", {
 const PERCENT_FORMATTER = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 2,
 });
+const NUMBER_FORMATTER = new Intl.NumberFormat("ko-KR", {
+  maximumFractionDigits: 8,
+});
 
 export function historyAccountLabel(account: HistoryAccount) {
   if (account === "all") return "전체";
@@ -50,6 +53,12 @@ export function formatHistoryKrw(value: string | number | null) {
 export function formatHistoryPercent(value: number | null) {
   if (value === null || !Number.isFinite(value)) return "n/a";
   return `${PERCENT_FORMATTER.format(value)}%`;
+}
+
+export function formatHistoryNumber(value: number | null) {
+  return value === null || !Number.isFinite(value)
+    ? "n/a"
+    : NUMBER_FORMATTER.format(value);
 }
 
 export function formatHistoryDateRange(range: {

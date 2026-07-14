@@ -11,6 +11,7 @@ import { HistoryControls } from "./history-controls";
 import { HistoryEventTimeline } from "./history-event-timeline";
 import { formatHistoryDateRange } from "./history-format";
 import { HistoryPositionDetail } from "./history-position-detail";
+import { HistoryPositionComparison } from "./history-position-comparison";
 import { HistoryTrajectoryChart } from "./history-trajectory-chart";
 import {
   BalanceHistoryTable,
@@ -116,6 +117,7 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
               detail="저장값과 표시용 합산을 구분"
             />
             <HistoryTrajectoryChart model={portfolioTrajectory} />
+            <HistoryPositionComparison model={history.positionComparison} />
             <HistoryPositionDetail model={history.positionDetail} />
             <PortfolioHistoryTable
               rows={history.portfolioRows}
