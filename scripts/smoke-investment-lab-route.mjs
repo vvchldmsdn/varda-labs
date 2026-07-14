@@ -175,6 +175,39 @@ async function main() {
     route.body,
     /event_ledger_entries|daily_portfolio_snapshots|asset_price_snapshots/i,
   );
+  assert.match(
+    route.body,
+    /data-section="investment-lab-small-adjustment"/,
+  );
+  const adjustmentAccountCount = readIntegerAttribute(
+    route.body,
+    "data-adjustment-account-count",
+  );
+  const adjustmentReadyAccounts = readIntegerAttribute(
+    route.body,
+    "data-adjustment-ready-accounts",
+  );
+  const adjustmentPolicy = readStringAttribute(
+    route.body,
+    "data-adjustment-policy",
+  );
+  const adjustmentPersistence = readStringAttribute(
+    route.body,
+    "data-persistence",
+  );
+  assert.equal(adjustmentAccountCount, 3);
+  assert.ok(adjustmentReadyAccounts >= 1 && adjustmentReadyAccounts <= 3);
+  assert.equal(
+    adjustmentPolicy,
+    "same_account_cash_neutral_direct_holdings_v1",
+  );
+  assert.equal(adjustmentPersistence, "none_client_memory_only");
+  for (const marker of [
+    "작은 조정 영향 실험",
+    "외부 현금, 목표비중, 추천, 주문은 반영하지 않습니다",
+  ]) {
+    assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+  }
 
   const countsAfter = await readCounts();
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
@@ -211,6 +244,10 @@ async function main() {
           etfPortfolioWeight,
           observedEtfExposure,
           uncoveredEtfExposure,
+          adjustmentAccountCount,
+          adjustmentReadyAccounts,
+          adjustmentPolicy,
+          adjustmentPersistence,
           noAuthStatus: unauthorized.status,
           authenticatedStatus: route.status,
           dashboardLink: true,
@@ -411,6 +448,10 @@ async function main() {
         etfPortfolioWeight,
         observedEtfExposure,
         uncoveredEtfExposure,
+        adjustmentAccountCount,
+        adjustmentReadyAccounts,
+        adjustmentPolicy,
+        adjustmentPersistence,
         leakPatternMatches: 0,
         databaseSideEffects: false,
         counts: countsAfter,

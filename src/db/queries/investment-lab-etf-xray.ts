@@ -4,7 +4,7 @@ import { and, asc, eq, inArray, max, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { etfHoldings, etfMasters } from "@/db/schema";
-import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { getReadOnlyAllPortfolioStructure } from "@/db/queries/portfolio-structure";
 import {
   buildInvestmentLabEtfXray,
   selectInvestmentLabEtfXrayMasterIds,
@@ -15,7 +15,7 @@ import type { EtfHoldingRawRow } from "@/lib/etf-holdings";
 
 export async function getReadOnlyInvestmentLabEtfXray(): Promise<InvestmentLabEtfXrayModel> {
   const [portfolio, masters] = await Promise.all([
-    getReadOnlyPortfolioStructure({ account: "all" }),
+    getReadOnlyAllPortfolioStructure(),
     loadEtfMasters(),
   ]);
   const masterIds = selectInvestmentLabEtfXrayMasterIds({

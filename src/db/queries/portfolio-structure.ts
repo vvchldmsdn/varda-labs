@@ -1,6 +1,7 @@
 import "server-only";
 
 import { desc, inArray } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/db/client";
 import {
@@ -24,6 +25,10 @@ const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"])
 export type ReadOnlyPortfolioStructureOptions = {
   account?: string | string[] | null;
 };
+
+export const getReadOnlyAllPortfolioStructure = cache(
+  loadReadOnlyAllPortfolioStructure,
+);
 
 export async function getReadOnlyPortfolioStructure({
   account,
@@ -61,6 +66,10 @@ export function normalizePortfolioStructureAccount(
 ): PortfolioStructureAccount {
   const rawAccount = Array.isArray(account) ? account[0] : account;
   return normalizeStructureAccount(rawAccount);
+}
+
+function loadReadOnlyAllPortfolioStructure() {
+  return getReadOnlyPortfolioStructure({ account: "all" });
 }
 
 async function loadLiveQuoteRows(

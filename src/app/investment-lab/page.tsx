@@ -6,9 +6,16 @@ import {
   InvestmentLabEtfXrayUnavailable,
 } from "@/components/investment-lab/investment-lab-etf-xray";
 import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
+import {
+  InvestmentLabSmallAdjustment,
+  InvestmentLabSmallAdjustmentSkeleton,
+  InvestmentLabSmallAdjustmentUnavailable,
+} from "@/components/investment-lab/investment-lab-small-adjustment";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
 import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
 import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
+import { getReadOnlyAllPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { buildInvestmentLabSmallAdjustmentModel } from "@/lib/investment-lab-small-adjustment";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +29,7 @@ type InvestmentLabPageProps = {
 export default async function InvestmentLabPage({
   searchParams,
 }: InvestmentLabPageProps) {
+  const portfolioStructurePromise = getReadOnlyAllPortfolioStructure();
   const etfXrayPromise = getReadOnlyInvestmentLabEtfXray();
   const params = await searchParams;
   const modelPromise = getReadOnlyInvestmentLabCounterfactual(
@@ -40,6 +48,11 @@ export default async function InvestmentLabPage({
       </Suspense>
       <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
         <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
+      </Suspense>
+      <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
+        <InvestmentLabSmallAdjustmentContent
+          modelPromise={portfolioStructurePromise}
+        />
       </Suspense>
     </div>
   );
@@ -71,6 +84,24 @@ async function InvestmentLabEtfXrayContent({
     return <InvestmentLabEtfXrayUnavailable />;
   }
   return <InvestmentLabEtfXray model={model} />;
+}
+
+async function InvestmentLabSmallAdjustmentContent({
+  modelPromise,
+}: {
+  modelPromise: ReturnType<typeof getReadOnlyAllPortfolioStructure>;
+}) {
+  let portfolio;
+  try {
+    portfolio = await modelPromise;
+  } catch {
+    return <InvestmentLabSmallAdjustmentUnavailable />;
+  }
+  return (
+    <InvestmentLabSmallAdjustment
+      model={buildInvestmentLabSmallAdjustmentModel(portfolio)}
+    />
+  );
 }
 
 function InvestmentLabSkeleton() {
