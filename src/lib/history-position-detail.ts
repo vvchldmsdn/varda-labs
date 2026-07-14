@@ -67,7 +67,7 @@ export type HistoryPositionDisplayRow = Readonly<{
   assetName: string;
   market: string | null;
   currency: string | null;
-  mappingStatus: "current_asset_mapped" | "legacy_only";
+  mappingStatus: "stored_asset_reference" | "legacy_only";
   evidenceStatus: "stored" | "duplicate_identity" | "invalid_identity";
   valuationStatus: "valued" | "missing_market_value";
   quantity: number | null;
@@ -136,7 +136,7 @@ export function normalizeHistoryPositionSelection({
       reason: "named_account_required",
     });
   }
-  if (lane === "balance") {
+  if (lane !== "all" && lane !== "portfolio") {
     return Object.freeze({
       status: "blocked",
       reason: "portfolio_lane_required",
@@ -250,7 +250,7 @@ export function buildHistoryPositionDetail({
       market: cleanText(row.market),
       currency: cleanText(row.currency),
       mappingStatus: row.assetId
-        ? ("current_asset_mapped" as const)
+        ? ("stored_asset_reference" as const)
         : ("legacy_only" as const),
       evidenceStatus:
         identity === null || assetName === "이름 없음"

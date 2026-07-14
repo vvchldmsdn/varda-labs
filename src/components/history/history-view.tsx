@@ -8,6 +8,7 @@ import {
 } from "@/lib/history-trajectory";
 
 import { HistoryControls } from "./history-controls";
+import { HistoryEventTimeline } from "./history-event-timeline";
 import { formatHistoryDateRange } from "./history-format";
 import { HistoryPositionDetail } from "./history-position-detail";
 import { HistoryTrajectoryChart } from "./history-trajectory-chart";
@@ -60,34 +61,38 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
 
           <HistoryControls account={history.account} lane={history.lane} />
 
-          <div
-            data-history-summary
-            className="mt-4 grid border-t border-[#e1e6dc] md:grid-cols-4"
-          >
-            <SummaryCell
-              label="잔액 기록"
-              value={String(history.summary.balanceRowCount)}
-              detail={formatHistoryDateRange(history.summary.balanceDateRange)}
-            />
-            <SummaryCell
-              label="포트폴리오 기록"
-              value={String(history.summary.portfolioRowCount)}
-              detail={formatHistoryDateRange(history.summary.portfolioDateRange)}
-            />
-            <SummaryCell
-              label="표시용 합산"
-              value={String(history.summary.derivedPortfolioRowCount)}
-              detail="DB에 쓰지 않은 화면 계산"
-            />
-            <SummaryCell
-              label="공통 날짜"
-              value={String(history.summary.overlappingDateCount)}
-              detail="두 기록은 합치지 않음"
-            />
-          </div>
+          {history.lane !== "events" ? (
+            <div
+              data-history-summary
+              className="mt-4 grid border-t border-[#e1e6dc] md:grid-cols-4"
+            >
+              <SummaryCell
+                label="잔액 기록"
+                value={String(history.summary.balanceRowCount)}
+                detail={formatHistoryDateRange(history.summary.balanceDateRange)}
+              />
+              <SummaryCell
+                label="포트폴리오 기록"
+                value={String(history.summary.portfolioRowCount)}
+                detail={formatHistoryDateRange(
+                  history.summary.portfolioDateRange,
+                )}
+              />
+              <SummaryCell
+                label="표시용 합산"
+                value={String(history.summary.derivedPortfolioRowCount)}
+                detail="DB에 쓰지 않은 화면 계산"
+              />
+              <SummaryCell
+                label="공통 날짜"
+                value={String(history.summary.overlappingDateCount)}
+                detail="두 기록은 합치지 않음"
+              />
+            </div>
+          ) : null}
         </section>
 
-        {history.lane !== "portfolio" ? (
+        {history.lane === "all" || history.lane === "balance" ? (
           <section
             data-history-section="balance"
             className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
@@ -101,7 +106,7 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
           </section>
         ) : null}
 
-        {history.lane !== "balance" ? (
+        {history.lane === "all" || history.lane === "portfolio" ? (
           <section
             data-history-section="portfolio"
             className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
@@ -117,6 +122,19 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
               lane={history.lane}
               positionDetail={history.positionDetail}
             />
+          </section>
+        ) : null}
+
+        {history.lane === "all" || history.lane === "events" ? (
+          <section
+            data-history-section="events"
+            className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+          >
+            <SectionHeader
+              title="저장 이벤트"
+              detail="계정별 저장 근거 · 인과 해석 없음"
+            />
+            <HistoryEventTimeline model={history.eventTimeline} />
           </section>
         ) : null}
       </div>

@@ -1,12 +1,16 @@
 # History Balance Read-Only Design
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 Status: the read-only `/history` route and its v1 close-out are implemented.
 The route remains a Server Component with direct server-side DB reads and URL
 filters. This work does not add schema, migrations, imports, backfills,
 cleanup, RLS policies, auth provider setup, Cron/KIS/snapshot/admin write-path
 changes, or recommendation logic.
+
+The stored event timeline extension is also implemented. It adds an `events`
+lane for exact named-account evidence without changing the earlier balance,
+portfolio, or position-history semantics.
 
 ## V1 Close-Out
 
@@ -31,8 +35,8 @@ derived aggregates. No derived row is written back to the database.
 
 ## Decision Summary
 
-Use `account_balance_snapshots` and `daily_portfolio_snapshots` as separate
-read-only history lanes.
+Use `account_balance_snapshots`, `daily_portfolio_snapshots`, and
+`event_ledger_entries` as separate read-only history lanes.
 
 - `account_balance_snapshots` is account/balance evidence imported from Base44
   `AccountBalance`.
@@ -41,6 +45,8 @@ read-only history lanes.
   varda-generated daily snapshots.
 - `daily_position_snapshots` supports the bounded named-account/date/source
   drilldown, but it is not the first source for high-level balance history.
+- `event_ledger_entries` supports a bounded, exact named-account event
+  timeline. It is stored evidence, not performance attribution.
 - Do not add or import `PortfolioSnapshot` now.
 - Do not add or import `DailyGroupSnapshot` now.
 
@@ -121,6 +127,33 @@ drilldown authority in v1. Position sums, stored cash, and portfolio totals stay
 separate, and reconciliation is claimed only when every selected position has a
 stored KRW market value. Do not use this table as the first source for
 high-level balance totals.
+
+### `event_ledger_entries`
+
+Role: exact named-account stored event evidence.
+
+The `/history?account=<named>&lane=events` read path:
+
+- accepts only `brokerage`, `isa`, or `irp` and matches the stored `account`
+  string exactly;
+- excludes `account = null`, empty, `all`, and foreign-account rows rather than
+  inferring an account from an asset reference;
+- selects at most 101 rows and displays at most 100 rows;
+- preserves buy, sell, asset-added, asset-removed, legacy-only, and correction
+  reference evidence without netting rows;
+- treats `event_date` as the stored event calendar date, separate from snapshot
+  dates and the 07:00 KST service-cycle boundary;
+- labels a non-null stored `asset_id` only as a stored asset reference. It does
+  not claim that the current asset row was joined or validated;
+- does not join current assets, fetch current prices, reconstruct missing
+  amounts with FX, calculate TWR, or claim performance contribution.
+
+A 2026-07-14 SELECT-only audit found 51 non-sample stored events. Seventeen
+rows are explicitly assigned to `brokerage`; 34 rows have no stored account and
+remain excluded from the named-account timeline. The brokerage subset contains
+12 trade events, 5 lifecycle events, and 6 legacy-only asset references. No ISA
+or IRP event is currently available, so those account views correctly render
+an unavailable state.
 
 ## Read-Only Data Smoke
 
@@ -315,12 +348,15 @@ Current URL shape:
 
 - `/history?account=all&lane=portfolio`
 - `/history?account=brokerage&lane=balance`
+- `/history?account=brokerage&lane=events`
 
 This does not authorize writes, imports, or chart/polish expansion.
 
 ## Guardrails
 
 - Keep `/history` read-only and table-first.
+- Keep the event lane account-exact, bounded, provider-free, and independent
+  from snapshot causality or return calculations.
 - No `/balance` route yet.
 - No schema or migration.
 - No import/backfill of `PortfolioSnapshot` or `DailyGroupSnapshot`.

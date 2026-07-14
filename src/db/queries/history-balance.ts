@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
   accountBalanceSnapshots,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
+  eventLedgerEntries,
 } from "@/db/schema";
 import {
   buildPortfolioHistoryDisplayRows,
@@ -22,6 +23,13 @@ import {
   type HistoryPositionRawRow,
   type HistoryPositionSelection,
 } from "@/lib/history-position-detail";
+import {
+  buildHistoryEventTimeline,
+  HISTORY_EVENT_QUERY_LIMIT,
+  shouldLoadHistoryEvents,
+  type HistoryEventRawRow,
+  type HistoryEventTimelineModel,
+} from "@/lib/history-event-timeline";
 
 export type ReadOnlyBalanceHistoryRow = {
   balanceDate: string;
@@ -37,6 +45,7 @@ export type ReadOnlyHistoryBalance = {
   balanceRows: ReadOnlyBalanceHistoryRow[];
   portfolioRows: PortfolioHistoryDisplayRow[];
   positionDetail: HistoryPositionDetailModel;
+  eventTimeline: HistoryEventTimelineModel;
   summary: {
     balanceRowCount: number;
     portfolioRowCount: number;
@@ -61,26 +70,38 @@ export async function getReadOnlyHistoryBalance({
   lane: HistoryLane;
   positionSelection: HistoryPositionSelection;
 }): Promise<ReadOnlyHistoryBalance> {
-  const [balanceRows, portfolioRawRows, positionRows] = await Promise.all([
-    loadBalanceRows(),
-    loadPortfolioRows(),
-    positionSelection.status === "requested"
-      ? loadPositionRows(positionSelection)
-      : Promise.resolve([]),
-  ]);
+  const [balanceRows, portfolioRawRows, positionRows, eventRows] =
+    await Promise.all([
+      lane === "events" ? Promise.resolve([]) : loadBalanceRows(),
+      lane === "events" ? Promise.resolve([]) : loadPortfolioRows(),
+      positionSelection.status === "requested"
+        ? loadPositionRows(positionSelection)
+        : Promise.resolve([]),
+      shouldLoadHistoryEvents(account, lane) && account !== "all"
+        ? loadEventRows(account)
+        : Promise.resolve([]),
+    ]);
   const portfolioRows = buildPortfolioHistoryDisplayRows({
     rows: portfolioRawRows,
     account,
   });
   const visibleBalanceRows =
-    lane === "portfolio" ? [] : [...balanceRows].sort(compareBalanceRowsDesc);
-  const visiblePortfolioRows = lane === "balance" ? [] : portfolioRows;
+    lane === "all" || lane === "balance"
+      ? [...balanceRows].sort(compareBalanceRowsDesc)
+      : [];
+  const visiblePortfolioRows =
+    lane === "all" || lane === "portfolio" ? portfolioRows : [];
   const positionDetail = buildHistoryPositionDetail({
     account,
     lane,
     selection: positionSelection,
     portfolioRows,
     positionRows,
+  });
+  const eventTimeline = buildHistoryEventTimeline({
+    account,
+    lane,
+    eventRows,
   });
 
   return {
@@ -89,6 +110,7 @@ export async function getReadOnlyHistoryBalance({
     balanceRows: visibleBalanceRows,
     portfolioRows: visiblePortfolioRows,
     positionDetail,
+    eventTimeline,
     summary: {
       balanceRowCount: balanceRows.length,
       portfolioRowCount: portfolioRows.length,
@@ -109,6 +131,48 @@ export async function getReadOnlyHistoryBalance({
       ),
     },
   };
+}
+
+async function loadEventRows(
+  account: Exclude<HistoryAccount, "all">,
+): Promise<HistoryEventRawRow[]> {
+  return db
+    .select({
+      internalId: eventLedgerEntries.id,
+      legacyBase44Id: eventLedgerEntries.legacyBase44Id,
+      eventDate: eventLedgerEntries.eventDate,
+      eventType: eventLedgerEntries.eventType,
+      source: eventLedgerEntries.source,
+      recordedAt: eventLedgerEntries.recordedAt,
+      ruleVersion: eventLedgerEntries.ruleVersion,
+      account: eventLedgerEntries.account,
+      assetId: eventLedgerEntries.assetId,
+      legacyAssetId: eventLedgerEntries.legacyAssetId,
+      ticker: eventLedgerEntries.ticker,
+      assetName: eventLedgerEntries.assetName,
+      groupName: eventLedgerEntries.groupName,
+      correctsEventId: eventLedgerEntries.correctsEventId,
+      legacyCorrectsEventId: eventLedgerEntries.legacyCorrectsEventId,
+      amountKrw: eventLedgerEntries.amountKrw,
+      quantityDelta: eventLedgerEntries.quantityDelta,
+      price: eventLedgerEntries.price,
+      fxRate: eventLedgerEntries.fxRate,
+    })
+    .from(eventLedgerEntries)
+    .where(
+      and(
+        eq(eventLedgerEntries.account, account),
+        eq(eventLedgerEntries.isSample, false),
+      ),
+    )
+    .orderBy(
+      desc(eventLedgerEntries.eventDate),
+      sql`${eventLedgerEntries.recordedAt} desc nulls last`,
+      desc(eventLedgerEntries.createdAt),
+      asc(eventLedgerEntries.legacyBase44Id),
+      asc(eventLedgerEntries.id),
+    )
+    .limit(HISTORY_EVENT_QUERY_LIMIT);
 }
 
 async function loadPositionRows(

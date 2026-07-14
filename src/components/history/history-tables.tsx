@@ -11,6 +11,10 @@ import { historyBalanceValueForAccount } from "@/lib/history-balance";
 import type { HistoryPositionDetailModel } from "@/lib/history-position-detail";
 
 import {
+  HistoryTableCell as TableCell,
+  HistoryTableHeader as TableHeader,
+} from "./history-evidence-primitives";
+import {
   formatHistoryKrw,
   formatHistoryPercent,
   historyAccountLabel,
@@ -196,47 +200,6 @@ function EmptyTableMessage({ children }: { children: ReactNode }) {
     <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[#687064]">
       {children}
     </p>
-  );
-}
-
-function TableHeader({
-  children,
-  align = "left",
-}: {
-  children: ReactNode;
-  align?: "left" | "right";
-}) {
-  return (
-    <th
-      className={cn(
-        "border-b border-[#dfe3d5] px-2 py-2 font-semibold",
-        align === "right" ? "text-right" : "text-left",
-      )}
-    >
-      {children}
-    </th>
-  );
-}
-
-function TableCell({
-  children,
-  strong = false,
-  align = "left",
-}: {
-  children: ReactNode;
-  strong?: boolean;
-  align?: "left" | "right";
-}) {
-  return (
-    <td
-      className={cn(
-        "border-b border-[#eef1e8] px-2 py-2 align-top",
-        strong ? "font-semibold text-[#171916]" : "text-[#4d574b]",
-        align === "right" ? "text-right tabular-nums" : "text-left",
-      )}
-    >
-      {children}
-    </td>
   );
 }
 

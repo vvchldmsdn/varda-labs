@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import type {
   HistoryPositionDetailModel,
@@ -11,6 +10,11 @@ import {
   historyAccountLabel,
   historySourceLabel,
 } from "./history-format";
+import {
+  HistoryEvidenceSummaryCell as SummaryCell,
+  HistoryTableCell as TableCell,
+  HistoryTableHeader as TableHeader,
+} from "./history-evidence-primitives";
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 8,
@@ -108,7 +112,7 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
       </div>
 
       <p className="mt-3 text-xs leading-5 text-[#687064]">
-        현재 자산 연결 {model.positionCount - model.legacyOnlyCount}행 · 레거시
+        저장 자산 참조 {model.positionCount - model.legacyOnlyCount}행 · 레거시
         전용 {model.legacyOnlyCount}행 · 중복 근거 {model.duplicateIdentityCount}행
         {model.rowLimitExceeded
           ? ` · 최대 ${model.policy.rowLimit}행만 표시`
@@ -199,65 +203,6 @@ function PositionRow({ row }: { row: HistoryPositionDisplayRow }) {
   );
 }
 
-function SummaryCell({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="border-b border-[#e1e6dc] px-3 py-3 sm:border-r lg:border-b-0 lg:last:border-r-0">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tracking-normal">{value}</p>
-      <p className="mt-1 text-xs text-[#687064]">{detail}</p>
-    </div>
-  );
-}
-
-function TableHeader({
-  children,
-  align = "left",
-}: {
-  children: ReactNode;
-  align?: "left" | "right";
-}) {
-  return (
-    <th
-      className={cn(
-        "border-b border-[#dfe3d5] px-2 py-2 font-semibold",
-        align === "right" ? "text-right" : "text-left",
-      )}
-    >
-      {children}
-    </th>
-  );
-}
-
-function TableCell({
-  children,
-  strong = false,
-  align = "left",
-}: {
-  children: ReactNode;
-  strong?: boolean;
-  align?: "left" | "right";
-}) {
-  return (
-    <td
-      className={cn(
-        "border-b border-[#eef1e8] px-2 py-2 align-top",
-        strong ? "font-semibold text-[#171916]" : "text-[#4d574b]",
-        align === "right" ? "text-right tabular-nums" : "text-left",
-      )}
-    >
-      {children}
-    </td>
-  );
-}
-
 function statusMessage(model: HistoryPositionDetailModel) {
   if (model.reason === "not_requested") {
     return model.account === "all"
@@ -298,7 +243,7 @@ function reconciliationDetail(model: HistoryPositionDetailModel) {
 function mappingLabel(
   status: HistoryPositionDisplayRow["mappingStatus"],
 ) {
-  return status === "current_asset_mapped" ? "현재 자산 연결" : "레거시 전용";
+  return status === "stored_asset_reference" ? "저장 자산 참조" : "레거시 전용";
 }
 
 function evidenceLabel(row: HistoryPositionDisplayRow) {
@@ -326,8 +271,4 @@ function clearDetailHref(model: HistoryPositionDetailModel) {
     lane: model.lane,
   });
   return `/history?${params.toString()}`;
-}
-
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
 }

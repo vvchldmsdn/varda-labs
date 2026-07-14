@@ -22,6 +22,7 @@ export function historyAccountLabel(account: HistoryAccount) {
 export function historyLaneLabel(lane: HistoryLane) {
   if (lane === "all") return "전체 기록";
   if (lane === "balance") return "잔액 기록";
+  if (lane === "events") return "저장 이벤트";
   return "포트폴리오 성과";
 }
 

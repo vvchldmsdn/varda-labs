@@ -17,7 +17,7 @@ const scenarios = [
   {
     label: "all_lanes",
     path: "/history",
-    expectedSections: ["balance", "portfolio"],
+    expectedSections: ["balance", "portfolio", "events"],
     absentSections: [],
     expectedCharts: ["balance", "portfolio"],
     absentCharts: [],
@@ -27,14 +27,23 @@ const scenarios = [
       "스냅샷 저장일",
       "저장값",
       "표시용 합산",
+      "저장 이벤트",
     ],
     minimumOverflowContainers: 2,
+    expectedEvent: {
+      allowedStatuses: ["blocked"],
+      eventCount: 0,
+      tradeCount: 0,
+      lifecycleCount: 0,
+      legacyOnlyCount: 0,
+      correctionCount: 0,
+    },
   },
   {
     label: "brokerage_balance",
     path: "/history?account=brokerage&lane=balance",
     expectedSections: ["balance"],
-    absentSections: ["portfolio"],
+    absentSections: ["portfolio", "events"],
     expectedCharts: ["balance"],
     absentCharts: ["portfolio"],
     expectedText: ["증권", "잔액 기준일"],
@@ -44,7 +53,7 @@ const scenarios = [
     label: "isa_portfolio",
     path: "/history?account=isa&lane=portfolio",
     expectedSections: ["portfolio"],
-    absentSections: ["balance"],
+    absentSections: ["balance", "events"],
     expectedCharts: ["portfolio"],
     absentCharts: ["balance"],
     expectedText: ["ISA", "스냅샷 저장일", "저장값"],
@@ -54,7 +63,7 @@ const scenarios = [
     label: "all_portfolio_derived",
     path: "/history?account=all&lane=portfolio",
     expectedSections: ["portfolio"],
-    absentSections: ["balance"],
+    absentSections: ["balance", "events"],
     expectedCharts: ["portfolio"],
     absentCharts: ["balance"],
     expectedText: ["표시용 합산", 'data-history-row-kind="derived"'],
@@ -70,13 +79,17 @@ const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("
 
 async function main() {
   const countsBefore = await readCounts();
-  const detailCandidates = await readDetailCandidates();
+  const [detailCandidates, brokerageEventStats] = await Promise.all([
+    readDetailCandidates(),
+    readEventStats("brokerage"),
+  ]);
   const routeScenarios = [
     ...scenarios,
+    eventScenario(brokerageEventStats),
     detailScenario("generated_position_detail", detailCandidates.generated, {
       allowedStatuses: ["ready"],
       allowedReconciliation: ["matched"],
-      expectedText: ["현재 자산 연결"],
+      expectedText: ["저장 자산 참조"],
     }),
     detailScenario("legacy_position_detail", detailCandidates.legacy, {
       allowedStatuses: ["ready", "partial"],
@@ -122,7 +135,7 @@ async function main() {
     assert.doesNotMatch(response.body, LEAK_PATTERN);
     assert.doesNotMatch(
       response.body,
-      /account_balance_snapshots|daily_portfolio_snapshots|daily_position_snapshots/i,
+      /account_balance_snapshots|daily_portfolio_snapshots|daily_position_snapshots|event_ledger_entries/i,
     );
 
     for (const section of scenario.expectedSections) {
@@ -171,10 +184,12 @@ async function main() {
         `${scenario.label} unexpectedly rendered ${lane} chart`,
       );
     }
-    assert.ok(
-      response.body.includes("보간하거나 평평한 값으로 채우지 않습니다"),
-      `${scenario.label} is missing no-interpolation disclosure`,
-    );
+    if (scenario.expectedCharts.length > 0) {
+      assert.ok(
+        response.body.includes("보간하거나 평평한 값으로 채우지 않습니다"),
+        `${scenario.label} is missing no-interpolation disclosure`,
+      );
+    }
     for (const expectedText of scenario.expectedText) {
       assert.ok(
         response.body.includes(expectedText),
@@ -232,6 +247,57 @@ async function main() {
       };
     }
 
+    let event = null;
+    if (scenario.expectedEvent) {
+      const eventTag = readEventTag(response.body);
+      const status = readStringAttribute(
+        eventTag,
+        "data-history-event-status",
+      );
+      const eventCount = readIntegerAttribute(
+        eventTag,
+        "data-history-event-count",
+      );
+      const tradeCount = readIntegerAttribute(
+        eventTag,
+        "data-history-event-trades",
+      );
+      const lifecycleCount = readIntegerAttribute(
+        eventTag,
+        "data-history-event-lifecycle",
+      );
+      const legacyOnlyCount = readIntegerAttribute(
+        eventTag,
+        "data-history-event-legacy-only",
+      );
+      const correctionCount = readIntegerAttribute(
+        eventTag,
+        "data-history-event-corrections",
+      );
+      assert.ok(
+        scenario.expectedEvent.allowedStatuses.includes(status),
+        `${scenario.label} has unexpected event status: ${status}`,
+      );
+      assert.equal(eventCount, scenario.expectedEvent.eventCount);
+      assert.equal(tradeCount, scenario.expectedEvent.tradeCount);
+      assert.equal(lifecycleCount, scenario.expectedEvent.lifecycleCount);
+      assert.equal(legacyOnlyCount, scenario.expectedEvent.legacyOnlyCount);
+      assert.equal(correctionCount, scenario.expectedEvent.correctionCount);
+      assert.equal(
+        response.body.match(/data-history-event-row="true"/g)?.length ?? 0,
+        eventCount,
+        `${scenario.label} rendered event row count drifted`,
+      );
+      event = {
+        status,
+        eventCount,
+        tradeCount,
+        lifecycleCount,
+        legacyOnlyCount,
+        correctionCount,
+      };
+    }
+
     const overflowContainers =
       response.body.match(/overflow-x-auto/g)?.length ?? 0;
     assert.ok(
@@ -247,6 +313,7 @@ async function main() {
       overflowContainers,
       leakPatternMatches: 0,
       detail,
+      event,
     });
   }
 
@@ -292,9 +359,63 @@ async function readCounts() {
       (select count(*)::int from assets) as assets,
       (select count(*)::int from account_balance_snapshots) as balance_snapshots,
       (select count(*)::int from daily_portfolio_snapshots) as portfolio_snapshots,
-      (select count(*)::int from daily_position_snapshots) as position_snapshots
+      (select count(*)::int from daily_position_snapshots) as position_snapshots,
+      (select count(*)::int from event_ledger_entries) as event_ledger_entries
   `);
   return row;
+}
+
+async function readEventStats(account) {
+  const [row] = await sql.query(`
+    select count(*)::int as event_count,
+      count(*) filter (where event_type in ('buy', 'sell'))::int as trade_count,
+      count(*) filter (where event_type in ('asset_added', 'asset_removed'))::int as lifecycle_count,
+      count(*) filter (where asset_id is null and legacy_asset_id is not null)::int as legacy_only_count,
+      count(*) filter (
+        where corrects_event_id is not null or legacy_corrects_event_id is not null
+      )::int as correction_count,
+      count(*) filter (
+        where event_type not in ('buy', 'sell', 'asset_added', 'asset_removed')
+          or (event_type in ('buy', 'sell') and (
+            amount_krw is null or quantity_delta is null or price is null
+          ))
+          or (asset_id is null and legacy_asset_id is null)
+          or corrects_event_id is not null
+          or legacy_corrects_event_id is not null
+      )::int as partial_count
+    from event_ledger_entries
+    where account = $1 and is_sample = false
+  `, [account]);
+  assert.ok(Number(row.event_count) > 0, "history smoke needs named-account events");
+  return { account, ...row };
+}
+
+function eventScenario(stats) {
+  const partialCount = Number(stats.partial_count);
+  return {
+    label: `${stats.account}_events`,
+    path: `/history?account=${encodeURIComponent(stats.account)}&lane=events`,
+    expectedSections: ["events"],
+    absentSections: ["balance", "portfolio"],
+    expectedCharts: [],
+    absentCharts: ["balance", "portfolio"],
+    expectedText: [
+      "저장 이벤트",
+      "이벤트 일자",
+      "계정 미귀속 이벤트",
+      "저장 자산 참조",
+      "레거시 전용",
+    ],
+    minimumOverflowContainers: 1,
+    expectedEvent: {
+      allowedStatuses: [partialCount > 0 ? "partial" : "ready"],
+      eventCount: Number(stats.event_count),
+      tradeCount: Number(stats.trade_count),
+      lifecycleCount: Number(stats.lifecycle_count),
+      legacyOnlyCount: Number(stats.legacy_only_count),
+      correctionCount: Number(stats.correction_count),
+    },
+  };
 }
 
 async function readDetailCandidates() {
@@ -353,7 +474,7 @@ function detailScenario(label, candidate, expectations) {
     label,
     path: `/history?${params.toString()}`,
     expectedSections: ["portfolio"],
-    absentSections: ["balance"],
+    absentSections: ["balance", "events"],
     expectedCharts: ["portfolio"],
     absentCharts: ["balance"],
     expectedText: [
@@ -390,6 +511,14 @@ function readDetailTag(html) {
     /<section[^>]*data-history-position-detail[^>]*>/,
   );
   assert.ok(match, "route is missing history position detail");
+  return match[0];
+}
+
+function readEventTag(html) {
+  const match = html.match(
+    /<div[^>]*data-history-event-timeline[^>]*>/,
+  );
+  assert.ok(match, "route is missing history event timeline");
   return match[0];
 }
 

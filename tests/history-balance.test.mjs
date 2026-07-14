@@ -30,6 +30,7 @@ describe("history balance helpers", () => {
     assert.equal(normalizeHistoryAccount(undefined), "all");
 
     assert.equal(normalizeHistoryLane("portfolio"), "portfolio");
+    assert.equal(normalizeHistoryLane("events"), "events");
     assert.equal(normalizeHistoryLane(["balance", "all"]), "balance");
     assert.equal(normalizeHistoryLane("source"), "all");
     assert.equal(normalizeHistoryLane(undefined), "all");

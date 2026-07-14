@@ -97,6 +97,7 @@ describe("stored named-account history position drilldown", () => {
     assert.equal(model.status, "ready");
     assert.equal(model.positionCount, 2);
     assert.equal(model.legacyOnlyCount, 1);
+    assert.equal(model.rows[1].mappingStatus, "stored_asset_reference");
     assert.equal(model.reconciliationStatus, "matched");
     assert.equal(model.reconciliationDifferenceKrw, 0);
     assert.equal(model.portfolioCashValueKrw, 25);

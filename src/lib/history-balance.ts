@@ -1,5 +1,5 @@
 export const HISTORY_ACCOUNTS = ["all", "brokerage", "isa", "irp"] as const;
-export const HISTORY_LANES = ["all", "portfolio", "balance"] as const;
+export const HISTORY_LANES = ["all", "portfolio", "balance", "events"] as const;
 
 const REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS = [
   "brokerage",
