@@ -220,11 +220,11 @@ recovery rule, not a current-metadata fallback or snapshot backfill:
    close history is bound and coverage is separately validated.
 6. Each special row receives one authority outcome:
    `eligible_historical_instrument`, `separate_valuation_model_required`, or
-   `permanently_unsupported`. Eligibility does not claim full scenario-date
-   price, FX, or execution coverage.
-7. A tickerless product with no explicit managed-product classification stays
-   unresolved and requires a separate valuation-model decision. A name such
-   as `Fount 일임서비스` is not classification authority.
+   `intentionally_excluded`, or `permanently_unsupported`. Eligibility does not
+   claim full scenario-date price, FX, or execution coverage.
+7. `Fount 일임서비스` is excluded only by the explicit 2026-07-16 product owner
+   decision and exact name/account/market/currency/asset-type match. Its name
+   alone is never classification authority.
 
 The production SELECT-only audit on 2026-07-15 found three tickerless rows at
 the default 2026-05-21 anchor:
@@ -233,13 +233,15 @@ the default 2026-05-21 anchor:
   matching Base44-imported position rows with one ticker consensus. A clean
   ticker-keyed price series is present, but this row-level audit does not claim
   full scenario-date coverage.
-- `금현물` has explicit commodity evidence but no bound instrument-keyed
-  official-close history, so it is `separate_valuation_model_required`.
+- `금현물` is bound to the KRX 99.99% 1kg product with gram quantity, but has no
+  bound instrument-keyed official-close history, so it remains
+  `separate_valuation_model_required`.
   Stored fallback/current-price rows are not promoted to official close
   authority.
-- `Fount 일임서비스` has neither a listed ticker nor explicit managed-sleeve
-  classification, so it is also `separate_valuation_model_required`. It
-  remains unresolved even though stored valuation rows exist.
+- `Fount 일임서비스` is `intentionally_excluded` from Investment Lab and
+  Simulation. The SELECT-only parity audit finds one exact source-matched row
+  on all 26 complete comparison dates from the anchor, with no duplicate,
+  invalid, overflow, or related event evidence.
 
 The detailed authority audit found 20 legacy `close` labels for each of Fount
 and KRX gold, but 19 rows in each series have no price source and neither has
@@ -247,11 +249,12 @@ an official-close candidate row. A populated `close_price` or `unit_price`
 column is therefore arithmetic display evidence, not historical price
 authority. See [the production special-holding authority audit](./instrument-identity-krx-gold-close-phase0.md#production-special-holding-authority-audit).
 
-The whole all-account anchor path therefore remains unavailable: 17 economic
-instruments are identified and two special positions remain unresolved or
-unsupported. The UI exposes all three row-level decisions without displaying
-asset ids or legacy ids. The bounded anchor price read still does not execute
-until every row is identified.
+The whole all-account anchor path remains unavailable: 17 listed economic
+instruments are identified, KRX Gold still lacks official-close history, and
+Fount must be subtracted from both the observed path and scenario capital by
+one scope-consistent transform. The UI exposes the row-level decisions without
+displaying asset ids or legacy ids. The bounded anchor price read still does
+not execute while either path blocker remains.
 
 ## Return Estimate Policy
 

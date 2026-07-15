@@ -27,9 +27,13 @@ export function InvestmentLabAnchorBasket({
       data-anchor-basket-economic-instruments={
         anchor.coverage.economicInstrumentCount
       }
+      data-anchor-basket-excluded-rows={anchor.coverage.excludedPositionRows}
       data-anchor-basket-policy={model.policy.version}
       data-anchor-basket-selected-date={anchor.selectedAnchorDate ?? ""}
       data-anchor-basket-source-rows={anchor.coverage.sourcePositionRows}
+      data-anchor-basket-separate-model-rows={
+        anchor.coverage.separateModelPositionRows
+      }
       data-anchor-basket-status={model.status}
       data-anchor-basket-unresolved-rows={
         anchor.coverage.unresolvedPositionRows
@@ -73,13 +77,13 @@ export function InvestmentLabAnchorBasket({
             value={`${anchor.coverage.economicInstrumentCount}개`}
           />
           <SummaryCell
-            label="미식별 포지션"
+            label="미식별·별도·제외"
             tone={
               anchor.coverage.unresolvedPositionRows > 0
                 ? "negative"
                 : "neutral"
             }
-            value={`${anchor.coverage.unresolvedPositionRows}건`}
+            value={`${anchor.coverage.unresolvedPositionRows} · ${anchor.coverage.separateModelPositionRows} · ${anchor.coverage.excludedPositionRows}`}
           />
         </div>
 
@@ -122,14 +126,23 @@ function SpecialHoldingEvidence({
   const unsupportedCount = rows.filter(
     (row) => row.historicalAuthorityOutcome === "permanently_unsupported",
   ).length;
+  const intentionallyExcludedCount = rows.filter(
+    (row) => row.historicalAuthorityOutcome === "intentionally_excluded",
+  ).length;
+  const unavailableCount = rows.filter(
+    (row) => row.identityStatus === "unavailable",
+  ).length;
   return (
     <div
       className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
       data-anchor-special-holding-eligible={eligibleCount}
+      data-anchor-special-holding-intentionally-excluded={
+        intentionallyExcludedCount
+      }
       data-anchor-special-holding-resolved={resolvedCount}
       data-anchor-special-holding-rows={rows.length}
       data-anchor-special-holding-separate-model={separateModelCount}
-      data-anchor-special-holding-unavailable={rows.length - resolvedCount}
+      data-anchor-special-holding-unavailable={unavailableCount}
       data-anchor-special-holding-unsupported={unsupportedCount}
       data-section="investment-lab-anchor-special-holding-evidence"
     >
@@ -170,9 +183,7 @@ function SpecialHoldingEvidence({
                         : "font-semibold text-[#9a6b18]"
                     }
                   >
-                    {row.identityStatus === "resolved"
-                      ? `listed ${row.resolvedTicker}`
-                      : "사용 불가"}
+                    {specialHoldingIdentityLabel(row)}
                   </span>
                 </td>
                 <td className="px-3 py-3 font-semibold text-[#34443d]">
@@ -369,6 +380,8 @@ function anchorBlockerLabel(reason: InvestmentLabAnchorBlocker) {
     tickerless_anchor_holding: "ticker가 없는 저장 포지션 존재",
     unsupported_anchor_holding_axis: "지원하지 않는 시장·통화 포지션 존재",
     physical_anchor_holding: "별도 가격 근거가 필요한 실물 포지션 존재",
+    excluded_holding_scope_transform_required:
+      "계산 제외 포지션을 실제 비교선과 시나리오 양쪽에서 제거해야 함",
     invalid_anchor_position_evidence: "수량 또는 평가액 근거가 유효하지 않음",
     duplicate_anchor_identity: "같은 계좌의 종목 identity가 중복됨",
     ambiguous_anchor_identity_metadata: "종목 이름 근거가 서로 다름",
@@ -397,6 +410,8 @@ function specialHoldingReasonLabel(
     stored_snapshot_metadata_mismatch: "이관 포지션 메타데이터 불일치",
     instrument_keyed_official_close_required:
       "실물 commodity용 instrument-keyed 공식 종가 모델 필요",
+    product_owner_excluded_from_decision_support:
+      "사용자 결정으로 투자 랩·시뮬레이션 계산 범위에서 제외",
     explicit_product_classification_required:
       "명시적 상품 분류와 평가 권위 필요",
     non_investment_asset_type_unsupported: "투자 바스켓 제외 자산 유형",
@@ -413,7 +428,19 @@ function specialHoldingOutcomeLabel(
   if (outcome === "separate_valuation_model_required") {
     return "별도 평가 모델 필요";
   }
+  if (outcome === "intentionally_excluded") {
+    return "계산 범위에서 제외";
+  }
   return "지원하지 않음";
+}
+
+function specialHoldingIdentityLabel(
+  row: InvestmentLabAnchorSpecialHoldingEvidence,
+) {
+  if (row.identityStatus === "not_required") return "식별 불필요";
+  if (row.resolvedTicker) return `listed ${row.resolvedTicker}`;
+  if (row.resolvedProductKey === "gold_9999_1kg") return "KRX 금 99.99_1kg";
+  return row.identityStatus === "resolved" ? "식별 완료" : "사용 불가";
 }
 
 function formatDate(value: string | null) {

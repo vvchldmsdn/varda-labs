@@ -1,6 +1,6 @@
 # KRX Gold Close-Only Source Feasibility Audit v1
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 Status: official-source feasibility reviewed; runtime remains blocked. This
 audit performed no provider request, database read or write, schema change,
@@ -9,15 +9,16 @@ backfill, route, API, UI, job, or Cron work.
 ## Decision
 
 KRX Gold daily closes are technically plausible as a future historical-price
-source, but the source is not ready for product use. Four independent blockers
-remain:
+source, but the source is not ready for product use. Broker holding evidence
+reviewed on 2026-07-16 binds the imported holding to the KRX 1kg product with
+gram-denominated quantity. No account number, holder name, or screenshot is
+stored in this repository. Three independent blockers remain:
 
-1. the imported `금현물` row is not bound to the KRX 1kg or 100g product;
-2. the exact Open API instrument and close fields are not verified from an
+1. the exact Open API instrument and close fields are not verified from an
    approved development specification or response;
-3. the current Open API terms do not establish the storage and multi-user
+2. the current Open API terms do not establish the storage and multi-user
    display rights required by Varda Labs;
-4. the Investment Lab path uses fractional units, while executable KRX Gold
+3. the Investment Lab path uses fractional units, while executable KRX Gold
    trades use integer grams.
 
 The existing Investment Lab anchor basket therefore remains wholly
@@ -148,12 +149,13 @@ Neither choice is approved by this audit.
 
 ## Next Safe Sequence
 
-1. Confirm the broker product identity: 1kg or 100g.
-2. Obtain the KRX development specification and product-use permission.
-3. Approve one read-only API fixture/dry-run packet with no persistence.
-4. Verify anchor-through-end close coverage and broker-statement spot checks.
-5. Choose fractional-research or integer-execution Investment Lab semantics.
-6. Only then review an additive instrument/close schema and provider adapter.
+1. Obtain the KRX development specification and product-use permission.
+2. Approve one read-only API fixture/dry-run packet with no persistence.
+3. Verify anchor-through-end close coverage and broker-statement spot checks.
+4. Choose fractional-research or integer-execution Investment Lab semantics.
+5. Only then review an additive instrument/close schema and provider adapter.
 
-The separate Fount managed-sleeve decision can proceed in parallel. The whole
-anchor basket stays unavailable while either special holding lacks authority.
+Fount is intentionally excluded from Investment Lab and Simulation by product
+owner decision. The whole anchor basket still stays unavailable until Fount is
+removed from both observed and scenario paths with one scope-consistent
+transform and KRX Gold has approved close authority.

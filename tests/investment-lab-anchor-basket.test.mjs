@@ -110,6 +110,7 @@ describe("investment lab anchor-date observed basket", () => {
         classification: "physical_commodity_position",
         identityStatus: "unavailable",
         resolvedTicker: null,
+        resolvedProductKey: null,
         identityAuthority: "explicit_snapshot_asset_type",
         historicalAuthorityOutcome: "separate_valuation_model_required",
         historicalCoverageStatus: "blocked",
@@ -158,6 +159,7 @@ describe("investment lab anchor-date observed basket", () => {
         classification: "stored_listed_instrument",
         identityStatus: "resolved",
         resolvedTicker: "315960",
+        resolvedProductKey: null,
         identityAuthority: "base44_imported_snapshot_ticker_consensus",
         historicalAuthorityOutcome: "eligible_historical_instrument",
         historicalCoverageStatus: "not_evaluated",
@@ -246,6 +248,97 @@ describe("investment lab anchor-date observed basket", () => {
       decision.specialHoldingEvidence.reason,
       "non_investment_asset_type_unsupported",
     );
+  });
+
+  it("binds the reviewed KRX gold holding to the 1kg product only", () => {
+    const decision = resolveInvestmentLabSpecialHoldingIdentity({
+      ticker: null,
+      assetName: "금현물",
+      account: "brokerage",
+      source: "stored",
+      market: "korea",
+      currency: "KRW",
+      assetType: "commodity",
+    });
+
+    assert.equal(decision.ticker, null);
+    assert.equal(decision.specialHoldingEvidence.identityStatus, "resolved");
+    assert.equal(
+      decision.specialHoldingEvidence.resolvedProductKey,
+      "gold_9999_1kg",
+    );
+    assert.equal(
+      decision.specialHoldingEvidence.identityAuthority,
+      "broker_statement_and_krx_product_definition",
+    );
+    assert.equal(
+      decision.specialHoldingEvidence.historicalAuthorityOutcome,
+      "separate_valuation_model_required",
+    );
+  });
+
+  it("records the exact Fount holding as excluded but keeps the path blocked", () => {
+    const input = fixture();
+    input.positionRows.push({
+      snapshotDate: "2026-01-06",
+      account: "irp",
+      source: "stored",
+      ticker: null,
+      assetName: "Fount 일임서비스",
+      market: "korea",
+      currency: "KRW",
+      assetType: "etf",
+      quantity: 1,
+      marketValueKrw: 100,
+    });
+
+    const anchor = resolveInvestmentLabAnchorSelection({
+      serviceDates: input.serviceDates,
+      snapshotRows: input.snapshotRows,
+      positionRows: input.positionRows,
+    });
+
+    assert.equal(anchor.status, "unavailable");
+    assert.equal(anchor.coverage.recognizedPositionRows, 3);
+    assert.equal(anchor.coverage.excludedPositionRows, 1);
+    assert.equal(anchor.coverage.separateModelPositionRows, 0);
+    assert.equal(anchor.coverage.unresolvedPositionRows, 0);
+    assert.deepEqual(anchor.blockers, [
+      "excluded_holding_scope_transform_required",
+    ]);
+    assert.deepEqual(anchor.specialHoldingEvidence, [
+      {
+        name: "Fount 일임서비스",
+        account: "irp",
+        source: "stored",
+        market: "korea",
+        currency: "KRW",
+        assetType: "etf",
+        classification: "product_owner_excluded",
+        identityStatus: "not_required",
+        resolvedTicker: null,
+        resolvedProductKey: null,
+        identityAuthority: "product_owner_scope_decision",
+        historicalAuthorityOutcome: "intentionally_excluded",
+        historicalCoverageStatus: "not_required",
+        evidenceRowCount: 0,
+        reason: "product_owner_excluded_from_decision_support",
+      },
+    ]);
+
+    const invalidValue = resolveInvestmentLabAnchorSelection({
+      serviceDates: input.serviceDates,
+      snapshotRows: input.snapshotRows,
+      positionRows: input.positionRows.map((row) =>
+        row.assetName === "Fount 일임서비스"
+          ? { ...row, marketValueKrw: null }
+          : row,
+      ),
+    });
+    assert.deepEqual(invalidValue.blockers, [
+      "excluded_holding_scope_transform_required",
+      "invalid_anchor_position_evidence",
+    ]);
   });
 
   it("does not classify a ticker-bearing commodity ETF as physical", () => {
@@ -403,6 +496,24 @@ describe("investment lab anchor-date observed basket", () => {
       /tickerless_noncommodity_product_authority_unresolved/,
     );
     assert.doesNotMatch(auditSource, /join\s+assets\b/i);
+  });
+
+  it("audits Fount exclusion on the exact observed-path scope", () => {
+    const auditSource = readFileSync(
+      new URL(
+        "../scripts/audit-investment-lab-anchor-basket.mjs",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    assert.match(auditSource, /FOUNT_EXCLUSION_PARITY_SQL/);
+    assert.match(auditSource, /excluded_holding_scope_transform_required/);
+    assert.match(auditSource, /p\.snapshot_date >= a\.snapshot_date/);
+    assert.match(auditSource, /f\.source = p\.source/);
+    assert.match(auditSource, /product_owner_scope_decision/);
+    assert.doesNotMatch(auditSource, /join\s+assets\b/i);
+    assert.doesNotMatch(auditSource, /\b(?:insert|update|delete)\b/i);
   });
 });
 

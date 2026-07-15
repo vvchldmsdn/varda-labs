@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
+import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "../src/lib/investment-lab-special-holding-authority.ts";
 
 config({ path: ".env.local", quiet: true });
 
@@ -7,6 +8,33 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
 const sql = neon(process.env.DATABASE_URL);
 const compactOutput = process.argv.includes("--compact");
+const goldDecision =
+  DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
+const fountDecision =
+  DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount;
+
+function exactDecisionPredicate(alias, decision) {
+  return [
+    `lower(btrim(${alias}.asset_name)) = lower(${sqlLiteral(decision.assetName)})`,
+    `lower(btrim(${alias}.account)) = ${sqlLiteral(decision.account)}`,
+    `lower(btrim(${alias}.market)) = ${sqlLiteral(decision.market)}`,
+    `upper(btrim(${alias}.currency)) = ${sqlLiteral(decision.currency)}`,
+    `lower(btrim(${alias}.asset_type)) = ${sqlLiteral(decision.assetType)}`,
+  ].join(" and ");
+}
+
+function sqlLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+const GOLD_POSITION_PREDICATE = exactDecisionPredicate("p", goldDecision);
+const FOUNT_POSITION_PREDICATE = exactDecisionPredicate("p", fountDecision);
+const FOUNT_INSTRUMENT_PREDICATE = exactDecisionPredicate("i", fountDecision);
+const FOUNT_HISTORY_PREDICATE = exactDecisionPredicate("h", fountDecision);
+const FOUNT_EVENT_PREDICATE = [
+  `lower(btrim(e.asset_name)) = lower(${sqlLiteral(fountDecision.assetName)})`,
+  `lower(btrim(e.account)) = ${sqlLiteral(fountDecision.account)}`,
+].join(" and ");
 
 const ANCHOR_SQL = `
   with named_portfolio_rows as (
@@ -127,15 +155,21 @@ const ANCHOR_SQL = `
         when stored_ticker is not null then 'stored_snapshot_ticker'
         when imported_ticker is not null
           then 'base44_imported_snapshot_ticker_consensus'
+        when ${GOLD_POSITION_PREDICATE}
+          then 'broker_statement_and_krx_product_definition'
+        when ${FOUNT_POSITION_PREDICATE}
+          then 'product_owner_scope_decision'
         when asset_type = 'commodity' then 'explicit_snapshot_asset_type'
         else 'none'
       end as identity_authority,
       case
         when stored_ticker is not null or imported_ticker is not null
           then 'resolved'
+        when ${GOLD_POSITION_PREDICATE} then 'resolved'
+        when ${FOUNT_POSITION_PREDICATE} then 'not_required'
         else 'unavailable'
       end as identity_status
-    from anchor_positions
+    from anchor_positions p
   ),
   price_summary as (
     select
@@ -255,6 +289,7 @@ const ANCHOR_SQL = `
       currency,
       min(legacy_asset_id) as legacy_asset_id,
       min(asset_name) as asset_name,
+      min(account) as account,
       min(asset_type) as asset_type,
       min(category) as category,
       min(identity_authority) as identity_authority,
@@ -294,11 +329,13 @@ const ANCHOR_SQL = `
     i.identity_status,
     i.stored_ticker_missing,
     case
+      when ${FOUNT_INSTRUMENT_PREDICATE} then 'product_owner_excluded'
       when i.ticker is not null then 'listed_instrument'
       when i.asset_type = 'commodity' then 'physical_commodity_position'
       else 'unresolved'
     end as classification,
     case
+      when ${FOUNT_INSTRUMENT_PREDICATE} then 'intentionally_excluded'
       when i.ticker is not null then 'eligible_historical_instrument'
       when i.asset_type in ('fixed_deposit', 'housing_subscription', 'savings')
         then 'permanently_unsupported'
@@ -349,6 +386,8 @@ const ANCHOR_SQL = `
     coalesce(e.event_price_rows, 0)::int as event_price_rows,
     coalesce(e.event_quantity_rows, 0)::int as event_quantity_rows,
     case
+      when ${FOUNT_INSTRUMENT_PREDICATE}
+        then 'not_required_product_owner_excluded'
       when i.asset_type = 'commodity'
         and coalesce(s.official_gold_close_candidate_rows, 0) > 0
         then 'official_close_candidate_rows_not_authority_instrument_binding_required'
@@ -365,6 +404,8 @@ const ANCHOR_SQL = `
       else 'not_applicable_listed_instrument'
     end as stored_series_authority,
     case
+      when ${FOUNT_INSTRUMENT_PREDICATE}
+        then 'not_required_product_owner_excluded'
       when i.ticker is not null
         and coalesce(p.price_rows, 0) > 0
         and coalesce(p.invalid_price_rows, 0) = 0
@@ -499,7 +540,15 @@ const SUMMARY_SQL = `
     )::int as imported_snapshot_ticker_recovered_rows,
     count(*) filter (
       where resolved_ticker is null
+        and not (${GOLD_POSITION_PREDICATE})
+        and not (${FOUNT_POSITION_PREDICATE})
     )::int as unresolved_identity_rows,
+    count(*) filter (
+      where resolved_ticker is null and ${GOLD_POSITION_PREDICATE}
+    )::int as separate_model_rows,
+    count(*) filter (
+      where resolved_ticker is null and ${FOUNT_POSITION_PREDICATE}
+    )::int as intentionally_excluded_rows,
     count(*) filter (
       where lower(coalesce(market, '')) not in ('korea', 'us')
         or upper(coalesce(currency, '')) not in ('KRW', 'USD')
@@ -514,7 +563,7 @@ const SUMMARY_SQL = `
       resolved_ticker
     )) filter (where resolved_ticker is not null)::int
       as recognized_economic_instruments
-  from anchor_positions
+  from anchor_positions p
 `;
 
 const SOURCE_SQL = `
@@ -609,14 +658,117 @@ const CANDIDATE_SQL = `
   order by p.snapshot_date
 `;
 
-const [summaryRows, instrumentRows, sourceRows, candidateRows] = await Promise.all([
+const FOUNT_EXCLUSION_PARITY_SQL = `
+  with named_portfolio_rows as (
+    select snapshot_date, account, source, total_market_value
+    from daily_portfolio_snapshots
+    where is_sample = false
+      and account in ('brokerage', 'isa', 'irp')
+  ),
+  complete_portfolio_dates as (
+    select snapshot_date
+    from named_portfolio_rows
+    group by snapshot_date
+    having count(*) = 3 and count(distinct account) = 3
+  ),
+  candidate_anchor_dates as (
+    select p.snapshot_date
+    from named_portfolio_rows p
+    join complete_portfolio_dates d on d.snapshot_date = p.snapshot_date
+    join daily_position_snapshots h
+      on h.snapshot_date = p.snapshot_date
+      and h.account = p.account
+      and h.source = p.source
+      and h.is_sample = false
+    group by p.snapshot_date
+    having count(distinct h.account) = 3
+  ),
+  anchor as (
+    select min(snapshot_date) as snapshot_date from candidate_anchor_dates
+  ),
+  fount_rows as (
+    select
+      h.snapshot_date,
+      h.account,
+      h.source,
+      count(*)::int as row_count,
+      sum(h.market_value_krw) as excluded_market_value_krw,
+      count(*) filter (
+        where h.market_value_krw is null or h.market_value_krw < 0
+      )::int as invalid_value_rows
+    from daily_position_snapshots h
+    where h.is_sample = false
+      and nullif(btrim(h.ticker), '') is null
+      and ${FOUNT_HISTORY_PREDICATE}
+    group by h.snapshot_date, h.account, h.source
+  ),
+  target_rows as (
+    select
+      p.snapshot_date,
+      p.source,
+      p.total_market_value,
+      coalesce(f.row_count, 0)::int as excluded_row_count,
+      f.excluded_market_value_krw,
+      coalesce(f.invalid_value_rows, 0)::int as invalid_value_rows
+    from named_portfolio_rows p
+    join complete_portfolio_dates d on d.snapshot_date = p.snapshot_date
+    cross join anchor a
+    left join fount_rows f
+      on f.snapshot_date = p.snapshot_date
+      and f.account = p.account
+      and f.source = p.source
+    where p.account = ${sqlLiteral(fountDecision.account)}
+      and p.snapshot_date >= a.snapshot_date
+  )
+  select
+    min(snapshot_date)::text as start_date,
+    max(snapshot_date)::text as end_date,
+    count(*)::int as complete_portfolio_dates,
+    count(*) filter (where excluded_row_count = 1)::int
+      as exact_source_position_dates,
+    count(*) filter (where excluded_row_count = 0)::int
+      as missing_position_dates,
+    coalesce(
+      json_agg(
+        json_build_object(
+          'snapshotDate', snapshot_date::text,
+          'source', source,
+          'portfolioValueKrw', total_market_value
+        )
+        order by snapshot_date
+      ) filter (where excluded_row_count = 0),
+      '[]'::json
+    ) as missing_position_evidence,
+    count(*) filter (where excluded_row_count > 1)::int
+      as duplicate_position_dates,
+    sum(invalid_value_rows)::int as invalid_value_rows,
+    count(*) filter (
+      where excluded_market_value_krw > total_market_value
+    )::int as invalid_subtraction_dates,
+    (
+      select count(*)::int
+      from event_ledger_entries e
+      where e.is_sample = false and ${FOUNT_EVENT_PREDICATE}
+    ) as event_rows
+  from target_rows
+`;
+
+const [
+  summaryRows,
+  instrumentRows,
+  sourceRows,
+  candidateRows,
+  fountExclusionParityRows,
+] = await Promise.all([
   sql.query(SUMMARY_SQL),
   sql.query(ANCHOR_SQL),
   sql.query(SOURCE_SQL),
   sql.query(CANDIDATE_SQL),
+  sql.query(FOUNT_EXCLUSION_PARITY_SQL),
 ]);
 
 const summary = summaryRows[0] ?? null;
+const fountExclusionParity = fountExclusionParityRows[0] ?? null;
 const blockers = [];
 if (!summary?.anchor_date) blockers.push("missing_complete_anchor");
 if (Number(summary?.portfolio_rows ?? 0) !== 3) {
@@ -632,13 +784,13 @@ if (
   blockers.push("anchor_position_source_mismatch");
 }
 const unavailableIdentityRows = instrumentRows.filter(
-  (row) => row.identity_status !== "resolved",
+  (row) => row.identity_status === "unavailable",
 );
 if (unavailableIdentityRows.length > 0) {
   blockers.push("tickerless_anchor_holding");
 }
 if (
-  unavailableIdentityRows.some(
+  instrumentRows.some(
     (row) => row.classification === "physical_commodity_position",
   )
 ) {
@@ -650,6 +802,24 @@ if (
 ) {
   blockers.push("anchor_holding_classification_unresolved");
   blockers.push("tickerless_noncommodity_product_authority_unresolved");
+}
+if (
+  instrumentRows.some(
+    (row) => row.historical_authority_outcome === "intentionally_excluded",
+  )
+) {
+  blockers.push("excluded_holding_scope_transform_required");
+}
+if (
+  !fountExclusionParity ||
+  Number(fountExclusionParity.complete_portfolio_dates ?? 0) === 0 ||
+  Number(fountExclusionParity.missing_position_dates ?? 0) > 0 ||
+  Number(fountExclusionParity.duplicate_position_dates ?? 0) > 0 ||
+  Number(fountExclusionParity.invalid_value_rows ?? 0) > 0 ||
+  Number(fountExclusionParity.invalid_subtraction_dates ?? 0) > 0 ||
+  Number(fountExclusionParity.event_rows ?? 0) > 0
+) {
+  blockers.push("fount_exclusion_parity_unavailable");
 }
 if (Number(summary?.unsupported_axis_rows ?? 0) > 0) {
   blockers.push("unsupported_anchor_holding_axis");
@@ -681,11 +851,13 @@ const report = {
       "same_legacy_identity_and_snapshot_metadata_consensus",
     currentAssetFallback: "forbidden",
     nameInference: "forbidden",
-    exclusions: "forbidden_whole_scenario_unavailable",
+    exclusions:
+      "explicit_product_owner_exclusion_requires_scope_consistent_actual_and_scenario_transform",
   },
   summary,
   sourceEvidence: sourceRows,
   candidateAnchors: candidateRows,
+  fountExclusionParity,
   instruments: instrumentRows,
   specialHoldingAuthority: instrumentRows.filter(
     (row) => row.stored_ticker_missing,
@@ -706,6 +878,7 @@ console.log(
           status: report.status,
           readOnly: report.readOnly,
           summary: report.summary,
+          fountExclusionParity: report.fountExclusionParity,
           specialHoldingAuthority: report.specialHoldingAuthority,
           blockers: report.blockers,
           boundaries: report.boundaries,

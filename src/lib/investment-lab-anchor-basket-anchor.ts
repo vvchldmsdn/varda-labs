@@ -23,6 +23,7 @@ export const INVESTMENT_LAB_ANCHOR_BASKET_POLICY = Object.freeze({
   subsequentFlowAllocation: "equal_split_across_anchor_instruments",
   rebalancing: "none",
   unresolvedHoldingHandling: "whole_scenario_unavailable",
+  explicitExclusionHandling: "blocked_until_scope_consistent_path_transform",
   maximumInstrumentCount: MAX_INSTRUMENTS,
 } as const);
 
@@ -59,6 +60,7 @@ export type InvestmentLabAnchorBlocker =
   | "tickerless_anchor_holding"
   | "unsupported_anchor_holding_axis"
   | "physical_anchor_holding"
+  | "excluded_holding_scope_transform_required"
   | "invalid_anchor_position_evidence"
   | "duplicate_anchor_identity"
   | "ambiguous_anchor_identity_metadata"
@@ -73,6 +75,8 @@ export type InvestmentLabAnchorSelection = Readonly<{
   coverage: Readonly<{
     sourcePositionRows: number;
     recognizedPositionRows: number;
+    separateModelPositionRows: number;
+    excludedPositionRows: number;
     unresolvedPositionRows: number;
     economicInstrumentCount: number;
   }>;
@@ -157,6 +161,8 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   >();
   const specialHoldingEvidence: InvestmentLabAnchorSpecialHoldingEvidence[] = [];
   let recognizedPositionRows = 0;
+  let separateModelPositionRows = 0;
+  let excludedPositionRows = 0;
 
   for (const row of anchorRows) {
     const identity = resolveInvestmentLabSpecialHoldingIdentity(row);
@@ -174,7 +180,27 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
     if (identity.specialHoldingEvidence) {
       specialHoldingEvidence.push(identity.specialHoldingEvidence);
     }
-    if (!ticker) blockers.add("tickerless_anchor_holding");
+    if (
+      identity.specialHoldingEvidence?.historicalAuthorityOutcome ===
+      "intentionally_excluded"
+    ) {
+      excludedPositionRows += 1;
+      if (marketValueKrw === null) {
+        blockers.add("invalid_anchor_position_evidence");
+      }
+      blockers.add("excluded_holding_scope_transform_required");
+      continue;
+    }
+    if (
+      identity.specialHoldingEvidence?.historicalAuthorityOutcome ===
+        "separate_valuation_model_required" &&
+      identity.specialHoldingEvidence.identityStatus === "resolved"
+    ) {
+      separateModelPositionRows += 1;
+    }
+    if (!ticker && identity.specialHoldingEvidence?.identityStatus !== "resolved") {
+      blockers.add("tickerless_anchor_holding");
+    }
     if (!ticker && assetType === "commodity") {
       blockers.add("physical_anchor_holding");
     }
@@ -249,7 +275,11 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
     blockers.add("no_complete_anchor_evidence");
   }
 
-  const unresolvedPositionRows = anchorRows.length - recognizedPositionRows;
+  const unresolvedPositionRows =
+    anchorRows.length -
+    recognizedPositionRows -
+    separateModelPositionRows -
+    excludedPositionRows;
   return Object.freeze({
     status: blockers.size === 0 ? "ready" : "unavailable",
     policy: INVESTMENT_LAB_ANCHOR_BASKET_POLICY,
@@ -260,6 +290,8 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
     coverage: Object.freeze({
       sourcePositionRows: anchorRows.length,
       recognizedPositionRows,
+      separateModelPositionRows,
+      excludedPositionRows,
       unresolvedPositionRows,
       economicInstrumentCount: instruments.length,
     }),
@@ -383,6 +415,8 @@ function unavailable(
     coverage: Object.freeze({
       sourcePositionRows,
       recognizedPositionRows,
+      separateModelPositionRows: 0,
+      excludedPositionRows: 0,
       unresolvedPositionRows: sourcePositionRows - recognizedPositionRows,
       economicInstrumentCount: instruments.length,
     }),

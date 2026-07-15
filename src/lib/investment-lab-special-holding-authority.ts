@@ -1,4 +1,31 @@
+import { KRX_GOLD_CLOSE_ONLY_CONTRACT } from "./instrument-identity.ts";
+
 const IMPORTED_SNAPSHOT_SOURCE = "base44_import";
+
+export const DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS = Object.freeze({
+  version: "legacy_imported_special_holding_decisions_v1",
+  authority: "product_owner_review_2026_07_16",
+  scope: Object.freeze(["investment_lab", "simulation"]),
+  decisions: Object.freeze({
+    krxGold: Object.freeze({
+      assetName: "금현물",
+      account: "brokerage",
+      market: "korea",
+      currency: "KRW",
+      assetType: "commodity",
+      productKey: KRX_GOLD_CLOSE_ONLY_CONTRACT.identityBinding.productKey,
+      outcome: "separate_valuation_model_required",
+    }),
+    fount: Object.freeze({
+      assetName: "Fount 일임서비스",
+      account: "irp",
+      market: "korea",
+      currency: "KRW",
+      assetType: "etf",
+      outcome: "intentionally_excluded",
+    }),
+  }),
+} as const);
 
 const PERMANENTLY_UNSUPPORTED_ASSET_TYPES = new Set([
   "fixed_deposit",
@@ -14,6 +41,9 @@ export const INVESTMENT_LAB_SPECIAL_HOLDING_AUTHORITY_POLICY = Object.freeze({
   currentPriceFallback: "forbidden",
   nameInference: "forbidden",
   partialBasket: "forbidden",
+  productOwnerDecisionBinding:
+    "exact_name_account_market_currency_asset_type",
+  exclusionApplication: "blocked_until_scope_consistent_path_transform",
 } as const);
 
 export type InvestmentLabImportedIdentityRow = Readonly<{
@@ -43,6 +73,7 @@ export type InvestmentLabImportedTickerEvidence = Readonly<{
 export type InvestmentLabSpecialHoldingAuthorityOutcome =
   | "eligible_historical_instrument"
   | "separate_valuation_model_required"
+  | "intentionally_excluded"
   | "permanently_unsupported";
 
 export type InvestmentLabAnchorSpecialHoldingEvidence = Readonly<{
@@ -55,22 +86,27 @@ export type InvestmentLabAnchorSpecialHoldingEvidence = Readonly<{
   classification:
     | "stored_listed_instrument"
     | "physical_commodity_position"
+    | "product_owner_excluded"
     | "unresolved"
     | "unsupported_non_investment_position";
-  identityStatus: "resolved" | "unavailable";
+  identityStatus: "resolved" | "unavailable" | "not_required";
   resolvedTicker: string | null;
+  resolvedProductKey: string | null;
   identityAuthority:
     | "base44_imported_snapshot_ticker_consensus"
+    | "broker_statement_and_krx_product_definition"
+    | "product_owner_scope_decision"
     | "explicit_snapshot_asset_type"
     | "none";
   historicalAuthorityOutcome: InvestmentLabSpecialHoldingAuthorityOutcome;
-  historicalCoverageStatus: "not_evaluated" | "blocked";
+  historicalCoverageStatus: "not_evaluated" | "blocked" | "not_required";
   evidenceRowCount: number;
   reason:
     | "stored_snapshot_ticker_recovered"
     | "stored_snapshot_ticker_conflict"
     | "stored_snapshot_metadata_mismatch"
     | "instrument_keyed_official_close_required"
+    | "product_owner_excluded_from_decision_support"
     | "explicit_product_classification_required"
     | "non_investment_asset_type_unsupported";
 }>;
@@ -165,6 +201,7 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
         classification: "stored_listed_instrument",
         identityStatus: "resolved",
         resolvedTicker: imported.ticker,
+        resolvedProductKey: null,
         identityAuthority: "base44_imported_snapshot_ticker_consensus",
         historicalAuthorityOutcome: "eligible_historical_instrument",
         historicalCoverageStatus: "not_evaluated",
@@ -181,11 +218,44 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
     market,
     currency,
     assetType,
-    identityStatus: "unavailable" as const,
-    resolvedTicker: null,
-    historicalCoverageStatus: "blocked" as const,
     evidenceRowCount: imported?.evidenceRowCount ?? 0,
   };
+
+  if (matchesApprovedDecision(row, "fount")) {
+    return Object.freeze({
+      ticker: null,
+      specialHoldingEvidence: Object.freeze({
+        ...common,
+        classification: "product_owner_excluded",
+        identityStatus: "not_required",
+        resolvedTicker: null,
+        resolvedProductKey: null,
+        identityAuthority: "product_owner_scope_decision",
+        historicalAuthorityOutcome: "intentionally_excluded",
+        historicalCoverageStatus: "not_required",
+        reason: "product_owner_excluded_from_decision_support",
+      }),
+    });
+  }
+
+  if (matchesApprovedDecision(row, "krxGold")) {
+    return Object.freeze({
+      ticker: null,
+      specialHoldingEvidence: Object.freeze({
+        ...common,
+        classification: "physical_commodity_position",
+        identityStatus: "resolved",
+        resolvedTicker: null,
+        resolvedProductKey:
+          DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold
+            .productKey,
+        identityAuthority: "broker_statement_and_krx_product_definition",
+        historicalAuthorityOutcome: "separate_valuation_model_required",
+        historicalCoverageStatus: "blocked",
+        reason: "instrument_keyed_official_close_required",
+      }),
+    });
+  }
 
   if (assetType === "commodity") {
     return Object.freeze({
@@ -193,8 +263,12 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
       specialHoldingEvidence: Object.freeze({
         ...common,
         classification: "physical_commodity_position",
+        identityStatus: "unavailable",
+        resolvedTicker: null,
+        resolvedProductKey: null,
         identityAuthority: "explicit_snapshot_asset_type",
         historicalAuthorityOutcome: "separate_valuation_model_required",
+        historicalCoverageStatus: "blocked",
         reason: "instrument_keyed_official_close_required",
       }),
     });
@@ -206,8 +280,12 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
       specialHoldingEvidence: Object.freeze({
         ...common,
         classification: "unsupported_non_investment_position",
+        identityStatus: "unavailable",
+        resolvedTicker: null,
+        resolvedProductKey: null,
         identityAuthority: "explicit_snapshot_asset_type",
         historicalAuthorityOutcome: "permanently_unsupported",
+        historicalCoverageStatus: "blocked",
         reason: "non_investment_asset_type_unsupported",
       }),
     });
@@ -218,8 +296,12 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
     specialHoldingEvidence: Object.freeze({
       ...common,
       classification: "unresolved",
+      identityStatus: "unavailable",
+      resolvedTicker: null,
+      resolvedProductKey: null,
       identityAuthority: "none",
       historicalAuthorityOutcome: "separate_valuation_model_required",
+      historicalCoverageStatus: "blocked",
       reason:
         imported?.reason === "conflicting_imported_tickers"
           ? "stored_snapshot_ticker_conflict"
@@ -228,6 +310,22 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
             : "explicit_product_classification_required",
     }),
   });
+}
+
+function matchesApprovedDecision(
+  row: InvestmentLabSpecialHoldingIdentityInput,
+  decisionKey: keyof typeof DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions,
+) {
+  const decision =
+    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions[decisionKey];
+  return (
+    normalizeText(row.assetName)?.toLowerCase() ===
+      decision.assetName.toLowerCase() &&
+    normalizeText(row.account)?.toLowerCase() === decision.account &&
+    normalizeText(row.market)?.toLowerCase() === decision.market &&
+    normalizeText(row.currency)?.toUpperCase() === decision.currency &&
+    normalizeText(row.assetType)?.toLowerCase() === decision.assetType
+  );
 }
 
 function resolveImportedTickerEvidence(

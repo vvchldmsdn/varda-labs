@@ -23,9 +23,12 @@ export const KRX_GOLD_CLOSE_ONLY_CONTRACT = Object.freeze({
     ]),
   }),
   identityBinding: Object.freeze({
-    status: "unresolved",
-    reason: "bar_size_product_not_bound",
-    requiredEvidence: "broker_or_krx_instrument_code",
+    status: "resolved",
+    productKey: "gold_9999_1kg",
+    holdingUnit: "g",
+    authority: "broker_holding_statement_and_krx_product_definition",
+    evidenceReviewedOn: "2026-07-16",
+    sensitiveEvidenceStored: false,
   }),
   pricing: Object.freeze({
     mode: "official_close_only",

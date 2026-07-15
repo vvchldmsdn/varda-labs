@@ -10,7 +10,7 @@ import {
 } from "../src/lib/instrument-identity.ts";
 
 describe("KRX gold close-only instrument contract", () => {
-  it("keeps verified market facts separate from unresolved product binding", () => {
+  it("binds the reviewed broker holding without claiming source readiness", () => {
     assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.verifiedMarketFacts, {
       instrumentKind: "commodity_spot",
       venue: "KRX_GOLD",
@@ -25,9 +25,12 @@ describe("KRX gold close-only instrument contract", () => {
       ],
     });
     assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.identityBinding, {
-      status: "unresolved",
-      reason: "bar_size_product_not_bound",
-      requiredEvidence: "broker_or_krx_instrument_code",
+      status: "resolved",
+      productKey: "gold_9999_1kg",
+      holdingUnit: "g",
+      authority: "broker_holding_statement_and_krx_product_definition",
+      evidenceReviewedOn: "2026-07-16",
+      sensitiveEvidenceStored: false,
     });
     assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.pricing, {
       mode: "official_close_only",

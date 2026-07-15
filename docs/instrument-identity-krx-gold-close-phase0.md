@@ -28,16 +28,16 @@ The production Gate B1 read-only audit on 2026-07-11 confirmed:
 ## Product Boundary
 
 KRX gold is a close-only spot commodity family in v1. It is not a live quote
-target. The exact KRX product remains unbound because the official market has
-both 1kg and 100g gold-bar products, both traded in 1g units and quoted in KRW
-per gram. The imported asset name `금현물`, integer gram quantity, and stored
-valuation are insufficient to distinguish those products.
+target. Broker holding evidence reviewed on 2026-07-16 binds this imported
+holding to the KRX 99.99% 1kg product. The holding quantity is denominated in
+grams because both KRX products trade in 1g units and are quoted in KRW per
+gram. Sensitive broker evidence is not stored in this repository.
 
 | Field | Value |
 | --- | --- |
 | instrument kind | `commodity_spot` |
 | venue | `KRX_GOLD` |
-| product key | unresolved: `gold_9999_1kg` or `gold_9999_100g` |
+| product key | `gold_9999_1kg` |
 | holding unit | `g` |
 | quote currency | `KRW` |
 | quote unit | `KRW_PER_G` |
@@ -46,10 +46,10 @@ valuation are insufficient to distinguish those products.
 | quote kind | `official_close` |
 | live quote eligible | `false` |
 
-The two `productKey` values are internal candidates, not KRX or broker symbols.
-Neither candidate is approved as the imported asset's canonical identity in
-this phase. Broker product evidence or an exact KRX provider instrument code is
-required before binding.
+The two `productKey` values are internal product identities, not KRX or broker
+symbols. This holding is bound only to `gold_9999_1kg`; it must never collapse
+with `gold_9999_100g`. A provider instrument code and official-close field
+mapping remain separate unresolved source concerns.
 
 The product boundary deliberately contains no ticker. A future shared
 instrument identity must remain separate from a user-owned asset row, provider
@@ -138,9 +138,9 @@ The audit deliberately does not treat `price_basis=close`, `close_price`, or
 `unit_price` as provider authority by themselves. A gold snapshot row is only
 an official-close candidate when the exact source is
 `krx_open_api_gold_daily`, the basis is `official_close`, the price date is
-present, the currency is KRW, and a positive price is present. Even such a
-candidate would still require a canonical instrument binding before runtime
-use.
+present, the currency is KRW, and a positive price is present. The canonical
+product binding is now resolved, but provider field mapping, rights, and date
+coverage are still required before runtime use.
 
 | Evidence | Fount tickerless position | KRX gold position |
 | --- | ---: | ---: |
@@ -154,20 +154,22 @@ use.
 | event rows | 0 | 1 |
 | valuation arithmetic mismatches | 0 | 0 |
 
-Fount's 27 rows repeat one whole-position value (`4,980,948 KRW`) with quantity
-one. This is compatible with a manually valued managed sleeve, but it does not
-prove that classification, a price source, or Investment Lab participation.
-The product owner must explicitly choose `tradable instrument`, `managed
-sleeve`, or `reporting-only/unsupported` and provide valuation authority.
+Fount's stored rows are now explicitly excluded from Investment Lab and
+Simulation by product owner decision. A SELECT-only parity audit found one
+exact Fount row on every one of the 26 complete comparison dates from the
+2026-05-21 anchor, with no duplicates, invalid values, subtraction overflow,
+or related event rows. Runtime still needs one scope-consistent transform that
+removes Fount from both the observed path and scenario capital.
 
 KRX gold has two stored values (`211,500` and `225,750 KRW`) and one trade
 event. The event is quantity/cost evidence, not official-close history. The
-stored commodity type establishes only a broad asset class; it does not bind
-the row to `gold_9999_1kg`, holding unit `g`, or an official KRX observation.
+product and holding unit are resolved, while the official KRX close series
+remains `separate_valuation_model_required`.
 
-Therefore both rows remain `separate_valuation_model_required`, and the anchor
-basket remains wholly unavailable. No provider call, database write, schema
-change, backfill, proxy substitution, or partial-basket calculation was used.
+Therefore the anchor basket remains wholly unavailable until the Fount scope
+transform and KRX Gold close authority are implemented. No provider call,
+database write, schema change, backfill, proxy substitution, or partial-basket
+calculation was used.
 
 ## Deferred Additive Sequence
 
