@@ -9,19 +9,51 @@ export type InstrumentSemanticIdentity = Readonly<{
 
 export const KRX_GOLD_CLOSE_ONLY_CONTRACT = Object.freeze({
   version: "krx_gold_close_only_v1",
-  identity: Object.freeze({
+  verifiedMarketFacts: Object.freeze({
     instrumentKind: "commodity_spot",
     venue: "KRX_GOLD",
-    productKey: "gold_9999_1kg",
+    purity: "99.99%",
     holdingUnit: "g",
     quoteCurrency: "KRW",
     quoteUnit: "KRW_PER_G",
-  } satisfies InstrumentSemanticIdentity),
+    transactionUnitG: 1,
+    productCandidates: Object.freeze([
+      Object.freeze({ productKey: "gold_9999_1kg", withdrawalUnitG: 1_000 }),
+      Object.freeze({ productKey: "gold_9999_100g", withdrawalUnitG: 100 }),
+    ]),
+  }),
+  identityBinding: Object.freeze({
+    status: "unresolved",
+    reason: "bar_size_product_not_bound",
+    requiredEvidence: "broker_or_krx_instrument_code",
+  }),
   pricing: Object.freeze({
     mode: "official_close_only",
     source: "krx_open_api_gold_daily",
     quoteKind: "official_close",
     liveQuoteEligible: false,
+  }),
+  sourceFeasibility: Object.freeze({
+    status: "blocked",
+    availableFrom: "2014-03-24",
+    access: "auth_key_and_service_approval_required",
+    providerInstrumentBinding: "not_verified",
+    providerCloseFieldBinding: "not_verified",
+    multiUserDisplayRights: "not_established",
+    attributionRequired: true,
+  }),
+  datePolicy: Object.freeze({
+    observationDate: "krx_trading_date",
+    snapshotReferenceDate: "same_krx_trading_date",
+    nonTradingDate:
+      "carry_latest_prior_observation_without_synthetic_copy",
+  }),
+  anchorModel: Object.freeze({
+    currentFractionalModel:
+      "requires_explicit_research_assumption",
+    executionFaithfulModel:
+      "integer_grams_with_residual_cash_not_implemented",
+    shortSelling: "forbidden_fail_closed",
   }),
 } as const);
 

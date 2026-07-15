@@ -10,14 +10,24 @@ import {
 } from "../src/lib/instrument-identity.ts";
 
 describe("KRX gold close-only instrument contract", () => {
-  it("uses a ticker-independent semantic identity and official close policy", () => {
-    assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.identity, {
+  it("keeps verified market facts separate from unresolved product binding", () => {
+    assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.verifiedMarketFacts, {
       instrumentKind: "commodity_spot",
       venue: "KRX_GOLD",
-      productKey: "gold_9999_1kg",
+      purity: "99.99%",
       holdingUnit: "g",
       quoteCurrency: "KRW",
       quoteUnit: "KRW_PER_G",
+      transactionUnitG: 1,
+      productCandidates: [
+        { productKey: "gold_9999_1kg", withdrawalUnitG: 1_000 },
+        { productKey: "gold_9999_100g", withdrawalUnitG: 100 },
+      ],
+    });
+    assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.identityBinding, {
+      status: "unresolved",
+      reason: "bar_size_product_not_bound",
+      requiredEvidence: "broker_or_krx_instrument_code",
     });
     assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.pricing, {
       mode: "official_close_only",
@@ -27,14 +37,26 @@ describe("KRX gold close-only instrument contract", () => {
     });
     assert.doesNotMatch(
       JSON.stringify(KRX_GOLD_CLOSE_ONLY_CONTRACT),
-      /ticker|kiwoom|kis|live_price/i,
+      /kiwoom|kis|live_price/i,
     );
   });
 
-  it("keeps KRX gold spot distinct from ETF, futures, and reference prices", () => {
-    const goldSpot = buildInstrumentSemanticKey(
-      KRX_GOLD_CLOSE_ONLY_CONTRACT.identity,
-    );
+  it("keeps both KRX gold products distinct from each other and from proxies", () => {
+    const sharedGoldIdentity = {
+      instrumentKind: "commodity_spot",
+      venue: "KRX_GOLD",
+      holdingUnit: "g",
+      quoteCurrency: "KRW",
+      quoteUnit: "KRW_PER_G",
+    };
+    const gold1kg = buildInstrumentSemanticKey({
+      ...sharedGoldIdentity,
+      productKey: "gold_9999_1kg",
+    });
+    const gold100g = buildInstrumentSemanticKey({
+      ...sharedGoldIdentity,
+      productKey: "gold_9999_100g",
+    });
     const aceGoldEtf = buildInstrumentSemanticKey({
       instrumentKind: "etf",
       venue: "KRX_SECURITIES",
@@ -60,15 +82,49 @@ describe("KRX gold close-only instrument contract", () => {
       quoteUnit: "KRW_PER_G",
     });
 
-    assert.ok(goldSpot);
-    assert.equal(new Set([goldSpot, aceGoldEtf, goldFuture, convertedReference]).size, 4);
+    assert.ok(gold1kg);
+    assert.ok(gold100g);
+    assert.equal(
+      new Set([
+        gold1kg,
+        gold100g,
+        aceGoldEtf,
+        goldFuture,
+        convertedReference,
+      ]).size,
+      5,
+    );
     assert.equal(
       buildInstrumentSemanticKey({
-        ...KRX_GOLD_CLOSE_ONLY_CONTRACT.identity,
+        ...sharedGoldIdentity,
         productKey: " ",
       }),
       null,
     );
+  });
+
+  it("does not claim runtime source or anchor-model readiness", () => {
+    assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.sourceFeasibility, {
+      status: "blocked",
+      availableFrom: "2014-03-24",
+      access: "auth_key_and_service_approval_required",
+      providerInstrumentBinding: "not_verified",
+      providerCloseFieldBinding: "not_verified",
+      multiUserDisplayRights: "not_established",
+      attributionRequired: true,
+    });
+    assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.datePolicy, {
+      observationDate: "krx_trading_date",
+      snapshotReferenceDate: "same_krx_trading_date",
+      nonTradingDate:
+        "carry_latest_prior_observation_without_synthetic_copy",
+    });
+    assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.anchorModel, {
+      currentFractionalModel: "requires_explicit_research_assumption",
+      executionFaithfulModel:
+        "integer_grams_with_residual_cash_not_implemented",
+      shortSelling: "forbidden_fail_closed",
+    });
   });
 
   it("selects a newer close and retains the last success on failure", () => {

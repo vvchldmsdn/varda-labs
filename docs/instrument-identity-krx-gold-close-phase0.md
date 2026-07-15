@@ -25,15 +25,19 @@ The production Gate B1 read-only audit on 2026-07-11 confirmed:
 - the assets row count remained 17 before and after;
 - database writes and provider calls were zero.
 
-## Product Decision
+## Product Boundary
 
-KRX gold is a close-only spot commodity in v1. It is not a live quote target.
+KRX gold is a close-only spot commodity family in v1. It is not a live quote
+target. The exact KRX product remains unbound because the official market has
+both 1kg and 100g gold-bar products, both traded in 1g units and quoted in KRW
+per gram. The imported asset name `금현물`, integer gram quantity, and stored
+valuation are insufficient to distinguish those products.
 
 | Field | Value |
 | --- | --- |
 | instrument kind | `commodity_spot` |
 | venue | `KRX_GOLD` |
-| product key | `gold_9999_1kg` |
+| product key | unresolved: `gold_9999_1kg` or `gold_9999_100g` |
 | holding unit | `g` |
 | quote currency | `KRW` |
 | quote unit | `KRW_PER_G` |
@@ -42,12 +46,18 @@ KRX gold is a close-only spot commodity in v1. It is not a live quote target.
 | quote kind | `official_close` |
 | live quote eligible | `false` |
 
-`productKey` is an internal semantic label, not a KRX or broker symbol. No
-provider symbol is approved in this phase.
+The two `productKey` values are internal candidates, not KRX or broker symbols.
+Neither candidate is approved as the imported asset's canonical identity in
+this phase. Broker product evidence or an exact KRX provider instrument code is
+required before binding.
 
-The semantic identity deliberately contains no ticker. The shared instrument
-identity must remain separate from a user-owned asset row, provider mapping,
-and execution capability.
+The product boundary deliberately contains no ticker. A future shared
+instrument identity must remain separate from a user-owned asset row, provider
+mapping, and execution capability.
+
+The provider, rights, date, and same-flow feasibility review is recorded in
+`docs/krx-gold-close-only-source-feasibility-audit-v1.md`. That audit keeps
+runtime readiness blocked.
 
 ## Explicit Non-Equivalence
 
