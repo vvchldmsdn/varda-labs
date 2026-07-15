@@ -241,6 +241,12 @@ the default 2026-05-21 anchor:
   classification, so it is also `separate_valuation_model_required`. It
   remains unresolved even though stored valuation rows exist.
 
+The detailed authority audit found 20 legacy `close` labels for each of Fount
+and KRX gold, but 19 rows in each series have no price source and neither has
+an official-close candidate row. A populated `close_price` or `unit_price`
+column is therefore arithmetic display evidence, not historical price
+authority. See [the production special-holding authority audit](./instrument-identity-krx-gold-close-phase0.md#production-special-holding-authority-audit).
+
 The whole all-account anchor path therefore remains unavailable: 17 economic
 instruments are identified and two special positions remain unresolved or
 unsupported. The UI exposes all three row-level decisions without displaying

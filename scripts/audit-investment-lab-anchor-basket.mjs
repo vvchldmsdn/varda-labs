@@ -175,12 +175,76 @@ const ANCHOR_SQL = `
       legacy_asset_id,
       count(*)::int as stored_series_rows,
       count(*) filter (where price_date is not null)::int as price_date_rows,
+      count(distinct price_date)::int as stored_price_dates,
       count(*) filter (
         where lower(coalesce(price_basis, '')) like '%fallback%'
           or lower(coalesce(price_source, '')) like '%fallback%'
       )::int as fallback_price_rows,
-      count(distinct nullif(btrim(price_basis), ''))::int as price_basis_count
+      count(distinct nullif(btrim(price_basis), ''))::int as price_basis_count,
+      count(distinct nullif(btrim(price_source), ''))::int as price_source_count,
+      count(*) filter (
+        where lower(coalesce(price_basis, '')) = 'close'
+      )::int as legacy_close_label_rows,
+      count(*) filter (
+        where lower(coalesce(price_basis, '')) = 'close'
+          and nullif(btrim(price_source), '') is null
+      )::int as unattributed_close_label_rows,
+      count(*) filter (
+        where lower(coalesce(price_source, '')) =
+            'krx_open_api_gold_daily'
+          and lower(coalesce(price_basis, '')) = 'official_close'
+          and price_date is not null
+          and upper(coalesce(currency, '')) = 'KRW'
+          and coalesce(unit_price, close_price, current_price) > 0
+      )::int as official_gold_close_candidate_rows,
+      count(distinct current_price) filter (
+        where current_price is not null and current_price > 0
+      )::int as distinct_current_prices,
+      count(distinct quantity) filter (
+        where quantity is not null and quantity > 0
+      )::int as distinct_quantities,
+      min(quantity) filter (
+        where quantity is not null and quantity > 0
+      ) as min_quantity,
+      max(quantity) filter (
+        where quantity is not null and quantity > 0
+      ) as max_quantity,
+      min(current_price) filter (
+        where current_price is not null and current_price > 0
+      ) as min_current_price,
+      max(current_price) filter (
+        where current_price is not null and current_price > 0
+      ) as max_current_price,
+      count(*) filter (
+        where close_price is not null and close_price > 0
+      )::int as explicit_close_price_rows,
+      count(*) filter (
+        where unit_price is not null and unit_price > 0
+      )::int as explicit_unit_price_rows,
+      count(*) filter (
+        where quantity is not null and quantity > 0
+          and current_price is not null and current_price > 0
+          and market_value_krw is not null
+          and abs(market_value_krw - quantity * current_price) > 0.01
+      )::int as value_formula_mismatch_rows
     from daily_position_snapshots
+    where is_sample = false
+    group by legacy_asset_id
+  ),
+  event_series_summary as (
+    select
+      legacy_asset_id,
+      count(*)::int as event_rows,
+      min(event_date)::text as event_start_date,
+      max(event_date)::text as event_end_date,
+      count(distinct event_type)::int as event_type_count,
+      count(*) filter (
+        where price is not null and price > 0
+      )::int as event_price_rows,
+      count(*) filter (
+        where quantity_delta is not null and quantity_delta <> 0
+      )::int as event_quantity_rows
+    from event_ledger_entries
     where is_sample = false
     group by legacy_asset_id
   ),
@@ -258,8 +322,48 @@ const ANCHOR_SQL = `
     coalesce(d.duplicate_date_groups, 0)::int as duplicate_price_date_groups,
     coalesce(s.stored_series_rows, 0)::int as stored_series_rows,
     coalesce(s.price_date_rows, 0)::int as stored_price_date_rows,
+    coalesce(s.stored_price_dates, 0)::int as stored_price_dates,
     coalesce(s.fallback_price_rows, 0)::int as stored_fallback_price_rows,
     coalesce(s.price_basis_count, 0)::int as stored_price_basis_count,
+    coalesce(s.price_source_count, 0)::int as stored_price_source_count,
+    coalesce(s.legacy_close_label_rows, 0)::int as legacy_close_label_rows,
+    coalesce(s.unattributed_close_label_rows, 0)::int
+      as unattributed_close_label_rows,
+    coalesce(s.official_gold_close_candidate_rows, 0)::int
+      as official_gold_close_candidate_rows,
+    coalesce(s.distinct_current_prices, 0)::int as distinct_current_prices,
+    coalesce(s.distinct_quantities, 0)::int as distinct_quantities,
+    s.min_quantity,
+    s.max_quantity,
+    s.min_current_price,
+    s.max_current_price,
+    coalesce(s.explicit_close_price_rows, 0)::int
+      as explicit_close_price_rows,
+    coalesce(s.explicit_unit_price_rows, 0)::int as explicit_unit_price_rows,
+    coalesce(s.value_formula_mismatch_rows, 0)::int
+      as value_formula_mismatch_rows,
+    coalesce(e.event_rows, 0)::int as event_rows,
+    e.event_start_date,
+    e.event_end_date,
+    coalesce(e.event_type_count, 0)::int as event_type_count,
+    coalesce(e.event_price_rows, 0)::int as event_price_rows,
+    coalesce(e.event_quantity_rows, 0)::int as event_quantity_rows,
+    case
+      when i.asset_type = 'commodity'
+        and coalesce(s.official_gold_close_candidate_rows, 0) > 0
+        then 'official_close_candidate_rows_not_authority_instrument_binding_required'
+      when i.asset_type = 'commodity'
+        and coalesce(s.legacy_close_label_rows, 0) > 0
+        then 'legacy_close_label_without_official_source_or_instrument_binding'
+      when i.asset_type = 'commodity'
+        then 'official_close_evidence_missing'
+      when i.ticker is null
+        and coalesce(s.legacy_close_label_rows, 0) > 0
+        then 'legacy_close_label_without_product_or_provider_authority'
+      when i.ticker is null
+        then 'product_and_valuation_authority_required'
+      else 'not_applicable_listed_instrument'
+    end as stored_series_authority,
     case
       when i.ticker is not null
         and coalesce(p.price_rows, 0) > 0
@@ -280,6 +384,7 @@ const ANCHOR_SQL = `
     and d.market = i.market
     and d.currency = i.currency
   left join stored_series_summary s on s.legacy_asset_id = i.legacy_asset_id
+  left join event_series_summary e on e.legacy_asset_id = i.legacy_asset_id
   order by
     i.market nulls last,
     i.currency nulls last,
@@ -538,11 +643,13 @@ if (
   )
 ) {
   blockers.push("physical_anchor_holding_history_unavailable");
+  blockers.push("commodity_official_close_authority_unavailable");
 }
 if (
   unavailableIdentityRows.some((row) => row.classification === "unresolved")
 ) {
   blockers.push("anchor_holding_classification_unresolved");
+  blockers.push("tickerless_noncommodity_product_authority_unresolved");
 }
 if (Number(summary?.unsupported_axis_rows ?? 0) > 0) {
   blockers.push("unsupported_anchor_holding_axis");

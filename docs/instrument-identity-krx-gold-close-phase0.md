@@ -1,6 +1,6 @@
 # Instrument Identity And KRX Gold Close-Only Phase 0
 
-Last updated: 2026-07-11
+Last updated: 2026-07-15
 
 Status: pure contract and dependency audit implemented. No schema, migration,
 database write, provider call, Cron, route, API, UI, snapshot reader, target
@@ -117,6 +117,47 @@ is no new comparison period; it is not evidence of a zero return.
 | portfolio risk | tickerless holdings are excluded and price history is ticker keyed | require instrument-keyed close history before risk inclusion |
 | Investment Lab | stored ticker or a single-ticker consensus from same-identity Base44-imported position snapshots can establish listed identity; current asset metadata is not historical authority and tickerless commodity remains blocked | require a bound gold instrument identity and instrument-keyed official-close history before inclusion |
 | event and movement matching | asset UUID and legacy asset id are primary fallbacks | no fake ticker is needed for historical event matching |
+
+## Production Special-Holding Authority Audit
+
+The 2026-07-15 SELECT-only audit uses the first exact-source three-account
+anchor (`2026-05-21`) and groups stored history by legacy identity internally.
+The legacy identity is never returned to the page or rendered in HTML.
+
+The audit deliberately does not treat `price_basis=close`, `close_price`, or
+`unit_price` as provider authority by themselves. A gold snapshot row is only
+an official-close candidate when the exact source is
+`krx_open_api_gold_daily`, the basis is `official_close`, the price date is
+present, the currency is KRW, and a positive price is present. Even such a
+candidate would still require a canonical instrument binding before runtime
+use.
+
+| Evidence | Fount tickerless position | KRX gold position |
+| --- | ---: | ---: |
+| stored position rows | 27 | 27 |
+| rows with a price date | 20 | 20 |
+| distinct price dates | 14 | 14 |
+| legacy `close` label rows | 20 | 20 |
+| `close` rows without a source | 19 | 19 |
+| official-close candidate rows | 0 | 0 |
+| distinct stored current prices | 1 | 2 |
+| event rows | 0 | 1 |
+| valuation arithmetic mismatches | 0 | 0 |
+
+Fount's 27 rows repeat one whole-position value (`4,980,948 KRW`) with quantity
+one. This is compatible with a manually valued managed sleeve, but it does not
+prove that classification, a price source, or Investment Lab participation.
+The product owner must explicitly choose `tradable instrument`, `managed
+sleeve`, or `reporting-only/unsupported` and provide valuation authority.
+
+KRX gold has two stored values (`211,500` and `225,750 KRW`) and one trade
+event. The event is quantity/cost evidence, not official-close history. The
+stored commodity type establishes only a broad asset class; it does not bind
+the row to `gold_9999_1kg`, holding unit `g`, or an official KRX observation.
+
+Therefore both rows remain `separate_valuation_model_required`, and the anchor
+basket remains wholly unavailable. No provider call, database write, schema
+change, backfill, proxy substitution, or partial-basket calculation was used.
 
 ## Deferred Additive Sequence
 

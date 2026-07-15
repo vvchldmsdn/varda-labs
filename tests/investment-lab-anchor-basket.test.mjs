@@ -375,6 +375,35 @@ describe("investment lab anchor-date observed basket", () => {
       /data-section="investment-lab-anchor-special-holding-evidence"/,
     );
   });
+
+  it("does not promote a legacy close label to official gold authority", () => {
+    const auditSource = readFileSync(
+      new URL(
+        "../scripts/audit-investment-lab-anchor-basket.mjs",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    assert.match(
+      auditSource,
+      /lower\(coalesce\(price_source, ''\)\) =\s*'krx_open_api_gold_daily'/,
+    );
+    assert.match(
+      auditSource,
+      /lower\(coalesce\(price_basis, ''\)\) = 'official_close'/,
+    );
+    assert.match(auditSource, /official_gold_close_candidate_rows/);
+    assert.match(
+      auditSource,
+      /legacy_close_label_without_official_source_or_instrument_binding/,
+    );
+    assert.match(
+      auditSource,
+      /tickerless_noncommodity_product_authority_unresolved/,
+    );
+    assert.doesNotMatch(auditSource, /join\s+assets\b/i);
+  });
 });
 
 function fixture() {
