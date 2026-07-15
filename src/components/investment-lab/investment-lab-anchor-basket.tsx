@@ -1,11 +1,9 @@
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
-import type {
-  InvestmentLabAnchorBlocker,
-  InvestmentLabAnchorSpecialHoldingEvidence,
-} from "@/lib/investment-lab-anchor-basket-anchor";
+import type { InvestmentLabAnchorBlocker } from "@/lib/investment-lab-anchor-basket-anchor";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
+import type { InvestmentLabAnchorSpecialHoldingEvidence } from "@/lib/investment-lab-special-holding-authority";
 
 export function InvestmentLabAnchorBasket({
   model,
@@ -113,28 +111,43 @@ function SpecialHoldingEvidence({
   const resolvedCount = rows.filter(
     (row) => row.identityStatus === "resolved",
   ).length;
+  const eligibleCount = rows.filter(
+    (row) =>
+      row.historicalAuthorityOutcome === "eligible_historical_instrument",
+  ).length;
+  const separateModelCount = rows.filter(
+    (row) =>
+      row.historicalAuthorityOutcome === "separate_valuation_model_required",
+  ).length;
+  const unsupportedCount = rows.filter(
+    (row) => row.historicalAuthorityOutcome === "permanently_unsupported",
+  ).length;
   return (
     <div
       className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      data-anchor-special-holding-eligible={eligibleCount}
       data-anchor-special-holding-resolved={resolvedCount}
       data-anchor-special-holding-rows={rows.length}
+      data-anchor-special-holding-separate-model={separateModelCount}
       data-anchor-special-holding-unavailable={rows.length - resolvedCount}
+      data-anchor-special-holding-unsupported={unsupportedCount}
       data-section="investment-lab-anchor-special-holding-evidence"
     >
       <div className="border-b border-[#e1e6dc] px-4 py-3">
         <h3 className="font-semibold">ticker 없는 저장 포지션 근거</h3>
         <p className="mt-1 text-xs leading-5 text-[#687064]">
-          이름으로 종목을 추론하지 않습니다. 보존된 legacy asset 연결과 저장
-          메타데이터가 모두 일치할 때만 listed ticker를 복구합니다.
+          이름이나 현재 자산값으로 종목을 추론하지 않습니다. 같은 legacy 자산의
+          Base44 이관 스냅샷 메타데이터와 ticker가 합의될 때만 복구합니다.
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+        <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
             <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
               <th className="px-4 py-3">저장 포지션</th>
               <th className="px-3 py-3">계좌·축</th>
               <th className="px-3 py-3">identity 상태</th>
+              <th className="px-3 py-3">과거 평가 판정</th>
               <th className="px-4 py-3">판정 근거</th>
             </tr>
           </thead>
@@ -161,6 +174,11 @@ function SpecialHoldingEvidence({
                       ? `listed ${row.resolvedTicker}`
                       : "사용 불가"}
                   </span>
+                </td>
+                <td className="px-3 py-3 font-semibold text-[#34443d]">
+                  {specialHoldingOutcomeLabel(
+                    row.historicalAuthorityOutcome,
+                  )}
                 </td>
                 <td className="px-4 py-3 text-[#5f685d]">
                   {specialHoldingReasonLabel(row.reason)}
@@ -373,14 +391,29 @@ function specialHoldingReasonLabel(
     InvestmentLabAnchorSpecialHoldingEvidence["reason"],
     string
   > = {
-    linked_ticker_recovered: "exact imported asset link와 저장 메타데이터 일치",
-    physical_commodity_history_unavailable:
-      "실물 commodity용 instrument-keyed 공식 종가 이력 없음",
-    linked_asset_metadata_mismatch: "연결 자산과 저장 메타데이터 불일치",
-    linked_asset_ticker_missing: "연결 자산에도 listed ticker 없음",
-    linked_asset_unavailable: "검증 가능한 imported asset link 없음",
+    stored_snapshot_ticker_recovered:
+      "Base44 이관 포지션 ticker 합의로 복구",
+    stored_snapshot_ticker_conflict: "이관 포지션 ticker가 서로 충돌",
+    stored_snapshot_metadata_mismatch: "이관 포지션 메타데이터 불일치",
+    instrument_keyed_official_close_required:
+      "실물 commodity용 instrument-keyed 공식 종가 모델 필요",
+    explicit_product_classification_required:
+      "명시적 상품 분류와 평가 권위 필요",
+    non_investment_asset_type_unsupported: "투자 바스켓 제외 자산 유형",
   };
   return labels[reason];
+}
+
+function specialHoldingOutcomeLabel(
+  outcome: InvestmentLabAnchorSpecialHoldingEvidence["historicalAuthorityOutcome"],
+) {
+  if (outcome === "eligible_historical_instrument") {
+    return "과거 종목 후보";
+  }
+  if (outcome === "separate_valuation_model_required") {
+    return "별도 평가 모델 필요";
+  }
+  return "지원하지 않음";
 }
 
 function formatDate(value: string | null) {

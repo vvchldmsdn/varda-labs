@@ -1,4 +1,9 @@
 import type { InvestmentLabSourceSnapshotRow } from "./investment-lab-counterfactual-read-model.ts";
+import {
+  resolveInvestmentLabSpecialHoldingIdentity,
+  type InvestmentLabAnchorSpecialHoldingEvidence,
+  type InvestmentLabImportedTickerEvidence,
+} from "./investment-lab-special-holding-authority.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
 
 const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
@@ -9,9 +14,10 @@ export const INVESTMENT_LAB_ANCHOR_BASKET_POLICY = Object.freeze({
   account: "all",
   anchorAuthority: "exact_stored_portfolio_and_position_source",
   identity:
-    "stored_ticker_or_exact_imported_asset_link_then_market_currency_ticker",
-  linkedIdentity:
-    "asset_id_legacy_id_and_snapshot_metadata_all_match",
+    "stored_ticker_or_base44_imported_snapshot_consensus_then_market_currency_ticker",
+  importedIdentity:
+    "same_legacy_identity_and_snapshot_metadata_consensus",
+  currentAssetFallback: "forbidden",
   nameInference: "forbidden",
   anchorAllocation: "equal_weight_once_at_anchor",
   subsequentFlowAllocation: "equal_split_across_anchor_instruments",
@@ -31,41 +37,7 @@ export type InvestmentLabAnchorPositionRow = Readonly<{
   assetType: string | null;
   quantity: string | number | null;
   marketValueKrw: string | number | null;
-  linkedAsset?: InvestmentLabAnchorLinkedAsset | null;
-}>;
-
-export type InvestmentLabAnchorLinkedAsset = Readonly<{
-  name: string;
-  ticker: string | null;
-  account: string;
-  market: string;
-  currency: string;
-  assetType: string | null;
-}>;
-
-export type InvestmentLabAnchorSpecialHoldingEvidence = Readonly<{
-  name: string;
-  account: string;
-  source: string | null;
-  market: string | null;
-  currency: string | null;
-  assetType: string | null;
-  classification:
-    | "linked_listed_instrument"
-    | "physical_commodity_position"
-    | "unresolved";
-  identityStatus: "resolved" | "unavailable";
-  resolvedTicker: string | null;
-  identityAuthority:
-    | "exact_imported_asset_link"
-    | "explicit_snapshot_asset_type"
-    | "none";
-  reason:
-    | "linked_ticker_recovered"
-    | "physical_commodity_history_unavailable"
-    | "linked_asset_metadata_mismatch"
-    | "linked_asset_ticker_missing"
-    | "linked_asset_unavailable";
+  importedTickerEvidence?: InvestmentLabImportedTickerEvidence | null;
 }>;
 
 export type InvestmentLabAnchorInstrument = Readonly<{
@@ -187,7 +159,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   let recognizedPositionRows = 0;
 
   for (const row of anchorRows) {
-    const identity = resolveAnchorPositionIdentity(row);
+    const identity = resolveInvestmentLabSpecialHoldingIdentity(row);
     const ticker = identity.ticker;
     const market = normalizeText(row.market)?.toLowerCase() ?? null;
     const currency = normalizeText(row.currency)?.toUpperCase() ?? null;
@@ -296,87 +268,6 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
     ),
     blockers: Object.freeze([...blockers].sort()),
   });
-}
-
-function resolveAnchorPositionIdentity(row: InvestmentLabAnchorPositionRow) {
-  const storedTicker = normalizeText(row.ticker)?.toUpperCase() ?? null;
-  if (storedTicker) {
-    return { ticker: storedTicker, specialHoldingEvidence: null } as const;
-  }
-
-  const name = normalizeText(row.assetName) ?? "이름 없는 저장 포지션";
-  const account = normalizeText(row.account)?.toLowerCase() ?? "unknown";
-  const source = normalizeText(row.source);
-  const market = normalizeText(row.market)?.toLowerCase() ?? null;
-  const currency = normalizeText(row.currency)?.toUpperCase() ?? null;
-  const assetType = normalizeText(row.assetType)?.toLowerCase() ?? null;
-  const linkedAsset = row.linkedAsset ?? null;
-  const linkedTicker = normalizeText(linkedAsset?.ticker)?.toUpperCase() ?? null;
-
-  if (linkedAsset && linkedTicker && linkedMetadataMatches(row, linkedAsset)) {
-    return {
-      ticker: linkedTicker,
-      specialHoldingEvidence: Object.freeze({
-        name,
-        account,
-        source,
-        market,
-        currency,
-        assetType,
-        classification: "linked_listed_instrument" as const,
-        identityStatus: "resolved" as const,
-        resolvedTicker: linkedTicker,
-        identityAuthority: "exact_imported_asset_link" as const,
-        reason: "linked_ticker_recovered" as const,
-      }),
-    };
-  }
-
-  const physicalCommodity = assetType === "commodity";
-  const reason = linkedAsset
-    ? linkedTicker
-      ? "linked_asset_metadata_mismatch"
-      : "linked_asset_ticker_missing"
-    : "linked_asset_unavailable";
-  return {
-    ticker: null,
-    specialHoldingEvidence: Object.freeze({
-      name,
-      account,
-      source,
-      market,
-      currency,
-      assetType,
-      classification: physicalCommodity
-        ? ("physical_commodity_position" as const)
-        : ("unresolved" as const),
-      identityStatus: "unavailable" as const,
-      resolvedTicker: null,
-      identityAuthority: physicalCommodity
-        ? ("explicit_snapshot_asset_type" as const)
-        : ("none" as const),
-      reason: physicalCommodity
-        ? ("physical_commodity_history_unavailable" as const)
-        : reason,
-    }),
-  };
-}
-
-function linkedMetadataMatches(
-  row: InvestmentLabAnchorPositionRow,
-  linked: InvestmentLabAnchorLinkedAsset,
-) {
-  return (
-    normalizedComparison(row.assetName) === normalizedComparison(linked.name) &&
-    normalizedComparison(row.account) === normalizedComparison(linked.account) &&
-    normalizedComparison(row.market) === normalizedComparison(linked.market) &&
-    normalizedComparison(row.currency) === normalizedComparison(linked.currency) &&
-    normalizedComparison(row.assetType) === normalizedComparison(linked.assetType)
-  );
-}
-
-function normalizedComparison(value: unknown) {
-  return normalizeText(value)?.toLocaleLowerCase("en-US") ?? null;
 }
 
 function compareSpecialHoldingEvidence(

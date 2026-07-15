@@ -17,9 +17,11 @@ simulation job is approved by this document.
 - Separate observed data, assumptions, deterministic calculations, stochastic
   calculations, and presentation.
 - Use `(market, currency, ticker)` as instrument identity.
-- A missing stored ticker may use an imported asset link only when asset id,
-  preserved legacy id, and snapshot name/account/market/currency/type all
-  agree. Never infer identity or product class from a display name.
+- A missing stored ticker may use only a single-ticker consensus from
+  Base44-imported position snapshots with the same legacy identity and matching
+  name/account/market/currency/type. A current mutable asset row is not
+  historical authority. Never infer identity or product class from a display
+  name.
 - Use adjusted historical prices and date-specific FX without look-ahead.
 - Preserve full precision in calculations and round only for presentation.
 - Expose missing evidence and model uncertainty instead of manufacturing a

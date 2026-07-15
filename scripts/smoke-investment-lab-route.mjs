@@ -97,6 +97,9 @@ async function main() {
   let anchorSpecialHoldingRows = 0;
   let anchorSpecialHoldingResolved = 0;
   let anchorSpecialHoldingUnavailable = 0;
+  let anchorSpecialHoldingEligible = 0;
+  let anchorSpecialHoldingSeparateModel = 0;
+  let anchorSpecialHoldingUnsupported = 0;
   if (
     route.body.includes(
       'data-section="investment-lab-anchor-special-holding-evidence"',
@@ -114,6 +117,18 @@ async function main() {
       route.body,
       "data-anchor-special-holding-unavailable",
     );
+    anchorSpecialHoldingEligible = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-eligible",
+    );
+    anchorSpecialHoldingSeparateModel = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-separate-model",
+    );
+    anchorSpecialHoldingUnsupported = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-unsupported",
+    );
     assert.equal(
       anchorSpecialHoldingResolved + anchorSpecialHoldingUnavailable,
       anchorSpecialHoldingRows,
@@ -122,10 +137,15 @@ async function main() {
       anchorSpecialHoldingUnavailable,
       anchorBasketUnresolvedRows,
     );
+    assert.equal(anchorSpecialHoldingEligible, anchorSpecialHoldingResolved);
+    assert.equal(
+      anchorSpecialHoldingSeparateModel + anchorSpecialHoldingUnsupported,
+      anchorSpecialHoldingUnavailable,
+    );
     assert.match(route.body, /data-special-holding-status="unavailable"/);
     if (anchorSpecialHoldingResolved > 0) {
       assert.match(route.body, /data-special-holding-status="resolved"/);
-      assert.ok(route.body.includes("exact imported asset link"));
+      assert.ok(route.body.includes("Base44 이관 포지션 ticker 합의"));
     }
   }
   const matrixExpected =
@@ -509,6 +529,9 @@ async function main() {
           anchorSpecialHoldingRows,
           anchorSpecialHoldingResolved,
           anchorSpecialHoldingUnavailable,
+          anchorSpecialHoldingEligible,
+          anchorSpecialHoldingSeparateModel,
+          anchorSpecialHoldingUnsupported,
           scenarioMatrixStatus,
           scenarioMatrixRows,
           scenarioMatrixReadyRows,
@@ -764,6 +787,9 @@ async function main() {
         anchorSpecialHoldingRows,
         anchorSpecialHoldingResolved,
         anchorSpecialHoldingUnavailable,
+        anchorSpecialHoldingEligible,
+        anchorSpecialHoldingSeparateModel,
+        anchorSpecialHoldingUnsupported,
         scenarioMatrixStatus,
         scenarioMatrixRows,
         scenarioMatrixReadyRows,

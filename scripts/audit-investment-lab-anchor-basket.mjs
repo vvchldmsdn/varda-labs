@@ -39,6 +39,29 @@ const ANCHOR_SQL = `
     from named_portfolio_rows p
     join anchor a on a.snapshot_date = p.snapshot_date
   ),
+  imported_ticker_consensus as (
+    select
+      legacy_asset_id,
+      min(upper(btrim(ticker))) as ticker,
+      count(*)::int as evidence_rows,
+      count(distinct upper(btrim(ticker)))::int as ticker_count,
+      count(distinct lower(btrim(asset_name)))::int as name_count,
+      count(distinct lower(btrim(account)))::int as account_count,
+      count(distinct lower(btrim(market)))::int as market_count,
+      count(distinct upper(btrim(currency)))::int as currency_count,
+      count(distinct lower(coalesce(btrim(asset_type), '')))::int
+        as asset_type_count,
+      min(lower(btrim(asset_name))) as asset_name_key,
+      min(lower(btrim(account))) as account_key,
+      min(lower(btrim(market))) as market_key,
+      min(upper(btrim(currency))) as currency_key,
+      min(lower(coalesce(btrim(asset_type), ''))) as asset_type_key
+    from daily_position_snapshots
+    where is_sample = false
+      and source = 'base44_import'
+      and nullif(btrim(ticker), '') is not null
+    group by legacy_asset_id
+  ),
   anchor_positions as (
     select
       p.account,
@@ -53,37 +76,62 @@ const ANCHOR_SQL = `
       p.quantity,
       p.market_value_krw,
       case
-        when linked.legacy_base44_id = p.legacy_asset_id
-          and nullif(btrim(linked.ticker), '') is not null
-          and lower(btrim(linked.name)) = lower(btrim(p.asset_name))
-          and lower(btrim(linked.account)) = lower(btrim(p.account))
-          and lower(btrim(linked.market)) = lower(btrim(p.market))
-          and upper(btrim(linked.currency)) = upper(btrim(p.currency))
-          and lower(coalesce(btrim(linked.asset_type), '')) =
+        when imported.ticker_count = 1
+          and imported.name_count = 1
+          and imported.account_count = 1
+          and imported.market_count = 1
+          and imported.currency_count = 1
+          and imported.asset_type_count = 1
+          and imported.asset_name_key = lower(btrim(p.asset_name))
+          and imported.account_key = lower(btrim(p.account))
+          and imported.market_key = lower(btrim(p.market))
+          and imported.currency_key = upper(btrim(p.currency))
+          and imported.asset_type_key =
             lower(coalesce(btrim(p.asset_type), ''))
-        then upper(btrim(linked.ticker))
+        then imported.ticker
         else null
-      end as linked_ticker
+      end as imported_ticker,
+      coalesce(imported.evidence_rows, 0)::int
+        as imported_ticker_evidence_rows,
+      case
+        when imported.legacy_asset_id is null then 'no_imported_ticker_evidence'
+        when imported.ticker_count <> 1 then 'conflicting_imported_tickers'
+        when imported.name_count <> 1
+          or imported.account_count <> 1
+          or imported.market_count <> 1
+          or imported.currency_count <> 1
+          or imported.asset_type_count <> 1
+          or imported.asset_name_key <> lower(btrim(p.asset_name))
+          or imported.account_key <> lower(btrim(p.account))
+          or imported.market_key <> lower(btrim(p.market))
+          or imported.currency_key <> upper(btrim(p.currency))
+          or imported.asset_type_key <>
+            lower(coalesce(btrim(p.asset_type), ''))
+        then 'metadata_mismatch'
+        else 'consensus'
+      end as imported_ticker_status
     from daily_position_snapshots p
     join anchor_portfolios a
       on a.snapshot_date = p.snapshot_date
       and a.account = p.account
       and a.source = p.source
-    left join assets linked on linked.id = p.asset_id
+    left join imported_ticker_consensus imported
+      on imported.legacy_asset_id = p.legacy_asset_id
     where p.is_sample = false
   ),
   resolved_anchor_positions as (
     select
       *,
-      coalesce(stored_ticker, linked_ticker) as ticker,
+      coalesce(stored_ticker, imported_ticker) as ticker,
       case
         when stored_ticker is not null then 'stored_snapshot_ticker'
-        when linked_ticker is not null then 'exact_imported_asset_link'
+        when imported_ticker is not null
+          then 'base44_imported_snapshot_ticker_consensus'
         when asset_type = 'commodity' then 'explicit_snapshot_asset_type'
         else 'none'
       end as identity_authority,
       case
-        when stored_ticker is not null or linked_ticker is not null
+        when stored_ticker is not null or imported_ticker is not null
           then 'resolved'
         else 'unavailable'
       end as identity_status
@@ -147,6 +195,8 @@ const ANCHOR_SQL = `
       min(category) as category,
       min(identity_authority) as identity_authority,
       min(identity_status) as identity_status,
+      max(imported_ticker_evidence_rows)::int as imported_ticker_evidence_rows,
+      min(imported_ticker_status) as imported_ticker_status,
       bool_or(stored_ticker is null) as stored_ticker_missing,
       count(*)::int as source_rows,
       count(distinct account)::int as account_count,
@@ -184,6 +234,14 @@ const ANCHOR_SQL = `
       when i.asset_type = 'commodity' then 'physical_commodity_position'
       else 'unresolved'
     end as classification,
+    case
+      when i.ticker is not null then 'eligible_historical_instrument'
+      when i.asset_type in ('fixed_deposit', 'housing_subscription', 'savings')
+        then 'permanently_unsupported'
+      else 'separate_valuation_model_required'
+    end as historical_authority_outcome,
+    i.imported_ticker_evidence_rows,
+    i.imported_ticker_status,
     case when i.currency = 'USD' then 'stored_usdkrw_required' else 'none' end
       as fx_requirement,
     i.source_rows,
@@ -260,21 +318,47 @@ const SUMMARY_SQL = `
     from named_portfolio_rows p
     join anchor a on a.snapshot_date = p.snapshot_date
   ),
+  imported_ticker_consensus as (
+    select
+      legacy_asset_id,
+      min(upper(btrim(ticker))) as ticker,
+      count(distinct upper(btrim(ticker)))::int as ticker_count,
+      count(distinct lower(btrim(asset_name)))::int as name_count,
+      count(distinct lower(btrim(account)))::int as account_count,
+      count(distinct lower(btrim(market)))::int as market_count,
+      count(distinct upper(btrim(currency)))::int as currency_count,
+      count(distinct lower(coalesce(btrim(asset_type), '')))::int
+        as asset_type_count,
+      min(lower(btrim(asset_name))) as asset_name_key,
+      min(lower(btrim(account))) as account_key,
+      min(lower(btrim(market))) as market_key,
+      min(upper(btrim(currency))) as currency_key,
+      min(lower(coalesce(btrim(asset_type), ''))) as asset_type_key
+    from daily_position_snapshots
+    where is_sample = false
+      and source = 'base44_import'
+      and nullif(btrim(ticker), '') is not null
+    group by legacy_asset_id
+  ),
   anchor_positions as (
     select
       p.*,
       case
         when nullif(btrim(p.ticker), '') is not null
           then upper(btrim(p.ticker))
-        when linked.legacy_base44_id = p.legacy_asset_id
-          and nullif(btrim(linked.ticker), '') is not null
-          and lower(btrim(linked.name)) = lower(btrim(p.asset_name))
-          and lower(btrim(linked.account)) = lower(btrim(p.account))
-          and lower(btrim(linked.market)) = lower(btrim(p.market))
-          and upper(btrim(linked.currency)) = upper(btrim(p.currency))
-          and lower(coalesce(btrim(linked.asset_type), '')) =
+        when imported.ticker_count = 1
+          and imported.name_count = 1
+          and imported.account_count = 1
+          and imported.market_count = 1
+          and imported.currency_count = 1
+          and imported.asset_type_count = 1
+          and imported.asset_name_key = lower(btrim(p.asset_name))
+          and imported.account_key = lower(btrim(p.account))
+          and imported.market_key = lower(btrim(p.market))
+          and imported.currency_key = upper(btrim(p.currency))
+          and imported.asset_type_key =
             lower(coalesce(btrim(p.asset_type), ''))
-        then upper(btrim(linked.ticker))
+        then imported.ticker
         else null
       end as resolved_ticker
     from daily_position_snapshots p
@@ -282,7 +366,8 @@ const SUMMARY_SQL = `
       on a.snapshot_date = p.snapshot_date
       and a.account = p.account
       and a.source = p.source
-    left join assets linked on linked.id = p.asset_id
+    left join imported_ticker_consensus imported
+      on imported.legacy_asset_id = p.legacy_asset_id
     where p.is_sample = false
   ),
   date_account_positions as (
@@ -306,7 +391,7 @@ const SUMMARY_SQL = `
     count(*) filter (
       where (ticker is null or btrim(ticker) = '')
         and resolved_ticker is not null
-    )::int as linked_ticker_recovered_rows,
+    )::int as imported_snapshot_ticker_recovered_rows,
     count(*) filter (
       where resolved_ticker is null
     )::int as unresolved_identity_rows,
@@ -484,9 +569,10 @@ const report = {
   policy: {
     anchor: "first_complete_exact_source_portfolio_and_position_intersection",
     identity:
-      "stored_ticker_or_exact_imported_asset_link_then_market_currency_ticker",
-    linkedIdentity:
-      "asset_id_and_legacy_id_and_snapshot_metadata_must_all_match",
+      "stored_ticker_or_base44_imported_snapshot_consensus_then_market_currency_ticker",
+    importedIdentity:
+      "same_legacy_identity_and_snapshot_metadata_consensus",
+    currentAssetFallback: "forbidden",
     nameInference: "forbidden",
     exclusions: "forbidden_whole_scenario_unavailable",
   },

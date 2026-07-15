@@ -203,36 +203,43 @@ without provider calls or writes.
 
 ## Anchor Special-Holding Identity Authority
 
-`exact_imported_asset_link_v1` is a narrow read-time identity recovery rule,
-not a current-metadata fallback or snapshot backfill:
+`base44_imported_snapshot_ticker_consensus_v1` is a narrow read-time identity
+recovery rule, not a current-metadata fallback or snapshot backfill:
 
 1. A stored snapshot ticker remains the primary authority.
-2. A missing ticker may be recovered only when the snapshot `asset_id` joins
-   one asset row, the snapshot and asset preserve the same non-null Base44
-   legacy id, and name, account, market, currency, and asset type all match.
+2. A missing ticker may be recovered only from other `base44_import` position
+   snapshots with the same legacy identity when every non-empty ticker agrees
+   and name, account, market, currency, and asset type match the target row.
 3. The recovered ticker is used only as listed-instrument identity evidence.
+   The current mutable asset row and current price are not identity authority.
    No snapshot row or asset row is written or relabeled.
 4. Display-name inference, proxy instruments, interpolation, zero return, and
    current-price reverse projection are forbidden.
 5. A ticker-bearing commodity ETF remains a listed instrument. A tickerless
    explicit commodity remains unavailable until instrument-keyed official
    close history is bound and coverage is separately validated.
-6. A tickerless product with no explicit managed-product classification stays
-   unresolved. A name such as `Fount 일임서비스` is not classification
-   authority.
+6. Each special row receives one authority outcome:
+   `eligible_historical_instrument`, `separate_valuation_model_required`, or
+   `permanently_unsupported`. Eligibility does not claim full scenario-date
+   price, FX, or execution coverage.
+7. A tickerless product with no explicit managed-product classification stays
+   unresolved and requires a separate valuation-model decision. A name such
+   as `Fount 일임서비스` is not classification authority.
 
 The production SELECT-only audit on 2026-07-15 found three tickerless rows at
 the default 2026-05-21 anchor:
 
-- `RISE 대형고배당10TotalReturn` passes the exact imported asset-link rule and
-  resolves to listed ticker `315960`. A clean ticker-keyed price series is
-  present, but this row-level audit does not claim full scenario-date coverage.
+- `RISE 대형고배당10TotalReturn` resolves to listed ticker `315960` from eleven
+  matching Base44-imported position rows with one ticker consensus. A clean
+  ticker-keyed price series is present, but this row-level audit does not claim
+  full scenario-date coverage.
 - `금현물` has explicit commodity evidence but no bound instrument-keyed
-  official-close history. Stored fallback/current-price rows are not promoted
-  to official close authority.
+  official-close history, so it is `separate_valuation_model_required`.
+  Stored fallback/current-price rows are not promoted to official close
+  authority.
 - `Fount 일임서비스` has neither a listed ticker nor explicit managed-sleeve
-  classification. It remains unresolved even though stored valuation rows
-  exist.
+  classification, so it is also `separate_valuation_model_required`. It
+  remains unresolved even though stored valuation rows exist.
 
 The whole all-account anchor path therefore remains unavailable: 17 economic
 instruments are identified and two special positions remain unresolved or

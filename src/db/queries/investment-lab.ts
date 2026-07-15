@@ -17,6 +17,7 @@ import {
 } from "@/lib/investment-lab-counterfactual-read-loader";
 import type { InvestmentLabPeriodRequest } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
+import { attachBase44ImportedTickerEvidence } from "@/lib/investment-lab-special-holding-authority";
 
 const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 
@@ -121,16 +122,8 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         quantity: dailyPositionSnapshots.quantity,
         marketValueKrw: dailyPositionSnapshots.marketValueKrw,
         snapshotLegacyAssetId: dailyPositionSnapshots.legacyAssetId,
-        linkedLegacyAssetId: assets.legacyBase44Id,
-        linkedAssetName: assets.name,
-        linkedAssetTicker: assets.ticker,
-        linkedAssetAccount: assets.account,
-        linkedAssetMarket: assets.market,
-        linkedAssetCurrency: assets.currency,
-        linkedAssetType: assets.assetType,
       })
       .from(dailyPositionSnapshots)
-      .leftJoin(assets, eq(dailyPositionSnapshots.assetId, assets.id))
       .where(
         and(
           eq(dailyPositionSnapshots.isSample, false),
@@ -149,37 +142,24 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         sql`${dailyPositionSnapshots.ticker} asc nulls last`,
       );
 
-    return rows.map(
-      ({
-        snapshotLegacyAssetId,
-        linkedLegacyAssetId,
-        linkedAssetName,
-        linkedAssetTicker,
-        linkedAssetAccount,
-        linkedAssetMarket,
-        linkedAssetCurrency,
-        linkedAssetType,
-        ...row
-      }) => ({
+    return attachBase44ImportedTickerEvidence(
+      rows.map(({ snapshotLegacyAssetId, ...row }) => ({
         ...row,
-        linkedAsset:
-          linkedLegacyAssetId !== null &&
-          snapshotLegacyAssetId === linkedLegacyAssetId &&
-          linkedAssetName !== null &&
-          linkedAssetAccount !== null &&
-          linkedAssetMarket !== null &&
-          linkedAssetCurrency !== null
-            ? Object.freeze({
-                name: linkedAssetName,
-                ticker: linkedAssetTicker,
-                account: linkedAssetAccount,
-                market: linkedAssetMarket,
-                currency: linkedAssetCurrency,
-                assetType: linkedAssetType,
-              })
-            : null,
-      }),
-    );
+        identityKey: snapshotLegacyAssetId,
+      })),
+    ).map((row) => ({
+      snapshotDate: row.snapshotDate,
+      account: row.account,
+      source: row.source,
+      ticker: row.ticker,
+      assetName: row.assetName,
+      market: row.market,
+      currency: row.currency,
+      assetType: row.assetType,
+      quantity: row.quantity,
+      marketValueKrw: row.marketValueKrw,
+      importedTickerEvidence: row.importedTickerEvidence,
+    }));
   },
 
   async loadAnchorPriceRows({

@@ -6,6 +6,10 @@ import { resolveInvestmentLabAnchorSelection } from "../src/lib/investment-lab-a
 import { resolveInvestmentLabAnchorBasketEvidence } from "../src/lib/investment-lab-anchor-basket-evidence.ts";
 import { loadInvestmentLabAnchorBasketScenario } from "../src/lib/investment-lab-anchor-basket-read-loader.ts";
 import { buildInvestmentLabAnchorBasketScenario } from "../src/lib/investment-lab-anchor-basket-scenario.ts";
+import {
+  attachBase44ImportedTickerEvidence,
+  resolveInvestmentLabSpecialHoldingIdentity,
+} from "../src/lib/investment-lab-special-holding-authority.ts";
 
 describe("investment lab anchor-date observed basket", () => {
   it("aggregates the same economic identity across accounts at the anchor", () => {
@@ -107,33 +111,30 @@ describe("investment lab anchor-date observed basket", () => {
         identityStatus: "unavailable",
         resolvedTicker: null,
         identityAuthority: "explicit_snapshot_asset_type",
-        reason: "physical_commodity_history_unavailable",
+        historicalAuthorityOutcome: "separate_valuation_model_required",
+        historicalCoverageStatus: "blocked",
+        evidenceRowCount: 0,
+        reason: "instrument_keyed_official_close_required",
       },
     ]);
   });
 
-  it("recovers a listed ticker only from an exact imported asset link", () => {
+  it("recovers a listed ticker from immutable imported snapshot consensus", () => {
     const input = fixture();
-    input.positionRows.push({
-      snapshotDate: "2026-01-06",
-      account: "irp",
-      source: "stored",
-      ticker: null,
-      assetName: "Linked listed ETF",
-      market: "korea",
-      currency: "KRW",
-      assetType: "etf",
-      quantity: 1,
-      marketValueKrw: 100,
-      linkedAsset: {
-        name: "Linked listed ETF",
-        ticker: "315960",
-        account: "irp",
-        market: "korea",
-        currency: "KRW",
-        assetType: "etf",
-      },
-    });
+    input.positionRows.push(
+      ...attachBase44ImportedTickerEvidence([
+        importedIdentityRow({
+          snapshotDate: "2026-01-06",
+          source: "stored",
+          ticker: null,
+        }),
+        importedIdentityRow({
+          snapshotDate: "2026-01-07",
+          source: "base44_import",
+          ticker: "315960",
+        }),
+      ]),
+    );
     const anchor = resolveInvestmentLabAnchorSelection({
       serviceDates: input.serviceDates,
       snapshotRows: input.snapshotRows,
@@ -148,43 +149,40 @@ describe("investment lab anchor-date observed basket", () => {
     assert.equal(anchor.coverage.unresolvedPositionRows, 0);
     assert.deepEqual(anchor.specialHoldingEvidence, [
       {
-        name: "Linked listed ETF",
+        name: "Imported listed ETF",
         account: "irp",
         source: "stored",
         market: "korea",
         currency: "KRW",
         assetType: "etf",
-        classification: "linked_listed_instrument",
+        classification: "stored_listed_instrument",
         identityStatus: "resolved",
         resolvedTicker: "315960",
-        identityAuthority: "exact_imported_asset_link",
-        reason: "linked_ticker_recovered",
+        identityAuthority: "base44_imported_snapshot_ticker_consensus",
+        historicalAuthorityOutcome: "eligible_historical_instrument",
+        historicalCoverageStatus: "not_evaluated",
+        evidenceRowCount: 1,
+        reason: "stored_snapshot_ticker_recovered",
       },
     ]);
   });
 
-  it("does not infer a ticker when linked metadata conflicts", () => {
+  it("does not recover a historical ticker when imported metadata conflicts", () => {
     const input = fixture();
-    input.positionRows.push({
-      snapshotDate: "2026-01-06",
-      account: "irp",
-      source: "stored",
-      ticker: null,
-      assetName: "Stored name",
-      market: "korea",
-      currency: "KRW",
-      assetType: "etf",
-      quantity: 1,
-      marketValueKrw: 100,
-      linkedAsset: {
-        name: "Different current name",
+    const rows = [
+      importedIdentityRow({
+        snapshotDate: "2026-01-06",
+        source: "stored",
+        ticker: null,
+      }),
+      importedIdentityRow({
+        snapshotDate: "2026-01-07",
+        source: "base44_import",
         ticker: "315960",
-        account: "irp",
-        market: "korea",
-        currency: "KRW",
-        assetType: "etf",
-      },
-    });
+        assetName: "Different imported name",
+      }),
+    ];
+    input.positionRows.push(...attachBase44ImportedTickerEvidence(rows));
     const anchor = resolveInvestmentLabAnchorSelection({
       serviceDates: input.serviceDates,
       snapshotRows: input.snapshotRows,
@@ -195,9 +193,59 @@ describe("investment lab anchor-date observed basket", () => {
     assert.equal(anchor.coverage.unresolvedPositionRows, 1);
     assert.equal(
       anchor.specialHoldingEvidence[0].reason,
-      "linked_asset_metadata_mismatch",
+      "stored_snapshot_metadata_mismatch",
     );
     assert.equal(anchor.specialHoldingEvidence[0].resolvedTicker, null);
+  });
+
+  it("blocks conflicting imported tickers for one legacy identity", () => {
+    const rows = attachBase44ImportedTickerEvidence([
+      importedIdentityRow({ source: "stored", ticker: null }),
+      importedIdentityRow({
+        snapshotDate: "2026-01-07",
+        source: "base44_import",
+        ticker: "315960",
+      }),
+      importedIdentityRow({
+        snapshotDate: "2026-01-08",
+        source: "base44_import",
+        ticker: "999999",
+      }),
+    ]);
+
+    const decision = resolveInvestmentLabSpecialHoldingIdentity(rows[0]);
+
+    assert.equal(decision.ticker, null);
+    assert.equal(
+      decision.specialHoldingEvidence.reason,
+      "stored_snapshot_ticker_conflict",
+    );
+    assert.equal(
+      decision.specialHoldingEvidence.historicalAuthorityOutcome,
+      "separate_valuation_model_required",
+    );
+  });
+
+  it("keeps explicit non-investment asset types permanently unsupported", () => {
+    const decision = resolveInvestmentLabSpecialHoldingIdentity({
+      ticker: null,
+      assetName: "Excluded savings",
+      account: "brokerage",
+      source: "stored",
+      market: "korea",
+      currency: "KRW",
+      assetType: "savings",
+    });
+
+    assert.equal(decision.ticker, null);
+    assert.equal(
+      decision.specialHoldingEvidence.historicalAuthorityOutcome,
+      "permanently_unsupported",
+    );
+    assert.equal(
+      decision.specialHoldingEvidence.reason,
+      "non_investment_asset_type_unsupported",
+    );
   });
 
   it("does not classify a ticker-bearing commodity ETF as physical", () => {
@@ -293,9 +341,16 @@ describe("investment lab anchor-date observed basket", () => {
     ]);
   });
 
-  it("keeps linked identity recovery server-only and legacy-id exact", () => {
+  it("keeps imported snapshot consensus server-only and strips legacy identity", () => {
     const querySource = readFileSync(
       new URL("../src/db/queries/investment-lab.ts", import.meta.url),
+      "utf8",
+    );
+    const authoritySource = readFileSync(
+      new URL(
+        "../src/lib/investment-lab-special-holding-authority.ts",
+        import.meta.url,
+      ),
       "utf8",
     );
     const componentSource = readFileSync(
@@ -308,12 +363,11 @@ describe("investment lab anchor-date observed basket", () => {
 
     assert.match(
       querySource,
-      /leftJoin\(assets, eq\(dailyPositionSnapshots\.assetId, assets\.id\)\)/,
+      /attachBase44ImportedTickerEvidence/,
     );
-    assert.match(
-      querySource,
-      /snapshotLegacyAssetId === linkedLegacyAssetId/,
-    );
+    assert.match(authoritySource, /source !== IMPORTED_SNAPSHOT_SOURCE/);
+    assert.match(authoritySource, /currentAssetFallback: "forbidden"/);
+    assert.doesNotMatch(querySource, /linkedAssetTicker|linkedLegacyAssetId/);
     assert.doesNotMatch(componentSource, /^"use client";/);
     assert.doesNotMatch(componentSource, /legacyAssetId|legacyBase44Id|assetId/);
     assert.match(
@@ -389,6 +443,23 @@ function position(account, ticker, assetName, market, currency, marketValueKrw) 
     assetType: "etf",
     quantity: 1,
     marketValueKrw,
+  };
+}
+
+function importedIdentityRow(overrides = {}) {
+  return {
+    identityKey: "legacy-fixture-identity",
+    snapshotDate: "2026-01-06",
+    account: "irp",
+    source: "base44_import",
+    ticker: null,
+    assetName: "Imported listed ETF",
+    market: "korea",
+    currency: "KRW",
+    assetType: "etf",
+    quantity: 1,
+    marketValueKrw: 100,
+    ...overrides,
   };
 }
 
