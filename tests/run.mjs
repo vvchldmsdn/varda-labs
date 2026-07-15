@@ -57,6 +57,7 @@ import "./target-policy-review-packet.test.mjs";
 import "./target-policy-holding-universe.test.mjs";
 import "./target-policy-resolver.test.mjs";
 import "./instrument-identity.test.mjs";
+import "./krx-gold-close-cycle.test.mjs";
 import "./today-holding-detail.test.mjs";
 import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";

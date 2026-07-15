@@ -116,6 +116,7 @@ describe("KRX gold close-only instrument contract", () => {
     assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.datePolicy, {
       observationDate: "krx_trading_date",
       snapshotReferenceDate: "same_krx_trading_date",
+      serviceCycleMapping: "krx_gold_close_cycle_v1",
       nonTradingDate:
         "carry_latest_prior_observation_without_synthetic_copy",
     });

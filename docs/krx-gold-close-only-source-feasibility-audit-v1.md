@@ -76,9 +76,21 @@ appropriate market-data distribution agreement covering:
 
 ## Date And Carry Policy
 
-An official close observation belongs to its actual KRX trading date. For a
-daily snapshot written at 07:00 KST on D+1, the D close maps to snapshot
-`reference_date=D`.
+An official close observation belongs to its actual KRX trading date. The
+existing snapshot cycle resolver labels the 24-hour cycle ending at 07:00 KST
+with that KST calendar date. Therefore a D close first becomes eligible in the
+D+1 snapshot cycle, while the stored snapshot `reference_date` remains D.
+
+`krx_gold_close_cycle_v1` now binds this policy to the existing snapshot and
+risk calendar helpers instead of maintaining a second calendar implementation.
+
+| Snapshot cycle | Expected KRX close | Classification |
+| --- | --- | --- |
+| 2026-07-10 07:00 KST | 2026-07-09 Thursday | first eligible cycle |
+| 2026-07-11 07:00 KST | 2026-07-10 Friday | first eligible cycle |
+| 2026-07-12 07:00 KST | 2026-07-10 Friday | one-day non-trading carry |
+| 2026-07-13 07:00 KST | 2026-07-10 Friday | two-day non-trading carry before Monday opens |
+| 2026-05-26 07:00 KST | 2026-05-22 Friday | weekend plus Monday-market-holiday carry |
 
 On weekends, holidays, or other KRX closures:
 
@@ -86,6 +98,11 @@ On weekends, holidays, or other KRX closures:
 - the original observation date remains visible;
 - no copied row is created for the non-trading date;
 - the carried value is not reported as a new zero-return observation.
+
+Once a later KRX trading day is expected, an older close is stale rather than
+an allowed carry. For example, the 2026-07-14 cycle expects the 2026-07-13
+close, so a remaining 2026-07-10 row is unavailable. A close newer than the
+calendar expectation is rejected as future evidence.
 
 A newer fetch for the same product and trading date may replace an earlier
 value only as an explicit correction. Older observations never overwrite newer
