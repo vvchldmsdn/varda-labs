@@ -92,6 +92,11 @@ risk calendar helpers instead of maintaining a second calendar implementation.
 | 2026-07-13 07:00 KST | 2026-07-10 Friday | two-day non-trading carry before Monday opens |
 | 2026-05-26 07:00 KST | 2026-05-22 Friday | weekend plus Monday-market-holiday carry |
 
+The Monday reopen does not make Friday stale at either 06:59 or 07:00 KST.
+Monday's close first enters the service model at Tuesday 07:00 KST. Therefore
+Friday remains the expected observation through Tuesday 06:59 and becomes
+stale only at Tuesday 07:00, when Monday's close is expected.
+
 On weekends, holidays, or other KRX closures:
 
 - valuation may carry the latest prior valid close;

@@ -71,6 +71,35 @@ describe("KRX gold close service-cycle mapping", () => {
     assert.equal(mondayBeforeOpen.createsSyntheticObservation, false);
   });
 
+  it("keeps Friday close usable until Monday close reaches the next 07:00 cycle", () => {
+    const instants = [
+      ["2026-07-12T21:59:00.000Z", "2026-07-12", "2026-07-10", "usable"],
+      ["2026-07-12T22:00:00.000Z", "2026-07-13", "2026-07-10", "usable"],
+      ["2026-07-13T21:59:00.000Z", "2026-07-13", "2026-07-10", "usable"],
+      ["2026-07-13T22:00:00.000Z", "2026-07-14", "2026-07-13", "stale_close"],
+    ];
+
+    for (const [instant, snapshotDate, expectedCloseDate, expectedStatus] of
+      instants) {
+      const resolvedSnapshotDate = resolveSnapshotCycle(
+        new Date(instant),
+      ).snapshotDate;
+      const result = resolveKrxGoldCloseCycle({
+        snapshotDate: resolvedSnapshotDate,
+        priceDate: "2026-07-10",
+      });
+
+      assert.equal(resolvedSnapshotDate, snapshotDate);
+      assert.equal(result.expectedCloseDate, expectedCloseDate);
+      assert.equal(
+        expectedStatus === "usable" ? result.status : result.reason,
+        expectedStatus,
+      );
+      assert.equal(result.observationDate, "2026-07-10");
+      assert.equal(result.createsSyntheticObservation, false);
+    }
+  });
+
   it("carries one Friday observation across a Monday KRX holiday", () => {
     const result = resolveKrxGoldCloseCycle({
       snapshotDate: "2026-05-26",
