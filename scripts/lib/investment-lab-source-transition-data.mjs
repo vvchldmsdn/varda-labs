@@ -1,4 +1,4 @@
-const AUDIT_AXIS_CTE = `
+export const SOURCE_TRANSITION_AUDIT_AXIS_CTE = `
   with named_portfolio_rows as (
     select snapshot_date, account, source
     from daily_portfolio_snapshots
@@ -35,7 +35,7 @@ const AUDIT_AXIS_CTE = `
 `;
 
 export const SOURCE_TRANSITION_SEGMENTS_SQL = `
-  ${AUDIT_AXIS_CTE}
+  ${SOURCE_TRANSITION_AUDIT_AXIS_CTE}
   select
     p.source,
     p.account,
@@ -55,7 +55,7 @@ export const SOURCE_TRANSITION_SEGMENTS_SQL = `
 `;
 
 export const SOURCE_TRANSITION_AXIS_SQL = `
-  ${AUDIT_AXIS_CTE}
+  ${SOURCE_TRANSITION_AUDIT_AXIS_CTE}
   select
     d.snapshot_date::text as snapshot_date,
     count(p.snapshot_date)::int as named_row_count,
@@ -74,7 +74,7 @@ export const SOURCE_TRANSITION_AXIS_SQL = `
 `;
 
 export const SOURCE_TRANSITION_CHANGES_SQL = `
-  ${AUDIT_AXIS_CTE},
+  ${SOURCE_TRANSITION_AUDIT_AXIS_CTE},
   distinct_account_sources as (
     select distinct p.snapshot_date, p.account, p.source
     from daily_portfolio_snapshots p
@@ -101,7 +101,7 @@ export const SOURCE_TRANSITION_CHANGES_SQL = `
 `;
 
 export const SOURCE_TRANSITION_RECONCILIATION_SQL = `
-  ${AUDIT_AXIS_CTE},
+  ${SOURCE_TRANSITION_AUDIT_AXIS_CTE},
   position_groups as (
     select
       h.snapshot_date,
@@ -153,7 +153,7 @@ export const SOURCE_TRANSITION_RECONCILIATION_SQL = `
 `;
 
 export const SOURCE_TRANSITION_POSITION_BASIS_SQL = `
-  ${AUDIT_AXIS_CTE}
+  ${SOURCE_TRANSITION_AUDIT_AXIS_CTE}
   select
     h.source,
     count(*)::int as position_rows,
@@ -196,7 +196,7 @@ export const SOURCE_TRANSITION_POSITION_BASIS_SQL = `
 `;
 
 export const SOURCE_TRANSITION_ALL_RECONCILIATION_SQL = `
-  ${AUDIT_AXIS_CTE},
+  ${SOURCE_TRANSITION_AUDIT_AXIS_CTE},
   named_totals as (
     select
       p.snapshot_date,
