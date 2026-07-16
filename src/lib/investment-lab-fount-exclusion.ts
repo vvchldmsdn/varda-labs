@@ -86,7 +86,15 @@ export function buildInvestmentLabFountScopeAdjustment(input: Readonly<{
 
   const accountRows: InvestmentLabFountAdjustedAccountRow[] = [];
   const pathRows: InvestmentLabFountAdjustedPathRow[] = [];
+  const previousSourceByAccount = new Map<
+    InvestmentLabFountNamedAccount,
+    string
+  >();
+  const sourceTransitionDates = new Set<string>();
+  let derivedAllRowCount = 0;
+  let storedAllRowCount = 0;
   let reconciledAllRowCount = 0;
+  let sourceTransitionCount = 0;
 
   if (validDates !== null && bindingValid) {
     for (const serviceDate of validDates) {
@@ -113,8 +121,20 @@ export function buildInvestmentLabFountScopeAdjustment(input: Readonly<{
 
       const allRows = portfolioForDate.filter((row) => row.account === "all");
       if (allRows.length > 1) blockers.add("portfolio_evidence_duplicate");
+      if (allRows.length === 1) storedAllRowCount += 1;
 
       if (namedRows.size !== INVESTMENT_LAB_FOUNT_ACCOUNTS.length) continue;
+
+      for (const account of INVESTMENT_LAB_FOUNT_ACCOUNTS) {
+        const source = namedRows.get(account)!.source;
+        const previousSource = previousSourceByAccount.get(account);
+        if (previousSource !== undefined && previousSource !== source) {
+          sourceTransitionCount += 1;
+          sourceTransitionDates.add(serviceDate);
+          blockers.add("portfolio_source_transition_unproven");
+        }
+        previousSourceByAccount.set(account, source);
+      }
 
       const originalTotal = sumExact(
         INVESTMENT_LAB_FOUNT_ACCOUNTS.map(
@@ -125,12 +145,15 @@ export function buildInvestmentLabFountScopeAdjustment(input: Readonly<{
         blockers.add("aggregate_value_overflow");
         continue;
       }
+      derivedAllRowCount += 1;
 
+      let storedAllReconciliation: "matched" | "not_present" = "not_present";
       if (allRows.length === 1) {
         if (allRows[0].totalMarketValueKrw !== originalTotal) {
           blockers.add("portfolio_all_reconciliation_mismatch");
         } else {
           reconciledAllRowCount += 1;
+          storedAllReconciliation = "matched";
         }
       }
 
@@ -191,6 +214,8 @@ export function buildInvestmentLabFountScopeAdjustment(input: Readonly<{
       pathRows.push(
         Object.freeze({
           serviceDate,
+          aggregateProvenance: "derived_named_account_sum",
+          storedAllReconciliation,
           originalTotalMarketValueKrw: formatFixed(originalTotal),
           excludedMarketValueKrw: formatFixed(excludedPosition.marketValueKrw),
           adjustedTotalMarketValueKrw: formatFixed(adjustedTotal),
@@ -206,7 +231,11 @@ export function buildInvestmentLabFountScopeAdjustment(input: Readonly<{
     inWindowEventRowCount: eventCoverage.inWindow,
     excludedHoldingEventRowCount: eventCoverage.excluded,
     unattributedEventRowCount: eventCoverage.unattributed,
+    derivedAllRowCount,
+    storedAllRowCount,
     reconciledAllRowCount,
+    sourceTransitionCount,
+    sourceTransitionDateCount: sourceTransitionDates.size,
   };
 
   if (

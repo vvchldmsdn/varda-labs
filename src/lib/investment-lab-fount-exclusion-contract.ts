@@ -5,11 +5,14 @@ export const INVESTMENT_LAB_FOUNT_ACCOUNTS = [
 ] as const;
 
 export const INVESTMENT_LAB_FOUNT_EXCLUSION_POLICY = Object.freeze({
-  version: "fount_scope_adjusted_observed_path_v1",
+  version: "fount_scope_adjusted_observed_path_v2",
   scope: "investment_lab_and_simulation_research_only",
   approvalAuthority: "explicit_static_owner_scope_decision",
   selectorBasis: "exact_snapshot_legacy_asset_id",
   subtractionAxis: "snapshot_date_account_source",
+  sourceContinuity: "exact_named_account_source_without_transition",
+  aggregateConstruction: "derived_named_account_sum",
+  storedAllRole: "optional_reconciliation_evidence_only",
   arithmetic: "fixed_decimal_24_6",
   eventInvariant: "zero_excluded_or_unattributed_events_in_window",
   output: "separate_scope_adjusted_observed_path",
@@ -55,6 +58,7 @@ export type InvestmentLabFountExclusionBlocker =
   | "invalid_portfolio_evidence"
   | "portfolio_evidence_incomplete"
   | "portfolio_evidence_duplicate"
+  | "portfolio_source_transition_unproven"
   | "portfolio_all_reconciliation_mismatch"
   | "invalid_position_identity_evidence"
   | "exclusion_evidence_missing"
@@ -78,6 +82,8 @@ export type InvestmentLabFountAdjustedAccountRow = Readonly<{
 
 export type InvestmentLabFountAdjustedPathRow = Readonly<{
   serviceDate: string;
+  aggregateProvenance: "derived_named_account_sum";
+  storedAllReconciliation: "matched" | "not_present";
   originalTotalMarketValueKrw: string;
   excludedMarketValueKrw: string;
   adjustedTotalMarketValueKrw: string;
@@ -90,7 +96,11 @@ export type InvestmentLabFountExclusionCoverage = Readonly<{
   inWindowEventRowCount: number;
   excludedHoldingEventRowCount: number;
   unattributedEventRowCount: number;
+  derivedAllRowCount: number;
+  storedAllRowCount: number;
   reconciledAllRowCount: number;
+  sourceTransitionCount: number;
+  sourceTransitionDateCount: number;
   adjustedDateCount: number;
 }>;
 
@@ -124,6 +134,7 @@ export const INVESTMENT_LAB_FOUNT_BLOCKER_ORDER: readonly InvestmentLabFountExcl
   "invalid_portfolio_evidence",
   "portfolio_evidence_incomplete",
   "portfolio_evidence_duplicate",
+  "portfolio_source_transition_unproven",
   "portfolio_all_reconciliation_mismatch",
   "invalid_position_identity_evidence",
   "exclusion_evidence_missing",

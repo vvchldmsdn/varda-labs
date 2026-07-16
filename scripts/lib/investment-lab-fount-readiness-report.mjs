@@ -3,11 +3,14 @@ import { buildInvestmentLabFountScopeAdjustment } from "../../src/lib/investment
 const LEGACY_ID_PATTERN = /^[0-9a-f]{24}$/;
 
 export const INVESTMENT_LAB_FOUNT_READINESS_AUDIT_POLICY = Object.freeze({
-  version: "investment_lab_fount_scope_adjustment_readiness_v1",
+  version: "investment_lab_fount_scope_adjustment_readiness_v2",
   bindingDiscovery:
     "reviewed_metadata_candidate_then_exact_snapshot_legacy_identity",
   bindingScope: "all_stored_position_dates_accounts_and_sources",
   eventScope: "all_binding_events_plus_selected_window_invariant",
+  sourceContinuity: "exact_named_account_source_without_transition",
+  aggregateProvenance:
+    "derived_named_account_sum_with_optional_stored_all_reconciliation",
   output: "aggregate_diagnostics_only",
   rawIdentityExposure: "forbidden",
   adjustedPathExposure: "forbidden",

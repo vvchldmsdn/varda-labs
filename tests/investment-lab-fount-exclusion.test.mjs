@@ -23,12 +23,16 @@ describe("investment lab Fount scope adjustment", () => {
     assert.deepEqual(result.scopeAdjustedObservedPath, [
       {
         serviceDate: "2026-01-02",
+        aggregateProvenance: "derived_named_account_sum",
+        storedAllReconciliation: "matched",
         originalTotalMarketValueKrw: "1500.100000",
         excludedMarketValueKrw: "100.050000",
         adjustedTotalMarketValueKrw: "1400.050000",
       },
       {
         serviceDate: "2026-01-03",
+        aggregateProvenance: "derived_named_account_sum",
+        storedAllReconciliation: "matched",
         originalTotalMarketValueKrw: "1650.200000",
         excludedMarketValueKrw: "120.010000",
         adjustedTotalMarketValueKrw: "1530.190000",
@@ -56,6 +60,10 @@ describe("investment lab Fount scope adjustment", () => {
       ],
     );
     assert.equal(result.coverage.reconciledAllRowCount, 2);
+    assert.equal(result.coverage.derivedAllRowCount, 2);
+    assert.equal(result.coverage.storedAllRowCount, 2);
+    assert.equal(result.coverage.sourceTransitionCount, 0);
+    assert.equal(result.coverage.sourceTransitionDateCount, 0);
     assert.equal(result.coverage.adjustedDateCount, 2);
     assert.deepEqual(input, original);
     assert.equal(Object.isFrozen(result.scopeAdjustedObservedPath), true);
@@ -104,6 +112,61 @@ describe("investment lab Fount scope adjustment", () => {
     assert.deepEqual(
       buildInvestmentLabFountScopeAdjustment(wrongSource).blockers,
       ["exclusion_axis_mismatch"],
+    );
+  });
+
+  it("blocks unproven source transitions across the selected service axis", () => {
+    const input = fixture();
+    input.portfolioRows = input.portfolioRows.map((row) =>
+      row.snapshotDate === "2026-01-03" && row.account === "irp"
+        ? { ...row, source: "replacement_source" }
+        : row,
+    );
+    input.positionRows = input.positionRows.map((row) =>
+      row.snapshotDate === "2026-01-03" &&
+      row.snapshotLegacyAssetId === FOUNT_ID
+        ? { ...row, source: "replacement_source" }
+        : row,
+    );
+
+    const result = buildInvestmentLabFountScopeAdjustment(input);
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.blockers, [
+      "portfolio_source_transition_unproven",
+    ]);
+    assert.equal(result.coverage.sourceTransitionCount, 1);
+    assert.equal(result.coverage.sourceTransitionDateCount, 1);
+    assert.deepEqual(result.scopeAdjustedObservedPath, []);
+  });
+
+  it("keeps missing stored all rows explicit instead of relabeling a derived sum", () => {
+    const input = fixture();
+    input.portfolioRows = input.portfolioRows.filter(
+      (row) => row.account !== "all",
+    );
+
+    const result = buildInvestmentLabFountScopeAdjustment(input);
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.coverage.derivedAllRowCount, 2);
+    assert.equal(result.coverage.storedAllRowCount, 0);
+    assert.equal(result.coverage.reconciledAllRowCount, 0);
+    assert.deepEqual(
+      result.scopeAdjustedObservedPath.map((row) => ({
+        aggregateProvenance: row.aggregateProvenance,
+        storedAllReconciliation: row.storedAllReconciliation,
+      })),
+      [
+        {
+          aggregateProvenance: "derived_named_account_sum",
+          storedAllReconciliation: "not_present",
+        },
+        {
+          aggregateProvenance: "derived_named_account_sum",
+          storedAllReconciliation: "not_present",
+        },
+      ],
     );
   });
 
@@ -253,6 +316,14 @@ describe("investment lab Fount scope adjustment", () => {
     assert.equal(
       INVESTMENT_LAB_FOUNT_EXCLUSION_POLICY.remainingHoldingRenormalization,
       "forbidden",
+    );
+    assert.equal(
+      INVESTMENT_LAB_FOUNT_EXCLUSION_POLICY.aggregateConstruction,
+      "derived_named_account_sum",
+    );
+    assert.equal(
+      INVESTMENT_LAB_FOUNT_EXCLUSION_POLICY.storedAllRole,
+      "optional_reconciliation_evidence_only",
     );
   });
 });

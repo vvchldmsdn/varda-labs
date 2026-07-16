@@ -42,6 +42,10 @@ describe("investment lab Fount readiness audit", () => {
     assert.equal(report.axis.serviceDateCount, 2);
     assert.equal(report.transformer.status, "ready");
     assert.equal(report.transformer.coverage.reconciledAllRowCount, 2);
+    assert.equal(report.transformer.coverage.derivedAllRowCount, 2);
+    assert.equal(report.transformer.coverage.storedAllRowCount, 2);
+    assert.equal(report.transformer.coverage.sourceTransitionCount, 0);
+    assert.equal(report.transformer.coverage.sourceTransitionDateCount, 0);
     assert.equal(report.transformer.scenarioInitialCapitalBound, true);
 
     const serialized = JSON.stringify(report);
@@ -149,6 +153,37 @@ describe("investment lab Fount readiness audit", () => {
     assert.deepEqual(report.transformer.blockers, [
       "excluded_holding_event_present",
     ]);
+    assert.equal(JSON.stringify(report).includes(FOUNT_ID), false);
+  });
+
+  it("keeps production-style source transitions blocked and aggregate-only", () => {
+    const evidence = readyEvidence();
+    evidence.bindingPositionRows[1] = {
+      ...evidence.bindingPositionRows[1],
+      source: "replacement_source",
+    };
+    evidence.portfolioRows = evidence.portfolioRows.map((row) =>
+      row.snapshot_date === "2026-01-03" && row.account === "irp"
+        ? { ...row, source: "replacement_source" }
+        : row,
+    );
+    evidence.positionRows[1] = {
+      ...evidence.positionRows[1],
+      source: "replacement_source",
+    };
+
+    const report = buildInvestmentLabFountReadinessReport({
+      decision: DECISION,
+      evidence,
+    });
+
+    assert.equal(report.status, "blocked");
+    assert.equal(report.transformer.status, "blocked");
+    assert.deepEqual(report.transformer.blockers, [
+      "portfolio_source_transition_unproven",
+    ]);
+    assert.equal(report.transformer.coverage.sourceTransitionCount, 1);
+    assert.equal(report.transformer.coverage.sourceTransitionDateCount, 1);
     assert.equal(JSON.stringify(report).includes(FOUNT_ID), false);
   });
 
