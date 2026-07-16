@@ -26,6 +26,7 @@
     "audit:investment-lab-counterfactual": "node --no-warnings scripts/audit-investment-lab-counterfactual-readiness.mjs",
     "audit:investment-lab-counterfactual-path": "node --no-warnings scripts/audit-investment-lab-counterfactual-path.mjs",
     "audit:investment-lab-anchor-basket": "node --no-warnings scripts/audit-investment-lab-anchor-basket.mjs",
+    "audit:investment-lab-fount-readiness": "node --no-warnings scripts/audit-investment-lab-fount-readiness.mjs",
     "audit:investment-lab-event-flow": "node --no-warnings scripts/audit-investment-lab-event-flow.mjs",
     "audit:portfolio-risk": "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs",
     "audit:portfolio-risk-read-model": "node --no-warnings scripts/audit-portfolio-risk-read-model.mjs",
