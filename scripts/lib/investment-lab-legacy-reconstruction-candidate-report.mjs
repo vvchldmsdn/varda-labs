@@ -3,6 +3,7 @@ import {
   buildCycleForSnapshotDate,
 } from "../../src/lib/snapshots/market-calendar.ts";
 import { resolveInvestmentLabSpecialHoldingIdentity } from "../../src/lib/investment-lab-special-holding-authority.ts";
+import { buildInvestmentLabLegacyCycleProvenanceReport } from "./investment-lab-legacy-cycle-provenance-report.mjs";
 
 export const LEGACY_RECONSTRUCTION_CANDIDATE_POLICY = Object.freeze({
   version: "investment_lab_legacy_reconstructed_observed_candidate_v1",
@@ -57,6 +58,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function buildInvestmentLabLegacyReconstructionCandidateReport({ rows }) {
   const evidenceRows = Array.isArray(rows) ? rows : null;
+  const cycleProvenance = buildInvestmentLabLegacyCycleProvenanceReport({
+    rows: evidenceRows,
+  });
   const groups = groupEvidenceRows(evidenceRows ?? []);
   const blockerCounts = Object.fromEntries(
     LEGACY_RECONSTRUCTION_BLOCKERS.map((blocker) => [blocker, 0]),
@@ -128,6 +132,7 @@ export function buildInvestmentLabLegacyReconstructionCandidateReport({ rows }) 
     byAccount: freezeNested(byAccount),
     evidence: Object.freeze(evidenceCounts),
     blockerGroups: Object.freeze(blockerCounts),
+    cycleProvenance,
     authority: Object.freeze({
       valuationCandidateStatus: status,
       canonicalActualAuthority: "not_established",
