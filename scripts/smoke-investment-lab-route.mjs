@@ -8,6 +8,7 @@ config({ path: ".env.local", quiet: true });
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3107";
 const START_SERVICE_DATE = readArgument("--start");
 const END_SERVICE_DATE = readArgument("--end");
+const ACCOUNT = readArgument("--account") ?? "all";
 const KODEX_WEIGHT = readArgument("--kodex-weight");
 const BASKET_ANCHOR = readArgument("--basket-anchor");
 const EXPECTED_PERIOD_STATUS =
@@ -42,6 +43,9 @@ const LEAK_PATTERN =
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
+if (!["all", "brokerage", "isa", "irp"].includes(ACCOUNT)) {
+  throw new Error(`Unsupported account scope: ${ACCOUNT}`);
+}
 
 const sql = neon(process.env.DATABASE_URL);
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
@@ -60,6 +64,10 @@ async function main() {
   const route = await request(routePath, true);
   assert.equal(route.status, 200, "authenticated route must return 200");
   assert.match(route.body, /data-page="investment-lab"/);
+  assert.equal(
+    readStringAttribute(route.body, "data-account-scope"),
+    ACCOUNT,
+  );
   for (const marker of ["투자 랩", "과거 비교 구간", "구간 적용"]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
@@ -130,6 +138,7 @@ async function main() {
   let anchorSpecialHoldingResolved = 0;
   let anchorSpecialHoldingUnavailable = 0;
   let anchorSpecialHoldingEligible = 0;
+  let anchorSpecialHoldingIntentionallyExcluded = 0;
   let anchorSpecialHoldingSeparateModel = 0;
   let anchorSpecialHoldingUnsupported = 0;
   if (
@@ -153,6 +162,10 @@ async function main() {
       route.body,
       "data-anchor-special-holding-eligible",
     );
+    anchorSpecialHoldingIntentionallyExcluded = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-intentionally-excluded",
+    );
     anchorSpecialHoldingSeparateModel = readIntegerAttribute(
       route.body,
       "data-anchor-special-holding-separate-model",
@@ -162,22 +175,26 @@ async function main() {
       "data-anchor-special-holding-unsupported",
     );
     assert.equal(
-      anchorSpecialHoldingResolved + anchorSpecialHoldingUnavailable,
+      anchorSpecialHoldingEligible +
+        anchorSpecialHoldingIntentionallyExcluded +
+        anchorSpecialHoldingSeparateModel +
+        anchorSpecialHoldingUnsupported,
       anchorSpecialHoldingRows,
     );
-    assert.equal(
-      anchorSpecialHoldingUnavailable,
-      anchorBasketUnresolvedRows,
+    assert.ok(anchorSpecialHoldingEligible <= anchorSpecialHoldingResolved);
+    assert.ok(
+      anchorSpecialHoldingUnavailable <=
+        anchorSpecialHoldingSeparateModel + anchorSpecialHoldingUnsupported,
     );
-    assert.equal(anchorSpecialHoldingEligible, anchorSpecialHoldingResolved);
-    assert.equal(
-      anchorSpecialHoldingSeparateModel + anchorSpecialHoldingUnsupported,
-      anchorSpecialHoldingUnavailable,
-    );
-    assert.match(route.body, /data-special-holding-status="unavailable"/);
-    if (anchorSpecialHoldingResolved > 0) {
+    if (anchorSpecialHoldingUnavailable > 0) {
+      assert.match(route.body, /data-special-holding-status="unavailable"/);
+    }
+    if (anchorSpecialHoldingEligible > 0) {
       assert.match(route.body, /data-special-holding-status="resolved"/);
       assert.ok(route.body.includes("Base44 이관 포지션 ticker 합의"));
+    }
+    if (anchorSpecialHoldingIntentionallyExcluded > 0) {
+      assert.match(route.body, /data-special-holding-status="not_required"/);
     }
   }
   const matrixExpected =
@@ -455,37 +472,48 @@ async function main() {
     route.body,
     "data-shock-persistence",
   );
-  const shockSelectedSymbol = readStringAttribute(
-    route.body,
-    "data-shock-selected-symbol",
-  );
-  const shockThroughExposure = readNumberAttribute(
-    route.body,
-    "data-shock-through-etf-exposure",
-  );
-  const shockDirectExposure = readNumberAttribute(
-    route.body,
-    "data-shock-direct-exposure",
-  );
-  const shockCoveredExposure = readNumberAttribute(
-    route.body,
-    "data-shock-covered-exposure",
-  );
-  const shockEstimatedChangeKrw = readNumberAttribute(
-    route.body,
-    "data-shock-estimated-change-krw",
-  );
-  assert.equal(shockStatus, "ready");
+  let shockSelectedSymbol = null;
+  let shockThroughExposure = null;
+  let shockDirectExposure = null;
+  let shockCoveredExposure = null;
+  let shockEstimatedChangeKrw = null;
   assert.equal(shockPolicy, "static_single_name_linear_shock_v1");
   assert.equal(shockPersistence, "none_client_memory_only");
-  assert.ok(shockSelectedSymbol.length > 0);
-  assert.ok(shockThroughExposure > 0);
-  assert.ok(shockDirectExposure >= 0);
-  assert.ok(
-    Math.abs(shockCoveredExposure - shockThroughExposure - shockDirectExposure) <
-      0.00001,
-  );
-  assert.ok(shockEstimatedChangeKrw < 0, "default -10% shock must be negative");
+  if (shockStatus === "ready") {
+    shockSelectedSymbol = readNonEmptyAttribute(
+      route.body,
+      "data-shock-selected-symbol",
+    );
+    shockThroughExposure = readNumberAttribute(
+      route.body,
+      "data-shock-through-etf-exposure",
+    );
+    shockDirectExposure = readNumberAttribute(
+      route.body,
+      "data-shock-direct-exposure",
+    );
+    shockCoveredExposure = readNumberAttribute(
+      route.body,
+      "data-shock-covered-exposure",
+    );
+    shockEstimatedChangeKrw = readNumberAttribute(
+      route.body,
+      "data-shock-estimated-change-krw",
+    );
+    assert.ok(shockSelectedSymbol.length > 0);
+    assert.ok(shockThroughExposure > 0);
+    assert.ok(shockDirectExposure >= 0);
+    assert.ok(
+      Math.abs(
+        shockCoveredExposure - shockThroughExposure - shockDirectExposure,
+      ) < 0.00001,
+    );
+    assert.ok(shockEstimatedChangeKrw < 0, "default -10% shock must be negative");
+  } else {
+    assert.equal(shockStatus, "unavailable");
+    assert.match(route.body, /data-shock-selected-symbol=""/);
+    assert.match(route.body, /data-shock-through-etf-exposure=""/);
+  }
   assert.doesNotMatch(route.body, LEAK_PATTERN);
   assert.doesNotMatch(
     route.body,
@@ -511,8 +539,12 @@ async function main() {
     route.body,
     "data-persistence",
   );
-  assert.equal(adjustmentAccountCount, 3);
-  assert.ok(adjustmentReadyAccounts >= 1 && adjustmentReadyAccounts <= 3);
+  const expectedAdjustmentAccountCount = ACCOUNT === "all" ? 3 : 1;
+  assert.equal(adjustmentAccountCount, expectedAdjustmentAccountCount);
+  assert.ok(
+    adjustmentReadyAccounts >= 0 &&
+      adjustmentReadyAccounts <= expectedAdjustmentAccountCount,
+  );
   assert.equal(
     adjustmentPolicy,
     "same_account_cash_neutral_direct_holdings_v1",
@@ -909,6 +941,7 @@ async function request(path, authenticated = false) {
 
 function investmentLabRoutePath() {
   const params = new URLSearchParams();
+  if (ACCOUNT !== "all") params.set("account", ACCOUNT);
   if (START_SERVICE_DATE) params.set("start", START_SERVICE_DATE);
   if (END_SERVICE_DATE) params.set("end", END_SERVICE_DATE);
   if (KODEX_WEIGHT !== null) params.set("kodexWeight", KODEX_WEIGHT);
@@ -953,6 +986,12 @@ function readIntegerAttribute(html, name) {
 function readStringAttribute(html, name) {
   const match = html.match(new RegExp(`${name}="([a-z0-9_]+)"`));
   assert.ok(match, `route is missing string attribute: ${name}`);
+  return match[1];
+}
+
+function readNonEmptyAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="([^"]+)"`));
+  assert.ok(match, `route is missing non-empty attribute: ${name}`);
   return match[1];
 }
 

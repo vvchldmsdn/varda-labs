@@ -24,6 +24,7 @@ import {
 } from "./investment-lab-anchor-basket-read-loader.ts";
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import { listInvestmentLabCompleteSnapshotDates } from "./investment-lab-source-segment-authority.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 export interface InvestmentLabCounterfactualReadRepository
   extends InvestmentLabAnchorBasketReadRepository {
@@ -39,6 +40,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   request?: InvestmentLabPeriodRequest,
   fixedMixSelection?: InvestmentLabFixedMixSelection,
   requestedAnchorDate?: string | null,
+  account: PortfolioAccountScope = "all",
 ): Promise<Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
@@ -63,7 +65,10 @@ export async function loadInvestmentLabCounterfactualReadModel(
   });
   const period = resolveInvestmentLabPeriodSelection({
     request,
-    availableServiceDates: listInvestmentLabCompleteSnapshotDates(snapshotRows),
+    availableServiceDates: listInvestmentLabCompleteSnapshotDates(
+      snapshotRows,
+      account,
+    ),
   });
 
   const selectedSource =
@@ -71,6 +76,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
       ? sliceInvestmentLabCounterfactualInput(input, period)
       : input;
   const model = buildInvestmentLabCounterfactualReadModel(selectedSource, {
+    account,
     fixedMixSelection,
   });
   let resolvedPeriod = period;
@@ -87,6 +93,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
       : markInvestmentLabPeriodUnavailable(period);
   }
   const rollingComparison = buildInvestmentLabRollingComparison({
+    account,
     source: selectedSource,
     availableServiceDates:
       model.status === "ready"
@@ -95,6 +102,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   });
 
   const anchorBasketScenario = await loadInvestmentLabAnchorBasketScenario({
+    account,
     repository,
     model,
     source: selectedSource,

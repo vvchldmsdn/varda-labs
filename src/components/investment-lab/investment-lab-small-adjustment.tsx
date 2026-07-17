@@ -23,7 +23,9 @@ export function InvestmentLabSmallAdjustment({
   model: InvestmentLabSmallAdjustmentModel;
 }) {
   const [accountCode, setAccountCode] =
-    useState<InvestmentLabSmallAdjustmentAccount>("brokerage");
+    useState<InvestmentLabSmallAdjustmentAccount>(
+      model.accounts[0]?.account ?? "brokerage",
+    );
   const [sourceKey, setSourceKey] = useState("");
   const [destinationKey, setDestinationKey] = useState("");
   const [amount, setAmount] = useState("");
@@ -91,7 +93,9 @@ export function InvestmentLabSmallAdjustment({
       <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <div
           aria-label="조정 계정"
-          className="grid grid-cols-3 gap-1 rounded-md border border-[#d9ded3] bg-white p-1 sm:w-[360px]"
+          className={`grid gap-1 rounded-md border border-[#d9ded3] bg-white p-1 sm:w-[360px] ${
+            model.accounts.length === 1 ? "grid-cols-1" : "grid-cols-3"
+          }`}
           role="group"
         >
           {model.accounts.map((account) => (

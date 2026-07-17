@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
@@ -18,6 +18,11 @@ import {
 import type { InvestmentLabPeriodRequest } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import { attachBase44ImportedTickerEvidence } from "@/lib/investment-lab-special-holding-authority";
+import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import {
+  buildInvestmentLabHistoricalAccountConsensus,
+  resolveInvestmentLabEventAccount,
+} from "@/lib/investment-lab-event-account";
 
 const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 
@@ -25,41 +30,73 @@ const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 // repository must add canonical owner predicates before this route is reused.
 const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository = {
   async loadEvents() {
-    const rows = await db
-      .select({
-        eventDate: eventLedgerEntries.eventDate,
-        eventType: eventLedgerEntries.eventType,
-        amountKrw: eventLedgerEntries.amountKrw,
-        quantityDelta: eventLedgerEntries.quantityDelta,
-        price: eventLedgerEntries.price,
-        fxRate: eventLedgerEntries.fxRate,
-        assetCurrency: assets.currency,
-        correctsEventId: eventLedgerEntries.correctsEventId,
-        legacyCorrectsEventId: eventLedgerEntries.legacyCorrectsEventId,
-      })
-      .from(eventLedgerEntries)
-      .leftJoin(assets, eq(eventLedgerEntries.assetId, assets.id))
-      .where(eq(eventLedgerEntries.isSample, false))
-      .orderBy(
-        asc(eventLedgerEntries.eventDate),
-        sql`${eventLedgerEntries.recordedAt} asc nulls last`,
-        asc(eventLedgerEntries.createdAt),
-        sql`${eventLedgerEntries.legacyBase44Id} asc nulls last`,
-        asc(eventLedgerEntries.id),
-      );
+    const [rows, historicalPositionRows] = await Promise.all([
+      db
+        .select({
+          account: eventLedgerEntries.account,
+          beforeValue: eventLedgerEntries.beforeValue,
+          afterValue: eventLedgerEntries.afterValue,
+          legacyAssetId: eventLedgerEntries.legacyAssetId,
+          assetAccount: assets.account,
+          eventDate: eventLedgerEntries.eventDate,
+          eventType: eventLedgerEntries.eventType,
+          amountKrw: eventLedgerEntries.amountKrw,
+          quantityDelta: eventLedgerEntries.quantityDelta,
+          price: eventLedgerEntries.price,
+          fxRate: eventLedgerEntries.fxRate,
+          assetCurrency: assets.currency,
+          correctsEventId: eventLedgerEntries.correctsEventId,
+          legacyCorrectsEventId: eventLedgerEntries.legacyCorrectsEventId,
+        })
+        .from(eventLedgerEntries)
+        .leftJoin(assets, eq(eventLedgerEntries.assetId, assets.id))
+        .where(eq(eventLedgerEntries.isSample, false))
+        .orderBy(
+          asc(eventLedgerEntries.eventDate),
+          sql`${eventLedgerEntries.recordedAt} asc nulls last`,
+          asc(eventLedgerEntries.createdAt),
+          sql`${eventLedgerEntries.legacyBase44Id} asc nulls last`,
+          asc(eventLedgerEntries.id),
+        ),
+      db
+        .select({
+          legacyAssetId: dailyPositionSnapshots.legacyAssetId,
+          account: dailyPositionSnapshots.account,
+        })
+        .from(dailyPositionSnapshots)
+        .where(
+          and(
+            eq(dailyPositionSnapshots.isSample, false),
+            isNotNull(dailyPositionSnapshots.legacyAssetId),
+          ),
+        )
+        .groupBy(
+          dailyPositionSnapshots.legacyAssetId,
+          dailyPositionSnapshots.account,
+        ),
+    ]);
+    const historicalConsensus =
+      buildInvestmentLabHistoricalAccountConsensus(historicalPositionRows);
 
-    return rows.map((row, index) => ({
-      eventDate: row.eventDate,
-      eventType: row.eventType,
-      sequence: index + 1,
-      amountKrw: row.amountKrw,
-      quantityDelta: row.quantityDelta,
-      price: row.price,
-      fxRate: row.fxRate,
-      assetCurrency: row.assetCurrency,
-      isCorrection:
-        row.correctsEventId !== null || row.legacyCorrectsEventId !== null,
-    }));
+    return rows.map((row, index) => {
+      const account = resolveInvestmentLabEventAccount(
+        row,
+        historicalConsensus,
+      ).account;
+      return {
+        account,
+        eventDate: row.eventDate,
+        eventType: row.eventType,
+        sequence: index + 1,
+        amountKrw: row.amountKrw,
+        quantityDelta: row.quantityDelta,
+        price: row.price,
+        fxRate: row.fxRate,
+        assetCurrency: row.assetCurrency,
+        isCorrection:
+          row.correctsEventId !== null || row.legacyCorrectsEventId !== null,
+      };
+    });
   },
 
   async loadSnapshots() {
@@ -237,12 +274,14 @@ export async function getReadOnlyInvestmentLabCounterfactual(
   request?: InvestmentLabPeriodRequest,
   fixedMixSelection?: InvestmentLabFixedMixSelection,
   requestedAnchorDate?: string | null,
+  account: PortfolioAccountScope = "all",
 ) {
   return loadInvestmentLabCounterfactualReadModel(
     drizzleInvestmentLabRepository,
     request,
     fixedMixSelection,
     requestedAnchorDate,
+    account,
   );
 }
 

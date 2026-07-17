@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+import {
+  AccountScopeTabs,
+  portfolioAccountScopeLabel,
+} from "@/components/account-scope-tabs";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
@@ -8,15 +12,24 @@ import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
+import {
+  buildPortfolioAccountScopeHref,
+  type PortfolioAccountScope,
+  type PortfolioAccountScopeQuery,
+} from "@/lib/portfolio-account-scope";
 
 export function InvestmentLabView({
+  accountQuery,
   anchorBasketScenario,
   model,
   period,
+  selectedAccount,
 }: {
+  accountQuery: PortfolioAccountScopeQuery;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
+  selectedAccount: PortfolioAccountScope;
 }) {
   const periodReady = period.status === "full" || period.status === "selected";
 
@@ -24,6 +37,7 @@ export function InvestmentLabView({
     <main
       className="min-h-screen bg-[#f3f4ef] text-[#171916]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
+      data-account-scope={selectedAccount}
       data-comparison-dates={
         periodReady ? model.coverage.completeComparisonDates : 0
       }
@@ -76,14 +90,49 @@ export function InvestmentLabView({
               </p>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
-              <NavLink href="/">홈</NavLink>
-              <NavLink href="/today">오늘 변동</NavLink>
-              <NavLink href="/portfolio/structure">포트 구조</NavLink>
-              <NavLink href="/history">히스토리</NavLink>
+              <NavLink
+                href={buildPortfolioAccountScopeHref("/", selectedAccount)}
+              >
+                홈
+              </NavLink>
+              <NavLink
+                href={buildPortfolioAccountScopeHref(
+                  "/today",
+                  selectedAccount,
+                )}
+              >
+                오늘 변동
+              </NavLink>
+              <NavLink
+                href={buildPortfolioAccountScopeHref(
+                  "/portfolio/structure",
+                  selectedAccount,
+                )}
+              >
+                포트 구조
+              </NavLink>
+              <NavLink
+                href={buildPortfolioAccountScopeHref(
+                  "/history",
+                  selectedAccount,
+                )}
+              >
+                히스토리
+              </NavLink>
             </nav>
           </div>
+          <div className="mt-4">
+            <AccountScopeTabs
+              basePath="/investment-lab"
+              query={accountQuery}
+              selectedAccount={selectedAccount}
+            />
+          </div>
           <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <StatusPill label="계정" value="전체" />
+            <StatusPill
+              label="계정"
+              value={portfolioAccountScopeLabel(selectedAccount)}
+            />
             <StatusPill label="시나리오" value="전액 KODEX 200" />
             <StatusPill
               label="상태"
@@ -98,7 +147,11 @@ export function InvestmentLabView({
           </div>
         </header>
 
-        <InvestmentLabPeriodSelector period={period} />
+        <InvestmentLabPeriodSelector
+          account={selectedAccount}
+          period={period}
+          query={accountQuery}
+        />
 
         {!periodReady ? null : model.status === "ready" && model.summary ? (
           <ReadyView

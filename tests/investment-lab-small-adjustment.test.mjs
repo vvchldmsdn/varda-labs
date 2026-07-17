@@ -33,6 +33,31 @@ describe("investment lab small adjustment", () => {
     assert.doesNotMatch(JSON.stringify(model), /assetId|legacyBase44Id|groupId/);
   });
 
+  it("returns only the account selected by the page scope", () => {
+    const portfolio = {
+      holdingRows: [
+        holding("Brokerage ETF", "069500", "KRW", 500_000),
+        holding("ISA ETF 1", "133690", "KRW", 300_000, "isa"),
+        holding("ISA ETF 2", "360200", "KRW", 200_000, "isa"),
+      ],
+      exclusions: [],
+    };
+
+    const isa = buildInvestmentLabSmallAdjustmentModel(portfolio, "isa");
+    assert.deepEqual(
+      isa.accounts.map((row) => row.account),
+      ["isa"],
+    );
+    assert.equal(isa.accounts[0].status, "ready");
+    assert.equal(isa.accounts[0].totalValueKrw, 500_000);
+
+    const all = buildInvestmentLabSmallAdjustmentModel(portfolio);
+    assert.deepEqual(
+      all.accounts.map((row) => row.account),
+      ["brokerage", "isa", "irp"],
+    );
+  });
+
   it("moves a user-specified KRW value and reconciles concentration and FX exposure", () => {
     const model = buildInvestmentLabSmallAdjustmentModel({
       holdingRows: [

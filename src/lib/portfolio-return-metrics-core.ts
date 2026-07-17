@@ -267,6 +267,15 @@ export function assetMetricKey(asset: Pick<PortfolioReturnAssetRow, "legacyBase4
 }
 
 export function portfolioEventAccount(event: PortfolioReturnEventRow) {
+  return portfolioEventAccountFromMetadata(event);
+}
+
+export function portfolioEventAccountFromMetadata(
+  event: Pick<
+    PortfolioReturnEventRow,
+    "account" | "beforeValue" | "afterValue"
+  >,
+) {
   if (event.account) return event.account;
   const before = parseJsonObject(event.beforeValue);
   const after = parseJsonObject(event.afterValue);

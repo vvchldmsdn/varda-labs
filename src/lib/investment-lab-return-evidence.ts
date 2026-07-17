@@ -2,8 +2,11 @@ import {
   isRiskDate,
   mapRiskEvidenceDateToServiceDate,
 } from "./portfolio-risk-calendar.ts";
-
-const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
+import {
+  accountsForPortfolioScope,
+  isNamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 
 export const INVESTMENT_LAB_RETURN_EVIDENCE_POLICY = Object.freeze({
   version: "position_return_evidence_v1",
@@ -21,6 +24,7 @@ export type InvestmentLabReturnEvidenceSnapshot = Readonly<{
 }>;
 
 export type InvestmentLabReturnEvidenceEvent = Readonly<{
+  account?: string | null;
   eventDate: string;
   eventType: string;
   amountKrw: string | number | null;
@@ -33,6 +37,7 @@ export type InvestmentLabReturnEvidenceEvent = Readonly<{
 export type InvestmentLabReturnEvidenceBlocker =
   | "cash_evidence_unavailable"
   | "nonzero_cash_evidence"
+  | "event_account_unresolved"
   | "ambiguous_position_metadata_event"
   | "unmodeled_return_event";
 
@@ -49,10 +54,13 @@ export type InvestmentLabReturnEvidenceResult = Readonly<{
 }>;
 
 export function validateInvestmentLabReturnEvidence(input: {
+  account?: PortfolioAccountScope;
   serviceDates: readonly string[];
   snapshotRows: readonly InvestmentLabReturnEvidenceSnapshot[];
   eventRows: readonly InvestmentLabReturnEvidenceEvent[];
 }): InvestmentLabReturnEvidenceResult {
+  const accountScope = input.account ?? "all";
+  const trackedAccounts = accountsForPortfolioScope(accountScope);
   const blockers = new Set<InvestmentLabReturnEvidenceBlocker>();
   const serviceDates = input.serviceDates.filter(isRiskDate);
   const serviceDateSet = new Set(serviceDates);
@@ -77,9 +85,8 @@ export function validateInvestmentLabReturnEvidence(input: {
     const account = String(row.account ?? "").trim().toLowerCase();
     if (
       !serviceDateSet.has(row.snapshotDate) ||
-      !TRACKED_ACCOUNTS.includes(
-        account as (typeof TRACKED_ACCOUNTS)[number],
-      )
+      !isNamedPortfolioAccount(account) ||
+      !trackedAccounts.includes(account)
     ) {
       continue;
     }
@@ -99,7 +106,7 @@ export function validateInvestmentLabReturnEvidence(input: {
   }
 
   for (const serviceDate of serviceDates) {
-    for (const account of TRACKED_ACCOUNTS) {
+    for (const account of trackedAccounts) {
       if (namedCashRows.get(`${serviceDate}|${account}`) !== 1) {
         blockers.add("cash_evidence_unavailable");
       }
@@ -113,6 +120,16 @@ export function validateInvestmentLabReturnEvidence(input: {
 
   if (startServiceDate && endServiceDate) {
     for (const row of input.eventRows) {
+      if (accountScope !== "all") {
+        const eventAccount = String(row.account ?? "").trim().toLowerCase();
+        if (isNamedPortfolioAccount(eventAccount)) {
+          if (eventAccount !== accountScope) continue;
+        } else {
+          unmodeledEventRows += 1;
+          blockers.add("event_account_unresolved");
+          continue;
+        }
+      }
       if (!isRiskDate(row.eventDate)) {
         unmodeledEventRows += 1;
         blockers.add("unmodeled_return_event");

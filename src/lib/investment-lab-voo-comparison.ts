@@ -12,6 +12,7 @@ import {
   buildInvestmentLabVooReturnEstimate,
   type InvestmentLabVooReturnEstimate,
 } from "./investment-lab-voo-return-estimate.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 type ActualPathRow = Readonly<{
   serviceDate: string;
@@ -71,6 +72,7 @@ export type InvestmentLabVooComparison =
     }>;
 
 export function buildInvestmentLabVooComparison(input: {
+  account?: PortfolioAccountScope;
   actualPath: readonly ActualPathRow[];
   boundaryFlows: readonly BoundaryFlow[];
   evidence: InvestmentLabVooEvidenceResolution;
@@ -107,6 +109,7 @@ export function buildInvestmentLabVooComparison(input: {
   );
   const latest = rows.at(-1)!;
   const returnEstimate = buildInvestmentLabVooReturnEstimate({
+    account: input.account,
     actualRows: input.actualPath,
     scenarioRows: path.rows,
     boundaryFlows: input.boundaryFlows,

@@ -20,6 +20,7 @@ import {
 import { calculateInvestmentLabModifiedDietz } from "./investment-lab-modified-dietz.ts";
 import { validateInvestmentLabReturnEvidence } from "./investment-lab-return-evidence.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 export interface InvestmentLabAnchorBasketReadRepository {
   loadAnchorPositionRows(
@@ -33,6 +34,7 @@ export interface InvestmentLabAnchorBasketReadRepository {
 }
 
 export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
+  account?: PortfolioAccountScope;
   repository: InvestmentLabAnchorBasketReadRepository;
   model: InvestmentLabCounterfactualReadModel;
   source: InvestmentLabCounterfactualReadInput;
@@ -45,6 +47,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
       ? await input.repository.loadAnchorPositionRows(serviceDates)
       : [];
   const anchor = resolveInvestmentLabAnchorSelection({
+    account: input.account,
     serviceDates,
     snapshotRows: input.source.snapshotRows,
     positionRows,
@@ -71,7 +74,10 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
   const selectedEventRows = input.source.eventRows.filter(
     (row) => row.eventDate > anchor.selectedAnchorDate!,
   );
-  const flowResolution = resolveInvestmentLabBoundaryFlows(selectedEventRows);
+  const flowResolution = resolveInvestmentLabBoundaryFlows(
+    selectedEventRows,
+    input.account,
+  );
   if (flowResolution.status !== "ready") {
     return buildInvestmentLabAnchorBasketScenario({
       anchor,
@@ -87,6 +93,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     endServiceDate: actualPath.at(-1)?.serviceDate ?? anchor.selectedAnchorDate,
   });
   const evidence = resolveInvestmentLabAnchorBasketEvidence({
+    account: input.account,
     anchor,
     serviceDates: actualPath.map((row) => row.serviceDate),
     priceRows,
@@ -99,6 +106,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     actualPath,
     evidence,
     actualReturn: resolveActualReturn({
+      account: input.account,
       actualPath,
       boundaryFlows: flowResolution.flows,
       snapshotRows: selectedSnapshotRows,
@@ -108,6 +116,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
 }
 
 function resolveActualReturn(input: Readonly<{
+  account?: PortfolioAccountScope;
   actualPath: readonly Readonly<{
     serviceDate: string;
     totalMarketValueKrw: number;
@@ -119,6 +128,7 @@ function resolveActualReturn(input: Readonly<{
   eventRows: InvestmentLabCounterfactualReadInput["eventRows"];
 }>) {
   const evidence = validateInvestmentLabReturnEvidence({
+    account: input.account,
     serviceDates: input.actualPath.map((row) => row.serviceDate),
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,

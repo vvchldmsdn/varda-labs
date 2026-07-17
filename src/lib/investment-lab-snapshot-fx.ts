@@ -1,4 +1,7 @@
-const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
+import {
+  accountsForPortfolioScope,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 
 export type InvestmentLabSnapshotFxRow = Readonly<{
   account: string;
@@ -15,16 +18,18 @@ export type InvestmentLabSnapshotFxBlocker =
 
 export function resolveInvestmentLabSnapshotFx(
   rows: readonly InvestmentLabSnapshotFxRow[],
+  account: PortfolioAccountScope = "all",
 ) {
+  const trackedAccounts = accountsForPortfolioScope(account);
   const blockers = new Set<InvestmentLabSnapshotFxBlocker>();
   const namedRates: number[] = [];
   const namedSources: string[] = [];
   const namedRules: string[] = [];
   let missing = false;
 
-  for (const account of TRACKED_ACCOUNTS) {
+  for (const trackedAccount of trackedAccounts) {
     const matches = rows.filter(
-      (row) => String(row.account).trim().toLowerCase() === account,
+      (row) => String(row.account).trim().toLowerCase() === trackedAccount,
     );
     if (matches.length !== 1) {
       missing = true;
@@ -43,7 +48,7 @@ export function resolveInvestmentLabSnapshotFx(
     }
   }
 
-  if (missing || namedRates.length !== TRACKED_ACCOUNTS.length) {
+  if (missing || namedRates.length !== trackedAccounts.length) {
     blockers.add("missing_snapshot_fx");
     return result(null, false, blockers);
   }
@@ -52,8 +57,8 @@ export function resolveInvestmentLabSnapshotFx(
     return result(null, false, blockers);
   }
   if (
-    namedSources.length !== TRACKED_ACCOUNTS.length ||
-    namedRules.length !== TRACKED_ACCOUNTS.length
+    namedSources.length !== trackedAccounts.length ||
+    namedRules.length !== trackedAccounts.length
   ) {
     return result(namedRates[0], false, blockers);
   }
@@ -65,9 +70,12 @@ export function resolveInvestmentLabSnapshotFx(
     return result(namedRates[0], false, blockers);
   }
 
-  const allRows = rows.filter(
-    (row) => String(row.account).trim().toLowerCase() === "all",
-  );
+  const allRows =
+    account === "all"
+      ? rows.filter(
+          (row) => String(row.account).trim().toLowerCase() === "all",
+        )
+      : [];
   if (allRows.length > 1) {
     blockers.add("ambiguous_snapshot_fx");
     return result(null, false, blockers);

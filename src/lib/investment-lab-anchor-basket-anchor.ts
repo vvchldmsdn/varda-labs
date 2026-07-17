@@ -5,13 +5,16 @@ import {
   type InvestmentLabImportedTickerEvidence,
 } from "./investment-lab-special-holding-authority.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
-
-const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
+import {
+  accountsForPortfolioScope,
+  isNamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 const MAX_INSTRUMENTS = 64;
 
 export const INVESTMENT_LAB_ANCHOR_BASKET_POLICY = Object.freeze({
   version: "anchor_observed_equal_weight_same_flow_v1",
-  account: "all",
+  account: "requested_account_scope",
   anchorAuthority: "exact_stored_portfolio_and_position_source",
   identity:
     "stored_ticker_or_base44_imported_snapshot_consensus_then_market_currency_ticker",
@@ -85,11 +88,14 @@ export type InvestmentLabAnchorSelection = Readonly<{
 }>;
 
 export function resolveInvestmentLabAnchorSelection(input: Readonly<{
+  account?: PortfolioAccountScope;
   serviceDates: readonly string[];
   snapshotRows: readonly InvestmentLabSourceSnapshotRow[];
   positionRows: readonly InvestmentLabAnchorPositionRow[];
   requestedAnchorDate?: string | null;
 }>): InvestmentLabAnchorSelection {
+  const accountScope = input.account ?? "all";
+  const selectedAccounts = accountsForPortfolioScope(accountScope);
   const blockers = new Set<InvestmentLabAnchorBlocker>();
   const serviceDates = [...input.serviceDates];
   if (!isOrderedDateAxis(serviceDates)) {
@@ -100,7 +106,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   const sourceByDateAccount = portfolioSourceIndex(input.snapshotRows);
   const positionsByDateAccountSource = positionIndex(input.positionRows);
   const candidateAnchorDates = serviceDates.filter((date) =>
-    TRACKED_ACCOUNTS.every((account) => {
+    selectedAccounts.every((account) => {
       const source = sourceByDateAccount.get(date)?.get(account);
       return (
         source !== undefined &&
@@ -134,7 +140,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   }
 
   const anchorRows: InvestmentLabAnchorPositionRow[] = [];
-  for (const account of TRACKED_ACCOUNTS) {
+  for (const account of selectedAccounts) {
     const source = sourceByDateAccount.get(selectedAnchorDate)?.get(account);
     if (!source) {
       blockers.add("ambiguous_portfolio_source");
@@ -209,7 +215,9 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
     }
     if (
       !account ||
-      !TRACKED_ACCOUNTS.includes(account as (typeof TRACKED_ACCOUNTS)[number]) ||
+      !selectedAccounts.includes(
+        account as (typeof selectedAccounts)[number],
+      ) ||
       !source ||
       !label ||
       quantity === null ||
@@ -319,7 +327,7 @@ function portfolioSourceIndex(
   const index = new Map<string, Map<string, string | null>>();
   for (const row of rows) {
     const account = normalizeText(row.account)?.toLowerCase() ?? "";
-    if (!TRACKED_ACCOUNTS.includes(account as (typeof TRACKED_ACCOUNTS)[number])) {
+    if (!isNamedPortfolioAccount(account)) {
       continue;
     }
     const byAccount = index.get(row.snapshotDate) ?? new Map();

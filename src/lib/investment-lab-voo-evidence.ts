@@ -6,6 +6,7 @@ import {
 } from "./portfolio-risk-calendar.ts";
 import type { InvestmentLabAmountProvenance } from "./investment-lab-execution-schedule.ts";
 import { resolveInvestmentLabSnapshotFx } from "./investment-lab-snapshot-fx.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 const MAX_EXECUTION_DELAY_DAYS = 7;
 
@@ -123,6 +124,7 @@ export type InvestmentLabVooExecutionEvidence = Readonly<{
 }>;
 
 export type InvestmentLabVooEvidenceInput = Readonly<{
+  account?: PortfolioAccountScope;
   serviceDates: readonly string[];
   priceRows: readonly InvestmentLabVooPriceRow[];
   snapshotRows: readonly InvestmentLabVooSnapshotFxRow[];
@@ -188,6 +190,7 @@ export function resolveInvestmentLabVooEvidence(
 
     const snapshot = resolveInvestmentLabSnapshotFx(
       snapshotGroups.get(serviceDate) ?? [],
+      input.account,
     );
     for (const blocker of snapshot.blockers) blockers.add(blocker);
     if (snapshot.rate !== null) snapshotFxReadyCount += 1;

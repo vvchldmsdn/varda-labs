@@ -4,11 +4,20 @@ import type {
   InvestmentLabPeriodSelection,
   InvestmentLabPeriodSelectionReason,
 } from "@/lib/investment-lab-period-selection";
+import {
+  buildPortfolioAccountScopeHref,
+  type PortfolioAccountScope,
+  type PortfolioAccountScopeQuery,
+} from "@/lib/portfolio-account-scope";
 
 export function InvestmentLabPeriodSelector({
+  account,
   period,
+  query,
 }: {
+  account: PortfolioAccountScope;
   period: InvestmentLabPeriodSelection;
+  query: PortfolioAccountScopeQuery;
 }) {
   return (
     <section
@@ -36,6 +45,8 @@ export function InvestmentLabPeriodSelector({
           className="flex flex-col gap-3 sm:flex-row sm:items-end"
           method="get"
         >
+          <input name="account" type="hidden" value={account} />
+          <PreservedHiddenInputs query={query} />
           <DateField
             defaultValue={period.requestedStartServiceDate}
             label="시작 관측일"
@@ -59,7 +70,14 @@ export function InvestmentLabPeriodSelector({
             </button>
             <Link
               className="flex h-10 items-center rounded-md border border-[#d4dbce] bg-white px-4 text-sm font-semibold text-[#394138] hover:bg-[#edf1e8]"
-              href="/investment-lab"
+              href={buildPortfolioAccountScopeHref(
+                "/investment-lab",
+                account,
+                {
+                  kodexWeight: query.kodexWeight,
+                  basketAnchor: query.basketAnchor,
+                },
+              )}
             >
               전체 보기
             </Link>
@@ -82,6 +100,29 @@ export function InvestmentLabPeriodSelector({
       ) : null}
     </section>
   );
+}
+
+function PreservedHiddenInputs({ query }: { query: PortfolioAccountScopeQuery }) {
+  return Object.entries(query).flatMap(([name, value]) => {
+    if (
+      name === "account" ||
+      name === "start" ||
+      name === "end" ||
+      value === null ||
+      value === undefined
+    ) {
+      return [];
+    }
+    const values = Array.isArray(value) ? value : [value];
+    return values.map((item, index) => (
+      <input
+        key={`${name}:${index}`}
+        name={name}
+        type="hidden"
+        value={item}
+      />
+    ));
+  });
 }
 
 function DateField({

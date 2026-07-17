@@ -8,6 +8,10 @@ import {
   calculatePortfolioDirectHoldingMetrics,
 } from "./portfolio-direct-holdings.ts";
 import {
+  accountsForPortfolioScope,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
+import {
   INVESTMENT_LAB_SMALL_ADJUSTMENT_POLICY,
   type InvestmentLabSmallAdjustmentAccount,
   type InvestmentLabSmallAdjustmentAccountBlocker,
@@ -32,15 +36,15 @@ export type {
   InvestmentLabSmallAdjustmentModel,
 } from "./investment-lab-small-adjustment-types.ts";
 
-const ACCOUNTS = ["brokerage", "isa", "irp"] as const;
-
 export function buildInvestmentLabSmallAdjustmentModel(
   portfolio: Pick<PortfolioStructureResult, "holdingRows" | "exclusions">,
+  selectedAccount: PortfolioAccountScope = "all",
 ): InvestmentLabSmallAdjustmentModel {
+  const accounts = accountsForPortfolioScope(selectedAccount);
   return Object.freeze({
     policy: INVESTMENT_LAB_SMALL_ADJUSTMENT_POLICY,
     accounts: Object.freeze(
-      ACCOUNTS.map((account) =>
+      accounts.map((account) =>
         buildAccountModel(
           account,
           portfolio.holdingRows.filter((row) => row.account === account),

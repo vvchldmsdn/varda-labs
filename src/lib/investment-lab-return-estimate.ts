@@ -10,6 +10,7 @@ import {
   type InvestmentLabReturnEvidenceSnapshot,
 } from "./investment-lab-return-evidence.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 export const INVESTMENT_LAB_RETURN_BASIS_POLICY = Object.freeze({
   version: "price_only_comparable_close_basis_v1",
@@ -94,6 +95,7 @@ export type InvestmentLabReturnEstimate =
     }>;
 
 export function buildInvestmentLabReturnEstimate(input: {
+  account?: PortfolioAccountScope;
   actualRows: readonly ActualValueRow[];
   scenarioRows: readonly ScenarioValueRow[];
   boundaryFlows: readonly BoundaryFlow[];
@@ -167,6 +169,7 @@ export function buildInvestmentLabReturnEstimate(input: {
     amountKrw: flow.amountKrw,
   }));
   const evidence = validateInvestmentLabReturnEvidence({
+    account: input.account,
     serviceDates: input.actualRows.map((row) => row.serviceDate),
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,

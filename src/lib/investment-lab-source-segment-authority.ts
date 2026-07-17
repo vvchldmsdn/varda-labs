@@ -1,11 +1,14 @@
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
+import {
+  accountsForPortfolioScope,
+  isNamedPortfolioAccount,
+  type NamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 
 const LEGACY_SOURCE = "base44_import";
 const CURRENT_SOURCE = "varda_manual_daily_snapshot";
 const CURRENT_RULE_VERSION = "varda-manual-daily-snapshot-v1";
-const NAMED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
-
-type NamedAccount = (typeof NAMED_ACCOUNTS)[number];
 type SourceRole = "legacy_display" | "current_writer" | "unknown";
 
 export const INVESTMENT_LAB_SOURCE_SEGMENT_AUTHORITY_POLICY = Object.freeze({
@@ -60,14 +63,16 @@ export type InvestmentLabSourceSegmentAuthority = Readonly<{
 
 export function listInvestmentLabCompleteSnapshotDates(
   rows: readonly InvestmentLabSourceSegmentEvidenceRow[],
+  account: PortfolioAccountScope = "all",
 ) {
-  return Object.freeze(buildNamedAccountAxis(rows).completeDates);
+  return Object.freeze(buildNamedAccountAxis(rows, account).completeDates);
 }
 
 export function resolveInvestmentLabSourceSegmentAuthority(
   rows: readonly InvestmentLabSourceSegmentEvidenceRow[],
+  account: PortfolioAccountScope = "all",
 ): InvestmentLabSourceSegmentAuthority {
-  const axis = buildNamedAccountAxis(rows);
+  const axis = buildNamedAccountAxis(rows, account);
   const blockers = new Set<InvestmentLabSourceSegmentAuthorityBlocker>();
   if (axis.invalidNamedRowCount > 0) blockers.add("source_axis_invalid");
   if (axis.observedDateCount === 0) blockers.add("source_axis_unavailable");
@@ -157,10 +162,12 @@ export function resolveInvestmentLabSourceSegmentAuthority(
 
 function buildNamedAccountAxis(
   rows: readonly InvestmentLabSourceSegmentEvidenceRow[],
+  accountScope: PortfolioAccountScope,
 ) {
+  const selectedAccounts = accountsForPortfolioScope(accountScope);
   const byDate = new Map<
     string,
-    Map<NamedAccount, InvestmentLabSourceSegmentEvidenceRow[]>
+    Map<NamedPortfolioAccount, InvestmentLabSourceSegmentEvidenceRow[]>
   >();
   let namedSourceRows = 0;
   let invalidNamedRowCount = 0;
@@ -168,7 +175,12 @@ function buildNamedAccountAxis(
   for (const row of rows) {
     const account = stableText(row.account).toLowerCase();
     if (account === "all") continue;
-    if (!isNamedAccount(account) || !isRiskDate(row.snapshotDate)) {
+    if (!isNamedPortfolioAccount(account)) {
+      if (accountScope === "all") invalidNamedRowCount += 1;
+      continue;
+    }
+    if (!selectedAccounts.includes(account)) continue;
+    if (!isRiskDate(row.snapshotDate)) {
       invalidNamedRowCount += 1;
       continue;
     }
@@ -187,7 +199,7 @@ function buildNamedAccountAxis(
   for (const [snapshotDate, accountRows] of [...byDate].sort(([left], [right]) =>
     left.localeCompare(right),
   )) {
-    const complete = NAMED_ACCOUNTS.every(
+    const complete = selectedAccounts.every(
       (account) => accountRows.get(account)?.length === 1,
     );
     if (!complete) {
@@ -196,7 +208,7 @@ function buildNamedAccountAxis(
     }
     completeDates.push(snapshotDate);
     completeRowsByDate.push(
-      NAMED_ACCOUNTS.map((account) => accountRows.get(account)![0]),
+      selectedAccounts.map((account) => accountRows.get(account)![0]),
     );
   }
 
@@ -216,10 +228,6 @@ function sourceRole(value: string | null): SourceRole {
   if (source === LEGACY_SOURCE) return "legacy_display";
   if (source === CURRENT_SOURCE) return "current_writer";
   return "unknown";
-}
-
-function isNamedAccount(value: string): value is NamedAccount {
-  return NAMED_ACCOUNTS.some((account) => account === value);
 }
 
 function stableText(value: unknown) {

@@ -20,6 +20,7 @@ import {
   mapRiskEvidenceDateToServiceDate,
   riskCalendarDayDistance,
 } from "./portfolio-risk-calendar.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 const MAX_EXECUTION_DELAY_DAYS = 7;
 
@@ -99,6 +100,7 @@ export type InvestmentLabAnchorEvidenceResolution = Readonly<{
 }>;
 
 export function resolveInvestmentLabAnchorBasketEvidence(input: Readonly<{
+  account?: PortfolioAccountScope;
   anchor: InvestmentLabAnchorSelection;
   serviceDates: readonly string[];
   priceRows: readonly InvestmentLabAnchorPriceRow[];
@@ -154,6 +156,7 @@ export function resolveInvestmentLabAnchorBasketEvidence(input: Readonly<{
               snapshotFx,
               instrument.key,
               blockers,
+              input.account,
             )
           : 1;
       if (price !== null && fx !== null) {
@@ -354,10 +357,11 @@ function resolveSnapshotRate(
   cache: Map<string, ReturnType<typeof resolveInvestmentLabSnapshotFx>>,
   instrumentKey: string,
   blockers: InvestmentLabAnchorEvidenceBlocker[],
+  account?: PortfolioAccountScope,
 ) {
   const resolution =
     cache.get(serviceDate) ??
-    resolveInvestmentLabSnapshotFx(groups.get(serviceDate) ?? []);
+    resolveInvestmentLabSnapshotFx(groups.get(serviceDate) ?? [], account);
   cache.set(serviceDate, resolution);
   for (const reason of resolution.blockers) {
     blockers.push(blocker(reason, instrumentKey, serviceDate));

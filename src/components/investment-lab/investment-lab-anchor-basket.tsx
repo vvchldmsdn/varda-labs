@@ -4,12 +4,15 @@ import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anc
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabAnchorSpecialHoldingEvidence } from "@/lib/investment-lab-special-holding-authority";
+import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
 
 export function InvestmentLabAnchorBasket({
+  account,
   model,
   period,
   fixedMixSelection,
 }: {
+  account: PortfolioAccountScope;
   model: InvestmentLabAnchorBasketScenario;
   period: InvestmentLabPeriodSelection;
   fixedMixSelection: InvestmentLabFixedMixSelection;
@@ -56,6 +59,7 @@ export function InvestmentLabAnchorBasket({
             </p>
           </div>
           <AnchorForm
+            account={account}
             anchorDates={anchor.candidateAnchorDates}
             fixedMixSelection={fixedMixSelection}
             period={period}
@@ -283,11 +287,13 @@ function UnavailableResult({ model }: { model: InvestmentLabAnchorBasketScenario
 }
 
 function AnchorForm({
+  account,
   anchorDates,
   selectedAnchorDate,
   period,
   fixedMixSelection,
 }: {
+  account: PortfolioAccountScope;
   anchorDates: readonly string[];
   selectedAnchorDate: string | null;
   period: InvestmentLabPeriodSelection;
@@ -296,6 +302,7 @@ function AnchorForm({
   if (anchorDates.length === 0) return null;
   return (
     <form action="/investment-lab" className="flex items-end gap-2" method="get">
+      <input name="account" type="hidden" value={account} />
       <PeriodHiddenInputs period={period} />
       {fixedMixSelection.kodexWeightPct !== null ? (
         <input

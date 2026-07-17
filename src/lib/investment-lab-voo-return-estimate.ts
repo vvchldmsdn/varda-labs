@@ -11,6 +11,7 @@ import {
 } from "./investment-lab-return-evidence.ts";
 import type { InvestmentLabVooAppliedFlow } from "./investment-lab-voo-path.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 export const INVESTMENT_LAB_VOO_RETURN_BASIS_POLICY = Object.freeze({
   version: "voo_raw_close_snapshot_fx_price_only_v1",
@@ -74,6 +75,7 @@ export type InvestmentLabVooReturnEstimate =
     }>;
 
 export function buildInvestmentLabVooReturnEstimate(input: {
+  account?: PortfolioAccountScope;
   actualRows: readonly ActualValueRow[];
   scenarioRows: readonly ScenarioValueRow[];
   boundaryFlows: readonly BoundaryFlow[];
@@ -116,6 +118,7 @@ export function buildInvestmentLabVooReturnEstimate(input: {
     amountKrw: flow.amountKrw,
   }));
   const evidence = validateInvestmentLabReturnEvidence({
+    account: input.account,
     serviceDates: input.actualRows.map((row) => row.serviceDate),
     snapshotRows: input.snapshotRows,
     eventRows: input.eventRows,

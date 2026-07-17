@@ -160,7 +160,10 @@ describe("investment lab ETF X-ray", () => {
     assert.match(querySource, /import "server-only"/);
     assert.doesNotMatch(querySource, /\.(insert|update|delete)\s*\(/);
     assert.doesNotMatch(querySource, /\bfetch\s*\(/);
-    assert.match(pageSource, /getReadOnlyInvestmentLabEtfXray\(\)/);
+    assert.match(
+      pageSource,
+      /getReadOnlyInvestmentLabEtfXray\(selectedAccount\)/,
+    );
     assert.match(pageSource, /InvestmentLabEtfXraySkeleton/);
     assert.match(pageSource, /InvestmentLabEtfXrayUnavailable/);
   });

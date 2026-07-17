@@ -38,10 +38,14 @@ import type {
   InvestmentLabContributionScenarioEvidence,
 } from "./investment-lab-contribution-experiment.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
-
-const TRACKED_ACCOUNTS = Object.freeze(["brokerage", "isa", "irp"] as const);
+import {
+  accountsForPortfolioScope,
+  isNamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 
 export type InvestmentLabSourceEventRow = Readonly<{
+  account?: string | null;
   eventDate: string;
   eventType: string;
   sequence: number;
@@ -83,6 +87,7 @@ export type InvestmentLabCounterfactualReadBlocker =
   | "source_segment_authority_blocked"
   | "actual_path_reconciliation_mismatch"
   | "actual_path_incomplete"
+  | "event_account_unresolved"
   | "event_evidence_unsupported"
   | "scenario_close_evidence_invalid"
   | "flow_schedule_blocked"
@@ -102,7 +107,7 @@ export type InvestmentLabCounterfactualDisplayRow = Readonly<{
 export type InvestmentLabCounterfactualReadModel = Readonly<{
   status: "ready" | "blocked";
   scenario: Readonly<{
-    account: "all";
+    account: PortfolioAccountScope;
     instrumentKey: "korea:KRW:069500";
     label: "KODEX 200";
     pathPolicyVersion: "position_flow_counterfactual_v1";
@@ -145,30 +150,41 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
 export function buildInvestmentLabCounterfactualReadModel(
   input: InvestmentLabCounterfactualReadInput,
   options: Readonly<{
+    account?: PortfolioAccountScope;
     fixedMixSelection?: InvestmentLabFixedMixSelection;
   }> = {},
 ): InvestmentLabCounterfactualReadModel {
+  const account = options.account ?? "all";
   const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
   const sourceAuthority = resolveInvestmentLabSourceSegmentAuthority(
     input.snapshotRows,
+    account,
   );
   if (sourceAuthority.status !== "eligible") {
     blockers.add("source_segment_authority_blocked");
   }
-  const actual = buildAggregateActualPath(input.snapshotRows, blockers);
-  const flowResolution = resolveInvestmentLabBoundaryFlows(input.eventRows);
+  const actual = buildActualPath(input.snapshotRows, account, blockers);
+  const flowResolution = resolveInvestmentLabBoundaryFlows(
+    input.eventRows,
+    account,
+  );
   for (const blocker of flowResolution.blockers) blockers.add(blocker);
   const events = flowResolution.flows;
   const closes = buildScenarioCloses(input.closeRows, blockers);
 
   const initialCoverage = coverage({
-    input,
     actual,
+    eventSourceRows: flowResolution.sourceRows.length,
     eligibleFlowRows: events.length,
     closeRows: closes.length,
   });
   if (blockers.size > 0) {
-    return blockedReadModel(initialCoverage, blockers, sourceAuthority);
+    return blockedReadModel(
+      initialCoverage,
+      blockers,
+      sourceAuthority,
+      account,
+    );
   }
 
   const windowEndPriceDate = closes.at(-1)?.priceDate ?? "invalid";
@@ -179,7 +195,12 @@ export function buildInvestmentLabCounterfactualReadModel(
   });
   if (schedule.status !== "ready") {
     blockers.add("flow_schedule_blocked");
-    return blockedReadModel(initialCoverage, blockers, sourceAuthority);
+    return blockedReadModel(
+      initialCoverage,
+      blockers,
+      sourceAuthority,
+      account,
+    );
   }
 
   const path = buildInvestmentLabCounterfactualPath({
@@ -196,6 +217,7 @@ export function buildInvestmentLabCounterfactualReadModel(
       },
       blockers,
       sourceAuthority,
+      account,
     );
   }
   if (path.pendingAtEnd.flowCount > 0) {
@@ -208,6 +230,7 @@ export function buildInvestmentLabCounterfactualReadModel(
       },
       blockers,
       sourceAuthority,
+      account,
     );
   }
 
@@ -228,15 +251,17 @@ export function buildInvestmentLabCounterfactualReadModel(
   );
   const latest = rows.at(-1)!;
   const returnEstimate = buildInvestmentLabReturnEstimate({
+    account,
     actualRows: actual.rows,
     scenarioRows: path.rows,
     boundaryFlows: events,
     appliedFlows: path.appliedFlows,
     priceRows: input.closeRows,
     snapshotRows: input.snapshotRows,
-    eventRows: input.eventRows,
+    eventRows: flowResolution.sourceRows,
   });
   const vooEvidence = resolveInvestmentLabVooEvidence({
+    account,
     serviceDates: actual.rows.map((row) => row.serviceDate),
     priceRows: input.vooCloseRows,
     snapshotRows: input.snapshotRows,
@@ -245,11 +270,12 @@ export function buildInvestmentLabCounterfactualReadModel(
   });
   const vooReadiness = vooEvidence.readiness;
   const vooComparison = buildInvestmentLabVooComparison({
+    account,
     actualPath: actual.rows,
     boundaryFlows: events,
     evidence: vooEvidence,
     snapshotRows: input.snapshotRows,
-    eventRows: input.eventRows,
+    eventRows: flowResolution.sourceRows,
   });
   const cashComparison = buildInvestmentLabCashComparison({
     actualPath: actual.rows,
@@ -281,7 +307,7 @@ export function buildInvestmentLabCounterfactualReadModel(
 
   return Object.freeze({
     status: "ready",
-    scenario: scenario(),
+    scenario: scenario(account),
     summary: Object.freeze({
       startServiceDate: rows[0].serviceDate,
       endServiceDate: latest.serviceDate,
@@ -314,18 +340,35 @@ export function buildInvestmentLabCounterfactualReadModel(
   });
 }
 
-function buildAggregateActualPath(
+function buildActualPath(
   sourceRows: readonly InvestmentLabSourceSnapshotRow[],
+  accountScope: PortfolioAccountScope,
   blockers: Set<InvestmentLabCounterfactualReadBlocker>,
 ) {
+  const selectedAccounts = accountsForPortfolioScope(accountScope);
   const byDate = new Map<string, Map<string, number>>();
+  let sourceRowCount = 0;
 
   for (const row of sourceRows) {
     const account = String(row.account ?? "").trim().toLowerCase();
+    const relevant =
+      accountScope === "all"
+        ? isNamedPortfolioAccount(account) || account === "all"
+        : account === accountScope;
+    if (!relevant) {
+      if (
+        accountScope === "all" &&
+        account !== "all" &&
+        !isNamedPortfolioAccount(account)
+      ) {
+        blockers.add("snapshot_evidence_invalid");
+      }
+      continue;
+    }
+    sourceRowCount += 1;
     const value = nonNegativeNumber(row.totalMarketValue);
     if (
       !isRiskDate(row.snapshotDate) ||
-      ![...TRACKED_ACCOUNTS, "all"].includes(account) ||
       value === null
     ) {
       blockers.add("snapshot_evidence_invalid");
@@ -343,15 +386,16 @@ function buildAggregateActualPath(
 
   const rows = [...byDate]
     .filter(([, accountValues]) =>
-      TRACKED_ACCOUNTS.every((account) => accountValues.has(account)),
+      selectedAccounts.every((account) => accountValues.has(account)),
     )
     .map(([serviceDate, accountValues]) => {
-      const totalMarketValueKrw = TRACKED_ACCOUNTS.reduce(
+      const totalMarketValueKrw = selectedAccounts.reduce(
         (sum, account) => sum + accountValues.get(account)!,
         0,
       );
       const storedAll = accountValues.get("all");
       if (
+        accountScope === "all" &&
         storedAll !== undefined &&
         Math.abs(storedAll - totalMarketValueKrw) > 1e-6
       ) {
@@ -363,7 +407,7 @@ function buildAggregateActualPath(
 
   const incompleteDates = [...byDate.values()].filter(
     (accountValues) =>
-      !TRACKED_ACCOUNTS.every((account) => accountValues.has(account)),
+      !selectedAccounts.every((account) => accountValues.has(account)),
   ).length;
   if (rows.length < 2 || incompleteDates > 0) {
     blockers.add("actual_path_incomplete");
@@ -371,6 +415,7 @@ function buildAggregateActualPath(
 
   return {
     rows,
+    sourceRows: sourceRowCount,
     completeDates: rows.length,
     incompleteDates,
   };
@@ -414,14 +459,62 @@ function buildBoundaryFlows(
 
 export function resolveInvestmentLabBoundaryFlows(
   sourceRows: readonly InvestmentLabSourceEventRow[],
+  account: PortfolioAccountScope = "all",
 ) {
   const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
-  const flows = buildBoundaryFlows(sourceRows, blockers);
+  const scopedRows = selectAccountEventRows(sourceRows, account, blockers);
+  const flows = buildBoundaryFlows(scopedRows, blockers);
   return Object.freeze({
     status: blockers.size === 0 ? "ready" : "blocked",
+    sourceRows: Object.freeze(scopedRows),
     flows: Object.freeze(flows),
     blockers: Object.freeze([...blockers].sort()),
   });
+}
+
+function selectAccountEventRows(
+  sourceRows: readonly InvestmentLabSourceEventRow[],
+  account: PortfolioAccountScope,
+  blockers: Set<InvestmentLabCounterfactualReadBlocker>,
+) {
+  if (account === "all") return [...sourceRows];
+
+  const selected: InvestmentLabSourceEventRow[] = [];
+  for (const row of sourceRows) {
+    const rowAccount = String(row.account ?? "").trim().toLowerCase();
+    if (rowAccount === account) {
+      selected.push(row);
+      continue;
+    }
+    if (isNamedPortfolioAccount(rowAccount)) continue;
+
+    const resolved = resolveEventAmount(row);
+    const classification = classifyInvestmentLabEvent({
+      eventType: row.eventType,
+      amountResolved: resolved !== null,
+      isCorrection: row.isCorrection,
+    });
+    if (
+      classification.category === "unsupported" ||
+      classification.category === "invested_boundary_flow" ||
+      classification.category === "cash_ledger_only" ||
+      (classification.category === "position_metadata" &&
+        hasEventFinancialPayload(row))
+    ) {
+      blockers.add("event_account_unresolved");
+    }
+  }
+  return selected;
+}
+
+function hasEventFinancialPayload(row: InvestmentLabSourceEventRow) {
+  return [row.amountKrw, row.quantityDelta, row.price, row.fxRate].some(
+    (value) => {
+      if (value === null || value === "") return false;
+      const parsed = Number(value);
+      return !Number.isFinite(parsed) || Math.abs(parsed) > 1e-8;
+    },
+  );
 }
 
 function buildScenarioCloses(
@@ -482,21 +575,25 @@ function resolveEventAmount(row: InvestmentLabSourceEventRow): Readonly<{
 }
 
 function coverage({
-  input,
   actual,
+  eventSourceRows,
   eligibleFlowRows,
   closeRows,
 }: {
-  input: InvestmentLabCounterfactualReadInput;
-  actual: { completeDates: number; incompleteDates: number };
+  actual: {
+    sourceRows: number;
+    completeDates: number;
+    incompleteDates: number;
+  };
+  eventSourceRows: number;
   eligibleFlowRows: number;
   closeRows: number;
 }) {
   return {
-    snapshotSourceRows: input.snapshotRows.length,
+    snapshotSourceRows: actual.sourceRows,
     completeComparisonDates: actual.completeDates,
     incompleteSnapshotDates: actual.incompleteDates,
-    eventSourceRows: input.eventRows.length,
+    eventSourceRows,
     eligibleFlowRows,
     appliedFlowRows: 0,
     scenarioCloseRows: closeRows,
@@ -512,10 +609,11 @@ function blockedReadModel(
   coverageValue: InvestmentLabCounterfactualReadModel["coverage"],
   blockers: Set<InvestmentLabCounterfactualReadBlocker>,
   sourceAuthority: InvestmentLabSourceSegmentAuthority,
+  account: PortfolioAccountScope,
 ): InvestmentLabCounterfactualReadModel {
   return Object.freeze({
     status: "blocked",
-    scenario: scenario(),
+    scenario: scenario(account),
     summary: null,
     returnEstimate: null,
     vooReadiness: null,
@@ -530,9 +628,9 @@ function blockedReadModel(
   });
 }
 
-function scenario() {
+function scenario(account: PortfolioAccountScope) {
   return Object.freeze({
-    account: "all",
+    account,
     instrumentKey: "korea:KRW:069500",
     label: "KODEX 200",
     pathPolicyVersion: "position_flow_counterfactual_v1",

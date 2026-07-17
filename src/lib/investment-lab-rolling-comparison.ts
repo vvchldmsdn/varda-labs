@@ -8,6 +8,7 @@ import {
   type InvestmentLabPeriodSelection,
 } from "./investment-lab-period-selection.ts";
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 export const INVESTMENT_LAB_ROLLING_COMPARISON_POLICY = Object.freeze({
   version: "observed_same_flow_rolling_v1",
@@ -47,6 +48,7 @@ export type InvestmentLabRollingComparison = Readonly<{
 }>;
 
 export function buildInvestmentLabRollingComparison(input: {
+  account?: PortfolioAccountScope;
   source: InvestmentLabCounterfactualReadInput;
   availableServiceDates: readonly string[];
 }): InvestmentLabRollingComparison {
@@ -81,6 +83,7 @@ export function buildInvestmentLabRollingComparison(input: {
     );
     const model = buildInvestmentLabCounterfactualReadModel(
       sliceInvestmentLabCounterfactualInput(input.source, selection),
+      { account: input.account },
     );
     const window = completeWindow(model, {
       startServiceDate,

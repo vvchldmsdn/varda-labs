@@ -16,15 +16,21 @@ import {
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
 import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
 import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
-import { getReadOnlyAllPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { buildInvestmentLabSmallAdjustmentModel } from "@/lib/investment-lab-small-adjustment";
 import { resolveInvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
+import {
+  normalizePortfolioAccountScope,
+  type PortfolioAccountScope,
+  type PortfolioAccountScopeQuery,
+} from "@/lib/portfolio-account-scope";
 
 export const dynamic = "force-dynamic";
 
 type InvestmentLabPageProps = {
   searchParams: Promise<{
+    account?: string | string[];
     start?: string | string[];
     end?: string | string[];
     kodexWeight?: string | string[];
@@ -35,12 +41,24 @@ type InvestmentLabPageProps = {
 export default async function InvestmentLabPage({
   searchParams,
 }: InvestmentLabPageProps) {
-  const portfolioStructurePromise = getReadOnlyAllPortfolioStructure();
-  const etfXrayPromise = getReadOnlyInvestmentLabEtfXray();
   const params = await searchParams;
+  const selectedAccount = normalizePortfolioAccountScope(
+    params.account,
+    "all",
+  );
+  const accountQuery = Object.freeze({
+    start: params.start,
+    end: params.end,
+    kodexWeight: params.kodexWeight,
+    basketAnchor: params.basketAnchor,
+  });
   const fixedMixSelection = resolveInvestmentLabFixedMixSelection(
     params.kodexWeight,
   );
+  const portfolioStructurePromise = getReadOnlyPortfolioStructure({
+    account: selectedAccount,
+  });
+  const etfXrayPromise = getReadOnlyInvestmentLabEtfXray(selectedAccount);
   const modelPromise = getReadOnlyInvestmentLabCounterfactual(
     params.start === undefined && params.end === undefined
       ? undefined
@@ -50,6 +68,7 @@ export default async function InvestmentLabPage({
         },
     fixedMixSelection,
     normalizeSingleParam(params.basketAnchor),
+    selectedAccount,
   );
 
   return (
@@ -58,6 +77,8 @@ export default async function InvestmentLabPage({
         <InvestmentLabContent
           fixedMixSelection={fixedMixSelection}
           modelPromise={modelPromise}
+          accountQuery={accountQuery}
+          selectedAccount={selectedAccount}
         />
       </Suspense>
       <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
@@ -66,6 +87,7 @@ export default async function InvestmentLabPage({
       <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
         <InvestmentLabSmallAdjustmentContent
           modelPromise={portfolioStructurePromise}
+          selectedAccount={selectedAccount}
         />
       </Suspense>
     </div>
@@ -73,11 +95,15 @@ export default async function InvestmentLabPage({
 }
 
 async function InvestmentLabContent({
+  accountQuery,
   fixedMixSelection,
   modelPromise,
+  selectedAccount,
 }: {
+  accountQuery: PortfolioAccountScopeQuery;
   fixedMixSelection: InvestmentLabFixedMixSelection;
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
+  selectedAccount: PortfolioAccountScope;
 }) {
   const { anchorBasketScenario, model, period, rollingComparison } =
     await modelPromise;
@@ -87,13 +113,17 @@ async function InvestmentLabContent({
         anchorBasketScenario={anchorBasketScenario}
         model={model}
         period={period}
+        accountQuery={accountQuery}
+        selectedAccount={selectedAccount}
       />
       <InvestmentLabFixedMix
+        account={selectedAccount}
         model={model.fixedMixScenario}
         period={period}
         selection={fixedMixSelection}
       />
       <InvestmentLabAnchorBasket
+        account={selectedAccount}
         fixedMixSelection={fixedMixSelection}
         model={anchorBasketScenario}
         period={period}
@@ -124,8 +154,10 @@ async function InvestmentLabEtfXrayContent({
 
 async function InvestmentLabSmallAdjustmentContent({
   modelPromise,
+  selectedAccount,
 }: {
-  modelPromise: ReturnType<typeof getReadOnlyAllPortfolioStructure>;
+  modelPromise: ReturnType<typeof getReadOnlyPortfolioStructure>;
+  selectedAccount: PortfolioAccountScope;
 }) {
   let portfolio;
   try {
@@ -135,7 +167,8 @@ async function InvestmentLabSmallAdjustmentContent({
   }
   return (
     <InvestmentLabSmallAdjustment
-      model={buildInvestmentLabSmallAdjustmentModel(portfolio)}
+      key={selectedAccount}
+      model={buildInvestmentLabSmallAdjustmentModel(portfolio, selectedAccount)}
     />
   );
 }

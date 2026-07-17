@@ -3,7 +3,7 @@ import {
   mapRiskEvidenceDateToServiceDate,
   shiftRiskDate,
 } from "../../src/lib/portfolio-risk-calendar.ts";
-import { portfolioEventAccount } from "../../src/lib/portfolio-return-metrics-core.ts";
+import { portfolioEventAccountFromMetadata } from "../../src/lib/portfolio-return-metrics-core.ts";
 
 const ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 
@@ -111,12 +111,14 @@ function resolveTradeAccount(row) {
     eventDate: row.event_date,
     amountResolved: row.amount_resolved,
     isCorrection: row.is_correction,
-    account: normalizeAccount(
-      portfolioEventAccount({
+    account: resolveKnownAccount(
+      portfolioEventAccountFromMetadata({
         account: row.account,
         beforeValue: row.before_value,
         afterValue: row.after_value,
-      }) ?? row.asset_account,
+      }),
+      row.asset_account,
+      row.historical_position_account,
     ),
   };
 }
@@ -223,6 +225,14 @@ function normalizeAccount(value) {
   return ACCOUNTS.includes(normalized) && normalized !== "all"
     ? normalized
     : "unknown";
+}
+
+function resolveKnownAccount(...values) {
+  for (const value of values) {
+    const account = normalizeAccount(value);
+    if (account !== "unknown") return account;
+  }
+  return "unknown";
 }
 
 function toRangeEvidence(row) {

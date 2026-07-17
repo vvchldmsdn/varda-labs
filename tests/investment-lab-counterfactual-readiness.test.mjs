@@ -126,7 +126,7 @@ describe("investment lab historical counterfactual readiness", () => {
     const brokerage = result.accounts.find((row) => row.account === "brokerage");
     const all = result.accounts.find((row) => row.account === "all");
 
-    assert.equal(brokerage.trades.rowCount, 1);
+    assert.equal(brokerage.trades.rowCount, 2);
     assert.equal(brokerage.trades.unknownAccountRows, 0);
     assert.equal(all.kodex200.status, "ready_for_engine_fixture");
     assert.deepEqual(result.evidence.allSnapshotReconciliation, {
@@ -248,6 +248,16 @@ function auditFixture() {
         event_date: "2026-07-01",
         account: null,
         asset_account: "brokerage",
+        amount_resolved: true,
+        is_correction: false,
+        before_value: null,
+        after_value: null,
+      },
+      {
+        event_date: "2026-07-02",
+        account: null,
+        asset_account: null,
+        historical_position_account: "brokerage",
         amount_resolved: true,
         is_correction: false,
         before_value: null,

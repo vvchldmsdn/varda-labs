@@ -81,6 +81,18 @@ export const TRADE_EVIDENCE_SQL = `
   select
     nullif(lower(btrim(e.account)), '') as account,
     nullif(lower(btrim(a.account)), '') as asset_account,
+    (
+      select case
+        when count(*) > 0
+          and bool_and(lower(btrim(p.account)) in ('brokerage', 'isa', 'irp'))
+          and count(distinct lower(btrim(p.account))) = 1
+        then min(lower(btrim(p.account)))
+        else null
+      end
+      from daily_position_snapshots p
+      where p.is_sample = false
+        and p.legacy_asset_id = e.legacy_asset_id
+    ) as historical_position_account,
     e.event_date::text as event_date,
     case
       when abs(coalesce(e.amount_krw, 0)) > 0 then true

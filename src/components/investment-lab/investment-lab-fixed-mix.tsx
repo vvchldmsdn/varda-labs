@@ -8,12 +8,15 @@ import {
 } from "@/lib/investment-lab-fixed-mix";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
+import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
 
 export function InvestmentLabFixedMix({
+  account,
   model,
   period,
   selection,
 }: {
+  account: PortfolioAccountScope;
   model: InvestmentLabFixedMixScenario | null;
   period: InvestmentLabPeriodSelection;
   selection: InvestmentLabFixedMixSelection;
@@ -66,13 +69,14 @@ export function InvestmentLabFixedMix({
             </p>
           </div>
           <MixForm
+            account={account}
             kodexWeightPct={kodexWeightPct}
             period={period}
             vooWeightPct={vooWeightPct}
           />
         </div>
 
-        <PresetLinks period={period} />
+        <PresetLinks account={account} period={period} />
 
         {selection.status === "invalid" ? (
           <UnavailableMessage>
@@ -109,10 +113,12 @@ export function InvestmentLabFixedMix({
 }
 
 function MixForm({
+  account,
   kodexWeightPct,
   period,
   vooWeightPct,
 }: {
+  account: PortfolioAccountScope;
   kodexWeightPct: number;
   period: InvestmentLabPeriodSelection;
   vooWeightPct: number;
@@ -123,6 +129,7 @@ function MixForm({
       className="flex flex-wrap items-end gap-2"
       method="get"
     >
+      <input name="account" type="hidden" value={account} />
       <PeriodHiddenInputs period={period} />
       <label className="grid gap-1 text-xs font-semibold text-[#586358]">
         KODEX 200 배분
@@ -153,13 +160,19 @@ function MixForm({
   );
 }
 
-function PresetLinks({ period }: { period: InvestmentLabPeriodSelection }) {
+function PresetLinks({
+  account,
+  period,
+}: {
+  account: PortfolioAccountScope;
+  period: InvestmentLabPeriodSelection;
+}) {
   return (
     <nav aria-label="고정 배분 예시" className="flex flex-wrap gap-2">
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
           className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
-          href={mixHref(period, kodexWeightPct)}
+          href={mixHref(account, period, kodexWeightPct)}
           key={kodexWeightPct}
         >
           {kodexWeightPct}:{100 - kodexWeightPct}
@@ -276,8 +289,13 @@ function PeriodHiddenInputs({ period }: { period: InvestmentLabPeriodSelection }
   );
 }
 
-function mixHref(period: InvestmentLabPeriodSelection, kodexWeightPct: number) {
+function mixHref(
+  account: PortfolioAccountScope,
+  period: InvestmentLabPeriodSelection,
+  kodexWeightPct: number,
+) {
   const params = new URLSearchParams({
+    account,
     kodexWeight: String(kodexWeightPct),
   });
   if (
