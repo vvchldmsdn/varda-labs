@@ -102,7 +102,10 @@ describe("investment lab counterfactual read model", () => {
     assert.deepEqual(result.rows, []);
     assert.equal(result.cashComparison, null);
     assert.deepEqual(result.contributionExperimentScenarios, []);
-    assert.deepEqual(result.blockers, ["snapshot_evidence_invalid"]);
+    assert.deepEqual(result.blockers, [
+      "snapshot_evidence_invalid",
+      "source_segment_authority_blocked",
+    ]);
   });
 
   it("blocks a stored all row that disagrees with the named-account sum", () => {
@@ -212,13 +215,68 @@ describe("investment lab counterfactual read model", () => {
     ]);
   });
 
-  it("keeps internal identifiers and secret-shaped fields out of the model", () => {
-    const serialized = JSON.stringify(
-      buildInvestmentLabCounterfactualReadModel(fixture()),
+  it("blocks a legacy-only actual path as display evidence", () => {
+    const source = fixture();
+    const result = buildInvestmentLabCounterfactualReadModel({
+      ...source,
+      snapshotRows: source.snapshotRows.map((row) => ({
+        ...row,
+        source: "base44_import",
+        ruleVersion: null,
+      })),
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.rows, []);
+    assert.deepEqual(result.blockers, ["source_segment_authority_blocked"]);
+    assert.equal(result.sourceAuthority.decision, "legacy_display_only");
+  });
+
+  it("blocks a mixed legacy-current actual path without partial output", () => {
+    const source = fixture();
+    const result = buildInvestmentLabCounterfactualReadModel({
+      ...source,
+      snapshotRows: source.snapshotRows.map((row) =>
+        row.snapshotDate <= "2026-01-05"
+          ? { ...row, source: "base44_import", ruleVersion: null }
+          : row,
+      ),
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.summary, null);
+    assert.deepEqual(result.rows, []);
+    assert.equal(
+      result.sourceAuthority.blockers.includes("source_splice_forbidden"),
+      true,
     );
+  });
+
+  it("blocks an incomplete current snapshot date", () => {
+    const source = fixture();
+    const result = buildInvestmentLabCounterfactualReadModel({
+      ...source,
+      snapshotRows: source.snapshotRows.filter(
+        (row) =>
+          row.snapshotDate !== "2026-01-06" || row.account !== "irp",
+      ),
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.rows, []);
+    assert.deepEqual(result.blockers, [
+      "actual_path_incomplete",
+      "source_segment_authority_blocked",
+    ]);
+  });
+
+  it("keeps internal identifiers and secret-shaped fields out of the model", () => {
+    const serialized = JSON.stringify(buildInvestmentLabCounterfactualReadModel(fixture()));
 
     assert.doesNotMatch(serialized, /legacyBase44Id|assetId|holdingId|ownerUserId|canonicalOwner/i);
     assert.doesNotMatch(serialized, /authorization|api[_-]?key|password|secret|token|cookie/i);
+    assert.equal(serialized.includes("base44_import"), false);
+    assert.equal(serialized.includes("varda_manual_daily_snapshot"), false);
   });
 
   it("keeps the route server-rendered, read-only, and Basic Auth protected", () => {
@@ -259,6 +317,9 @@ describe("investment lab counterfactual read model", () => {
       /\bfetch\s*\(|\/api\/|localStorage|sessionStorage|URLSearchParams|console\./,
     );
     assert.match(view, /InvestmentLabCashComparisonView/);
+    assert.match(view, /data-read-model-status/);
+    assert.match(view, /data-source-authority-status/);
+    assert.match(view, /data-source-transition-count/);
     assert.match(proxy, /"\/investment-lab"/);
   });
 });
@@ -313,8 +374,8 @@ function snapshotDate(snapshotDate, total) {
       cashValue: 0,
       totalMarketValue: total * 0.5,
       usdKrw: 1_300,
-      source: "snapshot_fixture",
-      ruleVersion: "snapshot-fixture-v1",
+      source: "varda_manual_daily_snapshot",
+      ruleVersion: "varda-manual-daily-snapshot-v1",
     },
     {
       snapshotDate,
@@ -322,8 +383,8 @@ function snapshotDate(snapshotDate, total) {
       cashValue: 0,
       totalMarketValue: total * 0.3,
       usdKrw: 1_300,
-      source: "snapshot_fixture",
-      ruleVersion: "snapshot-fixture-v1",
+      source: "varda_manual_daily_snapshot",
+      ruleVersion: "varda-manual-daily-snapshot-v1",
     },
     {
       snapshotDate,
@@ -331,8 +392,8 @@ function snapshotDate(snapshotDate, total) {
       cashValue: 0,
       totalMarketValue: total * 0.2,
       usdKrw: 1_300,
-      source: "snapshot_fixture",
-      ruleVersion: "snapshot-fixture-v1",
+      source: "varda_manual_daily_snapshot",
+      ruleVersion: "varda-manual-daily-snapshot-v1",
     },
   ];
 }

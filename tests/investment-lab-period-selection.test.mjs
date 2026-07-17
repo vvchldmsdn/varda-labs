@@ -152,6 +152,43 @@ describe("investment lab period selection", () => {
     assert.equal(result.period.status, "unavailable");
     assert.equal(result.period.reason, "range_evidence_incomplete");
   });
+
+  it("blocks the default mixed history but permits an explicit all-current range", async () => {
+    const source = fixture();
+    source.snapshotRows = source.snapshotRows.map((row) =>
+      row.snapshotDate <= "2026-01-05"
+        ? { ...row, source: "base44_import", ruleVersion: null }
+        : row,
+    );
+
+    const full = await loadInvestmentLabCounterfactualReadModel(
+      repository(source),
+    );
+    assert.equal(full.period.status, "full");
+    assert.equal(full.model.status, "blocked");
+    assert.deepEqual(full.model.rows, []);
+    assert.equal(full.rollingComparison.status, "unavailable");
+    assert.equal(
+      full.model.sourceAuthority.blockers.includes("source_splice_forbidden"),
+      true,
+    );
+
+    const selected = await loadInvestmentLabCounterfactualReadModel(
+      repository(source),
+      {
+        startServiceDate: "2026-01-06",
+        endServiceDate: "2026-01-07",
+      },
+    );
+    assert.equal(selected.period.status, "selected");
+    assert.equal(selected.model.status, "ready");
+    assert.equal(selected.model.summary.startServiceDate, "2026-01-06");
+    assert.equal(selected.model.summary.endServiceDate, "2026-01-07");
+    assert.equal(
+      selected.model.sourceAuthority.decision,
+      "current_writer_calculation_candidate",
+    );
+  });
 });
 
 function repository(source) {
@@ -237,8 +274,8 @@ function snapshot(snapshotDate, account, totalMarketValue) {
     cashValue: 0,
     totalMarketValue,
     usdKrw: 1_300,
-    source: "snapshot_fixture",
-    ruleVersion: "snapshot-fixture-v1",
+    source: "varda_manual_daily_snapshot",
+    ruleVersion: "varda-manual-daily-snapshot-v1",
   };
 }
 

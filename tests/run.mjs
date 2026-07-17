@@ -29,6 +29,7 @@ import "./investment-lab-fixed-mix-contribution.test.mjs";
 import "./investment-lab-fount-exclusion.test.mjs";
 import "./investment-lab-fount-readiness.test.mjs";
 import "./investment-lab-source-transition.test.mjs";
+import "./investment-lab-source-segment-authority.test.mjs";
 import "./investment-lab-legacy-reconciliation.test.mjs";
 import "./portfolio-direct-holdings.test.mjs";
 import "./portfolio-fx-shock.test.mjs";

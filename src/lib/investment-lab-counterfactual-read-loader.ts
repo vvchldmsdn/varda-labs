@@ -23,6 +23,7 @@ import {
   type InvestmentLabAnchorBasketReadRepository,
 } from "./investment-lab-anchor-basket-read-loader.ts";
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
+import { listInvestmentLabCompleteSnapshotDates } from "./investment-lab-source-segment-authority.ts";
 
 export interface InvestmentLabCounterfactualReadRepository
   extends InvestmentLabAnchorBasketReadRepository {
@@ -60,26 +61,20 @@ export async function loadInvestmentLabCounterfactualReadModel(
     vooCloseRows,
     fxRows,
   });
-  const fullModel = buildInvestmentLabCounterfactualReadModel(input, {
-    fixedMixSelection,
-  });
-  const rollingComparison = buildInvestmentLabRollingComparison({
-    source: input,
-    availableServiceDates: fullModel.rows.map((row) => row.serviceDate),
-  });
   const period = resolveInvestmentLabPeriodSelection({
     request,
-    availableServiceDates: fullModel.rows.map((row) => row.serviceDate),
+    availableServiceDates: listInvestmentLabCompleteSnapshotDates(snapshotRows),
   });
 
-  let model = fullModel;
-  let selectedSource = input;
+  const selectedSource =
+    period.status === "selected"
+      ? sliceInvestmentLabCounterfactualInput(input, period)
+      : input;
+  const model = buildInvestmentLabCounterfactualReadModel(selectedSource, {
+    fixedMixSelection,
+  });
   let resolvedPeriod = period;
   if (period.status === "selected") {
-    selectedSource = sliceInvestmentLabCounterfactualInput(input, period);
-    model = buildInvestmentLabCounterfactualReadModel(selectedSource, {
-      fixedMixSelection,
-    });
     const complete =
       model.status === "ready" &&
       model.summary?.startServiceDate === period.selectedStartServiceDate &&
@@ -91,6 +86,13 @@ export async function loadInvestmentLabCounterfactualReadModel(
       ? period
       : markInvestmentLabPeriodUnavailable(period);
   }
+  const rollingComparison = buildInvestmentLabRollingComparison({
+    source: selectedSource,
+    availableServiceDates:
+      model.status === "ready"
+        ? model.rows.map((row) => row.serviceDate)
+        : Object.freeze([]),
+  });
 
   const anchorBasketScenario = await loadInvestmentLabAnchorBasketScenario({
     repository,

@@ -31,7 +31,14 @@ describe("investment lab legacy reconciliation evidence classification", () => {
 
     const report = buildInvestmentLabLegacyReconciliationReport({ rows });
 
-    assert.equal(report.status, "complete");
+    assert.equal(report.status, "classified");
+    assert.equal(report.rowAssignmentComplete, true);
+    assert.equal(report.provenanceResolution.status, "not_established");
+    assert.equal(report.provenanceResolution.unresolvedEvidenceRows, 1);
+    assert.equal(
+      report.provenanceResolution.canonicalCalculationAuthority,
+      "not_established",
+    );
     assert.equal(report.counts.legacyRows, 7);
     assert.equal(report.counts.exactRows, 1);
     assert.equal(report.counts.classifiedNonExactRows, 6);
@@ -82,6 +89,7 @@ describe("investment lab legacy reconciliation evidence classification", () => {
 
     assert.equal(missingCount.classes.portfolio_membership_evidence_incomplete, 1);
     assert.equal(empty.status, "unavailable");
+    assert.equal(empty.rowAssignmentComplete, false);
   });
 
   it("keeps raw evidence and special-holding attribution out of output", () => {

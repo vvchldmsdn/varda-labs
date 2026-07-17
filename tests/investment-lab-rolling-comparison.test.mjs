@@ -132,8 +132,8 @@ function snapshotRow(snapshotDate, account, totalMarketValue) {
     cashValue: 0,
     totalMarketValue,
     usdKrw: 1_300,
-    source: "snapshot_fixture",
-    ruleVersion: "snapshot_fixture_v1",
+    source: "varda_manual_daily_snapshot",
+    ruleVersion: "varda-manual-daily-snapshot-v1",
   };
 }
 

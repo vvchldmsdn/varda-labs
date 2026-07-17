@@ -27,6 +27,10 @@ import {
   buildInvestmentLabContributionScenarioEvidence,
 } from "./investment-lab-contribution-evidence.ts";
 import {
+  resolveInvestmentLabSourceSegmentAuthority,
+  type InvestmentLabSourceSegmentAuthority,
+} from "./investment-lab-source-segment-authority.ts";
+import {
   buildInvestmentLabCashComparison,
   type InvestmentLabCashComparison,
 } from "./investment-lab-cash-comparison.ts";
@@ -76,6 +80,7 @@ export type InvestmentLabCounterfactualReadInput = Readonly<{
 
 export type InvestmentLabCounterfactualReadBlocker =
   | "snapshot_evidence_invalid"
+  | "source_segment_authority_blocked"
   | "actual_path_reconciliation_mismatch"
   | "actual_path_incomplete"
   | "event_evidence_unsupported"
@@ -118,6 +123,7 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
   fixedMixScenario: InvestmentLabFixedMixScenario | null;
   contributionExperimentScenarios:
     readonly InvestmentLabContributionScenarioEvidence[];
+  sourceAuthority: InvestmentLabSourceSegmentAuthority;
   rows: readonly InvestmentLabCounterfactualDisplayRow[];
   coverage: Readonly<{
     snapshotSourceRows: number;
@@ -143,6 +149,12 @@ export function buildInvestmentLabCounterfactualReadModel(
   }> = {},
 ): InvestmentLabCounterfactualReadModel {
   const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
+  const sourceAuthority = resolveInvestmentLabSourceSegmentAuthority(
+    input.snapshotRows,
+  );
+  if (sourceAuthority.status !== "eligible") {
+    blockers.add("source_segment_authority_blocked");
+  }
   const actual = buildAggregateActualPath(input.snapshotRows, blockers);
   const flowResolution = resolveInvestmentLabBoundaryFlows(input.eventRows);
   for (const blocker of flowResolution.blockers) blockers.add(blocker);
@@ -156,7 +168,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     closeRows: closes.length,
   });
   if (blockers.size > 0) {
-    return blockedReadModel(initialCoverage, blockers);
+    return blockedReadModel(initialCoverage, blockers, sourceAuthority);
   }
 
   const windowEndPriceDate = closes.at(-1)?.priceDate ?? "invalid";
@@ -167,7 +179,7 @@ export function buildInvestmentLabCounterfactualReadModel(
   });
   if (schedule.status !== "ready") {
     blockers.add("flow_schedule_blocked");
-    return blockedReadModel(initialCoverage, blockers);
+    return blockedReadModel(initialCoverage, blockers, sourceAuthority);
   }
 
   const path = buildInvestmentLabCounterfactualPath({
@@ -183,6 +195,7 @@ export function buildInvestmentLabCounterfactualReadModel(
         delayedExecutionRows: schedule.pendingFlowCount,
       },
       blockers,
+      sourceAuthority,
     );
   }
   if (path.pendingAtEnd.flowCount > 0) {
@@ -194,6 +207,7 @@ export function buildInvestmentLabCounterfactualReadModel(
         pendingAtEndRows: path.pendingAtEnd.flowCount,
       },
       blockers,
+      sourceAuthority,
     );
   }
 
@@ -282,6 +296,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     cashComparison,
     fixedMixScenario,
     contributionExperimentScenarios,
+    sourceAuthority,
     rows,
     coverage: Object.freeze({
       ...initialCoverage,
@@ -346,15 +361,18 @@ function buildAggregateActualPath(
     })
     .sort((left, right) => left.serviceDate.localeCompare(right.serviceDate));
 
-  if (rows.length < 2) blockers.add("actual_path_incomplete");
+  const incompleteDates = [...byDate.values()].filter(
+    (accountValues) =>
+      !TRACKED_ACCOUNTS.every((account) => accountValues.has(account)),
+  ).length;
+  if (rows.length < 2 || incompleteDates > 0) {
+    blockers.add("actual_path_incomplete");
+  }
 
   return {
     rows,
     completeDates: rows.length,
-    incompleteDates: [...byDate.values()].filter(
-      (accountValues) =>
-        !TRACKED_ACCOUNTS.every((account) => accountValues.has(account)),
-    ).length,
+    incompleteDates,
   };
 }
 
@@ -493,6 +511,7 @@ function coverage({
 function blockedReadModel(
   coverageValue: InvestmentLabCounterfactualReadModel["coverage"],
   blockers: Set<InvestmentLabCounterfactualReadBlocker>,
+  sourceAuthority: InvestmentLabSourceSegmentAuthority,
 ): InvestmentLabCounterfactualReadModel {
   return Object.freeze({
     status: "blocked",
@@ -504,6 +523,7 @@ function blockedReadModel(
     cashComparison: null,
     fixedMixScenario: null,
     contributionExperimentScenarios: Object.freeze([]),
+    sourceAuthority,
     rows: Object.freeze([]),
     coverage: Object.freeze({ ...coverageValue }),
     blockers: Object.freeze([...blockers].sort()),

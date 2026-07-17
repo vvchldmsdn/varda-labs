@@ -38,6 +38,7 @@ export function InvestmentLabView({
       data-page="investment-lab"
       data-pending-at-end={periodReady ? model.coverage.pendingAtEndRows : 0}
       data-period-status={period.status}
+      data-read-model-status={model.status}
       data-return-status={
         periodReady
           ? (model.returnEstimate?.status ?? "unavailable")
@@ -55,6 +56,11 @@ export function InvestmentLabView({
         periodReady
           ? (model.vooReadiness?.status ?? "unavailable")
           : "unavailable"
+      }
+      data-source-authority-decision={model.sourceAuthority.decision}
+      data-source-authority-status={model.sourceAuthority.status}
+      data-source-transition-count={
+        model.sourceAuthority.coverage.sourceTransitionCount
       }
     >
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
@@ -613,6 +619,8 @@ function ReadinessMetric({
 
 function blockerLabel(blocker: string) {
   const labels: Record<string, string> = {
+    source_segment_authority_blocked:
+      "선택 기간에 레거시와 현재 스냅샷이 섞였거나 현재 저장 구간이 아닙니다.",
     snapshot_evidence_invalid: "평가 스냅샷 형식 또는 중복을 확인해야 합니다.",
     actual_path_reconciliation_mismatch: "저장된 전체 평가액과 계정별 합계가 일치하지 않습니다.",
     actual_path_incomplete: "비교 가능한 전체 계정 평가일이 부족합니다.",

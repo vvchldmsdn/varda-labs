@@ -110,14 +110,15 @@ export function buildInvestmentLabLegacyReconciliationReport({
   const classifiedNonExactRows = sumCounts(classCounts);
   const legacyRows = evidenceRows?.length ?? 0;
   const expectedClassifiedRows = legacyRows - exactRows - roundingOnlyRows;
-  const classificationComplete = classifiedNonExactRows === expectedClassifiedRows;
+  const rowAssignmentComplete =
+    evidenceRows !== null &&
+    evidenceRows.length > 0 &&
+    classifiedNonExactRows === expectedClassifiedRows;
 
   return Object.freeze({
     audit: "investment_lab_legacy_reconciliation_evidence_classification",
     status:
-      evidenceRows === null || evidenceRows.length === 0 || !classificationComplete
-        ? "unavailable"
-        : "complete",
+      rowAssignmentComplete ? "classified" : "unavailable",
     readOnly: true,
     policy: LEGACY_RECONCILIATION_EVIDENCE_POLICY,
     runtimeTrustStatus: "not_established",
@@ -137,7 +138,13 @@ export function buildInvestmentLabLegacyReconciliationReport({
       roundingRuleUnprovenSmallDeltaRows,
     }),
     classes: Object.freeze(classCounts),
-    classificationComplete,
+    rowAssignmentComplete,
+    provenanceResolution: Object.freeze({
+      status: "not_established",
+      unresolvedEvidenceRows:
+        classCounts.unclassified + roundingRuleUnprovenSmallDeltaRows,
+      canonicalCalculationAuthority: "not_established",
+    }),
     sourceTransition: Object.freeze({
       status: "remains_contradictory",
       blocker: "portfolio_source_transition_unproven",

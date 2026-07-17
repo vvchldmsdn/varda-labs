@@ -13,12 +13,24 @@ const BASKET_ANCHOR = readArgument("--basket-anchor");
 const EXPECTED_PERIOD_STATUS =
   readArgument("--expect-period-status") ??
   (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "full");
+const EXPECTED_READ_MODEL_STATUS =
+  readArgument("--expect-read-model-status") ??
+  (START_SERVICE_DATE || END_SERVICE_DATE ? "ready" : "blocked");
+const EXPECTED_SOURCE_AUTHORITY_STATUS =
+  readArgument("--expect-source-authority-status") ??
+  (START_SERVICE_DATE || END_SERVICE_DATE ? "eligible" : "blocked");
+const EXPECTED_SOURCE_AUTHORITY_DECISION =
+  readArgument("--expect-source-authority-decision") ??
+  (EXPECTED_SOURCE_AUTHORITY_STATUS === "eligible"
+    ? "current_writer_calculation_candidate"
+    : "blocked");
 const EXPECTED_FIXED_MIX_SELECTION_STATUS = fixedMixSelectionStatus();
 const EXPECTED_FIXED_MIX_STATUS =
   readArgument("--expect-fixed-mix-status") ??
-  ((EXPECTED_PERIOD_STATUS === "full" ||
-    EXPECTED_PERIOD_STATUS === "selected") &&
-  EXPECTED_FIXED_MIX_SELECTION_STATUS !== "invalid"
+  (EXPECTED_READ_MODEL_STATUS === "ready" &&
+    (EXPECTED_PERIOD_STATUS === "full" ||
+      EXPECTED_PERIOD_STATUS === "selected") &&
+    EXPECTED_FIXED_MIX_SELECTION_STATUS !== "invalid"
     ? "ready"
     : "unavailable");
 const PASSWORD =
@@ -53,6 +65,26 @@ async function main() {
   }
   const periodStatus = readStringAttribute(route.body, "data-period-status");
   assert.equal(periodStatus, EXPECTED_PERIOD_STATUS);
+  const readModelStatus = readStringAttribute(
+    route.body,
+    "data-read-model-status",
+  );
+  assert.equal(readModelStatus, EXPECTED_READ_MODEL_STATUS);
+  const sourceAuthorityStatus = readStringAttribute(
+    route.body,
+    "data-source-authority-status",
+  );
+  const sourceAuthorityDecision = readStringAttribute(
+    route.body,
+    "data-source-authority-decision",
+  );
+  const sourceTransitionCount = readIntegerAttribute(
+    route.body,
+    "data-source-transition-count",
+  );
+  assert.equal(sourceAuthorityStatus, EXPECTED_SOURCE_AUTHORITY_STATUS);
+  assert.ok(sourceTransitionCount >= 0);
+  assert.equal(sourceAuthorityDecision, EXPECTED_SOURCE_AUTHORITY_DECISION);
   const cashComparisonStatus = readStringAttribute(
     route.body,
     "data-cash-comparison-status",
@@ -149,7 +181,8 @@ async function main() {
     }
   }
   const matrixExpected =
-    periodStatus === "full" || periodStatus === "selected";
+    readModelStatus === "ready" &&
+    (periodStatus === "full" || periodStatus === "selected");
   let scenarioMatrixStatus = "not_rendered";
   let scenarioMatrixRows = 0;
   let scenarioMatrixReadyRows = 0;
@@ -494,10 +527,16 @@ async function main() {
 
   const countsAfter = await readCounts();
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
-  if (periodStatus === "invalid" || periodStatus === "unavailable") {
+  if (
+    readModelStatus === "blocked" ||
+    periodStatus === "invalid" ||
+    periodStatus === "unavailable"
+  ) {
     assert.match(route.body, /data-return-status="unavailable"/);
     assert.equal(cashComparisonStatus, "unavailable");
-    assert.match(route.body, /data-period-reason="[a-z_]+"/);
+    if (periodStatus === "invalid" || periodStatus === "unavailable") {
+      assert.match(route.body, /data-period-reason="[a-z_]+"/);
+    }
     assert.doesNotMatch(route.body, /평가액 경로 비교/);
     assert.doesNotMatch(
       route.body,
@@ -510,6 +549,10 @@ async function main() {
           baseUrl: BASE_URL,
           routePath,
           periodStatus,
+          readModelStatus,
+          sourceAuthorityStatus,
+          sourceAuthorityDecision,
+          sourceTransitionCount,
           cashComparisonStatus,
           fixedMixStatus,
           fixedMixSelectionStatus,
