@@ -28,6 +28,7 @@
     "audit:investment-lab-anchor-basket": "node --no-warnings scripts/audit-investment-lab-anchor-basket.mjs",
     "audit:investment-lab-fount-readiness": "node --no-warnings scripts/audit-investment-lab-fount-readiness.mjs",
     "audit:investment-lab-legacy-reconciliation": "node --no-warnings scripts/audit-investment-lab-legacy-reconciliation.mjs",
+    "audit:investment-lab-legacy-reconstruction-candidate": "node --no-warnings scripts/audit-investment-lab-legacy-reconstruction-candidate.mjs",
     "audit:investment-lab-source-transition": "node --no-warnings scripts/audit-investment-lab-source-transition.mjs",
     "audit:investment-lab-event-flow": "node --no-warnings scripts/audit-investment-lab-event-flow.mjs",
     "audit:portfolio-risk": "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs",
