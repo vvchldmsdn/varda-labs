@@ -9,6 +9,7 @@ export type PortfolioRiskAssetSourceRow = {
   name: string;
   market: string;
   currency: string;
+  assetType?: string | null;
   quantity: NumericSourceValue;
 };
 

@@ -27,6 +27,7 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
         name: assets.name,
         market: sql<string>`lower(trim(${assets.market}))`,
         currency: sql<string>`upper(trim(${assets.currency}))`,
+        assetType: sql<string | null>`lower(trim(${assets.assetType}))`,
         quantity: assets.quantity,
       })
       .from(assets)

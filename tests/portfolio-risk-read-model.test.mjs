@@ -31,6 +31,15 @@ describe("portfolio risk read model", () => {
     assert.equal(result.inputHealth.status, "ready");
     assert.equal(result.calculation.calculationStatus, "complete");
     assert.equal(result.provenance.usableReturnObservations, 30);
+    assert.deepEqual(result.inputHealth.missingEvidence, {
+      missingPrice: 0,
+      stalePrice: 0,
+      missingFx: 0,
+      staleFx: 0,
+      affectedServiceDateCount: 0,
+      priceGapCount: 0,
+      fxGapCount: 0,
+    });
     assert.deepEqual(instrumentKeys, ["korea|KRW|069500", "us|USD|VOO"]);
     assert.equal(
       result.calculation.portfolio?.correlationMatrix.length,

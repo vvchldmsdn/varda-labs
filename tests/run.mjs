@@ -20,6 +20,7 @@ import "./investment-lab-voo-readiness.test.mjs";
 import "./investment-lab-voo-path.test.mjs";
 import "./investment-lab-counterfactual-read-model.test.mjs";
 import "./investment-lab-account-scope.test.mjs";
+import "./investment-lab-data-availability.test.mjs";
 import "./investment-lab-period-selection.test.mjs";
 import "./investment-lab-etf-xray.test.mjs";
 import "./investment-lab-etf-shock.test.mjs";

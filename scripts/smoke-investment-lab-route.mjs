@@ -93,6 +93,53 @@ async function main() {
   assert.equal(sourceAuthorityStatus, EXPECTED_SOURCE_AUTHORITY_STATUS);
   assert.ok(sourceTransitionCount >= 0);
   assert.equal(sourceAuthorityDecision, EXPECTED_SOURCE_AUTHORITY_DECISION);
+  assert.match(
+    route.body,
+    /data-section="investment-lab-data-availability"/,
+  );
+  const dataAvailabilityStatus = readStringAttribute(
+    route.body,
+    "data-availability-status",
+  );
+  const currentWriterDates = readIntegerAttribute(
+    route.body,
+    "data-current-writer-dates",
+  );
+  const marketObservations = readIntegerAttribute(
+    route.body,
+    "data-market-observations",
+  );
+  const marketTarget = readIntegerAttribute(route.body, "data-market-target");
+  const marketPriceGaps = readIntegerAttribute(
+    route.body,
+    "data-market-price-gaps",
+  );
+  const marketFxGaps = readIntegerAttribute(
+    route.body,
+    "data-market-fx-gaps",
+  );
+  const availabilityScenarioCount = readIntegerAttribute(
+    route.body,
+    "data-scenario-count",
+  );
+  assert.ok(
+    dataAvailabilityStatus === "partial" ||
+      dataAvailabilityStatus === "blocked",
+  );
+  assert.ok(currentWriterDates >= 0);
+  assert.equal(marketTarget, 90);
+  assert.ok(marketObservations >= 0 && marketObservations <= marketTarget);
+  assert.ok(marketPriceGaps >= 0 && marketFxGaps >= 0);
+  assert.equal(availabilityScenarioCount, 5);
+  for (const marker of [
+    "계산 데이터 준비 상태",
+    "현재 수량 유지",
+    "현재 비중·동일 비중 정기 리밸런싱",
+    "최고수익·최소변동성·최소MDD·최대Sharpe",
+    "자동 보완·DB 쓰기 없음",
+  ]) {
+    assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+  }
   const cashComparisonStatus = readStringAttribute(
     route.body,
     "data-cash-comparison-status",
@@ -292,18 +339,23 @@ async function main() {
     route.body,
     "data-fixed-mix-return-status",
   );
-  const fixedMixContributionStatus = readStringAttribute(
-    route.body,
-    "data-contribution-fixed-mix-status",
-  );
-  const fixedMixContributionKodexWeightBps = readIntegerAttribute(
-    route.body,
-    "data-contribution-fixed-mix-kodex-weight-bps",
-  );
-  const fixedMixContributionVooWeightBps = readIntegerAttribute(
-    route.body,
-    "data-contribution-fixed-mix-voo-weight-bps",
-  );
+  let fixedMixContributionStatus = "unavailable";
+  let fixedMixContributionKodexWeightBps = 0;
+  let fixedMixContributionVooWeightBps = 0;
+  if (matrixExpected) {
+    fixedMixContributionStatus = readStringAttribute(
+      route.body,
+      "data-contribution-fixed-mix-status",
+    );
+    fixedMixContributionKodexWeightBps = readIntegerAttribute(
+      route.body,
+      "data-contribution-fixed-mix-kodex-weight-bps",
+    );
+    fixedMixContributionVooWeightBps = readIntegerAttribute(
+      route.body,
+      "data-contribution-fixed-mix-voo-weight-bps",
+    );
+  }
   assert.equal(fixedMixStatus, EXPECTED_FIXED_MIX_STATUS);
   assert.equal(
     fixedMixSelectionStatus,
@@ -585,6 +637,13 @@ async function main() {
           sourceAuthorityStatus,
           sourceAuthorityDecision,
           sourceTransitionCount,
+          dataAvailabilityStatus,
+          currentWriterDates,
+          marketObservations,
+          marketTarget,
+          marketPriceGaps,
+          marketFxGaps,
+          availabilityScenarioCount,
           cashComparisonStatus,
           fixedMixStatus,
           fixedMixSelectionStatus,
@@ -829,6 +888,13 @@ async function main() {
         baseUrl: BASE_URL,
         routePath,
         periodStatus,
+        dataAvailabilityStatus,
+        currentWriterDates,
+        marketObservations,
+        marketTarget,
+        marketPriceGaps,
+        marketFxGaps,
+        availabilityScenarioCount,
         noAuthStatus: unauthorized.status,
         authenticatedStatus: route.status,
         dashboardLink: true,

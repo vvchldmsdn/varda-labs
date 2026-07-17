@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import {
   AccountScopeTabs,
@@ -21,12 +22,14 @@ import {
 export function InvestmentLabView({
   accountQuery,
   anchorBasketScenario,
+  dataAvailability,
   model,
   period,
   selectedAccount,
 }: {
   accountQuery: PortfolioAccountScopeQuery;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  dataAvailability: ReactNode;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
   selectedAccount: PortfolioAccountScope;
@@ -146,6 +149,8 @@ export function InvestmentLabView({
             />
           </div>
         </header>
+
+        {dataAvailability}
 
         <InvestmentLabPeriodSelector
           account={selectedAccount}

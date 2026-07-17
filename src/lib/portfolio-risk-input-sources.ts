@@ -36,6 +36,9 @@ export function aggregateRiskHoldings(
         account: holding.account,
         ticker,
         name: holding.name,
+        market: holding.market.trim().toLowerCase(),
+        currency,
+        assetType: holding.assetType?.trim().toLowerCase() || null,
         reason: exclusion,
       });
       continue;

@@ -58,6 +58,7 @@ export function composePortfolioRiskReadModel({
     annualRiskFreeRate: 0,
   });
   const observations = input.valueRows.flatMap((row) => row.observations);
+  const missingEvidence = summarizeMissingEvidence(input.valueRows);
 
   return {
     selection,
@@ -106,6 +107,7 @@ export function composePortfolioRiskReadModel({
       zeroVarianceInstruments: calculation.dataHealth.zeroVarianceInstruments,
       downDayObservations:
         calculation.portfolio?.stress.downDayObservations ?? null,
+      missingEvidence,
       sourceRows: {
         price: {
           queried: priceRows.length,
@@ -159,4 +161,38 @@ function countUndefinedPairs(matrix: Array<Array<number | null>> | null) {
 
 function maxOrNull(values: readonly number[]) {
   return values.length > 0 ? Math.max(...values) : null;
+}
+
+function summarizeMissingEvidence(
+  rows: readonly {
+    serviceDate: string;
+    missing: readonly {
+      reason: "missing_price" | "stale_price" | "missing_fx" | "stale_fx";
+    }[];
+  }[],
+) {
+  const affectedServiceDates = new Set<string>();
+  const counts = {
+    missingPrice: 0,
+    stalePrice: 0,
+    missingFx: 0,
+    staleFx: 0,
+  };
+
+  for (const row of rows) {
+    if (row.missing.length > 0) affectedServiceDates.add(row.serviceDate);
+    for (const missing of row.missing) {
+      if (missing.reason === "missing_price") counts.missingPrice += 1;
+      if (missing.reason === "stale_price") counts.stalePrice += 1;
+      if (missing.reason === "missing_fx") counts.missingFx += 1;
+      if (missing.reason === "stale_fx") counts.staleFx += 1;
+    }
+  }
+
+  return Object.freeze({
+    ...counts,
+    affectedServiceDateCount: affectedServiceDates.size,
+    priceGapCount: counts.missingPrice + counts.stalePrice,
+    fxGapCount: counts.missingFx + counts.staleFx,
+  });
 }

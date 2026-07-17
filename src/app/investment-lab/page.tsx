@@ -1,6 +1,11 @@
 import { Suspense } from "react";
 
 import {
+  InvestmentLabDataAvailabilitySkeleton,
+  InvestmentLabDataAvailabilityUnavailable,
+  InvestmentLabDataAvailabilityView,
+} from "@/components/investment-lab/investment-lab-data-availability";
+import {
   InvestmentLabEtfXray,
   InvestmentLabEtfXraySkeleton,
   InvestmentLabEtfXrayUnavailable,
@@ -14,6 +19,7 @@ import {
   InvestmentLabSmallAdjustmentUnavailable,
 } from "@/components/investment-lab/investment-lab-small-adjustment";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
+import { getReadOnlyInvestmentLabDataAvailability } from "@/db/queries/investment-lab-data-availability";
 import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
 import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
 import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
@@ -58,6 +64,8 @@ export default async function InvestmentLabPage({
   const portfolioStructurePromise = getReadOnlyPortfolioStructure({
     account: selectedAccount,
   });
+  const dataAvailabilityPromise =
+    getReadOnlyInvestmentLabDataAvailability(selectedAccount);
   const etfXrayPromise = getReadOnlyInvestmentLabEtfXray(selectedAccount);
   const modelPromise = getReadOnlyInvestmentLabCounterfactual(
     params.start === undefined && params.end === undefined
@@ -75,6 +83,7 @@ export default async function InvestmentLabPage({
     <div className="min-h-screen bg-[#f3f4ef] text-[#171916]">
       <Suspense fallback={<InvestmentLabSkeleton />}>
         <InvestmentLabContent
+          dataAvailabilityPromise={dataAvailabilityPromise}
           fixedMixSelection={fixedMixSelection}
           modelPromise={modelPromise}
           accountQuery={accountQuery}
@@ -96,11 +105,15 @@ export default async function InvestmentLabPage({
 
 async function InvestmentLabContent({
   accountQuery,
+  dataAvailabilityPromise,
   fixedMixSelection,
   modelPromise,
   selectedAccount,
 }: {
   accountQuery: PortfolioAccountScopeQuery;
+  dataAvailabilityPromise: ReturnType<
+    typeof getReadOnlyInvestmentLabDataAvailability
+  >;
   fixedMixSelection: InvestmentLabFixedMixSelection;
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
   selectedAccount: PortfolioAccountScope;
@@ -111,6 +124,13 @@ async function InvestmentLabContent({
     <>
       <InvestmentLabView
         anchorBasketScenario={anchorBasketScenario}
+        dataAvailability={
+          <Suspense fallback={<InvestmentLabDataAvailabilitySkeleton />}>
+            <InvestmentLabDataAvailabilityContent
+              modelPromise={dataAvailabilityPromise}
+            />
+          </Suspense>
+        }
         model={model}
         period={period}
         accountQuery={accountQuery}
@@ -131,6 +151,20 @@ async function InvestmentLabContent({
       <InvestmentLabRollingComparisonView model={rollingComparison} />
     </>
   );
+}
+
+async function InvestmentLabDataAvailabilityContent({
+  modelPromise,
+}: {
+  modelPromise: ReturnType<typeof getReadOnlyInvestmentLabDataAvailability>;
+}) {
+  let model;
+  try {
+    model = await modelPromise;
+  } catch {
+    return <InvestmentLabDataAvailabilityUnavailable />;
+  }
+  return <InvestmentLabDataAvailabilityView model={model} />;
 }
 
 function normalizeSingleParam(value: string | string[] | undefined) {

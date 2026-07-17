@@ -14,6 +14,7 @@ export type PortfolioRiskHoldingInput = {
   name: string;
   market: string;
   currency: string;
+  assetType?: string | null;
   quantity: NumericInput;
 };
 
@@ -36,6 +37,9 @@ export type PortfolioRiskInputExclusion = {
   account: string;
   ticker: string | null;
   name: string;
+  market: string;
+  currency: string;
+  assetType: string | null;
   reason:
     | "missing_ticker"
     | "non_positive_holding"
