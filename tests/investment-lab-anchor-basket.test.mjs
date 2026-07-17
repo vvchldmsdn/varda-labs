@@ -480,7 +480,7 @@ describe("investment lab anchor-date observed basket", () => {
 
     assert.match(
       auditSource,
-      /lower\(coalesce\(price_source, ''\)\) =\s*'krx_open_api_gold_daily'/,
+      /lower\(coalesce\(price_source, ''\)\) =\s*'fsc_public_data_gold_daily'/,
     );
     assert.match(
       auditSource,

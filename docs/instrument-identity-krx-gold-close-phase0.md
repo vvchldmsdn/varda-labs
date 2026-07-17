@@ -42,22 +42,24 @@ gram. Sensitive broker evidence is not stored in this repository.
 | quote currency | `KRW` |
 | quote unit | `KRW_PER_G` |
 | price mode | `official_close_only` |
-| source | `krx_open_api_gold_daily` |
+| source | `fsc_public_data_gold_daily` |
 | quote kind | `official_close` |
 | live quote eligible | `false` |
 
 The two `productKey` values are internal product identities, not KRX or broker
 symbols. This holding is bound only to `gold_9999_1kg`; it must never collapse
-with `gold_9999_100g`. A provider instrument code and official-close field
-mapping remain separate unresolved source concerns.
+with `gold_9999_100g`. The Financial Services Commission public-data binding is
+`04020000` / `KRD040200002` / `금 99.99_1Kg`, with `basDt` as trading date and
+`clpr` as official close. Actual response coverage remains a separate source
+concern.
 
 The product boundary deliberately contains no ticker. A future shared
 instrument identity must remain separate from a user-owned asset row, provider
 mapping, and execution capability.
 
 The provider, rights, date, and same-flow feasibility review is recorded in
-`docs/krx-gold-close-only-source-feasibility-audit-v1.md`. That audit keeps
-runtime readiness blocked.
+`docs/krx-gold-close-only-source-feasibility-audit-v1.md`. It permits a
+read-only provider dry-run but keeps persistence and runtime readers blocked.
 
 ## Explicit Non-Equivalence
 
@@ -76,7 +78,7 @@ semantic identity and proves that the keys cannot collapse into one another.
 
 A usable observation must contain all of:
 
-- `source=krx_open_api_gold_daily`;
+- `source=fsc_public_data_gold_daily`;
 - `quoteKind=official_close`;
 - positive finite price in KRW per gram;
 - valid `priceDate`;
@@ -137,7 +139,7 @@ The legacy identity is never returned to the page or rendered in HTML.
 The audit deliberately does not treat `price_basis=close`, `close_price`, or
 `unit_price` as provider authority by themselves. A gold snapshot row is only
 an official-close candidate when the exact source is
-`krx_open_api_gold_daily`, the basis is `official_close`, the price date is
+`fsc_public_data_gold_daily`, the basis is `official_close`, the price date is
 present, the currency is KRW, and a positive price is present. The canonical
 product binding is now resolved, but provider field mapping, rights, and date
 coverage are still required before runtime use.
@@ -175,14 +177,15 @@ calculation was used.
 
 Each item is a separate future approval boundary:
 
-1. Confirm KRX data storage, retention, and display rights for the intended
-   multi-user product.
-2. Design an expand-only shared instrument table, nullable
+1. Run the Financial Services Commission public-data read-only coverage audit
+   with a server-only decoding key.
+2. Confirm the exact product rows, coverage, duplicate behavior, and broker
+   statement spot checks.
+3. Design an expand-only shared instrument table, nullable
    `assets.instrument_id`, and an instrument-keyed official-close observation
    table. Do not mutate the existing ticker tables.
-3. Add schema and migration with no backfill or reader switch.
-4. Add a read-only KRX daily-close adapter and fixture-backed response parser.
-5. Run a one-observation dry-run plan.
+4. Add schema and migration with no backfill or reader switch.
+5. Add a guarded provider adapter around the verified fixture parser.
 6. Perform one guarded actual close upsert only after explicit approval.
 7. Backfill only the reviewed KRX gold asset-to-instrument link under a separate
    gate.

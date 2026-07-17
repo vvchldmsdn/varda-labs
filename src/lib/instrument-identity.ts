@@ -32,18 +32,20 @@ export const KRX_GOLD_CLOSE_ONLY_CONTRACT = Object.freeze({
   }),
   pricing: Object.freeze({
     mode: "official_close_only",
-    source: "krx_open_api_gold_daily",
+    source: "fsc_public_data_gold_daily",
     quoteKind: "official_close",
     liveQuoteEligible: false,
   }),
   sourceFeasibility: Object.freeze({
-    status: "blocked",
-    availableFrom: "2014-03-24",
-    access: "auth_key_and_service_approval_required",
-    providerInstrumentBinding: "not_verified",
-    providerCloseFieldBinding: "not_verified",
-    multiUserDisplayRights: "not_established",
-    attributionRequired: true,
+    status: "read_only_dry_run_ready",
+    availableFrom: "actual_response_coverage_pending",
+    access: "free_auto_approval_service_key_required",
+    providerInstrumentBinding:
+      "04020000_KRD040200002_gold_99_99_1kg",
+    providerCloseFieldBinding: "basDt_clpr",
+    multiUserDisplayRights: "unrestricted_public_data_portal_license",
+    attributionRequired: false,
+    actualResponseCoverage: "not_verified",
   }),
   datePolicy: Object.freeze({
     observationDate: "krx_trading_date",

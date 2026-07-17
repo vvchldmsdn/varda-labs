@@ -1,24 +1,32 @@
 # KRX Gold Close-Only Source Feasibility Audit v1
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
-Status: official-source feasibility reviewed; runtime remains blocked. This
+Status: official Financial Services Commission public-data source and a
+fixture-backed read-only dry-run are implemented. Actual response coverage,
+schema, persistence, readers, and calculation authority remain blocked. This
 audit performed no provider request, database read or write, schema change,
 backfill, route, API, UI, job, or Cron work.
 
 ## Decision
 
-KRX Gold daily closes are technically plausible as a future historical-price
-source, but the source is not ready for product use. Broker holding evidence
+KRX Gold daily closes have a viable official source. Broker holding evidence
 reviewed on 2026-07-16 binds the imported holding to the KRX 1kg product with
-gram-denominated quantity. No account number, holder name, or screenshot is
-stored in this repository. Three independent blockers remain:
+gram-denominated quantity. On 2026-07-17, the Financial Services Commission
+public-data specification resolved the provider identity and field mapping:
 
-1. the exact Open API instrument and close fields are not verified from an
-   approved development specification or response;
-2. the current Open API terms do not establish the storage and multi-user
-   display rights required by Varda Labs;
-3. the Investment Lab path uses fractional units, while executable KRX Gold
+- dataset `15094805`, operation `getGoldPriceInfo`;
+- `04020000` / `KRD040200002` / `금 99.99_1Kg`;
+- trading date `basDt` and official close `clpr`;
+- free automatic development and production approval;
+- public-data-portal license scope reported as unrestricted.
+
+No account number, holder name, or screenshot is stored in this repository.
+Two independent blockers remain:
+
+1. an authenticated read-only call has not yet verified row-level coverage,
+   pagination, duplicate behavior, and current product labels;
+2. the Investment Lab path uses fractional units, while executable KRX Gold
    trades use integer grams.
 
 The existing Investment Lab anchor basket therefore remains wholly
@@ -36,44 +44,49 @@ unavailable. No proxy, partial basket, or source-less stored price is admitted.
 | Prior-close role | The prior trading day's close is the next trading day's base price | [KRX trading-unit rules](https://regulation.krx.co.kr/contents/RGL/04/04010104/RGL04010104.jsp) |
 
 These facts verify the broad commodity family, `g` holding unit, and
-`KRW_PER_G` quote unit. They do not identify which bar-size product the imported
-asset represents. Both products share those units.
+`KRW_PER_G` quote unit. The reviewed broker evidence selects the 1kg product;
+the API mapping below must still match all three provider identifiers.
 
-## Open API Candidate
+## Official API Binding
 
-KRX lists `금시장 일별매매정보` as an Open API service and states that data is
-available from 2014-03-24. Access requires an issued authentication key and
-separate service-use approval. The key is sent in the `AUTH_KEY` request header.
+The selected authority is the Financial Services Commission public-data API,
+not KRX's separately governed direct Open API.
 
 Official references:
 
-- [Gold daily trading API service](https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES006_S2.cmd?BO_ID=sxveSnWzWNzWxQASsgEG)
-- [Open API usage steps](https://openapi.krx.co.kr/contents/OPP/INFO/OPPINFO003.jsp)
-- [Open API terms](https://openapi.krx.co.kr/contents/OPP/INFO/OPPINFO002.jsp)
+- [Financial Services Commission general-product price API](https://www.data.go.kr/data/15094805/openapi.do)
+- [KRX Gold Market overview](https://open.krx.co.kr/contents/OPN/01/01050206/OPN01050206.jsp)
 
-The public service page did not expose an approved instrument code, product
-name mapping, or exact close-field definition during this audit. Therefore
-`krx_open_api_gold_daily` remains an internal source candidate, not a runtime
-provider binding. A future response parser must be built from the approved
-development specification and fixture, not guessed field names.
+| Binding | Value |
+| --- | --- |
+| endpoint | `GetGeneralProductInfoService/getGoldPriceInfo` |
+| authentication | public-data `serviceKey` query parameter |
+| local environment variable | `FSC_PUBLIC_DATA_SERVICE_KEY` |
+| product short code | `04020000` |
+| ISIN | `KRD040200002` |
+| product name | `금 99.99_1Kg` |
+| trading-date field | `basDt` (`YYYYMMDD`) |
+| official-close field | `clpr` |
+| internal source | `fsc_public_data_gold_daily` |
 
-## Rights Boundary
+The parser fixture is copied from the official guide sample. It accepts the
+documented wrapped or unwrapped JSON root and singleton or array item shape,
+but it requires all three provider identity fields to agree. A partial identity
+match, malformed date, non-positive close, duplicate date, conflicting close,
+incomplete pagination, or missing expected KRX trading date blocks readiness.
 
-The current Open API terms state that use is non-commercial, results may not be
-provided to third parties, and a screen using the result must identify it as
-KRX statistical information. The usage guide also requires administrator
-approval before an external service is launched.
+## Rights And Secret Boundary
 
-Those clauses do not prove that Varda Labs may retain historical rows and show
-them to multiple signed-in users. This is a product-readiness blocker, not a
-legal conclusion. Before implementation, obtain written KRX confirmation or an
-appropriate market-data distribution agreement covering:
+The public-data-portal record reports free access, automatic development and
+production approval, and an unrestricted license scope. This removes the prior
+KRX-direct-API rights blocker for this selected source. The product should still
+identify the Financial Services Commission public-data source and the delayed
+publication date so users do not mistake it for a live KRX quote.
 
-- server-side storage and retention;
-- derived calculations and charts;
-- display to multiple end users;
-- required attribution and delayed-data labeling;
-- termination behavior when API approval or the key expires.
+The server-only service key remains a secret. It must not be returned to a
+browser, logged, persisted in Postgres, or included in provider URLs in error
+messages. If the portal changes its license or approval status, runtime
+readiness must be reviewed again.
 
 ## Date And Carry Policy
 
@@ -82,21 +95,11 @@ existing snapshot cycle resolver labels the 24-hour cycle ending at 07:00 KST
 with that KST calendar date. Therefore a D close first becomes eligible in the
 D+1 snapshot cycle, while the stored snapshot `reference_date` remains D.
 
-`krx_gold_close_cycle_v1` now binds this policy to the existing snapshot and
-risk calendar helpers instead of maintaining a second calendar implementation.
-
-| Snapshot cycle | Expected KRX close | Classification |
-| --- | --- | --- |
-| 2026-07-10 07:00 KST | 2026-07-09 Thursday | first eligible cycle |
-| 2026-07-11 07:00 KST | 2026-07-10 Friday | first eligible cycle |
-| 2026-07-12 07:00 KST | 2026-07-10 Friday | one-day non-trading carry |
-| 2026-07-13 07:00 KST | 2026-07-10 Friday | two-day non-trading carry before Monday opens |
-| 2026-05-26 07:00 KST | 2026-05-22 Friday | weekend plus Monday-market-holiday carry |
-
-The Monday reopen does not make Friday stale at either 06:59 or 07:00 KST.
-Monday's close first enters the service model at Tuesday 07:00 KST. Therefore
-Friday remains the expected observation through Tuesday 06:59 and becomes
-stale only at Tuesday 07:00, when Monday's close is expected.
+The Financial Services Commission dataset publishes after 13:00 KST on the
+following business day. This is later than the 07:00 snapshot cutoff, so a
+future writer must not assume the D close is available for the first D+1 07:00
+run. The close may be admitted only after the provider actually publishes it;
+the existing prior close remains visible with its original observation date.
 
 On weekends, holidays, or other KRX closures:
 
@@ -105,32 +108,35 @@ On weekends, holidays, or other KRX closures:
 - no copied row is created for the non-trading date;
 - the carried value is not reported as a new zero-return observation.
 
-Once a later KRX trading day is expected, an older close is stale rather than
-an allowed carry. For example, the 2026-07-14 cycle expects the 2026-07-13
-close, so a remaining 2026-07-10 row is unavailable. A close newer than the
-calendar expectation is rejected as future evidence.
+Once a later KRX trading day is published and expected, an older close is stale
+rather than an allowed carry. A newer fetch for the same product and trading
+date may replace an earlier value only as an explicit correction. Older
+observations never overwrite newer dates.
 
-A newer fetch for the same product and trading date may replace an earlier
-value only as an explicit correction. Older observations never overwrite newer
-dates. The future storage key should include canonical instrument, source, and
-trading date, but schema design is outside this audit.
+## Historical Coverage Dry-Run
 
-## Historical Coverage
+The official guide sample proves the response shape and the API provides date
+range filters. Row-level coverage does not pass yet because this change
+intentionally made no authenticated provider request. The dry-run defaults to
+the current Investment Lab anchor `2026-05-21` and a publication-safe end date.
 
-The advertised source range begins before the current Investment Lab anchor of
-2026-05-21, so range feasibility passes in principle. Row-level coverage does
-not pass yet because this audit intentionally made no provider request.
+It must verify:
 
-A separately approved read-only dry run must verify:
+- returned product identities and the exact 1kg binding;
+- every expected KRX trading date from anchor through selected end date;
+- duplicates, same-date conflicts, malformed rows, and complete pagination;
+- a small set of close values against reviewed broker-statement evidence.
 
-- both KRX product rows and their exact codes/names;
-- every required KRX trading date from anchor through selected end date;
-- duplicates, same-date corrections, nulls, and publication latency;
-- the selected product's close values against a small broker-statement sample.
+Run it with:
 
-No interpolation is allowed for missing market closes. A non-trading date may
-carry a prior close; a missing trading-date observation must remain an explicit
-gap until repaired from an approved authority.
+```text
+npm run audit:krx-gold-source -- --from=2026-05-21 --to=YYYY-MM-DD
+```
+
+The command performs provider reads only. It has no database dependency and no
+write mode. No interpolation is allowed for missing market closes. A missing
+trading-date observation remains an explicit gap until repaired from this
+approved authority.
 
 ## Investment Lab Compatibility
 
@@ -149,11 +155,12 @@ Neither choice is approved by this audit.
 
 ## Next Safe Sequence
 
-1. Obtain the KRX development specification and product-use permission.
-2. Approve one read-only API fixture/dry-run packet with no persistence.
-3. Verify anchor-through-end close coverage and broker-statement spot checks.
-4. Choose fractional-research or integer-execution Investment Lab semantics.
-5. Only then review an additive instrument/close schema and provider adapter.
+1. Add a server-only public-data decoding key and run the read-only coverage
+   audit with no persistence.
+2. Verify anchor-through-end close coverage and broker-statement spot checks.
+3. Choose fractional-research or integer-execution Investment Lab semantics.
+4. Review an additive instrument/close schema and guarded source adapter.
+5. Add one reviewed observation before any historical backfill or reader switch.
 
 Fount is intentionally excluded from Investment Lab and Simulation by product
 owner decision. The whole anchor basket still stays unavailable until Fount is

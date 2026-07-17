@@ -225,7 +225,7 @@ const ANCHOR_SQL = `
       )::int as unattributed_close_label_rows,
       count(*) filter (
         where lower(coalesce(price_source, '')) =
-            'krx_open_api_gold_daily'
+            'fsc_public_data_gold_daily'
           and lower(coalesce(price_basis, '')) = 'official_close'
           and price_date is not null
           and upper(coalesce(currency, '')) = 'KRW'

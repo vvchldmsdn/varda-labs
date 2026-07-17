@@ -1,0 +1,29 @@
+{
+  "response": {
+    "header": {
+      "resultCode": "00",
+      "resultMsg": "NORMAL SERVICE."
+    },
+    "body": {
+      "numOfRows": 1,
+      "pageNo": 1,
+      "totalCount": 1,
+      "items": {
+        "item": {
+          "basDt": "20220919",
+          "srtnCd": "04020000",
+          "isinCd": "KRD040200002",
+          "itmsNm": "금 99.99_1Kg",
+          "clpr": 74560,
+          "vs": 320,
+          "fltRt": 0.43,
+          "mkp": 74800,
+          "hipr": 74800,
+          "lopr": 74490,
+          "trqu": 87704,
+          "trPrc": 6541773300
+        }
+      }
+    }
+  }
+}

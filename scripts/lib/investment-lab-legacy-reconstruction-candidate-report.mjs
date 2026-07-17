@@ -235,7 +235,7 @@ function evaluateGroup(group, evidenceCounts) {
     if (isGold) {
       evidenceCounts.krxGoldRows += 1;
       const officialCandidate =
-        stableText(row.price_source)?.toLowerCase() === "krx_open_api_gold_daily" &&
+        stableText(row.price_source)?.toLowerCase() === "fsc_public_data_gold_daily" &&
         stableText(row.price_basis)?.toLowerCase() === "official_close" &&
         stableText(row.reference_date) !== null;
       blockers.add(
