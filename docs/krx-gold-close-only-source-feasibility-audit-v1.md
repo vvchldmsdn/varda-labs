@@ -92,14 +92,20 @@ readiness must be reviewed again.
 
 An official close observation belongs to its actual KRX trading date. The
 existing snapshot cycle resolver labels the 24-hour cycle ending at 07:00 KST
-with that KST calendar date. Therefore a D close first becomes eligible in the
-D+1 snapshot cycle, while the stored snapshot `reference_date` remains D.
+with that KST calendar date. The selected provider does not make a D close
+eligible merely because the D+1 07:00 boundary has passed.
 
 The Financial Services Commission dataset publishes after 13:00 KST on the
 following business day. This is later than the 07:00 snapshot cutoff, so a
-future writer must not assume the D close is available for the first D+1 07:00
-run. The close may be admitted only after the provider actually publishes it;
-the existing prior close remains visible with its original observation date.
+future writer must classify an absent D close as `source_lag_not_published`,
+not as a fresh zero-return close or an ordinary market-closure carry. The close
+may be admitted only after both the publication window opens and the provider
+actually returns the exact observation. The existing prior close may remain
+visible with its original observation date and explicit source-lag state.
+
+An observation returned before its documented publication window is not
+admitted automatically. It requires separate review rather than silently
+creating look-ahead evidence.
 
 On weekends, holidays, or other KRX closures:
 

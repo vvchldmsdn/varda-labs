@@ -6,8 +6,8 @@ import {
 } from "../src/lib/market-data/fsc-krx-gold.ts";
 import {
   buildFscKrxGoldCoverageReport,
-  resolveFscKrxGoldPublicationSafeEndDate,
 } from "../src/lib/market-data/fsc-krx-gold-coverage.ts";
+import { resolveFscKrxGoldPublicationSafeEndDate } from "../src/lib/market-data/fsc-krx-gold-publication.ts";
 
 config({ path: ".env.local", quiet: true });
 

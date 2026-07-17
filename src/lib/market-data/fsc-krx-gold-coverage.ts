@@ -1,8 +1,8 @@
-import { closeCalendarReferenceDateForAsset } from "../snapshots/market-calendar.ts";
 import {
   FSC_KRX_GOLD_SOURCE_CONTRACT,
   type FscKrxGoldSourceRow,
 } from "./fsc-krx-gold.ts";
+import { isFscKrxGoldExpectedTradingDate } from "./fsc-krx-gold-publication.ts";
 
 export type FscKrxGoldCoverageReport = Readonly<{
   status: "ready_for_schema_review" | "blocked";
@@ -31,8 +31,6 @@ export type FscKrxGoldCoverageReport = Readonly<{
 }>;
 
 const MAX_COVERAGE_DAYS = 6_000;
-const KRX_MARKET = Object.freeze({ market: "korea", currency: "KRW" });
-
 export function buildFscKrxGoldCoverageReport(input: Readonly<{
   rows: readonly FscKrxGoldSourceRow[];
   rejectedRowCount: number;
@@ -42,7 +40,7 @@ export function buildFscKrxGoldCoverageReport(input: Readonly<{
   fetchedProviderRowCount?: number;
 }>): FscKrxGoldCoverageReport {
   const dates = enumerateIsoDates(input.fromDate, input.toDate);
-  const expectedTradingDates = dates.filter(isExpectedKoreaTradingDate);
+  const expectedTradingDates = dates.filter(isFscKrxGoldExpectedTradingDate);
   const expectedSet = new Set(expectedTradingDates);
   const target = FSC_KRX_GOLD_SOURCE_CONTRACT.target;
   const identityUniverse = uniqueIdentities(input.rows);
@@ -132,25 +130,6 @@ export function buildFscKrxGoldCoverageReport(input: Readonly<{
   });
 }
 
-export function resolveFscKrxGoldPublicationSafeEndDate(now = new Date()) {
-  if (!Number.isFinite(now.getTime())) throw new Error("invalid_current_time");
-
-  const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1_000)
-    .toISOString()
-    .slice(0, 10);
-  let candidate = shiftIsoDate(kstDate, -1);
-
-  for (let inspected = 0; inspected < 31; inspected += 1) {
-    if (isExpectedKoreaTradingDate(candidate)) {
-      const publicationDate = nextKoreaTradingDate(candidate);
-      if (now >= kstHourToUtc(publicationDate, 13)) return candidate;
-    }
-    candidate = shiftIsoDate(candidate, -1);
-  }
-
-  throw new Error("publication_safe_end_date_unresolved");
-}
-
 function uniqueIdentities(rows: readonly FscKrxGoldSourceRow[]) {
   const identities = new Map<
     string,
@@ -203,27 +182,6 @@ function enumerateIsoDates(fromDate: string, toDate: string) {
     current = shiftIsoDate(current, 1);
   }
   return dates;
-}
-
-function isExpectedKoreaTradingDate(date: string) {
-  return (
-    closeCalendarReferenceDateForAsset(KRX_MARKET, shiftIsoDate(date, 1)) ===
-    date
-  );
-}
-
-function nextKoreaTradingDate(date: string) {
-  let candidate = shiftIsoDate(date, 1);
-  for (let inspected = 0; inspected < 31; inspected += 1) {
-    if (isExpectedKoreaTradingDate(candidate)) return candidate;
-    candidate = shiftIsoDate(candidate, 1);
-  }
-  throw new Error("next_korea_trading_date_unresolved");
-}
-
-function kstHourToUtc(date: string, hour: number) {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, hour - 9));
 }
 
 function isIsoDate(value: string) {

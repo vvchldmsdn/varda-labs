@@ -8,8 +8,11 @@ import {
 } from "../src/lib/market-data/fsc-krx-gold.ts";
 import {
   buildFscKrxGoldCoverageReport,
-  resolveFscKrxGoldPublicationSafeEndDate,
 } from "../src/lib/market-data/fsc-krx-gold-coverage.ts";
+import {
+  classifyFscKrxGoldMarketDateAvailability,
+  resolveFscKrxGoldPublicationSafeEndDate,
+} from "../src/lib/market-data/fsc-krx-gold-publication.ts";
 
 const fetchedAt = "2026-07-17T04:00:00.000Z";
 const officialGuideFixture = JSON.parse(
@@ -247,6 +250,64 @@ describe("FSC public-data KRX gold source coverage", () => {
         new Date("2026-07-14T04:00:00.000Z"),
       ),
       "2026-07-13",
+    );
+  });
+
+  it("separates 07:00 source lag from an admitted official close", () => {
+    assert.deepEqual(
+      classifyFscKrxGoldMarketDateAvailability({
+        marketDate: "2026-07-10",
+        evaluatedAt: "2026-07-13T00:00:00.000Z",
+        providerObservationPresent: false,
+      }),
+      {
+        marketDate: "2026-07-10",
+        status: "source_lag_not_published",
+        isTradingDate: true,
+        providerObservationPresent: false,
+        expectedPublicationAt: "2026-07-13T04:00:00.000Z",
+        observationAdmission: "do_not_admit",
+      },
+    );
+
+    assert.equal(
+      classifyFscKrxGoldMarketDateAvailability({
+        marketDate: "2026-07-10",
+        evaluatedAt: "2026-07-13T04:00:00.000Z",
+        providerObservationPresent: true,
+      }).status,
+      "official_close_available",
+    );
+  });
+
+  it("keeps provider lag distinct after the publication window opens", () => {
+    const availability = classifyFscKrxGoldMarketDateAvailability({
+      marketDate: "2026-07-13",
+      evaluatedAt: "2026-07-14T05:00:00.000Z",
+      providerObservationPresent: false,
+    });
+
+    assert.equal(availability.status, "source_lag_not_published");
+    assert.equal(availability.expectedPublicationAt, "2026-07-14T04:00:00.000Z");
+    assert.equal(availability.observationAdmission, "do_not_admit");
+  });
+
+  it("does not turn closures or early provider rows into official observations", () => {
+    assert.equal(
+      classifyFscKrxGoldMarketDateAvailability({
+        marketDate: "2026-07-11",
+        evaluatedAt: "2026-07-13T05:00:00.000Z",
+        providerObservationPresent: false,
+      }).status,
+      "non_trading_date_no_observation_expected",
+    );
+    assert.equal(
+      classifyFscKrxGoldMarketDateAvailability({
+        marketDate: "2026-07-10",
+        evaluatedAt: "2026-07-13T03:59:59.000Z",
+        providerObservationPresent: true,
+      }).status,
+      "observation_before_publication_window",
     );
   });
 });
