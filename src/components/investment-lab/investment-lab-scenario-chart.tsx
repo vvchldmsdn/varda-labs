@@ -45,6 +45,8 @@ export function InvestmentLabScenarioChartView({
   return (
     <section
       className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      data-scenario-chart-anchor={chart.policy.initialAnchorRequirement}
+      data-scenario-chart-domain={chart.policy.yDomain}
       data-scenario-chart-lines={chart.lines.length}
       data-scenario-chart-status={chart.status}
       data-scenario-chart-unavailable={chart.unavailableScenarioIds.length}

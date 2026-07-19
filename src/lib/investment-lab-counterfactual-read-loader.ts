@@ -43,6 +43,11 @@ import {
   type NamedPortfolioAccount,
   type PortfolioAccountScope,
 } from "./portfolio-account-scope.ts";
+import {
+  buildInvestmentLabAllAccountFundingPreflight,
+  buildInvestmentLabNamedAccountFundingPreflight,
+  type InvestmentLabAccountFundingPreflight,
+} from "./investment-lab-account-funding-preflight.ts";
 
 export interface InvestmentLabCounterfactualReadRepository
   extends InvestmentLabAnchorBasketReadRepository {
@@ -69,6 +74,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   accountComposition: InvestmentLabAccountComposition;
+  fundingPreflight: InvestmentLabAccountFundingPreflight;
 }>> {
   const [eventRows, snapshotRows, closeRows, vooCloseRows, fxRows] =
     await Promise.all([
@@ -129,6 +135,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   let model = pooledModel;
   let accountComposition = notApplicableInvestmentLabAccountComposition();
   let anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  let fundingPreflight: InvestmentLabAccountFundingPreflight;
 
   if (account === "all") {
     const namedModels = Object.freeze(
@@ -194,6 +201,11 @@ export async function loadInvestmentLabCounterfactualReadModel(
     model = composed.model;
     anchorBasketScenario = composed.anchorBasketScenario;
     accountComposition = composed.composition;
+    fundingPreflight = buildInvestmentLabAllAccountFundingPreflight({
+      namedModels,
+      namedAnchors,
+      composition: composed.composition,
+    });
   } else {
     anchorBasketScenario = await loadInvestmentLabAnchorBasketScenario({
       account,
@@ -203,6 +215,11 @@ export async function loadInvestmentLabCounterfactualReadModel(
       fxRows: fountScope.source.fxRows,
       requestedAnchorDate,
       fountScopeAdjustmentStatus: fountScope.scope.status,
+    });
+    fundingPreflight = buildInvestmentLabNamedAccountFundingPreflight({
+      account,
+      model,
+      anchorBasketScenario,
     });
   }
   let resolvedPeriod = period;
@@ -232,6 +249,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
     anchorBasketScenario,
     fountScopeAdjustment: fountScope.scope,
     accountComposition,
+    fundingPreflight,
   });
 }
 

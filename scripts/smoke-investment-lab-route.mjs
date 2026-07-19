@@ -82,6 +82,52 @@ async function main() {
   } else {
     assert.equal(accountCompositionStatus, "not_applicable");
   }
+  assert.match(
+    route.body,
+    /data-section="investment-lab-funding-preflight"/,
+  );
+  const fundingPreflightStatus = readStringAttribute(
+    route.body,
+    "data-funding-status",
+  );
+  const fundingAccountRows = readIntegerAttribute(
+    route.body,
+    "data-funding-account-rows",
+  );
+  const fundingRequestedCells = readIntegerAttribute(
+    route.body,
+    "data-funding-requested-cells",
+  );
+  const fundingReadyCells = readIntegerAttribute(
+    route.body,
+    "data-funding-ready-cells",
+  );
+  const fundingUnavailableCells = readIntegerAttribute(
+    route.body,
+    "data-funding-unavailable-cells",
+  );
+  const fundingNotRequestedCells = readIntegerAttribute(
+    route.body,
+    "data-funding-not-requested-cells",
+  );
+  assert.ok(
+    ["ready", "partial", "unavailable"].includes(fundingPreflightStatus),
+  );
+  assert.equal(fundingAccountRows, ACCOUNT === "all" ? 3 : 1);
+  assert.equal(fundingRequestedCells, fundingReadyCells + fundingUnavailableCells);
+  assert.equal(
+    fundingRequestedCells + fundingNotRequestedCells,
+    fundingAccountRows * 6,
+  );
+  assert.equal(
+    readStringAttribute(route.body, "data-cross-account-funding"),
+    "forbidden",
+  );
+  assert.equal(
+    (route.body.match(/data-funding-account="(?:brokerage|isa|irp)"/g) ?? [])
+      .length,
+    fundingAccountRows,
+  );
   for (const marker of ["투자 랩", "과거 비교 구간", "구간 적용"]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
@@ -355,6 +401,14 @@ async function main() {
     scenarioChartUnavailable = readIntegerAttribute(
       route.body,
       "data-scenario-chart-unavailable",
+    );
+    assert.equal(
+      readStringAttribute(route.body, "data-scenario-chart-anchor"),
+      "same_scope_adjusted_initial_value",
+    );
+    assert.equal(
+      readStringAttribute(route.body, "data-scenario-chart-domain"),
+      "single_domain_across_ready_paths",
     );
     assert.ok(
       scenarioChartStatus === "ready" || scenarioChartStatus === "partial",
@@ -1031,6 +1085,12 @@ async function main() {
         baseUrl: BASE_URL,
         routePath,
         accountCompositionStatus,
+        fundingPreflightStatus,
+        fundingAccountRows,
+        fundingRequestedCells,
+        fundingReadyCells,
+        fundingUnavailableCells,
+        fundingNotRequestedCells,
         periodStatus,
         readModelStatus,
         observedPathStatus,

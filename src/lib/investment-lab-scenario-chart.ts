@@ -5,6 +5,8 @@ import type { InvestmentLabScenarioMatrixId } from "./investment-lab-scenario-ma
 export const INVESTMENT_LAB_SCENARIO_CHART_POLICY = Object.freeze({
   version: "same_axis_available_scenario_paths_v1",
   observedAxisAuthority: "observed_path_service_dates",
+  initialAnchorRequirement: "same_scope_adjusted_initial_value",
+  yDomain: "single_domain_across_ready_paths",
   missingScenarioHandling: "omit_only_unavailable_scenario",
   interpolation: "forbidden",
   ranking: "forbidden",
@@ -63,16 +65,21 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
 
   const observed = input.model.observedPath;
   const axis = observed.rows.map((row) => row.serviceDate);
+  const initialAnchorKrw = observed.rows[0].marketValueKrw;
+  const chartLine = (
+    id: InvestmentLabScenarioMatrixId,
+    label: string,
+    points: readonly InvestmentLabScenarioChartPoint[],
+  ) => line(id, label, axis, initialAnchorKrw, points);
   const candidates = new Map<
     InvestmentLabScenarioMatrixId,
     InvestmentLabScenarioChartLine | null
   >([
     [
       "actual",
-      line(
+      chartLine(
         "actual",
         "실제 포트폴리오",
-        axis,
         observed.rows.map((row) => ({
           serviceDate: row.serviceDate,
           valueKrw: row.marketValueKrw,
@@ -83,10 +90,9 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
     [
       "zero_return",
       input.model.cashComparison?.status === "ready"
-        ? line(
+        ? chartLine(
             "zero_return",
             "제로수익 동일흐름",
-            axis,
             input.model.cashComparison.rows.map(toScenarioPoint),
           )
         : null,
@@ -94,10 +100,9 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
     [
       "kodex200",
       input.model.status === "ready"
-        ? line(
+        ? chartLine(
             "kodex200",
             "전액 KODEX 200",
-            axis,
             input.model.rows.map(toScenarioPoint),
           )
         : null,
@@ -105,10 +110,9 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
     [
       "voo",
       input.model.vooComparison?.status === "ready"
-        ? line(
+        ? chartLine(
             "voo",
             "전액 VOO",
-            axis,
             input.model.vooComparison.rows.map(toScenarioPoint),
           )
         : null,
@@ -116,10 +120,9 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
     [
       "fixed_mix",
       input.model.fixedMixScenario?.status === "ready"
-        ? line(
+        ? chartLine(
             "fixed_mix",
             fixedMixLabel(input.model),
-            axis,
             input.model.fixedMixScenario.rows.map(toScenarioPoint),
           )
         : null,
@@ -127,10 +130,9 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
     [
       "anchor_basket",
       input.anchorBasketScenario.status === "ready"
-        ? line(
+        ? chartLine(
             "anchor_basket",
             anchorLabel(input.anchorBasketScenario),
-            axis,
             input.anchorBasketScenario.rows.map(toScenarioPoint),
           )
         : null,
@@ -168,11 +170,13 @@ function line(
   id: InvestmentLabScenarioMatrixId,
   label: string,
   axis: readonly string[],
+  initialAnchorKrw: number,
   points: readonly InvestmentLabScenarioChartPoint[],
 ) {
   if (
     axis.length < 2 ||
     points.length !== axis.length ||
+    !nearlyEqual(points[0]?.valueKrw, initialAnchorKrw) ||
     points.some(
       (point, index) =>
         point.serviceDate !== axis[index] ||
@@ -188,6 +192,16 @@ function line(
     color: COLORS[id],
     points: Object.freeze(points.map((point) => Object.freeze({ ...point }))),
   });
+}
+
+function nearlyEqual(left: number | undefined, right: number) {
+  return (
+    left !== undefined &&
+    Number.isFinite(left) &&
+    Number.isFinite(right) &&
+    Math.abs(left - right) <=
+      1e-8 * Math.max(1, Math.abs(left), Math.abs(right))
+  );
 }
 
 function toScenarioPoint(row: Readonly<{

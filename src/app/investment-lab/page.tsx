@@ -124,6 +124,7 @@ async function InvestmentLabContent({
     accountComposition,
     anchorBasketScenario,
     fountScopeAdjustment,
+    fundingPreflight,
     model,
     period,
     rollingComparison,
@@ -142,6 +143,7 @@ async function InvestmentLabContent({
           </Suspense>
         }
         fountScopeAdjustment={fountScopeAdjustment}
+        fundingPreflight={fundingPreflight}
         model={model}
         period={period}
         accountQuery={accountQuery}

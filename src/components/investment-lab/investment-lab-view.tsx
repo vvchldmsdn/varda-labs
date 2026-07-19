@@ -9,10 +9,12 @@ import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart"
 import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
+import { InvestmentLabFundingPreflightView } from "./investment-lab-funding-preflight";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAccountComposition } from "@/lib/investment-lab-account-composition";
+import type { InvestmentLabAccountFundingPreflight } from "@/lib/investment-lab-account-funding-preflight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
@@ -28,6 +30,7 @@ export function InvestmentLabView({
   anchorBasketScenario,
   dataAvailability,
   fountScopeAdjustment,
+  fundingPreflight,
   model,
   period,
   selectedAccount,
@@ -37,6 +40,7 @@ export function InvestmentLabView({
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
+  fundingPreflight: InvestmentLabAccountFundingPreflight;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
   selectedAccount: PortfolioAccountScope;
@@ -173,6 +177,8 @@ export function InvestmentLabView({
           period={period}
           query={accountQuery}
         />
+
+        <InvestmentLabFundingPreflightView model={fundingPreflight} />
 
         {!periodReady ? null : model.observedPath.status === "ready" ? (
           <ReadyView

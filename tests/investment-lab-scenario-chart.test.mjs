@@ -65,6 +65,28 @@ describe("investment lab multi-scenario chart", () => {
     assert.ok(chart.unavailableScenarioIds.includes("voo"));
   });
 
+  it("omits a path whose initial value does not match the observed anchor", () => {
+    const model = readyModel();
+    model.cashComparison.rows[0] = {
+      ...model.cashComparison.rows[0],
+      scenarioMarketValueKrw: 900,
+    };
+
+    const chart = buildInvestmentLabScenarioChart({
+      model,
+      anchorBasketScenario: readyAnchor(),
+    });
+
+    assert.equal(chart.status, "partial");
+    assert.equal(chart.lines.some((line) => line.id === "zero_return"), false);
+    assert.ok(chart.unavailableScenarioIds.includes("zero_return"));
+    assert.equal(
+      chart.policy.initialAnchorRequirement,
+      "same_scope_adjusted_initial_value",
+    );
+    assert.equal(chart.policy.yDomain, "single_domain_across_ready_paths");
+  });
+
   it("remains server-rendered and free of ranking or data I/O", () => {
     const pureSource = readFileSync(
       "src/lib/investment-lab-scenario-chart.ts",
