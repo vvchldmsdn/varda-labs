@@ -10,6 +10,9 @@ const END_SERVICE_DATE = readArgument("--end");
 const RAW_QUERY = readArgument("--raw-query");
 const EXPECT_READY = numberArgument("--expect-ready");
 const EXPECT_RESEARCH_READY = numberArgument("--expect-research-ready");
+const EXPECT_JOINT_RESEARCH_READY = numberArgument(
+  "--expect-joint-research-ready",
+);
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
@@ -57,7 +60,10 @@ async function main() {
   }
   assert.match(simulation.body, /연구 입력 증거 준비도/);
   assert.match(simulation.body, /data-fixed-research-execution/);
+  assert.match(simulation.body, /data-fixed-mix-research-execution/);
   assert.match(simulation.body, /3개월 연구 시뮬레이션/);
+  assert.match(simulation.body, /50:50 공동 포트폴리오 연구/);
+  assert.match(simulation.body, /stationary bootstrap/);
   assert.match(simulation.body, /069500/);
   assert.match(simulation.body, /VOO/);
   assert.match(
@@ -83,6 +89,10 @@ async function main() {
   const researchReadyCount = researchStatuses.filter(
     (status) => status === "ready",
   ).length;
+  const jointResearchStatus = simulation.body.match(
+    /data-joint-research-execution-status="(ready|unavailable)"/,
+  )?.[1];
+  const jointResearchReadyCount = jointResearchStatus === "ready" ? 1 : 0;
   const historyRowCount =
     simulation.body.match(/data-readiness-history-row="\d{4}-\d{2}-\d{2}"/g)
       ?.length ?? 0;
@@ -108,6 +118,10 @@ async function main() {
     researchStatuses.length,
     2,
     "simulation must render two independent research execution states",
+  );
+  assert.ok(
+    jointResearchStatus,
+    "simulation must render one joint research execution state",
   );
   assert.equal(
     historyRowCount,
@@ -167,6 +181,13 @@ async function main() {
       "unexpected ready research execution count",
     );
   }
+  if (EXPECT_JOINT_RESEARCH_READY !== null) {
+    assert.equal(
+      jointResearchReadyCount,
+      EXPECT_JOINT_RESEARCH_READY,
+      "unexpected ready joint research execution count",
+    );
+  }
   if (researchReadyCount > 0) {
     assert.equal(
       simulation.body.match(/data-research-fan-chart="(?:kodex200|voo)"/g)
@@ -176,6 +197,19 @@ async function main() {
     );
     assert.match(simulation.body, /data-research-horizon="63"/);
     assert.match(simulation.body, /data-research-path-count="500"/);
+  }
+  if (jointResearchStatus === "ready") {
+    assert.match(
+      simulation.body,
+      /data-research-fan-chart="kodex200-voo-50-50"/,
+    );
+    assert.match(
+      simulation.body,
+      /data-joint-sampling="paired_cross_market_rows_same_draw_plan"/,
+    );
+    assert.match(simulation.body, /data-joint-rebalancing="none"/);
+    assert.match(simulation.body, /data-joint-research-horizon="63"/);
+    assert.match(simulation.body, /data-joint-research-path-count="500"/);
   }
 
   const countsAfter = await readCounts();
@@ -200,6 +234,8 @@ async function main() {
         readyCount,
         researchStatuses,
         researchReadyCount,
+        jointResearchStatus,
+        jointResearchReadyCount,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,

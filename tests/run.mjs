@@ -60,6 +60,7 @@ import "./simulation-normalized-nav.test.mjs";
 import "./simulation-normalized-nav-distribution-summary.test.mjs";
 import "./simulation-spaghetti-path-sampling.test.mjs";
 import "./simulation-fixed-research-execution.test.mjs";
+import "./simulation-fixed-mix-research-execution.test.mjs";
 import "./simulation-terminal-loss-probability.test.mjs";
 import "./simulation-path-max-drawdown.test.mjs";
 import "./simulation-path-max-drawdown-distribution-summary.test.mjs";

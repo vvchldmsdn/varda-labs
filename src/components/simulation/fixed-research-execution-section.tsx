@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import type { FixedResearchSimulationResult } from "@/lib/simulation-fixed-research-execution";
 
+import { ResearchFanChart } from "./research-fan-chart";
+
 type ReadyExecution = Extract<
   FixedResearchSimulationResult,
   { status: "ready" }
@@ -31,7 +33,8 @@ export function FixedResearchExecutionSection({
             3개월 연구 시뮬레이션
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            선택한 기준일까지의 90개 수익률을 5거래일 묶음으로 재표본해
+            선택한 기준일까지의 90개 수익률을 평균 5거래일 블록의 stationary
+            bootstrap으로 재표본해
             63거래일 경로 500개를 계산합니다. 두 종목은 각각 100% 보유한 경우로
             독립 실행하며, 같은 난수표를 써 비교 오차를 줄입니다.
           </p>
@@ -65,6 +68,14 @@ export function FixedResearchExecutionSection({
           ),
         )}
       </div>
+      <p
+        className="mt-3 text-xs leading-5 text-[#687064]"
+        data-research-methodology="stationary-bootstrap-v1"
+      >
+        방법: KRW 투자자 기준 수익률 90개 · 평균 블록 5거래일 · 63거래일 ·
+        500경로 · 재현 가능한 고정 seed. 시장 국면을 조건으로 삼는 regime
+        bootstrap 모델은 아닙니다.
+      </p>
     </section>
   );
 }
@@ -77,6 +88,8 @@ function ResearchExecutionPanel({ execution }: { execution: ReadyExecution }) {
       data-research-execution-status="ready"
       data-research-horizon={execution.assumptions.horizon}
       data-research-path-count={execution.assumptions.pathCount}
+      data-research-bootstrap-model={execution.policy.bootstrapModel}
+      data-research-seed-policy={execution.policy.seedPolicy}
     >
       <header className="flex items-start justify-between gap-3 border-b border-[#e1e5da] px-4 py-4">
         <div>
@@ -94,7 +107,7 @@ function ResearchExecutionPanel({ execution }: { execution: ReadyExecution }) {
         <Metric label="중앙 경로 수익률" value={formatSignedPct(execution.terminal.p50ReturnPct)} />
         <Metric label="손실 종료 확률" value={formatPct(execution.terminal.lossProbabilityPct)} />
         <Metric label="MDD 중앙값" value={formatPct(execution.terminal.maxDrawdownP50Pct)} />
-        <Metric label="MDD 상위 10%" value={formatPct(execution.terminal.maxDrawdownP90Pct)} />
+        <Metric label="MDD P90(더 큰 손실)" value={formatPct(execution.terminal.maxDrawdownP90Pct)} />
       </div>
 
       <ResearchFanChart execution={execution} />
@@ -107,7 +120,7 @@ function ResearchExecutionPanel({ execution }: { execution: ReadyExecution }) {
         </p>
         <p className="px-4 py-3">
           기준일 {formatDate(execution.source.endServiceDate)} · 시작지수 100 ·
-          수수료·세금·리밸런싱 미포함
+          수수료·세금 미포함
         </p>
       </div>
     </article>
@@ -137,113 +150,6 @@ function UnavailableExecutionPanel({
   );
 }
 
-function ResearchFanChart({ execution }: { execution: ReadyExecution }) {
-  const width = 760;
-  const height = 280;
-  const padding = 28;
-  const values = [
-    ...execution.bands.flatMap((band) => [band.p10, band.p50, band.p90]),
-    ...execution.samplePaths.flatMap((path) =>
-      path.points.map((point) => point.indexValue),
-    ),
-  ];
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const spread = Math.max(rawMax - rawMin, 1);
-  const min = rawMin - spread * 0.08;
-  const max = rawMax + spread * 0.08;
-  const x = (stepIndex: number) =>
-    padding +
-    (stepIndex / execution.assumptions.horizon) * (width - padding * 2);
-  const y = (value: number) =>
-    height - padding - ((value - min) / (max - min)) * (height - padding * 2);
-  const bandArea = [
-    ...execution.bands.map((band) => [x(band.stepIndex), y(band.p90)] as const),
-    ...[...execution.bands]
-      .reverse()
-      .map((band) => [x(band.stepIndex), y(band.p10)] as const),
-  ];
-
-  return (
-    <figure className="px-3 py-4" data-research-fan-chart={execution.id}>
-      <svg
-        aria-label={`${execution.name} 연구 시뮬레이션 경로와 P10 P50 P90 구간`}
-        className="h-auto w-full"
-        role="img"
-        viewBox={`0 0 ${width} ${height}`}
-      >
-        <line
-          stroke="#d5dacf"
-          strokeDasharray="4 5"
-          x1={padding}
-          x2={width - padding}
-          y1={y(100)}
-          y2={y(100)}
-        />
-        <path d={closedPath(bandArea)} fill="#dce8de" opacity="0.9" />
-        {execution.samplePaths.map((path) => (
-          <path
-            d={linePath(
-              path.points.map((point) => [
-                x(point.stepIndex),
-                y(point.indexValue),
-              ]),
-            )}
-            fill="none"
-            key={path.pathIndex}
-            opacity="0.22"
-            stroke="#78867a"
-            strokeWidth="1"
-          />
-        ))}
-        <path
-          d={linePath(
-            execution.bands.map((band) => [x(band.stepIndex), y(band.p10)]),
-          )}
-          fill="none"
-          stroke="#8ca295"
-          strokeDasharray="5 4"
-          strokeWidth="1.5"
-        />
-        <path
-          d={linePath(
-            execution.bands.map((band) => [x(band.stepIndex), y(band.p90)]),
-          )}
-          fill="none"
-          stroke="#8ca295"
-          strokeDasharray="5 4"
-          strokeWidth="1.5"
-        />
-        <path
-          d={linePath(
-            execution.bands.map((band) => [x(band.stepIndex), y(band.p50)]),
-          )}
-          fill="none"
-          stroke="#173f38"
-          strokeWidth="2.5"
-        />
-        <text fill="#687064" fontSize="11" x={padding} y={height - 6}>
-          시작
-        </text>
-        <text
-          fill="#687064"
-          fontSize="11"
-          textAnchor="end"
-          x={width - padding}
-          y={height - 6}
-        >
-          63거래일
-        </text>
-      </svg>
-      <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-[#687064]">
-        <span>진한 선: 중앙값(P50)</span>
-        <span>연한 구간: P10~P90</span>
-        <span>가는 선: 대표 경로 12개</span>
-      </figcaption>
-    </figure>
-  );
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-b border-r border-[#e1e5da] px-3 py-3 last:border-r-0 sm:border-b-0">
@@ -251,16 +157,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-semibold tabular-nums">{value}</p>
     </div>
   );
-}
-
-function linePath(points: readonly (readonly [number, number])[]) {
-  return points
-    .map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
-    .join(" ");
-}
-
-function closedPath(points: readonly (readonly [number, number])[]) {
-  return `${linePath(points)} Z`;
 }
 
 function unavailableReasonLabel(

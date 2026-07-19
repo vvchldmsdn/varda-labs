@@ -4,9 +4,24 @@ import {
   type SimulationResearchExecutionBlockerReason,
 } from "./simulation-research-execution-core.ts";
 
-export const FIXED_RESEARCH_SIMULATION_POLICY = Object.freeze({
-  version: "fixed_single_instrument_research_simulation_v1",
-  admission: "explicit_end_query_and_complete_matrix_only",
+const FIXED_MIX_WEIGHTS = Object.freeze([
+  Object.freeze({
+    market: "korea",
+    currency: "KRW",
+    ticker: "069500",
+    weightBps: 5_000,
+  }),
+  Object.freeze({
+    market: "us",
+    currency: "USD",
+    ticker: "VOO",
+    weightBps: 5_000,
+  }),
+] as const);
+
+export const FIXED_MIX_RESEARCH_SIMULATION_POLICY = Object.freeze({
+  version: "fixed_mix_joint_research_simulation_v1",
+  admission: "explicit_end_query_and_complete_joint_matrix_only",
   sourceReturnStepCount: 90,
   horizon: 63,
   horizonLabel: "approximately_three_market_months",
@@ -15,10 +30,11 @@ export const FIXED_RESEARCH_SIMULATION_POLICY = Object.freeze({
   seed: 0x56415244,
   bootstrapModel: "stationary_bootstrap_unconditional_not_regime_conditioned",
   seedPolicy: "explicit_fixed_seed_for_reproducibility",
-  randomComparison: "common_random_numbers_across_instruments",
+  jointSampling: "paired_cross_market_rows_same_draw_plan",
   samplePathCount: 12,
-  portfolioPath: "single_instrument_buy_and_hold_10000bps",
+  portfolioPath: "initial_fixed_weight_buy_and_hold_without_rebalancing",
   displayBasis: "normalized_index_100",
+  weights: FIXED_MIX_WEIGHTS,
   persistence: "forbidden",
   accountBinding: "forbidden",
   recommendation: "forbidden",
@@ -26,24 +42,19 @@ export const FIXED_RESEARCH_SIMULATION_POLICY = Object.freeze({
   interpretation: "research_distribution_not_forecast",
 } as const);
 
-export type FixedResearchSimulationId = "kodex200" | "voo";
-
-export type FixedResearchSimulationResult = ReturnType<
-  typeof buildFixedResearchSimulation
+export type FixedMixResearchSimulationResult = ReturnType<
+  typeof buildFixedMixResearchSimulation
 >;
 
-export function buildFixedResearchSimulation(input: {
-  id: FixedResearchSimulationId;
-  name: string;
-  ticker: string;
+export function buildFixedMixResearchSimulation(input: {
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
 }) {
   const base = {
-    id: input.id,
-    name: input.name,
-    ticker: input.ticker,
-    policy: FIXED_RESEARCH_SIMULATION_POLICY,
+    id: "kodex200-voo-50-50" as const,
+    name: "KODEX 200 50% + VOO 50%",
+    policy: FIXED_MIX_RESEARCH_SIMULATION_POLICY,
+    weights: FIXED_MIX_WEIGHTS,
     runtimeTrustStatus: "research_only" as const,
   };
 
@@ -55,29 +66,27 @@ export function buildFixedResearchSimulation(input: {
   }
 
   const matrix = input.matrix;
-  const instrument = matrix.instruments[0];
   const matrixEndServiceDate = matrix.requestedServiceDates.at(-1) ?? null;
   if (
-    matrix.instruments.length !== 1 ||
-    !instrument ||
-    instrument.ticker !== input.ticker ||
     matrix.matrix.length !==
-      FIXED_RESEARCH_SIMULATION_POLICY.sourceReturnStepCount ||
-    matrixEndServiceDate !== input.explicitEndServiceDate
+      FIXED_MIX_RESEARCH_SIMULATION_POLICY.sourceReturnStepCount ||
+    matrixEndServiceDate !== input.explicitEndServiceDate ||
+    !sameInstrumentUniverse(matrix)
   ) {
     return blockedResult(base, "input_matrix_shape_mismatch");
   }
 
   const execution = executeSimulationResearchPaths({
     matrix,
-    scenarioId: `research-single-${input.id}`,
+    scenarioId: "research-kodex200-voo-50-50",
     scenarioVersion: "v1",
-    weights: [{ ...instrument, weightBps: 10_000 }],
-    seed: FIXED_RESEARCH_SIMULATION_POLICY.seed,
-    expectedBlockLength: FIXED_RESEARCH_SIMULATION_POLICY.expectedBlockLength,
-    horizon: FIXED_RESEARCH_SIMULATION_POLICY.horizon,
-    pathCount: FIXED_RESEARCH_SIMULATION_POLICY.pathCount,
-    samplePathCount: FIXED_RESEARCH_SIMULATION_POLICY.samplePathCount,
+    weights: FIXED_MIX_WEIGHTS,
+    seed: FIXED_MIX_RESEARCH_SIMULATION_POLICY.seed,
+    expectedBlockLength:
+      FIXED_MIX_RESEARCH_SIMULATION_POLICY.expectedBlockLength,
+    horizon: FIXED_MIX_RESEARCH_SIMULATION_POLICY.horizon,
+    pathCount: FIXED_MIX_RESEARCH_SIMULATION_POLICY.pathCount,
+    samplePathCount: FIXED_MIX_RESEARCH_SIMULATION_POLICY.samplePathCount,
   });
   if (execution.status !== "ready") {
     return blockedResult(base, execution.reason);
@@ -89,13 +98,29 @@ export function buildFixedResearchSimulation(input: {
     source: Object.freeze({
       endServiceDate: input.explicitEndServiceDate,
       returnStepCount: matrix.matrix.length,
+      pairedInstrumentCount: matrix.instruments.length,
       firstServiceDate: matrix.requestedServiceDates[0] ?? null,
       lastServiceDate: matrixEndServiceDate,
     }),
   });
 }
 
-type FixedResearchBlockerReason =
+function sameInstrumentUniverse(matrix: SimulationReturnMatrixResult) {
+  return (
+    matrix.instruments.length === FIXED_MIX_WEIGHTS.length &&
+    matrix.instruments.every((instrument, index) => {
+      const expected = FIXED_MIX_WEIGHTS[index];
+      return (
+        expected !== undefined &&
+        instrument.market === expected.market &&
+        instrument.currency === expected.currency &&
+        instrument.ticker === expected.ticker
+      );
+    })
+  );
+}
+
+type FixedMixResearchBlockerReason =
   | "explicit_end_required"
   | "input_matrix_unavailable"
   | "input_matrix_shape_mismatch"
@@ -103,13 +128,13 @@ type FixedResearchBlockerReason =
 
 function blockedResult(
   base: {
-    id: FixedResearchSimulationId;
+    id: "kodex200-voo-50-50";
     name: string;
-    ticker: string;
-    policy: typeof FIXED_RESEARCH_SIMULATION_POLICY;
+    policy: typeof FIXED_MIX_RESEARCH_SIMULATION_POLICY;
+    weights: typeof FIXED_MIX_WEIGHTS;
     runtimeTrustStatus: "research_only";
   },
-  reason: FixedResearchBlockerReason,
+  reason: FixedMixResearchBlockerReason,
 ) {
   return Object.freeze({
     ...base,

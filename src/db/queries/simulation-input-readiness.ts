@@ -10,6 +10,7 @@ import {
   type SimulationInputReadinessDescriptor,
 } from "@/lib/simulation-input-readiness";
 import { buildFixedResearchSimulation } from "@/lib/simulation-fixed-research-execution";
+import { buildFixedMixResearchSimulation } from "@/lib/simulation-fixed-mix-research-execution";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const KODEX_200 = Object.freeze({
@@ -107,6 +108,10 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       matrix: preflights[index]?.matrixArtifact ?? null,
     }),
   );
+  const fixedMixResearchExecution = buildFixedMixResearchSimulation({
+    explicitEndServiceDate,
+    matrix: comparisonPreflight.matrixArtifact,
+  });
 
   return buildSimulationInputReadinessPageModel({
     selection,
@@ -114,6 +119,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     comparisonSource,
     history: selection.status === "valid" ? models : [],
     researchExecutions,
+    fixedMixResearchExecution,
   });
 }
 

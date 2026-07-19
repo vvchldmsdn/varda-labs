@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
+import { FixedMixResearchExecutionSection } from "./fixed-mix-research-execution-section";
 import { FixedResearchExecutionSection } from "./fixed-research-execution-section";
 import { ObservedReturnAlignmentEvidencePanel } from "./observed-return-alignment-evidence-panel";
 import { ObservedReturnComparisonPanel } from "./observed-return-comparison-panel";
@@ -21,9 +22,15 @@ export function SimulationInputReadinessView({
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
   const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
-  const readyExecutionCount = model.researchExecutions.filter(
+  const readySingleExecutionCount = model.researchExecutions.filter(
     (execution) => execution.status === "ready",
   ).length;
+  const totalExecutionCount =
+    model.researchExecutions.length +
+    (model.fixedMixResearchExecution ? 1 : 0);
+  const readyExecutionCount =
+    readySingleExecutionCount +
+    (model.fixedMixResearchExecution?.status === "ready" ? 1 : 0);
 
   return (
     <main
@@ -88,7 +95,7 @@ export function SimulationInputReadinessView({
             label="실행 상태"
             value={
               readyExecutionCount > 0
-                ? `${readyExecutionCount}/${model.researchExecutions.length} 계산 완료`
+                ? `${readyExecutionCount}/${totalExecutionCount} 계산 완료`
                 : "실행 안 함"
             }
             detail="연구용 · 저장 안 함"
@@ -104,6 +111,9 @@ export function SimulationInputReadinessView({
         <FixedResearchExecutionSection
           executions={model.researchExecutions}
           recommendedEndServiceDate={recommendedEndServiceDate}
+        />
+        <FixedMixResearchExecutionSection
+          execution={model.fixedMixResearchExecution}
         />
 
         <section

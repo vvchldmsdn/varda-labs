@@ -1,5 +1,6 @@
 import type { loadSimulationPeriodPreflight } from "./simulation-period-preflight-loader.ts";
 import type { FixedResearchSimulationResult } from "./simulation-fixed-research-execution.ts";
+import type { FixedMixResearchSimulationResult } from "./simulation-fixed-mix-research-execution.ts";
 import { buildSimulationObservedReturnComparison } from "./simulation-observed-return-comparison.ts";
 import { buildSimulationObservedReturnAlignment } from "./simulation-observed-return-alignment.ts";
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
@@ -139,6 +140,7 @@ export function buildSimulationInputReadinessPageModel(input: {
   comparisonSource: SimulationInputReadinessModel;
   history: readonly SimulationInputReadinessModel[];
   researchExecutions?: readonly FixedResearchSimulationResult[];
+  fixedMixResearchExecution?: FixedMixResearchSimulationResult;
 }) {
   const observedReturnComparison = buildSimulationObservedReturnComparison(
     input.comparisonSource.inputs,
@@ -185,6 +187,7 @@ export function buildSimulationInputReadinessPageModel(input: {
       }),
     history: Object.freeze(history),
     researchExecutions: Object.freeze([...(input.researchExecutions ?? [])]),
+    fixedMixResearchExecution: input.fixedMixResearchExecution ?? null,
   });
 }
 

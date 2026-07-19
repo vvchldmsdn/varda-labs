@@ -17,6 +17,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /resolveSimulationEndServiceDateSelection/);
     assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
     assert.match(query, /buildFixedResearchSimulation/);
+    assert.match(query, /buildFixedMixResearchSimulation/);
+    assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
     assert.match(query, /candidates: INPUTS\.map\(candidate\)/);
     assert.match(query, /\.\.\.independentRequests, comparisonRequest/);
     assert.doesNotMatch(query, /endServiceDate\?\.trim\(\)/);
@@ -41,9 +43,18 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-fixed-research-execution/);
     assert.match(view, /data-research-execution-status/);
     assert.match(view, /data-research-fan-chart/);
+    assert.match(view, /data-fixed-mix-research-execution/);
+    assert.match(view, /data-joint-research-execution-status/);
+    assert.match(view, /data-joint-sampling/);
+    assert.match(view, /data-joint-rebalancing="none"/);
     assert.match(view, /3개월 연구 시뮬레이션/);
+    assert.match(view, /50:50 공동 포트폴리오 연구/);
+    assert.match(view, /같은 기준일 수익률 쌍/);
+    assert.match(view, /리밸런싱하지 않아/);
     assert.match(view, /연구용 · 저장 안 함 · 예측 아님/);
     assert.match(view, /63거래일 경로 500개/);
+    assert.match(view, /stationary bootstrap/);
+    assert.match(view, /regime\s+bootstrap 모델은 아닙니다/);
     assert.match(view, /P10~P90/);
     assert.match(view, /최근 7개 기준일/);
     assert.match(view, /저장된 실행 기록이 아니라/);
@@ -86,7 +97,9 @@ function read(path) {
 function readSimulationView() {
   return [
     "src/components/simulation/simulation-input-readiness-view.tsx",
+    "src/components/simulation/fixed-mix-research-execution-section.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
+    "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",
     "src/components/simulation/observed-return-series-panel.tsx",
