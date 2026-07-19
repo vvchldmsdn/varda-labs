@@ -194,6 +194,8 @@ function priceBasisLabel(value: InvestmentLabScenarioPriceBasis) {
       "KODEX adjusted close + VOO raw close",
     zero_return_no_price: "가격 경로 미사용",
     anchor_instrument_raw_close: "기준일 종목별 raw close",
+    anchor_instrument_close_and_stored_manual:
+      "종목별 저장 종가 또는 저장 수동 평가",
   };
   return labels[value];
 }

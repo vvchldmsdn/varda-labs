@@ -72,6 +72,8 @@ import "./target-policy-holding-universe.test.mjs";
 import "./target-policy-resolver.test.mjs";
 import "./instrument-identity.test.mjs";
 import "./manual-asset-price.test.mjs";
+import "./manual-valuation-history-path.test.mjs";
+import "./investment-lab-manual-valuation-path.test.mjs";
 import "./krx-gold-close-cycle.test.mjs";
 import "./fsc-krx-gold-source.test.mjs";
 import "./today-holding-detail.test.mjs";

@@ -41,8 +41,8 @@ export type ManualValuationCurrentRow = Readonly<{
 
 export type ManualValuationSnapshotRow = Readonly<{
   snapshotDate: string;
-  assetId: string | null;
-  legacyAssetId: string | null;
+  assetId?: string | null;
+  legacyAssetId?: string | null;
   assetName: string;
   account: string;
   market: string | null;
@@ -60,6 +60,179 @@ export type ManualValuationSnapshotRow = Readonly<{
 export type ManualValuationHistoryCoverage = ReturnType<
   typeof buildManualValuationHistoryCoverage
 >;
+
+export type ManualValuationPathBlockerReason =
+  | "invalid_service_date_axis"
+  | "missing_manual_valuation"
+  | "duplicate_manual_valuation"
+  | "invalid_manual_valuation_provenance"
+  | "invalid_manual_valuation_envelope"
+  | "missing_manual_valuation_reference_date"
+  | "future_dated_manual_valuation"
+  | "invalid_manual_valuation_price"
+  | "missing_manual_valuation_identity"
+  | "manual_valuation_identity_mismatch";
+
+export type ManualValuationPathBlocker = Readonly<{
+  reason: ManualValuationPathBlockerReason;
+  serviceDate: string | null;
+}>;
+
+export type ManualValuationPathResolution = Readonly<{
+  status: "ready" | "unavailable";
+  policy: typeof MANUAL_VALUATION_HISTORY_POLICY;
+  rows: readonly Readonly<{
+    serviceDate: string;
+    referenceDate: string;
+    unitPriceKrw: number;
+    provenance: "manual_observation" | "stored_manual_carry";
+    capturedAt: string;
+  }>[];
+  coverage: Readonly<{
+    requiredDateCount: number;
+    sourceRowCount: number;
+    admittedRowCount: number;
+    manualObservationRowCount: number;
+    carriedValuationRowCount: number;
+  }>;
+  blockers: readonly ManualValuationPathBlocker[];
+}>;
+
+export function resolveManualValuationPath(input: Readonly<{
+  target: ManualValuationTarget;
+  snapshotRows: readonly ManualValuationSnapshotRow[];
+  serviceDates: readonly string[];
+}>): ManualValuationPathResolution {
+  if (!isOrderedDateAxis(input.serviceDates)) {
+    return unavailableManualPath(input, [
+      manualPathBlocker("invalid_service_date_axis"),
+    ]);
+  }
+
+  const targetRows = input.snapshotRows.filter((row) =>
+    matchesTarget(row, input.target),
+  );
+  const rows: Array<ManualValuationPathResolution["rows"][number]> = [];
+  const blockers: ManualValuationPathBlocker[] = [];
+  let admittedIdentity: string | null = null;
+
+  for (const serviceDate of input.serviceDates) {
+    const dateRows = targetRows.filter(
+      (row) => row.snapshotDate === serviceDate,
+    );
+    const writerRows = dateRows.filter(
+      (row) =>
+        normalizeText(row.source).toLowerCase() === CURRENT_SNAPSHOT_SOURCE,
+    );
+    if (writerRows.length === 0) {
+      blockers.push(
+        manualPathBlocker(
+          dateRows.length > 0
+            ? "invalid_manual_valuation_provenance"
+            : "missing_manual_valuation",
+          serviceDate,
+        ),
+      );
+      continue;
+    }
+    if (writerRows.length !== 1) {
+      blockers.push(
+        manualPathBlocker("duplicate_manual_valuation", serviceDate),
+      );
+      continue;
+    }
+
+    const row = writerRows[0];
+    if (
+      normalizeText(row.priceSource).toLowerCase() !==
+        MANUAL_ASSET_PRICE_POLICY.source ||
+      normalizeText(row.priceBasis).toLowerCase() !== MANUAL_PRICE_BASIS
+    ) {
+      blockers.push(
+        manualPathBlocker(
+          "invalid_manual_valuation_provenance",
+          serviceDate,
+        ),
+      );
+      continue;
+    }
+    if (!isValidSnapshotEnvelope(row)) {
+      blockers.push(
+        manualPathBlocker("invalid_manual_valuation_envelope", serviceDate),
+      );
+      continue;
+    }
+
+    const referenceDate = row.referenceDate ?? row.priceDate;
+    if (!referenceDate || !isIsoDate(referenceDate)) {
+      blockers.push(
+        manualPathBlocker(
+          "missing_manual_valuation_reference_date",
+          serviceDate,
+        ),
+      );
+      continue;
+    }
+    if (referenceDate > serviceDate) {
+      blockers.push(
+        manualPathBlocker("future_dated_manual_valuation", serviceDate),
+      );
+      continue;
+    }
+
+    const price = finitePositiveNumber(row.currentPrice);
+    if (price === null) {
+      blockers.push(
+        manualPathBlocker("invalid_manual_valuation_price", serviceDate),
+      );
+      continue;
+    }
+    const identity = manualValuationIdentity(row);
+    if (!identity) {
+      blockers.push(
+        manualPathBlocker("missing_manual_valuation_identity", serviceDate),
+      );
+      continue;
+    }
+    if (admittedIdentity !== null && identity !== admittedIdentity) {
+      blockers.push(
+        manualPathBlocker("manual_valuation_identity_mismatch", serviceDate),
+      );
+      continue;
+    }
+    admittedIdentity = identity;
+    rows.push(
+      Object.freeze({
+        serviceDate,
+        referenceDate,
+        unitPriceKrw: price,
+        provenance:
+          referenceDate === serviceDate
+            ? ("manual_observation" as const)
+            : ("stored_manual_carry" as const),
+        capturedAt: timestampIso(row.capturedAt)!,
+      }),
+    );
+  }
+
+  const coverage = manualPathCoverage(input, targetRows.length, rows);
+  if (blockers.length > 0 || rows.length !== input.serviceDates.length) {
+    return Object.freeze({
+      status: "unavailable",
+      policy: MANUAL_VALUATION_HISTORY_POLICY,
+      rows: [] as const,
+      coverage,
+      blockers: dedupeManualPathBlockers(blockers),
+    });
+  }
+  return Object.freeze({
+    status: "ready",
+    policy: MANUAL_VALUATION_HISTORY_POLICY,
+    rows: Object.freeze(rows),
+    coverage,
+    blockers: [] as const,
+  });
+}
 
 export function buildManualValuationHistoryCoverage(input: {
   account: PortfolioAccountScope;
@@ -293,6 +466,17 @@ function uniqueSortedDates(values: readonly string[]) {
   );
 }
 
+function isOrderedDateAxis(values: readonly string[]) {
+  return (
+    values.length >= 2 &&
+    new Set(values).size === values.length &&
+    values.every(
+      (value, index) =>
+        isIsoDate(value) && (index === 0 || values[index - 1] < value),
+    )
+  );
+}
+
 function isIsoDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -320,4 +504,63 @@ function timestampIso(value: Date | string | null) {
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function manualValuationIdentity(row: ManualValuationSnapshotRow) {
+  const assetId = normalizeText(row.assetId);
+  if (assetId) return `asset:${assetId}`;
+  const legacyAssetId = normalizeText(row.legacyAssetId);
+  return legacyAssetId ? `legacy:${legacyAssetId}` : null;
+}
+
+function manualPathBlocker(
+  reason: ManualValuationPathBlockerReason,
+  serviceDate: string | null = null,
+): ManualValuationPathBlocker {
+  return Object.freeze({ reason, serviceDate });
+}
+
+function manualPathCoverage(
+  input: Pick<Parameters<typeof resolveManualValuationPath>[0], "serviceDates">,
+  sourceRowCount: number,
+  rows: ManualValuationPathResolution["rows"],
+) {
+  return Object.freeze({
+    requiredDateCount: input.serviceDates.length,
+    sourceRowCount,
+    admittedRowCount: rows.length,
+    manualObservationRowCount: rows.filter(
+      (row) => row.provenance === "manual_observation",
+    ).length,
+    carriedValuationRowCount: rows.filter(
+      (row) => row.provenance === "stored_manual_carry",
+    ).length,
+  });
+}
+
+function unavailableManualPath(
+  input: Pick<Parameters<typeof resolveManualValuationPath>[0], "serviceDates">,
+  blockers: readonly ManualValuationPathBlocker[],
+): ManualValuationPathResolution {
+  return Object.freeze({
+    status: "unavailable",
+    policy: MANUAL_VALUATION_HISTORY_POLICY,
+    rows: [] as const,
+    coverage: manualPathCoverage(input, 0, []),
+    blockers: dedupeManualPathBlockers(blockers),
+  });
+}
+
+function dedupeManualPathBlockers(
+  blockers: readonly ManualValuationPathBlocker[],
+) {
+  const seen = new Set<string>();
+  return Object.freeze(
+    blockers.filter((blocker) => {
+      const key = `${blocker.reason}\u0000${blocker.serviceDate ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }),
+  );
 }

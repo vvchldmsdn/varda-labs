@@ -137,6 +137,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
     source: fountScope.source,
     fxRows: fountScope.source.fxRows,
     requestedAnchorDate,
+    fountScopeAdjustmentStatus: fountScope.scope.status,
   });
 
   return Object.freeze({

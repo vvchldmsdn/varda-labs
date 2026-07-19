@@ -1,5 +1,6 @@
 import type {
   InvestmentLabAnchorInstrument,
+  InvestmentLabAnchorPositionRow,
   InvestmentLabAnchorSelection,
 } from "./investment-lab-anchor-basket-anchor.ts";
 import type { InvestmentLabSourceSnapshotRow } from "./investment-lab-counterfactual-read-model.ts";
@@ -21,6 +22,13 @@ import {
   riskCalendarDayDistance,
 } from "./portfolio-risk-calendar.ts";
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
+import {
+  resolveManualValuationPath,
+  type ManualValuationPathBlockerReason,
+  type ManualValuationPathResolution,
+  type ManualValuationSnapshotRow,
+} from "./manual-valuation-history.ts";
+import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
 
 const MAX_EXECUTION_DELAY_DAYS = 7;
 
@@ -32,6 +40,9 @@ export const INVESTMENT_LAB_ANCHOR_BASKET_EVIDENCE_POLICY = Object.freeze({
   executionFx: "exact_usdkrw_on_execution_price_date",
   maximumExecutionDelayDays: MAX_EXECUTION_DELAY_DAYS,
   distributionTreatment: "excluded_not_reinvested",
+  manualValuation:
+    "exact_current_writer_stored_manual_observation_or_carry_only",
+  manualExecutionPrice: "stored_manual_value_available_on_execution_service_date",
   partialEvidence: "forbidden",
 } as const);
 
@@ -73,13 +84,17 @@ export type InvestmentLabAnchorEvidenceBlocker = Readonly<{
     | "missing_execution_fx"
     | "duplicate_execution_fx"
     | "invalid_execution_fx"
-    | "missing_execution_fx_provenance";
+    | "missing_execution_fx_provenance"
+    | ManualValuationPathBlockerReason
+    | "manual_execution_after_window"
+    | "missing_manual_execution_valuation";
   instrumentKey: string | null;
   evidenceDate: string | null;
 }>;
 
 export type InvestmentLabAnchorComponentEvidence = Readonly<{
   instrument: InvestmentLabAnchorInstrument;
+  valuationBasis: "listed_close" | "stored_manual_valuation";
   valuations: readonly InvestmentLabUnitValuation[];
   executions: readonly InvestmentLabUnitExecution[];
 }>;
@@ -95,6 +110,9 @@ export type InvestmentLabAnchorEvidenceResolution = Readonly<{
     relevantFlowCount: number;
     valuationEvidenceRows: number;
     executionEvidenceRows: number;
+    manualSourceRows: number;
+    manualObservationRows: number;
+    manualCarryRows: number;
   }>;
   blockers: readonly InvestmentLabAnchorEvidenceBlocker[];
 }>;
@@ -104,6 +122,7 @@ export function resolveInvestmentLabAnchorBasketEvidence(input: Readonly<{
   anchor: InvestmentLabAnchorSelection;
   serviceDates: readonly string[];
   priceRows: readonly InvestmentLabAnchorPriceRow[];
+  manualValuationRows?: readonly InvestmentLabAnchorPositionRow[];
   snapshotRows: readonly InvestmentLabSourceSnapshotRow[];
   fxRows: readonly InvestmentLabAnchorFxRow[];
   boundaryFlows: readonly InvestmentLabBoundaryFlow[];
@@ -131,10 +150,62 @@ export function resolveInvestmentLabAnchorBasketEvidence(input: Readonly<{
   let valuationEvidenceRows = 0;
   let executionEvidenceRows = 0;
   let relevantFlowCount = 0;
+  let manualSourceRows = 0;
+  let manualObservationRows = 0;
+  let manualCarryRows = 0;
   const anchorDate = input.anchor.selectedAnchorDate;
   const endServiceDate = input.serviceDates.at(-1)!;
 
   for (const instrument of input.anchor.instruments) {
+    if (instrument.valuationModel === "stored_manual") {
+      const manual = resolveManualValuationPath({
+        target: DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold,
+        snapshotRows: (input.manualValuationRows ?? []).map(
+          toManualValuationSnapshotRow,
+        ),
+        serviceDates: input.serviceDates,
+      });
+      manualSourceRows += manual.coverage.sourceRowCount;
+      manualObservationRows += manual.coverage.manualObservationRowCount;
+      manualCarryRows += manual.coverage.carriedValuationRowCount;
+      if (manual.status !== "ready") {
+        manual.blockers.forEach((row) => {
+          blockers.push(
+            blocker(row.reason, instrument.key, row.serviceDate),
+          );
+        });
+        continue;
+      }
+
+      const valuations = manual.rows.map((row) =>
+        Object.freeze({
+          serviceDate: row.serviceDate,
+          priceDate: row.referenceDate,
+          unitPriceKrw: row.unitPriceKrw,
+        }),
+      );
+      valuationEvidenceRows += valuations.length;
+      const executions = resolveManualExecutions({
+        anchorDate,
+        endServiceDate,
+        flows,
+        manualRows: manual.rows,
+        instrumentKey: instrument.key,
+        blockers,
+      });
+      relevantFlowCount += executions.relevantFlowCount;
+      executionEvidenceRows += executions.rows.length;
+      components.push(
+        Object.freeze({
+          instrument,
+          valuationBasis: "stored_manual_valuation" as const,
+          valuations: Object.freeze(valuations),
+          executions: Object.freeze(executions.rows),
+        }),
+      );
+      continue;
+    }
+
     const valuations: InvestmentLabUnitValuation[] = [];
     for (const serviceDate of input.serviceDates) {
       const priceDate = closeCalendarReferenceDateForAsset(
@@ -261,6 +332,7 @@ export function resolveInvestmentLabAnchorBasketEvidence(input: Readonly<{
     components.push(
       Object.freeze({
         instrument,
+        valuationBasis: "listed_close" as const,
         valuations: Object.freeze(valuations),
         executions: Object.freeze(executions),
       }),
@@ -274,6 +346,9 @@ export function resolveInvestmentLabAnchorBasketEvidence(input: Readonly<{
     relevantFlowCount,
     valuationEvidenceRows,
     executionEvidenceRows,
+    manualSourceRows,
+    manualObservationRows,
+    manualCarryRows,
   });
   if (blockers.length > 0) {
     return Object.freeze({
@@ -310,6 +385,81 @@ function normalizeFlows(
     }
     return Object.freeze({ ...row, sourceIndex });
   });
+}
+
+function toManualValuationSnapshotRow(
+  row: InvestmentLabAnchorPositionRow,
+): ManualValuationSnapshotRow {
+  return Object.freeze({
+    snapshotDate: row.snapshotDate,
+    assetId: row.assetId ?? null,
+    legacyAssetId: row.legacyAssetId ?? null,
+    assetName: row.assetName ?? "",
+    account: row.account,
+    market: row.market,
+    currency: row.currency,
+    assetType: row.assetType,
+    source: row.source,
+    priceSource: row.priceSource ?? null,
+    priceBasis: row.priceBasis ?? null,
+    currentPrice: row.currentPrice ?? null,
+    priceDate: row.priceDate ?? null,
+    referenceDate: row.referenceDate ?? null,
+    capturedAt: row.capturedAt ?? null,
+  });
+}
+
+function resolveManualExecutions(input: Readonly<{
+  anchorDate: string;
+  endServiceDate: string;
+  flows: ReturnType<typeof normalizeFlows>;
+  manualRows: ManualValuationPathResolution["rows"];
+  instrumentKey: string;
+  blockers: InvestmentLabAnchorEvidenceBlocker[];
+}>) {
+  const rows: InvestmentLabUnitExecution[] = [];
+  let relevantFlowCount = 0;
+  for (const flow of input.flows) {
+    if (flow.eventDate <= input.anchorDate) continue;
+    relevantFlowCount += 1;
+    const expectedServiceDate = mapRiskEvidenceDateToServiceDate(flow.eventDate);
+    if (expectedServiceDate > input.endServiceDate) {
+      input.blockers.push(
+        blocker(
+          "manual_execution_after_window",
+          input.instrumentKey,
+          expectedServiceDate,
+        ),
+      );
+      continue;
+    }
+    const valuation = input.manualRows.find(
+      (row) => row.serviceDate >= expectedServiceDate,
+    );
+    if (!valuation) {
+      input.blockers.push(
+        blocker(
+          "missing_manual_execution_valuation",
+          input.instrumentKey,
+          expectedServiceDate,
+        ),
+      );
+      continue;
+    }
+    rows.push(
+      Object.freeze({
+        ...flow,
+        executionPriceDate: valuation.referenceDate,
+        executionServiceDate: valuation.serviceDate,
+        unitPriceKrw: valuation.unitPriceKrw,
+        pendingCalendarDays: riskCalendarDayDistance(
+          flow.eventDate,
+          valuation.serviceDate,
+        ),
+      }),
+    );
+  }
+  return Object.freeze({ rows: Object.freeze(rows), relevantFlowCount });
 }
 
 function resolvePrice(
@@ -512,7 +662,7 @@ function dedupeBlockers(rows: readonly InvestmentLabAnchorEvidenceBlocker[]) {
 function unavailable(
   input: Pick<
     Parameters<typeof resolveInvestmentLabAnchorBasketEvidence>[0],
-    "serviceDates" | "anchor" | "priceRows"
+    "serviceDates" | "anchor" | "priceRows" | "manualValuationRows"
   >,
   blockers: readonly InvestmentLabAnchorEvidenceBlocker[],
 ): InvestmentLabAnchorEvidenceResolution {
@@ -527,6 +677,9 @@ function unavailable(
       relevantFlowCount: 0,
       valuationEvidenceRows: 0,
       executionEvidenceRows: 0,
+      manualSourceRows: input.manualValuationRows?.length ?? 0,
+      manualObservationRows: 0,
+      manualCarryRows: 0,
     }),
     blockers: dedupeBlockers(blockers),
   });

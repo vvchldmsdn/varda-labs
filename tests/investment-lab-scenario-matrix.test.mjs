@@ -37,6 +37,31 @@ describe("investment lab scenario comparison matrix", () => {
     );
     assert.equal(rowsById.zero_return.returnEstimate.value, 0);
     assert.equal(rowsById.anchor_basket.flowCount, 2);
+    assert.equal(
+      rowsById.anchor_basket.priceBasis,
+      "anchor_instrument_raw_close",
+    );
+  });
+
+  it("labels a manual-valued anchor basket without claiming raw closes", () => {
+    const anchor = readyAnchor();
+    anchor.anchor.instruments = [
+      { valuationModel: "listed_close" },
+      { valuationModel: "stored_manual" },
+    ];
+
+    const matrix = buildInvestmentLabScenarioMatrix({
+      model: readyModel(),
+      anchorBasketScenario: anchor,
+    });
+    const row = matrix.rows.find(
+      (candidate) => candidate.id === "anchor_basket",
+    );
+
+    assert.equal(
+      row?.priceBasis,
+      "anchor_instrument_close_and_stored_manual",
+    );
   });
 
   it("preserves an unavailable anchor without substituting a partial basket", () => {
@@ -244,7 +269,7 @@ function readyAnchor() {
       method: { version: "modified_dietz_daily_weighted_eod_v1" },
       scenarioReturn: 0.12,
     },
-    anchor: { blockers: [] },
+    anchor: { blockers: [], instruments: [] },
     evidenceBlockers: [],
     blockers: [],
     coverage: {
@@ -254,6 +279,9 @@ function readyAnchor() {
       splitExecutionDateRows: 1,
       delayedExecutionLegs: 1,
       pendingComparisonRows: 1,
+      manualValuationComponentCount: 0,
+      manualObservationRows: 0,
+      manualCarryRows: 0,
     },
   };
 }

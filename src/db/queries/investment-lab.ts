@@ -291,6 +291,8 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
     const rows = await db
       .select({
         snapshotDate: dailyPositionSnapshots.snapshotDate,
+        assetId: dailyPositionSnapshots.assetId,
+        legacyAssetId: dailyPositionSnapshots.legacyAssetId,
         account: dailyPositionSnapshots.account,
         source: dailyPositionSnapshots.source,
         ticker: dailyPositionSnapshots.ticker,
@@ -300,6 +302,12 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         assetType: dailyPositionSnapshots.assetType,
         quantity: dailyPositionSnapshots.quantity,
         marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+        priceSource: dailyPositionSnapshots.priceSource,
+        priceBasis: dailyPositionSnapshots.priceBasis,
+        currentPrice: dailyPositionSnapshots.currentPrice,
+        priceDate: dailyPositionSnapshots.priceDate,
+        referenceDate: dailyPositionSnapshots.referenceDate,
+        capturedAt: dailyPositionSnapshots.capturedAt,
         snapshotLegacyAssetId: dailyPositionSnapshots.legacyAssetId,
       })
       .from(dailyPositionSnapshots)
@@ -328,6 +336,8 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       })),
     ).map((row) => ({
       snapshotDate: row.snapshotDate,
+      assetId: row.assetId,
+      legacyAssetId: row.legacyAssetId,
       account: row.account,
       source: row.source,
       ticker: row.ticker,
@@ -337,6 +347,12 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       assetType: row.assetType,
       quantity: row.quantity,
       marketValueKrw: row.marketValueKrw,
+      priceSource: row.priceSource,
+      priceBasis: row.priceBasis,
+      currentPrice: row.currentPrice,
+      priceDate: row.priceDate,
+      referenceDate: row.referenceDate,
+      capturedAt: row.capturedAt,
       importedTickerEvidence: row.importedTickerEvidence,
     }));
   },
@@ -346,7 +362,11 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
     startServiceDate,
     endServiceDate,
   }) {
-    const tickers = [...new Set(instruments.map((row) => row.ticker))];
+    const tickers = [
+      ...new Set(
+        instruments.flatMap((row) => (row.ticker ? [row.ticker] : [])),
+      ),
+    ];
     if (tickers.length === 0) return [];
     return db
       .select({

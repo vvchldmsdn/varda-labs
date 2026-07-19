@@ -22,6 +22,8 @@ export const INVESTMENT_LAB_ANCHOR_BASKET_POLICY = Object.freeze({
     "same_legacy_identity_and_snapshot_metadata_consensus",
   currentAssetFallback: "forbidden",
   nameInference: "forbidden",
+  manualValuation:
+    "exact_current_writer_stored_manual_rows_without_historical_backcast",
   anchorAllocation: "equal_weight_once_at_anchor",
   subsequentFlowAllocation: "equal_split_across_anchor_instruments",
   rebalancing: "none",
@@ -32,6 +34,8 @@ export const INVESTMENT_LAB_ANCHOR_BASKET_POLICY = Object.freeze({
 
 export type InvestmentLabAnchorPositionRow = Readonly<{
   snapshotDate: string;
+  assetId?: string | null;
+  legacyAssetId?: string | null;
   account: string;
   source: string | null;
   ticker: string | null;
@@ -41,12 +45,20 @@ export type InvestmentLabAnchorPositionRow = Readonly<{
   assetType: string | null;
   quantity: string | number | null;
   marketValueKrw: string | number | null;
+  priceSource?: string | null;
+  priceBasis?: string | null;
+  currentPrice?: string | number | null;
+  priceDate?: string | null;
+  referenceDate?: string | null;
+  capturedAt?: Date | string | null;
   importedTickerEvidence?: InvestmentLabImportedTickerEvidence | null;
 }>;
 
 export type InvestmentLabAnchorInstrument = Readonly<{
   key: string;
-  ticker: string;
+  valuationModel: "listed_close" | "stored_manual";
+  ticker: string | null;
+  productKey: string | null;
   label: string;
   market: "korea" | "us";
   currency: "KRW" | "USD";
@@ -156,7 +168,9 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   const grouped = new Map<
     string,
     {
-      ticker: string;
+      valuationModel: "listed_close" | "stored_manual";
+      ticker: string | null;
+      productKey: string | null;
       market: "korea" | "us";
       currency: "KRW" | "USD";
       labels: Set<string>;
@@ -168,6 +182,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   const specialHoldingEvidence: InvestmentLabAnchorSpecialHoldingEvidence[] = [];
   let recognizedPositionRows = 0;
   let separateModelPositionRows = 0;
+  let admittedSeparateModelPositionRows = 0;
   let excludedPositionRows = 0;
 
   for (const row of anchorRows) {
@@ -195,6 +210,59 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
         blockers.add("invalid_anchor_position_evidence");
       }
       blockers.add("excluded_holding_scope_transform_required");
+      continue;
+    }
+    const manualProductKey =
+      identity.specialHoldingEvidence?.historicalAuthorityOutcome ===
+        "manual_valuation_history_required" &&
+      identity.specialHoldingEvidence.identityStatus === "resolved"
+        ? identity.specialHoldingEvidence.resolvedProductKey
+        : null;
+    if (manualProductKey) {
+      separateModelPositionRows += 1;
+      if (
+        !axis ||
+        !account ||
+        !selectedAccounts.includes(
+          account as (typeof selectedAccounts)[number],
+        ) ||
+        !source ||
+        !label ||
+        quantity === null ||
+        marketValueKrw === null
+      ) {
+        blockers.add("invalid_anchor_position_evidence");
+        continue;
+      }
+      const key = manualInstrumentKey(manualProductKey);
+      const existing = grouped.get(key) ?? {
+        valuationModel: "stored_manual" as const,
+        ticker: null,
+        productKey: manualProductKey,
+        market: axis.market,
+        currency: axis.currency,
+        labels: new Set<string>(),
+        accounts: new Set<string>(),
+        sourceRows: 0,
+        storedMarketValueKrw: 0,
+      };
+      if (
+        existing.valuationModel !== "stored_manual" ||
+        existing.productKey !== manualProductKey
+      ) {
+        blockers.add("ambiguous_anchor_identity_metadata");
+        continue;
+      }
+      if (existing.accounts.has(account)) {
+        blockers.add("duplicate_anchor_identity");
+      }
+      existing.labels.add(label);
+      existing.accounts.add(account);
+      existing.sourceRows += 1;
+      existing.storedMarketValueKrw += marketValueKrw;
+      grouped.set(key, existing);
+      recognizedPositionRows += 1;
+      admittedSeparateModelPositionRows += 1;
       continue;
     }
     if (
@@ -239,7 +307,9 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
 
     const key = instrumentKey(axis.market, axis.currency, ticker);
     const existing = grouped.get(key) ?? {
+      valuationModel: "listed_close" as const,
       ticker,
+      productKey: null,
       market: axis.market,
       currency: axis.currency,
       labels: new Set<string>(),
@@ -265,7 +335,9 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
       }
       return Object.freeze({
         key,
+        valuationModel: row.valuationModel,
         ticker: row.ticker,
+        productKey: row.productKey,
         label: [...row.labels].sort()[0] ?? row.ticker,
         market: row.market,
         currency: row.currency,
@@ -286,7 +358,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   const unresolvedPositionRows =
     anchorRows.length -
     recognizedPositionRows -
-    separateModelPositionRows -
+    (separateModelPositionRows - admittedSeparateModelPositionRows) -
     excludedPositionRows;
   return Object.freeze({
     status: blockers.size === 0 ? "ready" : "unavailable",
@@ -362,6 +434,10 @@ function instrumentKey(
   ticker: string,
 ) {
   return `${market}:${currency}:${ticker}`;
+}
+
+function manualInstrumentKey(productKey: string) {
+  return `manual:${productKey}`;
 }
 
 function supportedAxis(

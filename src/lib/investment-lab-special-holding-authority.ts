@@ -106,13 +106,18 @@ export type InvestmentLabAnchorSpecialHoldingEvidence = Readonly<{
     | "explicit_snapshot_asset_type"
     | "none";
   historicalAuthorityOutcome: InvestmentLabSpecialHoldingAuthorityOutcome;
-  historicalCoverageStatus: "not_evaluated" | "blocked" | "not_required";
+  historicalCoverageStatus:
+    | "not_evaluated"
+    | "blocked"
+    | "covered"
+    | "not_required";
   evidenceRowCount: number;
   reason:
     | "stored_snapshot_ticker_recovered"
     | "stored_snapshot_ticker_conflict"
     | "stored_snapshot_metadata_mismatch"
     | "manual_valuation_history_required"
+    | "stored_manual_valuation_history_covered"
     | "instrument_keyed_official_close_required"
     | "product_owner_excluded_from_decision_support"
     | "explicit_product_classification_required"

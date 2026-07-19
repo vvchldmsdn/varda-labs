@@ -24,7 +24,8 @@ export type InvestmentLabScenarioPriceBasis =
   | "voo_raw_close"
   | "kodex_adjusted_and_voo_raw_close"
   | "zero_return_no_price"
-  | "anchor_instrument_raw_close";
+  | "anchor_instrument_raw_close"
+  | "anchor_instrument_close_and_stored_manual";
 
 export type InvestmentLabScenarioFxBasis =
   | "stored_krw_market_value"
@@ -242,7 +243,7 @@ function buildRows(
         anchor.status === "ready"
           ? anchor.coverage.pendingComparisonRows
           : null,
-      priceBasis: "anchor_instrument_raw_close",
+      priceBasis: anchorPriceBasis(anchor),
       fxBasis: "stored_usdkrw_for_usd_legs",
       sourceReady: anchor.status === "ready",
       sourceReasons: anchorReasons(anchor),
@@ -362,7 +363,7 @@ function unavailableRows(
     unavailableRow(
       {
         id: "anchor_basket",
-        priceBasis: "anchor_instrument_raw_close",
+        priceBasis: anchorPriceBasis(anchor),
         fxBasis: "stored_usdkrw_for_usd_legs",
       },
       [...reasons, ...anchorReasons(anchor)],
@@ -387,6 +388,16 @@ function resolvePeriod(model: InvestmentLabCounterfactualReadModel) {
     endServiceDate,
     comparisonDateCount,
   });
+}
+
+function anchorPriceBasis(
+  anchor: InvestmentLabAnchorBasketScenario,
+): InvestmentLabScenarioPriceBasis {
+  return anchor.anchor.instruments.some(
+    (instrument) => instrument.valuationModel === "stored_manual",
+  )
+    ? "anchor_instrument_close_and_stored_manual"
+    : "anchor_instrument_raw_close";
 }
 
 function matchesPeriod(

@@ -31,6 +31,13 @@ export function InvestmentLabAnchorBasket({
         anchor.coverage.economicInstrumentCount
       }
       data-anchor-basket-excluded-rows={anchor.coverage.excludedPositionRows}
+      data-anchor-basket-manual-components={
+        model.coverage.manualValuationComponentCount
+      }
+      data-anchor-basket-manual-observations={
+        model.coverage.manualObservationRows
+      }
+      data-anchor-basket-manual-carries={model.coverage.manualCarryRows}
       data-anchor-basket-policy={model.policy.version}
       data-anchor-basket-selected-date={anchor.selectedAnchorDate ?? ""}
       data-anchor-basket-source-rows={anchor.coverage.sourcePositionRows}
@@ -196,9 +203,7 @@ function SpecialHoldingEvidence({
                   </span>
                 </td>
                 <td className="px-3 py-3 font-semibold text-[#34443d]">
-                  {specialHoldingOutcomeLabel(
-                    row.historicalAuthorityOutcome,
-                  )}
+                  {specialHoldingOutcomeLabel(row)}
                 </td>
                 <td className="px-4 py-3 text-[#5f685d]">
                   {specialHoldingReasonLabel(row.reason)}
@@ -263,6 +268,12 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
         · 실제 흐름 {model.coverage.sourceFlowCount}건 · 종목별 체결 근거 {" "}
         {model.coverage.scenarioFlowLegCount}건
       </p>
+      {model.coverage.manualValuationComponentCount > 0 ? (
+        <p className="text-xs leading-5 text-[#687064]">
+          금현물은 저장된 수동 평가 {model.coverage.manualObservationRows}건과
+          저장가 유지 {model.coverage.manualCarryRows}건만 사용했습니다.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -403,6 +414,7 @@ function anchorBlockerLabel(reason: InvestmentLabAnchorBlocker) {
 }
 
 function evidenceBlockerLabel(reason: string) {
+  if (reason.includes("manual")) return "금현물 수동 평가 근거 누락 또는 불일치";
   if (reason.includes("price")) return "필요 종가 근거 누락 또는 중복";
   if (reason.includes("fx")) return "필요 환율 근거 누락 또는 중복";
   if (reason.includes("execution")) return "매수·매도 체결 근거 불완전";
@@ -422,6 +434,8 @@ function specialHoldingReasonLabel(
     stored_snapshot_metadata_mismatch: "이관 포지션 메타데이터 불일치",
     manual_valuation_history_required:
       "금현물의 명시적 수동 평가 이력이 필요",
+    stored_manual_valuation_history_covered:
+      "날짜별 저장 수동 평가와 저장가 유지 근거가 확인됨",
     instrument_keyed_official_close_required:
       "실물 commodity용 instrument-keyed 공식 종가 모델 필요",
     product_owner_excluded_from_decision_support:
@@ -434,13 +448,16 @@ function specialHoldingReasonLabel(
 }
 
 function specialHoldingOutcomeLabel(
-  outcome: InvestmentLabAnchorSpecialHoldingEvidence["historicalAuthorityOutcome"],
+  row: InvestmentLabAnchorSpecialHoldingEvidence,
 ) {
+  const outcome = row.historicalAuthorityOutcome;
   if (outcome === "eligible_historical_instrument") {
     return "과거 종목 후보";
   }
   if (outcome === "manual_valuation_history_required") {
-    return "수동 평가 이력 필요";
+    return row.historicalCoverageStatus === "covered"
+      ? "저장 수동 평가 경로 사용"
+      : "수동 평가 이력 필요";
   }
   if (outcome === "separate_valuation_model_required") {
     return "별도 평가 모델 필요";

@@ -205,6 +205,18 @@ async function main() {
     route.body,
     "data-anchor-basket-comparison-dates",
   );
+  const anchorBasketManualComponents = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-manual-components",
+  );
+  const anchorBasketManualObservations = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-manual-observations",
+  );
+  const anchorBasketManualCarries = readIntegerAttribute(
+    route.body,
+    "data-anchor-basket-manual-carries",
+  );
   assert.ok(
     anchorBasketStatus === "ready" || anchorBasketStatus === "unavailable",
   );
@@ -213,8 +225,18 @@ async function main() {
   if (anchorBasketStatus === "ready") {
     assert.equal(anchorBasketUnresolvedRows, 0);
     assert.ok(anchorBasketComparisonDates >= 2);
+    assert.ok(
+      anchorBasketManualComponents <= anchorBasketEconomicInstruments,
+    );
+    assert.equal(
+      anchorBasketManualObservations + anchorBasketManualCarries,
+      anchorBasketComparisonDates * anchorBasketManualComponents,
+    );
   } else {
     assert.equal(anchorBasketComparisonDates, 0);
+    assert.equal(anchorBasketManualComponents, 0);
+    assert.equal(anchorBasketManualObservations, 0);
+    assert.equal(anchorBasketManualCarries, 0);
   }
   let anchorSpecialHoldingRows = 0;
   let anchorSpecialHoldingResolved = 0;
@@ -978,6 +1000,9 @@ async function main() {
         anchorBasketEconomicInstruments,
         anchorBasketUnresolvedRows,
         anchorBasketComparisonDates,
+        anchorBasketManualComponents,
+        anchorBasketManualObservations,
+        anchorBasketManualCarries,
         anchorSpecialHoldingRows,
         anchorSpecialHoldingResolved,
         anchorSpecialHoldingUnavailable,

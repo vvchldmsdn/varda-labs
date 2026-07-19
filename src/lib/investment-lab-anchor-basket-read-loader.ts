@@ -21,6 +21,7 @@ import { calculateInvestmentLabModifiedDietz } from "./investment-lab-modified-d
 import { validateInvestmentLabReturnEvidence } from "./investment-lab-return-evidence.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
+import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
 
 export interface InvestmentLabAnchorBasketReadRepository {
   loadAnchorPositionRows(
@@ -40,17 +41,24 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
   source: InvestmentLabCounterfactualReadInput;
   fxRows: readonly InvestmentLabAnchorFxRow[];
   requestedAnchorDate?: string | null;
+  fountScopeAdjustmentStatus?: "not_applicable" | "applied" | "blocked";
 }>): Promise<InvestmentLabAnchorBasketScenario> {
   const serviceDates = input.model.rows.map((row) => row.serviceDate);
   const positionRows =
     serviceDates.length >= 2
       ? await input.repository.loadAnchorPositionRows(serviceDates)
       : [];
+  const scopedPositionRows = applyAnchorPositionScope({
+    account: input.account ?? "all",
+    positionRows,
+    fountScopeAdjustmentStatus:
+      input.fountScopeAdjustmentStatus ?? "not_applicable",
+  });
   const anchor = resolveInvestmentLabAnchorSelection({
     account: input.account,
     serviceDates,
     snapshotRows: input.source.snapshotRows,
-    positionRows,
+    positionRows: scopedPositionRows,
     requestedAnchorDate: input.requestedAnchorDate,
   });
   if (anchor.status !== "ready" || !anchor.selectedAnchorDate) {
@@ -97,6 +105,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     anchor,
     serviceDates: actualPath.map((row) => row.serviceDate),
     priceRows,
+    manualValuationRows: scopedPositionRows,
     snapshotRows: selectedSnapshotRows,
     fxRows: input.fxRows,
     boundaryFlows: flowResolution.flows,
@@ -113,6 +122,42 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
       eventRows: selectedEventRows,
     }),
   });
+}
+
+function applyAnchorPositionScope(input: Readonly<{
+  account: PortfolioAccountScope;
+  positionRows: readonly InvestmentLabAnchorPositionRow[];
+  fountScopeAdjustmentStatus: "not_applicable" | "applied" | "blocked";
+}>) {
+  if (
+    input.fountScopeAdjustmentStatus !== "applied" ||
+    (input.account !== "irp" && input.account !== "all")
+  ) {
+    return input.positionRows;
+  }
+  return Object.freeze(
+    input.positionRows.filter((row) => !matchesFountDecision(row)),
+  );
+}
+
+function matchesFountDecision(row: InvestmentLabAnchorPositionRow) {
+  const decision =
+    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount;
+  return (
+    normalizeText(row.assetName) === normalizeText(decision.assetName) &&
+    normalizeText(row.account) === decision.account &&
+    normalizeText(row.market) === decision.market &&
+    normalizeUpper(row.currency) === decision.currency &&
+    normalizeText(row.assetType) === decision.assetType
+  );
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizeUpper(value: unknown) {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
 }
 
 function resolveActualReturn(input: Readonly<{

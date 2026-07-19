@@ -75,6 +75,9 @@ export type InvestmentLabAnchorBasketScenario = Readonly<{
     splitExecutionDateRows: number;
     delayedExecutionLegs: number;
     pendingComparisonRows: number;
+    manualValuationComponentCount: number;
+    manualObservationRows: number;
+    manualCarryRows: number;
   }>;
   evidenceBlockers: readonly InvestmentLabAnchorEvidenceBlocker[];
   blockers: readonly InvestmentLabAnchorScenarioBlocker[];
@@ -96,6 +99,10 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
       input.evidence?.blockers ?? [],
     );
   }
+  const resolvedAnchor = markManualValuationCoverage(
+    input.anchor,
+    input.evidence,
+  );
 
   const componentPaths = input.evidence.components.map((component) => ({
     instrumentKey: component.instrument.key,
@@ -109,7 +116,7 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
     (component) => component.path.status !== "ready",
   );
   if (blockedComponent) {
-    return unavailable(input.anchor, [
+    return unavailable(resolvedAnchor, [
       blocker(
         "component_path_unavailable",
         blockedComponent.instrumentKey,
@@ -123,12 +130,12 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
     path: Extract<InvestmentLabUnitPathResult, { status: "ready" }>;
   }>[];
   if (!componentsMatchActualAxis(input.actualPath, readyPaths)) {
-    return unavailable(input.anchor, [blocker("component_axis_mismatch")]);
+    return unavailable(resolvedAnchor, [blocker("component_axis_mismatch")]);
   }
 
   const flowResolution = resolveEqualSplitFlows(readyPaths);
   if (!flowResolution) {
-    return unavailable(input.anchor, [blocker("component_flow_mismatch")]);
+    return unavailable(resolvedAnchor, [blocker("component_flow_mismatch")]);
   }
 
   const ratio = 1 / readyPaths.length;
@@ -155,7 +162,7 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
         row.scenarioMarketValueKrw < 0,
     )
   ) {
-    return unavailable(input.anchor, [blocker("invalid_scenario_value")]);
+    return unavailable(resolvedAnchor, [blocker("invalid_scenario_value")]);
   }
 
   const scenarioReturn = calculateInvestmentLabModifiedDietz({
@@ -182,7 +189,7 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
   return Object.freeze({
     status: "ready",
     policy: INVESTMENT_LAB_ANCHOR_BASKET_SCENARIO_POLICY,
-    anchor: input.anchor,
+    anchor: resolvedAnchor,
     summary: Object.freeze({
       startServiceDate: rows[0].serviceDate,
       endServiceDate: latest.serviceDate,
@@ -206,6 +213,12 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
       ),
       pendingComparisonRows: rows.filter((row) => row.hasPendingExecution)
         .length,
+      manualValuationComponentCount: input.evidence.components.filter(
+        (component) =>
+          component.valuationBasis === "stored_manual_valuation",
+      ).length,
+      manualObservationRows: input.evidence.coverage.manualObservationRows,
+      manualCarryRows: input.evidence.coverage.manualCarryRows,
     }),
     evidenceBlockers: [] as const,
     blockers:
@@ -344,9 +357,39 @@ function unavailable(
       splitExecutionDateRows: 0,
       delayedExecutionLegs: 0,
       pendingComparisonRows: 0,
+      manualValuationComponentCount: 0,
+      manualObservationRows: 0,
+      manualCarryRows: 0,
     }),
     evidenceBlockers: Object.freeze([...evidenceBlockers]),
     blockers: Object.freeze([...blockers]),
+  });
+}
+
+function markManualValuationCoverage(
+  anchor: InvestmentLabAnchorSelection,
+  evidence: InvestmentLabAnchorEvidenceResolution,
+): InvestmentLabAnchorSelection {
+  if (
+    evidence.status !== "ready" ||
+    evidence.coverage.manualObservationRows + evidence.coverage.manualCarryRows ===
+      0
+  ) {
+    return anchor;
+  }
+  return Object.freeze({
+    ...anchor,
+    specialHoldingEvidence: Object.freeze(
+      anchor.specialHoldingEvidence.map((row) =>
+        row.historicalAuthorityOutcome === "manual_valuation_history_required"
+          ? Object.freeze({
+              ...row,
+              historicalCoverageStatus: "covered" as const,
+              reason: "stored_manual_valuation_history_covered" as const,
+            })
+          : row,
+      ),
+    ),
   });
 }
 
