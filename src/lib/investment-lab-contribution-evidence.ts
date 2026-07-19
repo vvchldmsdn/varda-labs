@@ -18,6 +18,7 @@ export function buildInvestmentLabContributionScenarioEvidence(input: {
   vooComparison: InvestmentLabVooComparison;
   vooValuations: readonly InvestmentLabVooValuationEvidence[];
 }): readonly InvestmentLabContributionScenarioEvidence[] {
+  const scenarios: InvestmentLabContributionScenarioEvidence[] = [];
   const kodex = createInvestmentLabContributionScenarioEvidence({
     scenarioId: "kodex200",
     priceBasis: "adjusted_close_krw",
@@ -28,9 +29,7 @@ export function buildInvestmentLabContributionScenarioEvidence(input: {
       baseScenarioValueKrw: row.investedMarketValueKrw,
     })),
   });
-  if (!kodex) return Object.freeze([]);
-
-  const scenarios = [kodex];
+  if (kodex) scenarios.push(kodex);
   const voo = buildVooScenario(input.vooComparison, input.vooValuations);
   if (voo) scenarios.push(voo);
 

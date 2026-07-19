@@ -1,4 +1,3 @@
-import type { InvestmentLabReturnEstimate } from "./investment-lab-return-estimate.ts";
 import {
   calculateInvestmentLabModifiedDietz,
   type InvestmentLabReturnFlow,
@@ -30,6 +29,11 @@ type BoundaryFlow = Readonly<{
   sequence: number;
   direction: "inflow" | "outflow";
   amountKrw: number;
+}>;
+
+type ActualReturnEvidence = Readonly<{
+  status: "ready" | "blocked" | "unavailable";
+  actualReturn: number | null;
 }>;
 
 export type InvestmentLabCashComparisonBlocker =
@@ -109,7 +113,7 @@ export type InvestmentLabCashComparison =
 export function buildInvestmentLabCashComparison(input: {
   actualPath: readonly ActualPathRow[];
   boundaryFlows: readonly BoundaryFlow[];
-  actualReturnEstimate: InvestmentLabReturnEstimate | null;
+  actualReturnEstimate: ActualReturnEvidence | null;
 }): InvestmentLabCashComparison {
   const actualPath = normalizeActualPath(input.actualPath);
   if (actualPath === null) {
@@ -206,7 +210,7 @@ export function buildInvestmentLabCashComparison(input: {
 function buildReturnComparison(input: {
   rows: readonly InvestmentLabCashComparisonRow[];
   appliedFlows: readonly InvestmentLabReturnFlow[];
-  actualReturnEstimate: InvestmentLabReturnEstimate | null;
+  actualReturnEstimate: ActualReturnEvidence | null;
 }): CashReturnComparison {
   const cashReturn = calculateInvestmentLabModifiedDietz({
     valuations: input.rows.map((row) => ({
@@ -231,7 +235,11 @@ function buildReturnComparison(input: {
       cashReturn.flowCount,
     );
   }
-  if (!input.actualReturnEstimate || input.actualReturnEstimate.status !== "ready") {
+  if (
+    !input.actualReturnEstimate ||
+    input.actualReturnEstimate.status !== "ready" ||
+    input.actualReturnEstimate.actualReturn === null
+  ) {
     return unavailableReturn(
       ["actual_return_unavailable"],
       cashReturn.totalReturn,

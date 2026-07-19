@@ -104,13 +104,13 @@ function buildRows(
   anchor: InvestmentLabAnchorBasketScenario,
   period: NonNullable<InvestmentLabScenarioMatrix["period"]>,
 ) {
-  const summary = model.summary!;
+  const observedSummary = model.observedPath.summary!;
   const actualReturn = readReturn(
-    model.returnEstimate?.status === "ready"
-      ? model.returnEstimate.actualReturn
+    model.observedPath.returnEstimate.status === "ready"
+      ? model.observedPath.returnEstimate.actualReturn
       : null,
-    model.returnEstimate?.status === "ready"
-      ? model.returnEstimate.method.version
+    model.observedPath.returnEstimate.status === "ready"
+      ? model.observedPath.returnEstimate.method.version
       : null,
   );
   const kodexReturn = readReturn(
@@ -125,14 +125,16 @@ function buildRows(
   return [
     readyRow({
       id: "actual",
-      endValueKrw: summary.actualEndValueKrw,
+      endValueKrw: observedSummary.endValueKrw,
       endDifferenceKrw: 0,
       returnEstimate: actualReturn,
       flowCount: model.coverage.eligibleFlowRows,
       pendingComparisonCount: null,
       priceBasis: "stored_position_market_value",
       fxBasis: "stored_krw_market_value",
-      reasonCodes: returnReasons(model.returnEstimate?.blockers),
+      reasonCodes: returnReasons(
+        model.observedPath.returnEstimate.blockers,
+      ),
     }),
     scenarioRow({
       id: "zero_return",
@@ -162,16 +164,24 @@ function buildRows(
               model.cashComparison?.returnComparison?.blockers,
             ),
     }),
-    readyRow({
+    scenarioRow({
       id: "kodex200",
-      endValueKrw: summary.scenarioEndValueKrw,
-      endDifferenceKrw: summary.endDifferenceKrw,
+      summary: model.summary,
+      period,
       returnEstimate: kodexReturn,
-      flowCount: model.coverage.appliedFlowRows,
-      pendingComparisonCount: model.coverage.pendingComparisonRows,
+      flowCount:
+        model.status === "ready" ? model.coverage.appliedFlowRows : null,
+      pendingComparisonCount:
+        model.status === "ready"
+          ? model.coverage.pendingComparisonRows
+          : null,
       priceBasis: "kodex200_adjusted_close",
       fxBasis: "krw_not_applicable",
-      reasonCodes: returnReasons(model.returnEstimate?.blockers),
+      sourceReady: model.status === "ready" && model.summary !== null,
+      sourceReasons:
+        model.status === "ready"
+          ? returnReasons(model.returnEstimate?.blockers)
+          : model.blockers,
     }),
     scenarioRow({
       id: "voo",
@@ -252,7 +262,7 @@ function buildRows(
 }
 
 function scenarioRow(input: Readonly<{
-  id: Exclude<InvestmentLabScenarioMatrixId, "actual" | "kodex200">;
+  id: Exclude<InvestmentLabScenarioMatrixId, "actual">;
   summary: Summary | null;
   period: NonNullable<InvestmentLabScenarioMatrix["period"]>;
   returnEstimate: InvestmentLabScenarioMatrixRow["returnEstimate"];
@@ -372,8 +382,9 @@ function unavailableRows(
 }
 
 function resolvePeriod(model: InvestmentLabCounterfactualReadModel) {
-  if (model.status !== "ready" || !model.summary) return null;
-  const { startServiceDate, endServiceDate, comparisonDateCount } = model.summary;
+  if (model.observedPath.status !== "ready") return null;
+  const { startServiceDate, endServiceDate, comparisonDateCount } =
+    model.observedPath.summary;
   if (
     !startServiceDate ||
     !endServiceDate ||

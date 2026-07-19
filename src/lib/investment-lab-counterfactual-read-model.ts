@@ -34,6 +34,10 @@ import {
   buildInvestmentLabCashComparison,
   type InvestmentLabCashComparison,
 } from "./investment-lab-cash-comparison.ts";
+import {
+  buildInvestmentLabObservedPath,
+  type InvestmentLabObservedPath,
+} from "./investment-lab-observed-path.ts";
 import type {
   InvestmentLabContributionScenarioEvidence,
 } from "./investment-lab-contribution-experiment.ts";
@@ -110,6 +114,7 @@ export type InvestmentLabCounterfactualDisplayRow = Readonly<{
 
 export type InvestmentLabCounterfactualReadModel = Readonly<{
   status: "ready" | "blocked";
+  observedPath: InvestmentLabObservedPath;
   scenario: Readonly<{
     account: PortfolioAccountScope;
     instrumentKey: "korea:KRW:069500";
@@ -160,25 +165,26 @@ export function buildInvestmentLabCounterfactualReadModel(
   }> = {},
 ): InvestmentLabCounterfactualReadModel {
   const account = options.account ?? "all";
-  const blockers = new Set<InvestmentLabCounterfactualReadBlocker>();
+  const baseBlockers = new Set<InvestmentLabCounterfactualReadBlocker>();
   const sourceAuthority = resolveInvestmentLabSourceSegmentAuthority(
     input.snapshotRows,
     account,
   );
   if (sourceAuthority.status !== "eligible") {
-    blockers.add("source_segment_authority_blocked");
+    baseBlockers.add("source_segment_authority_blocked");
   }
   if (options.fountScopeAdjustmentStatus === "blocked") {
-    blockers.add("fount_scope_adjustment_blocked");
+    baseBlockers.add("fount_scope_adjustment_blocked");
   }
-  const actual = buildActualPath(input.snapshotRows, account, blockers);
+  const actual = buildActualPath(input.snapshotRows, account, baseBlockers);
   const flowResolution = resolveInvestmentLabBoundaryFlows(
     input.eventRows,
     account,
   );
-  for (const blocker of flowResolution.blockers) blockers.add(blocker);
+  for (const blocker of flowResolution.blockers) baseBlockers.add(blocker);
   const events = flowResolution.flows;
-  const closes = buildScenarioCloses(input.closeRows, blockers);
+  const kodexBlockers = new Set<InvestmentLabCounterfactualReadBlocker>();
+  const closes = buildScenarioCloses(input.closeRows, kodexBlockers);
 
   const initialCoverage = coverage({
     actual,
@@ -186,12 +192,72 @@ export function buildInvestmentLabCounterfactualReadModel(
     eligibleFlowRows: events.length,
     closeRows: closes.length,
   });
-  if (blockers.size > 0) {
+  const observedPath = buildInvestmentLabObservedPath({
+    account,
+    actualRows: actual.rows,
+    boundaryFlows: events,
+    snapshotRows: input.snapshotRows,
+    eventRows: flowResolution.sourceRows,
+    blockers: [...baseBlockers],
+  });
+  if (observedPath.status !== "ready") {
     return blockedReadModel(
       initialCoverage,
-      blockers,
+      baseBlockers,
       sourceAuthority,
       account,
+      observedPath,
+    );
+  }
+
+  const vooEvidence = resolveInvestmentLabVooEvidence({
+    account,
+    serviceDates: actual.rows.map((row) => row.serviceDate),
+    priceRows: input.vooCloseRows,
+    snapshotRows: input.snapshotRows,
+    fxRows: input.fxRows,
+    boundaryFlows: events,
+  });
+  const vooReadiness = vooEvidence.readiness;
+  const vooComparison = buildInvestmentLabVooComparison({
+    account,
+    actualPath: actual.rows,
+    boundaryFlows: events,
+    evidence: vooEvidence,
+    snapshotRows: input.snapshotRows,
+    eventRows: flowResolution.sourceRows,
+  });
+  const cashComparison = buildInvestmentLabCashComparison({
+    actualPath: actual.rows,
+    boundaryFlows: events,
+    actualReturnEstimate: observedPath.returnEstimate,
+  });
+  const vooOnlyContributionScenarios =
+    buildInvestmentLabContributionScenarioEvidence({
+      kodexRows: [],
+      vooComparison,
+      vooValuations: vooEvidence.valuations,
+    });
+
+  if (kodexBlockers.size > 0) {
+    return blockedReadModel(
+      initialCoverage,
+      kodexBlockers,
+      sourceAuthority,
+      account,
+      observedPath,
+      {
+        vooReadiness,
+        vooComparison,
+        cashComparison,
+        fixedMixScenario: unavailableFixedMixScenario(
+          options.fixedMixSelection,
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
+        contributionExperimentScenarios: vooOnlyContributionScenarios,
+      },
     );
   }
 
@@ -202,12 +268,25 @@ export function buildInvestmentLabCounterfactualReadModel(
     windowEndPriceDate,
   });
   if (schedule.status !== "ready") {
-    blockers.add("flow_schedule_blocked");
+    kodexBlockers.add("flow_schedule_blocked");
     return blockedReadModel(
       initialCoverage,
-      blockers,
+      kodexBlockers,
       sourceAuthority,
       account,
+      observedPath,
+      {
+        vooReadiness,
+        vooComparison,
+        cashComparison,
+        fixedMixScenario: unavailableFixedMixScenario(
+          options.fixedMixSelection,
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
+        contributionExperimentScenarios: vooOnlyContributionScenarios,
+      },
     );
   }
 
@@ -217,28 +296,54 @@ export function buildInvestmentLabCounterfactualReadModel(
     scheduledFlows: schedule.scheduledFlows,
   });
   if (path.status !== "ready") {
-    blockers.add("path_calculation_blocked");
+    kodexBlockers.add("path_calculation_blocked");
     return blockedReadModel(
       {
         ...initialCoverage,
         delayedExecutionRows: schedule.pendingFlowCount,
       },
-      blockers,
+      kodexBlockers,
       sourceAuthority,
       account,
+      observedPath,
+      {
+        vooReadiness,
+        vooComparison,
+        cashComparison,
+        fixedMixScenario: unavailableFixedMixScenario(
+          options.fixedMixSelection,
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
+        contributionExperimentScenarios: vooOnlyContributionScenarios,
+      },
     );
   }
   if (path.pendingAtEnd.flowCount > 0) {
-    blockers.add("pending_flows_at_window_end");
+    kodexBlockers.add("pending_flows_at_window_end");
     return blockedReadModel(
       {
         ...initialCoverage,
         delayedExecutionRows: schedule.pendingFlowCount,
         pendingAtEndRows: path.pendingAtEnd.flowCount,
       },
-      blockers,
+      kodexBlockers,
       sourceAuthority,
       account,
+      observedPath,
+      {
+        vooReadiness,
+        vooComparison,
+        cashComparison,
+        fixedMixScenario: unavailableFixedMixScenario(
+          options.fixedMixSelection,
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
+        contributionExperimentScenarios: vooOnlyContributionScenarios,
+      },
     );
   }
 
@@ -268,28 +373,6 @@ export function buildInvestmentLabCounterfactualReadModel(
     snapshotRows: input.snapshotRows,
     eventRows: flowResolution.sourceRows,
   });
-  const vooEvidence = resolveInvestmentLabVooEvidence({
-    account,
-    serviceDates: actual.rows.map((row) => row.serviceDate),
-    priceRows: input.vooCloseRows,
-    snapshotRows: input.snapshotRows,
-    fxRows: input.fxRows,
-    boundaryFlows: events,
-  });
-  const vooReadiness = vooEvidence.readiness;
-  const vooComparison = buildInvestmentLabVooComparison({
-    account,
-    actualPath: actual.rows,
-    boundaryFlows: events,
-    evidence: vooEvidence,
-    snapshotRows: input.snapshotRows,
-    eventRows: flowResolution.sourceRows,
-  });
-  const cashComparison = buildInvestmentLabCashComparison({
-    actualPath: actual.rows,
-    boundaryFlows: events,
-    actualReturnEstimate: returnEstimate,
-  });
   const fixedMixScenario = options.fixedMixSelection
     ? buildInvestmentLabFixedMixScenario({
         selection: options.fixedMixSelection,
@@ -315,6 +398,7 @@ export function buildInvestmentLabCounterfactualReadModel(
 
   return Object.freeze({
     status: "ready",
+    observedPath,
     scenario: scenario(account),
     summary: Object.freeze({
       startServiceDate: rows[0].serviceDate,
@@ -618,21 +702,62 @@ function blockedReadModel(
   blockers: Set<InvestmentLabCounterfactualReadBlocker>,
   sourceAuthority: InvestmentLabSourceSegmentAuthority,
   account: PortfolioAccountScope,
+  observedPath: InvestmentLabObservedPath,
+  available: Readonly<{
+    vooReadiness?: InvestmentLabVooReadiness | null;
+    vooComparison?: InvestmentLabVooComparison | null;
+    cashComparison?: InvestmentLabCashComparison | null;
+    fixedMixScenario?: InvestmentLabFixedMixScenario | null;
+    contributionExperimentScenarios?: readonly InvestmentLabContributionScenarioEvidence[];
+  }> = {},
 ): InvestmentLabCounterfactualReadModel {
   return Object.freeze({
     status: "blocked",
+    observedPath,
     scenario: scenario(account),
     summary: null,
     returnEstimate: null,
-    vooReadiness: null,
-    vooComparison: null,
-    cashComparison: null,
-    fixedMixScenario: null,
-    contributionExperimentScenarios: Object.freeze([]),
+    vooReadiness: available.vooReadiness ?? null,
+    vooComparison: available.vooComparison ?? null,
+    cashComparison: available.cashComparison ?? null,
+    fixedMixScenario: available.fixedMixScenario ?? null,
+    contributionExperimentScenarios: Object.freeze([
+      ...(available.contributionExperimentScenarios ?? []),
+    ]),
     sourceAuthority,
     rows: Object.freeze([]),
     coverage: Object.freeze({ ...coverageValue }),
     blockers: Object.freeze([...blockers].sort()),
+  });
+}
+
+function unavailableFixedMixScenario(
+  selection: InvestmentLabFixedMixSelection | undefined,
+  actualPath: readonly Readonly<{
+    serviceDate: string;
+    totalMarketValueKrw: number;
+  }>[],
+  vooEvidence: ReturnType<typeof resolveInvestmentLabVooEvidence>,
+  vooComparison: InvestmentLabVooComparison,
+) {
+  if (!selection) return null;
+  return buildInvestmentLabFixedMixScenario({
+    selection,
+    actualPath,
+    kodexPath: Object.freeze({
+      status: "unavailable",
+      rows: [] as const,
+      appliedFlows: [] as const,
+    }),
+    vooPath: buildInvestmentLabVooPath({
+      actualPath,
+      evidence: vooEvidence,
+    }),
+    kodexReturnEvidence: null,
+    vooReturnEvidence:
+      vooComparison.status === "ready"
+        ? vooComparison.returnEstimate
+        : null,
   });
 }
 

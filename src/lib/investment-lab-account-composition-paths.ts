@@ -13,6 +13,10 @@ import {
   type InvestmentLabFixedMixScenario,
 } from "./investment-lab-fixed-mix.ts";
 import type { InvestmentLabVooComparison } from "./investment-lab-voo-comparison.ts";
+import {
+  unavailableInvestmentLabObservedPath,
+  type InvestmentLabObservedPath,
+} from "./investment-lab-observed-path.ts";
 import { NAMED_PORTFOLIO_ACCOUNTS } from "./portfolio-account-scope.ts";
 import {
   compensatedSum,
@@ -27,6 +31,71 @@ import {
   type InvestmentLabCompositionValue,
   type InvestmentLabNamedModels,
 } from "./investment-lab-account-composition-contract.ts";
+
+export function composeInvestmentLabObservedPath(
+  pooled: InvestmentLabCounterfactualReadModel,
+  named: InvestmentLabNamedModels,
+): InvestmentLabCompositionValue<InvestmentLabObservedPath> {
+  if (
+    pooled.observedPath.status !== "ready" ||
+    NAMED_PORTFOLIO_ACCOUNTS.some(
+      (account) => named[account].observedPath.status !== "ready",
+    )
+  ) {
+    return unavailableInvestmentLabCompositionValue([
+      "named_account_model_unavailable",
+    ]);
+  }
+  const composed = composeInvestmentLabAccountRows((account) =>
+    named[account].observedPath.rows.map((row) => ({
+      serviceDate: row.serviceDate,
+      actualMarketValueKrw: row.marketValueKrw,
+      scenarioMarketValueKrw: row.marketValueKrw,
+      differenceKrw: 0,
+      hasPendingExecution: false,
+    })),
+  );
+  if (composed.status !== "ready") {
+    return unavailableInvestmentLabCompositionValue(composed.blockers);
+  }
+  if (
+    composed.rows.length !== pooled.observedPath.rows.length ||
+    composed.rows.some(
+      (row, index) =>
+        row.serviceDate !== pooled.observedPath.rows[index].serviceDate ||
+        !compositionNumberMatches(
+          row.actualMarketValueKrw,
+          pooled.observedPath.rows[index].marketValueKrw,
+        ),
+    )
+  ) {
+    return unavailableInvestmentLabCompositionValue([
+      "aggregate_value_mismatch",
+    ]);
+  }
+
+  const rows = Object.freeze(
+    composed.rows.map((row) =>
+      Object.freeze({
+        serviceDate: row.serviceDate,
+        marketValueKrw: row.actualMarketValueKrw,
+      }),
+    ),
+  );
+  const latest = rows.at(-1)!;
+  return readyInvestmentLabCompositionValue(
+    Object.freeze({
+      ...pooled.observedPath,
+      summary: Object.freeze({
+        startServiceDate: rows[0].serviceDate,
+        endServiceDate: latest.serviceDate,
+        endValueKrw: latest.marketValueKrw,
+        comparisonDateCount: rows.length,
+      }),
+      rows,
+    }),
+  );
+}
 
 export function composeInvestmentLabMainModel(
   pooled: InvestmentLabCounterfactualReadModel,
@@ -309,13 +378,14 @@ export function composeInvestmentLabMainCoverage(
   pooled: InvestmentLabCounterfactualReadModel,
   named: InvestmentLabNamedModels,
   rows: readonly InvestmentLabCounterfactualDisplayRow[],
+  observedComparisonDates = rows.length,
 ): InvestmentLabCounterfactualReadModel["coverage"] {
   return Object.freeze({
     snapshotSourceRows: sumInvestmentLabNamedModels(
       named,
       (model) => model.coverage.snapshotSourceRows,
     ),
-    completeComparisonDates: rows.length,
+    completeComparisonDates: observedComparisonDates,
     incompleteSnapshotDates: sumInvestmentLabNamedModels(
       named,
       (model) => model.coverage.incompleteSnapshotDates,
@@ -364,6 +434,7 @@ export function blockInvestmentLabPooledModel(
   return Object.freeze({
     ...pooled,
     status: "blocked" as const,
+    observedPath: unavailableInvestmentLabObservedPath(blockers, 0),
     summary: null,
     returnEstimate: null,
     vooReadiness: null,
@@ -446,4 +517,17 @@ export function unavailableInvestmentLabFixedMix(
     }),
     blockers: [blocker] as const,
   });
+}
+
+function compositionNumberMatches(
+  left: number,
+  right: number,
+  tolerance = 1e-8,
+) {
+  return (
+    Number.isFinite(left) &&
+    Number.isFinite(right) &&
+    Math.abs(left - right) <=
+      tolerance * Math.max(1, Math.abs(left), Math.abs(right))
+  );
 }

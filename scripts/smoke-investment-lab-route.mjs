@@ -16,6 +16,8 @@ const EXPECTED_PERIOD_STATUS =
   (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "current_writer");
 const EXPECTED_READ_MODEL_STATUS =
   readArgument("--expect-read-model-status") ?? "ready";
+const EXPECTED_OBSERVED_PATH_STATUS =
+  readArgument("--expect-observed-path-status") ?? "ready";
 const EXPECTED_SOURCE_AUTHORITY_STATUS =
   readArgument("--expect-source-authority-status") ?? "eligible";
 const EXPECTED_SOURCE_AUTHORITY_DECISION =
@@ -90,6 +92,11 @@ async function main() {
     "data-read-model-status",
   );
   assert.equal(readModelStatus, EXPECTED_READ_MODEL_STATUS);
+  const observedPathStatus = readStringAttribute(
+    route.body,
+    "data-observed-path-status",
+  );
+  assert.equal(observedPathStatus, EXPECTED_OBSERVED_PATH_STATUS);
   const fountScopeAdjustment = readStringAttribute(
     route.body,
     "data-fount-scope-adjustment",
@@ -321,7 +328,7 @@ async function main() {
     }
   }
   const matrixExpected =
-    readModelStatus === "ready" &&
+    observedPathStatus === "ready" &&
     (periodStatus === "full" ||
       periodStatus === "current_writer" ||
       periodStatus === "selected");
@@ -329,7 +336,35 @@ async function main() {
   let scenarioMatrixRows = 0;
   let scenarioMatrixReadyRows = 0;
   let scenarioMatrixUnavailableRows = 0;
+  let scenarioChartStatus = "not_rendered";
+  let scenarioChartLines = 0;
+  let scenarioChartUnavailable = 0;
   if (matrixExpected) {
+    assert.match(
+      route.body,
+      /data-section="investment-lab-scenario-chart"/,
+    );
+    scenarioChartStatus = readStringAttribute(
+      route.body,
+      "data-scenario-chart-status",
+    );
+    scenarioChartLines = readIntegerAttribute(
+      route.body,
+      "data-scenario-chart-lines",
+    );
+    scenarioChartUnavailable = readIntegerAttribute(
+      route.body,
+      "data-scenario-chart-unavailable",
+    );
+    assert.ok(
+      scenarioChartStatus === "ready" || scenarioChartStatus === "partial",
+    );
+    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 6);
+    assert.equal(scenarioChartLines + scenarioChartUnavailable, 6);
+    assert.equal(
+      scenarioChartStatus,
+      scenarioChartUnavailable ? "partial" : "ready",
+    );
     assert.match(
       route.body,
       /data-section="investment-lab-scenario-matrix"/,
@@ -376,6 +411,10 @@ async function main() {
       assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
     }
   } else {
+    assert.doesNotMatch(
+      route.body,
+      /data-section="investment-lab-scenario-chart"/,
+    );
     assert.doesNotMatch(
       route.body,
       /data-section="investment-lab-scenario-matrix"/,
@@ -690,7 +729,7 @@ async function main() {
   const countsAfter = await readCounts();
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
   if (
-    readModelStatus === "blocked" ||
+    observedPathStatus === "blocked" ||
     periodStatus === "invalid" ||
     periodStatus === "unavailable"
   ) {
@@ -699,7 +738,10 @@ async function main() {
     if (periodStatus === "invalid" || periodStatus === "unavailable") {
       assert.match(route.body, /data-period-reason="[a-z_]+"/);
     }
-    assert.doesNotMatch(route.body, /평가액 경로 비교/);
+    assert.doesNotMatch(
+      route.body,
+      /data-section="investment-lab-scenario-chart"/,
+    );
     assert.doesNotMatch(
       route.body,
       /data-section="investment-lab-cash-comparison"/,
@@ -713,6 +755,7 @@ async function main() {
           accountCompositionStatus,
           periodStatus,
           readModelStatus,
+          observedPathStatus,
           sourceAuthorityStatus,
           sourceAuthorityDecision,
           sourceTransitionCount,
@@ -751,6 +794,9 @@ async function main() {
           scenarioMatrixRows,
           scenarioMatrixReadyRows,
           scenarioMatrixUnavailableRows,
+          scenarioChartStatus,
+          scenarioChartLines,
+          scenarioChartUnavailable,
           rollingStatus,
           rollingCandidateWindows,
           rollingCompleteWindows,
@@ -792,13 +838,8 @@ async function main() {
   }
 
   for (const marker of [
-    "전액 KODEX 200",
-    "평가액 경로 비교",
-    "KODEX 200 종가",
-    "종료 시 대기 거래",
-    "현금흐름 조정 추정수익률",
+    "시나리오 평가액 경로",
     "Modified Dietz",
-    "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
     "제로수익 동일흐름 기준선",
     "현재 현금 잔액이나 추가투입 분배 계산도 아닙니다",
     "전액 VOO 비교",
@@ -807,7 +848,23 @@ async function main() {
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
-  assert.match(route.body, /data-return-status="ready"/);
+  if (readModelStatus === "ready") {
+    for (const marker of [
+      "전액 KODEX 200",
+      "KODEX 200 종가",
+      "종료 시 대기 거래",
+      "현금흐름 조정 추정수익률",
+      "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
+    ]) {
+      assert.ok(
+        route.body.includes(marker),
+        `route is missing marker: ${marker}`,
+      );
+    }
+    assert.match(route.body, /data-return-status="ready"/);
+  } else {
+    assert.match(route.body, /data-return-status="unavailable"/);
+  }
   if (periodStatus === "selected") {
     assert.ok(route.body.includes("선택 구간"));
     assert.ok(route.body.includes("다시 계산했습니다"));
@@ -975,6 +1032,8 @@ async function main() {
         routePath,
         accountCompositionStatus,
         periodStatus,
+        readModelStatus,
+        observedPathStatus,
         fountScopeAdjustment,
         dataAvailabilityStatus,
         currentWriterDates,
@@ -1028,6 +1087,9 @@ async function main() {
         scenarioMatrixRows,
         scenarioMatrixReadyRows,
         scenarioMatrixUnavailableRows,
+        scenarioChartStatus,
+        scenarioChartLines,
+        scenarioChartUnavailable,
         fixedMixContributionStatus,
         fixedMixContributionKodexWeightBps,
         fixedMixContributionVooWeightBps,

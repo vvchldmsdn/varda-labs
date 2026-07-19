@@ -20,6 +20,7 @@ import {
   composeInvestmentLabFixedMix,
   composeInvestmentLabMainCoverage,
   composeInvestmentLabMainModel,
+  composeInvestmentLabObservedPath,
   composeInvestmentLabVoo,
   unavailableInvestmentLabCash,
   unavailableInvestmentLabFixedMix,
@@ -53,6 +54,10 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   composition: InvestmentLabAccountComposition;
 }> {
+  const observed = composeInvestmentLabObservedPath(
+    input.pooledModel,
+    input.namedModels,
+  );
   const main = composeInvestmentLabMainModel(
     input.pooledModel,
     input.namedModels,
@@ -71,7 +76,7 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
   });
 
   const scenarios = Object.freeze({
-    actual: resolution(main),
+    actual: resolution(observed),
     kodex200: resolution(main),
     voo: resolution(voo),
     zero_return: resolution(cash),
@@ -82,7 +87,7 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     (scenario) => scenario.status !== "not_requested",
   );
   const status =
-    main.status !== "ready"
+    observed.status !== "ready"
       ? "unavailable"
       : required.some((scenario) => scenario.status === "unavailable")
         ? "partial"
@@ -93,11 +98,11 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     scenarios,
   });
 
-  if (main.status !== "ready") {
+  if (observed.status !== "ready") {
     return Object.freeze({
       model: blockInvestmentLabPooledModel(
         input.pooledModel,
-        main.blockers,
+        observed.blockers,
       ),
       anchorBasketScenario:
         anchor.status === "ready"
@@ -110,12 +115,21 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     });
   }
 
+  const mainReady = main.status === "ready";
+  const mainRows = main.status === "ready" ? main.value : ([] as const);
+  const mainBlockers =
+    main.status === "ready" ? ([] as const) : main.blockers;
+
   return Object.freeze({
     model: Object.freeze({
       ...input.pooledModel,
-      status: "ready" as const,
-      summary: summarizeInvestmentLabCompositionRows(main.value),
-      rows: main.value,
+      status: mainReady ? ("ready" as const) : ("blocked" as const),
+      observedPath: observed.value,
+      summary: mainReady
+        ? summarizeInvestmentLabCompositionRows(mainRows)
+        : null,
+      returnEstimate: mainReady ? input.pooledModel.returnEstimate : null,
+      rows: mainRows,
       vooComparison:
         voo.status === "ready"
           ? voo.value
@@ -140,9 +154,19 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
       coverage: composeInvestmentLabMainCoverage(
         input.pooledModel,
         input.namedModels,
-        main.value,
+        mainRows,
+        observed.value.rows.length,
       ),
-      blockers: [] as const,
+      blockers: mainReady
+        ? ([] as const)
+        : (Object.freeze([
+            ...new Set([
+              ...input.pooledModel.blockers,
+              mainBlockers.includes("named_account_model_unavailable")
+                ? "account_composition_incomplete"
+                : "account_composition_mismatch",
+            ]),
+          ]) as InvestmentLabCounterfactualReadModel["blockers"]),
     }),
     anchorBasketScenario:
       anchor.status === "ready"

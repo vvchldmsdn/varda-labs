@@ -242,6 +242,13 @@ function listedPrice(priceDate, closePrice) {
 function readModel(actualPath) {
   return {
     status: "ready",
+    observedPath: {
+      status: "ready",
+      rows: actualPath.map((row) => ({
+        serviceDate: row.serviceDate,
+        marketValueKrw: row.totalMarketValueKrw,
+      })),
+    },
     scenario: {},
     summary: null,
     returnEstimate: null,

@@ -208,9 +208,10 @@ export async function loadInvestmentLabCounterfactualReadModel(
   let resolvedPeriod = period;
   if (period.status === "selected") {
     const complete =
-      model.status === "ready" &&
-      model.summary?.startServiceDate === period.selectedStartServiceDate &&
-      model.summary.endServiceDate === period.selectedEndServiceDate;
+      model.observedPath.status === "ready" &&
+      model.observedPath.summary.startServiceDate ===
+        period.selectedStartServiceDate &&
+      model.observedPath.summary.endServiceDate === period.selectedEndServiceDate;
     resolvedPeriod = complete
       ? period
       : markInvestmentLabPeriodUnavailable(period);
@@ -219,8 +220,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
     account,
     source: fountScope.source,
     availableServiceDates:
-      model.status === "ready"
-        ? model.rows.map((row) => row.serviceDate)
+      model.observedPath.status === "ready"
+        ? model.observedPath.rows.map((row) => row.serviceDate)
         : Object.freeze([]),
   });
 

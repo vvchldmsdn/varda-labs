@@ -43,7 +43,10 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
   requestedAnchorDate?: string | null;
   fountScopeAdjustmentStatus?: "not_applicable" | "applied" | "blocked";
 }>): Promise<InvestmentLabAnchorBasketScenario> {
-  const serviceDates = input.model.rows.map((row) => row.serviceDate);
+  const observedRows = input.model.observedPath.rows;
+  const serviceDates = observedRows.map(
+    (row) => row.serviceDate,
+  );
   const positionRows =
     serviceDates.length >= 2
       ? await input.repository.loadAnchorPositionRows(serviceDates)
@@ -70,11 +73,11 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     });
   }
 
-  const actualPath = input.model.rows
+  const actualPath = observedRows
     .filter((row) => row.serviceDate >= anchor.selectedAnchorDate!)
     .map((row) => ({
       serviceDate: row.serviceDate,
-      totalMarketValueKrw: row.actualMarketValueKrw,
+      totalMarketValueKrw: row.marketValueKrw,
     }));
   const selectedSnapshotRows = input.source.snapshotRows.filter(
     (row) => row.snapshotDate >= anchor.selectedAnchorDate!,

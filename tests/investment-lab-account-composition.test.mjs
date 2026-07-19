@@ -88,7 +88,7 @@ describe("investment lab named-account composition", () => {
     assert.equal(result.model.fixedMixScenario.status, "ready");
   });
 
-  it("blocks the all-account base path when pooled values diverge from named sums", () => {
+  it("isolates a pooled KODEX divergence from the observed and cash paths", () => {
     const fixture = buildFixture();
     fixture.pooledModel = {
       ...fixture.pooledModel,
@@ -101,14 +101,53 @@ describe("investment lab named-account composition", () => {
 
     const result = compose(fixture);
 
-    assert.equal(result.composition.status, "unavailable");
-    assert.equal(result.composition.scenarios.actual.status, "unavailable");
-    assert.deepEqual(result.composition.scenarios.actual.blockers, [
+    assert.equal(result.composition.status, "partial");
+    assert.equal(result.composition.scenarios.actual.status, "ready");
+    assert.equal(result.composition.scenarios.zero_return.status, "ready");
+    assert.equal(result.composition.scenarios.kodex200.status, "unavailable");
+    assert.deepEqual(result.composition.scenarios.kodex200.blockers, [
       "aggregate_value_mismatch",
     ]);
     assert.equal(result.model.status, "blocked");
     assert.ok(result.model.blockers.includes("account_composition_mismatch"));
+    assert.equal(result.model.observedPath.status, "ready");
+    assert.equal(result.model.cashComparison.status, "ready");
     assert.deepEqual(result.model.rows, []);
+  });
+
+  it("keeps all observed, cash, and VOO paths when one named KODEX path is unavailable", () => {
+    const fixture = buildFixture();
+    fixture.namedModels = {
+      ...fixture.namedModels,
+      isa: {
+        ...fixture.namedModels.isa,
+        status: "blocked",
+        summary: null,
+        returnEstimate: null,
+        rows: [],
+        fixedMixScenario: {
+          ...fixture.namedModels.isa.fixedMixScenario,
+          status: "unavailable",
+          summary: null,
+          returnEstimate: null,
+          rows: [],
+          blockers: ["component_path_unavailable"],
+        },
+        blockers: ["scenario_close_evidence_invalid"],
+      },
+    };
+
+    const result = compose(fixture);
+
+    assert.equal(result.composition.status, "partial");
+    assert.equal(result.composition.scenarios.actual.status, "ready");
+    assert.equal(result.composition.scenarios.zero_return.status, "ready");
+    assert.equal(result.composition.scenarios.voo.status, "ready");
+    assert.equal(result.composition.scenarios.kodex200.status, "unavailable");
+    assert.equal(result.composition.scenarios.fixed_mix.status, "unavailable");
+    assert.equal(result.model.observedPath.status, "ready");
+    assert.equal(result.model.cashComparison.status, "ready");
+    assert.equal(result.model.vooComparison.status, "ready");
   });
 });
 

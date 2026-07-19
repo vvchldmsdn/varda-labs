@@ -6,6 +6,7 @@ import {
   portfolioAccountScopeLabel,
 } from "@/components/account-scope-tabs";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
+import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
@@ -65,6 +66,7 @@ export function InvestmentLabView({
       data-page="investment-lab"
       data-fount-scope-adjustment={fountScopeAdjustment.status}
       data-output-authority="research_counterfactual_not_executable"
+      data-observed-path-status={model.observedPath.status}
       data-pending-at-end={periodReady ? model.coverage.pendingAtEndRows : 0}
       data-period-status={period.status}
       data-read-model-status={model.status}
@@ -154,9 +156,11 @@ export function InvestmentLabView({
               value={
                 !periodReady
                   ? "구간 확인 필요"
-                  : model.status === "ready"
-                    ? "계산 가능"
-                    : "계산 차단"
+                  : model.observedPath.status !== "ready"
+                    ? "관측 경로 차단"
+                    : model.status === "ready"
+                      ? "비교 계산 가능"
+                      : "일부 시나리오만 가능"
               }
             />
           </div>
@@ -170,7 +174,7 @@ export function InvestmentLabView({
           query={accountQuery}
         />
 
-        {!periodReady ? null : model.status === "ready" && model.summary ? (
+        {!periodReady ? null : model.observedPath.status === "ready" ? (
           <ReadyView
             anchorBasketScenario={anchorBasketScenario}
             fountScopeAdjustment={fountScopeAdjustment}
@@ -199,7 +203,8 @@ function ReadyView({
   period: InvestmentLabPeriodSelection;
   selectedAccount: PortfolioAccountScope;
 }) {
-  const summary = model.summary!;
+  const observedSummary = model.observedPath.summary!;
+  const kodexSummary = model.summary;
   const fixedMixWeights = model.fixedMixScenario?.weights ?? null;
 
   return (
@@ -214,26 +219,45 @@ function ReadyView({
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCell
           label="실제 최종 평가액"
-          value={formatKrw(summary.actualEndValueKrw)}
-          detail={formatDate(summary.endServiceDate)}
+          value={formatKrw(observedSummary.endValueKrw)}
+          detail={formatDate(observedSummary.endServiceDate)}
         />
         <SummaryCell
           label="KODEX 200 최종 평가액"
-          value={formatKrw(summary.scenarioEndValueKrw)}
-          detail="동일 거래금액 반영"
+          value={
+            kodexSummary
+              ? formatKrw(kodexSummary.scenarioEndValueKrw)
+              : "-"
+          }
+          detail={kodexSummary ? "동일 거래금액 반영" : "가격 근거 부족"}
         />
         <SummaryCell
           label="최종 차이"
-          value={formatSignedKrw(summary.endDifferenceKrw)}
-          detail="가상 경로 - 실제 경로"
-          tone={summary.endDifferenceKrw >= 0 ? "positive" : "negative"}
+          value={
+            kodexSummary
+              ? formatSignedKrw(kodexSummary.endDifferenceKrw)
+              : "-"
+          }
+          detail={kodexSummary ? "가상 경로 - 실제 경로" : "KODEX 경로 미계산"}
+          tone={
+            !kodexSummary
+              ? undefined
+              : kodexSummary.endDifferenceKrw >= 0
+                ? "positive"
+                : "negative"
+          }
         />
         <SummaryCell
           label="비교 구간"
-          value={`${summary.comparisonDateCount}개 평가일`}
-          detail={`${formatDate(summary.startServiceDate)} ~ ${formatDate(summary.endServiceDate)}`}
+          value={`${observedSummary.comparisonDateCount}개 평가일`}
+          detail={`${formatDate(observedSummary.startServiceDate)} ~ ${formatDate(observedSummary.endServiceDate)}`}
         />
       </section>
+
+      <InvestmentLabScenarioChartView
+        anchorBasketScenario={anchorBasketScenario}
+        model={model}
+      />
 
       <InvestmentLabScenarioMatrix
         anchorBasketScenario={anchorBasketScenario}
@@ -248,37 +272,12 @@ function ReadyView({
 
       <InvestmentLabContributionExperiment
         fixedMixWeights={fixedMixWeights}
-        key={`${summary.startServiceDate}:${summary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
+        key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
         scenarios={model.contributionExperimentScenarios}
       />
 
-      <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">평가액 경로 비교</h2>
-            <p className="mt-1 text-sm text-[#687064]">
-              저장된 전체 계정 평가일 기준, 거래비용 0원·소수점 수량 허용
-            </p>
-          </div>
-          <p className="text-sm text-[#687064]">
-            KODEX 200 종가 최대 이월 {model.coverage.maxValuationCarryDays ?? 0}일
-          </p>
-        </div>
-        <InvestmentLabComparisonChart
-          chartId="investment-lab-kodex200-chart"
-          description="저장된 평가일마다 실제 평가액과 동일 거래금액을 KODEX 200에 적용한 가상 평가액을 비교합니다."
-          rows={model.rows}
-          scenarioLabel="전액 KODEX 200"
-          title="실제 포트폴리오와 KODEX 200 시나리오 비교"
-        />
-        {model.coverage.pendingComparisonRows > 0 ? (
-          <p className="mt-3 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-3 py-2 text-sm text-[#725f2d]">
-            지연 체결 표시가 있는 {model.coverage.pendingComparisonRows}개 평가일은 가상 경로의 대기 현금 또는 매도 의무를 평가액에 포함하지 않습니다.
-          </p>
-        ) : null}
-      </section>
-
-      <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
+      {model.status === "ready" ? (
+        <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
         <div className="flex flex-col gap-1 border-b border-[#e1e6dc] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">비교 데이터</h2>
@@ -325,7 +324,8 @@ function ReadyView({
             </tbody>
           </table>
         </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <h2 className="text-lg font-semibold">데이터 상태</h2>
@@ -351,7 +351,7 @@ function CurrentWriterSegmentNotice({
   period: InvestmentLabPeriodSelection;
   selectedAccount: PortfolioAccountScope;
 }) {
-  const summary = model.summary!;
+  const summary = model.observedPath.summary!;
   return (
     <section
       className="rounded-lg border border-[#d9dfcf] bg-[#f8faf5] p-4"

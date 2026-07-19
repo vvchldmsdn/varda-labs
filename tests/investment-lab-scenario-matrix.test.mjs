@@ -136,9 +136,10 @@ describe("investment lab scenario comparison matrix", () => {
     });
 
     assert.equal(matrix.rows[0].status, "ready");
-    assert.equal(matrix.rows[0].returnEstimate.status, "unavailable");
+    assert.equal(matrix.rows[0].returnEstimate.status, "ready");
     const kodexRow = matrix.rows.find((row) => row.id === "kodex200");
     assert.equal(kodexRow?.status, "ready");
+    assert.equal(kodexRow?.returnEstimate.status, "unavailable");
     assert.ok(kodexRow?.reasonCodes.includes("price_basis_mismatch"));
   });
 
@@ -147,6 +148,16 @@ describe("investment lab scenario comparison matrix", () => {
     model.status = "blocked";
     model.summary = null;
     model.blockers = ["actual_path_incomplete"];
+    model.observedPath = {
+      status: "unavailable",
+      summary: null,
+      rows: [],
+      returnEstimate: {
+        status: "unavailable",
+        blockers: ["actual_path_incomplete"],
+      },
+      blockers: ["actual_path_incomplete"],
+    };
 
     const matrix = buildInvestmentLabScenarioMatrix({
       model,
@@ -157,6 +168,34 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(matrix.coverage.readyRowCount, 0);
     assert.equal(matrix.coverage.unavailableRowCount, 6);
     assert.ok(matrix.rows.every((row) => row.endValueKrw === null));
+  });
+
+  it("isolates a KODEX outage from actual, cash, and VOO rows", () => {
+    const model = readyModel();
+    model.status = "blocked";
+    model.summary = null;
+    model.returnEstimate = null;
+    model.rows = [];
+    model.blockers = ["scenario_close_evidence_invalid"];
+    model.fixedMixScenario = {
+      status: "unavailable",
+      summary: null,
+      blockers: ["component_path_unavailable"],
+    };
+
+    const matrix = buildInvestmentLabScenarioMatrix({
+      model,
+      anchorBasketScenario: readyAnchor(),
+    });
+    const rows = Object.fromEntries(matrix.rows.map((row) => [row.id, row]));
+
+    assert.equal(matrix.status, "ready");
+    assert.equal(rows.actual.status, "ready");
+    assert.equal(rows.zero_return.status, "ready");
+    assert.equal(rows.voo.status, "ready");
+    assert.equal(rows.anchor_basket.status, "ready");
+    assert.equal(rows.kodex200.status, "unavailable");
+    assert.equal(rows.fixed_mix.status, "unavailable");
   });
 
   it("stays pure and server-rendered without authority or I/O", () => {
@@ -193,6 +232,27 @@ describe("investment lab scenario comparison matrix", () => {
 function readyModel() {
   return {
     status: "ready",
+    observedPath: {
+      status: "ready",
+      summary: {
+        startServiceDate: "2026-01-02",
+        endServiceDate: "2026-01-05",
+        endValueKrw: 1_000,
+        comparisonDateCount: 3,
+      },
+      rows: [
+        { serviceDate: "2026-01-02", marketValueKrw: 800 },
+        { serviceDate: "2026-01-03", marketValueKrw: 900 },
+        { serviceDate: "2026-01-05", marketValueKrw: 1_000 },
+      ],
+      returnEstimate: {
+        status: "ready",
+        method: { version: "modified_dietz_daily_weighted_eod_v1" },
+        actualReturn: 0.1,
+        blockers: [],
+      },
+      blockers: [],
+    },
     summary: {
       startServiceDate: "2026-01-02",
       endServiceDate: "2026-01-05",

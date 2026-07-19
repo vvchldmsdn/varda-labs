@@ -10,6 +10,8 @@ describe("investment lab counterfactual read model", () => {
     const result = buildInvestmentLabCounterfactualReadModel(fixture());
 
     assert.equal(result.status, "ready");
+    assert.equal(result.observedPath.status, "ready");
+    assert.equal(result.observedPath.summary.endValueKrw, 1_150);
     assert.deepEqual(result.summary, {
       startServiceDate: "2026-01-02",
       endServiceDate: "2026-01-07",
@@ -163,7 +165,7 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(result.cashComparison.status, "ready");
     assert.equal(
       result.cashComparison.returnComparison.status,
-      "unavailable",
+      "ready",
     );
   });
 
@@ -213,6 +215,31 @@ describe("investment lab counterfactual read model", () => {
     assert.deepEqual(result.vooReadiness.blockers, [
       "missing_execution_fx",
     ]);
+  });
+
+  it("keeps observed, cash, and VOO paths when only KODEX evidence is unavailable", () => {
+    const source = fixture();
+    source.closeRows = [];
+    const result = buildInvestmentLabCounterfactualReadModel(source, {
+      fixedMixSelection: resolveInvestmentLabFixedMixSelection("50"),
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.blockers, ["scenario_close_evidence_invalid"]);
+    assert.equal(result.observedPath.status, "ready");
+    assert.equal(result.observedPath.summary.endValueKrw, 1_150);
+    assert.equal(result.observedPath.returnEstimate.status, "ready");
+    assert.equal(result.cashComparison.status, "ready");
+    assert.equal(result.vooComparison.status, "ready");
+    assert.equal(result.fixedMixScenario.status, "unavailable");
+    assert.deepEqual(
+      result.contributionExperimentScenarios.map((scenario) =>
+        scenario.scenarioId,
+      ),
+      ["voo"],
+    );
+    assert.equal(result.summary, null);
+    assert.deepEqual(result.rows, []);
   });
 
   it("blocks a legacy-only actual path as display evidence", () => {
