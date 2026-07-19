@@ -268,10 +268,29 @@ describe("portfolio movement builder", () => {
     assert.equal(result.coverage.currentCoveragePct, 0);
   });
 
-  it("retains an explicit manual valuation until the next manual update", () => {
+  it("keeps a stale manual valuation out of the current movement cycle", () => {
     const manualHolding = holding({
       priceFetchedAt: null,
       priceAsOf: "2026-06-01T03:00:00.000Z",
+      priceQuoteType: "manual_valuation",
+      priceStatus: "stored_manual",
+    });
+    const result = buildDaily({ holdings: [manualHolding] });
+
+    assert.equal(hasFreshMovementPrice(manualHolding, movementCycle), false);
+    assert.equal(result.ready, false);
+    assert.equal(result.changeKrw, null);
+    assert.equal(result.contributions.size, 0);
+    assert.deepEqual(
+      result.exclusions.map((exclusion) => exclusion.reason),
+      ["manual_valuation_not_updated_in_cycle", "coverage_below_threshold"],
+    );
+  });
+
+  it("uses a manual valuation entered inside the current movement cycle", () => {
+    const manualHolding = holding({
+      priceFetchedAt: null,
+      priceAsOf: "2026-07-08T01:00:00.000Z",
       priceQuoteType: "manual_valuation",
       priceStatus: "stored_manual",
     });

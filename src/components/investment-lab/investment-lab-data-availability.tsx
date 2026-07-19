@@ -23,6 +23,10 @@ export function InvestmentLabDataAvailabilityView({
       data-market-observations={market.usableReturnObservations}
       data-market-price-gaps={market.priceGapCount}
       data-market-target={market.requestedReturnObservations}
+      data-manual-valuation-coverage={
+        model.manualValuationHistory.history.currentSegmentCoveragePct ?? "n/a"
+      }
+      data-manual-valuation-status={model.manualValuationHistory.status}
       data-scenario-count={model.scenarioRows.length}
       data-section="investment-lab-data-availability"
     >
@@ -115,7 +119,9 @@ export function InvestmentLabDataAvailabilityView({
           <h3 className="font-semibold">보완 경로</h3>
           <ul className="mt-3 space-y-2 text-sm text-[#5f685d]">
             {model.repairItems.map((item) => (
-              <li key={item.id}>{repairItemLabel(item)}</li>
+              <li key={item.id}>
+                {repairItemLabel(item, model.manualValuationHistory)}
+              </li>
             ))}
           </ul>
         </div>
@@ -132,6 +138,11 @@ export function InvestmentLabDataAvailabilityView({
                   <strong className="text-[#2f3931]">{holding.name}</strong>
                   {" · "}
                   {specialHoldingLabel(holding.kind)}
+                  {holding.kind === "krx_gold" ? (
+                    <p className="mt-1 text-xs text-[#777e73]">
+                      {manualValuationSummary(model.manualValuationHistory)}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -233,7 +244,10 @@ function scenarioReasonLabel(reason: InvestmentLabScenarioAvailabilityReason) {
   return labels[reason];
 }
 
-function repairItemLabel(item: InvestmentLabRepairItem) {
+function repairItemLabel(
+  item: InvestmentLabRepairItem,
+  manualValuation: InvestmentLabDataAvailability["manualValuationHistory"],
+) {
   if (item.id === "actual_history") {
     return item.status === "not_needed"
       ? "실제 평가액: 별도 보완 불필요"
@@ -245,9 +259,32 @@ function repairItemLabel(item: InvestmentLabRepairItem) {
       : `시장 가격·환율: ${item.affectedCount}개 누락 근거는 승인 후 provider backfill 후보`;
   }
   if (item.id === "krx_gold") {
-    return "KRX 금현물: 저장된 1g당 수동 가격은 현재 평가에 사용하며, 과거 비교는 명시적 수동 평가 이력이 쌓인 구간만 사용";
+    return `KRX 금현물: ${manualValuationSummary(manualValuation)}`;
   }
   return "Fount: 가격 누락이 아니라 투자 랩 범위에서 제외하는 경로 변환 필요";
+}
+
+function manualValuationSummary(
+  model: InvestmentLabDataAvailability["manualValuationHistory"],
+) {
+  if (!model.applicable) return "이 계정 범위의 대상 아님";
+  const current =
+    model.current.status === "stored_manual" && model.current.price !== null
+      ? `현재 ${formatKrwPerGram(model.current.price)} · 입력 ${formatTimestampDate(model.current.priceAsOf)}`
+      : "현재 수동 평가 미입력";
+  const history = model.history;
+  if (history.requiredCurrentSegmentDateCount === 0) {
+    return `${current} · 비교할 최신 writer 구간 없음`;
+  }
+  return `${current} · 최신 writer 구간 ${history.coveredCurrentSegmentDateCount}/${history.requiredCurrentSegmentDateCount}일 · 수동 관측 ${history.distinctManualObservationCount}회 · 저장값 이월 ${history.carriedValuationRowCount}일`;
+}
+
+function formatKrwPerGram(value: number) {
+  return `${Math.round(value).toLocaleString("ko-KR")}원/g`;
+}
+
+function formatTimestampDate(value: string | null) {
+  return value ? value.slice(0, 10).replaceAll("-", ".") : "-";
 }
 
 function specialHoldingLabel(kind: "fount" | "krx_gold" | "unresolved") {

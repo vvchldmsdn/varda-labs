@@ -532,6 +532,9 @@ function reasonLabel(reason: string | null) {
   if (!reason) return "-";
   if (reason === "missing_baseline_snapshot") return "기준 스냅샷 없음";
   if (reason === "missing_fresh_live_prices") return "실시간 가격 없음";
+  if (reason === "manual_valuation_not_updated_in_cycle") {
+    return "이번 주기 수동 평가 미입력";
+  }
   if (reason === "missing_previous_close_fallback") return "전일 종가 없음";
   if (reason === "unsupported_currency") return "지원하지 않는 통화";
   if (reason === "missing_current_fx") return "현재 환율 없음";
@@ -544,11 +547,13 @@ function quoteTypeLabel(value: string | null) {
   if (value === "live") return "실시간";
   if (value === "delayed") return "지연";
   if (value === "realtime") return "실시간";
+  if (value === "manual_valuation") return "수동 평가";
   return value ?? "-";
 }
 
 function statusLabel(value: string | null) {
   if (value === "ok") return "정상";
+  if (value === "stored_manual") return "저장된 수동값";
   return value ?? "-";
 }
 

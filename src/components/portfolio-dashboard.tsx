@@ -785,7 +785,7 @@ function movementHealthText(data: DashboardData) {
   }
 
   if (data.dataHealth.movementReason === "missing_fresh_live_prices") {
-    return "실시간 가격 갱신 전이라 오늘 변동을 숨김";
+    return "현재 주기 가격 근거가 부족해 오늘 변동을 숨김";
   }
 
   return data.dataHealth.movementReason === "incomplete_baseline_snapshot"

@@ -122,6 +122,14 @@ async function main() {
     route.body,
     "data-scenario-count",
   );
+  const manualValuationStatus = readStringAttribute(
+    route.body,
+    "data-manual-valuation-status",
+  );
+  const manualValuationCoverage = readStringAttribute(
+    route.body,
+    "data-manual-valuation-coverage",
+  );
   assert.ok(
     dataAvailabilityStatus === "partial" ||
       dataAvailabilityStatus === "blocked",
@@ -131,12 +139,26 @@ async function main() {
   assert.ok(marketObservations >= 0 && marketObservations <= marketTarget);
   assert.ok(marketPriceGaps >= 0 && marketFxGaps >= 0);
   assert.equal(availabilityScenarioCount, 5);
+  assert.ok(
+    [
+      "not_applicable",
+      "unavailable",
+      "history_pending",
+      "partial_current_segment",
+      "current_segment_covered",
+    ].includes(manualValuationStatus),
+  );
+  if (manualValuationCoverage !== "n/a") {
+    const coverage = Number(manualValuationCoverage);
+    assert.ok(Number.isFinite(coverage) && coverage >= 0 && coverage <= 100);
+  }
   for (const marker of [
     "계산 데이터 준비 상태",
     "현재 수량 유지",
     "현재 비중·동일 비중 정기 리밸런싱",
     "최고수익·최소변동성·최소MDD·최대Sharpe",
     "자동 보완·DB 쓰기 없음",
+    "수동 관측",
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
@@ -644,6 +666,8 @@ async function main() {
           marketPriceGaps,
           marketFxGaps,
           availabilityScenarioCount,
+          manualValuationStatus,
+          manualValuationCoverage,
           cashComparisonStatus,
           fixedMixStatus,
           fixedMixSelectionStatus,
@@ -895,6 +919,8 @@ async function main() {
         marketPriceGaps,
         marketFxGaps,
         availabilityScenarioCount,
+        manualValuationStatus,
+        manualValuationCoverage,
         noAuthStatus: unauthorized.status,
         authenticatedStatus: route.status,
         dashboardLink: true,

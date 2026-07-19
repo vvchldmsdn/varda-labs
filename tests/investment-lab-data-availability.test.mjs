@@ -75,6 +75,71 @@ describe("investment lab data availability", () => {
       status: "manual_history_required",
       affectedCount: 1,
     });
+    assert.equal(model.manualValuationHistory.status, "unavailable");
+    assert.equal(model.manualValuationHistory.current.status, "unavailable");
+  });
+
+  it("separates manual observations from carried valuation rows", () => {
+    const model = buildInvestmentLabDataAvailability({
+      account: "brokerage",
+      snapshotRows: [
+        snapshot("2026-07-08", "brokerage", "current"),
+        snapshot("2026-07-09", "brokerage", "current"),
+      ],
+      manualValuationCurrentRows: [manualCurrent()],
+      manualValuationSnapshotRows: [
+        manualSnapshot("2026-07-08", "2026-07-08"),
+        manualSnapshot("2026-07-09", "2026-07-08"),
+        manualSnapshot("2026-07-09", "2026-07-10"),
+        {
+          ...manualSnapshot("2026-07-07", "2026-07-07"),
+          source: "base44_import",
+        },
+        {
+          ...manualSnapshot("2026-07-08", "2026-07-08"),
+          priceSource: "legacy_close",
+        },
+      ],
+      marketHistory: marketHistory({
+        selectedHoldingCount: 11,
+        eligibleHoldingCount: 10,
+        includedInstrumentCount: 10,
+        excludedHoldings: [goldExclusion()],
+      }),
+    });
+
+    assert.equal(
+      model.manualValuationHistory.status,
+      "current_segment_covered",
+    );
+    assert.equal(model.manualValuationHistory.current.status, "stored_manual");
+    assert.equal(model.manualValuationHistory.current.price, 225750);
+    assert.equal(
+      model.manualValuationHistory.current.priceAsOf,
+      "2026-07-09T03:00:00.000Z",
+    );
+    assert.deepEqual(model.manualValuationHistory.history, {
+      sourceRowCount: 5,
+      trustedValuationRowCount: 2,
+      distinctManualObservationCount: 1,
+      carriedValuationRowCount: 1,
+      nonCurrentWriterRowCount: 1,
+      nonManualValuationRowCount: 1,
+      invalidRowCount: 0,
+      futureDatedRowCount: 1,
+      requiredCurrentSegmentDateCount: 2,
+      coveredCurrentSegmentDateCount: 2,
+      currentSegmentCoveragePct: 100,
+      availableStartServiceDate: "2026-07-08",
+      availableEndServiceDate: "2026-07-09",
+      latestManualReferenceDate: "2026-07-08",
+    });
+    assert.equal(scenario(model, "fixed_quantity").status, "blocked");
+    assert.ok(
+      scenario(model, "fixed_quantity").reasons.includes(
+        "manual_valuation_history_required",
+      ),
+    );
   });
 
   it("treats Fount as a scope transform, not a price backfill", () => {
@@ -190,6 +255,42 @@ function fountExclusion() {
     currency: "KRW",
     assetType: "etf",
     reason: "missing_ticker",
+  };
+}
+
+function manualCurrent() {
+  return {
+    assetId: "gold-asset",
+    assetName: "금현물",
+    account: "brokerage",
+    market: "korea",
+    currency: "KRW",
+    assetType: "commodity",
+    currentPrice: "225750",
+    priceSource: "manual_entry",
+    priceAsOf: "2026-07-09T03:00:00.000Z",
+    priceQuoteType: "manual_valuation",
+    priceStatus: "stored_manual",
+  };
+}
+
+function manualSnapshot(snapshotDate, referenceDate) {
+  return {
+    snapshotDate,
+    assetId: "gold-asset",
+    legacyAssetId: "legacy-gold",
+    assetName: "금현물",
+    account: "brokerage",
+    market: "korea",
+    currency: "KRW",
+    assetType: "commodity",
+    source: "varda_manual_daily_snapshot",
+    priceSource: "manual_entry",
+    priceBasis: "manual_current",
+    currentPrice: "225750",
+    priceDate: referenceDate,
+    referenceDate,
+    capturedAt: `${snapshotDate}T22:00:00.000Z`,
   };
 }
 

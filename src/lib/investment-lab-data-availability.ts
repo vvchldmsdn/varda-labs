@@ -6,6 +6,11 @@ import {
   type PortfolioAccountScope,
 } from "./portfolio-account-scope.ts";
 import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
+import {
+  buildManualValuationHistoryCoverage,
+  type ManualValuationCurrentRow,
+  type ManualValuationSnapshotRow,
+} from "./manual-valuation-history.ts";
 
 const LEGACY_SOURCE = "base44_import";
 const CURRENT_SOURCE = "varda_manual_daily_snapshot";
@@ -108,8 +113,25 @@ export function buildInvestmentLabDataAvailability(input: {
   account: PortfolioAccountScope;
   snapshotRows: readonly InvestmentLabAvailabilitySnapshotRow[];
   marketHistory: InvestmentLabMarketHistoryAvailabilityInput;
+  manualValuationCurrentRows?: readonly ManualValuationCurrentRow[];
+  manualValuationSnapshotRows?: readonly ManualValuationSnapshotRow[];
 }) {
   const actualHistory = buildActualHistory(input.snapshotRows, input.account);
+  const goldDecision =
+    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
+  const manualValuationHistory = buildManualValuationHistoryCoverage({
+    account: input.account,
+    target: {
+      assetName: goldDecision.assetName,
+      account: goldDecision.account,
+      market: goldDecision.market,
+      currency: goldDecision.currency,
+      assetType: goldDecision.assetType,
+    },
+    currentRows: input.manualValuationCurrentRows ?? [],
+    snapshotRows: input.manualValuationSnapshotRows ?? [],
+    requiredSnapshotDates: actualHistory.latestCurrentWriterServiceDates,
+  });
   const specialHoldings = classifySpecialHoldings(
     input.marketHistory.excludedHoldings,
   );
@@ -246,6 +268,7 @@ export function buildInvestmentLabDataAvailability(input: {
     policy: INVESTMENT_LAB_DATA_AVAILABILITY_POLICY,
     account: input.account,
     actualHistory,
+    manualValuationHistory,
     marketHistory: Object.freeze({
       status: marketHistoryReady
         ? ("ready" as const)
@@ -354,6 +377,9 @@ function buildActualHistory(
       latestCurrentRows[0]?.snapshotDate ?? null,
     latestCurrentWriterEndServiceDate:
       latestCurrentRows.at(-1)?.snapshotDate ?? null,
+    latestCurrentWriterServiceDates: Object.freeze(
+      latestCurrentRows.map((row) => row.snapshotDate),
+    ),
   });
 }
 

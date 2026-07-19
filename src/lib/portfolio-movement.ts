@@ -108,6 +108,7 @@ export type PortfolioMovementContribution = {
 export type PortfolioMovementExclusionReason =
   | "missing_baseline_snapshot"
   | "missing_fresh_live_prices"
+  | "manual_valuation_not_updated_in_cycle"
   | "missing_previous_close_fallback"
   | "unsupported_currency"
   | "missing_current_fx"
@@ -236,7 +237,7 @@ export function buildDailyPositionMovement({
       exclusions.push(
         holdingExclusion(
           holding,
-          "missing_fresh_live_prices",
+          movementPriceExclusionReason(holding),
           "daily_position_snapshot",
         ),
       );
@@ -417,7 +418,7 @@ export function buildPreviousCloseMovement({
       exclusions.push(
         holdingExclusion(
           holding,
-          "missing_fresh_live_prices",
+          movementPriceExclusionReason(holding),
           "asset_price_snapshot",
         ),
       );
@@ -505,11 +506,13 @@ export function hasFreshMovementPrice(
 ) {
   const quoteType = holding.priceQuoteType?.trim().toLowerCase() ?? "";
   if (quoteType === MANUAL_ASSET_PRICE_POLICY.quoteType) {
+    const priceTimestampMs = timestampMs(holding.priceAsOf);
     return (
       holding.priceStatus === MANUAL_ASSET_PRICE_POLICY.status &&
       Number.isFinite(holding.currentPrice) &&
       holding.currentPrice > 0 &&
-      timestampMs(holding.priceAsOf) > 0
+      priceTimestampMs >= movementCycle.liveWindowStartAt.getTime() &&
+      priceTimestampMs < movementCycle.liveWindowEndAt.getTime()
     );
   }
   if (!MOVEMENT_FRESH_PRICE_QUOTE_TYPES.has(quoteType)) return false;
@@ -523,6 +526,15 @@ export function hasFreshMovementPrice(
     priceTimestampMs >= movementCycle.liveWindowStartAt.getTime() &&
     priceTimestampMs < movementCycle.liveWindowEndAt.getTime()
   );
+}
+
+function movementPriceExclusionReason(
+  holding: PortfolioMovementHoldingInput,
+): PortfolioMovementExclusionReason {
+  return holding.priceQuoteType?.trim().toLowerCase() ===
+    MANUAL_ASSET_PRICE_POLICY.quoteType
+    ? "manual_valuation_not_updated_in_cycle"
+    : "missing_fresh_live_prices";
 }
 
 function calculatePreviousCloseContribution(

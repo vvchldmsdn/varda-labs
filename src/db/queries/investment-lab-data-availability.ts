@@ -3,9 +3,16 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { dailyPortfolioSnapshots } from "@/db/schema";
 import { getReadOnlyPortfolioRisk } from "@/db/queries/portfolio-risk";
+import {
+  assets,
+  dailyPortfolioSnapshots,
+  dailyPositionSnapshots,
+} from "@/db/schema";
 import { buildInvestmentLabDataAvailability } from "@/lib/investment-lab-data-availability";
+import {
+  DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
+} from "@/lib/investment-lab-special-holding-authority";
 import {
   accountsForPortfolioScope,
   type PortfolioAccountScope,
@@ -17,7 +24,14 @@ export async function getReadOnlyInvestmentLabDataAvailability(
   account: PortfolioAccountScope,
 ) {
   const selectedAccounts = [...accountsForPortfolioScope(account)];
-  const [snapshotRows, riskModel] = await Promise.all([
+  const goldDecision =
+    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
+  const [
+    snapshotRows,
+    manualValuationCurrentRows,
+    manualValuationSnapshotRows,
+    riskModel,
+  ] = await Promise.all([
     db
       .select({
         snapshotDate: dailyPortfolioSnapshots.snapshotDate,
@@ -39,12 +53,93 @@ export async function getReadOnlyInvestmentLabDataAvailability(
         asc(dailyPortfolioSnapshots.snapshotDate),
         asc(dailyPortfolioSnapshots.account),
       ),
+    db
+      .select({
+        assetId: assets.id,
+        assetName: assets.name,
+        account: assets.account,
+        market: assets.market,
+        currency: assets.currency,
+        assetType: assets.assetType,
+        currentPrice: assets.currentPrice,
+        priceSource: assets.priceSource,
+        priceAsOf: assets.priceAsOf,
+        priceQuoteType: assets.priceQuoteType,
+        priceStatus: assets.priceStatus,
+      })
+      .from(assets)
+      .where(
+        and(
+          inArray(
+            sql<string>`lower(trim(${assets.account}))`,
+            selectedAccounts,
+          ),
+          eq(assets.name, goldDecision.assetName),
+          eq(sql<string>`lower(trim(${assets.account}))`, goldDecision.account),
+          eq(sql<string>`lower(trim(${assets.market}))`, goldDecision.market),
+          eq(sql<string>`upper(trim(${assets.currency}))`, goldDecision.currency),
+          eq(sql<string>`lower(trim(${assets.assetType}))`, goldDecision.assetType),
+        ),
+      )
+      .orderBy(asc(assets.account), asc(assets.name)),
+    db
+      .select({
+        snapshotDate: dailyPositionSnapshots.snapshotDate,
+        assetId: dailyPositionSnapshots.assetId,
+        legacyAssetId: dailyPositionSnapshots.legacyAssetId,
+        assetName: dailyPositionSnapshots.assetName,
+        account: dailyPositionSnapshots.account,
+        market: dailyPositionSnapshots.market,
+        currency: dailyPositionSnapshots.currency,
+        assetType: dailyPositionSnapshots.assetType,
+        source: dailyPositionSnapshots.source,
+        priceSource: dailyPositionSnapshots.priceSource,
+        priceBasis: dailyPositionSnapshots.priceBasis,
+        currentPrice: dailyPositionSnapshots.currentPrice,
+        priceDate: dailyPositionSnapshots.priceDate,
+        referenceDate: dailyPositionSnapshots.referenceDate,
+        capturedAt: dailyPositionSnapshots.capturedAt,
+      })
+      .from(dailyPositionSnapshots)
+      .where(
+        and(
+          eq(dailyPositionSnapshots.isSample, false),
+          inArray(
+            sql<string>`lower(trim(${dailyPositionSnapshots.account}))`,
+            selectedAccounts,
+          ),
+          eq(dailyPositionSnapshots.assetName, goldDecision.assetName),
+          eq(
+            sql<string>`lower(trim(${dailyPositionSnapshots.account}))`,
+            goldDecision.account,
+          ),
+          eq(
+            sql<string>`lower(trim(${dailyPositionSnapshots.market}))`,
+            goldDecision.market,
+          ),
+          eq(
+            sql<string>`upper(trim(${dailyPositionSnapshots.currency}))`,
+            goldDecision.currency,
+          ),
+          eq(
+            sql<string>`lower(trim(${dailyPositionSnapshots.assetType}))`,
+            goldDecision.assetType,
+          ),
+        ),
+      )
+      .orderBy(
+        asc(dailyPositionSnapshots.snapshotDate),
+        asc(dailyPositionSnapshots.account),
+        asc(dailyPositionSnapshots.assetName),
+      ),
     getReadOnlyPortfolioRisk({ account, window: 90 }),
   ]);
 
   return buildInvestmentLabDataAvailability({
     account,
     snapshotRows,
+    manualValuationCurrentRows,
+    manualValuationSnapshotRows,
     marketHistory: {
       inputStatus: riskModel.inputHealth.status,
       requestedReturnObservations:
