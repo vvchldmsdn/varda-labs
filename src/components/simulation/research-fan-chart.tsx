@@ -17,22 +17,34 @@ type ResearchFanChartData = Readonly<{
   }>[];
 }>;
 
+export type ResearchFanChartValueDomain = Readonly<{
+  min: number;
+  max: number;
+}>;
+
+export function resolveResearchFanChartValueDomain(
+  executions: readonly ResearchFanChartData[],
+): ResearchFanChartValueDomain {
+  const values = executions.flatMap(collectValues);
+  return Object.freeze({
+    min: Math.min(...values),
+    max: Math.max(...values),
+  });
+}
+
 export function ResearchFanChart({
   execution,
+  valueDomain,
 }: {
   execution: ResearchFanChartData;
+  valueDomain?: ResearchFanChartValueDomain;
 }) {
   const width = 760;
   const height = 280;
   const padding = 28;
-  const values = [
-    ...execution.bands.flatMap((band) => [band.p10, band.p50, band.p90]),
-    ...execution.samplePaths.flatMap((path) =>
-      path.points.map((point) => point.indexValue),
-    ),
-  ];
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
+  const values = collectValues(execution);
+  const rawMin = valueDomain?.min ?? Math.min(...values);
+  const rawMax = valueDomain?.max ?? Math.max(...values);
   const spread = Math.max(rawMax - rawMin, 1);
   const min = rawMin - spread * 0.08;
   const max = rawMax + spread * 0.08;
@@ -126,6 +138,15 @@ export function ResearchFanChart({
       </figcaption>
     </figure>
   );
+}
+
+function collectValues(execution: ResearchFanChartData) {
+  return [
+    ...execution.bands.flatMap((band) => [band.p10, band.p50, band.p90]),
+    ...execution.samplePaths.flatMap((path) =>
+      path.points.map((point) => point.indexValue),
+    ),
+  ];
 }
 
 function linePath(points: readonly (readonly [number, number])[]) {

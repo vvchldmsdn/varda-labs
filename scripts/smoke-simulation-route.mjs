@@ -13,6 +13,9 @@ const EXPECT_RESEARCH_READY = numberArgument("--expect-research-ready");
 const EXPECT_JOINT_RESEARCH_READY = numberArgument(
   "--expect-joint-research-ready",
 );
+const EXPECT_FIXED_MIX_COMPARISON_READY = numberArgument(
+  "--expect-fixed-mix-comparison-ready",
+);
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
@@ -63,6 +66,7 @@ async function main() {
   assert.match(simulation.body, /연구 입력 증거 준비도/);
   assert.match(simulation.body, /data-fixed-research-execution/);
   assert.match(simulation.body, /data-fixed-mix-research-execution/);
+  assert.match(simulation.body, /data-fixed-mix-research-comparison/);
   assert.match(simulation.body, /3개월 연구 시뮬레이션/);
   assert.match(simulation.body, /명시 비중 공동 포트폴리오 연구/);
   assert.match(simulation.body, /KODEX 200 최초 비중/);
@@ -96,6 +100,11 @@ async function main() {
     /data-joint-research-execution-status="(ready|unavailable)"/,
   )?.[1];
   const jointResearchReadyCount = jointResearchStatus === "ready" ? 1 : 0;
+  const fixedMixComparisonStatus = simulation.body.match(
+    /data-fixed-mix-research-comparison-status="(ready|unavailable)"/,
+  )?.[1];
+  const fixedMixComparisonReadyCount =
+    fixedMixComparisonStatus === "ready" ? 1 : 0;
   const jointSelectionStatus = simulation.body.match(
     /data-joint-research-selection-status="(default|selected|invalid)"/,
   )?.[1];
@@ -133,6 +142,10 @@ async function main() {
   assert.ok(
     jointResearchStatus,
     "simulation must render one joint research execution state",
+  );
+  assert.ok(
+    fixedMixComparisonStatus,
+    "simulation must render one fixed-mix comparison state",
   );
   assert.equal(
     jointSelectionStatus,
@@ -210,6 +223,13 @@ async function main() {
       "unexpected ready joint research execution count",
     );
   }
+  if (EXPECT_FIXED_MIX_COMPARISON_READY !== null) {
+    assert.equal(
+      fixedMixComparisonReadyCount,
+      EXPECT_FIXED_MIX_COMPARISON_READY,
+      "unexpected fixed-mix comparison readiness",
+    );
+  }
   if (researchReadyCount > 0) {
     assert.equal(
       simulation.body.match(/data-research-fan-chart="(?:kodex200|voo)"/g)
@@ -247,6 +267,30 @@ async function main() {
       );
     }
   }
+  if (fixedMixComparisonStatus === "ready") {
+    assert.match(
+      simulation.body,
+      /data-fixed-mix-comparison-pairing="single_prepared_draw_plan_and_gross_growth_reused_pathwise"/,
+    );
+    assert.match(
+      simulation.body,
+      /data-fixed-mix-comparison-scenario-count="3"/,
+    );
+    assert.equal(
+      simulation.body.match(
+        /data-fixed-mix-comparison-scenario="(?:25-75|50-50|75-25)"/g,
+      )?.length ?? 0,
+      3,
+      "comparison must render all three fixed mixes without ranking",
+    );
+    assert.equal(
+      simulation.body.match(
+        /data-research-fan-chart="kodex-(?:25-voo-75|50-voo-50|75-voo-25)"/g,
+      )?.length ?? 0,
+      3,
+      "comparison must render one fan chart for each fixed mix",
+    );
+  }
 
   const countsAfter = await readCounts();
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
@@ -272,6 +316,8 @@ async function main() {
         researchReadyCount,
         jointResearchStatus,
         jointResearchReadyCount,
+        fixedMixComparisonStatus,
+        fixedMixComparisonReadyCount,
         jointSelectionStatus,
         historyRowCount,
         observedReturnSeriesCount,

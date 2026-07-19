@@ -5,6 +5,9 @@ import {
   FIXED_MIX_RESEARCH_SIMULATION_POLICY,
   buildFixedMixResearchSimulation,
 } from "../src/lib/simulation-fixed-mix-research-execution.ts";
+import {
+  buildFixedMixResearchComparison,
+} from "../src/lib/simulation-fixed-mix-research-comparison.ts";
 import { resolveKodexVooFixedMixSelection } from "../src/lib/kodex-voo-fixed-mix-selection.ts";
 import { SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
 
@@ -136,9 +139,101 @@ describe("Fixed-mix joint research simulation", () => {
       "deterministic_only_for_identical_matrix_engine_policy_and_seed",
     );
   });
+
+  it("reuses one pathwise draw and growth artifact across the three preset mixes", () => {
+    const matrix = readyJointMatrix({ varyReturns: true });
+    const comparison = buildFixedMixResearchComparison({
+      explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      matrix,
+    });
+
+    assert.equal(comparison.status, "ready");
+    assert.equal(comparison.pairing.status, "shared_pathwise_draw_verified");
+    assert.equal(comparison.pairing.scenarioCount, 3);
+    assert.equal(
+      comparison.policy.sharedSampling,
+      "single_prepared_draw_plan_and_gross_growth_reused_pathwise",
+    );
+    assert.deepEqual(
+      comparison.scenarios.map((scenario) => [
+        scenario.execution.weights[0].weightBps,
+        scenario.execution.weights[1].weightBps,
+      ]),
+      [
+        [2_500, 7_500],
+        [5_000, 5_000],
+        [7_500, 2_500],
+      ],
+    );
+
+    const [lowKodex, midpoint, highKodex] = comparison.scenarios;
+    assert.ok(lowKodex && midpoint && highKodex);
+    assert.deepEqual(
+      lowKodex.execution.samplePaths.map((path) => path.pathIndex),
+      midpoint.execution.samplePaths.map((path) => path.pathIndex),
+    );
+    assert.deepEqual(
+      midpoint.execution.samplePaths.map((path) => path.pathIndex),
+      highKodex.execution.samplePaths.map((path) => path.pathIndex),
+    );
+
+    for (let pathIndex = 0; pathIndex < midpoint.execution.samplePaths.length; pathIndex += 1) {
+      const lowPath = lowKodex.execution.samplePaths[pathIndex];
+      const middlePath = midpoint.execution.samplePaths[pathIndex];
+      const highPath = highKodex.execution.samplePaths[pathIndex];
+      assert.ok(lowPath && middlePath && highPath);
+      for (let pointIndex = 0; pointIndex < middlePath.points.length; pointIndex += 1) {
+        const lowPoint = lowPath.points[pointIndex];
+        const middlePoint = middlePath.points[pointIndex];
+        const highPoint = highPath.points[pointIndex];
+        assert.ok(lowPoint && middlePoint && highPoint);
+        assert.equal(lowPoint.stepIndex, middlePoint.stepIndex);
+        assert.equal(middlePoint.stepIndex, highPoint.stepIndex);
+        assert.ok(
+          Math.abs(
+            middlePoint.indexValue -
+              (lowPoint.indexValue + highPoint.indexValue) / 2,
+          ) < 1e-10,
+          "the midpoint mix must use the same underlying instrument growth path",
+        );
+      }
+    }
+
+    assert.equal(comparison.policy.ranking, "forbidden");
+    assert.equal(comparison.policy.recommendation, "forbidden");
+    assert.equal(comparison.policy.optimizer, "forbidden");
+    assert.equal(Object.hasOwn(comparison, "rankings"), false);
+    assert.doesNotMatch(
+      JSON.stringify(comparison),
+      /sha256:|inputMatrixHash|drawPlanHash/,
+    );
+  });
+
+  it("uses one canonical scenario identity for default and explicit 50:50", () => {
+    const matrix = readyJointMatrix({ varyReturns: true });
+    const input = {
+      explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      matrix,
+    };
+    const defaultResult = buildFixedMixResearchSimulation({
+      ...input,
+      selection: resolveKodexVooFixedMixSelection(undefined),
+    });
+    const explicitResult = buildFixedMixResearchSimulation({
+      ...input,
+      selection: resolveKodexVooFixedMixSelection("50"),
+    });
+
+    assert.equal(defaultResult.status, "ready");
+    assert.equal(explicitResult.status, "ready");
+    assert.deepEqual(defaultResult.weights, explicitResult.weights);
+    assert.deepEqual(defaultResult.terminal, explicitResult.terminal);
+    assert.deepEqual(defaultResult.bands, explicitResult.bands);
+    assert.deepEqual(defaultResult.samplePaths, explicitResult.samplePaths);
+  });
 });
 
-function readyJointMatrix() {
+function readyJointMatrix({ varyReturns = false } = {}) {
   const requestedServiceDates = Array.from({ length: 91 }, (_, index) =>
     isoDate(index),
   );
@@ -148,8 +243,19 @@ function readyJointMatrix() {
     previousServiceDate: requestedServiceDates[index],
     serviceDate: requestedServiceDates[index + 1],
     cells: [
-      cell(kodexKey, 0.01, requestedServiceDates[index], requestedServiceDates[index + 1]),
-      cell(vooKey, -0.005, requestedServiceDates[index], requestedServiceDates[index + 1], true),
+      cell(
+        kodexKey,
+        varyReturns ? ((index % 7) - 3) * 0.003 : 0.01,
+        requestedServiceDates[index],
+        requestedServiceDates[index + 1],
+      ),
+      cell(
+        vooKey,
+        varyReturns ? ((index % 5) - 2) * 0.002 : -0.005,
+        requestedServiceDates[index],
+        requestedServiceDates[index + 1],
+        true,
+      ),
     ],
   }));
 

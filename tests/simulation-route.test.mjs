@@ -19,7 +19,9 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /resolveSimulationEndServiceDateSelection/);
     assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
     assert.match(query, /buildFixedResearchSimulation/);
-    assert.match(query, /buildFixedMixResearchSimulation/);
+    assert.match(query, /prepareFixedMixResearchContext/);
+    assert.match(query, /buildFixedMixResearchSimulationFromContext/);
+    assert.match(query, /buildFixedMixResearchComparisonFromContext/);
     assert.match(query, /resolveKodexVooFixedMixSelection/);
     assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
     assert.match(query, /candidates: INPUTS\.map\(candidate\)/);
@@ -55,6 +57,12 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-joint-rebalancing="none"/);
     assert.match(view, /data-joint-research-selection-status/);
     assert.match(view, /data-joint-research-kodex-weight-bps/);
+    assert.match(view, /data-fixed-mix-research-comparison/);
+    assert.match(view, /data-fixed-mix-research-comparison-status/);
+    assert.match(view, /data-fixed-mix-comparison-pairing/);
+    assert.match(view, /data-fixed-mix-comparison-scenario/);
+    assert.match(view, /고정 비중 3안 공통 경로 비교/);
+    assert.match(view, /성과 순위·추천 아님/);
     assert.match(view, /3개월 연구 시뮬레이션/);
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
     assert.match(view, /KODEX 200 최초 비중/);
@@ -110,6 +118,7 @@ function readSimulationView() {
   return [
     "src/components/simulation/simulation-input-readiness-view.tsx",
     "src/components/simulation/fixed-mix-research-execution-section.tsx",
+    "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",

@@ -1,40 +1,18 @@
 import type { KodexVooFixedMixSelection } from "./kodex-voo-fixed-mix-selection.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 import {
-  executeSimulationResearchPaths,
+  buildFixedMixResearchWeights,
+  FIXED_MIX_RESEARCH_SIMULATION_POLICY,
+  prepareFixedMixResearchContext,
+  type FixedMixResearchContext,
+  type FixedMixResearchContextBlockerReason,
+} from "./simulation-fixed-mix-research-context.ts";
+import {
+  executeSimulationResearchPathsFromPrepared,
   type SimulationResearchExecutionBlockerReason,
 } from "./simulation-research-execution-core.ts";
 
-const FIXED_MIX_INSTRUMENTS = Object.freeze([
-  Object.freeze({ market: "korea", currency: "KRW", ticker: "069500" }),
-  Object.freeze({ market: "us", currency: "USD", ticker: "VOO" }),
-] as const);
-
-export const FIXED_MIX_RESEARCH_SIMULATION_POLICY = Object.freeze({
-  version: "explicit_fixed_mix_joint_research_simulation_v2",
-  admission:
-    "valid_explicit_weight_selection_end_query_and_complete_joint_matrix_only",
-  sourceReturnStepCount: 90,
-  horizon: 63,
-  horizonLabel: "approximately_three_market_months",
-  pathCount: 500,
-  expectedBlockLength: 5,
-  seed: 0x56415244,
-  bootstrapModel: "stationary_bootstrap_unconditional_not_regime_conditioned",
-  seedPolicy:
-    "deterministic_only_for_identical_matrix_engine_policy_and_seed",
-  jointSampling: "paired_cross_market_rows_same_draw_plan",
-  samplePathCount: 12,
-  portfolioPath: "initial_fixed_weight_buy_and_hold_without_rebalancing",
-  displayBasis: "normalized_index_100",
-  weightUnit: "integer_basis_points",
-  weightTotalBps: 10_000,
-  persistence: "forbidden",
-  accountBinding: "forbidden",
-  recommendation: "forbidden",
-  optimizer: "forbidden",
-  interpretation: "research_distribution_not_forecast",
-} as const);
+export { FIXED_MIX_RESEARCH_SIMULATION_POLICY } from "./simulation-fixed-mix-research-context.ts";
 
 export type FixedMixResearchSimulationResult = ReturnType<
   typeof buildFixedMixResearchSimulation
@@ -43,6 +21,21 @@ export type FixedMixResearchSimulationResult = ReturnType<
 export function buildFixedMixResearchSimulation(input: {
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
+  selection: KodexVooFixedMixSelection;
+}) {
+  const context =
+    input.selection.status === "invalid"
+      ? null
+      : prepareFixedMixResearchContext(input);
+
+  return buildFixedMixResearchSimulationFromContext({
+    context,
+    selection: input.selection,
+  });
+}
+
+export function buildFixedMixResearchSimulationFromContext(input: {
+  context: FixedMixResearchContext | null;
   selection: KodexVooFixedMixSelection;
 }) {
   if (
@@ -58,7 +51,7 @@ export function buildFixedMixResearchSimulation(input: {
     );
   }
 
-  const weights = buildWeights(
+  const weights = buildFixedMixResearchWeights(
     input.selection.kodexWeightBps,
     input.selection.vooWeightBps,
   );
@@ -67,34 +60,18 @@ export function buildFixedMixResearchSimulation(input: {
     name: `KODEX 200 ${input.selection.kodexWeightPct}% + VOO ${input.selection.vooWeightPct}%`,
   };
 
-  if (!input.explicitEndServiceDate) {
-    return blockedResult(base, "explicit_end_required");
-  }
-  if (!input.matrix || input.matrix.status !== "ready") {
-    return blockedResult(base, "input_matrix_unavailable");
-  }
-
-  const matrix = input.matrix;
-  const matrixEndServiceDate = matrix.requestedServiceDates.at(-1) ?? null;
-  if (
-    matrix.matrix.length !==
-      FIXED_MIX_RESEARCH_SIMULATION_POLICY.sourceReturnStepCount ||
-    matrixEndServiceDate !== input.explicitEndServiceDate ||
-    !sameInstrumentUniverse(matrix)
-  ) {
-    return blockedResult(base, "input_matrix_shape_mismatch");
+  if (!input.context || input.context.status !== "ready") {
+    return blockedResult(
+      base,
+      input.context?.reason ?? "input_matrix_unavailable",
+    );
   }
 
-  const execution = executeSimulationResearchPaths({
-    matrix,
+  const execution = executeSimulationResearchPathsFromPrepared({
+    prepared: input.context.prepared,
     scenarioId: "research-kodex200-voo-explicit-mix",
     scenarioVersion: `v2-${input.selection.kodexWeightBps}-${input.selection.vooWeightBps}`,
     weights,
-    seed: FIXED_MIX_RESEARCH_SIMULATION_POLICY.seed,
-    expectedBlockLength:
-      FIXED_MIX_RESEARCH_SIMULATION_POLICY.expectedBlockLength,
-    horizon: FIXED_MIX_RESEARCH_SIMULATION_POLICY.horizon,
-    pathCount: FIXED_MIX_RESEARCH_SIMULATION_POLICY.pathCount,
     samplePathCount: FIXED_MIX_RESEARCH_SIMULATION_POLICY.samplePathCount,
   });
   if (execution.status !== "ready") {
@@ -104,40 +81,17 @@ export function buildFixedMixResearchSimulation(input: {
   return Object.freeze({
     ...base,
     ...execution,
-    source: Object.freeze({
-      endServiceDate: input.explicitEndServiceDate,
-      returnStepCount: matrix.matrix.length,
-      pairedInstrumentCount: matrix.instruments.length,
-      firstServiceDate: matrix.requestedServiceDates[0] ?? null,
-      lastServiceDate: matrixEndServiceDate,
-    }),
+    source: input.context.source,
   });
-}
-
-function sameInstrumentUniverse(matrix: SimulationReturnMatrixResult) {
-  return (
-    matrix.instruments.length === FIXED_MIX_INSTRUMENTS.length &&
-    matrix.instruments.every((instrument, index) => {
-      const expected = FIXED_MIX_INSTRUMENTS[index];
-      return (
-        expected !== undefined &&
-        instrument.market === expected.market &&
-        instrument.currency === expected.currency &&
-        instrument.ticker === expected.ticker
-      );
-    })
-  );
 }
 
 type FixedMixResearchBlockerReason =
   | "invalid_weight_selection"
-  | "explicit_end_required"
-  | "input_matrix_unavailable"
-  | "input_matrix_shape_mismatch"
+  | FixedMixResearchContextBlockerReason
   | SimulationResearchExecutionBlockerReason;
 
 function blockedResult<
-  TWeights extends ReturnType<typeof buildWeights> | null,
+  TWeights extends ReturnType<typeof buildFixedMixResearchWeights> | null,
 >(
   base: {
     id: "kodex200-voo-explicit-mix";
@@ -161,7 +115,9 @@ function blockedResult<
   });
 }
 
-function baseResult<TWeights extends ReturnType<typeof buildWeights> | null>(
+function baseResult<
+  TWeights extends ReturnType<typeof buildFixedMixResearchWeights> | null,
+>(
   selection: KodexVooFixedMixSelection,
   weights: TWeights,
 ) {
@@ -173,17 +129,4 @@ function baseResult<TWeights extends ReturnType<typeof buildWeights> | null>(
     weights,
     runtimeTrustStatus: "research_only" as const,
   };
-}
-
-function buildWeights(kodexWeightBps: number, vooWeightBps: number) {
-  return Object.freeze([
-    Object.freeze({
-      ...FIXED_MIX_INSTRUMENTS[0],
-      weightBps: kodexWeightBps,
-    }),
-    Object.freeze({
-      ...FIXED_MIX_INSTRUMENTS[1],
-      weightBps: vooWeightBps,
-    }),
-  ] as const);
 }

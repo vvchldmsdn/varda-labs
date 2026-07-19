@@ -16,8 +16,22 @@ export type SimulationResearchExecutionBlockerReason =
   | "normalized_nav_blocked"
   | "summary_blocked";
 
+export type SimulationResearchPreparationBlockerReason = Extract<
+  SimulationResearchExecutionBlockerReason,
+  "draw_plan_blocked" | "gross_growth_blocked"
+>;
+
 export type SimulationResearchExecutionCoreResult = ReturnType<
   typeof executeSimulationResearchPaths
+>;
+
+export type PreparedSimulationResearchPaths = ReturnType<
+  typeof prepareSimulationResearchPaths
+>;
+
+export type ReadyPreparedSimulationResearchPaths = Extract<
+  PreparedSimulationResearchPaths,
+  { status: "ready" }
 >;
 
 type ResearchWeight = Readonly<{
@@ -38,20 +52,27 @@ export function executeSimulationResearchPaths(input: {
   pathCount: number;
   samplePathCount: number;
 }) {
-  const vectorPacket = buildSimulationScenarioVectorReviewPacket({
-    scenarioId: input.scenarioId,
-    scenarioVersion: input.scenarioVersion,
-    matrixInstruments: input.matrix.instruments,
-    weights: input.weights,
-  });
-  if (
-    vectorPacket.status !== "reviewable" ||
-    !vectorPacket.canonicalVector ||
-    !vectorPacket.scenarioVectorHash
-  ) {
-    return blockedResult("research_vector_invalid");
+  const prepared = prepareSimulationResearchPaths(input);
+  if (prepared.status !== "ready") {
+    return blockedResult(prepared.reason);
   }
 
+  return executeSimulationResearchPathsFromPrepared({
+    prepared,
+    scenarioId: input.scenarioId,
+    scenarioVersion: input.scenarioVersion,
+    weights: input.weights,
+    samplePathCount: input.samplePathCount,
+  });
+}
+
+export function prepareSimulationResearchPaths(input: {
+  matrix: SimulationReturnMatrixResult;
+  seed: number;
+  expectedBlockLength: number;
+  horizon: number;
+  pathCount: number;
+}) {
   const drawPlan = buildStationaryBootstrapDrawPlan({
     matrix: input.matrix,
     seed: input.seed,
@@ -64,13 +85,58 @@ export function executeSimulationResearchPaths(input: {
     !drawPlan.inputMatrixHash ||
     !drawPlan.drawPlanHash
   ) {
-    return blockedResult("draw_plan_blocked");
+    return preparationBlockedResult("draw_plan_blocked");
   }
 
   const grossGrowth = materializeSimulationGrossGrowth({
     matrix: input.matrix,
     drawPlan,
   });
+  if (
+    grossGrowth.status !== "ready" ||
+    !grossGrowth.inputMatrixHash ||
+    !grossGrowth.drawPlanHash
+  ) {
+    return preparationBlockedResult("gross_growth_blocked");
+  }
+
+  return Object.freeze({
+    status: "ready" as const,
+    reason: null,
+    matrix: input.matrix,
+    grossGrowth,
+    assumptions: Object.freeze({
+      horizon: input.horizon,
+      pathCount: input.pathCount,
+      expectedBlockLength: input.expectedBlockLength,
+      seed: input.seed,
+      normalizedStartIndex: 100,
+    }),
+  });
+}
+
+export function executeSimulationResearchPathsFromPrepared(input: {
+  prepared: ReadyPreparedSimulationResearchPaths;
+  scenarioId: string;
+  scenarioVersion: string;
+  weights: readonly ResearchWeight[];
+  samplePathCount: number;
+}) {
+  const vectorPacket = buildSimulationScenarioVectorReviewPacket({
+    scenarioId: input.scenarioId,
+    scenarioVersion: input.scenarioVersion,
+    matrixInstruments: input.prepared.matrix.instruments,
+    weights: input.weights,
+  });
+  if (
+    vectorPacket.status !== "reviewable" ||
+    !vectorPacket.canonicalVector ||
+    !vectorPacket.scenarioVectorHash
+  ) {
+    return blockedResult("research_vector_invalid");
+  }
+
+  const grossGrowth = input.prepared.grossGrowth;
   if (
     grossGrowth.status !== "ready" ||
     !grossGrowth.inputMatrixHash ||
@@ -147,13 +213,7 @@ export function executeSimulationResearchPaths(input: {
   return Object.freeze({
     status: "ready" as const,
     reason: null,
-    assumptions: Object.freeze({
-      horizon: input.horizon,
-      pathCount: input.pathCount,
-      expectedBlockLength: input.expectedBlockLength,
-      seed: input.seed,
-      normalizedStartIndex: 100,
-    }),
+    assumptions: input.prepared.assumptions,
     terminal: Object.freeze({
       p10Index: distribution.terminalSummary.p10 * 100,
       p50Index: distribution.terminalSummary.p50 * 100,
@@ -190,6 +250,18 @@ export function executeSimulationResearchPaths(input: {
         }),
       ),
     ),
+  });
+}
+
+function preparationBlockedResult(
+  reason: SimulationResearchPreparationBlockerReason,
+) {
+  return Object.freeze({
+    status: "unavailable" as const,
+    reason,
+    matrix: null,
+    grossGrowth: null,
+    assumptions: null,
   });
 }
 

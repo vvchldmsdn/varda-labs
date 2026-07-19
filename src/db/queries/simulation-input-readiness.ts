@@ -11,7 +11,9 @@ import {
   type SimulationInputReadinessDescriptor,
 } from "@/lib/simulation-input-readiness";
 import { buildFixedResearchSimulation } from "@/lib/simulation-fixed-research-execution";
-import { buildFixedMixResearchSimulation } from "@/lib/simulation-fixed-mix-research-execution";
+import { buildFixedMixResearchComparisonFromContext } from "@/lib/simulation-fixed-mix-research-comparison";
+import { buildFixedMixResearchSimulationFromContext } from "@/lib/simulation-fixed-mix-research-execution";
+import { prepareFixedMixResearchContext } from "@/lib/simulation-fixed-mix-research-context";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const KODEX_200 = Object.freeze({
@@ -113,11 +115,16 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       matrix: preflights[index]?.matrixArtifact ?? null,
     }),
   );
-  const fixedMixResearchExecution = buildFixedMixResearchSimulation({
+  const fixedMixResearchContext = prepareFixedMixResearchContext({
     explicitEndServiceDate,
     matrix: comparisonPreflight.matrixArtifact,
+  });
+  const fixedMixResearchExecution = buildFixedMixResearchSimulationFromContext({
+    context: fixedMixResearchContext,
     selection: fixedMixSelection,
   });
+  const fixedMixResearchComparison =
+    buildFixedMixResearchComparisonFromContext(fixedMixResearchContext);
 
   return buildSimulationInputReadinessPageModel({
     selection,
@@ -126,6 +133,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     history: selection.status === "valid" ? models : [],
     researchExecutions,
     fixedMixResearchExecution,
+    fixedMixResearchComparison,
     fixedMixSelection,
   });
 }

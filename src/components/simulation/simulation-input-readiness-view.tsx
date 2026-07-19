@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
+import { FixedMixResearchComparisonSection } from "./fixed-mix-research-comparison-section";
 import { FixedMixResearchExecutionSection } from "./fixed-mix-research-execution-section";
 import { FixedResearchExecutionSection } from "./fixed-research-execution-section";
 import { ObservedReturnAlignmentEvidencePanel } from "./observed-return-alignment-evidence-panel";
@@ -26,12 +27,19 @@ export function SimulationInputReadinessView({
   const readySingleExecutionCount = model.researchExecutions.filter(
     (execution) => execution.status === "ready",
   ).length;
+  const comparisonScenarioCount = model.fixedMixResearchComparison ? 3 : 0;
+  const readyComparisonScenarioCount =
+    model.fixedMixResearchComparison?.status === "ready"
+      ? model.fixedMixResearchComparison.scenarios.length
+      : 0;
   const totalExecutionCount =
     model.researchExecutions.length +
-    (model.fixedMixResearchExecution ? 1 : 0);
+    (model.fixedMixResearchExecution ? 1 : 0) +
+    comparisonScenarioCount;
   const readyExecutionCount =
     readySingleExecutionCount +
-    (model.fixedMixResearchExecution?.status === "ready" ? 1 : 0);
+    (model.fixedMixResearchExecution?.status === "ready" ? 1 : 0) +
+    readyComparisonScenarioCount;
 
   return (
     <main
@@ -125,6 +133,10 @@ export function SimulationInputReadinessView({
           endServiceDate={model.requestedEndServiceDate}
           execution={model.fixedMixResearchExecution}
           selection={model.fixedMixSelection}
+        />
+        <FixedMixResearchComparisonSection
+          comparison={model.fixedMixResearchComparison}
+          selectedKodexWeightPct={selectedKodexWeightPct}
         />
 
         <section
