@@ -19,7 +19,7 @@ export const LEGACY_RECONSTRUCTION_CANDIDATE_POLICY = Object.freeze({
   legacyFxReferenceDateField:
     "diagnostic_only_writer_stored_service_date_instead_of_source_date",
   fount: "exclude_on_same_account_date_source_axis_without_renormalization",
-  krxGold: "blocked_until_instrument_keyed_official_close_authority_exists",
+  krxGold: "blocked_until_explicit_manual_valuation_history_exists",
   output: "count_only",
 });
 
@@ -46,8 +46,8 @@ export const LEGACY_RECONSTRUCTION_BLOCKERS = Object.freeze([
   "usd_fx_value_mismatch",
   "position_formula_mismatch",
   "fount_exclusion_value_incomplete",
-  "krx_gold_official_close_missing",
-  "krx_gold_instrument_binding_unproven",
+  "krx_gold_manual_history_missing",
+  "krx_gold_manual_history_coverage_pending",
   "unknown_tickerless_holding",
   "portfolio_reconstruction_mismatch",
   "empty_candidate",
@@ -229,19 +229,20 @@ function evaluateGroup(group, evidenceCounts) {
 
     includedRows += 1;
     evidenceCounts.includedRows += 1;
-    const isGold = specialOutcome === "separate_valuation_model_required" &&
-      identity.specialHoldingEvidence?.classification === "physical_commodity_position";
+    const isGold =
+      specialOutcome === "manual_valuation_history_required" &&
+      identity.specialHoldingEvidence?.resolvedProductKey === "gold_9999_1kg";
     const isUnknown = !identity.ticker && !isGold;
     if (isGold) {
       evidenceCounts.krxGoldRows += 1;
-      const officialCandidate =
-        stableText(row.price_source)?.toLowerCase() === "fsc_public_data_gold_daily" &&
-        stableText(row.price_basis)?.toLowerCase() === "official_close" &&
+      const manualCandidate =
+        stableText(row.price_source)?.toLowerCase() === "manual_entry" &&
+        stableText(row.price_basis)?.toLowerCase() === "manual_current" &&
         stableText(row.reference_date) !== null;
       blockers.add(
-        officialCandidate
-          ? "krx_gold_instrument_binding_unproven"
-          : "krx_gold_official_close_missing",
+        manualCandidate
+          ? "krx_gold_manual_history_coverage_pending"
+          : "krx_gold_manual_history_missing",
       );
     } else if (isUnknown) {
       evidenceCounts.unknownTickerlessRows += 1;

@@ -9,6 +9,7 @@ import {
   toNumber,
 } from "./portfolio-math.ts";
 import { portfolioEventAccount } from "./portfolio-return-metrics-core.ts";
+import { MANUAL_ASSET_PRICE_POLICY } from "./market-data/manual-asset-price.ts";
 
 const MOVEMENT_INVESTMENT_ASSET_TYPES = new Set([
   "etf",
@@ -503,6 +504,14 @@ export function hasFreshMovementPrice(
   movementCycle: PortfolioMovementCycle,
 ) {
   const quoteType = holding.priceQuoteType?.trim().toLowerCase() ?? "";
+  if (quoteType === MANUAL_ASSET_PRICE_POLICY.quoteType) {
+    return (
+      holding.priceStatus === MANUAL_ASSET_PRICE_POLICY.status &&
+      Number.isFinite(holding.currentPrice) &&
+      holding.currentPrice > 0 &&
+      timestampMs(holding.priceAsOf) > 0
+    );
+  }
   if (!MOVEMENT_FRESH_PRICE_QUOTE_TYPES.has(quoteType)) return false;
   if (holding.priceStatus && holding.priceStatus !== "ok") return false;
 

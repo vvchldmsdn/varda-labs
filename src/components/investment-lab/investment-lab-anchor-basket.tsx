@@ -415,6 +415,8 @@ function specialHoldingReasonLabel(
       "Base44 이관 포지션 ticker 합의로 복구",
     stored_snapshot_ticker_conflict: "이관 포지션 ticker가 서로 충돌",
     stored_snapshot_metadata_mismatch: "이관 포지션 메타데이터 불일치",
+    manual_valuation_history_required:
+      "금현물의 명시적 수동 평가 이력이 필요",
     instrument_keyed_official_close_required:
       "실물 commodity용 instrument-keyed 공식 종가 모델 필요",
     product_owner_excluded_from_decision_support:
@@ -431,6 +433,9 @@ function specialHoldingOutcomeLabel(
 ) {
   if (outcome === "eligible_historical_instrument") {
     return "과거 종목 후보";
+  }
+  if (outcome === "manual_valuation_history_required") {
+    return "수동 평가 이력 필요";
   }
   if (outcome === "separate_valuation_model_required") {
     return "별도 평가 모델 필요";

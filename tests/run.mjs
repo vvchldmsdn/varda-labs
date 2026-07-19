@@ -67,6 +67,7 @@ import "./target-policy-review-packet.test.mjs";
 import "./target-policy-holding-universe.test.mjs";
 import "./target-policy-resolver.test.mjs";
 import "./instrument-identity.test.mjs";
+import "./manual-asset-price.test.mjs";
 import "./krx-gold-close-cycle.test.mjs";
 import "./fsc-krx-gold-source.test.mjs";
 import "./today-holding-detail.test.mjs";

@@ -222,6 +222,8 @@ function scenarioReasonLabel(reason: InvestmentLabScenarioAvailabilityReason) {
     market_history_incomplete: "90개 수익률 축의 가격·환율 근거가 불완전",
     authoritative_actual_history_pending: "장기 실제 평가액 경로의 계산 권한은 아직 없음",
     fount_scope_adjustment_required: "Fount 제외 경로 변환이 필요",
+    manual_valuation_history_required:
+      "금현물은 현재 수동 평가만 있고 과거 수동 평가 이력이 부족",
     special_holding_price_authority_required: "특수 보유자산의 별도 가격 권한이 필요",
     scheduled_rebalance_contract_pending: "월간·분기 리밸런싱 규칙과 비용 계약이 미정",
     point_in_time_policy_receipts_missing: "과거 시점 목표·추천 승인 기록이 없음",
@@ -243,14 +245,16 @@ function repairItemLabel(item: InvestmentLabRepairItem) {
       : `시장 가격·환율: ${item.affectedCount}개 누락 근거는 승인 후 provider backfill 후보`;
   }
   if (item.id === "krx_gold") {
-    return "KRX 금현물: 공식 종가 소스와 상품 키를 연결한 별도 가격 경로 필요";
+    return "KRX 금현물: 저장된 1g당 수동 가격은 현재 평가에 사용하며, 과거 비교는 명시적 수동 평가 이력이 쌓인 구간만 사용";
   }
   return "Fount: 가격 누락이 아니라 투자 랩 범위에서 제외하는 경로 변환 필요";
 }
 
 function specialHoldingLabel(kind: "fount" | "krx_gold" | "unresolved") {
   if (kind === "fount") return "투자 랩·시뮬레이션에서 의도적으로 제외";
-  if (kind === "krx_gold") return "KRX 공식 종가 기반 별도 평가 모델 필요";
+  if (kind === "krx_gold") {
+    return "저장된 1g당 수동 평가 사용 · 과거 계산은 수동 이력 필요";
+  }
   return "정확한 상품 식별과 가격 권한 확인 필요";
 }
 

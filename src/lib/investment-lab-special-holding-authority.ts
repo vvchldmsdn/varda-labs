@@ -1,4 +1,7 @@
-import { KRX_GOLD_CLOSE_ONLY_CONTRACT } from "./instrument-identity.ts";
+import {
+  KRX_GOLD_ACTIVE_VALUATION_POLICY,
+  KRX_GOLD_CLOSE_ONLY_CONTRACT,
+} from "./instrument-identity.ts";
 
 const IMPORTED_SNAPSHOT_SOURCE = "base44_import";
 
@@ -14,7 +17,7 @@ export const DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS = Object.freeze({
       currency: "KRW",
       assetType: "commodity",
       productKey: KRX_GOLD_CLOSE_ONLY_CONTRACT.identityBinding.productKey,
-      outcome: "separate_valuation_model_required",
+      outcome: "manual_valuation_history_required",
     }),
     fount: Object.freeze({
       assetName: "Fount 일임서비스",
@@ -38,7 +41,10 @@ export const INVESTMENT_LAB_SPECIAL_HOLDING_AUTHORITY_POLICY = Object.freeze({
   importedTickerAuthority:
     "same_legacy_identity_base44_snapshot_metadata_consensus",
   currentAssetFallback: "forbidden",
-  currentPriceFallback: "forbidden",
+  currentValuation:
+    KRX_GOLD_ACTIVE_VALUATION_POLICY.currentValuation.mode,
+  currentPriceFallback: "forbidden_for_historical_backcast",
+  manualValuationHistory: "admit_explicit_observations_only",
   nameInference: "forbidden",
   partialBasket: "forbidden",
   productOwnerDecisionBinding:
@@ -72,6 +78,7 @@ export type InvestmentLabImportedTickerEvidence = Readonly<{
 
 export type InvestmentLabSpecialHoldingAuthorityOutcome =
   | "eligible_historical_instrument"
+  | "manual_valuation_history_required"
   | "separate_valuation_model_required"
   | "intentionally_excluded"
   | "permanently_unsupported";
@@ -105,6 +112,7 @@ export type InvestmentLabAnchorSpecialHoldingEvidence = Readonly<{
     | "stored_snapshot_ticker_recovered"
     | "stored_snapshot_ticker_conflict"
     | "stored_snapshot_metadata_mismatch"
+    | "manual_valuation_history_required"
     | "instrument_keyed_official_close_required"
     | "product_owner_excluded_from_decision_support"
     | "explicit_product_classification_required"
@@ -250,9 +258,9 @@ export function resolveInvestmentLabSpecialHoldingIdentity(
           DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold
             .productKey,
         identityAuthority: "broker_statement_and_krx_product_definition",
-        historicalAuthorityOutcome: "separate_valuation_model_required",
+        historicalAuthorityOutcome: "manual_valuation_history_required",
         historicalCoverageStatus: "blocked",
-        reason: "instrument_keyed_official_close_required",
+        reason: "manual_valuation_history_required",
       }),
     });
   }

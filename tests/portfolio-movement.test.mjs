@@ -268,6 +268,21 @@ describe("portfolio movement builder", () => {
     assert.equal(result.coverage.currentCoveragePct, 0);
   });
 
+  it("retains an explicit manual valuation until the next manual update", () => {
+    const manualHolding = holding({
+      priceFetchedAt: null,
+      priceAsOf: "2026-06-01T03:00:00.000Z",
+      priceQuoteType: "manual_valuation",
+      priceStatus: "stored_manual",
+    });
+    const result = buildDaily({ holdings: [manualHolding] });
+
+    assert.equal(hasFreshMovementPrice(manualHolding, movementCycle), true);
+    assert.equal(result.ready, true);
+    assert.equal(result.changeKrw, -50);
+    assert.equal(result.contributions.get("asset-kr")?.changeKrw, -50);
+  });
+
   it("excludes unsupported currency instead of treating it as KRW", () => {
     const result = buildDaily({
       holdings: [

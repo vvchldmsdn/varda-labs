@@ -1,12 +1,19 @@
 # KRX Gold Close-Only Source Feasibility Audit v1
 
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 Status: official Financial Services Commission public-data source and a
 fixture-backed read-only dry-run are implemented. Actual response coverage,
 schema, persistence, readers, and calculation authority remain blocked. This
 audit performed no provider request, database read or write, schema change,
 backfill, route, API, UI, job, or Cron work.
+
+This document now records a deferred provider option, not the active valuation
+gate. The active product direction uses the stored user-entered KRW-per-gram
+value until the next manual update. No public-data key or authenticated provider
+response is required to continue the migration. Manual values are forward-only
+valuation observations and are not relabeled as official closes or backcast into
+missing history.
 
 ## Decision
 
@@ -29,8 +36,9 @@ Two independent blockers remain:
 2. the Investment Lab path uses fractional units, while executable KRX Gold
    trades use integer grams.
 
-The existing Investment Lab anchor basket therefore remains wholly
-unavailable. No proxy, partial basket, or source-less stored price is admitted.
+The official-close path remains unavailable. Investment Lab may separately use
+an explicit manual valuation history once enough forward observations exist;
+the current stored value alone is not admitted as a synthetic past series.
 
 ## Official Market Facts
 

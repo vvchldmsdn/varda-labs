@@ -45,7 +45,7 @@ describe("investment lab data availability", () => {
     );
   });
 
-  it("keeps KRX gold on a separate close authority without blocking same-flow baselines", () => {
+  it("requires explicit manual KRX gold history without blocking same-flow baselines", () => {
     const model = buildInvestmentLabDataAvailability({
       account: "brokerage",
       snapshotRows: [
@@ -67,12 +67,12 @@ describe("investment lab data availability", () => {
     assert.equal(scenario(model, "fixed_quantity").status, "blocked");
     assert.ok(
       scenario(model, "fixed_quantity").reasons.includes(
-        "special_holding_price_authority_required",
+        "manual_valuation_history_required",
       ),
     );
     assert.deepEqual(model.repairItems.at(-1), {
       id: "krx_gold",
-      status: "separate_source_required",
+      status: "manual_history_required",
       affectedCount: 1,
     });
   });

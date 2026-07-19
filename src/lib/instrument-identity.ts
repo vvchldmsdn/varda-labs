@@ -1,3 +1,5 @@
+import { MANUAL_ASSET_PRICE_POLICY } from "./market-data/manual-asset-price.ts";
+
 export type InstrumentSemanticIdentity = Readonly<{
   instrumentKind: string;
   venue: string;
@@ -61,6 +63,28 @@ export const KRX_GOLD_CLOSE_ONLY_CONTRACT = Object.freeze({
       "integer_grams_with_residual_cash_not_implemented",
     shortSelling: "forbidden_fail_closed",
   }),
+} as const);
+
+export const KRX_GOLD_ACTIVE_VALUATION_POLICY = Object.freeze({
+  version: "krx_gold_manual_valuation_v1",
+  approvedOn: "2026-07-19",
+  productKey: KRX_GOLD_CLOSE_ONLY_CONTRACT.identityBinding.productKey,
+  holdingUnit: "g",
+  quoteCurrency: "KRW",
+  quoteUnit: "KRW_PER_G",
+  currentValuation: Object.freeze({
+    mode: "stored_manual_price",
+    source: MANUAL_ASSET_PRICE_POLICY.source,
+    quoteKind: MANUAL_ASSET_PRICE_POLICY.quoteType,
+    storage: "assets.current_price",
+    carryPolicy: MANUAL_ASSET_PRICE_POLICY.carryPolicy,
+  }),
+  history: Object.freeze({
+    admission: "manual_observations_only",
+    currentValueBackcast: "forbidden",
+    missingObservationFill: "forbidden_without_separate_policy",
+  }),
+  automatedProvider: "deferred_not_current_gate",
 } as const);
 
 export type KrxGoldCloseEvidence = Readonly<{

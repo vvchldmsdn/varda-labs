@@ -71,6 +71,7 @@ export type InvestmentLabScenarioAvailabilityReason =
   | "market_history_incomplete"
   | "authoritative_actual_history_pending"
   | "fount_scope_adjustment_required"
+  | "manual_valuation_history_required"
   | "special_holding_price_authority_required"
   | "scheduled_rebalance_contract_pending"
   | "point_in_time_policy_receipts_missing"
@@ -94,7 +95,7 @@ export type InvestmentLabRepairItem = Readonly<{
     | "not_needed"
     | "review_required"
     | "provider_backfill_candidate"
-    | "separate_source_required"
+    | "manual_history_required"
     | "scope_transform_required";
   affectedCount: number;
 }>;
@@ -130,7 +131,13 @@ export function buildInvestmentLabDataAvailability(input: {
   const actualSegmentReady =
     actualHistory.latestCurrentWriterDateCount >=
     INVESTMENT_LAB_DATA_AVAILABILITY_POLICY.minimumActualComparisonDates;
-  const specialPriceAuthorityBlocked = hasGold || hasUnresolvedSpecialHolding;
+  const specialHistoryBlocked = hasGold || hasUnresolvedSpecialHolding;
+  const specialHistoryReasons: InvestmentLabScenarioAvailabilityReason[] = [
+    ...(hasGold ? (["manual_valuation_history_required"] as const) : []),
+    ...(hasUnresolvedSpecialHolding
+      ? (["special_holding_price_authority_required"] as const)
+      : []),
+  ];
 
   const scenarioRows: readonly InvestmentLabScenarioAvailability[] =
     Object.freeze([
@@ -148,7 +155,7 @@ export function buildInvestmentLabDataAvailability(input: {
       ),
       scenario(
         "fixed_quantity",
-        marketHistoryReady && !hasFount && !specialPriceAuthorityBlocked
+        marketHistoryReady && !hasFount && !specialHistoryBlocked
           ? "market_only_ready"
           : "blocked",
         [
@@ -156,14 +163,12 @@ export function buildInvestmentLabDataAvailability(input: {
             ? "authoritative_actual_history_pending"
             : "market_history_incomplete",
           ...(hasFount ? ["fount_scope_adjustment_required" as const] : []),
-          ...(specialPriceAuthorityBlocked
-            ? ["special_holding_price_authority_required" as const]
-            : []),
+          ...specialHistoryReasons,
         ],
       ),
       scenario(
         "scheduled_weights",
-        marketHistoryReady && !hasFount && !specialPriceAuthorityBlocked
+        marketHistoryReady && !hasFount && !specialHistoryBlocked
           ? "market_only_ready"
           : "blocked",
         [
@@ -172,9 +177,7 @@ export function buildInvestmentLabDataAvailability(input: {
             : "market_history_incomplete",
           "scheduled_rebalance_contract_pending",
           ...(hasFount ? ["fount_scope_adjustment_required" as const] : []),
-          ...(specialPriceAuthorityBlocked
-            ? ["special_holding_price_authority_required" as const]
-            : []),
+          ...specialHistoryReasons,
         ],
       ),
       scenario("historical_policy_weights", "blocked", [
@@ -182,7 +185,7 @@ export function buildInvestmentLabDataAvailability(input: {
       ]),
       scenario(
         "hindsight_research",
-        multivariateHistoryReady && !hasFount && !specialPriceAuthorityBlocked
+        multivariateHistoryReady && !hasFount && !specialHistoryBlocked
           ? "research_only"
           : "blocked",
         [
@@ -190,9 +193,7 @@ export function buildInvestmentLabDataAvailability(input: {
             ? "walk_forward_cost_constraints_pending"
             : "multivariate_history_unavailable",
           ...(hasFount ? ["fount_scope_adjustment_required" as const] : []),
-          ...(specialPriceAuthorityBlocked
-            ? ["special_holding_price_authority_required" as const]
-            : []),
+          ...specialHistoryReasons,
         ],
       ),
     ]);
@@ -221,7 +222,7 @@ export function buildInvestmentLabDataAvailability(input: {
     repairItems.push(
       Object.freeze({
         id: "krx_gold" as const,
-        status: "separate_source_required" as const,
+        status: "manual_history_required" as const,
         affectedCount: specialHoldings.filter((row) => row.kind === "krx_gold")
           .length,
       }),

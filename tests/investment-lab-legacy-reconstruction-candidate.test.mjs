@@ -120,7 +120,7 @@ describe("investment lab legacy reconstructed-observed candidate", () => {
 
     assert.equal(report.status, "blocked");
     assert.equal(report.blockerGroups.fallback_price_marker, 1);
-    assert.equal(report.blockerGroups.krx_gold_official_close_missing, 1);
+    assert.equal(report.blockerGroups.krx_gold_manual_history_missing, 1);
   });
 
   it("does not expose raw dates, values, names, or identities", () => {

@@ -1,10 +1,33 @@
 # Instrument Identity And KRX Gold Close-Only Phase 0
 
-Last updated: 2026-07-15
+Last updated: 2026-07-19
 
-Status: pure contract and dependency audit implemented. No schema, migration,
-database write, provider call, Cron, route, API, UI, snapshot reader, target
-resolver, or allocator behavior changed.
+Status: the active valuation policy is stored manual KRW-per-gram input. The
+official-close source work remains available for a later phase but is not a
+current implementation gate. No schema, migration, provider call, Cron,
+authenticated user-edit UI, target resolver, or allocator behavior changed.
+
+## Active Manual Valuation Direction
+
+The user may explicitly replace the stored 1g valuation. Until that happens,
+the service retains `assets.current_price` and continues to use it for current
+valuation and future daily snapshots. A manual update also records
+`price_source=manual_entry`, `price_quote_type=manual_valuation`, and the exact
+update time. It is not a market quote or an official close.
+
+The policy is forward-only:
+
+- a newly entered value does not rewrite older snapshots;
+- the current value is never copied backward to manufacture historical returns;
+- Investment Lab and Simulation may use only explicit stored manual observations;
+- missing historical observations remain disclosed until a separate fill policy
+  or automated source is implemented;
+- the Financial Services Commission provider is deferred and no longer blocks
+  unrelated migration work.
+
+The existing asset CRUD route remains admin-protected. A user-facing editor must
+wait for the authenticated tenant session boundary rather than exposing a global
+Basic-Auth mutation.
 
 ## Ordering Decision
 
@@ -27,7 +50,7 @@ The production Gate B1 read-only audit on 2026-07-11 confirmed:
 
 ## Product Boundary
 
-KRX gold is a close-only spot commodity family in v1. It is not a live quote
+KRX gold is a manually valued spot commodity family in the active v1 path. It is not a live quote
 target. Broker holding evidence reviewed on 2026-07-16 binds this imported
 holding to the KRX 99.99% 1kg product. The holding quantity is denominated in
 grams because both KRX products trade in 1g units and are quoted in KRW per
@@ -41,10 +64,11 @@ gram. Sensitive broker evidence is not stored in this repository.
 | holding unit | `g` |
 | quote currency | `KRW` |
 | quote unit | `KRW_PER_G` |
-| price mode | `official_close_only` |
-| source | `fsc_public_data_gold_daily` |
-| quote kind | `official_close` |
+| price mode | `stored_manual_price` |
+| source | `manual_entry` |
+| quote kind | `manual_valuation` |
 | live quote eligible | `false` |
+| automated provider | deferred (`fsc_public_data_gold_daily`) |
 
 The two `productKey` values are internal product identities, not KRX or broker
 symbols. This holding is bound only to `gold_9999_1kg`; it must never collapse
@@ -74,7 +98,7 @@ proxy for the KRX gold holding:
 The fixture in `tests/instrument-identity.test.mjs` gives each a different
 semantic identity and proves that the keys cannot collapse into one another.
 
-## Official-Close Evidence
+## Deferred Official-Close Evidence
 
 A usable observation must contain all of:
 
@@ -120,14 +144,14 @@ is no new comparison period; it is not evidence of a zero return.
 | `asset_price_snapshots` | ticker is required and uniqueness is `(ticker,date)` | do not reuse for tickerless KRX gold |
 | `live_price_quotes` | ticker is required and key is market/ticker/provider | never store close-only gold here |
 | KIS price sync | silently excludes rows without ticker | keep gold outside this target builder; do not invent a ticker |
-| daily snapshot writer | uses `assets.current_price` with `manual_current` fallback | later read explicit official-close evidence and preserve its `priceDate` |
-| dashboard and structure reads | live quotes are ticker keyed; asset current price is fallback | later expose latest close with source and as-of date, not as live |
-| today movement | asset freshness is modeled as a live-window timestamp | add an isolated close-only comparison path before including gold |
+| daily snapshot writer | uses `assets.current_price` with manual provenance | retain the stored value until the next manual update; never backcast it |
+| dashboard and structure reads | live quotes are ticker keyed; asset current price is the intended gold valuation | expose the manual source and as-of date without calling it live |
+| today movement | tickerless gold uses stored current valuation evidence | compare only against an explicit prior stored observation |
 | admin sync status | price and close coverage are ticker based | add separate close-only health evidence later |
 | Gate B1 | `(market,currency,ticker)` makes brokerage fail closed | keep blocked until explicit instrument identity and policy treatment are reviewed |
 | Additional Contribution | allocation identity is ticker based | do not include gold in a positive vector before a separate allocator decision |
-| portfolio risk | tickerless holdings are excluded and price history is ticker keyed | require instrument-keyed close history before risk inclusion |
-| Investment Lab | stored ticker or a single-ticker consensus from same-identity Base44-imported position snapshots can establish listed identity; current asset metadata is not historical authority and tickerless commodity remains blocked | require a bound gold instrument identity and instrument-keyed official-close history before inclusion |
+| portfolio risk | tickerless holdings are excluded and price history is ticker keyed | add an explicit manual-observation history path before risk inclusion |
+| Investment Lab | the reviewed gold product is identified, but a single current manual value is not historical authority | admit only explicit forward manual observations; do not wait for the deferred provider |
 | event and movement matching | asset UUID and legacy asset id are primary fallbacks | no fake ticker is needed for historical event matching |
 
 ## Production Special-Holding Authority Audit
@@ -165,13 +189,13 @@ removes Fount from both the observed path and scenario capital.
 
 KRX gold has two stored values (`211,500` and `225,750 KRW`) and one trade
 event. The event is quantity/cost evidence, not official-close history. The
-product and holding unit are resolved, while the official KRX close series
-remains `separate_valuation_model_required`.
+product and holding unit are resolved. These values may remain explicit manual
+valuation observations, but they are not silently relabeled as provider data.
 
-Therefore the anchor basket remains wholly unavailable until the Fount scope
-transform and KRX Gold close authority are implemented. No provider call,
-database write, schema change, backfill, proxy substitution, or partial-basket
-calculation was used.
+The anchor basket remains unavailable until the Fount scope transform and a
+bounded manual-observation history path are implemented. The official provider
+is no longer a prerequisite. No provider call, database write, schema change,
+backfill, proxy substitution, or partial-basket calculation was used.
 
 ## Deferred Additive Sequence
 

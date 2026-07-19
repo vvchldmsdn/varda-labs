@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  KRX_GOLD_ACTIVE_VALUATION_POLICY,
   KRX_GOLD_CLOSE_ONLY_CONTRACT,
   buildInstrumentSemanticKey,
   classifyKrxGoldCloseMovement,
@@ -10,6 +11,30 @@ import {
 } from "../src/lib/instrument-identity.ts";
 
 describe("KRX gold close-only instrument contract", () => {
+  it("uses a stored manual price until the next explicit update", () => {
+    assert.deepEqual(KRX_GOLD_ACTIVE_VALUATION_POLICY, {
+      version: "krx_gold_manual_valuation_v1",
+      approvedOn: "2026-07-19",
+      productKey: "gold_9999_1kg",
+      holdingUnit: "g",
+      quoteCurrency: "KRW",
+      quoteUnit: "KRW_PER_G",
+      currentValuation: {
+        mode: "stored_manual_price",
+        source: "manual_entry",
+        quoteKind: "manual_valuation",
+        storage: "assets.current_price",
+        carryPolicy: "retain_until_next_manual_update",
+      },
+      history: {
+        admission: "manual_observations_only",
+        currentValueBackcast: "forbidden",
+        missingObservationFill: "forbidden_without_separate_policy",
+      },
+      automatedProvider: "deferred_not_current_gate",
+    });
+  });
+
   it("binds the reviewed broker holding without claiming source readiness", () => {
     assert.deepEqual(KRX_GOLD_CLOSE_ONLY_CONTRACT.verifiedMarketFacts, {
       instrumentKind: "commodity_spot",

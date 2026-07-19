@@ -273,7 +273,11 @@ describe("investment lab anchor-date observed basket", () => {
     );
     assert.equal(
       decision.specialHoldingEvidence.historicalAuthorityOutcome,
-      "separate_valuation_model_required",
+      "manual_valuation_history_required",
+    );
+    assert.equal(
+      decision.specialHoldingEvidence.reason,
+      "manual_valuation_history_required",
     );
   });
 

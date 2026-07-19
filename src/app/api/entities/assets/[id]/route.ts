@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { assetEntityApiSelection } from "@/db/entity-api-selections";
 import { assets } from "@/db/schema";
 import { requireAdminJob } from "@/lib/api-guards";
+import { buildManualAssetPriceUpdate } from "@/lib/market-data/manual-asset-price";
 
 const optionalText = z.preprocess((value) => {
   if (value === undefined) return undefined;
@@ -207,6 +208,8 @@ export async function PATCH(
     );
   }
 
+  const updatedAt = new Date();
+
   const [updated] = await db
     .update(assets)
     .set({
@@ -220,7 +223,9 @@ export async function PATCH(
       ...(body.account !== undefined ? { account: body.account } : {}),
       ...(accountId !== undefined ? { accountId } : {}),
       ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
-      ...(currentPrice !== undefined ? { currentPrice } : {}),
+      ...(currentPrice !== undefined
+        ? buildManualAssetPriceUpdate({ currentPrice, recordedAt: updatedAt })
+        : {}),
       ...(averageCost !== undefined ? { averageCost } : {}),
       ...(targetWeight !== undefined ? { targetWeight } : {}),
       ...(groupId !== undefined ? { groupId } : {}),
@@ -235,7 +240,7 @@ export async function PATCH(
       ...(monthlyContribution !== undefined ? { monthlyContribution } : {}),
       ...(contributionDay !== undefined ? { contributionDay } : {}),
       ...(createdById !== undefined ? { createdById } : {}),
-      updatedAt: new Date(),
+      updatedAt,
     })
     .where(eq(assets.id, id))
     .returning(assetEntityApiSelection);
