@@ -22,6 +22,7 @@ export function SimulationInputReadinessView({
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
   const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
+  const selectedKodexWeightPct = model.fixedMixSelection.kodexWeightPct;
   const readySingleExecutionCount = model.researchExecutions.filter(
     (execution) => execution.status === "ready",
   ).length;
@@ -110,10 +111,20 @@ export function SimulationInputReadinessView({
         />
         <FixedResearchExecutionSection
           executions={model.researchExecutions}
+          recommendedEndHref={
+            recommendedEndServiceDate
+              ? simulationDateHref(
+                  recommendedEndServiceDate,
+                  selectedKodexWeightPct,
+                )
+              : null
+          }
           recommendedEndServiceDate={recommendedEndServiceDate}
         />
         <FixedMixResearchExecutionSection
+          endServiceDate={model.requestedEndServiceDate}
           execution={model.fixedMixResearchExecution}
+          selection={model.fixedMixSelection}
         />
 
         <section
@@ -128,6 +139,7 @@ export function SimulationInputReadinessView({
                 sharedReturnScale ?? resolveObservedReturnScale(input)
               }
               returnScaleMode={sharedReturnScale ? "shared" : "individual"}
+              selectedKodexWeightPct={selectedKodexWeightPct}
             />
           ))}
         </section>
@@ -135,6 +147,7 @@ export function SimulationInputReadinessView({
         {model.history.length > 0 ? (
           <ReadinessHistory
             rows={model.history}
+            selectedKodexWeightPct={selectedKodexWeightPct}
             selectedServiceDate={model.requestedEndServiceDate}
           />
         ) : null}
@@ -162,9 +175,11 @@ function sharedNearestPriorDate(inputs: readonly InputReadiness[]) {
 
 function ReadinessHistory({
   rows,
+  selectedKodexWeightPct,
   selectedServiceDate,
 }: {
   rows: readonly HistoryRow[];
+  selectedKodexWeightPct: number | null;
   selectedServiceDate: string;
 }) {
   return (
@@ -230,7 +245,10 @@ function ReadinessHistory({
                       </span>
                     ) : (
                       <Link
-                        href={`/simulation?end=${row.serviceDate}`}
+                        href={simulationDateHref(
+                          row.serviceDate,
+                          selectedKodexWeightPct,
+                        )}
                         className="inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-xs font-semibold text-[#253029] hover:bg-[#eef1e8]"
                       >
                         이 날짜 검사
@@ -284,10 +302,12 @@ function InputPanel({
   input,
   observedReturnScale,
   returnScaleMode,
+  selectedKodexWeightPct,
 }: {
   input: InputReadiness;
   observedReturnScale: number;
   returnScaleMode: "shared" | "individual";
+  selectedKodexWeightPct: number | null;
 }) {
   const ready = input.status === "matrix_ready";
 
@@ -392,7 +412,10 @@ function InputPanel({
         {!ready && input.nearestPriorObservedServiceDate ? (
           <Link
             data-review-nearest-prior
-            href={`/simulation?end=${input.nearestPriorObservedServiceDate}`}
+            href={simulationDateHref(
+              input.nearestPriorObservedServiceDate,
+              selectedKodexWeightPct,
+            )}
             className="mt-4 inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-semibold text-[#253029] hover:bg-[#eef1e8]"
           >
             최근 관측 기준일 {formatDate(input.nearestPriorObservedServiceDate)}로 다시 검사
@@ -478,4 +501,15 @@ function formatDate(value: string | null) {
 
 function formatPct(value: number) {
   return `${value.toFixed(2)}%`;
+}
+
+function simulationDateHref(
+  endServiceDate: string,
+  kodexWeightPct: number | null,
+) {
+  const params = new URLSearchParams({ end: endServiceDate });
+  if (kodexWeightPct !== null) {
+    params.set("kodexWeight", String(kodexWeightPct));
+  }
+  return `/simulation?${params}`;
 }

@@ -6,6 +6,7 @@ describe("Simulation input readiness route boundary", () => {
   it("keeps the page server-rendered and the database adapter server-only", () => {
     const page = read("src/app/simulation/page.tsx");
     const query = read("src/db/queries/simulation-input-readiness.ts");
+    const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
     const view = readSimulationView();
 
     assert.doesNotMatch(page, /["']use client["']/);
@@ -13,15 +14,20 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
     assert.match(query, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
+    assert.match(page, /kodexWeight: params\.kodexWeight/);
     assert.doesNotMatch(page, /params\.end\[0\]/);
     assert.match(query, /resolveSimulationEndServiceDateSelection/);
     assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
     assert.match(query, /buildFixedResearchSimulation/);
     assert.match(query, /buildFixedMixResearchSimulation/);
+    assert.match(query, /resolveKodexVooFixedMixSelection/);
     assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
     assert.match(query, /candidates: INPUTS\.map\(candidate\)/);
     assert.match(query, /\.\.\.independentRequests, comparisonRequest/);
     assert.doesNotMatch(query, /endServiceDate\?\.trim\(\)/);
+    assert.match(selection, /typeof value !== "string"/);
+    assert.match(selection, /minimumComponentWeightPct: 1/);
+    assert.match(selection, /maximumComponentWeightPct: 99/);
     assert.match(query, /ticker: "069500"/);
     assert.match(query, /ticker: "VOO"/);
     assert.doesNotMatch(
@@ -47,13 +53,19 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-joint-research-execution-status/);
     assert.match(view, /data-joint-sampling/);
     assert.match(view, /data-joint-rebalancing="none"/);
+    assert.match(view, /data-joint-research-selection-status/);
+    assert.match(view, /data-joint-research-kodex-weight-bps/);
     assert.match(view, /3개월 연구 시뮬레이션/);
-    assert.match(view, /50:50 공동 포트폴리오 연구/);
+    assert.match(view, /명시 비중 공동 포트폴리오 연구/);
+    assert.match(view, /KODEX 200 최초 비중/);
+    assert.match(view, /이 비중으로 계산/);
     assert.match(view, /같은 기준일 수익률 쌍/);
-    assert.match(view, /리밸런싱하지 않아/);
+    assert.match(view, /리밸런싱하지\s*않아/);
     assert.match(view, /연구용 · 저장 안 함 · 예측 아님/);
     assert.match(view, /63거래일 경로 500개/);
-    assert.match(view, /stationary bootstrap/);
+    assert.match(view, /stationary\s+bootstrap/);
+    assert.match(view, /같은 입력 행렬,/);
+    assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);
     assert.match(view, /regime\s+bootstrap 모델은 아닙니다/);
     assert.match(view, /P10~P90/);
     assert.match(view, /최근 7개 기준일/);

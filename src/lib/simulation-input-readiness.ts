@@ -1,6 +1,10 @@
 import type { loadSimulationPeriodPreflight } from "./simulation-period-preflight-loader.ts";
 import type { FixedResearchSimulationResult } from "./simulation-fixed-research-execution.ts";
 import type { FixedMixResearchSimulationResult } from "./simulation-fixed-mix-research-execution.ts";
+import {
+  resolveKodexVooFixedMixSelection,
+  type KodexVooFixedMixSelection,
+} from "./kodex-voo-fixed-mix-selection.ts";
 import { buildSimulationObservedReturnComparison } from "./simulation-observed-return-comparison.ts";
 import { buildSimulationObservedReturnAlignment } from "./simulation-observed-return-alignment.ts";
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
@@ -141,6 +145,7 @@ export function buildSimulationInputReadinessPageModel(input: {
   history: readonly SimulationInputReadinessModel[];
   researchExecutions?: readonly FixedResearchSimulationResult[];
   fixedMixResearchExecution?: FixedMixResearchSimulationResult;
+  fixedMixSelection?: KodexVooFixedMixSelection;
 }) {
   const observedReturnComparison = buildSimulationObservedReturnComparison(
     input.comparisonSource.inputs,
@@ -188,6 +193,8 @@ export function buildSimulationInputReadinessPageModel(input: {
     history: Object.freeze(history),
     researchExecutions: Object.freeze([...(input.researchExecutions ?? [])]),
     fixedMixResearchExecution: input.fixedMixResearchExecution ?? null,
+    fixedMixSelection:
+      input.fixedMixSelection ?? resolveKodexVooFixedMixSelection(undefined),
   });
 }
 

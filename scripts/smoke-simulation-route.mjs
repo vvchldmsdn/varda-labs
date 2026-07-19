@@ -13,7 +13,9 @@ const EXPECT_RESEARCH_READY = numberArgument("--expect-research-ready");
 const EXPECT_JOINT_RESEARCH_READY = numberArgument(
   "--expect-joint-research-ready",
 );
+const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
+const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -62,7 +64,8 @@ async function main() {
   assert.match(simulation.body, /data-fixed-research-execution/);
   assert.match(simulation.body, /data-fixed-mix-research-execution/);
   assert.match(simulation.body, /3개월 연구 시뮬레이션/);
-  assert.match(simulation.body, /50:50 공동 포트폴리오 연구/);
+  assert.match(simulation.body, /명시 비중 공동 포트폴리오 연구/);
+  assert.match(simulation.body, /KODEX 200 최초 비중/);
   assert.match(simulation.body, /stationary bootstrap/);
   assert.match(simulation.body, /069500/);
   assert.match(simulation.body, /VOO/);
@@ -93,6 +96,14 @@ async function main() {
     /data-joint-research-execution-status="(ready|unavailable)"/,
   )?.[1];
   const jointResearchReadyCount = jointResearchStatus === "ready" ? 1 : 0;
+  const jointSelectionStatus = simulation.body.match(
+    /data-joint-research-selection-status="(default|selected|invalid)"/,
+  )?.[1];
+  const expectedJointSelectionStatus = EXPECT_INVALID_WEIGHT
+    ? "invalid"
+    : EXPECT_KODEX_WEIGHT_PCT === null
+      ? "default"
+      : "selected";
   const historyRowCount =
     simulation.body.match(/data-readiness-history-row="\d{4}-\d{2}-\d{2}"/g)
       ?.length ?? 0;
@@ -123,6 +134,17 @@ async function main() {
     jointResearchStatus,
     "simulation must render one joint research execution state",
   );
+  assert.equal(
+    jointSelectionStatus,
+    expectedJointSelectionStatus,
+    "simulation rendered an unexpected joint weight selection state",
+  );
+  if (EXPECT_INVALID_WEIGHT) {
+    assert.match(
+      simulation.body,
+      /data-joint-research-unavailable-reason="invalid_weight_selection"/,
+    );
+  }
   assert.equal(
     historyRowCount,
     EXPECT_INVALID_QUERY ? 0 : 7,
@@ -201,7 +223,7 @@ async function main() {
   if (jointResearchStatus === "ready") {
     assert.match(
       simulation.body,
-      /data-research-fan-chart="kodex200-voo-50-50"/,
+      /data-research-fan-chart="kodex200-voo-explicit-mix"/,
     );
     assert.match(
       simulation.body,
@@ -210,6 +232,20 @@ async function main() {
     assert.match(simulation.body, /data-joint-rebalancing="none"/);
     assert.match(simulation.body, /data-joint-research-horizon="63"/);
     assert.match(simulation.body, /data-joint-research-path-count="500"/);
+    if (EXPECT_KODEX_WEIGHT_PCT !== null) {
+      assert.match(
+        simulation.body,
+        new RegExp(
+          `data-joint-research-kodex-weight-bps="${EXPECT_KODEX_WEIGHT_PCT * 100}"`,
+        ),
+      );
+      assert.match(
+        simulation.body,
+        new RegExp(
+          `data-joint-research-voo-weight-bps="${(100 - EXPECT_KODEX_WEIGHT_PCT) * 100}"`,
+        ),
+      );
+    }
   }
 
   const countsAfter = await readCounts();
@@ -236,6 +272,7 @@ async function main() {
         researchReadyCount,
         jointResearchStatus,
         jointResearchReadyCount,
+        jointSelectionStatus,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,

@@ -5,19 +5,23 @@ import {
   FIXED_MIX_RESEARCH_SIMULATION_POLICY,
   buildFixedMixResearchSimulation,
 } from "../src/lib/simulation-fixed-mix-research-execution.ts";
+import { resolveKodexVooFixedMixSelection } from "../src/lib/kodex-voo-fixed-mix-selection.ts";
 import { SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
 
 describe("Fixed-mix joint research simulation", () => {
-  it("jointly resamples paired returns into a no-rebalancing 50:50 path", () => {
+  it("jointly resamples paired returns into the selected no-rebalancing path", () => {
     const matrix = readyJointMatrix();
     const endServiceDate = matrix.requestedServiceDates.at(-1);
+    const selection = resolveKodexVooFixedMixSelection("25");
     const left = buildFixedMixResearchSimulation({
       explicitEndServiceDate: endServiceDate,
       matrix,
+      selection,
     });
     const right = buildFixedMixResearchSimulation({
       explicitEndServiceDate: endServiceDate,
       matrix,
+      selection,
     });
 
     assert.equal(left.status, "ready");
@@ -29,21 +33,21 @@ describe("Fixed-mix joint research simulation", () => {
     assert.deepEqual(
       left.weights.map(({ ticker, weightBps }) => ({ ticker, weightBps })),
       [
-        { ticker: "069500", weightBps: 5_000 },
-        { ticker: "VOO", weightBps: 5_000 },
+        { ticker: "069500", weightBps: 2_500 },
+        { ticker: "VOO", weightBps: 7_500 },
       ],
     );
 
     const expectedBuyAndHoldIndex =
-      (0.5 * 1.01 ** 63 + 0.5 * 0.995 ** 63) * 100;
-    const dailyRebalancedIndex = 1.0025 ** 63 * 100;
+      (0.25 * 1.01 ** 63 + 0.75 * 0.995 ** 63) * 100;
+    const dailyRebalancedIndex = (0.25 * 1.01 + 0.75 * 0.995) ** 63 * 100;
     assert.ok(
       Math.abs(left.terminal.p50Index - expectedBuyAndHoldIndex) < 1e-9,
       "the path must preserve the initial allocation without periodic rebalancing",
     );
     assert.ok(
       Math.abs(left.terminal.p50Index - dailyRebalancedIndex) > 0.01,
-      "the path must not accidentally rebalance to 50:50 every day",
+      "the path must not accidentally rebalance to the selected weights every day",
     );
     assert.ok(
       left.terminal.maxDrawdownP90Pct >= left.terminal.maxDrawdownP50Pct,
@@ -59,6 +63,7 @@ describe("Fixed-mix joint research simulation", () => {
     const result = buildFixedMixResearchSimulation({
       explicitEndServiceDate: null,
       matrix: readyJointMatrix(),
+      selection: resolveKodexVooFixedMixSelection(undefined),
     });
 
     assert.equal(result.status, "unavailable");
@@ -66,10 +71,26 @@ describe("Fixed-mix joint research simulation", () => {
     assert.deepEqual(result.bands, []);
   });
 
+  it("rejects blank, repeated, and out-of-range weights before execution", () => {
+    for (const value of ["", ["25", "75"], "0", "100", "25.5"]) {
+      const result = buildFixedMixResearchSimulation({
+        explicitEndServiceDate: readyJointMatrix().requestedServiceDates.at(-1),
+        matrix: readyJointMatrix(),
+        selection: resolveKodexVooFixedMixSelection(value),
+      });
+
+      assert.equal(result.status, "unavailable");
+      assert.equal(result.reason, "invalid_weight_selection");
+      assert.equal(result.weights, null);
+      assert.deepEqual(result.samplePaths, []);
+    }
+  });
+
   it("does not build a joint path from one independently ready instrument", () => {
     const matrix = readyJointMatrix();
     const result = buildFixedMixResearchSimulation({
       explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      selection: resolveKodexVooFixedMixSelection(undefined),
       matrix: {
         ...matrix,
         instruments: [matrix.instruments[0]],
@@ -88,6 +109,7 @@ describe("Fixed-mix joint research simulation", () => {
     const matrix = readyJointMatrix();
     const result = buildFixedMixResearchSimulation({
       explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      selection: resolveKodexVooFixedMixSelection(undefined),
       matrix: {
         ...matrix,
         status: "incomplete",
@@ -108,6 +130,10 @@ describe("Fixed-mix joint research simulation", () => {
     assert.equal(
       FIXED_MIX_RESEARCH_SIMULATION_POLICY.portfolioPath,
       "initial_fixed_weight_buy_and_hold_without_rebalancing",
+    );
+    assert.equal(
+      FIXED_MIX_RESEARCH_SIMULATION_POLICY.seedPolicy,
+      "deterministic_only_for_identical_matrix_engine_policy_and_seed",
     );
   });
 });

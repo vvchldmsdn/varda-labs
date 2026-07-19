@@ -14,7 +14,8 @@ export const FIXED_RESEARCH_SIMULATION_POLICY = Object.freeze({
   expectedBlockLength: 5,
   seed: 0x56415244,
   bootstrapModel: "stationary_bootstrap_unconditional_not_regime_conditioned",
-  seedPolicy: "explicit_fixed_seed_for_reproducibility",
+  seedPolicy:
+    "deterministic_only_for_identical_matrix_engine_policy_and_seed",
   randomComparison: "common_random_numbers_across_instruments",
   samplePathCount: 12,
   portfolioPath: "single_instrument_buy_and_hold_10000bps",

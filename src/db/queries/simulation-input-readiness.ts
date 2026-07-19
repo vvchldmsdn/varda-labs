@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getReadOnlySimulationPeriodPreflightBatch } from "@/db/queries/simulation-return-matrix";
+import { resolveKodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-selection";
 import {
   buildSimulationInputReadiness,
   buildSimulationInputReadinessDates,
@@ -39,6 +40,7 @@ const INPUTS = Object.freeze([KODEX_200, VOO]);
 
 export async function getReadOnlySimulationInputReadiness(options?: {
   endServiceDate?: string | string[];
+  kodexWeight?: string | string[];
   now?: Date;
 }) {
   const now = options?.now ?? new Date();
@@ -99,6 +101,9 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     selection.status === "valid" && selection.source === "query"
       ? selection.endServiceDate
       : null;
+  const fixedMixSelection = resolveKodexVooFixedMixSelection(
+    options?.kodexWeight,
+  );
   const researchExecutions = INPUTS.map((descriptor, index) =>
     buildFixedResearchSimulation({
       id: descriptor.id,
@@ -111,6 +116,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
   const fixedMixResearchExecution = buildFixedMixResearchSimulation({
     explicitEndServiceDate,
     matrix: comparisonPreflight.matrixArtifact,
+    selection: fixedMixSelection,
   });
 
   return buildSimulationInputReadinessPageModel({
@@ -120,6 +126,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     history: selection.status === "valid" ? models : [],
     researchExecutions,
     fixedMixResearchExecution,
+    fixedMixSelection,
   });
 }
 

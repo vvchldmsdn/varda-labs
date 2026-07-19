@@ -1,27 +1,19 @@
+import type { KodexVooFixedMixSelection } from "./kodex-voo-fixed-mix-selection.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 import {
   executeSimulationResearchPaths,
   type SimulationResearchExecutionBlockerReason,
 } from "./simulation-research-execution-core.ts";
 
-const FIXED_MIX_WEIGHTS = Object.freeze([
-  Object.freeze({
-    market: "korea",
-    currency: "KRW",
-    ticker: "069500",
-    weightBps: 5_000,
-  }),
-  Object.freeze({
-    market: "us",
-    currency: "USD",
-    ticker: "VOO",
-    weightBps: 5_000,
-  }),
+const FIXED_MIX_INSTRUMENTS = Object.freeze([
+  Object.freeze({ market: "korea", currency: "KRW", ticker: "069500" }),
+  Object.freeze({ market: "us", currency: "USD", ticker: "VOO" }),
 ] as const);
 
 export const FIXED_MIX_RESEARCH_SIMULATION_POLICY = Object.freeze({
-  version: "fixed_mix_joint_research_simulation_v1",
-  admission: "explicit_end_query_and_complete_joint_matrix_only",
+  version: "explicit_fixed_mix_joint_research_simulation_v2",
+  admission:
+    "valid_explicit_weight_selection_end_query_and_complete_joint_matrix_only",
   sourceReturnStepCount: 90,
   horizon: 63,
   horizonLabel: "approximately_three_market_months",
@@ -29,12 +21,14 @@ export const FIXED_MIX_RESEARCH_SIMULATION_POLICY = Object.freeze({
   expectedBlockLength: 5,
   seed: 0x56415244,
   bootstrapModel: "stationary_bootstrap_unconditional_not_regime_conditioned",
-  seedPolicy: "explicit_fixed_seed_for_reproducibility",
+  seedPolicy:
+    "deterministic_only_for_identical_matrix_engine_policy_and_seed",
   jointSampling: "paired_cross_market_rows_same_draw_plan",
   samplePathCount: 12,
   portfolioPath: "initial_fixed_weight_buy_and_hold_without_rebalancing",
   displayBasis: "normalized_index_100",
-  weights: FIXED_MIX_WEIGHTS,
+  weightUnit: "integer_basis_points",
+  weightTotalBps: 10_000,
   persistence: "forbidden",
   accountBinding: "forbidden",
   recommendation: "forbidden",
@@ -49,13 +43,28 @@ export type FixedMixResearchSimulationResult = ReturnType<
 export function buildFixedMixResearchSimulation(input: {
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
+  selection: KodexVooFixedMixSelection;
 }) {
+  if (
+    input.selection.status === "invalid" ||
+    input.selection.kodexWeightPct === null ||
+    input.selection.vooWeightPct === null ||
+    input.selection.kodexWeightBps === null ||
+    input.selection.vooWeightBps === null
+  ) {
+    return blockedResult(
+      baseResult(input.selection, null),
+      "invalid_weight_selection",
+    );
+  }
+
+  const weights = buildWeights(
+    input.selection.kodexWeightBps,
+    input.selection.vooWeightBps,
+  );
   const base = {
-    id: "kodex200-voo-50-50" as const,
-    name: "KODEX 200 50% + VOO 50%",
-    policy: FIXED_MIX_RESEARCH_SIMULATION_POLICY,
-    weights: FIXED_MIX_WEIGHTS,
-    runtimeTrustStatus: "research_only" as const,
+    ...baseResult(input.selection, weights),
+    name: `KODEX 200 ${input.selection.kodexWeightPct}% + VOO ${input.selection.vooWeightPct}%`,
   };
 
   if (!input.explicitEndServiceDate) {
@@ -78,9 +87,9 @@ export function buildFixedMixResearchSimulation(input: {
 
   const execution = executeSimulationResearchPaths({
     matrix,
-    scenarioId: "research-kodex200-voo-50-50",
-    scenarioVersion: "v1",
-    weights: FIXED_MIX_WEIGHTS,
+    scenarioId: "research-kodex200-voo-explicit-mix",
+    scenarioVersion: `v2-${input.selection.kodexWeightBps}-${input.selection.vooWeightBps}`,
+    weights,
     seed: FIXED_MIX_RESEARCH_SIMULATION_POLICY.seed,
     expectedBlockLength:
       FIXED_MIX_RESEARCH_SIMULATION_POLICY.expectedBlockLength,
@@ -107,9 +116,9 @@ export function buildFixedMixResearchSimulation(input: {
 
 function sameInstrumentUniverse(matrix: SimulationReturnMatrixResult) {
   return (
-    matrix.instruments.length === FIXED_MIX_WEIGHTS.length &&
+    matrix.instruments.length === FIXED_MIX_INSTRUMENTS.length &&
     matrix.instruments.every((instrument, index) => {
-      const expected = FIXED_MIX_WEIGHTS[index];
+      const expected = FIXED_MIX_INSTRUMENTS[index];
       return (
         expected !== undefined &&
         instrument.market === expected.market &&
@@ -121,17 +130,21 @@ function sameInstrumentUniverse(matrix: SimulationReturnMatrixResult) {
 }
 
 type FixedMixResearchBlockerReason =
+  | "invalid_weight_selection"
   | "explicit_end_required"
   | "input_matrix_unavailable"
   | "input_matrix_shape_mismatch"
   | SimulationResearchExecutionBlockerReason;
 
-function blockedResult(
+function blockedResult<
+  TWeights extends ReturnType<typeof buildWeights> | null,
+>(
   base: {
-    id: "kodex200-voo-50-50";
+    id: "kodex200-voo-explicit-mix";
     name: string;
     policy: typeof FIXED_MIX_RESEARCH_SIMULATION_POLICY;
-    weights: typeof FIXED_MIX_WEIGHTS;
+    selection: KodexVooFixedMixSelection;
+    weights: TWeights;
     runtimeTrustStatus: "research_only";
   },
   reason: FixedMixResearchBlockerReason,
@@ -146,4 +159,31 @@ function blockedResult(
     bands: Object.freeze([]),
     samplePaths: Object.freeze([]),
   });
+}
+
+function baseResult<TWeights extends ReturnType<typeof buildWeights> | null>(
+  selection: KodexVooFixedMixSelection,
+  weights: TWeights,
+) {
+  return {
+    id: "kodex200-voo-explicit-mix" as const,
+    name: "KODEX 200 + VOO 명시 비중",
+    policy: FIXED_MIX_RESEARCH_SIMULATION_POLICY,
+    selection,
+    weights,
+    runtimeTrustStatus: "research_only" as const,
+  };
+}
+
+function buildWeights(kodexWeightBps: number, vooWeightBps: number) {
+  return Object.freeze([
+    Object.freeze({
+      ...FIXED_MIX_INSTRUMENTS[0],
+      weightBps: kodexWeightBps,
+    }),
+    Object.freeze({
+      ...FIXED_MIX_INSTRUMENTS[1],
+      weightBps: vooWeightBps,
+    }),
+  ] as const);
 }

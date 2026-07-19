@@ -6,7 +6,10 @@ import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-inp
 export const dynamic = "force-dynamic";
 
 type SimulationPageProps = {
-  searchParams: Promise<{ end?: string | string[] }>;
+  searchParams: Promise<{
+    end?: string | string[];
+    kodexWeight?: string | string[];
+  }>;
 };
 
 export default async function SimulationPage({
@@ -15,6 +18,7 @@ export default async function SimulationPage({
   const params = await searchParams;
   const modelPromise = getReadOnlySimulationInputReadiness({
     endServiceDate: params.end,
+    kodexWeight: params.kodexWeight,
   });
 
   return (
