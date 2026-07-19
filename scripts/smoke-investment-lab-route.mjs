@@ -158,7 +158,7 @@ async function main() {
     "현재 비중·동일 비중 정기 리밸런싱",
     "최고수익·최소변동성·최소MDD·최대Sharpe",
     "자동 보완·DB 쓰기 없음",
-    "수동 관측",
+    "구분 가능한 일별 저장값",
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }

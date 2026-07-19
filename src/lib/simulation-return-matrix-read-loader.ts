@@ -81,6 +81,7 @@ export async function loadSimulationReturnMatrixUniverseBundle(
 
   return Object.freeze({
     evidence,
+    matrix,
     returnSeries: projectObservedReturnSeries(matrix),
   });
 }

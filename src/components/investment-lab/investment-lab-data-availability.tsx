@@ -276,7 +276,7 @@ function manualValuationSummary(
   if (history.requiredCurrentSegmentDateCount === 0) {
     return `${current} · 비교할 최신 writer 구간 없음`;
   }
-  return `${current} · 최신 writer 구간 ${history.coveredCurrentSegmentDateCount}/${history.requiredCurrentSegmentDateCount}일 · 수동 관측 ${history.distinctManualObservationCount}회 · 저장값 이월 ${history.carriedValuationRowCount}일`;
+  return `${current} · 최신 writer 구간 ${history.coveredCurrentSegmentDateCount}/${history.requiredCurrentSegmentDateCount}일 · 구분 가능한 일별 저장값 ${history.distinctManualObservationCount}개 · 저장값 이월 ${history.carriedValuationRowCount}일 · 같은 날짜 재실행은 최신 상태로 갱신`;
 }
 
 function formatKrwPerGram(value: number) {

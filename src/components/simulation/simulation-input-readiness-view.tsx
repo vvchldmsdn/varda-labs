@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
+import { FixedResearchExecutionSection } from "./fixed-research-execution-section";
 import { ObservedReturnAlignmentEvidencePanel } from "./observed-return-alignment-evidence-panel";
 import { ObservedReturnComparisonPanel } from "./observed-return-comparison-panel";
 import {
@@ -19,6 +20,10 @@ export function SimulationInputReadinessView({
   model: SimulationInputReadinessPageModel;
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
+  const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
+  const readyExecutionCount = model.researchExecutions.filter(
+    (execution) => execution.status === "ready",
+  ).length;
 
   return (
     <main
@@ -36,7 +41,7 @@ export function SimulationInputReadinessView({
                 시뮬레이션 검증
               </h1>
               <p className="mt-2 text-sm text-[#596158]">
-                연구 입력 증거 준비도
+                연구 입력 증거 준비도와 고정 연구 실행
               </p>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
@@ -46,8 +51,8 @@ export function SimulationInputReadinessView({
             </nav>
           </div>
           <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#62542c]">
-            이 화면은 저장된 시장 데이터가 연구 입력으로 사용 가능한지 확인합니다.
-            시뮬레이션 실행, 미래 예측, 비중 추천 결과가 아닙니다.
+            기준일을 직접 선택하고 입력이 완전할 때만 연구용 재표본 경로를
+            계산합니다. 결과는 미래 예측, 비중 추천 또는 주문 근거가 아닙니다.
           </div>
         </header>
 
@@ -81,8 +86,12 @@ export function SimulationInputReadinessView({
           />
           <SummaryItem
             label="실행 상태"
-            value="실행 안 함"
-            detail="런타임 신뢰 미확립"
+            value={
+              readyExecutionCount > 0
+                ? `${readyExecutionCount}/${model.researchExecutions.length} 계산 완료`
+                : "실행 안 함"
+            }
+            detail="연구용 · 저장 안 함"
           />
         </section>
 
@@ -91,6 +100,10 @@ export function SimulationInputReadinessView({
         />
         <ObservedReturnAlignmentEvidencePanel
           evidence={model.observedReturnAlignmentEvidence}
+        />
+        <FixedResearchExecutionSection
+          executions={model.researchExecutions}
+          recommendedEndServiceDate={recommendedEndServiceDate}
         />
 
         <section
@@ -126,6 +139,15 @@ export function SimulationInputReadinessView({
       </div>
     </main>
   );
+}
+
+function sharedNearestPriorDate(inputs: readonly InputReadiness[]) {
+  const dates = inputs
+    .map((input) => input.nearestPriorObservedServiceDate)
+    .filter((date): date is string => Boolean(date));
+  return dates.length === inputs.length && new Set(dates).size === 1
+    ? dates[0]
+    : null;
 }
 
 function ReadinessHistory({

@@ -13,6 +13,7 @@ export const MANUAL_VALUATION_HISTORY_POLICY = Object.freeze({
   priceSource: MANUAL_ASSET_PRICE_POLICY.source,
   priceBasis: MANUAL_PRICE_BASIS,
   carryMeaning: "stored_valuation_not_market_observation",
+  sameDateWriteMeaning: "latest_snapshot_state_not_immutable_input_event",
   researchAdmission: "current_segment_candidate_only",
 } as const);
 

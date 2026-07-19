@@ -9,6 +9,7 @@ const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3100";
 const END_SERVICE_DATE = readArgument("--end");
 const RAW_QUERY = readArgument("--raw-query");
 const EXPECT_READY = numberArgument("--expect-ready");
+const EXPECT_RESEARCH_READY = numberArgument("--expect-research-ready");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
@@ -55,11 +56,13 @@ async function main() {
     assert.match(simulation.body, /data-simulation-readiness-history/);
   }
   assert.match(simulation.body, /연구 입력 증거 준비도/);
+  assert.match(simulation.body, /data-fixed-research-execution/);
+  assert.match(simulation.body, /3개월 연구 시뮬레이션/);
   assert.match(simulation.body, /069500/);
   assert.match(simulation.body, /VOO/);
   assert.match(
     simulation.body,
-    /시뮬레이션 실행, 미래 예측, 비중 추천 결과가 아닙니다/,
+    /결과는 미래 예측, 비중 추천 또는 주문 근거가 아닙니다/,
   );
   assert.doesNotMatch(simulation.body, LEAK_PATTERN);
 
@@ -72,6 +75,14 @@ async function main() {
     ),
   ].map((match) => match[1]);
   const readyCount = statuses.filter((status) => status === "matrix_ready").length;
+  const researchStatuses = [
+    ...simulation.body.matchAll(
+      /data-research-execution-status="(ready|unavailable)"/g,
+    ),
+  ].map((match) => match[1]);
+  const researchReadyCount = researchStatuses.filter(
+    (status) => status === "ready",
+  ).length;
   const historyRowCount =
     simulation.body.match(/data-readiness-history-row="\d{4}-\d{2}-\d{2}"/g)
       ?.length ?? 0;
@@ -93,6 +104,11 @@ async function main() {
   ].map((match) => Number(match[1]));
   assert.equal(inputCount, 2, "simulation must render two independent inputs");
   assert.equal(statuses.length, 2, "simulation must render two readiness states");
+  assert.equal(
+    researchStatuses.length,
+    2,
+    "simulation must render two independent research execution states",
+  );
   assert.equal(
     historyRowCount,
     EXPECT_INVALID_QUERY ? 0 : 7,
@@ -144,6 +160,23 @@ async function main() {
   if (EXPECT_READY !== null) {
     assert.equal(readyCount, EXPECT_READY, "unexpected ready input count");
   }
+  if (EXPECT_RESEARCH_READY !== null) {
+    assert.equal(
+      researchReadyCount,
+      EXPECT_RESEARCH_READY,
+      "unexpected ready research execution count",
+    );
+  }
+  if (researchReadyCount > 0) {
+    assert.equal(
+      simulation.body.match(/data-research-fan-chart="(?:kodex200|voo)"/g)
+        ?.length ?? 0,
+      researchReadyCount,
+      "each ready research execution must render one fan chart",
+    );
+    assert.match(simulation.body, /data-research-horizon="63"/);
+    assert.match(simulation.body, /data-research-path-count="500"/);
+  }
 
   const countsAfter = await readCounts();
   assert.deepEqual(countsAfter, countsBefore, "route render changed DB row counts");
@@ -165,6 +198,8 @@ async function main() {
         inputCount,
         statuses,
         readyCount,
+        researchStatuses,
+        researchReadyCount,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,

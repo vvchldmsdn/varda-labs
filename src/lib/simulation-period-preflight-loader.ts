@@ -31,6 +31,7 @@ export async function loadSimulationPeriodPreflight(
       plan,
       axis: blockedAxisProjection(plan),
       matrixEvidence: null,
+      matrixArtifact: null,
       matrixReturnSeries: Object.freeze([]),
       scanOutcome: "request_blocked",
     });
@@ -72,6 +73,7 @@ export async function loadSimulationPeriodPreflight(
       plan,
       axis,
       matrixEvidence: null,
+      matrixArtifact: null,
       matrixReturnSeries: Object.freeze([]),
       scanOutcome: insufficientWithinBound
         ? "insufficient_axis_within_scan_bound"
@@ -97,6 +99,7 @@ export async function loadSimulationPeriodPreflight(
     plan,
     axis,
     matrixEvidence,
+    matrixArtifact: matrixBundle.matrix,
     matrixReturnSeries: matrixBundle.returnSeries,
     scanOutcome: "axis_resolved",
   });
@@ -225,6 +228,7 @@ function buildPreflightResult({
   plan,
   axis,
   matrixEvidence,
+  matrixArtifact,
   matrixReturnSeries,
   scanOutcome,
 }: {
@@ -239,6 +243,9 @@ function buildPreflightResult({
   matrixEvidence: Awaited<
     ReturnType<typeof loadSimulationReturnMatrixUniverseBundle>
   >["evidence"] | null;
+  matrixArtifact: Awaited<
+    ReturnType<typeof loadSimulationReturnMatrixUniverseBundle>
+  >["matrix"] | null;
   matrixReturnSeries: readonly SimulationObservedReturnSeries[];
   scanOutcome:
     | "request_blocked"
@@ -274,6 +281,7 @@ function buildPreflightResult({
     }),
     axis,
     matrixEvidence,
+    matrixArtifact,
     matrixReturnSeries,
   });
 }

@@ -9,6 +9,7 @@ import {
   SIMULATION_INPUT_READINESS_POLICY,
   type SimulationInputReadinessDescriptor,
 } from "@/lib/simulation-input-readiness";
+import { buildFixedResearchSimulation } from "@/lib/simulation-fixed-research-execution";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const KODEX_200 = Object.freeze({
@@ -93,12 +94,26 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       preflight: comparisonPreflight,
     })),
   });
+  const explicitEndServiceDate =
+    selection.status === "valid" && selection.source === "query"
+      ? selection.endServiceDate
+      : null;
+  const researchExecutions = INPUTS.map((descriptor, index) =>
+    buildFixedResearchSimulation({
+      id: descriptor.id,
+      name: descriptor.name,
+      ticker: descriptor.ticker,
+      explicitEndServiceDate,
+      matrix: preflights[index]?.matrixArtifact ?? null,
+    }),
+  );
 
   return buildSimulationInputReadinessPageModel({
     selection,
     selected,
     comparisonSource,
     history: selection.status === "valid" ? models : [],
+    researchExecutions,
   });
 }
 
