@@ -1,7 +1,6 @@
 import type {
   PortfolioStructureExclusion,
   PortfolioStructureHoldingRow,
-  PortfolioStructureResult,
 } from "./portfolio-structure.ts";
 import {
   analyzePortfolioDirectHoldings,
@@ -37,7 +36,10 @@ export type {
 } from "./investment-lab-small-adjustment-types.ts";
 
 export function buildInvestmentLabSmallAdjustmentModel(
-  portfolio: Pick<PortfolioStructureResult, "holdingRows" | "exclusions">,
+  portfolio: Readonly<{
+    holdingRows: readonly PortfolioStructureHoldingRow[];
+    exclusions: readonly PortfolioStructureExclusion[];
+  }>,
   selectedAccount: PortfolioAccountScope = "all",
 ): InvestmentLabSmallAdjustmentModel {
   const accounts = accountsForPortfolioScope(selectedAccount);

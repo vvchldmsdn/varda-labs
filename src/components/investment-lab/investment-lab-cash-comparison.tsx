@@ -15,10 +15,10 @@ export function InvestmentLabCashComparisonView({
         data-section="investment-lab-cash-comparison"
       >
         <h2 className="text-lg font-semibold text-[#5f5027]">
-          전액 현금 기준선
+          제로수익 동일흐름 기준선
         </h2>
         <p className="mt-2 text-sm text-[#725f2d]">
-          동일 자금 흐름으로 현금 기준선을 계산할 수 없습니다.
+          동일 자금 흐름으로 제로수익 기준선을 계산할 수 없습니다.
         </p>
       </section>
     );
@@ -38,7 +38,7 @@ export function InvestmentLabCashComparisonView({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">전액 현금 기준선</h2>
+          <h2 className="text-lg font-semibold">제로수익 동일흐름 기준선</h2>
           <p className="mt-1 text-sm text-[#687064]">
             첫 평가액과 실제 매수·매도 원화 금액은 같게 두고, 가격 수익은
             0%라고 가정합니다.
@@ -95,13 +95,13 @@ export function InvestmentLabCashComparisonView({
           chartId="investment-lab-cash-chart"
           description="저장된 평가일마다 실제 평가액과 동일한 매수·매도 원화 흐름을 적용한 무이자 현금 기준선을 비교합니다."
           rows={comparison.rows}
-          scenarioLabel="전액 현금"
-          title="실제 포트폴리오와 전액 현금 기준선 비교"
+          scenarioLabel="제로수익 동일흐름"
+          title="실제 포트폴리오와 제로수익 동일흐름 기준선 비교"
         />
       </div>
 
       <p className="mt-3 text-xs leading-5 text-[#777e73]">
-        이 기준선은 현재 현금 잔액이나 추가투입 분배 계산이 아닙니다. 이자,
+        이 기준선은 모든 자산을 현금으로 바꾼 평탄한 과거선이 아니며, 현재 현금 잔액이나 추가투입 분배 계산도 아닙니다. 이자,
         세금, 수수료, 주문 가능 여부를 반영하지 않으며 저장하거나 주문으로
         연결하지 않습니다.
       </p>

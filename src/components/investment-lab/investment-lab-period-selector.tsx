@@ -79,7 +79,7 @@ export function InvestmentLabPeriodSelector({
                 },
               )}
             >
-              전체 보기
+              최신 구간
             </Link>
           </div>
         </form>
@@ -91,6 +91,11 @@ export function InvestmentLabPeriodSelector({
           data-period-reason={period.reason}
         >
           {periodReasonLabel(period.reason)}
+        </p>
+      ) : period.status === "current_writer" ? (
+        <p className="mt-3 text-sm font-medium text-[#356555]">
+          최신 writer 구간 {formatDate(period.selectedStartServiceDate!)} ~{" "}
+          {formatDate(period.selectedEndServiceDate!)}를 자동 적용했습니다.
         </p>
       ) : period.status === "selected" ? (
         <p className="mt-3 text-sm font-medium text-[#356555]">

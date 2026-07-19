@@ -13,6 +13,7 @@ import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
+import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
 import {
   buildPortfolioAccountScopeHref,
   type PortfolioAccountScope,
@@ -23,6 +24,7 @@ export function InvestmentLabView({
   accountQuery,
   anchorBasketScenario,
   dataAvailability,
+  fountScopeAdjustment,
   model,
   period,
   selectedAccount,
@@ -30,11 +32,15 @@ export function InvestmentLabView({
   accountQuery: PortfolioAccountScopeQuery;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   dataAvailability: ReactNode;
+  fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
   selectedAccount: PortfolioAccountScope;
 }) {
-  const periodReady = period.status === "full" || period.status === "selected";
+  const periodReady =
+    period.status === "full" ||
+    period.status === "current_writer" ||
+    period.status === "selected";
 
   return (
     <main
@@ -53,6 +59,8 @@ export function InvestmentLabView({
         periodReady ? model.coverage.delayedExecutionRows : 0
       }
       data-page="investment-lab"
+      data-fount-scope-adjustment={fountScopeAdjustment.status}
+      data-output-authority="research_counterfactual_not_executable"
       data-pending-at-end={periodReady ? model.coverage.pendingAtEndRows : 0}
       data-period-status={period.status}
       data-read-model-status={model.status}
@@ -161,7 +169,10 @@ export function InvestmentLabView({
         {!periodReady ? null : model.status === "ready" && model.summary ? (
           <ReadyView
             anchorBasketScenario={anchorBasketScenario}
+            fountScopeAdjustment={fountScopeAdjustment}
             model={model}
+            period={period}
+            selectedAccount={selectedAccount}
           />
         ) : (
           <BlockedView model={model} />
@@ -173,16 +184,29 @@ export function InvestmentLabView({
 
 function ReadyView({
   anchorBasketScenario,
+  fountScopeAdjustment,
   model,
+  period,
+  selectedAccount,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
+  period: InvestmentLabPeriodSelection;
+  selectedAccount: PortfolioAccountScope;
 }) {
   const summary = model.summary!;
   const fixedMixWeights = model.fixedMixScenario?.weights ?? null;
 
   return (
     <>
+      <CurrentWriterSegmentNotice
+        fountScopeAdjustment={fountScopeAdjustment}
+        model={model}
+        period={period}
+        selectedAccount={selectedAccount}
+      />
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCell
           label="실제 최종 평가액"
@@ -212,11 +236,11 @@ function ReadyView({
         model={model}
       />
 
+      <InvestmentLabCashComparisonView comparison={model.cashComparison} />
+
       <ReturnEstimateSection model={model} />
 
       <VooComparisonSection model={model} />
-
-      <InvestmentLabCashComparisonView comparison={model.cashComparison} />
 
       <InvestmentLabContributionExperiment
         fixedMixWeights={fixedMixWeights}
@@ -309,6 +333,44 @@ function ReadyView({
         </div>
       </section>
     </>
+  );
+}
+
+function CurrentWriterSegmentNotice({
+  fountScopeAdjustment,
+  model,
+  period,
+  selectedAccount,
+}: {
+  fountScopeAdjustment: InvestmentLabFountRuntimeScope;
+  model: InvestmentLabCounterfactualReadModel;
+  period: InvestmentLabPeriodSelection;
+  selectedAccount: PortfolioAccountScope;
+}) {
+  const summary = model.summary!;
+  return (
+    <section
+      className="rounded-lg border border-[#d9dfcf] bg-[#f8faf5] p-4"
+      data-section="investment-lab-current-writer-segment"
+    >
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="font-semibold">최신 writer 관측 구간 연구 비교</h2>
+          <p className="mt-1 text-sm leading-6 text-[#5f685d]">
+            {formatDate(summary.startServiceDate)} ~ {formatDate(summary.endServiceDate)} · {summary.comparisonDateCount}개 평가일만 사용합니다. 레거시 구간과 이어 붙이지 않았고, 짧은 구간이므로 연환산·순위·스트레스 결론을 만들지 않습니다.
+          </p>
+        </div>
+        <span className="w-fit rounded-md border border-[#d4dbce] bg-white px-3 py-1.5 text-xs font-semibold text-[#4e594d]">
+          {period.status === "current_writer" ? "최신 구간 자동 적용" : "명시 구간 적용"}
+        </span>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-[#73786c]">
+        {portfolioAccountScopeLabel(selectedAccount)} 범위의 연구용 반사실 비교이며, 계정별 매수 가능 상품·환전·세금·주문 가능성을 검증한 투자 권고가 아닙니다. 금현물은 저장된 수동 평가 이력을 사용합니다.
+        {fountScopeAdjustment.status === "applied"
+          ? ` Fount는 ${fountScopeAdjustment.adjustedDateCount}개 평가일에서 제외했습니다.`
+          : ""}
+      </p>
+    </section>
   );
 }
 
@@ -679,9 +741,12 @@ function blockerLabel(blocker: string) {
   const labels: Record<string, string> = {
     source_segment_authority_blocked:
       "선택 기간에 레거시와 현재 스냅샷이 섞였거나 현재 저장 구간이 아닙니다.",
+    fount_scope_adjustment_blocked:
+      "Fount 제외 경로의 계정·날짜·저장 식별 근거를 확인해야 합니다.",
     snapshot_evidence_invalid: "평가 스냅샷 형식 또는 중복을 확인해야 합니다.",
     actual_path_reconciliation_mismatch: "저장된 전체 평가액과 계정별 합계가 일치하지 않습니다.",
     actual_path_incomplete: "비교 가능한 전체 계정 평가일이 부족합니다.",
+    event_account_unresolved: "일부 거래 이벤트의 계정을 확정할 수 없습니다.",
     event_evidence_unsupported: "거래 금액 또는 이벤트 유형을 확인해야 합니다.",
     scenario_close_evidence_invalid: "KODEX 200 조정종가 증거를 확인해야 합니다.",
     flow_schedule_blocked: "거래일 이후 7일 안에 체결 가능한 종가가 없습니다.",

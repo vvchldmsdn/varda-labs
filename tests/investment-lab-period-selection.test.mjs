@@ -19,6 +19,24 @@ describe("investment lab period selection", () => {
     assert.equal(result.reason, null);
   });
 
+  it("uses a trusted current-writer range as the default when supplied", () => {
+    const result = resolveInvestmentLabPeriodSelection({
+      availableServiceDates: [
+        "2026-01-02",
+        "2026-01-05",
+        "2026-01-06",
+        "2026-01-07",
+      ],
+      defaultServiceDates: ["2026-01-06", "2026-01-07"],
+    });
+
+    assert.equal(result.status, "current_writer");
+    assert.equal(result.requestedStartServiceDate, null);
+    assert.equal(result.requestedEndServiceDate, null);
+    assert.equal(result.selectedStartServiceDate, "2026-01-06");
+    assert.equal(result.selectedEndServiceDate, "2026-01-07");
+  });
+
   it("rejects ambiguous, incomplete, reversed, and unobserved requests", () => {
     const availableServiceDates = [
       "2026-01-02",
@@ -136,7 +154,7 @@ describe("investment lab period selection", () => {
     assert.equal(result.model.vooComparison.coverage.appliedFlowRows, 1);
   });
 
-  it("hides the whole selected range when one fixed comparison lacks evidence", async () => {
+  it("keeps the selected range when only the VOO scenario lacks evidence", async () => {
     const source = fixture();
     source.fxRows = [];
     const result = await loadInvestmentLabCounterfactualReadModel(
@@ -149,11 +167,11 @@ describe("investment lab period selection", () => {
 
     assert.equal(result.model.status, "ready");
     assert.equal(result.model.vooComparison.status, "unavailable");
-    assert.equal(result.period.status, "unavailable");
-    assert.equal(result.period.reason, "range_evidence_incomplete");
+    assert.equal(result.period.status, "selected");
+    assert.equal(result.period.reason, null);
   });
 
-  it("blocks the default mixed history but permits an explicit all-current range", async () => {
+  it("defaults mixed history to its latest current-writer segment", async () => {
     const source = fixture();
     source.snapshotRows = source.snapshotRows.map((row) =>
       row.snapshotDate <= "2026-01-05"
@@ -164,14 +182,11 @@ describe("investment lab period selection", () => {
     const full = await loadInvestmentLabCounterfactualReadModel(
       repository(source),
     );
-    assert.equal(full.period.status, "full");
-    assert.equal(full.model.status, "blocked");
-    assert.deepEqual(full.model.rows, []);
-    assert.equal(full.rollingComparison.status, "unavailable");
-    assert.equal(
-      full.model.sourceAuthority.blockers.includes("source_splice_forbidden"),
-      true,
-    );
+    assert.equal(full.period.status, "current_writer");
+    assert.equal(full.model.status, "ready");
+    assert.equal(full.model.summary.startServiceDate, "2026-01-06");
+    assert.equal(full.model.summary.endServiceDate, "2026-01-07");
+    assert.equal(full.model.sourceAuthority.status, "eligible");
 
     const selected = await loadInvestmentLabCounterfactualReadModel(
       repository(source),
@@ -207,6 +222,9 @@ function repository(source) {
     },
     async loadFxRows() {
       return source.fxRows;
+    },
+    async loadFountRuntimeEvidence() {
+      return { status: "not_applicable" };
     },
     async loadAnchorPositionRows() {
       return [];

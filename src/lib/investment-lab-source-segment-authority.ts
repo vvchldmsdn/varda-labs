@@ -68,6 +68,32 @@ export function listInvestmentLabCompleteSnapshotDates(
   return Object.freeze(buildNamedAccountAxis(rows, account).completeDates);
 }
 
+export function listInvestmentLabLatestCurrentWriterDates(
+  rows: readonly InvestmentLabSourceSegmentEvidenceRow[],
+  account: PortfolioAccountScope = "all",
+) {
+  const axis = buildNamedAccountAxis(rows, account);
+  const latestObservedDate = axis.observedDates.at(-1);
+  const latestCompleteDate = axis.completeDates.at(-1);
+  if (!latestObservedDate || latestCompleteDate !== latestObservedDate) {
+    return Object.freeze([] as string[]);
+  }
+
+  const dates: string[] = [];
+  for (let index = axis.completeRowsByDate.length - 1; index >= 0; index -= 1) {
+    const dateRows = axis.completeRowsByDate[index];
+    const isCurrentWriterDate = dateRows.every(
+      (row) =>
+        sourceRole(row.source) === "current_writer" &&
+        stableText(row.ruleVersion) === CURRENT_RULE_VERSION,
+    );
+    if (!isCurrentWriterDate) break;
+    dates.unshift(axis.completeDates[index]);
+  }
+
+  return Object.freeze(dates);
+}
+
 export function resolveInvestmentLabSourceSegmentAuthority(
   rows: readonly InvestmentLabSourceSegmentEvidenceRow[],
   account: PortfolioAccountScope = "all",
@@ -196,9 +222,10 @@ function buildNamedAccountAxis(
   const completeDates: string[] = [];
   const completeRowsByDate: InvestmentLabSourceSegmentEvidenceRow[][] = [];
   let incompleteDateCount = 0;
-  for (const [snapshotDate, accountRows] of [...byDate].sort(([left], [right]) =>
+  const observedEntries = [...byDate].sort(([left], [right]) =>
     left.localeCompare(right),
-  )) {
+  );
+  for (const [snapshotDate, accountRows] of observedEntries) {
     const complete = selectedAccounts.every(
       (account) => accountRows.get(account)?.length === 1,
     );
@@ -218,6 +245,7 @@ function buildNamedAccountAxis(
     observedDateCount: byDate.size,
     completeDateCount: completeDates.length,
     incompleteDateCount,
+    observedDates: observedEntries.map(([snapshotDate]) => snapshotDate),
     completeDates,
     completeRowsByDate,
   } as const;

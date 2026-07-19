@@ -21,7 +21,10 @@ export function InvestmentLabFixedMix({
   period: InvestmentLabPeriodSelection;
   selection: InvestmentLabFixedMixSelection;
 }) {
-  const periodReady = period.status === "full" || period.status === "selected";
+  const periodReady =
+    period.status === "full" ||
+    period.status === "current_writer" ||
+    period.status === "selected";
   const ready =
     periodReady && selection.status !== "invalid" && model?.status === "ready";
   const kodexWeightPct = selection.kodexWeightPct ?? 50;

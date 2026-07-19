@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildInvestmentLabDataAvailability } from "../src/lib/investment-lab-data-availability.ts";
+import {
+  applyInvestmentLabFountAvailabilityScope,
+  buildInvestmentLabDataAvailability,
+} from "../src/lib/investment-lab-data-availability.ts";
 
 describe("investment lab data availability", () => {
   it("separates the latest trusted actual segment from legacy display evidence", () => {
@@ -167,6 +170,30 @@ describe("investment lab data availability", () => {
     assert.deepEqual(model.repairItems.at(-1), {
       id: "fount",
       status: "scope_transform_required",
+      affectedCount: 1,
+    });
+
+    const adjusted = applyInvestmentLabFountAvailabilityScope(
+      model,
+      "applied",
+    );
+    assert.equal(adjusted.status, "partial");
+    assert.equal(
+      scenario(adjusted, "same_flow_baselines").status,
+      "limited_input_ready",
+    );
+    assert.equal(
+      scenario(adjusted, "fixed_quantity").status,
+      "market_only_ready",
+    );
+    assert.ok(
+      adjusted.scenarioRows.every(
+        (row) => !row.reasons.includes("fount_scope_adjustment_required"),
+      ),
+    );
+    assert.deepEqual(adjusted.repairItems.at(-1), {
+      id: "fount",
+      status: "not_needed",
       affectedCount: 1,
     });
   });

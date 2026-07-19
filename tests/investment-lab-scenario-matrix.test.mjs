@@ -16,21 +16,27 @@ describe("investment lab scenario comparison matrix", () => {
       matrix.rows.map((row) => row.id),
       [
         "actual",
+        "zero_return",
         "kodex200",
         "voo",
         "fixed_mix",
-        "zero_return",
         "anchor_basket",
       ],
     );
     assert.equal(matrix.coverage.readyRowCount, 6);
     assert.equal(matrix.coverage.unavailableRowCount, 0);
-    assert.equal(matrix.rows[0].endValueKrw, 1_000);
-    assert.equal(matrix.rows[0].endDifferenceKrw, 0);
-    assert.equal(matrix.rows[1].returnEstimate.value, 0.2);
-    assert.equal(matrix.rows[2].fxBasis, "stored_snapshot_and_execution_usdkrw");
-    assert.equal(matrix.rows[4].returnEstimate.value, 0);
-    assert.equal(matrix.rows[5].flowCount, 2);
+    const rowsById = Object.fromEntries(
+      matrix.rows.map((row) => [row.id, row]),
+    );
+    assert.equal(rowsById.actual.endValueKrw, 1_000);
+    assert.equal(rowsById.actual.endDifferenceKrw, 0);
+    assert.equal(rowsById.kodex200.returnEstimate.value, 0.2);
+    assert.equal(
+      rowsById.voo.fxBasis,
+      "stored_snapshot_and_execution_usdkrw",
+    );
+    assert.equal(rowsById.zero_return.returnEstimate.value, 0);
+    assert.equal(rowsById.anchor_basket.flowCount, 2);
   });
 
   it("preserves an unavailable anchor without substituting a partial basket", () => {
@@ -106,8 +112,9 @@ describe("investment lab scenario comparison matrix", () => {
 
     assert.equal(matrix.rows[0].status, "ready");
     assert.equal(matrix.rows[0].returnEstimate.status, "unavailable");
-    assert.equal(matrix.rows[1].status, "ready");
-    assert.ok(matrix.rows[1].reasonCodes.includes("price_basis_mismatch"));
+    const kodexRow = matrix.rows.find((row) => row.id === "kodex200");
+    assert.equal(kodexRow?.status, "ready");
+    assert.ok(kodexRow?.reasonCodes.includes("price_basis_mismatch"));
   });
 
   it("fails all rows when the base comparison period is unavailable", () => {

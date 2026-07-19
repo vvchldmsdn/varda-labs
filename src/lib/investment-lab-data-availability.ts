@@ -109,6 +109,39 @@ export type InvestmentLabDataAvailability = ReturnType<
   typeof buildInvestmentLabDataAvailability
 >;
 
+export function applyInvestmentLabFountAvailabilityScope(
+  model: InvestmentLabDataAvailability,
+  scopeStatus: "not_applicable" | "applied" | "blocked",
+): InvestmentLabDataAvailability {
+  if (scopeStatus !== "applied") return model;
+
+  const scenarioRows = model.scenarioRows.map((row) => {
+    if (!row.reasons.includes("fount_scope_adjustment_required")) return row;
+    const reasons = row.reasons.filter(
+      (reason) => reason !== "fount_scope_adjustment_required",
+    );
+    return Object.freeze({
+      ...row,
+      status: statusAfterFountAdjustment(row.id, reasons),
+      reasons: Object.freeze(reasons),
+    });
+  });
+  const repairItems = model.repairItems.map((row) =>
+    row.id === "fount"
+      ? Object.freeze({ ...row, status: "not_needed" as const })
+      : row,
+  );
+
+  return Object.freeze({
+    ...model,
+    status: scenarioRows.some((row) => row.status !== "blocked")
+      ? ("partial" as const)
+      : ("blocked" as const),
+    scenarioRows: Object.freeze(scenarioRows),
+    repairItems: Object.freeze(repairItems),
+  });
+}
+
 export function buildInvestmentLabDataAvailability(input: {
   account: PortfolioAccountScope;
   snapshotRows: readonly InvestmentLabAvailabilitySnapshotRow[];
@@ -381,6 +414,33 @@ function buildActualHistory(
       latestCurrentRows.map((row) => row.snapshotDate),
     ),
   });
+}
+
+function statusAfterFountAdjustment(
+  id: InvestmentLabScenarioAvailability["id"],
+  reasons: readonly InvestmentLabScenarioAvailabilityReason[],
+): InvestmentLabScenarioAvailabilityStatus {
+  if (id === "same_flow_baselines") {
+    return reasons.includes("latest_trusted_segment_ready")
+      ? "limited_input_ready"
+      : "blocked";
+  }
+  const specialHistoryBlocked =
+    reasons.includes("manual_valuation_history_required") ||
+    reasons.includes("special_holding_price_authority_required");
+  if (id === "fixed_quantity" || id === "scheduled_weights") {
+    return !specialHistoryBlocked &&
+      reasons.includes("authoritative_actual_history_pending")
+      ? "market_only_ready"
+      : "blocked";
+  }
+  if (id === "hindsight_research") {
+    return !specialHistoryBlocked &&
+      reasons.includes("walk_forward_cost_constraints_pending")
+      ? "research_only"
+      : "blocked";
+  }
+  return "blocked";
 }
 
 function sourceRole(

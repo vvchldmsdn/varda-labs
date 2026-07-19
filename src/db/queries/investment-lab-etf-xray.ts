@@ -12,6 +12,7 @@ import {
   type InvestmentLabEtfXrayModel,
 } from "@/lib/investment-lab-etf-xray";
 import type { EtfHoldingRawRow } from "@/lib/etf-holdings";
+import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
 import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
 
 export async function getReadOnlyInvestmentLabEtfXray(
@@ -21,15 +22,17 @@ export async function getReadOnlyInvestmentLabEtfXray(
     getReadOnlyPortfolioStructure({ account }),
     loadEtfMasters(),
   ]);
+  const scopedPortfolio =
+    applyInvestmentLabCurrentHoldingScope(portfolio).portfolio;
   const masterIds = selectInvestmentLabEtfXrayMasterIds({
-    portfolioHoldings: portfolio.holdingRows,
+    portfolioHoldings: scopedPortfolio.holdingRows,
     masters,
   });
   const holdingEvidence = await loadLatestHoldingEvidence(masterIds);
 
   return buildInvestmentLabEtfXray({
-    portfolioHoldings: portfolio.holdingRows,
-    portfolioExclusions: portfolio.exclusions,
+    portfolioHoldings: scopedPortfolio.holdingRows,
+    portfolioExclusions: scopedPortfolio.exclusions,
     masters,
     holdingEvidence,
   });

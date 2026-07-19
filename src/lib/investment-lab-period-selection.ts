@@ -19,7 +19,12 @@ export type InvestmentLabPeriodSelectionReason =
   | "range_evidence_incomplete";
 
 export type InvestmentLabPeriodSelection = Readonly<{
-  status: "full" | "selected" | "invalid" | "unavailable";
+  status:
+    | "full"
+    | "current_writer"
+    | "selected"
+    | "invalid"
+    | "unavailable";
   requestedStartServiceDate: string | null;
   requestedEndServiceDate: string | null;
   selectedStartServiceDate: string | null;
@@ -32,6 +37,7 @@ export type InvestmentLabPeriodSelection = Readonly<{
 export function resolveInvestmentLabPeriodSelection(input: {
   request?: InvestmentLabPeriodRequest;
   availableServiceDates: readonly string[];
+  defaultServiceDates?: readonly string[];
 }): InvestmentLabPeriodSelection {
   const start = normalizeRequestValue(input.request?.startServiceDate);
   const end = normalizeRequestValue(input.request?.endServiceDate);
@@ -50,6 +56,26 @@ export function resolveInvestmentLabPeriodSelection(input: {
   } as const;
 
   if (!input.request) {
+    const defaultServiceDates = uniqueSortedRiskDates(
+      input.defaultServiceDates ?? [],
+    );
+    const defaultStartServiceDate = defaultServiceDates[0] ?? null;
+    const defaultEndServiceDate = defaultServiceDates.at(-1) ?? null;
+    const available = new Set(availableServiceDates);
+    if (
+      defaultServiceDates.length >= 2 &&
+      defaultStartServiceDate &&
+      defaultEndServiceDate &&
+      defaultServiceDates.every((date) => available.has(date))
+    ) {
+      return Object.freeze({
+        ...base,
+        status: "current_writer" as const,
+        selectedStartServiceDate: defaultStartServiceDate,
+        selectedEndServiceDate: defaultEndServiceDate,
+        reason: null,
+      });
+    }
     return Object.freeze({
       ...base,
       status: "full" as const,
@@ -94,7 +120,8 @@ export function sliceInvestmentLabCounterfactualInput(
   selection: InvestmentLabPeriodSelection,
 ): InvestmentLabCounterfactualReadInput {
   if (
-    selection.status !== "selected" ||
+    (selection.status !== "selected" &&
+      selection.status !== "current_writer") ||
     !selection.selectedStartServiceDate ||
     !selection.selectedEndServiceDate
   ) {

@@ -157,10 +157,10 @@ function scenarioLabel(
 ) {
   const labels: Record<InvestmentLabScenarioMatrixId, string> = {
     actual: "실제 포트폴리오",
-    kodex200: "전액 KODEX 200",
-    voo: "전액 VOO",
+    kodex200: "전액 KODEX 200 연구 경로",
+    voo: "전액 VOO 연구 경로",
     fixed_mix: fixedMixLabel(model),
-    zero_return: "제로수익 동일흐름",
+    zero_return: "제로수익 동일흐름 현금 기준선",
     anchor_basket: "기준일 바스켓",
   };
   return labels[id];
@@ -176,10 +176,10 @@ function fixedMixLabel(model: InvestmentLabCounterfactualReadModel) {
 function scenarioDetail(id: InvestmentLabScenarioMatrixId) {
   const details: Record<InvestmentLabScenarioMatrixId, string> = {
     actual: "저장 포지션 평가액",
-    kodex200: "동일 외부 흐름",
-    voo: "동일 원화 외부 흐름",
+    kodex200: "동일 외부 흐름 · 주문 가능성 미검증",
+    voo: "동일 원화 외부 흐름 · 계정 매수 가능성 미검증",
     fixed_mix: "초기·외부 흐름 고정 배분",
-    zero_return: "수익률 0% 가상 경로",
+    zero_return: "외부 흐름만 반영한 수익률 0% 가상 장부",
     anchor_basket: "초기 동일비중·이후 흐름 균등배분",
   };
   return details[id];

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   listInvestmentLabCompleteSnapshotDates,
+  listInvestmentLabLatestCurrentWriterDates,
   resolveInvestmentLabSourceSegmentAuthority,
 } from "../src/lib/investment-lab-source-segment-authority.ts";
 
@@ -90,6 +91,24 @@ describe("investment lab source segment authority", () => {
     ]);
 
     assert.deepEqual(dates, ["2026-07-09", "2026-07-10"]);
+  });
+
+  it("selects only the trailing complete current-writer segment", () => {
+    const rows = [
+      ...snapshotDate("2026-07-07", LEGACY_SOURCE, null),
+      ...snapshotDate("2026-07-08", CURRENT_SOURCE, CURRENT_RULE),
+      ...snapshotDate("2026-07-09", CURRENT_SOURCE, CURRENT_RULE),
+    ];
+
+    assert.deepEqual(listInvestmentLabLatestCurrentWriterDates(rows), [
+      "2026-07-08",
+      "2026-07-09",
+    ]);
+
+    rows.push(
+      ...snapshotDate("2026-07-10", CURRENT_SOURCE, CURRENT_RULE).slice(0, 2),
+    );
+    assert.deepEqual(listInvestmentLabLatestCurrentWriterDates(rows), []);
   });
 });
 

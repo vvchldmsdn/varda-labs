@@ -133,6 +133,34 @@ function buildRows(
       fxBasis: "stored_krw_market_value",
       reasonCodes: returnReasons(model.returnEstimate?.blockers),
     }),
+    scenarioRow({
+      id: "zero_return",
+      summary: model.cashComparison?.summary ?? null,
+      period,
+      returnEstimate: readReturn(
+        model.cashComparison?.returnComparison?.status === "ready"
+          ? model.cashComparison.returnComparison.cashReturn
+          : null,
+        model.cashComparison?.returnComparison?.status === "ready"
+          ? INVESTMENT_LAB_MODIFIED_DIETZ_POLICY.version
+          : null,
+      ),
+      flowCount:
+        model.cashComparison?.status === "ready"
+          ? model.cashComparison.coverage.appliedFlowRows
+          : null,
+      pendingComparisonCount:
+        model.cashComparison?.status === "ready" ? 0 : null,
+      priceBasis: "zero_return_no_price",
+      fxBasis: "zero_return_not_applicable",
+      sourceReady: model.cashComparison?.status === "ready",
+      sourceReasons:
+        model.cashComparison?.status === "unavailable"
+          ? model.cashComparison.blockers
+          : returnReasons(
+              model.cashComparison?.returnComparison?.blockers,
+            ),
+    }),
     readyRow({
       id: "kodex200",
       endValueKrw: summary.scenarioEndValueKrw,
@@ -199,34 +227,6 @@ function buildRows(
         model.fixedMixScenario?.status === "unavailable"
           ? model.fixedMixScenario.blockers
           : [],
-    }),
-    scenarioRow({
-      id: "zero_return",
-      summary: model.cashComparison?.summary ?? null,
-      period,
-      returnEstimate: readReturn(
-        model.cashComparison?.returnComparison?.status === "ready"
-          ? model.cashComparison.returnComparison.cashReturn
-          : null,
-        model.cashComparison?.returnComparison?.status === "ready"
-          ? INVESTMENT_LAB_MODIFIED_DIETZ_POLICY.version
-          : null,
-      ),
-      flowCount:
-        model.cashComparison?.status === "ready"
-          ? model.cashComparison.coverage.appliedFlowRows
-          : null,
-      pendingComparisonCount:
-        model.cashComparison?.status === "ready" ? 0 : null,
-      priceBasis: "zero_return_no_price",
-      fxBasis: "zero_return_not_applicable",
-      sourceReady: model.cashComparison?.status === "ready",
-      sourceReasons:
-        model.cashComparison?.status === "unavailable"
-          ? model.cashComparison.blockers
-          : returnReasons(
-              model.cashComparison?.returnComparison?.blockers,
-            ),
     }),
     scenarioRow({
       id: "anchor_basket",
@@ -329,6 +329,14 @@ function unavailableRows(
     ),
     unavailableRow(
       {
+        id: "zero_return",
+        priceBasis: "zero_return_no_price",
+        fxBasis: "zero_return_not_applicable",
+      },
+      reasons,
+    ),
+    unavailableRow(
+      {
         id: "kodex200",
         priceBasis: "kodex200_adjusted_close",
         fxBasis: "krw_not_applicable",
@@ -348,14 +356,6 @@ function unavailableRows(
         id: "fixed_mix",
         priceBasis: "kodex_adjusted_and_voo_raw_close",
         fxBasis: "krw_and_stored_usdkrw",
-      },
-      reasons,
-    ),
-    unavailableRow(
-      {
-        id: "zero_return",
-        priceBasis: "zero_return_no_price",
-        fxBasis: "zero_return_not_applicable",
       },
       reasons,
     ),

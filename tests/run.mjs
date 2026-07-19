@@ -30,6 +30,8 @@ import "./investment-lab-small-adjustment.test.mjs";
 import "./investment-lab-fixed-mix.test.mjs";
 import "./investment-lab-fixed-mix-contribution.test.mjs";
 import "./investment-lab-fount-exclusion.test.mjs";
+import "./investment-lab-fount-runtime-scope.test.mjs";
+import "./investment-lab-current-holding-scope.test.mjs";
 import "./investment-lab-fount-readiness.test.mjs";
 import "./investment-lab-source-transition.test.mjs";
 import "./investment-lab-source-segment-authority.test.mjs";

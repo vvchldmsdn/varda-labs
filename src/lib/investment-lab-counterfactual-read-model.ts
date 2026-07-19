@@ -45,6 +45,7 @@ import {
 } from "./portfolio-account-scope.ts";
 
 export type InvestmentLabSourceEventRow = Readonly<{
+  legacyAssetId?: string | null;
   account?: string | null;
   eventDate: string;
   eventType: string;
@@ -85,6 +86,7 @@ export type InvestmentLabCounterfactualReadInput = Readonly<{
 export type InvestmentLabCounterfactualReadBlocker =
   | "snapshot_evidence_invalid"
   | "source_segment_authority_blocked"
+  | "fount_scope_adjustment_blocked"
   | "actual_path_reconciliation_mismatch"
   | "actual_path_incomplete"
   | "event_account_unresolved"
@@ -152,6 +154,7 @@ export function buildInvestmentLabCounterfactualReadModel(
   options: Readonly<{
     account?: PortfolioAccountScope;
     fixedMixSelection?: InvestmentLabFixedMixSelection;
+    fountScopeAdjustmentStatus?: "not_applicable" | "applied" | "blocked";
   }> = {},
 ): InvestmentLabCounterfactualReadModel {
   const account = options.account ?? "all";
@@ -162,6 +165,9 @@ export function buildInvestmentLabCounterfactualReadModel(
   );
   if (sourceAuthority.status !== "eligible") {
     blockers.add("source_segment_authority_blocked");
+  }
+  if (options.fountScopeAdjustmentStatus === "blocked") {
+    blockers.add("fount_scope_adjustment_blocked");
   }
   const actual = buildActualPath(input.snapshotRows, account, blockers);
   const flowResolution = resolveInvestmentLabBoundaryFlows(

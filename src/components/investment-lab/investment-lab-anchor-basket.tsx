@@ -123,6 +123,10 @@ function SpecialHoldingEvidence({
     (row) =>
       row.historicalAuthorityOutcome === "eligible_historical_instrument",
   ).length;
+  const manualValuationCount = rows.filter(
+    (row) =>
+      row.historicalAuthorityOutcome === "manual_valuation_history_required",
+  ).length;
   const separateModelCount = rows.filter(
     (row) =>
       row.historicalAuthorityOutcome === "separate_valuation_model_required",
@@ -143,6 +147,7 @@ function SpecialHoldingEvidence({
       data-anchor-special-holding-intentionally-excluded={
         intentionallyExcludedCount
       }
+      data-anchor-special-holding-manual-valuation={manualValuationCount}
       data-anchor-special-holding-resolved={resolvedCount}
       data-anchor-special-holding-rows={rows.length}
       data-anchor-special-holding-separate-model={separateModelCount}

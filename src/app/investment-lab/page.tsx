@@ -23,7 +23,9 @@ import { getReadOnlyInvestmentLabDataAvailability } from "@/db/queries/investmen
 import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
 import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
 import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { applyInvestmentLabFountAvailabilityScope } from "@/lib/investment-lab-data-availability";
 import { buildInvestmentLabSmallAdjustmentModel } from "@/lib/investment-lab-small-adjustment";
+import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
 import { resolveInvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import {
@@ -118,8 +120,13 @@ async function InvestmentLabContent({
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
   selectedAccount: PortfolioAccountScope;
 }) {
-  const { anchorBasketScenario, model, period, rollingComparison } =
-    await modelPromise;
+  const {
+    anchorBasketScenario,
+    fountScopeAdjustment,
+    model,
+    period,
+    rollingComparison,
+  } = await modelPromise;
   return (
     <>
       <InvestmentLabView
@@ -127,10 +134,12 @@ async function InvestmentLabContent({
         dataAvailability={
           <Suspense fallback={<InvestmentLabDataAvailabilitySkeleton />}>
             <InvestmentLabDataAvailabilityContent
+              fountScopeStatus={fountScopeAdjustment.status}
               modelPromise={dataAvailabilityPromise}
             />
           </Suspense>
         }
+        fountScopeAdjustment={fountScopeAdjustment}
         model={model}
         period={period}
         accountQuery={accountQuery}
@@ -154,8 +163,10 @@ async function InvestmentLabContent({
 }
 
 async function InvestmentLabDataAvailabilityContent({
+  fountScopeStatus,
   modelPromise,
 }: {
+  fountScopeStatus: "not_applicable" | "applied" | "blocked";
   modelPromise: ReturnType<typeof getReadOnlyInvestmentLabDataAvailability>;
 }) {
   let model;
@@ -164,7 +175,14 @@ async function InvestmentLabDataAvailabilityContent({
   } catch {
     return <InvestmentLabDataAvailabilityUnavailable />;
   }
-  return <InvestmentLabDataAvailabilityView model={model} />;
+  return (
+    <InvestmentLabDataAvailabilityView
+      model={applyInvestmentLabFountAvailabilityScope(
+        model,
+        fountScopeStatus,
+      )}
+    />
+  );
 }
 
 function normalizeSingleParam(value: string | string[] | undefined) {
@@ -202,7 +220,10 @@ async function InvestmentLabSmallAdjustmentContent({
   return (
     <InvestmentLabSmallAdjustment
       key={selectedAccount}
-      model={buildInvestmentLabSmallAdjustmentModel(portfolio, selectedAccount)}
+      model={buildInvestmentLabSmallAdjustmentModel(
+        applyInvestmentLabCurrentHoldingScope(portfolio).portfolio,
+        selectedAccount,
+      )}
     />
   );
 }

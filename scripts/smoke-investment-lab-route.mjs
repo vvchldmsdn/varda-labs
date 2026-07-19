@@ -13,13 +13,11 @@ const KODEX_WEIGHT = readArgument("--kodex-weight");
 const BASKET_ANCHOR = readArgument("--basket-anchor");
 const EXPECTED_PERIOD_STATUS =
   readArgument("--expect-period-status") ??
-  (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "full");
+  (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "current_writer");
 const EXPECTED_READ_MODEL_STATUS =
-  readArgument("--expect-read-model-status") ??
-  (START_SERVICE_DATE || END_SERVICE_DATE ? "ready" : "blocked");
+  readArgument("--expect-read-model-status") ?? "ready";
 const EXPECTED_SOURCE_AUTHORITY_STATUS =
-  readArgument("--expect-source-authority-status") ??
-  (START_SERVICE_DATE || END_SERVICE_DATE ? "eligible" : "blocked");
+  readArgument("--expect-source-authority-status") ?? "eligible";
 const EXPECTED_SOURCE_AUTHORITY_DECISION =
   readArgument("--expect-source-authority-decision") ??
   (EXPECTED_SOURCE_AUTHORITY_STATUS === "eligible"
@@ -30,6 +28,7 @@ const EXPECTED_FIXED_MIX_STATUS =
   readArgument("--expect-fixed-mix-status") ??
   (EXPECTED_READ_MODEL_STATUS === "ready" &&
     (EXPECTED_PERIOD_STATUS === "full" ||
+      EXPECTED_PERIOD_STATUS === "current_writer" ||
       EXPECTED_PERIOD_STATUS === "selected") &&
     EXPECTED_FIXED_MIX_SELECTION_STATUS !== "invalid"
     ? "ready"
@@ -78,6 +77,18 @@ async function main() {
     "data-read-model-status",
   );
   assert.equal(readModelStatus, EXPECTED_READ_MODEL_STATUS);
+  const fountScopeAdjustment = readStringAttribute(
+    route.body,
+    "data-fount-scope-adjustment",
+  );
+  assert.equal(
+    fountScopeAdjustment,
+    ACCOUNT === "all" || ACCOUNT === "irp" ? "applied" : "not_applicable",
+  );
+  assert.equal(
+    readStringAttribute(route.body, "data-output-authority"),
+    "research_counterfactual_not_executable",
+  );
   const sourceAuthorityStatus = readStringAttribute(
     route.body,
     "data-source-authority-status",
@@ -158,9 +169,11 @@ async function main() {
     "현재 비중·동일 비중 정기 리밸런싱",
     "최고수익·최소변동성·최소MDD·최대Sharpe",
     "자동 보완·DB 쓰기 없음",
-    "구분 가능한 일별 저장값",
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+  }
+  if (manualValuationStatus !== "not_applicable") {
+    assert.ok(route.body.includes("구분 가능한 일별 저장값"));
   }
   const cashComparisonStatus = readStringAttribute(
     route.body,
@@ -208,6 +221,7 @@ async function main() {
   let anchorSpecialHoldingUnavailable = 0;
   let anchorSpecialHoldingEligible = 0;
   let anchorSpecialHoldingIntentionallyExcluded = 0;
+  let anchorSpecialHoldingManualValuation = 0;
   let anchorSpecialHoldingSeparateModel = 0;
   let anchorSpecialHoldingUnsupported = 0;
   if (
@@ -235,6 +249,10 @@ async function main() {
       route.body,
       "data-anchor-special-holding-intentionally-excluded",
     );
+    anchorSpecialHoldingManualValuation = readIntegerAttribute(
+      route.body,
+      "data-anchor-special-holding-manual-valuation",
+    );
     anchorSpecialHoldingSeparateModel = readIntegerAttribute(
       route.body,
       "data-anchor-special-holding-separate-model",
@@ -246,6 +264,7 @@ async function main() {
     assert.equal(
       anchorSpecialHoldingEligible +
         anchorSpecialHoldingIntentionallyExcluded +
+        anchorSpecialHoldingManualValuation +
         anchorSpecialHoldingSeparateModel +
         anchorSpecialHoldingUnsupported,
       anchorSpecialHoldingRows,
@@ -268,7 +287,9 @@ async function main() {
   }
   const matrixExpected =
     readModelStatus === "ready" &&
-    (periodStatus === "full" || periodStatus === "selected");
+    (periodStatus === "full" ||
+      periodStatus === "current_writer" ||
+      periodStatus === "selected");
   let scenarioMatrixStatus = "not_rendered";
   let scenarioMatrixRows = 0;
   let scenarioMatrixReadyRows = 0;
@@ -742,8 +763,8 @@ async function main() {
     "현금흐름 조정 추정수익률",
     "Modified Dietz",
     "정확한 일별 TWR 또는 총수익률을 의미하지 않습니다",
-    "전액 현금 기준선",
-    "현재 현금 잔액이나 추가투입 분배 계산이 아닙니다",
+    "제로수익 동일흐름 기준선",
+    "현재 현금 잔액이나 추가투입 분배 계산도 아닙니다",
     "전액 VOO 비교",
     "소수점 수량을 허용해 잔여 현금을 만들지 않으며",
     "보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다",
@@ -754,6 +775,11 @@ async function main() {
   if (periodStatus === "selected") {
     assert.ok(route.body.includes("선택 구간"));
     assert.ok(route.body.includes("다시 계산했습니다"));
+  }
+  if (periodStatus === "current_writer") {
+    assert.ok(route.body.includes("최신 writer 관측 구간 연구 비교"));
+    assert.ok(route.body.includes("최신 구간 자동 적용"));
+    assert.ok(route.body.includes("연환산·순위·스트레스 결론을 만들지 않습니다"));
   }
   assert.ok(
     route.body.includes("과거 추가 투입 효과 실험"),
@@ -912,6 +938,7 @@ async function main() {
         baseUrl: BASE_URL,
         routePath,
         periodStatus,
+        fountScopeAdjustment,
         dataAvailabilityStatus,
         currentWriterDates,
         marketObservations,
@@ -1076,7 +1103,7 @@ function readIntegerAttribute(html, name) {
 }
 
 function readStringAttribute(html, name) {
-  const match = html.match(new RegExp(`${name}="([a-z0-9_]+)"`));
+  const match = html.match(new RegExp(`${name}="([a-z0-9_/-]+)"`));
   assert.ok(match, `route is missing string attribute: ${name}`);
   return match[1];
 }
