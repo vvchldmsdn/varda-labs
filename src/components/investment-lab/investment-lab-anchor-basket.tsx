@@ -238,7 +238,11 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
         />
         <SummaryCell
           label="기준일 종목당 비중"
-          value={`${summary.equalWeightPct.toFixed(2)}%`}
+          value={
+            summary.equalWeightPct === null
+              ? "계좌별 동일 비중"
+              : `${summary.equalWeightPct.toFixed(2)}%`
+          }
         />
         <SummaryCell
           label="현금흐름 조정 추정 수익률"

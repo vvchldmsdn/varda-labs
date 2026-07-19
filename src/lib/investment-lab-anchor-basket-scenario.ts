@@ -36,7 +36,9 @@ export type InvestmentLabAnchorScenarioBlocker = Readonly<{
     | "component_axis_mismatch"
     | "component_flow_mismatch"
     | "invalid_scenario_value"
-    | "scenario_return_unavailable";
+    | "scenario_return_unavailable"
+    | "account_composition_incomplete"
+    | "account_composition_mismatch";
   instrumentKey: string | null;
   detail: string | null;
 }>;
@@ -49,7 +51,10 @@ export type InvestmentLabAnchorBasketScenario = Readonly<{
     startServiceDate: string;
     endServiceDate: string;
     instrumentCount: number;
-    equalWeightPct: number;
+    equalWeightPct: number | null;
+    allocationBasis:
+      | "single_scope_equal_weight"
+      | "named_account_equal_weight_then_sum";
     actualEndValueKrw: number;
     scenarioEndValueKrw: number;
     endDifferenceKrw: number;
@@ -195,6 +200,7 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
       endServiceDate: latest.serviceDate,
       instrumentCount: readyPaths.length,
       equalWeightPct: 100 / readyPaths.length,
+      allocationBasis: "single_scope_equal_weight" as const,
       actualEndValueKrw: latest.actualMarketValueKrw,
       scenarioEndValueKrw: latest.scenarioMarketValueKrw,
       endDifferenceKrw: latest.differenceKrw,

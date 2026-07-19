@@ -121,6 +121,7 @@ async function InvestmentLabContent({
   selectedAccount: PortfolioAccountScope;
 }) {
   const {
+    accountComposition,
     anchorBasketScenario,
     fountScopeAdjustment,
     model,
@@ -130,6 +131,7 @@ async function InvestmentLabContent({
   return (
     <>
       <InvestmentLabView
+        accountComposition={accountComposition}
         anchorBasketScenario={anchorBasketScenario}
         dataAvailability={
           <Suspense fallback={<InvestmentLabDataAvailabilitySkeleton />}>

@@ -58,7 +58,9 @@ export type InvestmentLabFixedMixBlocker =
   | "component_flow_mismatch"
   | "return_evidence_unavailable"
   | "actual_return_mismatch"
-  | "scenario_return_calculation_blocked";
+  | "scenario_return_calculation_blocked"
+  | "account_composition_incomplete"
+  | "account_composition_mismatch";
 
 export type InvestmentLabFixedMixRow = Readonly<{
   serviceDate: string;

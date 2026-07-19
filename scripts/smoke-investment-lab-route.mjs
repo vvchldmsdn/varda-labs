@@ -67,6 +67,19 @@ async function main() {
     readStringAttribute(route.body, "data-account-scope"),
     ACCOUNT,
   );
+  const accountCompositionStatus = readStringAttribute(
+    route.body,
+    "data-account-composition-status",
+  );
+  if (ACCOUNT === "all") {
+    assert.ok(
+      accountCompositionStatus === "ready" ||
+        accountCompositionStatus === "partial",
+      `unexpected all-account composition: ${accountCompositionStatus}`,
+    );
+  } else {
+    assert.equal(accountCompositionStatus, "not_applicable");
+  }
   for (const marker of ["투자 랩", "과거 비교 구간", "구간 적용"]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
@@ -697,6 +710,7 @@ async function main() {
           smoke: "investment_lab_route",
           baseUrl: BASE_URL,
           routePath,
+          accountCompositionStatus,
           periodStatus,
           readModelStatus,
           sourceAuthorityStatus,
@@ -959,6 +973,7 @@ async function main() {
         smoke: "investment_lab_route",
         baseUrl: BASE_URL,
         routePath,
+        accountCompositionStatus,
         periodStatus,
         fountScopeAdjustment,
         dataAvailabilityStatus,

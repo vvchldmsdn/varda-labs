@@ -11,6 +11,7 @@ import { InvestmentLabContributionExperiment } from "./investment-lab-contributi
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
+import type { InvestmentLabAccountComposition } from "@/lib/investment-lab-account-composition";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
@@ -22,6 +23,7 @@ import {
 
 export function InvestmentLabView({
   accountQuery,
+  accountComposition,
   anchorBasketScenario,
   dataAvailability,
   fountScopeAdjustment,
@@ -30,6 +32,7 @@ export function InvestmentLabView({
   selectedAccount,
 }: {
   accountQuery: PortfolioAccountScopeQuery;
+  accountComposition: InvestmentLabAccountComposition;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
@@ -46,6 +49,7 @@ export function InvestmentLabView({
     <main
       className="min-h-screen bg-[#f3f4ef] text-[#171916]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
+      data-account-composition-status={accountComposition.status}
       data-account-scope={selectedAccount}
       data-comparison-dates={
         periodReady ? model.coverage.completeComparisonDates : 0

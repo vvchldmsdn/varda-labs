@@ -322,6 +322,8 @@ function blockerLabel(blocker: InvestmentLabFixedMixBlocker) {
     return_evidence_unavailable: "수익률 근거가 완전하지 않습니다.",
     actual_return_mismatch: "실제 수익률 기준이 서로 일치하지 않습니다.",
     scenario_return_calculation_blocked: "시나리오 수익률을 계산할 수 없습니다.",
+    account_composition_incomplete: "계좌별 시나리오 근거가 모두 필요합니다.",
+    account_composition_mismatch: "계좌별 합계와 전체 결과가 일치하지 않습니다.",
   };
   return labels[blocker];
 }

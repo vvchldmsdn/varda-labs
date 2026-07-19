@@ -299,6 +299,7 @@ function snapshot(snapshotDate, account, totalMarketValue) {
 
 function event(eventDate, sequence, eventType, amountKrw) {
   return {
+    account: ["brokerage", "isa", "irp", "brokerage"][sequence],
     eventDate,
     eventType,
     sequence,

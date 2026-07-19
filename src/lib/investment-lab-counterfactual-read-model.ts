@@ -94,7 +94,9 @@ export type InvestmentLabCounterfactualReadBlocker =
   | "scenario_close_evidence_invalid"
   | "flow_schedule_blocked"
   | "path_calculation_blocked"
-  | "pending_flows_at_window_end";
+  | "pending_flows_at_window_end"
+  | "account_composition_incomplete"
+  | "account_composition_mismatch";
 
 export type InvestmentLabCounterfactualDisplayRow = Readonly<{
   serviceDate: string;

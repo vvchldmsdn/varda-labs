@@ -39,7 +39,9 @@ export type InvestmentLabCashComparisonBlocker =
   | "cash_balance_negative"
   | "cash_return_calculation_blocked"
   | "cash_return_not_zero"
-  | "actual_return_unavailable";
+  | "actual_return_unavailable"
+  | "account_composition_incomplete"
+  | "account_composition_mismatch";
 
 export type InvestmentLabCashComparisonRow = Readonly<{
   serviceDate: string;

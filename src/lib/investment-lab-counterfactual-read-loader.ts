@@ -1,10 +1,16 @@
 import {
   buildInvestmentLabCounterfactualReadModel,
+  resolveInvestmentLabBoundaryFlows,
   type InvestmentLabCounterfactualReadModel,
   type InvestmentLabSourceCloseRow,
   type InvestmentLabSourceEventRow,
   type InvestmentLabSourceSnapshotRow,
 } from "./investment-lab-counterfactual-read-model.ts";
+import {
+  composeInvestmentLabAllAccounts,
+  notApplicableInvestmentLabAccountComposition,
+  type InvestmentLabAccountComposition,
+} from "./investment-lab-account-composition.ts";
 import type { InvestmentLabVooFxRow } from "./investment-lab-voo-readiness.ts";
 import type { InvestmentLabFixedMixSelection } from "./investment-lab-fixed-mix-selection.ts";
 import {
@@ -32,7 +38,11 @@ import {
   type InvestmentLabFountRuntimeEvidence,
   type InvestmentLabFountRuntimeScope,
 } from "./investment-lab-fount-runtime-scope.ts";
-import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
+import {
+  NAMED_PORTFOLIO_ACCOUNTS,
+  type NamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 
 export interface InvestmentLabCounterfactualReadRepository
   extends InvestmentLabAnchorBasketReadRepository {
@@ -58,6 +68,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   rollingComparison: InvestmentLabRollingComparison;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
+  accountComposition: InvestmentLabAccountComposition;
 }>> {
   const [eventRows, snapshotRows, closeRows, vooCloseRows, fxRows] =
     await Promise.all([
@@ -106,11 +117,94 @@ export async function loadInvestmentLabCounterfactualReadModel(
     allEventRows: input.eventRows,
     evidence: fountEvidence,
   });
-  const model = buildInvestmentLabCounterfactualReadModel(fountScope.source, {
-    account,
-    fixedMixSelection,
-    fountScopeAdjustmentStatus: fountScope.scope.status,
-  });
+  const pooledModel = buildInvestmentLabCounterfactualReadModel(
+    fountScope.source,
+    {
+      account,
+      fixedMixSelection,
+      fountScopeAdjustmentStatus: fountScope.scope.status,
+    },
+  );
+  const cachedAnchorRepository = cacheAnchorRepository(repository);
+  let model = pooledModel;
+  let accountComposition = notApplicableInvestmentLabAccountComposition();
+  let anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+
+  if (account === "all") {
+    const namedModels = Object.freeze(
+      Object.fromEntries(
+        NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount) => [
+          namedAccount,
+          buildInvestmentLabCounterfactualReadModel(fountScope.source, {
+            account: namedAccount,
+            fixedMixSelection,
+            fountScopeAdjustmentStatus:
+              namedAccount === "irp"
+                ? fountScope.scope.status
+                : "not_applicable",
+          }),
+        ]),
+      ) as Record<NamedPortfolioAccount, InvestmentLabCounterfactualReadModel>,
+    );
+    const [pooledAnchor, ...namedAnchorValues] = await Promise.all([
+      loadInvestmentLabAnchorBasketScenario({
+        account,
+        repository: cachedAnchorRepository,
+        model: pooledModel,
+        source: fountScope.source,
+        fxRows: fountScope.source.fxRows,
+        requestedAnchorDate,
+        fountScopeAdjustmentStatus: fountScope.scope.status,
+      }),
+      ...NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount) =>
+        loadInvestmentLabAnchorBasketScenario({
+          account: namedAccount,
+          repository: cachedAnchorRepository,
+          model: namedModels[namedAccount],
+          source: fountScope.source,
+          fxRows: fountScope.source.fxRows,
+          requestedAnchorDate,
+          fountScopeAdjustmentStatus:
+            namedAccount === "irp"
+              ? fountScope.scope.status
+              : "not_applicable",
+        }),
+      ),
+    ]);
+    const namedAnchors = Object.freeze(
+      Object.fromEntries(
+        NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount, index) => [
+          namedAccount,
+          namedAnchorValues[index],
+        ]),
+      ) as Record<NamedPortfolioAccount, InvestmentLabAnchorBasketScenario>,
+    );
+    const boundaryFlows = resolveInvestmentLabBoundaryFlows(
+      fountScope.source.eventRows,
+      "all",
+    );
+    const composed = composeInvestmentLabAllAccounts({
+      pooledModel,
+      namedModels,
+      pooledAnchor,
+      namedAnchors,
+      boundaryFlows:
+        boundaryFlows.status === "ready" ? boundaryFlows.flows : [],
+    });
+    model = composed.model;
+    anchorBasketScenario = composed.anchorBasketScenario;
+    accountComposition = composed.composition;
+  } else {
+    anchorBasketScenario = await loadInvestmentLabAnchorBasketScenario({
+      account,
+      repository: cachedAnchorRepository,
+      model,
+      source: fountScope.source,
+      fxRows: fountScope.source.fxRows,
+      requestedAnchorDate,
+      fountScopeAdjustmentStatus: fountScope.scope.status,
+    });
+  }
   let resolvedPeriod = period;
   if (period.status === "selected") {
     const complete =
@@ -130,21 +224,51 @@ export async function loadInvestmentLabCounterfactualReadModel(
         : Object.freeze([]),
   });
 
-  const anchorBasketScenario = await loadInvestmentLabAnchorBasketScenario({
-    account,
-    repository,
-    model,
-    source: fountScope.source,
-    fxRows: fountScope.source.fxRows,
-    requestedAnchorDate,
-    fountScopeAdjustmentStatus: fountScope.scope.status,
-  });
-
   return Object.freeze({
     model,
     rollingComparison,
     period: resolvedPeriod,
     anchorBasketScenario,
     fountScopeAdjustment: fountScope.scope,
+    accountComposition,
+  });
+}
+
+function cacheAnchorRepository(
+  repository: InvestmentLabAnchorBasketReadRepository,
+): InvestmentLabAnchorBasketReadRepository {
+  const positionReads = new Map<
+    string,
+    ReturnType<InvestmentLabAnchorBasketReadRepository["loadAnchorPositionRows"]>
+  >();
+  const priceReads = new Map<
+    string,
+    ReturnType<InvestmentLabAnchorBasketReadRepository["loadAnchorPriceRows"]>
+  >();
+  return Object.freeze({
+    loadAnchorPositionRows(serviceDates: readonly string[]) {
+      const key = serviceDates.join(",");
+      const existing = positionReads.get(key);
+      if (existing) return existing;
+      const pending = repository.loadAnchorPositionRows(serviceDates);
+      positionReads.set(key, pending);
+      return pending;
+    },
+    loadAnchorPriceRows(
+      input: Parameters<
+        InvestmentLabAnchorBasketReadRepository["loadAnchorPriceRows"]
+      >[0],
+    ) {
+      const key = JSON.stringify({
+        instruments: input.instruments.map((instrument) => instrument.key),
+        startServiceDate: input.startServiceDate,
+        endServiceDate: input.endServiceDate,
+      });
+      const existing = priceReads.get(key);
+      if (existing) return existing;
+      const pending = repository.loadAnchorPriceRows(input);
+      priceReads.set(key, pending);
+      return pending;
+    },
   });
 }
