@@ -1,8 +1,10 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
+import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import type {
   InvestmentLabAccountComposition,
   InvestmentLabAccountCompositionScenarioId,
   InvestmentLabNamedAnchors,
+  InvestmentLabNamedAnchorValueWeights,
   InvestmentLabNamedModels,
 } from "./investment-lab-account-composition-contract.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
@@ -78,17 +80,20 @@ const SCENARIO_IDS = Object.freeze([
   "voo",
   "fixed_mix",
   "anchor_basket",
+  "anchor_value_weight",
 ] as const satisfies readonly InvestmentLabAccountCompositionScenarioId[]);
 
 export function buildInvestmentLabNamedAccountFundingPreflight(input: Readonly<{
   account: NamedPortfolioAccount;
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
 }>): InvestmentLabAccountFundingPreflight {
   const row = accountRow(
     input.account,
     input.model,
     input.anchorBasketScenario,
+    input.anchorValueWeightScenario,
   );
   return preflight(input.account, [row], row.scenarios);
 }
@@ -96,6 +101,7 @@ export function buildInvestmentLabNamedAccountFundingPreflight(input: Readonly<{
 export function buildInvestmentLabAllAccountFundingPreflight(input: Readonly<{
   namedModels: InvestmentLabNamedModels;
   namedAnchors: InvestmentLabNamedAnchors;
+  namedAnchorValueWeights: InvestmentLabNamedAnchorValueWeights;
   composition: InvestmentLabAccountComposition;
 }>): InvestmentLabAccountFundingPreflight {
   const rows = Object.freeze(
@@ -104,6 +110,7 @@ export function buildInvestmentLabAllAccountFundingPreflight(input: Readonly<{
         account,
         input.namedModels[account],
         input.namedAnchors[account],
+        input.namedAnchorValueWeights[account],
       ),
     ),
   );
@@ -120,6 +127,7 @@ function accountRow(
   account: NamedPortfolioAccount,
   model: InvestmentLabCounterfactualReadModel,
   anchor: InvestmentLabAnchorBasketScenario,
+  anchorValueWeight: InvestmentLabAnchorValueWeightScenario,
 ): InvestmentLabFundingAccountRow {
   const scenarios = scenarioRecord((scenarioId) => {
     switch (scenarioId) {
@@ -146,6 +154,10 @@ function accountRow(
           : unavailableResolution("upstream_scenario_unavailable");
       case "anchor_basket":
         return anchor.status === "ready"
+          ? readyResolution()
+          : unavailableResolution("upstream_scenario_unavailable");
+      case "anchor_value_weight":
+        return anchorValueWeight.status === "ready"
           ? readyResolution()
           : unavailableResolution("upstream_scenario_unavailable");
     }

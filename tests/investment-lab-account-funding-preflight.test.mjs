@@ -17,6 +17,7 @@ describe("investment lab account-local funding preflight", () => {
       account: "brokerage",
       model: readyModel({ fixedMix: null }),
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyAnchor(),
     });
 
     assert.equal(result.status, "ready");
@@ -25,8 +26,8 @@ describe("investment lab account-local funding preflight", () => {
     assert.equal(result.accountRows[0].scenarios.fixed_mix.status, "not_requested");
     assert.deepEqual(result.coverage, {
       accountCount: 1,
-      requestedScenarioCells: 5,
-      readyScenarioCells: 5,
+      requestedScenarioCells: 6,
+      readyScenarioCells: 6,
       unavailableScenarioCells: 0,
       notRequestedScenarioCells: 1,
     });
@@ -44,9 +45,15 @@ describe("investment lab account-local funding preflight", () => {
       isa: readyAnchor(),
       irp: readyAnchor(),
     };
+    const namedAnchorValueWeights = {
+      brokerage: readyAnchor(),
+      isa: readyAnchor(),
+      irp: readyAnchor(),
+    };
     const result = buildInvestmentLabAllAccountFundingPreflight({
       namedModels,
       namedAnchors,
+      namedAnchorValueWeights,
       composition: composition({ kodex200: false, fixed_mix: false }),
     });
 
@@ -61,6 +68,7 @@ describe("investment lab account-local funding preflight", () => {
     assert.equal(result.aggregateScenarios.zero_return.status, "ready");
     assert.equal(result.aggregateScenarios.voo.status, "ready");
     assert.equal(result.aggregateScenarios.anchor_basket.status, "ready");
+    assert.equal(result.aggregateScenarios.anchor_value_weight.status, "ready");
     assert.equal(result.aggregateScenarios.kodex200.status, "unavailable");
     assert.equal(result.aggregateScenarios.fixed_mix.status, "unavailable");
   });
@@ -95,6 +103,11 @@ describe("investment lab account-local funding preflight", () => {
         isa: readyAnchor(),
         irp: readyAnchor(),
       },
+      namedAnchorValueWeights: {
+        brokerage: readyAnchor(),
+        isa: readyAnchor(),
+        irp: readyAnchor(),
+      },
       composition: composition({
         kodex200: false,
         zero_return: false,
@@ -115,6 +128,7 @@ describe("investment lab account-local funding preflight", () => {
       account: "isa",
       model: readyModel({ observed: false }),
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyAnchor(),
     });
 
     assert.equal(result.status, "unavailable");
@@ -183,7 +197,15 @@ function composition(overrides = {}) {
       ? "partial"
       : "ready",
     scenarios: Object.fromEntries(
-      ["actual", "zero_return", "kodex200", "voo", "fixed_mix", "anchor_basket"].map(
+      [
+        "actual",
+        "zero_return",
+        "kodex200",
+        "voo",
+        "fixed_mix",
+        "anchor_basket",
+        "anchor_value_weight",
+      ].map(
         (id) => [id, overrides[id] === false ? unavailable() : ready()],
       ),
     ),

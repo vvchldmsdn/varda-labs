@@ -25,10 +25,11 @@ import {
   type InvestmentLabPeriodSelection,
 } from "./investment-lab-period-selection.ts";
 import {
-  loadInvestmentLabAnchorBasketScenario,
+  loadInvestmentLabAnchorScenarios,
   type InvestmentLabAnchorBasketReadRepository,
 } from "./investment-lab-anchor-basket-read-loader.ts";
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
+import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import {
   listInvestmentLabCompleteSnapshotDates,
   listInvestmentLabLatestCurrentWriterDates,
@@ -72,6 +73,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   period: InvestmentLabPeriodSelection;
   rollingComparison: InvestmentLabRollingComparison;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   accountComposition: InvestmentLabAccountComposition;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
@@ -135,6 +137,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   let model = pooledModel;
   let accountComposition = notApplicableInvestmentLabAccountComposition();
   let anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  let anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   let fundingPreflight: InvestmentLabAccountFundingPreflight;
 
   if (account === "all") {
@@ -153,38 +156,50 @@ export async function loadInvestmentLabCounterfactualReadModel(
         ]),
       ) as Record<NamedPortfolioAccount, InvestmentLabCounterfactualReadModel>,
     );
-    const [pooledAnchor, ...namedAnchorValues] = await Promise.all([
-      loadInvestmentLabAnchorBasketScenario({
-        account,
-        repository: cachedAnchorRepository,
-        model: pooledModel,
-        source: fountScope.source,
-        fxRows: fountScope.source.fxRows,
-        requestedAnchorDate,
-        fountScopeAdjustmentStatus: fountScope.scope.status,
-      }),
-      ...NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount) =>
-        loadInvestmentLabAnchorBasketScenario({
-          account: namedAccount,
+    const [pooledAnchorScenarios, ...namedAnchorScenarioValues] =
+      await Promise.all([
+        loadInvestmentLabAnchorScenarios({
+          account,
           repository: cachedAnchorRepository,
-          model: namedModels[namedAccount],
+          model: pooledModel,
           source: fountScope.source,
           fxRows: fountScope.source.fxRows,
           requestedAnchorDate,
-          fountScopeAdjustmentStatus:
-            namedAccount === "irp"
-              ? fountScope.scope.status
-              : "not_applicable",
+          fountScopeAdjustmentStatus: fountScope.scope.status,
         }),
-      ),
-    ]);
+        ...NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount) =>
+          loadInvestmentLabAnchorScenarios({
+            account: namedAccount,
+            repository: cachedAnchorRepository,
+            model: namedModels[namedAccount],
+            source: fountScope.source,
+            fxRows: fountScope.source.fxRows,
+            requestedAnchorDate,
+            fountScopeAdjustmentStatus:
+              namedAccount === "irp"
+                ? fountScope.scope.status
+                : "not_applicable",
+          }),
+        ),
+      ]);
     const namedAnchors = Object.freeze(
       Object.fromEntries(
         NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount, index) => [
           namedAccount,
-          namedAnchorValues[index],
+          namedAnchorScenarioValues[index].equalWeight,
         ]),
       ) as Record<NamedPortfolioAccount, InvestmentLabAnchorBasketScenario>,
+    );
+    const namedAnchorValueWeights = Object.freeze(
+      Object.fromEntries(
+        NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount, index) => [
+          namedAccount,
+          namedAnchorScenarioValues[index].valueWeight,
+        ]),
+      ) as Record<
+        NamedPortfolioAccount,
+        InvestmentLabAnchorValueWeightScenario
+      >,
     );
     const boundaryFlows = resolveInvestmentLabBoundaryFlows(
       fountScope.source.eventRows,
@@ -193,21 +208,25 @@ export async function loadInvestmentLabCounterfactualReadModel(
     const composed = composeInvestmentLabAllAccounts({
       pooledModel,
       namedModels,
-      pooledAnchor,
+      pooledAnchor: pooledAnchorScenarios.equalWeight,
       namedAnchors,
+      pooledAnchorValueWeight: pooledAnchorScenarios.valueWeight,
+      namedAnchorValueWeights,
       boundaryFlows:
         boundaryFlows.status === "ready" ? boundaryFlows.flows : [],
     });
     model = composed.model;
     anchorBasketScenario = composed.anchorBasketScenario;
+    anchorValueWeightScenario = composed.anchorValueWeightScenario;
     accountComposition = composed.composition;
     fundingPreflight = buildInvestmentLabAllAccountFundingPreflight({
       namedModels,
       namedAnchors,
+      namedAnchorValueWeights,
       composition: composed.composition,
     });
   } else {
-    anchorBasketScenario = await loadInvestmentLabAnchorBasketScenario({
+    const anchorScenarios = await loadInvestmentLabAnchorScenarios({
       account,
       repository: cachedAnchorRepository,
       model,
@@ -216,10 +235,13 @@ export async function loadInvestmentLabCounterfactualReadModel(
       requestedAnchorDate,
       fountScopeAdjustmentStatus: fountScope.scope.status,
     });
+    anchorBasketScenario = anchorScenarios.equalWeight;
+    anchorValueWeightScenario = anchorScenarios.valueWeight;
     fundingPreflight = buildInvestmentLabNamedAccountFundingPreflight({
       account,
       model,
       anchorBasketScenario,
+      anchorValueWeightScenario,
     });
   }
   let resolvedPeriod = period;
@@ -247,6 +269,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
     rollingComparison,
     period: resolvedPeriod,
     anchorBasketScenario,
+    anchorValueWeightScenario,
     fountScopeAdjustment: fountScope.scope,
     accountComposition,
     fundingPreflight,

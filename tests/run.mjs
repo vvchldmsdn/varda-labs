@@ -14,6 +14,7 @@ import "./investment-lab-counterfactual-path.test.mjs";
 import "./investment-lab-modified-dietz.test.mjs";
 import "./investment-lab-cash-comparison.test.mjs";
 import "./investment-lab-anchor-basket.test.mjs";
+import "./investment-lab-anchor-value-weight.test.mjs";
 import "./investment-lab-scenario-matrix.test.mjs";
 import "./investment-lab-scenario-chart.test.mjs";
 import "./investment-lab-return-evidence.test.mjs";

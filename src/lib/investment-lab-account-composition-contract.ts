@@ -1,8 +1,6 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
-import type {
-  InvestmentLabCounterfactualDisplayRow,
-  InvestmentLabCounterfactualReadModel,
-} from "./investment-lab-counterfactual-read-model.ts";
+import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
   type NamedPortfolioAccount,
@@ -29,7 +27,8 @@ export type InvestmentLabAccountCompositionScenarioId =
   | "voo"
   | "zero_return"
   | "fixed_mix"
-  | "anchor_basket";
+  | "anchor_basket"
+  | "anchor_value_weight";
 
 export type InvestmentLabAccountCompositionBlocker =
   | "named_account_model_unavailable"
@@ -62,6 +61,10 @@ export type InvestmentLabNamedModels = Readonly<
 
 export type InvestmentLabNamedAnchors = Readonly<
   Record<NamedPortfolioAccount, InvestmentLabAnchorBasketScenario>
+>;
+
+export type InvestmentLabNamedAnchorValueWeights = Readonly<
+  Record<NamedPortfolioAccount, InvestmentLabAnchorValueWeightScenario>
 >;
 
 export type InvestmentLabCompositionBoundaryFlow = Readonly<{
@@ -187,7 +190,10 @@ export function investmentLabCompositionRowsMatch(
 
 export function investmentLabCompositionActualRowsMatchModel(
   composed: readonly InvestmentLabComposableRow[],
-  pooled: readonly InvestmentLabCounterfactualDisplayRow[],
+  pooled: readonly Readonly<{
+    serviceDate: string;
+    actualMarketValueKrw: number;
+  }>[],
 ) {
   const pooledByDate = new Map(
     pooled.map((row) => [row.serviceDate, row.actualMarketValueKrw]),

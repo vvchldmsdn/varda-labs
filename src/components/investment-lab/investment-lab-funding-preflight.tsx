@@ -11,6 +11,7 @@ const SCENARIOS = Object.freeze([
   ["voo", "VOO"],
   ["fixed_mix", "고정 혼합"],
   ["anchor_basket", "기준 바스켓"],
+  ["anchor_value_weight", "기준일 비중"],
 ] as const satisfies readonly (readonly [
   InvestmentLabAccountCompositionScenarioId,
   string,

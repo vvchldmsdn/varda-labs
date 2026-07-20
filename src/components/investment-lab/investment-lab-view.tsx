@@ -13,6 +13,7 @@ import { InvestmentLabFundingPreflightView } from "./investment-lab-funding-pref
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
+import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAccountComposition } from "@/lib/investment-lab-account-composition";
 import type { InvestmentLabAccountFundingPreflight } from "@/lib/investment-lab-account-funding-preflight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
@@ -28,6 +29,7 @@ export function InvestmentLabView({
   accountQuery,
   accountComposition,
   anchorBasketScenario,
+  anchorValueWeightScenario,
   dataAvailability,
   fountScopeAdjustment,
   fundingPreflight,
@@ -38,6 +40,7 @@ export function InvestmentLabView({
   accountQuery: PortfolioAccountScopeQuery;
   accountComposition: InvestmentLabAccountComposition;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
@@ -56,6 +59,14 @@ export function InvestmentLabView({
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-account-composition-status={accountComposition.status}
       data-account-scope={selectedAccount}
+      data-anchor-value-weight-comparison-dates={
+        periodReady && anchorValueWeightScenario.status === "ready"
+          ? (anchorValueWeightScenario.summary?.comparisonDateCount ?? 0)
+          : 0
+      }
+      data-anchor-value-weight-status={
+        periodReady ? anchorValueWeightScenario.status : "unavailable"
+      }
       data-comparison-dates={
         periodReady ? model.coverage.completeComparisonDates : 0
       }
@@ -183,6 +194,7 @@ export function InvestmentLabView({
         {!periodReady ? null : model.observedPath.status === "ready" ? (
           <ReadyView
             anchorBasketScenario={anchorBasketScenario}
+            anchorValueWeightScenario={anchorValueWeightScenario}
             fountScopeAdjustment={fountScopeAdjustment}
             model={model}
             period={period}
@@ -198,12 +210,14 @@ export function InvestmentLabView({
 
 function ReadyView({
   anchorBasketScenario,
+  anchorValueWeightScenario,
   fountScopeAdjustment,
   model,
   period,
   selectedAccount,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
@@ -262,11 +276,13 @@ function ReadyView({
 
       <InvestmentLabScenarioChartView
         anchorBasketScenario={anchorBasketScenario}
+        anchorValueWeightScenario={anchorValueWeightScenario}
         model={model}
       />
 
       <InvestmentLabScenarioMatrix
         anchorBasketScenario={anchorBasketScenario}
+        anchorValueWeightScenario={anchorValueWeightScenario}
         model={model}
       />
 

@@ -1,8 +1,11 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
+import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import {
   composeInvestmentLabAnchor,
+  composeInvestmentLabAnchorValueWeight,
   unavailableInvestmentLabAnchor,
+  unavailableInvestmentLabAnchorValueWeight,
 } from "./investment-lab-account-composition-anchor.ts";
 import {
   INVESTMENT_LAB_ACCOUNT_COMPOSITION_POLICY,
@@ -12,6 +15,7 @@ import {
   type InvestmentLabCompositionBoundaryFlow,
   type InvestmentLabCompositionValue,
   type InvestmentLabNamedAnchors,
+  type InvestmentLabNamedAnchorValueWeights,
   type InvestmentLabNamedModels,
 } from "./investment-lab-account-composition-contract.ts";
 import {
@@ -49,10 +53,13 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
   namedModels: InvestmentLabNamedModels;
   pooledAnchor: InvestmentLabAnchorBasketScenario;
   namedAnchors: InvestmentLabNamedAnchors;
+  pooledAnchorValueWeight: InvestmentLabAnchorValueWeightScenario;
+  namedAnchorValueWeights: InvestmentLabNamedAnchorValueWeights;
   boundaryFlows: readonly InvestmentLabCompositionBoundaryFlow[];
 }>): Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   composition: InvestmentLabAccountComposition;
 }> {
   const observed = composeInvestmentLabObservedPath(
@@ -74,9 +81,13 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     input.namedModels,
   );
   const anchor = composeInvestmentLabAnchor({
-    pooledModel: input.pooledModel,
     pooledAnchor: input.pooledAnchor,
     namedAnchors: input.namedAnchors,
+    boundaryFlows: input.boundaryFlows,
+  });
+  const anchorValueWeight = composeInvestmentLabAnchorValueWeight({
+    pooledAnchor: input.pooledAnchorValueWeight,
+    namedAnchors: input.namedAnchorValueWeights,
     boundaryFlows: input.boundaryFlows,
   });
 
@@ -87,6 +98,7 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     zero_return: resolution(cash),
     fixed_mix: resolution(fixedMix),
     anchor_basket: resolution(anchor),
+    anchor_value_weight: resolution(anchorValueWeight),
   });
   const required = Object.values(scenarios).filter(
     (scenario) => scenario.status !== "not_requested",
@@ -115,6 +127,13 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
           : unavailableInvestmentLabAnchor(
               input.pooledAnchor,
               anchor.blockers,
+            ),
+      anchorValueWeightScenario:
+        anchorValueWeight.status === "ready"
+          ? anchorValueWeight.value
+          : unavailableInvestmentLabAnchorValueWeight(
+              input.pooledAnchorValueWeight,
+              anchorValueWeight.blockers,
             ),
       composition,
     });
@@ -181,6 +200,13 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
             input.pooledAnchor,
             anchor.blockers,
           ),
+    anchorValueWeightScenario:
+      anchorValueWeight.status === "ready"
+        ? anchorValueWeight.value
+        : unavailableInvestmentLabAnchorValueWeight(
+            input.pooledAnchorValueWeight,
+            anchorValueWeight.blockers,
+          ),
     composition,
   });
 }
@@ -196,6 +222,7 @@ function scenarioRecord(
     "zero_return",
     "fixed_mix",
     "anchor_basket",
+    "anchor_value_weight",
   ];
   return Object.freeze(
     Object.fromEntries(

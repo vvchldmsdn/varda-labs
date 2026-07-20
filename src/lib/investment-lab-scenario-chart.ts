@@ -1,4 +1,5 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
+import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import type { InvestmentLabScenarioMatrixId } from "./investment-lab-scenario-matrix.ts";
 
@@ -44,6 +45,7 @@ const SCENARIOS = Object.freeze([
   "voo",
   "fixed_mix",
   "anchor_basket",
+  "anchor_value_weight",
 ] as const satisfies readonly InvestmentLabScenarioMatrixId[]);
 
 const COLORS: Readonly<Record<InvestmentLabScenarioMatrixId, string>> = {
@@ -53,11 +55,13 @@ const COLORS: Readonly<Record<InvestmentLabScenarioMatrixId, string>> = {
   voo: "#2369a8",
   fixed_mix: "#8b5a9e",
   anchor_basket: "#b47a13",
+  anchor_value_weight: "#2f7d68",
 };
 
 export function buildInvestmentLabScenarioChart(input: Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
 }>): InvestmentLabScenarioChart {
   if (input.model.observedPath.status !== "ready") {
     return unavailableChart();
@@ -134,6 +138,16 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
             "anchor_basket",
             anchorLabel(input.anchorBasketScenario),
             input.anchorBasketScenario.rows.map(toScenarioPoint),
+          )
+        : null,
+    ],
+    [
+      "anchor_value_weight",
+      input.anchorValueWeightScenario.status === "ready"
+        ? chartLine(
+            "anchor_value_weight",
+            anchorValueWeightLabel(input.anchorValueWeightScenario),
+            input.anchorValueWeightScenario.rows.map(toScenarioPoint),
           )
         : null,
     ],
@@ -228,6 +242,15 @@ function anchorLabel(anchor: InvestmentLabAnchorBasketScenario) {
     "named_account_equal_weight_then_sum"
     ? "계좌별 동일 비중"
     : "기준일 동일 비중";
+}
+
+function anchorValueWeightLabel(
+  scenario: InvestmentLabAnchorValueWeightScenario,
+) {
+  return scenario.summary?.allocationBasis ===
+    "named_account_anchor_value_weight_then_sum"
+    ? "계좌별 기준일 비중"
+    : "기준일 비중 유지";
 }
 
 function unavailableChart(): InvestmentLabScenarioChart {

@@ -13,6 +13,10 @@ import {
   type InvestmentLabAnchorBasketScenario,
 } from "./investment-lab-anchor-basket-scenario.ts";
 import {
+  buildInvestmentLabAnchorValueWeightScenario,
+  type InvestmentLabAnchorValueWeightScenario,
+} from "./investment-lab-anchor-value-weight-scenario.ts";
+import {
   resolveInvestmentLabBoundaryFlows,
   type InvestmentLabCounterfactualReadInput,
   type InvestmentLabCounterfactualReadModel,
@@ -34,7 +38,7 @@ export interface InvestmentLabAnchorBasketReadRepository {
   }>): Promise<readonly InvestmentLabAnchorPriceRow[]>;
 }
 
-export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
+export type InvestmentLabAnchorScenarioLoadInput = Readonly<{
   account?: PortfolioAccountScope;
   repository: InvestmentLabAnchorBasketReadRepository;
   model: InvestmentLabCounterfactualReadModel;
@@ -42,7 +46,22 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
   fxRows: readonly InvestmentLabAnchorFxRow[];
   requestedAnchorDate?: string | null;
   fountScopeAdjustmentStatus?: "not_applicable" | "applied" | "blocked";
-}>): Promise<InvestmentLabAnchorBasketScenario> {
+}>;
+
+export type InvestmentLabAnchorScenarios = Readonly<{
+  equalWeight: InvestmentLabAnchorBasketScenario;
+  valueWeight: InvestmentLabAnchorValueWeightScenario;
+}>;
+
+export async function loadInvestmentLabAnchorBasketScenario(
+  input: InvestmentLabAnchorScenarioLoadInput,
+): Promise<InvestmentLabAnchorBasketScenario> {
+  return (await loadInvestmentLabAnchorScenarios(input)).equalWeight;
+}
+
+export async function loadInvestmentLabAnchorScenarios(
+  input: InvestmentLabAnchorScenarioLoadInput,
+): Promise<InvestmentLabAnchorScenarios> {
   const observedRows = input.model.observedPath.rows;
   const serviceDates = observedRows.map(
     (row) => row.serviceDate,
@@ -65,7 +84,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     requestedAnchorDate: input.requestedAnchorDate,
   });
   if (anchor.status !== "ready" || !anchor.selectedAnchorDate) {
-    return buildInvestmentLabAnchorBasketScenario({
+    return buildAnchorScenarios({
       anchor,
       actualPath: [],
       evidence: null,
@@ -90,7 +109,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     input.account,
   );
   if (flowResolution.status !== "ready") {
-    return buildInvestmentLabAnchorBasketScenario({
+    return buildAnchorScenarios({
       anchor,
       actualPath,
       evidence: null,
@@ -113,7 +132,7 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
     fxRows: input.fxRows,
     boundaryFlows: flowResolution.flows,
   });
-  return buildInvestmentLabAnchorBasketScenario({
+  return buildAnchorScenarios({
     anchor,
     actualPath,
     evidence,
@@ -124,6 +143,15 @@ export async function loadInvestmentLabAnchorBasketScenario(input: Readonly<{
       snapshotRows: selectedSnapshotRows,
       eventRows: selectedEventRows,
     }),
+  });
+}
+
+function buildAnchorScenarios(
+  input: Parameters<typeof buildInvestmentLabAnchorBasketScenario>[0],
+): InvestmentLabAnchorScenarios {
+  return Object.freeze({
+    equalWeight: buildInvestmentLabAnchorBasketScenario(input),
+    valueWeight: buildInvestmentLabAnchorValueWeightScenario(input),
   });
 }
 

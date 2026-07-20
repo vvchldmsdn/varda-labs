@@ -1,4 +1,5 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
+import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
 
@@ -16,7 +17,8 @@ export type InvestmentLabScenarioMatrixId =
   | "voo"
   | "fixed_mix"
   | "zero_return"
-  | "anchor_basket";
+  | "anchor_basket"
+  | "anchor_value_weight";
 
 export type InvestmentLabScenarioPriceBasis =
   | "stored_position_market_value"
@@ -79,11 +81,21 @@ type Summary = Readonly<{
 export function buildInvestmentLabScenarioMatrix(input: Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
 }>): InvestmentLabScenarioMatrix {
   const period = resolvePeriod(input.model);
   const rows = period
-    ? buildRows(input.model, input.anchorBasketScenario, period)
-    : unavailableRows(input.model, input.anchorBasketScenario);
+    ? buildRows(
+        input.model,
+        input.anchorBasketScenario,
+        input.anchorValueWeightScenario,
+        period,
+      )
+    : unavailableRows(
+        input.model,
+        input.anchorBasketScenario,
+        input.anchorValueWeightScenario,
+      );
   const readyRowCount = rows.filter((row) => row.status === "ready").length;
 
   return Object.freeze({
@@ -102,6 +114,7 @@ export function buildInvestmentLabScenarioMatrix(input: Readonly<{
 function buildRows(
   model: InvestmentLabCounterfactualReadModel,
   anchor: InvestmentLabAnchorBasketScenario,
+  anchorValueWeight: InvestmentLabAnchorValueWeightScenario,
   period: NonNullable<InvestmentLabScenarioMatrix["period"]>,
 ) {
   const observedSummary = model.observedPath.summary!;
@@ -258,6 +271,27 @@ function buildRows(
       sourceReady: anchor.status === "ready",
       sourceReasons: anchorReasons(anchor),
     }),
+    scenarioRow({
+      id: "anchor_value_weight",
+      summary: anchorValueWeight.summary,
+      period,
+      returnEstimate: readReturn(
+        anchorValueWeight.returnEstimate?.scenarioReturn ?? null,
+        anchorValueWeight.returnEstimate?.method.version ?? null,
+      ),
+      flowCount:
+        anchorValueWeight.status === "ready"
+          ? anchorValueWeight.coverage.sourceFlowCount
+          : null,
+      pendingComparisonCount:
+        anchorValueWeight.status === "ready"
+          ? anchorValueWeight.coverage.pendingComparisonRows
+          : null,
+      priceBasis: anchorPriceBasis(anchorValueWeight),
+      fxBasis: "stored_usdkrw_for_usd_legs",
+      sourceReady: anchorValueWeight.status === "ready",
+      sourceReasons: anchorReasons(anchorValueWeight),
+    }),
   ];
 }
 
@@ -327,6 +361,7 @@ function unavailableRow(
 function unavailableRows(
   model: InvestmentLabCounterfactualReadModel,
   anchor: InvestmentLabAnchorBasketScenario,
+  anchorValueWeight: InvestmentLabAnchorValueWeightScenario,
 ) {
   const reasons = ["base_period_unavailable", ...model.blockers];
   return [
@@ -378,6 +413,14 @@ function unavailableRows(
       },
       [...reasons, ...anchorReasons(anchor)],
     ),
+    unavailableRow(
+      {
+        id: "anchor_value_weight",
+        priceBasis: anchorPriceBasis(anchorValueWeight),
+        fxBasis: "stored_usdkrw_for_usd_legs",
+      },
+      [...reasons, ...anchorReasons(anchorValueWeight)],
+    ),
   ];
 }
 
@@ -402,7 +445,9 @@ function resolvePeriod(model: InvestmentLabCounterfactualReadModel) {
 }
 
 function anchorPriceBasis(
-  anchor: InvestmentLabAnchorBasketScenario,
+  anchor:
+    | InvestmentLabAnchorBasketScenario
+    | InvestmentLabAnchorValueWeightScenario,
 ): InvestmentLabScenarioPriceBasis {
   return anchor.anchor.instruments.some(
     (instrument) => instrument.valuationModel === "stored_manual",
@@ -435,7 +480,11 @@ function returnReasons(values: readonly unknown[] | undefined) {
   return values?.map(String) ?? [];
 }
 
-function anchorReasons(anchor: InvestmentLabAnchorBasketScenario) {
+function anchorReasons(
+  anchor:
+    | InvestmentLabAnchorBasketScenario
+    | InvestmentLabAnchorValueWeightScenario,
+) {
   return unique([
     ...anchor.anchor.blockers,
     ...anchor.evidenceBlockers.map((row) => row.reason),

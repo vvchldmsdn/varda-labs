@@ -1,4 +1,5 @@
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
+import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import {
   buildInvestmentLabScenarioChart,
@@ -13,14 +14,17 @@ const PADDING_Y = 34;
 
 export function InvestmentLabScenarioChartView({
   anchorBasketScenario,
+  anchorValueWeightScenario,
   model,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
+  anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   model: InvestmentLabCounterfactualReadModel;
 }) {
   const chart = buildInvestmentLabScenarioChart({
     model,
     anchorBasketScenario,
+    anchorValueWeightScenario,
   });
   if (!chart.period || chart.lines.length === 0) return null;
 

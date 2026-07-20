@@ -5,10 +5,11 @@ import { describe, it } from "node:test";
 import { buildInvestmentLabScenarioMatrix } from "../src/lib/investment-lab-scenario-matrix.ts";
 
 describe("investment lab scenario comparison matrix", () => {
-  it("projects six existing scenarios in a fixed neutral order", () => {
+  it("projects seven existing scenarios in a fixed neutral order", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model: readyModel(),
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(matrix.status, "ready");
@@ -21,9 +22,10 @@ describe("investment lab scenario comparison matrix", () => {
         "voo",
         "fixed_mix",
         "anchor_basket",
+        "anchor_value_weight",
       ],
     );
-    assert.equal(matrix.coverage.readyRowCount, 6);
+    assert.equal(matrix.coverage.readyRowCount, 7);
     assert.equal(matrix.coverage.unavailableRowCount, 0);
     const rowsById = Object.fromEntries(
       matrix.rows.map((row) => [row.id, row]),
@@ -41,6 +43,7 @@ describe("investment lab scenario comparison matrix", () => {
       rowsById.anchor_basket.priceBasis,
       "anchor_instrument_raw_close",
     );
+    assert.equal(rowsById.anchor_value_weight.flowCount, 2);
   });
 
   it("labels a manual-valued anchor basket without claiming raw closes", () => {
@@ -53,6 +56,7 @@ describe("investment lab scenario comparison matrix", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model: readyModel(),
       anchorBasketScenario: anchor,
+      anchorValueWeightScenario: readyValueWeight(),
     });
     const row = matrix.rows.find(
       (candidate) => candidate.id === "anchor_basket",
@@ -89,6 +93,7 @@ describe("investment lab scenario comparison matrix", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model: readyModel(),
       anchorBasketScenario: anchor,
+      anchorValueWeightScenario: readyValueWeight(),
     });
     const row = matrix.rows.find((candidate) => candidate.id === "anchor_basket");
 
@@ -97,7 +102,7 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(row.endValueKrw, null);
     assert.equal(row.flowCount, null);
     assert.ok(row.reasonCodes.includes("tickerless_anchor_holding"));
-    assert.equal(matrix.coverage.readyRowCount, 5);
+    assert.equal(matrix.coverage.readyRowCount, 6);
   });
 
   it("fails only a source row whose period differs from the common period", () => {
@@ -111,12 +116,13 @@ describe("investment lab scenario comparison matrix", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model: readyModel(),
       anchorBasketScenario: anchor,
+      anchorValueWeightScenario: readyValueWeight(),
     });
     const row = matrix.rows.find((candidate) => candidate.id === "anchor_basket");
 
     assert.equal(row?.status, "unavailable");
     assert.deepEqual(row?.reasonCodes, ["period_mismatch"]);
-    assert.equal(matrix.coverage.readyRowCount, 5);
+    assert.equal(matrix.coverage.readyRowCount, 6);
     assert.equal(matrix.rows[1].status, "ready");
   });
 
@@ -133,6 +139,7 @@ describe("investment lab scenario comparison matrix", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model,
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(matrix.rows[0].status, "ready");
@@ -162,11 +169,12 @@ describe("investment lab scenario comparison matrix", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model,
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(matrix.status, "unavailable");
     assert.equal(matrix.coverage.readyRowCount, 0);
-    assert.equal(matrix.coverage.unavailableRowCount, 6);
+    assert.equal(matrix.coverage.unavailableRowCount, 7);
     assert.ok(matrix.rows.every((row) => row.endValueKrw === null));
   });
 
@@ -186,6 +194,7 @@ describe("investment lab scenario comparison matrix", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model,
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
     const rows = Object.fromEntries(matrix.rows.map((row) => [row.id, row]));
 
@@ -194,6 +203,7 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(rows.zero_return.status, "ready");
     assert.equal(rows.voo.status, "ready");
     assert.equal(rows.anchor_basket.status, "ready");
+    assert.equal(rows.anchor_value_weight.status, "ready");
     assert.equal(rows.kodex200.status, "unavailable");
     assert.equal(rows.fixed_mix.status, "unavailable");
   });
@@ -342,6 +352,23 @@ function readyAnchor() {
       manualValuationComponentCount: 0,
       manualObservationRows: 0,
       manualCarryRows: 0,
+    },
+  };
+}
+
+function readyValueWeight() {
+  const anchor = readyAnchor();
+  return {
+    ...anchor,
+    weights: [
+      { instrumentKey: "korea:KRW:AAA", label: "AAA", weight: 0.6 },
+      { instrumentKey: "us:USD:BBB", label: "BBB", weight: 0.4 },
+    ],
+    summary: {
+      ...anchor.summary,
+      allocationBasis: "single_scope_anchor_value_weight",
+      scenarioEndValueKrw: 1_075,
+      endDifferenceKrw: 75,
     },
   };
 }

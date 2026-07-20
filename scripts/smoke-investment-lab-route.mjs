@@ -125,7 +125,7 @@ async function main() {
   assert.equal(fundingRequestedCells, fundingReadyCells + fundingUnavailableCells);
   assert.equal(
     fundingRequestedCells + fundingNotRequestedCells,
-    fundingAccountRows * 6,
+    fundingAccountRows * 7,
   );
   assert.equal(
     readStringAttribute(route.body, "data-cross-account-funding"),
@@ -259,6 +259,14 @@ async function main() {
     route.body,
     "data-anchor-basket-status",
   );
+  const anchorValueWeightStatus = readStringAttribute(
+    route.body,
+    "data-anchor-value-weight-status",
+  );
+  const anchorValueWeightComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-anchor-value-weight-comparison-dates",
+  );
   const anchorBasketCandidateDates = readIntegerAttribute(
     route.body,
     "data-anchor-basket-candidate-dates",
@@ -294,6 +302,10 @@ async function main() {
   assert.ok(
     anchorBasketStatus === "ready" || anchorBasketStatus === "unavailable",
   );
+  assert.ok(
+    anchorValueWeightStatus === "ready" ||
+      anchorValueWeightStatus === "unavailable",
+  );
   assert.ok(anchorBasketCandidateDates >= 0);
   assert.ok(anchorBasketSourceRows >= anchorBasketEconomicInstruments);
   if (anchorBasketStatus === "ready") {
@@ -311,6 +323,14 @@ async function main() {
     assert.equal(anchorBasketManualComponents, 0);
     assert.equal(anchorBasketManualObservations, 0);
     assert.equal(anchorBasketManualCarries, 0);
+  }
+  if (anchorValueWeightStatus === "ready") {
+    assert.equal(
+      anchorValueWeightComparisonDates,
+      anchorBasketComparisonDates,
+    );
+  } else {
+    assert.equal(anchorValueWeightComparisonDates, 0);
   }
   let anchorSpecialHoldingRows = 0;
   let anchorSpecialHoldingResolved = 0;
@@ -421,8 +441,8 @@ async function main() {
     assert.ok(
       scenarioChartStatus === "ready" || scenarioChartStatus === "partial",
     );
-    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 6);
-    assert.equal(scenarioChartLines + scenarioChartUnavailable, 6);
+    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 7);
+    assert.equal(scenarioChartLines + scenarioChartUnavailable, 7);
     assert.equal(
       scenarioChartStatus,
       scenarioChartUnavailable ? "partial" : "ready",
@@ -448,7 +468,7 @@ async function main() {
       "data-scenario-matrix-unavailable-rows",
     );
     assert.equal(scenarioMatrixStatus, "ready");
-    assert.equal(scenarioMatrixRows, 6);
+    assert.equal(scenarioMatrixRows, 7);
     assert.equal(
       scenarioMatrixReadyRows + scenarioMatrixUnavailableRows,
       scenarioMatrixRows,
@@ -460,6 +480,7 @@ async function main() {
       "fixed_mix",
       "zero_return",
       "anchor_basket",
+      "anchor_value_weight",
     ]) {
       assert.match(route.body, new RegExp(`data-scenario-row="${scenarioId}"`));
     }
@@ -469,6 +490,7 @@ async function main() {
       "KODEX 200 adjusted close",
       "VOO raw close",
       "초기 동일비중·이후 흐름 균등배분",
+      "기준일 비중 유지",
     ]) {
       assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
     }
@@ -872,6 +894,8 @@ async function main() {
           fixedMixSplitExecutionDateRows,
           fixedMixReturnStatus,
           anchorBasketStatus,
+          anchorValueWeightStatus,
+          anchorValueWeightComparisonDates,
           anchorBasketCandidateDates,
           anchorBasketSourceRows,
           anchorBasketEconomicInstruments,
@@ -1077,7 +1101,8 @@ async function main() {
     (vooComparisonStatus === "ready" ? 1 : 0) +
     (fixedMixStatus === "ready" ? 1 : 0) +
     (cashComparisonStatus === "ready" ? 1 : 0) +
-    (anchorBasketStatus === "ready" ? 1 : 0);
+    (anchorBasketStatus === "ready" ? 1 : 0) +
+    (anchorValueWeightStatus === "ready" ? 1 : 0);
   assert.equal(scenarioMatrixReadyRows, expectedScenarioMatrixReadyRows);
   assert.equal(
     scenarioMatrixUnavailableRows,
@@ -1168,6 +1193,8 @@ async function main() {
         fixedMixSplitExecutionDateRows,
         fixedMixReturnStatus,
         anchorBasketStatus,
+        anchorValueWeightStatus,
+        anchorValueWeightComparisonDates,
         anchorBasketCandidateDates,
         anchorBasketSourceRows,
         anchorBasketEconomicInstruments,

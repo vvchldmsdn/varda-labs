@@ -4,6 +4,9 @@ import { describe, it } from "node:test";
 import {
   INVESTMENT_LAB_ANCHOR_BASKET_SCENARIO_POLICY,
 } from "../src/lib/investment-lab-anchor-basket-scenario.ts";
+import {
+  INVESTMENT_LAB_ANCHOR_VALUE_WEIGHT_SCENARIO_POLICY,
+} from "../src/lib/investment-lab-anchor-value-weight-scenario.ts";
 import { composeInvestmentLabAllAccounts } from "../src/lib/investment-lab-account-composition.ts";
 import { buildInvestmentLabCounterfactualReadModel } from "../src/lib/investment-lab-counterfactual-read-model.ts";
 import { resolveInvestmentLabFixedMixSelection } from "../src/lib/investment-lab-fixed-mix-selection.ts";
@@ -11,7 +14,7 @@ import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "../src/lib/investment-lab-
 import { NAMED_PORTFOLIO_ACCOUNTS } from "../src/lib/portfolio-account-scope.ts";
 
 describe("investment lab named-account composition", () => {
-  it("derives all six all-account paths from complete named-account paths", () => {
+  it("derives all seven all-account paths from complete named-account paths", () => {
     const fixture = buildFixture();
     const result = compose(fixture);
 
@@ -30,6 +33,7 @@ describe("investment lab named-account composition", () => {
         zero_return: "ready",
         fixed_mix: "ready",
         anchor_basket: "ready",
+        anchor_value_weight: "ready",
       },
     );
     assert.equal(result.model.status, "ready");
@@ -66,6 +70,11 @@ describe("investment lab named-account composition", () => {
     );
     assert.equal(result.anchorBasketScenario.summary.equalWeightPct, null);
     assert.equal(result.anchorBasketScenario.coverage.sourceFlowCount, 3);
+    assert.equal(
+      result.anchorValueWeightScenario.summary.allocationBasis,
+      "named_account_anchor_value_weight_then_sum",
+    );
+    assert.equal(result.anchorValueWeightScenario.weights.length, 0);
   });
 
   it("keeps unrelated all-account scenarios when one named VOO path is unavailable", () => {
@@ -101,6 +110,39 @@ describe("investment lab named-account composition", () => {
     assert.equal(result.model.cashComparison.status, "ready");
     assert.equal(result.model.fixedMixScenario.status, "ready");
     assert.equal(result.model.fixedMixComparison.status, "ready");
+  });
+
+  it("keeps other scenarios when one named anchor-weight path is unavailable", () => {
+    const fixture = buildFixture();
+    fixture.namedAnchorValueWeights = {
+      ...fixture.namedAnchorValueWeights,
+      isa: {
+        ...fixture.namedAnchorValueWeights.isa,
+        status: "unavailable",
+        summary: null,
+        returnEstimate: null,
+        rows: [],
+        blockers: [
+          {
+            reason: "evidence_unavailable",
+            instrumentKey: null,
+            detail: null,
+          },
+        ],
+      },
+    };
+
+    const result = compose(fixture);
+
+    assert.equal(result.composition.status, "partial");
+    assert.equal(
+      result.composition.scenarios.anchor_value_weight.status,
+      "unavailable",
+    );
+    assert.equal(result.composition.scenarios.anchor_basket.status, "ready");
+    assert.equal(result.model.status, "ready");
+    assert.equal(result.anchorValueWeightScenario.status, "unavailable");
+    assert.deepEqual(result.anchorValueWeightScenario.weights, []);
   });
 
   it("isolates a pooled KODEX divergence from the observed and cash paths", () => {
@@ -173,6 +215,8 @@ function compose(fixture) {
     namedModels: fixture.namedModels,
     pooledAnchor: fixture.pooledAnchor,
     namedAnchors: fixture.namedAnchors,
+    pooledAnchorValueWeight: fixture.pooledAnchorValueWeight,
+    namedAnchorValueWeights: fixture.namedAnchorValueWeights,
     boundaryFlows: fixture.source.eventRows.map((row) => ({
       eventDate: row.eventDate,
       sequence: row.sequence,
@@ -211,7 +255,32 @@ function buildFixture() {
     ]),
   );
   const pooledAnchor = anchorScenario("all", pooledModel, 1.5, 3);
-  return { source, pooledModel, namedModels, pooledAnchor, namedAnchors };
+  const namedAnchorValueWeights = Object.fromEntries(
+    NAMED_PORTFOLIO_ACCOUNTS.map((account, index) => [
+      account,
+      anchorValueWeightScenario(
+        account,
+        namedModels[account],
+        1 + (index + 1) / 200,
+        1,
+      ),
+    ]),
+  );
+  const pooledAnchorValueWeight = anchorValueWeightScenario(
+    "all",
+    pooledModel,
+    1.25,
+    3,
+  );
+  return {
+    source,
+    pooledModel,
+    namedModels,
+    pooledAnchor,
+    namedAnchors,
+    pooledAnchorValueWeight,
+    namedAnchorValueWeights,
+  };
 }
 
 function anchorScenario(account, model, multiplier, sourceFlowCount) {
@@ -268,6 +337,32 @@ function anchorScenario(account, model, multiplier, sourceFlowCount) {
     },
     evidenceBlockers: [],
     blockers: [],
+  };
+}
+
+function anchorValueWeightScenario(
+  account,
+  model,
+  multiplier,
+  sourceFlowCount,
+) {
+  const scenario = anchorScenario(
+    account,
+    model,
+    multiplier,
+    sourceFlowCount,
+  );
+  return {
+    ...scenario,
+    policy: INVESTMENT_LAB_ANCHOR_VALUE_WEIGHT_SCENARIO_POLICY,
+    weights: [
+      { instrumentKey: "korea:KRW:AAA", label: "AAA", weight: 0.6 },
+      { instrumentKey: "us:USD:BBB", label: "BBB", weight: 0.4 },
+    ],
+    summary: {
+      ...scenario.summary,
+      allocationBasis: "single_scope_anchor_value_weight",
+    },
   };
 }
 

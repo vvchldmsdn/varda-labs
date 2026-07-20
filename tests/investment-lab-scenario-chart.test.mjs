@@ -9,6 +9,7 @@ describe("investment lab multi-scenario chart", () => {
     const chart = buildInvestmentLabScenarioChart({
       model: readyModel(),
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(chart.status, "ready");
@@ -21,6 +22,7 @@ describe("investment lab multi-scenario chart", () => {
         "voo",
         "fixed_mix",
         "anchor_basket",
+        "anchor_value_weight",
       ],
     );
     assert.equal(chart.period.comparisonDateCount, 3);
@@ -41,12 +43,19 @@ describe("investment lab multi-scenario chart", () => {
     const chart = buildInvestmentLabScenarioChart({
       model,
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(chart.status, "partial");
     assert.deepEqual(
       chart.lines.map((line) => line.id),
-      ["actual", "zero_return", "voo", "anchor_basket"],
+      [
+        "actual",
+        "zero_return",
+        "voo",
+        "anchor_basket",
+        "anchor_value_weight",
+      ],
     );
     assert.deepEqual(chart.unavailableScenarioIds, ["kodex200", "fixed_mix"]);
   });
@@ -58,6 +67,7 @@ describe("investment lab multi-scenario chart", () => {
     const chart = buildInvestmentLabScenarioChart({
       model,
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(chart.status, "partial");
@@ -75,6 +85,7 @@ describe("investment lab multi-scenario chart", () => {
     const chart = buildInvestmentLabScenarioChart({
       model,
       anchorBasketScenario: readyAnchor(),
+      anchorValueWeightScenario: readyValueWeight(),
     });
 
     assert.equal(chart.status, "partial");
@@ -151,6 +162,17 @@ function readyAnchor() {
       allocationBasis: "single_scope_equal_weight",
     },
     rows: scenarioRows(dates, [1000, 1050, 1100], [1000, 1060, 1120]),
+  };
+}
+
+function readyValueWeight() {
+  const dates = ["2026-01-02", "2026-01-05", "2026-01-06"];
+  return {
+    status: "ready",
+    summary: {
+      allocationBasis: "single_scope_anchor_value_weight",
+    },
+    rows: scenarioRows(dates, [1000, 1050, 1100], [1000, 1080, 1160]),
   };
 }
 
