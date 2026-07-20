@@ -71,6 +71,11 @@ async function main() {
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
+  assert.match(simulation.body, /data-regime-fixed-mix-comparison/);
+  assert.match(
+    simulation.body,
+    /data-regime-fixed-mix-comparison-status="(?:ready|unavailable)"/,
+  );
   assert.match(simulation.body, /data-regime-readiness-history/);
   assert.match(
     simulation.body,
@@ -123,6 +128,12 @@ async function main() {
   )?.[1];
   const regimeReadyCount =
     simulation.body.match(/data-regime-scenario-status="ready"/g)?.length ?? 0;
+  const regimeFixedMixReadyCount =
+    simulation.body.match(
+      /data-regime-fixed-mix-scenario-status="ready"/g,
+    )?.length ?? 0;
+  const regimeSelectedScenarioCount =
+    simulation.body.match(/data-regime-scenario-selected="true"/g)?.length ?? 0;
   const regimeFactorCount =
     simulation.body.match(/data-regime-factor-key="[^"]+"/g)?.length ?? 0;
   const regimeHistoryRowCount =
@@ -264,11 +275,38 @@ async function main() {
     );
   }
   if (regimeStatus === "ready") {
-    assert.equal(regimeReadyCount, 3, "ready regime model must render three scenarios");
+    const expectedRegimeScenarioCount =
+      EXPECT_KODEX_WEIGHT_PCT !== null &&
+      ![25, 50, 75].includes(EXPECT_KODEX_WEIGHT_PCT)
+        ? 6
+        : 5;
+    assert.equal(
+      regimeReadyCount,
+      expectedRegimeScenarioCount,
+      "ready regime model must render references, three presets, and an optional custom mix",
+    );
+    assert.equal(
+      regimeFixedMixReadyCount,
+      3,
+      "ready regime model must render all three shared-draw fixed mixes",
+    );
+    assert.equal(
+      regimeSelectedScenarioCount,
+      EXPECT_INVALID_WEIGHT ? 0 : 1,
+      "a valid current weight input must mark exactly one regime scenario",
+    );
     assert.equal(regimeFactorCount, 3, "ready regime model must show three factor sources");
     assert.match(simulation.body, /data-regime-bootstrap-engine="regime_bootstrap_research_v2"/);
     assert.match(simulation.body, /data-regime-scenario-kodex-weight-bps="/);
     assert.match(simulation.body, /data-regime-scenario-voo-weight-bps="/);
+    assert.match(
+      simulation.body,
+      /data-regime-fixed-mix-pairing="shared_regime_state_and_draw_plan_verified"/,
+    );
+    assert.match(simulation.body, /data-regime-fixed-mix-scenario-count="3"/);
+    assert.match(simulation.body, /data-regime-fixed-mix-rebalancing="none"/);
+    assert.match(simulation.body, /국면별 고정 비중 3안 공통 경로/);
+    assert.match(simulation.body, /성과 순위·추천 아님/);
   }
   if (researchReadyCount > 0) {
     assert.equal(
@@ -361,6 +399,8 @@ async function main() {
         jointSelectionStatus,
         regimeStatus,
         regimeReadyCount,
+        regimeFixedMixReadyCount,
+        regimeSelectedScenarioCount,
         regimeFactorCount,
         regimeHistoryRowCount,
         historyRowCount,

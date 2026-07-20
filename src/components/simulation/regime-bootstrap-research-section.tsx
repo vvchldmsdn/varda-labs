@@ -1,15 +1,13 @@
 import type { SimulationRegimeResearchResult } from "@/lib/simulation-regime-research-execution";
 
+import { RegimeFixedMixComparisonPanel } from "./regime-fixed-mix-comparison-panel";
+import { resolveResearchFanChartValueDomain } from "./research-fan-chart";
 import {
-  ResearchFanChart,
-  resolveResearchFanChartValueDomain,
-} from "./research-fan-chart";
+  RegimeScenarioCard,
+  type ReadyRegimeScenario,
+} from "./regime-scenario-card";
 
 type ReadyModel = Extract<SimulationRegimeResearchResult, { status: "ready" }>;
-type ReadyScenario = Extract<
-  ReadyModel["scenarios"][number],
-  { status: "ready" }
->;
 
 export function RegimeBootstrapResearchSection({
   model,
@@ -19,7 +17,7 @@ export function RegimeBootstrapResearchSection({
   const readyScenarios =
     model.status === "ready"
       ? model.scenarios.filter(isReadyScenario)
-      : Object.freeze([] as ReadyScenario[]);
+      : Object.freeze([] as ReadyRegimeScenario[]);
   const sharedValueDomain =
     readyScenarios.length > 0
       ? resolveResearchFanChartValueDomain(readyScenarios)
@@ -138,29 +136,55 @@ export function RegimeBootstrapResearchSection({
         </div>
       ) : null}
 
+      <RegimeFixedMixComparisonPanel
+        comparison={model.fixedMixComparison}
+        selection={model.selection}
+      />
+
       {model.status === "ready" ? (
-        <div className="mt-4 grid gap-4 xl:grid-cols-3">
-          {model.scenarios.map((scenario) =>
-            scenario.status === "ready" ? (
-              <RegimeScenarioPanel
-                key={scenario.id}
-                scenario={scenario}
-                valueDomain={sharedValueDomain!}
-              />
-            ) : (
-              <div
-                className="rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
-                data-regime-scenario={scenario.id}
-                data-regime-scenario-status="unavailable"
-                key={scenario.id}
-              >
-                <p className="font-semibold">{scenario.name}</p>
-                <p className="mt-2 text-sm text-[#6b6044]">
-                  명시 비중 입력이 유효하지 않아 이 시나리오만 제외했습니다.
-                </p>
-              </div>
-            ),
-          )}
+        <div className="mt-5 border-t border-[#d7ddcf] pt-5">
+            <h3 className="text-base font-semibold">단일 종목·직접 입력 참고 경로</h3>
+            <p className="mt-1 text-sm leading-6 text-[#687064]">
+              단일 종목 두 경로와 25·50·75 이외의 직접 입력 비중만 별도로
+              표시합니다. 고정 비중 3안과 같은 국면 상태와 추출 계획을
+              사용합니다.
+            </p>
+            <div className="mt-4 grid gap-4 xl:grid-cols-3">
+              {model.scenarios.map((scenario) =>
+                scenario.status === "ready" ? (
+                  <RegimeScenarioCard
+                    eyebrow={
+                      scenario.id === "regime-kodex200-voo-explicit-mix"
+                        ? "직접 입력 비중"
+                        : "단일 종목 참고 경로"
+                    }
+                    group={
+                      scenario.id === "regime-kodex200-voo-explicit-mix"
+                        ? "custom"
+                        : "reference"
+                    }
+                    key={scenario.id}
+                    scenario={scenario}
+                    selected={
+                      scenario.id === "regime-kodex200-voo-explicit-mix"
+                    }
+                    valueDomain={sharedValueDomain!}
+                  />
+                ) : (
+                  <div
+                    className="rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+                    data-regime-scenario={scenario.id}
+                    data-regime-scenario-status="unavailable"
+                    key={scenario.id}
+                  >
+                    <p className="font-semibold">{scenario.name}</p>
+                    <p className="mt-2 text-sm text-[#6b6044]">
+                      명시 비중 입력이 유효하지 않아 이 시나리오만 제외했습니다.
+                    </p>
+                  </div>
+                ),
+              )}
+            </div>
         </div>
       ) : null}
 
@@ -173,40 +197,6 @@ export function RegimeBootstrapResearchSection({
         계좌, Fount, 금현물, 승인 벡터, 주문 가능성은 입력에 포함하지 않습니다.
       </p>
     </section>
-  );
-}
-
-function RegimeScenarioPanel({
-  scenario,
-  valueDomain,
-}: {
-  scenario: ReadyScenario;
-  valueDomain: ReturnType<typeof resolveResearchFanChartValueDomain>;
-}) {
-  return (
-    <article
-      className="overflow-hidden rounded-lg border border-[#d7ddcf] bg-[#fbfcf7]"
-      data-regime-scenario={scenario.id}
-      data-regime-scenario-status="ready"
-      data-regime-scenario-kodex-weight-bps={scenario.weightsBps[0]}
-      data-regime-scenario-voo-weight-bps={scenario.weightsBps[1]}
-    >
-      <header className="border-b border-[#e1e5da] px-4 py-4">
-        <p className="text-xs font-semibold text-[#687064]">국면 조건부 경로</p>
-        <h3 className="mt-1 text-lg font-semibold">{scenario.name}</h3>
-        <p className="mt-1 text-xs text-[#687064]">
-          069500 {formatBps(scenario.weightsBps[0])} · VOO {formatBps(scenario.weightsBps[1])}
-          {" · "}최초 배분 후 리밸런싱 없음
-        </p>
-      </header>
-      <div className="grid grid-cols-2 border-b border-[#e1e5da]">
-        <Metric label="중앙 경로 수익률" value={formatSignedPct(scenario.terminal.p50ReturnPct)} />
-        <Metric label="손실 종료 확률" value={formatPct(scenario.terminal.lossProbabilityPct)} />
-        <Metric label="MDD 중앙값" value={formatPct(scenario.terminal.maxDrawdownP50Pct)} />
-        <Metric label="MDD P90" value={formatPct(scenario.terminal.maxDrawdownP90Pct)} />
-      </div>
-      <ResearchFanChart execution={scenario} valueDomain={valueDomain} />
-    </article>
   );
 }
 
@@ -228,18 +218,9 @@ function SummaryItem({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-b border-r border-[#e1e5da] px-3 py-3">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 font-semibold tabular-nums">{value}</p>
-    </div>
-  );
-}
-
 function isReadyScenario(
   scenario: ReadyModel["scenarios"][number],
-): scenario is ReadyScenario {
+): scenario is ReadyRegimeScenario {
   return scenario.status === "ready";
 }
 
@@ -272,16 +253,4 @@ function formatCurrentRelease(date: string | null, carryDays: number | null) {
 
 function formatDate(value: string | null) {
   return value ? value.replaceAll("-", ".") : "없음";
-}
-
-function formatBps(value: number) {
-  return `${(value / 100).toFixed(0)}%`;
-}
-
-function formatPct(value: number) {
-  return `${value.toFixed(1)}%`;
-}
-
-function formatSignedPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

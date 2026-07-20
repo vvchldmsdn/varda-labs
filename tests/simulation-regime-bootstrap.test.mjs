@@ -7,7 +7,7 @@ import { buildSimulationRegimeReadinessHistory } from "../src/lib/simulation-reg
 import { SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
 
 describe("Regime bootstrap research execution", () => {
-  it("runs three deterministic retrospective scenarios from 120 aligned rows", () => {
+  it("runs deterministic references and three fixed mixes from one regime execution", () => {
     const matrix = readyMatrix();
     const input = {
       explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
@@ -34,18 +34,37 @@ describe("Regime bootstrap research execution", () => {
     assert.equal(left.readiness.alignedRowCount, 120);
     assert.equal(left.readiness.selectedNeighborCount, 40);
     assert.equal(left.readiness.informativeFeatureCount, 6);
-    assert.equal(left.summary.readyScenarioCount, 3);
+    assert.equal(left.summary.scenarioCount, 5);
+    assert.equal(left.summary.readyScenarioCount, 5);
     assert.equal(left.assumptions.horizon, 63);
     assert.equal(left.assumptions.pathCount, 500);
+    assert.equal(left.scenarios.length, 2);
     assert.equal(left.scenarios[0].status, "ready");
     assert.deepEqual(left.scenarios[0].weightsBps, [10_000, 0]);
     assert.deepEqual(left.scenarios[1].weightsBps, [0, 10_000]);
-    assert.deepEqual(left.scenarios[2].weightsBps, [5_000, 5_000]);
+    assert.equal(left.fixedMixComparison.status, "ready");
+    assert.equal(
+      left.fixedMixComparison.policy.executionBinding,
+      "single_regime_bootstrap_engine_invocation",
+    );
+    assert.equal(
+      left.fixedMixComparison.pairing.status,
+      "shared_regime_state_and_draw_plan_verified",
+    );
+    assert.equal(left.fixedMixComparison.pairing.scenarioCount, 3);
+    assert.deepEqual(
+      left.fixedMixComparison.scenarios.map((scenario) => scenario.weightsBps),
+      [
+        [2_500, 7_500],
+        [5_000, 5_000],
+        [7_500, 2_500],
+      ],
+    );
     assert.equal(left.scenarios[0].bands.length, 64);
     assert.equal(left.scenarios[0].samplePaths.length, 12);
     assert.equal(left.scenarios[0].bands[0].p50, 100);
     assert.ok(
-      left.scenarios.every(
+      [...left.scenarios, ...left.fixedMixComparison.scenarios].every(
         (scenario) =>
           scenario.status === "ready" &&
           scenario.bands.every(
@@ -73,6 +92,7 @@ describe("Regime bootstrap research execution", () => {
     assert.equal(result.status, "unavailable");
     assert.equal(result.reason, "current_factor_state_stale");
     assert.deepEqual(result.scenarios, []);
+    assert.equal(result.fixedMixComparison.status, "unavailable");
     assert.equal(result.policy.fallback, "forbidden");
     assert.ok(result.readiness.eligibleCandidateRowCount > 0);
   });
@@ -100,7 +120,7 @@ describe("Regime bootstrap research execution", () => {
     assert.equal(result.readiness.alignedRowCount, 118);
   });
 
-  it("keeps single-instrument scenarios when only the mix query is invalid", () => {
+  it("keeps references and preset comparisons when only the custom query is invalid", () => {
     const matrix = readyMatrix();
     const endServiceDate = matrix.requestedServiceDates.at(-1);
     const result = buildSimulationRegimeResearch({
@@ -111,10 +131,28 @@ describe("Regime bootstrap research execution", () => {
     });
 
     assert.equal(result.status, "ready");
-    assert.equal(result.summary.readyScenarioCount, 2);
+    assert.equal(result.summary.readyScenarioCount, 5);
     assert.equal(result.summary.unavailableScenarioCount, 1);
+    assert.equal(result.fixedMixComparison.status, "ready");
     assert.equal(result.scenarios[2].status, "unavailable");
     assert.equal(result.scenarios[2].reason, "invalid_weight_selection");
+  });
+
+  it("adds a non-preset custom mix without changing the preset comparison", () => {
+    const matrix = readyMatrix();
+    const endServiceDate = matrix.requestedServiceDates.at(-1);
+    const result = buildSimulationRegimeResearch({
+      explicitEndServiceDate: endServiceDate,
+      matrix,
+      factorRows: factorRows(endServiceDate),
+      selection: resolveKodexVooFixedMixSelection("40"),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.summary.scenarioCount, 6);
+    assert.equal(result.summary.readyScenarioCount, 6);
+    assert.deepEqual(result.scenarios[2].weightsBps, [4_000, 6_000]);
+    assert.equal(result.fixedMixComparison.scenarios.length, 3);
   });
 
   it("rejects a shorter matrix even when it claims to be ready", () => {

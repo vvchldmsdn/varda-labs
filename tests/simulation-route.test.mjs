@@ -87,6 +87,12 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-regime-history-date/);
     assert.match(view, /data-regime-factor-key/);
     assert.match(view, /data-regime-scenario-status/);
+    assert.match(view, /data-regime-fixed-mix-comparison/);
+    assert.match(view, /data-regime-fixed-mix-comparison-status/);
+    assert.match(view, /data-regime-fixed-mix-pairing/);
+    assert.match(view, /data-regime-fixed-mix-scenario/);
+    assert.match(view, /data-regime-fixed-mix-rebalancing="none"/);
+    assert.match(view, /data-regime-scenario-selected/);
     assert.match(view, /data-fixed-mix-comparison-pairing/);
     assert.match(view, /data-fixed-mix-comparison-scenario/);
     assert.match(view, /고정 비중 3안 공통 경로 비교/);
@@ -109,6 +115,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /시점 안전 날짜/);
     assert.match(view, /자동으로 되돌리지 않으며/);
     assert.match(view, /시장 국면 사후 연구/);
+    assert.match(view, /국면별 고정 비중 3안 공통 경로/);
+    assert.match(view, /같은 시장 상태·과거 후보·500개 추출/);
+    assert.match(view, /비중 순서 · 성과 순위·추천 아님/);
+    assert.match(view, /stationary\s*bootstrap 결과와 합산하거나 승패를 판정하지 않습니다/);
+    assert.match(view, /단일 종목·직접 입력 참고 경로/);
     assert.match(view, /기존 stationary\s+bootstrap의 결손을 대신하지 않습니다/);
     assert.match(view, /자동 fallback 없음/);
     assert.match(view, /DB 적재시각은\s*과거 공개시점으로 간주하지 않습니다/);
@@ -159,7 +170,9 @@ function readSimulationView() {
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",
+    "src/components/simulation/regime-fixed-mix-comparison-panel.tsx",
     "src/components/simulation/regime-readiness-history-panel.tsx",
+    "src/components/simulation/regime-scenario-card.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",
