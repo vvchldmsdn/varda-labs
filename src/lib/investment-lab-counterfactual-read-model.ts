@@ -22,6 +22,10 @@ import {
   buildInvestmentLabFixedMixScenario,
   type InvestmentLabFixedMixScenario,
 } from "./investment-lab-fixed-mix.ts";
+import {
+  buildInvestmentLabFixedMixComparison,
+  type InvestmentLabFixedMixComparison,
+} from "./investment-lab-fixed-mix-comparison.ts";
 import type { InvestmentLabFixedMixSelection } from "./investment-lab-fixed-mix-selection.ts";
 import {
   buildInvestmentLabContributionScenarioEvidence,
@@ -135,6 +139,7 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
   vooComparison: InvestmentLabVooComparison | null;
   cashComparison: InvestmentLabCashComparison | null;
   fixedMixScenario: InvestmentLabFixedMixScenario | null;
+  fixedMixComparison: InvestmentLabFixedMixComparison | null;
   contributionExperimentScenarios:
     readonly InvestmentLabContributionScenarioEvidence[];
   sourceAuthority: InvestmentLabSourceSegmentAuthority;
@@ -256,6 +261,11 @@ export function buildInvestmentLabCounterfactualReadModel(
           vooEvidence,
           vooComparison,
         ),
+        fixedMixComparison: unavailableFixedMixComparison(
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
         contributionExperimentScenarios: vooOnlyContributionScenarios,
       },
     );
@@ -281,6 +291,11 @@ export function buildInvestmentLabCounterfactualReadModel(
         cashComparison,
         fixedMixScenario: unavailableFixedMixScenario(
           options.fixedMixSelection,
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
+        fixedMixComparison: unavailableFixedMixComparison(
           actual.rows,
           vooEvidence,
           vooComparison,
@@ -316,6 +331,11 @@ export function buildInvestmentLabCounterfactualReadModel(
           vooEvidence,
           vooComparison,
         ),
+        fixedMixComparison: unavailableFixedMixComparison(
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
         contributionExperimentScenarios: vooOnlyContributionScenarios,
       },
     );
@@ -338,6 +358,11 @@ export function buildInvestmentLabCounterfactualReadModel(
         cashComparison,
         fixedMixScenario: unavailableFixedMixScenario(
           options.fixedMixSelection,
+          actual.rows,
+          vooEvidence,
+          vooComparison,
+        ),
+        fixedMixComparison: unavailableFixedMixComparison(
           actual.rows,
           vooEvidence,
           vooComparison,
@@ -373,15 +398,26 @@ export function buildInvestmentLabCounterfactualReadModel(
     snapshotRows: input.snapshotRows,
     eventRows: flowResolution.sourceRows,
   });
+  const vooPath = buildInvestmentLabVooPath({
+    actualPath: actual.rows,
+    evidence: vooEvidence,
+  });
+  const fixedMixComparison = buildInvestmentLabFixedMixComparison({
+    actualPath: actual.rows,
+    kodexPath: path,
+    vooPath,
+    kodexReturnEvidence: returnEstimate,
+    vooReturnEvidence:
+      vooComparison.status === "ready"
+        ? vooComparison.returnEstimate
+        : null,
+  });
   const fixedMixScenario = options.fixedMixSelection
     ? buildInvestmentLabFixedMixScenario({
         selection: options.fixedMixSelection,
         actualPath: actual.rows,
         kodexPath: path,
-        vooPath: buildInvestmentLabVooPath({
-          actualPath: actual.rows,
-          evidence: vooEvidence,
-        }),
+        vooPath,
         kodexReturnEvidence: returnEstimate,
         vooReturnEvidence:
           vooComparison.status === "ready"
@@ -413,6 +449,7 @@ export function buildInvestmentLabCounterfactualReadModel(
     vooComparison,
     cashComparison,
     fixedMixScenario,
+    fixedMixComparison,
     contributionExperimentScenarios,
     sourceAuthority,
     rows,
@@ -708,6 +745,7 @@ function blockedReadModel(
     vooComparison?: InvestmentLabVooComparison | null;
     cashComparison?: InvestmentLabCashComparison | null;
     fixedMixScenario?: InvestmentLabFixedMixScenario | null;
+    fixedMixComparison?: InvestmentLabFixedMixComparison | null;
     contributionExperimentScenarios?: readonly InvestmentLabContributionScenarioEvidence[];
   }> = {},
 ): InvestmentLabCounterfactualReadModel {
@@ -721,6 +759,7 @@ function blockedReadModel(
     vooComparison: available.vooComparison ?? null,
     cashComparison: available.cashComparison ?? null,
     fixedMixScenario: available.fixedMixScenario ?? null,
+    fixedMixComparison: available.fixedMixComparison ?? null,
     contributionExperimentScenarios: Object.freeze([
       ...(available.contributionExperimentScenarios ?? []),
     ]),
@@ -743,6 +782,33 @@ function unavailableFixedMixScenario(
   if (!selection) return null;
   return buildInvestmentLabFixedMixScenario({
     selection,
+    actualPath,
+    kodexPath: Object.freeze({
+      status: "unavailable",
+      rows: [] as const,
+      appliedFlows: [] as const,
+    }),
+    vooPath: buildInvestmentLabVooPath({
+      actualPath,
+      evidence: vooEvidence,
+    }),
+    kodexReturnEvidence: null,
+    vooReturnEvidence:
+      vooComparison.status === "ready"
+        ? vooComparison.returnEstimate
+        : null,
+  });
+}
+
+function unavailableFixedMixComparison(
+  actualPath: readonly Readonly<{
+    serviceDate: string;
+    totalMarketValueKrw: number;
+  }>[],
+  vooEvidence: ReturnType<typeof resolveInvestmentLabVooEvidence>,
+  vooComparison: InvestmentLabVooComparison,
+) {
+  return buildInvestmentLabFixedMixComparison({
     actualPath,
     kodexPath: Object.freeze({
       status: "unavailable",

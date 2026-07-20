@@ -18,6 +18,7 @@ import {
   blockInvestmentLabPooledModel,
   composeInvestmentLabCash,
   composeInvestmentLabFixedMix,
+  composeInvestmentLabFixedMixComparison,
   composeInvestmentLabMainCoverage,
   composeInvestmentLabMainModel,
   composeInvestmentLabObservedPath,
@@ -65,6 +66,10 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
   const voo = composeInvestmentLabVoo(input.pooledModel, input.namedModels);
   const cash = composeInvestmentLabCash(input.pooledModel, input.namedModels);
   const fixedMix = composeInvestmentLabFixedMix(
+    input.pooledModel,
+    input.namedModels,
+  );
+  const fixedMixComparison = composeInvestmentLabFixedMixComparison(
     input.pooledModel,
     input.namedModels,
   );
@@ -147,6 +152,7 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
                 input.pooledModel,
                 fixedMix.blockers,
               ),
+      fixedMixComparison,
       contributionExperimentScenarios:
         voo.status === "ready"
           ? input.pooledModel.contributionExperimentScenarios

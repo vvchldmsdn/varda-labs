@@ -80,6 +80,8 @@ describe("investment lab counterfactual read model", () => {
     );
 
     assert.equal(withoutSelection.fixedMixScenario, null);
+    assert.equal(withoutSelection.fixedMixComparison.status, "ready");
+    assert.equal(withoutSelection.fixedMixComparison.scenarios.length, 3);
     assert.equal(withSelection.fixedMixScenario.status, "ready");
     assert.equal(withSelection.fixedMixScenario.weights.kodexWeightBps, 2500);
     assert.equal(withSelection.fixedMixScenario.weights.vooWeightBps, 7500);

@@ -2,21 +2,33 @@ import Link from "next/link";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import {
+  InvestmentLabFixedMixStandardComparison,
+  isInvestmentLabStandardFixedMixPreset,
+} from "./investment-lab-fixed-mix-standard-comparison";
+import {
+  formatInvestmentLabKrw,
+  formatInvestmentLabSignedKrw,
+  formatInvestmentLabSignedPercent,
+  investmentLabFixedMixBlockerLabel,
+} from "./investment-lab-fixed-mix-presentation";
+import {
   INVESTMENT_LAB_FIXED_MIX_POLICY,
-  type InvestmentLabFixedMixBlocker,
   type InvestmentLabFixedMixScenario,
 } from "@/lib/investment-lab-fixed-mix";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
+import type { InvestmentLabFixedMixComparison as FixedMixComparisonModel } from "@/lib/investment-lab-fixed-mix-comparison";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
 
 export function InvestmentLabFixedMix({
   account,
+  comparison,
   model,
   period,
   selection,
 }: {
   account: PortfolioAccountScope;
+  comparison: FixedMixComparisonModel | null;
   model: InvestmentLabFixedMixScenario | null;
   period: InvestmentLabPeriodSelection;
   selection: InvestmentLabFixedMixSelection;
@@ -35,6 +47,12 @@ export function InvestmentLabFixedMix({
       className="border-t border-[#dfe3d5] bg-[#f3f4ef] px-4 py-6"
       data-fixed-mix-comparison-dates={
         ready ? model.summary.comparisonDateCount : 0
+      }
+      data-fixed-mix-comparison-ready={
+        periodReady ? (comparison?.readyScenarioCount ?? 0) : 0
+      }
+      data-fixed-mix-comparison-status={
+        periodReady ? (comparison?.status ?? "unavailable") : "unavailable"
       }
       data-fixed-mix-flow-sources={
         ready ? model.coverage.componentFlowSourceCount : 0
@@ -81,22 +99,34 @@ export function InvestmentLabFixedMix({
 
         <PresetLinks account={account} period={period} />
 
-        {selection.status === "invalid" ? (
-          <UnavailableMessage>
-            KODEX 200 배분은 1~99 사이의 정수 퍼센트로 입력해야 합니다.
-          </UnavailableMessage>
-        ) : !periodReady ? (
+        {!periodReady ? (
           <UnavailableMessage>
             먼저 사용할 수 있는 과거 비교 구간을 선택해야 합니다.
           </UnavailableMessage>
-        ) : model?.status !== "ready" ? (
+        ) : (
+          <InvestmentLabFixedMixStandardComparison
+            model={comparison}
+            selectedKodexWeightPct={selection.kodexWeightPct}
+          />
+        )}
+
+        {periodReady && selection.status === "invalid" ? (
           <UnavailableMessage>
-            {model?.blockers.map(blockerLabel).join(" · ") ??
+            KODEX 200 배분은 1~99 사이의 정수 퍼센트로 입력해야 합니다.
+          </UnavailableMessage>
+        ) : periodReady && !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) && model?.status !== "ready" ? (
+          <UnavailableMessage>
+            {model?.blockers
+              .map(investmentLabFixedMixBlockerLabel)
+              .join(" · ") ??
               "기존 KODEX 200·VOO 경로 증거를 준비할 수 없습니다."}
           </UnavailableMessage>
-        ) : (
-          <FixedMixResult model={model} />
-        )}
+        ) : periodReady && !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) && model?.status === "ready" ? (
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">직접 입력한 비중 상세</h3>
+            <FixedMixResult model={model} />
+          </div>
+        ) : null}
 
         <p className="text-xs leading-5 text-[#73786c]">
           두 leg 중 하나라도 가격·환율·체결·매도 가능성 검증에 실패하면
@@ -196,17 +226,17 @@ function FixedMixResult({ model }: { model: Extract<InvestmentLabFixedMixScenari
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCell
           label="시나리오 종료 평가액"
-          value={formatKrw(summary.scenarioEndValueKrw)}
+          value={formatInvestmentLabKrw(summary.scenarioEndValueKrw)}
         />
         <SummaryCell
           label="실제 대비 차이"
           tone={summary.endDifferenceKrw >= 0 ? "positive" : "negative"}
-          value={formatSignedKrw(summary.endDifferenceKrw)}
+          value={formatInvestmentLabSignedKrw(summary.endDifferenceKrw)}
         />
         <SummaryCell
           label="현금흐름 조정 추정수익률"
           tone={estimate.scenarioReturn >= 0 ? "positive" : "negative"}
-          value={formatSignedPercent(estimate.scenarioReturn)}
+          value={formatInvestmentLabSignedPercent(estimate.scenarioReturn)}
         />
         <SummaryCell
           label="실제 대비 수익률 차이"
@@ -310,40 +340,6 @@ function mixHref(
     params.set("end", period.selectedEndServiceDate);
   }
   return `/investment-lab?${params}`;
-}
-
-function blockerLabel(blocker: InvestmentLabFixedMixBlocker) {
-  const labels: Record<InvestmentLabFixedMixBlocker, string> = {
-    invalid_weight_selection: "배분 입력을 확인해야 합니다.",
-    component_path_unavailable: "두 종목의 완전한 경로가 모두 필요합니다.",
-    valuation_axis_mismatch: "두 종목의 비교 날짜축이 일치하지 않습니다.",
-    invalid_component_value: "구성 종목 평가액 근거를 확인해야 합니다.",
-    component_flow_mismatch: "두 종목의 현금흐름 원본이 일치하지 않습니다.",
-    return_evidence_unavailable: "수익률 근거가 완전하지 않습니다.",
-    actual_return_mismatch: "실제 수익률 기준이 서로 일치하지 않습니다.",
-    scenario_return_calculation_blocked: "시나리오 수익률을 계산할 수 없습니다.",
-    account_composition_incomplete: "계좌별 시나리오 근거가 모두 필요합니다.",
-    account_composition_mismatch: "계좌별 합계와 전체 결과가 일치하지 않습니다.",
-  };
-  return labels[blocker];
-}
-
-function formatKrw(value: number) {
-  return new Intl.NumberFormat("ko-KR", {
-    style: "currency",
-    currency: "KRW",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatSignedKrw(value: number) {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${formatKrw(value)}`;
-}
-
-function formatSignedPercent(value: number) {
-  const percentage = value * 100;
-  return `${percentage > 0 ? "+" : ""}${percentage.toFixed(2)}%`;
 }
 
 function formatSignedPercentagePoints(value: number) {

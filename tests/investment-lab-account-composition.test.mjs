@@ -46,6 +46,20 @@ describe("investment lab named-account composition", () => {
         model.fixedMixScenario.rows.at(-1).scenarioMarketValueKrw,
       ),
     );
+    assert.equal(result.model.fixedMixComparison.status, "ready");
+    assert.equal(result.model.fixedMixComparison.scenarios.length, 3);
+    for (let index = 0; index < 3; index += 1) {
+      assert.equal(
+        result.model.fixedMixComparison.scenarios[index].scenario.rows.at(-1)
+          .scenarioMarketValueKrw,
+        sumNamed(
+          fixture.namedModels,
+          (model) =>
+            model.fixedMixComparison.scenarios[index].scenario.rows.at(-1)
+              .scenarioMarketValueKrw,
+        ),
+      );
+    }
     assert.equal(
       result.anchorBasketScenario.summary.allocationBasis,
       "named_account_equal_weight_then_sum",
@@ -86,6 +100,7 @@ describe("investment lab named-account composition", () => {
     assert.equal(result.model.vooComparison.status, "unavailable");
     assert.equal(result.model.cashComparison.status, "ready");
     assert.equal(result.model.fixedMixScenario.status, "ready");
+    assert.equal(result.model.fixedMixComparison.status, "ready");
   });
 
   it("isolates a pooled KODEX divergence from the observed and cash paths", () => {
@@ -145,6 +160,7 @@ describe("investment lab named-account composition", () => {
     assert.equal(result.composition.scenarios.voo.status, "ready");
     assert.equal(result.composition.scenarios.kodex200.status, "unavailable");
     assert.equal(result.composition.scenarios.fixed_mix.status, "unavailable");
+    assert.equal(result.model.fixedMixComparison.status, "ready");
     assert.equal(result.model.observedPath.status, "ready");
     assert.equal(result.model.cashComparison.status, "ready");
     assert.equal(result.model.vooComparison.status, "ready");

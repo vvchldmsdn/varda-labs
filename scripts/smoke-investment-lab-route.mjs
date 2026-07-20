@@ -35,6 +35,14 @@ const EXPECTED_FIXED_MIX_STATUS =
     EXPECTED_FIXED_MIX_SELECTION_STATUS !== "invalid"
     ? "ready"
     : "unavailable");
+const EXPECTED_FIXED_MIX_COMPARISON_STATUS =
+  readArgument("--expect-fixed-mix-comparison-status") ??
+  (EXPECTED_READ_MODEL_STATUS === "ready" &&
+    (EXPECTED_PERIOD_STATUS === "full" ||
+      EXPECTED_PERIOD_STATUS === "current_writer" ||
+      EXPECTED_PERIOD_STATUS === "selected")
+    ? "ready"
+    : "unavailable");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -494,6 +502,17 @@ async function main() {
     route.body,
     "data-fixed-mix-comparison-dates",
   );
+  const fixedMixStandardStatus = readStringAttribute(
+    route.body,
+    "data-fixed-mix-comparison-status",
+  );
+  const fixedMixStandardReady = readIntegerAttribute(
+    route.body,
+    "data-fixed-mix-comparison-ready",
+  );
+  const fixedMixStandardSelectedCount = (
+    route.body.match(/data-fixed-mix-standard-selected="true"/g) ?? []
+  ).length;
   const fixedMixFlowSources = readIntegerAttribute(
     route.body,
     "data-fixed-mix-flow-sources",
@@ -551,6 +570,8 @@ async function main() {
       "과거 연구 비교",
       "VOO 배당은 반영하지 않습니다",
       "정확한 일별 TWR 또는 총수익률을",
+      "표준 비중 3안 비교",
+      "성과 순위나 추천을",
     ]) {
       assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
     }
@@ -560,6 +581,24 @@ async function main() {
     assert.equal(fixedMixContributionStatus, "unavailable");
     assert.equal(fixedMixContributionKodexWeightBps, 0);
     assert.equal(fixedMixContributionVooWeightBps, 0);
+  }
+  assert.equal(
+    fixedMixStandardStatus,
+    EXPECTED_FIXED_MIX_COMPARISON_STATUS,
+  );
+  if (fixedMixStandardStatus === "ready") {
+    assert.equal(fixedMixStandardReady, 3);
+    assert.match(
+      route.body,
+      /data-section="investment-lab-fixed-mix-comparison"/,
+    );
+    assert.equal(
+      fixedMixStandardSelectedCount,
+      [2500, 5000, 7500].includes(fixedMixKodexWeightBps) ? 1 : 0,
+    );
+  } else {
+    assert.equal(fixedMixStandardReady, 0);
+    assert.equal(fixedMixStandardSelectedCount, 0);
   }
   assert.match(
     route.body,

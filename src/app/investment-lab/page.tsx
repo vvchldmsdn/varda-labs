@@ -151,6 +151,7 @@ async function InvestmentLabContent({
       />
       <InvestmentLabFixedMix
         account={selectedAccount}
+        comparison={model.fixedMixComparison}
         model={model.fixedMixScenario}
         period={period}
         selection={fixedMixSelection}

@@ -12,6 +12,11 @@ import {
   type InvestmentLabFixedMixBlocker,
   type InvestmentLabFixedMixScenario,
 } from "./investment-lab-fixed-mix.ts";
+import {
+  summarizeInvestmentLabFixedMixComparison,
+  type InvestmentLabFixedMixComparison,
+  type InvestmentLabFixedMixComparisonEntry,
+} from "./investment-lab-fixed-mix-comparison.ts";
 import type { InvestmentLabVooComparison } from "./investment-lab-voo-comparison.ts";
 import {
   unavailableInvestmentLabObservedPath,
@@ -307,6 +312,53 @@ export function composeInvestmentLabFixedMix(
   const namedScenarios = NAMED_PORTFOLIO_ACCOUNTS.map(
     (account) => named[account].fixedMixScenario,
   );
+  return composeInvestmentLabFixedMixScenario(pooled, namedScenarios);
+}
+
+export function composeInvestmentLabFixedMixComparison(
+  pooledModel: InvestmentLabCounterfactualReadModel,
+  named: InvestmentLabNamedModels,
+): InvestmentLabFixedMixComparison | null {
+  const pooled = pooledModel.fixedMixComparison;
+  if (pooled === null) return null;
+
+  const scenarios = pooled.scenarios.map((entry, index) => {
+    const namedEntries = NAMED_PORTFOLIO_ACCOUNTS.map(
+      (account) => named[account].fixedMixComparison?.scenarios[index],
+    );
+    const identityMismatch = namedEntries.some(
+      (namedEntry) =>
+        namedEntry?.id !== entry.id ||
+        namedEntry.kodexWeightPct !== entry.kodexWeightPct ||
+        namedEntry.vooWeightPct !== entry.vooWeightPct,
+    );
+    const composed = identityMismatch
+      ? unavailableInvestmentLabCompositionValue<InvestmentLabFixedMixScenario>([
+          "named_account_scenario_unavailable",
+        ])
+      : composeInvestmentLabFixedMixScenario(
+          entry.scenario,
+          namedEntries.map((namedEntry) => namedEntry?.scenario),
+        );
+    return Object.freeze({
+      ...entry,
+      scenario:
+        composed.status === "ready"
+          ? composed.value
+          : unavailableInvestmentLabFixedMixFromScenario(
+              entry.scenario,
+              composed.blockers,
+            ),
+    }) satisfies InvestmentLabFixedMixComparisonEntry;
+  });
+
+  return summarizeInvestmentLabFixedMixComparison(scenarios);
+}
+
+function composeInvestmentLabFixedMixScenario(
+  pooled: InvestmentLabFixedMixScenario,
+  namedScenarios: readonly (InvestmentLabFixedMixScenario | null | undefined)[],
+): InvestmentLabCompositionValue<InvestmentLabFixedMixScenario> {
   if (pooled.status !== "ready") {
     return unavailableInvestmentLabCompositionValue([
       "pooled_scenario_unavailable",
@@ -322,7 +374,8 @@ export function composeInvestmentLabFixedMix(
     { status: "ready" }
   >[];
   const composed = composeInvestmentLabAccountRows(
-    (account) => named[account].fixedMixScenario!.rows,
+    (account) =>
+      ready[NAMED_PORTFOLIO_ACCOUNTS.indexOf(account)].rows,
   );
   if (composed.status !== "ready") {
     return unavailableInvestmentLabCompositionValue(composed.blockers);
@@ -441,6 +494,7 @@ export function blockInvestmentLabPooledModel(
     vooComparison: null,
     cashComparison: null,
     fixedMixScenario: null,
+    fixedMixComparison: null,
     contributionExperimentScenarios: [] as const,
     rows: [] as const,
     blockers: Object.freeze([
@@ -497,6 +551,16 @@ export function unavailableInvestmentLabFixedMix(
   pooled: InvestmentLabCounterfactualReadModel,
   blockers: readonly InvestmentLabAccountCompositionBlocker[],
 ): InvestmentLabFixedMixScenario {
+  return unavailableInvestmentLabFixedMixFromScenario(
+    pooled.fixedMixScenario,
+    blockers,
+  );
+}
+
+function unavailableInvestmentLabFixedMixFromScenario(
+  source: InvestmentLabFixedMixScenario | null,
+  blockers: readonly InvestmentLabAccountCompositionBlocker[],
+): InvestmentLabFixedMixScenario {
   const blocker: InvestmentLabFixedMixBlocker = blockers.includes(
     "named_account_scenario_unavailable",
   )
@@ -505,7 +569,7 @@ export function unavailableInvestmentLabFixedMix(
   return Object.freeze({
     status: "unavailable",
     policy: INVESTMENT_LAB_FIXED_MIX_POLICY,
-    weights: pooled.fixedMixScenario?.weights ?? null,
+    weights: source?.weights ?? null,
     summary: null,
     returnEstimate: null,
     rows: [] as const,

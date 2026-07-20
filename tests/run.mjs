@@ -31,6 +31,7 @@ import "./investment-lab-rolling-comparison.test.mjs";
 import "./investment-lab-contribution-experiment.test.mjs";
 import "./investment-lab-small-adjustment.test.mjs";
 import "./investment-lab-fixed-mix.test.mjs";
+import "./investment-lab-fixed-mix-comparison.test.mjs";
 import "./investment-lab-fixed-mix-contribution.test.mjs";
 import "./investment-lab-fount-exclusion.test.mjs";
 import "./investment-lab-fount-runtime-scope.test.mjs";
