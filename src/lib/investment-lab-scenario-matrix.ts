@@ -2,6 +2,10 @@ import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
+import {
+  unavailableInvestmentLabPathRisk,
+  type InvestmentLabPathRiskMetrics,
+} from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_SCENARIO_MATRIX_POLICY = Object.freeze({
   version: "same_period_scenario_comparison_matrix_v1",
@@ -47,6 +51,7 @@ export type InvestmentLabScenarioMatrixRow = Readonly<{
     value: number | null;
     method: string | null;
   }>;
+  riskMetrics: InvestmentLabPathRiskMetrics;
   flowCount: number | null;
   pendingComparisonCount: number | null;
   priceBasis: InvestmentLabScenarioPriceBasis;
@@ -141,6 +146,11 @@ function buildRows(
       endValueKrw: observedSummary.endValueKrw,
       endDifferenceKrw: 0,
       returnEstimate: actualReturn,
+      riskMetrics: readRisk(
+        model.observedPath.returnEstimate.status === "ready"
+          ? model.observedPath.returnEstimate.riskMetrics
+          : null,
+      ),
       flowCount: model.coverage.eligibleFlowRows,
       pendingComparisonCount: null,
       priceBasis: "stored_position_market_value",
@@ -159,6 +169,11 @@ function buildRows(
           : null,
         model.cashComparison?.returnComparison?.status === "ready"
           ? INVESTMENT_LAB_MODIFIED_DIETZ_POLICY.version
+          : null,
+      ),
+      riskMetrics: readRisk(
+        model.cashComparison?.returnComparison?.status === "ready"
+          ? model.cashComparison.returnComparison.scenarioRiskMetrics
           : null,
       ),
       flowCount:
@@ -182,6 +197,11 @@ function buildRows(
       summary: model.summary,
       period,
       returnEstimate: kodexReturn,
+      riskMetrics: readRisk(
+        model.returnEstimate?.status === "ready"
+          ? model.returnEstimate.scenarioRiskMetrics
+          : null,
+      ),
       flowCount:
         model.status === "ready" ? model.coverage.appliedFlowRows : null,
       pendingComparisonCount:
@@ -206,6 +226,11 @@ function buildRows(
           : null,
         model.vooComparison?.returnEstimate?.status === "ready"
           ? model.vooComparison.returnEstimate.method.version
+          : null,
+      ),
+      riskMetrics: readRisk(
+        model.vooComparison?.returnEstimate?.status === "ready"
+          ? model.vooComparison.returnEstimate.scenarioRiskMetrics
           : null,
       ),
       flowCount:
@@ -236,6 +261,11 @@ function buildRows(
           ? model.fixedMixScenario.returnEstimate.method.version
           : null,
       ),
+      riskMetrics: readRisk(
+        model.fixedMixScenario?.status === "ready"
+          ? model.fixedMixScenario.returnEstimate.scenarioRiskMetrics
+          : null,
+      ),
       flowCount:
         model.fixedMixScenario?.status === "ready"
           ? model.fixedMixScenario.coverage.componentFlowSourceCount
@@ -260,6 +290,7 @@ function buildRows(
         anchor.returnEstimate?.scenarioReturn ?? null,
         anchor.returnEstimate?.method.version ?? null,
       ),
+      riskMetrics: readRisk(anchor.returnEstimate?.scenarioRiskMetrics),
       flowCount:
         anchor.status === "ready" ? anchor.coverage.sourceFlowCount : null,
       pendingComparisonCount:
@@ -278,6 +309,9 @@ function buildRows(
       returnEstimate: readReturn(
         anchorValueWeight.returnEstimate?.scenarioReturn ?? null,
         anchorValueWeight.returnEstimate?.method.version ?? null,
+      ),
+      riskMetrics: readRisk(
+        anchorValueWeight.returnEstimate?.scenarioRiskMetrics,
       ),
       flowCount:
         anchorValueWeight.status === "ready"
@@ -300,6 +334,7 @@ function scenarioRow(input: Readonly<{
   summary: Summary | null;
   period: NonNullable<InvestmentLabScenarioMatrix["period"]>;
   returnEstimate: InvestmentLabScenarioMatrixRow["returnEstimate"];
+  riskMetrics: InvestmentLabScenarioMatrixRow["riskMetrics"];
   flowCount: number | null;
   pendingComparisonCount: number | null;
   priceBasis: InvestmentLabScenarioPriceBasis;
@@ -318,6 +353,7 @@ function scenarioRow(input: Readonly<{
     endValueKrw: input.summary.scenarioEndValueKrw,
     endDifferenceKrw: input.summary.endDifferenceKrw,
     returnEstimate: input.returnEstimate,
+    riskMetrics: input.riskMetrics,
     flowCount: input.flowCount,
     pendingComparisonCount: input.pendingComparisonCount,
     priceBasis: input.priceBasis,
@@ -352,10 +388,17 @@ function unavailableRow(
     endValueKrw: null,
     endDifferenceKrw: null,
     returnEstimate: readReturn(null, null),
+    riskMetrics: unavailableInvestmentLabPathRisk(),
     flowCount: null,
     pendingComparisonCount: null,
     reasonCodes: Object.freeze(unique(reasons)),
   });
+}
+
+function readRisk(
+  value: InvestmentLabPathRiskMetrics | null | undefined,
+): InvestmentLabPathRiskMetrics {
+  return value ?? unavailableInvestmentLabPathRisk();
 }
 
 function unavailableRows(

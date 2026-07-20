@@ -38,6 +38,10 @@ describe("investment lab scenario comparison matrix", () => {
       "stored_snapshot_and_execution_usdkrw",
     );
     assert.equal(rowsById.zero_return.returnEstimate.value, 0);
+    assert.equal(rowsById.zero_return.riskMetrics.maximumDrawdown, 0);
+    assert.equal(rowsById.kodex200.riskMetrics.maximumDrawdown, 0.15);
+    assert.equal(rowsById.kodex200.riskMetrics.annualizedVolatility, 0.25);
+    assert.ok(matrix.rows.every((row) => row.riskMetrics.status === "ready"));
     assert.equal(rowsById.anchor_basket.flowCount, 2);
     assert.equal(
       rowsById.anchor_basket.priceBasis,
@@ -232,6 +236,8 @@ describe("investment lab scenario comparison matrix", () => {
       componentSource,
       /data-section="investment-lab-scenario-matrix"/,
     );
+    assert.match(componentSource, /최대낙폭 \(MDD\)/);
+    assert.match(componentSource, /252 관측일 기준/);
     assert.doesNotMatch(
       componentSource,
       /최고 시나리오|추천 시나리오|주문하기|data-rank/,
@@ -259,6 +265,7 @@ function readyModel() {
         status: "ready",
         method: { version: "modified_dietz_daily_weighted_eod_v1" },
         actualReturn: 0.1,
+        riskMetrics: risk(0.1, 0.2),
         blockers: [],
       },
       blockers: [],
@@ -276,6 +283,7 @@ function readyModel() {
       method: { version: "modified_dietz_daily_weighted_eod_v1" },
       actualReturn: 0.1,
       scenarioReturn: 0.2,
+      scenarioRiskMetrics: risk(0.15, 0.25),
       blockers: [],
     },
     vooComparison: {
@@ -285,6 +293,7 @@ function readyModel() {
         status: "ready",
         method: { version: "modified_dietz_daily_weighted_eod_v1" },
         scenarioReturn: 0.15,
+        scenarioRiskMetrics: risk(0.08, 0.18),
         blockers: [],
       },
       coverage: {
@@ -300,6 +309,7 @@ function readyModel() {
       returnEstimate: {
         method: { version: "modified_dietz_daily_weighted_eod_v1" },
         scenarioReturn: 0.17,
+        scenarioRiskMetrics: risk(0.09, 0.19),
       },
       coverage: {
         componentFlowSourceCount: 2,
@@ -313,6 +323,7 @@ function readyModel() {
       returnComparison: {
         status: "ready",
         cashReturn: 0,
+        scenarioRiskMetrics: risk(0, 0),
         blockers: [],
       },
       coverage: { appliedFlowRows: 2 },
@@ -338,6 +349,7 @@ function readyAnchor() {
     returnEstimate: {
       method: { version: "modified_dietz_daily_weighted_eod_v1" },
       scenarioReturn: 0.12,
+      scenarioRiskMetrics: risk(0.12, 0.22),
     },
     anchor: { blockers: [], instruments: [] },
     evidenceBlockers: [],
@@ -381,5 +393,16 @@ function scenarioSummary(scenarioEndValueKrw, endDifferenceKrw) {
     scenarioEndValueKrw,
     endDifferenceKrw,
     comparisonDateCount: 3,
+  };
+}
+
+function risk(maximumDrawdown, annualizedVolatility) {
+  return {
+    status: "ready",
+    policy: { version: "cashflow_adjusted_linked_path_risk_v1" },
+    maximumDrawdown,
+    annualizedVolatility,
+    periodCount: 2,
+    blockers: [],
   };
 }

@@ -9,6 +9,7 @@ import {
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
   type InvestmentLabReturnFlow,
 } from "./investment-lab-modified-dietz.ts";
+import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import {
   buildInvestmentLabUnitPricePath,
   type InvestmentLabUnitPathBlocker,
@@ -53,6 +54,7 @@ export type InvestmentLabAnchorAllocationPath = Readonly<{
     actualReturn: number;
     scenarioReturn: number;
     differencePercentagePoints: number;
+    scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
   }> | null;
   rows: readonly Readonly<{
     serviceDate: string;
@@ -181,6 +183,7 @@ export function buildInvestmentLabAnchorAllocationPath(input: Readonly<{
           scenarioReturn: scenarioReturn.totalReturn,
           differencePercentagePoints:
             (scenarioReturn.totalReturn - input.actualReturn) * 100,
+          scenarioRiskMetrics: scenarioReturn.riskMetrics,
         })
       : null;
 

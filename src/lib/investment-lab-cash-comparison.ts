@@ -2,6 +2,7 @@ import {
   calculateInvestmentLabModifiedDietz,
   type InvestmentLabReturnFlow,
 } from "./investment-lab-modified-dietz.ts";
+import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import {
   isRiskDate,
   mapRiskEvidenceDateToServiceDate,
@@ -63,6 +64,7 @@ type CashReturnComparison =
       differencePercentagePoints: number;
       periodCount: number;
       flowCount: number;
+      scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
       blockers: readonly [];
     }>
   | Readonly<{
@@ -256,6 +258,7 @@ function buildReturnComparison(input: {
       (cashReturn.totalReturn - input.actualReturnEstimate.actualReturn) * 100,
     periodCount: cashReturn.periodCount,
     flowCount: cashReturn.flowCount,
+    scenarioRiskMetrics: cashReturn.riskMetrics,
     blockers: [] as const,
   });
 }

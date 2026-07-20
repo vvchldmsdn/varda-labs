@@ -489,6 +489,8 @@ async function main() {
       "순위나 추천이 아니라",
       "KODEX 200 adjusted close",
       "VOO raw close",
+      "최대낙폭 (MDD)",
+      "252 관측일 기준",
       "초기 동일비중·이후 흐름 균등배분",
       "기준일 비중 유지",
     ]) {

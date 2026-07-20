@@ -2,6 +2,11 @@ import {
   isRiskDate,
   riskCalendarDayDistance,
 } from "./portfolio-risk-calendar.ts";
+import {
+  calculateInvestmentLabPathRisk,
+  unavailableInvestmentLabPathRisk,
+  type InvestmentLabPathRiskMetrics,
+} from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_MODIFIED_DIETZ_POLICY = Object.freeze({
   version: "modified_dietz_daily_weighted_eod_v1",
@@ -68,6 +73,7 @@ export type InvestmentLabModifiedDietzResult =
       periodCount: number;
       flowCount: number;
       periods: readonly InvestmentLabModifiedDietzPeriod[];
+      riskMetrics: InvestmentLabPathRiskMetrics;
       blockers: readonly [];
     }>
   | Readonly<{
@@ -77,6 +83,7 @@ export type InvestmentLabModifiedDietzResult =
       periodCount: 0;
       flowCount: 0;
       periods: readonly [];
+      riskMetrics: InvestmentLabPathRiskMetrics;
       blockers: readonly InvestmentLabModifiedDietzBlocker[];
     }>;
 
@@ -195,6 +202,7 @@ export function calculateInvestmentLabModifiedDietz(input: {
     periodCount: periods.length,
     flowCount: flows.length,
     periods: Object.freeze(periods),
+    riskMetrics: calculateInvestmentLabPathRisk(periods),
     blockers: [] as const,
   });
 }
@@ -320,6 +328,7 @@ function blocked(
     periodCount: 0,
     flowCount: 0,
     periods: [] as const,
+    riskMetrics: unavailableInvestmentLabPathRisk(),
     blockers: Object.freeze([...blockers]),
   });
 }

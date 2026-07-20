@@ -11,6 +11,7 @@ import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
 } from "./investment-lab-modified-dietz.ts";
+import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
@@ -45,6 +46,7 @@ type ComposedAnchorParts = Readonly<{
   summary: ReturnType<typeof summarizeInvestmentLabCompositionRows>;
   actualReturn: number;
   scenarioReturn: number;
+  scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
   rows: InvestmentLabAnchorBasketScenario["rows"];
   coverage: InvestmentLabAnchorBasketScenario["coverage"];
   instrumentCount: number;
@@ -190,6 +192,7 @@ function composeAnchorScenario<T extends AnchorScenario>(input: Readonly<{
       summary: summarizeInvestmentLabCompositionRows(composed.rows),
       actualReturn,
       scenarioReturn: scenarioReturn.totalReturn,
+      scenarioRiskMetrics: scenarioReturn.riskMetrics,
       rows: composed.rows,
       coverage: composeCoverage(ready, composed.rows),
       instrumentCount: compensatedSum(
@@ -241,6 +244,7 @@ function returnEstimate(parts: ComposedAnchorParts) {
     scenarioReturn: parts.scenarioReturn,
     differencePercentagePoints:
       (parts.scenarioReturn - parts.actualReturn) * 100,
+    scenarioRiskMetrics: parts.scenarioRiskMetrics,
   });
 }
 

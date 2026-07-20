@@ -1,4 +1,5 @@
 import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
+import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_FIXED_MIX_POLICY = Object.freeze({
   version: "kodex_voo_fixed_allocation_same_flow_v1",
@@ -90,6 +91,7 @@ export type InvestmentLabFixedMixScenario =
         actualReturn: number;
         scenarioReturn: number;
         differencePercentagePoints: number;
+        scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
       }>;
       rows: readonly InvestmentLabFixedMixRow[];
       coverage: Readonly<{

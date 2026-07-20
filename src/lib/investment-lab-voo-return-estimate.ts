@@ -2,6 +2,7 @@ import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
 } from "./investment-lab-modified-dietz.ts";
+import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import {
   validateInvestmentLabReturnEvidence,
   type InvestmentLabReturnEvidenceBlocker,
@@ -57,6 +58,8 @@ export type InvestmentLabVooReturnEstimate =
       periodCount: number;
       actualFlowCount: number;
       scenarioFlowCount: number;
+      actualRiskMetrics: InvestmentLabPathRiskMetrics;
+      scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
       evidence: InvestmentLabReturnEvidenceResult;
       blockers: readonly [];
     }>
@@ -173,6 +176,8 @@ export function buildInvestmentLabVooReturnEstimate(input: {
     periodCount: actual.periodCount,
     actualFlowCount: actual.flowCount,
     scenarioFlowCount: scenario.flowCount,
+    actualRiskMetrics: actual.riskMetrics,
+    scenarioRiskMetrics: scenario.riskMetrics,
     evidence,
     blockers: [] as const,
   });

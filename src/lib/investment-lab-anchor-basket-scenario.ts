@@ -7,6 +7,7 @@ import type { InvestmentLabAnchorSelection } from "./investment-lab-anchor-baske
 import type { InvestmentLabAnchorEvidenceResolution } from "./investment-lab-anchor-basket-evidence.ts";
 import type { InvestmentLabActualPathPoint } from "./investment-lab-counterfactual-path.ts";
 import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
+import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_ANCHOR_BASKET_SCENARIO_POLICY = Object.freeze({
   version: "anchor_observed_equal_weight_same_flow_path_v1",
@@ -44,6 +45,7 @@ export type InvestmentLabAnchorBasketScenario = Readonly<{
     actualReturn: number;
     scenarioReturn: number;
     differencePercentagePoints: number;
+    scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
   }> | null;
   rows: InvestmentLabAnchorAllocationPath["rows"];
   coverage: InvestmentLabAnchorAllocationPath["coverage"];

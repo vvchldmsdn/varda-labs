@@ -53,7 +53,7 @@ export function InvestmentLabScenarioMatrix({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] border-collapse text-sm">
+        <table className="w-full min-w-[1380px] border-collapse text-sm">
           <thead>
             <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
               <th className="px-4 py-3">시나리오</th>
@@ -61,6 +61,8 @@ export function InvestmentLabScenarioMatrix({
               <th className="px-3 py-3 text-right">종료 평가액</th>
               <th className="px-3 py-3 text-right">실제 대비</th>
               <th className="px-3 py-3 text-right">추정수익률</th>
+              <th className="px-3 py-3 text-right">최대낙폭 (MDD)</th>
+              <th className="px-3 py-3 text-right">연환산 변동성</th>
               <th className="px-3 py-3 text-right">흐름 / 대기 평가일</th>
               <th className="px-4 py-3">가격·환율 근거</th>
             </tr>
@@ -74,10 +76,10 @@ export function InvestmentLabScenarioMatrix({
       </div>
 
       <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
-        KODEX 200은 adjusted close, VOO는 raw close와 저장 USD/KRW를
-        사용합니다. 제로수익 경로는 실제 현금계좌가 아니며, 기준일 바스켓은
-        기준일에만 동일비중으로 시작한 뒤 이후 외부 흐름을 종목별로 균등
-        배분합니다.
+        최대낙폭과 변동성은 외부 입출금을 조정한 Modified Dietz
+        기간수익률을 연결해 계산하며, 변동성은 252 관측일 기준으로
+        연환산합니다. KODEX 200은 adjusted close, VOO는 raw close와 저장
+        USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가 아닙니다.
       </p>
     </section>
   );
@@ -95,6 +97,7 @@ function ScenarioRow({
       className="border-t border-[#e1e6dc] align-top"
       data-scenario-row={row.id}
       data-scenario-status={row.status}
+      data-scenario-risk-status={row.riskMetrics.status}
     >
       <td className="px-4 py-3">
         <p className="font-semibold text-[#171916]">
@@ -138,6 +141,19 @@ function ScenarioRow({
         )}`}
       >
         {formatPercentOrDash(row.returnEstimate.value)}
+      </td>
+      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#4f584f]">
+        {formatRiskPercentOrDash(row.riskMetrics.maximumDrawdown)}
+      </td>
+      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#4f584f]">
+        <p>
+          {formatRiskPercentOrDash(row.riskMetrics.annualizedVolatility)}
+        </p>
+        <p className="mt-1 text-xs font-normal text-[#73786c]">
+          {row.riskMetrics.periodCount > 0
+            ? `${row.riskMetrics.periodCount}개 기간`
+            : "근거 없음"}
+        </p>
       </td>
       <td className="px-3 py-3 text-right tabular-nums text-[#4f584f]">
         <p>{row.flowCount === null ? "-" : `${row.flowCount}건`}</p>
@@ -261,6 +277,10 @@ function formatPercentOrDash(value: number | null) {
   return value === null
     ? "-"
     : `${value >= 0 ? "+" : ""}${(value * 100).toFixed(2)}%`;
+}
+
+function formatRiskPercentOrDash(value: number | null) {
+  return value === null ? "-" : `${(value * 100).toFixed(2)}%`;
 }
 
 function moneyTone(value: number | null) {
