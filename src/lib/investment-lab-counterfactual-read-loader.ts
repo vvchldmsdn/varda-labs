@@ -27,6 +27,7 @@ import {
 import {
   loadInvestmentLabAnchorScenarios,
   type InvestmentLabAnchorBasketReadRepository,
+  type InvestmentLabAnchorFountScope,
 } from "./investment-lab-anchor-basket-read-loader.ts";
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
@@ -125,6 +126,10 @@ export async function loadInvestmentLabCounterfactualReadModel(
     allEventRows: input.eventRows,
     evidence: fountEvidence,
   });
+  const anchorFountScope = resolveAnchorFountScope(
+    fountScope.scope.status,
+    fountEvidence,
+  );
   const pooledModel = buildInvestmentLabCounterfactualReadModel(
     fountScope.source,
     {
@@ -165,7 +170,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
           source: fountScope.source,
           fxRows: fountScope.source.fxRows,
           requestedAnchorDate,
-          fountScopeAdjustmentStatus: fountScope.scope.status,
+          fountScopeAdjustment: anchorFountScope,
         }),
         ...NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount) =>
           loadInvestmentLabAnchorScenarios({
@@ -175,10 +180,10 @@ export async function loadInvestmentLabCounterfactualReadModel(
             source: fountScope.source,
             fxRows: fountScope.source.fxRows,
             requestedAnchorDate,
-            fountScopeAdjustmentStatus:
+            fountScopeAdjustment:
               namedAccount === "irp"
-                ? fountScope.scope.status
-                : "not_applicable",
+                ? anchorFountScope
+                : Object.freeze({ status: "not_applicable" }),
           }),
         ),
       ]);
@@ -233,7 +238,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
       source: fountScope.source,
       fxRows: fountScope.source.fxRows,
       requestedAnchorDate,
-      fountScopeAdjustmentStatus: fountScope.scope.status,
+      fountScopeAdjustment: anchorFountScope,
     });
     anchorBasketScenario = anchorScenarios.equalWeight;
     anchorValueWeightScenario = anchorScenarios.valueWeight;
@@ -274,6 +279,17 @@ export async function loadInvestmentLabCounterfactualReadModel(
     accountComposition,
     fundingPreflight,
   });
+}
+
+function resolveAnchorFountScope(
+  status: InvestmentLabFountRuntimeScope["status"],
+  evidence: InvestmentLabFountRuntimeEvidence,
+): InvestmentLabAnchorFountScope {
+  if (status !== "applied") return Object.freeze({ status });
+  if (evidence.status !== "ready") {
+    return Object.freeze({ status: "blocked" });
+  }
+  return Object.freeze({ status: "applied", binding: evidence.binding });
 }
 
 function cacheAnchorRepository(

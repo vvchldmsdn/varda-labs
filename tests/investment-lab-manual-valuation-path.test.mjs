@@ -7,6 +7,8 @@ import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "../src/lib/investmen
 const WRITER = "varda_manual_daily_snapshot";
 const GOLD = DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
 const FOUNT = DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount;
+const FOUNT_LEGACY_ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
+const FOUNT_COLLISION_LEGACY_ID = "bbbbbbbbbbbbbbbbbbbbbbbb";
 
 describe("investment lab stored manual valuation path", () => {
   it("combines listed closes with provenance-safe KRX Gold observations", async () => {
@@ -107,6 +109,7 @@ describe("investment lab stored manual valuation path", () => {
       listedPosition(snapshotDate, "irp"),
       {
         snapshotDate,
+        legacyAssetId: FOUNT_LEGACY_ID,
         account: FOUNT.account,
         source: WRITER,
         ticker: null,
@@ -122,7 +125,7 @@ describe("investment lab stored manual valuation path", () => {
 
     const scenario = await loadInvestmentLabAnchorBasketScenario({
       account: "irp",
-      fountScopeAdjustmentStatus: "applied",
+      fountScopeAdjustment: fountScope(FOUNT_LEGACY_ID),
       repository: {
         async loadAnchorPositionRows() {
           return positionRows;
@@ -156,8 +159,94 @@ describe("investment lab stored manual valuation path", () => {
     assert.equal(scenario.summary.instrumentCount, 1);
     assert.equal(scenario.anchor.coverage.sourcePositionRows, 1);
     assert.deepEqual(scenario.anchor.specialHoldingEvidence, []);
+    assert.equal(JSON.stringify(scenario).includes(FOUNT_LEGACY_ID), false);
+  });
+
+  it("fails closed when another legacy identity shares the Fount metadata", async () => {
+    const serviceDates = ["2026-01-06", "2026-01-07", "2026-01-08"];
+    const snapshotRows = serviceDates.map((snapshotDate, index) => ({
+      snapshotDate,
+      account: "irp",
+      cashValue: 0,
+      totalMarketValue: 500 + index * 50,
+      usdKrw: 1_400,
+      source: WRITER,
+      ruleVersion: "fixture_v1",
+    }));
+    const positionRows = serviceDates.flatMap((snapshotDate) => [
+      listedPosition(snapshotDate, "irp"),
+      fountPosition(snapshotDate, FOUNT_LEGACY_ID),
+      fountPosition(snapshotDate, FOUNT_COLLISION_LEGACY_ID),
+    ]);
+    let priceReads = 0;
+
+    const scenario = await loadInvestmentLabAnchorBasketScenario({
+      account: "irp",
+      fountScopeAdjustment: fountScope(FOUNT_LEGACY_ID),
+      repository: {
+        async loadAnchorPositionRows() {
+          return positionRows;
+        },
+        async loadAnchorPriceRows() {
+          priceReads += 1;
+          return listedPrices();
+        },
+      },
+      model: readModel(
+        serviceDates.map((serviceDate, index) => ({
+          serviceDate,
+          totalMarketValueKrw: 400 + index * 40,
+        })),
+      ),
+      source: {
+        eventRows: [],
+        snapshotRows,
+        closeRows: [],
+        vooCloseRows: [],
+        fxRows: [],
+      },
+      fxRows: [],
+    });
+
+    assert.equal(priceReads, 0);
+    assert.equal(scenario.status, "unavailable");
+    assert.deepEqual(scenario.anchor.blockers, [
+      "excluded_holding_scope_transform_required",
+    ]);
+    assert.equal(scenario.anchor.coverage.excludedPositionRows, 1);
+    assert.equal(
+      JSON.stringify(scenario).includes(FOUNT_COLLISION_LEGACY_ID),
+      false,
+    );
   });
 });
+
+function fountScope(snapshotLegacyAssetId) {
+  return {
+    status: "applied",
+    binding: {
+      selectorBasis: "exact_snapshot_legacy_asset_id",
+      snapshotLegacyAssetId,
+      account: "irp",
+    },
+  };
+}
+
+function fountPosition(snapshotDate, legacyAssetId) {
+  return {
+    snapshotDate,
+    legacyAssetId,
+    account: FOUNT.account,
+    source: WRITER,
+    ticker: null,
+    assetName: FOUNT.assetName,
+    market: FOUNT.market,
+    currency: FOUNT.currency,
+    assetType: FOUNT.assetType,
+    quantity: 1,
+    marketValueKrw: 100,
+  };
+}
 
 function goldFixture() {
   const serviceDates = ["2026-01-06", "2026-01-07", "2026-01-08"];

@@ -38,6 +38,18 @@ export interface InvestmentLabAnchorBasketReadRepository {
   }>): Promise<readonly InvestmentLabAnchorPriceRow[]>;
 }
 
+export type InvestmentLabAnchorFountScope =
+  | Readonly<{ status: "not_applicable" }>
+  | Readonly<{ status: "blocked" }>
+  | Readonly<{
+      status: "applied";
+      binding: Readonly<{
+        selectorBasis: "exact_snapshot_legacy_asset_id";
+        snapshotLegacyAssetId: string;
+        account: "brokerage" | "isa" | "irp";
+      }>;
+    }>;
+
 export type InvestmentLabAnchorScenarioLoadInput = Readonly<{
   account?: PortfolioAccountScope;
   repository: InvestmentLabAnchorBasketReadRepository;
@@ -45,7 +57,7 @@ export type InvestmentLabAnchorScenarioLoadInput = Readonly<{
   source: InvestmentLabCounterfactualReadInput;
   fxRows: readonly InvestmentLabAnchorFxRow[];
   requestedAnchorDate?: string | null;
-  fountScopeAdjustmentStatus?: "not_applicable" | "applied" | "blocked";
+  fountScopeAdjustment?: InvestmentLabAnchorFountScope;
 }>;
 
 export type InvestmentLabAnchorScenarios = Readonly<{
@@ -73,8 +85,8 @@ export async function loadInvestmentLabAnchorScenarios(
   const scopedPositionRows = applyAnchorPositionScope({
     account: input.account ?? "all",
     positionRows,
-    fountScopeAdjustmentStatus:
-      input.fountScopeAdjustmentStatus ?? "not_applicable",
+    fountScopeAdjustment:
+      input.fountScopeAdjustment ?? Object.freeze({ status: "not_applicable" }),
   });
   const anchor = resolveInvestmentLabAnchorSelection({
     account: input.account,
@@ -158,37 +170,42 @@ function buildAnchorScenarios(
 function applyAnchorPositionScope(input: Readonly<{
   account: PortfolioAccountScope;
   positionRows: readonly InvestmentLabAnchorPositionRow[];
-  fountScopeAdjustmentStatus: "not_applicable" | "applied" | "blocked";
+  fountScopeAdjustment: InvestmentLabAnchorFountScope;
 }>) {
   if (
-    input.fountScopeAdjustmentStatus !== "applied" ||
+    input.fountScopeAdjustment.status !== "applied" ||
     (input.account !== "irp" && input.account !== "all")
   ) {
     return input.positionRows;
   }
+  const binding = input.fountScopeAdjustment.binding;
+  if (!isValidFountBinding(binding)) return input.positionRows;
+
   return Object.freeze(
-    input.positionRows.filter((row) => !matchesFountDecision(row)),
+    input.positionRows.filter(
+      (row) =>
+        row.legacyAssetId !== binding.snapshotLegacyAssetId ||
+        normalizeText(row.account) !== binding.account,
+    ),
   );
 }
 
-function matchesFountDecision(row: InvestmentLabAnchorPositionRow) {
-  const decision =
-    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount;
+function isValidFountBinding(
+  binding: Extract<
+    InvestmentLabAnchorFountScope,
+    { status: "applied" }
+  >["binding"],
+) {
   return (
-    normalizeText(row.assetName) === normalizeText(decision.assetName) &&
-    normalizeText(row.account) === decision.account &&
-    normalizeText(row.market) === decision.market &&
-    normalizeUpper(row.currency) === decision.currency &&
-    normalizeText(row.assetType) === decision.assetType
+    binding.selectorBasis === "exact_snapshot_legacy_asset_id" &&
+    /^[0-9a-f]{24}$/.test(binding.snapshotLegacyAssetId) &&
+    binding.account ===
+      DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount.account
   );
 }
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
-function normalizeUpper(value: unknown) {
-  return typeof value === "string" ? value.trim().toUpperCase() : "";
 }
 
 function resolveActualReturn(input: Readonly<{
