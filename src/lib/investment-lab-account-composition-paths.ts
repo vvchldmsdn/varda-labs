@@ -19,9 +19,18 @@ import {
 } from "./investment-lab-fixed-mix-comparison.ts";
 import type { InvestmentLabVooComparison } from "./investment-lab-voo-comparison.ts";
 import {
+  unavailableInvestmentLabObservedReturn,
   unavailableInvestmentLabObservedPath,
   type InvestmentLabObservedPath,
+  type InvestmentLabObservedReturnEstimate,
 } from "./investment-lab-observed-path.ts";
+import { composeInvestmentLabNamedAccountReturns } from "./investment-lab-account-composition-return.ts";
+import {
+  composeInvestmentLabCashReturnComparison,
+  composeInvestmentLabFixedMixReturnEstimate,
+  composeInvestmentLabVooReturnEstimate,
+} from "./investment-lab-account-composition-return-models.ts";
+import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
 import { NAMED_PORTFOLIO_ACCOUNTS } from "./portfolio-account-scope.ts";
 import {
   compensatedSum,
@@ -88,6 +97,28 @@ export function composeInvestmentLabObservedPath(
     ),
   );
   const latest = rows.at(-1)!;
+  const composedReturn = composeInvestmentLabNamedAccountReturns(
+    NAMED_PORTFOLIO_ACCOUNTS.map((account) => {
+      const estimate = named[account].observedPath.returnEstimate;
+      return estimate.status === "ready" ? estimate.periods : [];
+    }),
+  );
+  const returnEstimate: InvestmentLabObservedReturnEstimate =
+    composedReturn.status === "ready"
+      ? Object.freeze({
+          status: "ready" as const,
+          method: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+          actualReturn: composedReturn.totalReturn,
+          periodCount: composedReturn.periodCount,
+          flowCount: composedReturn.flowCount,
+          periods: composedReturn.periods,
+          riskMetrics: composedReturn.riskMetrics,
+          blockers: [] as const,
+        })
+      : unavailableInvestmentLabObservedReturn(
+          ["account_composition_return_unavailable"],
+          0,
+        );
   return readyInvestmentLabCompositionValue(
     Object.freeze({
       ...pooled.observedPath,
@@ -98,6 +129,7 @@ export function composeInvestmentLabObservedPath(
         comparisonDateCount: rows.length,
       }),
       rows,
+      returnEstimate,
     }),
   );
 }
@@ -175,6 +207,7 @@ export function composeInvestmentLabMainModel(
 export function composeInvestmentLabVoo(
   pooledModel: InvestmentLabCounterfactualReadModel,
   named: InvestmentLabNamedModels,
+  actual: InvestmentLabObservedReturnEstimate,
 ): InvestmentLabCompositionValue<InvestmentLabVooComparison> {
   const pooled = pooledModel.vooComparison;
   const namedComparisons = NAMED_PORTFOLIO_ACCOUNTS.map(
@@ -212,9 +245,15 @@ export function composeInvestmentLabVoo(
   ) {
     return unavailableInvestmentLabCompositionValue(["flow_count_mismatch"]);
   }
+  const returnEstimate = composeInvestmentLabVooReturnEstimate(
+    pooled,
+    ready,
+    actual,
+  );
   return readyInvestmentLabCompositionValue(
     Object.freeze({
       ...pooled,
+      returnEstimate,
       summary: summarizeInvestmentLabCompositionRows(composed.rows),
       rows: Object.freeze(
         composed.rows.map((row, index) =>
@@ -240,6 +279,7 @@ export function composeInvestmentLabVoo(
 export function composeInvestmentLabCash(
   pooledModel: InvestmentLabCounterfactualReadModel,
   named: InvestmentLabNamedModels,
+  actual: InvestmentLabObservedReturnEstimate,
 ): InvestmentLabCompositionValue<InvestmentLabCashComparison> {
   const pooled = pooledModel.cashComparison;
   const namedComparisons = NAMED_PORTFOLIO_ACCOUNTS.map(
@@ -277,9 +317,14 @@ export function composeInvestmentLabCash(
   ) {
     return unavailableInvestmentLabCompositionValue(["flow_count_mismatch"]);
   }
+  const returnComparison = composeInvestmentLabCashReturnComparison(
+    ready,
+    actual,
+  );
   return readyInvestmentLabCompositionValue(
     Object.freeze({
       ...pooled,
+      returnComparison,
       summary: summarizeInvestmentLabCompositionRows(composed.rows),
       rows: Object.freeze(
         composed.rows.map((row) =>
@@ -304,6 +349,7 @@ export function composeInvestmentLabCash(
 export function composeInvestmentLabFixedMix(
   pooledModel: InvestmentLabCounterfactualReadModel,
   named: InvestmentLabNamedModels,
+  actual: InvestmentLabObservedReturnEstimate,
 ): InvestmentLabCompositionValue<InvestmentLabFixedMixScenario> {
   const pooled = pooledModel.fixedMixScenario;
   if (pooled === null) {
@@ -312,12 +358,13 @@ export function composeInvestmentLabFixedMix(
   const namedScenarios = NAMED_PORTFOLIO_ACCOUNTS.map(
     (account) => named[account].fixedMixScenario,
   );
-  return composeInvestmentLabFixedMixScenario(pooled, namedScenarios);
+  return composeInvestmentLabFixedMixScenario(pooled, namedScenarios, actual);
 }
 
 export function composeInvestmentLabFixedMixComparison(
   pooledModel: InvestmentLabCounterfactualReadModel,
   named: InvestmentLabNamedModels,
+  actual: InvestmentLabObservedReturnEstimate,
 ): InvestmentLabFixedMixComparison | null {
   const pooled = pooledModel.fixedMixComparison;
   if (pooled === null) return null;
@@ -339,6 +386,7 @@ export function composeInvestmentLabFixedMixComparison(
       : composeInvestmentLabFixedMixScenario(
           entry.scenario,
           namedEntries.map((namedEntry) => namedEntry?.scenario),
+          actual,
         );
     return Object.freeze({
       ...entry,
@@ -358,6 +406,7 @@ export function composeInvestmentLabFixedMixComparison(
 function composeInvestmentLabFixedMixScenario(
   pooled: InvestmentLabFixedMixScenario,
   namedScenarios: readonly (InvestmentLabFixedMixScenario | null | undefined)[],
+  actual: InvestmentLabObservedReturnEstimate,
 ): InvestmentLabCompositionValue<InvestmentLabFixedMixScenario> {
   if (pooled.status !== "ready") {
     return unavailableInvestmentLabCompositionValue([
@@ -392,9 +441,20 @@ function composeInvestmentLabFixedMixScenario(
   ) {
     return unavailableInvestmentLabCompositionValue(["flow_count_mismatch"]);
   }
+  const returnEstimate = composeInvestmentLabFixedMixReturnEstimate(
+    pooled,
+    ready,
+    actual,
+  );
+  if (!returnEstimate) {
+    return unavailableInvestmentLabCompositionValue([
+      "return_calculation_unavailable",
+    ]);
+  }
   return readyInvestmentLabCompositionValue(
     Object.freeze({
       ...pooled,
+      returnEstimate,
       summary: summarizeInvestmentLabCompositionRows(composed.rows),
       rows: Object.freeze(
         composed.rows.map((row, index) =>

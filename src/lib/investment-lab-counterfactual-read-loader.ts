@@ -1,6 +1,5 @@
 import {
   buildInvestmentLabCounterfactualReadModel,
-  resolveInvestmentLabBoundaryFlows,
   type InvestmentLabCounterfactualReadModel,
   type InvestmentLabSourceCloseRow,
   type InvestmentLabSourceEventRow,
@@ -206,10 +205,6 @@ export async function loadInvestmentLabCounterfactualReadModel(
         InvestmentLabAnchorValueWeightScenario
       >,
     );
-    const boundaryFlows = resolveInvestmentLabBoundaryFlows(
-      fountScope.source.eventRows,
-      "all",
-    );
     const composed = composeInvestmentLabAllAccounts({
       pooledModel,
       namedModels,
@@ -217,8 +212,6 @@ export async function loadInvestmentLabCounterfactualReadModel(
       namedAnchors,
       pooledAnchorValueWeight: pooledAnchorScenarios.valueWeight,
       namedAnchorValueWeights,
-      boundaryFlows:
-        boundaryFlows.status === "ready" ? boundaryFlows.flows : [],
     });
     model = composed.model;
     anchorBasketScenario = composed.anchorBasketScenario;

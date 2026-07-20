@@ -1,6 +1,7 @@
 import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
 } from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import {
@@ -45,7 +46,8 @@ export type InvestmentLabVooReturnEstimateBlocker =
   | InvestmentLabReturnEvidenceBlocker
   | "valuation_axis_mismatch"
   | "actual_return_calculation_blocked"
-  | "scenario_return_calculation_blocked";
+  | "scenario_return_calculation_blocked"
+  | "account_composition_return_unavailable";
 
 export type InvestmentLabVooReturnEstimate =
   | Readonly<{
@@ -58,6 +60,7 @@ export type InvestmentLabVooReturnEstimate =
       periodCount: number;
       actualFlowCount: number;
       scenarioFlowCount: number;
+      scenarioPeriods: readonly InvestmentLabModifiedDietzPeriod[];
       actualRiskMetrics: InvestmentLabPathRiskMetrics;
       scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
       evidence: InvestmentLabReturnEvidenceResult;
@@ -176,10 +179,22 @@ export function buildInvestmentLabVooReturnEstimate(input: {
     periodCount: actual.periodCount,
     actualFlowCount: actual.flowCount,
     scenarioFlowCount: scenario.flowCount,
+    scenarioPeriods: scenario.periods,
     actualRiskMetrics: actual.riskMetrics,
     scenarioRiskMetrics: scenario.riskMetrics,
     evidence,
     blockers: [] as const,
+  });
+}
+
+export function blockInvestmentLabVooReturnEstimateForAccountComposition(
+  source: InvestmentLabVooReturnEstimate,
+): InvestmentLabVooReturnEstimate {
+  return blockedEstimate({
+    blockers: ["account_composition_return_unavailable"],
+    actualFlowCount: source.actualFlowCount,
+    scenarioFlowCount: source.scenarioFlowCount,
+    evidence: source.evidence,
   });
 }
 

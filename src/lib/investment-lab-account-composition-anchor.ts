@@ -7,12 +7,7 @@ import {
   INVESTMENT_LAB_ANCHOR_VALUE_WEIGHT_SCENARIO_POLICY,
   type InvestmentLabAnchorValueWeightScenario,
 } from "./investment-lab-anchor-value-weight-scenario.ts";
-import {
-  calculateInvestmentLabModifiedDietz,
-  INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
-} from "./investment-lab-modified-dietz.ts";
-import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
-import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
+import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
   type NamedPortfolioAccount,
@@ -25,11 +20,14 @@ import {
   summarizeInvestmentLabCompositionRows,
   unavailableInvestmentLabCompositionValue,
   type InvestmentLabAccountCompositionBlocker,
-  type InvestmentLabCompositionBoundaryFlow,
   type InvestmentLabCompositionValue,
   type InvestmentLabNamedAnchors,
   type InvestmentLabNamedAnchorValueWeights,
 } from "./investment-lab-account-composition-contract.ts";
+import {
+  composeInvestmentLabNamedAccountReturns,
+  investmentLabReturnPeriodAxesMatch,
+} from "./investment-lab-account-composition-return.ts";
 
 type AnchorScenario =
   | InvestmentLabAnchorBasketScenario
@@ -39,14 +37,13 @@ type ReadyAnchorScenario<T extends AnchorScenario> = T &
   Readonly<{
     status: "ready";
     summary: NonNullable<T["summary"]>;
-    returnEstimate: NonNullable<T["returnEstimate"]>;
   }>;
 
 type ComposedAnchorParts = Readonly<{
   summary: ReturnType<typeof summarizeInvestmentLabCompositionRows>;
-  actualReturn: number;
-  scenarioReturn: number;
-  scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
+  returnEstimate: NonNullable<
+    InvestmentLabAnchorBasketScenario["returnEstimate"]
+  > | null;
   rows: InvestmentLabAnchorBasketScenario["rows"];
   coverage: InvestmentLabAnchorBasketScenario["coverage"];
   instrumentCount: number;
@@ -55,12 +52,10 @@ type ComposedAnchorParts = Readonly<{
 export function composeInvestmentLabAnchor(input: Readonly<{
   pooledAnchor: InvestmentLabAnchorBasketScenario;
   namedAnchors: InvestmentLabNamedAnchors;
-  boundaryFlows: readonly InvestmentLabCompositionBoundaryFlow[];
 }>): InvestmentLabCompositionValue<InvestmentLabAnchorBasketScenario> {
   return composeAnchorScenario({
     pooled: input.pooledAnchor,
     named: input.namedAnchors,
-    boundaryFlows: input.boundaryFlows,
     create(parts) {
       return Object.freeze({
         ...input.pooledAnchor,
@@ -72,11 +67,19 @@ export function composeInvestmentLabAnchor(input: Readonly<{
           equalWeightPct: null,
           allocationBasis: "named_account_equal_weight_then_sum" as const,
         }),
-        returnEstimate: returnEstimate(parts),
+        returnEstimate: parts.returnEstimate,
         rows: parts.rows,
         coverage: parts.coverage,
         evidenceBlockers: [] as const,
-        blockers: [] as const,
+        blockers: parts.returnEstimate
+          ? ([] as const)
+          : ([
+              {
+                reason: "scenario_return_unavailable" as const,
+                instrumentKey: null,
+                detail: "account_composition_return_unavailable",
+              },
+            ] as const),
       });
     },
   });
@@ -85,12 +88,10 @@ export function composeInvestmentLabAnchor(input: Readonly<{
 export function composeInvestmentLabAnchorValueWeight(input: Readonly<{
   pooledAnchor: InvestmentLabAnchorValueWeightScenario;
   namedAnchors: InvestmentLabNamedAnchorValueWeights;
-  boundaryFlows: readonly InvestmentLabCompositionBoundaryFlow[];
 }>): InvestmentLabCompositionValue<InvestmentLabAnchorValueWeightScenario> {
   return composeAnchorScenario({
     pooled: input.pooledAnchor,
     named: input.namedAnchors,
-    boundaryFlows: input.boundaryFlows,
     create(parts) {
       return Object.freeze({
         ...input.pooledAnchor,
@@ -103,11 +104,19 @@ export function composeInvestmentLabAnchorValueWeight(input: Readonly<{
           allocationBasis:
             "named_account_anchor_value_weight_then_sum" as const,
         }),
-        returnEstimate: returnEstimate(parts),
+        returnEstimate: parts.returnEstimate,
         rows: parts.rows,
         coverage: parts.coverage,
         evidenceBlockers: [] as const,
-        blockers: [] as const,
+        blockers: parts.returnEstimate
+          ? ([] as const)
+          : ([
+              {
+                reason: "scenario_return_unavailable" as const,
+                instrumentKey: null,
+                detail: "account_composition_return_unavailable",
+              },
+            ] as const),
       });
     },
   });
@@ -116,7 +125,6 @@ export function composeInvestmentLabAnchorValueWeight(input: Readonly<{
 function composeAnchorScenario<T extends AnchorScenario>(input: Readonly<{
   pooled: T;
   named: Readonly<Record<NamedPortfolioAccount, T>>;
-  boundaryFlows: readonly InvestmentLabCompositionBoundaryFlow[];
   create(parts: ComposedAnchorParts): T;
 }>): InvestmentLabCompositionValue<T> {
   if (input.pooled.status !== "ready") {
@@ -160,39 +168,37 @@ function composeAnchorScenario<T extends AnchorScenario>(input: Readonly<{
     return unavailableInvestmentLabCompositionValue(["flow_count_mismatch"]);
   }
 
-  const firstDate = composed.rows[0].serviceDate;
-  const lastDate = composed.rows.at(-1)!.serviceDate;
-  const scenarioReturn = calculateInvestmentLabModifiedDietz({
-    valuations: composed.rows.map((row) => ({
-      serviceDate: row.serviceDate,
-      valueKrw: row.scenarioMarketValueKrw,
-    })),
-    flows: input.boundaryFlows
-      .map((flow) => ({
-        effectiveServiceDate: mapRiskEvidenceDateToServiceDate(flow.eventDate),
-        sequence: flow.sequence,
-        direction: flow.direction,
-        amountKrw: flow.amountKrw,
-      }))
-      .filter(
-        (flow) =>
-          flow.effectiveServiceDate > firstDate &&
-          flow.effectiveServiceDate <= lastDate,
-      ),
-  });
-  const actualReturn = input.pooled.returnEstimate?.actualReturn ?? null;
-  if (scenarioReturn.status !== "ready" || actualReturn === null) {
-    return unavailableInvestmentLabCompositionValue([
-      "return_calculation_unavailable",
-    ]);
-  }
+  const namedReturnEstimates = ready.map((scenario) => scenario.returnEstimate);
+  const actualReturn = composeInvestmentLabNamedAccountReturns(
+    namedReturnEstimates.map((estimate) => estimate?.actualPeriods ?? []),
+  );
+  const scenarioReturn = composeInvestmentLabNamedAccountReturns(
+    namedReturnEstimates.map((estimate) => estimate?.scenarioPeriods ?? []),
+  );
+  const returnEvidenceReady =
+    actualReturn.status === "ready" &&
+    scenarioReturn.status === "ready" &&
+    investmentLabReturnPeriodAxesMatch(
+      actualReturn.periods,
+      scenarioReturn.periods,
+    );
+  const returnEstimate = returnEvidenceReady
+    ? Object.freeze({
+        method: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+        actualReturn: actualReturn.totalReturn,
+        scenarioReturn: scenarioReturn.totalReturn,
+        differencePercentagePoints:
+          (scenarioReturn.totalReturn - actualReturn.totalReturn) * 100,
+        actualPeriods: actualReturn.periods,
+        scenarioPeriods: scenarioReturn.periods,
+        scenarioRiskMetrics: scenarioReturn.riskMetrics,
+      })
+    : null;
 
   return readyInvestmentLabCompositionValue(
     input.create({
       summary: summarizeInvestmentLabCompositionRows(composed.rows),
-      actualReturn,
-      scenarioReturn: scenarioReturn.totalReturn,
-      scenarioRiskMetrics: scenarioReturn.riskMetrics,
+      returnEstimate,
       rows: composed.rows,
       coverage: composeCoverage(ready, composed.rows),
       instrumentCount: compensatedSum(
@@ -234,17 +240,6 @@ function composeCoverage<T extends AnchorScenario>(
     manualCarryRows: compensatedSum(
       ready.map((scenario) => scenario.coverage.manualCarryRows),
     ),
-  });
-}
-
-function returnEstimate(parts: ComposedAnchorParts) {
-  return Object.freeze({
-    method: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
-    actualReturn: parts.actualReturn,
-    scenarioReturn: parts.scenarioReturn,
-    differencePercentagePoints:
-      (parts.scenarioReturn - parts.actualReturn) * 100,
-    scenarioRiskMetrics: parts.scenarioRiskMetrics,
   });
 }
 

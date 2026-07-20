@@ -489,12 +489,17 @@ async function main() {
       "순위나 추천이 아니라",
       "KODEX 200 adjusted close",
       "VOO raw close",
-      "최대낙폭 (MDD)",
+      "현금흐름 조정 MDD",
+      "개 기간수익률이 있을 때만",
+      "근거 축적 중",
       "252 관측일 기준",
       "초기 동일비중·이후 흐름 균등배분",
       "기준일 비중 유지",
     ]) {
-      assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+      assert.ok(
+        route.body.replaceAll("<!-- -->", "").includes(marker),
+        `route is missing marker: ${marker}`,
+      );
     }
   } else {
     assert.doesNotMatch(

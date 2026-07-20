@@ -7,6 +7,7 @@ import type { InvestmentLabActualPathPoint } from "./investment-lab-counterfactu
 import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
   type InvestmentLabReturnFlow,
 } from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
@@ -54,6 +55,8 @@ export type InvestmentLabAnchorAllocationPath = Readonly<{
     actualReturn: number;
     scenarioReturn: number;
     differencePercentagePoints: number;
+    actualPeriods: readonly InvestmentLabModifiedDietzPeriod[];
+    scenarioPeriods: readonly InvestmentLabModifiedDietzPeriod[];
     scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
   }> | null;
   rows: readonly Readonly<{
@@ -83,6 +86,7 @@ export function buildInvestmentLabAnchorAllocationPath(input: Readonly<{
   actualPath: readonly InvestmentLabActualPathPoint[];
   evidence: InvestmentLabAnchorEvidenceResolution | null;
   actualReturn: number | null;
+  actualPeriods?: readonly InvestmentLabModifiedDietzPeriod[];
   weights: readonly InvestmentLabAnchorAllocationWeight[];
 }>): InvestmentLabAnchorAllocationPath {
   if (input.anchor.status !== "ready") {
@@ -183,6 +187,8 @@ export function buildInvestmentLabAnchorAllocationPath(input: Readonly<{
           scenarioReturn: scenarioReturn.totalReturn,
           differencePercentagePoints:
             (scenarioReturn.totalReturn - input.actualReturn) * 100,
+          actualPeriods: Object.freeze([...(input.actualPeriods ?? [])]),
+          scenarioPeriods: scenarioReturn.periods,
           scenarioRiskMetrics: scenarioReturn.riskMetrics,
         })
       : null;

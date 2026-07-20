@@ -6,7 +6,10 @@ import {
 import type { InvestmentLabAnchorSelection } from "./investment-lab-anchor-basket-anchor.ts";
 import type { InvestmentLabAnchorEvidenceResolution } from "./investment-lab-anchor-basket-evidence.ts";
 import type { InvestmentLabActualPathPoint } from "./investment-lab-counterfactual-path.ts";
-import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
+import {
+  INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
+} from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_ANCHOR_VALUE_WEIGHT_SCENARIO_POLICY =
@@ -48,6 +51,8 @@ export type InvestmentLabAnchorValueWeightScenario = Readonly<{
     actualReturn: number;
     scenarioReturn: number;
     differencePercentagePoints: number;
+    actualPeriods: readonly InvestmentLabModifiedDietzPeriod[];
+    scenarioPeriods: readonly InvestmentLabModifiedDietzPeriod[];
     scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
   }> | null;
   rows: InvestmentLabAnchorAllocationPath["rows"];
@@ -61,6 +66,7 @@ export function buildInvestmentLabAnchorValueWeightScenario(input: Readonly<{
   actualPath: readonly InvestmentLabActualPathPoint[];
   evidence: InvestmentLabAnchorEvidenceResolution | null;
   actualReturn: number | null;
+  actualPeriods?: readonly InvestmentLabModifiedDietzPeriod[];
 }>): InvestmentLabAnchorValueWeightScenario {
   const anchorTotal = compensatedSum(
     input.anchor.instruments.map(

@@ -144,17 +144,19 @@ export async function loadInvestmentLabAnchorScenarios(
     fxRows: input.fxRows,
     boundaryFlows: flowResolution.flows,
   });
+  const actualReturn = resolveActualReturn({
+    account: input.account,
+    actualPath,
+    boundaryFlows: flowResolution.flows,
+    snapshotRows: selectedSnapshotRows,
+    eventRows: selectedEventRows,
+  });
   return buildAnchorScenarios({
     anchor,
     actualPath,
     evidence,
-    actualReturn: resolveActualReturn({
-      account: input.account,
-      actualPath,
-      boundaryFlows: flowResolution.flows,
-      snapshotRows: selectedSnapshotRows,
-      eventRows: selectedEventRows,
-    }),
+    actualReturn: actualReturn?.totalReturn ?? null,
+    actualPeriods: actualReturn?.periods ?? [],
   });
 }
 
@@ -248,5 +250,5 @@ function resolveActualReturn(input: Readonly<{
           flow.effectiveServiceDate <= endDate,
       ),
   });
-  return result.status === "ready" ? result.totalReturn : null;
+  return result.status === "ready" ? result : null;
 }

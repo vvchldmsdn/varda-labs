@@ -6,7 +6,10 @@ import {
 import type { InvestmentLabAnchorSelection } from "./investment-lab-anchor-basket-anchor.ts";
 import type { InvestmentLabAnchorEvidenceResolution } from "./investment-lab-anchor-basket-evidence.ts";
 import type { InvestmentLabActualPathPoint } from "./investment-lab-counterfactual-path.ts";
-import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
+import {
+  INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
+} from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_ANCHOR_BASKET_SCENARIO_POLICY = Object.freeze({
@@ -45,6 +48,8 @@ export type InvestmentLabAnchorBasketScenario = Readonly<{
     actualReturn: number;
     scenarioReturn: number;
     differencePercentagePoints: number;
+    actualPeriods: readonly InvestmentLabModifiedDietzPeriod[];
+    scenarioPeriods: readonly InvestmentLabModifiedDietzPeriod[];
     scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
   }> | null;
   rows: InvestmentLabAnchorAllocationPath["rows"];
@@ -58,6 +63,7 @@ export function buildInvestmentLabAnchorBasketScenario(input: Readonly<{
   actualPath: readonly InvestmentLabActualPathPoint[];
   evidence: InvestmentLabAnchorEvidenceResolution | null;
   actualReturn: number | null;
+  actualPeriods?: readonly InvestmentLabModifiedDietzPeriod[];
 }>): InvestmentLabAnchorBasketScenario {
   const instrumentCount = input.anchor.instruments.length;
   const result = buildInvestmentLabAnchorAllocationPath({

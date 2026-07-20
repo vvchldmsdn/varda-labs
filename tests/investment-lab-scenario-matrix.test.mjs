@@ -236,8 +236,10 @@ describe("investment lab scenario comparison matrix", () => {
       componentSource,
       /data-section="investment-lab-scenario-matrix"/,
     );
-    assert.match(componentSource, /최대낙폭 \(MDD\)/);
-    assert.match(componentSource, /252 관측일 기준/);
+    assert.match(componentSource, /현금흐름 조정 MDD/);
+    assert.match(componentSource, /minimumAnnualizedVolatilityPeriods/);
+    assert.match(componentSource, /근거 축적 중/);
+    assert.match(componentSource, /252 관측일\s+기준/);
     assert.doesNotMatch(
       componentSource,
       /최고 시나리오|추천 시나리오|주문하기|data-rank/,

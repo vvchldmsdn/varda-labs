@@ -1,6 +1,7 @@
 import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
 } from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import {
@@ -59,7 +60,8 @@ export type InvestmentLabReturnEstimateBlocker =
   | "price_basis_unavailable"
   | "price_basis_mismatch"
   | "actual_return_calculation_blocked"
-  | "scenario_return_calculation_blocked";
+  | "scenario_return_calculation_blocked"
+  | "account_composition_return_unavailable";
 
 export type InvestmentLabReturnEstimate =
   | Readonly<{
@@ -72,6 +74,7 @@ export type InvestmentLabReturnEstimate =
       periodCount: number;
       actualFlowCount: number;
       scenarioFlowCount: number;
+      scenarioPeriods: readonly InvestmentLabModifiedDietzPeriod[];
       actualRiskMetrics: InvestmentLabPathRiskMetrics;
       scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
       basisRowCount: number;
@@ -252,6 +255,7 @@ export function buildInvestmentLabReturnEstimate(input: {
     periodCount: actual.periodCount,
     actualFlowCount: actual.flowCount,
     scenarioFlowCount: scenario.flowCount,
+    scenarioPeriods: scenario.periods,
     actualRiskMetrics: actual.riskMetrics,
     scenarioRiskMetrics: scenario.riskMetrics,
     basisRowCount: basisRows.length,
@@ -259,6 +263,21 @@ export function buildInvestmentLabReturnEstimate(input: {
     basisUnavailableRows: 0,
     evidence,
     blockers: [] as const,
+  });
+}
+
+export function blockInvestmentLabReturnEstimateForAccountComposition(
+  source: InvestmentLabReturnEstimate | null,
+): InvestmentLabReturnEstimate | null {
+  if (!source) return null;
+  return blockedEstimate({
+    blockers: ["account_composition_return_unavailable"],
+    actualFlowCount: source.actualFlowCount,
+    scenarioFlowCount: source.scenarioFlowCount,
+    basisRowCount: source.basisRowCount,
+    basisMismatchRows: source.basisMismatchRows,
+    basisUnavailableRows: source.basisUnavailableRows,
+    evidence: source.evidence,
   });
 }
 

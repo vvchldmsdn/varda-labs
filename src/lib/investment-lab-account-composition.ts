@@ -12,7 +12,6 @@ import {
   type InvestmentLabAccountComposition,
   type InvestmentLabAccountCompositionScenarioId,
   type InvestmentLabAccountCompositionScenarioResolution,
-  type InvestmentLabCompositionBoundaryFlow,
   type InvestmentLabCompositionValue,
   type InvestmentLabNamedAnchors,
   type InvestmentLabNamedAnchorValueWeights,
@@ -31,6 +30,7 @@ import {
   unavailableInvestmentLabFixedMix,
   unavailableInvestmentLabVoo,
 } from "./investment-lab-account-composition-paths.ts";
+import { composeInvestmentLabMainReturnEstimate } from "./investment-lab-account-composition-return-models.ts";
 import { summarizeInvestmentLabCompositionRows } from "./investment-lab-account-composition-contract.ts";
 
 export {
@@ -55,7 +55,6 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
   namedAnchors: InvestmentLabNamedAnchors;
   pooledAnchorValueWeight: InvestmentLabAnchorValueWeightScenario;
   namedAnchorValueWeights: InvestmentLabNamedAnchorValueWeights;
-  boundaryFlows: readonly InvestmentLabCompositionBoundaryFlow[];
 }>): Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
@@ -66,29 +65,41 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     input.pooledModel,
     input.namedModels,
   );
+  const actualReturn =
+    observed.status === "ready"
+      ? observed.value.returnEstimate
+      : input.pooledModel.observedPath.returnEstimate;
   const main = composeInvestmentLabMainModel(
     input.pooledModel,
     input.namedModels,
   );
-  const voo = composeInvestmentLabVoo(input.pooledModel, input.namedModels);
-  const cash = composeInvestmentLabCash(input.pooledModel, input.namedModels);
+  const voo = composeInvestmentLabVoo(
+    input.pooledModel,
+    input.namedModels,
+    actualReturn,
+  );
+  const cash = composeInvestmentLabCash(
+    input.pooledModel,
+    input.namedModels,
+    actualReturn,
+  );
   const fixedMix = composeInvestmentLabFixedMix(
     input.pooledModel,
     input.namedModels,
+    actualReturn,
   );
   const fixedMixComparison = composeInvestmentLabFixedMixComparison(
     input.pooledModel,
     input.namedModels,
+    actualReturn,
   );
   const anchor = composeInvestmentLabAnchor({
     pooledAnchor: input.pooledAnchor,
     namedAnchors: input.namedAnchors,
-    boundaryFlows: input.boundaryFlows,
   });
   const anchorValueWeight = composeInvestmentLabAnchorValueWeight({
     pooledAnchor: input.pooledAnchorValueWeight,
     namedAnchors: input.namedAnchorValueWeights,
-    boundaryFlows: input.boundaryFlows,
   });
 
   const scenarios = Object.freeze({
@@ -141,6 +152,13 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
 
   const mainReady = main.status === "ready";
   const mainRows = main.status === "ready" ? main.value : ([] as const);
+  const mainReturnEstimate = mainReady
+    ? composeInvestmentLabMainReturnEstimate(
+        input.pooledModel,
+        input.namedModels,
+        actualReturn,
+      )
+    : null;
   const mainBlockers =
     main.status === "ready" ? ([] as const) : main.blockers;
 
@@ -152,7 +170,7 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
       summary: mainReady
         ? summarizeInvestmentLabCompositionRows(mainRows)
         : null,
-      returnEstimate: mainReady ? input.pooledModel.returnEstimate : null,
+      returnEstimate: mainReturnEstimate,
       rows: mainRows,
       vooComparison:
         voo.status === "ready"

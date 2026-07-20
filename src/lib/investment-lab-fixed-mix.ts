@@ -112,6 +112,7 @@ export function buildInvestmentLabFixedMixScenario(input: {
       scenarioReturn: scenarioReturn.totalReturn,
       differencePercentagePoints:
         (scenarioReturn.totalReturn - actualReturn.value) * 100,
+      scenarioPeriods: scenarioReturn.periods,
       scenarioRiskMetrics: scenarioReturn.riskMetrics,
     }),
     rows,

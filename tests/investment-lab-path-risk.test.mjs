@@ -10,21 +10,18 @@ import { calculateInvestmentLabModifiedDietz } from "../src/lib/investment-lab-m
 
 describe("investment lab cashflow-adjusted path risk", () => {
   it("calculates peak-to-trough drawdown from linked period returns", () => {
-    const result = calculateInvestmentLabPathRisk([
-      period(0.1),
-      period(-0.2),
-      period(0.25),
-    ]);
+    const returns = [0.1, -0.2, 0.25, ...Array.from({ length: 17 }, () => 0)];
+    const result = calculateInvestmentLabPathRisk(returns.map(period));
 
     assert.equal(result.status, "ready");
     assert.ok(closeTo(result.maximumDrawdown, 0.2));
     assert.ok(
       closeTo(
         result.annualizedVolatility,
-        sampleVolatility([0.1, -0.2, 0.25]) * Math.sqrt(252),
+        sampleVolatility(returns) * Math.sqrt(252),
       ),
     );
-    assert.equal(result.periodCount, 3);
+    assert.equal(result.periodCount, 20);
   });
 
   it("does not mistake a same-day external inflow for investment risk", () => {
@@ -39,9 +36,12 @@ describe("investment lab cashflow-adjusted path risk", () => {
 
     assert.equal(result.status, "ready");
     assert.equal(result.totalReturn, 0);
-    assert.equal(result.riskMetrics.status, "ready");
+    assert.equal(result.riskMetrics.status, "partial");
     assert.equal(result.riskMetrics.maximumDrawdown, 0);
-    assert.equal(result.riskMetrics.annualizedVolatility, 0);
+    assert.equal(result.riskMetrics.annualizedVolatility, null);
+    assert.deepEqual(result.riskMetrics.blockers, [
+      "insufficient_volatility_periods",
+    ]);
   });
 
   it("preserves MDD when only one return period exists", () => {
@@ -50,7 +50,22 @@ describe("investment lab cashflow-adjusted path risk", () => {
     assert.equal(result.status, "partial");
     assert.ok(closeTo(result.maximumDrawdown, 0.1));
     assert.equal(result.annualizedVolatility, null);
-    assert.deepEqual(result.blockers, ["insufficient_periods"]);
+    assert.deepEqual(result.blockers, ["insufficient_volatility_periods"]);
+  });
+
+  it("requires the pinned minimum before annualizing volatility", () => {
+    const belowMinimum = calculateInvestmentLabPathRisk(
+      Array.from({ length: 19 }, () => period(0.01)),
+    );
+    const atMinimum = calculateInvestmentLabPathRisk(
+      Array.from({ length: 20 }, () => period(0.01)),
+    );
+
+    assert.equal(belowMinimum.status, "partial");
+    assert.equal(belowMinimum.maximumDrawdown, 0);
+    assert.equal(belowMinimum.annualizedVolatility, null);
+    assert.equal(atMinimum.status, "ready");
+    assert.equal(atMinimum.annualizedVolatility, 0);
   });
 
   it("rejects invalid return factors instead of substituting values", () => {
@@ -69,6 +84,10 @@ describe("investment lab cashflow-adjusted path risk", () => {
     );
 
     assert.equal(INVESTMENT_LAB_PATH_RISK_POLICY.annualizationFactor, 252);
+    assert.equal(
+      INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods,
+      20,
+    );
     assert.equal(
       INVESTMENT_LAB_PATH_RISK_POLICY.returnSource,
       "modified_dietz_period_returns",

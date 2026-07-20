@@ -10,7 +10,10 @@ import {
 import { composeInvestmentLabAllAccounts } from "../src/lib/investment-lab-account-composition.ts";
 import { buildInvestmentLabCounterfactualReadModel } from "../src/lib/investment-lab-counterfactual-read-model.ts";
 import { resolveInvestmentLabFixedMixSelection } from "../src/lib/investment-lab-fixed-mix-selection.ts";
-import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "../src/lib/investment-lab-modified-dietz.ts";
+import {
+  INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  calculateInvestmentLabModifiedDietz,
+} from "../src/lib/investment-lab-modified-dietz.ts";
 import { NAMED_PORTFOLIO_ACCOUNTS } from "../src/lib/portfolio-account-scope.ts";
 
 describe("investment lab named-account composition", () => {
@@ -207,6 +210,44 @@ describe("investment lab named-account composition", () => {
     assert.equal(result.model.cashComparison.status, "ready");
     assert.equal(result.model.vooComparison.status, "ready");
   });
+
+  it("recomputes all-account returns from named evidence instead of pooled estimates", () => {
+    const fixture = buildFixture();
+    const baseline = compose(fixture);
+    fixture.pooledModel = tamperPooledReturns(fixture.pooledModel);
+    fixture.pooledAnchor = tamperAnchorReturn(fixture.pooledAnchor);
+    fixture.pooledAnchorValueWeight = tamperAnchorReturn(
+      fixture.pooledAnchorValueWeight,
+    );
+
+    const result = compose(fixture);
+
+    assert.equal(
+      result.model.returnEstimate.scenarioReturn,
+      baseline.model.returnEstimate.scenarioReturn,
+    );
+    assert.equal(
+      result.model.vooComparison.returnEstimate.scenarioReturn,
+      baseline.model.vooComparison.returnEstimate.scenarioReturn,
+    );
+    assert.equal(
+      result.model.cashComparison.returnComparison.cashReturn,
+      baseline.model.cashComparison.returnComparison.cashReturn,
+    );
+    assert.equal(
+      result.model.fixedMixScenario.returnEstimate.scenarioReturn,
+      baseline.model.fixedMixScenario.returnEstimate.scenarioReturn,
+    );
+    assert.equal(
+      result.anchorBasketScenario.returnEstimate.scenarioReturn,
+      baseline.anchorBasketScenario.returnEstimate.scenarioReturn,
+    );
+    assert.equal(
+      result.anchorValueWeightScenario.returnEstimate.scenarioReturn,
+      baseline.anchorValueWeightScenario.returnEstimate.scenarioReturn,
+    );
+    assert.notEqual(result.model.returnEstimate.scenarioReturn, 99);
+  });
 });
 
 function compose(fixture) {
@@ -217,12 +258,6 @@ function compose(fixture) {
     namedAnchors: fixture.namedAnchors,
     pooledAnchorValueWeight: fixture.pooledAnchorValueWeight,
     namedAnchorValueWeights: fixture.namedAnchorValueWeights,
-    boundaryFlows: fixture.source.eventRows.map((row) => ({
-      eventDate: row.eventDate,
-      sequence: row.sequence,
-      direction: row.eventType === "sell" ? "outflow" : "inflow",
-      amountKrw: row.amountKrw,
-    })),
   });
 }
 
@@ -292,6 +327,8 @@ function anchorScenario(account, model, multiplier, sourceFlowCount) {
     hasPendingExecution: false,
   }));
   const latest = rows.at(-1);
+  const actualReturn = modifiedDietzFromRows(rows, "actualMarketValueKrw");
+  const scenarioReturn = modifiedDietzFromRows(rows, "scenarioMarketValueKrw");
   return {
     status: "ready",
     policy: INVESTMENT_LAB_ANCHOR_BASKET_SCENARIO_POLICY,
@@ -319,9 +356,13 @@ function anchorScenario(account, model, multiplier, sourceFlowCount) {
     },
     returnEstimate: {
       method: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
-      actualReturn: 0.1,
-      scenarioReturn: 0.2,
-      differencePercentagePoints: 10,
+      actualReturn: actualReturn.totalReturn,
+      scenarioReturn: scenarioReturn.totalReturn,
+      differencePercentagePoints:
+        (scenarioReturn.totalReturn - actualReturn.totalReturn) * 100,
+      actualPeriods: actualReturn.periods,
+      scenarioPeriods: scenarioReturn.periods,
+      scenarioRiskMetrics: scenarioReturn.riskMetrics,
     },
     rows,
     coverage: {
@@ -433,4 +474,65 @@ function sumNamed(namedModels, read) {
     (total, account) => total + read(namedModels[account]),
     0,
   );
+}
+
+function modifiedDietzFromRows(rows, valueKey) {
+  const result = calculateInvestmentLabModifiedDietz({
+    valuations: rows.map((row) => ({
+      serviceDate: row.serviceDate,
+      valueKrw: row[valueKey],
+    })),
+    flows: [],
+  });
+  assert.equal(result.status, "ready");
+  return result;
+}
+
+function tamperPooledReturns(model) {
+  return {
+    ...model,
+    returnEstimate: tamperReturn(model.returnEstimate),
+    vooComparison: {
+      ...model.vooComparison,
+      returnEstimate: tamperReturn(model.vooComparison.returnEstimate),
+    },
+    cashComparison: {
+      ...model.cashComparison,
+      returnComparison: {
+        ...model.cashComparison.returnComparison,
+        cashReturn: 99,
+        scenarioRiskMetrics: tamperedRisk(),
+      },
+    },
+    fixedMixScenario: {
+      ...model.fixedMixScenario,
+      returnEstimate: tamperReturn(model.fixedMixScenario.returnEstimate),
+    },
+  };
+}
+
+function tamperAnchorReturn(scenario) {
+  return {
+    ...scenario,
+    returnEstimate: tamperReturn(scenario.returnEstimate),
+  };
+}
+
+function tamperReturn(estimate) {
+  return {
+    ...estimate,
+    scenarioReturn: 99,
+    differencePercentagePoints: 9_900,
+    scenarioRiskMetrics: tamperedRisk(),
+  };
+}
+
+function tamperedRisk() {
+  return {
+    status: "ready",
+    maximumDrawdown: 0.99,
+    annualizedVolatility: 9.9,
+    periodCount: 99,
+    blockers: [],
+  };
 }

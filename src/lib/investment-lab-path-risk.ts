@@ -4,6 +4,7 @@ export const INVESTMENT_LAB_PATH_RISK_POLICY = Object.freeze({
   maximumDrawdown: "linked_growth_peak_to_trough",
   annualizedVolatility: "sample_standard_deviation_sqrt_252",
   annualizationFactor: 252,
+  minimumAnnualizedVolatilityPeriods: 20,
   partialResultHandling: "preserve_available_metric",
 } as const);
 
@@ -15,6 +16,7 @@ export type InvestmentLabPathRiskMetrics = Readonly<{
   periodCount: number;
   blockers: readonly (
     | "insufficient_periods"
+    | "insufficient_volatility_periods"
     | "invalid_period_return"
     | "non_finite_linked_growth"
     | "non_finite_volatility"
@@ -58,14 +60,19 @@ export function calculateInvestmentLabPathRisk(
     );
   }
 
-  if (returns.length < 2) {
+  if (
+    returns.length <
+    INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods
+  ) {
     return Object.freeze({
       status: "partial",
       policy: INVESTMENT_LAB_PATH_RISK_POLICY,
       maximumDrawdown: cleanZero(maximumDrawdown),
       annualizedVolatility: null,
       periodCount: returns.length,
-      blockers: Object.freeze(["insufficient_periods"] as const),
+      blockers: Object.freeze([
+        "insufficient_volatility_periods",
+      ] as const),
     });
   }
 

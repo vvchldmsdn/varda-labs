@@ -1,6 +1,7 @@
 import {
   calculateInvestmentLabModifiedDietz,
   INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
 } from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 import {
@@ -35,6 +36,7 @@ export type InvestmentLabObservedReturnEstimate =
       actualReturn: number;
       periodCount: number;
       flowCount: number;
+      periods: readonly InvestmentLabModifiedDietzPeriod[];
       riskMetrics: InvestmentLabPathRiskMetrics;
       blockers: readonly [];
     }>
@@ -143,7 +145,7 @@ function buildObservedReturnEstimate(input: Readonly<{
     eventRows: input.eventRows,
   });
   if (evidence.status !== "ready") {
-    return unavailableObservedReturn(
+    return unavailableInvestmentLabObservedReturn(
       evidence.blockers,
       input.boundaryFlows.length,
     );
@@ -171,7 +173,7 @@ function buildObservedReturnEstimate(input: Readonly<{
     flows,
   });
   if (result.status !== "ready") {
-    return unavailableObservedReturn(
+    return unavailableInvestmentLabObservedReturn(
       ["actual_return_calculation_blocked"],
       flows.length,
     );
@@ -183,6 +185,7 @@ function buildObservedReturnEstimate(input: Readonly<{
     actualReturn: result.totalReturn,
     periodCount: result.periodCount,
     flowCount: result.flowCount,
+    periods: result.periods,
     riskMetrics: result.riskMetrics,
     blockers: [] as const,
   });
@@ -210,12 +213,12 @@ export function unavailableInvestmentLabObservedPath(
     policy: INVESTMENT_LAB_OBSERVED_PATH_POLICY,
     summary: null,
     rows: [] as const,
-    returnEstimate: unavailableObservedReturn(blockers, flowCount),
+    returnEstimate: unavailableInvestmentLabObservedReturn(blockers, flowCount),
     blockers: Object.freeze(unique(blockers)),
   });
 }
 
-function unavailableObservedReturn(
+export function unavailableInvestmentLabObservedReturn(
   blockers: readonly (string | InvestmentLabReturnEvidenceBlocker)[],
   flowCount: number,
 ): InvestmentLabObservedReturnEstimate {

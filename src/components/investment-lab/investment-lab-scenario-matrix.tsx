@@ -1,6 +1,7 @@
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
+import { INVESTMENT_LAB_PATH_RISK_POLICY } from "@/lib/investment-lab-path-risk";
 import {
   buildInvestmentLabScenarioMatrix,
   type InvestmentLabScenarioFxBasis,
@@ -8,6 +9,9 @@ import {
   type InvestmentLabScenarioMatrixRow,
   type InvestmentLabScenarioPriceBasis,
 } from "@/lib/investment-lab-scenario-matrix";
+
+const MINIMUM_VOLATILITY_PERIODS =
+  INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods;
 
 export function InvestmentLabScenarioMatrix({
   anchorBasketScenario,
@@ -61,7 +65,7 @@ export function InvestmentLabScenarioMatrix({
               <th className="px-3 py-3 text-right">종료 평가액</th>
               <th className="px-3 py-3 text-right">실제 대비</th>
               <th className="px-3 py-3 text-right">추정수익률</th>
-              <th className="px-3 py-3 text-right">최대낙폭 (MDD)</th>
+              <th className="px-3 py-3 text-right">현금흐름 조정 MDD</th>
               <th className="px-3 py-3 text-right">연환산 변동성</th>
               <th className="px-3 py-3 text-right">흐름 / 대기 평가일</th>
               <th className="px-4 py-3">가격·환율 근거</th>
@@ -76,10 +80,12 @@ export function InvestmentLabScenarioMatrix({
       </div>
 
       <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
-        최대낙폭과 변동성은 외부 입출금을 조정한 Modified Dietz
-        기간수익률을 연결해 계산하며, 변동성은 252 관측일 기준으로
-        연환산합니다. KODEX 200은 adjusted close, VOO는 raw close와 저장
-        USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가 아닙니다.
+        MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을
+        연결해 계산합니다. MDD는 가능한 구간부터 표시하고, 변동성은 최소
+        {MINIMUM_VOLATILITY_PERIODS}개 기간수익률이 있을 때만 252 관측일
+        기준으로 연환산합니다. KODEX 200은 adjusted close, VOO는 raw
+        close와 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제
+        현금계좌가 아닙니다.
       </p>
     </section>
   );
@@ -151,7 +157,9 @@ function ScenarioRow({
         </p>
         <p className="mt-1 text-xs font-normal text-[#73786c]">
           {row.riskMetrics.periodCount > 0
-            ? `${row.riskMetrics.periodCount}개 기간`
+            ? row.riskMetrics.annualizedVolatility === null
+              ? `${row.riskMetrics.periodCount}/${MINIMUM_VOLATILITY_PERIODS}개 기간 · 근거 축적 중`
+              : `${row.riskMetrics.periodCount}개 기간`
             : "근거 없음"}
         </p>
       </td>

@@ -67,13 +67,6 @@ export type InvestmentLabNamedAnchorValueWeights = Readonly<
   Record<NamedPortfolioAccount, InvestmentLabAnchorValueWeightScenario>
 >;
 
-export type InvestmentLabCompositionBoundaryFlow = Readonly<{
-  eventDate: string;
-  sequence: number;
-  direction: "inflow" | "outflow";
-  amountKrw: number;
-}>;
-
 export type InvestmentLabComposableRow = Readonly<{
   serviceDate: string;
   actualMarketValueKrw: number;

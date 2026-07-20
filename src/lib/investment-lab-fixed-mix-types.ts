@@ -1,4 +1,7 @@
-import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
+import {
+  INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  type InvestmentLabModifiedDietzPeriod,
+} from "./investment-lab-modified-dietz.ts";
 import type { InvestmentLabPathRiskMetrics } from "./investment-lab-path-risk.ts";
 
 export const INVESTMENT_LAB_FIXED_MIX_POLICY = Object.freeze({
@@ -91,6 +94,7 @@ export type InvestmentLabFixedMixScenario =
         actualReturn: number;
         scenarioReturn: number;
         differencePercentagePoints: number;
+        scenarioPeriods: readonly InvestmentLabModifiedDietzPeriod[];
         scenarioRiskMetrics: InvestmentLabPathRiskMetrics;
       }>;
       rows: readonly InvestmentLabFixedMixRow[];
