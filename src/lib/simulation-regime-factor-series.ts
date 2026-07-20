@@ -99,7 +99,7 @@ export function resolveSimulationRegimeFactorVector(
 
   const values: number[] = [];
   for (const definition of SIMULATION_REGIME_FACTOR_DEFINITIONS) {
-    const observation = latestSimulationRegimeFactorOnOrBefore(
+    const observation = latestSimulationRegimeFactorBeforeStateDate(
       series.get(definition.factorKey) ?? [],
       stateDate,
     );
@@ -135,7 +135,7 @@ export function buildSimulationRegimeFactorSourceSummaries(
   return Object.freeze(
     SIMULATION_REGIME_FACTOR_DEFINITIONS.map((definition) => {
       const rows = series.get(definition.factorKey) ?? [];
-      const current = latestSimulationRegimeFactorOnOrBefore(
+      const current = latestSimulationRegimeFactorBeforeStateDate(
         rows,
         currentStateDate,
       );
@@ -143,7 +143,10 @@ export function buildSimulationRegimeFactorSourceSummaries(
         ? riskCalendarDayDistance(current.releaseDate, currentStateDate)
         : null;
       const alignedStateCount = stateDates.filter((stateDate) => {
-        const row = latestSimulationRegimeFactorOnOrBefore(rows, stateDate);
+        const row = latestSimulationRegimeFactorBeforeStateDate(
+          rows,
+          stateDate,
+        );
         if (!row) return false;
         const carryDays = riskCalendarDayDistance(row.releaseDate, stateDate);
         return (
@@ -158,12 +161,14 @@ export function buildSimulationRegimeFactorSourceSummaries(
         currentReleaseDate: current?.releaseDate ?? null,
         currentCarryDays,
         alignedStateCount,
+        availabilityTimestampStatus: "not_preserved" as const,
+        vintageStatus: "not_preserved" as const,
       });
     }),
   );
 }
 
-function latestSimulationRegimeFactorOnOrBefore(
+function latestSimulationRegimeFactorBeforeStateDate(
   rows: readonly CanonicalSimulationRegimeFactorObservation[],
   stateDate: string,
 ) {
@@ -173,7 +178,7 @@ function latestSimulationRegimeFactorOnOrBefore(
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
     const row = rows[middle];
-    if (row.releaseDate <= stateDate) {
+    if (row.releaseDate < stateDate) {
       selected = row;
       low = middle + 1;
     } else {

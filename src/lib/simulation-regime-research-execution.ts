@@ -7,18 +7,12 @@ import {
   SIMULATION_REGIME_BOOTSTRAP_POLICY,
   type SimulationRegimeFactorObservation,
 } from "./simulation-regime-bootstrap-policy.ts";
+import type { SimulationRegimeFactorReadinessSummary } from "./simulation-regime-factor-state.ts";
 import {
-  buildSimulationRegimeFactorState,
-  type SimulationRegimeFactorReadinessSummary,
-  type SimulationRegimeFactorStateBlockerReason,
-} from "./simulation-regime-factor-state.ts";
-import { validateAndHashReadyReturnMatrix } from "./simulation-stationary-bootstrap-serialization.ts";
+  inspectSimulationRegimeResearchReadiness,
+  type SimulationRegimeResearchReadinessBlockerReason,
+} from "./simulation-regime-research-readiness.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
-
-const EXPECTED_INSTRUMENT_KEYS = Object.freeze([
-  "korea|KRW|069500",
-  "us|USD|VOO",
-]);
 
 export type SimulationRegimeResearchResult = ReturnType<
   typeof buildSimulationRegimeResearch
@@ -32,54 +26,37 @@ export function buildSimulationRegimeResearch(input: {
 }) {
   const base = Object.freeze({
     policy: SIMULATION_REGIME_BOOTSTRAP_POLICY,
-    runtimeTrustStatus: "research_only" as const,
+    runtimeTrustStatus: "retrospective_research_only" as const,
+    pointInTime: SIMULATION_REGIME_BOOTSTRAP_POLICY.pointInTimeEvidence,
     selection: input.selection,
   });
-  if (!input.explicitEndServiceDate) {
-    return unavailable(base, "explicit_end_required", null, null);
-  }
-  if (!input.matrix || input.matrix.status !== "ready") {
-    return unavailable(base, "input_matrix_unavailable", null, null);
-  }
-
-  const matrixValidation = validateAndHashReadyReturnMatrix(input.matrix);
-  const matrixEndServiceDate = input.matrix.requestedServiceDates.at(-1) ?? null;
-  const instrumentKeys = input.matrix.instruments.map(
-    (instrument) => instrument.instrumentKey,
-  );
-  if (
-    !matrixValidation.canonical ||
-    input.matrix.matrix.length !==
-      SIMULATION_REGIME_BOOTSTRAP_POLICY.sourceReturnStepCount ||
-    matrixEndServiceDate !== input.explicitEndServiceDate ||
-    !sameStrings(instrumentKeys, EXPECTED_INSTRUMENT_KEYS)
-  ) {
-    return unavailable(base, "input_matrix_shape_mismatch", null, null);
-  }
-
-  const factorState = buildSimulationRegimeFactorState({
-    currentStateDate: input.explicitEndServiceDate,
-    stateDates: input.matrix.matrix.map((row) => row.previousServiceDate),
+  const inspection = inspectSimulationRegimeResearchReadiness({
+    explicitEndServiceDate: input.explicitEndServiceDate,
+    matrix: input.matrix,
     factorRows: input.factorRows,
   });
-  const source = Object.freeze({
-    endServiceDate: input.explicitEndServiceDate,
-    returnStepCount: input.matrix.matrix.length,
-    firstStateDate: input.matrix.matrix[0]?.previousServiceDate ?? null,
-    lastReturnDate: matrixEndServiceDate,
-  });
-  if (factorState.status !== "ready") {
-    return unavailable(base, factorState.reason, source, factorState.summary);
+  if (inspection.status !== "research_ready") {
+    return unavailable(
+      base,
+      inspection.reason,
+      inspection.source,
+      inspection.readiness,
+    );
   }
 
   const validScenarios = buildValidScenarios(input.selection);
   const execution = executeSimulationRegimeBootstrap({
-    matrix: input.matrix,
-    factorState,
+    matrix: input.matrix!,
+    factorState: inspection.factorState,
     scenarios: validScenarios,
   });
   if (execution.status !== "ready") {
-    return unavailable(base, execution.reason, source, factorState.summary);
+    return unavailable(
+      base,
+      execution.reason,
+      inspection.source,
+      inspection.readiness,
+    );
   }
 
   const scenarios = [
@@ -96,8 +73,8 @@ export function buildSimulationRegimeResearch(input: {
     ...base,
     status: "ready" as const,
     reason: null,
-    source,
-    readiness: factorState.summary,
+    source: inspection.source,
+    readiness: inspection.readiness,
     assumptions: execution.assumptions,
     scenarios: Object.freeze(scenarios),
     summary: Object.freeze({
@@ -157,10 +134,7 @@ function invalidMixScenario() {
 }
 
 type RegimeResearchBlockerReason =
-  | "explicit_end_required"
-  | "input_matrix_unavailable"
-  | "input_matrix_shape_mismatch"
-  | SimulationRegimeFactorStateBlockerReason
+  | SimulationRegimeResearchReadinessBlockerReason
   | "invalid_return_matrix_values"
   | "draw_plan_blocked"
   | "scenario_execution_blocked";
@@ -168,7 +142,8 @@ type RegimeResearchBlockerReason =
 function unavailable(
   base: Readonly<{
     policy: typeof SIMULATION_REGIME_BOOTSTRAP_POLICY;
-    runtimeTrustStatus: "research_only";
+    runtimeTrustStatus: "retrospective_research_only";
+    pointInTime: typeof SIMULATION_REGIME_BOOTSTRAP_POLICY.pointInTimeEvidence;
     selection: KodexVooFixedMixSelection;
   }>,
   reason: RegimeResearchBlockerReason,
@@ -194,11 +169,4 @@ function unavailable(
       unavailableScenarioCount: 3,
     }),
   });
-}
-
-function sameStrings(left: readonly string[], right: readonly string[]) {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  );
 }

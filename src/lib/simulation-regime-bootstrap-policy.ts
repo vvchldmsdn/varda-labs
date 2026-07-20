@@ -5,13 +5,21 @@ export const SIMULATION_REGIME_FACTOR_DEFINITIONS = Object.freeze([
 ] as const);
 
 export const SIMULATION_REGIME_BOOTSTRAP_POLICY = Object.freeze({
-  version: "regime_bootstrap_research_v1",
+  version: "regime_bootstrap_research_v2",
   inputMatrixVersion: "simulation_return_matrix_v1",
   sourceReturnStepCount: 120,
   requiredFactorCount: 3,
   factorMetrics: Object.freeze(["value", "volatility_20d_pct"] as const),
-  factorAsOfPolicy: "latest_release_date_lte_state_date",
+  factorAsOfPolicy: "latest_release_date_strictly_before_state_date",
+  sameDayReleasePolicy: "defer_to_later_service_date_without_available_at",
   factorObservedAtRole: "import_provenance_only_not_availability_authority",
+  pointInTimeEvidence: Object.freeze({
+    status: "not_established" as const,
+    availableAtAuthority: "not_preserved_in_current_import" as const,
+    vintageAuthority: "not_preserved_in_current_import" as const,
+    strictSafeDateSelection: "forbidden" as const,
+    retrospectiveResearch: "allowed_with_explicit_disclosure" as const,
+  }),
   factorMaxCarryDays: 7,
   minimumAlignedRegimeRows: 120,
   minimumCandidateRows: 20,
@@ -59,4 +67,6 @@ export type SimulationRegimeFactorSourceSummary = Readonly<{
   currentReleaseDate: string | null;
   currentCarryDays: number | null;
   alignedStateCount: number;
+  availabilityTimestampStatus: "not_preserved";
+  vintageStatus: "not_preserved";
 }>;

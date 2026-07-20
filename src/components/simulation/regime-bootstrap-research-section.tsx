@@ -34,21 +34,22 @@ export function RegimeBootstrapResearchSection({
       data-regime-bootstrap-status={model.status}
       data-regime-bootstrap-unavailable-reason={model.reason ?? ""}
       data-regime-fallback="forbidden"
+      data-regime-point-in-time-status={model.pointInTime.status}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="regime-bootstrap-research-title" className="text-lg font-semibold">
-            시장 국면 조건부 연구
+            시장 국면 사후 연구
           </h2>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
-            선택 기준일의 환율·미국 금리·장단기 금리차와 유사했던 과거
-            구간에서 교차시장 수익률 블록을 뽑습니다. 기존 stationary
-            bootstrap과 별개이며, 한 모델의 결손을 다른 모델 결과로 대체하지
-            않습니다.
+            저장된 환율·미국 금리·장단기 금리차로 선택 기준일과 유사한 과거
+            구간을 찾아 교차시장 수익률 블록을 뽑습니다. 공개시각과 revision
+            vintage가 없어 당시 예측을 재현한 결과는 아니며, 기존 stationary
+            bootstrap의 결손을 대신하지 않습니다.
           </p>
         </div>
         <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
-          연구용 · 저장 안 함 · 추천 아님
+          사후 연구용 · 저장 안 함 · 추천 아님
         </span>
       </div>
 
@@ -167,8 +168,9 @@ export function RegimeBootstrapResearchSection({
         방법: 공개일이 선택일 이전인 3개 일별 요인의 수준·20일 변동성을
         robust scaling한 뒤 가까운 과거 국면을 선택합니다. 120개 완전 수익률
         행, 5~20거래일 연속 블록, 63거래일, 500경로를 사용합니다. DB 적재시각은
-        과거 공개시점으로 간주하지 않습니다. 현재 보유, 계좌, Fount, 금현물,
-        승인 벡터, 주문 가능성은 입력에 포함하지 않습니다.
+        과거 공개시점으로 간주하지 않습니다. 공개시각과 revision vintage가
+        보존되기 전에는 엄격한 시점 검증 결과로 승격하지 않습니다. 현재 보유,
+        계좌, Fount, 금현물, 승인 벡터, 주문 가능성은 입력에 포함하지 않습니다.
       </p>
     </section>
   );

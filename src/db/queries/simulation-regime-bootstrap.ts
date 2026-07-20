@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { getReadOnlySimulationPeriodPreflight } from "@/db/queries/simulation-return-matrix";
+import { getReadOnlySimulationPeriodPreflightBatch } from "@/db/queries/simulation-return-matrix";
 import { globalMarketFactors } from "@/db/schema";
 import { resolveKodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-selection";
 import {
@@ -11,6 +11,10 @@ import {
   SIMULATION_REGIME_FACTOR_DEFINITIONS,
 } from "@/lib/simulation-regime-bootstrap-policy";
 import { buildSimulationRegimeResearch } from "@/lib/simulation-regime-research-execution";
+import {
+  buildSimulationRegimeReadinessHistory,
+  buildSimulationRegimeReadinessHistoryDates,
+} from "@/lib/simulation-regime-readiness-history";
 import { resolveSimulationEndServiceDateSelection } from "@/lib/simulation-input-readiness";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
@@ -48,29 +52,54 @@ export async function getReadOnlySimulationRegimeBootstrap(options?: {
   );
 
   if (!explicitEndServiceDate) {
-    return buildSimulationRegimeResearch({
+    const research = buildSimulationRegimeResearch({
       explicitEndServiceDate: null,
       matrix: null,
       factorRows: Object.freeze([]),
       selection: fixedMixSelection,
     });
+    return Object.freeze({
+      research,
+      readinessHistory: buildSimulationRegimeReadinessHistory({
+        selectedEndServiceDate: null,
+        candidates: Object.freeze([]),
+        factorRows: Object.freeze([]),
+      }),
+    });
   }
 
-  const [preflight, factorRows] = await Promise.all([
-    getReadOnlySimulationPeriodPreflight({
-      candidates: REGIME_RESEARCH_CANDIDATES,
-      endServiceDate: explicitEndServiceDate,
-      returnStepCount:
-        SIMULATION_REGIME_BOOTSTRAP_POLICY.sourceReturnStepCount,
-    }),
+  const historyDates = buildSimulationRegimeReadinessHistoryDates(
+    explicitEndServiceDate,
+  );
+  const [preflights, factorRows] = await Promise.all([
+    getReadOnlySimulationPeriodPreflightBatch(
+      historyDates.map((endServiceDate) => ({
+        candidates: REGIME_RESEARCH_CANDIDATES,
+        endServiceDate,
+        returnStepCount:
+          SIMULATION_REGIME_BOOTSTRAP_POLICY.sourceReturnStepCount,
+      })),
+    ),
     loadRegimeFactorRows(explicitEndServiceDate),
   ]);
-
-  return buildSimulationRegimeResearch({
+  const selectedPreflight = preflights[0];
+  const research = buildSimulationRegimeResearch({
     explicitEndServiceDate,
-    matrix: preflight.matrixArtifact,
+    matrix: selectedPreflight?.matrixArtifact ?? null,
     factorRows,
     selection: fixedMixSelection,
+  });
+
+  return Object.freeze({
+    research,
+    readinessHistory: buildSimulationRegimeReadinessHistory({
+      selectedEndServiceDate: explicitEndServiceDate,
+      candidates: historyDates.map((serviceDate, index) => ({
+        serviceDate,
+        matrix: preflights[index]?.matrixArtifact ?? null,
+      })),
+      factorRows,
+    }),
   });
 }
 

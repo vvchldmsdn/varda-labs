@@ -3,10 +3,11 @@ import { describe, it } from "node:test";
 
 import { resolveKodexVooFixedMixSelection } from "../src/lib/kodex-voo-fixed-mix-selection.ts";
 import { buildSimulationRegimeResearch } from "../src/lib/simulation-regime-research-execution.ts";
+import { buildSimulationRegimeReadinessHistory } from "../src/lib/simulation-regime-readiness-history.ts";
 import { SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
 
 describe("Regime bootstrap research execution", () => {
-  it("runs three deterministic scenarios from 120 point-in-time aligned rows", () => {
+  it("runs three deterministic retrospective scenarios from 120 aligned rows", () => {
     const matrix = readyMatrix();
     const input = {
       explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
@@ -19,7 +20,17 @@ describe("Regime bootstrap research execution", () => {
 
     assert.equal(left.status, "ready");
     assert.deepEqual(right, left);
-    assert.equal(left.policy.version, "regime_bootstrap_research_v1");
+    assert.equal(left.policy.version, "regime_bootstrap_research_v2");
+    assert.equal(left.runtimeTrustStatus, "retrospective_research_only");
+    assert.equal(left.pointInTime.status, "not_established");
+    assert.equal(
+      left.readiness.factors[0].currentReleaseDate,
+      shiftDate(input.explicitEndServiceDate, -1),
+    );
+    assert.equal(
+      left.readiness.factors[0].availabilityTimestampStatus,
+      "not_preserved",
+    );
     assert.equal(left.readiness.alignedRowCount, 120);
     assert.equal(left.readiness.selectedNeighborCount, 40);
     assert.equal(left.readiness.informativeFeatureCount, 6);
@@ -63,6 +74,7 @@ describe("Regime bootstrap research execution", () => {
     assert.equal(result.reason, "current_factor_state_stale");
     assert.deepEqual(result.scenarios, []);
     assert.equal(result.policy.fallback, "forbidden");
+    assert.ok(result.readiness.eligibleCandidateRowCount > 0);
   });
 
   it("does not use a factor row before its release date", () => {
@@ -85,7 +97,7 @@ describe("Regime bootstrap research execution", () => {
 
     assert.equal(result.status, "unavailable");
     assert.equal(result.reason, "insufficient_aligned_regime_rows");
-    assert.equal(result.readiness.alignedRowCount, 119);
+    assert.equal(result.readiness.alignedRowCount, 118);
   });
 
   it("keeps single-instrument scenarios when only the mix query is invalid", () => {
@@ -129,6 +141,28 @@ describe("Regime bootstrap research execution", () => {
 
     assert.equal(result.status, "unavailable");
     assert.equal(result.reason, "explicit_end_required");
+  });
+
+  it("keeps retrospective readiness separate from strict point-in-time safe dates", () => {
+    const matrix = readyMatrix();
+    const endServiceDate = matrix.requestedServiceDates.at(-1);
+    const history = buildSimulationRegimeReadinessHistory({
+      selectedEndServiceDate: endServiceDate,
+      candidates: [
+        { serviceDate: endServiceDate, matrix },
+        { serviceDate: shiftDate(endServiceDate, -1), matrix: null },
+      ],
+      factorRows: factorRows(endServiceDate),
+    });
+
+    assert.equal(history.summary.inspectedDateCount, 2);
+    assert.equal(history.summary.retrospectiveReadyDateCount, 1);
+    assert.equal(history.summary.pointInTimeSafeDateCount, 0);
+    assert.deepEqual(history.safeEndServiceDates, []);
+    assert.equal(history.entries[0].retrospectiveStatus, "research_ready");
+    assert.equal(history.entries[0].pointInTimeStatus, "not_established");
+    assert.equal(history.entries[1].reason, "input_matrix_unavailable");
+    assert.equal(history.policy.automaticEndpointRollback, "forbidden");
   });
 });
 

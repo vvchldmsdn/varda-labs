@@ -97,13 +97,20 @@ export function buildSimulationRegimeFactorState(input: {
     input.currentStateDate,
     input.stateDates,
   );
+  const maximumStartIndex =
+    input.stateDates.length -
+    SIMULATION_REGIME_BOOTSTRAP_POLICY.minimumBlockLength;
+  const structurallyEligible = aligned.filter(
+    (row) => row.sourceRowIndex <= maximumStartIndex,
+  );
+  const scaling = robustScaling(aligned.map((row) => row.values));
   const baseSummary = Object.freeze({
     requiredAlignedRowCount:
       SIMULATION_REGIME_BOOTSTRAP_POLICY.minimumAlignedRegimeRows,
     alignedRowCount: aligned.length,
-    eligibleCandidateRowCount: 0,
+    eligibleCandidateRowCount: structurallyEligible.length,
     selectedNeighborCount: 0,
-    informativeFeatureCount: 0,
+    informativeFeatureCount: scaling.informativeFeatureCount,
     totalFeatureCount:
       SIMULATION_REGIME_FACTOR_DEFINITIONS.length *
       SIMULATION_REGIME_BOOTSTRAP_POLICY.factorMetrics.length,
@@ -130,7 +137,6 @@ export function buildSimulationRegimeFactorState(input: {
     );
   }
 
-  const scaling = robustScaling(aligned.map((row) => row.values));
   if (
     scaling.informativeFeatureCount <
       SIMULATION_REGIME_BOOTSTRAP_POLICY.minimumInformativeFeatures
@@ -138,18 +144,11 @@ export function buildSimulationRegimeFactorState(input: {
     return unavailable(
       "factor_state_degenerate",
       input.currentStateDate,
-      Object.freeze({
-        ...baseSummary,
-        informativeFeatureCount: scaling.informativeFeatureCount,
-      }),
+      baseSummary,
     );
   }
 
-  const maximumStartIndex =
-    input.stateDates.length -
-    SIMULATION_REGIME_BOOTSTRAP_POLICY.minimumBlockLength;
-  const eligible = aligned
-    .filter((row) => row.sourceRowIndex <= maximumStartIndex)
+  const eligible = structurallyEligible
     .map((row) =>
       Object.freeze({
         sourceRowIndex: row.sourceRowIndex,
@@ -172,7 +171,6 @@ export function buildSimulationRegimeFactorState(input: {
       Object.freeze({
         ...baseSummary,
         eligibleCandidateRowCount: eligible.length,
-        informativeFeatureCount: scaling.informativeFeatureCount,
       }),
     );
   }
@@ -298,6 +296,8 @@ function emptySummary(): SimulationRegimeFactorReadinessSummary {
           currentReleaseDate: null,
           currentCarryDays: null,
           alignedStateCount: 0,
+          availabilityTimestampStatus: "not_preserved" as const,
+          vintageStatus: "not_preserved" as const,
         }),
       ),
     ),

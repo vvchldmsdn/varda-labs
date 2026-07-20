@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
+import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
@@ -63,7 +64,12 @@ async function RegimeBootstrapContent({
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
 }) {
   const model = await regimePromise;
-  return <RegimeBootstrapResearchSection model={model} />;
+  return (
+    <>
+      <RegimeReadinessHistoryPanel model={model.readinessHistory} />
+      <RegimeBootstrapResearchSection model={model.research} />
+    </>
+  );
 }
 
 function SimulationSkeleton() {

@@ -19,6 +19,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /kodexWeight: params\.kodexWeight/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
     assert.match(page, /regimePromise/);
+    assert.match(page, /RegimeReadinessHistoryPanel/);
     assert.match(page, /RegimeBootstrapResearchSection/);
     assert.match(page, /<Suspense fallback=\{<RegimeBootstrapSkeleton \/>\}>/);
     assert.doesNotMatch(page, /params\.end\[0\]/);
@@ -38,7 +39,9 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(selection, /maximumComponentWeightPct: 99/);
     assert.match(query, /ticker: "069500"/);
     assert.match(query, /ticker: "VOO"/);
-    assert.match(regimeQuery, /getReadOnlySimulationPeriodPreflight/);
+    assert.match(regimeQuery, /getReadOnlySimulationPeriodPreflightBatch/);
+    assert.match(regimeQuery, /buildSimulationRegimeReadinessHistoryDates/);
+    assert.match(regimeQuery, /buildSimulationRegimeReadinessHistory/);
     assert.match(regimeQuery, /loadRegimeFactorRows/);
     assert.match(regimeQuery, /Promise\.all/);
     assert.match(regimeQuery, /returnStepCount:/);
@@ -78,6 +81,10 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
     assert.match(view, /data-regime-fallback="forbidden"/);
+    assert.match(view, /data-regime-readiness-history/);
+    assert.match(view, /data-regime-point-in-time-status/);
+    assert.match(view, /data-regime-safe-date-count/);
+    assert.match(view, /data-regime-history-date/);
     assert.match(view, /data-regime-factor-key/);
     assert.match(view, /data-regime-scenario-status/);
     assert.match(view, /data-fixed-mix-comparison-pairing/);
@@ -96,11 +103,16 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /같은 입력 행렬,/);
     assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);
     assert.match(view, /regime\s+bootstrap 모델은 아닙니다/);
-    assert.match(view, /시장 국면 조건부 연구/);
-    assert.match(view, /기존 stationary\s+bootstrap과 별개/);
+    assert.match(view, /체제 데이터 시점 검증/);
+    assert.match(view, /엄격한 시점 검증 미확립/);
+    assert.match(view, /공개시각과 revision vintage/);
+    assert.match(view, /시점 안전 날짜/);
+    assert.match(view, /자동으로 되돌리지 않으며/);
+    assert.match(view, /시장 국면 사후 연구/);
+    assert.match(view, /기존 stationary\s+bootstrap의 결손을 대신하지 않습니다/);
     assert.match(view, /자동 fallback 없음/);
     assert.match(view, /DB 적재시각은\s*과거 공개시점으로 간주하지 않습니다/);
-    assert.match(view, /현재 보유, 계좌, Fount, 금현물/);
+    assert.match(view, /현재 보유,\s*계좌, Fount, 금현물/);
     assert.match(view, /P10~P90/);
     assert.match(view, /최근 7개 기준일/);
     assert.match(view, /저장된 실행 기록이 아니라/);
@@ -147,6 +159,7 @@ function readSimulationView() {
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",
+    "src/components/simulation/regime-readiness-history-panel.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",

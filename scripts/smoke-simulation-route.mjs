@@ -71,6 +71,12 @@ async function main() {
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
+  assert.match(simulation.body, /data-regime-readiness-history/);
+  assert.match(
+    simulation.body,
+    /data-regime-point-in-time-status="not_established"/,
+  );
+  assert.match(simulation.body, /data-regime-safe-date-count="0"/);
   assert.match(simulation.body, /3개월 연구 시뮬레이션/);
   assert.match(simulation.body, /명시 비중 공동 포트폴리오 연구/);
   assert.match(simulation.body, /KODEX 200 최초 비중/);
@@ -119,6 +125,9 @@ async function main() {
     simulation.body.match(/data-regime-scenario-status="ready"/g)?.length ?? 0;
   const regimeFactorCount =
     simulation.body.match(/data-regime-factor-key="[^"]+"/g)?.length ?? 0;
+  const regimeHistoryRowCount =
+    simulation.body.match(/data-regime-history-date="\d{4}-\d{2}-\d{2}"/g)
+      ?.length ?? 0;
   const expectedJointSelectionStatus = EXPECT_INVALID_WEIGHT
     ? "invalid"
     : EXPECT_KODEX_WEIGHT_PCT === null
@@ -174,6 +183,11 @@ async function main() {
     historyRowCount,
     EXPECT_INVALID_QUERY ? 0 : 7,
     "simulation rendered an unexpected history row count",
+  );
+  assert.equal(
+    regimeHistoryRowCount,
+    EXPECT_INVALID_QUERY ? 0 : 7,
+    "simulation rendered an unexpected regime readiness history row count",
   );
   assert.equal(
     observedReturnSeriesCount,
@@ -252,7 +266,7 @@ async function main() {
   if (regimeStatus === "ready") {
     assert.equal(regimeReadyCount, 3, "ready regime model must render three scenarios");
     assert.equal(regimeFactorCount, 3, "ready regime model must show three factor sources");
-    assert.match(simulation.body, /data-regime-bootstrap-engine="regime_bootstrap_research_v1"/);
+    assert.match(simulation.body, /data-regime-bootstrap-engine="regime_bootstrap_research_v2"/);
     assert.match(simulation.body, /data-regime-scenario-kodex-weight-bps="/);
     assert.match(simulation.body, /data-regime-scenario-voo-weight-bps="/);
   }
@@ -348,6 +362,7 @@ async function main() {
         regimeStatus,
         regimeReadyCount,
         regimeFactorCount,
+        regimeHistoryRowCount,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,
