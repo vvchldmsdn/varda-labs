@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
@@ -18,8 +19,10 @@ type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 
 export function SimulationInputReadinessView({
   model,
+  regimeBootstrap,
 }: {
   model: SimulationInputReadinessPageModel;
+  regimeBootstrap?: ReactNode;
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
   const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
@@ -138,6 +141,7 @@ export function SimulationInputReadinessView({
           comparison={model.fixedMixResearchComparison}
           selectedKodexWeightPct={selectedKodexWeightPct}
         />
+        {regimeBootstrap}
 
         <section
           aria-label="독립 연구 입력"

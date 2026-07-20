@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 
+import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
+import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +22,48 @@ export default async function SimulationPage({
     endServiceDate: params.end,
     kodexWeight: params.kodexWeight,
   });
+  const regimePromise = getReadOnlySimulationRegimeBootstrap({
+    endServiceDate: params.end,
+    kodexWeight: params.kodexWeight,
+  });
 
   return (
     <Suspense fallback={<SimulationSkeleton />}>
-      <SimulationContent modelPromise={modelPromise} />
+      <SimulationContent
+        modelPromise={modelPromise}
+        regimePromise={regimePromise}
+      />
     </Suspense>
   );
 }
 
 async function SimulationContent({
   modelPromise,
+  regimePromise,
 }: {
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
+  regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
 }) {
   const model = await modelPromise;
-  return <SimulationInputReadinessView model={model} />;
+  return (
+    <SimulationInputReadinessView
+      model={model}
+      regimeBootstrap={
+        <Suspense fallback={<RegimeBootstrapSkeleton />}>
+          <RegimeBootstrapContent regimePromise={regimePromise} />
+        </Suspense>
+      }
+    />
+  );
+}
+
+async function RegimeBootstrapContent({
+  regimePromise,
+}: {
+  regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
+}) {
+  const model = await regimePromise;
+  return <RegimeBootstrapResearchSection model={model} />;
 }
 
 function SimulationSkeleton() {
@@ -48,5 +77,18 @@ function SimulationSkeleton() {
         </div>
       </div>
     </main>
+  );
+}
+
+function RegimeBootstrapSkeleton() {
+  return (
+    <section
+      aria-label="시장 국면 조건부 연구 로딩"
+      className="border-b border-[#d7ddcf] py-5"
+      data-regime-bootstrap-loading
+    >
+      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
   );
 }

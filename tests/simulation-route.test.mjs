@@ -6,6 +6,7 @@ describe("Simulation input readiness route boundary", () => {
   it("keeps the page server-rendered and the database adapter server-only", () => {
     const page = read("src/app/simulation/page.tsx");
     const query = read("src/db/queries/simulation-input-readiness.ts");
+    const regimeQuery = read("src/db/queries/simulation-regime-bootstrap.ts");
     const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
     const view = readSimulationView();
 
@@ -13,8 +14,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(view, /["']use client["']/);
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
     assert.match(query, /^import "server-only";/);
+    assert.match(regimeQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
+    assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
+    assert.match(page, /regimePromise/);
+    assert.match(page, /RegimeBootstrapResearchSection/);
+    assert.match(page, /<Suspense fallback=\{<RegimeBootstrapSkeleton \/>\}>/);
     assert.doesNotMatch(page, /params\.end\[0\]/);
     assert.match(query, /resolveSimulationEndServiceDateSelection/);
     assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
@@ -32,8 +38,17 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(selection, /maximumComponentWeightPct: 99/);
     assert.match(query, /ticker: "069500"/);
     assert.match(query, /ticker: "VOO"/);
+    assert.match(regimeQuery, /getReadOnlySimulationPeriodPreflight/);
+    assert.match(regimeQuery, /loadRegimeFactorRows/);
+    assert.match(regimeQuery, /Promise\.all/);
+    assert.match(regimeQuery, /returnStepCount:/);
+    assert.match(regimeQuery, /globalMarketFactors\.releaseDate/);
     assert.doesNotMatch(
       query,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      regimeQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
   });
@@ -59,6 +74,12 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-joint-research-kodex-weight-bps/);
     assert.match(view, /data-fixed-mix-research-comparison/);
     assert.match(view, /data-fixed-mix-research-comparison-status/);
+    assert.match(view, /data-regime-bootstrap-research/);
+    assert.match(view, /data-regime-bootstrap-status/);
+    assert.match(view, /data-regime-bootstrap-engine/);
+    assert.match(view, /data-regime-fallback="forbidden"/);
+    assert.match(view, /data-regime-factor-key/);
+    assert.match(view, /data-regime-scenario-status/);
     assert.match(view, /data-fixed-mix-comparison-pairing/);
     assert.match(view, /data-fixed-mix-comparison-scenario/);
     assert.match(view, /고정 비중 3안 공통 경로 비교/);
@@ -75,6 +96,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /같은 입력 행렬,/);
     assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);
     assert.match(view, /regime\s+bootstrap 모델은 아닙니다/);
+    assert.match(view, /시장 국면 조건부 연구/);
+    assert.match(view, /기존 stationary\s+bootstrap과 별개/);
+    assert.match(view, /자동 fallback 없음/);
+    assert.match(view, /DB 적재시각은\s*과거 공개시점으로 간주하지 않습니다/);
+    assert.match(view, /현재 보유, 계좌, Fount, 금현물/);
     assert.match(view, /P10~P90/);
     assert.match(view, /최근 7개 기준일/);
     assert.match(view, /저장된 실행 기록이 아니라/);
@@ -120,6 +146,7 @@ function readSimulationView() {
     "src/components/simulation/fixed-mix-research-execution-section.tsx",
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
+    "src/components/simulation/regime-bootstrap-research-section.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",

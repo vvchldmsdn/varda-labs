@@ -16,6 +16,7 @@ const EXPECT_JOINT_RESEARCH_READY = numberArgument(
 const EXPECT_FIXED_MIX_COMPARISON_READY = numberArgument(
   "--expect-fixed-mix-comparison-ready",
 );
+const EXPECT_REGIME_READY = numberArgument("--expect-regime-ready");
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
@@ -67,6 +68,9 @@ async function main() {
   assert.match(simulation.body, /data-fixed-research-execution/);
   assert.match(simulation.body, /data-fixed-mix-research-execution/);
   assert.match(simulation.body, /data-fixed-mix-research-comparison/);
+  assert.match(simulation.body, /data-regime-bootstrap-research/);
+  assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
+  assert.match(simulation.body, /data-regime-fallback="forbidden"/);
   assert.match(simulation.body, /3개월 연구 시뮬레이션/);
   assert.match(simulation.body, /명시 비중 공동 포트폴리오 연구/);
   assert.match(simulation.body, /KODEX 200 최초 비중/);
@@ -108,6 +112,13 @@ async function main() {
   const jointSelectionStatus = simulation.body.match(
     /data-joint-research-selection-status="(default|selected|invalid)"/,
   )?.[1];
+  const regimeStatus = simulation.body.match(
+    /data-regime-bootstrap-status="(ready|unavailable)"/,
+  )?.[1];
+  const regimeReadyCount =
+    simulation.body.match(/data-regime-scenario-status="ready"/g)?.length ?? 0;
+  const regimeFactorCount =
+    simulation.body.match(/data-regime-factor-key="[^"]+"/g)?.length ?? 0;
   const expectedJointSelectionStatus = EXPECT_INVALID_WEIGHT
     ? "invalid"
     : EXPECT_KODEX_WEIGHT_PCT === null
@@ -147,6 +158,7 @@ async function main() {
     fixedMixComparisonStatus,
     "simulation must render one fixed-mix comparison state",
   );
+  assert.ok(regimeStatus, "simulation must render regime research state");
   assert.equal(
     jointSelectionStatus,
     expectedJointSelectionStatus,
@@ -229,6 +241,20 @@ async function main() {
       EXPECT_FIXED_MIX_COMPARISON_READY,
       "unexpected fixed-mix comparison readiness",
     );
+  }
+  if (EXPECT_REGIME_READY !== null) {
+    assert.equal(
+      regimeReadyCount,
+      EXPECT_REGIME_READY,
+      "unexpected ready regime scenario count",
+    );
+  }
+  if (regimeStatus === "ready") {
+    assert.equal(regimeReadyCount, 3, "ready regime model must render three scenarios");
+    assert.equal(regimeFactorCount, 3, "ready regime model must show three factor sources");
+    assert.match(simulation.body, /data-regime-bootstrap-engine="regime_bootstrap_research_v1"/);
+    assert.match(simulation.body, /data-regime-scenario-kodex-weight-bps="/);
+    assert.match(simulation.body, /data-regime-scenario-voo-weight-bps="/);
   }
   if (researchReadyCount > 0) {
     assert.equal(
@@ -319,6 +345,9 @@ async function main() {
         fixedMixComparisonStatus,
         fixedMixComparisonReadyCount,
         jointSelectionStatus,
+        regimeStatus,
+        regimeReadyCount,
+        regimeFactorCount,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,
