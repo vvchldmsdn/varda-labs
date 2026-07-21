@@ -104,6 +104,7 @@ function ScenarioRow({
     <tr
       className="border-t border-[#e1e6dc] align-top"
       data-scenario-row={row.id}
+      data-scenario-weight-constraint={scenarioWeightConstraint(row.id, model)}
       data-scenario-status={row.status}
       data-scenario-risk-status={row.riskMetrics.status}
     >
@@ -112,7 +113,7 @@ function ScenarioRow({
           {scenarioLabel(row.id, model)}
         </p>
         <p className="mt-1 text-xs text-[#73786c]">
-          {scenarioDetail(row.id)}
+          {scenarioDetail(row.id, model)}
         </p>
       </td>
       <td className="px-3 py-3">
@@ -218,25 +219,52 @@ function preperiodMinVolatilityLabel(
   model: InvestmentLabCounterfactualReadModel,
 ) {
   const weights = model.preperiodMinVolatility.weights;
+  const constraintStatus =
+    model.preperiodMinVolatility.weightConstraint?.status;
+  const constraintSuffix =
+    constraintStatus && constraintStatus !== "interior" ? " · 하한 제약" : "";
   return weights
-    ? `기간 전 최소변동성 KODEX ${weights.kodexWeightBps / 100}% · VOO ${weights.vooWeightBps / 100}%`
+    ? `기간 전 최소변동성 KODEX ${weights.kodexWeightBps / 100}% · VOO ${weights.vooWeightBps / 100}%${constraintSuffix}`
     : "기간 전 최소변동성 KODEX · VOO";
 }
 
-function scenarioDetail(id: InvestmentLabScenarioMatrixId) {
+function scenarioDetail(
+  id: InvestmentLabScenarioMatrixId,
+  model: InvestmentLabCounterfactualReadModel,
+) {
   const details: Record<InvestmentLabScenarioMatrixId, string> = {
     actual: "저장 포지션 평가액",
     kodex200: "동일 외부 흐름 · 주문 가능성 미검증",
     voo: "동일 원화 외부 흐름 · 계정 매수 가능성 미검증",
     fixed_mix: "초기·외부 흐름 고정 배분",
-    preperiod_min_volatility:
-      "기간 전 60개 공동 수익률로 1회 산정 · 리밸런싱 없음",
+    preperiod_min_volatility: preperiodMinVolatilityDetail(model),
     zero_return: "외부 흐름만 반영한 수익률 0% 가상 장부",
     anchor_basket: "초기 동일비중·이후 흐름 균등배분",
     anchor_value_weight:
       "기준일 저장 평가액 비중으로 초기·외부 흐름 배분 · 리밸런싱 없음",
   };
   return details[id];
+}
+
+function preperiodMinVolatilityDetail(
+  model: InvestmentLabCounterfactualReadModel,
+) {
+  const constraint = model.preperiodMinVolatility.weightConstraint;
+  if (!constraint || constraint.status === "interior") {
+    return "기간 전 60개 공동 수익률로 1회 산정 · 리밸런싱 없음";
+  }
+  const instrument =
+    constraint.status === "kodex_minimum_active" ? "KODEX" : "VOO";
+  return `기간 전 60개 공동 수익률 · ${instrument} ${constraint.minimumComponentWeightBps}bp 최소 하한 제약 발동 · 리밸런싱 없음`;
+}
+
+function scenarioWeightConstraint(
+  id: InvestmentLabScenarioMatrixId,
+  model: InvestmentLabCounterfactualReadModel,
+) {
+  return id === "preperiod_min_volatility"
+    ? (model.preperiodMinVolatility.weightConstraint?.status ?? "unavailable")
+    : "not_applicable";
 }
 
 function priceBasisLabel(value: InvestmentLabScenarioPriceBasis) {

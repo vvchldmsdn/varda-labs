@@ -76,6 +76,11 @@ export type InvestmentLabPreperiodMinVolatilityCoverage = Readonly<{
   commonPriceDateCount: number;
 }>;
 
+export type InvestmentLabPreperiodMinVolatilityWeightConstraint = Readonly<{
+  status: "interior" | "kodex_minimum_active" | "voo_minimum_active";
+  minimumComponentWeightBps: number;
+}>;
+
 type ResultBase = Readonly<{
   policy: typeof INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY;
   coverage: InvestmentLabPreperiodMinVolatilityCoverage;
@@ -88,6 +93,7 @@ export type InvestmentLabPreperiodMinVolatility =
         status: "ready";
         training: InvestmentLabPreperiodMinVolatilityTraining;
         weights: InvestmentLabFixedMixWeights;
+        weightConstraint: InvestmentLabPreperiodMinVolatilityWeightConstraint;
         scenario: Extract<InvestmentLabFixedMixScenario, { status: "ready" }>;
       }>)
   | (ResultBase &
@@ -95,6 +101,7 @@ export type InvestmentLabPreperiodMinVolatility =
         status: "path_unavailable";
         training: InvestmentLabPreperiodMinVolatilityTraining;
         weights: InvestmentLabFixedMixWeights;
+        weightConstraint: InvestmentLabPreperiodMinVolatilityWeightConstraint;
         scenario: Extract<
           InvestmentLabFixedMixScenario,
           { status: "unavailable" }
@@ -105,6 +112,7 @@ export type InvestmentLabPreperiodMinVolatility =
         status: "training_unavailable";
         training: null;
         weights: null;
+        weightConstraint: null;
         scenario: null;
       }>);
 
@@ -197,6 +205,7 @@ export function buildInvestmentLabPreperiodMinVolatility(input: Readonly<{
     kodexWeightBps: estimate.leftWeightBps,
     vooWeightBps: estimate.rightWeightBps,
   });
+  const weightConstraint = resolveWeightConstraint(weights);
   const training = Object.freeze({
     startPriceDate: trainingDates[0],
     endPriceDate: trainingDates.at(-1)!,
@@ -220,6 +229,7 @@ export function buildInvestmentLabPreperiodMinVolatility(input: Readonly<{
       policy: INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY,
       training,
       weights,
+      weightConstraint,
       scenario,
       coverage,
       blockers: Object.freeze([...scenario.blockers]),
@@ -230,6 +240,7 @@ export function buildInvestmentLabPreperiodMinVolatility(input: Readonly<{
     policy: INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY,
     training,
     weights,
+    weightConstraint,
     scenario,
     coverage,
     blockers: [] as const,
@@ -257,6 +268,7 @@ export function markInvestmentLabPreperiodMinVolatilityPathUnavailable(
     policy: INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY,
     training: source.training,
     weights: source.weights,
+    weightConstraint: source.weightConstraint,
     scenario: unavailableScenario(source.weights, blocker),
     coverage: source.coverage,
     blockers: [blocker] as const,
@@ -327,10 +339,25 @@ function trainingUnavailable(
     policy: INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY,
     training: null,
     weights: null,
+    weightConstraint: null,
     scenario: null,
     coverage,
     blockers: Object.freeze([...new Set(blockers)].sort()),
   });
+}
+
+function resolveWeightConstraint(
+  weights: InvestmentLabFixedMixWeights,
+): InvestmentLabPreperiodMinVolatilityWeightConstraint {
+  const minimumComponentWeightBps =
+    INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY.minimumComponentWeightBps;
+  const status =
+    weights.kodexWeightBps === minimumComponentWeightBps
+      ? "kodex_minimum_active"
+      : weights.vooWeightBps === minimumComponentWeightBps
+        ? "voo_minimum_active"
+        : "interior";
+  return Object.freeze({ status, minimumComponentWeightBps });
 }
 
 function unavailableScenario(

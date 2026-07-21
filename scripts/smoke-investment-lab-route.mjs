@@ -432,6 +432,10 @@ async function main() {
     route.body,
     "data-preperiod-min-volatility-voo-weight-bps",
   );
+  const preperiodMinVolatilityWeightConstraint = readStringAttribute(
+    route.body,
+    "data-preperiod-min-volatility-weight-constraint",
+  );
   assert.ok(
     preperiodMinVolatilityStatus === "ready" ||
       preperiodMinVolatilityStatus === "path_unavailable" ||
@@ -441,6 +445,7 @@ async function main() {
     assert.equal(preperiodMinVolatilityTrainingReturnObservations, 0);
     assert.equal(preperiodMinVolatilityKodexWeightBps, 0);
     assert.equal(preperiodMinVolatilityVooWeightBps, 0);
+    assert.equal(preperiodMinVolatilityWeightConstraint, "unavailable");
   } else {
     assert.equal(preperiodMinVolatilityTrainingReturnObservations, 60);
     assert.ok(preperiodMinVolatilityCandidateCommonPriceDates >= 61);
@@ -451,6 +456,25 @@ async function main() {
         preperiodMinVolatilityVooWeightBps,
       10_000,
     );
+    const expectedWeightConstraint =
+      preperiodMinVolatilityKodexWeightBps === 1
+        ? "kodex_minimum_active"
+        : preperiodMinVolatilityVooWeightBps === 1
+          ? "voo_minimum_active"
+          : "interior";
+    assert.equal(
+      preperiodMinVolatilityWeightConstraint,
+      expectedWeightConstraint,
+    );
+    if (expectedWeightConstraint !== "interior") {
+      assert.ok(route.body.includes("최소 하한 제약 발동"));
+      assert.match(
+        route.body,
+        new RegExp(
+          `data-scenario-row="preperiod_min_volatility"[^>]*data-scenario-weight-constraint="${expectedWeightConstraint}"`,
+        ),
+      );
+    }
   }
   let scenarioMatrixStatus = "not_rendered";
   let scenarioMatrixRows = 0;
@@ -967,6 +991,7 @@ async function main() {
           preperiodMinVolatilityCandidateCommonPriceDates,
           preperiodMinVolatilityKodexWeightBps,
           preperiodMinVolatilityVooWeightBps,
+          preperiodMinVolatilityWeightConstraint,
           scenarioMatrixStatus,
           scenarioMatrixRows,
           scenarioMatrixReadyRows,
@@ -1275,6 +1300,7 @@ async function main() {
         preperiodMinVolatilityCandidateCommonPriceDates,
         preperiodMinVolatilityKodexWeightBps,
         preperiodMinVolatilityVooWeightBps,
+        preperiodMinVolatilityWeightConstraint,
         scenarioMatrixStatus,
         scenarioMatrixRows,
         scenarioMatrixReadyRows,

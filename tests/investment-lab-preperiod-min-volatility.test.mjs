@@ -22,6 +22,11 @@ describe("investment lab pre-period minimum-volatility research", () => {
     );
     assert.ok(result.weights.kodexWeightBps >= 1);
     assert.ok(result.weights.vooWeightBps >= 1);
+    assert.ok(
+      ["interior", "kodex_minimum_active", "voo_minimum_active"].includes(
+        result.weightConstraint.status,
+      ),
+    );
     assert.equal(result.scenario.status, "ready");
     assert.equal(result.scenario.rows.length, 3);
     assert.equal(result.policy.rebalancing, "none");
@@ -83,6 +88,7 @@ describe("investment lab pre-period minimum-volatility research", () => {
     assert.ok(result.training);
     assert.equal(result.weights.kodexWeightBps + result.weights.vooWeightBps, 10_000);
     assert.equal(result.scenario.status, "unavailable");
+    assert.ok(result.weightConstraint);
     assert.ok(result.blockers.includes("component_path_unavailable"));
   });
 
@@ -114,6 +120,30 @@ describe("investment lab pre-period minimum-volatility research", () => {
     assert.ok(result);
     assert.equal(result.leftWeightBps, 9_999);
     assert.equal(result.rightWeightBps, 1);
+  });
+
+  it("marks a one-basis-point boundary solution as constrained", () => {
+    const source = fixture();
+    const dates = source.kodexPriceRows.map((row) => row.priceDate);
+    const result = buildInvestmentLabPreperiodMinVolatility({
+      ...source,
+      kodexPriceRows: dates.map((date, index) =>
+        price(date, index % 2 === 0 ? 100 : 150, index % 2 === 0 ? 100 : 150),
+      ),
+      vooPriceRows: dates.map((date, index) => {
+        const value = 100 * 1.001 ** index;
+        return price(date, value, value);
+      }),
+      fxRows: dates.map((date) => fx(date, 1_300)),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.weights.kodexWeightBps, 1);
+    assert.equal(result.weights.vooWeightBps, 9_999);
+    assert.deepEqual(result.weightConstraint, {
+      status: "kodex_minimum_active",
+      minimumComponentWeightBps: 1,
+    });
   });
 
   it("stays pure and explicitly forbids backfill, interpolation, and recommendation authority", () => {

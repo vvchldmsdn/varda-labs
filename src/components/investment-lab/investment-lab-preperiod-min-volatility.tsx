@@ -22,6 +22,9 @@ export function InvestmentLabPreperiodMinVolatilityView({
       data-preperiod-min-volatility-voo-weight-bps={
         model.weights?.vooWeightBps ?? 0
       }
+      data-preperiod-min-volatility-weight-constraint={
+        model.weightConstraint?.status ?? "unavailable"
+      }
       data-section="investment-lab-preperiod-min-volatility"
     >
       <div className="mx-auto w-full max-w-[1500px] overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
@@ -53,12 +56,12 @@ export function InvestmentLabPreperiodMinVolatilityView({
             <EvidenceCell
               label="KODEX 200 비중"
               value={formatWeight(model.weights.kodexWeightBps)}
-              detail="기간 시작 전에 고정"
+              detail={weightDetail(model, "kodex200")}
             />
             <EvidenceCell
               label="VOO 비중"
               value={formatWeight(model.weights.vooWeightBps)}
-              detail="원화 환산 수익률 기준"
+              detail={weightDetail(model, "voo")}
             />
             <EvidenceCell
               label="학습 구간 추정 변동성"
@@ -66,6 +69,16 @@ export function InvestmentLabPreperiodMinVolatilityView({
               detail="공동 관측행 252 기준 연환산"
             />
           </div>
+        ) : null}
+
+        {model.weightConstraint &&
+        model.weightConstraint.status !== "interior" ? (
+          <p className="border-t border-[#ead8b5] bg-[#fff8e8] px-4 py-3 text-sm leading-6 text-[#76551c]">
+            {boundaryConstraintLabel(model)} 비중은 모델의
+            {` ${model.weightConstraint.minimumComponentWeightBps}bp`} 최소 하한
+            제약이 작동한 경계값입니다. 무제약 최적 비중이나 투자 권고로
+            해석하면 안 됩니다.
+          </p>
         ) : null}
 
         <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
@@ -159,6 +172,24 @@ function statusLabel(status: InvestmentLabPreperiodMinVolatility["status"]) {
   if (status === "ready") return "계산 가능";
   if (status === "path_unavailable") return "비중만 계산";
   return "학습 근거 부족";
+}
+
+function weightDetail(
+  model: InvestmentLabPreperiodMinVolatility,
+  instrument: "kodex200" | "voo",
+) {
+  const activeStatus = `${instrument}_minimum_active`;
+  return model.weightConstraint?.status === activeStatus
+    ? `${model.weightConstraint.minimumComponentWeightBps}bp 최소 하한 제약 발동`
+    : instrument === "kodex200"
+      ? "기간 시작 전에 고정"
+      : "원화 환산 수익률 기준";
+}
+
+function boundaryConstraintLabel(model: InvestmentLabPreperiodMinVolatility) {
+  return model.weightConstraint?.status === "kodex_minimum_active"
+    ? "KODEX 200"
+    : "VOO";
 }
 
 function formatDate(value: string) {

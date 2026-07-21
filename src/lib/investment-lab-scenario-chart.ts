@@ -255,8 +255,12 @@ function preperiodMinVolatilityLabel(
   model: InvestmentLabCounterfactualReadModel,
 ) {
   const weights = model.preperiodMinVolatility.weights;
+  const constraintStatus =
+    model.preperiodMinVolatility.weightConstraint?.status;
+  const constraintSuffix =
+    constraintStatus && constraintStatus !== "interior" ? " · 하한 제약" : "";
   return weights
-    ? `기간 전 최소변동성 ${weights.kodexWeightBps / 100}:${weights.vooWeightBps / 100}`
+    ? `기간 전 최소변동성 ${weights.kodexWeightBps / 100}:${weights.vooWeightBps / 100}${constraintSuffix}`
     : "기간 전 최소변동성";
 }
 
