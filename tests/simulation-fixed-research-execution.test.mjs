@@ -44,6 +44,11 @@ describe("Fixed single-instrument research simulation", () => {
     assert.ok(left.bands.every((band) => band.p10 <= band.p50));
     assert.ok(left.bands.every((band) => band.p50 <= band.p90));
     assert.ok(Number.isFinite(left.terminal.lossProbabilityPct));
+    assert.ok(Number.isFinite(left.terminal.p5ReturnPct));
+    assert.ok(Number.isFinite(left.terminal.lowerTailMeanReturnPct));
+    assert.ok(
+      left.terminal.lowerTailMeanReturnPct <= left.terminal.p5ReturnPct,
+    );
     assert.ok(Number.isFinite(left.terminal.maxDrawdownP90Pct));
     assert.doesNotMatch(JSON.stringify(left), /sha256:|inputMatrixHash|drawPlanHash/);
   });

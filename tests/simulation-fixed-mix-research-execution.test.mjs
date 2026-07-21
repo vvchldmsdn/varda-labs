@@ -56,6 +56,10 @@ describe("Fixed-mix joint research simulation", () => {
       left.terminal.maxDrawdownP90Pct >= left.terminal.maxDrawdownP50Pct,
       "positive drawdown magnitudes must make P90 at least as severe as P50",
     );
+    assert.ok(
+      left.terminal.lowerTailMeanReturnPct <= left.terminal.p5ReturnPct,
+      "the exact lower-tail mean must not exceed the interpolated P5 return",
+    );
     assert.doesNotMatch(
       JSON.stringify(left),
       /sha256:|inputMatrixHash|drawPlanHash|scenarioVectorHash/,

@@ -67,6 +67,8 @@ describe("Regime bootstrap research execution", () => {
       [...left.scenarios, ...left.fixedMixComparison.scenarios].every(
         (scenario) =>
           scenario.status === "ready" &&
+          scenario.terminal.lowerTailMeanReturnPct <=
+            scenario.terminal.p5ReturnPct &&
           scenario.bands.every(
             (band) => band.p10 <= band.p50 && band.p50 <= band.p90,
           ),

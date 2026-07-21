@@ -150,6 +150,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /DB 적재시각은\s*과거 공개시점으로 간주하지 않습니다/);
     assert.match(view, /현재 보유,\s*계좌, Fount, 금현물/);
     assert.match(view, /P10~P90/);
+    assert.match(view, /P5 종료수익률/);
+    assert.match(view, /종료수익률 하위 5% 평균/);
     assert.match(view, /최근 7개 기준일/);
     assert.match(view, /저장된 실행 기록이 아니라/);
     assert.match(view, /수익률 행/);
@@ -201,6 +203,7 @@ function readSimulationView() {
     "src/components/simulation/regime-fixed-mix-comparison-panel.tsx",
     "src/components/simulation/regime-readiness-history-panel.tsx",
     "src/components/simulation/regime-scenario-card.tsx",
+    "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",

@@ -4,6 +4,7 @@ import {
   ResearchFanChart,
   resolveResearchFanChartValueDomain,
 } from "./research-fan-chart";
+import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 
 type ReadyComparison = Extract<
   FixedMixResearchComparisonResult,
@@ -117,24 +118,10 @@ function ReadyComparisonGrid({
                 ) : null}
               </header>
 
-              <dl className="grid grid-cols-2 border-b border-[#e1e5da] text-sm">
-                <Metric
-                  label="중앙 경로 수익률"
-                  value={formatSignedPct(execution.terminal.p50ReturnPct)}
-                />
-                <Metric
-                  label="손실 종료 확률"
-                  value={formatPct(execution.terminal.lossProbabilityPct)}
-                />
-                <Metric
-                  label="MDD 중앙값"
-                  value={formatPct(execution.terminal.maxDrawdownP50Pct)}
-                />
-                <Metric
-                  label="MDD P90"
-                  value={formatPct(execution.terminal.maxDrawdownP90Pct)}
-                />
-              </dl>
+              <SimulationTerminalRiskMetrics
+                compact
+                terminal={execution.terminal}
+              />
 
               <ResearchFanChart
                 execution={execution}
@@ -144,15 +131,6 @@ function ReadyComparisonGrid({
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-b border-r border-[#e1e5da] px-3 py-3 even:border-r-0">
-      <dt className="text-xs text-[#687064]">{label}</dt>
-      <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -177,12 +155,4 @@ function unavailableReasonLabel(
     summary_blocked: "경로는 계산했지만 분포·위험 요약 검증을 통과하지 못했습니다.",
   } as const;
   return labels[reason];
-}
-
-function formatPct(value: number) {
-  return `${value.toFixed(1)}%`;
-}
-
-function formatSignedPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

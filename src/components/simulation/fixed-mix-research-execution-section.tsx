@@ -5,6 +5,7 @@ import type { KodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-select
 import type { FixedMixResearchSimulationResult } from "@/lib/simulation-fixed-mix-research-execution";
 
 import { ResearchFanChart } from "./research-fan-chart";
+import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 
 type ReadyExecution = Extract<
   FixedMixResearchSimulationResult,
@@ -116,24 +117,7 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
         </span>
       </header>
 
-      <div className="grid grid-cols-2 border-b border-[#e1e5da] sm:grid-cols-4">
-        <Metric
-          label="중앙 경로 수익률"
-          value={formatSignedPct(execution.terminal.p50ReturnPct)}
-        />
-        <Metric
-          label="손실 종료 확률"
-          value={formatPct(execution.terminal.lossProbabilityPct)}
-        />
-        <Metric
-          label="MDD 중앙값"
-          value={formatPct(execution.terminal.maxDrawdownP50Pct)}
-        />
-        <Metric
-          label="MDD P90(더 큰 손실)"
-          value={formatPct(execution.terminal.maxDrawdownP90Pct)}
-        />
-      </div>
+      <SimulationTerminalRiskMetrics terminal={execution.terminal} />
 
       <ResearchFanChart execution={execution} />
 
@@ -149,15 +133,6 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
         </p>
       </div>
     </article>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-b border-r border-[#e1e5da] px-3 py-3 last:border-r-0 sm:border-b-0">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 font-semibold tabular-nums">{value}</p>
-    </div>
   );
 }
 
@@ -258,12 +233,4 @@ function formatBps(value: number) {
 
 function formatDate(value: string) {
   return value.replaceAll("-", ".");
-}
-
-function formatPct(value: number) {
-  return `${value.toFixed(1)}%`;
-}
-
-function formatSignedPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

@@ -2,6 +2,7 @@ import { createMulberry32 } from "./simulation-prng.ts";
 import { SIMULATION_REGIME_BOOTSTRAP_POLICY } from "./simulation-regime-bootstrap-policy.ts";
 import type { ReadySimulationRegimeFactorState } from "./simulation-regime-factor-state.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
+import { summarizeSimulationTerminalDownsideTail } from "./simulation-terminal-downside-tail.ts";
 
 export type SimulationRegimeScenarioInput = Readonly<{
   id: string;
@@ -193,6 +194,12 @@ function executeScenario(input: {
   const terminalValues = navPaths
     .map((path) => path.at(-1) as number)
     .sort((left, right) => left - right);
+  const terminalDownsideTail = summarizeSimulationTerminalDownsideTail({
+    terminalReturns: terminalValues.map((terminalNav) => terminalNav - 1),
+  });
+  if (terminalDownsideTail.summaryStatus !== "ready") {
+    return blockedScenario(input.scenario, "invalid_terminal_tail_summary");
+  }
   const drawdowns = navPaths
     .map(maxDrawdown)
     .sort((left, right) => left - right);
@@ -216,6 +223,9 @@ function executeScenario(input: {
       p50Index: type7Quantile(terminalValues, 0.5) * 100,
       p90Index: type7Quantile(terminalValues, 0.9) * 100,
       p50ReturnPct: (type7Quantile(terminalValues, 0.5) - 1) * 100,
+      p5ReturnPct: terminalDownsideTail.p5TerminalReturn * 100,
+      lowerTailMeanReturnPct:
+        terminalDownsideTail.lowerTailMeanTerminalReturn * 100,
       lossProbabilityPct:
         (terminalValues.filter((value) => value < 1).length /
           terminalValues.length) *
@@ -337,7 +347,8 @@ function blockedScenario(
   reason:
     | "invalid_scenario_weights"
     | "invalid_draw_source"
-    | "invalid_growth_path",
+    | "invalid_growth_path"
+    | "invalid_terminal_tail_summary",
 ) {
   return Object.freeze({
     status: "unavailable" as const,

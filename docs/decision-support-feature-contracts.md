@@ -309,9 +309,13 @@ The first Simulation Validation surface should eventually include:
   outcome, band hit/miss, coverage, median error, and weight stability.
 
 `Expected MDD` is not a sufficient metric name. The UI must state whether it is
-mean, median, p90, or another statistic over per-path maximum drawdown. CVaR or
-expected shortfall remains unavailable until its tail, sign, denominator, and
-aggregation semantics are separately fixed. Expected turnover and improvement
+mean, median, p90, or another statistic over per-path maximum drawdown. The v1
+terminal downside-tail summary reports both the Type 7 P5 terminal return and
+the signed mean of exactly the lowest 25 terminal returns from a complete
+500-path run. Boundary ties do not expand that fixed denominator. The UI names
+the latter `종료수익률 하위 5% 평균`; it does not present it as bare CVaR.
+Expected shortfall with any other horizon, loss variable, tail, or denominator
+remains unavailable. Expected turnover and improvement
 must appear only for an actual candidate strategy; they are not meaningful
 fallbacks for the current no-rebalance normalized buy-and-hold path.
 

@@ -75,6 +75,7 @@ import "./simulation-walk-forward-min-volatility.test.mjs";
 import "./simulation-walk-forward-stability-history.test.mjs";
 import "./simulation-regime-bootstrap.test.mjs";
 import "./simulation-terminal-loss-probability.test.mjs";
+import "./simulation-terminal-downside-tail.test.mjs";
 import "./simulation-path-max-drawdown.test.mjs";
 import "./simulation-path-max-drawdown-distribution-summary.test.mjs";
 import "./target-policy-evidence.test.mjs";
