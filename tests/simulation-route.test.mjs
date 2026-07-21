@@ -30,11 +30,14 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /buildFixedMixResearchSimulationFromContext/);
     assert.match(query, /buildFixedMixResearchComparisonFromContext/);
     assert.match(query, /buildSimulationWalkForwardMinimumVolatility/);
+    assert.match(query, /buildSimulationWalkForwardStabilityHistory/);
     assert.match(query, /resolveKodexVooFixedMixSelection/);
     assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
     assert.match(query, /walkForwardMinimumVolatility/);
+    assert.match(query, /walkForwardStabilityHistory/);
     assert.match(query, /candidates: INPUTS\.map\(candidate\)/);
-    assert.match(query, /\.\.\.independentRequests, comparisonRequest/);
+    assert.match(query, /comparisonDates = explicitEndServiceDate/);
+    assert.match(query, /\.\.\.independentRequests, \.\.\.comparisonRequests/);
     assert.doesNotMatch(query, /endServiceDate\?\.trim\(\)/);
     assert.match(selection, /typeof value !== "string"/);
     assert.match(selection, /minimumComponentWeightPct: 1/);
@@ -84,6 +87,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-walk-forward-fold-count/);
     assert.match(view, /data-walk-forward-fold/);
     assert.match(view, /data-simulation-path-comparison-chart/);
+    assert.match(view, /data-walk-forward-stability-history/);
+    assert.match(view, /data-walk-forward-stability-status/);
+    assert.match(view, /data-walk-forward-stability-ready-count/);
+    assert.match(view, /data-walk-forward-stability-row/);
+    assert.match(view, /data-walk-forward-stability-row-status/);
     assert.match(view, /data-regime-bootstrap-research/);
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
@@ -108,6 +116,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /다음 10개/);
     assert.match(view, /미래 예측·추천 아님/);
     assert.match(view, /표본 공분산은 10% 대각 축소/);
+    assert.match(view, /워크포워드 기준일 안정성/);
+    assert.match(view, /직전 6개 날짜/);
+    assert.match(view, /가장 좋은 날짜나 설정을 고르는 기능이 아닙니다/);
+    assert.match(view, /서로 독립된 7번의/);
+    assert.match(view, /성과 순위를 만들지 않습니다/);
     assert.match(view, /성과 순위·추천 아님/);
     assert.match(view, /3개월 연구 시뮬레이션/);
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
@@ -181,6 +194,7 @@ function readSimulationView() {
     "src/components/simulation/fixed-mix-research-execution-section.tsx",
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/walk-forward-min-volatility-section.tsx",
+    "src/components/simulation/walk-forward-stability-history-section.tsx",
     "src/components/simulation/simulation-path-comparison-chart.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",

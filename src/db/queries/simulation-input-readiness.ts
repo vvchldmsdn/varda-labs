@@ -15,6 +15,7 @@ import { buildFixedMixResearchComparisonFromContext } from "@/lib/simulation-fix
 import { buildFixedMixResearchSimulationFromContext } from "@/lib/simulation-fixed-mix-research-execution";
 import { prepareFixedMixResearchContext } from "@/lib/simulation-fixed-mix-research-context";
 import { buildSimulationWalkForwardMinimumVolatility } from "@/lib/simulation-walk-forward-min-volatility";
+import { buildSimulationWalkForwardStabilityHistory } from "@/lib/simulation-walk-forward-stability-history";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const KODEX_200 = Object.freeze({
@@ -52,6 +53,10 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     defaultEndServiceDate: resolveSnapshotCycle(now).snapshotDate,
   });
   const requestedEndServiceDate = selection.endServiceDate;
+  const explicitEndServiceDate =
+    selection.status === "valid" && selection.source === "query"
+      ? selection.endServiceDate
+      : null;
   const historyDates = buildSimulationInputReadinessDates(
     requestedEndServiceDate,
   );
@@ -64,13 +69,16 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       returnStepCount,
     })),
   );
-  const comparisonRequest = {
+  const comparisonDates = explicitEndServiceDate
+    ? dates
+    : [requestedEndServiceDate];
+  const comparisonRequests = comparisonDates.map((endServiceDate) => ({
     candidates: INPUTS.map(candidate),
-    endServiceDate: requestedEndServiceDate,
+    endServiceDate,
     returnStepCount,
-  };
+  }));
   const preflights = await getReadOnlySimulationPeriodPreflightBatch(
-    [...independentRequests, comparisonRequest],
+    [...independentRequests, ...comparisonRequests],
   );
   const generatedAt = now.toISOString();
   const models = dates.map((endServiceDate, dateIndex) =>
@@ -88,7 +96,8 @@ export async function getReadOnlySimulationInputReadiness(options?: {
   if (!selected) {
     throw new Error("Simulation input readiness projection is empty");
   }
-  const comparisonPreflight = preflights[independentRequests.length];
+  const comparisonPreflights = preflights.slice(independentRequests.length);
+  const comparisonPreflight = comparisonPreflights[0];
   if (!comparisonPreflight) {
     throw new Error("Simulation comparison preflight is empty");
   }
@@ -100,10 +109,6 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       preflight: comparisonPreflight,
     })),
   });
-  const explicitEndServiceDate =
-    selection.status === "valid" && selection.source === "query"
-      ? selection.endServiceDate
-      : null;
   const fixedMixSelection = resolveKodexVooFixedMixSelection(
     options?.kodexWeight,
   );
@@ -131,6 +136,16 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       explicitEndServiceDate,
       matrix: comparisonPreflight.matrixArtifact,
     });
+  const walkForwardStabilityHistory =
+    buildSimulationWalkForwardStabilityHistory({
+      explicitEndServiceDate,
+      endpoints: explicitEndServiceDate
+        ? comparisonDates.map((serviceDate, index) => ({
+            serviceDate,
+            matrix: comparisonPreflights[index]?.matrixArtifact ?? null,
+          }))
+        : [],
+    });
 
   return buildSimulationInputReadinessPageModel({
     selection,
@@ -141,6 +156,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     fixedMixResearchExecution,
     fixedMixResearchComparison,
     walkForwardMinimumVolatility,
+    walkForwardStabilityHistory,
     fixedMixSelection,
   });
 }

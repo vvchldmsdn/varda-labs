@@ -3,6 +3,7 @@ import type { FixedResearchSimulationResult } from "./simulation-fixed-research-
 import type { FixedMixResearchComparisonResult } from "./simulation-fixed-mix-research-comparison.ts";
 import type { FixedMixResearchSimulationResult } from "./simulation-fixed-mix-research-execution.ts";
 import type { SimulationWalkForwardMinimumVolatilityResult } from "./simulation-walk-forward-min-volatility.ts";
+import type { SimulationWalkForwardStabilityHistoryResult } from "./simulation-walk-forward-stability-history.ts";
 import {
   resolveKodexVooFixedMixSelection,
   type KodexVooFixedMixSelection,
@@ -149,6 +150,7 @@ export function buildSimulationInputReadinessPageModel(input: {
   fixedMixResearchExecution?: FixedMixResearchSimulationResult;
   fixedMixResearchComparison?: FixedMixResearchComparisonResult;
   walkForwardMinimumVolatility?: SimulationWalkForwardMinimumVolatilityResult;
+  walkForwardStabilityHistory?: SimulationWalkForwardStabilityHistoryResult;
   fixedMixSelection?: KodexVooFixedMixSelection;
 }) {
   const observedReturnComparison = buildSimulationObservedReturnComparison(
@@ -200,6 +202,7 @@ export function buildSimulationInputReadinessPageModel(input: {
     fixedMixResearchComparison: input.fixedMixResearchComparison ?? null,
     walkForwardMinimumVolatility:
       input.walkForwardMinimumVolatility ?? null,
+    walkForwardStabilityHistory: input.walkForwardStabilityHistory ?? null,
     fixedMixSelection:
       input.fixedMixSelection ?? resolveKodexVooFixedMixSelection(undefined),
   });

@@ -14,6 +14,7 @@ import {
   resolveSharedObservedReturnScale,
 } from "./observed-return-series-panel";
 import { WalkForwardMinimumVolatilitySection } from "./walk-forward-min-volatility-section";
+import { WalkForwardStabilityHistorySection } from "./walk-forward-stability-history-section";
 
 type InputReadiness = SimulationInputReadinessPageModel["inputs"][number];
 type HistoryRow = SimulationInputReadinessPageModel["history"][number];
@@ -146,6 +147,9 @@ export function SimulationInputReadinessView({
         />
         <WalkForwardMinimumVolatilitySection
           result={model.walkForwardMinimumVolatility}
+        />
+        <WalkForwardStabilityHistorySection
+          result={model.walkForwardStabilityHistory}
         />
         {regimeBootstrap}
 
