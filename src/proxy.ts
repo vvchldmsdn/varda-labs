@@ -1,12 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { PREVIEW_AUTH_CALLBACK_PATH } from "@/lib/auth/preview-auth-policy";
+import { handlePreviewAuthProxy } from "@/lib/auth/preview-auth-proxy";
+
 const DASHBOARD_PASSWORD_ENV_KEYS = [
   "VARDA_APP_PASSWORD",
   "APP_ACCESS_PASSWORD",
 ] as const;
 const DASHBOARD_USER_ENV_KEY = "VARDA_APP_USER";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === PREVIEW_AUTH_CALLBACK_PATH) {
+    return handlePreviewAuthProxy(request);
+  }
+
+  return enforceDashboardBasicAuth(request);
+}
+
+function enforceDashboardBasicAuth(request: NextRequest) {
   const password = firstConfiguredEnv(DASHBOARD_PASSWORD_ENV_KEYS);
 
   if (!password) {
@@ -40,6 +51,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
+    "/auth/session",
     "/admin/:path*",
     "/portfolio/:path*",
     "/etfs",

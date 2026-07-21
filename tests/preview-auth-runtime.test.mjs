@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   assessPreviewAuthEnvironment,
   PREVIEW_AUTH_ALLOWED_GIT_REF,
+  PREVIEW_AUTH_CALLBACK_PATH,
   PREVIEW_AUTH_SESSION_CACHE_SECONDS,
 } from "../src/lib/auth/preview-auth-policy.ts";
 import { auditPreviewAuthRuntime } from "../scripts/lib/preview-auth-runtime-audit.mjs";
@@ -57,6 +58,7 @@ describe("preview auth session transport smoke", () => {
       { state: "ready" },
     );
     assert.equal(PREVIEW_AUTH_SESSION_CACHE_SECONDS, 60);
+    assert.equal(PREVIEW_AUTH_CALLBACK_PATH, "/auth/session");
   });
 
   it("keeps the smoke runtime outside product data and production auth", () => {
@@ -65,14 +67,16 @@ describe("preview auth session transport smoke", () => {
     assert.equal(result.status, "passed");
     assert.deepEqual(result.findings, []);
     assert.deepEqual(result.evidence, {
-      requiredFiles: 6,
-      presentFiles: 6,
-      inspectedRuntimeGraphFiles: 6,
+      requiredFiles: 8,
+      presentFiles: 8,
+      inspectedRuntimeGraphFiles: 8,
       productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       previewAuthSdkPinned: true,
       previewGitRefGatePresent: true,
       basicAuthBoundaryIntact: true,
+      oauthCallbackExchangeProxyPresent: true,
+      previewAuthRouteBypassesBasicAuth: true,
       managedAuthSchemaOwnedByDrizzle: false,
       managedAuthSessionIoExpected: true,
     });
