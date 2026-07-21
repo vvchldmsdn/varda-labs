@@ -18,6 +18,7 @@ import "./investment-lab-anchor-basket.test.mjs";
 import "./investment-lab-anchor-value-weight.test.mjs";
 import "./investment-lab-scenario-matrix.test.mjs";
 import "./investment-lab-scenario-chart.test.mjs";
+import "./investment-lab-preperiod-min-volatility.test.mjs";
 import "./investment-lab-return-evidence.test.mjs";
 import "./investment-lab-voo-readiness.test.mjs";
 import "./investment-lab-voo-path.test.mjs";

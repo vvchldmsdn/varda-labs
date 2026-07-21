@@ -25,11 +25,13 @@ import {
   composeInvestmentLabMainCoverage,
   composeInvestmentLabMainModel,
   composeInvestmentLabObservedPath,
+  composeInvestmentLabPreperiodMinVolatility,
   composeInvestmentLabVoo,
   unavailableInvestmentLabCash,
   unavailableInvestmentLabFixedMix,
   unavailableInvestmentLabVoo,
 } from "./investment-lab-account-composition-paths.ts";
+import { markInvestmentLabPreperiodMinVolatilityPathUnavailable } from "./investment-lab-preperiod-min-volatility.ts";
 import { composeInvestmentLabMainReturnEstimate } from "./investment-lab-account-composition-return-models.ts";
 import { summarizeInvestmentLabCompositionRows } from "./investment-lab-account-composition-contract.ts";
 
@@ -93,6 +95,12 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     input.namedModels,
     actualReturn,
   );
+  const preperiodMinVolatility =
+    composeInvestmentLabPreperiodMinVolatility(
+      input.pooledModel,
+      input.namedModels,
+      actualReturn,
+    );
   const anchor = composeInvestmentLabAnchor({
     pooledAnchor: input.pooledAnchor,
     namedAnchors: input.namedAnchors,
@@ -108,6 +116,7 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     voo: resolution(voo),
     zero_return: resolution(cash),
     fixed_mix: resolution(fixedMix),
+    preperiod_min_volatility: resolution(preperiodMinVolatility),
     anchor_basket: resolution(anchor),
     anchor_value_weight: resolution(anchorValueWeight),
   });
@@ -190,6 +199,18 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
                 fixedMix.blockers,
               ),
       fixedMixComparison,
+      preperiodMinVolatility:
+        preperiodMinVolatility.status === "ready"
+          ? preperiodMinVolatility.value
+          : markInvestmentLabPreperiodMinVolatilityPathUnavailable(
+              input.pooledModel.preperiodMinVolatility,
+              hasCompositionBlocker(
+                preperiodMinVolatility.blockers,
+                "named_account_scenario_unavailable",
+              )
+                ? "account_composition_incomplete"
+                : "account_composition_mismatch",
+            ),
       contributionExperimentScenarios:
         voo.status === "ready"
           ? input.pooledModel.contributionExperimentScenarios
@@ -239,6 +260,7 @@ function scenarioRecord(
     "voo",
     "zero_return",
     "fixed_mix",
+    "preperiod_min_volatility",
     "anchor_basket",
     "anchor_value_weight",
   ];
@@ -262,4 +284,11 @@ function resolution<T>(
     status: input.status,
     blockers: Object.freeze([...input.blockers]),
   });
+}
+
+function hasCompositionBlocker(
+  blockers: readonly string[],
+  blocker: string,
+) {
+  return blockers.some((value) => value === blocker);
 }

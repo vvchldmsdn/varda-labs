@@ -21,6 +21,7 @@ describe("investment lab multi-scenario chart", () => {
         "kodex200",
         "voo",
         "fixed_mix",
+        "preperiod_min_volatility",
         "anchor_basket",
         "anchor_value_weight",
       ],
@@ -38,6 +39,11 @@ describe("investment lab multi-scenario chart", () => {
       status: "unavailable",
       weights: { kodexWeightBps: 5000, vooWeightBps: 5000 },
       rows: [],
+    };
+    model.preperiodMinVolatility = {
+      status: "path_unavailable",
+      weights: { kodexWeightBps: 4500, vooWeightBps: 5500 },
+      scenario: { status: "unavailable", rows: [] },
     };
 
     const chart = buildInvestmentLabScenarioChart({
@@ -57,7 +63,11 @@ describe("investment lab multi-scenario chart", () => {
         "anchor_value_weight",
       ],
     );
-    assert.deepEqual(chart.unavailableScenarioIds, ["kodex200", "fixed_mix"]);
+    assert.deepEqual(chart.unavailableScenarioIds, [
+      "kodex200",
+      "fixed_mix",
+      "preperiod_min_volatility",
+    ]);
   });
 
   it("does not trim or interpolate a scenario with a mismatched axis", () => {
@@ -150,6 +160,14 @@ function readyModel() {
       status: "ready",
       weights: { kodexWeightBps: 5000, vooWeightBps: 5000 },
       rows: scenarioRows(dates, actual, [1000, 1088, 1175]),
+    },
+    preperiodMinVolatility: {
+      status: "ready",
+      weights: { kodexWeightBps: 4500, vooWeightBps: 5500 },
+      scenario: {
+        status: "ready",
+        rows: scenarioRows(dates, actual, [1000, 1080, 1160]),
+      },
     },
   };
 }

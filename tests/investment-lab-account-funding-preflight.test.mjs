@@ -26,8 +26,8 @@ describe("investment lab account-local funding preflight", () => {
     assert.equal(result.accountRows[0].scenarios.fixed_mix.status, "not_requested");
     assert.deepEqual(result.coverage, {
       accountCount: 1,
-      requestedScenarioCells: 6,
-      readyScenarioCells: 6,
+      requestedScenarioCells: 7,
+      readyScenarioCells: 7,
       unavailableScenarioCells: 0,
       notRequestedScenarioCells: 1,
     });
@@ -179,6 +179,9 @@ function readyModel({
       fixedMix === null
         ? null
         : { status: fixedMix ? "ready" : "unavailable" },
+    preperiodMinVolatility: {
+      status: kodex ? "ready" : "path_unavailable",
+    },
   };
 }
 
@@ -203,6 +206,7 @@ function composition(overrides = {}) {
         "kodex200",
         "voo",
         "fixed_mix",
+        "preperiod_min_volatility",
         "anchor_basket",
         "anchor_value_weight",
       ].map(

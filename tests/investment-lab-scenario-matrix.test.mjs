@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { buildInvestmentLabScenarioMatrix } from "../src/lib/investment-lab-scenario-matrix.ts";
 
 describe("investment lab scenario comparison matrix", () => {
-  it("projects seven existing scenarios in a fixed neutral order", () => {
+  it("projects eight existing scenarios in a fixed neutral order", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model: readyModel(),
       anchorBasketScenario: readyAnchor(),
@@ -21,11 +21,12 @@ describe("investment lab scenario comparison matrix", () => {
         "kodex200",
         "voo",
         "fixed_mix",
+        "preperiod_min_volatility",
         "anchor_basket",
         "anchor_value_weight",
       ],
     );
-    assert.equal(matrix.coverage.readyRowCount, 7);
+    assert.equal(matrix.coverage.readyRowCount, 8);
     assert.equal(matrix.coverage.unavailableRowCount, 0);
     const rowsById = Object.fromEntries(
       matrix.rows.map((row) => [row.id, row]),
@@ -106,7 +107,7 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(row.endValueKrw, null);
     assert.equal(row.flowCount, null);
     assert.ok(row.reasonCodes.includes("tickerless_anchor_holding"));
-    assert.equal(matrix.coverage.readyRowCount, 6);
+    assert.equal(matrix.coverage.readyRowCount, 7);
   });
 
   it("fails only a source row whose period differs from the common period", () => {
@@ -126,7 +127,7 @@ describe("investment lab scenario comparison matrix", () => {
 
     assert.equal(row?.status, "unavailable");
     assert.deepEqual(row?.reasonCodes, ["period_mismatch"]);
-    assert.equal(matrix.coverage.readyRowCount, 6);
+    assert.equal(matrix.coverage.readyRowCount, 7);
     assert.equal(matrix.rows[1].status, "ready");
   });
 
@@ -178,7 +179,7 @@ describe("investment lab scenario comparison matrix", () => {
 
     assert.equal(matrix.status, "unavailable");
     assert.equal(matrix.coverage.readyRowCount, 0);
-    assert.equal(matrix.coverage.unavailableRowCount, 7);
+    assert.equal(matrix.coverage.unavailableRowCount, 8);
     assert.ok(matrix.rows.every((row) => row.endValueKrw === null));
   });
 
@@ -192,6 +193,12 @@ describe("investment lab scenario comparison matrix", () => {
     model.fixedMixScenario = {
       status: "unavailable",
       summary: null,
+      blockers: ["component_path_unavailable"],
+    };
+    model.preperiodMinVolatility = {
+      ...model.preperiodMinVolatility,
+      status: "path_unavailable",
+      scenario: { status: "unavailable", summary: null },
       blockers: ["component_path_unavailable"],
     };
 
@@ -210,6 +217,7 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(rows.anchor_value_weight.status, "ready");
     assert.equal(rows.kodex200.status, "unavailable");
     assert.equal(rows.fixed_mix.status, "unavailable");
+    assert.equal(rows.preperiod_min_volatility.status, "unavailable");
   });
 
   it("stays pure and server-rendered without authority or I/O", () => {
@@ -320,6 +328,24 @@ function readyModel() {
         pendingComparisonRows: 1,
       },
       blockers: [],
+    },
+    preperiodMinVolatility: {
+      status: "ready",
+      weights: { kodexWeightBps: 4500, vooWeightBps: 5500 },
+      blockers: [],
+      scenario: {
+        status: "ready",
+        summary: scenarioSummary(1_140, 140),
+        returnEstimate: {
+          method: { version: "modified_dietz_daily_weighted_eod_v1" },
+          scenarioReturn: 0.16,
+          scenarioRiskMetrics: risk(0.085, 0.185),
+        },
+        coverage: {
+          componentFlowSourceCount: 2,
+          pendingComparisonRows: 1,
+        },
+      },
     },
     cashComparison: {
       status: "ready",

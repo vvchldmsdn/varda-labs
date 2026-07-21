@@ -10,6 +10,7 @@ const SCENARIOS = Object.freeze([
   ["kodex200", "KODEX 200"],
   ["voo", "VOO"],
   ["fixed_mix", "고정 혼합"],
+  ["preperiod_min_volatility", "기간 전 최소변동성"],
   ["anchor_basket", "기준 바스켓"],
   ["anchor_value_weight", "기준일 비중"],
 ] as const satisfies readonly (readonly [

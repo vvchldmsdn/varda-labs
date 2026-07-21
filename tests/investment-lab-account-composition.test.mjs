@@ -17,7 +17,7 @@ import {
 import { NAMED_PORTFOLIO_ACCOUNTS } from "../src/lib/portfolio-account-scope.ts";
 
 describe("investment lab named-account composition", () => {
-  it("derives all seven all-account paths from complete named-account paths", () => {
+  it("derives all eight all-account paths from complete named-account paths", () => {
     const fixture = buildFixture();
     const result = compose(fixture);
 
@@ -35,6 +35,7 @@ describe("investment lab named-account composition", () => {
         voo: "ready",
         zero_return: "ready",
         fixed_mix: "ready",
+        preperiod_min_volatility: "ready",
         anchor_basket: "ready",
         anchor_value_weight: "ready",
       },
@@ -54,6 +55,17 @@ describe("investment lab named-account composition", () => {
       ),
     );
     assert.equal(result.model.fixedMixComparison.status, "ready");
+    assert.equal(result.model.preperiodMinVolatility.status, "ready");
+    assert.equal(
+      result.model.preperiodMinVolatility.scenario.rows.at(-1)
+        .scenarioMarketValueKrw,
+      sumNamed(
+        fixture.namedModels,
+        (model) =>
+          model.preperiodMinVolatility.scenario.rows.at(-1)
+            .scenarioMarketValueKrw,
+      ),
+    );
     assert.equal(result.model.fixedMixComparison.scenarios.length, 3);
     for (let index = 0; index < 3; index += 1) {
       assert.equal(
@@ -408,6 +420,7 @@ function anchorValueWeightScenario(
 }
 
 function sourceFixture() {
+  const preperiod = preperiodEvidence();
   return {
     snapshotRows: [
       ...snapshotDate("2026-01-02", [500, 300, 150]),
@@ -421,21 +434,50 @@ function sourceFixture() {
       event("irp", "2026-01-06", 2, "buy", 25),
     ],
     closeRows: [
+      ...preperiod.kodex,
       price("2026-01-01", 100, 100),
       price("2026-01-05", 110, 110),
       price("2026-01-06", 121, 121),
     ],
     vooCloseRows: [
+      ...preperiod.voo,
       price("2025-12-31", 100, 101),
       price("2026-01-02", 101, 102),
       price("2026-01-05", 102, 103),
       price("2026-01-06", 103, 104),
     ],
     fxRows: [
+      ...preperiod.fx,
       { rateDate: "2026-01-05", usdKrw: 1300, source: "fixture", status: "ok" },
       { rateDate: "2026-01-06", usdKrw: 1301, source: "fixture", status: "ok" },
     ],
   };
+}
+
+function preperiodEvidence() {
+  const dates = Array.from({ length: 61 }, (_, index) =>
+    addDays("2025-10-01", index),
+  );
+  return {
+    kodex: dates.map((date, index) =>
+      price(date, 100 + index * 0.5, 100 + index * 0.5),
+    ),
+    voo: dates.map((date, index) =>
+      price(date, 50 + index * 0.3, 50 + index * 0.3),
+    ),
+    fx: dates.map((rateDate, index) => ({
+      rateDate,
+      usdKrw: 1_280 + index * 0.2,
+      source: "fixture",
+      status: "ok",
+    })),
+  };
+}
+
+function addDays(value, days) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function snapshotDate(snapshotDate, values) {

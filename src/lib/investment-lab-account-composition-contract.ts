@@ -27,6 +27,7 @@ export type InvestmentLabAccountCompositionScenarioId =
   | "voo"
   | "zero_return"
   | "fixed_mix"
+  | "preperiod_min_volatility"
   | "anchor_basket"
   | "anchor_value_weight";
 

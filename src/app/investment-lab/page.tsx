@@ -12,6 +12,7 @@ import {
 } from "@/components/investment-lab/investment-lab-etf-xray";
 import { InvestmentLabFixedMix } from "@/components/investment-lab/investment-lab-fixed-mix";
 import { InvestmentLabAnchorBasket } from "@/components/investment-lab/investment-lab-anchor-basket";
+import { InvestmentLabPreperiodMinVolatilityView } from "@/components/investment-lab/investment-lab-preperiod-min-volatility";
 import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
 import {
   InvestmentLabSmallAdjustment,
@@ -157,6 +158,9 @@ async function InvestmentLabContent({
         model={model.fixedMixScenario}
         period={period}
         selection={fixedMixSelection}
+      />
+      <InvestmentLabPreperiodMinVolatilityView
+        model={model.preperiodMinVolatility}
       />
       <InvestmentLabAnchorBasket
         account={selectedAccount}

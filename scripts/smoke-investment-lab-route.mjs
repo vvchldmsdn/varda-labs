@@ -125,7 +125,7 @@ async function main() {
   assert.equal(fundingRequestedCells, fundingReadyCells + fundingUnavailableCells);
   assert.equal(
     fundingRequestedCells + fundingNotRequestedCells,
-    fundingAccountRows * 7,
+    fundingAccountRows * 8,
   );
   assert.equal(
     readStringAttribute(route.body, "data-cross-account-funding"),
@@ -406,6 +406,52 @@ async function main() {
     (periodStatus === "full" ||
       periodStatus === "current_writer" ||
       periodStatus === "selected");
+  assert.match(
+    route.body,
+    /data-section="investment-lab-preperiod-min-volatility"/,
+  );
+  const preperiodMinVolatilityStatus = readStringAttribute(
+    route.body,
+    "data-preperiod-min-volatility-status",
+  );
+  const preperiodMinVolatilityTrainingReturnObservations =
+    readIntegerAttribute(
+      route.body,
+      "data-preperiod-min-volatility-training-return-observations",
+    );
+  const preperiodMinVolatilityCandidateCommonPriceDates =
+    readIntegerAttribute(
+      route.body,
+      "data-preperiod-min-volatility-candidate-common-price-dates",
+    );
+  const preperiodMinVolatilityKodexWeightBps = readIntegerAttribute(
+    route.body,
+    "data-preperiod-min-volatility-kodex-weight-bps",
+  );
+  const preperiodMinVolatilityVooWeightBps = readIntegerAttribute(
+    route.body,
+    "data-preperiod-min-volatility-voo-weight-bps",
+  );
+  assert.ok(
+    preperiodMinVolatilityStatus === "ready" ||
+      preperiodMinVolatilityStatus === "path_unavailable" ||
+      preperiodMinVolatilityStatus === "training_unavailable",
+  );
+  if (preperiodMinVolatilityStatus === "training_unavailable") {
+    assert.equal(preperiodMinVolatilityTrainingReturnObservations, 0);
+    assert.equal(preperiodMinVolatilityKodexWeightBps, 0);
+    assert.equal(preperiodMinVolatilityVooWeightBps, 0);
+  } else {
+    assert.equal(preperiodMinVolatilityTrainingReturnObservations, 60);
+    assert.ok(preperiodMinVolatilityCandidateCommonPriceDates >= 61);
+    assert.ok(preperiodMinVolatilityKodexWeightBps >= 1);
+    assert.ok(preperiodMinVolatilityVooWeightBps >= 1);
+    assert.equal(
+      preperiodMinVolatilityKodexWeightBps +
+        preperiodMinVolatilityVooWeightBps,
+      10_000,
+    );
+  }
   let scenarioMatrixStatus = "not_rendered";
   let scenarioMatrixRows = 0;
   let scenarioMatrixReadyRows = 0;
@@ -441,8 +487,8 @@ async function main() {
     assert.ok(
       scenarioChartStatus === "ready" || scenarioChartStatus === "partial",
     );
-    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 7);
-    assert.equal(scenarioChartLines + scenarioChartUnavailable, 7);
+    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 8);
+    assert.equal(scenarioChartLines + scenarioChartUnavailable, 8);
     assert.equal(
       scenarioChartStatus,
       scenarioChartUnavailable ? "partial" : "ready",
@@ -468,7 +514,7 @@ async function main() {
       "data-scenario-matrix-unavailable-rows",
     );
     assert.equal(scenarioMatrixStatus, "ready");
-    assert.equal(scenarioMatrixRows, 7);
+    assert.equal(scenarioMatrixRows, 8);
     assert.equal(
       scenarioMatrixReadyRows + scenarioMatrixUnavailableRows,
       scenarioMatrixRows,
@@ -478,6 +524,7 @@ async function main() {
       "kodex200",
       "voo",
       "fixed_mix",
+      "preperiod_min_volatility",
       "zero_return",
       "anchor_basket",
       "anchor_value_weight",
@@ -915,6 +962,11 @@ async function main() {
           anchorSpecialHoldingEligible,
           anchorSpecialHoldingSeparateModel,
           anchorSpecialHoldingUnsupported,
+          preperiodMinVolatilityStatus,
+          preperiodMinVolatilityTrainingReturnObservations,
+          preperiodMinVolatilityCandidateCommonPriceDates,
+          preperiodMinVolatilityKodexWeightBps,
+          preperiodMinVolatilityVooWeightBps,
           scenarioMatrixStatus,
           scenarioMatrixRows,
           scenarioMatrixReadyRows,
@@ -1109,6 +1161,7 @@ async function main() {
     (vooComparisonStatus === "ready" ? 1 : 0) +
     (fixedMixStatus === "ready" ? 1 : 0) +
     (cashComparisonStatus === "ready" ? 1 : 0) +
+    (preperiodMinVolatilityStatus === "ready" ? 1 : 0) +
     (anchorBasketStatus === "ready" ? 1 : 0) +
     (anchorValueWeightStatus === "ready" ? 1 : 0);
   assert.equal(scenarioMatrixReadyRows, expectedScenarioMatrixReadyRows);
@@ -1217,6 +1270,11 @@ async function main() {
         anchorSpecialHoldingEligible,
         anchorSpecialHoldingSeparateModel,
         anchorSpecialHoldingUnsupported,
+        preperiodMinVolatilityStatus,
+        preperiodMinVolatilityTrainingReturnObservations,
+        preperiodMinVolatilityCandidateCommonPriceDates,
+        preperiodMinVolatilityKodexWeightBps,
+        preperiodMinVolatilityVooWeightBps,
         scenarioMatrixStatus,
         scenarioMatrixRows,
         scenarioMatrixReadyRows,

@@ -79,6 +79,7 @@ const SCENARIO_IDS = Object.freeze([
   "kodex200",
   "voo",
   "fixed_mix",
+  "preperiod_min_volatility",
   "anchor_basket",
   "anchor_value_weight",
 ] as const satisfies readonly InvestmentLabAccountCompositionScenarioId[]);
@@ -150,6 +151,10 @@ function accountRow(
       case "fixed_mix":
         if (model.fixedMixScenario === null) return notRequestedResolution();
         return model.fixedMixScenario.status === "ready"
+          ? readyResolution()
+          : unavailableResolution("upstream_scenario_unavailable");
+      case "preperiod_min_volatility":
+        return model.preperiodMinVolatility.status === "ready"
           ? readyResolution()
           : unavailableResolution("upstream_scenario_unavailable");
       case "anchor_basket":

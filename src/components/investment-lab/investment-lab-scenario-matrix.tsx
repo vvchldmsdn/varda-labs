@@ -199,6 +199,7 @@ function scenarioLabel(
     kodex200: "전액 KODEX 200 연구 경로",
     voo: "전액 VOO 연구 경로",
     fixed_mix: fixedMixLabel(model),
+    preperiod_min_volatility: preperiodMinVolatilityLabel(model),
     zero_return: "제로수익 동일흐름 현금 기준선",
     anchor_basket: "기준일 바스켓",
     anchor_value_weight: "기준일 비중 유지",
@@ -213,12 +214,23 @@ function fixedMixLabel(model: InvestmentLabCounterfactualReadModel) {
     : "고정혼합 KODEX · VOO";
 }
 
+function preperiodMinVolatilityLabel(
+  model: InvestmentLabCounterfactualReadModel,
+) {
+  const weights = model.preperiodMinVolatility.weights;
+  return weights
+    ? `기간 전 최소변동성 KODEX ${weights.kodexWeightBps / 100}% · VOO ${weights.vooWeightBps / 100}%`
+    : "기간 전 최소변동성 KODEX · VOO";
+}
+
 function scenarioDetail(id: InvestmentLabScenarioMatrixId) {
   const details: Record<InvestmentLabScenarioMatrixId, string> = {
     actual: "저장 포지션 평가액",
     kodex200: "동일 외부 흐름 · 주문 가능성 미검증",
     voo: "동일 원화 외부 흐름 · 계정 매수 가능성 미검증",
     fixed_mix: "초기·외부 흐름 고정 배분",
+    preperiod_min_volatility:
+      "기간 전 60개 공동 수익률로 1회 산정 · 리밸런싱 없음",
     zero_return: "외부 흐름만 반영한 수익률 0% 가상 장부",
     anchor_basket: "초기 동일비중·이후 흐름 균등배분",
     anchor_value_weight:
@@ -270,6 +282,9 @@ function reasonLabel(reasonCodes: readonly string[]) {
   }
   if (reasonCodes.includes("base_period_unavailable")) {
     return "기본 비교 구간 계산 불가";
+  }
+  if (reasonCodes.includes("insufficient_common_preperiod_rows")) {
+    return "기간 시작 전 공동 관측 60개 미만";
   }
   return "필요한 계산 근거가 완전하지 않음";
 }

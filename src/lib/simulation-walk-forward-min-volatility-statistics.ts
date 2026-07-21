@@ -1,5 +1,6 @@
 import { SIMULATION_WALK_FORWARD_MIN_VOLATILITY_POLICY } from "./simulation-walk-forward-min-volatility-policy.ts";
 import type { SimulationReturnMatrixRow } from "./simulation-return-matrix-types.ts";
+import { estimateTwoAssetMinimumVariance } from "./two-asset-minimum-variance.ts";
 
 export type WalkForwardEstimatedWeights = Readonly<{
   kodexWeightBps: number;
@@ -21,60 +22,19 @@ export function estimateWalkForwardMinimumVolatilityWeights(
     return null;
   }
 
-  const kodex = kodexReturns as number[];
-  const voo = vooReturns as number[];
-  const kodexMean = neumaierSum(kodex) / kodex.length;
-  const vooMean = neumaierSum(voo) / voo.length;
-  const denominator = kodex.length - 1;
-  const kodexVariance = Math.max(
-    policy.varianceFloor,
-    neumaierSum(kodex.map((value) => (value - kodexMean) ** 2)) /
-      denominator,
-  );
-  const vooVariance = Math.max(
-    policy.varianceFloor,
-    neumaierSum(voo.map((value) => (value - vooMean) ** 2)) / denominator,
-  );
-  const rawCovariance =
-    neumaierSum(
-      kodex.map(
-        (value, index) =>
-          (value - kodexMean) * ((voo[index] ?? vooMean) - vooMean),
-      ),
-    ) / denominator;
-  const covarianceLimit = Math.sqrt(kodexVariance * vooVariance);
-  const boundedCovariance = Math.max(
-    -covarianceLimit,
-    Math.min(covarianceLimit, rawCovariance),
-  );
-  const shrunkCovariance =
-    boundedCovariance * (1 - policy.covarianceShrinkage);
-  const weightDenominator =
-    kodexVariance + vooVariance - 2 * shrunkCovariance;
-  const continuousKodexWeight =
-    weightDenominator > Number.EPSILON
-      ? (vooVariance - shrunkCovariance) / weightDenominator
-      : 0.5;
-  const kodexWeightBps = Math.round(
-    Math.max(0, Math.min(1, continuousKodexWeight)) * 10_000,
-  );
-  const vooWeightBps = 10_000 - kodexWeightBps;
-  const kodexWeight = kodexWeightBps / 10_000;
-  const vooWeight = vooWeightBps / 10_000;
-  const estimatedVariance = Math.max(
-    0,
-    kodexWeight ** 2 * kodexVariance +
-      vooWeight ** 2 * vooVariance +
-      2 * kodexWeight * vooWeight * shrunkCovariance,
-  );
-  const estimatedAnnualizedVolatilityPct =
-    Math.sqrt(estimatedVariance) * Math.sqrt(policy.annualizationFactor) * 100;
-
-  if (!Number.isFinite(estimatedAnnualizedVolatilityPct)) return null;
+  const estimate = estimateTwoAssetMinimumVariance({
+    leftReturns: kodexReturns as number[],
+    rightReturns: vooReturns as number[],
+    covarianceShrinkage: policy.covarianceShrinkage,
+    varianceFloor: policy.varianceFloor,
+    annualizationFactor: policy.annualizationFactor,
+  });
+  if (!estimate) return null;
   return Object.freeze({
-    kodexWeightBps,
-    vooWeightBps,
-    estimatedAnnualizedVolatilityPct,
+    kodexWeightBps: estimate.leftWeightBps,
+    vooWeightBps: estimate.rightWeightBps,
+    estimatedAnnualizedVolatilityPct:
+      estimate.estimatedAnnualizedVolatilityPct,
   });
 }
 

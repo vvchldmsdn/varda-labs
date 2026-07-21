@@ -94,6 +94,11 @@ export async function loadInvestmentLabCounterfactualReadModel(
     vooCloseRows,
     fxRows,
   });
+  const preperiodEvidence = Object.freeze({
+    closeRows,
+    vooCloseRows,
+    fxRows,
+  });
   const availableServiceDates = listInvestmentLabCompleteSnapshotDates(
     snapshotRows,
     account,
@@ -135,6 +140,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
       account,
       fixedMixSelection,
       fountScopeAdjustmentStatus: fountScope.scope.status,
+      preperiodEvidence,
     },
   );
   const cachedAnchorRepository = cacheAnchorRepository(repository);
@@ -156,6 +162,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
               namedAccount === "irp"
                 ? fountScope.scope.status
                 : "not_applicable",
+            preperiodEvidence,
           }),
         ]),
       ) as Record<NamedPortfolioAccount, InvestmentLabCounterfactualReadModel>,

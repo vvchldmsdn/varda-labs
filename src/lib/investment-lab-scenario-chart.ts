@@ -44,6 +44,7 @@ const SCENARIOS = Object.freeze([
   "kodex200",
   "voo",
   "fixed_mix",
+  "preperiod_min_volatility",
   "anchor_basket",
   "anchor_value_weight",
 ] as const satisfies readonly InvestmentLabScenarioMatrixId[]);
@@ -54,6 +55,7 @@ const COLORS: Readonly<Record<InvestmentLabScenarioMatrixId, string>> = {
   kodex200: "#d75645",
   voo: "#2369a8",
   fixed_mix: "#8b5a9e",
+  preperiod_min_volatility: "#a34f22",
   anchor_basket: "#b47a13",
   anchor_value_weight: "#2f7d68",
 };
@@ -128,6 +130,18 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
             "fixed_mix",
             fixedMixLabel(input.model),
             input.model.fixedMixScenario.rows.map(toScenarioPoint),
+          )
+        : null,
+    ],
+    [
+      "preperiod_min_volatility",
+      input.model.preperiodMinVolatility.status === "ready"
+        ? chartLine(
+            "preperiod_min_volatility",
+            preperiodMinVolatilityLabel(input.model),
+            input.model.preperiodMinVolatility.scenario.rows.map(
+              toScenarioPoint,
+            ),
           )
         : null,
     ],
@@ -235,6 +249,15 @@ function fixedMixLabel(model: InvestmentLabCounterfactualReadModel) {
   return weights
     ? `고정혼합 ${weights.kodexWeightBps / 100}:${weights.vooWeightBps / 100}`
     : "고정혼합";
+}
+
+function preperiodMinVolatilityLabel(
+  model: InvestmentLabCounterfactualReadModel,
+) {
+  const weights = model.preperiodMinVolatility.weights;
+  return weights
+    ? `기간 전 최소변동성 ${weights.kodexWeightBps / 100}:${weights.vooWeightBps / 100}`
+    : "기간 전 최소변동성";
 }
 
 function anchorLabel(anchor: InvestmentLabAnchorBasketScenario) {

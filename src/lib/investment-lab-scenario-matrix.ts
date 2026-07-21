@@ -20,6 +20,7 @@ export type InvestmentLabScenarioMatrixId =
   | "kodex200"
   | "voo"
   | "fixed_mix"
+  | "preperiod_min_volatility"
   | "zero_return"
   | "anchor_basket"
   | "anchor_value_weight";
@@ -283,6 +284,39 @@ function buildRows(
           : [],
     }),
     scenarioRow({
+      id: "preperiod_min_volatility",
+      summary: model.preperiodMinVolatility.scenario?.summary ?? null,
+      period,
+      returnEstimate: readReturn(
+        model.preperiodMinVolatility.status === "ready"
+          ? model.preperiodMinVolatility.scenario.returnEstimate.scenarioReturn
+          : null,
+        model.preperiodMinVolatility.status === "ready"
+          ? model.preperiodMinVolatility.scenario.returnEstimate.method.version
+          : null,
+      ),
+      riskMetrics: readRisk(
+        model.preperiodMinVolatility.status === "ready"
+          ? model.preperiodMinVolatility.scenario.returnEstimate
+              .scenarioRiskMetrics
+          : null,
+      ),
+      flowCount:
+        model.preperiodMinVolatility.status === "ready"
+          ? model.preperiodMinVolatility.scenario.coverage
+              .componentFlowSourceCount
+          : null,
+      pendingComparisonCount:
+        model.preperiodMinVolatility.status === "ready"
+          ? model.preperiodMinVolatility.scenario.coverage
+              .pendingComparisonRows
+          : null,
+      priceBasis: "kodex_adjusted_and_voo_raw_close",
+      fxBasis: "krw_and_stored_usdkrw",
+      sourceReady: model.preperiodMinVolatility.status === "ready",
+      sourceReasons: model.preperiodMinVolatility.blockers,
+    }),
+    scenarioRow({
       id: "anchor_basket",
       summary: anchor.summary,
       period,
@@ -447,6 +481,14 @@ function unavailableRows(
         fxBasis: "krw_and_stored_usdkrw",
       },
       reasons,
+    ),
+    unavailableRow(
+      {
+        id: "preperiod_min_volatility",
+        priceBasis: "kodex_adjusted_and_voo_raw_close",
+        fxBasis: "krw_and_stored_usdkrw",
+      },
+      [...reasons, ...model.preperiodMinVolatility.blockers],
     ),
     unavailableRow(
       {

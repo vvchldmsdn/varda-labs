@@ -19,6 +19,10 @@ import {
 } from "./investment-lab-fixed-mix-comparison.ts";
 import type { InvestmentLabVooComparison } from "./investment-lab-voo-comparison.ts";
 import {
+  markInvestmentLabPreperiodMinVolatilityPathUnavailable,
+  type InvestmentLabPreperiodMinVolatility,
+} from "./investment-lab-preperiod-min-volatility.ts";
+import {
   unavailableInvestmentLabObservedReturn,
   unavailableInvestmentLabObservedPath,
   type InvestmentLabObservedPath,
@@ -361,6 +365,60 @@ export function composeInvestmentLabFixedMix(
   return composeInvestmentLabFixedMixScenario(pooled, namedScenarios, actual);
 }
 
+export function composeInvestmentLabPreperiodMinVolatility(
+  pooledModel: InvestmentLabCounterfactualReadModel,
+  named: InvestmentLabNamedModels,
+  actual: InvestmentLabObservedReturnEstimate,
+): InvestmentLabCompositionValue<InvestmentLabPreperiodMinVolatility> {
+  const pooled = pooledModel.preperiodMinVolatility;
+  const namedResults = NAMED_PORTFOLIO_ACCOUNTS.map(
+    (account) => named[account].preperiodMinVolatility,
+  );
+  if (!pooled.training || !pooled.weights) {
+    return unavailableInvestmentLabCompositionValue([
+      "pooled_scenario_unavailable",
+    ]);
+  }
+  if (
+    namedResults.some(
+      (result) =>
+        !result.training ||
+        !result.weights ||
+        result.training.startPriceDate !== pooled.training.startPriceDate ||
+        result.training.endPriceDate !== pooled.training.endPriceDate ||
+        result.training.returnObservationCount !==
+          pooled.training.returnObservationCount ||
+        result.weights.kodexWeightBps !== pooled.weights.kodexWeightBps ||
+        result.weights.vooWeightBps !== pooled.weights.vooWeightBps,
+    )
+  ) {
+    return unavailableInvestmentLabCompositionValue([
+      "named_account_scenario_unavailable",
+    ]);
+  }
+  const composed = composeInvestmentLabFixedMixScenario(
+    pooled.scenario,
+    namedResults.map((result) => result.scenario),
+    actual,
+  );
+  if (composed.status !== "ready") {
+    return unavailableInvestmentLabCompositionValue(composed.blockers);
+  }
+  if (composed.value.status !== "ready") {
+    return unavailableInvestmentLabCompositionValue([
+      "aggregate_value_mismatch",
+    ]);
+  }
+  return readyInvestmentLabCompositionValue(
+    Object.freeze({
+      ...pooled,
+      status: "ready" as const,
+      scenario: composed.value,
+      blockers: [] as const,
+    }),
+  );
+}
+
 export function composeInvestmentLabFixedMixComparison(
   pooledModel: InvestmentLabCounterfactualReadModel,
   named: InvestmentLabNamedModels,
@@ -555,6 +613,13 @@ export function blockInvestmentLabPooledModel(
     cashComparison: null,
     fixedMixScenario: null,
     fixedMixComparison: null,
+    preperiodMinVolatility:
+      markInvestmentLabPreperiodMinVolatilityPathUnavailable(
+        pooled.preperiodMinVolatility,
+        blockers.includes("named_account_model_unavailable")
+          ? "account_composition_incomplete"
+          : "account_composition_mismatch",
+      ),
     contributionExperimentScenarios: [] as const,
     rows: [] as const,
     blockers: Object.freeze([
