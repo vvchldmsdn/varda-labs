@@ -3,15 +3,29 @@ import { describe, it } from "node:test";
 
 import {
   assessPreviewAuthEnvironment,
+  PREVIEW_AUTH_ALLOWED_GIT_REF,
   PREVIEW_AUTH_SESSION_CACHE_SECONDS,
 } from "../src/lib/auth/preview-auth-policy.ts";
 import { auditPreviewAuthRuntime } from "../scripts/lib/preview-auth-runtime-audit.mjs";
 
-describe("preview auth runtime Phase 1G1-B1", () => {
+describe("preview auth session transport smoke", () => {
   it("stays disabled outside Preview even when credentials exist", () => {
     assert.deepEqual(
       assessPreviewAuthEnvironment({
         VERCEL_ENV: "production",
+        VERCEL_GIT_COMMIT_REF: PREVIEW_AUTH_ALLOWED_GIT_REF,
+        NEON_AUTH_BASE_URL: "https://auth.example.invalid/project/auth",
+        NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
+      }),
+      { state: "disabled" },
+    );
+  });
+
+  it("stays disabled on every other Preview branch", () => {
+    assert.deepEqual(
+      assessPreviewAuthEnvironment({
+        VERCEL_ENV: "preview",
+        VERCEL_GIT_COMMIT_REF: "feature/unrelated-preview",
         NEON_AUTH_BASE_URL: "https://auth.example.invalid/project/auth",
         NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
       }),
@@ -23,6 +37,7 @@ describe("preview auth runtime Phase 1G1-B1", () => {
     const marker = "must-not-be-reflected";
     const result = assessPreviewAuthEnvironment({
       VERCEL_ENV: "preview",
+      VERCEL_GIT_COMMIT_REF: PREVIEW_AUTH_ALLOWED_GIT_REF,
       NEON_AUTH_BASE_URL: `http://${marker}.invalid/auth`,
       NEON_AUTH_COOKIE_SECRET: marker,
     });
@@ -35,6 +50,7 @@ describe("preview auth runtime Phase 1G1-B1", () => {
     assert.deepEqual(
       assessPreviewAuthEnvironment({
         VERCEL_ENV: "preview",
+        VERCEL_GIT_COMMIT_REF: PREVIEW_AUTH_ALLOWED_GIT_REF,
         NEON_AUTH_BASE_URL: "https://auth.example.invalid/project/auth",
         NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
       }),
@@ -51,15 +67,14 @@ describe("preview auth runtime Phase 1G1-B1", () => {
     assert.deepEqual(result.evidence, {
       requiredFiles: 6,
       presentFiles: 6,
-      productDatabaseImports: 0,
+      inspectedRuntimeGraphFiles: 6,
+      productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       previewAuthSdkPinned: true,
+      previewGitRefGatePresent: true,
       basicAuthBoundaryIntact: true,
       managedAuthSchemaOwnedByDrizzle: false,
-      databaseQueries: 0,
-      databaseWrites: 0,
-      identityLinks: 0,
-      appUserStatusChanges: 0,
+      managedAuthSessionIoExpected: true,
     });
   });
 });

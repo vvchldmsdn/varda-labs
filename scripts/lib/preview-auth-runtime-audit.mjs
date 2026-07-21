@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, extname, join, normalize, relative } from "node:path";
 
 const AUTH_RUNTIME_FILES = Object.freeze([
   "src/lib/auth/preview-auth-policy.ts",
@@ -11,8 +11,10 @@ const AUTH_RUNTIME_FILES = Object.freeze([
 ]);
 
 const FORBIDDEN_PRODUCT_IMPORT =
-  /(?:from\s+["']@\/(?:db|db\/queries)|drizzle-orm|authIdentities|appUsers|TenantContext|getCurrentAppUser)/;
+  /(?:from\s+["']@\/(?:db|db\/queries)|@neondatabase\/serverless|drizzle-orm|authIdentities|appUsers|TenantContext|getCurrentAppUser)/;
 const PUBLIC_AUTH_ENVIRONMENT = /NEXT_PUBLIC_[A-Z0-9_]*AUTH[A-Z0-9_]*/;
+const LOCAL_IMPORT =
+  /(?:^|\n)\s*(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["']([^"']+)["'];?/g;
 
 export function auditPreviewAuthRuntime(root) {
   const findings = [];
@@ -33,8 +35,12 @@ export function auditPreviewAuthRuntime(root) {
     sources.set(path, readFileSync(absolutePath, "utf8"));
   }
 
-  const runtimeSources = [...sources.values()];
-  if (runtimeSources.some((source) => FORBIDDEN_PRODUCT_IMPORT.test(source))) {
+  const runtimeGraph = collectLocalImportGraph(root, AUTH_RUNTIME_FILES);
+  const runtimeSources = [...runtimeGraph.values()];
+  const productBoundaryFiles = [...runtimeGraph.entries()]
+    .filter(([, source]) => FORBIDDEN_PRODUCT_IMPORT.test(source))
+    .map(([path]) => path);
+  if (productBoundaryFiles.length !== 0) {
     findings.push("product_data_boundary_crossed");
   }
   if (runtimeSources.some((source) => PUBLIC_AUTH_ENVIRONMENT.test(source))) {
@@ -44,6 +50,12 @@ export function auditPreviewAuthRuntime(root) {
   const policy = sources.get("src/lib/auth/preview-auth-policy.ts") ?? "";
   if (!policy.includes('VERCEL_ENV?.trim() !== "preview"')) {
     findings.push("preview_environment_gate_missing");
+  }
+  if (
+    !policy.includes("VERCEL_GIT_COMMIT_REF") ||
+    !policy.includes("PREVIEW_AUTH_ALLOWED_GIT_REF")
+  ) {
+    findings.push("preview_git_ref_gate_missing");
   }
   if (!policy.includes("cookieSecret.length < 32")) {
     findings.push("cookie_secret_length_guard_missing");
@@ -61,7 +73,11 @@ export function auditPreviewAuthRuntime(root) {
   if (!route.includes('runtime.state === "disabled"') || !route.includes("status: 404")) {
     findings.push("production_disabled_response_missing");
   }
-  if (/export\s+async\s+function\s+(?:PUT|PATCH|DELETE)/.test(route)) {
+  if (
+    /export\s+(?:(?:async\s+)?function|const)\s+(?:PUT|PATCH|DELETE)/.test(
+      route,
+    )
+  ) {
     findings.push("unneeded_auth_method_exposed");
   }
 
@@ -89,25 +105,75 @@ export function auditPreviewAuthRuntime(root) {
   }
 
   return Object.freeze({
-    audit: "phase1g1b1_preview_auth_runtime",
+    audit: "preview_auth_session_transport_smoke",
     status: findings.length === 0 ? "passed" : "failed",
     findings: Object.freeze([...new Set(findings)]),
     evidence: Object.freeze({
       requiredFiles: AUTH_RUNTIME_FILES.length,
       presentFiles: sources.size,
-      productDatabaseImports: runtimeSources.filter((source) =>
-        FORBIDDEN_PRODUCT_IMPORT.test(source),
-      ).length,
+      inspectedRuntimeGraphFiles: runtimeGraph.size,
+      productDatabaseBoundaryFiles: productBoundaryFiles.length,
       publicAuthEnvironmentReferences: runtimeSources.filter((source) =>
         PUBLIC_AUTH_ENVIRONMENT.test(source),
       ).length,
       previewAuthSdkPinned: authSdkVersion === "0.4.2-beta",
+      previewGitRefGatePresent:
+        policy.includes("VERCEL_GIT_COMMIT_REF") &&
+        policy.includes("PREVIEW_AUTH_ALLOWED_GIT_REF"),
       basicAuthBoundaryIntact,
       managedAuthSchemaOwnedByDrizzle,
-      databaseQueries: 0,
-      databaseWrites: 0,
-      identityLinks: 0,
-      appUserStatusChanges: 0,
+      managedAuthSessionIoExpected: true,
     }),
   });
+}
+
+function collectLocalImportGraph(root, entryPaths) {
+  const graph = new Map();
+  const pending = [...entryPaths];
+
+  while (pending.length !== 0) {
+    const path = pending.pop();
+    if (!path || graph.has(path)) continue;
+
+    const absolutePath = join(root, path);
+    if (!existsSync(absolutePath)) continue;
+
+    const source = readFileSync(absolutePath, "utf8");
+    graph.set(path, source);
+
+    for (const specifier of readImportSpecifiers(source)) {
+      const resolved = resolveLocalImport(root, path, specifier);
+      if (resolved && !graph.has(resolved)) pending.push(resolved);
+    }
+  }
+
+  return graph;
+}
+
+function readImportSpecifiers(source) {
+  const specifiers = [];
+  for (const match of source.matchAll(LOCAL_IMPORT)) specifiers.push(match[1]);
+  return specifiers;
+}
+
+function resolveLocalImport(root, importerPath, specifier) {
+  if (!specifier.startsWith("@/") && !specifier.startsWith(".")) return null;
+
+  const basePath = specifier.startsWith("@/")
+    ? join(root, "src", specifier.slice(2))
+    : join(root, dirname(importerPath), specifier);
+  const candidates = extname(basePath)
+    ? [basePath]
+    : [
+        `${basePath}.ts`,
+        `${basePath}.tsx`,
+        `${basePath}.js`,
+        `${basePath}.mjs`,
+        join(basePath, "index.ts"),
+        join(basePath, "index.tsx"),
+      ];
+  const absolutePath = candidates.find((candidate) => existsSync(candidate));
+  if (!absolutePath) return null;
+
+  return normalize(relative(root, absolutePath)).replaceAll("\\", "/");
 }
