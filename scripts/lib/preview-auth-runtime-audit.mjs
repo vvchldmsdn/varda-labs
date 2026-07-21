@@ -3,11 +3,13 @@ import { dirname, extname, join, normalize, relative } from "node:path";
 
 const AUTH_RUNTIME_FILES = Object.freeze([
   "src/lib/auth/preview-auth-policy.ts",
+  "src/lib/auth/preview-auth-proxy.ts",
   "src/lib/auth/preview-auth-runtime.ts",
   "src/app/api/auth/[...path]/route.ts",
   "src/app/auth/sign-in/page.tsx",
   "src/app/auth/session/page.tsx",
   "src/components/auth/preview-auth-controls.tsx",
+  "src/proxy.ts",
 ]);
 
 const FORBIDDEN_PRODUCT_IMPORT =
@@ -86,15 +88,35 @@ export function auditPreviewAuthRuntime(root) {
     findings.push("session_profile_exposed");
   }
 
-  const proxy = readFileSync(join(root, "src/proxy.ts"), "utf8");
+  const authProxy = sources.get("src/lib/auth/preview-auth-proxy.ts") ?? "";
+  const proxy = sources.get("src/proxy.ts") ?? "";
   const basicAuthBoundaryIntact = [
     "VARDA_APP_PASSWORD",
     "APP_ACCESS_PASSWORD",
     "WWW-Authenticate",
   ].every((marker) => proxy.includes(marker));
   if (!basicAuthBoundaryIntact) findings.push("basic_auth_boundary_drift");
-  if (/['"]\/auth(?:\/|['"])/.test(proxy)) {
-    findings.push("auth_smoke_added_to_basic_auth_matcher");
+
+  const callbackBranchMarker =
+    "request.nextUrl.pathname === PREVIEW_AUTH_CALLBACK_PATH";
+  const basicAuthMarker = "return enforceDashboardBasicAuth(request)";
+  const callbackBranchIndex = proxy.indexOf(callbackBranchMarker);
+  const basicAuthIndex = proxy.indexOf(basicAuthMarker);
+  const previewAuthRouteBypassesBasicAuth =
+    callbackBranchIndex >= 0 &&
+    basicAuthIndex >= 0 &&
+    callbackBranchIndex < basicAuthIndex &&
+    proxy.includes('"/auth/session"');
+  if (!previewAuthRouteBypassesBasicAuth) {
+    findings.push("preview_auth_callback_basic_auth_isolation_missing");
+  }
+
+  const oauthCallbackExchangeProxyPresent =
+    authProxy.includes("runtime.auth.middleware") &&
+    authProxy.includes('loginUrl: "/auth/sign-in"') &&
+    authProxy.includes('runtime.state !== "ready"');
+  if (!oauthCallbackExchangeProxyPresent) {
+    findings.push("oauth_callback_exchange_proxy_missing");
   }
 
   const schema = readFileSync(join(root, "src/db/schema.ts"), "utf8");
@@ -121,6 +143,8 @@ export function auditPreviewAuthRuntime(root) {
         policy.includes("VERCEL_GIT_COMMIT_REF") &&
         policy.includes("PREVIEW_AUTH_ALLOWED_GIT_REF"),
       basicAuthBoundaryIntact,
+      oauthCallbackExchangeProxyPresent,
+      previewAuthRouteBypassesBasicAuth,
       managedAuthSchemaOwnedByDrizzle,
       managedAuthSessionIoExpected: true,
     }),
