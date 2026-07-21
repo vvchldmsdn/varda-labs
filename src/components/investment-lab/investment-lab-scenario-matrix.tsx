@@ -12,6 +12,8 @@ import {
 
 const MINIMUM_VOLATILITY_PERIODS =
   INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods;
+const VOLATILITY_ANNUALIZATION_FACTOR =
+  INVESTMENT_LAB_PATH_RISK_POLICY.annualizationFactor;
 
 export function InvestmentLabScenarioMatrix({
   anchorBasketScenario,
@@ -65,7 +67,7 @@ export function InvestmentLabScenarioMatrix({
               <th className="px-3 py-3 text-right">종료 평가액</th>
               <th className="px-3 py-3 text-right">실제 대비</th>
               <th className="px-3 py-3 text-right">추정수익률</th>
-              <th className="px-3 py-3 text-right">현금흐름 조정 MDD</th>
+              <th className="px-3 py-3 text-right">관측 기준 MDD</th>
               <th className="px-3 py-3 text-right">연환산 변동성</th>
               <th className="px-3 py-3 text-right">흐름 / 대기 평가일</th>
               <th className="px-4 py-3">가격·환율 근거</th>
@@ -81,11 +83,11 @@ export function InvestmentLabScenarioMatrix({
 
       <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
         MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을
-        연결해 계산합니다. MDD는 가능한 구간부터 표시하고, 변동성은 최소
-        {MINIMUM_VOLATILITY_PERIODS}개 기간수익률이 있을 때만 252 관측일
-        기준으로 연환산합니다. KODEX 200은 adjusted close, VOO는 raw
-        close와 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제
-        현금계좌가 아닙니다.
+        연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만
+        표시합니다. 변동성은 최소 {MINIMUM_VOLATILITY_PERIODS}개의 연속 1일
+        기간수익률이 있을 때만 {VOLATILITY_ANNUALIZATION_FACTOR}일 기준으로
+        연환산합니다. KODEX 200은 adjusted close, VOO는 raw close와 저장
+        USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가 아닙니다.
       </p>
     </section>
   );
@@ -156,11 +158,7 @@ function ScenarioRow({
           {formatRiskPercentOrDash(row.riskMetrics.annualizedVolatility)}
         </p>
         <p className="mt-1 text-xs font-normal text-[#73786c]">
-          {row.riskMetrics.periodCount > 0
-            ? row.riskMetrics.annualizedVolatility === null
-              ? `${row.riskMetrics.periodCount}/${MINIMUM_VOLATILITY_PERIODS}개 기간 · 근거 축적 중`
-              : `${row.riskMetrics.periodCount}개 기간`
-            : "근거 없음"}
+          {riskEvidenceLabel(row.riskMetrics)}
         </p>
       </td>
       <td className="px-3 py-3 text-right tabular-nums text-[#4f584f]">
@@ -177,6 +175,19 @@ function ScenarioRow({
       </td>
     </tr>
   );
+}
+
+function riskEvidenceLabel(
+  risk: InvestmentLabScenarioMatrixRow["riskMetrics"],
+) {
+  if (risk.periodCount === 0) return "근거 없음";
+  if (risk.blockers.includes("irregular_volatility_axis")) {
+    return `${risk.periodCount}개 기간 · 날짜축 불연속`;
+  }
+  if (risk.annualizedVolatility === null) {
+    return `${risk.periodCount}/${MINIMUM_VOLATILITY_PERIODS}개 연속 일간 · 근거 축적 중`;
+  }
+  return `${risk.periodCount}개 연속 일간`;
 }
 
 function scenarioLabel(

@@ -11,14 +11,16 @@ import { calculateInvestmentLabModifiedDietz } from "../src/lib/investment-lab-m
 describe("investment lab cashflow-adjusted path risk", () => {
   it("calculates peak-to-trough drawdown from linked period returns", () => {
     const returns = [0.1, -0.2, 0.25, ...Array.from({ length: 17 }, () => 0)];
-    const result = calculateInvestmentLabPathRisk(returns.map(period));
+    const result = calculateInvestmentLabPathRisk(
+      returns.map((value) => period(value)),
+    );
 
     assert.equal(result.status, "ready");
     assert.ok(closeTo(result.maximumDrawdown, 0.2));
     assert.ok(
       closeTo(
         result.annualizedVolatility,
-        sampleVolatility(returns) * Math.sqrt(252),
+        sampleVolatility(returns) * Math.sqrt(365),
       ),
     );
     assert.equal(result.periodCount, 20);
@@ -68,6 +70,21 @@ describe("investment lab cashflow-adjusted path risk", () => {
     assert.equal(atMinimum.annualizedVolatility, 0);
   });
 
+  it("preserves observed MDD but blocks volatility on an irregular date axis", () => {
+    const returns = [
+      period(0.1),
+      period(-0.2, 2),
+      ...Array.from({ length: 18 }, () => period(0)),
+    ];
+    const result = calculateInvestmentLabPathRisk(returns);
+
+    assert.equal(result.status, "partial");
+    assert.ok(closeTo(result.maximumDrawdown, 0.2));
+    assert.equal(result.annualizedVolatility, null);
+    assert.equal(result.periodCount, 20);
+    assert.deepEqual(result.blockers, ["irregular_volatility_axis"]);
+  });
+
   it("rejects invalid return factors instead of substituting values", () => {
     const result = calculateInvestmentLabPathRisk([period(-1.1), period(0)]);
 
@@ -77,13 +94,21 @@ describe("investment lab cashflow-adjusted path risk", () => {
     assert.deepEqual(result.blockers, ["invalid_period_return"]);
   });
 
-  it("is a pure calculation with an explicit 252-observation basis", () => {
+  it("is a pure calculation with an explicit daily service-date basis", () => {
     const source = readFileSync(
       "src/lib/investment-lab-path-risk.ts",
       "utf8",
     );
 
-    assert.equal(INVESTMENT_LAB_PATH_RISK_POLICY.annualizationFactor, 252);
+    assert.equal(INVESTMENT_LAB_PATH_RISK_POLICY.annualizationFactor, 365);
+    assert.equal(
+      INVESTMENT_LAB_PATH_RISK_POLICY.volatilityObservationAxis,
+      "consecutive_calendar_day_service_periods",
+    );
+    assert.equal(
+      INVESTMENT_LAB_PATH_RISK_POLICY.requiredCalendarDaysPerVolatilityPeriod,
+      1,
+    );
     assert.equal(
       INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods,
       20,
@@ -100,8 +125,8 @@ describe("investment lab cashflow-adjusted path risk", () => {
   });
 });
 
-function period(periodReturn) {
-  return { periodReturn };
+function period(periodReturn, calendarDays = 1) {
+  return { periodReturn, calendarDays };
 }
 
 function value(serviceDate, valueKrw) {
