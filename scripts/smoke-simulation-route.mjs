@@ -16,6 +16,9 @@ const EXPECT_JOINT_RESEARCH_READY = numberArgument(
 const EXPECT_FIXED_MIX_COMPARISON_READY = numberArgument(
   "--expect-fixed-mix-comparison-ready",
 );
+const EXPECT_WALK_FORWARD_READY = numberArgument(
+  "--expect-walk-forward-ready",
+);
 const EXPECT_REGIME_READY = numberArgument("--expect-regime-ready");
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
@@ -68,6 +71,11 @@ async function main() {
   assert.match(simulation.body, /data-fixed-research-execution/);
   assert.match(simulation.body, /data-fixed-mix-research-execution/);
   assert.match(simulation.body, /data-fixed-mix-research-comparison/);
+  assert.match(simulation.body, /data-walk-forward-min-volatility/);
+  assert.match(
+    simulation.body,
+    /data-walk-forward-min-volatility-status="(?:ready|unavailable)"/,
+  );
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
@@ -120,6 +128,10 @@ async function main() {
   )?.[1];
   const fixedMixComparisonReadyCount =
     fixedMixComparisonStatus === "ready" ? 1 : 0;
+  const walkForwardStatus = simulation.body.match(
+    /data-walk-forward-min-volatility-status="(ready|unavailable)"/,
+  )?.[1];
+  const walkForwardReadyCount = walkForwardStatus === "ready" ? 1 : 0;
   const jointSelectionStatus = simulation.body.match(
     /data-joint-research-selection-status="(default|selected|invalid)"/,
   )?.[1];
@@ -177,6 +189,10 @@ async function main() {
   assert.ok(
     fixedMixComparisonStatus,
     "simulation must render one fixed-mix comparison state",
+  );
+  assert.ok(
+    walkForwardStatus,
+    "simulation must render one walk-forward minimum-volatility state",
   );
   assert.ok(regimeStatus, "simulation must render regime research state");
   assert.equal(
@@ -259,6 +275,22 @@ async function main() {
       EXPECT_JOINT_RESEARCH_READY,
       "unexpected ready joint research execution count",
     );
+  }
+  if (EXPECT_WALK_FORWARD_READY !== null) {
+    assert.equal(
+      walkForwardReadyCount,
+      EXPECT_WALK_FORWARD_READY,
+      "unexpected walk-forward minimum-volatility readiness",
+    );
+  }
+  if (walkForwardStatus === "ready") {
+    assert.match(simulation.body, /data-walk-forward-fold-count="3"/);
+    assert.equal(
+      simulation.body.match(/data-walk-forward-fold="[123]"/g)?.length ?? 0,
+      3,
+      "ready walk-forward research must render three folds",
+    );
+    assert.match(simulation.body, /data-simulation-path-comparison-chart/);
   }
   if (EXPECT_FIXED_MIX_COMPARISON_READY !== null) {
     assert.equal(
@@ -396,6 +428,8 @@ async function main() {
         jointResearchReadyCount,
         fixedMixComparisonStatus,
         fixedMixComparisonReadyCount,
+        walkForwardStatus,
+        walkForwardReadyCount,
         jointSelectionStatus,
         regimeStatus,
         regimeReadyCount,

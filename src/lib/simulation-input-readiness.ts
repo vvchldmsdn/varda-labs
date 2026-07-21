@@ -2,6 +2,7 @@ import type { loadSimulationPeriodPreflight } from "./simulation-period-prefligh
 import type { FixedResearchSimulationResult } from "./simulation-fixed-research-execution.ts";
 import type { FixedMixResearchComparisonResult } from "./simulation-fixed-mix-research-comparison.ts";
 import type { FixedMixResearchSimulationResult } from "./simulation-fixed-mix-research-execution.ts";
+import type { SimulationWalkForwardMinimumVolatilityResult } from "./simulation-walk-forward-min-volatility.ts";
 import {
   resolveKodexVooFixedMixSelection,
   type KodexVooFixedMixSelection,
@@ -147,6 +148,7 @@ export function buildSimulationInputReadinessPageModel(input: {
   researchExecutions?: readonly FixedResearchSimulationResult[];
   fixedMixResearchExecution?: FixedMixResearchSimulationResult;
   fixedMixResearchComparison?: FixedMixResearchComparisonResult;
+  walkForwardMinimumVolatility?: SimulationWalkForwardMinimumVolatilityResult;
   fixedMixSelection?: KodexVooFixedMixSelection;
 }) {
   const observedReturnComparison = buildSimulationObservedReturnComparison(
@@ -196,6 +198,8 @@ export function buildSimulationInputReadinessPageModel(input: {
     researchExecutions: Object.freeze([...(input.researchExecutions ?? [])]),
     fixedMixResearchExecution: input.fixedMixResearchExecution ?? null,
     fixedMixResearchComparison: input.fixedMixResearchComparison ?? null,
+    walkForwardMinimumVolatility:
+      input.walkForwardMinimumVolatility ?? null,
     fixedMixSelection:
       input.fixedMixSelection ?? resolveKodexVooFixedMixSelection(undefined),
   });

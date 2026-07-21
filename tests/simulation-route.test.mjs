@@ -29,8 +29,10 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /prepareFixedMixResearchContext/);
     assert.match(query, /buildFixedMixResearchSimulationFromContext/);
     assert.match(query, /buildFixedMixResearchComparisonFromContext/);
+    assert.match(query, /buildSimulationWalkForwardMinimumVolatility/);
     assert.match(query, /resolveKodexVooFixedMixSelection/);
     assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
+    assert.match(query, /walkForwardMinimumVolatility/);
     assert.match(query, /candidates: INPUTS\.map\(candidate\)/);
     assert.match(query, /\.\.\.independentRequests, comparisonRequest/);
     assert.doesNotMatch(query, /endServiceDate\?\.trim\(\)/);
@@ -77,6 +79,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-joint-research-kodex-weight-bps/);
     assert.match(view, /data-fixed-mix-research-comparison/);
     assert.match(view, /data-fixed-mix-research-comparison-status/);
+    assert.match(view, /data-walk-forward-min-volatility/);
+    assert.match(view, /data-walk-forward-min-volatility-status/);
+    assert.match(view, /data-walk-forward-fold-count/);
+    assert.match(view, /data-walk-forward-fold/);
+    assert.match(view, /data-simulation-path-comparison-chart/);
     assert.match(view, /data-regime-bootstrap-research/);
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
@@ -96,6 +103,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-fixed-mix-comparison-pairing/);
     assert.match(view, /data-fixed-mix-comparison-scenario/);
     assert.match(view, /고정 비중 3안 공통 경로 비교/);
+    assert.match(view, /워크포워드 최소변동성 연구/);
+    assert.match(view, /직전 60개/);
+    assert.match(view, /다음 10개/);
+    assert.match(view, /미래 예측·추천 아님/);
+    assert.match(view, /표본 공분산은 10% 대각 축소/);
     assert.match(view, /성과 순위·추천 아님/);
     assert.match(view, /3개월 연구 시뮬레이션/);
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
@@ -168,6 +180,8 @@ function readSimulationView() {
     "src/components/simulation/simulation-input-readiness-view.tsx",
     "src/components/simulation/fixed-mix-research-execution-section.tsx",
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
+    "src/components/simulation/walk-forward-min-volatility-section.tsx",
+    "src/components/simulation/simulation-path-comparison-chart.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",
     "src/components/simulation/regime-fixed-mix-comparison-panel.tsx",

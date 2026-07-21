@@ -14,6 +14,7 @@ import { buildFixedResearchSimulation } from "@/lib/simulation-fixed-research-ex
 import { buildFixedMixResearchComparisonFromContext } from "@/lib/simulation-fixed-mix-research-comparison";
 import { buildFixedMixResearchSimulationFromContext } from "@/lib/simulation-fixed-mix-research-execution";
 import { prepareFixedMixResearchContext } from "@/lib/simulation-fixed-mix-research-context";
+import { buildSimulationWalkForwardMinimumVolatility } from "@/lib/simulation-walk-forward-min-volatility";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const KODEX_200 = Object.freeze({
@@ -125,6 +126,11 @@ export async function getReadOnlySimulationInputReadiness(options?: {
   });
   const fixedMixResearchComparison =
     buildFixedMixResearchComparisonFromContext(fixedMixResearchContext);
+  const walkForwardMinimumVolatility =
+    buildSimulationWalkForwardMinimumVolatility({
+      explicitEndServiceDate,
+      matrix: comparisonPreflight.matrixArtifact,
+    });
 
   return buildSimulationInputReadinessPageModel({
     selection,
@@ -134,6 +140,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     researchExecutions,
     fixedMixResearchExecution,
     fixedMixResearchComparison,
+    walkForwardMinimumVolatility,
     fixedMixSelection,
   });
 }

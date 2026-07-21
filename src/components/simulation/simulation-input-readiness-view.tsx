@@ -13,6 +13,7 @@ import {
   resolveObservedReturnScale,
   resolveSharedObservedReturnScale,
 } from "./observed-return-series-panel";
+import { WalkForwardMinimumVolatilitySection } from "./walk-forward-min-volatility-section";
 
 type InputReadiness = SimulationInputReadinessPageModel["inputs"][number];
 type HistoryRow = SimulationInputReadinessPageModel["history"][number];
@@ -38,11 +39,13 @@ export function SimulationInputReadinessView({
   const totalExecutionCount =
     model.researchExecutions.length +
     (model.fixedMixResearchExecution ? 1 : 0) +
-    comparisonScenarioCount;
+    comparisonScenarioCount +
+    (model.walkForwardMinimumVolatility ? 1 : 0);
   const readyExecutionCount =
     readySingleExecutionCount +
     (model.fixedMixResearchExecution?.status === "ready" ? 1 : 0) +
-    readyComparisonScenarioCount;
+    readyComparisonScenarioCount +
+    (model.walkForwardMinimumVolatility?.status === "ready" ? 1 : 0);
 
   return (
     <main
@@ -140,6 +143,9 @@ export function SimulationInputReadinessView({
         <FixedMixResearchComparisonSection
           comparison={model.fixedMixResearchComparison}
           selectedKodexWeightPct={selectedKodexWeightPct}
+        />
+        <WalkForwardMinimumVolatilitySection
+          result={model.walkForwardMinimumVolatility}
         />
         {regimeBootstrap}
 
