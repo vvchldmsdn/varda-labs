@@ -20,6 +20,7 @@ let authSingleton: NeonAuth | undefined;
 export function getPreviewAuthRuntimeState() {
   return assessPreviewAuthEnvironment({
     VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
     NEON_AUTH_BASE_URL: process.env.NEON_AUTH_BASE_URL,
     NEON_AUTH_COOKIE_SECRET: process.env.NEON_AUTH_COOKIE_SECRET,
   });
