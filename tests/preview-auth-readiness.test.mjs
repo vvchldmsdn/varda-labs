@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -161,27 +161,48 @@ describe("preview auth integration readiness Phase 1G1-B0", () => {
     }
   });
 
-  it("keeps the current repository frozen and returns aggregate blockers only", () => {
-    const result = auditPreviewAuthReadiness({
-      root: process.cwd(),
-      localEnvironment: VALID_ENVIRONMENT,
-    });
+  it("keeps the historical B0 audit reproducible with a frozen fixture", () => {
+    const root = mkdtempSync(join(tmpdir(), "varda-auth-b0-"));
+    try {
+      mkdirSync(join(root, "src", "db"), { recursive: true });
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({ dependencies: { next: "16.2.10" } }),
+      );
+      writeFileSync(
+        join(root, "src", "proxy.ts"),
+        [
+          "VARDA_APP_PASSWORD",
+          "APP_ACCESS_PASSWORD",
+          "Basic ",
+          "WWW-Authenticate",
+        ].join("\n"),
+      );
+      writeFileSync(join(root, "src", "db", "schema.ts"), "export {};\n");
 
-    assert.equal(result.status, "passed");
-    assert.equal(result.previewReadiness, "blocked");
-    assert.equal(result.evidence.authSdkDependencies, 0);
-    assert.equal(result.evidence.authRoutePresent, false);
-    assert.equal(result.evidence.authRuntimeImports, 0);
-    assert.equal(result.evidence.basicAuthBoundaryIntact, true);
-    assert.equal(result.evidence.managedNeonAuthSchemaOwnedByDrizzle, false);
-    assert.equal(result.evidence.publicAuthEnvironmentReferences, 0);
-    assert.deepEqual(result.blockers, [
-      "preview_environment_unverified",
-      "production_isolation_unverified",
-      "provider_subject_source_unresolved",
-      "reviewed_operator_handoff_unresolved",
-    ]);
-    assert.doesNotMatch(JSON.stringify(result), /[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+      const result = auditPreviewAuthReadiness({
+        root,
+        localEnvironment: VALID_ENVIRONMENT,
+      });
+
+      assert.equal(result.status, "passed");
+      assert.equal(result.previewReadiness, "blocked");
+      assert.equal(result.evidence.authSdkDependencies, 0);
+      assert.equal(result.evidence.authRoutePresent, false);
+      assert.equal(result.evidence.authRuntimeImports, 0);
+      assert.equal(result.evidence.basicAuthBoundaryIntact, true);
+      assert.equal(result.evidence.managedNeonAuthSchemaOwnedByDrizzle, false);
+      assert.equal(result.evidence.publicAuthEnvironmentReferences, 0);
+      assert.deepEqual(result.blockers, [
+        "preview_environment_unverified",
+        "production_isolation_unverified",
+        "provider_subject_source_unresolved",
+        "reviewed_operator_handoff_unresolved",
+      ]);
+      assert.doesNotMatch(JSON.stringify(result), /[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -38,6 +38,7 @@
     "audit:session-resolver-contract": "node --no-warnings scripts/audit-session-resolver-contract.mjs",
     "audit:initial-identity-link-planner": "node --no-warnings scripts/audit-initial-identity-link-planner.mjs",
     "audit:preview-auth-readiness": "node --no-warnings scripts/audit-preview-auth-readiness.mjs",
+    "audit:preview-auth-runtime": "node --no-warnings scripts/audit-preview-auth-runtime.mjs",
     "audit:tenant-ownership": "node --no-warnings scripts/audit-tenant-ownership-preflight.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",
     "cleanup:base44:nonportfolio-assets": "node --no-warnings scripts/remove-base44-nonportfolio-assets.mjs",
@@ -54,6 +55,7 @@
     "import:base44:settings": "node --no-warnings scripts/import-base44-settings.mjs"
   },
   "dependencies": {
+    "@neondatabase/auth": "0.4.2-beta",
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.10",

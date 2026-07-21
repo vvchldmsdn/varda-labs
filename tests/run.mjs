@@ -113,6 +113,7 @@ import "./runtime-writer-convergence.test.mjs";
 import "./session-resolver-contract.test.mjs";
 import "./initial-identity-link-planner.test.mjs";
 import "./preview-auth-readiness.test.mjs";
+import "./preview-auth-runtime.test.mjs";
 import "./initial-app-user-provisioning.test.mjs";
 import "./base44-core-canonical-plan.test.mjs";
 import "./base44-settings-canonical-plan.test.mjs";
