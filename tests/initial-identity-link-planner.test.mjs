@@ -296,7 +296,7 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
     });
   });
 
-  it("has no production import, DML, SDK, subject CLI, or runtime call", () => {
+  it("keeps identity linking unimplemented despite the isolated Preview auth SDK", () => {
     const result = auditInitialIdentityLinkPlanner({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -309,7 +309,8 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
       identityDmlMatches: 0,
       productionImports: 0,
       subjectCliEntrypoints: 0,
-      authSdkDependencies: 0,
+      authSdkDependencies: 1,
+      unexpectedAuthSdkDependencies: 0,
       basicAuthBoundaryIntact: true,
       databaseQueries: 0,
       databaseWrites: 0,

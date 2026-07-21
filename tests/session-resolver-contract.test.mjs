@@ -273,7 +273,7 @@ describe("provider-neutral session resolver Phase 1G0", () => {
     });
   });
 
-  it("has no production runtime import, SDK, DB, route, identity write, or cache implementation", () => {
+  it("keeps the resolver unimplemented despite the isolated Preview auth SDK", () => {
     const result = auditSessionResolverContract({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -285,7 +285,8 @@ describe("provider-neutral session resolver Phase 1G0", () => {
       pureContractViolations: 0,
       identityDmlMatches: 0,
       productionImports: 0,
-      authSdkDependencies: 0,
+      authSdkDependencies: 1,
+      unexpectedAuthSdkDependencies: 0,
       basicAuthBoundaryIntact: true,
       databaseQueries: 0,
       databaseWrites: 0,

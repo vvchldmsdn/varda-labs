@@ -14,6 +14,7 @@ const IDENTITY_DML_PATTERN =
   /(?:\.insert|\.update|\.delete)\s*\(|(?:insert\s+into|update\s+|delete\s+from)\s+["']?(?:app_users|auth_identities)\b/i;
 const AUTH_SDK_DEPENDENCY_PATTERN =
   /^(?:@neondatabase\/auth|@auth\/|next-auth|better-auth)/i;
+const ALLOWED_PREVIEW_AUTH_SDK = "@neondatabase/auth";
 
 export function auditSessionResolverContract({ root, writerRegistry }) {
   const findings = [];
@@ -67,7 +68,12 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
   const authSdkDependencies = dependencyNames.filter((name) =>
     AUTH_SDK_DEPENDENCY_PATTERN.test(name),
   );
-  if (authSdkDependencies.length !== 0) findings.push("auth_sdk_installed");
+  const unexpectedAuthSdkDependencies = authSdkDependencies.filter(
+    (name) => name !== ALLOWED_PREVIEW_AUTH_SDK,
+  );
+  if (unexpectedAuthSdkDependencies.length !== 0) {
+    findings.push("unexpected_auth_sdk_installed");
+  }
 
   const proxySource = readFileSync(join(root, "src/proxy.ts"), "utf8");
   const basicAuthBoundaryIntact = [
@@ -88,6 +94,7 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
       identityDmlMatches,
       productionImports,
       authSdkDependencies: authSdkDependencies.length,
+      unexpectedAuthSdkDependencies: unexpectedAuthSdkDependencies.length,
       basicAuthBoundaryIntact,
       databaseQueries: 0,
       databaseWrites: 0,
