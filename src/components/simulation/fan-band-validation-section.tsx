@@ -1,9 +1,18 @@
-import type { SimulationFanBandValidationHistoryResult } from "@/lib/simulation-fan-band-validation";
+import {
+  formatHistoricalValidationDate,
+  formatHistoricalValidationPctPoint,
+  formatHistoricalValidationSignedPct,
+  formatNullableHistoricalValidationPct,
+  formatNullableHistoricalValidationPctPoint,
+  HistoricalValidationSummaryCard,
+  historicalValidationReasonLabel,
+} from "@/components/simulation/historical-validation-ui";
+import type { SimulationHistoricalOutcomeValidationResult } from "@/lib/simulation-historical-outcome-validation";
 
 export function FanBandValidationSection({
   result,
 }: {
-  result: SimulationFanBandValidationHistoryResult;
+  result: SimulationHistoricalOutcomeValidationResult;
 }) {
   return (
     <section
@@ -24,7 +33,7 @@ export function FanBandValidationSection({
             id="fan-band-validation-title"
             className="mt-1 text-lg font-semibold"
           >
-            P10~P90 확률밴드 검증
+            종료수익률 P10~P90 확률밴드 검증
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
             KODEX 200 50%와 VOO 50%를 처음 한 번 배분하고 리밸런싱하지
@@ -38,23 +47,25 @@ export function FanBandValidationSection({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <SummaryCard
+        <HistoricalValidationSummaryCard
           label="계산 가능"
           value={`${result.summary.readyEndpointCount}/${result.summary.endpointCount}`}
           detail={`${result.summary.unavailableEndpointCount}개 행 계산 불가`}
         />
-        <SummaryCard
+        <HistoricalValidationSummaryCard
           label="P10~P90 포함률"
-          value={formatNullablePct(result.summary.bandCoveragePct)}
+          value={formatNullableHistoricalValidationPct(
+            result.summary.bandCoveragePct,
+          )}
           detail={
             result.summary.readyEndpointCount > 0
               ? `${result.summary.bandHitCount}/${result.summary.readyEndpointCount}개 실제 결과 포함`
               : "비교 가능한 행 없음"
           }
         />
-        <SummaryCard
+        <HistoricalValidationSummaryCard
           label="평균 P50 절대오차"
-          value={formatNullablePctPoint(
+          value={formatNullableHistoricalValidationPctPoint(
             result.summary.meanAbsoluteP50ErrorPctPoints,
           )}
           detail="실제 종료수익률과 중앙값 차이"
@@ -90,27 +101,41 @@ export function FanBandValidationSection({
                   key={row.outcomeEndServiceDate}
                 >
                   <td className="px-3 py-2 font-medium">
-                    {formatDate(row.outcomeEndServiceDate)}
+                    {formatHistoricalValidationDate(
+                      row.outcomeEndServiceDate,
+                    )}
                   </td>
                   {row.status === "ready" ? (
                     <>
                       <td className="px-3 py-2">
-                        {formatDate(row.trainingEndServiceDate)}
+                        {formatHistoricalValidationDate(
+                          row.trainingEndServiceDate,
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {formatSignedPct(row.predictedP10ReturnPct)}
+                        {formatHistoricalValidationSignedPct(
+                          row.predictedP10ReturnPct,
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {formatSignedPct(row.predictedP50ReturnPct)}
+                        {formatHistoricalValidationSignedPct(
+                          row.predictedP50ReturnPct,
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {formatSignedPct(row.predictedP90ReturnPct)}
+                        {formatHistoricalValidationSignedPct(
+                          row.predictedP90ReturnPct,
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                        {formatSignedPct(row.actualReturnPct)}
+                        {formatHistoricalValidationSignedPct(
+                          row.actualReturnPct,
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {formatPctPoint(row.absoluteP50ErrorPctPoints)}
+                        {formatHistoricalValidationPctPoint(
+                          row.absoluteP50ErrorPctPoints,
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right font-semibold">
                         {row.inP10P90Band ? "포함" : "이탈"}
@@ -118,7 +143,7 @@ export function FanBandValidationSection({
                     </>
                   ) : (
                     <td className="px-3 py-2 text-[#7a5117]" colSpan={7}>
-                      계산 불가 · {reasonLabel(row.reason)}
+                      계산 불가 · {historicalValidationReasonLabel(row.reason)}
                     </td>
                   )}
                 </tr>
@@ -136,51 +161,4 @@ export function FanBandValidationSection({
       </p>
     </section>
   );
-}
-
-function SummaryCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-3">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#687064]">{detail}</p>
-    </div>
-  );
-}
-
-function formatDate(value: string) {
-  return value.replaceAll("-", ".");
-}
-
-function formatSignedPct(value: number) {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}%`;
-}
-
-function formatPctPoint(value: number) {
-  return `${value.toFixed(2)}%p`;
-}
-
-function formatNullablePct(value: number | null) {
-  return value === null ? "-" : `${value.toFixed(1)}%`;
-}
-
-function formatNullablePctPoint(value: number | null) {
-  return value === null ? "-" : formatPctPoint(value);
-}
-
-function reasonLabel(reason: string) {
-  if (reason === "input_matrix_unavailable") return "필요한 관측값 부족";
-  if (reason === "input_matrix_shape_mismatch") return "관측 구간 불일치";
-  if (reason === "simulation_unavailable") return "경로 계산 불가";
-  if (reason === "observed_path_unavailable") return "실제 경로 계산 불가";
-  return "입력 확인 필요";
 }

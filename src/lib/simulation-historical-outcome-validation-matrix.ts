@@ -2,7 +2,7 @@ import { FIXED_MIX_INSTRUMENTS } from "./simulation-fixed-mix-research-context.t
 import { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 
-export function isFanBandValidationSourceMatrix(
+export function isHistoricalOutcomeValidationSourceMatrix(
   matrix: SimulationReturnMatrixResult,
   outcomeEndServiceDate: string,
 ) {

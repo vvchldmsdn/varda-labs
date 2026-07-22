@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 
+import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
-import { getReadOnlySimulationFanBandValidation } from "@/db/queries/simulation-fan-band-validation";
+import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 
@@ -25,9 +26,10 @@ export default async function SimulationPage({
     endServiceDate: params.end,
     kodexWeight: params.kodexWeight,
   });
-  const fanBandValidationPromise = getReadOnlySimulationFanBandValidation({
-    endServiceDate: params.end,
-  });
+  const historicalOutcomeValidationPromise =
+    getReadOnlySimulationHistoricalOutcomeValidation({
+      endServiceDate: params.end,
+    });
   const regimePromise = getReadOnlySimulationRegimeBootstrap({
     endServiceDate: params.end,
     kodexWeight: params.kodexWeight,
@@ -36,7 +38,9 @@ export default async function SimulationPage({
   return (
     <Suspense fallback={<SimulationSkeleton />}>
       <SimulationContent
-        fanBandValidationPromise={fanBandValidationPromise}
+        historicalOutcomeValidationPromise={
+          historicalOutcomeValidationPromise
+        }
         modelPromise={modelPromise}
         regimePromise={regimePromise}
       />
@@ -45,12 +49,12 @@ export default async function SimulationPage({
 }
 
 async function SimulationContent({
-  fanBandValidationPromise,
+  historicalOutcomeValidationPromise,
   modelPromise,
   regimePromise,
 }: {
-  fanBandValidationPromise: ReturnType<
-    typeof getReadOnlySimulationFanBandValidation
+  historicalOutcomeValidationPromise: ReturnType<
+    typeof getReadOnlySimulationHistoricalOutcomeValidation
   >;
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
@@ -58,10 +62,12 @@ async function SimulationContent({
   const model = await modelPromise;
   return (
     <SimulationInputReadinessView
-      fanBandValidation={
-        <Suspense fallback={<FanBandValidationSkeleton />}>
-          <FanBandValidationContent
-            fanBandValidationPromise={fanBandValidationPromise}
+      historicalOutcomeValidation={
+        <Suspense fallback={<HistoricalOutcomeValidationSkeleton />}>
+          <HistoricalOutcomeValidationContent
+            historicalOutcomeValidationPromise={
+              historicalOutcomeValidationPromise
+            }
           />
         </Suspense>
       }
@@ -75,15 +81,20 @@ async function SimulationContent({
   );
 }
 
-async function FanBandValidationContent({
-  fanBandValidationPromise,
+async function HistoricalOutcomeValidationContent({
+  historicalOutcomeValidationPromise,
 }: {
-  fanBandValidationPromise: ReturnType<
-    typeof getReadOnlySimulationFanBandValidation
+  historicalOutcomeValidationPromise: ReturnType<
+    typeof getReadOnlySimulationHistoricalOutcomeValidation
   >;
 }) {
-  const result = await fanBandValidationPromise;
-  return <FanBandValidationSection result={result} />;
+  const result = await historicalOutcomeValidationPromise;
+  return (
+    <>
+      <FanBandValidationSection result={result} />
+      <DownsideOutcomeValidationSection result={result} />
+    </>
+  );
 }
 
 async function RegimeBootstrapContent({
@@ -127,12 +138,12 @@ function RegimeBootstrapSkeleton() {
   );
 }
 
-function FanBandValidationSkeleton() {
+function HistoricalOutcomeValidationSkeleton() {
   return (
     <section
-      aria-label="과거 확률밴드 검증 로딩"
+      aria-label="과거 시뮬레이션 결과 검증 로딩"
       className="border-b border-[#d7ddcf] py-5"
-      data-fan-band-validation-loading
+      data-historical-outcome-validation-loading
     >
       <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
       <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />

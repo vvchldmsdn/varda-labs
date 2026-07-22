@@ -21,11 +21,11 @@ type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 
 export function SimulationInputReadinessView({
   model,
-  fanBandValidation,
+  historicalOutcomeValidation,
   regimeBootstrap,
 }: {
   model: SimulationInputReadinessPageModel;
-  fanBandValidation?: ReactNode;
+  historicalOutcomeValidation?: ReactNode;
   regimeBootstrap?: ReactNode;
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
@@ -153,7 +153,7 @@ export function SimulationInputReadinessView({
         <WalkForwardStabilityHistorySection
           result={model.walkForwardStabilityHistory}
         />
-        {fanBandValidation}
+        {historicalOutcomeValidation}
         {regimeBootstrap}
 
         <section

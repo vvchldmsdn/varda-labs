@@ -1,22 +1,24 @@
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
+import { SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY } from "./simulation-downside-outcome-validation-policy.ts";
 import { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
 import {
-  calculateFanBandObservedTerminalNav,
-  calculateFanBandPredictedTerminalReturns,
-} from "./simulation-fan-band-terminal.ts";
+  calculateObservedHistoricalOutcome,
+  calculatePredictedHistoricalOutcome,
+} from "./simulation-historical-outcome-engine.ts";
 import {
-  isFanBandValidationSourceMatrix,
+  isHistoricalOutcomeValidationSourceMatrix,
   sliceReadySimulationReturnMatrix,
-} from "./simulation-fan-band-validation-matrix.ts";
+} from "./simulation-historical-outcome-validation-matrix.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 
 export { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
+export { SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY } from "./simulation-downside-outcome-validation-policy.ts";
 
-export type SimulationFanBandValidationHistoryResult = ReturnType<
-  typeof buildSimulationFanBandValidationHistory
+export type SimulationHistoricalOutcomeValidationResult = ReturnType<
+  typeof buildSimulationHistoricalOutcomeValidation
 >;
 
-export type SimulationFanBandValidationHistoryReason =
+export type SimulationHistoricalOutcomeValidationReason =
   | "explicit_end_required"
   | "endpoint_set_mismatch"
   | "some_endpoints_unavailable"
@@ -33,7 +35,7 @@ type RowBlockerReason =
   | "simulation_unavailable"
   | "observed_path_unavailable";
 
-export function buildSimulationFanBandValidationHistory(input: {
+export function buildSimulationHistoricalOutcomeValidation(input: {
   explicitEndServiceDate: string | null;
   endpoints: readonly Endpoint[];
 }) {
@@ -49,6 +51,12 @@ export function buildSimulationFanBandValidationHistory(input: {
   const readyEndpointCount = readyRows.length;
   const unavailableEndpointCount = rows.length - readyEndpointCount;
   const bandHitCount = readyRows.filter((row) => row.inP10P90Band).length;
+  const actualLossEndpointCount = readyRows.filter(
+    (row) => row.actualTerminalLoss,
+  ).length;
+  const actualWithinPredictedMddP90Count = readyRows.filter(
+    (row) => row.actualWithinPredictedMddP90,
+  ).length;
   const status =
     readyEndpointCount === rows.length
       ? ("ready" as const)
@@ -67,6 +75,7 @@ export function buildSimulationFanBandValidationHistory(input: {
     reason,
     runtimeTrustStatus: "research_only" as const,
     policy: SIMULATION_FAN_BAND_VALIDATION_POLICY,
+    downsidePolicy: SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY,
     summary: Object.freeze({
       endpointCount: rows.length,
       readyEndpointCount,
@@ -83,6 +92,24 @@ export function buildSimulationFanBandValidationHistory(input: {
             )
           : null,
     }),
+    downsideSummary: Object.freeze({
+      readyEndpointCount,
+      unavailableEndpointCount,
+      meanPredictedLossProbabilityPct:
+        readyEndpointCount > 0
+          ? compensatedMean(
+              readyRows.map((row) => row.predictedLossProbabilityPct),
+            )
+          : null,
+      actualLossEndpointCount,
+      actualWithinPredictedMddP90Count,
+      meanAbsoluteMddP50ErrorPctPoints:
+        readyEndpointCount > 0
+          ? compensatedMean(
+              readyRows.map((row) => row.absoluteMddP50ErrorPctPoints),
+            )
+          : null,
+    }),
     rows,
   });
 }
@@ -95,7 +122,12 @@ function buildEndpointRow(endpoint: Endpoint) {
   if (!matrix || matrix.status !== "ready") {
     return blockedRow(base, "input_matrix_unavailable");
   }
-  if (!isFanBandValidationSourceMatrix(matrix, endpoint.outcomeEndServiceDate)) {
+  if (
+    !isHistoricalOutcomeValidationSourceMatrix(
+      matrix,
+      endpoint.outcomeEndServiceDate,
+    )
+  ) {
     return blockedRow(base, "input_matrix_shape_mismatch");
   }
 
@@ -113,17 +145,17 @@ function buildEndpointRow(endpoint: Endpoint) {
     return blockedRow(base, "input_matrix_shape_mismatch");
   }
 
-  const predicted = calculateFanBandPredictedTerminalReturns(trainingMatrix);
+  const predicted = calculatePredictedHistoricalOutcome(trainingMatrix);
   if (!predicted) {
     return blockedRow(base, "simulation_unavailable");
   }
 
-  const observedTerminalNav = calculateFanBandObservedTerminalNav(outcomeRows);
-  if (observedTerminalNav === null) {
+  const observed = calculateObservedHistoricalOutcome(outcomeRows);
+  if (!observed) {
     return blockedRow(base, "observed_path_unavailable");
   }
 
-  const actualReturnPct = (observedTerminalNav - 1) * 100;
+  const actualReturnPct = observed.terminalReturnPct;
   const predictedP10ReturnPct = predicted.p10ReturnPct;
   const predictedP50ReturnPct = predicted.p50ReturnPct;
   const predictedP90ReturnPct = predicted.p90ReturnPct;
@@ -147,6 +179,18 @@ function buildEndpointRow(endpoint: Endpoint) {
       actualReturnPct <= predictedP90ReturnPct,
     signedP50ErrorPctPoints,
     absoluteP50ErrorPctPoints: Math.abs(signedP50ErrorPctPoints),
+    predictedLossProbabilityPct: predicted.lossProbabilityPct,
+    actualTerminalLoss: observed.terminalLoss,
+    predictedMaxDrawdownP50Pct: predicted.maxDrawdownP50Pct,
+    predictedMaxDrawdownP90Pct: predicted.maxDrawdownP90Pct,
+    actualMaxDrawdownPct: observed.maxDrawdownPct,
+    actualWithinPredictedMddP90:
+      observed.maxDrawdownPct <= predicted.maxDrawdownP90Pct,
+    signedMddP50ErrorPctPoints:
+      observed.maxDrawdownPct - predicted.maxDrawdownP50Pct,
+    absoluteMddP50ErrorPctPoints: Math.abs(
+      observed.maxDrawdownPct - predicted.maxDrawdownP50Pct,
+    ),
   });
 }
 
@@ -204,15 +248,24 @@ function blockedRow(
     inP10P90Band: null,
     signedP50ErrorPctPoints: null,
     absoluteP50ErrorPctPoints: null,
+    predictedLossProbabilityPct: null,
+    actualTerminalLoss: null,
+    predictedMaxDrawdownP50Pct: null,
+    predictedMaxDrawdownP90Pct: null,
+    actualMaxDrawdownPct: null,
+    actualWithinPredictedMddP90: null,
+    signedMddP50ErrorPctPoints: null,
+    absoluteMddP50ErrorPctPoints: null,
   });
 }
 
-function unavailable(reason: SimulationFanBandValidationHistoryReason) {
+function unavailable(reason: SimulationHistoricalOutcomeValidationReason) {
   return Object.freeze({
     status: "unavailable" as const,
     reason,
     runtimeTrustStatus: "research_only" as const,
     policy: SIMULATION_FAN_BAND_VALIDATION_POLICY,
+    downsidePolicy: SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY,
     summary: Object.freeze({
       endpointCount: 0,
       readyEndpointCount: 0,
@@ -220,6 +273,14 @@ function unavailable(reason: SimulationFanBandValidationHistoryReason) {
       bandHitCount: 0,
       bandCoveragePct: null,
       meanAbsoluteP50ErrorPctPoints: null,
+    }),
+    downsideSummary: Object.freeze({
+      readyEndpointCount: 0,
+      unavailableEndpointCount: 0,
+      meanPredictedLossProbabilityPct: null,
+      actualLossEndpointCount: 0,
+      actualWithinPredictedMddP90Count: 0,
+      meanAbsoluteMddP50ErrorPctPoints: null,
     }),
     rows: Object.freeze([]),
   });

@@ -3,15 +3,16 @@ import { describe, it } from "node:test";
 
 import {
   SIMULATION_FAN_BAND_VALIDATION_POLICY,
-  buildSimulationFanBandValidationHistory,
-} from "../src/lib/simulation-fan-band-validation.ts";
+  SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY,
+  buildSimulationHistoricalOutcomeValidation,
+} from "../src/lib/simulation-historical-outcome-validation.ts";
 import { executeSimulationResearchPaths } from "../src/lib/simulation-research-execution-core.ts";
 import { readyJointMatrix } from "./support/simulation-ready-joint-matrix.mjs";
 
-describe("Stationary fan-band validation history", () => {
+describe("Stationary historical outcome validation", () => {
   it("scores seven exact endpoints with 90 training and 63 observed rows", () => {
     const endpoints = readyEndpoints();
-    const result = buildSimulationFanBandValidationHistory({
+    const result = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
       endpoints,
     });
@@ -25,6 +26,14 @@ describe("Stationary fan-band validation history", () => {
       bandCoveragePct: 100,
       meanAbsoluteP50ErrorPctPoints: 0,
     });
+    assert.deepEqual(result.downsideSummary, {
+      readyEndpointCount: 7,
+      unavailableEndpointCount: 0,
+      meanPredictedLossProbabilityPct: 0,
+      actualLossEndpointCount: 0,
+      actualWithinPredictedMddP90Count: 7,
+      meanAbsoluteMddP50ErrorPctPoints: 0,
+    });
     assert.ok(
       result.rows.every(
         (row) =>
@@ -32,7 +41,13 @@ describe("Stationary fan-band validation history", () => {
           row.trainingReturnStepCount === 90 &&
           row.outcomeReturnStepCount === 63 &&
           row.actualReturnPct === 0 &&
-          row.inP10P90Band === true,
+          row.inP10P90Band === true &&
+          row.predictedLossProbabilityPct === 0 &&
+          row.actualTerminalLoss === false &&
+          row.predictedMaxDrawdownP50Pct === 0 &&
+          row.predictedMaxDrawdownP90Pct === 0 &&
+          row.actualMaxDrawdownPct === 0 &&
+          row.actualWithinPredictedMddP90 === true,
       ),
     );
   });
@@ -47,11 +62,11 @@ describe("Stationary fan-band validation history", () => {
       ]),
     };
 
-    const baseline = buildSimulationFanBandValidationHistory({
+    const baseline = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: baselineEndpoints[0].outcomeEndServiceDate,
       endpoints: baselineEndpoints,
     });
-    const changed = buildSimulationFanBandValidationHistory({
+    const changed = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: changedEndpoints[0].outcomeEndServiceDate,
       endpoints: changedEndpoints,
     });
@@ -62,12 +77,20 @@ describe("Stationary fan-band validation history", () => {
       changed.rows[0].predictedP50ReturnPct,
       baseline.rows[0].predictedP50ReturnPct,
     );
+    assert.equal(
+      changed.rows[0].predictedLossProbabilityPct,
+      baseline.rows[0].predictedLossProbabilityPct,
+    );
+    assert.equal(
+      changed.rows[0].predictedMaxDrawdownP90Pct,
+      baseline.rows[0].predictedMaxDrawdownP90Pct,
+    );
     assert.ok(changed.rows[0].actualReturnPct > 0);
     assert.equal(changed.rows[0].inP10P90Band, false);
     assert.deepEqual(changed.rows.slice(1), baseline.rows.slice(1));
   });
 
-  it("matches the existing full research engine terminal quantiles", () => {
+  it("matches the existing full research engine terminal and MDD summaries", () => {
     const fullMatrix = readyJointMatrix({
       endServiceDate: "2026-07-09",
       returnStepCount: 153,
@@ -77,7 +100,7 @@ describe("Stationary fan-band validation history", () => {
       outcomeEndServiceDate: "2026-07-09",
       matrix: fullMatrix,
     };
-    const result = buildSimulationFanBandValidationHistory({
+    const result = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: "2026-07-09",
       endpoints,
     });
@@ -115,12 +138,50 @@ describe("Stationary fan-band validation history", () => {
       result.rows[0].predictedP90ReturnPct,
       execution.terminal.p90Index - 100,
     );
+    assertApprox(
+      result.rows[0].predictedLossProbabilityPct,
+      execution.terminal.lossProbabilityPct,
+    );
+    assertApprox(
+      result.rows[0].predictedMaxDrawdownP50Pct,
+      execution.terminal.maxDrawdownP50Pct,
+    );
+    assertApprox(
+      result.rows[0].predictedMaxDrawdownP90Pct,
+      execution.terminal.maxDrawdownP90Pct,
+    );
+  });
+
+  it("compares predicted downside with the exact following observed path", () => {
+    const endpoints = readyEndpoints();
+    endpoints[0] = {
+      ...endpoints[0],
+      matrix: zeroMatrix(endpoints[0].outcomeEndServiceDate, [
+        [90, [0.1, 0.1]],
+        [91, [-0.2, -0.2]],
+      ]),
+    };
+    const result = buildSimulationHistoricalOutcomeValidation({
+      explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
+      endpoints,
+    });
+    const row = result.rows[0];
+
+    assert.equal(row.status, "ready");
+    assert.equal(row.predictedLossProbabilityPct, 0);
+    assert.equal(row.predictedMaxDrawdownP50Pct, 0);
+    assert.equal(row.predictedMaxDrawdownP90Pct, 0);
+    assert.equal(row.actualTerminalLoss, true);
+    assertApprox(row.actualReturnPct, -12);
+    assertApprox(row.actualMaxDrawdownPct, 20);
+    assert.equal(row.actualWithinPredictedMddP90, false);
+    assertApprox(row.signedMddP50ErrorPctPoints, 20);
   });
 
   it("preserves ready rows when one endpoint is unavailable", () => {
     const endpoints = readyEndpoints();
     endpoints[3] = { ...endpoints[3], matrix: null };
-    const result = buildSimulationFanBandValidationHistory({
+    const result = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
       endpoints,
     });
@@ -129,6 +190,8 @@ describe("Stationary fan-band validation history", () => {
     assert.equal(result.reason, "some_endpoints_unavailable");
     assert.equal(result.summary.readyEndpointCount, 6);
     assert.equal(result.summary.unavailableEndpointCount, 1);
+    assert.equal(result.downsideSummary.readyEndpointCount, 6);
+    assert.equal(result.downsideSummary.unavailableEndpointCount, 1);
     assert.equal(result.rows.length, 7);
     assert.equal(result.rows[3].status, "unavailable");
     assert.equal(result.rows[3].reason, "input_matrix_unavailable");
@@ -141,7 +204,7 @@ describe("Stationary fan-band validation history", () => {
       ...endpoint,
       matrix: null,
     }));
-    const result = buildSimulationFanBandValidationHistory({
+    const result = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
       endpoints,
     });
@@ -151,19 +214,20 @@ describe("Stationary fan-band validation history", () => {
     assert.equal(result.rows.length, 7);
     assert.equal(result.summary.readyEndpointCount, 0);
     assert.equal(result.summary.bandCoveragePct, null);
+    assert.equal(result.downsideSummary.meanPredictedLossProbabilityPct, null);
   });
 
   it("requires one explicit exact seven-date endpoint set", () => {
     const endpoints = readyEndpoints();
-    const missingExplicit = buildSimulationFanBandValidationHistory({
+    const missingExplicit = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: null,
       endpoints,
     });
-    const missingRow = buildSimulationFanBandValidationHistory({
+    const missingRow = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
       endpoints: endpoints.slice(0, 6),
     });
-    const reordered = buildSimulationFanBandValidationHistory({
+    const reordered = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
       endpoints: [...endpoints].reverse(),
     });
@@ -176,7 +240,7 @@ describe("Stationary fan-band validation history", () => {
 
   it("keeps the diagnostic free of account authority and tuning", () => {
     const endpoints = readyEndpoints();
-    const result = buildSimulationFanBandValidationHistory({
+    const result = buildSimulationHistoricalOutcomeValidation({
       explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
       endpoints,
     });
@@ -193,6 +257,14 @@ describe("Stationary fan-band validation history", () => {
     );
     assert.equal(
       SIMULATION_FAN_BAND_VALIDATION_POLICY.providerBackfill,
+      "forbidden",
+    );
+    assert.equal(
+      SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY.calibrationPassFail,
+      "forbidden",
+    );
+    assert.equal(
+      SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY.modelRanking,
       "forbidden",
     );
     assert.doesNotMatch(

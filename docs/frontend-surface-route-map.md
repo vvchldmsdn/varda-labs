@@ -89,10 +89,10 @@ Current route decisions:
 | `/market` | Read-only market context page for benchmarks, regime rows, duplicate regime groups, and global factors. | `src/app/market/page.tsx`, `getReadOnlyMarketContext`, `market-context` helpers. Reads `benchmark_snapshots`, `market_regime_daily`, and `global_market_factors`. | Basic Auth via `src/proxy.ts`. | Read-only render. | Prior smoke covered no-auth/auth, expected markers, and no side effects. | Duplicate regime diagnostics still expose selected legacy ids in the duplicate section. That is acceptable only as admin/evidence text, not polished product UI. | Keep read-only. If this becomes user-facing, hide legacy identifiers and add visual smoke. |
 | `/admin/market-sync` | Status-only operator console for market data freshness, close coverage, FX status, snapshot evidence, KIS cooldown, recent sync metadata, and manual boundary hints. | `src/app/admin/market-sync/page.tsx`, `getAdminMarketSyncStatus`, `admin-market-sync-status` helpers. Reads stored DB state including `assets`, `asset_price_snapshots`, `fx_rates`, `daily_position_snapshots`, `daily_portfolio_snapshots`, and `market_data_sync_runs`. | Basic Auth via `src/proxy.ts`; under `/admin/:path*`. | Read-only render. Must not call providers, dry-run routes, or write routes. | Prior status page checks showed status-only behavior and no render-time provider/write calls. | This is not an action console. Manual action buttons remain intentionally absent. | Keep as status-only until a separate reviewed admin action contract is approved. |
 
-### Simulation Fan-Band Addendum
+### Simulation Historical Outcome Addendum
 
-The `/simulation` route also starts a separate server-only fan-band validation
-read in parallel with the main readiness and regime reads. It renders through
+The `/simulation` route also starts one server-only historical outcome
+validation read in parallel with the main readiness and regime reads. It renders through
 its own Suspense boundary, so a slow or unavailable validation does not erase
 the other Simulation sections. Each of seven fixed outcome endpoints requests
 153 paired KODEX 200/VOO KRW-return rows: 90 training rows and the immediately
@@ -101,6 +101,14 @@ initial-weight, no-rebalancing research path and exposes P10/P50/P90, actual
 terminal return, band hit/miss, and absolute P50 error. It preserves available
 rows when another endpoint is missing and performs no provider call, fallback,
 write, account binding, ranking, tuning, or persistence.
+
+The same matrix read and one complete 500-path calculation also produce the
+downside outcome view. It compares predicted terminal loss probability and MDD
+P50/P90 with the exact following observed terminal loss event and MDD. The
+fan-band and downside sections are separate Server Components for presentation,
+but they share one promise and result because their data source, freshness, and
+calculation lifecycle are identical. P90 comparison is descriptive, not a
+pass/fail model score.
 
 ## API And Operator Boundaries
 

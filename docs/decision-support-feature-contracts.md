@@ -332,6 +332,15 @@ parameters. Coverage and median error are retrospective research diagnostics,
 not calibration pass/fail, account results, forecasts, recommendations, or
 orders.
 
+The v1 downside outcome diagnostic shares that exact matrix read and bootstrap
+pass. For every complete path it records terminal loss using `terminal NAV <
+1` and maximum drawdown from the running peak. It compares predicted terminal
+loss probability and Type 7 MDD P50/P90 with the exact following 63-row
+observed path's terminal loss event and MDD. Actual MDD at or below predicted
+P90 is a descriptive comparison only. Missing evidence preserves the other
+endpoint rows; overlapping windows cannot be treated as independent
+calibration trials, ranked, tuned, or converted into a recommendation.
+
 A partial job may expose progress, missing chunk count, and failure diagnostics
 only. It must not emit distribution bands, comparison metrics, optimizer input,
 or a reusable calculation artifact. Product calculation eligibility requires a
@@ -423,3 +432,7 @@ separate future contracts.
     50:50 KODEX 200/VOO research path against seven fixed 63-row observed
     outcomes. Tenant/account binding, persistence, tuning, provider backfill,
     optimizer claims, and pass/fail calibration remain blocked.
+27. The same read-only historical outcome pass now compares predicted terminal
+    loss probability and MDD P50/P90 with each following observed loss event
+    and MDD. It does not create an additional database read, simulation run,
+    model score, or calibration authority.

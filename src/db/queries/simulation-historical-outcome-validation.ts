@@ -7,8 +7,8 @@ import {
 } from "@/lib/simulation-input-readiness";
 import {
   SIMULATION_FAN_BAND_VALIDATION_POLICY,
-  buildSimulationFanBandValidationHistory,
-} from "@/lib/simulation-fan-band-validation";
+  buildSimulationHistoricalOutcomeValidation,
+} from "@/lib/simulation-historical-outcome-validation";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const CANDIDATES = Object.freeze([
@@ -26,7 +26,7 @@ const CANDIDATES = Object.freeze([
   }),
 ]);
 
-export async function getReadOnlySimulationFanBandValidation(options?: {
+export async function getReadOnlySimulationHistoricalOutcomeValidation(options?: {
   endServiceDate?: string | string[];
   now?: Date;
 }) {
@@ -51,7 +51,7 @@ export async function getReadOnlySimulationFanBandValidation(options?: {
     })),
   );
 
-  return buildSimulationFanBandValidationHistory({
+  return buildSimulationHistoricalOutcomeValidation({
     explicitEndServiceDate,
     endpoints: outcomeEndServiceDates.map((outcomeEndServiceDate, index) => ({
       outcomeEndServiceDate,

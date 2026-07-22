@@ -89,6 +89,11 @@ async function main() {
     simulation.body,
     /data-fan-band-validation-status="(?:ready|partial|unavailable)"/,
   );
+  assert.match(simulation.body, /data-downside-outcome-validation/);
+  assert.match(
+    simulation.body,
+    /data-downside-outcome-validation-status="(?:ready|partial|unavailable)"/,
+  );
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
@@ -107,6 +112,7 @@ async function main() {
   assert.match(simulation.body, /명시 비중 공동 포트폴리오 연구/);
   assert.match(simulation.body, /KODEX 200 최초 비중/);
   assert.match(simulation.body, /stationary bootstrap/);
+  assert.match(simulation.body, /종료 손실확률·최대낙폭 검증/);
   assert.match(simulation.body, /069500/);
   assert.match(simulation.body, /VOO/);
   assert.match(
@@ -171,6 +177,19 @@ async function main() {
   const fanBandValidationReadyCount = Number(
     simulation.body.match(
       /data-fan-band-validation-ready-count="(\d+)"/,
+    )?.[1] ?? 0,
+  );
+  const downsideOutcomeValidationStatus = simulation.body.match(
+    /data-downside-outcome-validation-status="(ready|partial|unavailable)"/,
+  )?.[1];
+  const downsideOutcomeValidationRows = [
+    ...simulation.body.matchAll(
+      /data-downside-outcome-validation-row="(\d{4}-\d{2}-\d{2})"/g,
+    ),
+  ].map((match) => match[1]);
+  const downsideOutcomeValidationReadyCount = Number(
+    simulation.body.match(
+      /data-downside-outcome-validation-ready-count="(\d+)"/,
     )?.[1] ?? 0,
   );
   const jointSelectionStatus = simulation.body.match(
@@ -242,6 +261,25 @@ async function main() {
   assert.ok(
     fanBandValidationStatus,
     "simulation must render one fan-band validation state",
+  );
+  assert.ok(
+    downsideOutcomeValidationStatus,
+    "simulation must render one downside outcome validation state",
+  );
+  assert.equal(
+    downsideOutcomeValidationStatus,
+    fanBandValidationStatus,
+    "shared historical outcome sections must expose one status",
+  );
+  assert.deepEqual(
+    downsideOutcomeValidationRows,
+    fanBandValidationRows,
+    "shared historical outcome sections must expose the same endpoints",
+  );
+  assert.equal(
+    downsideOutcomeValidationReadyCount,
+    fanBandValidationReadyCount,
+    "shared historical outcome sections must expose one ready count",
   );
   assert.ok(regimeStatus, "simulation must render regime research state");
   assert.equal(
@@ -512,6 +550,10 @@ async function main() {
         fanBandValidationStatus,
         fanBandValidationRowCount: fanBandValidationRows.length,
         fanBandValidationReadyCount,
+        downsideOutcomeValidationStatus,
+        downsideOutcomeValidationRowCount:
+          downsideOutcomeValidationRows.length,
+        downsideOutcomeValidationReadyCount,
         jointSelectionStatus,
         regimeStatus,
         regimeReadyCount,

@@ -6,8 +6,8 @@ describe("Simulation input readiness route boundary", () => {
   it("keeps the page server-rendered and the database adapter server-only", () => {
     const page = read("src/app/simulation/page.tsx");
     const query = read("src/db/queries/simulation-input-readiness.ts");
-    const fanBandQuery = read(
-      "src/db/queries/simulation-fan-band-validation.ts",
+    const historicalOutcomeQuery = read(
+      "src/db/queries/simulation-historical-outcome-validation.ts",
     );
     const regimeQuery = read("src/db/queries/simulation-regime-bootstrap.ts");
     const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
@@ -17,17 +17,18 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(view, /["']use client["']/);
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
     assert.match(query, /^import "server-only";/);
-    assert.match(fanBandQuery, /^import "server-only";/);
+    assert.match(historicalOutcomeQuery, /^import "server-only";/);
     assert.match(regimeQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
-    assert.match(page, /getReadOnlySimulationFanBandValidation/);
-    assert.match(page, /fanBandValidationPromise/);
+    assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
+    assert.match(page, /historicalOutcomeValidationPromise/);
     assert.match(page, /FanBandValidationSection/);
+    assert.match(page, /DownsideOutcomeValidationSection/);
     assert.match(
       page,
-      /<Suspense fallback=\{<FanBandValidationSkeleton \/>\}>/,
+      /<Suspense fallback=\{<HistoricalOutcomeValidationSkeleton \/>\}>/,
     );
     assert.match(page, /regimePromise/);
     assert.match(page, /RegimeReadinessHistoryPanel/);
@@ -62,10 +63,16 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeQuery, /Promise\.all/);
     assert.match(regimeQuery, /returnStepCount:/);
     assert.match(regimeQuery, /globalMarketFactors\.releaseDate/);
-    assert.match(fanBandQuery, /buildSimulationFanBandValidationHistory/);
-    assert.match(fanBandQuery, /buildSimulationInputReadinessDates/);
-    assert.match(fanBandQuery, /sourceReturnStepCount/);
-    assert.match(fanBandQuery, /getReadOnlySimulationPeriodPreflightBatch/);
+    assert.match(
+      historicalOutcomeQuery,
+      /buildSimulationHistoricalOutcomeValidation/,
+    );
+    assert.match(historicalOutcomeQuery, /buildSimulationInputReadinessDates/);
+    assert.match(historicalOutcomeQuery, /sourceReturnStepCount/);
+    assert.match(
+      historicalOutcomeQuery,
+      /getReadOnlySimulationPeriodPreflightBatch/,
+    );
     assert.doesNotMatch(
       query,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
@@ -75,7 +82,7 @@ describe("Simulation input readiness route boundary", () => {
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
     assert.doesNotMatch(
-      fanBandQuery,
+      historicalOutcomeQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
   });
@@ -116,6 +123,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-fan-band-validation-ready-count/);
     assert.match(view, /data-fan-band-validation-row/);
     assert.match(view, /data-fan-band-validation-row-status/);
+    assert.match(view, /data-downside-outcome-validation/);
+    assert.match(view, /data-downside-outcome-validation-status/);
+    assert.match(view, /data-downside-outcome-validation-ready-count/);
+    assert.match(view, /data-downside-outcome-validation-row/);
+    assert.match(view, /data-downside-outcome-validation-row-status/);
     assert.match(view, /data-regime-bootstrap-research/);
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
@@ -222,6 +234,8 @@ function readSimulationView() {
     "src/components/simulation/walk-forward-min-volatility-section.tsx",
     "src/components/simulation/walk-forward-stability-history-section.tsx",
     "src/components/simulation/fan-band-validation-section.tsx",
+    "src/components/simulation/downside-outcome-validation-section.tsx",
+    "src/components/simulation/historical-validation-ui.tsx",
     "src/components/simulation/simulation-path-comparison-chart.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",
