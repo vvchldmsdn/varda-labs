@@ -319,27 +319,32 @@ remains unavailable. Expected turnover and improvement
 must appear only for an actual candidate strategy; they are not meaningful
 fallbacks for the current no-rebalance normalized buy-and-hold path.
 
-The v1 retrospective fan-band diagnostic uses the selected explicit end date
-and the previous six calendar service dates as seven fixed outcome endpoints.
-For each endpoint it requires one complete 153-row paired KRW-return matrix,
-uses only the first 90 rows to generate 500 stationary-bootstrap paths, and
-scores the resulting terminal P10/P50/P90 values against the following 63
-observed rows. Its scenario is an explicit KODEX 200 5,000 bps plus VOO 5,000
-bps initial-weight buy-and-hold path with no rebalancing. Missing evidence
-marks only that endpoint unavailable. The overlapping endpoints are not
-independent trials, are never ranked, and cannot select dates or retune model
+The bounded retrospective fan-band diagnostic uses the selected explicit end
+date and the previous six calendar service dates as seven fixed outcome
+endpoints. Its only supported horizons are 63 and 126 trading steps. For each
+endpoint it requires one complete paired KRW-return matrix containing 90
+training rows followed by exactly the selected number of observed rows. It uses
+only the first 90 rows to generate 500 stationary-bootstrap paths and scores
+the resulting terminal P10/P50/P90 values against the later observations. Its
+scenario is an explicit KODEX 200 5,000 bps plus VOO 5,000 bps initial-weight
+buy-and-hold path with no rebalancing. Missing evidence marks only that endpoint
+and selected horizon unavailable; it does not erase a prepared result at the
+other horizon. The overlapping endpoints are not independent trials. Endpoints
+or horizons are never ranked and cannot select dates or retune model
 parameters. Coverage and median error are retrospective research diagnostics,
 not calibration pass/fail, account results, forecasts, recommendations, or
-orders.
+orders. Regime-conditioned research remains on its separately reviewed horizon
+and does not inherit the 126-step selection.
 
-The v1 downside outcome diagnostic shares that exact matrix read and bootstrap
-pass. For every complete path it records terminal loss using `terminal NAV <
-1` and maximum drawdown from the running peak. It compares predicted terminal
-loss probability and Type 7 MDD P50/P90 with the exact following 63-row
-observed path's terminal loss event and MDD. Actual MDD at or below predicted
-P90 is a descriptive comparison only. Missing evidence preserves the other
-endpoint rows; overlapping windows cannot be treated as independent
-calibration trials, ranked, tuned, or converted into a recommendation.
+The downside outcome diagnostic shares that selected horizon's exact matrix
+read and bootstrap pass. For every complete path it records terminal loss using
+`terminal NAV < 1` and maximum drawdown from the running peak. It compares
+predicted terminal loss probability and Type 7 MDD P50/P90 with the exact
+following 63- or 126-row observed path's terminal loss event and MDD. Actual MDD
+at or below predicted P90 is a descriptive comparison only. Missing evidence
+preserves the other endpoint rows; overlapping windows and horizons cannot be
+treated as independent calibration trials, ranked, tuned, or converted into a
+recommendation.
 
 A partial job may expose progress, missing chunk count, and failure diagnostics
 only. It must not emit distribution bands, comparison metrics, optimizer input,

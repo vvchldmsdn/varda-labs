@@ -15,10 +15,12 @@ type ReadyExecution = Extract<
 export function FixedMixResearchExecutionSection({
   endServiceDate,
   execution,
+  researchHorizon,
   selection,
 }: {
   endServiceDate: string;
   execution: FixedMixResearchSimulationResult | null;
+  researchHorizon: 63 | 126;
   selection: KodexVooFixedMixSelection;
 }) {
   if (!execution) return null;
@@ -55,9 +57,13 @@ export function FixedMixResearchExecutionSection({
         <MixForm
           endServiceDate={endServiceDate}
           kodexWeightPct={kodexWeightPct}
+          researchHorizon={researchHorizon}
           vooWeightPct={vooWeightPct}
         />
-        <PresetLinks endServiceDate={endServiceDate} />
+        <PresetLinks
+          endServiceDate={endServiceDate}
+          researchHorizon={researchHorizon}
+        />
       </div>
 
       {execution.status === "ready" ? (
@@ -80,7 +86,7 @@ export function FixedMixResearchExecutionSection({
         data-joint-research-methodology="paired-stationary-bootstrap-v1"
       >
         방법 v2: 완전한 KRW 투자자 기준 수익률 쌍 90개 · stationary
-        bootstrap · 평균 블록 5거래일 · 63거래일 · 500경로. 같은 입력 행렬,
+        bootstrap · 평균 블록 5거래일 · {researchHorizon}거래일 · 500경로. 같은 입력 행렬,
         엔진 정책, 고정 seed에서만 결과가 동일합니다. 시장 국면 조건, 미래
         예측, 계좌 보유비중, Fount, 금현물은 사용하지 않습니다.
       </p>
@@ -142,6 +148,8 @@ function unavailableReasonLabel(
   const labels = {
     invalid_weight_selection:
       "KODEX 200 비중은 중복 없이 1~99 사이의 정수 퍼센트로 입력해야 합니다.",
+    invalid_horizon_selection:
+      "연구 기간은 63거래일 또는 126거래일만 선택할 수 있습니다.",
     explicit_end_required:
       "공동 연구 실행은 기준일을 직접 선택한 뒤에만 시작합니다.",
     input_matrix_unavailable:
@@ -160,10 +168,12 @@ function unavailableReasonLabel(
 function MixForm({
   endServiceDate,
   kodexWeightPct,
+  researchHorizon,
   vooWeightPct,
 }: {
   endServiceDate: string;
   kodexWeightPct: number;
+  researchHorizon: 63 | 126;
   vooWeightPct: number;
 }) {
   return (
@@ -171,6 +181,7 @@ function MixForm({
       {isDateKey(endServiceDate) ? (
         <input name="end" type="hidden" value={endServiceDate} />
       ) : null}
+      <input name="horizon" type="hidden" value={researchHorizon} />
       <label className="grid gap-1 text-xs font-semibold text-[#586358]">
         KODEX 200 최초 비중
         <span className="flex items-center overflow-hidden rounded-md border border-[#cfd5c9] bg-white">
@@ -200,13 +211,23 @@ function MixForm({
   );
 }
 
-function PresetLinks({ endServiceDate }: { endServiceDate: string }) {
+function PresetLinks({
+  endServiceDate,
+  researchHorizon,
+}: {
+  endServiceDate: string;
+  researchHorizon: 63 | 126;
+}) {
   return (
     <nav aria-label="공동 연구 비중 예시" className="flex flex-wrap gap-2">
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
           className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
-          href={simulationHref(endServiceDate, kodexWeightPct)}
+          href={simulationHref(
+            endServiceDate,
+            kodexWeightPct,
+            researchHorizon,
+          )}
           key={kodexWeightPct}
           scroll={false}
         >
@@ -217,8 +238,15 @@ function PresetLinks({ endServiceDate }: { endServiceDate: string }) {
   );
 }
 
-function simulationHref(endServiceDate: string, kodexWeightPct: number) {
-  const params = new URLSearchParams({ kodexWeight: String(kodexWeightPct) });
+function simulationHref(
+  endServiceDate: string,
+  kodexWeightPct: number,
+  researchHorizon: 63 | 126,
+) {
+  const params = new URLSearchParams({
+    horizon: String(researchHorizon),
+    kodexWeight: String(kodexWeightPct),
+  });
   if (isDateKey(endServiceDate)) params.set("end", endServiceDate);
   return `/simulation?${params}`;
 }

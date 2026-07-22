@@ -1,17 +1,25 @@
 import { FIXED_MIX_INSTRUMENTS } from "./simulation-fixed-mix-research-context.ts";
-import { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
+import {
+  createSimulationFanBandValidationPolicy,
+} from "./simulation-fan-band-validation-policy.ts";
 import type {
   SimulationReturnMatrixResult,
   SimulationReturnMatrixRow,
 } from "./simulation-return-matrix-types.ts";
 import { buildStationaryBootstrapDrawPlan } from "./simulation-stationary-bootstrap.ts";
+import {
+  SIMULATION_RESEARCH_HORIZON_POLICY,
+  type SimulationResearchHorizon,
+} from "./simulation-research-horizon.ts";
 
 const EQUAL_WEIGHTS_BPS = Object.freeze([5_000, 5_000]);
 
 export function calculatePredictedHistoricalOutcome(
   matrix: SimulationReturnMatrixResult,
+  horizon: SimulationResearchHorizon =
+    SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon,
 ) {
-  const policy = SIMULATION_FAN_BAND_VALIDATION_POLICY;
+  const policy = createSimulationFanBandValidationPolicy(horizon);
   const drawPlan = buildStationaryBootstrapDrawPlan({
     matrix,
     seed: policy.seed,

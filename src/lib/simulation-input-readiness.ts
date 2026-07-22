@@ -11,6 +11,10 @@ import {
 import { buildSimulationObservedReturnComparison } from "./simulation-observed-return-comparison.ts";
 import { buildSimulationObservedReturnAlignment } from "./simulation-observed-return-alignment.ts";
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
+import {
+  resolveSimulationResearchHorizon,
+  type SimulationResearchHorizonSelection,
+} from "./simulation-research-horizon.ts";
 
 export const SIMULATION_INPUT_READINESS_POLICY = Object.freeze({
   version: "simulation_input_readiness_v1",
@@ -152,6 +156,7 @@ export function buildSimulationInputReadinessPageModel(input: {
   walkForwardMinimumVolatility?: SimulationWalkForwardMinimumVolatilityResult;
   walkForwardStabilityHistory?: SimulationWalkForwardStabilityHistoryResult;
   fixedMixSelection?: KodexVooFixedMixSelection;
+  researchHorizonSelection?: SimulationResearchHorizonSelection;
 }) {
   const observedReturnComparison = buildSimulationObservedReturnComparison(
     input.comparisonSource.inputs,
@@ -205,6 +210,9 @@ export function buildSimulationInputReadinessPageModel(input: {
     walkForwardStabilityHistory: input.walkForwardStabilityHistory ?? null,
     fixedMixSelection:
       input.fixedMixSelection ?? resolveKodexVooFixedMixSelection(undefined),
+    researchHorizonSelection:
+      input.researchHorizonSelection ??
+      resolveSimulationResearchHorizon(undefined),
   });
 }
 

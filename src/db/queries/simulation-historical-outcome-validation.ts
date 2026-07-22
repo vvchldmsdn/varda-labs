@@ -4,11 +4,14 @@ import { getReadOnlySimulationPeriodPreflightBatch } from "@/db/queries/simulati
 import {
   buildSimulationInputReadinessDates,
   resolveSimulationEndServiceDateSelection,
+  SIMULATION_INPUT_READINESS_POLICY,
 } from "@/lib/simulation-input-readiness";
 import {
-  SIMULATION_FAN_BAND_VALIDATION_POLICY,
   buildSimulationHistoricalOutcomeValidation,
 } from "@/lib/simulation-historical-outcome-validation";
+import {
+  resolveSimulationResearchHorizon,
+} from "@/lib/simulation-research-horizon";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const CANDIDATES = Object.freeze([
@@ -28,6 +31,7 @@ const CANDIDATES = Object.freeze([
 
 export async function getReadOnlySimulationHistoricalOutcomeValidation(options?: {
   endServiceDate?: string | string[];
+  horizon?: string | string[];
   now?: Date;
 }) {
   const now = options?.now ?? new Date();
@@ -39,20 +43,27 @@ export async function getReadOnlySimulationHistoricalOutcomeValidation(options?:
     selection.status === "valid" && selection.source === "query"
       ? selection.endServiceDate
       : null;
+  const horizonSelection = resolveSimulationResearchHorizon(
+    options?.horizon,
+  );
+  const horizon = horizonSelection.horizon;
   const outcomeEndServiceDates = explicitEndServiceDate
     ? buildSimulationInputReadinessDates(explicitEndServiceDate)
     : [];
   const preflights = await getReadOnlySimulationPeriodPreflightBatch(
-    outcomeEndServiceDates.map((endServiceDate) => ({
-      candidates: CANDIDATES,
-      endServiceDate,
-      returnStepCount:
-        SIMULATION_FAN_BAND_VALIDATION_POLICY.sourceReturnStepCount,
-    })),
+    horizon === null
+      ? []
+      : outcomeEndServiceDates.map((endServiceDate) => ({
+          candidates: CANDIDATES,
+          endServiceDate,
+          returnStepCount:
+            SIMULATION_INPUT_READINESS_POLICY.returnStepCount + horizon,
+        })),
   );
 
   return buildSimulationHistoricalOutcomeValidation({
     explicitEndServiceDate,
+    horizon,
     endpoints: outcomeEndServiceDates.map((outcomeEndServiceDate, index) => ({
       outcomeEndServiceDate,
       matrix: preflights[index]?.matrixArtifact ?? null,

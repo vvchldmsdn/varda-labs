@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
+import { SIMULATION_RESEARCH_HORIZON_POLICY } from "@/lib/simulation-research-horizon";
 
 import { FixedMixResearchComparisonSection } from "./fixed-mix-research-comparison-section";
 import { FixedMixResearchExecutionSection } from "./fixed-mix-research-execution-section";
@@ -31,6 +32,14 @@ export function SimulationInputReadinessView({
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
   const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
   const selectedKodexWeightPct = model.fixedMixSelection.kodexWeightPct;
+  const selectedResearchHorizon =
+    model.researchHorizonSelection.horizon ??
+    SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon;
+  const explicitEndServiceDate =
+    model.endServiceDateSelection.status === "valid" &&
+    model.endServiceDateSelection.source === "query"
+      ? model.requestedEndServiceDate
+      : null;
   const readySingleExecutionCount = model.researchExecutions.filter(
     (execution) => execution.status === "ready",
   ).length;
@@ -91,6 +100,22 @@ export function SimulationInputReadinessView({
           </section>
         ) : null}
 
+        {model.researchHorizonSelection.status === "invalid" ? (
+          <section
+            data-invalid-horizon-query
+            className="border-b border-[#d7ddcf] py-4 text-sm text-[#7a5117]"
+          >
+            연구 기간은 <code>63</code> 또는 <code>126</code>만 선택할 수
+            있습니다. 잘못된 값은 기본 기간으로 대체하지 않았습니다.
+          </section>
+        ) : null}
+
+        <ResearchHorizonSelector
+          endServiceDate={explicitEndServiceDate}
+          kodexWeightPct={selectedKodexWeightPct}
+          selectedHorizon={selectedResearchHorizon}
+        />
+
         <section
           aria-label="검사 요약"
           className="grid border-b border-[#d7ddcf] py-4 sm:grid-cols-2 xl:grid-cols-4"
@@ -133,14 +158,17 @@ export function SimulationInputReadinessView({
               ? simulationDateHref(
                   recommendedEndServiceDate,
                   selectedKodexWeightPct,
+                  selectedResearchHorizon,
                 )
               : null
           }
           recommendedEndServiceDate={recommendedEndServiceDate}
+          researchHorizon={selectedResearchHorizon}
         />
         <FixedMixResearchExecutionSection
           endServiceDate={model.requestedEndServiceDate}
           execution={model.fixedMixResearchExecution}
+          researchHorizon={selectedResearchHorizon}
           selection={model.fixedMixSelection}
         />
         <FixedMixResearchComparisonSection
@@ -169,6 +197,7 @@ export function SimulationInputReadinessView({
               }
               returnScaleMode={sharedReturnScale ? "shared" : "individual"}
               selectedKodexWeightPct={selectedKodexWeightPct}
+              selectedResearchHorizon={selectedResearchHorizon}
             />
           ))}
         </section>
@@ -177,6 +206,7 @@ export function SimulationInputReadinessView({
           <ReadinessHistory
             rows={model.history}
             selectedKodexWeightPct={selectedKodexWeightPct}
+            selectedResearchHorizon={selectedResearchHorizon}
             selectedServiceDate={model.requestedEndServiceDate}
           />
         ) : null}
@@ -202,13 +232,65 @@ function sharedNearestPriorDate(inputs: readonly InputReadiness[]) {
     : null;
 }
 
+function ResearchHorizonSelector({
+  endServiceDate,
+  kodexWeightPct,
+  selectedHorizon,
+}: {
+  endServiceDate: string | null;
+  kodexWeightPct: number | null;
+  selectedHorizon: 63 | 126;
+}) {
+  return (
+    <section
+      aria-label="연구 기간 선택"
+      className="flex flex-col gap-3 border-b border-[#d7ddcf] py-4 sm:flex-row sm:items-center sm:justify-between"
+      data-simulation-research-horizon={selectedHorizon}
+    >
+      <div>
+        <p className="text-sm font-semibold">연구 기간</p>
+        <p className="mt-1 text-xs leading-5 text-[#687064]">
+          Stationary 연구와 과거 outcome 검증에만 적용됩니다. 시장 국면
+          모델은 기존 63거래일 경계를 유지합니다.
+        </p>
+      </div>
+      <nav className="flex w-fit rounded-md border border-[#cfd6c8] bg-white p-1">
+        {SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons.map((horizon) => {
+          const selected = horizon === selectedHorizon;
+          return (
+            <Link
+              aria-current={selected ? "page" : undefined}
+              className={
+                selected
+                  ? "rounded px-3 py-2 text-sm font-semibold text-white bg-[#173c35]"
+                  : "rounded px-3 py-2 text-sm font-semibold text-[#33423a] hover:bg-[#eef1e8]"
+              }
+              href={simulationResearchHref({
+                endServiceDate,
+                horizon,
+                kodexWeightPct,
+              })}
+              key={horizon}
+              scroll={false}
+            >
+              {horizon}거래일
+            </Link>
+          );
+        })}
+      </nav>
+    </section>
+  );
+}
+
 function ReadinessHistory({
   rows,
   selectedKodexWeightPct,
+  selectedResearchHorizon,
   selectedServiceDate,
 }: {
   rows: readonly HistoryRow[];
   selectedKodexWeightPct: number | null;
+  selectedResearchHorizon: 63 | 126;
   selectedServiceDate: string;
 }) {
   return (
@@ -277,6 +359,7 @@ function ReadinessHistory({
                         href={simulationDateHref(
                           row.serviceDate,
                           selectedKodexWeightPct,
+                          selectedResearchHorizon,
                         )}
                         className="inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-xs font-semibold text-[#253029] hover:bg-[#eef1e8]"
                       >
@@ -332,11 +415,13 @@ function InputPanel({
   observedReturnScale,
   returnScaleMode,
   selectedKodexWeightPct,
+  selectedResearchHorizon,
 }: {
   input: InputReadiness;
   observedReturnScale: number;
   returnScaleMode: "shared" | "individual";
   selectedKodexWeightPct: number | null;
+  selectedResearchHorizon: 63 | 126;
 }) {
   const ready = input.status === "matrix_ready";
 
@@ -444,6 +529,7 @@ function InputPanel({
             href={simulationDateHref(
               input.nearestPriorObservedServiceDate,
               selectedKodexWeightPct,
+              selectedResearchHorizon,
             )}
             className="mt-4 inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-semibold text-[#253029] hover:bg-[#eef1e8]"
           >
@@ -535,8 +621,26 @@ function formatPct(value: number) {
 function simulationDateHref(
   endServiceDate: string,
   kodexWeightPct: number | null,
+  horizon: 63 | 126,
 ) {
-  const params = new URLSearchParams({ end: endServiceDate });
+  return simulationResearchHref({
+    endServiceDate,
+    horizon,
+    kodexWeightPct,
+  });
+}
+
+function simulationResearchHref({
+  endServiceDate,
+  horizon,
+  kodexWeightPct,
+}: {
+  endServiceDate: string | null;
+  horizon: 63 | 126;
+  kodexWeightPct: number | null;
+}) {
+  const params = new URLSearchParams({ horizon: String(horizon) });
+  if (endServiceDate) params.set("end", endServiceDate);
   if (kodexWeightPct !== null) {
     params.set("kodexWeight", String(kodexWeightPct));
   }

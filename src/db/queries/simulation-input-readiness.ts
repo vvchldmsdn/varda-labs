@@ -17,6 +17,7 @@ import { prepareFixedMixResearchContext } from "@/lib/simulation-fixed-mix-resea
 import { buildSimulationWalkForwardMinimumVolatility } from "@/lib/simulation-walk-forward-min-volatility";
 import { buildSimulationWalkForwardStabilityHistory } from "@/lib/simulation-walk-forward-stability-history";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { resolveSimulationResearchHorizon } from "@/lib/simulation-research-horizon";
 
 const KODEX_200 = Object.freeze({
   id: "kodex200",
@@ -44,6 +45,7 @@ const INPUTS = Object.freeze([KODEX_200, VOO]);
 
 export async function getReadOnlySimulationInputReadiness(options?: {
   endServiceDate?: string | string[];
+  horizon?: string | string[];
   kodexWeight?: string | string[];
   now?: Date;
 }) {
@@ -112,6 +114,10 @@ export async function getReadOnlySimulationInputReadiness(options?: {
   const fixedMixSelection = resolveKodexVooFixedMixSelection(
     options?.kodexWeight,
   );
+  const researchHorizonSelection = resolveSimulationResearchHorizon(
+    options?.horizon,
+  );
+  const researchHorizon = researchHorizonSelection.horizon;
   const researchExecutions = INPUTS.map((descriptor, index) =>
     buildFixedResearchSimulation({
       id: descriptor.id,
@@ -119,11 +125,13 @@ export async function getReadOnlySimulationInputReadiness(options?: {
       ticker: descriptor.ticker,
       explicitEndServiceDate,
       matrix: preflights[index]?.matrixArtifact ?? null,
+      horizon: researchHorizon,
     }),
   );
   const fixedMixResearchContext = prepareFixedMixResearchContext({
     explicitEndServiceDate,
     matrix: comparisonPreflight.matrixArtifact,
+    horizon: researchHorizon,
   });
   const fixedMixResearchExecution = buildFixedMixResearchSimulationFromContext({
     context: fixedMixResearchContext,
@@ -158,6 +166,7 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     walkForwardMinimumVolatility,
     walkForwardStabilityHistory,
     fixedMixSelection,
+    researchHorizonSelection,
   });
 }
 

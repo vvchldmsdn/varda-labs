@@ -56,6 +56,7 @@ import "./simulation-return-matrix-universe-evidence.test.mjs";
 import "./simulation-period-request-resolver.test.mjs";
 import "./simulation-period-preflight.test.mjs";
 import "./simulation-input-readiness.test.mjs";
+import "./simulation-research-horizon.test.mjs";
 import "./simulation-observed-return-comparison.test.mjs";
 import "./simulation-route.test.mjs";
 import "./simulation-stationary-bootstrap.test.mjs";

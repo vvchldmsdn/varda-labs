@@ -19,6 +19,7 @@ export function FanBandValidationSection({
       aria-labelledby="fan-band-validation-title"
       className="border-b border-[#d7ddcf] py-5"
       data-fan-band-validation
+      data-fan-band-validation-horizon={result.horizon ?? "invalid"}
       data-fan-band-validation-status={result.status}
       data-fan-band-validation-ready-count={
         result.summary.readyEndpointCount
@@ -38,7 +39,8 @@ export function FanBandValidationSection({
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
             KODEX 200 50%와 VOO 50%를 처음 한 번 배분하고 리밸런싱하지
             않은 연구 포트폴리오입니다. 각 행은 앞선 90개 공동 KRW 수익률로
-            500개 경로를 만들고, 이어진 실제 63개 관측값과 비교합니다.
+            500개 경로를 만들고, 이어진 실제 {result.horizon ?? "선택"}개
+            관측값과 비교합니다.
           </p>
         </div>
         <span className="text-xs text-[#687064]">
@@ -74,8 +76,17 @@ export function FanBandValidationSection({
 
       {result.rows.length === 0 ? (
         <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#62542c]">
-          URL에서 검증 종료 기준일을 하나의 <code>YYYY-MM-DD</code> 값으로
-          선택해야 계산합니다. 최근 날짜로 자동 대체하지 않습니다.
+          {result.reason === "invalid_horizon_selection" ? (
+            <>
+              연구 기간은 <code>63</code> 또는 <code>126</code>만 선택할 수
+              있습니다.
+            </>
+          ) : (
+            <>
+              URL에서 검증 종료 기준일을 하나의 <code>YYYY-MM-DD</code> 값으로
+              선택해야 계산합니다. 최근 날짜로 자동 대체하지 않습니다.
+            </>
+          )}
         </div>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">

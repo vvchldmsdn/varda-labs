@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 type SimulationPageProps = {
   searchParams: Promise<{
     end?: string | string[];
+    horizon?: string | string[];
     kodexWeight?: string | string[];
   }>;
 };
@@ -24,11 +25,13 @@ export default async function SimulationPage({
   const params = await searchParams;
   const modelPromise = getReadOnlySimulationInputReadiness({
     endServiceDate: params.end,
+    horizon: params.horizon,
     kodexWeight: params.kodexWeight,
   });
   const historicalOutcomeValidationPromise =
     getReadOnlySimulationHistoricalOutcomeValidation({
       endServiceDate: params.end,
+      horizon: params.horizon,
     });
   const regimePromise = getReadOnlySimulationRegimeBootstrap({
     endServiceDate: params.end,

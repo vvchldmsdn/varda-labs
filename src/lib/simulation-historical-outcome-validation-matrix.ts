@@ -1,12 +1,16 @@
 import { FIXED_MIX_INSTRUMENTS } from "./simulation-fixed-mix-research-context.ts";
-import { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
+import {
+  SIMULATION_FAN_BAND_VALIDATION_POLICY,
+  type SimulationFanBandValidationPolicy,
+} from "./simulation-fan-band-validation-policy.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 
 export function isHistoricalOutcomeValidationSourceMatrix(
   matrix: SimulationReturnMatrixResult,
   outcomeEndServiceDate: string,
+  policy: SimulationFanBandValidationPolicy =
+    SIMULATION_FAN_BAND_VALIDATION_POLICY,
 ) {
-  const policy = SIMULATION_FAN_BAND_VALIDATION_POLICY;
   return (
     matrix.consumerStatus === "matrix_ready" &&
     matrix.blockers.length === 0 &&

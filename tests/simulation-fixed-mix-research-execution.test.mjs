@@ -66,6 +66,22 @@ describe("Fixed-mix joint research simulation", () => {
     );
   });
 
+  it("supports the fixed 126-step research horizon without changing the 90-row input", () => {
+    const matrix = readyJointMatrix();
+    const result = buildFixedMixResearchSimulation({
+      explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      horizon: 126,
+      matrix,
+      selection: resolveKodexVooFixedMixSelection("50"),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.source.returnStepCount, 90);
+    assert.equal(result.assumptions.horizon, 126);
+    assert.equal(result.bands.length, 127);
+    assert.equal(result.samplePaths[0].points.length, 127);
+  });
+
   it("requires an explicit end date without a silent endpoint rollback", () => {
     const result = buildFixedMixResearchSimulation({
       explicitEndServiceDate: null,

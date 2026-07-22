@@ -20,6 +20,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(historicalOutcomeQuery, /^import "server-only";/);
     assert.match(regimeQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
+    assert.match(page, /horizon: params\.horizon/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
@@ -44,6 +45,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /buildSimulationWalkForwardMinimumVolatility/);
     assert.match(query, /buildSimulationWalkForwardStabilityHistory/);
     assert.match(query, /resolveKodexVooFixedMixSelection/);
+    assert.match(query, /resolveSimulationResearchHorizon/);
+    assert.match(query, /horizon: researchHorizon/);
     assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
     assert.match(query, /walkForwardMinimumVolatility/);
     assert.match(query, /walkForwardStabilityHistory/);
@@ -68,7 +71,11 @@ describe("Simulation input readiness route boundary", () => {
       /buildSimulationHistoricalOutcomeValidation/,
     );
     assert.match(historicalOutcomeQuery, /buildSimulationInputReadinessDates/);
-    assert.match(historicalOutcomeQuery, /sourceReturnStepCount/);
+    assert.match(historicalOutcomeQuery, /90 \+ horizon|returnStepCount:/);
+    assert.match(
+      historicalOutcomeQuery,
+      /resolveSimulationResearchHorizon/,
+    );
     assert.match(
       historicalOutcomeQuery,
       /getReadOnlySimulationPeriodPreflightBatch/,
@@ -96,6 +103,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-readiness-status/);
     assert.match(view, /data-end-query-status/);
     assert.match(view, /data-invalid-end-query/);
+    assert.match(view, /data-invalid-horizon-query/);
+    assert.match(view, /data-simulation-research-horizon/);
     assert.match(view, /data-simulation-readiness-history/);
     assert.match(view, /data-fixed-research-execution/);
     assert.match(view, /data-research-execution-status/);
@@ -120,11 +129,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-walk-forward-stability-row-status/);
     assert.match(view, /data-fan-band-validation/);
     assert.match(view, /data-fan-band-validation-status/);
+    assert.match(view, /data-fan-band-validation-horizon/);
     assert.match(view, /data-fan-band-validation-ready-count/);
     assert.match(view, /data-fan-band-validation-row/);
     assert.match(view, /data-fan-band-validation-row-status/);
     assert.match(view, /data-downside-outcome-validation/);
     assert.match(view, /data-downside-outcome-validation-status/);
+    assert.match(view, /data-downside-outcome-validation-horizon/);
     assert.match(view, /data-downside-outcome-validation-ready-count/);
     assert.match(view, /data-downside-outcome-validation-row/);
     assert.match(view, /data-downside-outcome-validation-row-status/);
@@ -158,14 +169,14 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /서로 독립된 7번의/);
     assert.match(view, /성과 순위를 만들지 않습니다/);
     assert.match(view, /성과 순위·추천 아님/);
-    assert.match(view, /3개월 연구 시뮬레이션/);
+    assert.match(view, /\{researchHorizon\}거래일 연구 시뮬레이션/);
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
     assert.match(view, /KODEX 200 최초 비중/);
     assert.match(view, /이 비중으로 계산/);
     assert.match(view, /같은 기준일 수익률 쌍/);
     assert.match(view, /리밸런싱하지\s*않아/);
     assert.match(view, /연구용 · 저장 안 함 · 예측 아님/);
-    assert.match(view, /63거래일 경로 500개/);
+    assert.match(view, /\{researchHorizon\}거래일 경로 500개/);
     assert.match(view, /stationary\s+bootstrap/);
     assert.match(view, /같은 입력 행렬,/);
     assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);

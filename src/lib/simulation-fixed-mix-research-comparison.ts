@@ -11,6 +11,7 @@ import {
 } from "./simulation-fixed-mix-research-context.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 import type { SimulationResearchExecutionBlockerReason } from "./simulation-research-execution-core.ts";
+import type { SimulationResearchHorizon } from "./simulation-research-horizon.ts";
 
 const PRESET_KODEX_WEIGHTS_PCT = Object.freeze([25, 50, 75] as const);
 
@@ -41,6 +42,7 @@ type ReadyExecution = Extract<
 export function buildFixedMixResearchComparison(input: {
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
+  horizon?: SimulationResearchHorizon | null;
 }) {
   return buildFixedMixResearchComparisonFromContext(
     prepareFixedMixResearchContext(input),

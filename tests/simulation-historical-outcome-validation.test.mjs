@@ -52,6 +52,44 @@ describe("Stationary historical outcome validation", () => {
     );
   });
 
+  it("scores the approved 126-row outcome horizon from an exact 216-row source", () => {
+    const endpoints = readyEndpoints(126);
+    const result = buildSimulationHistoricalOutcomeValidation({
+      explicitEndServiceDate: endpoints[0].outcomeEndServiceDate,
+      endpoints,
+      horizon: 126,
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.horizon, 126);
+    assert.equal(result.policy.outcomeReturnStepCount, 126);
+    assert.equal(result.policy.sourceReturnStepCount, 216);
+    assert.equal(result.policy.crossHorizonRanking, "forbidden");
+    assert.equal(result.downsidePolicy.crossHorizonRanking, "forbidden");
+    assert.ok(
+      result.rows.every(
+        (row) =>
+          row.status === "ready" &&
+          row.trainingReturnStepCount === 90 &&
+          row.outcomeReturnStepCount === 126,
+      ),
+    );
+  });
+
+  it("blocks an invalid horizon before evaluating endpoint evidence", () => {
+    const result = buildSimulationHistoricalOutcomeValidation({
+      explicitEndServiceDate: "2026-07-09",
+      endpoints: readyEndpoints(),
+      horizon: null,
+    });
+
+    assert.equal(result.status, "unavailable");
+    assert.equal(result.reason, "invalid_horizon_selection");
+    assert.equal(result.horizon, null);
+    assert.equal(result.policy, null);
+    assert.deepEqual(result.rows, []);
+  });
+
   it("uses only pre-cutoff rows for the predicted distribution", () => {
     const baselineEndpoints = readyEndpoints();
     const changedEndpoints = readyEndpoints();
@@ -274,24 +312,25 @@ describe("Stationary historical outcome validation", () => {
   });
 });
 
-function readyEndpoints() {
+function readyEndpoints(horizon = 63) {
   return Array.from({ length: 7 }, (_, index) => {
     const outcomeEndServiceDate = shiftDate("2026-07-09", -index);
     return {
       outcomeEndServiceDate,
-      matrix: zeroMatrix(outcomeEndServiceDate),
+      matrix: zeroMatrix(outcomeEndServiceDate, [], horizon),
     };
   });
 }
 
-function zeroMatrix(outcomeEndServiceDate, changedRows = []) {
+function zeroMatrix(outcomeEndServiceDate, changedRows = [], horizon = 63) {
+  const returnStepCount = 90 + horizon;
   return readyJointMatrix({
     endServiceDate: outcomeEndServiceDate,
     override: new Map([
-      ...Array.from({ length: 153 }, (_, index) => [index, [0, 0]]),
+      ...Array.from({ length: returnStepCount }, (_, index) => [index, [0, 0]]),
       ...changedRows,
     ]),
-    returnStepCount: 153,
+    returnStepCount,
   });
 }
 

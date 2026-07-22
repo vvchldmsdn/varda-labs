@@ -23,6 +23,7 @@ const EXPECT_WALK_FORWARD_STABILITY_READY = numberArgument(
   "--expect-walk-forward-stability-ready",
 );
 const EXPECT_REGIME_READY = numberArgument("--expect-regime-ready");
+const EXPECT_HORIZON = numberArgument("--expect-horizon") ?? 63;
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
@@ -35,6 +36,9 @@ const LEAK_PATTERN =
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
+if (![63, 126].includes(EXPECT_HORIZON)) {
+  throw new Error("--expect-horizon must be 63 or 126");
+}
 
 const sql = neon(process.env.DATABASE_URL);
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
@@ -108,11 +112,27 @@ async function main() {
     /data-regime-point-in-time-status="not_established"/,
   );
   assert.match(simulation.body, /data-regime-safe-date-count="0"/);
-  assert.match(simulation.body, /3개월 연구 시뮬레이션/);
+  assert.match(simulation.body, /연구 시뮬레이션/);
   assert.match(simulation.body, /명시 비중 공동 포트폴리오 연구/);
   assert.match(simulation.body, /KODEX 200 최초 비중/);
   assert.match(simulation.body, /stationary bootstrap/);
   assert.match(simulation.body, /종료 손실확률·최대낙폭 검증/);
+  assert.match(
+    simulation.body,
+    new RegExp(`data-simulation-research-horizon="${EXPECT_HORIZON}"`),
+  );
+  assert.match(
+    simulation.body,
+    new RegExp(
+      `data-fan-band-validation-horizon(?:="${EXPECT_HORIZON}"|\\\\":${EXPECT_HORIZON})`,
+    ),
+  );
+  assert.match(
+    simulation.body,
+    new RegExp(
+      `data-downside-outcome-validation-horizon(?:="${EXPECT_HORIZON}"|\\\\":${EXPECT_HORIZON})`,
+    ),
+  );
   assert.match(simulation.body, /069500/);
   assert.match(simulation.body, /VOO/);
   assert.match(
@@ -460,7 +480,10 @@ async function main() {
       researchReadyCount,
       "each ready research execution must render one fan chart",
     );
-    assert.match(simulation.body, /data-research-horizon="63"/);
+    assert.match(
+      simulation.body,
+      new RegExp(`data-research-horizon="${EXPECT_HORIZON}"`),
+    );
     assert.match(simulation.body, /data-research-path-count="500"/);
   }
   if (jointResearchStatus === "ready") {
@@ -473,7 +496,10 @@ async function main() {
       /data-joint-sampling="paired_cross_market_rows_same_draw_plan"/,
     );
     assert.match(simulation.body, /data-joint-rebalancing="none"/);
-    assert.match(simulation.body, /data-joint-research-horizon="63"/);
+    assert.match(
+      simulation.body,
+      new RegExp(`data-joint-research-horizon="${EXPECT_HORIZON}"`),
+    );
     assert.match(simulation.body, /data-joint-research-path-count="500"/);
     if (EXPECT_KODEX_WEIGHT_PCT !== null) {
       assert.match(
@@ -524,6 +550,7 @@ async function main() {
         smoke: "simulation_input_readiness_route",
         baseUrl: BASE_URL,
         path: simulationPath,
+        horizon: EXPECT_HORIZON,
         noAuthStatus: {
           dashboard: unauthorizedDashboard.status,
           simulation: unauthorized.status,

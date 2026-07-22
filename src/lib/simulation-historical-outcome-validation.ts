@@ -1,6 +1,11 @@
 import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
-import { SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY } from "./simulation-downside-outcome-validation-policy.ts";
-import { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
+import {
+  createSimulationDownsideOutcomeValidationPolicy,
+} from "./simulation-downside-outcome-validation-policy.ts";
+import {
+  createSimulationFanBandValidationPolicy,
+  type SimulationFanBandValidationPolicy,
+} from "./simulation-fan-band-validation-policy.ts";
 import {
   calculateObservedHistoricalOutcome,
   calculatePredictedHistoricalOutcome,
@@ -9,6 +14,10 @@ import {
   isHistoricalOutcomeValidationSourceMatrix,
   sliceReadySimulationReturnMatrix,
 } from "./simulation-historical-outcome-validation-matrix.ts";
+import {
+  SIMULATION_RESEARCH_HORIZON_POLICY,
+  type SimulationResearchHorizon,
+} from "./simulation-research-horizon.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 
 export { SIMULATION_FAN_BAND_VALIDATION_POLICY } from "./simulation-fan-band-validation-policy.ts";
@@ -19,6 +28,7 @@ export type SimulationHistoricalOutcomeValidationResult = ReturnType<
 >;
 
 export type SimulationHistoricalOutcomeValidationReason =
+  | "invalid_horizon_selection"
   | "explicit_end_required"
   | "endpoint_set_mismatch"
   | "some_endpoints_unavailable"
@@ -38,15 +48,34 @@ type RowBlockerReason =
 export function buildSimulationHistoricalOutcomeValidation(input: {
   explicitEndServiceDate: string | null;
   endpoints: readonly Endpoint[];
+  horizon?: SimulationResearchHorizon | null;
 }) {
-  if (!input.explicitEndServiceDate) {
-    return unavailable("explicit_end_required");
+  const horizon =
+    input.horizon === undefined
+      ? SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon
+      : input.horizon;
+  if (horizon === null) {
+    return unavailable("invalid_horizon_selection", null);
   }
-  if (!isExpectedEndpointSet(input.explicitEndServiceDate, input.endpoints)) {
-    return unavailable("endpoint_set_mismatch");
+  const policy = createSimulationFanBandValidationPolicy(horizon);
+  const downsidePolicy =
+    createSimulationDownsideOutcomeValidationPolicy(policy);
+  if (!input.explicitEndServiceDate) {
+    return unavailable("explicit_end_required", policy);
+  }
+  if (
+    !isExpectedEndpointSet(
+      input.explicitEndServiceDate,
+      input.endpoints,
+      policy,
+    )
+  ) {
+    return unavailable("endpoint_set_mismatch", policy);
   }
 
-  const rows = Object.freeze(input.endpoints.map(buildEndpointRow));
+  const rows = Object.freeze(
+    input.endpoints.map((endpoint) => buildEndpointRow(endpoint, policy)),
+  );
   const readyRows = rows.filter((row) => row.status === "ready");
   const readyEndpointCount = readyRows.length;
   const unavailableEndpointCount = rows.length - readyEndpointCount;
@@ -74,8 +103,9 @@ export function buildSimulationHistoricalOutcomeValidation(input: {
     status,
     reason,
     runtimeTrustStatus: "research_only" as const,
-    policy: SIMULATION_FAN_BAND_VALIDATION_POLICY,
-    downsidePolicy: SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY,
+    horizon,
+    policy,
+    downsidePolicy,
     summary: Object.freeze({
       endpointCount: rows.length,
       readyEndpointCount,
@@ -114,7 +144,10 @@ export function buildSimulationHistoricalOutcomeValidation(input: {
   });
 }
 
-function buildEndpointRow(endpoint: Endpoint) {
+function buildEndpointRow(
+  endpoint: Endpoint,
+  policy: SimulationFanBandValidationPolicy,
+) {
   const base = {
     outcomeEndServiceDate: endpoint.outcomeEndServiceDate,
   };
@@ -126,12 +159,12 @@ function buildEndpointRow(endpoint: Endpoint) {
     !isHistoricalOutcomeValidationSourceMatrix(
       matrix,
       endpoint.outcomeEndServiceDate,
+      policy,
     )
   ) {
     return blockedRow(base, "input_matrix_shape_mismatch");
   }
 
-  const policy = SIMULATION_FAN_BAND_VALIDATION_POLICY;
   const trainingMatrix = sliceReadySimulationReturnMatrix(
     matrix,
     0,
@@ -145,7 +178,10 @@ function buildEndpointRow(endpoint: Endpoint) {
     return blockedRow(base, "input_matrix_shape_mismatch");
   }
 
-  const predicted = calculatePredictedHistoricalOutcome(trainingMatrix);
+  const predicted = calculatePredictedHistoricalOutcome(
+    trainingMatrix,
+    policy.outcomeReturnStepCount,
+  );
   if (!predicted) {
     return blockedRow(base, "simulation_unavailable");
   }
@@ -216,8 +252,8 @@ function compensatedMean(values: readonly number[]) {
 function isExpectedEndpointSet(
   explicitEndServiceDate: string,
   endpoints: readonly Endpoint[],
+  policy: SimulationFanBandValidationPolicy,
 ) {
-  const policy = SIMULATION_FAN_BAND_VALIDATION_POLICY;
   return (
     isRiskDate(explicitEndServiceDate) &&
     endpoints.length === policy.endpointCount &&
@@ -259,13 +295,19 @@ function blockedRow(
   });
 }
 
-function unavailable(reason: SimulationHistoricalOutcomeValidationReason) {
+function unavailable(
+  reason: SimulationHistoricalOutcomeValidationReason,
+  policy: SimulationFanBandValidationPolicy | null,
+) {
   return Object.freeze({
     status: "unavailable" as const,
     reason,
     runtimeTrustStatus: "research_only" as const,
-    policy: SIMULATION_FAN_BAND_VALIDATION_POLICY,
-    downsidePolicy: SIMULATION_DOWNSIDE_OUTCOME_VALIDATION_POLICY,
+    horizon: policy?.outcomeReturnStepCount ?? null,
+    policy,
+    downsidePolicy: policy
+      ? createSimulationDownsideOutcomeValidationPolicy(policy)
+      : null,
     summary: Object.freeze({
       endpointCount: 0,
       readyEndpointCount: 0,

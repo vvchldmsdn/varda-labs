@@ -20,6 +20,7 @@ export function DownsideOutcomeValidationSection({
       aria-labelledby="downside-outcome-validation-title"
       className="border-b border-[#d7ddcf] py-5"
       data-downside-outcome-validation
+      data-downside-outcome-validation-horizon={result.horizon ?? "invalid"}
       data-downside-outcome-validation-status={result.status}
       data-downside-outcome-validation-ready-count={summary.readyEndpointCount}
     >
@@ -36,8 +37,9 @@ export function DownsideOutcomeValidationSection({
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
             확률밴드와 동일한 90개 학습 구간과 500개 완전 경로를 사용합니다.
-            예측 종료 손실확률과 MDD P50·P90을, 바로 이어진 실제 63개
-            관측값의 종료 손실 여부와 MDD에 대조합니다.
+            예측 종료 손실확률과 MDD P50·P90을, 바로 이어진 실제{" "}
+            {result.horizon ?? "선택"}개 관측값의 종료 손실 여부와 MDD에
+            대조합니다.
           </p>
         </div>
         <span className="text-xs text-[#687064]">
@@ -74,8 +76,17 @@ export function DownsideOutcomeValidationSection({
 
       {result.rows.length === 0 ? (
         <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#62542c]">
-          URL에서 검증 종료 기준일을 하나의 <code>YYYY-MM-DD</code> 값으로
-          선택해야 계산합니다. 최근 날짜로 자동 대체하지 않습니다.
+          {result.reason === "invalid_horizon_selection" ? (
+            <>
+              연구 기간은 <code>63</code> 또는 <code>126</code>만 선택할 수
+              있습니다.
+            </>
+          ) : (
+            <>
+              URL에서 검증 종료 기준일을 하나의 <code>YYYY-MM-DD</code> 값으로
+              선택해야 계산합니다. 최근 날짜로 자동 대체하지 않습니다.
+            </>
+          )}
         </div>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">

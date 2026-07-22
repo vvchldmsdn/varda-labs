@@ -3,6 +3,10 @@ import {
   prepareSimulationResearchPaths,
   type SimulationResearchPreparationBlockerReason,
 } from "./simulation-research-execution-core.ts";
+import {
+  SIMULATION_RESEARCH_HORIZON_POLICY,
+  type SimulationResearchHorizon,
+} from "./simulation-research-horizon.ts";
 
 export const FIXED_MIX_INSTRUMENTS = Object.freeze([
   Object.freeze({ market: "korea", currency: "KRW", ticker: "069500" }),
@@ -14,8 +18,9 @@ export const FIXED_MIX_RESEARCH_SIMULATION_POLICY = Object.freeze({
   admission:
     "valid_explicit_weight_selection_end_query_and_complete_joint_matrix_only",
   sourceReturnStepCount: 90,
-  horizon: 63,
-  horizonLabel: "approximately_three_market_months",
+  horizonPolicyVersion: SIMULATION_RESEARCH_HORIZON_POLICY.version,
+  allowedHorizons: SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons,
+  defaultHorizon: SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon,
   pathCount: 500,
   expectedBlockLength: 5,
   seed: 0x56415244,
@@ -46,6 +51,7 @@ export type ReadyFixedMixResearchContext = Extract<
 
 export type FixedMixResearchContextBlockerReason =
   | "explicit_end_required"
+  | "invalid_horizon_selection"
   | "input_matrix_unavailable"
   | "input_matrix_shape_mismatch"
   | SimulationResearchPreparationBlockerReason;
@@ -53,9 +59,17 @@ export type FixedMixResearchContextBlockerReason =
 export function prepareFixedMixResearchContext(input: {
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
+  horizon?: SimulationResearchHorizon | null;
 }) {
+  const horizon =
+    input.horizon === undefined
+      ? SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon
+      : input.horizon;
   if (!input.explicitEndServiceDate) {
     return blockedContext("explicit_end_required");
+  }
+  if (horizon === null) {
+    return blockedContext("invalid_horizon_selection");
   }
   if (!input.matrix || input.matrix.status !== "ready") {
     return blockedContext("input_matrix_unavailable");
@@ -77,7 +91,7 @@ export function prepareFixedMixResearchContext(input: {
     seed: FIXED_MIX_RESEARCH_SIMULATION_POLICY.seed,
     expectedBlockLength:
       FIXED_MIX_RESEARCH_SIMULATION_POLICY.expectedBlockLength,
-    horizon: FIXED_MIX_RESEARCH_SIMULATION_POLICY.horizon,
+    horizon,
     pathCount: FIXED_MIX_RESEARCH_SIMULATION_POLICY.pathCount,
   });
   if (prepared.status !== "ready") {
