@@ -87,7 +87,7 @@ function ReadyComparisonGrid({
       <p className="border-y border-[#e1e5da] py-3 text-xs leading-5 text-[#687064]">
         세 그래프는 같은 세로축을 사용합니다. 각 카드의 위치는 KODEX 200
         비중 오름차순이며 성과 순위가 아닙니다. 경로 500개 ·{" "}
-        {comparison.pairing.horizon}거래일 · 리밸런싱 없음.
+        서비스 기준일 수익률 {comparison.pairing.horizon}단계 · 리밸런싱 없음.
       </p>
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         {comparison.scenarios.map((scenario, index) => {
@@ -144,7 +144,7 @@ function unavailableReasonLabel(
   const labels = {
     invalid_weight_selection: "비교용 고정 비중을 검증하지 못했습니다.",
     invalid_horizon_selection:
-      "연구 기간은 63거래일 또는 126거래일만 선택할 수 있습니다.",
+      "연구 기간은 서비스 기준일 수익률 63단계 또는 126단계만 선택할 수 있습니다.",
     explicit_end_required: "기준일을 직접 선택한 뒤에만 비교를 시작합니다.",
     input_matrix_unavailable:
       "두 종목 모두에 대해 같은 날짜축의 완전한 90개 수익률 쌍이 없습니다.",

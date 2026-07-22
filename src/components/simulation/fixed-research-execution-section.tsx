@@ -35,11 +35,12 @@ export function FixedResearchExecutionSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="fixed-research-execution-title" className="text-lg font-semibold">
-            {researchHorizon}거래일 연구 시뮬레이션
+            서비스 기준일 수익률 {researchHorizon}단계 연구 시뮬레이션
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            선택한 기준일까지의 90개 수익률을 평균 5거래일 블록의 stationary
-            bootstrap으로 재표본해 {researchHorizon}거래일 경로 500개를
+            선택한 기준일까지의 90개 수익률을 평균 5단계 블록의 stationary
+            bootstrap으로 재표본해 서비스 기준일 수익률 {researchHorizon}단계
+            경로 500개를
             계산합니다. 두 종목은 각각 100% 보유한 경우로
             독립 실행합니다. 두 결과의 차이는 공동 초과확률이나 순위를 뜻하지
             않습니다.
@@ -78,7 +79,8 @@ export function FixedResearchExecutionSection({
         className="mt-3 text-xs leading-5 text-[#687064]"
         data-research-methodology="stationary-bootstrap-v1"
       >
-        방법: KRW 투자자 기준 수익률 90개 · 평균 블록 5거래일 · {researchHorizon}거래일 ·
+        방법: KRW 투자자 기준 수익률 90개 · 평균 블록 5단계 · 서비스 기준일
+        수익률 {researchHorizon}단계 ·
         500경로. 같은 입력 행렬, 엔진 정책, 고정 seed에서만 결과가 동일합니다.
         시장 국면을 조건으로 삼는 regime bootstrap 모델은 아닙니다.
       </p>
@@ -158,7 +160,7 @@ function unavailableReasonLabel(
     explicit_end_required:
       "연구 실행은 기준일을 직접 선택한 뒤에만 시작합니다.",
     invalid_horizon_selection:
-      "연구 기간은 63거래일 또는 126거래일만 선택할 수 있습니다.",
+      "연구 기간은 서비스 기준일 수익률 63단계 또는 126단계만 선택할 수 있습니다.",
     input_matrix_unavailable:
       "이 기준일에는 완전한 90개 수익률 입력이 없어 실행하지 않았습니다.",
     input_matrix_shape_mismatch:

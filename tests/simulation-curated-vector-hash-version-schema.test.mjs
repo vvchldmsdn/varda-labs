@@ -46,16 +46,19 @@ describe("curated approved-vector hash-version schema amendment", () => {
     assert.doesNotMatch(migration, /\bDEFAULT\b/i);
   });
 
-  it("keeps 0017 immutable and records exactly one 0018 journal entry", () => {
+  it("keeps 0017 immutable and preserves exactly one 0018 journal entry", () => {
     assert.equal(normalizedHash(priorMigration), PRIOR_MIGRATION_SHA256);
     assert.equal(snapshot.prevId, priorSnapshot.id);
-    assert.deepEqual(journal.entries.at(-1), {
+    const matchingEntries = journal.entries.filter(
+      (entry) => entry.tag === "0018_massive_wolfpack",
+    );
+    assert.deepEqual(matchingEntries, [{
       idx: 18,
       version: "7",
       when: 1783945272945,
       tag: "0018_massive_wolfpack",
       breakpoints: true,
-    });
+    }]);
   });
 
   it("changes only the target table metadata", () => {

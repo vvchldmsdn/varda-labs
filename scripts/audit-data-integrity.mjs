@@ -900,12 +900,12 @@ async function getAssetPriceAudit() {
     order by rows desc, snapshot_ticker asc
     limit ${SAMPLE_LIMIT}
   `);
-  const duplicateTickerDateGroups = await sql.query(`
-    select ticker, date::text as price_date, count(*)::int as rows
+  const duplicateInstrumentDateGroups = await sql.query(`
+    select market, currency, ticker, date::text as price_date, count(*)::int as rows
     from asset_price_snapshots
-    group by ticker, date
+    group by market, currency, ticker, date
     having count(*) > 1
-    order by rows desc, price_date desc, ticker asc
+    order by rows desc, price_date desc, market, currency, ticker
     limit ${SAMPLE_LIMIT}
   `);
   const marketCurrencyDistribution = await sql.query(`
@@ -928,7 +928,7 @@ async function getAssetPriceAudit() {
       assetIdOrphanCount: assetIdOrphans,
       tickerUnmatched,
       assetIdTickerMismatches,
-      duplicateTickerDateGroups,
+      duplicateInstrumentDateGroups,
     },
     checks: [
       check(

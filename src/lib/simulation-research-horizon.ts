@@ -3,7 +3,7 @@ export const SIMULATION_RESEARCH_HORIZON_POLICY = Object.freeze({
   queryParameter: "horizon",
   allowedHorizons: Object.freeze([63, 126] as const),
   defaultHorizon: 63 as const,
-  unit: "trading_steps",
+  unit: "service_date_return_steps",
   invalidFallback: "forbidden",
   regimeExtension: "forbidden_until_strict_pit_evidence_is_ready",
 } as const);

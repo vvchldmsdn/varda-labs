@@ -169,14 +169,17 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /서로 독립된 7번의/);
     assert.match(view, /성과 순위를 만들지 않습니다/);
     assert.match(view, /성과 순위·추천 아님/);
-    assert.match(view, /\{researchHorizon\}거래일 연구 시뮬레이션/);
+    assert.match(
+      view,
+      /서비스 기준일 수익률 \{researchHorizon\}단계 연구 시뮬레이션/,
+    );
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
     assert.match(view, /KODEX 200 최초 비중/);
     assert.match(view, /이 비중으로 계산/);
     assert.match(view, /같은 기준일 수익률 쌍/);
     assert.match(view, /리밸런싱하지\s*않아/);
     assert.match(view, /연구용 · 저장 안 함 · 예측 아님/);
-    assert.match(view, /\{researchHorizon\}거래일 경로 500개/);
+    assert.match(view, /서비스 기준일 수익률 \{researchHorizon\}단계/);
     assert.match(view, /stationary\s+bootstrap/);
     assert.match(view, /같은 입력 행렬,/);
     assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);

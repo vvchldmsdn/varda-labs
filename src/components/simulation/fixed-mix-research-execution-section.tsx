@@ -86,7 +86,8 @@ export function FixedMixResearchExecutionSection({
         data-joint-research-methodology="paired-stationary-bootstrap-v1"
       >
         방법 v2: 완전한 KRW 투자자 기준 수익률 쌍 90개 · stationary
-        bootstrap · 평균 블록 5거래일 · {researchHorizon}거래일 · 500경로. 같은 입력 행렬,
+        bootstrap · 평균 블록 5단계 · 서비스 기준일 수익률 {researchHorizon}
+        단계 · 500경로. 같은 입력 행렬,
         엔진 정책, 고정 seed에서만 결과가 동일합니다. 시장 국면 조건, 미래
         예측, 계좌 보유비중, Fount, 금현물은 사용하지 않습니다.
       </p>
@@ -149,7 +150,7 @@ function unavailableReasonLabel(
     invalid_weight_selection:
       "KODEX 200 비중은 중복 없이 1~99 사이의 정수 퍼센트로 입력해야 합니다.",
     invalid_horizon_selection:
-      "연구 기간은 63거래일 또는 126거래일만 선택할 수 있습니다.",
+      "연구 기간은 서비스 기준일 수익률 63단계 또는 126단계만 선택할 수 있습니다.",
     explicit_end_required:
       "공동 연구 실행은 기준일을 직접 선택한 뒤에만 시작합니다.",
     input_matrix_unavailable:

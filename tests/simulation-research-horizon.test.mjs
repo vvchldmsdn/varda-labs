@@ -19,6 +19,10 @@ describe("Simulation research horizon selection", () => {
       63,
       126,
     ]);
+    assert.equal(
+      SIMULATION_RESEARCH_HORIZON_POLICY.unit,
+      "service_date_return_steps",
+    );
   });
 
   it("blocks malformed, repeated, and unapproved values without fallback", () => {

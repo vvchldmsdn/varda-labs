@@ -52,6 +52,8 @@ import "./portfolio-special-holdings.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./simulation-return-matrix.test.mjs";
+import "./simulation-historical-evidence-admission.test.mjs";
+import "./simulation-historical-evidence-schema.test.mjs";
 import "./simulation-return-matrix-universe-evidence.test.mjs";
 import "./simulation-period-request-resolver.test.mjs";
 import "./simulation-period-preflight.test.mjs";

@@ -134,6 +134,13 @@
       "when": 1783945272945,
       "tag": "0018_massive_wolfpack",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784761030555,
+      "tag": "0019_lush_maddog",
+      "breakpoints": true
     }
   ]
 }

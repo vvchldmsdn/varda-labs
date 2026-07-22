@@ -251,7 +251,7 @@ function ResearchHorizonSelector({
         <p className="text-sm font-semibold">연구 기간</p>
         <p className="mt-1 text-xs leading-5 text-[#687064]">
           Stationary 연구와 과거 outcome 검증에만 적용됩니다. 시장 국면
-          모델은 기존 63거래일 경계를 유지합니다.
+          모델은 기존 서비스 기준일 수익률 63단계 경계를 유지합니다.
         </p>
       </div>
       <nav className="flex w-fit rounded-md border border-[#cfd6c8] bg-white p-1">
@@ -273,7 +273,7 @@ function ResearchHorizonSelector({
               key={horizon}
               scroll={false}
             >
-              {horizon}거래일
+              {horizon}단계
             </Link>
           );
         })}

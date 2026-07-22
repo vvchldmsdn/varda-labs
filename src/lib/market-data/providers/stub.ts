@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ADJUSTED_CLOSE_BASIS } from "./types";
 import type {
   ClosePrice,
   LiveQuote,
@@ -84,8 +85,14 @@ function toSkippedClosePrice(
     priceDate: context.priceDate,
     closePrice: null,
     adjustedClosePrice: null,
+    adjustedCloseBasis: null,
+    adjustedCloseProvider: null,
+    adjustedCloseSource: null,
+    adjustedCloseFetchedAt: null,
     closePriceKrw: null,
     fxRate: null,
+    providerSymbol: target.ticker,
+    providerExchange: normalizeStubExchange(target.market),
     fetchedAt: context.requestedAt,
     source: "stub",
     quoteType: "close",
@@ -113,14 +120,27 @@ function toFixtureClosePrice(
     priceDate: context.priceDate,
     closePrice,
     adjustedClosePrice: closePrice,
+    adjustedCloseBasis: ADJUSTED_CLOSE_BASIS.syntheticFixture,
+    adjustedCloseProvider: "stub",
+    adjustedCloseSource: "stub_fixture",
+    adjustedCloseFetchedAt: context.requestedAt,
     closePriceKrw,
     fxRate,
+    providerSymbol: target.ticker,
+    providerExchange: normalizeStubExchange(target.market),
     fetchedAt: context.requestedAt,
     source: "stub_fixture",
     quoteType: "close",
     status: "ok",
     isSample: true,
   };
+}
+
+function normalizeStubExchange(market: string) {
+  const normalized = market.trim().toLowerCase();
+  if (normalized === "korea") return "KRX";
+  if (normalized === "us") return "US_UNSPECIFIED";
+  return "STUB_UNSPECIFIED";
 }
 
 function deterministicClosePrice(target: PriceLookupTarget) {

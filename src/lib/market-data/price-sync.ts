@@ -13,6 +13,7 @@ import {
   LIVE_PRICE_WRITE_CONTRACT,
   planLiveAssetPriceWrite,
 } from "@/lib/market-data/live-price-write";
+import { ADJUSTED_CLOSE_BASIS } from "@/lib/market-data/providers/types";
 import { createStubMarketDataProvider } from "@/lib/market-data/providers/stub";
 import { safeErrorMessage } from "@/lib/redaction";
 import type {
@@ -46,11 +47,14 @@ export const PRICE_SYNC_CONTRACT = {
     ],
   },
   close: {
-    updates: ["asset_price_snapshots upsert by ticker/date"],
+    updates: [
+      "asset_price_snapshots upsert by market/currency/ticker/date",
+    ],
     inserts: ["asset_price_snapshots"],
     snapshotWrites: true,
     notes: [
-      "future implementation uses asset_price_snapshots(ticker,date) unique key",
+      "close writes use exact market/currency/ticker/date identity",
+      "raw close evidence must not be copied into adjusted_close_price",
       "future implementation may update ma_120 and days_above_ma after close history is fresh",
       "whether close mode updates assets.current_price remains an explicit option, not default skeleton behavior",
     ],
@@ -162,6 +166,8 @@ type ClosePriceWritePolicy = "none" | "stub_fixture" | "kis";
 
 type ClosePriceWriteResult = {
   ticker: string;
+  market: string;
+  currency: string;
   priceDate: string;
   source: string | null;
   action: ClosePriceWriteAction;
@@ -830,8 +836,14 @@ async function buildDryRunProviderResult(options: {
             priceDate: options.priceDate,
             closePrice: null,
             adjustedClosePrice: null,
+            adjustedCloseBasis: null,
+            adjustedCloseProvider: null,
+            adjustedCloseSource: null,
+            adjustedCloseFetchedAt: null,
             closePriceKrw: null,
             fxRate: null,
+            providerSymbol: target.ticker,
+            providerExchange: null,
             fetchedAt: options.requestedAt,
             source: options.provider.name,
             quoteType: "close" as const,
@@ -1005,6 +1017,8 @@ async function planOrApplyClosePriceRow(options: {
 }): Promise<ClosePriceWriteResult> {
   const rowKey = {
     ticker: options.row.ticker,
+    market: options.row.market,
+    currency: options.row.currency,
     priceDate: options.row.priceDate,
     source: options.row.source,
   };
@@ -1024,6 +1038,8 @@ async function planOrApplyClosePriceRow(options: {
 
   const snapshot = toSnapshotInsert(options.row, options.target);
   const existing = await findExistingAssetPriceSnapshot(
+    snapshot.market,
+    snapshot.currency,
     snapshot.ticker,
     snapshot.priceDate,
   );
@@ -1076,16 +1092,26 @@ async function planOrApplyClosePriceRow(options: {
     .insert(assetPriceSnapshots)
     .values(snapshot)
     .onConflictDoUpdate({
-      target: [assetPriceSnapshots.ticker, assetPriceSnapshots.priceDate],
+      target: [
+        assetPriceSnapshots.market,
+        assetPriceSnapshots.currency,
+        assetPriceSnapshots.ticker,
+        assetPriceSnapshots.priceDate,
+      ],
       set: {
         assetId: sql`excluded.asset_id`,
-        market: sql`excluded.market`,
-        currency: sql`excluded.currency`,
         closePrice: sql`excluded.close_price`,
-        adjustedClosePrice: sql`excluded.adjusted_close_price`,
-        closePriceKrw: sql`excluded.close_price_krw`,
-        fxRate: sql`excluded.fx_rate`,
+        adjustedClosePrice: sql`coalesce(excluded.adjusted_close_price, ${assetPriceSnapshots.adjustedClosePrice})`,
+        adjustedCloseBasis: sql`coalesce(excluded.adjusted_close_basis, ${assetPriceSnapshots.adjustedCloseBasis})`,
+        adjustedCloseProvider: sql`coalesce(excluded.adjusted_close_provider, ${assetPriceSnapshots.adjustedCloseProvider})`,
+        adjustedCloseSource: sql`coalesce(excluded.adjusted_close_source, ${assetPriceSnapshots.adjustedCloseSource})`,
+        adjustedCloseFetchedAt: sql`coalesce(excluded.adjusted_close_fetched_at, ${assetPriceSnapshots.adjustedCloseFetchedAt})`,
+        closePriceKrw: sql`coalesce(excluded.close_price_krw, ${assetPriceSnapshots.closePriceKrw})`,
+        fxRate: sql`coalesce(excluded.fx_rate, ${assetPriceSnapshots.fxRate})`,
         source: sql`excluded.source`,
+        providerSymbol: sql`excluded.provider_symbol`,
+        providerExchange: sql`excluded.provider_exchange`,
+        fetchedAt: sql`excluded.fetched_at`,
         isSample: sql`excluded.is_sample`,
         updatedAt: new Date(),
       },
@@ -1116,15 +1142,44 @@ function validateClosePriceRow(
 ) {
   if (row.status !== "ok") return row.error ?? `provider_status_${row.status}`;
   if (!target) return "target_not_found";
+  if (toTargetKey(row) !== target.key) return "target_identity_mismatch";
   if (!isDateKey(row.priceDate)) return "invalid_price_date";
   if (!isDecimalString(row.closePrice)) return "invalid_close_price";
-  if (!isDecimalString(row.adjustedClosePrice)) {
-    return "invalid_adjusted_close_price";
+  if (row.adjustedClosePrice === null) {
+    if (
+      row.adjustedCloseBasis !== null ||
+      row.adjustedCloseProvider !== null ||
+      row.adjustedCloseSource !== null ||
+      row.adjustedCloseFetchedAt !== null
+    ) {
+      return "adjusted_close_metadata_without_value";
+    }
+  } else {
+    if (!isDecimalString(row.adjustedClosePrice)) {
+      return "invalid_adjusted_close_price";
+    }
+    if (!isAllowedAdjustedCloseBasis(row.adjustedCloseBasis, writePolicy)) {
+      return "unsupported_adjusted_close_basis";
+    }
+    if (!normalizeText(row.adjustedCloseProvider)) {
+      return "missing_adjusted_close_provider";
+    }
+    if (!normalizeText(row.adjustedCloseSource)) {
+      return "missing_adjusted_close_source";
+    }
+    if (!isValidDate(row.adjustedCloseFetchedAt)) {
+      return "invalid_adjusted_close_fetched_at";
+    }
   }
   if (row.closePriceKrw !== null && !isDecimalString(row.closePriceKrw)) {
     return "invalid_close_price_krw";
   }
   if (row.fxRate !== null && !isDecimalString(row.fxRate)) return "invalid_fx_rate";
+  if (!normalizeTicker(row.providerSymbol)) return "missing_provider_symbol";
+  if (!normalizeText(row.providerExchange)) {
+    return "missing_provider_exchange";
+  }
+  if (!isValidDate(row.fetchedAt)) return "invalid_fetched_at";
   if (!isAllowedClosePriceSource(row.source, writePolicy)) {
     return "unsupported_write_source";
   }
@@ -1136,31 +1191,48 @@ function toSnapshotInsert(
   target: PriceLookupTarget | undefined,
 ) {
   const closePrice = row.closePrice ?? "0";
+  const ticker = normalizeTicker(row.ticker) ?? row.ticker;
+  const market = normalizeText(row.market) ?? row.market;
+  const currency = (normalizeText(row.currency) ?? row.currency).toUpperCase();
 
   return {
     legacyBase44Id: null,
     priceDate: row.priceDate,
-    ticker: row.ticker,
+    ticker,
     assetId: target?.assetIds[0] ?? null,
-    market: row.market,
-    currency: row.currency,
+    market,
+    currency,
     closePrice,
-    adjustedClosePrice: row.adjustedClosePrice ?? closePrice,
+    adjustedClosePrice: row.adjustedClosePrice,
+    adjustedCloseBasis: row.adjustedCloseBasis,
+    adjustedCloseProvider: row.adjustedCloseProvider,
+    adjustedCloseSource: row.adjustedCloseSource,
+    adjustedCloseFetchedAt: row.adjustedCloseFetchedAt,
     closePriceKrw: row.closePriceKrw,
     fxRate: row.fxRate,
     source: row.source,
+    providerSymbol: normalizeTicker(row.providerSymbol),
+    providerExchange: row.providerExchange?.trim().toUpperCase() ?? null,
+    fetchedAt: row.fetchedAt,
     isSample: row.isSample ?? true,
     base44CreatedAt: null,
     base44UpdatedAt: null,
   };
 }
 
-async function findExistingAssetPriceSnapshot(ticker: string, priceDate: string) {
+async function findExistingAssetPriceSnapshot(
+  market: string,
+  currency: string,
+  ticker: string,
+  priceDate: string,
+) {
   const [existing] = await db
     .select()
     .from(assetPriceSnapshots)
     .where(
       and(
+        eq(assetPriceSnapshots.market, market),
+        eq(assetPriceSnapshots.currency, currency),
         eq(assetPriceSnapshots.ticker, ticker),
         eq(assetPriceSnapshots.priceDate, priceDate),
       ),
@@ -1241,6 +1313,19 @@ function isAllowedClosePriceSource(
   return false;
 }
 
+function isAllowedAdjustedCloseBasis(
+  basis: ClosePrice["adjustedCloseBasis"],
+  writePolicy: ClosePriceWritePolicy,
+) {
+  if (writePolicy === "stub_fixture") {
+    return basis === ADJUSTED_CLOSE_BASIS.syntheticFixture;
+  }
+  if (writePolicy === "kis") {
+    return basis === ADJUSTED_CLOSE_BASIS.provider;
+  }
+  return false;
+}
+
 function isKisClosePriceSource(source: string | null) {
   return (
     source === "kis_domestic_itemchartprice" ||
@@ -1284,15 +1369,40 @@ function snapshotMatches(
   existing: AssetPriceSnapshotRow,
   incoming: ReturnType<typeof toSnapshotInsert>,
 ) {
+  const adjustedCloseMatches =
+    incoming.adjustedClosePrice === null ||
+    sameNullableDecimal(
+      existing.adjustedClosePrice,
+      incoming.adjustedClosePrice,
+    );
+
   return (
     existing.assetId === incoming.assetId &&
     existing.market === incoming.market &&
     existing.currency === incoming.currency &&
     sameDecimal(existing.closePrice, incoming.closePrice) &&
-    sameDecimal(existing.adjustedClosePrice, incoming.adjustedClosePrice) &&
-    sameNullableDecimal(existing.closePriceKrw, incoming.closePriceKrw) &&
-    sameNullableDecimal(existing.fxRate, incoming.fxRate) &&
+    adjustedCloseMatches &&
+    preservesNullableText(
+      existing.adjustedCloseBasis,
+      incoming.adjustedCloseBasis,
+    ) &&
+    preservesNullableText(
+      existing.adjustedCloseProvider,
+      incoming.adjustedCloseProvider,
+    ) &&
+    preservesNullableText(
+      existing.adjustedCloseSource,
+      incoming.adjustedCloseSource,
+    ) &&
+    preservesNullableDate(
+      existing.adjustedCloseFetchedAt,
+      incoming.adjustedCloseFetchedAt,
+    ) &&
+    preservesNullableDecimal(existing.closePriceKrw, incoming.closePriceKrw) &&
+    preservesNullableDecimal(existing.fxRate, incoming.fxRate) &&
     existing.source === incoming.source &&
+    existing.providerSymbol === incoming.providerSymbol &&
+    existing.providerExchange === incoming.providerExchange &&
     existing.isSample === incoming.isSample
   );
 }
@@ -1371,6 +1481,10 @@ function isDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isValidDate(value: Date | null) {
+  return value instanceof Date && Number.isFinite(value.getTime());
+}
+
 function isDecimalString(value: string | null) {
   if (value === null) return false;
   return Number.isFinite(Number(value));
@@ -1397,6 +1511,18 @@ function sameDecimal(left: string, right: string) {
 function sameNullableDecimal(left: string | null, right: string | null) {
   if (left === null || right === null) return left === right;
   return sameDecimal(left, right);
+}
+
+function preservesNullableDecimal(left: string | null, right: string | null) {
+  return right === null || sameNullableDecimal(left, right);
+}
+
+function preservesNullableText(left: string | null, right: string | null) {
+  return right === null || left === right;
+}
+
+function preservesNullableDate(left: Date | null, right: Date | null) {
+  return right === null || left?.getTime() === right.getTime();
 }
 
 function toTargetKey(
