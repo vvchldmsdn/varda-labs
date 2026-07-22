@@ -319,6 +319,19 @@ remains unavailable. Expected turnover and improvement
 must appear only for an actual candidate strategy; they are not meaningful
 fallbacks for the current no-rebalance normalized buy-and-hold path.
 
+The v1 retrospective fan-band diagnostic uses the selected explicit end date
+and the previous six calendar service dates as seven fixed outcome endpoints.
+For each endpoint it requires one complete 153-row paired KRW-return matrix,
+uses only the first 90 rows to generate 500 stationary-bootstrap paths, and
+scores the resulting terminal P10/P50/P90 values against the following 63
+observed rows. Its scenario is an explicit KODEX 200 5,000 bps plus VOO 5,000
+bps initial-weight buy-and-hold path with no rebalancing. Missing evidence
+marks only that endpoint unavailable. The overlapping endpoints are not
+independent trials, are never ranked, and cannot select dates or retune model
+parameters. Coverage and median error are retrospective research diagnostics,
+not calibration pass/fail, account results, forecasts, recommendations, or
+orders.
+
 A partial job may expose progress, missing chunk count, and failure diagnostics
 only. It must not emit distribution bands, comparison metrics, optimizer input,
 or a reusable calculation artifact. Product calculation eligibility requires a
@@ -406,3 +419,7 @@ separate future contracts.
     auth, ownership, admission, resource, and persistence gates permit it.
 25. Add the separate parametric factor engine and point-in-time walk-forward
     validation before any optimizer is labeled useful.
+26. A read-only stationary fan-band validation history now scores the explicit
+    50:50 KODEX 200/VOO research path against seven fixed 63-row observed
+    outcomes. Tenant/account binding, persistence, tuning, provider backfill,
+    optimizer claims, and pass/fail calibration remain blocked.

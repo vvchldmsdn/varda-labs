@@ -6,6 +6,9 @@ describe("Simulation input readiness route boundary", () => {
   it("keeps the page server-rendered and the database adapter server-only", () => {
     const page = read("src/app/simulation/page.tsx");
     const query = read("src/db/queries/simulation-input-readiness.ts");
+    const fanBandQuery = read(
+      "src/db/queries/simulation-fan-band-validation.ts",
+    );
     const regimeQuery = read("src/db/queries/simulation-regime-bootstrap.ts");
     const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
     const view = readSimulationView();
@@ -14,10 +17,18 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(view, /["']use client["']/);
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
     assert.match(query, /^import "server-only";/);
+    assert.match(fanBandQuery, /^import "server-only";/);
     assert.match(regimeQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
+    assert.match(page, /getReadOnlySimulationFanBandValidation/);
+    assert.match(page, /fanBandValidationPromise/);
+    assert.match(page, /FanBandValidationSection/);
+    assert.match(
+      page,
+      /<Suspense fallback=\{<FanBandValidationSkeleton \/>\}>/,
+    );
     assert.match(page, /regimePromise/);
     assert.match(page, /RegimeReadinessHistoryPanel/);
     assert.match(page, /RegimeBootstrapResearchSection/);
@@ -51,12 +62,20 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeQuery, /Promise\.all/);
     assert.match(regimeQuery, /returnStepCount:/);
     assert.match(regimeQuery, /globalMarketFactors\.releaseDate/);
+    assert.match(fanBandQuery, /buildSimulationFanBandValidationHistory/);
+    assert.match(fanBandQuery, /buildSimulationInputReadinessDates/);
+    assert.match(fanBandQuery, /sourceReturnStepCount/);
+    assert.match(fanBandQuery, /getReadOnlySimulationPeriodPreflightBatch/);
     assert.doesNotMatch(
       query,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
     assert.doesNotMatch(
       regimeQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      fanBandQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
   });
@@ -92,6 +111,11 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-walk-forward-stability-ready-count/);
     assert.match(view, /data-walk-forward-stability-row/);
     assert.match(view, /data-walk-forward-stability-row-status/);
+    assert.match(view, /data-fan-band-validation/);
+    assert.match(view, /data-fan-band-validation-status/);
+    assert.match(view, /data-fan-band-validation-ready-count/);
+    assert.match(view, /data-fan-band-validation-row/);
+    assert.match(view, /data-fan-band-validation-row-status/);
     assert.match(view, /data-regime-bootstrap-research/);
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
@@ -197,6 +221,7 @@ function readSimulationView() {
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/walk-forward-min-volatility-section.tsx",
     "src/components/simulation/walk-forward-stability-history-section.tsx",
+    "src/components/simulation/fan-band-validation-section.tsx",
     "src/components/simulation/simulation-path-comparison-chart.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",

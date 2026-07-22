@@ -84,6 +84,11 @@ async function main() {
     simulation.body,
     /data-walk-forward-stability-status="(?:ready|partial|unavailable)"/,
   );
+  assert.match(simulation.body, /data-fan-band-validation/);
+  assert.match(
+    simulation.body,
+    /data-fan-band-validation-status="(?:ready|partial|unavailable)"/,
+  );
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
@@ -155,6 +160,19 @@ async function main() {
   const parsedWalkForwardStabilityReadyCount = Number(
     walkForwardStabilityReadyCount ?? 0,
   );
+  const fanBandValidationStatus = simulation.body.match(
+    /data-fan-band-validation-status="(ready|partial|unavailable)"/,
+  )?.[1];
+  const fanBandValidationRows = [
+    ...simulation.body.matchAll(
+      /data-fan-band-validation-row="(\d{4}-\d{2}-\d{2})"/g,
+    ),
+  ].map((match) => match[1]);
+  const fanBandValidationReadyCount = Number(
+    simulation.body.match(
+      /data-fan-band-validation-ready-count="(\d+)"/,
+    )?.[1] ?? 0,
+  );
   const jointSelectionStatus = simulation.body.match(
     /data-joint-research-selection-status="(default|selected|invalid)"/,
   )?.[1];
@@ -220,6 +238,10 @@ async function main() {
   assert.ok(
     walkForwardStabilityStatus,
     "simulation must render one walk-forward stability state",
+  );
+  assert.ok(
+    fanBandValidationStatus,
+    "simulation must render one fan-band validation state",
   );
   assert.ok(regimeStatus, "simulation must render regime research state");
   assert.equal(
@@ -487,6 +509,9 @@ async function main() {
         walkForwardStabilityRowCount: walkForwardStabilityRows.length,
         walkForwardStabilityReadyCount:
           parsedWalkForwardStabilityReadyCount,
+        fanBandValidationStatus,
+        fanBandValidationRowCount: fanBandValidationRows.length,
+        fanBandValidationReadyCount,
         jointSelectionStatus,
         regimeStatus,
         regimeReadyCount,
