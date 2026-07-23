@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:vercel": "node --no-warnings scripts/vercel-build.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "node --no-warnings tests/run.mjs",
