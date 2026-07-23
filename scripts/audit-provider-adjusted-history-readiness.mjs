@@ -66,11 +66,9 @@ async function main() {
       catalog.exact_instrument_date_unique === true,
     legacyTickerDateUnique: catalog.legacy_ticker_date_unique === true,
   };
-  const fxCoverage =
-    Number(fx.duplicate_dates ?? 0) === 0 &&
-    Number(fx.conflicting_value_dates ?? 0) === 0
-      ? "complete"
-      : "incomplete";
+  // This provider-level audit has no exact instrument request window.
+  // Global duplicate counts are diagnostic only and cannot prove FX coverage.
+  const exactWindowFxCoverage = "incomplete";
   const candidates = [
     evaluateProviderAdjustedHistoryReadiness({
       provider: "kis_domestic_history_candidate",
@@ -98,7 +96,7 @@ async function main() {
       corporateActionParity: "unproven",
       correctionPolicy: "unproven",
       duplicatePolicy: "unproven",
-      fxCoverage,
+      fxCoverage: exactWindowFxCoverage,
     }),
   ];
 
@@ -117,9 +115,11 @@ async function main() {
           ),
         },
         fx: {
+          scope: "global_diagnostic_only",
           duplicateDates: Number(fx.duplicate_dates ?? 0),
           conflictingValueDates: Number(fx.conflicting_value_dates ?? 0),
-          coverageStatus: fxCoverage,
+          candidateCoverageStatus:
+            "not_evaluated_without_exact_instrument_window",
         },
         candidates,
         nextBoundary:

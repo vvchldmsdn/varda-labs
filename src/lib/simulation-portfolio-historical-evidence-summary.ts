@@ -16,6 +16,21 @@ export type SimulationPortfolioEvidenceSummary = Readonly<{
     | "eligible_instrument_subset"
     | "partial_modeled_instrument_subset"
     | "diagnostics_only";
+  consumerAuthority:
+    | "full_portfolio_research"
+    | "eligible_subset_research"
+    | "partial_subset_research_only"
+    | "diagnostics_only";
+  weightPolicy: "preserve_original_weight_mass_without_renormalization";
+  forbiddenConsumers: readonly (
+    | "research_fan"
+    | "current_portfolio_label"
+    | "target_comparison"
+    | "current_vs_candidate_comparison"
+    | "optimizer"
+    | "recommendation"
+    | "order"
+  )[];
   diagnosticStatus: "ready" | "partial" | "unavailable";
   totalPositiveWeightBps: number;
   admittedWeightBps: number;
@@ -70,6 +85,14 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
           ? "ready_eligible_subset"
           : "ready_full_portfolio";
   const readyCount = admitted.length;
+  const consumerAuthority =
+    status === "ready_full_portfolio"
+      ? ("full_portfolio_research" as const)
+      : status === "ready_eligible_subset"
+        ? ("eligible_subset_research" as const)
+        : status === "partial_modeled_subset"
+          ? ("partial_subset_research_only" as const)
+          : ("diagnostics_only" as const);
 
   return Object.freeze({
     status,
@@ -81,6 +104,9 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
           : status === "partial_modeled_subset"
             ? "partial_modeled_instrument_subset"
             : "diagnostics_only",
+    consumerAuthority,
+    weightPolicy: "preserve_original_weight_mass_without_renormalization",
+    forbiddenConsumers: forbiddenConsumersFor(consumerAuthority),
     diagnosticStatus:
       readyCount === positiveEntries.length && positiveEntries.length > 0
         ? "ready"
@@ -98,4 +124,23 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
 
 function sumWeights(entries: readonly SimulationPortfolioEvidenceEntry[]) {
   return entries.reduce((sum, entry) => sum + entry.weightBps, 0);
+}
+
+function forbiddenConsumersFor(
+  authority: SimulationPortfolioEvidenceSummary["consumerAuthority"],
+): SimulationPortfolioEvidenceSummary["forbiddenConsumers"] {
+  const alwaysForbidden = ["optimizer", "recommendation", "order"] as const;
+  if (authority === "full_portfolio_research") {
+    return Object.freeze([...alwaysForbidden]);
+  }
+
+  const subsetRestrictions = [
+    "current_portfolio_label",
+    "target_comparison",
+    "current_vs_candidate_comparison",
+    ...alwaysForbidden,
+  ] as const;
+  return authority === "diagnostics_only"
+    ? Object.freeze(["research_fan", ...subsetRestrictions])
+    : Object.freeze([...subsetRestrictions]);
 }

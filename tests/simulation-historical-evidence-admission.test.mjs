@@ -159,6 +159,20 @@ describe("Simulation historical evidence admission", () => {
       goldBlockedSubset.displayAuthority,
       "partial_modeled_instrument_subset",
     );
+    assert.equal(
+      goldBlockedSubset.consumerAuthority,
+      "partial_subset_research_only",
+    );
+    assert.equal(
+      goldBlockedSubset.weightPolicy,
+      "preserve_original_weight_mass_without_renormalization",
+    );
+    assert.ok(
+      goldBlockedSubset.forbiddenConsumers.includes(
+        "current_portfolio_label",
+      ),
+    );
+    assert.ok(goldBlockedSubset.forbiddenConsumers.includes("optimizer"));
     assert.equal(goldBlockedSubset.explicitlyExcludedWeightBps, 0);
     assert.equal(goldBlockedSubset.manualHistoryRequiredWeightBps, 2_000);
     assert.equal(goldBlockedSubset.incompleteModeledWeightBps, 2_000);
@@ -177,6 +191,11 @@ describe("Simulation historical evidence admission", () => {
     );
     assert.equal(blockedSubset.diagnosticStatus, "partial");
     assert.equal(blockedSubset.incompleteModeledWeightBps, 5_000);
+    assert.ok(
+      blockedSubset.forbiddenConsumers.includes(
+        "current_vs_candidate_comparison",
+      ),
+    );
   });
 });
 

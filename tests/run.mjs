@@ -7,6 +7,7 @@ import "./portfolio-risk-input.test.mjs";
 import "./portfolio-risk.test.mjs";
 import "./portfolio-risk-read-model.test.mjs";
 import "./provider-adjusted-history-readiness.test.mjs";
+import "./provider-instrument-evidence-matrix.test.mjs";
 import "./portfolio-risk-route.test.mjs";
 import "./investment-lab-counterfactual-readiness.test.mjs";
 import "./investment-lab-event-flow.test.mjs";
