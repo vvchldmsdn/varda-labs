@@ -266,6 +266,8 @@ function instrumentStatusLabel(status: string) {
       return "Fount 제외";
     case "manual_history_required":
       return "금현물 수동 이력 필요";
+    case "identity_unresolved":
+      return "특수 종목 식별 불일치";
     case "zero_weight_not_evaluated":
       return "0% 행 보존";
     default:

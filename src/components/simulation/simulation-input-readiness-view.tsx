@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
+import { buildSimulationHref } from "@/lib/simulation-navigation";
 import { SIMULATION_RESEARCH_HORIZON_POLICY } from "@/lib/simulation-research-horizon";
 
 import { FixedMixResearchComparisonSection } from "./fixed-mix-research-comparison-section";
@@ -23,12 +24,14 @@ type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 export function SimulationInputReadinessView({
   model,
   historicalOutcomeValidation,
+  researchUniverse,
   researchUniversePreflight,
   regimeHistoricalOutcomeValidation,
   regimeBootstrap,
 }: {
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
+  researchUniverse: string | null;
   researchUniversePreflight?: ReactNode;
   regimeHistoricalOutcomeValidation?: ReactNode;
   regimeBootstrap?: ReactNode;
@@ -117,6 +120,7 @@ export function SimulationInputReadinessView({
         <ResearchHorizonSelector
           endServiceDate={explicitEndServiceDate}
           kodexWeightPct={selectedKodexWeightPct}
+          researchUniverse={researchUniverse}
           selectedHorizon={selectedResearchHorizon}
         />
         {researchUniversePreflight}
@@ -164,6 +168,7 @@ export function SimulationInputReadinessView({
                   recommendedEndServiceDate,
                   selectedKodexWeightPct,
                   selectedResearchHorizon,
+                  researchUniverse,
                 )
               : null
           }
@@ -174,6 +179,7 @@ export function SimulationInputReadinessView({
           endServiceDate={model.requestedEndServiceDate}
           execution={model.fixedMixResearchExecution}
           researchHorizon={selectedResearchHorizon}
+          researchUniverse={researchUniverse}
           selection={model.fixedMixSelection}
         />
         <FixedMixResearchComparisonSection
@@ -204,6 +210,7 @@ export function SimulationInputReadinessView({
               returnScaleMode={sharedReturnScale ? "shared" : "individual"}
               selectedKodexWeightPct={selectedKodexWeightPct}
               selectedResearchHorizon={selectedResearchHorizon}
+              researchUniverse={researchUniverse}
             />
           ))}
         </section>
@@ -214,6 +221,7 @@ export function SimulationInputReadinessView({
             selectedKodexWeightPct={selectedKodexWeightPct}
             selectedResearchHorizon={selectedResearchHorizon}
             selectedServiceDate={model.requestedEndServiceDate}
+            researchUniverse={researchUniverse}
           />
         ) : null}
 
@@ -241,10 +249,12 @@ function sharedNearestPriorDate(inputs: readonly InputReadiness[]) {
 function ResearchHorizonSelector({
   endServiceDate,
   kodexWeightPct,
+  researchUniverse,
   selectedHorizon,
 }: {
   endServiceDate: string | null;
   kodexWeightPct: number | null;
+  researchUniverse: string | null;
   selectedHorizon: 63 | 126;
 }) {
   return (
@@ -271,10 +281,11 @@ function ResearchHorizonSelector({
                   ? "rounded px-3 py-2 text-sm font-semibold text-white bg-[#173c35]"
                   : "rounded px-3 py-2 text-sm font-semibold text-[#33423a] hover:bg-[#eef1e8]"
               }
-              href={simulationResearchHref({
+              href={buildSimulationHref({
                 endServiceDate,
-                horizon,
                 kodexWeightPct,
+                researchHorizon: horizon,
+                researchUniverse,
               })}
               key={horizon}
               scroll={false}
@@ -293,11 +304,13 @@ function ReadinessHistory({
   selectedKodexWeightPct,
   selectedResearchHorizon,
   selectedServiceDate,
+  researchUniverse,
 }: {
   rows: readonly HistoryRow[];
   selectedKodexWeightPct: number | null;
   selectedResearchHorizon: 63 | 126;
   selectedServiceDate: string;
+  researchUniverse: string | null;
 }) {
   return (
     <section
@@ -366,6 +379,7 @@ function ReadinessHistory({
                           row.serviceDate,
                           selectedKodexWeightPct,
                           selectedResearchHorizon,
+                          researchUniverse,
                         )}
                         className="inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-xs font-semibold text-[#253029] hover:bg-[#eef1e8]"
                       >
@@ -419,12 +433,14 @@ function formatHistoryCoverage(
 function InputPanel({
   input,
   observedReturnScale,
+  researchUniverse,
   returnScaleMode,
   selectedKodexWeightPct,
   selectedResearchHorizon,
 }: {
   input: InputReadiness;
   observedReturnScale: number;
+  researchUniverse: string | null;
   returnScaleMode: "shared" | "individual";
   selectedKodexWeightPct: number | null;
   selectedResearchHorizon: 63 | 126;
@@ -536,6 +552,7 @@ function InputPanel({
               input.nearestPriorObservedServiceDate,
               selectedKodexWeightPct,
               selectedResearchHorizon,
+              researchUniverse,
             )}
             className="mt-4 inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-semibold text-[#253029] hover:bg-[#eef1e8]"
           >
@@ -628,27 +645,12 @@ function simulationDateHref(
   endServiceDate: string,
   kodexWeightPct: number | null,
   horizon: 63 | 126,
+  researchUniverse: string | null,
 ) {
-  return simulationResearchHref({
+  return buildSimulationHref({
     endServiceDate,
-    horizon,
     kodexWeightPct,
+    researchHorizon: horizon,
+    researchUniverse,
   });
-}
-
-function simulationResearchHref({
-  endServiceDate,
-  horizon,
-  kodexWeightPct,
-}: {
-  endServiceDate: string | null;
-  horizon: 63 | 126;
-  kodexWeightPct: number | null;
-}) {
-  const params = new URLSearchParams({ horizon: String(horizon) });
-  if (endServiceDate) params.set("end", endServiceDate);
-  if (kodexWeightPct !== null) {
-    params.set("kodexWeight", String(kodexWeightPct));
-  }
-  return `/simulation?${params}`;
 }

@@ -104,7 +104,14 @@ async function main() {
     EXPECT_RESEARCH_UNIVERSE_SELECTION,
     "research universe selection status did not match the requested smoke case",
   );
+  let researchUniversePreservedLinkCount = 0;
   if (EXPECT_RESEARCH_UNIVERSE_SELECTION === "valid") {
+    const requestedResearchUniverse =
+      RAW_QUERY_PARAMS?.get("researchUniverse") ?? null;
+    assert.ok(
+      requestedResearchUniverse,
+      "valid research universe smoke requires an explicit query value",
+    );
     assert.match(
       researchUniverseStatus ?? "",
       /^(?:stored_evidence_ready_for_separate_review|partial_diagnostics_only|diagnostics_only)$/,
@@ -112,6 +119,25 @@ async function main() {
     assert.ok(
       researchUniverseInstrumentStatuses.length > 0,
       "valid research universe must preserve per-instrument diagnostics",
+    );
+    const simulationHrefs = [
+      ...simulation.body.matchAll(/href="(\/simulation\?[^"]+)"/g),
+    ].map((match) => match[1].replaceAll("&amp;", "&"));
+    assert.ok(
+      simulationHrefs.length > 0,
+      "valid research universe must render internal simulation state links",
+    );
+    for (const href of simulationHrefs) {
+      assert.equal(
+        new URL(href, BASE_URL).searchParams.get("researchUniverse"),
+        requestedResearchUniverse,
+        `simulation state link dropped researchUniverse: ${href}`,
+      );
+    }
+    researchUniversePreservedLinkCount = simulationHrefs.length;
+    assert.ok(
+      (simulation.body.match(/name="researchUniverse"/g)?.length ?? 0) >= 2,
+      "research universe must remain in both its input and the fixed-mix form",
     );
   }
   if (EXPECT_INVALID_QUERY) {
@@ -660,6 +686,7 @@ async function main() {
         researchUniverseSelectionStatus,
         researchUniverseStatus,
         researchUniverseInstrumentStatuses,
+        researchUniversePreservedLinkCount,
         noAuthStatus: {
           dashboard: unauthorizedDashboard.status,
           simulation: unauthorized.status,

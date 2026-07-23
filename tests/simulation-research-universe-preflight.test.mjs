@@ -84,6 +84,47 @@ describe("Simulation research universe preflight", () => {
     assert.equal(model.summary.incompleteWeightBps, 2_000);
   });
 
+  it("requires exact reserved tuples for special-holding classification", () => {
+    const selection = resolveSimulationResearchUniverseSelection(
+      [
+        "managed:KRW:FOUNT:1000",
+        "managed:KRW:OTHER:1000",
+        "us:USD:FOUNT:1000",
+        "krx-gold:KRW:GOLD_9999_1KG:1000",
+        "krx-gold:KRW:OTHER:1000",
+        "korea:KRW:GOLD_9999_1KG:5000",
+      ].join(","),
+    );
+    assert.equal(selection.status, "valid");
+    assert.deepEqual(
+      selection.instruments.map((row) => row.classification),
+      [
+        "managed_sleeve",
+        "unresolved",
+        "listed_instrument",
+        "physical_commodity_position",
+        "unresolved",
+        "listed_instrument",
+      ],
+    );
+
+    const unresolved = buildSimulationResearchUniversePreflight({
+      selection: resolveSimulationResearchUniverseSelection(
+        "managed:KRW:OTHER:10000",
+      ),
+      requestedEndServiceDate: "2026-07-08",
+      preflight: null,
+      priceRows: [],
+      fxRows: [],
+    });
+    assert.equal(unresolved.status, "diagnostics_only");
+    assert.equal(
+      unresolved.instruments[0].status,
+      "identity_unresolved",
+    );
+    assert.equal(unresolved.summary.incompleteWeightBps, 10_000);
+  });
+
   it("keeps stored coverage but blocks execution review when provenance is absent", () => {
     const selection = resolveSimulationResearchUniverseSelection(
       "korea:KRW:069500:10000",

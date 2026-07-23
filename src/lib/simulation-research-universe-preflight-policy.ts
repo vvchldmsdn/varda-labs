@@ -1,5 +1,20 @@
 import type { PortfolioHoldingClassification } from "./portfolio-special-holdings.ts";
 
+export const SIMULATION_RESEARCH_UNIVERSE_SPECIAL_IDENTITIES = Object.freeze({
+  managedSleeve: Object.freeze({
+    market: "managed",
+    currency: "KRW",
+    ticker: "FOUNT",
+    classification: "managed_sleeve",
+  }),
+  krxGold: Object.freeze({
+    market: "krx-gold",
+    currency: "KRW",
+    ticker: "GOLD_9999_1KG",
+    classification: "physical_commodity_position",
+  }),
+} as const);
+
 export const SIMULATION_RESEARCH_UNIVERSE_PREFLIGHT_POLICY = Object.freeze({
   version: "simulation_research_universe_preflight_v1",
   queryParameter: "researchUniverse",
@@ -16,6 +31,8 @@ export const SIMULATION_RESEARCH_UNIVERSE_PREFLIGHT_POLICY = Object.freeze({
   runtimeTrustStatus: "not_established",
   managedSleevePolicy: "excluded_by_policy",
   physicalCommodityPolicy: "manual_history_required",
+  specialIdentityBinding: "exact_market_currency_ticker_tuple",
+  unrecognizedSpecialNamespace: "unresolved",
 } as const);
 
 export type SimulationResearchUniverseSelectionIssue =

@@ -56,6 +56,7 @@ export default async function SimulationPage({
     end: singleQueryValue(params.end),
     horizon: singleQueryValue(params.horizon),
     kodexWeight: singleQueryValue(params.kodexWeight),
+    researchUniverse: singleQueryValue(params.researchUniverse),
   });
 
   return (
@@ -101,6 +102,7 @@ async function SimulationContent({
     end: string | null;
     horizon: string | null;
     kodexWeight: string | null;
+    researchUniverse: string | null;
   }>;
 }) {
   const model = await modelPromise;
@@ -121,6 +123,7 @@ async function SimulationContent({
         </SimulationSectionErrorBoundary>
       }
       model={model}
+      researchUniverse={preservedQuery.researchUniverse}
       researchUniversePreflight={
         <SimulationSectionErrorBoundary
           section="research-universe-preflight"
@@ -174,6 +177,7 @@ async function ResearchUniversePreflightContent({
     end: string | null;
     horizon: string | null;
     kodexWeight: string | null;
+    researchUniverse: string | null;
   }>;
   resultPromise: ReturnType<
     typeof getReadOnlySimulationResearchUniversePreflight

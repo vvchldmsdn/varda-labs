@@ -19,6 +19,13 @@ describe("Simulation input readiness route boundary", () => {
     const researchUniverseQuery = read(
       "src/db/queries/simulation-research-universe-preflight.ts",
     );
+    const fixedMixView = read(
+      "src/components/simulation/fixed-mix-research-execution-section.tsx",
+    );
+    const inputReadinessView = read(
+      "src/components/simulation/simulation-input-readiness-view.tsx",
+    );
+    const navigation = read("src/lib/simulation-navigation.ts");
     const sectionErrorBoundary = read(
       "src/components/simulation/simulation-section-error-boundary.tsx",
     );
@@ -41,6 +48,16 @@ describe("Simulation input readiness route boundary", () => {
       page,
       /researchUniverse: params\.researchUniverse/,
     );
+    assert.match(
+      page,
+      /researchUniverse=\{preservedQuery\.researchUniverse\}/,
+    );
+    assert.match(inputReadinessView, /buildSimulationHref/);
+    assert.doesNotMatch(inputReadinessView, /new URLSearchParams/);
+    assert.match(fixedMixView, /buildSimulationHref/);
+    assert.match(fixedMixView, /name="researchUniverse"/);
+    assert.doesNotMatch(fixedMixView, /new URLSearchParams/);
+    assert.match(navigation, /params\.set\("researchUniverse"/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
     assert.match(
       page,

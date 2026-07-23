@@ -1,6 +1,7 @@
 import type { PortfolioHoldingClassification } from "./portfolio-special-holdings.ts";
 import {
   SIMULATION_RESEARCH_UNIVERSE_PREFLIGHT_POLICY,
+  SIMULATION_RESEARCH_UNIVERSE_SPECIAL_IDENTITIES,
   type SimulationResearchUniverseInstrument,
   type SimulationResearchUniverseSelection,
   type SimulationResearchUniverseSelectionIssue,
@@ -98,7 +99,11 @@ export function resolveSimulationResearchUniverseSelection(
         currency,
         ticker,
         weightBps,
-        classification: classifyResearchInstrument({ market, ticker }),
+        classification: classifyResearchInstrument({
+          market,
+          currency,
+          ticker,
+        }),
       }),
     );
   }
@@ -148,16 +153,25 @@ function invalidSelection(
 
 function classifyResearchInstrument(input: {
   market: string;
+  currency: "KRW" | "USD";
   ticker: string;
 }): PortfolioHoldingClassification {
-  if (input.ticker === "FOUNT" || input.market === "managed") {
-    return "managed_sleeve";
-  }
+  const identity = `${input.market}|${input.currency}|${input.ticker}`;
+  const managed = SIMULATION_RESEARCH_UNIVERSE_SPECIAL_IDENTITIES.managedSleeve;
   if (
-    input.ticker === "GOLD_9999_1KG" ||
-    input.market === "krx-gold"
+    identity ===
+    `${managed.market}|${managed.currency}|${managed.ticker}`
   ) {
-    return "physical_commodity_position";
+    return managed.classification;
+  }
+  const gold = SIMULATION_RESEARCH_UNIVERSE_SPECIAL_IDENTITIES.krxGold;
+  if (
+    identity === `${gold.market}|${gold.currency}|${gold.ticker}`
+  ) {
+    return gold.classification;
+  }
+  if (input.market === managed.market || input.market === gold.market) {
+    return "unresolved";
   }
   return "listed_instrument";
 }

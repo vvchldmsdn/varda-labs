@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import type { KodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-selection";
 import type { FixedMixResearchSimulationResult } from "@/lib/simulation-fixed-mix-research-execution";
+import { buildSimulationHref } from "@/lib/simulation-navigation";
 
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
@@ -16,11 +17,13 @@ export function FixedMixResearchExecutionSection({
   endServiceDate,
   execution,
   researchHorizon,
+  researchUniverse,
   selection,
 }: {
   endServiceDate: string;
   execution: FixedMixResearchSimulationResult | null;
   researchHorizon: 63 | 126;
+  researchUniverse: string | null;
   selection: KodexVooFixedMixSelection;
 }) {
   if (!execution) return null;
@@ -58,11 +61,13 @@ export function FixedMixResearchExecutionSection({
           endServiceDate={endServiceDate}
           kodexWeightPct={kodexWeightPct}
           researchHorizon={researchHorizon}
+          researchUniverse={researchUniverse}
           vooWeightPct={vooWeightPct}
         />
         <PresetLinks
           endServiceDate={endServiceDate}
           researchHorizon={researchHorizon}
+          researchUniverse={researchUniverse}
         />
       </div>
 
@@ -170,11 +175,13 @@ function MixForm({
   endServiceDate,
   kodexWeightPct,
   researchHorizon,
+  researchUniverse,
   vooWeightPct,
 }: {
   endServiceDate: string;
   kodexWeightPct: number;
   researchHorizon: 63 | 126;
+  researchUniverse: string | null;
   vooWeightPct: number;
 }) {
   return (
@@ -183,6 +190,13 @@ function MixForm({
         <input name="end" type="hidden" value={endServiceDate} />
       ) : null}
       <input name="horizon" type="hidden" value={researchHorizon} />
+      {researchUniverse !== null ? (
+        <input
+          name="researchUniverse"
+          type="hidden"
+          value={researchUniverse}
+        />
+      ) : null}
       <label className="grid gap-1 text-xs font-semibold text-[#586358]">
         KODEX 200 최초 비중
         <span className="flex items-center overflow-hidden rounded-md border border-[#cfd5c9] bg-white">
@@ -215,20 +229,25 @@ function MixForm({
 function PresetLinks({
   endServiceDate,
   researchHorizon,
+  researchUniverse,
 }: {
   endServiceDate: string;
   researchHorizon: 63 | 126;
+  researchUniverse: string | null;
 }) {
   return (
     <nav aria-label="공동 연구 비중 예시" className="flex flex-wrap gap-2">
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
           className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
-          href={simulationHref(
-            endServiceDate,
+          href={buildSimulationHref({
+            endServiceDate: isDateKey(endServiceDate)
+              ? endServiceDate
+              : null,
             kodexWeightPct,
             researchHorizon,
-          )}
+            researchUniverse,
+          })}
           key={kodexWeightPct}
           scroll={false}
         >
@@ -237,19 +256,6 @@ function PresetLinks({
       ))}
     </nav>
   );
-}
-
-function simulationHref(
-  endServiceDate: string,
-  kodexWeightPct: number,
-  researchHorizon: 63 | 126,
-) {
-  const params = new URLSearchParams({
-    horizon: String(researchHorizon),
-    kodexWeight: String(kodexWeightPct),
-  });
-  if (isDateKey(endServiceDate)) params.set("end", endServiceDate);
-  return `/simulation?${params}`;
 }
 
 function isDateKey(value: string) {

@@ -86,6 +86,9 @@ export function buildSimulationResearchUniversePreflight(input: {
     if (instrument.classification === "physical_commodity_position") {
       return terminalInstrument(instrument, "manual_history_required");
     }
+    if (instrument.classification === "unresolved") {
+      return terminalInstrument(instrument, "identity_unresolved");
+    }
 
     const priceRows = input.priceRows.filter((row) =>
       matchesInstrument(row, instrument),
@@ -159,7 +162,8 @@ function terminalInstrument(
   status:
     | "zero_weight_not_evaluated"
     | "excluded_by_policy"
-    | "manual_history_required",
+    | "manual_history_required"
+    | "identity_unresolved",
 ) {
   return Object.freeze({
     ...instrument,
@@ -325,6 +329,7 @@ function summarizeWeights(
       | "zero_weight_not_evaluated"
       | "excluded_by_policy"
       | "manual_history_required"
+      | "identity_unresolved"
       | "stored_coverage_incomplete"
       | "provenance_incomplete"
       | "provenance_ready_for_separate_review";
