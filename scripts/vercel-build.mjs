@@ -6,7 +6,12 @@ const PREVIEW_ENVIRONMENT = "preview";
 
 export function getVercelBuildSteps(vercelEnvironment) {
   return vercelEnvironment === PREVIEW_ENVIRONMENT
-    ? ["db:migrate", "build"]
+    ? [
+        "db:preview:preflight",
+        "db:migrate",
+        "db:preview:postflight",
+        "build",
+      ]
     : ["build"];
 }
 
@@ -19,10 +24,17 @@ export function runVercelBuild({
   platform = process.platform,
   log = console.log,
 } = {}) {
-  if (vercelEnvironment === PREVIEW_ENVIRONMENT && !env.DATABASE_URL) {
-    throw new Error(
-      "[vercel-build] DATABASE_URL is required before migrating a Preview database.",
-    );
+  if (vercelEnvironment === PREVIEW_ENVIRONMENT) {
+    const missing = [
+      "DATABASE_URL",
+      "DATABASE_URL_UNPOOLED",
+      "NEON_PROJECT_ID",
+    ].filter((name) => !env[name]?.trim());
+    if (missing.length > 0) {
+      throw new Error(
+        `[vercel-build] Preview database evidence requires: ${missing.join(", ")}.`,
+      );
+    }
   }
 
   const steps = getVercelBuildSteps(vercelEnvironment);

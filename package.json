@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:vercel": "node --no-warnings scripts/vercel-build.mjs",
+    "db:preview:preflight": "node --no-warnings scripts/preview-database-evidence.mjs --phase preflight",
+    "db:preview:postflight": "node --no-warnings scripts/preview-database-evidence.mjs --phase postflight",
     "start": "next start",
     "lint": "eslint",
     "test": "node --no-warnings tests/run.mjs",

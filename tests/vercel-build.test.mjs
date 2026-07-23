@@ -10,7 +10,9 @@ import {
 describe("Vercel build database boundary", () => {
   it("migrates the isolated Preview database before building", () => {
     assert.deepEqual(getVercelBuildSteps("preview"), [
+      "db:preview:preflight",
       "db:migrate",
+      "db:preview:postflight",
       "build",
     ]);
   });
@@ -31,7 +33,7 @@ describe("Vercel build database boundary", () => {
           },
           log: () => {},
         }),
-      /DATABASE_URL is required/,
+      /DATABASE_URL, DATABASE_URL_UNPOOLED, NEON_PROJECT_ID/,
     );
   });
 
@@ -39,6 +41,8 @@ describe("Vercel build database boundary", () => {
     const calls = [];
     const env = {
       DATABASE_URL: "postgresql://example.invalid/preview",
+      DATABASE_URL_UNPOOLED: "postgresql://example.invalid/preview",
+      NEON_PROJECT_ID: "synthetic-project",
       VERCEL_ENV: "preview",
       npm_execpath: "/opt/npm/bin/npm-cli.js",
     };
@@ -58,7 +62,23 @@ describe("Vercel build database boundary", () => {
       [
         {
           command: "/usr/bin/node",
+          args: [
+            "/opt/npm/bin/npm-cli.js",
+            "run",
+            "db:preview:preflight",
+          ],
+        },
+        {
+          command: "/usr/bin/node",
           args: ["/opt/npm/bin/npm-cli.js", "run", "db:migrate"],
+        },
+        {
+          command: "/usr/bin/node",
+          args: [
+            "/opt/npm/bin/npm-cli.js",
+            "run",
+            "db:preview:postflight",
+          ],
         },
         {
           command: "/usr/bin/node",
@@ -78,18 +98,22 @@ describe("Vercel build database boundary", () => {
         runVercelBuild({
           env: {
             DATABASE_URL: "postgresql://example.invalid/preview",
+            DATABASE_URL_UNPOOLED:
+              "postgresql://example.invalid/preview",
+            NEON_PROJECT_ID: "synthetic-project",
             VERCEL_ENV: "preview",
           },
           platform: "linux",
           spawn: (_command, args) => {
-            scripts.push(args.at(-1));
-            return { status: 1 };
+            const script = args.at(-1);
+            scripts.push(script);
+            return { status: script === "db:migrate" ? 1 : 0 };
           },
           log: () => {},
         }),
       /db:migrate failed with exit code 1/,
     );
-    assert.deepEqual(scripts, ["db:migrate"]);
+    assert.deepEqual(scripts, ["db:preview:preflight", "db:migrate"]);
   });
 
   it("uses a platform npm executable when npm_execpath is unavailable", () => {

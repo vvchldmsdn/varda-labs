@@ -35,6 +35,9 @@ const EXPECT_HORIZON = numberArgument("--expect-horizon") ?? 63;
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
+const USE_REMOTE_DATABASE_EVIDENCE = process.argv.includes(
+  "--remote-db-evidence",
+);
 const HAS_EXPLICIT_END =
   END_SERVICE_DATE !== null ||
   RAW_QUERY_PARAMS?.has("end");
@@ -46,7 +49,11 @@ const LEAK_PATTERN =
   /legacyBase44Id|holdingId|assetId|ownerUser|api[_-]?key|authorization|password|secret|token|scenarioVectorHash|matrixRequestHash|inputMatrixHash|drawPlanHash|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
+if (!USE_REMOTE_DATABASE_EVIDENCE && !process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL is required unless --remote-db-evidence is enabled",
+  );
+}
 if (![63, 126].includes(EXPECT_HORIZON)) {
   throw new Error("--expect-horizon must be 63 or 126");
 }
@@ -60,7 +67,9 @@ if (
   );
 }
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = USE_REMOTE_DATABASE_EVIDENCE
+  ? null
+  : neon(process.env.DATABASE_URL);
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
 const simulationPath =
   RAW_QUERY !== null
@@ -70,6 +79,16 @@ const simulationPath =
       : "/simulation";
 
 async function main() {
+  if (USE_REMOTE_DATABASE_EVIDENCE) {
+    const unauthorizedEvidence = await request(
+      "/admin/preview-db-evidence",
+    );
+    assert.equal(
+      unauthorizedEvidence.status,
+      401,
+      "no-auth Preview database evidence must return 401",
+    );
+  }
   const countsBefore = await readCounts();
   const unauthorized = await request(simulationPath);
   const unauthorizedDashboard = await request("/");
@@ -734,6 +753,9 @@ async function main() {
         priceCarryCounts,
         fxCarryCounts,
         databaseSideEffects: false,
+        databaseEvidenceSource: USE_REMOTE_DATABASE_EVIDENCE
+          ? "preview_runtime_route"
+          : "local_database_url",
         counts: countsAfter,
       },
       null,
@@ -752,6 +774,28 @@ async function request(path, authenticated = false) {
 }
 
 async function readCounts() {
+  if (USE_REMOTE_DATABASE_EVIDENCE) {
+    const response = await request("/admin/preview-db-evidence", true);
+    assert.equal(
+      response.status,
+      200,
+      "authenticated Preview database evidence must return 200",
+    );
+    const evidence = JSON.parse(response.body);
+    assert.equal(evidence.evidenceVersion, "preview_database_evidence_v1");
+    assert.equal(evidence.status, "attested");
+    assert.equal(evidence.catalogStatus, "reviewed_0019_present");
+    assert.equal(evidence.latestReviewedMigration, "0019_lush_maddog");
+    assert.match(evidence.targetFingerprint, /^sha256:[0-9a-f]{64}$/);
+    return {
+      assets: evidence.rowCounts.assets,
+      price_snapshots: evidence.rowCounts.priceSnapshots,
+      fx_rates: evidence.rowCounts.fxRates,
+      approval_revisions: evidence.rowCounts.approvalRevisions,
+      target_fingerprint: evidence.targetFingerprint,
+    };
+  }
+
   const [row] = await sql.query(`
     select
       (select count(*)::int from assets) as assets,
