@@ -121,6 +121,14 @@ describe("Simulation historical evidence admission", () => {
       priceRows: [],
       fxRows: [],
     });
+    const gold = admitSimulationHistoricalEvidence({
+      classification: "physical_commodity_position",
+      instrument: instrument("korea", "KRW", null),
+      providerBinding: null,
+      requestedServiceDates: SERVICE_DATES,
+      priceRows: [],
+      fxRows: [],
+    });
     const incomplete = admitSimulationHistoricalEvidence({
       classification: "listed_instrument",
       instrument: instrument("us", "USD", "QQQ"),
@@ -139,13 +147,34 @@ describe("Simulation historical evidence admission", () => {
     assert.equal(eligibleSubset.status, "ready_eligible_subset");
     assert.equal(eligibleSubset.displayAuthority, "eligible_instrument_subset");
     assert.equal(eligibleSubset.explicitlyExcludedWeightBps, 2_000);
+    assert.equal(eligibleSubset.manualHistoryRequiredWeightBps, 0);
+
+    const goldBlockedSubset =
+      summarizeSimulationPortfolioHistoricalEvidence([
+        { weightBps: 8_000, admission: ready },
+        { weightBps: 2_000, admission: gold },
+      ]);
+    assert.equal(goldBlockedSubset.status, "partial_modeled_subset");
+    assert.equal(
+      goldBlockedSubset.displayAuthority,
+      "partial_modeled_instrument_subset",
+    );
+    assert.equal(goldBlockedSubset.explicitlyExcludedWeightBps, 0);
+    assert.equal(goldBlockedSubset.manualHistoryRequiredWeightBps, 2_000);
+    assert.equal(goldBlockedSubset.incompleteModeledWeightBps, 2_000);
+    assert.ok(
+      goldBlockedSubset.blockers.includes("manual_history_required"),
+    );
 
     const blockedSubset = summarizeSimulationPortfolioHistoricalEvidence([
       { weightBps: 5_000, admission: ready },
       { weightBps: 5_000, admission: incomplete },
     ]);
-    assert.equal(blockedSubset.status, "unavailable");
-    assert.equal(blockedSubset.displayAuthority, "diagnostics_only");
+    assert.equal(blockedSubset.status, "partial_modeled_subset");
+    assert.equal(
+      blockedSubset.displayAuthority,
+      "partial_modeled_instrument_subset",
+    );
     assert.equal(blockedSubset.diagnosticStatus, "partial");
     assert.equal(blockedSubset.incompleteModeledWeightBps, 5_000);
   });

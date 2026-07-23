@@ -6,15 +6,21 @@ export type SimulationPortfolioEvidenceEntry = Readonly<{
 }>;
 
 export type SimulationPortfolioEvidenceSummary = Readonly<{
-  status: "ready_full_portfolio" | "ready_eligible_subset" | "unavailable";
+  status:
+    | "ready_full_portfolio"
+    | "ready_eligible_subset"
+    | "partial_modeled_subset"
+    | "unavailable";
   displayAuthority:
     | "current_full_portfolio"
     | "eligible_instrument_subset"
+    | "partial_modeled_instrument_subset"
     | "diagnostics_only";
   diagnosticStatus: "ready" | "partial" | "unavailable";
   totalPositiveWeightBps: number;
   admittedWeightBps: number;
   explicitlyExcludedWeightBps: number;
+  manualHistoryRequiredWeightBps: number;
   incompleteModeledWeightBps: number;
   blockers: readonly string[];
 }>;
@@ -31,16 +37,16 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
   const admitted = positiveEntries.filter(
     (entry) => entry.admission.status === "ready",
   );
-  const explicitlyExcluded = positiveEntries.filter((entry) =>
-    ["excluded_by_policy", "manual_history_required"].includes(
-      entry.admission.status,
-    ),
+  const explicitlyExcluded = positiveEntries.filter(
+    (entry) => entry.admission.status === "excluded_by_policy",
+  );
+  const manualHistoryRequired = positiveEntries.filter(
+    (entry) => entry.admission.status === "manual_history_required",
   );
   const incompleteModeled = positiveEntries.filter(
     (entry) =>
       entry.admission.status !== "ready" &&
-      entry.admission.status !== "excluded_by_policy" &&
-      entry.admission.status !== "manual_history_required",
+      entry.admission.status !== "excluded_by_policy",
   );
   const blockers = new Set<string>();
 
@@ -53,13 +59,16 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
   const totalPositiveWeightBps = sumWeights(positiveEntries);
   const admittedWeightBps = sumWeights(admitted);
   const explicitlyExcludedWeightBps = sumWeights(explicitlyExcluded);
+  const manualHistoryRequiredWeightBps = sumWeights(manualHistoryRequired);
   const incompleteModeledWeightBps = sumWeights(incompleteModeled);
   const status =
-    !invalidWeight && incompleteModeled.length === 0 && admitted.length > 0
-      ? explicitlyExcluded.length > 0
-        ? "ready_eligible_subset"
-        : "ready_full_portfolio"
-      : "unavailable";
+    invalidWeight || admitted.length === 0
+      ? "unavailable"
+      : incompleteModeled.length > 0
+        ? "partial_modeled_subset"
+        : explicitlyExcluded.length > 0
+          ? "ready_eligible_subset"
+          : "ready_full_portfolio";
   const readyCount = admitted.length;
 
   return Object.freeze({
@@ -69,7 +78,9 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
         ? "current_full_portfolio"
         : status === "ready_eligible_subset"
           ? "eligible_instrument_subset"
-          : "diagnostics_only",
+          : status === "partial_modeled_subset"
+            ? "partial_modeled_instrument_subset"
+            : "diagnostics_only",
     diagnosticStatus:
       readyCount === positiveEntries.length && positiveEntries.length > 0
         ? "ready"
@@ -79,6 +90,7 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
     totalPositiveWeightBps,
     admittedWeightBps,
     explicitlyExcludedWeightBps,
+    manualHistoryRequiredWeightBps,
     incompleteModeledWeightBps,
     blockers: Object.freeze([...blockers].sort()),
   });
