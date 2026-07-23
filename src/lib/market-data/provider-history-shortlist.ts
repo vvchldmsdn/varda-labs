@@ -84,7 +84,7 @@ export function buildProviderHistoryShortlist(input: {
       candidate.nextAction !== "blocked_invalid_evidence" &&
       candidate.nextAction !== "reject_not_supported",
   );
-  const nearestDistance =
+  const firstActionOrder =
     selectable.length > 0
       ? Math.min(
           ...selectable.map(
@@ -92,13 +92,13 @@ export function buildProviderHistoryShortlist(input: {
           ),
         )
       : null;
-  const nearestNextActionProviderIds =
-    nearestDistance === null
+  const firstRequiredActionProviderIds =
+    firstActionOrder === null
       ? []
       : selectable
           .filter(
             (candidate) =>
-              ACTION_DISTANCE[candidate.nextAction] === nearestDistance,
+              ACTION_DISTANCE[candidate.nextAction] === firstActionOrder,
           )
           .map((candidate) => candidate.providerId!)
           .sort();
@@ -110,8 +110,8 @@ export function buildProviderHistoryShortlist(input: {
     candidates: Object.freeze(candidates),
     summary: Object.freeze({
       candidateCount: candidates.length,
-      nearestNextActionProviderIds: Object.freeze(
-        nearestNextActionProviderIds,
+      firstRequiredActionProviderIds: Object.freeze(
+        firstRequiredActionProviderIds,
       ),
       duplicateProviderIds: Object.freeze(duplicateProviderIds),
       providerAdoptionAdmitted: false,

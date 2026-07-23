@@ -23,10 +23,12 @@ type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 export function SimulationInputReadinessView({
   model,
   historicalOutcomeValidation,
+  regimeHistoricalOutcomeValidation,
   regimeBootstrap,
 }: {
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
+  regimeHistoricalOutcomeValidation?: ReactNode;
   regimeBootstrap?: ReactNode;
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
@@ -182,6 +184,7 @@ export function SimulationInputReadinessView({
           result={model.walkForwardStabilityHistory}
         />
         {historicalOutcomeValidation}
+        {regimeHistoricalOutcomeValidation}
         {regimeBootstrap}
 
         <section

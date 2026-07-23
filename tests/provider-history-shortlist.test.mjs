@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { buildProviderHistoryShortlist } from "../src/lib/market-data/provider-history-shortlist.ts";
 
 describe("Provider history shortlist", () => {
-  it("selects the closest candidate without treating a required contract as admitted", () => {
+  it("lists candidates whose policy-ordered first required action appears earliest", () => {
     const result = buildProviderHistoryShortlist({
       ...request(),
       candidates: [
@@ -22,7 +22,7 @@ describe("Provider history shortlist", () => {
       ],
     });
 
-    assert.deepEqual(result.summary.nearestNextActionProviderIds, [
+    assert.deepEqual(result.summary.firstRequiredActionProviderIds, [
       "eodhd",
     ]);
     assert.equal(result.summary.providerAdoptionAdmitted, false);
@@ -132,7 +132,7 @@ describe("Provider history shortlist", () => {
     assert.deepEqual(result.summary.duplicateProviderIds, [
       "fixture_provider",
     ]);
-    assert.deepEqual(result.summary.nearestNextActionProviderIds, []);
+    assert.deepEqual(result.summary.firstRequiredActionProviderIds, []);
     assert.ok(
       result.candidates.every(
         (row) => row.nextAction === "blocked_invalid_evidence",

@@ -109,6 +109,14 @@ async function main() {
   assert.match(simulation.body, /data-regime-readiness-history/);
   assert.match(
     simulation.body,
+    /data-regime-historical-outcome-validation/,
+  );
+  assert.match(
+    simulation.body,
+    /data-regime-historical-outcome-validation-status="(?:ready|partial|unavailable)"/,
+  );
+  assert.match(
+    simulation.body,
     /data-regime-point-in-time-status="not_established"/,
   );
   assert.match(simulation.body, /data-regime-safe-date-count="0"/);
@@ -231,6 +239,13 @@ async function main() {
   const regimeHistoryRowCount =
     simulation.body.match(/data-regime-history-date="\d{4}-\d{2}-\d{2}"/g)
       ?.length ?? 0;
+  const regimeHistoricalOutcomeStatus = simulation.body.match(
+    /data-regime-historical-outcome-validation-status="(ready|partial|unavailable)"/,
+  )?.[1];
+  const regimeHistoricalOutcomeRows =
+    simulation.body.match(
+      /data-regime-historical-outcome-row="\d{4}-\d{2}-\d{2}"/g,
+    )?.length ?? 0;
   const expectedJointSelectionStatus = EXPECT_INVALID_WEIGHT
     ? "invalid"
     : EXPECT_KODEX_WEIGHT_PCT === null
@@ -302,6 +317,10 @@ async function main() {
     "shared historical outcome sections must expose one ready count",
   );
   assert.ok(regimeStatus, "simulation must render regime research state");
+  assert.ok(
+    regimeHistoricalOutcomeStatus,
+    "simulation must render retrospective regime outcome validation state",
+  );
   assert.equal(
     jointSelectionStatus,
     expectedJointSelectionStatus,
@@ -322,6 +341,11 @@ async function main() {
     regimeHistoryRowCount,
     EXPECT_INVALID_QUERY ? 0 : 7,
     "simulation rendered an unexpected regime readiness history row count",
+  );
+  assert.equal(
+    regimeHistoricalOutcomeRows,
+    EXPECT_INVALID_QUERY ? 0 : 7,
+    "simulation rendered an unexpected retrospective regime outcome row count",
   );
   assert.equal(
     observedReturnSeriesCount,
@@ -588,6 +612,8 @@ async function main() {
         regimeSelectedScenarioCount,
         regimeFactorCount,
         regimeHistoryRowCount,
+        regimeHistoricalOutcomeStatus,
+        regimeHistoricalOutcomeRows,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,

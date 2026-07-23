@@ -30,10 +30,10 @@ console.log(
       request: REQUEST,
       result,
       interpretation: {
-        nearestNextActionProviderIds:
-          result.summary.nearestNextActionProviderIds,
+        firstRequiredActionProviderIds:
+          result.summary.firstRequiredActionProviderIds,
         selectionMeaning:
-          "Fewest remaining evidence stages only. This is not a provider recommendation or adoption decision.",
+          "Candidates whose policy-ordered first required action appears earliest. This is not evidence-counting, procurement ranking, provider recommendation, or adoption.",
         sourceAuthority:
           "Vendor-aggregated historical research evidence only. Never current valuation, official close, or the observed portfolio path.",
         productBoundary:

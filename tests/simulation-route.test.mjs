@@ -10,6 +10,12 @@ describe("Simulation input readiness route boundary", () => {
       "src/db/queries/simulation-historical-outcome-validation.ts",
     );
     const regimeQuery = read("src/db/queries/simulation-regime-bootstrap.ts");
+    const regimeEvidenceQuery = read(
+      "src/db/queries/simulation-regime-evidence.ts",
+    );
+    const regimeHistoricalOutcomeQuery = read(
+      "src/db/queries/simulation-regime-historical-outcome-validation.ts",
+    );
     const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
     const view = readSimulationView();
 
@@ -19,10 +25,16 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /^import "server-only";/);
     assert.match(historicalOutcomeQuery, /^import "server-only";/);
     assert.match(regimeQuery, /^import "server-only";/);
+    assert.match(regimeEvidenceQuery, /^import "server-only";/);
+    assert.match(regimeHistoricalOutcomeQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /horizon: params\.horizon/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
+    assert.match(
+      page,
+      /getReadOnlySimulationRegimeHistoricalOutcomeValidation/,
+    );
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
     assert.match(page, /historicalOutcomeValidationPromise/);
     assert.match(page, /FanBandValidationSection/);
@@ -33,6 +45,12 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.match(page, /regimePromise/);
     assert.match(page, /RegimeReadinessHistoryPanel/);
+    assert.match(page, /RegimeHistoricalOutcomeValidationSection/);
+    assert.match(page, /regimeHistoricalOutcomeValidationPromise/);
+    assert.match(
+      page,
+      /<RegimeHistoricalOutcomeValidationSkeleton \/>/,
+    );
     assert.match(page, /RegimeBootstrapResearchSection/);
     assert.match(page, /<Suspense fallback=\{<RegimeBootstrapSkeleton \/>\}>/);
     assert.doesNotMatch(page, /params\.end\[0\]/);
@@ -65,7 +83,25 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeQuery, /loadRegimeFactorRows/);
     assert.match(regimeQuery, /Promise\.all/);
     assert.match(regimeQuery, /returnStepCount:/);
-    assert.match(regimeQuery, /globalMarketFactors\.releaseDate/);
+    assert.match(regimeEvidenceQuery, /cache\(/);
+    assert.match(
+      regimeEvidenceQuery,
+      /globalMarketFactors\.releaseDate/,
+    );
+    assert.match(
+      regimeHistoricalOutcomeQuery,
+      /buildSimulationRegimeHistoricalOutcomeValidation/,
+    );
+    assert.match(
+      regimeHistoricalOutcomeQuery,
+      /SIMULATION_REGIME_HISTORICAL_OUTCOME_VALIDATION_POLICY/,
+    );
+    assert.match(
+      regimeHistoricalOutcomeQuery,
+      /getReadOnlySimulationPeriodPreflightBatch/,
+    );
+    assert.match(regimeHistoricalOutcomeQuery, /loadRegimeFactorRows/);
+    assert.match(regimeHistoricalOutcomeQuery, /Promise\.all/);
     assert.match(
       historicalOutcomeQuery,
       /buildSimulationHistoricalOutcomeValidation/,
@@ -86,6 +122,14 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.doesNotMatch(
       regimeQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      regimeEvidenceQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      regimeHistoricalOutcomeQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
     assert.doesNotMatch(
@@ -143,6 +187,14 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
     assert.match(view, /data-regime-fallback="forbidden"/);
+    assert.match(view, /data-regime-historical-outcome-validation/);
+    assert.match(
+      view,
+      /data-regime-historical-outcome-validation-status/,
+    );
+    assert.match(view, /data-regime-historical-outcome-ready-count/);
+    assert.match(view, /data-regime-historical-outcome-row/);
+    assert.match(view, /data-regime-historical-outcome-row-status/);
     assert.match(view, /data-regime-readiness-history/);
     assert.match(view, /data-regime-point-in-time-status/);
     assert.match(view, /data-regime-safe-date-count/);
@@ -253,6 +305,7 @@ function readSimulationView() {
     "src/components/simulation/simulation-path-comparison-chart.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",
+    "src/components/simulation/regime-historical-outcome-validation-section.tsx",
     "src/components/simulation/regime-fixed-mix-comparison-panel.tsx",
     "src/components/simulation/regime-readiness-history-panel.tsx",
     "src/components/simulation/regime-scenario-card.tsx",

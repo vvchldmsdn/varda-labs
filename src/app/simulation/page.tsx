@@ -3,11 +3,13 @@ import { Suspense } from "react";
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
+import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
 import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
+import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +39,10 @@ export default async function SimulationPage({
     endServiceDate: params.end,
     kodexWeight: params.kodexWeight,
   });
+  const regimeHistoricalOutcomeValidationPromise =
+    getReadOnlySimulationRegimeHistoricalOutcomeValidation({
+      endServiceDate: params.end,
+    });
 
   return (
     <Suspense fallback={<SimulationSkeleton />}>
@@ -46,6 +52,9 @@ export default async function SimulationPage({
         }
         modelPromise={modelPromise}
         regimePromise={regimePromise}
+        regimeHistoricalOutcomeValidationPromise={
+          regimeHistoricalOutcomeValidationPromise
+        }
       />
     </Suspense>
   );
@@ -55,12 +64,16 @@ async function SimulationContent({
   historicalOutcomeValidationPromise,
   modelPromise,
   regimePromise,
+  regimeHistoricalOutcomeValidationPromise,
 }: {
   historicalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationHistoricalOutcomeValidation
   >;
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
+  regimeHistoricalOutcomeValidationPromise: ReturnType<
+    typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
+  >;
 }) {
   const model = await modelPromise;
   return (
@@ -75,6 +88,19 @@ async function SimulationContent({
         </Suspense>
       }
       model={model}
+      regimeHistoricalOutcomeValidation={
+        <Suspense
+          fallback={
+            <RegimeHistoricalOutcomeValidationSkeleton />
+          }
+        >
+          <RegimeHistoricalOutcomeValidationContent
+            resultPromise={
+              regimeHistoricalOutcomeValidationPromise
+            }
+          />
+        </Suspense>
+      }
       regimeBootstrap={
         <Suspense fallback={<RegimeBootstrapSkeleton />}>
           <RegimeBootstrapContent regimePromise={regimePromise} />
@@ -114,6 +140,17 @@ async function RegimeBootstrapContent({
   );
 }
 
+async function RegimeHistoricalOutcomeValidationContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
+  >;
+}) {
+  const result = await resultPromise;
+  return <RegimeHistoricalOutcomeValidationSection result={result} />;
+}
+
 function SimulationSkeleton() {
   return (
     <main className="min-h-screen bg-[#f3f4ef] p-4 text-[#171916]">
@@ -149,6 +186,19 @@ function HistoricalOutcomeValidationSkeleton() {
       data-historical-outcome-validation-loading
     >
       <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
+  );
+}
+
+function RegimeHistoricalOutcomeValidationSkeleton() {
+  return (
+    <section
+      aria-label="시장 국면 모델 과거 결과 대조 로딩"
+      className="border-b border-[#d7ddcf] py-5"
+      data-regime-historical-outcome-validation-loading
+    >
+      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
       <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
     </section>
   );

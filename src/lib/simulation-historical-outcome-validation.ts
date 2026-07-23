@@ -11,6 +11,11 @@ import {
   calculatePredictedHistoricalOutcome,
 } from "./simulation-historical-outcome-engine.ts";
 import {
+  buildSimulationHistoricalOutcomeReadyRow,
+  summarizeSimulationHistoricalOutcomeRows,
+  unavailableSimulationHistoricalOutcomeRow,
+} from "./simulation-historical-outcome-comparison.ts";
+import {
   isHistoricalOutcomeValidationSourceMatrix,
   sliceReadySimulationReturnMatrix,
 } from "./simulation-historical-outcome-validation-matrix.ts";
@@ -38,12 +43,6 @@ type Endpoint = Readonly<{
   outcomeEndServiceDate: string;
   matrix: SimulationReturnMatrixResult | null;
 }>;
-
-type RowBlockerReason =
-  | "input_matrix_unavailable"
-  | "input_matrix_shape_mismatch"
-  | "simulation_unavailable"
-  | "observed_path_unavailable";
 
 export function buildSimulationHistoricalOutcomeValidation(input: {
   explicitEndServiceDate: string | null;
@@ -76,70 +75,17 @@ export function buildSimulationHistoricalOutcomeValidation(input: {
   const rows = Object.freeze(
     input.endpoints.map((endpoint) => buildEndpointRow(endpoint, policy)),
   );
-  const readyRows = rows.filter((row) => row.status === "ready");
-  const readyEndpointCount = readyRows.length;
-  const unavailableEndpointCount = rows.length - readyEndpointCount;
-  const bandHitCount = readyRows.filter((row) => row.inP10P90Band).length;
-  const actualLossEndpointCount = readyRows.filter(
-    (row) => row.actualTerminalLoss,
-  ).length;
-  const actualWithinPredictedMddP90Count = readyRows.filter(
-    (row) => row.actualWithinPredictedMddP90,
-  ).length;
-  const status =
-    readyEndpointCount === rows.length
-      ? ("ready" as const)
-      : readyEndpointCount > 0
-        ? ("partial" as const)
-        : ("unavailable" as const);
-  const reason =
-    status === "ready"
-      ? null
-      : status === "partial"
-        ? ("some_endpoints_unavailable" as const)
-        : ("all_endpoints_unavailable" as const);
+  const aggregate = summarizeSimulationHistoricalOutcomeRows(rows);
 
   return Object.freeze({
-    status,
-    reason,
+    status: aggregate.status,
+    reason: aggregate.reason,
     runtimeTrustStatus: "research_only" as const,
     horizon,
     policy,
     downsidePolicy,
-    summary: Object.freeze({
-      endpointCount: rows.length,
-      readyEndpointCount,
-      unavailableEndpointCount,
-      bandHitCount,
-      bandCoveragePct:
-        readyEndpointCount > 0
-          ? (bandHitCount / readyEndpointCount) * 100
-          : null,
-      meanAbsoluteP50ErrorPctPoints:
-        readyEndpointCount > 0
-          ? compensatedMean(
-              readyRows.map((row) => row.absoluteP50ErrorPctPoints),
-            )
-          : null,
-    }),
-    downsideSummary: Object.freeze({
-      readyEndpointCount,
-      unavailableEndpointCount,
-      meanPredictedLossProbabilityPct:
-        readyEndpointCount > 0
-          ? compensatedMean(
-              readyRows.map((row) => row.predictedLossProbabilityPct),
-            )
-          : null,
-      actualLossEndpointCount,
-      actualWithinPredictedMddP90Count,
-      meanAbsoluteMddP50ErrorPctPoints:
-        readyEndpointCount > 0
-          ? compensatedMean(
-              readyRows.map((row) => row.absoluteMddP50ErrorPctPoints),
-            )
-          : null,
-    }),
+    summary: aggregate.summary,
+    downsideSummary: aggregate.downsideSummary,
     rows,
   });
 }
@@ -153,7 +99,10 @@ function buildEndpointRow(
   };
   const matrix = endpoint.matrix;
   if (!matrix || matrix.status !== "ready") {
-    return blockedRow(base, "input_matrix_unavailable");
+    return unavailableSimulationHistoricalOutcomeRow(
+      base.outcomeEndServiceDate,
+      "input_matrix_unavailable",
+    );
   }
   if (
     !isHistoricalOutcomeValidationSourceMatrix(
@@ -162,7 +111,10 @@ function buildEndpointRow(
       policy,
     )
   ) {
-    return blockedRow(base, "input_matrix_shape_mismatch");
+    return unavailableSimulationHistoricalOutcomeRow(
+      base.outcomeEndServiceDate,
+      "input_matrix_shape_mismatch",
+    );
   }
 
   const trainingMatrix = sliceReadySimulationReturnMatrix(
@@ -175,7 +127,10 @@ function buildEndpointRow(
     trainingMatrix.requestedServiceDates.at(-1) ?? null;
   const outcomeStartServiceDate = outcomeRows[0]?.serviceDate ?? null;
   if (!trainingEndServiceDate || !outcomeStartServiceDate) {
-    return blockedRow(base, "input_matrix_shape_mismatch");
+    return unavailableSimulationHistoricalOutcomeRow(
+      base.outcomeEndServiceDate,
+      "input_matrix_shape_mismatch",
+    );
   }
 
   const predicted = calculatePredictedHistoricalOutcome(
@@ -183,70 +138,29 @@ function buildEndpointRow(
     policy.outcomeReturnStepCount,
   );
   if (!predicted) {
-    return blockedRow(base, "simulation_unavailable");
+    return unavailableSimulationHistoricalOutcomeRow(
+      base.outcomeEndServiceDate,
+      "simulation_unavailable",
+    );
   }
 
   const observed = calculateObservedHistoricalOutcome(outcomeRows);
   if (!observed) {
-    return blockedRow(base, "observed_path_unavailable");
+    return unavailableSimulationHistoricalOutcomeRow(
+      base.outcomeEndServiceDate,
+      "observed_path_unavailable",
+    );
   }
 
-  const actualReturnPct = observed.terminalReturnPct;
-  const predictedP10ReturnPct = predicted.p10ReturnPct;
-  const predictedP50ReturnPct = predicted.p50ReturnPct;
-  const predictedP90ReturnPct = predicted.p90ReturnPct;
-  const signedP50ErrorPctPoints =
-    actualReturnPct - predictedP50ReturnPct;
-
-  return Object.freeze({
-    ...base,
-    status: "ready" as const,
-    reason: null,
+  return buildSimulationHistoricalOutcomeReadyRow({
+    outcomeEndServiceDate: base.outcomeEndServiceDate,
     trainingEndServiceDate,
     outcomeStartServiceDate,
     trainingReturnStepCount: trainingMatrix.matrix.length,
     outcomeReturnStepCount: outcomeRows.length,
-    predictedP10ReturnPct,
-    predictedP50ReturnPct,
-    predictedP90ReturnPct,
-    actualReturnPct,
-    inP10P90Band:
-      actualReturnPct >= predictedP10ReturnPct &&
-      actualReturnPct <= predictedP90ReturnPct,
-    signedP50ErrorPctPoints,
-    absoluteP50ErrorPctPoints: Math.abs(signedP50ErrorPctPoints),
-    predictedLossProbabilityPct: predicted.lossProbabilityPct,
-    actualTerminalLoss: observed.terminalLoss,
-    predictedMaxDrawdownP50Pct: predicted.maxDrawdownP50Pct,
-    predictedMaxDrawdownP90Pct: predicted.maxDrawdownP90Pct,
-    actualMaxDrawdownPct: observed.maxDrawdownPct,
-    actualWithinPredictedMddP90:
-      observed.maxDrawdownPct <= predicted.maxDrawdownP90Pct,
-    signedMddP50ErrorPctPoints:
-      observed.maxDrawdownPct - predicted.maxDrawdownP50Pct,
-    absoluteMddP50ErrorPctPoints: Math.abs(
-      observed.maxDrawdownPct - predicted.maxDrawdownP50Pct,
-    ),
+    predicted,
+    observed,
   });
-}
-
-function neumaierSum(values: readonly number[]) {
-  let sum = 0;
-  let compensation = 0;
-  for (const term of values) {
-    const next = sum + term;
-    const correction =
-      Math.abs(sum) >= Math.abs(term)
-        ? (sum - next) + term
-        : (term - next) + sum;
-    sum = next;
-    compensation += correction;
-  }
-  return sum + compensation;
-}
-
-function compensatedMean(values: readonly number[]) {
-  return neumaierSum(values) / values.length;
 }
 
 function isExpectedEndpointSet(
@@ -263,36 +177,6 @@ function isExpectedEndpointSet(
         shiftRiskDate(explicitEndServiceDate, -index),
     )
   );
-}
-
-function blockedRow(
-  base: Readonly<{ outcomeEndServiceDate: string }>,
-  reason: RowBlockerReason,
-) {
-  return Object.freeze({
-    ...base,
-    status: "unavailable" as const,
-    reason,
-    trainingEndServiceDate: null,
-    outcomeStartServiceDate: null,
-    trainingReturnStepCount: null,
-    outcomeReturnStepCount: null,
-    predictedP10ReturnPct: null,
-    predictedP50ReturnPct: null,
-    predictedP90ReturnPct: null,
-    actualReturnPct: null,
-    inP10P90Band: null,
-    signedP50ErrorPctPoints: null,
-    absoluteP50ErrorPctPoints: null,
-    predictedLossProbabilityPct: null,
-    actualTerminalLoss: null,
-    predictedMaxDrawdownP50Pct: null,
-    predictedMaxDrawdownP90Pct: null,
-    actualMaxDrawdownPct: null,
-    actualWithinPredictedMddP90: null,
-    signedMddP50ErrorPctPoints: null,
-    absoluteMddP50ErrorPctPoints: null,
-  });
 }
 
 function unavailable(

@@ -22,8 +22,7 @@ export const PROVIDER_HISTORY_SHORTLIST_POLICY = Object.freeze({
   providerCalls: "none",
   databaseWrites: "none",
   sharedCacheWriteAdmission: "never",
-  selection:
-    "fewest_remaining_evidence_stages_without_numeric_vendor_score",
+  selection: "policy_ordered_first_required_action_only",
 } as const);
 
 export type ProviderHistoryEvidenceStatus =
@@ -151,7 +150,7 @@ export type ProviderHistoryShortlist = Readonly<{
   candidates: readonly ProviderHistoryCandidateEvaluation[];
   summary: Readonly<{
     candidateCount: number;
-    nearestNextActionProviderIds: readonly string[];
+    firstRequiredActionProviderIds: readonly string[];
     duplicateProviderIds: readonly string[];
     providerAdoptionAdmitted: false;
     providerCallsAdmitted: 0;
