@@ -5,12 +5,14 @@ import { FanBandValidationSection } from "@/components/simulation/fan-band-valid
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
 import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
+import { ResearchUniversePreflightSection } from "@/components/simulation/research-universe-preflight-section";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
+import { getReadOnlySimulationResearchUniversePreflight } from "@/db/queries/simulation-research-universe-preflight";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ type SimulationPageProps = {
     end?: string | string[];
     horizon?: string | string[];
     kodexWeight?: string | string[];
+    researchUniverse?: string | string[];
   }>;
 };
 
@@ -44,6 +47,16 @@ export default async function SimulationPage({
     getReadOnlySimulationRegimeHistoricalOutcomeValidation({
       endServiceDate: params.end,
     });
+  const researchUniversePreflightPromise =
+    getReadOnlySimulationResearchUniversePreflight({
+      endServiceDate: params.end,
+      researchUniverse: params.researchUniverse,
+    });
+  const preservedQuery = Object.freeze({
+    end: singleQueryValue(params.end),
+    horizon: singleQueryValue(params.horizon),
+    kodexWeight: singleQueryValue(params.kodexWeight),
+  });
 
   return (
     <Suspense fallback={<SimulationSkeleton />}>
@@ -56,6 +69,10 @@ export default async function SimulationPage({
         regimeHistoricalOutcomeValidationPromise={
           regimeHistoricalOutcomeValidationPromise
         }
+        researchUniversePreflightPromise={
+          researchUniversePreflightPromise
+        }
+        preservedQuery={preservedQuery}
       />
     </Suspense>
   );
@@ -66,6 +83,8 @@ async function SimulationContent({
   modelPromise,
   regimePromise,
   regimeHistoricalOutcomeValidationPromise,
+  researchUniversePreflightPromise,
+  preservedQuery,
 }: {
   historicalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationHistoricalOutcomeValidation
@@ -75,6 +94,14 @@ async function SimulationContent({
   regimeHistoricalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
   >;
+  researchUniversePreflightPromise: ReturnType<
+    typeof getReadOnlySimulationResearchUniversePreflight
+  >;
+  preservedQuery: Readonly<{
+    end: string | null;
+    horizon: string | null;
+    kodexWeight: string | null;
+  }>;
 }) {
   const model = await modelPromise;
   return (
@@ -94,6 +121,19 @@ async function SimulationContent({
         </SimulationSectionErrorBoundary>
       }
       model={model}
+      researchUniversePreflight={
+        <SimulationSectionErrorBoundary
+          section="research-universe-preflight"
+          title="연구 종목 데이터 점검"
+        >
+          <Suspense fallback={<ResearchUniversePreflightSkeleton />}>
+            <ResearchUniversePreflightContent
+              preservedQuery={preservedQuery}
+              resultPromise={researchUniversePreflightPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
       regimeHistoricalOutcomeValidation={
         <SimulationSectionErrorBoundary
           section="regime-historical-outcome-validation"
@@ -122,6 +162,28 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
+    />
+  );
+}
+
+async function ResearchUniversePreflightContent({
+  preservedQuery,
+  resultPromise,
+}: {
+  preservedQuery: Readonly<{
+    end: string | null;
+    horizon: string | null;
+    kodexWeight: string | null;
+  }>;
+  resultPromise: ReturnType<
+    typeof getReadOnlySimulationResearchUniversePreflight
+  >;
+}) {
+  const model = await resultPromise;
+  return (
+    <ResearchUniversePreflightSection
+      model={model}
+      preservedQuery={preservedQuery}
     />
   );
 }
@@ -218,4 +280,21 @@ function RegimeHistoricalOutcomeValidationSkeleton() {
       <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
     </section>
   );
+}
+
+function ResearchUniversePreflightSkeleton() {
+  return (
+    <section
+      aria-label="연구 종목 데이터 점검 로딩"
+      className="border-b border-[#d7ddcf] py-5"
+      data-research-universe-preflight-loading
+    >
+      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
+  );
+}
+
+function singleQueryValue(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : null;
 }

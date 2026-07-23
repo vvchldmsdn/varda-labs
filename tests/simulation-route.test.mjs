@@ -16,6 +16,9 @@ describe("Simulation input readiness route boundary", () => {
     const regimeHistoricalOutcomeQuery = read(
       "src/db/queries/simulation-regime-historical-outcome-validation.ts",
     );
+    const researchUniverseQuery = read(
+      "src/db/queries/simulation-research-universe-preflight.ts",
+    );
     const sectionErrorBoundary = read(
       "src/components/simulation/simulation-section-error-boundary.tsx",
     );
@@ -30,9 +33,14 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeQuery, /^import "server-only";/);
     assert.match(regimeEvidenceQuery, /^import "server-only";/);
     assert.match(regimeHistoricalOutcomeQuery, /^import "server-only";/);
+    assert.match(researchUniverseQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /horizon: params\.horizon/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
+    assert.match(
+      page,
+      /researchUniverse: params\.researchUniverse/,
+    );
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
     assert.match(
       page,
@@ -41,7 +49,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
     assert.equal(
       page.match(/<SimulationSectionErrorBoundary/g)?.length,
-      3,
+      4,
       "each independent simulation query section must have its own error boundary",
     );
     assert.match(sectionErrorBoundary, /^"use client";/);
@@ -148,6 +156,18 @@ describe("Simulation input readiness route boundary", () => {
       historicalOutcomeQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
+    assert.doesNotMatch(
+      researchUniverseQuery,
+      /\.insert\(|\.update\(|\.delete\(|cron|fetch\s*\(/i,
+    );
+    assert.match(
+      researchUniverseQuery,
+      /Promise\.all\(\[\s*loadPriceRows/,
+    );
+    assert.match(
+      researchUniverseQuery,
+      /buildSimulationResearchUniversePreflight/,
+    );
   });
 
   it("exposes readiness and fixed research output behind the existing access gate", () => {
@@ -227,6 +247,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-regime-fixed-mix-pairing/);
     assert.match(view, /data-regime-fixed-mix-scenario/);
     assert.match(view, /data-regime-fixed-mix-rebalancing="none"/);
+    assert.match(view, /data-research-universe-preflight/);
+    assert.match(view, /data-research-universe-selection/);
+    assert.match(view, /data-research-universe-instrument/);
+    assert.match(view, /data-research-universe-result-boundary/);
+    assert.match(view, /name="researchUniverse"/);
+    assert.match(view, /시뮬레이션은 실행하지 않습니다/);
+    assert.match(view, /비중을 다시 나누거나 전체 포트폴리오 결과로 표시하지 않습니다/);
     assert.match(view, /data-regime-scenario-selected/);
     assert.match(view, /data-fixed-mix-comparison-pairing/);
     assert.match(view, /data-fixed-mix-comparison-scenario/);
@@ -344,6 +371,7 @@ function readSimulationView() {
     "src/components/simulation/regime-fixed-mix-comparison-panel.tsx",
     "src/components/simulation/regime-readiness-history-panel.tsx",
     "src/components/simulation/regime-scenario-card.tsx",
+    "src/components/simulation/research-universe-preflight-section.tsx",
     "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",

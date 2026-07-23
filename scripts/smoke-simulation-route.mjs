@@ -8,6 +8,11 @@ config({ path: ".env.local", quiet: true });
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3100";
 const END_SERVICE_DATE = readArgument("--end");
 const RAW_QUERY = readArgument("--raw-query");
+const RAW_QUERY_PARAMS =
+  RAW_QUERY === null ? null : new URLSearchParams(RAW_QUERY);
+const EXPECT_RESEARCH_UNIVERSE_SELECTION =
+  readArgument("--expect-research-universe-selection") ??
+  (RAW_QUERY_PARAMS?.has("researchUniverse") ? "valid" : "not_requested");
 const EXPECT_READY = numberArgument("--expect-ready");
 const EXPECT_RESEARCH_READY = numberArgument("--expect-research-ready");
 const EXPECT_JOINT_RESEARCH_READY = numberArgument(
@@ -32,7 +37,7 @@ const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
 const HAS_EXPLICIT_END =
   END_SERVICE_DATE !== null ||
-  (RAW_QUERY !== null && new URLSearchParams(RAW_QUERY).has("end"));
+  RAW_QUERY_PARAMS?.has("end");
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -44,6 +49,15 @@ if (!PASSWORD) throw new Error("Dashboard access password is not configured");
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 if (![63, 126].includes(EXPECT_HORIZON)) {
   throw new Error("--expect-horizon must be 63 or 126");
+}
+if (
+  !["not_requested", "valid", "invalid"].includes(
+    EXPECT_RESEARCH_UNIVERSE_SELECTION,
+  )
+) {
+  throw new Error(
+    "--expect-research-universe-selection must be not_requested, valid, or invalid",
+  );
 }
 
 const sql = neon(process.env.DATABASE_URL);
@@ -73,6 +87,33 @@ async function main() {
   assert.match(dashboard.body, /href="\/simulation"/);
   assert.match(simulation.body, /data-page="simulation-input-readiness"/);
   assert.match(simulation.body, /data-runtime-trust-status="not_established"/);
+  assert.match(simulation.body, /data-research-universe-preflight/);
+  const researchUniverseSelectionStatus = simulation.body.match(
+    /data-research-universe-selection="([^"]+)"/,
+  )?.[1];
+  const researchUniverseStatus = simulation.body.match(
+    /data-research-universe-status="([^"]+)"/,
+  )?.[1];
+  const researchUniverseInstrumentStatuses = [
+    ...simulation.body.matchAll(
+      /data-research-universe-instrument-status="([^"]+)"/g,
+    ),
+  ].map((match) => match[1]);
+  assert.equal(
+    researchUniverseSelectionStatus,
+    EXPECT_RESEARCH_UNIVERSE_SELECTION,
+    "research universe selection status did not match the requested smoke case",
+  );
+  if (EXPECT_RESEARCH_UNIVERSE_SELECTION === "valid") {
+    assert.match(
+      researchUniverseStatus ?? "",
+      /^(?:stored_evidence_ready_for_separate_review|partial_diagnostics_only|diagnostics_only)$/,
+    );
+    assert.ok(
+      researchUniverseInstrumentStatuses.length > 0,
+      "valid research universe must preserve per-instrument diagnostics",
+    );
+  }
   if (EXPECT_INVALID_QUERY) {
     assert.match(simulation.body, /data-end-query-status="invalid"/);
     assert.match(simulation.body, /data-invalid-end-query/);
@@ -616,6 +657,9 @@ async function main() {
         baseUrl: BASE_URL,
         path: simulationPath,
         horizon: EXPECT_HORIZON,
+        researchUniverseSelectionStatus,
+        researchUniverseStatus,
+        researchUniverseInstrumentStatuses,
         noAuthStatus: {
           dashboard: unauthorizedDashboard.status,
           simulation: unauthorized.status,

@@ -23,11 +23,13 @@ type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 export function SimulationInputReadinessView({
   model,
   historicalOutcomeValidation,
+  researchUniversePreflight,
   regimeHistoricalOutcomeValidation,
   regimeBootstrap,
 }: {
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
+  researchUniversePreflight?: ReactNode;
   regimeHistoricalOutcomeValidation?: ReactNode;
   regimeBootstrap?: ReactNode;
 }) {
@@ -117,6 +119,7 @@ export function SimulationInputReadinessView({
           kodexWeightPct={selectedKodexWeightPct}
           selectedHorizon={selectedResearchHorizon}
         />
+        {researchUniversePreflight}
 
         <section
           aria-label="검사 요약"
