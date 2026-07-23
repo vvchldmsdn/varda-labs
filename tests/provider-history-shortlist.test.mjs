@@ -22,7 +22,19 @@ describe("Provider history shortlist", () => {
       ],
     });
 
-    assert.deepEqual(result.summary.recommendedProviderIds, ["eodhd"]);
+    assert.deepEqual(result.summary.nearestNextActionProviderIds, [
+      "eodhd",
+    ]);
+    assert.equal(result.summary.providerAdoptionAdmitted, false);
+    assert.equal(
+      result.policy.consumerScope,
+      "historical_research_scenarios_only",
+    );
+    assert.deepEqual(result.policy.prohibitedConsumers, [
+      "current_valuation",
+      "official_close",
+      "observed_portfolio_path",
+    ]);
     assert.equal(
       result.candidates[0].nextAction,
       "request_written_commercial_terms",
@@ -120,7 +132,7 @@ describe("Provider history shortlist", () => {
     assert.deepEqual(result.summary.duplicateProviderIds, [
       "fixture_provider",
     ]);
-    assert.deepEqual(result.summary.recommendedProviderIds, []);
+    assert.deepEqual(result.summary.nearestNextActionProviderIds, []);
     assert.ok(
       result.candidates.every(
         (row) => row.nextAction === "blocked_invalid_evidence",

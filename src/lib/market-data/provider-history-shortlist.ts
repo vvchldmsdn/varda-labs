@@ -92,7 +92,7 @@ export function buildProviderHistoryShortlist(input: {
           ),
         )
       : null;
-  const recommendedProviderIds =
+  const nearestNextActionProviderIds =
     nearestDistance === null
       ? []
       : selectable
@@ -110,8 +110,11 @@ export function buildProviderHistoryShortlist(input: {
     candidates: Object.freeze(candidates),
     summary: Object.freeze({
       candidateCount: candidates.length,
-      recommendedProviderIds: Object.freeze(recommendedProviderIds),
+      nearestNextActionProviderIds: Object.freeze(
+        nearestNextActionProviderIds,
+      ),
       duplicateProviderIds: Object.freeze(duplicateProviderIds),
+      providerAdoptionAdmitted: false,
       providerCallsAdmitted: 0,
       sharedCacheWritesAdmitted: 0,
     }),

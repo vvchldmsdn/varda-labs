@@ -30,10 +30,12 @@ console.log(
       request: REQUEST,
       result,
       interpretation: {
-        recommendedProviderIds:
-          result.summary.recommendedProviderIds,
-        recommendationMeaning:
-          "Closest candidate for the next evidence step, not an operational provider selection.",
+        nearestNextActionProviderIds:
+          result.summary.nearestNextActionProviderIds,
+        selectionMeaning:
+          "Fewest remaining evidence stages only. This is not a provider recommendation or adoption decision.",
+        sourceAuthority:
+          "Vendor-aggregated historical research evidence only. Never current valuation, official close, or the observed portfolio path.",
         productBoundary:
           "No provider payload trial, shared cache, adapter, migration, backfill, runtime, UI, or TenantContext change is admitted.",
       },

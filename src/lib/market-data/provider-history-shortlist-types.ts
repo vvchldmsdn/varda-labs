@@ -12,6 +12,12 @@ export const PROVIDER_HISTORY_SHORTLIST_POLICY = Object.freeze({
     "distribution_adjusted_documented",
     "split_and_distribution_components_documented",
   ] as const),
+  consumerScope: "historical_research_scenarios_only",
+  prohibitedConsumers: Object.freeze([
+    "current_valuation",
+    "official_close",
+    "observed_portfolio_path",
+  ] as const),
   contractRequiredIsAdmitted: false,
   providerCalls: "none",
   databaseWrites: "none",
@@ -145,8 +151,9 @@ export type ProviderHistoryShortlist = Readonly<{
   candidates: readonly ProviderHistoryCandidateEvaluation[];
   summary: Readonly<{
     candidateCount: number;
-    recommendedProviderIds: readonly string[];
+    nearestNextActionProviderIds: readonly string[];
     duplicateProviderIds: readonly string[];
+    providerAdoptionAdmitted: false;
     providerCallsAdmitted: 0;
     sharedCacheWritesAdmitted: 0;
   }>;
