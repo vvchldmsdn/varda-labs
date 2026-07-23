@@ -6,6 +6,7 @@ import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-b
 import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
 import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
+import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
@@ -79,32 +80,47 @@ async function SimulationContent({
   return (
     <SimulationInputReadinessView
       historicalOutcomeValidation={
-        <Suspense fallback={<HistoricalOutcomeValidationSkeleton />}>
-          <HistoricalOutcomeValidationContent
-            historicalOutcomeValidationPromise={
-              historicalOutcomeValidationPromise
-            }
-          />
-        </Suspense>
+        <SimulationSectionErrorBoundary
+          section="historical-outcome-validation"
+          title="과거 결과 검증"
+        >
+          <Suspense fallback={<HistoricalOutcomeValidationSkeleton />}>
+            <HistoricalOutcomeValidationContent
+              historicalOutcomeValidationPromise={
+                historicalOutcomeValidationPromise
+              }
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
       }
       model={model}
       regimeHistoricalOutcomeValidation={
-        <Suspense
-          fallback={
-            <RegimeHistoricalOutcomeValidationSkeleton />
-          }
+        <SimulationSectionErrorBoundary
+          section="regime-historical-outcome-validation"
+          title="시장 국면 모델 과거 결과 대조"
         >
-          <RegimeHistoricalOutcomeValidationContent
-            resultPromise={
-              regimeHistoricalOutcomeValidationPromise
+          <Suspense
+            fallback={
+              <RegimeHistoricalOutcomeValidationSkeleton />
             }
-          />
-        </Suspense>
+          >
+            <RegimeHistoricalOutcomeValidationContent
+              resultPromise={
+                regimeHistoricalOutcomeValidationPromise
+              }
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
       }
       regimeBootstrap={
-        <Suspense fallback={<RegimeBootstrapSkeleton />}>
-          <RegimeBootstrapContent regimePromise={regimePromise} />
-        </Suspense>
+        <SimulationSectionErrorBoundary
+          section="regime-bootstrap"
+          title="시장 국면 사후 연구"
+        >
+          <Suspense fallback={<RegimeBootstrapSkeleton />}>
+            <RegimeBootstrapContent regimePromise={regimePromise} />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
       }
     />
   );

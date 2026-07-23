@@ -17,6 +17,7 @@ export function RegimeHistoricalOutcomeValidationSection({
       data-regime-historical-outcome-point-in-time={
         result.pointInTimeStatus
       }
+      data-regime-historical-outcome-scenario="kodex200-50-voo-50-buy-and-hold"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -30,6 +31,10 @@ export function RegimeHistoricalOutcomeValidationSection({
             과거 각 기준일에서 이전 120개 수익률과 당시까지 공개된
             시장 요인만 사용해 분포를 만든 뒤, 실제 다음 63개 서비스
             기준일 결과와 비교합니다.
+          </p>
+          <p className="mt-1 text-sm font-medium text-[#3f473d]">
+            고정 연구 시나리오: KODEX 200 50% + VOO 50%, 최초 배분 후
+            리밸런싱 없음
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">

@@ -16,6 +16,9 @@ describe("Simulation input readiness route boundary", () => {
     const regimeHistoricalOutcomeQuery = read(
       "src/db/queries/simulation-regime-historical-outcome-validation.ts",
     );
+    const sectionErrorBoundary = read(
+      "src/components/simulation/simulation-section-error-boundary.tsx",
+    );
     const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
     const view = readSimulationView();
 
@@ -36,6 +39,15 @@ describe("Simulation input readiness route boundary", () => {
       /getReadOnlySimulationRegimeHistoricalOutcomeValidation/,
     );
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
+    assert.equal(
+      page.match(/<SimulationSectionErrorBoundary/g)?.length,
+      3,
+      "each independent simulation query section must have its own error boundary",
+    );
+    assert.match(sectionErrorBoundary, /^"use client";/);
+    assert.match(sectionErrorBoundary, /unstable_catchError/);
+    assert.match(sectionErrorBoundary, /unstable_retry/);
+    assert.doesNotMatch(sectionErrorBoundary, /error\.message|error\.digest/);
     assert.match(page, /historicalOutcomeValidationPromise/);
     assert.match(page, /FanBandValidationSection/);
     assert.match(page, /DownsideOutcomeValidationSection/);
@@ -142,6 +154,7 @@ describe("Simulation input readiness route boundary", () => {
     const view = readSimulationView();
     const proxy = read("src/proxy.ts");
     const dashboard = read("src/components/portfolio-dashboard.tsx");
+    const smoke = read("scripts/smoke-simulation-route.mjs");
 
     assert.match(view, /data-page="simulation-input-readiness"/);
     assert.match(view, /data-readiness-status/);
@@ -193,6 +206,14 @@ describe("Simulation input readiness route boundary", () => {
       /data-regime-historical-outcome-validation-status/,
     );
     assert.match(view, /data-regime-historical-outcome-ready-count/);
+    assert.match(
+      view,
+      /data-regime-historical-outcome-point-in-time/,
+    );
+    assert.match(
+      view,
+      /data-regime-historical-outcome-scenario="kodex200-50-voo-50-buy-and-hold"/,
+    );
     assert.match(view, /data-regime-historical-outcome-row/);
     assert.match(view, /data-regime-historical-outcome-row-status/);
     assert.match(view, /data-regime-readiness-history/);
@@ -251,6 +272,10 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /자동 fallback 없음/);
     assert.match(view, /DB 적재시각은\s*과거 공개시점으로 간주하지 않습니다/);
     assert.match(view, /현재 보유,\s*계좌, Fount, 금현물/);
+    assert.match(
+      view,
+      /고정 연구 시나리오: KODEX 200 50% \+ VOO 50%, 최초 배분 후\s*리밸런싱 없음/,
+    );
     assert.match(view, /P10~P90/);
     assert.match(view, /P5 종료수익률/);
     assert.match(view, /종료수익률 하위 5% 평균/);
@@ -285,6 +310,16 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(proxy, /"\/simulation"/);
     assert.match(proxy, /"\/simulation\/:path\*"/);
     assert.match(dashboard, /href: "\/simulation"/);
+    assert.match(
+      smoke,
+      /data-regime-historical-outcome-point-in-time="not_established"/,
+    );
+    assert.match(smoke, /EXPECT_REGIME_HISTORICAL_READY/);
+    assert.match(smoke, /HAS_EXPLICIT_END/);
+    assert.match(
+      smoke,
+      /regimeHistoricalOutcomeReadyCount > 0/,
+    );
   });
 });
 

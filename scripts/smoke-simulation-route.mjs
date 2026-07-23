@@ -23,10 +23,16 @@ const EXPECT_WALK_FORWARD_STABILITY_READY = numberArgument(
   "--expect-walk-forward-stability-ready",
 );
 const EXPECT_REGIME_READY = numberArgument("--expect-regime-ready");
+const EXPECT_REGIME_HISTORICAL_READY = numberArgument(
+  "--expect-regime-historical-ready",
+);
 const EXPECT_HORIZON = numberArgument("--expect-horizon") ?? 63;
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
 const EXPECT_INVALID_WEIGHT = process.argv.includes("--expect-invalid-weight");
+const HAS_EXPLICIT_END =
+  END_SERVICE_DATE !== null ||
+  (RAW_QUERY !== null && new URLSearchParams(RAW_QUERY).has("end"));
 const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
@@ -117,7 +123,15 @@ async function main() {
   );
   assert.match(
     simulation.body,
-    /data-regime-point-in-time-status="not_established"/,
+    /data-regime-historical-outcome-point-in-time="not_established"/,
+  );
+  assert.match(
+    simulation.body,
+    /data-regime-historical-outcome-scenario="kodex200-50-voo-50-buy-and-hold"/,
+  );
+  assert.match(
+    simulation.body,
+    /KODEX 200 50% \+ VOO 50%, 최초 배분 후\s*리밸런싱 없음/,
   );
   assert.match(simulation.body, /data-regime-safe-date-count="0"/);
   assert.match(simulation.body, /연구 시뮬레이션/);
@@ -246,6 +260,11 @@ async function main() {
     simulation.body.match(
       /data-regime-historical-outcome-row="\d{4}-\d{2}-\d{2}"/g,
     )?.length ?? 0;
+  const regimeHistoricalOutcomeReadyCount = Number(
+    simulation.body.match(
+      /data-regime-historical-outcome-ready-count="(\d+)"/,
+    )?.[1],
+  );
   const expectedJointSelectionStatus = EXPECT_INVALID_WEIGHT
     ? "invalid"
     : EXPECT_KODEX_WEIGHT_PCT === null
@@ -321,6 +340,10 @@ async function main() {
     regimeHistoricalOutcomeStatus,
     "simulation must render retrospective regime outcome validation state",
   );
+  assert.ok(
+    Number.isInteger(regimeHistoricalOutcomeReadyCount),
+    "simulation must expose retrospective regime outcome ready count",
+  );
   assert.equal(
     jointSelectionStatus,
     expectedJointSelectionStatus,
@@ -344,9 +367,27 @@ async function main() {
   );
   assert.equal(
     regimeHistoricalOutcomeRows,
-    EXPECT_INVALID_QUERY ? 0 : 7,
+    EXPECT_INVALID_QUERY || !HAS_EXPLICIT_END ? 0 : 7,
     "simulation rendered an unexpected retrospective regime outcome row count",
   );
+  if (EXPECT_INVALID_QUERY || !HAS_EXPLICIT_END) {
+    assert.equal(
+      regimeHistoricalOutcomeReadyCount,
+      0,
+      "a request without a valid explicit end date must not render ready retrospective regime outcomes",
+    );
+  } else if (EXPECT_REGIME_HISTORICAL_READY !== null) {
+    assert.equal(
+      regimeHistoricalOutcomeReadyCount,
+      EXPECT_REGIME_HISTORICAL_READY,
+      "unexpected ready retrospective regime outcome count",
+    );
+  } else {
+    assert.ok(
+      regimeHistoricalOutcomeReadyCount > 0,
+      "valid deployment smoke must not pass with every retrospective regime outcome unavailable",
+    );
+  }
   assert.equal(
     observedReturnSeriesCount,
     readyCount,
@@ -614,6 +655,7 @@ async function main() {
         regimeHistoryRowCount,
         regimeHistoricalOutcomeStatus,
         regimeHistoricalOutcomeRows,
+        regimeHistoricalOutcomeReadyCount,
         historyRowCount,
         observedReturnSeriesCount,
         observedReturnComparisonStatus,
