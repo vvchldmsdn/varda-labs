@@ -2,10 +2,22 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-const [migration, schema, priceSync, kisProvider] = await Promise.all([
+const [expandMigration, contractMigration, schema, priceSync, repository, kisProvider] =
+  await Promise.all([
   readFile(new URL("../drizzle/0019_lush_maddog.sql", import.meta.url), "utf8"),
+  readFile(
+    new URL("../drizzle/0020_rainy_northstar.sql", import.meta.url),
+    "utf8",
+  ),
   readFile(new URL("../src/db/schema.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/market-data/price-sync.ts", import.meta.url), "utf8"),
+  readFile(
+    new URL(
+      "../src/lib/market-data/asset-price-snapshot-repository.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
   readFile(
     new URL("../src/lib/market-data/providers/kis.ts", import.meta.url),
     "utf8",
@@ -13,22 +25,26 @@ const [migration, schema, priceSync, kisProvider] = await Promise.all([
 ]);
 
 describe("Simulation historical evidence schema expansion", () => {
-  it("keeps the legacy writer key while adding exact instrument identity", () => {
+  it("contracts legacy uniqueness only after exact instrument identity exists", () => {
     assert.match(
-      migration,
+      expandMigration,
       /CREATE UNIQUE INDEX "asset_price_snapshots_instrument_date_unique"[\s\S]*"market","currency","ticker","date"/,
     );
     assert.doesNotMatch(
-      migration,
+      expandMigration,
       /DROP INDEX "asset_price_snapshots_ticker_date_unique"/i,
     );
-    assert.match(schema, /tickerDateUnique: uniqueIndex/);
+    assert.match(
+      contractMigration,
+      /^DROP INDEX "asset_price_snapshots_ticker_date_unique";\s*$/,
+    );
+    assert.doesNotMatch(schema, /tickerDateUnique: uniqueIndex/);
     assert.match(schema, /instrumentDateUnique: uniqueIndex/);
   });
 
   it("is an expand-only metadata migration without row mutation", () => {
     assert.match(
-      migration,
+      expandMigration,
       /ALTER COLUMN "adjusted_close_price" DROP NOT NULL/,
     );
     for (const column of [
@@ -40,14 +56,17 @@ describe("Simulation historical evidence schema expansion", () => {
       "provider_exchange",
       "fetched_at",
     ]) {
-      assert.match(migration, new RegExp(`ADD COLUMN "${column}"`));
+      assert.match(expandMigration, new RegExp(`ADD COLUMN "${column}"`));
     }
-    assert.doesNotMatch(migration, /\b(?:insert|update|delete|truncate)\b/i);
+    assert.doesNotMatch(
+      `${expandMigration}\n${contractMigration}`,
+      /\b(?:insert|update|delete|truncate)\b/i,
+    );
   });
 
   it("uses exact identity for new writes and never labels raw KIS close as adjusted", () => {
     assert.match(
-      priceSync,
+      repository,
       /target: \[[\s\S]*assetPriceSnapshots\.market,[\s\S]*assetPriceSnapshots\.currency,[\s\S]*assetPriceSnapshots\.ticker,[\s\S]*assetPriceSnapshots\.priceDate/,
     );
     assert.match(

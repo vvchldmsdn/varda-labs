@@ -43,6 +43,7 @@ export type PreviewDatabaseState = {
     presentColumns: string[];
     instrumentDateUniqueIndexExact: boolean;
     legacyTickerDateUniqueIndexExact: boolean;
+    legacyTickerDateIndexPresent: boolean;
   };
 };
 
@@ -181,6 +182,10 @@ export async function readPreviewDatabaseState(input: {
         indexRows,
         REVIEWED_INDEXES.legacyTickerDate,
       ),
+      legacyTickerDateIndexPresent: hasNamedIndex(
+        indexRows,
+        REVIEWED_INDEXES.legacyTickerDate.name,
+      ),
     },
   };
 }
@@ -195,7 +200,7 @@ export function assertReviewedPreviewDatabaseState(
   }
   if (!hasReviewedCatalog(state)) {
     throw new Error(
-      "Preview database reviewed 0019 catalog is incomplete.",
+      "Preview database reviewed 0020 catalog is incomplete.",
     );
   }
 }
@@ -204,7 +209,7 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedMigrationPresent = hasReviewedLatestMigration(state);
   const reviewedCatalogPresent = hasReviewedCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v2",
+    evidenceVersion: "preview_database_evidence_v3",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -214,8 +219,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       : null,
     catalogStatus:
       reviewedMigrationPresent && reviewedCatalogPresent
-        ? "reviewed_0019_present"
-        : "reviewed_0019_not_present",
+        ? "reviewed_0020_present"
+        : "reviewed_0020_not_present",
   };
 }
 
@@ -232,8 +237,12 @@ function hasReviewedCatalog(state: PreviewDatabaseState) {
     state.reviewedCatalog.adjustedClosePriceNullable &&
     state.reviewedCatalog.presentColumns.length === REVIEWED_COLUMNS.length &&
     state.reviewedCatalog.instrumentDateUniqueIndexExact &&
-    state.reviewedCatalog.legacyTickerDateUniqueIndexExact
+    !state.reviewedCatalog.legacyTickerDateIndexPresent
   );
+}
+
+function hasNamedIndex(rows: Record<string, unknown>[], name: string) {
+  return rows.some(({ index_name }) => index_name === name);
 }
 
 function hasExactUniqueIndex(

@@ -1,0 +1,1 @@
+DROP INDEX "asset_price_snapshots_ticker_date_unique";

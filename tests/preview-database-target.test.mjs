@@ -155,7 +155,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v2",
+        evidenceVersion: "preview_database_evidence_v3",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
@@ -163,7 +163,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).catalogStatus,
-      "reviewed_0019_present",
+      "reviewed_0020_present",
     );
 
     const pending = { ...reviewed, latestMigration: null };
@@ -179,12 +179,12 @@ describe("Preview database target operational guard", () => {
       },
       {
         latestReviewedMigration: null,
-        catalogStatus: "reviewed_0019_not_present",
+        catalogStatus: "reviewed_0020_not_present",
       },
     );
   });
 
-  it("requires exact composite and legacy index catalog evidence", () => {
+  it("requires exact composite uniqueness and removal of legacy uniqueness", () => {
     const reviewed = reviewedState();
     for (const reviewedCatalog of [
       {
@@ -193,7 +193,7 @@ describe("Preview database target operational guard", () => {
       },
       {
         ...reviewed.reviewedCatalog,
-        legacyTickerDateUniqueIndexExact: false,
+        legacyTickerDateIndexPresent: true,
       },
     ]) {
       const drifted = { ...reviewed, reviewedCatalog };
@@ -203,7 +203,7 @@ describe("Preview database target operational guard", () => {
       );
       assert.equal(
         publicPreviewDatabaseEvidence(drifted).catalogStatus,
-        "reviewed_0019_not_present",
+        "reviewed_0020_not_present",
       );
     }
 
@@ -276,7 +276,8 @@ function reviewedState() {
         "fetched_at",
       ],
       instrumentDateUniqueIndexExact: true,
-      legacyTickerDateUniqueIndexExact: true,
+      legacyTickerDateUniqueIndexExact: false,
+      legacyTickerDateIndexPresent: false,
     },
   };
 }

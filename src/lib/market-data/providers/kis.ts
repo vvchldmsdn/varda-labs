@@ -2,12 +2,22 @@ import "server-only";
 
 import type {
   ClosePrice,
+  HistoricalPriceFailure,
+  HistoricalPriceRequestContext,
+  HistoricalPriceResult,
   LiveQuote,
   MarketDataProvider,
   PriceLookupTarget,
   ProviderRequestContext,
   ProviderResult,
 } from "./types";
+import {
+  KIS_RAW_HISTORY_POLICY,
+  mergeKisRawHistoryRows,
+  normalizeKisRawHistoryPayload,
+  planKisRawHistoryRequests,
+  type KisHistoryWindow,
+} from "./kis-history";
 import { redactSensitiveText } from "@/lib/redaction";
 
 export const KIS_REQUIRED_ENV_KEYS = ["KIS_APP_KEY", "KIS_APP_SECRET"] as const;
@@ -95,6 +105,9 @@ export function createKisMarketDataProvider(): MarketDataProvider {
     },
     async fetchClosePrices(targets, context) {
       return fetchKisClosePrices(targets, context);
+    },
+    async fetchHistoricalClosePrices(targets, context) {
+      return fetchKisHistoricalClosePrices(targets, context);
     },
   };
 }
@@ -244,6 +257,181 @@ async function fetchKisClosePrices(
   };
 }
 
+async function fetchKisHistoricalClosePrices(
+  targets: PriceLookupTarget[],
+  context: HistoricalPriceRequestContext,
+): Promise<HistoricalPriceResult> {
+  const fetchedAt = context.requestedAt;
+  const plan = planKisRawHistoryRequests({
+    targets,
+    startDate: context.startDate,
+    endDate: context.endDate,
+  });
+  const config = getKisConfig();
+
+  if (!config) {
+    const policy = getKisProviderPolicy();
+    return {
+      provider: "kis",
+      fetchedAt,
+      priceBasis: KIS_RAW_HISTORY_POLICY.priceBasis,
+      rows: [],
+      failures: plan.instruments.map((instrument) => ({
+        instrumentKey: instrument.key,
+        ticker: instrument.ticker,
+        market: instrument.market,
+        currency: instrument.currency,
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        code: "provider_not_configured",
+        error: `missing_env:${policy.missingEnvKeys.join(",")}`,
+      })),
+      requestCount: 0,
+      warnings: [
+        "kis provider is not configured",
+        ...policy.missingEnvKeys.map((key) => `missing env: ${key}`),
+      ],
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getKisAccessToken(config);
+  } catch (error) {
+    const message = redactSensitiveText(toErrorMessage(error));
+    return {
+      provider: "kis",
+      fetchedAt,
+      priceBasis: KIS_RAW_HISTORY_POLICY.priceBasis,
+      rows: [],
+      failures: plan.instruments.map((instrument) => ({
+        instrumentKey: instrument.key,
+        ticker: instrument.ticker,
+        market: instrument.market,
+        currency: instrument.currency,
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        code: "transport_error",
+        error: message,
+      })),
+      requestCount: 0,
+      warnings: ["kis token request failed"],
+    };
+  }
+
+  const failures: HistoricalPriceFailure[] = [];
+  const series: ClosePrice[][] = [];
+  const warnings: string[] = [];
+  let requestCount = 0;
+  let invalidRowCount = 0;
+  let outsideWindowRowCount = 0;
+  let duplicateRowCount = 0;
+
+  for (const [targetIndex, target] of targets.entries()) {
+    const instrument = plan.instruments[targetIndex];
+    const requests = plan.requests.filter(
+      (request) => request.instrumentKey === instrument.key,
+    );
+    const targetSeries: ClosePrice[][] = [];
+    let knownUsExchange: (typeof US_EXCHANGES)[number] | null = null;
+
+    for (const request of requests) {
+      try {
+        const payload: {
+          rawRows: unknown;
+          exchange: (typeof US_EXCHANGES)[number] | null;
+        } =
+          request.market === "korea"
+            ? await fetchKoreanHistoryWindow({
+                target,
+                token,
+                config,
+                window: request.window,
+                onRequest: () => {
+                  requestCount += 1;
+                },
+              })
+            : await fetchUsHistoryWindow({
+                target,
+                token,
+                config,
+                window: request.window,
+                knownExchange: knownUsExchange,
+                onRequest: () => {
+                  requestCount += 1;
+                },
+              });
+
+        if (payload.exchange) knownUsExchange = payload.exchange;
+        const normalized = normalizeKisRawHistoryPayload({
+          target,
+          window: request.window,
+          rawRows: payload.rawRows,
+          fetchedAt,
+          exchange: payload.exchange,
+        });
+        invalidRowCount += normalized.invalidRowCount;
+        outsideWindowRowCount += normalized.outsideWindowRowCount;
+        duplicateRowCount += normalized.duplicateRowCount;
+
+        if (normalized.rows.length === 0) {
+          failures.push(
+            historyFailure({
+              instrument,
+              window: request.window,
+              code: "empty_window",
+              error: "KIS history returned no valid closes in the requested window",
+            }),
+          );
+        } else {
+          targetSeries.push([...normalized.rows]);
+        }
+      } catch (error) {
+        failures.push(
+          historyFailure({
+            instrument,
+            window: request.window,
+            code: "transport_error",
+            error: redactSensitiveText(toErrorMessage(error)),
+          }),
+        );
+      }
+
+      await sleep(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds);
+    }
+
+    series.push([...mergeKisRawHistoryRows(targetSeries)]);
+  }
+
+  if (invalidRowCount > 0) {
+    warnings.push(`rejected invalid provider rows: ${invalidRowCount}`);
+  }
+  if (outsideWindowRowCount > 0) {
+    warnings.push(
+      `ignored provider rows outside requested windows: ${outsideWindowRowCount}`,
+    );
+  }
+  if (duplicateRowCount > 0) {
+    warnings.push(`collapsed exact duplicate provider rows: ${duplicateRowCount}`);
+  }
+  warnings.push(
+    "KIS historical rows are raw price-return evidence; adjusted-close and total-return claims remain unset",
+    context.dryRun
+      ? "KIS historical dry-run fetched provider evidence without database writes"
+      : "KIS historical fetch completed; this provider method does not write to the database",
+  );
+
+  return {
+    provider: "kis",
+    fetchedAt,
+    priceBasis: KIS_RAW_HISTORY_POLICY.priceBasis,
+    rows: [...mergeKisRawHistoryRows(series)],
+    failures,
+    requestCount,
+    warnings,
+  };
+}
+
 async function getKisAccessToken(config: KisConfig) {
   const now = Date.now();
   if (
@@ -282,6 +470,111 @@ async function getKisAccessToken(config: KisConfig) {
   }
 
   return token;
+}
+
+async function fetchKoreanHistoryWindow(options: {
+  target: PriceLookupTarget;
+  token: string;
+  config: KisConfig;
+  window: KisHistoryWindow;
+  onRequest: () => void;
+}): Promise<{
+  rawRows: unknown;
+  exchange: null;
+}> {
+  const params = new URLSearchParams({
+    fid_cond_mrkt_div_code: "J",
+    fid_input_iscd: options.target.ticker,
+    fid_input_date_1: toCompactDate(options.window.startDate),
+    fid_input_date_2: toCompactDate(options.window.endDate),
+    fid_period_div_code: "D",
+    fid_org_adj_prc: "1",
+  });
+  options.onRequest();
+  const response = await fetch(
+    `${options.config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
+    {
+      headers: kisHeaders(options.config, options.token, "FHKST03010100"),
+      signal: AbortSignal.timeout(12_000),
+    },
+  );
+  const data = await readKisJson(
+    response,
+    `domestic-history:${options.target.ticker}`,
+  );
+
+  if (data.rt_cd !== "0") {
+    throw new Error(
+      `KIS domestic history failed (${options.target.ticker}): ${kisErrorText(data)}`,
+    );
+  }
+
+  return {
+    rawRows: data.output2,
+    exchange: null,
+  };
+}
+
+async function fetchUsHistoryWindow(options: {
+  target: PriceLookupTarget;
+  token: string;
+  config: KisConfig;
+  window: KisHistoryWindow;
+  knownExchange: (typeof US_EXCHANGES)[number] | null;
+  onRequest: () => void;
+}): Promise<{
+  rawRows: unknown;
+  exchange: (typeof US_EXCHANGES)[number];
+}> {
+  const exchanges = options.knownExchange
+    ? [options.knownExchange]
+    : [...US_EXCHANGES];
+  const errors: string[] = [];
+
+  for (const exchange of exchanges) {
+    try {
+      const params = new URLSearchParams({
+        AUTH: "",
+        EXCD: exchange,
+        SYMB: options.target.ticker,
+        GUBN: "0",
+        BYMD: toCompactDate(options.window.endDate),
+        MODP: "1",
+        KEYB: "",
+      });
+      options.onRequest();
+      const response = await fetch(
+        `${options.config.baseUrl}/uapi/overseas-price/v1/quotations/dailyprice?${params}`,
+        {
+          headers: kisHeaders(options.config, options.token, "HHDFS76240000"),
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      const data = await readKisJson(
+        response,
+        `overseas-history:${options.target.ticker}:${exchange}`,
+      );
+
+      if (data.rt_cd !== "0") {
+        errors.push(`${exchange}:${kisErrorText(data)}`);
+      } else if (Array.isArray(data.output2) && data.output2.length > 0) {
+        return {
+          rawRows: data.output2,
+          exchange,
+        };
+      } else {
+        errors.push(`${exchange}:empty`);
+      }
+    } catch (error) {
+      errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
+    }
+
+    await sleep(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds);
+  }
+
+  throw new Error(
+    `KIS overseas history returned no rows (${options.target.ticker}): ${errors.join(" / ")}`,
+  );
 }
 
 async function fetchLatestCloseRow(
@@ -719,6 +1012,29 @@ function kisErrorText(data: Record<string, unknown>) {
 
 function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "unknown KIS provider error";
+}
+
+function historyFailure(options: {
+  instrument: {
+    key: string;
+    ticker: string;
+    market: KisMarket;
+    currency: "KRW" | "USD";
+  };
+  window: KisHistoryWindow;
+  code: HistoricalPriceFailure["code"];
+  error: string;
+}): HistoricalPriceFailure {
+  return {
+    instrumentKey: options.instrument.key,
+    ticker: options.instrument.ticker,
+    market: options.instrument.market,
+    currency: options.instrument.currency,
+    startDate: options.window.startDate,
+    endDate: options.window.endDate,
+    code: options.code,
+    error: options.error,
+  };
 }
 
 function sleep(ms: number) {

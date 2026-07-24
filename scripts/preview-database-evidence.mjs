@@ -17,7 +17,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v2.json",
+  "varda-preview-database-preflight-v3.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -55,7 +55,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v2",
+      evidenceVersion: "preview_database_build_preflight_v3",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
     };
@@ -77,7 +77,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v2",
+    "preview_database_build_preflight_v3",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -103,28 +103,41 @@ function assertPreflightCatalog(plan, state) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0019_lush_maddog"],
-    "Only reviewed migration 0019 may be pending",
+    ["0020_rainy_northstar"],
+    "Only reviewed migration 0020 may be pending",
   );
   assert.equal(
     state.reviewedCatalog.adjustedClosePriceNullable,
-    false,
-    "Pending 0019 target has partial nullability drift",
+    true,
+    "Pending 0020 target lost reviewed adjusted-close nullability",
   );
   assert.deepEqual(
     state.reviewedCatalog.presentColumns,
-    [],
-    "Pending 0019 target already has partial reviewed columns",
+    [
+      "adjusted_close_basis",
+      "adjusted_close_provider",
+      "adjusted_close_source",
+      "adjusted_close_fetched_at",
+      "provider_symbol",
+      "provider_exchange",
+      "fetched_at",
+    ],
+    "Pending 0020 target lost reviewed provenance columns",
   );
   assert.equal(
     state.reviewedCatalog.instrumentDateUniqueIndexExact,
-    false,
-    "Pending 0019 target already has the reviewed unique index",
+    true,
+    "Pending 0020 target lost the exact instrument/date unique index",
   );
   assert.equal(
     state.reviewedCatalog.legacyTickerDateUniqueIndexExact,
     true,
-    "Pending 0019 target lost the exact legacy unique index",
+    "Pending 0020 target does not have the reviewed legacy unique index",
+  );
+  assert.equal(
+    state.reviewedCatalog.legacyTickerDateIndexPresent,
+    true,
+    "Pending 0020 target already removed the legacy unique index",
   );
 }
 

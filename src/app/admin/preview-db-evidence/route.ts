@@ -13,7 +13,7 @@ export async function GET() {
   if (process.env.VERCEL_ENV !== "preview") {
     return Response.json(
       {
-        evidenceVersion: "preview_database_evidence_v2",
+        evidenceVersion: "preview_database_evidence_v3",
         status: "not_found",
       },
       { status: 404, headers: { "Cache-Control": "no-store" } },
@@ -37,7 +37,7 @@ export async function GET() {
   } catch {
     return Response.json(
       {
-        evidenceVersion: "preview_database_evidence_v2",
+        evidenceVersion: "preview_database_evidence_v3",
         status: "blocked",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
