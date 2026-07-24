@@ -9,6 +9,8 @@ import "./portfolio-risk-read-model.test.mjs";
 import "./provider-adjusted-history-readiness.test.mjs";
 import "./provider-instrument-evidence-matrix.test.mjs";
 import "./provider-history-shortlist.test.mjs";
+import "./kis-raw-history.test.mjs";
+import "./kis-history-route.test.mjs";
 import "./portfolio-risk-route.test.mjs";
 import "./investment-lab-counterfactual-readiness.test.mjs";
 import "./investment-lab-event-flow.test.mjs";

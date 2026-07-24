@@ -71,6 +71,34 @@ export type ProviderResult<TQuote extends LiveQuote | ClosePrice> = {
   warnings: string[];
 };
 
+export type HistoricalPriceRequestContext = {
+  dryRun: boolean;
+  requestedAt: Date;
+  startDate: string;
+  endDate: string;
+};
+
+export type HistoricalPriceFailure = {
+  instrumentKey: string;
+  ticker: string;
+  market: string;
+  currency: string;
+  startDate: string;
+  endDate: string;
+  code: "empty_window" | "transport_error" | "provider_not_configured";
+  error: string;
+};
+
+export type HistoricalPriceResult = {
+  provider: string;
+  fetchedAt: Date;
+  priceBasis: "raw_price_return";
+  rows: ClosePrice[];
+  failures: HistoricalPriceFailure[];
+  requestCount: number;
+  warnings: string[];
+};
+
 export type MarketDataProvider = {
   name: string;
   supportedMarkets: string[];
@@ -82,4 +110,8 @@ export type MarketDataProvider = {
     targets: PriceLookupTarget[],
     context: ProviderRequestContext,
   ): Promise<ProviderResult<ClosePrice>>;
+  fetchHistoricalClosePrices?(
+    targets: PriceLookupTarget[],
+    context: HistoricalPriceRequestContext,
+  ): Promise<HistoricalPriceResult>;
 };

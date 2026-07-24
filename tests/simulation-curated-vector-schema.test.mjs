@@ -30,7 +30,7 @@ assert.deepEqual(migrationNames, [MIGRATION_NAME]);
 
 const MIGRATION_PATH = join(ROOT, "drizzle", MIGRATION_NAME);
 const migration = readFileSync(MIGRATION_PATH, "utf8");
-const schema = readFileSync(SCHEMA_PATH, "utf8");
+const schema = readFileSync(SCHEMA_PATH, "utf8").replace(/\r\n/g, "\n");
 const metadata = JSON.parse(readFileSync(META_PATH, "utf8"));
 const rehearsal = readFileSync(REHEARSAL_PATH, "utf8");
 const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, "utf8"));
