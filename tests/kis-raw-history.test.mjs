@@ -249,6 +249,9 @@ describe("KIS history preview boundary", () => {
     });
 
     assert.equal(request.targets.length, 2);
+    assert.equal(request.dryRun, true);
+    assert.equal(request.write, false);
+    assert.equal(request.confirmWrite, false);
     assert.deepEqual(request.targets[1], {
       key: "us|USD|QQQ",
       ticker: "QQQ",
@@ -260,7 +263,7 @@ describe("KIS history preview boundary", () => {
     });
   });
 
-  it("rejects writes and ranges above the synchronous preview cap", () => {
+  it("requires all write confirmations and enforces the synchronous cap", () => {
     assert.throws(
       () =>
         parseKisHistoryPreviewRequest({
@@ -271,6 +274,18 @@ describe("KIS history preview boundary", () => {
         }),
       KisHistoryPreviewInputError,
     );
+
+    const writeRequest = parseKisHistoryPreviewRequest({
+      dryRun: false,
+      write: true,
+      confirmWrite: true,
+      startDate: "2026-07-01",
+      endDate: "2026-07-10",
+      targets: [{ ticker: "QQQ", market: "us", currency: "USD" }],
+    });
+    assert.equal(writeRequest.dryRun, false);
+    assert.equal(writeRequest.write, true);
+    assert.equal(writeRequest.confirmWrite, true);
 
     assert.throws(
       () =>

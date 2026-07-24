@@ -11,6 +11,7 @@ import "./provider-instrument-evidence-matrix.test.mjs";
 import "./provider-history-shortlist.test.mjs";
 import "./kis-raw-history.test.mjs";
 import "./kis-history-route.test.mjs";
+import "./raw-price-history.test.mjs";
 import "./portfolio-risk-route.test.mjs";
 import "./investment-lab-counterfactual-readiness.test.mjs";
 import "./investment-lab-event-flow.test.mjs";

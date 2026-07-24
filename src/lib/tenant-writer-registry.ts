@@ -310,8 +310,15 @@ export const TENANT_WRITER_REGISTRY = [
     id: "admin_market_price_sync",
     classification: "mixed",
     authorization: "machine_admin",
-    entrypoints: ["/api/admin/market/prices/sync"],
-    implementationPaths: ["src/lib/market-data/price-sync.ts"],
+    entrypoints: [
+      "/api/admin/market/prices/sync",
+      "/api/admin/market/prices/history",
+    ],
+    implementationPaths: [
+      "src/lib/market-data/price-sync.ts",
+      "src/lib/market-data/kis-history-cache-sync.ts",
+      "src/lib/market-data/asset-price-snapshot-repository.ts",
+    ],
     targets: [
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("live_price_quotes", "insert", "update"),

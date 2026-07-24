@@ -4,18 +4,25 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
-  assetPriceSnapshots,
   assets,
   livePriceQuotes,
   marketDataSyncRuns,
 } from "@/db/schema";
 import {
+  applyAssetPriceSnapshotRows,
+  emptyAssetPriceSnapshotWriteSummary,
+  getAssetPriceSnapshotWritePolicy,
+} from "@/lib/market-data/asset-price-snapshot-repository";
+import {
   LIVE_PRICE_WRITE_CONTRACT,
   planLiveAssetPriceWrite,
 } from "@/lib/market-data/live-price-write";
-import { ADJUSTED_CLOSE_BASIS } from "@/lib/market-data/providers/types";
 import { createStubMarketDataProvider } from "@/lib/market-data/providers/stub";
 import { safeErrorMessage } from "@/lib/redaction";
+import type {
+  AssetPriceSnapshotWritePolicy,
+  AssetPriceSnapshotWriteResult,
+} from "@/lib/market-data/asset-price-snapshot-repository";
 import type {
   LivePriceWritePolicy,
   LivePriceWriteResult,
@@ -31,9 +38,6 @@ import type {
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const DEFAULT_KIS_JOB_COOLDOWN_SECONDS = 90;
-const DEFAULT_KIS_VALUE_CONFLICT_THRESHOLD_PCT = 3;
-const DECIMAL_COMPARE_ABSOLUTE_TOLERANCE = 1e-9;
-const DECIMAL_COMPARE_RELATIVE_TOLERANCE = 1e-10;
 
 export const PRICE_SYNC_CONTRACT = {
   live: {
@@ -152,39 +156,9 @@ type RunCounts = {
   skippedCount: number;
 };
 
-type ClosePriceWriteAction =
-  | "planned_insert"
-  | "planned_update"
-  | "planned_skip"
-  | "inserted"
-  | "updated"
-  | "skipped"
-  | "failed"
-  | "conflict";
-
-type ClosePriceWritePolicy = "none" | "stub_fixture" | "kis";
-
-type ClosePriceWriteResult = {
-  ticker: string;
-  market: string;
-  currency: string;
-  priceDate: string;
-  source: string | null;
-  action: ClosePriceWriteAction;
-  reason?: string;
-  existingSource?: string | null;
-};
-
-type MarketDataWriteResult = ClosePriceWriteResult | LivePriceWriteResult;
-
-type ClosePriceWriteSummary = {
-  insertedCount: number;
-  updatedCount: number;
-  skippedCount: number;
-  failedCount: number;
-  conflictCount: number;
-  results: ClosePriceWriteResult[];
-};
+type MarketDataWriteResult =
+  | AssetPriceSnapshotWriteResult
+  | LivePriceWriteResult;
 
 type LivePriceWriteSummary = {
   insertedCount: number;
@@ -202,8 +176,6 @@ type MarketDataWriteResultSummary = {
   existingSources: Record<string, number>;
   sample: MarketDataWriteResult[];
 };
-
-type AssetPriceSnapshotRow = typeof assetPriceSnapshots.$inferSelect;
 
 export function isPriceSyncMode(value: string | null): value is PriceSyncMode {
   return value === "live" || value === "close";
@@ -280,7 +252,10 @@ export async function runMarketPriceSync(options: {
   const fixture = options.fixture ?? false;
   const priceDate = options.priceDate ?? toDateKey(new Date());
   const startedAt = new Date();
-  const closeWritePolicy = getClosePriceWritePolicy(provider.name, fixture);
+  const closeWritePolicy = getAssetPriceSnapshotWritePolicy(
+    provider.name,
+    fixture,
+  );
   const liveWritePolicy = getLivePriceWritePolicy(provider.name);
   const closeWriteEnabled = !dryRun && closeWritePolicy !== "none";
   const liveWriteEnabled = !dryRun && liveWritePolicy !== "none";
@@ -396,15 +371,14 @@ export async function runMarketPriceSync(options: {
     const counts = countProviderRows(providerResult.rows);
     const closeWriteSummary =
       options.mode === "close"
-        ? await applyClosePriceRows({
+        ? await applyAssetPriceSnapshotRows({
             rows: providerResult.rows as ClosePrice[],
             targets: priceTargets,
             dryRun,
-            fixture,
             writePolicy: closeWritePolicy,
             allowWrite: closeWriteEnabled,
           })
-        : emptyClosePriceWriteSummary();
+        : emptyAssetPriceSnapshotWriteSummary();
     const liveWriteSummary =
       options.mode === "live"
         ? await applyLivePriceRows({
@@ -733,7 +707,7 @@ function orderPriceTargetsByFilter(
 function buildPlannedWrites(
   mode: PriceSyncMode,
   dryRun: boolean,
-  closeWritePolicy: ClosePriceWritePolicy,
+  closeWritePolicy: AssetPriceSnapshotWritePolicy,
   liveWritePolicy: LivePriceWritePolicy,
   priceTargetCount: number,
 ): PlannedWrite[] {
@@ -963,459 +937,9 @@ async function findExistingLivePriceQuote(
   return existing ?? null;
 }
 
-async function applyClosePriceRows(options: {
-  rows: ClosePrice[];
-  targets: PriceLookupTarget[];
-  dryRun: boolean;
-  fixture: boolean;
-  writePolicy: ClosePriceWritePolicy;
-  allowWrite: boolean;
-}): Promise<ClosePriceWriteSummary> {
-  const targetByKey = new Map(
-    options.targets.map((target) => [target.key, target] as const),
-  );
-  const summary = emptyClosePriceWriteSummary();
-
-  for (const row of options.rows) {
-    const target = targetByKey.get(toTargetKey(row));
-    const result = await planOrApplyClosePriceRow({
-      row,
-      target,
-      dryRun: options.dryRun,
-      fixture: options.fixture,
-      writePolicy: options.writePolicy,
-      allowWrite: options.allowWrite,
-    });
-
-    summary.results.push(result);
-
-    if (result.action === "inserted") summary.insertedCount += 1;
-    if (result.action === "updated") summary.updatedCount += 1;
-    if (result.action === "failed") summary.failedCount += 1;
-    if (result.action === "conflict") {
-      summary.conflictCount += 1;
-      summary.skippedCount += 1;
-    }
-    if (
-      result.action === "skipped" ||
-      result.action === "planned_skip"
-    ) {
-      summary.skippedCount += 1;
-    }
-  }
-
-  return summary;
-}
-
-async function planOrApplyClosePriceRow(options: {
-  row: ClosePrice;
-  target: PriceLookupTarget | undefined;
-  dryRun: boolean;
-  fixture: boolean;
-  writePolicy: ClosePriceWritePolicy;
-  allowWrite: boolean;
-}): Promise<ClosePriceWriteResult> {
-  const rowKey = {
-    ticker: options.row.ticker,
-    market: options.row.market,
-    currency: options.row.currency,
-    priceDate: options.row.priceDate,
-    source: options.row.source,
-  };
-  const validationError = validateClosePriceRow(
-    options.row,
-    options.target,
-    options.writePolicy,
-  );
-
-  if (validationError) {
-    return {
-      ...rowKey,
-      action: options.row.status === "error" ? "failed" : "skipped",
-      reason: validationError,
-    };
-  }
-
-  const snapshot = toSnapshotInsert(options.row, options.target);
-  const existing = await findExistingAssetPriceSnapshot(
-    snapshot.market,
-    snapshot.currency,
-    snapshot.ticker,
-    snapshot.priceDate,
-  );
-  const protectedReason = getProtectedExistingReason(
-    existing,
-    snapshot,
-    options.writePolicy,
-  );
-
-  if (protectedReason) {
-    return {
-      ...rowKey,
-      action: protectedReason.startsWith("value_conflict")
-        ? "conflict"
-        : options.dryRun
-          ? "planned_skip"
-          : "skipped",
-      reason: protectedReason,
-      existingSource: existing?.source ?? null,
-    };
-  }
-
-  if (existing && snapshotMatches(existing, snapshot)) {
-    return {
-      ...rowKey,
-      action: options.dryRun ? "planned_skip" : "skipped",
-      reason: "unchanged",
-      existingSource: existing.source,
-    };
-  }
-
-  if (options.dryRun) {
-    return {
-      ...rowKey,
-      action: existing ? "planned_update" : "planned_insert",
-      existingSource: existing?.source ?? null,
-    };
-  }
-
-  if (!options.allowWrite || options.writePolicy === "none") {
-    return {
-      ...rowKey,
-      action: "skipped",
-      reason: "write_guard_not_satisfied",
-      existingSource: existing?.source ?? null,
-    };
-  }
-
-  const returned = await db
-    .insert(assetPriceSnapshots)
-    .values(snapshot)
-    .onConflictDoUpdate({
-      target: [
-        assetPriceSnapshots.market,
-        assetPriceSnapshots.currency,
-        assetPriceSnapshots.ticker,
-        assetPriceSnapshots.priceDate,
-      ],
-      set: {
-        assetId: sql`excluded.asset_id`,
-        closePrice: sql`excluded.close_price`,
-        adjustedClosePrice: sql`coalesce(excluded.adjusted_close_price, ${assetPriceSnapshots.adjustedClosePrice})`,
-        adjustedCloseBasis: sql`coalesce(excluded.adjusted_close_basis, ${assetPriceSnapshots.adjustedCloseBasis})`,
-        adjustedCloseProvider: sql`coalesce(excluded.adjusted_close_provider, ${assetPriceSnapshots.adjustedCloseProvider})`,
-        adjustedCloseSource: sql`coalesce(excluded.adjusted_close_source, ${assetPriceSnapshots.adjustedCloseSource})`,
-        adjustedCloseFetchedAt: sql`coalesce(excluded.adjusted_close_fetched_at, ${assetPriceSnapshots.adjustedCloseFetchedAt})`,
-        closePriceKrw: sql`coalesce(excluded.close_price_krw, ${assetPriceSnapshots.closePriceKrw})`,
-        fxRate: sql`coalesce(excluded.fx_rate, ${assetPriceSnapshots.fxRate})`,
-        source: sql`excluded.source`,
-        providerSymbol: sql`excluded.provider_symbol`,
-        providerExchange: sql`excluded.provider_exchange`,
-        fetchedAt: sql`excluded.fetched_at`,
-        isSample: sql`excluded.is_sample`,
-        updatedAt: new Date(),
-      },
-      setWhere: getClosePriceUpsertSetWhere(snapshot, options.writePolicy),
-    })
-    .returning({ id: assetPriceSnapshots.id });
-
-  if (returned.length === 0) {
-    return {
-      ...rowKey,
-      action: "skipped",
-      reason: "write_guard_not_satisfied_after_conflict_check",
-      existingSource: existing?.source ?? null,
-    };
-  }
-
-  return {
-    ...rowKey,
-    action: existing ? "updated" : "inserted",
-    existingSource: existing?.source ?? null,
-  };
-}
-
-function validateClosePriceRow(
-  row: ClosePrice,
-  target: PriceLookupTarget | undefined,
-  writePolicy: ClosePriceWritePolicy,
-) {
-  if (row.status !== "ok") return row.error ?? `provider_status_${row.status}`;
-  if (!target) return "target_not_found";
-  if (toTargetKey(row) !== target.key) return "target_identity_mismatch";
-  if (!isDateKey(row.priceDate)) return "invalid_price_date";
-  if (!isDecimalString(row.closePrice)) return "invalid_close_price";
-  if (row.adjustedClosePrice === null) {
-    if (
-      row.adjustedCloseBasis !== null ||
-      row.adjustedCloseProvider !== null ||
-      row.adjustedCloseSource !== null ||
-      row.adjustedCloseFetchedAt !== null
-    ) {
-      return "adjusted_close_metadata_without_value";
-    }
-  } else {
-    if (!isDecimalString(row.adjustedClosePrice)) {
-      return "invalid_adjusted_close_price";
-    }
-    if (!isAllowedAdjustedCloseBasis(row.adjustedCloseBasis, writePolicy)) {
-      return "unsupported_adjusted_close_basis";
-    }
-    if (!normalizeText(row.adjustedCloseProvider)) {
-      return "missing_adjusted_close_provider";
-    }
-    if (!normalizeText(row.adjustedCloseSource)) {
-      return "missing_adjusted_close_source";
-    }
-    if (!isValidDate(row.adjustedCloseFetchedAt)) {
-      return "invalid_adjusted_close_fetched_at";
-    }
-  }
-  if (row.closePriceKrw !== null && !isDecimalString(row.closePriceKrw)) {
-    return "invalid_close_price_krw";
-  }
-  if (row.fxRate !== null && !isDecimalString(row.fxRate)) return "invalid_fx_rate";
-  if (!normalizeTicker(row.providerSymbol)) return "missing_provider_symbol";
-  if (!normalizeText(row.providerExchange)) {
-    return "missing_provider_exchange";
-  }
-  if (!isValidDate(row.fetchedAt)) return "invalid_fetched_at";
-  if (!isAllowedClosePriceSource(row.source, writePolicy)) {
-    return "unsupported_write_source";
-  }
-  return null;
-}
-
-function toSnapshotInsert(
-  row: ClosePrice,
-  target: PriceLookupTarget | undefined,
-) {
-  const closePrice = row.closePrice ?? "0";
-  const ticker = normalizeTicker(row.ticker) ?? row.ticker;
-  const market = normalizeText(row.market) ?? row.market;
-  const currency = (normalizeText(row.currency) ?? row.currency).toUpperCase();
-
-  return {
-    legacyBase44Id: null,
-    priceDate: row.priceDate,
-    ticker,
-    assetId: target?.assetIds[0] ?? null,
-    market,
-    currency,
-    closePrice,
-    adjustedClosePrice: row.adjustedClosePrice,
-    adjustedCloseBasis: row.adjustedCloseBasis,
-    adjustedCloseProvider: row.adjustedCloseProvider,
-    adjustedCloseSource: row.adjustedCloseSource,
-    adjustedCloseFetchedAt: row.adjustedCloseFetchedAt,
-    closePriceKrw: row.closePriceKrw,
-    fxRate: row.fxRate,
-    source: row.source,
-    providerSymbol: normalizeTicker(row.providerSymbol),
-    providerExchange: row.providerExchange?.trim().toUpperCase() ?? null,
-    fetchedAt: row.fetchedAt,
-    isSample: row.isSample ?? true,
-    base44CreatedAt: null,
-    base44UpdatedAt: null,
-  };
-}
-
-async function findExistingAssetPriceSnapshot(
-  market: string,
-  currency: string,
-  ticker: string,
-  priceDate: string,
-) {
-  const [existing] = await db
-    .select()
-    .from(assetPriceSnapshots)
-    .where(
-      and(
-        eq(assetPriceSnapshots.market, market),
-        eq(assetPriceSnapshots.currency, currency),
-        eq(assetPriceSnapshots.ticker, ticker),
-        eq(assetPriceSnapshots.priceDate, priceDate),
-      ),
-    )
-    .limit(1);
-
-  return existing ?? null;
-}
-
-function getProtectedExistingReason(
-  existing: AssetPriceSnapshotRow | null,
-  incoming: ReturnType<typeof toSnapshotInsert>,
-  writePolicy: ClosePriceWritePolicy,
-) {
-  if (!existing) return null;
-
-  if (writePolicy === "stub_fixture") {
-    if (incoming.source !== "stub_fixture") return "unsupported_write_source";
-    if (existing.source !== "stub_fixture") return "protected_existing_source";
-    return null;
-  }
-
-  if (writePolicy === "kis") {
-    if (!isKisClosePriceSource(incoming.source)) return "unsupported_write_source";
-    if (isKisClosePriceSource(existing.source)) return null;
-
-    const conflictReason = getKisValueConflictReason(existing, incoming);
-    if (conflictReason) return conflictReason;
-
-    return null;
-  }
-
-  return "write_policy_disabled";
-}
-
-function getClosePriceUpsertSetWhere(
-  snapshot: ReturnType<typeof toSnapshotInsert>,
-  writePolicy: ClosePriceWritePolicy,
-) {
-  if (writePolicy === "stub_fixture") {
-    return sql`${assetPriceSnapshots.source} = ${snapshot.source}`;
-  }
-
-  if (writePolicy === "kis") {
-    const threshold = getKisValueConflictThresholdFraction();
-    return sql`
-      ${assetPriceSnapshots.source} like 'kis_%'
-      or (
-        abs(${assetPriceSnapshots.closePrice} - excluded.close_price)
-        / greatest(abs(${assetPriceSnapshots.closePrice}), 1)
-      ) <= ${threshold}
-    `;
-  }
-
-  return sql`false`;
-}
-
-function getClosePriceWritePolicy(
-  providerName: string,
-  fixture: boolean,
-): ClosePriceWritePolicy {
-  if (providerName === "kis") return "kis";
-  if (fixture) return "stub_fixture";
-  return "none";
-}
-
 function getLivePriceWritePolicy(providerName: string): LivePriceWritePolicy {
   if (providerName === "kis") return "kis";
   return "none";
-}
-
-function isAllowedClosePriceSource(
-  source: string | null,
-  writePolicy: ClosePriceWritePolicy,
-) {
-  if (writePolicy === "stub_fixture") return source === "stub_fixture";
-  if (writePolicy === "kis") return isKisClosePriceSource(source);
-  return false;
-}
-
-function isAllowedAdjustedCloseBasis(
-  basis: ClosePrice["adjustedCloseBasis"],
-  writePolicy: ClosePriceWritePolicy,
-) {
-  if (writePolicy === "stub_fixture") {
-    return basis === ADJUSTED_CLOSE_BASIS.syntheticFixture;
-  }
-  if (writePolicy === "kis") {
-    return basis === ADJUSTED_CLOSE_BASIS.provider;
-  }
-  return false;
-}
-
-function isKisClosePriceSource(source: string | null) {
-  return (
-    source === "kis_domestic_itemchartprice" ||
-    /^kis_overseas_dailyprice:[A-Z]+$/.test(source ?? "")
-  );
-}
-
-function getKisValueConflictReason(
-  existing: AssetPriceSnapshotRow,
-  incoming: ReturnType<typeof toSnapshotInsert>,
-) {
-  const existingClose = Number(existing.closePrice);
-  const incomingClose = Number(incoming.closePrice);
-
-  if (!Number.isFinite(existingClose) || !Number.isFinite(incomingClose)) {
-    return "value_conflict_invalid_decimal";
-  }
-
-  const thresholdPct = getKisValueConflictThresholdPct();
-  const relativeDiffPct =
-    (Math.abs(existingClose - incomingClose) /
-      Math.max(Math.abs(existingClose), 1)) *
-    100;
-
-  if (relativeDiffPct <= thresholdPct) return null;
-
-  return `value_conflict:${relativeDiffPct.toFixed(4)}pct_gt_${thresholdPct}pct`;
-}
-
-function getKisValueConflictThresholdPct() {
-  const configured = Number(process.env.KIS_VALUE_CONFLICT_THRESHOLD_PCT);
-  if (Number.isFinite(configured) && configured >= 0) return configured;
-  return DEFAULT_KIS_VALUE_CONFLICT_THRESHOLD_PCT;
-}
-
-function getKisValueConflictThresholdFraction() {
-  return getKisValueConflictThresholdPct() / 100;
-}
-
-function snapshotMatches(
-  existing: AssetPriceSnapshotRow,
-  incoming: ReturnType<typeof toSnapshotInsert>,
-) {
-  const adjustedCloseMatches =
-    incoming.adjustedClosePrice === null ||
-    sameNullableDecimal(
-      existing.adjustedClosePrice,
-      incoming.adjustedClosePrice,
-    );
-
-  return (
-    existing.assetId === incoming.assetId &&
-    existing.market === incoming.market &&
-    existing.currency === incoming.currency &&
-    sameDecimal(existing.closePrice, incoming.closePrice) &&
-    adjustedCloseMatches &&
-    preservesNullableText(
-      existing.adjustedCloseBasis,
-      incoming.adjustedCloseBasis,
-    ) &&
-    preservesNullableText(
-      existing.adjustedCloseProvider,
-      incoming.adjustedCloseProvider,
-    ) &&
-    preservesNullableText(
-      existing.adjustedCloseSource,
-      incoming.adjustedCloseSource,
-    ) &&
-    preservesNullableDate(
-      existing.adjustedCloseFetchedAt,
-      incoming.adjustedCloseFetchedAt,
-    ) &&
-    preservesNullableDecimal(existing.closePriceKrw, incoming.closePriceKrw) &&
-    preservesNullableDecimal(existing.fxRate, incoming.fxRate) &&
-    existing.source === incoming.source &&
-    existing.providerSymbol === incoming.providerSymbol &&
-    existing.providerExchange === incoming.providerExchange &&
-    existing.isSample === incoming.isSample
-  );
-}
-
-function emptyClosePriceWriteSummary(): ClosePriceWriteSummary {
-  return {
-    insertedCount: 0,
-    updatedCount: 0,
-    skippedCount: 0,
-    failedCount: 0,
-    conflictCount: 0,
-    results: [],
-  };
 }
 
 function emptyLivePriceWriteSummary(): LivePriceWriteSummary {
@@ -1477,54 +1001,6 @@ function summarizeTargetFilterResults(results: PriceSyncTargetFilterResult[]) {
   };
 }
 
-function isDateKey(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function isValidDate(value: Date | null) {
-  return value instanceof Date && Number.isFinite(value.getTime());
-}
-
-function isDecimalString(value: string | null) {
-  if (value === null) return false;
-  return Number.isFinite(Number(value));
-}
-
-function sameDecimal(left: string, right: string) {
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
-
-  if (!Number.isFinite(leftNumber) || !Number.isFinite(rightNumber)) {
-    return left === right;
-  }
-
-  const difference = Math.abs(leftNumber - rightNumber);
-  const tolerance = Math.max(
-    DECIMAL_COMPARE_ABSOLUTE_TOLERANCE,
-    Math.max(Math.abs(leftNumber), Math.abs(rightNumber)) *
-      DECIMAL_COMPARE_RELATIVE_TOLERANCE,
-  );
-
-  return difference <= tolerance;
-}
-
-function sameNullableDecimal(left: string | null, right: string | null) {
-  if (left === null || right === null) return left === right;
-  return sameDecimal(left, right);
-}
-
-function preservesNullableDecimal(left: string | null, right: string | null) {
-  return right === null || sameNullableDecimal(left, right);
-}
-
-function preservesNullableText(left: string | null, right: string | null) {
-  return right === null || left === right;
-}
-
-function preservesNullableDate(left: Date | null, right: Date | null) {
-  return right === null || left?.getTime() === right.getTime();
-}
-
 function toTargetKey(
   row: Pick<LiveQuote | ClosePrice, "market" | "ticker" | "currency">,
 ) {
@@ -1554,7 +1030,7 @@ function buildSkeletonWarnings(options: {
   mode: PriceSyncMode;
   dryRun: boolean;
   fixture: boolean;
-  closeWritePolicy: ClosePriceWritePolicy;
+  closeWritePolicy: AssetPriceSnapshotWritePolicy;
   liveWritePolicy: LivePriceWritePolicy;
   closeWriteEnabled: boolean;
   liveWriteEnabled: boolean;

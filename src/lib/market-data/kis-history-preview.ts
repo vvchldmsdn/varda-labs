@@ -11,12 +11,17 @@ export const KIS_HISTORY_PREVIEW_POLICY = Object.freeze({
   maximumInstrumentCount: 2,
   maximumRangeCalendarDays: 180,
   responseShape: "coverage_summary_without_full_series",
+  defaultMode: "dry_run",
+  actualWriteGuard: "dryRun=false_write=true_confirmWrite=true",
 } as const);
 
 export type KisHistoryPreviewRequest = Readonly<{
   startDate: string;
   endDate: string;
   targets: readonly PriceLookupTarget[];
+  dryRun: boolean;
+  write: boolean;
+  confirmWrite: boolean;
 }>;
 
 export class KisHistoryPreviewInputError extends Error {
@@ -33,15 +38,27 @@ export function parseKisHistoryPreviewRequest(
   const startDate = parseDateKey(record?.startDate);
   const endDate = parseDateKey(record?.endDate);
   const rawTargets = record?.targets;
+  const dryRun = parseOptionalBoolean(record?.dryRun, true, "dryRun");
+  const write = parseOptionalBoolean(record?.write, false, "write");
+  const confirmWrite = parseOptionalBoolean(
+    record?.confirmWrite,
+    false,
+    "confirmWrite",
+  );
 
-  if (record && "write" in record) {
+  if (dryRun && write) {
     throw new KisHistoryPreviewInputError(
-      "KIS history preview does not accept a write option",
+      "KIS history dry-run does not accept write=true",
     );
   }
-  if (record?.dryRun !== undefined && record.dryRun !== true) {
+  if (dryRun && confirmWrite) {
     throw new KisHistoryPreviewInputError(
-      "KIS history preview only supports dryRun=true",
+      "KIS history dry-run does not accept confirmWrite=true",
+    );
+  }
+  if (!dryRun && (!write || !confirmWrite)) {
+    throw new KisHistoryPreviewInputError(
+      "KIS history writes require dryRun=false, write=true, and confirmWrite=true",
     );
   }
   if (!startDate || !endDate || startDate > endDate) {
@@ -77,6 +94,9 @@ export function parseKisHistoryPreviewRequest(
     startDate,
     endDate,
     targets: Object.freeze(targets),
+    dryRun,
+    write,
+    confirmWrite,
   });
 }
 
@@ -209,4 +229,14 @@ function objectRecord(value: unknown) {
 
 function normalizeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function parseOptionalBoolean(
+  value: unknown,
+  fallback: boolean,
+  label: string,
+) {
+  if (value === undefined) return fallback;
+  if (typeof value === "boolean") return value;
+  throw new KisHistoryPreviewInputError(`${label} must be a boolean`);
 }

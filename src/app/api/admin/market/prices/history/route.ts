@@ -8,6 +8,10 @@ import {
   summarizeKisHistoryPreview,
 } from "@/lib/market-data/kis-history-preview";
 import {
+  KisHistoryCacheSyncError,
+  runKisHistoryCacheSync,
+} from "@/lib/market-data/kis-history-cache-sync";
+import {
   createKisMarketDataProvider,
   getKisProviderPolicy,
 } from "@/lib/market-data/providers/kis";
@@ -68,6 +72,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!previewRequest.dryRun) {
+      const result = await runKisHistoryCacheSync({
+        targets: [...previewRequest.targets],
+        startDate: previewRequest.startDate,
+        endDate: previewRequest.endDate,
+        provider,
+      });
+      return NextResponse.json(result);
+    }
+
     const result = await provider.fetchHistoricalClosePrices(
       [...previewRequest.targets],
       {
@@ -79,6 +93,15 @@ export async function POST(request: Request) {
     );
     return NextResponse.json(summarizeKisHistoryPreview(result));
   } catch (error) {
+    if (error instanceof KisHistoryCacheSyncError) {
+      return NextResponse.json(
+        {
+          error: "KIS historical cache sync failed",
+          runId: error.runId,
+        },
+        { status: 500 },
+      );
+    }
     if (error instanceof KisRawHistoryInputError) {
       return NextResponse.json(
         { error: error.code, message: error.message },

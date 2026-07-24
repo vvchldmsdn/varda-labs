@@ -52,7 +52,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 17);
-    assert.equal(registeredPaths.length, 21);
+    assert.equal(registeredPaths.length, 23);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
