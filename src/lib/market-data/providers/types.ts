@@ -85,7 +85,11 @@ export type HistoricalPriceFailure = {
   currency: string;
   startDate: string;
   endDate: string;
-  code: "empty_window" | "transport_error" | "provider_not_configured";
+  code:
+    | "empty_window"
+    | "transport_error"
+    | "provider_auth_error"
+    | "provider_not_configured";
   error: string;
 };
 

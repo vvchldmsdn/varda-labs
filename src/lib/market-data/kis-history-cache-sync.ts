@@ -5,6 +5,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { marketDataSyncRuns } from "@/db/schema";
 import { applyAssetPriceSnapshotRows } from "@/lib/market-data/asset-price-snapshot-repository";
+import {
+  formatKisHistoryNoRowsError,
+  summarizeKisHistoryProviderResult,
+  type KisHistoryProviderDiagnostics,
+} from "@/lib/market-data/kis-history-diagnostics";
 import { safeErrorMessage } from "@/lib/redaction";
 import type {
   HistoricalPriceFailure,
@@ -96,6 +101,8 @@ export async function runKisHistoryCacheSync(options: {
     })
     .returning({ id: marketDataSyncRuns.id });
 
+  let providerDiagnostics: KisHistoryProviderDiagnostics | null = null;
+
   try {
     const providerResult =
       await options.provider.fetchHistoricalClosePrices(options.targets, {
@@ -104,12 +111,16 @@ export async function runKisHistoryCacheSync(options: {
         startDate: options.startDate,
         endDate: options.endDate,
       });
+    providerDiagnostics =
+      summarizeKisHistoryProviderResult(providerResult);
 
     if (providerResult.priceBasis !== KIS_HISTORY_CACHE_SYNC_POLICY.priceBasis) {
       throw new Error("KIS history returned an unsupported price basis");
     }
     if (providerResult.rows.length === 0) {
-      throw new Error("KIS history returned no cacheable rows");
+      throw new Error(
+        formatKisHistoryNoRowsError(providerDiagnostics),
+      );
     }
 
     const writeSummary = await applyAssetPriceSnapshotRows({
@@ -149,7 +160,7 @@ export async function runKisHistoryCacheSync(options: {
           skippedCount: writeSummary.skippedCount,
           failedCount,
           conflictCount: writeSummary.conflictCount,
-          failureCodes: countFailureCodes(providerResult.failures),
+          failureCodes: providerDiagnostics.failureCodes,
           writeReasons: countWriteReasons(writeSummary.results),
           phase: "completed",
         },
@@ -186,27 +197,23 @@ export async function runKisHistoryCacheSync(options: {
       .set({
         status: "failed",
         finishedAt: new Date(),
-        failedCount: 1,
+        failedCount: Math.max(
+          1,
+          providerDiagnostics?.providerFailureCount ?? 0,
+        ),
         error: message,
         metadataJson: {
           policy: KIS_HISTORY_CACHE_SYNC_POLICY.version,
           startDate: options.startDate,
           endDate: options.endDate,
           targetCount: options.targets.length,
+          ...(providerDiagnostics ?? {}),
           phase: "failed",
         },
       })
       .where(eq(marketDataSyncRuns.id, run.id));
     throw new KisHistoryCacheSyncError(message, run.id);
   }
-}
-
-function countFailureCodes(failures: readonly HistoricalPriceFailure[]) {
-  const counts = new Map<string, number>();
-  for (const failure of failures) {
-    counts.set(failure.code, (counts.get(failure.code) ?? 0) + 1);
-  }
-  return Object.fromEntries(counts);
 }
 
 function countWriteReasons(

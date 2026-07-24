@@ -10,6 +10,7 @@ import "./provider-adjusted-history-readiness.test.mjs";
 import "./provider-instrument-evidence-matrix.test.mjs";
 import "./provider-history-shortlist.test.mjs";
 import "./kis-raw-history.test.mjs";
+import "./kis-history-diagnostics.test.mjs";
 import "./kis-history-route.test.mjs";
 import "./raw-price-history.test.mjs";
 import "./portfolio-risk-route.test.mjs";

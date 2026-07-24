@@ -311,7 +311,7 @@ async function fetchKisHistoricalClosePrices(
         currency: instrument.currency,
         startDate: plan.startDate,
         endDate: plan.endDate,
-        code: "transport_error",
+        code: "provider_auth_error",
         error: message,
       })),
       requestCount: 0,
