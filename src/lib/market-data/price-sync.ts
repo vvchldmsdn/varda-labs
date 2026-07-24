@@ -749,13 +749,13 @@ function buildPlannedWrites(
   }
 
   return [
-      {
-        table: "asset_price_snapshots",
-        operation: "upsert_close_price_by_ticker_date",
-        count: priceTargetCount,
-        active: !dryRun && closeWritePolicy !== "none",
-      },
-    ];
+    {
+      table: "asset_price_snapshots",
+      operation: "upsert_close_price_by_market_currency_ticker_date",
+      count: priceTargetCount,
+      active: !dryRun && closeWritePolicy !== "none",
+    },
+  ];
 }
 
 async function fetchProviderRows(

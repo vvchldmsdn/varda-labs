@@ -11,13 +11,13 @@ import {
   publicPreviewDatabaseEvidence,
   readPreviewDatabaseState,
 } from "../src/lib/deployment/preview-database-evidence.ts";
-import { PREVIEW_DATABASE_TARGET_POLICY } from "../src/lib/deployment/preview-database-target.ts";
+import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
 import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-plan.ts";
 
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v1.json",
+  "varda-preview-database-preflight-v2.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -49,13 +49,13 @@ async function run() {
     localMigrations,
     appliedMigrations,
     allowedPendingMigrations:
-      PREVIEW_DATABASE_TARGET_POLICY.allowedPendingMigrations,
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
   });
 
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v1",
+      evidenceVersion: "preview_database_build_preflight_v2",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
     };
@@ -77,7 +77,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v1",
+    "preview_database_build_preflight_v2",
     "Preview preflight evidence version drifted",
   );
   assert.equal(

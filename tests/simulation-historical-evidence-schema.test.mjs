@@ -50,6 +50,14 @@ describe("Simulation historical evidence schema expansion", () => {
       priceSync,
       /target: \[[\s\S]*assetPriceSnapshots\.market,[\s\S]*assetPriceSnapshots\.currency,[\s\S]*assetPriceSnapshots\.ticker,[\s\S]*assetPriceSnapshots\.priceDate/,
     );
+    assert.match(
+      priceSync,
+      /operation: "upsert_close_price_by_market_currency_ticker_date"/,
+    );
+    assert.doesNotMatch(
+      priceSync,
+      /operation: "upsert_close_price_by_ticker_date"/,
+    );
     assert.match(kisProvider, /fid_org_adj_prc: "1"/);
     assert.match(
       kisProvider,

@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const NEON_ENDPOINT_PATTERN = /^ep-[a-z0-9-]+$/;
 
-export const PREVIEW_DATABASE_TARGET_POLICY = Object.freeze({
-  policyId: "preview_database_target_attestation_v1",
-  expectedNeonProjectSha256:
+export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
+  policyId: "preview_database_target_operational_guard_v2",
+  expectedNeonIntegrationProjectSha256:
     "sha256:715beb5ee1546f662b876ab7af2ca37da852332bcbc3d93863e95be4d9952a87",
   productionEndpointSha256:
     "sha256:e47003b830425b835f435c9149931906a1e3df40307b7462a222755a923981a2",
@@ -25,7 +25,7 @@ export const PREVIEW_DATABASE_TARGET_POLICY = Object.freeze({
   ]),
 });
 
-export type PreviewDatabaseTargetEnvironment = {
+export type PreviewDatabaseTargetGuardEnvironment = {
   [key: string]: string | undefined;
   VERCEL_ENV?: string;
   DATABASE_URL?: string;
@@ -33,26 +33,30 @@ export type PreviewDatabaseTargetEnvironment = {
   NEON_PROJECT_ID?: string;
 };
 
-export type PreviewDatabaseTargetAttestation = {
-  policyId: typeof PREVIEW_DATABASE_TARGET_POLICY.policyId;
-  status: "attested";
-  projectFingerprint: string;
+export type PreviewDatabaseTargetGuard = {
+  policyId: typeof PREVIEW_DATABASE_TARGET_GUARD_POLICY.policyId;
+  status: "operational_guard_passed";
+  integrationProjectFingerprint: string;
   endpointFingerprint: string;
   targetFingerprint: string;
+  endpointProjectBinding: "external_vercel_neon_integration_control";
 };
 
-type PreviewDatabaseTargetPolicy = {
-  policyId: typeof PREVIEW_DATABASE_TARGET_POLICY.policyId;
-  expectedNeonProjectSha256: string;
+type PreviewDatabaseTargetGuardPolicy = {
+  policyId: typeof PREVIEW_DATABASE_TARGET_GUARD_POLICY.policyId;
+  expectedNeonIntegrationProjectSha256: string;
   productionEndpointSha256: string;
 };
 
-export function attestPreviewDatabaseTarget(
-  env: PreviewDatabaseTargetEnvironment,
-  policy: PreviewDatabaseTargetPolicy = PREVIEW_DATABASE_TARGET_POLICY,
-): PreviewDatabaseTargetAttestation {
+export function guardPreviewDatabaseTarget(
+  env: PreviewDatabaseTargetGuardEnvironment,
+  policy: PreviewDatabaseTargetGuardPolicy =
+    PREVIEW_DATABASE_TARGET_GUARD_POLICY,
+): PreviewDatabaseTargetGuard {
   if (env.VERCEL_ENV !== "preview") {
-    throw new Error("Preview database attestation requires VERCEL_ENV=preview.");
+    throw new Error(
+      "Preview database operational guard requires VERCEL_ENV=preview.",
+    );
   }
 
   const databaseUrl = requiredValue(env.DATABASE_URL, "DATABASE_URL");
@@ -64,7 +68,10 @@ export function attestPreviewDatabaseTarget(
     env.NEON_PROJECT_ID,
     "NEON_PROJECT_ID",
   );
-  assertSha256(policy.expectedNeonProjectSha256, "expected project fingerprint");
+  assertSha256(
+    policy.expectedNeonIntegrationProjectSha256,
+    "expected integration project fingerprint",
+  );
   assertSha256(
     policy.productionEndpointSha256,
     "production endpoint fingerprint",
@@ -84,9 +91,14 @@ export function attestPreviewDatabaseTarget(
     );
   }
 
-  const projectFingerprint = sha256Fingerprint(neonProjectId);
-  if (projectFingerprint !== policy.expectedNeonProjectSha256) {
-    throw new Error("Preview database belongs to an unexpected Neon project.");
+  const integrationProjectFingerprint = sha256Fingerprint(neonProjectId);
+  if (
+    integrationProjectFingerprint !==
+    policy.expectedNeonIntegrationProjectSha256
+  ) {
+    throw new Error(
+      "Preview NEON_PROJECT_ID does not match the pinned Vercel-Neon integration configuration.",
+    );
   }
 
   const endpointFingerprint = sha256Fingerprint(pooled.endpointId);
@@ -98,18 +110,19 @@ export function attestPreviewDatabaseTarget(
 
   return {
     policyId: policy.policyId,
-    status: "attested",
-    projectFingerprint,
+    status: "operational_guard_passed",
+    integrationProjectFingerprint,
     endpointFingerprint,
     targetFingerprint: sha256Fingerprint(
       JSON.stringify({
         policyId: policy.policyId,
-        projectFingerprint,
+        integrationProjectFingerprint,
         endpointFingerprint,
         username: pooled.username,
         databaseName: pooled.databaseName,
       }),
     ),
+    endpointProjectBinding: "external_vercel_neon_integration_control",
   };
 }
 
@@ -155,7 +168,7 @@ function parseNeonDatabaseUrl(rawUrl: string) {
 function requiredValue(value: string | undefined, name: string) {
   const normalized = value?.trim();
   if (!normalized) {
-    throw new Error(`${name} is required for Preview database attestation.`);
+    throw new Error(`${name} is required for the Preview database guard.`);
   }
   return normalized;
 }

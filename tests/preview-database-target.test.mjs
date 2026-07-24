@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
-  PREVIEW_DATABASE_TARGET_POLICY,
-  attestPreviewDatabaseTarget,
+  PREVIEW_DATABASE_TARGET_GUARD_POLICY,
+  guardPreviewDatabaseTarget,
   sha256Fingerprint,
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
@@ -16,23 +16,30 @@ const PROJECT_ID = "synthetic-neon-project";
 const PRODUCTION_ENDPOINT = "ep-production-synthetic";
 const PREVIEW_ENDPOINT = "ep-preview-synthetic";
 const POLICY = {
-  policyId: "preview_database_target_attestation_v1",
-  expectedNeonProjectSha256: sha256Fingerprint(PROJECT_ID),
+  policyId: "preview_database_target_operational_guard_v2",
+  expectedNeonIntegrationProjectSha256: sha256Fingerprint(PROJECT_ID),
   productionEndpointSha256: sha256Fingerprint(PRODUCTION_ENDPOINT),
 };
 
-describe("Preview database target attestation", () => {
-  it("attests one pooled and unpooled Preview target in the pinned project", () => {
-    const result = attestPreviewDatabaseTarget(
+describe("Preview database target operational guard", () => {
+  it("guards one pooled and unpooled Preview target under the pinned integration configuration", () => {
+    const result = guardPreviewDatabaseTarget(
       environment(PREVIEW_ENDPOINT),
       POLICY,
     );
 
-    assert.equal(result.status, "attested");
-    assert.equal(result.projectFingerprint, sha256Fingerprint(PROJECT_ID));
+    assert.equal(result.status, "operational_guard_passed");
+    assert.equal(
+      result.integrationProjectFingerprint,
+      sha256Fingerprint(PROJECT_ID),
+    );
     assert.equal(
       result.endpointFingerprint,
       sha256Fingerprint(PREVIEW_ENDPOINT),
+    );
+    assert.equal(
+      result.endpointProjectBinding,
+      "external_vercel_neon_integration_control",
     );
     assert.match(result.targetFingerprint, /^sha256:[0-9a-f]{64}$/);
   });
@@ -40,7 +47,7 @@ describe("Preview database target attestation", () => {
   it("blocks the pinned Production endpoint even in VERCEL_ENV=preview", () => {
     assert.throws(
       () =>
-        attestPreviewDatabaseTarget(
+        guardPreviewDatabaseTarget(
           environment(PRODUCTION_ENDPOINT),
           POLICY,
         ),
@@ -48,24 +55,41 @@ describe("Preview database target attestation", () => {
     );
   });
 
-  it("blocks a database from another Neon project", () => {
+  it("blocks Neon project metadata outside the pinned integration configuration", () => {
     assert.throws(
       () =>
-        attestPreviewDatabaseTarget(
+        guardPreviewDatabaseTarget(
           {
             ...environment(PREVIEW_ENDPOINT),
             NEON_PROJECT_ID: "unexpected-project",
           },
           POLICY,
         ),
-      /unexpected Neon project/,
+      /does not match the pinned Vercel-Neon integration configuration/,
+    );
+  });
+
+  it("does not claim endpoint-to-project binding from independent environment values", () => {
+    const result = guardPreviewDatabaseTarget(
+      environment("ep-other-project-synthetic"),
+      POLICY,
+    );
+
+    assert.equal(result.status, "operational_guard_passed");
+    assert.equal(
+      result.endpointProjectBinding,
+      "external_vercel_neon_integration_control",
+    );
+    assert.notEqual(
+      result.endpointFingerprint,
+      sha256Fingerprint(PREVIEW_ENDPOINT),
     );
   });
 
   it("blocks pooled and unpooled URL identity drift", () => {
     assert.throws(
       () =>
-        attestPreviewDatabaseTarget(
+        guardPreviewDatabaseTarget(
           {
             ...environment(PREVIEW_ENDPOINT),
             DATABASE_URL_UNPOOLED: databaseUrl(
@@ -80,15 +104,16 @@ describe("Preview database target attestation", () => {
   });
 
   it("keeps the committed target policy fingerprint-only", () => {
-    const serialized = JSON.stringify(PREVIEW_DATABASE_TARGET_POLICY);
+    const serialized = JSON.stringify(PREVIEW_DATABASE_TARGET_GUARD_POLICY);
     assert.doesNotMatch(serialized, /postgres(?:ql)?:\/\//i);
     assert.doesNotMatch(serialized, /\.neon\.tech/i);
     assert.match(
-      PREVIEW_DATABASE_TARGET_POLICY.expectedNeonProjectSha256,
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY
+        .expectedNeonIntegrationProjectSha256,
       /^sha256:[0-9a-f]{64}$/,
     );
     assert.match(
-      PREVIEW_DATABASE_TARGET_POLICY.productionEndpointSha256,
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY.productionEndpointSha256,
       /^sha256:[0-9a-f]{64}$/,
     );
   });
@@ -120,6 +145,21 @@ describe("Preview database target attestation", () => {
     const reviewed = reviewedState();
     assert.doesNotThrow(() =>
       assertReviewedPreviewDatabaseState(reviewed),
+    );
+    assert.deepEqual(
+      {
+        evidenceVersion:
+          publicPreviewDatabaseEvidence(reviewed).evidenceVersion,
+        status: publicPreviewDatabaseEvidence(reviewed).status,
+        endpointProjectBinding:
+          publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
+      },
+      {
+        evidenceVersion: "preview_database_evidence_v2",
+        status: "operational_guard_passed",
+        endpointProjectBinding:
+          "external_vercel_neon_integration_control",
+      },
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).catalogStatus,
@@ -205,11 +245,12 @@ function databaseUrl(endpoint, pooled) {
 function reviewedState() {
   return {
     target: {
-      policyId: "preview_database_target_attestation_v1",
-      status: "attested",
-      projectFingerprint: sha256Fingerprint(PROJECT_ID),
+      policyId: "preview_database_target_operational_guard_v2",
+      status: "operational_guard_passed",
+      integrationProjectFingerprint: sha256Fingerprint(PROJECT_ID),
       endpointFingerprint: sha256Fingerprint(PREVIEW_ENDPOINT),
       targetFingerprint: sha256Fingerprint("synthetic-target"),
+      endpointProjectBinding: "external_vercel_neon_integration_control",
     },
     rowCounts: {
       assets: 1,
@@ -219,8 +260,9 @@ function reviewedState() {
     },
     latestMigration: {
       createdAt:
-        PREVIEW_DATABASE_TARGET_POLICY.latestReviewedMigration.createdAt,
-      sha256: PREVIEW_DATABASE_TARGET_POLICY.latestReviewedMigration.sha256,
+        PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.createdAt,
+      sha256:
+        PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.sha256,
     },
     reviewedCatalog: {
       adjustedClosePriceNullable: true,

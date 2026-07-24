@@ -1,7 +1,7 @@
 import {
-  PREVIEW_DATABASE_TARGET_POLICY,
-  attestPreviewDatabaseTarget,
-  type PreviewDatabaseTargetEnvironment,
+  PREVIEW_DATABASE_TARGET_GUARD_POLICY,
+  guardPreviewDatabaseTarget,
+  type PreviewDatabaseTargetGuardEnvironment,
 } from "./preview-database-target.ts";
 
 const REVIEWED_COLUMNS = Object.freeze([
@@ -27,7 +27,7 @@ const REVIEWED_INDEXES = Object.freeze({
 type Query = (query: string) => Promise<Record<string, unknown>[]>;
 
 export type PreviewDatabaseState = {
-  target: ReturnType<typeof attestPreviewDatabaseTarget>;
+  target: ReturnType<typeof guardPreviewDatabaseTarget>;
   rowCounts: {
     assets: number;
     priceSnapshots: number;
@@ -47,10 +47,10 @@ export type PreviewDatabaseState = {
 };
 
 export async function readPreviewDatabaseState(input: {
-  env: PreviewDatabaseTargetEnvironment;
+  env: PreviewDatabaseTargetGuardEnvironment;
   query: Query;
 }): Promise<PreviewDatabaseState> {
-  const target = attestPreviewDatabaseTarget(input.env);
+  const target = guardPreviewDatabaseTarget(input.env);
   const [countRows, migrationRows, columnRows, indexRows] = await Promise.all([
     input.query(`
       select
@@ -190,7 +190,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedLatestMigration(state)) {
     throw new Error(
-      `Preview database latest migration is not ${PREVIEW_DATABASE_TARGET_POLICY.latestReviewedMigration.tag}.`,
+      `Preview database latest migration is not ${PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag}.`,
     );
   }
   if (!hasReviewedCatalog(state)) {
@@ -204,12 +204,13 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedMigrationPresent = hasReviewedLatestMigration(state);
   const reviewedCatalogPresent = hasReviewedCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v1",
-    status: "attested",
+    evidenceVersion: "preview_database_evidence_v2",
+    status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
+    endpointProjectBinding: state.target.endpointProjectBinding,
     rowCounts: state.rowCounts,
     latestReviewedMigration: reviewedMigrationPresent
-      ? PREVIEW_DATABASE_TARGET_POLICY.latestReviewedMigration.tag
+      ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     catalogStatus:
       reviewedMigrationPresent && reviewedCatalogPresent
@@ -219,7 +220,7 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
 }
 
 function hasReviewedLatestMigration(state: PreviewDatabaseState) {
-  const reviewed = PREVIEW_DATABASE_TARGET_POLICY.latestReviewedMigration;
+  const reviewed = PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration;
   return (
     state.latestMigration?.createdAt === reviewed.createdAt &&
     state.latestMigration.sha256 === reviewed.sha256
