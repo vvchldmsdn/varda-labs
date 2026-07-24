@@ -13,6 +13,16 @@ const REVIEWED_COLUMNS = Object.freeze([
   "provider_exchange",
   "fetched_at",
 ]);
+const REVIEWED_INDEXES = Object.freeze({
+  instrumentDate: Object.freeze({
+    name: "asset_price_snapshots_instrument_date_unique",
+    columns: Object.freeze(["market", "currency", "ticker", "date"]),
+  }),
+  legacyTickerDate: Object.freeze({
+    name: "asset_price_snapshots_ticker_date_unique",
+    columns: Object.freeze(["ticker", "date"]),
+  }),
+});
 
 type Query = (query: string) => Promise<Record<string, unknown>[]>;
 
@@ -31,7 +41,8 @@ export type PreviewDatabaseState = {
   reviewedCatalog: {
     adjustedClosePriceNullable: boolean;
     presentColumns: string[];
-    instrumentDateUniqueIndex: boolean;
+    instrumentDateUniqueIndexExact: boolean;
+    legacyTickerDateUniqueIndexExact: boolean;
   };
 };
 
@@ -75,11 +86,50 @@ export async function readPreviewDatabaseState(input: {
        order by column_name
     `),
     input.query(`
-      select indexname
-        from pg_catalog.pg_indexes
-       where schemaname = 'public'
-         and tablename = 'asset_price_snapshots'
-         and indexname = 'asset_price_snapshots_instrument_date_unique'
+      select
+        index_class.relname as index_name,
+        index_definition.indisvalid as is_valid,
+        index_definition.indisunique as is_unique,
+        index_definition.indisready as is_ready,
+        index_definition.indislive as is_live,
+        (index_definition.indpred is null) as has_no_predicate,
+        (index_definition.indexprs is null) as has_no_expressions,
+        index_definition.indnkeyatts::integer as key_attribute_count,
+        index_definition.indnatts::integer as total_attribute_count,
+        string_agg(
+          table_attribute.attname,
+          ','
+          order by index_key.ordinality
+        ) as key_columns
+      from pg_catalog.pg_index as index_definition
+      join pg_catalog.pg_class as index_class
+        on index_class.oid = index_definition.indexrelid
+      join pg_catalog.pg_class as table_class
+        on table_class.oid = index_definition.indrelid
+      join pg_catalog.pg_namespace as table_namespace
+        on table_namespace.oid = table_class.relnamespace
+      cross join lateral unnest(index_definition.indkey)
+        with ordinality as index_key(attribute_number, ordinality)
+      left join pg_catalog.pg_attribute as table_attribute
+        on table_attribute.attrelid = table_class.oid
+       and table_attribute.attnum = index_key.attribute_number
+      where table_namespace.nspname = 'public'
+        and table_class.relname = 'asset_price_snapshots'
+        and index_class.relname in (
+          'asset_price_snapshots_instrument_date_unique',
+          'asset_price_snapshots_ticker_date_unique'
+        )
+      group by
+        index_class.relname,
+        index_definition.indisvalid,
+        index_definition.indisunique,
+        index_definition.indisready,
+        index_definition.indislive,
+        (index_definition.indpred is null),
+        (index_definition.indexprs is null),
+        index_definition.indnkeyatts,
+        index_definition.indnatts
+      order by index_class.relname
     `),
   ]);
 
@@ -123,7 +173,14 @@ export async function readPreviewDatabaseState(input: {
       adjustedClosePriceNullable:
         adjustedClosePrice?.is_nullable === "YES",
       presentColumns,
-      instrumentDateUniqueIndex: indexRows.length === 1,
+      instrumentDateUniqueIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.instrumentDate,
+      ),
+      legacyTickerDateUniqueIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.legacyTickerDate,
+      ),
     },
   };
 }
@@ -173,7 +230,29 @@ function hasReviewedCatalog(state: PreviewDatabaseState) {
   return (
     state.reviewedCatalog.adjustedClosePriceNullable &&
     state.reviewedCatalog.presentColumns.length === REVIEWED_COLUMNS.length &&
-    state.reviewedCatalog.instrumentDateUniqueIndex
+    state.reviewedCatalog.instrumentDateUniqueIndexExact &&
+    state.reviewedCatalog.legacyTickerDateUniqueIndexExact
+  );
+}
+
+function hasExactUniqueIndex(
+  rows: Record<string, unknown>[],
+  expected: { name: string; columns: readonly string[] },
+) {
+  const matching = rows.filter(({ index_name }) => index_name === expected.name);
+  if (matching.length !== 1) return false;
+
+  const row = matching[0];
+  return (
+    row.is_valid === true &&
+    row.is_unique === true &&
+    row.is_ready === true &&
+    row.is_live === true &&
+    row.has_no_predicate === true &&
+    row.has_no_expressions === true &&
+    Number(row.key_attribute_count) === expected.columns.length &&
+    Number(row.total_attribute_count) === expected.columns.length &&
+    row.key_columns === expected.columns.join(",")
   );
 }
 

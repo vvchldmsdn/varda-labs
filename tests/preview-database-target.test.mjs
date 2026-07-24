@@ -143,6 +143,50 @@ describe("Preview database target attestation", () => {
       },
     );
   });
+
+  it("requires exact composite and legacy index catalog evidence", () => {
+    const reviewed = reviewedState();
+    for (const reviewedCatalog of [
+      {
+        ...reviewed.reviewedCatalog,
+        instrumentDateUniqueIndexExact: false,
+      },
+      {
+        ...reviewed.reviewedCatalog,
+        legacyTickerDateUniqueIndexExact: false,
+      },
+    ]) {
+      const drifted = { ...reviewed, reviewedCatalog };
+      assert.throws(
+        () => assertReviewedPreviewDatabaseState(drifted),
+        /catalog is incomplete/,
+      );
+      assert.equal(
+        publicPreviewDatabaseEvidence(drifted).catalogStatus,
+        "reviewed_0019_not_present",
+      );
+    }
+
+    const source = readFileSync(
+      "src/lib/deployment/preview-database-evidence.ts",
+      "utf8",
+    );
+    for (const requiredCatalogField of [
+      "indisvalid",
+      "indisunique",
+      "indisready",
+      "indislive",
+      "indnkeyatts",
+      "indnatts",
+      "indpred",
+      "indexprs",
+    ]) {
+      assert.match(source, new RegExp(requiredCatalogField));
+    }
+    assert.match(source, /string_agg\([\s\S]*order by index_key\.ordinality/);
+    assert.match(source, /asset_price_snapshots_instrument_date_unique/);
+    assert.match(source, /asset_price_snapshots_ticker_date_unique/);
+  });
 });
 
 function environment(endpoint) {
@@ -189,7 +233,8 @@ function reviewedState() {
         "provider_exchange",
         "fetched_at",
       ],
-      instrumentDateUniqueIndex: true,
+      instrumentDateUniqueIndexExact: true,
+      legacyTickerDateUniqueIndexExact: true,
     },
   };
 }

@@ -117,9 +117,14 @@ function assertPreflightCatalog(plan, state) {
     "Pending 0019 target already has partial reviewed columns",
   );
   assert.equal(
-    state.reviewedCatalog.instrumentDateUniqueIndex,
+    state.reviewedCatalog.instrumentDateUniqueIndexExact,
     false,
     "Pending 0019 target already has the reviewed unique index",
+  );
+  assert.equal(
+    state.reviewedCatalog.legacyTickerDateUniqueIndexExact,
+    true,
+    "Pending 0019 target lost the exact legacy unique index",
   );
 }
 
