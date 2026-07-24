@@ -44,8 +44,46 @@ describe("Fixed single-instrument research simulation", () => {
     assert.ok(left.bands.every((band) => band.p10 <= band.p50));
     assert.ok(left.bands.every((band) => band.p50 <= band.p90));
     assert.ok(Number.isFinite(left.terminal.lossProbabilityPct));
+    assert.ok(Number.isFinite(left.terminal.p5ReturnPct));
+    assert.ok(Number.isFinite(left.terminal.lowerTailMeanReturnPct));
+    assert.ok(
+      left.terminal.lowerTailMeanReturnPct <= left.terminal.p5ReturnPct,
+    );
     assert.ok(Number.isFinite(left.terminal.maxDrawdownP90Pct));
     assert.doesNotMatch(JSON.stringify(left), /sha256:|inputMatrixHash|drawPlanHash/);
+  });
+
+  it("reuses the same 90-row input policy for the approved 126-step horizon", () => {
+    const matrix = readyMatrix();
+    const result = buildFixedResearchSimulation({
+      id: "kodex200",
+      name: "KODEX 200",
+      ticker: "069500",
+      explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      horizon: 126,
+      matrix,
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.source.returnStepCount, 90);
+    assert.equal(result.assumptions.horizon, 126);
+    assert.equal(result.bands.length, 127);
+    assert.equal(result.samplePaths[0].points.length, 127);
+  });
+
+  it("does not silently replace an invalid horizon", () => {
+    const matrix = readyMatrix();
+    const result = buildFixedResearchSimulation({
+      id: "kodex200",
+      name: "KODEX 200",
+      ticker: "069500",
+      explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      horizon: null,
+      matrix,
+    });
+
+    assert.equal(result.status, "unavailable");
+    assert.equal(result.reason, "invalid_horizon_selection");
   });
 
   it("requires an explicit end date rather than silently rolling back", () => {

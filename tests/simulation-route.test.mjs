@@ -6,7 +6,29 @@ describe("Simulation input readiness route boundary", () => {
   it("keeps the page server-rendered and the database adapter server-only", () => {
     const page = read("src/app/simulation/page.tsx");
     const query = read("src/db/queries/simulation-input-readiness.ts");
+    const historicalOutcomeQuery = read(
+      "src/db/queries/simulation-historical-outcome-validation.ts",
+    );
     const regimeQuery = read("src/db/queries/simulation-regime-bootstrap.ts");
+    const regimeEvidenceQuery = read(
+      "src/db/queries/simulation-regime-evidence.ts",
+    );
+    const regimeHistoricalOutcomeQuery = read(
+      "src/db/queries/simulation-regime-historical-outcome-validation.ts",
+    );
+    const researchUniverseQuery = read(
+      "src/db/queries/simulation-research-universe-preflight.ts",
+    );
+    const fixedMixView = read(
+      "src/components/simulation/fixed-mix-research-execution-section.tsx",
+    );
+    const inputReadinessView = read(
+      "src/components/simulation/simulation-input-readiness-view.tsx",
+    );
+    const navigation = read("src/lib/simulation-navigation.ts");
+    const sectionErrorBoundary = read(
+      "src/components/simulation/simulation-section-error-boundary.tsx",
+    );
     const selection = read("src/lib/kodex-voo-fixed-mix-selection.ts");
     const view = readSimulationView();
 
@@ -14,12 +36,58 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(view, /["']use client["']/);
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
     assert.match(query, /^import "server-only";/);
+    assert.match(historicalOutcomeQuery, /^import "server-only";/);
     assert.match(regimeQuery, /^import "server-only";/);
+    assert.match(regimeEvidenceQuery, /^import "server-only";/);
+    assert.match(regimeHistoricalOutcomeQuery, /^import "server-only";/);
+    assert.match(researchUniverseQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
+    assert.match(page, /horizon: params\.horizon/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
+    assert.match(
+      page,
+      /researchUniverse: params\.researchUniverse/,
+    );
+    assert.match(
+      page,
+      /researchUniverse=\{preservedQuery\.researchUniverse\}/,
+    );
+    assert.match(inputReadinessView, /buildSimulationHref/);
+    assert.doesNotMatch(inputReadinessView, /new URLSearchParams/);
+    assert.match(fixedMixView, /buildSimulationHref/);
+    assert.match(fixedMixView, /name="researchUniverse"/);
+    assert.doesNotMatch(fixedMixView, /new URLSearchParams/);
+    assert.match(navigation, /params\.set\("researchUniverse"/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
+    assert.match(
+      page,
+      /getReadOnlySimulationRegimeHistoricalOutcomeValidation/,
+    );
+    assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
+    assert.equal(
+      page.match(/<SimulationSectionErrorBoundary/g)?.length,
+      4,
+      "each independent simulation query section must have its own error boundary",
+    );
+    assert.match(sectionErrorBoundary, /^"use client";/);
+    assert.match(sectionErrorBoundary, /unstable_catchError/);
+    assert.match(sectionErrorBoundary, /unstable_retry/);
+    assert.doesNotMatch(sectionErrorBoundary, /error\.message|error\.digest/);
+    assert.match(page, /historicalOutcomeValidationPromise/);
+    assert.match(page, /FanBandValidationSection/);
+    assert.match(page, /DownsideOutcomeValidationSection/);
+    assert.match(
+      page,
+      /<Suspense fallback=\{<HistoricalOutcomeValidationSkeleton \/>\}>/,
+    );
     assert.match(page, /regimePromise/);
     assert.match(page, /RegimeReadinessHistoryPanel/);
+    assert.match(page, /RegimeHistoricalOutcomeValidationSection/);
+    assert.match(page, /regimeHistoricalOutcomeValidationPromise/);
+    assert.match(
+      page,
+      /<RegimeHistoricalOutcomeValidationSkeleton \/>/,
+    );
     assert.match(page, /RegimeBootstrapResearchSection/);
     assert.match(page, /<Suspense fallback=\{<RegimeBootstrapSkeleton \/>\}>/);
     assert.doesNotMatch(page, /params\.end\[0\]/);
@@ -32,6 +100,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(query, /buildSimulationWalkForwardMinimumVolatility/);
     assert.match(query, /buildSimulationWalkForwardStabilityHistory/);
     assert.match(query, /resolveKodexVooFixedMixSelection/);
+    assert.match(query, /resolveSimulationResearchHorizon/);
+    assert.match(query, /horizon: researchHorizon/);
     assert.match(query, /matrix: comparisonPreflight\.matrixArtifact/);
     assert.match(query, /walkForwardMinimumVolatility/);
     assert.match(query, /walkForwardStabilityHistory/);
@@ -50,7 +120,39 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeQuery, /loadRegimeFactorRows/);
     assert.match(regimeQuery, /Promise\.all/);
     assert.match(regimeQuery, /returnStepCount:/);
-    assert.match(regimeQuery, /globalMarketFactors\.releaseDate/);
+    assert.match(regimeEvidenceQuery, /cache\(/);
+    assert.match(
+      regimeEvidenceQuery,
+      /globalMarketFactors\.releaseDate/,
+    );
+    assert.match(
+      regimeHistoricalOutcomeQuery,
+      /buildSimulationRegimeHistoricalOutcomeValidation/,
+    );
+    assert.match(
+      regimeHistoricalOutcomeQuery,
+      /SIMULATION_REGIME_HISTORICAL_OUTCOME_VALIDATION_POLICY/,
+    );
+    assert.match(
+      regimeHistoricalOutcomeQuery,
+      /getReadOnlySimulationPeriodPreflightBatch/,
+    );
+    assert.match(regimeHistoricalOutcomeQuery, /loadRegimeFactorRows/);
+    assert.match(regimeHistoricalOutcomeQuery, /Promise\.all/);
+    assert.match(
+      historicalOutcomeQuery,
+      /buildSimulationHistoricalOutcomeValidation/,
+    );
+    assert.match(historicalOutcomeQuery, /buildSimulationInputReadinessDates/);
+    assert.match(historicalOutcomeQuery, /90 \+ horizon|returnStepCount:/);
+    assert.match(
+      historicalOutcomeQuery,
+      /resolveSimulationResearchHorizon/,
+    );
+    assert.match(
+      historicalOutcomeQuery,
+      /getReadOnlySimulationPeriodPreflightBatch/,
+    );
     assert.doesNotMatch(
       query,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
@@ -59,17 +161,44 @@ describe("Simulation input readiness route boundary", () => {
       regimeQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
+    assert.doesNotMatch(
+      regimeEvidenceQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      regimeHistoricalOutcomeQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      historicalOutcomeQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      researchUniverseQuery,
+      /\.insert\(|\.update\(|\.delete\(|cron|fetch\s*\(/i,
+    );
+    assert.match(
+      researchUniverseQuery,
+      /Promise\.all\(\[\s*loadPriceRows/,
+    );
+    assert.match(
+      researchUniverseQuery,
+      /buildSimulationResearchUniversePreflight/,
+    );
   });
 
   it("exposes readiness and fixed research output behind the existing access gate", () => {
     const view = readSimulationView();
     const proxy = read("src/proxy.ts");
     const dashboard = read("src/components/portfolio-dashboard.tsx");
+    const smoke = read("scripts/smoke-simulation-route.mjs");
 
     assert.match(view, /data-page="simulation-input-readiness"/);
     assert.match(view, /data-readiness-status/);
     assert.match(view, /data-end-query-status/);
     assert.match(view, /data-invalid-end-query/);
+    assert.match(view, /data-invalid-horizon-query/);
+    assert.match(view, /data-simulation-research-horizon/);
     assert.match(view, /data-simulation-readiness-history/);
     assert.match(view, /data-fixed-research-execution/);
     assert.match(view, /data-research-execution-status/);
@@ -92,10 +221,38 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-walk-forward-stability-ready-count/);
     assert.match(view, /data-walk-forward-stability-row/);
     assert.match(view, /data-walk-forward-stability-row-status/);
+    assert.match(view, /data-fan-band-validation/);
+    assert.match(view, /data-fan-band-validation-status/);
+    assert.match(view, /data-fan-band-validation-horizon/);
+    assert.match(view, /data-fan-band-validation-ready-count/);
+    assert.match(view, /data-fan-band-validation-row/);
+    assert.match(view, /data-fan-band-validation-row-status/);
+    assert.match(view, /data-downside-outcome-validation/);
+    assert.match(view, /data-downside-outcome-validation-status/);
+    assert.match(view, /data-downside-outcome-validation-horizon/);
+    assert.match(view, /data-downside-outcome-validation-ready-count/);
+    assert.match(view, /data-downside-outcome-validation-row/);
+    assert.match(view, /data-downside-outcome-validation-row-status/);
     assert.match(view, /data-regime-bootstrap-research/);
     assert.match(view, /data-regime-bootstrap-status/);
     assert.match(view, /data-regime-bootstrap-engine/);
     assert.match(view, /data-regime-fallback="forbidden"/);
+    assert.match(view, /data-regime-historical-outcome-validation/);
+    assert.match(
+      view,
+      /data-regime-historical-outcome-validation-status/,
+    );
+    assert.match(view, /data-regime-historical-outcome-ready-count/);
+    assert.match(
+      view,
+      /data-regime-historical-outcome-point-in-time/,
+    );
+    assert.match(
+      view,
+      /data-regime-historical-outcome-scenario="kodex200-50-voo-50-buy-and-hold"/,
+    );
+    assert.match(view, /data-regime-historical-outcome-row/);
+    assert.match(view, /data-regime-historical-outcome-row-status/);
     assert.match(view, /data-regime-readiness-history/);
     assert.match(view, /data-regime-point-in-time-status/);
     assert.match(view, /data-regime-safe-date-count/);
@@ -107,6 +264,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-regime-fixed-mix-pairing/);
     assert.match(view, /data-regime-fixed-mix-scenario/);
     assert.match(view, /data-regime-fixed-mix-rebalancing="none"/);
+    assert.match(view, /data-research-universe-preflight/);
+    assert.match(view, /data-research-universe-selection/);
+    assert.match(view, /data-research-universe-instrument/);
+    assert.match(view, /data-research-universe-result-boundary/);
+    assert.match(view, /name="researchUniverse"/);
+    assert.match(view, /시뮬레이션은 실행하지 않습니다/);
+    assert.match(view, /비중을 다시 나누거나 전체 포트폴리오 결과로 표시하지 않습니다/);
     assert.match(view, /data-regime-scenario-selected/);
     assert.match(view, /data-fixed-mix-comparison-pairing/);
     assert.match(view, /data-fixed-mix-comparison-scenario/);
@@ -122,14 +286,17 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /서로 독립된 7번의/);
     assert.match(view, /성과 순위를 만들지 않습니다/);
     assert.match(view, /성과 순위·추천 아님/);
-    assert.match(view, /3개월 연구 시뮬레이션/);
+    assert.match(
+      view,
+      /서비스 기준일 수익률 \{researchHorizon\}단계 연구 시뮬레이션/,
+    );
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
     assert.match(view, /KODEX 200 최초 비중/);
     assert.match(view, /이 비중으로 계산/);
     assert.match(view, /같은 기준일 수익률 쌍/);
     assert.match(view, /리밸런싱하지\s*않아/);
     assert.match(view, /연구용 · 저장 안 함 · 예측 아님/);
-    assert.match(view, /63거래일 경로 500개/);
+    assert.match(view, /서비스 기준일 수익률 \{researchHorizon\}단계/);
     assert.match(view, /stationary\s+bootstrap/);
     assert.match(view, /같은 입력 행렬,/);
     assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);
@@ -149,7 +316,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /자동 fallback 없음/);
     assert.match(view, /DB 적재시각은\s*과거 공개시점으로 간주하지 않습니다/);
     assert.match(view, /현재 보유,\s*계좌, Fount, 금현물/);
+    assert.match(
+      view,
+      /고정 연구 시나리오: KODEX 200 50% \+ VOO 50%, 최초 배분 후\s*리밸런싱 없음/,
+    );
     assert.match(view, /P10~P90/);
+    assert.match(view, /P5 종료수익률/);
+    assert.match(view, /종료수익률 하위 5% 평균/);
     assert.match(view, /최근 7개 기준일/);
     assert.match(view, /저장된 실행 기록이 아니라/);
     assert.match(view, /수익률 행/);
@@ -181,6 +354,16 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(proxy, /"\/simulation"/);
     assert.match(proxy, /"\/simulation\/:path\*"/);
     assert.match(dashboard, /href: "\/simulation"/);
+    assert.match(
+      smoke,
+      /data-regime-historical-outcome-point-in-time="not_established"/,
+    );
+    assert.match(smoke, /EXPECT_REGIME_HISTORICAL_READY/);
+    assert.match(smoke, /HAS_EXPLICIT_END/);
+    assert.match(
+      smoke,
+      /regimeHistoricalOutcomeReadyCount > 0/,
+    );
   });
 });
 
@@ -195,12 +378,18 @@ function readSimulationView() {
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
     "src/components/simulation/walk-forward-min-volatility-section.tsx",
     "src/components/simulation/walk-forward-stability-history-section.tsx",
+    "src/components/simulation/fan-band-validation-section.tsx",
+    "src/components/simulation/downside-outcome-validation-section.tsx",
+    "src/components/simulation/historical-validation-ui.tsx",
     "src/components/simulation/simulation-path-comparison-chart.tsx",
     "src/components/simulation/fixed-research-execution-section.tsx",
     "src/components/simulation/regime-bootstrap-research-section.tsx",
+    "src/components/simulation/regime-historical-outcome-validation-section.tsx",
     "src/components/simulation/regime-fixed-mix-comparison-panel.tsx",
     "src/components/simulation/regime-readiness-history-panel.tsx",
     "src/components/simulation/regime-scenario-card.tsx",
+    "src/components/simulation/research-universe-preflight-section.tsx",
+    "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
     "src/components/simulation/observed-return-comparison-panel.tsx",

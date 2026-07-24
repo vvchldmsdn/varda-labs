@@ -3,13 +3,18 @@ import {
   executeSimulationResearchPaths,
   type SimulationResearchExecutionBlockerReason,
 } from "./simulation-research-execution-core.ts";
+import {
+  SIMULATION_RESEARCH_HORIZON_POLICY,
+  type SimulationResearchHorizon,
+} from "./simulation-research-horizon.ts";
 
 export const FIXED_RESEARCH_SIMULATION_POLICY = Object.freeze({
   version: "fixed_single_instrument_research_simulation_v1",
   admission: "explicit_end_query_and_complete_matrix_only",
   sourceReturnStepCount: 90,
-  horizon: 63,
-  horizonLabel: "approximately_three_market_months",
+  horizonPolicyVersion: SIMULATION_RESEARCH_HORIZON_POLICY.version,
+  allowedHorizons: SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons,
+  defaultHorizon: SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon,
   pathCount: 500,
   expectedBlockLength: 5,
   seed: 0x56415244,
@@ -39,7 +44,12 @@ export function buildFixedResearchSimulation(input: {
   ticker: string;
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
+  horizon?: SimulationResearchHorizon | null;
 }) {
+  const horizon =
+    input.horizon === undefined
+      ? SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon
+      : input.horizon;
   const base = {
     id: input.id,
     name: input.name,
@@ -50,6 +60,9 @@ export function buildFixedResearchSimulation(input: {
 
   if (!input.explicitEndServiceDate) {
     return blockedResult(base, "explicit_end_required");
+  }
+  if (horizon === null) {
+    return blockedResult(base, "invalid_horizon_selection");
   }
   if (!input.matrix || input.matrix.status !== "ready") {
     return blockedResult(base, "input_matrix_unavailable");
@@ -76,7 +89,7 @@ export function buildFixedResearchSimulation(input: {
     weights: [{ ...instrument, weightBps: 10_000 }],
     seed: FIXED_RESEARCH_SIMULATION_POLICY.seed,
     expectedBlockLength: FIXED_RESEARCH_SIMULATION_POLICY.expectedBlockLength,
-    horizon: FIXED_RESEARCH_SIMULATION_POLICY.horizon,
+    horizon,
     pathCount: FIXED_RESEARCH_SIMULATION_POLICY.pathCount,
     samplePathCount: FIXED_RESEARCH_SIMULATION_POLICY.samplePathCount,
   });
@@ -98,6 +111,7 @@ export function buildFixedResearchSimulation(input: {
 
 type FixedResearchBlockerReason =
   | "explicit_end_required"
+  | "invalid_horizon_selection"
   | "input_matrix_unavailable"
   | "input_matrix_shape_mismatch"
   | SimulationResearchExecutionBlockerReason;

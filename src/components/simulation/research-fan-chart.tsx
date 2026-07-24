@@ -128,7 +128,7 @@ export function ResearchFanChart({
           x={width - padding}
           y={height - 6}
         >
-          {execution.assumptions.horizon}거래일
+          {execution.assumptions.horizon}단계
         </text>
       </svg>
       <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-[#687064]">

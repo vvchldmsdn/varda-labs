@@ -4,11 +4,15 @@ export function readyJointMatrix({
   endServiceDate = "2025-04-01",
   override = new Map(),
   flatTraining = false,
+  returnStepCount = 90,
 } = {}) {
-  const requestedServiceDates = dateRangeEndingAt(endServiceDate, 91);
+  const requestedServiceDates = dateRangeEndingAt(
+    endServiceDate,
+    returnStepCount + 1,
+  );
   const kodexKey = "korea|KRW|069500";
   const vooKey = "us|USD|VOO";
-  const matrix = Array.from({ length: 90 }, (_, index) => {
+  const matrix = Array.from({ length: returnStepCount }, (_, index) => {
     const replacement = override.get(index);
     const trainingFlat = flatTraining && index < 60;
     const kodexReturn =
@@ -48,16 +52,16 @@ export function readyJointMatrix({
       requestedInstrumentCount: 2,
       includedInstrumentCount: 2,
       excludedInstrumentCount: 0,
-      requestedServiceDateCount: 91,
-      matrixRowCount: 90,
-      totalCellCount: 180,
-      readyCellCount: 180,
+      requestedServiceDateCount: returnStepCount + 1,
+      matrixRowCount: returnStepCount,
+      totalCellCount: returnStepCount * 2,
+      readyCellCount: returnStepCount * 2,
       incompleteCellCount: 0,
       coveragePct: 100,
     },
     sourceSummary: {
-      acceptedPriceRows: 182,
-      acceptedFxRows: 91,
+      acceptedPriceRows: (returnStepCount + 1) * 2,
+      acceptedFxRows: returnStepCount + 1,
       ignoredOutOfWindowPriceRows: 0,
       ignoredOutOfWindowFxRows: 0,
     },

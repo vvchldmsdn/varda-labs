@@ -20,6 +20,14 @@ export type ProviderRequestContext = {
 
 export type ProviderQuoteStatus = "ok" | "empty" | "error" | "skipped";
 
+export const ADJUSTED_CLOSE_BASIS = Object.freeze({
+  provider: "provider_adjusted_close_v1",
+  syntheticFixture: "synthetic_fixture_adjusted_close_v1",
+} as const);
+
+export type AdjustedCloseBasis =
+  (typeof ADJUSTED_CLOSE_BASIS)[keyof typeof ADJUSTED_CLOSE_BASIS];
+
 export type LiveQuote = {
   ticker: string;
   market: string;
@@ -40,8 +48,14 @@ export type ClosePrice = {
   priceDate: string;
   closePrice: string | null;
   adjustedClosePrice: string | null;
+  adjustedCloseBasis: AdjustedCloseBasis | null;
+  adjustedCloseProvider: string | null;
+  adjustedCloseSource: string | null;
+  adjustedCloseFetchedAt: Date | null;
   closePriceKrw: string | null;
   fxRate: string | null;
+  providerSymbol: string | null;
+  providerExchange: string | null;
   fetchedAt: Date;
   source: string;
   quoteType: "close";

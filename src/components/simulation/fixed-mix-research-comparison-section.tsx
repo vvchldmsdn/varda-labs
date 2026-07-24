@@ -4,6 +4,7 @@ import {
   ResearchFanChart,
   resolveResearchFanChartValueDomain,
 } from "./research-fan-chart";
+import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 
 type ReadyComparison = Extract<
   FixedMixResearchComparisonResult,
@@ -85,8 +86,8 @@ function ReadyComparisonGrid({
     >
       <p className="border-y border-[#e1e5da] py-3 text-xs leading-5 text-[#687064]">
         세 그래프는 같은 세로축을 사용합니다. 각 카드의 위치는 KODEX 200
-        비중 오름차순이며 성과 순위가 아닙니다. 경로 500개 · 63거래일 ·
-        리밸런싱 없음.
+        비중 오름차순이며 성과 순위가 아닙니다. 경로 500개 ·{" "}
+        서비스 기준일 수익률 {comparison.pairing.horizon}단계 · 리밸런싱 없음.
       </p>
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         {comparison.scenarios.map((scenario, index) => {
@@ -117,24 +118,10 @@ function ReadyComparisonGrid({
                 ) : null}
               </header>
 
-              <dl className="grid grid-cols-2 border-b border-[#e1e5da] text-sm">
-                <Metric
-                  label="중앙 경로 수익률"
-                  value={formatSignedPct(execution.terminal.p50ReturnPct)}
-                />
-                <Metric
-                  label="손실 종료 확률"
-                  value={formatPct(execution.terminal.lossProbabilityPct)}
-                />
-                <Metric
-                  label="MDD 중앙값"
-                  value={formatPct(execution.terminal.maxDrawdownP50Pct)}
-                />
-                <Metric
-                  label="MDD P90"
-                  value={formatPct(execution.terminal.maxDrawdownP90Pct)}
-                />
-              </dl>
+              <SimulationTerminalRiskMetrics
+                compact
+                terminal={execution.terminal}
+              />
 
               <ResearchFanChart
                 execution={execution}
@@ -148,15 +135,6 @@ function ReadyComparisonGrid({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-b border-r border-[#e1e5da] px-3 py-3 even:border-r-0">
-      <dt className="text-xs text-[#687064]">{label}</dt>
-      <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
-    </div>
-  );
-}
-
 function unavailableReasonLabel(
   reason: Exclude<
     FixedMixResearchComparisonResult,
@@ -165,6 +143,8 @@ function unavailableReasonLabel(
 ) {
   const labels = {
     invalid_weight_selection: "비교용 고정 비중을 검증하지 못했습니다.",
+    invalid_horizon_selection:
+      "연구 기간은 서비스 기준일 수익률 63단계 또는 126단계만 선택할 수 있습니다.",
     explicit_end_required: "기준일을 직접 선택한 뒤에만 비교를 시작합니다.",
     input_matrix_unavailable:
       "두 종목 모두에 대해 같은 날짜축의 완전한 90개 수익률 쌍이 없습니다.",
@@ -177,12 +157,4 @@ function unavailableReasonLabel(
     summary_blocked: "경로는 계산했지만 분포·위험 요약 검증을 통과하지 못했습니다.",
   } as const;
   return labels[reason];
-}
-
-function formatPct(value: number) {
-  return `${value.toFixed(1)}%`;
-}
-
-function formatSignedPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

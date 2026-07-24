@@ -8,6 +8,7 @@ import { buildSimulationScenarioVectorReviewPacket } from "./simulation-scenario
 import { sampleSimulationSpaghettiPaths } from "./simulation-spaghetti-path-sampling.ts";
 import { buildStationaryBootstrapDrawPlan } from "./simulation-stationary-bootstrap.ts";
 import { calculateSimulationTerminalLossProbability } from "./simulation-terminal-loss-probability.ts";
+import { summarizeSimulationTerminalDownsideTail } from "./simulation-terminal-downside-tail.ts";
 
 export type SimulationResearchExecutionBlockerReason =
   | "research_vector_invalid"
@@ -196,6 +197,11 @@ export function executeSimulationResearchPathsFromPrepared(input: {
     normalizedNav,
     expectedBinding: downstreamBinding,
   });
+  const terminalDownsideTail = summarizeSimulationTerminalDownsideTail({
+    terminalReturns: normalizedNav.paths.map(
+      (path) => path.points[normalizedNav.horizon].nav - 1,
+    ),
+  });
 
   if (
     distribution.summaryStatus !== "ready" ||
@@ -203,6 +209,7 @@ export function executeSimulationResearchPathsFromPrepared(input: {
     pathMaxDrawdown.drawdownStatus !== "ready" ||
     drawdownDistribution.summaryStatus !== "ready" ||
     terminalLoss.lossStatus !== "ready" ||
+    terminalDownsideTail.summaryStatus !== "ready" ||
     !distribution.terminalSummary ||
     !drawdownDistribution.maxDrawdownQuantiles ||
     terminalLoss.lossProbability === null
@@ -219,6 +226,9 @@ export function executeSimulationResearchPathsFromPrepared(input: {
       p50Index: distribution.terminalSummary.p50 * 100,
       p90Index: distribution.terminalSummary.p90 * 100,
       p50ReturnPct: (distribution.terminalSummary.p50 - 1) * 100,
+      p5ReturnPct: terminalDownsideTail.p5TerminalReturn * 100,
+      lowerTailMeanReturnPct:
+        terminalDownsideTail.lowerTailMeanTerminalReturn * 100,
       lossProbabilityPct: terminalLoss.lossProbability * 100,
       maxDrawdownP50Pct:
         drawdownDistribution.maxDrawdownQuantiles.p50 * 100,

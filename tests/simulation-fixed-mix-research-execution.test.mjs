@@ -56,10 +56,30 @@ describe("Fixed-mix joint research simulation", () => {
       left.terminal.maxDrawdownP90Pct >= left.terminal.maxDrawdownP50Pct,
       "positive drawdown magnitudes must make P90 at least as severe as P50",
     );
+    assert.ok(
+      left.terminal.lowerTailMeanReturnPct <= left.terminal.p5ReturnPct,
+      "the exact lower-tail mean must not exceed the interpolated P5 return",
+    );
     assert.doesNotMatch(
       JSON.stringify(left),
       /sha256:|inputMatrixHash|drawPlanHash|scenarioVectorHash/,
     );
+  });
+
+  it("supports the fixed 126-step research horizon without changing the 90-row input", () => {
+    const matrix = readyJointMatrix();
+    const result = buildFixedMixResearchSimulation({
+      explicitEndServiceDate: matrix.requestedServiceDates.at(-1),
+      horizon: 126,
+      matrix,
+      selection: resolveKodexVooFixedMixSelection("50"),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.source.returnStepCount, 90);
+    assert.equal(result.assumptions.horizon, 126);
+    assert.equal(result.bands.length, 127);
+    assert.equal(result.samplePaths[0].points.length, 127);
   });
 
   it("requires an explicit end date without a silent endpoint rollback", () => {

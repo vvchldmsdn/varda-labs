@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { resolveKodexVooFixedMixSelection } from "../src/lib/kodex-voo-fixed-mix-selection.ts";
 import { buildSimulationRegimeResearch } from "../src/lib/simulation-regime-research-execution.ts";
+import { buildSimulationRegimeHistoricalOutcomeValidation } from "../src/lib/simulation-regime-historical-outcome-validation.ts";
 import { buildSimulationRegimeReadinessHistory } from "../src/lib/simulation-regime-readiness-history.ts";
 import { SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
 
@@ -67,6 +68,8 @@ describe("Regime bootstrap research execution", () => {
       [...left.scenarios, ...left.fixedMixComparison.scenarios].every(
         (scenario) =>
           scenario.status === "ready" &&
+          scenario.terminal.lowerTailMeanReturnPct <=
+            scenario.terminal.p5ReturnPct &&
           scenario.bands.every(
             (band) => band.p10 <= band.p50 && band.p50 <= band.p90,
           ),
@@ -202,13 +205,123 @@ describe("Regime bootstrap research execution", () => {
     assert.equal(history.entries[1].reason, "input_matrix_unavailable");
     assert.equal(history.policy.automaticEndpointRollback, "forbidden");
   });
+
+  it("compares seven retrospective regime distributions with the following 63-step outcomes", () => {
+    const endServiceDate = "2025-10-01";
+    const result = buildSimulationRegimeHistoricalOutcomeValidation({
+      explicitEndServiceDate: endServiceDate,
+      endpoints: historicalValidationEndpoints(endServiceDate),
+      factorRows: factorRows(endServiceDate),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(
+      result.policy.version,
+      "regime_bootstrap_historical_outcome_validation_v1",
+    );
+    assert.equal(result.runtimeTrustStatus, "retrospective_research_only");
+    assert.equal(result.pointInTimeStatus, "not_established");
+    assert.equal(result.policy.stationaryFallback, "forbidden");
+    assert.equal(result.policy.calibrationDecision, "forbidden");
+    assert.equal(result.policy.modelRanking, "forbidden");
+    assert.equal(result.policy.overlappingEndpoints, "descriptive_not_independent");
+    assert.equal(result.summary.endpointCount, 7);
+    assert.equal(result.summary.readyEndpointCount, 7);
+    assert.equal(result.downsideSummary.readyEndpointCount, 7);
+    assert.ok(
+      result.rows.every(
+        (row) =>
+          row.status === "ready" &&
+          row.trainingReturnStepCount === 120 &&
+          row.outcomeReturnStepCount === 63 &&
+          row.factorReleaseDates.every(
+            (factor) =>
+              factor.releaseDate !== null &&
+              factor.releaseDate < row.trainingEndServiceDate,
+          ),
+      ),
+    );
+  });
+
+  it("does not let factors released after a research origin change that endpoint", () => {
+    const endServiceDate = "2025-10-01";
+    const latestResearchOrigin = shiftDate(endServiceDate, -63);
+    const rows = factorRows(endServiceDate);
+    const mutatedFutureRows = rows.map((row) =>
+      row.releaseDate > latestResearchOrigin
+        ? {
+            ...row,
+            value: Number(row.value) * 10_000,
+            volatility20dPct: Number(row.volatility20dPct) * 10_000,
+          }
+        : row,
+    );
+    const input = {
+      explicitEndServiceDate: endServiceDate,
+      endpoints: historicalValidationEndpoints(endServiceDate),
+    };
+    const baseline =
+      buildSimulationRegimeHistoricalOutcomeValidation({
+        ...input,
+        factorRows: rows,
+      });
+    const changed =
+      buildSimulationRegimeHistoricalOutcomeValidation({
+        ...input,
+        factorRows: mutatedFutureRows,
+      });
+
+    assert.equal(baseline.status, "ready");
+    assert.deepEqual(changed, baseline);
+  });
+
+  it("keeps six endpoint results when only the newest factor state is stale", () => {
+    const endServiceDate = "2025-10-01";
+    const latestResearchOrigin = shiftDate(endServiceDate, -63);
+    const result = buildSimulationRegimeHistoricalOutcomeValidation({
+      explicitEndServiceDate: endServiceDate,
+      endpoints: historicalValidationEndpoints(endServiceDate),
+      factorRows: factorRows(shiftDate(latestResearchOrigin, -8)),
+    });
+
+    assert.equal(result.status, "partial");
+    assert.equal(result.reason, "some_endpoints_unavailable");
+    assert.equal(result.summary.readyEndpointCount, 6);
+    assert.equal(result.summary.unavailableEndpointCount, 1);
+    assert.equal(result.rows[0].status, "unavailable");
+    assert.equal(result.rows[0].reason, "current_factor_state_stale");
+    assert.ok(result.rows.slice(1).every((row) => row.status === "ready"));
+  });
+
+  it("keeps matrix failure local to one retrospective endpoint", () => {
+    const endServiceDate = "2025-10-01";
+    const endpoints = historicalValidationEndpoints(endServiceDate);
+    const result = buildSimulationRegimeHistoricalOutcomeValidation({
+      explicitEndServiceDate: endServiceDate,
+      endpoints: endpoints.map((endpoint, index) =>
+        index === 3 ? { ...endpoint, matrix: null } : endpoint,
+      ),
+      factorRows: factorRows(endServiceDate),
+    });
+
+    assert.equal(result.status, "partial");
+    assert.equal(result.summary.readyEndpointCount, 6);
+    assert.equal(result.rows[3].status, "unavailable");
+    assert.equal(result.rows[3].reason, "input_matrix_unavailable");
+  });
 });
 
-function readyMatrix({ returnStepCount = 120 } = {}) {
-  const requestedServiceDates = Array.from(
-    { length: returnStepCount + 1 },
-    (_, index) => shiftDate("2025-01-01", index),
-  );
+function readyMatrix({ returnStepCount = 120, endServiceDate = null } = {}) {
+  const requestedServiceDates = endServiceDate
+    ? Array.from(
+        { length: returnStepCount + 1 },
+        (_, index) =>
+          shiftDate(endServiceDate, index - returnStepCount),
+      )
+    : Array.from(
+        { length: returnStepCount + 1 },
+        (_, index) => shiftDate("2025-01-01", index),
+      );
   const instruments = [
     {
       instrumentKey: "korea|KRW|069500",
@@ -265,6 +378,19 @@ function readyMatrix({ returnStepCount = 120 } = {}) {
     consumerStatus: "matrix_ready",
     blockers: [],
   };
+}
+
+function historicalValidationEndpoints(endServiceDate) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const outcomeEndServiceDate = shiftDate(endServiceDate, -index);
+    return {
+      outcomeEndServiceDate,
+      matrix: readyMatrix({
+        returnStepCount: 183,
+        endServiceDate: outcomeEndServiceDate,
+      }),
+    };
+  });
 }
 
 function factorRows(endServiceDate) {

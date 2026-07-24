@@ -3,8 +3,10 @@ import Link from "next/link";
 
 import type { KodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-selection";
 import type { FixedMixResearchSimulationResult } from "@/lib/simulation-fixed-mix-research-execution";
+import { buildSimulationHref } from "@/lib/simulation-navigation";
 
 import { ResearchFanChart } from "./research-fan-chart";
+import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 
 type ReadyExecution = Extract<
   FixedMixResearchSimulationResult,
@@ -14,10 +16,14 @@ type ReadyExecution = Extract<
 export function FixedMixResearchExecutionSection({
   endServiceDate,
   execution,
+  researchHorizon,
+  researchUniverse,
   selection,
 }: {
   endServiceDate: string;
   execution: FixedMixResearchSimulationResult | null;
+  researchHorizon: 63 | 126;
+  researchUniverse: string | null;
   selection: KodexVooFixedMixSelection;
 }) {
   if (!execution) return null;
@@ -54,9 +60,15 @@ export function FixedMixResearchExecutionSection({
         <MixForm
           endServiceDate={endServiceDate}
           kodexWeightPct={kodexWeightPct}
+          researchHorizon={researchHorizon}
+          researchUniverse={researchUniverse}
           vooWeightPct={vooWeightPct}
         />
-        <PresetLinks endServiceDate={endServiceDate} />
+        <PresetLinks
+          endServiceDate={endServiceDate}
+          researchHorizon={researchHorizon}
+          researchUniverse={researchUniverse}
+        />
       </div>
 
       {execution.status === "ready" ? (
@@ -79,7 +91,8 @@ export function FixedMixResearchExecutionSection({
         data-joint-research-methodology="paired-stationary-bootstrap-v1"
       >
         방법 v2: 완전한 KRW 투자자 기준 수익률 쌍 90개 · stationary
-        bootstrap · 평균 블록 5거래일 · 63거래일 · 500경로. 같은 입력 행렬,
+        bootstrap · 평균 블록 5단계 · 서비스 기준일 수익률 {researchHorizon}
+        단계 · 500경로. 같은 입력 행렬,
         엔진 정책, 고정 seed에서만 결과가 동일합니다. 시장 국면 조건, 미래
         예측, 계좌 보유비중, Fount, 금현물은 사용하지 않습니다.
       </p>
@@ -116,24 +129,7 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
         </span>
       </header>
 
-      <div className="grid grid-cols-2 border-b border-[#e1e5da] sm:grid-cols-4">
-        <Metric
-          label="중앙 경로 수익률"
-          value={formatSignedPct(execution.terminal.p50ReturnPct)}
-        />
-        <Metric
-          label="손실 종료 확률"
-          value={formatPct(execution.terminal.lossProbabilityPct)}
-        />
-        <Metric
-          label="MDD 중앙값"
-          value={formatPct(execution.terminal.maxDrawdownP50Pct)}
-        />
-        <Metric
-          label="MDD P90(더 큰 손실)"
-          value={formatPct(execution.terminal.maxDrawdownP90Pct)}
-        />
-      </div>
+      <SimulationTerminalRiskMetrics terminal={execution.terminal} />
 
       <ResearchFanChart execution={execution} />
 
@@ -152,21 +148,14 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-b border-r border-[#e1e5da] px-3 py-3 last:border-r-0 sm:border-b-0">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 font-semibold tabular-nums">{value}</p>
-    </div>
-  );
-}
-
 function unavailableReasonLabel(
   reason: Exclude<FixedMixResearchSimulationResult, { status: "ready" }>["reason"],
 ) {
   const labels = {
     invalid_weight_selection:
       "KODEX 200 비중은 중복 없이 1~99 사이의 정수 퍼센트로 입력해야 합니다.",
+    invalid_horizon_selection:
+      "연구 기간은 서비스 기준일 수익률 63단계 또는 126단계만 선택할 수 있습니다.",
     explicit_end_required:
       "공동 연구 실행은 기준일을 직접 선택한 뒤에만 시작합니다.",
     input_matrix_unavailable:
@@ -185,16 +174,28 @@ function unavailableReasonLabel(
 function MixForm({
   endServiceDate,
   kodexWeightPct,
+  researchHorizon,
+  researchUniverse,
   vooWeightPct,
 }: {
   endServiceDate: string;
   kodexWeightPct: number;
+  researchHorizon: 63 | 126;
+  researchUniverse: string | null;
   vooWeightPct: number;
 }) {
   return (
     <Form action="/simulation" className="flex flex-wrap items-end gap-2" scroll={false}>
       {isDateKey(endServiceDate) ? (
         <input name="end" type="hidden" value={endServiceDate} />
+      ) : null}
+      <input name="horizon" type="hidden" value={researchHorizon} />
+      {researchUniverse !== null ? (
+        <input
+          name="researchUniverse"
+          type="hidden"
+          value={researchUniverse}
+        />
       ) : null}
       <label className="grid gap-1 text-xs font-semibold text-[#586358]">
         KODEX 200 최초 비중
@@ -225,13 +226,28 @@ function MixForm({
   );
 }
 
-function PresetLinks({ endServiceDate }: { endServiceDate: string }) {
+function PresetLinks({
+  endServiceDate,
+  researchHorizon,
+  researchUniverse,
+}: {
+  endServiceDate: string;
+  researchHorizon: 63 | 126;
+  researchUniverse: string | null;
+}) {
   return (
     <nav aria-label="공동 연구 비중 예시" className="flex flex-wrap gap-2">
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
           className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
-          href={simulationHref(endServiceDate, kodexWeightPct)}
+          href={buildSimulationHref({
+            endServiceDate: isDateKey(endServiceDate)
+              ? endServiceDate
+              : null,
+            kodexWeightPct,
+            researchHorizon,
+            researchUniverse,
+          })}
           key={kodexWeightPct}
           scroll={false}
         >
@@ -240,12 +256,6 @@ function PresetLinks({ endServiceDate }: { endServiceDate: string }) {
       ))}
     </nav>
   );
-}
-
-function simulationHref(endServiceDate: string, kodexWeightPct: number) {
-  const params = new URLSearchParams({ kodexWeight: String(kodexWeightPct) });
-  if (isDateKey(endServiceDate)) params.set("end", endServiceDate);
-  return `/simulation?${params}`;
 }
 
 function isDateKey(value: string) {
@@ -258,12 +268,4 @@ function formatBps(value: number) {
 
 function formatDate(value: string) {
   return value.replaceAll("-", ".");
-}
-
-function formatPct(value: number) {
-  return `${value.toFixed(1)}%`;
-}
-
-function formatSignedPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

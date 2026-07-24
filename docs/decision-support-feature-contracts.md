@@ -309,11 +309,42 @@ The first Simulation Validation surface should eventually include:
   outcome, band hit/miss, coverage, median error, and weight stability.
 
 `Expected MDD` is not a sufficient metric name. The UI must state whether it is
-mean, median, p90, or another statistic over per-path maximum drawdown. CVaR or
-expected shortfall remains unavailable until its tail, sign, denominator, and
-aggregation semantics are separately fixed. Expected turnover and improvement
+mean, median, p90, or another statistic over per-path maximum drawdown. The v1
+terminal downside-tail summary reports both the Type 7 P5 terminal return and
+the signed mean of exactly the lowest 25 terminal returns from a complete
+500-path run. Boundary ties do not expand that fixed denominator. The UI names
+the latter `종료수익률 하위 5% 평균`; it does not present it as bare CVaR.
+Expected shortfall with any other horizon, loss variable, tail, or denominator
+remains unavailable. Expected turnover and improvement
 must appear only for an actual candidate strategy; they are not meaningful
 fallbacks for the current no-rebalance normalized buy-and-hold path.
+
+The bounded retrospective fan-band diagnostic uses the selected explicit end
+date and the previous six calendar service dates as seven fixed outcome
+endpoints. Its only supported horizons are 63 and 126 trading steps. For each
+endpoint it requires one complete paired KRW-return matrix containing 90
+training rows followed by exactly the selected number of observed rows. It uses
+only the first 90 rows to generate 500 stationary-bootstrap paths and scores
+the resulting terminal P10/P50/P90 values against the later observations. Its
+scenario is an explicit KODEX 200 5,000 bps plus VOO 5,000 bps initial-weight
+buy-and-hold path with no rebalancing. Missing evidence marks only that endpoint
+and selected horizon unavailable; it does not erase a prepared result at the
+other horizon. The overlapping endpoints are not independent trials. Endpoints
+or horizons are never ranked and cannot select dates or retune model
+parameters. Coverage and median error are retrospective research diagnostics,
+not calibration pass/fail, account results, forecasts, recommendations, or
+orders. Regime-conditioned research remains on its separately reviewed horizon
+and does not inherit the 126-step selection.
+
+The downside outcome diagnostic shares that selected horizon's exact matrix
+read and bootstrap pass. For every complete path it records terminal loss using
+`terminal NAV < 1` and maximum drawdown from the running peak. It compares
+predicted terminal loss probability and Type 7 MDD P50/P90 with the exact
+following 63- or 126-row observed path's terminal loss event and MDD. Actual MDD
+at or below predicted P90 is a descriptive comparison only. Missing evidence
+preserves the other endpoint rows; overlapping windows and horizons cannot be
+treated as independent calibration trials, ranked, tuned, or converted into a
+recommendation.
 
 A partial job may expose progress, missing chunk count, and failure diagnostics
 only. It must not emit distribution bands, comparison metrics, optimizer input,
@@ -402,3 +433,11 @@ separate future contracts.
     auth, ownership, admission, resource, and persistence gates permit it.
 25. Add the separate parametric factor engine and point-in-time walk-forward
     validation before any optimizer is labeled useful.
+26. A read-only stationary fan-band validation history now scores the explicit
+    50:50 KODEX 200/VOO research path against seven fixed 63-row observed
+    outcomes. Tenant/account binding, persistence, tuning, provider backfill,
+    optimizer claims, and pass/fail calibration remain blocked.
+27. The same read-only historical outcome pass now compares predicted terminal
+    loss probability and MDD P50/P90 with each following observed loss event
+    and MDD. It does not create an additional database read, simulation run,
+    model score, or calibration authority.

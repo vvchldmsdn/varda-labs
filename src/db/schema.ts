@@ -480,10 +480,19 @@ export const assetPriceSnapshots = pgTable(
     adjustedClosePrice: decimal("adjusted_close_price", {
       precision: 28,
       scale: 12,
-    }).notNull(),
+    }),
+    adjustedCloseBasis: varchar("adjusted_close_basis", { length: 50 }),
+    adjustedCloseProvider: varchar("adjusted_close_provider", { length: 50 }),
+    adjustedCloseSource: varchar("adjusted_close_source", { length: 100 }),
+    adjustedCloseFetchedAt: timestamp("adjusted_close_fetched_at", {
+      withTimezone: true,
+    }),
     closePriceKrw: decimal("close_price_krw", { precision: 28, scale: 12 }),
     fxRate: decimal("fx_rate", { precision: 20, scale: 6 }),
     source: varchar("source", { length: 100 }),
+    providerSymbol: varchar("provider_symbol", { length: 100 }),
+    providerExchange: varchar("provider_exchange", { length: 50 }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
     isSample: boolean("is_sample").default(false).notNull(),
 
     base44CreatedAt: timestamp("base44_created_at", { withTimezone: true }),
@@ -499,6 +508,9 @@ export const assetPriceSnapshots = pgTable(
       table.ticker,
       table.priceDate,
     ),
+    instrumentDateUnique: uniqueIndex(
+      "asset_price_snapshots_instrument_date_unique",
+    ).on(table.market, table.currency, table.ticker, table.priceDate),
     priceDateIdx: index("asset_price_snapshots_date_idx").on(table.priceDate),
     assetDateIdx: index("asset_price_snapshots_asset_date_idx").on(
       table.assetId,

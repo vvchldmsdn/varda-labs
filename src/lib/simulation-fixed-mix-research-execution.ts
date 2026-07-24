@@ -11,6 +11,7 @@ import {
   executeSimulationResearchPathsFromPrepared,
   type SimulationResearchExecutionBlockerReason,
 } from "./simulation-research-execution-core.ts";
+import type { SimulationResearchHorizon } from "./simulation-research-horizon.ts";
 
 export { FIXED_MIX_RESEARCH_SIMULATION_POLICY } from "./simulation-fixed-mix-research-context.ts";
 
@@ -22,6 +23,7 @@ export function buildFixedMixResearchSimulation(input: {
   explicitEndServiceDate: string | null;
   matrix: SimulationReturnMatrixResult | null;
   selection: KodexVooFixedMixSelection;
+  horizon?: SimulationResearchHorizon | null;
 }) {
   const context =
     input.selection.status === "invalid"

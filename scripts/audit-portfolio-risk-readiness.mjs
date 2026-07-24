@@ -150,8 +150,15 @@ async function getDatabaseChecks() {
         from pg_indexes
         where schemaname = current_schema()
           and tablename = 'asset_price_snapshots'
+          and indexname = 'asset_price_snapshots_instrument_date_unique'
+      ) as price_instrument_date_unique_index,
+      exists (
+        select 1
+        from pg_indexes
+        where schemaname = current_schema()
+          and tablename = 'asset_price_snapshots'
           and indexname = 'asset_price_snapshots_ticker_date_unique'
-      ) as price_ticker_date_unique_index,
+      ) as legacy_price_ticker_date_unique_index,
       exists (
         select 1
         from pg_indexes
@@ -162,11 +169,16 @@ async function getDatabaseChecks() {
   `);
 
   const priceDuplicateGroups = await sql.query(`
-    select upper(trim(ticker)) as ticker, date::text as price_date, count(*)::int as rows
+    select
+      lower(trim(market)) as market,
+      upper(trim(currency)) as currency,
+      upper(trim(ticker)) as ticker,
+      date::text as price_date,
+      count(*)::int as rows
     from asset_price_snapshots
-    group by upper(trim(ticker)), date
+    group by lower(trim(market)), upper(trim(currency)), upper(trim(ticker)), date
     having count(*) > 1
-    order by rows desc, price_date desc, ticker
+    order by rows desc, price_date desc, market, currency, ticker
   `);
 
   const fxDuplicateGroups = await sql.query(`
@@ -588,7 +600,7 @@ function observationAt(series, serviceDate) {
 
 function buildBlockers(databaseChecks, fxAudit, scopeAudits) {
   return {
-    priceTickerDateDuplicates: databaseChecks.priceDuplicateGroups.length,
+    priceInstrumentDateDuplicates: databaseChecks.priceDuplicateGroups.length,
     fxDuplicateDates: fxAudit.duplicateGroups.length,
     currentTickerIdentityConflicts:
       databaseChecks.currentTickerIdentityConflicts.length,
