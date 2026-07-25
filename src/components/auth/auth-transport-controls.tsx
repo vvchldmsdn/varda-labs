@@ -3,9 +3,11 @@
 import { createAuthClient } from "@neondatabase/auth/next";
 import { useState } from "react";
 
+import { AUTH_TRANSPORT_CALLBACK_PATH } from "@/lib/auth/auth-transport-routes";
+
 const authClient = createAuthClient();
 
-export function PreviewGoogleSignInButton() {
+export function GoogleSignInButton() {
   const [status, setStatus] = useState<"idle" | "pending" | "failed">("idle");
 
   async function signIn() {
@@ -14,8 +16,8 @@ export function PreviewGoogleSignInButton() {
     try {
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/auth/session",
-        newUserCallbackURL: "/auth/session",
+        callbackURL: AUTH_TRANSPORT_CALLBACK_PATH,
+        newUserCallbackURL: AUTH_TRANSPORT_CALLBACK_PATH,
         errorCallbackURL: "/auth/sign-in",
       });
 
@@ -44,7 +46,7 @@ export function PreviewGoogleSignInButton() {
   );
 }
 
-export function PreviewSignOutButton() {
+export function SignOutButton() {
   const [pending, setPending] = useState(false);
 
   async function signOut() {
@@ -64,7 +66,7 @@ export function PreviewSignOutButton() {
       disabled={pending}
       className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8] disabled:cursor-wait disabled:opacity-60"
     >
-      {pending ? "Signing out" : "Sign out of Preview"}
+      {pending ? "Signing out" : "Sign out"}
     </button>
   );
 }

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PreviewSignOutButton } from "@/components/auth/preview-auth-controls";
-import { getPreviewAuthRuntime } from "@/lib/auth/preview-auth-runtime";
+import { SignOutButton } from "@/components/auth/auth-transport-controls";
+import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,8 @@ type SessionEvidence =
   | "unauthenticated"
   | "unavailable";
 
-export default async function PreviewSessionPage() {
-  const runtime = getPreviewAuthRuntime();
+export default async function SessionPage() {
+  const runtime = getAuthTransportRuntime();
   if (runtime.state === "disabled") notFound();
 
   const evidence = await readSessionEvidence(runtime);
@@ -20,7 +20,7 @@ export default async function PreviewSessionPage() {
   return (
     <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
       <section className="mx-auto w-full max-w-xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <p className="text-xs font-semibold text-[#687064]">Varda Labs Preview</p>
+        <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal">
           Server session evidence
         </h1>
@@ -45,7 +45,7 @@ export default async function PreviewSessionPage() {
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
-          {evidence === "authenticated" ? <PreviewSignOutButton /> : null}
+          {evidence === "authenticated" ? <SignOutButton /> : null}
           <Link
             href="/auth/sign-in"
             className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8]"
@@ -59,7 +59,7 @@ export default async function PreviewSessionPage() {
 }
 
 async function readSessionEvidence(
-  runtime: ReturnType<typeof getPreviewAuthRuntime>,
+  runtime: ReturnType<typeof getAuthTransportRuntime>,
 ): Promise<SessionEvidence> {
   if (runtime.state !== "ready") return "unavailable";
 

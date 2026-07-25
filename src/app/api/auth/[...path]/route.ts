@@ -1,5 +1,7 @@
-import { getPreviewAuthRuntime } from "@/lib/auth/preview-auth-runtime";
-import { isPreviewAuthApiRequestAllowed } from "@/lib/auth/preview-auth-policy";
+import { createReviewedGoogleSocialSignInRequest } from "@/lib/auth/auth-transport-api-contract";
+import { createAuthTransportUpstreamRequest } from "@/lib/auth/auth-transport-request";
+import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
+import { isAuthTransportApiRequestAllowed } from "@/lib/auth/auth-transport-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +23,22 @@ async function dispatchAuthRequest(
   context: AuthRouteContext,
 ) {
   const path = (await context.params).path;
-  const socialProvider = await readSocialProvider(request, method, path);
+  const isGoogleSocialSignIn =
+    method === "POST" &&
+    path.length === 2 &&
+    path[0] === "sign-in" &&
+    path[1] === "social";
+  const forwardedRequest = isGoogleSocialSignIn
+    ? await createReviewedGoogleSocialSignInRequest(request)
+    : request;
+  const socialProvider = forwardedRequest && isGoogleSocialSignIn
+    ? "google"
+    : null;
 
   if (
-    !isPreviewAuthApiRequestAllowed({
+    !forwardedRequest ||
+    new URL(request.url).search !== "" ||
+    !isAuthTransportApiRequestAllowed({
       method,
       path,
       socialProvider,
@@ -33,7 +47,7 @@ async function dispatchAuthRequest(
     return notFoundResponse();
   }
 
-  const runtime = getPreviewAuthRuntime();
+  const runtime = getAuthTransportRuntime();
 
   if (runtime.state === "disabled") {
     return notFoundResponse();
@@ -49,38 +63,10 @@ async function dispatchAuthRequest(
     );
   }
 
-  return runtime.auth.handler()[method](request, context);
-}
+  const upstreamRequest =
+    createAuthTransportUpstreamRequest(forwardedRequest);
 
-async function readSocialProvider(
-  request: Request,
-  method: "GET" | "POST",
-  path: readonly string[],
-) {
-  if (
-    method !== "POST" ||
-    path.length !== 2 ||
-    path[0] !== "sign-in" ||
-    path[1] !== "social"
-  ) {
-    return null;
-  }
-
-  try {
-    const body: unknown = await request.clone().json();
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "provider" in body &&
-      typeof body.provider === "string"
-    ) {
-      return body.provider;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
+  return runtime.auth.handler()[method](upstreamRequest, context);
 }
 
 function notFoundResponse() {

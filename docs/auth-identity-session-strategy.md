@@ -301,6 +301,7 @@ Removal gate:
 | Variable/config | Exposure | Policy |
 | --- | --- | --- |
 | `NEON_AUTH_BASE_URL` | Server only | Required by the Next.js server SDK; do not copy into product DTOs/logs |
+| `NEON_AUTH_BASE_URL_SHA256` | Server only | Environment-specific reviewed fingerprint; runtime must fail closed when it does not match the canonical server URL |
 | `NEON_AUTH_COOKIE_SECRET` | Secret, server only | 32+ characters; stable within one environment; distinct between production and local/test; intentional rotation invalidates cached session data |
 | `VITE_NEON_AUTH_URL` | Browser-oriented integration value | Present locally but not used by the planned Next.js server boundary; do not introduce a `NEXT_PUBLIC_` copy unless the selected client SDK proves it is required |
 | Google OAuth client id/secret | Neon Auth configuration | Configure in Neon, not public product tables; secret never enters browser bundles or logs |
@@ -393,3 +394,10 @@ Phase 1G1-B1b now adds the next authority layer as a pure synthetic dry-run in
 independent operator, explicit provisioning-user target, verified subject
 binding, and short-lived single-use intent, but grants no runtime trust and
 performs no identity, intent, or app-user mutation.
+
+Phase 1G1-B1c generalizes the verified session transport for a separately
+reviewed Production deployment in
+`docs/auth-tenant-phase1g1b1c-production-session-transport.md`. The temporary
+Basic Auth boundary still gates sign-in initiation and the Auth API, while the
+OAuth session callback remains isolated from product data. Identity pairing,
+activation, tenant resolution, owner filtering, and RLS remain closed.

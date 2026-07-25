@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { PREVIEW_AUTH_CALLBACK_PATH } from "@/lib/auth/preview-auth-policy";
-import { handlePreviewAuthProxy } from "@/lib/auth/preview-auth-proxy";
+import { AUTH_TRANSPORT_CALLBACK_PATH } from "@/lib/auth/auth-transport-routes";
+import { handleAuthTransportProxy } from "@/lib/auth/auth-transport-proxy";
 
 const DASHBOARD_PASSWORD_ENV_KEYS = [
   "VARDA_APP_PASSWORD",
@@ -10,8 +10,8 @@ const DASHBOARD_PASSWORD_ENV_KEYS = [
 const DASHBOARD_USER_ENV_KEY = "VARDA_APP_USER";
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === PREVIEW_AUTH_CALLBACK_PATH) {
-    return handlePreviewAuthProxy(request);
+  if (request.nextUrl.pathname === AUTH_TRANSPORT_CALLBACK_PATH) {
+    return handleAuthTransportProxy(request);
   }
 
   return enforceDashboardBasicAuth(request);
@@ -51,6 +51,9 @@ function enforceDashboardBasicAuth(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
+    "/api/auth/:path*",
+    "/auth/callback",
+    "/auth/sign-in",
     "/auth/session",
     "/admin/:path*",
     "/portfolio/:path*",

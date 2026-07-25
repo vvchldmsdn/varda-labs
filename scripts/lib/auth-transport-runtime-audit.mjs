@@ -1,14 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, relative } from "node:path";
 
-const AUTH_RUNTIME_FILES = Object.freeze([
-  "src/lib/auth/preview-auth-policy.ts",
-  "src/lib/auth/preview-auth-proxy.ts",
-  "src/lib/auth/preview-auth-runtime.ts",
+const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
+  "src/lib/auth/auth-transport-api-contract.ts",
+  "src/lib/auth/auth-transport-policy.ts",
+  "src/lib/auth/auth-transport-proxy.ts",
+  "src/lib/auth/auth-transport-request.ts",
+  "src/lib/auth/auth-transport-routes.ts",
+  "src/lib/auth/auth-transport-runtime.ts",
   "src/app/api/auth/[...path]/route.ts",
+  "src/app/auth/callback/page.tsx",
   "src/app/auth/sign-in/page.tsx",
   "src/app/auth/session/page.tsx",
-  "src/components/auth/preview-auth-controls.tsx",
+  "src/components/auth/auth-transport-controls.tsx",
   "src/proxy.ts",
 ]);
 
@@ -18,17 +22,17 @@ const PUBLIC_AUTH_ENVIRONMENT = /NEXT_PUBLIC_[A-Z0-9_]*AUTH[A-Z0-9_]*/;
 const LOCAL_IMPORT =
   /(?:^|\n)\s*(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["']([^"']+)["'];?/g;
 
-export function auditPreviewAuthRuntime(root) {
+export function auditAuthTransportRuntime(root) {
   const findings = [];
   const sources = new Map();
 
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const authSdkVersion = packageJson.dependencies?.["@neondatabase/auth"];
   if (authSdkVersion !== "0.4.2-beta") {
-    findings.push("preview_auth_sdk_version_drift");
+    findings.push("auth_sdk_version_drift");
   }
 
-  for (const path of AUTH_RUNTIME_FILES) {
+  for (const path of AUTH_TRANSPORT_RUNTIME_FILES) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) {
       findings.push("required_file_missing");
@@ -37,7 +41,10 @@ export function auditPreviewAuthRuntime(root) {
     sources.set(path, readFileSync(absolutePath, "utf8"));
   }
 
-  const runtimeGraph = collectLocalImportGraph(root, AUTH_RUNTIME_FILES);
+  const runtimeGraph = collectLocalImportGraph(
+    root,
+    AUTH_TRANSPORT_RUNTIME_FILES,
+  );
   const runtimeSources = [...runtimeGraph.values()];
   const productBoundaryFiles = [...runtimeGraph.entries()]
     .filter(([, source]) => FORBIDDEN_PRODUCT_IMPORT.test(source))
@@ -49,21 +56,28 @@ export function auditPreviewAuthRuntime(root) {
     findings.push("public_auth_environment_reference");
   }
 
-  const policy = sources.get("src/lib/auth/preview-auth-policy.ts") ?? "";
-  if (!policy.includes('VERCEL_ENV?.trim() !== "preview"')) {
-    findings.push("preview_environment_gate_missing");
-  }
-  if (
-    !policy.includes("VERCEL_GIT_COMMIT_REF") ||
-    !policy.includes("PREVIEW_AUTH_ALLOWED_GIT_REF")
-  ) {
-    findings.push("preview_git_ref_gate_missing");
+  const policy = sources.get("src/lib/auth/auth-transport-policy.ts") ?? "";
+  const previewRuntimeEnabled =
+    policy.includes("AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS") &&
+    policy.includes('"preview"');
+  const productionRuntimeEnabled =
+    policy.includes("AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS") &&
+    policy.includes('"production"');
+  if (previewRuntimeEnabled || !productionRuntimeEnabled) {
+    findings.push("auth_environment_gate_incomplete");
   }
   if (!policy.includes("cookieSecret.length < 32")) {
     findings.push("cookie_secret_length_guard_missing");
   }
+  const authTargetFingerprintGuardPresent =
+    policy.includes("NEON_AUTH_BASE_URL_SHA256") &&
+    policy.includes("createAuthTransportBaseUrlFingerprint") &&
+    policy.includes("actualBaseUrlFingerprint !== expectedBaseUrlFingerprint");
+  if (!authTargetFingerprintGuardPresent) {
+    findings.push("auth_target_fingerprint_guard_missing");
+  }
 
-  const runtime = sources.get("src/lib/auth/preview-auth-runtime.ts") ?? "";
+  const runtime = sources.get("src/lib/auth/auth-transport-runtime.ts") ?? "";
   if (!runtime.includes('import "server-only"')) {
     findings.push("server_only_boundary_missing");
   }
@@ -72,6 +86,8 @@ export function auditPreviewAuthRuntime(root) {
   }
 
   const route = sources.get("src/app/api/auth/[...path]/route.ts") ?? "";
+  const apiContract =
+    sources.get("src/lib/auth/auth-transport-api-contract.ts") ?? "";
   if (!route.includes('runtime.state === "disabled"') || !route.includes("status: 404")) {
     findings.push("production_disabled_response_missing");
   }
@@ -86,23 +102,44 @@ export function auditPreviewAuthRuntime(root) {
     (policy.match(/method:\s*"(?:GET|POST)"/g) ?? []).length;
   const googleSocialProviderRestricted =
     policy.includes('socialProvider: "google"') &&
-    route.includes("isPreviewAuthApiRequestAllowed") &&
-    route.includes("readSocialProvider") &&
-    route.indexOf("isPreviewAuthApiRequestAllowed") <
+    route.includes("isAuthTransportApiRequestAllowed") &&
+    route.includes("createReviewedGoogleSocialSignInRequest") &&
+    route.indexOf("isAuthTransportApiRequestAllowed") <
+      route.indexOf("runtime.auth.handler()");
+  const strictGoogleSocialSignInBody =
+    apiContract.includes("AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY") &&
+    apiContract.includes("Object.getOwnPropertyDescriptors") &&
+    apiContract.includes("AUTH_TRANSPORT_MAX_SOCIAL_SIGN_IN_BODY_BYTES") &&
+    route.includes("forwardedRequest") &&
+    route.indexOf("createReviewedGoogleSocialSignInRequest") <
       route.indexOf("runtime.auth.handler()");
   if (allowedAuthApiEndpoints !== 2) {
-    findings.push("preview_auth_endpoint_allowlist_drift");
+    findings.push("auth_endpoint_allowlist_drift");
   }
   if (!googleSocialProviderRestricted) {
-    findings.push("preview_auth_social_provider_guard_missing");
+    findings.push("auth_social_provider_guard_missing");
+  }
+  if (!strictGoogleSocialSignInBody) {
+    findings.push("auth_social_sign_in_body_contract_missing");
   }
 
   const sessionPage = sources.get("src/app/auth/session/page.tsx") ?? "";
   if (/\.user\.(?:email|name|image)|provider[_A-Z]?subject/i.test(sessionPage)) {
     findings.push("session_profile_exposed");
   }
+  const callbackPage = sources.get("src/app/auth/callback/page.tsx") ?? "";
+  const routes = sources.get("src/lib/auth/auth-transport-routes.ts") ?? "";
+  if (
+    !callbackPage.includes("redirect(AUTH_TRANSPORT_SESSION_PATH)") ||
+    !routes.includes('AUTH_TRANSPORT_CALLBACK_PATH = "/auth/callback"') ||
+    !routes.includes('AUTH_TRANSPORT_SESSION_PATH = "/auth/session"')
+  ) {
+    findings.push("dedicated_callback_route_missing");
+  }
 
-  const authProxy = sources.get("src/lib/auth/preview-auth-proxy.ts") ?? "";
+  const authProxy = sources.get("src/lib/auth/auth-transport-proxy.ts") ?? "";
+  const requestSanitizer =
+    sources.get("src/lib/auth/auth-transport-request.ts") ?? "";
   const proxy = sources.get("src/proxy.ts") ?? "";
   const basicAuthBoundaryIntact = [
     "VARDA_APP_PASSWORD",
@@ -111,26 +148,60 @@ export function auditPreviewAuthRuntime(root) {
   ].every((marker) => proxy.includes(marker));
   if (!basicAuthBoundaryIntact) findings.push("basic_auth_boundary_drift");
 
+  const basicAuthSignInApiGatePresent =
+    proxy.includes('"/auth/sign-in"') &&
+    proxy.includes('"/api/auth/:path*"');
+  if (!basicAuthSignInApiGatePresent) {
+    findings.push("auth_entry_basic_auth_gate_missing");
+  }
+
   const callbackBranchMarker =
-    "request.nextUrl.pathname === PREVIEW_AUTH_CALLBACK_PATH";
+    "request.nextUrl.pathname === AUTH_TRANSPORT_CALLBACK_PATH";
   const basicAuthMarker = "return enforceDashboardBasicAuth(request)";
   const callbackBranchIndex = proxy.indexOf(callbackBranchMarker);
   const basicAuthIndex = proxy.indexOf(basicAuthMarker);
-  const previewAuthRouteBypassesBasicAuth =
+  const authCallbackBypassesBasicAuth =
     callbackBranchIndex >= 0 &&
     basicAuthIndex >= 0 &&
     callbackBranchIndex < basicAuthIndex &&
-    proxy.includes('"/auth/session"');
-  if (!previewAuthRouteBypassesBasicAuth) {
-    findings.push("preview_auth_callback_basic_auth_isolation_missing");
+    proxy.includes('"/auth/callback"');
+  if (!authCallbackBypassesBasicAuth) {
+    findings.push("auth_callback_basic_auth_isolation_missing");
+  }
+  const sessionEvidenceRequiresBasicAuth =
+    proxy.includes('"/auth/session"') &&
+    !routes.includes('AUTH_TRANSPORT_CALLBACK_PATH = "/auth/session"');
+  if (!sessionEvidenceRequiresBasicAuth) {
+    findings.push("session_evidence_basic_auth_gate_missing");
   }
 
   const oauthCallbackExchangeProxyPresent =
     authProxy.includes("runtime.auth.middleware") &&
     authProxy.includes('loginUrl: "/auth/sign-in"') &&
-    authProxy.includes('runtime.state !== "ready"');
+    authProxy.includes('runtime.state === "disabled"') &&
+    authProxy.includes('runtime.state === "misconfigured"');
   if (!oauthCallbackExchangeProxyPresent) {
     findings.push("oauth_callback_exchange_proxy_missing");
+  }
+  const callbackFailureClosed =
+    authProxy.includes("status: 404") &&
+    authProxy.includes("status: 503") &&
+    !authProxy.includes("NextResponse.next()");
+  if (!callbackFailureClosed) {
+    findings.push("auth_callback_failure_closed_missing");
+  }
+  const dashboardCredentialHeadersStripped =
+    requestSanitizer.includes('"authorization"') &&
+    requestSanitizer.includes('"proxy-authorization"') &&
+    requestSanitizer.includes("sanitizedHeaders.delete(header)") &&
+    route.includes("createAuthTransportUpstreamRequest(forwardedRequest)") &&
+    route.indexOf("createAuthTransportUpstreamRequest(forwardedRequest)") <
+      route.indexOf("runtime.auth.handler()") &&
+    authProxy.includes("createAuthTransportUpstreamHeaders(request.headers)") &&
+    authProxy.indexOf("createAuthTransportUpstreamHeaders(request.headers)") <
+      authProxy.indexOf("runtime.auth.middleware");
+  if (!dashboardCredentialHeadersStripped) {
+    findings.push("dashboard_auth_credential_sanitizer_missing");
   }
 
   const schema = readFileSync(join(root, "src/db/schema.ts"), "utf8");
@@ -141,26 +212,31 @@ export function auditPreviewAuthRuntime(root) {
   }
 
   return Object.freeze({
-    audit: "preview_auth_session_transport_smoke",
+    audit: "auth_session_transport_smoke",
     status: findings.length === 0 ? "passed" : "failed",
     findings: Object.freeze([...new Set(findings)]),
     evidence: Object.freeze({
-      requiredFiles: AUTH_RUNTIME_FILES.length,
+      requiredFiles: AUTH_TRANSPORT_RUNTIME_FILES.length,
       presentFiles: sources.size,
       inspectedRuntimeGraphFiles: runtimeGraph.size,
       productDatabaseBoundaryFiles: productBoundaryFiles.length,
       publicAuthEnvironmentReferences: runtimeSources.filter((source) =>
         PUBLIC_AUTH_ENVIRONMENT.test(source),
       ).length,
-      previewAuthSdkPinned: authSdkVersion === "0.4.2-beta",
-      previewGitRefGatePresent:
-        policy.includes("VERCEL_GIT_COMMIT_REF") &&
-        policy.includes("PREVIEW_AUTH_ALLOWED_GIT_REF"),
+      authSdkPinned: authSdkVersion === "0.4.2-beta",
+      previewRuntimeDisabled: !previewRuntimeEnabled,
+      productionRuntimeEnabled,
+      authTargetFingerprintGuardPresent,
       allowedAuthApiEndpoints,
       googleSocialProviderRestricted,
+      strictGoogleSocialSignInBody,
       basicAuthBoundaryIntact,
       oauthCallbackExchangeProxyPresent,
-      previewAuthRouteBypassesBasicAuth,
+      basicAuthSignInApiGatePresent,
+      authCallbackBypassesBasicAuth,
+      sessionEvidenceRequiresBasicAuth,
+      callbackFailureClosed,
+      dashboardCredentialHeadersStripped,
       managedAuthSchemaOwnedByDrizzle,
       managedAuthSessionIoExpected: true,
     }),
