@@ -31,6 +31,13 @@ const EXPECT_REGIME_READY = numberArgument("--expect-regime-ready");
 const EXPECT_REGIME_HISTORICAL_READY = numberArgument(
   "--expect-regime-historical-ready",
 );
+const EXPECT_HISTORY_ROWS = numberArgument("--expect-history-rows");
+const EXPECT_REGIME_HISTORY_ROWS = numberArgument(
+  "--expect-regime-history-rows",
+);
+const EXPECT_REGIME_HISTORICAL_ROWS = numberArgument(
+  "--expect-regime-historical-rows",
+);
 const EXPECT_HORIZON = numberArgument("--expect-horizon") ?? 63;
 const EXPECT_KODEX_WEIGHT_PCT = numberArgument("--expect-kodex-weight");
 const EXPECT_INVALID_QUERY = process.argv.includes("--expect-invalid-query");
@@ -443,17 +450,18 @@ async function main() {
   }
   assert.equal(
     historyRowCount,
-    EXPECT_INVALID_QUERY ? 0 : 7,
+    EXPECT_HISTORY_ROWS ?? (EXPECT_INVALID_QUERY ? 0 : 7),
     "simulation rendered an unexpected history row count",
   );
   assert.equal(
     regimeHistoryRowCount,
-    EXPECT_INVALID_QUERY ? 0 : 7,
+    EXPECT_REGIME_HISTORY_ROWS ?? (EXPECT_INVALID_QUERY ? 0 : 7),
     "simulation rendered an unexpected regime readiness history row count",
   );
   assert.equal(
     regimeHistoricalOutcomeRows,
-    EXPECT_INVALID_QUERY || !HAS_EXPLICIT_END ? 0 : 7,
+    EXPECT_REGIME_HISTORICAL_ROWS ??
+      (EXPECT_INVALID_QUERY || !HAS_EXPLICIT_END ? 0 : 7),
     "simulation rendered an unexpected retrospective regime outcome row count",
   );
   if (EXPECT_INVALID_QUERY || !HAS_EXPLICIT_END) {

@@ -37,7 +37,35 @@ describe("KIS history preview route boundary", () => {
     );
     assert.match(
       repository,
-      /coalesce\(excluded\.adjusted_close_price,[\s\S]*adjustedClosePrice/,
+      /adjustedClosePrice:\s*sql`excluded\.adjusted_close_price`/,
+    );
+    assert.match(
+      repository,
+      /adjustedCloseBasis:\s*sql`excluded\.adjusted_close_basis`/,
+    );
+    assert.match(
+      repository,
+      /adjustedCloseProvider:\s*sql`excluded\.adjusted_close_provider`/,
+    );
+    assert.match(
+      repository,
+      /adjustedCloseSource:\s*sql`excluded\.adjusted_close_source`/,
+    );
+    assert.match(
+      repository,
+      /adjustedCloseFetchedAt:\s*sql`excluded\.adjusted_close_fetched_at`/,
+    );
+    assert.doesNotMatch(
+      repository,
+      /coalesce\(excluded\.adjusted_close_/,
+    );
+    assert.match(
+      repository,
+      /closePriceKrw:\s*sql`excluded\.close_price_krw`/,
+    );
+    assert.match(
+      repository,
+      /fxRate:\s*sql`excluded\.fx_rate`/,
     );
     assert.match(
       repository,
@@ -47,9 +75,21 @@ describe("KIS history preview route boundary", () => {
       repository,
       /assetPriceSnapshots\.source} like 'kis_%'[\s\S]*greatest\(abs\(/,
     );
+    assert.match(
+      repository,
+      /protected_provider_adjusted_history/,
+    );
+    assert.match(
+      repository,
+      /adjustedCloseBasis}[\s\S]*is distinct from[\s\S]*ADJUSTED_CLOSE_BASIS\.provider/,
+    );
     assert.doesNotMatch(
       repository,
       /protected_compatible_existing_source/,
+    );
+    assert.match(
+      repository,
+      /if \(writePolicy === "kis"\) return false;/,
     );
     assert.match(provider, /^import "server-only";/);
     assert.match(provider, /fetchHistoricalClosePrices/);

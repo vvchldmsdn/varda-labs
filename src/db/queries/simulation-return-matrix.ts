@@ -4,6 +4,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshots, fxRates } from "@/db/schema";
+import { admitAdjustedHistoricalPriceRows } from "@/lib/market-data/asset-price-consumer-admission";
 import {
   loadSimulationPeriodPreflight,
   loadSimulationPeriodPreflightBatch,
@@ -21,13 +22,21 @@ const drizzleSimulationReturnMatrixRepository: SimulationReturnMatrixReadReposit
       const tickers = [...new Set(instruments.map((row) => row.ticker))];
       if (tickers.length === 0) return [];
 
-      return db
+      const rows = await db
         .select({
           market: sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
           currency: sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
           ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
           priceDate: assetPriceSnapshots.priceDate,
+          closePrice: assetPriceSnapshots.closePrice,
           adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+          adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
+          adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
+          adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
+          adjustedCloseFetchedAt:
+            assetPriceSnapshots.adjustedCloseFetchedAt,
+          providerSymbol: assetPriceSnapshots.providerSymbol,
+          providerExchange: assetPriceSnapshots.providerExchange,
         })
         .from(assetPriceSnapshots)
         .where(
@@ -47,6 +56,14 @@ const drizzleSimulationReturnMatrixRepository: SimulationReturnMatrixReadReposit
           asc(assetPriceSnapshots.currency),
           asc(assetPriceSnapshots.ticker),
         );
+
+      return admitAdjustedHistoricalPriceRows(rows).rows.map((row) => ({
+        market: row.market,
+        currency: row.currency,
+        ticker: row.ticker,
+        priceDate: row.priceDate,
+        adjustedClosePrice: row.adjustedClosePrice,
+      }));
     },
 
     async loadFxRows({ sourceDateFrom, sourceDateTo }) {

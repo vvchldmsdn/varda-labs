@@ -209,13 +209,13 @@ export async function applyAssetPriceSnapshotRows(options: {
         set: {
           assetId: sql`coalesce(excluded.asset_id, ${assetPriceSnapshots.assetId})`,
           closePrice: sql`excluded.close_price`,
-          adjustedClosePrice: sql`coalesce(excluded.adjusted_close_price, ${assetPriceSnapshots.adjustedClosePrice})`,
-          adjustedCloseBasis: sql`coalesce(excluded.adjusted_close_basis, ${assetPriceSnapshots.adjustedCloseBasis})`,
-          adjustedCloseProvider: sql`coalesce(excluded.adjusted_close_provider, ${assetPriceSnapshots.adjustedCloseProvider})`,
-          adjustedCloseSource: sql`coalesce(excluded.adjusted_close_source, ${assetPriceSnapshots.adjustedCloseSource})`,
-          adjustedCloseFetchedAt: sql`coalesce(excluded.adjusted_close_fetched_at, ${assetPriceSnapshots.adjustedCloseFetchedAt})`,
-          closePriceKrw: sql`coalesce(excluded.close_price_krw, ${assetPriceSnapshots.closePriceKrw})`,
-          fxRate: sql`coalesce(excluded.fx_rate, ${assetPriceSnapshots.fxRate})`,
+          adjustedClosePrice: sql`excluded.adjusted_close_price`,
+          adjustedCloseBasis: sql`excluded.adjusted_close_basis`,
+          adjustedCloseProvider: sql`excluded.adjusted_close_provider`,
+          adjustedCloseSource: sql`excluded.adjusted_close_source`,
+          adjustedCloseFetchedAt: sql`excluded.adjusted_close_fetched_at`,
+          closePriceKrw: sql`excluded.close_price_krw`,
+          fxRate: sql`excluded.fx_rate`,
           source: sql`excluded.source`,
           providerSymbol: sql`excluded.provider_symbol`,
           providerExchange: sql`excluded.provider_exchange`,
@@ -412,6 +412,9 @@ function getProtectedExistingReason(
     if (!isKisClosePriceSource(incoming.source ?? null)) {
       return "unsupported_write_source";
     }
+    if (existing.adjustedCloseBasis === ADJUSTED_CLOSE_BASIS.provider) {
+      return "protected_provider_adjusted_history";
+    }
     if (isKisClosePriceSource(existing.source)) return null;
     return getKisValueConflictReason(existing, incoming);
   }
@@ -426,11 +429,15 @@ function getUpsertSetWhere(writePolicy: AssetPriceSnapshotWritePolicy) {
   if (writePolicy === "kis") {
     const threshold = getKisValueConflictThresholdPct() / 100;
     return sql`
-      ${assetPriceSnapshots.source} like 'kis_%'
-      or (
-        abs(${assetPriceSnapshots.closePrice} - excluded.close_price)
-        / greatest(abs(${assetPriceSnapshots.closePrice}), 1)
-      ) <= ${threshold}
+      ${assetPriceSnapshots.adjustedCloseBasis}
+        is distinct from ${ADJUSTED_CLOSE_BASIS.provider}
+      and (
+        ${assetPriceSnapshots.source} like 'kis_%'
+        or (
+          abs(${assetPriceSnapshots.closePrice} - excluded.close_price)
+          / greatest(abs(${assetPriceSnapshots.closePrice}), 1)
+        ) <= ${threshold}
+      )
     `;
   }
   return sql`false`;
@@ -452,9 +459,9 @@ function isAllowedAdjustedCloseBasis(
   if (writePolicy === "stub_fixture") {
     return basis === ADJUSTED_CLOSE_BASIS.syntheticFixture;
   }
-  if (writePolicy === "kis") {
-    return basis === ADJUSTED_CLOSE_BASIS.provider;
-  }
+  // KIS is admitted only for private operational raw closes. A future
+  // adjusted-history writer needs its own capability-backed write policy.
+  if (writePolicy === "kis") return false;
   return false;
 }
 
@@ -496,14 +503,6 @@ function snapshotMatches(
   existing: AssetPriceSnapshotRow,
   incoming: AssetPriceSnapshotInsert,
 ) {
-  const adjustedCloseMatches =
-    incoming.adjustedClosePrice === null ||
-    incoming.adjustedClosePrice === undefined ||
-    sameNullableDecimal(
-      existing.adjustedClosePrice,
-      incoming.adjustedClosePrice,
-    );
-
   return (
     (incoming.assetId === null ||
       incoming.assetId === undefined ||
@@ -511,25 +510,19 @@ function snapshotMatches(
     existing.market === incoming.market &&
     existing.currency === incoming.currency &&
     sameDecimal(existing.closePrice, String(incoming.closePrice)) &&
-    adjustedCloseMatches &&
-    preservesNullableText(
-      existing.adjustedCloseBasis,
-      incoming.adjustedCloseBasis,
+    sameNullableDecimalValue(
+      existing.adjustedClosePrice,
+      incoming.adjustedClosePrice,
     ) &&
-    preservesNullableText(
-      existing.adjustedCloseProvider,
-      incoming.adjustedCloseProvider,
-    ) &&
-    preservesNullableText(
-      existing.adjustedCloseSource,
-      incoming.adjustedCloseSource,
-    ) &&
-    preservesNullableDate(
+    existing.adjustedCloseBasis === incoming.adjustedCloseBasis &&
+    existing.adjustedCloseProvider === incoming.adjustedCloseProvider &&
+    existing.adjustedCloseSource === incoming.adjustedCloseSource &&
+    sameNullableDateValue(
       existing.adjustedCloseFetchedAt,
       incoming.adjustedCloseFetchedAt,
     ) &&
-    preservesNullableDecimal(existing.closePriceKrw, incoming.closePriceKrw) &&
-    preservesNullableDecimal(existing.fxRate, incoming.fxRate) &&
+    sameNullableDecimalValue(existing.closePriceKrw, incoming.closePriceKrw) &&
+    sameNullableDecimalValue(existing.fxRate, incoming.fxRate) &&
     existing.source === incoming.source &&
     existing.providerSymbol === incoming.providerSymbol &&
     existing.providerExchange === incoming.providerExchange &&
@@ -648,11 +641,6 @@ function sameDecimal(left: string, right: string) {
   );
 }
 
-function sameNullableDecimal(left: string | null, right: string | null) {
-  if (left === null || right === null) return left === right;
-  return sameDecimal(left, right);
-}
-
 function sameNullableDecimalValue(
   left: string | number | null | undefined,
   right: string | number | null | undefined,
@@ -663,33 +651,6 @@ function sameNullableDecimalValue(
     return normalizedLeft === normalizedRight;
   }
   return sameDecimal(String(normalizedLeft), String(normalizedRight));
-}
-
-function preservesNullableDecimal(
-  left: string | null,
-  right: string | number | null | undefined,
-) {
-  return right === null || right === undefined
-    ? true
-    : sameNullableDecimal(left, String(right));
-}
-
-function preservesNullableText(
-  left: string | null,
-  right: string | null | undefined,
-) {
-  return right === null || right === undefined || left === right;
-}
-
-function preservesNullableDate(
-  left: Date | null,
-  right: Date | null | undefined,
-) {
-  return (
-    right === null ||
-    right === undefined ||
-    (left !== null && left.getTime() === right.getTime())
-  );
 }
 
 function sameNullableDateValue(

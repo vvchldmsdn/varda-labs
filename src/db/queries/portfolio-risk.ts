@@ -12,6 +12,7 @@ import type {
   PortfolioRiskAccount,
   PortfolioRiskReadRepository,
 } from "@/lib/portfolio-risk-read-model-types";
+import { admitAdjustedHistoricalPriceRows } from "@/lib/market-data/asset-price-consumer-admission";
 
 const TRACKED_ACCOUNTS = ["brokerage", "isa", "irp"];
 
@@ -37,7 +38,7 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
 
   async loadPrices({ tickers, sourceDateFrom, sourceDateTo }) {
     if (tickers.length === 0) return [];
-    return db
+    const rows = await db
       .select({
         ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
         market: sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
@@ -45,6 +46,13 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
         priceDate: assetPriceSnapshots.priceDate,
         closePrice: assetPriceSnapshots.closePrice,
         adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+        adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
+        adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
+        adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
+        adjustedCloseFetchedAt:
+          assetPriceSnapshots.adjustedCloseFetchedAt,
+        providerSymbol: assetPriceSnapshots.providerSymbol,
+        providerExchange: assetPriceSnapshots.providerExchange,
         source: assetPriceSnapshots.source,
         isSample: assetPriceSnapshots.isSample,
       })
@@ -57,12 +65,15 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
           ),
           gte(assetPriceSnapshots.priceDate, sourceDateFrom),
           lte(assetPriceSnapshots.priceDate, sourceDateTo),
+          eq(assetPriceSnapshots.isSample, false),
         ),
       )
       .orderBy(
         asc(assetPriceSnapshots.priceDate),
         asc(assetPriceSnapshots.ticker),
       );
+
+    return [...admitAdjustedHistoricalPriceRows(rows).rows];
   },
 
   async loadFxRates({ sourceDateFrom, sourceDateTo }) {

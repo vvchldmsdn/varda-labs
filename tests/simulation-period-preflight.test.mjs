@@ -218,7 +218,7 @@ describe("Simulation Period Phase 0C read-only preflight", () => {
     );
     assert.doesNotMatch(
       source,
-      /\.insert\(|\.update\(|\.delete\(|\.returning\(|fetch\s*\(|\/api\/|provider|cron|setTimeout|while\s*\(/i,
+      /\.insert\(|\.update\(|\.delete\(|\.returning\(|fetch\s*\(|\/api\/|market-data\/providers\/(?!types)|cron|setTimeout|while\s*\(/i,
     );
     assert.match(source, /^import "server-only";/m);
     assert.doesNotMatch(source, /\.select\(\s*\)/);

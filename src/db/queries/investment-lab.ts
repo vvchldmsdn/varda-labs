@@ -27,6 +27,10 @@ import {
   buildInvestmentLabHistoricalAccountConsensus,
   resolveInvestmentLabEventAccount,
 } from "@/lib/investment-lab-event-account";
+import {
+  admitAdjustedHistoricalPriceRows,
+  admitRawHistoricalPriceRows,
+} from "@/lib/market-data/asset-price-consumer-admission";
 
 const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 const LEGACY_ID_PATTERN = /^[0-9a-f]{24}$/;
@@ -135,11 +139,11 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
   },
 
   async loadScenarioCloses() {
-    return loadScenarioCloseRows("069500", "korea", "KRW");
+    return loadAdjustedScenarioCloseRows("069500", "korea", "KRW");
   },
 
   async loadVooCloses() {
-    return loadScenarioCloseRows("VOO", "us", "USD");
+    return loadRawScenarioCloseRows("VOO", "us", "USD");
   },
 
   async loadFxRows() {
@@ -368,13 +372,21 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       ),
     ];
     if (tickers.length === 0) return [];
-    return db
+    const rows = await db
       .select({
         ticker: assetPriceSnapshots.ticker,
         market: assetPriceSnapshots.market,
         currency: assetPriceSnapshots.currency,
         priceDate: assetPriceSnapshots.priceDate,
         closePrice: assetPriceSnapshots.closePrice,
+        adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+        adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
+        adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
+        adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
+        adjustedCloseFetchedAt: assetPriceSnapshots.adjustedCloseFetchedAt,
+        providerSymbol: assetPriceSnapshots.providerSymbol,
+        providerExchange: assetPriceSnapshots.providerExchange,
+        fetchedAt: assetPriceSnapshots.fetchedAt,
         source: assetPriceSnapshots.source,
       })
       .from(assetPriceSnapshots)
@@ -396,19 +408,38 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         asc(assetPriceSnapshots.priceDate),
         asc(assetPriceSnapshots.ticker),
       );
+
+    return admitRawHistoricalPriceRows(rows).rows.map((row) => ({
+      ticker: row.ticker,
+      market: row.market,
+      currency: row.currency,
+      priceDate: row.priceDate,
+      closePrice: row.closePrice,
+      source: row.source,
+    }));
   },
 };
 
-function loadScenarioCloseRows(
+async function loadAdjustedScenarioCloseRows(
   ticker: string,
   market: string,
   currency: string,
 ) {
-  return db
+  const rows = await db
     .select({
+      ticker: assetPriceSnapshots.ticker,
+      market: assetPriceSnapshots.market,
+      currency: assetPriceSnapshots.currency,
       priceDate: assetPriceSnapshots.priceDate,
       closePrice: assetPriceSnapshots.closePrice,
       adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+      adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
+      adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
+      adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
+      adjustedCloseFetchedAt: assetPriceSnapshots.adjustedCloseFetchedAt,
+      providerSymbol: assetPriceSnapshots.providerSymbol,
+      providerExchange: assetPriceSnapshots.providerExchange,
+      fetchedAt: assetPriceSnapshots.fetchedAt,
       source: assetPriceSnapshots.source,
     })
     .from(assetPriceSnapshots)
@@ -430,6 +461,59 @@ function loadScenarioCloseRows(
       ),
     )
     .orderBy(asc(assetPriceSnapshots.priceDate));
+
+  return admitAdjustedHistoricalPriceRows(rows).rows.map((row) => ({
+    priceDate: row.priceDate,
+    closePrice: row.closePrice,
+    adjustedClosePrice: row.adjustedClosePrice,
+    source: row.adjustedCloseSource,
+  }));
+}
+
+async function loadRawScenarioCloseRows(
+  ticker: string,
+  market: string,
+  currency: string,
+) {
+  const rows = await db
+    .select({
+      ticker: assetPriceSnapshots.ticker,
+      market: assetPriceSnapshots.market,
+      currency: assetPriceSnapshots.currency,
+      priceDate: assetPriceSnapshots.priceDate,
+      closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+      source: assetPriceSnapshots.source,
+      providerSymbol: assetPriceSnapshots.providerSymbol,
+      providerExchange: assetPriceSnapshots.providerExchange,
+      fetchedAt: assetPriceSnapshots.fetchedAt,
+    })
+    .from(assetPriceSnapshots)
+    .where(
+      and(
+        eq(assetPriceSnapshots.isSample, false),
+        eq(
+          sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+          ticker.toUpperCase(),
+        ),
+        eq(
+          sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
+          market.toLowerCase(),
+        ),
+        eq(
+          sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
+          currency.toUpperCase(),
+        ),
+      ),
+    )
+    .orderBy(asc(assetPriceSnapshots.priceDate));
+
+  return admitRawHistoricalPriceRows(rows).rows.map((row) => ({
+    priceDate: row.priceDate,
+    closePrice: row.closePrice,
+    adjustedClosePrice: row.adjustedClosePrice,
+    source: row.source,
+  }));
 }
 
 export async function getReadOnlyInvestmentLabCounterfactual(

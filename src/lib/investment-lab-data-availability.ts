@@ -183,6 +183,11 @@ export function buildInvestmentLabDataAvailability(input: {
     marketHistoryReady &&
     input.marketHistory.inputStatus === "ready" &&
     input.marketHistory.includedInstrumentCount >= 2;
+  const marketHistoryRepairCount =
+    input.marketHistory.priceGapCount + input.marketHistory.fxGapCount;
+  const admittedMarketHistoryUnavailable =
+    input.marketHistory.eligibleHoldingCount > 0 &&
+    input.marketHistory.usableReturnObservations === 0;
   const actualSegmentReady =
     actualHistory.latestCurrentWriterDateCount >=
     INVESTMENT_LAB_DATA_AVAILABILITY_POLICY.minimumActualComparisonDates;
@@ -266,11 +271,15 @@ export function buildInvestmentLabDataAvailability(input: {
     Object.freeze({
       id: "market_history" as const,
       status:
-        input.marketHistory.priceGapCount + input.marketHistory.fxGapCount > 0
+        marketHistoryRepairCount > 0 || admittedMarketHistoryUnavailable
           ? ("provider_backfill_candidate" as const)
           : ("not_needed" as const),
       affectedCount:
-        input.marketHistory.priceGapCount + input.marketHistory.fxGapCount,
+        marketHistoryRepairCount > 0
+          ? marketHistoryRepairCount
+          : admittedMarketHistoryUnavailable
+            ? input.marketHistory.eligibleHoldingCount
+            : 0,
     }),
   ];
   if (hasGold) {
