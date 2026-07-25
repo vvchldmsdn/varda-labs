@@ -387,3 +387,9 @@ transition findings; the current runtime criterion is
 and sign-out on one reviewed Preview branch. Product identity pairing, tenant
 resolution, product database access, production Neon Auth, and any replacement
 of Basic Auth remain closed.
+
+Phase 1G1-B1b now adds the next authority layer as a pure synthetic dry-run in
+`docs/auth-tenant-phase1g1b1b-pairing-authority-dry-run.md`. It requires an
+independent operator, explicit provisioning-user target, verified subject
+binding, and short-lived single-use intent, but grants no runtime trust and
+performs no identity, intent, or app-user mutation.
