@@ -7,10 +7,12 @@ implemented. It is intentionally narrower than the full market-data pipeline.
 
 ## Decision
 
-Use KIS as the primary official provider for close and live prices. Do not make
-Naver or Yahoo the primary provider. They can be evaluated later as fallback or
-read-only comparison sources, but their response stability and blocking risk are
-not acceptable as the first operational path.
+Use KIS as the current private operational provider for raw close and live
+prices. This does not make KIS an exchange-authoritative close, adjusted-price,
+or total-return provider. Do not make Naver or Yahoo the primary operational
+provider. They can be evaluated later as fallback or read-only comparison
+sources, but their response stability and blocking risk are not acceptable as
+the first operational path.
 
 This decision applies to the current private, single-migration-tenant
 operational path. It does not grant KIS data multi-user cache, display, or

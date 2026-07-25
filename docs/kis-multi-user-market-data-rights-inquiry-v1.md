@@ -72,10 +72,22 @@ Please confirm each item separately in writing:
    delay, user-count, geography, or exchange-contract conditions apply?
 7. What raw-data and derived-result retention and deletion rules apply during
    service operation and after termination?
-8. If one shared provider key is not allowed, may each authenticated user
-   connect and use their own KIS credentials through the service? If so, what
-   security, consent, account-linking, and display conditions apply?
-9. Do KIS daily-price APIs provide raw prices only, or is there a documented
+8. Must every end user be an existing KIS trading customer, and must the
+   service verify or link that user's KIS securities account before showing
+   any current price, historical price, or derived analytics?
+9. Do those end-user requirements also apply when the service shows only
+   delayed prices, daily historical prices, or derived analytics without raw
+   source prices?
+10. If one shared provider key is not allowed, may each authenticated user
+    connect and use their own KIS credentials through the service? If so, what
+    security, consent, account-linking, and display conditions apply?
+11. If user-owned credentials are permitted, may the service keep a cache
+    isolated to that user? Separately, may the same fetched row be reused
+    across users in a shared cache?
+12. For required KRX or overseas exchange information-use agreements, which
+    party must sign and maintain the agreement: Varda Labs, KIS, each end user,
+    or another licensed entity? What eligibility requirements apply?
+13. Do KIS daily-price APIs provide raw prices only, or is there a documented
    adjusted-price or total-return series that incorporates stock splits and
    cash distributions?
 
@@ -95,11 +107,16 @@ Record the response dimensions independently:
 - `rawPriceDisplay`
 - `derivedAnalyticsDisplay`
 - `multiUser`
+- `endUserKisCustomerRequired`
+- `endUserAccountVerification`
 - `krx`
 - `overseasExchanges`
+- `exchangeAgreementHolder`
 - `rawRetention`
 - `derivedRetention`
 - `userOwnedCredentials`
+- `perUserCache`
+- `crossUserCacheReuse`
 - `adjustedPriceSemantics`
 
 A dimension becomes `admitted` only when a written reply explicitly grants it
