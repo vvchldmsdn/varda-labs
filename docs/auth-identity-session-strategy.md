@@ -377,3 +377,13 @@ Phase 1G1-B0 records the current preview integration readiness in
 but G1-B1 is blocked because preview/production environment isolation and a
 trusted reviewed-operator target handoff are not available. Auth runtime remains
 frozen and Basic Auth remains unchanged.
+
+That paragraph is the immutable, date-scoped B0 conclusion. The repository has
+since entered the separately reviewed Preview-only transport phase recorded in
+`docs/auth-tenant-phase1g1b1a-preview-session-transport.md`. Consequently,
+`npm run audit:preview-auth-readiness` now fails with the expected B0 scope
+transition findings; the current runtime criterion is
+`npm run audit:preview-auth-runtime`. B1a proves only Google session transport
+and sign-out on one reviewed Preview branch. Product identity pairing, tenant
+resolution, product database access, production Neon Auth, and any replacement
+of Basic Auth remain closed.

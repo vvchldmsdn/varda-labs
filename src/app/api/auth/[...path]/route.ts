@@ -1,4 +1,5 @@
 import { getPreviewAuthRuntime } from "@/lib/auth/preview-auth-runtime";
+import { isPreviewAuthApiRequestAllowed } from "@/lib/auth/preview-auth-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,23 @@ async function dispatchAuthRequest(
   request: Request,
   context: AuthRouteContext,
 ) {
+  const path = (await context.params).path;
+  const socialProvider = await readSocialProvider(request, method, path);
+
+  if (
+    !isPreviewAuthApiRequestAllowed({
+      method,
+      path,
+      socialProvider,
+    })
+  ) {
+    return notFoundResponse();
+  }
+
   const runtime = getPreviewAuthRuntime();
 
   if (runtime.state === "disabled") {
-    return new Response("Not found", {
-      status: 404,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return notFoundResponse();
   }
 
   if (runtime.state === "misconfigured") {
@@ -39,4 +50,42 @@ async function dispatchAuthRequest(
   }
 
   return runtime.auth.handler()[method](request, context);
+}
+
+async function readSocialProvider(
+  request: Request,
+  method: "GET" | "POST",
+  path: readonly string[],
+) {
+  if (
+    method !== "POST" ||
+    path.length !== 2 ||
+    path[0] !== "sign-in" ||
+    path[1] !== "social"
+  ) {
+    return null;
+  }
+
+  try {
+    const body: unknown = await request.clone().json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "provider" in body &&
+      typeof body.provider === "string"
+    ) {
+      return body.provider;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function notFoundResponse() {
+  return new Response("Not found", {
+    status: 404,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

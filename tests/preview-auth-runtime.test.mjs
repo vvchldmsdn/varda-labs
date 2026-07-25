@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   assessPreviewAuthEnvironment,
+  isPreviewAuthApiRequestAllowed,
+  PREVIEW_AUTH_ALLOWED_API_ENDPOINTS,
   PREVIEW_AUTH_ALLOWED_GIT_REF,
   PREVIEW_AUTH_CALLBACK_PATH,
   PREVIEW_AUTH_SESSION_CACHE_SECONDS,
@@ -61,6 +63,63 @@ describe("preview auth session transport smoke", () => {
     assert.equal(PREVIEW_AUTH_CALLBACK_PATH, "/auth/session");
   });
 
+  it("allows only the three reviewed Google session transport requests", () => {
+    assert.deepEqual(PREVIEW_AUTH_ALLOWED_API_ENDPOINTS, [
+      { method: "GET", path: ["get-session"] },
+      {
+        method: "POST",
+        path: ["sign-in", "social"],
+        socialProvider: "google",
+      },
+      { method: "POST", path: ["sign-out"] },
+    ]);
+
+    assert.equal(
+      isPreviewAuthApiRequestAllowed({
+        method: "GET",
+        path: ["get-session"],
+      }),
+      true,
+    );
+    assert.equal(
+      isPreviewAuthApiRequestAllowed({
+        method: "POST",
+        path: ["sign-in", "social"],
+        socialProvider: "google",
+      }),
+      true,
+    );
+    assert.equal(
+      isPreviewAuthApiRequestAllowed({
+        method: "POST",
+        path: ["sign-out"],
+      }),
+      true,
+    );
+  });
+
+  it("rejects unreviewed auth methods, routes, and social providers", () => {
+    const rejectedRequests = [
+      { method: "POST", path: ["sign-up", "email"] },
+      { method: "POST", path: ["sign-in", "email"] },
+      { method: "GET", path: ["list-sessions"] },
+      { method: "POST", path: ["delete-user"] },
+      { method: "GET", path: ["callback", "google"] },
+      {
+        method: "POST",
+        path: ["sign-in", "social"],
+        socialProvider: "github",
+      },
+      { method: "GET", path: ["sign-out"] },
+      { method: "PATCH", path: ["get-session"] },
+      { method: "GET", path: ["get-session", "extra"] },
+    ];
+
+    for (const request of rejectedRequests) {
+      assert.equal(isPreviewAuthApiRequestAllowed(request), false);
+    }
+  });
+
   it("keeps the smoke runtime outside product data and production auth", () => {
     const result = auditPreviewAuthRuntime(process.cwd());
 
@@ -74,6 +133,8 @@ describe("preview auth session transport smoke", () => {
       publicAuthEnvironmentReferences: 0,
       previewAuthSdkPinned: true,
       previewGitRefGatePresent: true,
+      allowedAuthApiEndpoints: 3,
+      googleSocialProviderRestricted: true,
       basicAuthBoundaryIntact: true,
       oauthCallbackExchangeProxyPresent: true,
       previewAuthRouteBypassesBasicAuth: true,

@@ -82,6 +82,20 @@ export function auditPreviewAuthRuntime(root) {
   ) {
     findings.push("unneeded_auth_method_exposed");
   }
+  const allowedAuthApiEndpoints =
+    (policy.match(/method:\s*"(?:GET|POST)"/g) ?? []).length;
+  const googleSocialProviderRestricted =
+    policy.includes('socialProvider: "google"') &&
+    route.includes("isPreviewAuthApiRequestAllowed") &&
+    route.includes("readSocialProvider") &&
+    route.indexOf("isPreviewAuthApiRequestAllowed") <
+      route.indexOf("runtime.auth.handler()");
+  if (allowedAuthApiEndpoints !== 3) {
+    findings.push("preview_auth_endpoint_allowlist_drift");
+  }
+  if (!googleSocialProviderRestricted) {
+    findings.push("preview_auth_social_provider_guard_missing");
+  }
 
   const sessionPage = sources.get("src/app/auth/session/page.tsx") ?? "";
   if (/\.user\.(?:email|name|image)|provider[_A-Z]?subject/i.test(sessionPage)) {
@@ -142,6 +156,8 @@ export function auditPreviewAuthRuntime(root) {
       previewGitRefGatePresent:
         policy.includes("VERCEL_GIT_COMMIT_REF") &&
         policy.includes("PREVIEW_AUTH_ALLOWED_GIT_REF"),
+      allowedAuthApiEndpoints,
+      googleSocialProviderRestricted,
       basicAuthBoundaryIntact,
       oauthCallbackExchangeProxyPresent,
       previewAuthRouteBypassesBasicAuth,
