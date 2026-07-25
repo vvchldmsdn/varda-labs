@@ -1,4 +1,5 @@
 import { createReviewedGoogleSocialSignInRequest } from "@/lib/auth/auth-transport-api-contract";
+import { createAuthTransportUpstreamRequest } from "@/lib/auth/auth-transport-request";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 import { isAuthTransportApiRequestAllowed } from "@/lib/auth/auth-transport-policy";
 
@@ -62,7 +63,10 @@ async function dispatchAuthRequest(
     );
   }
 
-  return runtime.auth.handler()[method](forwardedRequest, context);
+  const upstreamRequest =
+    createAuthTransportUpstreamRequest(forwardedRequest);
+
+  return runtime.auth.handler()[method](upstreamRequest, context);
 }
 
 function notFoundResponse() {

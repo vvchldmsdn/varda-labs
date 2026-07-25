@@ -29,6 +29,9 @@ The temporary dashboard Basic Auth remains in place.
   fields and current-session sign-out. Token sign-in, explicit sign-up flags,
   custom scopes, custom callback URLs, and unknown fields are rejected before
   the managed handler runs.
+- Dashboard `Authorization` and `Proxy-Authorization` credentials are removed
+  before every managed sign-in, sign-out, and callback exchange request. Neon
+  Auth cookies, the verifier URL, origin evidence, and reviewed JSON remain.
 
 This prevents open self-service onboarding while the product still lacks
 owner-filtered reads, two-user isolation, and RLS. An authenticated but

@@ -5,6 +5,7 @@ const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
   "src/lib/auth/auth-transport-api-contract.ts",
   "src/lib/auth/auth-transport-policy.ts",
   "src/lib/auth/auth-transport-proxy.ts",
+  "src/lib/auth/auth-transport-request.ts",
   "src/lib/auth/auth-transport-routes.ts",
   "src/lib/auth/auth-transport-runtime.ts",
   "src/app/api/auth/[...path]/route.ts",
@@ -137,6 +138,8 @@ export function auditAuthTransportRuntime(root) {
   }
 
   const authProxy = sources.get("src/lib/auth/auth-transport-proxy.ts") ?? "";
+  const requestSanitizer =
+    sources.get("src/lib/auth/auth-transport-request.ts") ?? "";
   const proxy = sources.get("src/proxy.ts") ?? "";
   const basicAuthBoundaryIntact = [
     "VARDA_APP_PASSWORD",
@@ -187,6 +190,19 @@ export function auditAuthTransportRuntime(root) {
   if (!callbackFailureClosed) {
     findings.push("auth_callback_failure_closed_missing");
   }
+  const dashboardCredentialHeadersStripped =
+    requestSanitizer.includes('"authorization"') &&
+    requestSanitizer.includes('"proxy-authorization"') &&
+    requestSanitizer.includes("sanitizedHeaders.delete(header)") &&
+    route.includes("createAuthTransportUpstreamRequest(forwardedRequest)") &&
+    route.indexOf("createAuthTransportUpstreamRequest(forwardedRequest)") <
+      route.indexOf("runtime.auth.handler()") &&
+    authProxy.includes("createAuthTransportUpstreamHeaders(request.headers)") &&
+    authProxy.indexOf("createAuthTransportUpstreamHeaders(request.headers)") <
+      authProxy.indexOf("runtime.auth.middleware");
+  if (!dashboardCredentialHeadersStripped) {
+    findings.push("dashboard_auth_credential_sanitizer_missing");
+  }
 
   const schema = readFileSync(join(root, "src/db/schema.ts"), "utf8");
   const managedAuthSchemaOwnedByDrizzle =
@@ -220,6 +236,7 @@ export function auditAuthTransportRuntime(root) {
       authCallbackBypassesBasicAuth,
       sessionEvidenceRequiresBasicAuth,
       callbackFailureClosed,
+      dashboardCredentialHeadersStripped,
       managedAuthSchemaOwnedByDrizzle,
       managedAuthSessionIoExpected: true,
     }),

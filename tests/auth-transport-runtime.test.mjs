@@ -6,6 +6,11 @@ import {
   createReviewedGoogleSocialSignInRequest,
 } from "../src/lib/auth/auth-transport-api-contract.ts";
 import {
+  AUTH_TRANSPORT_STRIPPED_CREDENTIAL_HEADERS,
+  createAuthTransportUpstreamHeaders,
+  createAuthTransportUpstreamRequest,
+} from "../src/lib/auth/auth-transport-request.ts";
+import {
   assessAuthTransportEnvironment,
   createAuthTransportBaseUrlFingerprint,
   isAuthTransportApiRequestAllowed,
@@ -225,15 +230,87 @@ describe("auth session transport smoke", () => {
     );
   });
 
+  it("strips dashboard credentials before every Neon Auth upstream call", async () => {
+    assert.deepEqual(AUTH_TRANSPORT_STRIPPED_CREDENTIAL_HEADERS, [
+      "authorization",
+      "proxy-authorization",
+    ]);
+
+    const credentialHeaders = {
+      authorization: "Basic must-not-reach-upstream",
+      "proxy-authorization": "Basic must-not-reach-upstream",
+      cookie: "neon-auth-cookie=opaque",
+      origin: "https://app.example.invalid",
+      "content-type": "application/json",
+    };
+    const originalRequests = [
+      new Request(
+        "https://app.example.invalid/api/auth/sign-in/social",
+        {
+          method: "POST",
+          headers: credentialHeaders,
+          body: JSON.stringify(AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY),
+        },
+      ),
+      new Request("https://app.example.invalid/api/auth/sign-out", {
+        method: "POST",
+        headers: credentialHeaders,
+        body: "{}",
+      }),
+      new Request(
+        "https://app.example.invalid/auth/callback?neon_auth_session_verifier=opaque",
+        {
+          method: "GET",
+          headers: credentialHeaders,
+        },
+      ),
+    ];
+
+    const upstreamRequests = originalRequests.map((originalRequest) =>
+      createAuthTransportUpstreamRequest(originalRequest),
+    );
+
+    for (const upstreamRequest of upstreamRequests) {
+      assert.equal(upstreamRequest.headers.get("authorization"), null);
+      assert.equal(upstreamRequest.headers.get("proxy-authorization"), null);
+      assert.equal(
+        upstreamRequest.headers.get("cookie"),
+        "neon-auth-cookie=opaque",
+      );
+      assert.equal(
+        upstreamRequest.headers.get("origin"),
+        "https://app.example.invalid",
+      );
+    }
+
+    const signOutRequest = upstreamRequests[1];
+    assert.equal(await signOutRequest.text(), "{}");
+
+    const callbackRequest = upstreamRequests[2];
+    assert.equal(
+      new URL(callbackRequest.url).searchParams.get(
+        "neon_auth_session_verifier",
+      ),
+      "opaque",
+    );
+
+    const callbackHeaders = createAuthTransportUpstreamHeaders(
+      originalRequests[2].headers,
+    );
+    assert.equal(callbackHeaders.get("authorization"), null);
+    assert.equal(callbackHeaders.get("proxy-authorization"), null);
+    assert.equal(callbackHeaders.get("cookie"), "neon-auth-cookie=opaque");
+  });
+
   it("keeps the transport outside product data and identity authority", () => {
     const result = auditAuthTransportRuntime(process.cwd());
 
     assert.equal(result.status, "passed");
     assert.deepEqual(result.findings, []);
     assert.deepEqual(result.evidence, {
-      requiredFiles: 11,
-      presentFiles: 11,
-      inspectedRuntimeGraphFiles: 11,
+      requiredFiles: 12,
+      presentFiles: 12,
+      inspectedRuntimeGraphFiles: 12,
       productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       authSdkPinned: true,
@@ -249,6 +326,7 @@ describe("auth session transport smoke", () => {
       authCallbackBypassesBasicAuth: true,
       sessionEvidenceRequiresBasicAuth: true,
       callbackFailureClosed: true,
+      dashboardCredentialHeadersStripped: true,
       managedAuthSchemaOwnedByDrizzle: false,
       managedAuthSessionIoExpected: true,
     });

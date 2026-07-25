@@ -1,7 +1,8 @@
 import "server-only";
 
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
+import { createAuthTransportUpstreamHeaders } from "@/lib/auth/auth-transport-request";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 
 export async function handleAuthTransportProxy(request: NextRequest) {
@@ -21,5 +22,11 @@ export async function handleAuthTransportProxy(request: NextRequest) {
     });
   }
 
-  return runtime.auth.middleware({ loginUrl: "/auth/sign-in" })(request);
+  const upstreamRequest = new NextRequest(request, {
+    headers: createAuthTransportUpstreamHeaders(request.headers),
+  });
+
+  return runtime.auth.middleware({ loginUrl: "/auth/sign-in" })(
+    upstreamRequest,
+  );
 }
