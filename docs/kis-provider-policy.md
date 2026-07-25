@@ -1,16 +1,52 @@
 # KIS Provider Policy
 
-Last updated: 2026-07-06
+Last updated: 2026-07-25
 
 This document fixes the provider and token policy before any KIS HTTP calls are
 implemented. It is intentionally narrower than the full market-data pipeline.
 
 ## Decision
 
-Use KIS as the primary official provider for close and live prices. Do not make
-Naver or Yahoo the primary provider. They can be evaluated later as fallback or
-read-only comparison sources, but their response stability and blocking risk are
-not acceptable as the first operational path.
+Use KIS as the current private operational provider for raw close and live
+prices. This does not make KIS an exchange-authoritative close, adjusted-price,
+or total-return provider. Do not make Naver or Yahoo the primary operational
+provider. They can be evaluated later as fallback or read-only comparison
+sources, but their response stability and blocking risk are not acceptable as
+the first operational path.
+
+This decision applies to the current private, single-migration-tenant
+operational path. It does not grant KIS data multi-user cache, display, or
+research-model authority.
+
+## Multi-User Rights Boundary
+
+KIS is not currently admitted as a shared market-data provider for multiple
+Varda Labs users.
+
+The official KIS Developers guidance distinguishes personal or general
+corporate use for the customer's own assets from a corporation providing a
+KIS-powered service to third parties. The partnership page also states that a
+non-regulated fintech company is not eligible for that partnership route and
+that a partner application displaying KRX or overseas exchange prices needs
+the relevant exchange information-use agreement.
+
+References:
+
+- https://apiportal.koreainvestment.com/about-howto
+- https://apiportal.koreainvestment.com/provider
+- https://apiportal.koreainvestment.com/provider-apply
+
+Until explicit written permission is obtained:
+
+- Keep KIS provider calls private/admin-only.
+- Do not expose a user-triggered KIS provider route.
+- Do not treat a shared raw-price cache as authorized.
+- Do not promote KIS raw-price rows to public Investment Lab or Simulation
+  authority.
+- Do not claim that KIS raw prices are adjusted or total-return data.
+
+The confirmation questions and admission rules are recorded in
+`docs/kis-multi-user-market-data-rights-inquiry-v1.md`.
 
 ## Environment Variables
 
@@ -112,7 +148,8 @@ Allowed KIS write sources:
 - `kis_domestic_itemchartprice`
 - `kis_overseas_dailyprice:<exchange>`
 
-Existing row policy for `asset_price_snapshots(ticker,date)`:
+Existing row policy for
+`asset_price_snapshots(market,currency,ticker,date)`:
 
 - Existing KIS rows can be updated by KIS rows.
 - Existing non-KIS rows can be replaced by KIS only when the close price
@@ -162,8 +199,8 @@ KIS adapter work should proceed in this order:
 
 1. Token helper using env vars only.
 2. Close price dry-run preview.
-3. Guarded `dryRun=false` upsert through the existing
-   `asset_price_snapshots(ticker,date)` writer.
+3. Guarded `dryRun=false` upsert through the existing composite-identity
+   `asset_price_snapshots(market,currency,ticker,date)` writer.
 4. Duplicate audit.
 5. Daily snapshot writer.
 
