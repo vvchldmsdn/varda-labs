@@ -190,6 +190,20 @@ function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel }) {
     return null;
   }
 
+  if (
+    provenance.eligibleHoldingCount > 0 &&
+    inputHealth.sourceRows.price.canonical === 0
+  ) {
+    return (
+      <RiskNotice tone="warning">
+        <span data-historical-price-admission="unavailable">
+          승인된 분석용 조정종가 이력이 없습니다. 현재가와 운영 종가는 계속
+          사용할 수 있지만, 수익률·상관관계·Sharpe 계산에는 사용하지 않습니다.
+        </span>
+      </RiskNotice>
+    );
+  }
+
   if (inputHealth.status === "partial") {
     return (
       <RiskNotice tone="warning">

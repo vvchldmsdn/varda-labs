@@ -555,7 +555,7 @@ describe("portfolio movement builder", () => {
           currency: "KRW",
           ticker: "069500",
           priceDate: "2026-07-07",
-          adjustedClosePrice: 100,
+          adjustedClosePrice: 80,
           closePrice: 100,
           closePriceKrw: 100,
           fxRate: null,

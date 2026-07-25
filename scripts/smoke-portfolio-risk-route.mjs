@@ -10,6 +10,9 @@ const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
 const USERNAME = process.env.VARDA_APP_USER?.trim() || "varda";
+const EXPECT_HISTORY_UNAVAILABLE = process.argv.includes(
+  "--expect-history-unavailable",
+);
 const LEAK_PATTERN =
   /legacyBase44Id|holdingId|api[_-]?key|authorization|password|secret|token|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
@@ -21,7 +24,7 @@ const FULL_SECTIONS = [
   "stress-correlation",
   "data-health",
 ];
-const scenarios = [
+const baseScenarios = [
   {
     label: "brokerage_90_complete",
     path: "/portfolio/risk",
@@ -74,6 +77,22 @@ const scenarios = [
     minimumOverflowContainers: 3,
   },
 ];
+const scenarios = EXPECT_HISTORY_UNAVAILABLE
+  ? baseScenarios.map((scenario) => ({
+      ...scenario,
+      expectedSections: ["analysis-basis", "data-health"],
+      absentSections: [
+        "portfolio-summary",
+        "standalone-summary",
+        "instrument-risk",
+        "correlation-matrix",
+        "stress-correlation",
+      ],
+      expectedText: [],
+      absentText: [],
+      minimumOverflowContainers: 0,
+    }))
+  : baseScenarios;
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
@@ -113,6 +132,13 @@ async function main() {
   for (const scenario of scenarios) {
     const response = await request(scenario.path, true);
     assert.equal(response.status, 200, `${scenario.label} must return 200`);
+    if (EXPECT_HISTORY_UNAVAILABLE) {
+      assert.match(
+        response.body,
+        /data-historical-price-admission="unavailable"/,
+        `${scenario.label} must explain the admitted-history boundary`,
+      );
+    }
     assert.match(response.body, /data-page="portfolio-risk"/);
     assert.match(response.body, /포트폴리오 위험·분산/);
     assert.match(response.body, /리스크 계산 대상/);

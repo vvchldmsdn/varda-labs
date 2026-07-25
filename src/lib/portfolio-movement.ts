@@ -9,6 +9,7 @@ import {
   toNumber,
 } from "./portfolio-math.ts";
 import { portfolioEventAccount } from "./portfolio-return-metrics-core.ts";
+import { resolveOperationalClosePrice } from "./market-data/asset-price-consumer-admission.ts";
 import { MANUAL_ASSET_PRICE_POLICY } from "./market-data/manual-asset-price.ts";
 import { isSamePriceInstrument } from "./market-data/price-instrument-identity.ts";
 
@@ -557,8 +558,7 @@ function calculatePreviousCloseContribution(
   );
   if (!previousRow) return null;
 
-  const closePrice =
-    toNumber(previousRow.adjustedClosePrice) ?? toNumber(previousRow.closePrice);
+  const closePrice = resolveOperationalClosePrice(previousRow);
   if (closePrice === null || closePrice <= 0) return null;
 
   const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);

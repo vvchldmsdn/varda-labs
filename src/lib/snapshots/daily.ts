@@ -29,6 +29,7 @@ import {
   groupPriceRowsByInstrument,
   priceRowsForInstrument,
 } from "@/lib/market-data/price-instrument-identity";
+import { resolveOperationalClosePrice } from "@/lib/market-data/asset-price-consumer-admission";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -1493,7 +1494,7 @@ function selectClosePriceForAsset(
   const referenceDate = closeReference.expectedCloseDate;
   const row = priceRowsForInstrument(rowsByInstrument, asset)
     .filter((item) => item.priceDate <= referenceDate)
-    .filter((item) => (toNumber(item.adjustedClosePrice) ?? toNumber(item.closePrice) ?? 0) > 0)
+    .filter((item) => resolveOperationalClosePrice(item) !== null)
     .filter((item) => isFreshCloseRow(item.priceDate, referenceDate))
     .sort((left, right) => {
       const dateCompare = right.priceDate.localeCompare(left.priceDate);
@@ -1516,7 +1517,7 @@ function selectClosePriceForAsset(
 
   return {
     row,
-    price: toNumber(row.adjustedClosePrice) ?? toNumber(row.closePrice) ?? fallbackPrice,
+    price: resolveOperationalClosePrice(row) ?? fallbackPrice,
     source: row.source ?? "asset_price_snapshots",
     referenceDate: row.priceDate,
     calendarReferenceDate: closeReference.calendarReferenceDate,
@@ -2105,7 +2106,7 @@ function isFreshCloseRow(actualDate: string, referenceDate: string) {
 }
 
 function isPositiveCloseRow(row: PriceRow) {
-  return (toNumber(row.adjustedClosePrice) ?? toNumber(row.closePrice) ?? 0) > 0;
+  return resolveOperationalClosePrice(row) !== null;
 }
 
 function closeSnapshotScore(row: PriceRow) {
@@ -2116,7 +2117,7 @@ function closeSnapshotScore(row: PriceRow) {
   }
   if (source.includes("kis")) score += 4;
   if ((toNumber(row.closePriceKrw) ?? 0) > 0) score += 2;
-  if ((toNumber(row.adjustedClosePrice) ?? 0) > 0) score += 1;
+  if (resolveOperationalClosePrice(row) !== null) score += 1;
   return score;
 }
 

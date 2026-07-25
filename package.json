@@ -21,6 +21,7 @@
     "rehearse:curated-vector-schema": "node --no-warnings scripts/rehearse-curated-vector-schema.mjs",
     "rehearse:curated-vector-hash-version": "node --no-warnings scripts/rehearse-curated-vector-hash-version.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
+    "audit:asset-price-consumer-admission": "node --no-warnings scripts/audit-asset-price-consumer-admission.mjs",
     "audit:data-integrity": "node scripts/audit-data-integrity.mjs",
     "audit:market-context": "node scripts/audit-market-context-readonly.mjs",
     "audit:market-sync-metadata": "node scripts/audit-market-data-sync-metadata.mjs",

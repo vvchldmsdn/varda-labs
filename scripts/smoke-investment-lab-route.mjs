@@ -1039,18 +1039,21 @@ async function main() {
     return;
   }
 
-  for (const marker of [
-    "시나리오 평가액 경로",
-    "Modified Dietz",
-    "제로수익 동일흐름 기준선",
-    "현재 현금 잔액이나 추가투입 분배 계산도 아닙니다",
-    "전액 VOO 비교",
-    "소수점 수량을 허용해 잔여 현금을 만들지 않으며",
-    "보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다",
-  ]) {
-    assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
-  }
   if (readModelStatus === "ready") {
+    for (const marker of [
+      "시나리오 평가액 경로",
+      "Modified Dietz",
+      "제로수익 동일흐름 기준선",
+      "현재 현금 잔액이나 추가투입 분배 계산도 아닙니다",
+      "전액 VOO 비교",
+      "소수점 수량을 허용해 잔여 현금을 만들지 않으며",
+      "보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다",
+    ]) {
+      assert.ok(
+        route.body.includes(marker),
+        `route is missing marker: ${marker}`,
+      );
+    }
     for (const marker of [
       "전액 KODEX 200",
       "KODEX 200 종가",
@@ -1084,10 +1087,12 @@ async function main() {
     route.body,
     /data-contribution-experiment="ephemeral_client_only"/,
   );
-  assert.match(
-    route.body,
-    /data-return-method="modified_dietz_daily_weighted_eod_v1"/,
-  );
+  if (readModelStatus === "ready") {
+    assert.match(
+      route.body,
+      /data-return-method="modified_dietz_daily_weighted_eod_v1"/,
+    );
+  }
   assert.match(route.body, /overflow-x-auto/);
   assert.match(route.body, /viewBox="0 0 1000 340"/);
   const comparisonDates = readIntegerAttribute(
@@ -1150,23 +1155,23 @@ async function main() {
     route.body,
     "data-voo-execution-fx-ready",
   );
-  const vooComparisonDates = readIntegerAttribute(
+  const vooComparisonDates = readOptionalIntegerAttribute(
     route.body,
     "data-voo-comparison-dates",
   );
-  const vooAppliedFlows = readIntegerAttribute(
+  const vooAppliedFlows = readOptionalIntegerAttribute(
     route.body,
     "data-voo-applied-flows",
   );
-  const vooDelayedExecutions = readIntegerAttribute(
+  const vooDelayedExecutions = readOptionalIntegerAttribute(
     route.body,
     "data-voo-delayed-executions",
   );
-  const vooReturnStatus = readStringAttribute(
+  const vooReturnStatus = readOptionalStringAttribute(
     route.body,
     "data-voo-return-status",
   );
-  const vooReturnMethod = readStringAttribute(
+  const vooReturnMethod = readOptionalStringAttribute(
     route.body,
     "data-voo-return-method",
   );
@@ -1182,7 +1187,8 @@ async function main() {
   assert.equal(cashAppliedFlows, appliedFlows);
   assert.equal(cashReturnStatus, "ready");
   const expectedScenarioMatrixReadyRows =
-    2 +
+    1 +
+    (readModelStatus === "ready" ? 1 : 0) +
     (vooComparisonStatus === "ready" ? 1 : 0) +
     (fixedMixStatus === "ready" ? 1 : 0) +
     (cashComparisonStatus === "ready" ? 1 : 0) +
@@ -1196,12 +1202,28 @@ async function main() {
   );
   assert.ok(appliedFlows >= 0, "applied flow count must be non-negative");
   assert.ok(delayedExecutions >= 0, "delayed count must be non-negative");
-  assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
+  if (readModelStatus === "ready") {
+    assert.ok(scenarioCloseRows >= 2, "scenario needs at least two close rows");
+  } else {
+    assert.equal(
+      scenarioCloseRows,
+      0,
+      "blocked scenario must not expose unadmitted close rows",
+    );
+  }
   assert.equal(pendingAtEnd, 0, "route must not publish an unfinished path");
-  assert.ok(
-    contributionScenarioCount >= 1 && contributionScenarioCount <= 3,
-    "contribution experiment must expose only complete fixed scenarios",
-  );
+  if (readModelStatus === "ready") {
+    assert.ok(
+      contributionScenarioCount >= 1 && contributionScenarioCount <= 3,
+      "contribution experiment must expose only complete fixed scenarios",
+    );
+  } else {
+    assert.equal(
+      contributionScenarioCount,
+      0,
+      "blocked historical model must not expose contribution scenarios",
+    );
+  }
   assert.ok(
     vooReadiness === "ready" || vooReadiness === "unavailable",
     "VOO readiness must be explicit",
@@ -1267,8 +1289,11 @@ async function main() {
         delayedExecutions,
         scenarioCloseRows,
         pendingAtEnd,
-        returnStatus: "ready",
-        returnMethod: "modified_dietz_daily_weighted_eod_v1",
+        returnStatus: readModelStatus === "ready" ? "ready" : "unavailable",
+        returnMethod:
+          readModelStatus === "ready"
+            ? "modified_dietz_daily_weighted_eod_v1"
+            : null,
         fixedMixStatus,
         fixedMixSelectionStatus,
         fixedMixKodexWeightBps,
@@ -1422,10 +1447,19 @@ function readIntegerAttribute(html, name) {
   return Number(match[1]);
 }
 
+function readOptionalIntegerAttribute(html, name) {
+  const match = html.match(new RegExp(`${name}="(\\d+)"`));
+  return match ? Number(match[1]) : null;
+}
+
 function readStringAttribute(html, name) {
   const match = html.match(new RegExp(`${name}="([a-z0-9_/-]+)"`));
   assert.ok(match, `route is missing string attribute: ${name}`);
   return match[1];
+}
+
+function readOptionalStringAttribute(html, name) {
+  return html.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null;
 }
 
 function readNonEmptyAttribute(html, name) {

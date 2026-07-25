@@ -2,6 +2,7 @@ import "./market-calendar.test.mjs";
 import "./portfolio-math.test.mjs";
 import "./portfolio-movement.test.mjs";
 import "./price-instrument-identity.test.mjs";
+import "./asset-price-consumer-admission.test.mjs";
 import "./historical-evidence-completeness.test.mjs";
 import "./portfolio-structure.test.mjs";
 import "./portfolio-risk-input.test.mjs";
