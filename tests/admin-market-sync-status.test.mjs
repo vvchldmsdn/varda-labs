@@ -115,12 +115,16 @@ describe("admin market sync status helpers", () => {
       [
         {
           ticker: "069500",
+          market: "korea",
+          currency: "KRW",
           priceDate: "2026-07-07",
           source: "kis",
           updatedAt: "2026-07-08T01:00:00.000Z",
         },
         {
           ticker: "VOO",
+          market: "us",
+          currency: "USD",
           priceDate: "2026-07-03",
           source: "kis_overseas_dailyprice",
           updatedAt: "2026-07-08T01:00:00.000Z",
@@ -145,5 +149,35 @@ describe("admin market sync status helpers", () => {
         status: "stale",
       },
     ]);
+  });
+
+  it("does not count a same-ticker close from another market as coverage", () => {
+    const summary = summarizeCloseCoverageStatus(
+      [baseAssets[0]],
+      [
+        {
+          ticker: "069500",
+          market: "us",
+          currency: "USD",
+          priceDate: "2026-07-07",
+          source: "other-market",
+          updatedAt: "2026-07-08T02:00:00.000Z",
+        },
+        {
+          ticker: "069500",
+          market: "korea",
+          currency: "KRW",
+          priceDate: "2026-07-03",
+          source: "korea-close",
+          updatedAt: "2026-07-08T01:00:00.000Z",
+        },
+      ],
+      "2026-07-08",
+    );
+
+    assert.equal(summary.coveredCount, 0);
+    assert.equal(summary.staleOrMissingCount, 1);
+    assert.equal(summary.gaps[0].selectedCloseDate, "2026-07-03");
+    assert.equal(summary.gaps[0].source, "korea-close");
   });
 });

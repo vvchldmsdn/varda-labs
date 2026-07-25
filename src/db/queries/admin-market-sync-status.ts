@@ -1,8 +1,9 @@
 import "server-only";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
 import {
   assetPriceSnapshots,
   assets,
@@ -13,7 +14,6 @@ import {
   marketDataSyncRuns,
 } from "@/db/schema";
 import {
-  normalizeTicker,
   summarizeCloseCoverageStatus,
   summarizeLivePriceStatus,
   type AdminSyncAssetInput,
@@ -115,8 +115,7 @@ export async function getAdminMarketSyncStatus(
     getKisCooldownStatus("close", now),
   ]);
 
-  const tickers = uniqueTickers(assetRows);
-  const closeRows = tickers.length > 0 ? await getCloseRows(tickers) : [];
+  const closeRows = assetRows.length > 0 ? await getCloseRows(assetRows) : [];
   const livePrice = summarizeLivePriceStatus(
     assetRows,
     liveQuoteRows,
@@ -204,17 +203,19 @@ async function getLatestFxRows() {
 }
 
 async function getCloseRows(
-  tickers: string[],
+  targetAssets: AdminSyncAssetInput[],
 ): Promise<AdminSyncCloseRowInput[]> {
   return db
     .select({
       ticker: assetPriceSnapshots.ticker,
+      market: assetPriceSnapshots.market,
+      currency: assetPriceSnapshots.currency,
       priceDate: assetPriceSnapshots.priceDate,
       source: assetPriceSnapshots.source,
       updatedAt: assetPriceSnapshots.updatedAt,
     })
     .from(assetPriceSnapshots)
-    .where(inArray(assetPriceSnapshots.ticker, tickers))
+    .where(assetPriceSnapshotInstrumentCondition(targetAssets))
     .orderBy(desc(assetPriceSnapshots.priceDate));
 }
 
@@ -344,16 +345,6 @@ function buildSnapshotStatus(
     currentPositionRowsByAccount: countByAccount(currentPositionRows),
     currentPortfolioRowsByAccount: countByAccount(currentPortfolioRows),
   };
-}
-
-function uniqueTickers(rows: AdminSyncAssetInput[]) {
-  return [
-    ...new Set(
-      rows
-        .map((row) => normalizeTicker(row.ticker))
-        .filter((ticker): ticker is string => Boolean(ticker)),
-    ),
-  ];
 }
 
 function countByAccount(rows: { account: string }[]) {

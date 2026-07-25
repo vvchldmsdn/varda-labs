@@ -1,4 +1,5 @@
 import { closeCalendarReferenceDateForAsset } from "./snapshots/market-calendar.ts";
+import { priceInstrumentKey } from "./market-data/price-instrument-identity.ts";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const FRESH_PRICE_QUOTE_TYPES = new Set(["live", "delayed", "realtime"]);
@@ -25,6 +26,8 @@ export type AdminSyncLiveQuoteInput = {
 
 export type AdminSyncCloseRowInput = {
   ticker: string;
+  market: string;
+  currency: string;
   priceDate: string;
   source: string | null;
   updatedAt: Date | string | null;
@@ -109,7 +112,7 @@ export function summarizeCloseCoverageStatus(
   snapshotDate: string,
 ): CloseCoverageStatusSummary {
   const targets = syncableAssets(assets);
-  const latestCloseRows = latestCloseRowsByTicker(closeRows);
+  const latestCloseRows = latestCloseRowsByInstrument(closeRows);
   const gaps: CloseCoverageTarget[] = [];
   let coveredCount = 0;
   let latestCloseDate: string | null = null;
@@ -119,8 +122,8 @@ export function summarizeCloseCoverageStatus(
   }
 
   for (const asset of targets) {
-    const ticker = normalizeTicker(asset.ticker);
-    if (!ticker) continue;
+    const instrumentKey = priceInstrumentKey(asset);
+    if (!instrumentKey) continue;
 
     const expectedCloseDate = closeCalendarReferenceDateForAsset(
       {
@@ -129,7 +132,7 @@ export function summarizeCloseCoverageStatus(
       },
       snapshotDate,
     );
-    const closeRow = latestCloseRows.get(ticker) ?? null;
+    const closeRow = latestCloseRows.get(instrumentKey) ?? null;
     const selectedCloseDate = closeRow?.priceDate ?? null;
 
     if (selectedCloseDate === expectedCloseDate) {
@@ -221,20 +224,20 @@ function liveQuoteKey(market: string, ticker: string, currency: string) {
   return `${market}:${normalizeTicker(ticker) ?? ""}:${currency}`;
 }
 
-function latestCloseRowsByTicker(rows: AdminSyncCloseRowInput[]) {
+function latestCloseRowsByInstrument(rows: AdminSyncCloseRowInput[]) {
   const sortedRows = [...rows].sort((left, right) => {
     const dateCompare = right.priceDate.localeCompare(left.priceDate);
     if (dateCompare !== 0) return dateCompare;
     return timestampIso(right.updatedAt)?.localeCompare(timestampIso(left.updatedAt) ?? "") ?? 0;
   });
-  const byTicker = new Map<string, AdminSyncCloseRowInput>();
+  const byInstrument = new Map<string, AdminSyncCloseRowInput>();
 
   for (const row of sortedRows) {
-    const ticker = normalizeTicker(row.ticker);
-    if (ticker && !byTicker.has(ticker)) byTicker.set(ticker, row);
+    const key = priceInstrumentKey(row);
+    if (key && !byInstrument.has(key)) byInstrument.set(key, row);
   }
 
-  return byTicker;
+  return byInstrument;
 }
 
 function assetTarget(asset: AdminSyncAssetInput): AdminSyncTarget {
