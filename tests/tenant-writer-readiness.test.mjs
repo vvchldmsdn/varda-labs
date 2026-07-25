@@ -38,6 +38,10 @@ const LEGACY_TABLE_LITERAL_PATTERN =
   /["'](?:goals|transactions|fixed_transactions|monthly_incomes)["']/;
 const LEGACY_RAW_SQL_TABLE_PATTERN =
   /\b(?:from|join|into|update|delete\s+from)\s+["']?(?:goals|transactions|fixed_transactions|monthly_incomes)\b/i;
+const ISOLATED_REHEARSAL_DML_PATHS = new Set([
+  "scripts/rehearse-identity-pairing-schema.mjs",
+  "scripts/rehearse-tenant-expand.mjs",
+]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
   it("registers every current DML implementation exactly once by path", () => {
@@ -510,7 +514,9 @@ function capturePolicyError(action) {
 function discoverDmlPaths() {
   return [join(ROOT, "src"), join(ROOT, "scripts")]
     .flatMap(walkFiles)
-    .filter((path) => !path.endsWith("rehearse-tenant-expand.mjs"))
+    .filter(
+      (path) => !ISOLATED_REHEARSAL_DML_PATHS.has(relativePath(path)),
+    )
     .filter((path) => {
       const source = readFileSync(path, "utf8");
       return (

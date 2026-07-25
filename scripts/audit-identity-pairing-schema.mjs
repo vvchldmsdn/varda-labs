@@ -196,7 +196,10 @@ async function auditPresentSchema(query) {
       validated: Boolean(constraint.convalidated),
       deferrable: Boolean(constraint.condeferrable),
       initiallyDeferred: Boolean(constraint.condeferred),
-      sourceColumns: constraint.source_columns,
+      sourceColumns: normalizeConstraintSourceColumns(
+        constraint.contype,
+        constraint.source_columns,
+      ),
       referencedTable: constraint.referenced_table ?? null,
       referencedColumns: constraint.referenced_columns,
       onDelete:
@@ -207,7 +210,7 @@ async function auditPresentSchema(query) {
         constraint.contype === "f"
           ? constraintAction(constraint.confupdtype)
           : null,
-      definition: normalizeSqlDefinition(constraint.definition),
+      definition: normalizeConstraintDefinition(constraint.definition),
     })),
     expectedConstraints(),
     "pairing constraint definitions differ from the reviewed schema",
@@ -881,12 +884,12 @@ function catalogConstraint({
     validated: true,
     deferrable: false,
     initiallyDeferred: false,
-    sourceColumns,
+    sourceColumns: normalizeConstraintSourceColumns(type, sourceColumns),
     referencedTable,
     referencedColumns,
     onDelete,
     onUpdate,
-    definition: normalizeSqlDefinition(definition),
+    definition: normalizeConstraintDefinition(definition),
   };
 }
 
@@ -992,6 +995,16 @@ function normalizeSqlDefinition(value) {
     .replaceAll('"', "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeConstraintDefinition(value) {
+  return normalizeSqlDefinition(value)
+    .replace(/\(\s+/g, "(")
+    .replace(/\s+\)/g, ")");
+}
+
+function normalizeConstraintSourceColumns(type, sourceColumns) {
+  return type === "c" ? [...sourceColumns].sort() : sourceColumns;
 }
 
 function normalizedFileSha256(path) {

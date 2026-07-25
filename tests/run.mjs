@@ -131,6 +131,7 @@ import "./initial-identity-link-planner.test.mjs";
 import "./identity-pairing-authority.test.mjs";
 import "./identity-bootstrap-claim-authority.test.mjs";
 import "./identity-pairing-intent-schema.test.mjs";
+import "./identity-pairing-rehearsal.test.mjs";
 import "./preview-auth-readiness.test.mjs";
 import "./auth-transport-runtime.test.mjs";
 import "./preview-database-target.test.mjs";
