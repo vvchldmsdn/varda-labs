@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, relative } from "node:path";
 
 const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
+  "src/lib/auth/auth-transport-api-contract.ts",
   "src/lib/auth/auth-transport-policy.ts",
   "src/lib/auth/auth-transport-proxy.ts",
   "src/lib/auth/auth-transport-routes.ts",
@@ -84,6 +85,8 @@ export function auditAuthTransportRuntime(root) {
   }
 
   const route = sources.get("src/app/api/auth/[...path]/route.ts") ?? "";
+  const apiContract =
+    sources.get("src/lib/auth/auth-transport-api-contract.ts") ?? "";
   if (!route.includes('runtime.state === "disabled"') || !route.includes("status: 404")) {
     findings.push("production_disabled_response_missing");
   }
@@ -99,14 +102,24 @@ export function auditAuthTransportRuntime(root) {
   const googleSocialProviderRestricted =
     policy.includes('socialProvider: "google"') &&
     route.includes("isAuthTransportApiRequestAllowed") &&
-    route.includes("readSocialProvider") &&
+    route.includes("createReviewedGoogleSocialSignInRequest") &&
     route.indexOf("isAuthTransportApiRequestAllowed") <
+      route.indexOf("runtime.auth.handler()");
+  const strictGoogleSocialSignInBody =
+    apiContract.includes("AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY") &&
+    apiContract.includes("Object.getOwnPropertyDescriptors") &&
+    apiContract.includes("AUTH_TRANSPORT_MAX_SOCIAL_SIGN_IN_BODY_BYTES") &&
+    route.includes("forwardedRequest") &&
+    route.indexOf("createReviewedGoogleSocialSignInRequest") <
       route.indexOf("runtime.auth.handler()");
   if (allowedAuthApiEndpoints !== 2) {
     findings.push("auth_endpoint_allowlist_drift");
   }
   if (!googleSocialProviderRestricted) {
     findings.push("auth_social_provider_guard_missing");
+  }
+  if (!strictGoogleSocialSignInBody) {
+    findings.push("auth_social_sign_in_body_contract_missing");
   }
 
   const sessionPage = sources.get("src/app/auth/session/page.tsx") ?? "";
@@ -200,6 +213,7 @@ export function auditAuthTransportRuntime(root) {
       authTargetFingerprintGuardPresent,
       allowedAuthApiEndpoints,
       googleSocialProviderRestricted,
+      strictGoogleSocialSignInBody,
       basicAuthBoundaryIntact,
       oauthCallbackExchangeProxyPresent,
       basicAuthSignInApiGatePresent,

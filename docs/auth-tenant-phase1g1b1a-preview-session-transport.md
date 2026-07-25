@@ -2,9 +2,8 @@
 
 Last updated: 2026-07-25
 
-Status: Preview-only Google session transport is implemented and passes
-automated and interactive verification on the latest reviewed runtime.
-Product identity resolution, tenant access, and production auth remain closed.
+Status: historical verification record, superseded by B1c. Preview Auth is now
+disabled. Product identity resolution and tenant access remain closed.
 
 Historical note: this document records the original Preview verification. The
 B1c transport replaces its shared `/auth/session` callback/display path with a
@@ -45,7 +44,7 @@ npm run audit:preview-auth-runtime
 The B0 audit remains useful only through its frozen fixture test. It must not be
 rewritten to make the historical audit pass against the B1a repository.
 
-## Runtime Boundary
+## Historical Runtime Boundary (Superseded)
 
 The auth runtime is enabled only when both conditions hold:
 

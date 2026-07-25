@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+  createReviewedGoogleSocialSignInRequest,
+} from "../src/lib/auth/auth-transport-api-contract.ts";
+import {
   assessAuthTransportEnvironment,
   createAuthTransportBaseUrlFingerprint,
   isAuthTransportApiRequestAllowed,
@@ -144,15 +148,92 @@ describe("auth session transport smoke", () => {
     }
   });
 
+  it("rebuilds the reviewed Google redirect request from exact fields", async () => {
+    const originalRequest = createSocialSignInRequest(
+      AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+    );
+    const reviewedRequest =
+      await createReviewedGoogleSocialSignInRequest(originalRequest);
+
+    assert.notEqual(reviewedRequest, null);
+    assert.deepEqual(
+      await reviewedRequest.json(),
+      AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+    );
+    assert.equal(reviewedRequest.headers.get("x-request-marker"), "preserved");
+    assert.equal(reviewedRequest.headers.get("content-length"), null);
+  });
+
+  it("rejects unreviewed social sign-in modes and callback fields", async () => {
+    const rejectedBodies = [
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        requestSignUp: true,
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        idToken: { token: "unreviewed" },
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        scopes: ["unreviewed"],
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        callbackURL: "https://outside.example.invalid/callback",
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        newUserCallbackURL: "/unexpected-new-user",
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        errorCallbackURL: "/unexpected-error",
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        extra: true,
+      },
+      {
+        ...AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+        provider: "github",
+      },
+      {
+        provider: "google",
+      },
+      null,
+      [],
+    ];
+
+    for (const body of rejectedBodies) {
+      assert.equal(
+        await createReviewedGoogleSocialSignInRequest(
+          createSocialSignInRequest(body),
+        ),
+        null,
+      );
+    }
+
+    assert.equal(
+      await createReviewedGoogleSocialSignInRequest(
+        createSocialSignInRequest(
+          AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY,
+          "?callbackURL=https://outside.example.invalid",
+        ),
+      ),
+      null,
+    );
+  });
+
   it("keeps the transport outside product data and identity authority", () => {
     const result = auditAuthTransportRuntime(process.cwd());
 
     assert.equal(result.status, "passed");
     assert.deepEqual(result.findings, []);
     assert.deepEqual(result.evidence, {
-      requiredFiles: 10,
-      presentFiles: 10,
-      inspectedRuntimeGraphFiles: 10,
+      requiredFiles: 11,
+      presentFiles: 11,
+      inspectedRuntimeGraphFiles: 11,
       productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       authSdkPinned: true,
@@ -161,6 +242,7 @@ describe("auth session transport smoke", () => {
       authTargetFingerprintGuardPresent: true,
       allowedAuthApiEndpoints: 2,
       googleSocialProviderRestricted: true,
+      strictGoogleSocialSignInBody: true,
       basicAuthBoundaryIntact: true,
       oauthCallbackExchangeProxyPresent: true,
       basicAuthSignInApiGatePresent: true,
@@ -172,3 +254,18 @@ describe("auth session transport smoke", () => {
     });
   });
 });
+
+function createSocialSignInRequest(body, search = "") {
+  return new Request(
+    `https://app.example.invalid/api/auth/sign-in/social${search}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "999",
+        "x-request-marker": "preserved",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+}

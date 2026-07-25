@@ -8,8 +8,9 @@ Production.
 ## Decision
 
 The first legacy-user bootstrap will use the Production Neon Auth subject, not
-the subject copied from a Preview branch. Preview and Production remain
-separate Auth and database environments.
+the subject copied from a Preview branch. Preview Auth is disabled because the
+current integration does not provide an isolated target. Production product
+data remains outside this transport.
 
 This phase moves the already verified Google session transport to Vercel
 Production. It does not link an identity or read product data.
@@ -24,12 +25,19 @@ The temporary dashboard Basic Auth remains in place.
   verifier and immediately redirects to `/auth/session`.
 - `/auth/session` remains behind Basic Auth and projects presence
   classifications only.
-- The auth route allows only Google social sign-in and current-session
-  sign-out.
+- The auth route allows only Google redirect sign-in with server-fixed callback
+  fields and current-session sign-out. Token sign-in, explicit sign-up flags,
+  custom scopes, custom callback URLs, and unknown fields are rejected before
+  the managed handler runs.
 
 This prevents open self-service onboarding while the product still lacks
 owner-filtered reads, two-user isolation, and RLS. An authenticated but
 unlinked Neon Auth user receives no portfolio authority.
+
+The first reviewed Production Google login may create a provider-managed Neon
+Auth user and session. That enrollment is available only behind the temporary
+Basic Auth boundary and does not create an `app_users` row, link an identity,
+or grant product authority.
 
 ## Environment Boundary
 
@@ -57,7 +65,8 @@ This phase does not add or change:
 - `app_users`, `auth_identities`, ownership columns, or financial rows;
 - pairing-intent schema, identity writes, app-user activation, or backfill;
 - `TenantContext`, owner-filtered queries, RLS, or Basic Auth removal;
-- ordinary new-user provisioning or public registration;
+- ordinary product-user provisioning, public product registration, or
+  `app_users` auto-creation;
 - provider subject, email, token, cookie, or internal user identifiers in UI,
   logs, response payloads, CLI arguments, or environment output.
 
