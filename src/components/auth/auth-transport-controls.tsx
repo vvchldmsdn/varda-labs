@@ -47,26 +47,40 @@ export function GoogleSignInButton() {
 }
 
 export function SignOutButton() {
-  const [pending, setPending] = useState(false);
+  const [status, setStatus] = useState<"idle" | "pending" | "failed">("idle");
 
   async function signOut() {
-    setPending(true);
+    setStatus("pending");
 
     try {
-      await authClient.signOut();
-    } finally {
-      window.location.assign("/auth/sign-in");
+      const result = await authClient.signOut();
+
+      if (result.error) {
+        setStatus("failed");
+        return;
+      }
+
+      window.location.replace("/auth/sign-in");
+    } catch {
+      setStatus("failed");
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={signOut}
-      disabled={pending}
-      className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8] disabled:cursor-wait disabled:opacity-60"
-    >
-      {pending ? "Signing out" : "Sign out"}
-    </button>
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={signOut}
+        disabled={status === "pending"}
+        className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8] disabled:cursor-wait disabled:opacity-60"
+      >
+        {status === "pending" ? "Signing out" : "Sign out"}
+      </button>
+      {status === "failed" ? (
+        <p role="alert" className="text-sm text-[#a43e3e]">
+          Sign-out failed. Your session is still active.
+        </p>
+      ) : null}
+    </div>
   );
 }
