@@ -1,7 +1,7 @@
 export const PREVIEW_AUTH_SESSION_CACHE_SECONDS = 60;
 export const PREVIEW_AUTH_CALLBACK_PATH = "/auth/session";
 export const PREVIEW_AUTH_ALLOWED_GIT_REF =
-  "codex/neon-auth-preview-smoke-20260721";
+  "codex/preview-auth-transport-convergence";
 
 export type PreviewAuthEnvironment = Readonly<{
   VERCEL_ENV?: string;
