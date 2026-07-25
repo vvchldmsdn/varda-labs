@@ -7,7 +7,7 @@ const NEON_ENDPOINT_PATTERN = /^ep-[a-z0-9-]+$/;
 const NEON_BRANCH_PATTERN = /^br-[a-z0-9-]+$/;
 
 export const IDENTITY_PAIRING_REHEARSAL_TARGET_POLICY = Object.freeze({
-  policyId: "identity_pairing_isolated_branch_rehearsal_target_v1",
+  policyId: "identity_pairing_non_production_rehearsal_endpoint_v2",
   expectedNeonIntegrationProjectSha256:
     PREVIEW_DATABASE_TARGET_GUARD_POLICY
       .expectedNeonIntegrationProjectSha256,
@@ -32,7 +32,9 @@ type IdentityPairingRehearsalTargetPolicy = {
 
 export type IdentityPairingRehearsalTargetGuard = {
   policyId: typeof IDENTITY_PAIRING_REHEARSAL_TARGET_POLICY.policyId;
-  status: "isolated_rehearsal_target_guard_passed";
+  status: "non_production_rehearsal_endpoint_guard_passed";
+  branchEndpointAttestation: "not_established";
+  controlPlaneVerificationRequired: true;
   branchFingerprint: string;
   endpointFingerprint: string;
   integrationProjectFingerprint: string;
@@ -115,13 +117,16 @@ export function guardIdentityPairingRehearsalTarget(
   const branchFingerprint = sha256Fingerprint(branchId);
   return {
     policyId: policy.policyId,
-    status: "isolated_rehearsal_target_guard_passed",
+    status: "non_production_rehearsal_endpoint_guard_passed",
+    branchEndpointAttestation: "not_established",
+    controlPlaneVerificationRequired: true,
     branchFingerprint,
     endpointFingerprint,
     integrationProjectFingerprint,
     targetFingerprint: sha256Fingerprint(
       JSON.stringify({
         policyId: policy.policyId,
+        branchEndpointAttestation: "not_established",
         branchFingerprint,
         endpointFingerprint,
         integrationProjectFingerprint,

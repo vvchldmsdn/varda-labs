@@ -12,7 +12,7 @@ const PROJECT_ID = "synthetic-neon-project";
 const PRODUCTION_ENDPOINT = "ep-production-synthetic";
 const REHEARSAL_ENDPOINT = "ep-rehearsal-synthetic";
 const POLICY = {
-  policyId: "identity_pairing_isolated_branch_rehearsal_target_v1",
+  policyId: "identity_pairing_non_production_rehearsal_endpoint_v2",
   expectedNeonIntegrationProjectSha256: sha256Fingerprint(PROJECT_ID),
   productionEndpointSha256: sha256Fingerprint(PRODUCTION_ENDPOINT),
 };
@@ -26,8 +26,10 @@ describe("identity pairing isolated branch rehearsal", () => {
 
     assert.equal(
       result.status,
-      "isolated_rehearsal_target_guard_passed",
+      "non_production_rehearsal_endpoint_guard_passed",
     );
+    assert.equal(result.branchEndpointAttestation, "not_established");
+    assert.equal(result.controlPlaneVerificationRequired, true);
     assert.equal(
       result.endpointFingerprint,
       sha256Fingerprint(REHEARSAL_ENDPOINT),
@@ -113,7 +115,7 @@ describe("identity pairing isolated branch rehearsal", () => {
     assert.match(source, /not_yet_valid_and_expired/);
     assert.match(source, /append_only_update_delete_truncate/);
     assert.match(source, /target_and_provider_mismatch/);
-    assert.match(source, /deferred_constraint_is_enforced/);
+    assert.match(source, /constraint_deferral_is_rejected/);
     assert.match(source, /productionDatabaseWrites: 0/);
     assert.doesNotMatch(
       source,

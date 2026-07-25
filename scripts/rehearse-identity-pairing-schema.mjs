@@ -13,7 +13,7 @@ const MIGRATION = Object.freeze({
   tag: "0021_strange_sinister_six",
   createdAt: 1784991961050,
   drizzleHash:
-    "2a466a9b0dbf38ffd0286e5f1e05154102be12da5ac7a6e2430aed16c8bcbec4",
+    "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553",
 });
 const PAIRING_TABLES = [
   "identity_pairing_intent_events",
@@ -287,47 +287,23 @@ async function main() {
     });
     checks.push("append_only_update_delete_truncate");
 
-    await runRolledBackCase(pool, "deferred_constraint", async (client) => {
-      const targetUserId = await insertAppUser(client);
-      const otherUserId = await insertAppUser(client);
-      const identityId = await insertIdentity(
-        client,
-        otherUserId,
-        "neon_auth",
-      );
-      const intentId = await insertIntent(client, targetUserId, "valid");
-
-      await client.query(
-        'set constraints "id_pair_intent_events_identity_match" deferred',
-      );
-      await insertConsumedEvent(
-        client,
-        intentId,
-        identityId,
-        "deferred",
-      );
-      const { rows } = await client.query(
-        `select count(*)::int as row_count
-           from identity_pairing_intent_events
-          where identity_pairing_intent_id = $1`,
-        [intentId],
-      );
-      assert.equal(Number(rows[0].row_count), 1);
-
-      try {
-        await client.query(
-          'set constraints "id_pair_intent_events_identity_match" immediate',
-        );
-        assert.fail("Deferred mismatch unexpectedly became immediate.");
-      } catch (error) {
-        assertDatabaseError(
-          error,
-          "23514",
-          "does not match pairing intent",
+    await runRolledBackCase(pool, "constraint_deferral", async (client) => {
+      for (const constraintName of [
+        "id_pair_intent_events_identity_match",
+        "auth_identities_consumed_pairing_binding_guard",
+      ]) {
+        await expectDatabaseError(
+          client,
+          () =>
+            client.query(
+              `set constraints "${constraintName}" deferred`,
+            ),
+          "42809",
+          "is not deferrable",
         );
       }
     });
-    checks.push("deferred_constraint_is_enforced");
+    checks.push("constraint_deferral_is_rejected");
 
     const afterRolledBackCases = await readBoundaryState(pool);
     assert.deepEqual(
@@ -449,11 +425,13 @@ async function runLockWaitExpiry(pool, fixture) {
     );
 
     let settled = false;
-    const consume = insertConsumedEvent(
-      consumer,
-      fixture.intentId,
-      fixture.identityId,
-      "lock-wait-expiry",
+    const consume = settle(
+      insertConsumedEvent(
+        consumer,
+        fixture.intentId,
+        fixture.identityId,
+        "lock-wait-expiry",
+      ),
     ).finally(() => {
       settled = true;
     });
@@ -462,16 +440,15 @@ async function runLockWaitExpiry(pool, fixture) {
     await delay(5_250);
     await locker.query("commit");
 
-    try {
-      await consume;
+    const consumeResult = await consume;
+    if (consumeResult.ok) {
       assert.fail("Expired consume unexpectedly committed after lock wait.");
-    } catch (error) {
-      assertDatabaseError(
-        error,
-        "23514",
-        "not valid at database time",
-      );
     }
+    assertDatabaseError(
+      consumeResult.error,
+      "23514",
+      "not valid at database time",
+    );
   } finally {
     await locker.query("rollback").catch(() => {});
     await consumer.query("rollback").catch(() => {});
@@ -501,30 +478,29 @@ async function runConsumeRebindRace(pool, fixture) {
     );
 
     let settled = false;
-    const rebind = rebinder
-      .query(
+    const rebind = settle(
+      rebinder.query(
         `update auth_identities
             set provider_subject = $1
           where id = $2`,
         [syntheticSubject("race-update"), fixture.identityId],
-      )
-      .finally(() => {
+      ),
+    ).finally(() => {
         settled = true;
       });
     await delay(250);
     assert.equal(settled, false, "Rebind did not wait on the consume lock.");
     await consumer.query("commit");
 
-    try {
-      await rebind;
+    const rebindResult = await rebind;
+    if (rebindResult.ok) {
       assert.fail("Rebind unexpectedly committed after consume.");
-    } catch (error) {
-      assertDatabaseError(
-        error,
-        "23514",
-        "owner, provider, and provider subject are immutable",
-      );
     }
+    assertDatabaseError(
+      rebindResult.error,
+      "23514",
+      "owner, provider, and provider subject are immutable",
+    );
     await rebinder.query("rollback");
 
     assert.equal(
@@ -751,6 +727,14 @@ function digest(prefix, value) {
   return `${prefix}:${createHash("sha256").update(value).digest("hex")}`;
 }
 
+async function settle(promise) {
+  try {
+    return { ok: true, value: await promise };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
 function databaseErrorCode(error) {
   if (error && typeof error === "object" && "code" in error) {
     return String(error.code);
@@ -767,9 +751,24 @@ function databaseErrorCode(error) {
 }
 
 function sanitizeErrorMessage(error) {
-  const message =
-    error instanceof Error ? error.message : String(error ?? "unknown error");
-  return message.replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[database-url]");
+  const messages = [];
+  const visited = new Set();
+  let current = error;
+  while (current !== undefined && current !== null && !visited.has(current)) {
+    visited.add(current);
+    messages.push(
+      current instanceof Error
+        ? current.message
+        : String(current ?? "unknown error"),
+    );
+    current =
+      typeof current === "object" && "cause" in current
+        ? current.cause
+        : null;
+  }
+  return messages
+    .join(": ")
+    .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[database-url]");
 }
 
 function escapeRegExp(value) {

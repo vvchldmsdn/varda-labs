@@ -7,13 +7,19 @@ import { describe, it } from "node:test";
 const ROOT = process.cwd();
 const MIGRATION_NAME = "0021_strange_sinister_six.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "2a466a9b0dbf38ffd0286e5f1e05154102be12da5ac7a6e2430aed16c8bcbec4";
+  "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553";
 const MIGRATION_PATH = join(ROOT, "drizzle", MIGRATION_NAME);
 const SCHEMA_PATH = join(ROOT, "src", "db", "schema.ts");
 const AUDIT_PATH = join(ROOT, "scripts", "audit-identity-pairing-schema.mjs");
+const CONTRACT_PATH = join(
+  ROOT,
+  "docs",
+  "auth-tenant-phase1g1b2-durable-pairing-intent-schema.md",
+);
 const migration = readFileSync(MIGRATION_PATH, "utf8");
 const schema = readFileSync(SCHEMA_PATH, "utf8");
 const audit = readFileSync(AUDIT_PATH, "utf8");
+const contract = readFileSync(CONTRACT_PATH, "utf8");
 const priorSnapshot = JSON.parse(
   readFileSync(join(ROOT, "drizzle", "meta", "0020_snapshot.json"), "utf8"),
 );
@@ -198,12 +204,31 @@ describe("durable identity bootstrap claim schema", () => {
     );
     assert.match(
       migration,
-      /CREATE CONSTRAINT TRIGGER "id_pair_intent_events_identity_match"\s+AFTER INSERT ON "identity_pairing_intent_events"\s+DEFERRABLE INITIALLY IMMEDIATE\s+FOR EACH ROW\s+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\)/,
+      /CREATE CONSTRAINT TRIGGER "id_pair_intent_events_identity_match"\s+AFTER INSERT ON "identity_pairing_intent_events"\s+FOR EACH ROW\s+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\)/,
     );
     assert.match(
       migration,
-      /CREATE CONSTRAINT TRIGGER "auth_identities_consumed_pairing_binding_guard"\s+AFTER UPDATE ON "auth_identities"\s+DEFERRABLE INITIALLY IMMEDIATE\s+FOR EACH ROW\s+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\)/,
+      /CREATE CONSTRAINT TRIGGER "auth_identities_consumed_pairing_binding_guard"\s+AFTER UPDATE ON "auth_identities"\s+FOR EACH ROW\s+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\)/,
     );
+    assert.doesNotMatch(migration, /\bDEFERRABLE\b/);
+  });
+
+  it("pins the future consume writer transaction without enabling it", () => {
+    for (const requiredContract of [
+      /READ COMMITTED/,
+      /claim header.*FOR UPDATE/is,
+      /target `app_users`.*FOR UPDATE/is,
+      /identity row.*stable `id` order.*FOR UPDATE/is,
+      /must not issue `SET CONSTRAINTS`/i,
+      /after the locks.*`clock_timestamp\(\)`/is,
+      /`provisioning\/user`/,
+      /same\s+server-verified provider subject/i,
+      /rolls the\s+entire transaction back/i,
+      /automatic retry count is zero/i,
+    ]) {
+      assert.match(contract, requiredContract);
+    }
+    assert.match(contract, /writer.*not implemented/i);
   });
 
   it("enforces append-only evidence with exact functions and triggers", () => {

@@ -134,11 +134,9 @@ END;
 $$;--> statement-breakpoint
 CREATE CONSTRAINT TRIGGER "id_pair_intent_events_identity_match"
 AFTER INSERT ON "identity_pairing_intent_events"
-DEFERRABLE INITIALLY IMMEDIATE
 FOR EACH ROW
 EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"();--> statement-breakpoint
 CREATE CONSTRAINT TRIGGER "auth_identities_consumed_pairing_binding_guard"
 AFTER UPDATE ON "auth_identities"
-DEFERRABLE INITIALLY IMMEDIATE
 FOR EACH ROW
 EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"();

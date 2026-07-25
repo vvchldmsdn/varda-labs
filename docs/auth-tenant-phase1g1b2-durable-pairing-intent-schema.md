@@ -2,11 +2,12 @@
 
 Last updated: 2026-07-26
 
-Status: corrected and verified locally. Migration
-`0021_strange_sinister_six.sql` is generated but not applied to any database.
+Status: corrected locally and verified on a deleted disposable Neon branch.
+Migration `0021_strange_sinister_six.sql` is not applied to Production or any
+surviving Neon branch.
 
 Normalized file SHA-256:
-`2a466a9b0dbf38ffd0286e5f1e05154102be12da5ac7a6e2430aed16c8bcbec4`.
+`e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553`.
 
 ## Purpose
 
@@ -44,13 +45,14 @@ A unique index permits at most one terminal event per claim. Expiry is derived
 from `expires_at`; it is not represented by mutable status. Database triggers
 reject `UPDATE`, `DELETE`, and `TRUNCATE` on both evidence tables.
 
-A deferred constraint trigger also verifies, using the database clock, that a
+A non-deferrable, immediate constraint trigger verifies, using the database clock, that a
 consumed event occurs within the intent's issue/expiry window and references an
 identity whose `app_user_id` and provider match the immutable intent header.
 It locks that identity row while validating the event. A companion constraint
 trigger freezes the consumed identity's owner, provider, and
 `provider_subject`, preventing a later principal rebind from invalidating the
-stored subject-binding evidence.
+stored subject-binding evidence. Neither trigger may be changed to deferred
+mode with `SET CONSTRAINTS`.
 
 ## Authority Boundary
 
@@ -67,21 +69,48 @@ is the independent authority factor. Session-only, Basic Auth-only, machine
 secret-only, singleton-row, email, or request-target claims remain
 insufficient.
 
-## Future Atomic Consume
+## Future Atomic Consume Contract
 
-A future writer must perform one reviewed transaction:
+The future writer uses one `READ COMMITTED` transaction and this fixed lock
+order:
 
-1. hash the presented raw claim and lock the exact pending header;
-2. re-check DB time, expiry, target role/status/cardinality, and terminal-event
-   absence;
-3. verify the server session and current G1-A commitment;
-4. insert the active identity;
-5. activate the exact target;
-6. append the `consumed` event;
-7. commit all changes together.
+1. hash the presented raw claim outside logging and select the exact claim
+   header `FOR UPDATE`;
+2. select the exact target `app_users` row `FOR UPDATE`;
+3. select every existing identity row that matches either the verified
+   provider/subject or target/provider, in stable `id` order, `FOR UPDATE`;
+4. rely on the unique indexes for an absent-row insertion race.
 
-None of that writer, claim preissuer, repository, or transaction exists in this
-phase.
+The writer must not issue `SET CONSTRAINTS`. After the locks are held it reads
+`clock_timestamp()` and revalidates the unconsumed claim window, the exact
+`provisioning/user` target, terminal-event absence, and the same
+server-verified provider subject. It reruns the current G1-A plan against those
+locked rows and accepts only a new `planned_link`; an existing, disabled,
+ambiguous, or colliding link fails closed.
+
+The subject HMAC and plan commitment must be computed from that same locked
+input snapshot. The writer then inserts one active identity, changes exactly
+one target from `provisioning/user` to `active/user`, and appends one consumed
+event. The non-deferrable trigger runs before the insert statement completes.
+Any state mismatch, uniqueness conflict, timeout, or DML failure rolls the
+entire transaction back. The automatic retry count is zero; a caller must
+obtain a fresh state review instead of replaying a stale decision.
+
+The database can compare owner and provider, but cannot recompute the subject
+HMAC without the server secret. Therefore subject-to-session equality is a
+mandatory writer invariant, not a database claim.
+
+This writer, claim preissuer, repository, and transaction are not implemented
+in this phase.
+
+## Rehearsal Target Evidence
+
+The local guard proves that pooled and unpooled URLs identify one Neon
+endpoint, that it is not the pinned Production endpoint, and that the supplied
+project id matches the reviewed integration. It does not prove that the
+supplied branch id owns that endpoint. Every destructive rehearsal therefore
+requires separate Neon control-plane evidence binding branch id to endpoint,
+plus post-run branch deletion evidence.
 
 ## Verification
 
@@ -106,6 +135,13 @@ function bodies and execution
 attributes; zero rows; and the Drizzle ledger hash. Its product-row-count
 digest can be passed back as
 `--expect-product-row-counts-sha256` for same-window pre/post comparison.
+
+The disposable-branch rehearsal verified absent and present catalog states,
+zero initial pairing rows, rejection of constraint deferral, claim-window and
+relationship failures, append-only enforcement, database-clock behavior under
+lock wait, and concurrent consume/rebind serialization. The branch was deleted
+after the rehearsal. Production remained in the absent state with the same
+product-row-count digest and zero writes.
 
 ## Still Closed
 
