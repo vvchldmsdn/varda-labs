@@ -3,10 +3,8 @@
 Last updated: 2026-07-25
 
 Status: Preview-only Google session transport is implemented and passes
-automated verification. The predecessor Preview flow was interactively
-verified; one final browser round trip remains pending on the latest allowlisted
-deployment. Product identity resolution, tenant access, and production auth
-remain closed.
+automated and interactive verification on the latest reviewed runtime.
+Product identity resolution, tenant access, and production auth remain closed.
 
 ## Scope
 
@@ -83,19 +81,20 @@ Automated evidence on 2026-07-25:
 - the reviewed API allowlist contains exactly two method/path entries;
 - the social sign-in entry is restricted to Google.
 
-Interactive evidence on 2026-07-25, before the endpoint allowlist was added:
+Final interactive evidence on 2026-07-25:
 
-- Google sign-in completed on the reviewed Preview deployment;
+- runtime commit:
+  `e81ed903b45de4498d82f657009dd9d00310c158`;
+- reviewed Preview deployment:
+  `https://varda-labs-cgtnb7uxx-king-totoros-projects.vercel.app`;
+- Google sign-in completed on that deployment;
 - `/auth/session` displayed `Authenticated session: Present`;
+- `/auth/session` displayed `Server user identifier: Present` without exposing
+  the identifier;
+- `Portfolio user link` and `Product database read` remained `Not attempted`;
 - no email, name, image, provider subject, token, or product identifier was
   exposed;
 - sign-out completed and the authenticated session was no longer present.
-
-The latest commit adds endpoint admission before the otherwise unchanged
-managed handler. Therefore the prior interactive result is retained as
-predecessor evidence, not reused as proof of the latest commit. A final
-Google sign-in, `Present`, sign-out, and unauthenticated refresh round trip is
-still required on the latest Preview deployment before merge.
 
 Only the pass/fail classifications above are retained. No cookie, token,
 provider subject, authorization header, environment value, or user identifier
