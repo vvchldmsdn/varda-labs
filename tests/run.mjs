@@ -128,6 +128,7 @@ import "./tenant-writer-readiness.test.mjs";
 import "./runtime-writer-convergence.test.mjs";
 import "./session-resolver-contract.test.mjs";
 import "./initial-identity-link-planner.test.mjs";
+import "./identity-pairing-authority.test.mjs";
 import "./preview-auth-readiness.test.mjs";
 import "./preview-auth-runtime.test.mjs";
 import "./preview-database-target.test.mjs";

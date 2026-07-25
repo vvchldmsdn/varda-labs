@@ -44,6 +44,7 @@
     "audit:runtime-writer-convergence": "node --no-warnings scripts/audit-runtime-writer-convergence.mjs",
     "audit:session-resolver-contract": "node --no-warnings scripts/audit-session-resolver-contract.mjs",
     "audit:initial-identity-link-planner": "node --no-warnings scripts/audit-initial-identity-link-planner.mjs",
+    "audit:identity-pairing-authority": "node --no-warnings scripts/audit-identity-pairing-authority.mjs",
     "audit:preview-auth-readiness": "node --no-warnings scripts/audit-preview-auth-readiness.mjs",
     "audit:preview-auth-runtime": "node --no-warnings scripts/audit-preview-auth-runtime.mjs",
     "audit:tenant-ownership": "node --no-warnings scripts/audit-tenant-ownership-preflight.mjs",
