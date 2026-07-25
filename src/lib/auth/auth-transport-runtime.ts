@@ -21,6 +21,7 @@ export function getAuthTransportRuntimeState() {
   return assessAuthTransportEnvironment({
     VERCEL_ENV: process.env.VERCEL_ENV,
     NEON_AUTH_BASE_URL: process.env.NEON_AUTH_BASE_URL,
+    NEON_AUTH_BASE_URL_SHA256: process.env.NEON_AUTH_BASE_URL_SHA256,
     NEON_AUTH_COOKIE_SECRET: process.env.NEON_AUTH_COOKIE_SECRET,
   });
 }

@@ -1,7 +1,11 @@
+import { createHash } from "node:crypto";
+
 export const AUTH_TRANSPORT_SESSION_CACHE_SECONDS = 60;
-export const AUTH_TRANSPORT_CALLBACK_PATH = "/auth/session";
+export {
+  AUTH_TRANSPORT_CALLBACK_PATH,
+  AUTH_TRANSPORT_SESSION_PATH,
+} from "./auth-transport-routes.ts";
 export const AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS = Object.freeze([
-  "preview",
   "production",
 ] as const);
 
@@ -20,6 +24,7 @@ export const AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS = Object.freeze([
 export type AuthTransportEnvironment = Readonly<{
   VERCEL_ENV?: string;
   NEON_AUTH_BASE_URL?: string;
+  NEON_AUTH_BASE_URL_SHA256?: string;
   NEON_AUTH_COOKIE_SECRET?: string;
 }>;
 
@@ -47,9 +52,19 @@ export function assessAuthTransportEnvironment(
   }
 
   const baseUrl = environment.NEON_AUTH_BASE_URL?.trim();
+  const expectedBaseUrlFingerprint =
+    environment.NEON_AUTH_BASE_URL_SHA256?.trim();
   const cookieSecret = environment.NEON_AUTH_COOKIE_SECRET?.trim();
+  const actualBaseUrlFingerprint =
+    createAuthTransportBaseUrlFingerprint(baseUrl);
 
-  if (!isHttpsUrl(baseUrl) || !cookieSecret || cookieSecret.length < 32) {
+  if (
+    !actualBaseUrlFingerprint ||
+    !isSha256Fingerprint(expectedBaseUrlFingerprint) ||
+    actualBaseUrlFingerprint !== expectedBaseUrlFingerprint ||
+    !cookieSecret ||
+    cookieSecret.length < 32
+  ) {
     return Object.freeze({ state: "misconfigured" });
   }
 
@@ -74,12 +89,39 @@ export function isAuthTransportApiRequestAllowed(
   );
 }
 
-function isHttpsUrl(value: string | undefined) {
-  if (!value) return false;
+export function createAuthTransportBaseUrlFingerprint(
+  value: string | undefined,
+) {
+  const canonicalUrl = canonicalizeAuthTransportBaseUrl(value);
+  if (!canonicalUrl) return null;
+
+  return `sha256:${createHash("sha256")
+    .update(canonicalUrl, "utf8")
+    .digest("hex")}`;
+}
+
+function canonicalizeAuthTransportBaseUrl(value: string | undefined) {
+  if (!value) return null;
 
   try {
-    return new URL(value).protocol === "https:";
+    const url = new URL(value);
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      return null;
+    }
+
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return `${url.origin}${pathname}`;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isSha256Fingerprint(value: string | undefined): value is string {
+  return /^sha256:[a-f0-9]{64}$/.test(value ?? "");
 }

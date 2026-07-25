@@ -25,6 +25,9 @@ assert.equal(rootWithoutAuth.status, 401);
 const signInWithoutAuth = await request("/auth/sign-in");
 assert.equal(signInWithoutAuth.status, 401);
 
+const sessionWithoutAuth = await request("/auth/session");
+assert.equal(sessionWithoutAuth.status, 401);
+
 const authApiWithoutAuth = await request("/api/auth/get-session");
 assert.equal(authApiWithoutAuth.status, 401);
 
@@ -38,11 +41,18 @@ const rejectedAuthApi = await request("/api/auth/get-session", true);
 assert.equal(rejectedAuthApi.status, 404);
 assert.doesNotMatch(rejectedAuthApi.body, LEAK_PATTERN);
 
-const callback = await request("/auth/session");
+const session = await request("/auth/session", true);
+assert.equal(session.status, 200);
+assert.match(session.body, /Server session evidence/);
+assert.match(session.body, /Not present/);
+assert.match(session.body, /Not attempted/);
+assert.doesNotMatch(session.body, LEAK_PATTERN);
+
+const callback = await request("/auth/callback");
 assert.equal(callback.status, 307);
 assert.equal(
   new URL(callback.location, BASE_URL).pathname,
-  "/auth/sign-in",
+  "/auth/session",
 );
 
 console.log(
@@ -52,9 +62,11 @@ console.log(
       baseUrl: BASE_URL,
       rootWithoutAuth: rootWithoutAuth.status,
       signInWithoutAuth: signInWithoutAuth.status,
+      sessionWithoutAuth: sessionWithoutAuth.status,
       authApiWithoutAuth: authApiWithoutAuth.status,
       signInWithAuth: signIn.status,
       rejectedAuthApiWithAuth: rejectedAuthApi.status,
+      sessionWithBasicAuth: session.status,
       callbackWithoutSession: callback.status,
       providerSessionCreated: false,
       productDatabaseAccess: false,

@@ -3,42 +3,47 @@ import { describe, it } from "node:test";
 
 import {
   assessAuthTransportEnvironment,
+  createAuthTransportBaseUrlFingerprint,
   isAuthTransportApiRequestAllowed,
   AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS,
   AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS,
   AUTH_TRANSPORT_CALLBACK_PATH,
+  AUTH_TRANSPORT_SESSION_PATH,
   AUTH_TRANSPORT_SESSION_CACHE_SECONDS,
 } from "../src/lib/auth/auth-transport-policy.ts";
 import { auditAuthTransportRuntime } from "../scripts/lib/auth-transport-runtime-audit.mjs";
 
+const AUTH_BASE_URL = "https://auth.example.invalid/project/auth";
+const AUTH_BASE_URL_SHA256 =
+  createAuthTransportBaseUrlFingerprint(AUTH_BASE_URL);
+
 describe("auth session transport smoke", () => {
-  it("stays disabled outside Vercel Preview and Production", () => {
-    assert.deepEqual(
-      assessAuthTransportEnvironment({
-        VERCEL_ENV: "development",
-        NEON_AUTH_BASE_URL: "https://auth.example.invalid/project/auth",
-        NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
-      }),
-      { state: "disabled" },
-    );
-  });
-
-  it("allows both isolated Preview and Production auth transports", () => {
-    assert.deepEqual(AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS, [
-      "preview",
-      "production",
-    ]);
-
-    for (const VERCEL_ENV of AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS) {
+  it("stays disabled outside Vercel Production", () => {
+    for (const VERCEL_ENV of ["development", "preview"]) {
       assert.deepEqual(
         assessAuthTransportEnvironment({
           VERCEL_ENV,
-          NEON_AUTH_BASE_URL: "https://auth.example.invalid/project/auth",
+          NEON_AUTH_BASE_URL: AUTH_BASE_URL,
+          NEON_AUTH_BASE_URL_SHA256: AUTH_BASE_URL_SHA256 ?? undefined,
           NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
         }),
-        { state: "ready" },
+        { state: "disabled" },
       );
     }
+  });
+
+  it("allows only the reviewed Production auth transport", () => {
+    assert.deepEqual(AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS, ["production"]);
+
+    assert.deepEqual(
+      assessAuthTransportEnvironment({
+        VERCEL_ENV: "production",
+        NEON_AUTH_BASE_URL: AUTH_BASE_URL,
+        NEON_AUTH_BASE_URL_SHA256: AUTH_BASE_URL_SHA256 ?? undefined,
+        NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
+      }),
+      { state: "ready" },
+    );
   });
 
   it("fails closed without reflecting invalid configuration values", () => {
@@ -46,6 +51,7 @@ describe("auth session transport smoke", () => {
     const result = assessAuthTransportEnvironment({
       VERCEL_ENV: "production",
       NEON_AUTH_BASE_URL: `http://${marker}.invalid/auth`,
+      NEON_AUTH_BASE_URL_SHA256: `sha256:${"0".repeat(64)}`,
       NEON_AUTH_COOKIE_SECRET: marker,
     });
 
@@ -53,17 +59,39 @@ describe("auth session transport smoke", () => {
     assert.equal(JSON.stringify(result).includes(marker), false);
   });
 
+  it("fails closed when the Auth endpoint fingerprint does not match", () => {
+    assert.deepEqual(
+      assessAuthTransportEnvironment({
+        VERCEL_ENV: "production",
+        NEON_AUTH_BASE_URL: AUTH_BASE_URL,
+        NEON_AUTH_BASE_URL_SHA256: `sha256:${"0".repeat(64)}`,
+        NEON_AUTH_COOKIE_SECRET: "x".repeat(48),
+      }),
+      { state: "misconfigured" },
+    );
+    assert.equal(
+      createAuthTransportBaseUrlFingerprint(`${AUTH_BASE_URL}/`),
+      AUTH_BASE_URL_SHA256,
+    );
+    assert.equal(
+      createAuthTransportBaseUrlFingerprint(`${AUTH_BASE_URL}?wrong=target`),
+      null,
+    );
+  });
+
   it("requires a complete server configuration in every enabled environment", () => {
     assert.deepEqual(
       assessAuthTransportEnvironment({
         VERCEL_ENV: "production",
-        NEON_AUTH_BASE_URL: "https://auth.example.invalid/project/auth",
+        NEON_AUTH_BASE_URL: AUTH_BASE_URL,
+        NEON_AUTH_BASE_URL_SHA256: AUTH_BASE_URL_SHA256 ?? undefined,
         NEON_AUTH_COOKIE_SECRET: "",
       }),
       { state: "misconfigured" },
     );
     assert.equal(AUTH_TRANSPORT_SESSION_CACHE_SECONDS, 60);
-    assert.equal(AUTH_TRANSPORT_CALLBACK_PATH, "/auth/session");
+    assert.equal(AUTH_TRANSPORT_CALLBACK_PATH, "/auth/callback");
+    assert.equal(AUTH_TRANSPORT_SESSION_PATH, "/auth/session");
   });
 
   it("allows only the two reviewed Google session transport requests", () => {
@@ -122,20 +150,23 @@ describe("auth session transport smoke", () => {
     assert.equal(result.status, "passed");
     assert.deepEqual(result.findings, []);
     assert.deepEqual(result.evidence, {
-      requiredFiles: 8,
-      presentFiles: 8,
-      inspectedRuntimeGraphFiles: 8,
+      requiredFiles: 10,
+      presentFiles: 10,
+      inspectedRuntimeGraphFiles: 10,
       productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       authSdkPinned: true,
-      previewRuntimeEnabled: true,
+      previewRuntimeDisabled: true,
       productionRuntimeEnabled: true,
+      authTargetFingerprintGuardPresent: true,
       allowedAuthApiEndpoints: 2,
       googleSocialProviderRestricted: true,
       basicAuthBoundaryIntact: true,
       oauthCallbackExchangeProxyPresent: true,
       basicAuthSignInApiGatePresent: true,
       authCallbackBypassesBasicAuth: true,
+      sessionEvidenceRequiresBasicAuth: true,
+      callbackFailureClosed: true,
       managedAuthSchemaOwnedByDrizzle: false,
       managedAuthSessionIoExpected: true,
     });

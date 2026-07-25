@@ -4,8 +4,10 @@ import { dirname, extname, join, normalize, relative } from "node:path";
 const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
   "src/lib/auth/auth-transport-policy.ts",
   "src/lib/auth/auth-transport-proxy.ts",
+  "src/lib/auth/auth-transport-routes.ts",
   "src/lib/auth/auth-transport-runtime.ts",
   "src/app/api/auth/[...path]/route.ts",
+  "src/app/auth/callback/page.tsx",
   "src/app/auth/sign-in/page.tsx",
   "src/app/auth/session/page.tsx",
   "src/components/auth/auth-transport-controls.tsx",
@@ -59,11 +61,18 @@ export function auditAuthTransportRuntime(root) {
   const productionRuntimeEnabled =
     policy.includes("AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS") &&
     policy.includes('"production"');
-  if (!previewRuntimeEnabled || !productionRuntimeEnabled) {
+  if (previewRuntimeEnabled || !productionRuntimeEnabled) {
     findings.push("auth_environment_gate_incomplete");
   }
   if (!policy.includes("cookieSecret.length < 32")) {
     findings.push("cookie_secret_length_guard_missing");
+  }
+  const authTargetFingerprintGuardPresent =
+    policy.includes("NEON_AUTH_BASE_URL_SHA256") &&
+    policy.includes("createAuthTransportBaseUrlFingerprint") &&
+    policy.includes("actualBaseUrlFingerprint !== expectedBaseUrlFingerprint");
+  if (!authTargetFingerprintGuardPresent) {
+    findings.push("auth_target_fingerprint_guard_missing");
   }
 
   const runtime = sources.get("src/lib/auth/auth-transport-runtime.ts") ?? "";
@@ -104,6 +113,15 @@ export function auditAuthTransportRuntime(root) {
   if (/\.user\.(?:email|name|image)|provider[_A-Z]?subject/i.test(sessionPage)) {
     findings.push("session_profile_exposed");
   }
+  const callbackPage = sources.get("src/app/auth/callback/page.tsx") ?? "";
+  const routes = sources.get("src/lib/auth/auth-transport-routes.ts") ?? "";
+  if (
+    !callbackPage.includes("redirect(AUTH_TRANSPORT_SESSION_PATH)") ||
+    !routes.includes('AUTH_TRANSPORT_CALLBACK_PATH = "/auth/callback"') ||
+    !routes.includes('AUTH_TRANSPORT_SESSION_PATH = "/auth/session"')
+  ) {
+    findings.push("dedicated_callback_route_missing");
+  }
 
   const authProxy = sources.get("src/lib/auth/auth-transport-proxy.ts") ?? "";
   const proxy = sources.get("src/proxy.ts") ?? "";
@@ -130,17 +148,31 @@ export function auditAuthTransportRuntime(root) {
     callbackBranchIndex >= 0 &&
     basicAuthIndex >= 0 &&
     callbackBranchIndex < basicAuthIndex &&
-    proxy.includes('"/auth/session"');
+    proxy.includes('"/auth/callback"');
   if (!authCallbackBypassesBasicAuth) {
     findings.push("auth_callback_basic_auth_isolation_missing");
+  }
+  const sessionEvidenceRequiresBasicAuth =
+    proxy.includes('"/auth/session"') &&
+    !routes.includes('AUTH_TRANSPORT_CALLBACK_PATH = "/auth/session"');
+  if (!sessionEvidenceRequiresBasicAuth) {
+    findings.push("session_evidence_basic_auth_gate_missing");
   }
 
   const oauthCallbackExchangeProxyPresent =
     authProxy.includes("runtime.auth.middleware") &&
     authProxy.includes('loginUrl: "/auth/sign-in"') &&
-    authProxy.includes('runtime.state !== "ready"');
+    authProxy.includes('runtime.state === "disabled"') &&
+    authProxy.includes('runtime.state === "misconfigured"');
   if (!oauthCallbackExchangeProxyPresent) {
     findings.push("oauth_callback_exchange_proxy_missing");
+  }
+  const callbackFailureClosed =
+    authProxy.includes("status: 404") &&
+    authProxy.includes("status: 503") &&
+    !authProxy.includes("NextResponse.next()");
+  if (!callbackFailureClosed) {
+    findings.push("auth_callback_failure_closed_missing");
   }
 
   const schema = readFileSync(join(root, "src/db/schema.ts"), "utf8");
@@ -163,14 +195,17 @@ export function auditAuthTransportRuntime(root) {
         PUBLIC_AUTH_ENVIRONMENT.test(source),
       ).length,
       authSdkPinned: authSdkVersion === "0.4.2-beta",
-      previewRuntimeEnabled,
+      previewRuntimeDisabled: !previewRuntimeEnabled,
       productionRuntimeEnabled,
+      authTargetFingerprintGuardPresent,
       allowedAuthApiEndpoints,
       googleSocialProviderRestricted,
       basicAuthBoundaryIntact,
       oauthCallbackExchangeProxyPresent,
       basicAuthSignInApiGatePresent,
       authCallbackBypassesBasicAuth,
+      sessionEvidenceRequiresBasicAuth,
+      callbackFailureClosed,
       managedAuthSchemaOwnedByDrizzle,
       managedAuthSessionIoExpected: true,
     }),

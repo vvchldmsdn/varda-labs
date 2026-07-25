@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { AUTH_TRANSPORT_CALLBACK_PATH } from "@/lib/auth/auth-transport-policy";
+import { AUTH_TRANSPORT_CALLBACK_PATH } from "@/lib/auth/auth-transport-routes";
 import { handleAuthTransportProxy } from "@/lib/auth/auth-transport-proxy";
 
 const DASHBOARD_PASSWORD_ENV_KEYS = [
@@ -52,6 +52,7 @@ export const config = {
   matcher: [
     "/",
     "/api/auth/:path*",
+    "/auth/callback",
     "/auth/sign-in",
     "/auth/session",
     "/admin/:path*",

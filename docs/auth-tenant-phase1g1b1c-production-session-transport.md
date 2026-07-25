@@ -11,10 +11,8 @@ The first legacy-user bootstrap will use the Production Neon Auth subject, not
 the subject copied from a Preview branch. Preview and Production remain
 separate Auth and database environments.
 
-This phase generalizes the already verified Google session transport so the
-same server-only adapter can run in either Vercel Preview or Production when
-that environment has complete server configuration. It does not link an
-identity or read product data.
+This phase moves the already verified Google session transport to Vercel
+Production. It does not link an identity or read product data.
 
 ## Interim Access Boundary
 
@@ -22,9 +20,10 @@ The temporary dashboard Basic Auth remains in place.
 
 - `/auth/sign-in` and `/api/auth/*` pass through Basic Auth before Google
   sign-in or sign-out can start.
-- `/auth/session` bypasses Basic Auth only so the OAuth verifier can be
-  exchanged for the signed HTTP-only session cookie.
-- The session page projects presence classifications only.
+- `/auth/callback` is the only Basic Auth exception. It exchanges the OAuth
+  verifier and immediately redirects to `/auth/session`.
+- `/auth/session` remains behind Basic Auth and projects presence
+  classifications only.
 - The auth route allows only Google social sign-in and current-session
   sign-out.
 
@@ -34,15 +33,22 @@ unlinked Neon Auth user receives no portfolio authority.
 
 ## Environment Boundary
 
-The runtime is enabled only for `VERCEL_ENV=preview` or
-`VERCEL_ENV=production`. Every enabled environment must provide:
+The runtime is enabled only for `VERCEL_ENV=production`. Preview remains
+disabled because an operational fingerprint comparison on 2026-07-25 found
+that the current Vercel Preview and Production integrations resolve to the
+same Neon Auth target. No target values or fingerprints were printed.
+
+Every enabled environment must provide:
 
 - an HTTPS-shaped `NEON_AUTH_BASE_URL`;
+- a reviewed `NEON_AUTH_BASE_URL_SHA256` that exactly matches the canonical
+  server URL;
 - a server-only `NEON_AUTH_COOKIE_SECRET` of at least 32 characters.
 
 Missing or malformed configuration fails closed without reflecting values.
-Preview and Production cookie secrets must be distinct. Production deployment
-must not proceed until the Production secret is configured.
+Production deployment must not proceed until the Production secret and
+endpoint fingerprint are configured. Preview Auth must remain disabled until a
+future isolated target is independently verified.
 
 ## Still Closed
 
@@ -71,10 +77,12 @@ After a separately reviewed Production deployment:
 1. unauthenticated `/` remains `401`;
 2. Basic Auth is required for `/auth/sign-in`;
 3. Google sign-in completes on Production;
-4. `/auth/session` reports authenticated presence without identifiers;
-5. portfolio link and product database read remain `Not attempted`;
-6. sign-out removes authenticated presence;
-7. protected product pages retain the existing Basic Auth behavior.
+4. `/auth/callback` exchanges the verifier and redirects to the Basic
+   Auth-protected `/auth/session`;
+5. `/auth/session` reports authenticated presence without identifiers;
+6. portfolio link and product database read remain `Not attempted`;
+7. sign-out removes authenticated presence;
+8. protected product pages retain the existing Basic Auth behavior.
 
 ## Next Gate
 

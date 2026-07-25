@@ -3,6 +3,8 @@
 import { createAuthClient } from "@neondatabase/auth/next";
 import { useState } from "react";
 
+import { AUTH_TRANSPORT_CALLBACK_PATH } from "@/lib/auth/auth-transport-routes";
+
 const authClient = createAuthClient();
 
 export function GoogleSignInButton() {
@@ -14,8 +16,8 @@ export function GoogleSignInButton() {
     try {
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/auth/session",
-        newUserCallbackURL: "/auth/session",
+        callbackURL: AUTH_TRANSPORT_CALLBACK_PATH,
+        newUserCallbackURL: AUTH_TRANSPORT_CALLBACK_PATH,
         errorCallbackURL: "/auth/sign-in",
       });
 

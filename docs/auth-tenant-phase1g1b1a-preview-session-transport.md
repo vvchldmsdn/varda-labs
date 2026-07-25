@@ -6,6 +6,12 @@ Status: Preview-only Google session transport is implemented and passes
 automated and interactive verification on the latest reviewed runtime.
 Product identity resolution, tenant access, and production auth remain closed.
 
+Historical note: this document records the original Preview verification. The
+B1c transport replaces its shared `/auth/session` callback/display path with a
+dedicated `/auth/callback` exchange route and keeps `/auth/session` behind
+Basic Auth. B1c also disables Preview Auth after an operational check found
+that the current Preview and Production integration targets were not isolated.
+
 ## Scope
 
 This phase proves one narrow transport path:

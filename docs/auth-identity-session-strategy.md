@@ -301,6 +301,7 @@ Removal gate:
 | Variable/config | Exposure | Policy |
 | --- | --- | --- |
 | `NEON_AUTH_BASE_URL` | Server only | Required by the Next.js server SDK; do not copy into product DTOs/logs |
+| `NEON_AUTH_BASE_URL_SHA256` | Server only | Environment-specific reviewed fingerprint; runtime must fail closed when it does not match the canonical server URL |
 | `NEON_AUTH_COOKIE_SECRET` | Secret, server only | 32+ characters; stable within one environment; distinct between production and local/test; intentional rotation invalidates cached session data |
 | `VITE_NEON_AUTH_URL` | Browser-oriented integration value | Present locally but not used by the planned Next.js server boundary; do not introduce a `NEXT_PUBLIC_` copy unless the selected client SDK proves it is required |
 | Google OAuth client id/secret | Neon Auth configuration | Configure in Neon, not public product tables; secret never enters browser bundles or logs |
