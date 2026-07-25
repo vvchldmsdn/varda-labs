@@ -6,7 +6,7 @@ Status: corrected and verified locally. Migration
 `0021_strange_sinister_six.sql` is generated but not applied to any database.
 
 Normalized file SHA-256:
-`e7713662bdbbedef69f7358128abe62e2ea4085335a6134396d68a5bcccbf90a`.
+`2a466a9b0dbf38ffd0286e5f1e05154102be12da5ac7a6e2430aed16c8bcbec4`.
 
 ## Purpose
 
@@ -44,10 +44,13 @@ A unique index permits at most one terminal event per claim. Expiry is derived
 from `expires_at`; it is not represented by mutable status. Database triggers
 reject `UPDATE`, `DELETE`, and `TRUNCATE` on both evidence tables.
 
-A deferred constraint trigger also verifies that a consumed event references
-an identity whose `app_user_id` and provider match the immutable intent header.
+A deferred constraint trigger also verifies, using the database clock, that a
+consumed event occurs within the intent's issue/expiry window and references an
+identity whose `app_user_id` and provider match the immutable intent header.
 It locks that identity row while validating the event. A companion constraint
-trigger prevents a later identity rebind from invalidating consumed evidence.
+trigger freezes the consumed identity's owner, provider, and
+`provider_subject`, preventing a later principal rebind from invalidating the
+stored subject-binding evidence.
 
 ## Authority Boundary
 
@@ -90,13 +93,16 @@ phase.
 - one terminal event and ten-minute lifetime;
 - restrictive foreign keys;
 - two append-only triggers plus the consumed-identity relationship guards;
+- database-clock issue/expiry enforcement and consumed provider-principal
+  immutability;
 - absence of identity DML, destructive DDL, RLS, and secrets.
 
 `npm run audit:identity-pairing-schema` is SELECT-only. Before migration it must
 report `state=absent`. After a separately approved migration it will verify the
 exact columns; complete constraint definitions and FK actions; index
 uniqueness, validity, predicates, expressions, and key order; complete trigger
-metadata and definitions; normalized function bodies and execution
+metadata, constraint-trigger catalog rows, and definitions; normalized
+function bodies and execution
 attributes; zero rows; and the Drizzle ledger hash. Its product-row-count
 digest can be passed back as
 `--expect-product-row-counts-sha256` for same-window pre/post comparison.

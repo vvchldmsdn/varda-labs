@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 const ROOT = process.cwd();
 const MIGRATION_NAME = "0021_strange_sinister_six.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "e7713662bdbbedef69f7358128abe62e2ea4085335a6134396d68a5bcccbf90a";
+  "2a466a9b0dbf38ffd0286e5f1e05154102be12da5ac7a6e2430aed16c8bcbec4";
 const MIGRATION_PATH = join(ROOT, "drizzle", MIGRATION_NAME);
 const SCHEMA_PATH = join(ROOT, "src", "db", "schema.ts");
 const AUDIT_PATH = join(ROOT, "scripts", "audit-identity-pairing-schema.mjs");
@@ -171,14 +171,18 @@ describe("durable identity bootstrap claim schema", () => {
     assert.doesNotMatch(migration, /ON DELETE cascade/i);
   });
 
-  it("binds consumed identity evidence to the reviewed target and provider", () => {
+  it("binds consumed identity evidence to a live intent and immutable provider principal", () => {
     assert.match(
       migration,
       /CREATE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\) RETURNS trigger/,
     );
     assert.match(
       migration,
-      /identity_row\.app_user_id[\s\S]*identity_row\.provider[\s\S]*FROM public\.identity_pairing_intents AS intent[\s\S]*JOIN public\.auth_identities AS identity_row[\s\S]*FOR UPDATE OF identity_row/,
+      /intent\.issued_at[\s\S]*intent\.expires_at[\s\S]*identity_row\.app_user_id[\s\S]*identity_row\.provider[\s\S]*FROM public\.identity_pairing_intents AS intent[\s\S]*JOIN public\.auth_identities AS identity_row[\s\S]*FOR UPDATE OF identity_row/,
+    );
+    assert.match(
+      migration,
+      /FOR UPDATE OF identity_row;[\s\S]*validation_time := clock_timestamp\(\)[\s\S]*validation_time < intent_issued_at[\s\S]*validation_time >= intent_expires_at[\s\S]*identity pairing intent is not valid at database time/,
     );
     assert.match(
       migration,
@@ -186,11 +190,11 @@ describe("durable identity bootstrap claim schema", () => {
     );
     assert.match(
       migration,
-      /public\.identity_pairing_intent_events AS event[\s\S]*public\.identity_pairing_intents AS intent[\s\S]*event\.auth_identity_id = NEW\.id[\s\S]*intent\.target_app_user_id IS DISTINCT FROM NEW\.app_user_id[\s\S]*intent\.provider IS DISTINCT FROM NEW\.provider/,
+      /NEW\.app_user_id IS NOT DISTINCT FROM OLD\.app_user_id[\s\S]*NEW\.provider IS NOT DISTINCT FROM OLD\.provider[\s\S]*NEW\.provider_subject IS NOT DISTINCT FROM OLD\.provider_subject[\s\S]*public\.identity_pairing_intent_events AS event[\s\S]*event\.auth_identity_id = NEW\.id[\s\S]*consumed identity owner, provider, and provider subject are immutable/,
     );
     assert.equal(
       countMatches(migration, /USING ERRCODE = '23514'/g),
-      2,
+      3,
     );
     assert.match(
       migration,
@@ -251,6 +255,9 @@ describe("durable identity bootstrap claim schema", () => {
       "tgtype",
       "tgdeferrable",
       "tginitdeferred",
+      "constraint_catalog_name",
+      "constraint_catalog_type",
+      "constraint_catalog_validated",
       "provolatile",
       "proparallel",
       "prosrc",
@@ -261,6 +268,8 @@ describe("durable identity bootstrap claim schema", () => {
     assert.match(audit, /expectedIndexes\(\)/);
     assert.match(audit, /expectedTriggers\(\)/);
     assert.match(audit, /expectedFunctions\(\)/);
+    assert.match(audit, /c\.contype <> 't'/);
+    assert.match(audit, /constraintCatalog/);
     assert.doesNotMatch(audit, /assertConstraintMarker/);
   });
 

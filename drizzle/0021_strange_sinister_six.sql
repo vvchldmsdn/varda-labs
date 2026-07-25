@@ -61,8 +61,11 @@ AS $$
 DECLARE
 	intent_target_app_user_id uuid;
 	intent_provider varchar(50);
+	intent_issued_at timestamp with time zone;
+	intent_expires_at timestamp with time zone;
 	identity_app_user_id uuid;
 	identity_provider varchar(50);
+	validation_time timestamp with time zone;
 BEGIN
 	IF TG_TABLE_NAME = 'identity_pairing_intent_events' THEN
 		IF NEW.event_type <> 'consumed' THEN
@@ -72,11 +75,15 @@ BEGIN
 		SELECT
 			intent.target_app_user_id,
 			intent.provider,
+			intent.issued_at,
+			intent.expires_at,
 			identity_row.app_user_id,
 			identity_row.provider
 		INTO STRICT
 			intent_target_app_user_id,
 			intent_provider,
+			intent_issued_at,
+			intent_expires_at,
 			identity_app_user_id,
 			identity_provider
 		FROM public.identity_pairing_intents AS intent
@@ -84,6 +91,14 @@ BEGIN
 			ON identity_row.id = NEW.auth_identity_id
 		WHERE intent.id = NEW.identity_pairing_intent_id
 		FOR UPDATE OF identity_row;
+
+		validation_time := clock_timestamp();
+
+		IF validation_time < intent_issued_at
+			OR validation_time >= intent_expires_at THEN
+			RAISE EXCEPTION 'identity pairing intent is not valid at database time'
+				USING ERRCODE = '23514';
+		END IF;
 
 		IF identity_app_user_id IS DISTINCT FROM intent_target_app_user_id
 			OR identity_provider IS DISTINCT FROM intent_provider THEN
@@ -96,23 +111,18 @@ BEGIN
 
 	IF TG_TABLE_NAME = 'auth_identities' THEN
 		IF NEW.app_user_id IS NOT DISTINCT FROM OLD.app_user_id
-			AND NEW.provider IS NOT DISTINCT FROM OLD.provider THEN
+			AND NEW.provider IS NOT DISTINCT FROM OLD.provider
+			AND NEW.provider_subject IS NOT DISTINCT FROM OLD.provider_subject THEN
 			RETURN NEW;
 		END IF;
 
 		IF EXISTS (
 			SELECT 1
 			FROM public.identity_pairing_intent_events AS event
-			JOIN public.identity_pairing_intents AS intent
-				ON intent.id = event.identity_pairing_intent_id
 			WHERE event.auth_identity_id = NEW.id
 				AND event.event_type = 'consumed'
-				AND (
-					intent.target_app_user_id IS DISTINCT FROM NEW.app_user_id
-					OR intent.provider IS DISTINCT FROM NEW.provider
-				)
 		) THEN
-			RAISE EXCEPTION 'consumed identity cannot be rebound away from pairing intent target or provider'
+			RAISE EXCEPTION 'consumed identity owner, provider, and provider subject are immutable'
 				USING ERRCODE = '23514';
 		END IF;
 
