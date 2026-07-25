@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
@@ -300,6 +301,22 @@ describe("auth session transport smoke", () => {
     assert.equal(callbackHeaders.get("authorization"), null);
     assert.equal(callbackHeaders.get("proxy-authorization"), null);
     assert.equal(callbackHeaders.get("cookie"), "neon-auth-cookie=opaque");
+  });
+
+  it("does not present a rejected sign-out as successful", () => {
+    const controls = readFileSync(
+      "src/components/auth/auth-transport-controls.tsx",
+      "utf8",
+    );
+
+    assert.match(controls, /const result = await authClient\.signOut\(\)/);
+    assert.match(controls, /if \(result\.error\)/);
+    assert.match(controls, /setStatus\("failed"\)/);
+    assert.match(controls, /window\.location\.replace\("\/auth\/sign-in"\)/);
+    assert.doesNotMatch(
+      controls,
+      /finally\s*\{\s*window\.location\.(?:assign|replace)/,
+    );
   });
 
   it("keeps the transport outside product data and identity authority", () => {

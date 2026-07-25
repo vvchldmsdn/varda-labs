@@ -31,6 +31,16 @@ assert.equal(sessionWithoutAuth.status, 401);
 const authApiWithoutAuth = await request("/api/auth/get-session");
 assert.equal(authApiWithoutAuth.status, 401);
 
+const signOutWithoutAuth = await request("/api/auth/sign-out", false, {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    origin: new URL(BASE_URL).origin,
+  },
+  body: "{}",
+});
+assert.equal(signOutWithoutAuth.status, 401);
+
 const signIn = await request("/auth/sign-in", true);
 assert.equal(signIn.status, 200);
 assert.match(signIn.body, />Sign in</);
@@ -48,6 +58,31 @@ assert.match(session.body, /Not present/);
 assert.match(session.body, /Not attempted/);
 assert.doesNotMatch(session.body, LEAK_PATTERN);
 
+const signOut = await request("/api/auth/sign-out", true, {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    cookie:
+      "__Secure-neon-auth.session_token=auth-transport-smoke-invalid-session",
+    origin: new URL(BASE_URL).origin,
+  },
+  body: "{}",
+});
+assert.equal(
+  signOut.status,
+  200,
+  `authenticated sign-out transport failed: ${signOut.body}`,
+);
+assert.deepEqual(JSON.parse(signOut.body), { success: true });
+assert.match(
+  signOut.setCookieHeaders.join("\n"),
+  /__Secure-neon-auth\.session_token=.*(?:Max-Age=0|Expires=Thu, 01 Jan 1970)/i,
+);
+assert.match(
+  signOut.setCookieHeaders.join("\n"),
+  /__Secure-neon-auth\.session_data=.*(?:Max-Age=0|Expires=Thu, 01 Jan 1970)/i,
+);
+
 const callback = await request("/auth/callback");
 assert.equal(callback.status, 307);
 assert.equal(
@@ -64,9 +99,11 @@ console.log(
       signInWithoutAuth: signInWithoutAuth.status,
       sessionWithoutAuth: sessionWithoutAuth.status,
       authApiWithoutAuth: authApiWithoutAuth.status,
+      signOutWithoutAuth: signOutWithoutAuth.status,
       signInWithAuth: signIn.status,
       rejectedAuthApiWithAuth: rejectedAuthApi.status,
       sessionWithBasicAuth: session.status,
+      signOutWithBasicAuthAndSessionCookie: signOut.status,
       callbackWithoutSession: callback.status,
       providerSessionCreated: false,
       productDatabaseAccess: false,
@@ -76,9 +113,13 @@ console.log(
   ),
 );
 
-async function request(path, authenticated = false) {
+async function request(path, authenticated = false, init = {}) {
+  const headers = new Headers(init.headers);
+  if (authenticated) headers.set("authorization", authorization);
+
   const response = await fetch(new URL(path, BASE_URL), {
-    headers: authenticated ? { authorization } : undefined,
+    ...init,
+    headers,
     redirect: "manual",
     signal: AbortSignal.timeout(30_000),
   });
@@ -86,6 +127,10 @@ async function request(path, authenticated = false) {
     status: response.status,
     body: await response.text(),
     location: response.headers.get("location"),
+    setCookieHeaders:
+      typeof response.headers.getSetCookie === "function"
+        ? response.headers.getSetCookie()
+        : [response.headers.get("set-cookie")].filter(Boolean),
   };
 }
 
