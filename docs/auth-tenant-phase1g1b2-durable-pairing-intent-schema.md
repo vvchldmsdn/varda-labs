@@ -1,12 +1,12 @@
 # Auth/Tenant Phase 1G1-B2: Durable Bootstrap Claim Schema
 
-Last updated: 2026-07-25
+Last updated: 2026-07-26
 
 Status: corrected and verified locally. Migration
 `0021_strange_sinister_six.sql` is generated but not applied to any database.
 
 Normalized file SHA-256:
-`d912d7692a856fb0fc097462fd8a97102533d84471d30524040e456dcf8fc0d0`.
+`e7713662bdbbedef69f7358128abe62e2ea4085335a6134396d68a5bcccbf90a`.
 
 ## Purpose
 
@@ -43,6 +43,11 @@ out-of-band channel, but that tool is not implemented here.
 A unique index permits at most one terminal event per claim. Expiry is derived
 from `expires_at`; it is not represented by mutable status. Database triggers
 reject `UPDATE`, `DELETE`, and `TRUNCATE` on both evidence tables.
+
+A deferred constraint trigger also verifies that a consumed event references
+an identity whose `app_user_id` and provider match the immutable intent header.
+It locks that identity row while validating the event. A companion constraint
+trigger prevents a later identity rebind from invalidating consumed evidence.
 
 ## Authority Boundary
 
@@ -84,13 +89,16 @@ phase.
 - fixed policy and digest formats;
 - one terminal event and ten-minute lifetime;
 - restrictive foreign keys;
-- exactly one append-only function and two triggers;
+- two append-only triggers plus the consumed-identity relationship guards;
 - absence of identity DML, destructive DDL, RLS, and secrets.
 
 `npm run audit:identity-pairing-schema` is SELECT-only. Before migration it must
 report `state=absent`. After a separately approved migration it will verify the
-exact columns, constraints, indexes, triggers, function, zero rows, and Drizzle
-ledger hash. Its product-row-count digest can be passed back as
+exact columns; complete constraint definitions and FK actions; index
+uniqueness, validity, predicates, expressions, and key order; complete trigger
+metadata and definitions; normalized function bodies and execution
+attributes; zero rows; and the Drizzle ledger hash. Its product-row-count
+digest can be passed back as
 `--expect-product-row-counts-sha256` for same-window pre/post comparison.
 
 ## Still Closed

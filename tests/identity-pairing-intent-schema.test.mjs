@@ -7,11 +7,13 @@ import { describe, it } from "node:test";
 const ROOT = process.cwd();
 const MIGRATION_NAME = "0021_strange_sinister_six.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "d912d7692a856fb0fc097462fd8a97102533d84471d30524040e456dcf8fc0d0";
+  "e7713662bdbbedef69f7358128abe62e2ea4085335a6134396d68a5bcccbf90a";
 const MIGRATION_PATH = join(ROOT, "drizzle", MIGRATION_NAME);
 const SCHEMA_PATH = join(ROOT, "src", "db", "schema.ts");
+const AUDIT_PATH = join(ROOT, "scripts", "audit-identity-pairing-schema.mjs");
 const migration = readFileSync(MIGRATION_PATH, "utf8");
 const schema = readFileSync(SCHEMA_PATH, "utf8");
+const audit = readFileSync(AUDIT_PATH, "utf8");
 const priorSnapshot = JSON.parse(
   readFileSync(join(ROOT, "drizzle", "meta", "0020_snapshot.json"), "utf8"),
 );
@@ -41,7 +43,7 @@ describe("durable identity bootstrap claim schema", () => {
       migration,
       /CREATE TABLE "identity_pairing_intent_events"/,
     );
-    assert.equal(statements.length, 13);
+    assert.equal(statements.length, 16);
 
     const intentTable = extractCreateTable(
       migration,
@@ -169,15 +171,48 @@ describe("durable identity bootstrap claim schema", () => {
     assert.doesNotMatch(migration, /ON DELETE cascade/i);
   });
 
-  it("enforces append-only evidence with exactly one function and two triggers", () => {
+  it("binds consumed identity evidence to the reviewed target and provider", () => {
+    assert.match(
+      migration,
+      /CREATE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\) RETURNS trigger/,
+    );
+    assert.match(
+      migration,
+      /identity_row\.app_user_id[\s\S]*identity_row\.provider[\s\S]*FROM public\.identity_pairing_intents AS intent[\s\S]*JOIN public\.auth_identities AS identity_row[\s\S]*FOR UPDATE OF identity_row/,
+    );
+    assert.match(
+      migration,
+      /identity_app_user_id IS DISTINCT FROM intent_target_app_user_id[\s\S]*identity_provider IS DISTINCT FROM intent_provider/,
+    );
+    assert.match(
+      migration,
+      /public\.identity_pairing_intent_events AS event[\s\S]*public\.identity_pairing_intents AS intent[\s\S]*event\.auth_identity_id = NEW\.id[\s\S]*intent\.target_app_user_id IS DISTINCT FROM NEW\.app_user_id[\s\S]*intent\.provider IS DISTINCT FROM NEW\.provider/,
+    );
+    assert.equal(
+      countMatches(migration, /USING ERRCODE = '23514'/g),
+      2,
+    );
+    assert.match(
+      migration,
+      /CREATE CONSTRAINT TRIGGER "id_pair_intent_events_identity_match"\s+AFTER INSERT ON "identity_pairing_intent_events"\s+DEFERRABLE INITIALLY IMMEDIATE\s+FOR EACH ROW\s+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\)/,
+    );
+    assert.match(
+      migration,
+      /CREATE CONSTRAINT TRIGGER "auth_identities_consumed_pairing_binding_guard"\s+AFTER UPDATE ON "auth_identities"\s+DEFERRABLE INITIALLY IMMEDIATE\s+FOR EACH ROW\s+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"\(\)/,
+    );
+  });
+
+  it("enforces append-only evidence with exact functions and triggers", () => {
     const functions = statements.filter((statement) =>
       statement.startsWith("CREATE FUNCTION"),
     );
-    const triggers = statements.filter((statement) =>
-      statement.startsWith("CREATE TRIGGER"),
+    const triggers = statements.filter(
+      (statement) =>
+        statement.startsWith("CREATE TRIGGER") ||
+        statement.startsWith("CREATE CONSTRAINT TRIGGER"),
     );
-    assert.equal(functions.length, 1);
-    assert.equal(triggers.length, 2);
+    assert.equal(functions.length, 2);
+    assert.equal(triggers.length, 4);
     assert.match(
       functions[0],
       /^CREATE FUNCTION "prevent_identity_pairing_evidence_mutation"\(\) RETURNS trigger[\s\S]*RAISE EXCEPTION 'identity pairing evidence is append-only'/,
@@ -197,6 +232,36 @@ describe("durable identity bootstrap claim schema", () => {
         ),
       );
     }
+  });
+
+  it("pins full catalog semantics for the postflight audit", () => {
+    for (const catalogField of [
+      "convalidated",
+      "condeferrable",
+      "condeferred",
+      "confupdtype",
+      "source_columns",
+      "referenced_columns",
+      "indisunique",
+      "indisvalid",
+      "indisready",
+      "indislive",
+      "indnullsnotdistinct",
+      "key_expressions",
+      "tgtype",
+      "tgdeferrable",
+      "tginitdeferred",
+      "provolatile",
+      "proparallel",
+      "prosrc",
+    ]) {
+      assert.match(audit, new RegExp(`\\b${catalogField}\\b`));
+    }
+    assert.match(audit, /expectedConstraints\(\)/);
+    assert.match(audit, /expectedIndexes\(\)/);
+    assert.match(audit, /expectedTriggers\(\)/);
+    assert.match(audit, /expectedFunctions\(\)/);
+    assert.doesNotMatch(audit, /assertConstraintMarker/);
   });
 
   it("contains no identity DML, destructive DDL, RLS, or auth secret", () => {

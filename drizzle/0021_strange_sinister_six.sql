@@ -54,4 +54,81 @@ EXECUTE FUNCTION "prevent_identity_pairing_evidence_mutation"();--> statement-br
 CREATE TRIGGER "identity_pairing_intent_events_append_only"
 BEFORE UPDATE OR DELETE OR TRUNCATE ON "identity_pairing_intent_events"
 FOR EACH STATEMENT
-EXECUTE FUNCTION "prevent_identity_pairing_evidence_mutation"();
+EXECUTE FUNCTION "prevent_identity_pairing_evidence_mutation"();--> statement-breakpoint
+CREATE FUNCTION "enforce_identity_pairing_consumed_identity_match"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	intent_target_app_user_id uuid;
+	intent_provider varchar(50);
+	identity_app_user_id uuid;
+	identity_provider varchar(50);
+BEGIN
+	IF TG_TABLE_NAME = 'identity_pairing_intent_events' THEN
+		IF NEW.event_type <> 'consumed' THEN
+			RETURN NEW;
+		END IF;
+
+		SELECT
+			intent.target_app_user_id,
+			intent.provider,
+			identity_row.app_user_id,
+			identity_row.provider
+		INTO STRICT
+			intent_target_app_user_id,
+			intent_provider,
+			identity_app_user_id,
+			identity_provider
+		FROM public.identity_pairing_intents AS intent
+		JOIN public.auth_identities AS identity_row
+			ON identity_row.id = NEW.auth_identity_id
+		WHERE intent.id = NEW.identity_pairing_intent_id
+		FOR UPDATE OF identity_row;
+
+		IF identity_app_user_id IS DISTINCT FROM intent_target_app_user_id
+			OR identity_provider IS DISTINCT FROM intent_provider THEN
+			RAISE EXCEPTION 'consumed identity does not match pairing intent target and provider'
+				USING ERRCODE = '23514';
+		END IF;
+
+		RETURN NEW;
+	END IF;
+
+	IF TG_TABLE_NAME = 'auth_identities' THEN
+		IF NEW.app_user_id IS NOT DISTINCT FROM OLD.app_user_id
+			AND NEW.provider IS NOT DISTINCT FROM OLD.provider THEN
+			RETURN NEW;
+		END IF;
+
+		IF EXISTS (
+			SELECT 1
+			FROM public.identity_pairing_intent_events AS event
+			JOIN public.identity_pairing_intents AS intent
+				ON intent.id = event.identity_pairing_intent_id
+			WHERE event.auth_identity_id = NEW.id
+				AND event.event_type = 'consumed'
+				AND (
+					intent.target_app_user_id IS DISTINCT FROM NEW.app_user_id
+					OR intent.provider IS DISTINCT FROM NEW.provider
+				)
+		) THEN
+			RAISE EXCEPTION 'consumed identity cannot be rebound away from pairing intent target or provider'
+				USING ERRCODE = '23514';
+		END IF;
+
+		RETURN NEW;
+	END IF;
+
+	RAISE EXCEPTION 'unsupported identity pairing constraint trigger table';
+END;
+$$;--> statement-breakpoint
+CREATE CONSTRAINT TRIGGER "id_pair_intent_events_identity_match"
+AFTER INSERT ON "identity_pairing_intent_events"
+DEFERRABLE INITIALLY IMMEDIATE
+FOR EACH ROW
+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"();--> statement-breakpoint
+CREATE CONSTRAINT TRIGGER "auth_identities_consumed_pairing_binding_guard"
+AFTER UPDATE ON "auth_identities"
+DEFERRABLE INITIALLY IMMEDIATE
+FOR EACH ROW
+EXECUTE FUNCTION "enforce_identity_pairing_consumed_identity_match"();
