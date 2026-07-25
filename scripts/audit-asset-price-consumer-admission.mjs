@@ -1,7 +1,10 @@
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
-import { admitAdjustedHistoricalPriceRows } from "../src/lib/market-data/asset-price-consumer-admission.ts";
+import {
+  admitAdjustedHistoricalPriceRows,
+  admitRawHistoricalPriceRows,
+} from "../src/lib/market-data/asset-price-consumer-admission.ts";
 
 config({ path: ".env.local" });
 
@@ -43,6 +46,7 @@ async function main() {
       adjusted_close_fetched_at as "adjustedCloseFetchedAt",
       provider_symbol as "providerSymbol",
       provider_exchange as "providerExchange",
+      fetched_at as "fetchedAt",
       source,
       ${hasPriceIsSample ? 'is_sample' : 'false'} as "isSample"
     from asset_price_snapshots
@@ -61,9 +65,10 @@ async function main() {
       and coalesce(quantity, 0) > 0
   `);
 
-  const admission = admitAdjustedHistoricalPriceRows(rows);
+  const adjustedAdmission = admitAdjustedHistoricalPriceRows(rows);
+  const rawAdmission = admitRawHistoricalPriceRows(rows);
   const admittedIdentityKeys = new Set(
-    admission.rows.map(instrumentKey).filter(Boolean),
+    adjustedAdmission.rows.map(instrumentKey).filter(Boolean),
   );
   const holdingIdentityKeys = new Set(
     currentHoldingInstruments.map(instrumentKey).filter(Boolean),
@@ -72,7 +77,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        audit: "asset_price_snapshot_consumer_admission_v1",
+        audit: "asset_price_snapshot_consumer_admission_v2",
         readOnly: true,
         providerCalls: false,
         databaseWrites: false,
@@ -102,21 +107,30 @@ async function main() {
               typeof row.source === "string" &&
               row.source.toLowerCase().startsWith("kis_"),
           ).length,
-          admittedHistoricalReturn: admission.summary.admittedRowCount,
-          excludedHistoricalReturn: admission.summary.excludedRowCount,
+          admittedHistoricalReturn:
+            adjustedAdmission.summary.admittedRowCount,
+          excludedHistoricalReturn:
+            adjustedAdmission.summary.excludedRowCount,
+          admittedRawPriceReturn: rawAdmission.summary.admittedRowCount,
+          excludedRawPriceReturn: rawAdmission.summary.excludedRowCount,
         },
         instruments: {
           stored: new Set(rows.map(instrumentKey).filter(Boolean)).size,
           admittedHistoricalReturn:
-            admission.summary.admittedInstrumentCount,
+            adjustedAdmission.summary.admittedInstrumentCount,
+          admittedRawPriceReturn:
+            rawAdmission.summary.admittedInstrumentCount,
           currentHoldings: holdingIdentityKeys.size,
           currentHoldingsWithAdmittedHistory: [...holdingIdentityKeys].filter(
             (key) => admittedIdentityKeys.has(key),
           ).length,
         },
-        issues: admission.issues,
+        issues: {
+          adjustedHistoricalReturn: adjustedAdmission.issues,
+          rawHistoricalReturn: rawAdmission.issues,
+        },
         nextBoundary:
-          admission.summary.admittedRowCount > 0
+          adjustedAdmission.summary.admittedRowCount > 0
             ? "Only admitted provider-adjusted rows may reach historical return consumers."
             : "Historical return consumers remain unavailable until admitted adjusted history exists.",
       },

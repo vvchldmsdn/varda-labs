@@ -1,36 +1,64 @@
 import { ADJUSTED_CLOSE_BASIS } from "./providers/types.ts";
 
 export const ASSET_PRICE_CONSUMER_ADMISSION_POLICY = Object.freeze({
-  version: "asset_price_snapshot_consumer_admission_v1",
+  version: "asset_price_snapshot_consumer_admission_v2",
   operationalClose: Object.freeze({
     priceField: "close_price",
     adjustedCloseFallback: "forbidden",
   }),
-  historicalReturn: Object.freeze({
+  adjustedHistoricalReturn: Object.freeze({
     priceField: "adjusted_close_price",
     adjustedCloseBasis: ADJUSTED_CLOSE_BASIS.provider,
     providerBinding: "single_binding_per_instrument",
     incompleteProvenance: "exclude_row",
     conflictingProviderBinding: "exclude_instrument",
   }),
+  rawHistoricalReturn: Object.freeze({
+    priceField: "close_price",
+    provenanceFields: Object.freeze([
+      "source",
+      "provider_symbol",
+      "provider_exchange",
+      "fetched_at",
+    ]),
+    consumerRights: "not_admitted",
+    rightsEvidence:
+      "kis_multi_user_display_and_analysis_rights_unproven",
+    incompleteProvenance: "exclude_row",
+    rightsNotAdmitted: "exclude_all_rows",
+  }),
 } as const);
 
 type NumericInput = number | string | null | undefined;
 
-export type AssetPriceConsumerEvidenceRow = Readonly<{
+type AssetPriceInstrumentEvidenceRow = Readonly<{
   market: string;
   currency: string;
   ticker: string;
   priceDate: string;
-  closePrice: NumericInput;
-  adjustedClosePrice: NumericInput;
-  adjustedCloseBasis: string | null;
-  adjustedCloseProvider: string | null;
-  adjustedCloseSource: string | null;
-  adjustedCloseFetchedAt: string | Date | null;
-  providerSymbol: string | null;
-  providerExchange: string | null;
 }>;
+
+export type AdjustedHistoricalPriceConsumerEvidenceRow =
+  AssetPriceInstrumentEvidenceRow &
+    Readonly<{
+      adjustedClosePrice: NumericInput;
+      adjustedCloseBasis: string | null;
+      adjustedCloseProvider: string | null;
+      adjustedCloseSource: string | null;
+      adjustedCloseFetchedAt: string | Date | null;
+      providerSymbol: string | null;
+      providerExchange: string | null;
+    }>;
+
+export type RawHistoricalPriceConsumerEvidenceRow =
+  AssetPriceInstrumentEvidenceRow &
+    Readonly<{
+      closePrice: NumericInput;
+      source: string | null;
+      providerSymbol: string | null;
+      providerExchange: string | null;
+      fetchedAt: string | Date | null;
+    }>;
 
 export type AdjustedHistoricalAdmissionIssue =
   | "invalid_instrument_identity"
@@ -44,7 +72,7 @@ export type AdjustedHistoricalAdmissionIssue =
   | "conflicting_provider_binding";
 
 export type AdjustedHistoricalPriceAdmission<T> = Readonly<{
-  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.historicalReturn;
+  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.adjustedHistoricalReturn;
   rows: readonly T[];
   summary: Readonly<{
     suppliedRowCount: number;
@@ -56,6 +84,23 @@ export type AdjustedHistoricalPriceAdmission<T> = Readonly<{
   issues: readonly AdjustedHistoricalAdmissionIssue[];
 }>;
 
+export type RawHistoricalAdmissionIssue =
+  | "invalid_instrument_identity"
+  | "raw_history_consumer_rights_not_admitted";
+
+export type RawHistoricalPriceAdmission<T> = Readonly<{
+  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.rawHistoricalReturn;
+  rows: readonly T[];
+  summary: Readonly<{
+    suppliedRowCount: number;
+    admittedRowCount: 0;
+    excludedRowCount: number;
+    admittedInstrumentCount: 0;
+    excludedInstrumentCount: number;
+  }>;
+  issues: readonly RawHistoricalAdmissionIssue[];
+}>;
+
 export function resolveOperationalClosePrice(input: {
   closePrice: NumericInput;
 }) {
@@ -63,7 +108,7 @@ export function resolveOperationalClosePrice(input: {
 }
 
 export function admitAdjustedHistoricalPriceRows<
-  T extends AssetPriceConsumerEvidenceRow,
+  T extends AdjustedHistoricalPriceConsumerEvidenceRow,
 >(rows: readonly T[]): AdjustedHistoricalPriceAdmission<T> {
   const suppliedRows = Array.isArray(rows) ? rows : [];
   const issues = new Set<AdjustedHistoricalAdmissionIssue>();
@@ -113,7 +158,7 @@ export function admitAdjustedHistoricalPriceRows<
   }
 
   return Object.freeze({
-    policy: ASSET_PRICE_CONSUMER_ADMISSION_POLICY.historicalReturn,
+    policy: ASSET_PRICE_CONSUMER_ADMISSION_POLICY.adjustedHistoricalReturn,
     rows: Object.freeze(admittedRows),
     summary: Object.freeze({
       suppliedRowCount: suppliedRows.length,
@@ -126,8 +171,40 @@ export function admitAdjustedHistoricalPriceRows<
   });
 }
 
+export function admitRawHistoricalPriceRows<
+  T extends RawHistoricalPriceConsumerEvidenceRow,
+>(rows: readonly T[]): RawHistoricalPriceAdmission<T> {
+  const suppliedRows = Array.isArray(rows) ? rows : [];
+  const issues = new Set<RawHistoricalAdmissionIssue>([
+    "raw_history_consumer_rights_not_admitted",
+  ]);
+  const instrumentKeys = new Set<string>();
+
+  for (const row of suppliedRows) {
+    const instrumentKey = normalizeInstrumentKey(row);
+    if (!instrumentKey) {
+      issues.add("invalid_instrument_identity");
+      continue;
+    }
+    instrumentKeys.add(instrumentKey);
+  }
+
+  return Object.freeze({
+    policy: ASSET_PRICE_CONSUMER_ADMISSION_POLICY.rawHistoricalReturn,
+    rows: Object.freeze([]),
+    summary: Object.freeze({
+      suppliedRowCount: suppliedRows.length,
+      admittedRowCount: 0,
+      excludedRowCount: suppliedRows.length,
+      admittedInstrumentCount: 0,
+      excludedInstrumentCount: instrumentKeys.size,
+    }),
+    issues: Object.freeze([...issues].sort()),
+  });
+}
+
 function validateAdjustedHistoricalRow(
-  row: AssetPriceConsumerEvidenceRow,
+  row: AdjustedHistoricalPriceConsumerEvidenceRow,
 ): AdjustedHistoricalAdmissionIssue[] {
   const issues: AdjustedHistoricalAdmissionIssue[] = [];
   if (positiveNumber(row.adjustedClosePrice) === null) {
@@ -135,7 +212,8 @@ function validateAdjustedHistoricalRow(
   }
   if (
     row.adjustedCloseBasis !==
-    ASSET_PRICE_CONSUMER_ADMISSION_POLICY.historicalReturn.adjustedCloseBasis
+    ASSET_PRICE_CONSUMER_ADMISSION_POLICY.adjustedHistoricalReturn
+      .adjustedCloseBasis
   ) {
     issues.push("adjusted_close_basis_ineligible");
   }
@@ -157,7 +235,7 @@ function validateAdjustedHistoricalRow(
   return issues;
 }
 
-function normalizeInstrumentKey(row: AssetPriceConsumerEvidenceRow) {
+function normalizeInstrumentKey(row: AssetPriceInstrumentEvidenceRow) {
   const market = normalizeText(row.market)?.toLowerCase();
   const currency = normalizeText(row.currency)?.toUpperCase();
   const ticker = normalizeText(row.ticker)?.toUpperCase();
@@ -166,7 +244,7 @@ function normalizeInstrumentKey(row: AssetPriceConsumerEvidenceRow) {
     : null;
 }
 
-function providerBindingKey(row: AssetPriceConsumerEvidenceRow) {
+function providerBindingKey(row: AdjustedHistoricalPriceConsumerEvidenceRow) {
   return [
     normalizeText(row.adjustedCloseProvider)?.toLowerCase(),
     normalizeText(row.providerSymbol)?.toUpperCase(),

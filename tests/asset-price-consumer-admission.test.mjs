@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import {
   admitAdjustedHistoricalPriceRows,
+  admitRawHistoricalPriceRows,
   ASSET_PRICE_CONSUMER_ADMISSION_POLICY,
   resolveOperationalClosePrice,
 } from "../src/lib/market-data/asset-price-consumer-admission.ts";
@@ -53,7 +54,7 @@ describe("asset price consumer admission", () => {
 
     assert.equal(
       result.policy.adjustedCloseBasis,
-      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.historicalReturn
+      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.adjustedHistoricalReturn
         .adjustedCloseBasis,
     );
     assert.deepEqual(
@@ -71,6 +72,48 @@ describe("asset price consumer admission", () => {
       "adjusted_close_source_missing",
       "provider_exchange_missing",
       "provider_symbol_missing",
+    ]);
+  });
+
+  it("fails raw historical analysis closed even with complete row metadata", () => {
+    const result = admitRawHistoricalPriceRows([
+      providerRow({
+        source: "kis_overseas_dailyprice:AMS",
+        fetchedAt: "2026-07-10T00:00:00.000Z",
+      }),
+    ]);
+
+    assert.equal(result.policy.priceField, "close_price");
+    assert.equal(result.policy.consumerRights, "not_admitted");
+    assert.deepEqual(result.rows, []);
+    assert.deepEqual(result.summary, {
+      suppliedRowCount: 1,
+      admittedRowCount: 0,
+      excludedRowCount: 1,
+      admittedInstrumentCount: 0,
+      excludedInstrumentCount: 1,
+    });
+    assert.deepEqual(result.issues, [
+      "raw_history_consumer_rights_not_admitted",
+    ]);
+  });
+
+  it("does not let stale adjusted metadata admit a newer KIS raw close", () => {
+    const result = admitRawHistoricalPriceRows([
+      providerRow({
+        closePrice: 99,
+        adjustedClosePrice: 101,
+        adjustedCloseProvider: "older_adjusted_provider",
+        adjustedCloseSource: "older_adjusted_history",
+        adjustedCloseFetchedAt: "2026-07-09T00:00:00.000Z",
+        source: "kis_overseas_dailyprice:AMS",
+        fetchedAt: "2026-07-10T00:00:00.000Z",
+      }),
+    ]);
+
+    assert.equal(result.summary.admittedRowCount, 0);
+    assert.deepEqual(result.issues, [
+      "raw_history_consumer_rights_not_admitted",
     ]);
   });
 
@@ -116,17 +159,20 @@ describe("asset price consumer admission", () => {
   });
 
   it("keeps operational and historical consumers on their explicit boundaries", () => {
-    const historicalAdapters = [
+    const adjustedHistoricalAdapters = [
       "src/db/queries/simulation-return-matrix.ts",
-      "src/db/queries/investment-lab.ts",
       "src/db/queries/portfolio-risk.ts",
     ].map((path) => readFileSync(path, "utf8"));
+    const investmentLabAdapter = readFileSync(
+      "src/db/queries/investment-lab.ts",
+      "utf8",
+    );
     const operationalConsumers = [
       "src/lib/portfolio-movement.ts",
       "src/lib/snapshots/daily.ts",
     ].map((path) => readFileSync(path, "utf8"));
 
-    for (const source of historicalAdapters) {
+    for (const source of adjustedHistoricalAdapters) {
       assert.match(source, /admitAdjustedHistoricalPriceRows/);
       assert.match(source, /adjustedCloseBasis/);
       assert.match(source, /adjustedCloseProvider/);
@@ -134,10 +180,16 @@ describe("asset price consumer admission", () => {
       assert.match(source, /providerSymbol/);
       assert.match(source, /providerExchange/);
     }
-    assert.ok(
-      historicalAdapters[1].match(/admitAdjustedHistoricalPriceRows/g)
-        ?.length >= 2,
-      "investment lab scenario and anchor history must both use admission",
+    assert.equal(
+      investmentLabAdapter.match(/admitAdjustedHistoricalPriceRows/g)
+        ?.length,
+      2,
+      "investment lab KODEX history must use adjusted admission",
+    );
+    assert.equal(
+      investmentLabAdapter.match(/admitRawHistoricalPriceRows/g)?.length,
+      3,
+      "investment lab VOO and anchor history must use raw admission",
     );
     for (const source of operationalConsumers) {
       assert.match(source, /resolveOperationalClosePrice/);
@@ -160,6 +212,7 @@ function providerRow(overrides = {}) {
     providerSymbol: "069500",
     providerExchange: "KRX",
     source: "fixture",
+    fetchedAt: "2026-07-10T00:00:00.000Z",
     ...overrides,
   };
 }
