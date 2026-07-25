@@ -12,13 +12,15 @@ exist. It must not automatically claim the existing provisioning portfolio
 user. This phase adds the missing authority checks before any future identity
 link:
 
-1. an independently authenticated operator explicitly reviews one target;
+1. an independently authenticated operator explicitly reviews one target and
+   is represented by a server-created, domain-separated opaque binding;
 2. the signed-in subject is represented only by a server-created HMAC binding;
 3. a target- and subject-bound pairing intent is pending and no more than ten
    minutes old;
 4. the challenge is carried only by a secure HTTP-only SameSite cookie;
 5. the existing G1-A identity-link planner independently reports
-   `planned_link`.
+   `planned_link` with a server-created commitment bound to its policy,
+   provider, subject binding, and target.
 
 The signed-in subject session, Basic Auth, a machine secret, a singleton
 `app_users` row, email, account scope, or request-provided owner cannot approve
@@ -32,6 +34,9 @@ The future intent must be a durable server record with one lifecycle:
 
 This pure phase does not create or mutate that record. A consumed, revoked,
 expired, not-yet-valid, overlong, mismatched, or malformed intent is blocked.
+The intent carries the exact operator binding and G1-A plan commitment; neither
+can be substituted by another otherwise-valid operator session or
+`planned_link` result.
 Actual intent consumption and identity insertion must eventually occur in one
 reviewed transaction, but neither operation is implemented here.
 

@@ -12,6 +12,8 @@ export type PairingOperatorAuthorityPort =
       state: "authorized";
       authorizationSource: PairingOperatorAuthorizationSource;
       actorSeparation: "verified_distinct" | "not_verified";
+      operatorBindingVersion: "operator_session_hmac_sha256_v1";
+      operatorBinding: string;
       reviewedTargetAppUserId: string;
     }>;
 
@@ -46,7 +48,12 @@ export type PairingIntentPort =
       provider: string;
       subjectBindingVersion: "provider_subject_hmac_sha256_v1";
       subjectBinding: string;
+      operatorBindingVersion: "operator_session_hmac_sha256_v1";
+      operatorBinding: string;
       targetAppUserId: string;
+      identityLinkPlannerPolicyId: "initial_identity_link_planner_v1";
+      identityLinkPlanBindingVersion: "identity_link_plan_hmac_sha256_v1";
+      identityLinkPlanBinding: string;
       issuedAt: string;
       expiresAt: string;
       persistence: "server_durable_single_use_record";
@@ -57,12 +64,20 @@ export type IdentityLinkDryRunEvidence = Readonly<{
   outcome: "planned_link" | "already_linked" | "blocked";
   identityDmlEnabled: false;
   appUserMutation: "none";
+  plannerPolicyId: "initial_identity_link_planner_v1";
+  provider: string;
+  subjectBindingVersion: "provider_subject_hmac_sha256_v1";
+  subjectBinding: string;
+  targetAppUserId: string;
+  planBindingVersion: "identity_link_plan_hmac_sha256_v1";
+  planBinding: string;
 }>;
 
 export type IdentityPairingAuthorityBlockedReason =
   | "operator_authority_required"
   | "operator_authority_invalid"
   | "operator_subject_separation_required"
+  | "operator_binding_required"
   | "verified_subject_binding_required"
   | "reviewed_target_required"
   | "reviewed_target_invalid"
@@ -75,6 +90,8 @@ export type IdentityPairingAuthorityBlockedReason =
   | "pairing_intent_binding_mismatch"
   | "pairing_intent_not_yet_valid"
   | "pairing_intent_lifetime_exceeded"
+  | "identity_link_plan_invalid"
+  | "identity_link_plan_binding_mismatch"
   | "identity_link_plan_blocked"
   | "identity_already_linked";
 
@@ -106,18 +123,30 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SUBJECT_BINDING_PATTERN =
   /^hmac-sha256-v1:[0-9a-f]{64}$/;
+const OPERATOR_BINDING_PATTERN =
+  /^operator-hmac-sha256-v1:[0-9a-f]{64}$/;
+const IDENTITY_LINK_PLAN_BINDING_PATTERN =
+  /^identity-link-plan-hmac-sha256-v1:[0-9a-f]{64}$/;
 
 export function planIdentityPairingAuthority(
   input: IdentityPairingAuthorityInput,
 ): IdentityPairingAuthorityPlan {
-  const operatorTarget = readAuthorizedOperatorTarget(input.operator);
-  if (operatorTarget === null) {
+  const operator = readAuthorizedOperator(input.operator);
+  if (operator === null) {
     if (
       input.operator.state === "authorized" &&
       input.operator.actorSeparation !==
         IDENTITY_PAIRING_AUTHORITY_POLICY.operatorSeparation
     ) {
       return blocked("operator_subject_separation_required");
+    }
+    if (
+      input.operator.state === "authorized" &&
+      (input.operator.operatorBindingVersion !==
+        IDENTITY_PAIRING_AUTHORITY_POLICY.operatorBindingVersion ||
+        !OPERATOR_BINDING_PATTERN.test(input.operator.operatorBinding))
+    ) {
+      return blocked("operator_binding_required");
     }
     return blocked(
       input.operator.state === "authorized"
@@ -139,7 +168,7 @@ export function planIdentityPairingAuthority(
         : "reviewed_target_required",
     );
   }
-  if (operatorTarget !== target) {
+  if (operator.targetAppUserId !== target) {
     return blocked("operator_target_mismatch");
   }
 
@@ -157,6 +186,8 @@ export function planIdentityPairingAuthority(
     intent.provider !== subject.provider ||
     intent.subjectBindingVersion !== subject.subjectBindingVersion ||
     intent.subjectBinding !== subject.subjectBinding ||
+    intent.operatorBindingVersion !== operator.operatorBindingVersion ||
+    intent.operatorBinding !== operator.operatorBinding ||
     normalizeUuid(intent.targetAppUserId) !== target
   ) {
     return blocked("pairing_intent_binding_mismatch");
@@ -186,16 +217,26 @@ export function planIdentityPairingAuthority(
     return blocked("pairing_intent_expired");
   }
 
-  if (
-    input.identityLinkPlan.identityDmlEnabled !== false ||
-    input.identityLinkPlan.appUserMutation !== "none"
-  ) {
-    return blocked("identity_link_plan_blocked");
+  const identityLinkPlan = input.identityLinkPlan;
+  if (!isValidIdentityLinkPlanEvidence(identityLinkPlan)) {
+    return blocked("identity_link_plan_invalid");
   }
-  if (input.identityLinkPlan.outcome === "already_linked") {
+  if (
+    identityLinkPlan.provider !== subject.provider ||
+    identityLinkPlan.subjectBindingVersion !== subject.subjectBindingVersion ||
+    identityLinkPlan.subjectBinding !== subject.subjectBinding ||
+    normalizeUuid(identityLinkPlan.targetAppUserId) !== target ||
+    intent.identityLinkPlannerPolicyId !== identityLinkPlan.plannerPolicyId ||
+    intent.identityLinkPlanBindingVersion !==
+      identityLinkPlan.planBindingVersion ||
+    intent.identityLinkPlanBinding !== identityLinkPlan.planBinding
+  ) {
+    return blocked("identity_link_plan_binding_mismatch");
+  }
+  if (identityLinkPlan.outcome === "already_linked") {
     return blocked("identity_already_linked");
   }
-  if (input.identityLinkPlan.outcome !== "planned_link") {
+  if (identityLinkPlan.outcome !== "planned_link") {
     return blocked("identity_link_plan_blocked");
   }
 
@@ -216,16 +257,25 @@ export function projectIdentityPairingAuthorityPlan(
   return Object.freeze({ outcome: plan.outcome, reason: plan.reason });
 }
 
-function readAuthorizedOperatorTarget(port: PairingOperatorAuthorityPort) {
+function readAuthorizedOperator(port: PairingOperatorAuthorityPort) {
   if (
     port.state !== "authorized" ||
     !canAuthorizeIdentityPairing(port.authorizationSource) ||
     port.actorSeparation !==
-      IDENTITY_PAIRING_AUTHORITY_POLICY.operatorSeparation
+      IDENTITY_PAIRING_AUTHORITY_POLICY.operatorSeparation ||
+    port.operatorBindingVersion !==
+      IDENTITY_PAIRING_AUTHORITY_POLICY.operatorBindingVersion ||
+    !OPERATOR_BINDING_PATTERN.test(port.operatorBinding)
   ) {
     return null;
   }
-  return normalizeUuid(port.reviewedTargetAppUserId);
+  const targetAppUserId = normalizeUuid(port.reviewedTargetAppUserId);
+  if (targetAppUserId === null) return null;
+  return Object.freeze({
+    targetAppUserId,
+    operatorBindingVersion: port.operatorBindingVersion,
+    operatorBinding: port.operatorBinding,
+  });
 }
 
 function readVerifiedSubjectBinding(
@@ -276,10 +326,39 @@ function isValidPendingIntent(
     intent.subjectBindingVersion ===
       IDENTITY_PAIRING_AUTHORITY_POLICY.subjectBindingVersion &&
     SUBJECT_BINDING_PATTERN.test(intent.subjectBinding) &&
+    intent.operatorBindingVersion ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.operatorBindingVersion &&
+    OPERATOR_BINDING_PATTERN.test(intent.operatorBinding) &&
     normalizeUuid(intent.targetAppUserId) !== null &&
+    intent.identityLinkPlannerPolicyId ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.identityLinkPlannerPolicyId &&
+    intent.identityLinkPlanBindingVersion ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.identityLinkPlanBindingVersion &&
+    IDENTITY_LINK_PLAN_BINDING_PATTERN.test(
+      intent.identityLinkPlanBinding,
+    ) &&
     intent.persistence ===
       IDENTITY_PAIRING_AUTHORITY_POLICY.intentPersistence &&
     canTransportIdentityPairingChallenge(intent.challengeTransport)
+  );
+}
+
+function isValidIdentityLinkPlanEvidence(
+  evidence: IdentityLinkDryRunEvidence,
+) {
+  return (
+    evidence.identityDmlEnabled === false &&
+    evidence.appUserMutation === "none" &&
+    evidence.plannerPolicyId ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.identityLinkPlannerPolicyId &&
+    evidence.provider === IDENTITY_PAIRING_AUTHORITY_POLICY.provider &&
+    evidence.subjectBindingVersion ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.subjectBindingVersion &&
+    SUBJECT_BINDING_PATTERN.test(evidence.subjectBinding) &&
+    normalizeUuid(evidence.targetAppUserId) !== null &&
+    evidence.planBindingVersion ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.identityLinkPlanBindingVersion &&
+    IDENTITY_LINK_PLAN_BINDING_PATTERN.test(evidence.planBinding)
   );
 }
 

@@ -17,6 +17,10 @@ const TARGET = "11111111-1111-4111-8111-111111111111";
 const OTHER_TARGET = "22222222-2222-4222-8222-222222222222";
 const INTENT = "33333333-3333-4333-8333-333333333333";
 const BINDING = `hmac-sha256-v1:${"a".repeat(64)}`;
+const OPERATOR_BINDING =
+  `operator-hmac-sha256-v1:${"b".repeat(64)}`;
+const PLAN_BINDING =
+  `identity-link-plan-hmac-sha256-v1:${"c".repeat(64)}`;
 
 describe("identity pairing authority Phase 1G1-B1b", () => {
   it("prepares only a synthetic dry-run without mutation authority", () => {
@@ -57,6 +61,16 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
         },
       }),
       "operator_subject_separation_required",
+    );
+    assertBlocked(
+      planIdentityPairingAuthority({
+        ...validInput(),
+        operator: {
+          ...validInput().operator,
+          operatorBinding: "operator-hmac-sha256-v1:invalid",
+        },
+      }),
+      "operator_binding_required",
     );
   });
 
@@ -112,12 +126,54 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
         ...validInput().pairingIntent,
         subjectBinding: `hmac-sha256-v1:${"b".repeat(64)}`,
       },
+      {
+        ...validInput().pairingIntent,
+        operatorBinding:
+          `operator-hmac-sha256-v1:${"d".repeat(64)}`,
+      },
     ]) {
       assertBlocked(
         planIdentityPairingAuthority({ ...validInput(), pairingIntent }),
         "pairing_intent_binding_mismatch",
       );
     }
+  });
+
+  it("binds G1-A evidence to the exact subject, target, and plan", () => {
+    for (const identityLinkPlan of [
+      {
+        ...validInput().identityLinkPlan,
+        subjectBinding: `hmac-sha256-v1:${"d".repeat(64)}`,
+      },
+      {
+        ...validInput().identityLinkPlan,
+        targetAppUserId: OTHER_TARGET,
+      },
+      {
+        ...validInput().identityLinkPlan,
+        planBinding:
+          `identity-link-plan-hmac-sha256-v1:${"d".repeat(64)}`,
+      },
+    ]) {
+      assertBlocked(
+        planIdentityPairingAuthority({
+          ...validInput(),
+          identityLinkPlan,
+        }),
+        "identity_link_plan_binding_mismatch",
+      );
+    }
+
+    assertBlocked(
+      planIdentityPairingAuthority({
+        ...validInput(),
+        identityLinkPlan: {
+          ...validInput().identityLinkPlan,
+          plannerPolicyId: "unknown",
+        },
+      }),
+      "identity_link_plan_invalid",
+    );
   });
 
   it("rejects consumed, revoked, expired, future, and overlong intents", () => {
@@ -217,7 +273,14 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       outcome: "synthetic_dry_run_ready",
       reason: null,
     });
-    for (const forbidden of [TARGET, INTENT, BINDING, "neon_auth"]) {
+    for (const forbidden of [
+      TARGET,
+      INTENT,
+      BINDING,
+      OPERATOR_BINDING,
+      PLAN_BINDING,
+      "neon_auth",
+    ]) {
       assert.equal(serialized.includes(forbidden), false);
     }
   });
@@ -253,6 +316,8 @@ function validInput() {
       state: "authorized",
       authorizationSource: "server_verified_operator_session",
       actorSeparation: "verified_distinct",
+      operatorBindingVersion: "operator_session_hmac_sha256_v1",
+      operatorBinding: OPERATOR_BINDING,
       reviewedTargetAppUserId: TARGET,
     },
     subjectSession: {
@@ -276,7 +341,12 @@ function validInput() {
       provider: "neon_auth",
       subjectBindingVersion: "provider_subject_hmac_sha256_v1",
       subjectBinding: BINDING,
+      operatorBindingVersion: "operator_session_hmac_sha256_v1",
+      operatorBinding: OPERATOR_BINDING,
       targetAppUserId: TARGET,
+      identityLinkPlannerPolicyId: "initial_identity_link_planner_v1",
+      identityLinkPlanBindingVersion: "identity_link_plan_hmac_sha256_v1",
+      identityLinkPlanBinding: PLAN_BINDING,
       issuedAt: "2026-07-25T06:00:00.000Z",
       expiresAt: "2026-07-25T06:10:00.000Z",
       persistence: "server_durable_single_use_record",
@@ -286,6 +356,13 @@ function validInput() {
       outcome: "planned_link",
       identityDmlEnabled: false,
       appUserMutation: "none",
+      plannerPolicyId: "initial_identity_link_planner_v1",
+      provider: "neon_auth",
+      subjectBindingVersion: "provider_subject_hmac_sha256_v1",
+      subjectBinding: BINDING,
+      targetAppUserId: TARGET,
+      planBindingVersion: "identity_link_plan_hmac_sha256_v1",
+      planBinding: PLAN_BINDING,
     },
     evaluationTime: "2026-07-25T06:05:00.000Z",
   };
