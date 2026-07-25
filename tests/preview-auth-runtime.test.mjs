@@ -63,9 +63,8 @@ describe("preview auth session transport smoke", () => {
     assert.equal(PREVIEW_AUTH_CALLBACK_PATH, "/auth/session");
   });
 
-  it("allows only the three reviewed Google session transport requests", () => {
+  it("allows only the two reviewed Google session transport requests", () => {
     assert.deepEqual(PREVIEW_AUTH_ALLOWED_API_ENDPOINTS, [
-      { method: "GET", path: ["get-session"] },
       {
         method: "POST",
         path: ["sign-in", "social"],
@@ -74,13 +73,6 @@ describe("preview auth session transport smoke", () => {
       { method: "POST", path: ["sign-out"] },
     ]);
 
-    assert.equal(
-      isPreviewAuthApiRequestAllowed({
-        method: "GET",
-        path: ["get-session"],
-      }),
-      true,
-    );
     assert.equal(
       isPreviewAuthApiRequestAllowed({
         method: "POST",
@@ -103,6 +95,7 @@ describe("preview auth session transport smoke", () => {
       { method: "POST", path: ["sign-up", "email"] },
       { method: "POST", path: ["sign-in", "email"] },
       { method: "GET", path: ["list-sessions"] },
+      { method: "GET", path: ["get-session"] },
       { method: "POST", path: ["delete-user"] },
       { method: "GET", path: ["callback", "google"] },
       {
@@ -133,7 +126,7 @@ describe("preview auth session transport smoke", () => {
       publicAuthEnvironmentReferences: 0,
       previewAuthSdkPinned: true,
       previewGitRefGatePresent: true,
-      allowedAuthApiEndpoints: 3,
+      allowedAuthApiEndpoints: 2,
       googleSocialProviderRestricted: true,
       basicAuthBoundaryIntact: true,
       oauthCallbackExchangeProxyPresent: true,

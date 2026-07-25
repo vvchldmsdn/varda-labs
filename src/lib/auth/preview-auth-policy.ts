@@ -5,10 +5,6 @@ export const PREVIEW_AUTH_ALLOWED_GIT_REF =
 
 export const PREVIEW_AUTH_ALLOWED_API_ENDPOINTS = Object.freeze([
   Object.freeze({
-    method: "GET",
-    path: Object.freeze(["get-session"]),
-  }),
-  Object.freeze({
     method: "POST",
     path: Object.freeze(["sign-in", "social"]),
     socialProvider: "google",

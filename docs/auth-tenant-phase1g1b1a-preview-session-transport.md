@@ -58,7 +58,6 @@ The local `/api/auth/[...path]` proxy accepts only:
 
 | Method | Path | Additional restriction |
 | --- | --- | --- |
-| `GET` | `/api/auth/get-session` | session evidence only |
 | `POST` | `/api/auth/sign-in/social` | provider must be `google` |
 | `POST` | `/api/auth/sign-out` | current session only |
 
@@ -66,6 +65,12 @@ All other methods, auth paths, and social providers are rejected before the
 Neon Auth handler runs. The OAuth provider callback itself is managed by Neon
 Auth. The app's `/auth/session` proxy branch only exchanges the returned
 short-lived verifier for the local HTTP-only session cookie.
+
+The browser-facing `GET /api/auth/get-session` SDK endpoint is intentionally
+closed because it can return complete provider-managed user and session
+objects. This phase does not mount the client `useSession` query that needs that
+endpoint. The `/auth/session` server component instead calls the server SDK
+directly and projects only presence classifications.
 
 ## Verification Evidence
 
@@ -75,7 +80,7 @@ Automated evidence on 2026-07-25:
 - the runtime graph contains no product database imports;
 - the managed `neon_auth` schema is not owned by Drizzle;
 - the production Basic Auth boundary remains intact;
-- the reviewed API allowlist contains exactly three method/path entries;
+- the reviewed API allowlist contains exactly two method/path entries;
 - the social sign-in entry is restricted to Google.
 
 Interactive evidence on 2026-07-25, before the endpoint allowlist was added:

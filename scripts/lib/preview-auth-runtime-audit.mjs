@@ -90,7 +90,7 @@ export function auditPreviewAuthRuntime(root) {
     route.includes("readSocialProvider") &&
     route.indexOf("isPreviewAuthApiRequestAllowed") <
       route.indexOf("runtime.auth.handler()");
-  if (allowedAuthApiEndpoints !== 3) {
+  if (allowedAuthApiEndpoints !== 2) {
     findings.push("preview_auth_endpoint_allowlist_drift");
   }
   if (!googleSocialProviderRestricted) {
