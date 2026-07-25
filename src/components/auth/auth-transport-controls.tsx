@@ -5,7 +5,7 @@ import { useState } from "react";
 
 const authClient = createAuthClient();
 
-export function PreviewGoogleSignInButton() {
+export function GoogleSignInButton() {
   const [status, setStatus] = useState<"idle" | "pending" | "failed">("idle");
 
   async function signIn() {
@@ -44,7 +44,7 @@ export function PreviewGoogleSignInButton() {
   );
 }
 
-export function PreviewSignOutButton() {
+export function SignOutButton() {
   const [pending, setPending] = useState(false);
 
   async function signOut() {
@@ -64,7 +64,7 @@ export function PreviewSignOutButton() {
       disabled={pending}
       className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8] disabled:cursor-wait disabled:opacity-60"
     >
-      {pending ? "Signing out" : "Sign out of Preview"}
+      {pending ? "Signing out" : "Sign out"}
     </button>
   );
 }

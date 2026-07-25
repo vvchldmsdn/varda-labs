@@ -2,10 +2,10 @@ import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getPreviewAuthRuntime } from "@/lib/auth/preview-auth-runtime";
+import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 
-export async function handlePreviewAuthProxy(request: NextRequest) {
-  const runtime = getPreviewAuthRuntime();
+export async function handleAuthTransportProxy(request: NextRequest) {
+  const runtime = getAuthTransportRuntime();
 
   if (runtime.state !== "ready") return NextResponse.next();
 

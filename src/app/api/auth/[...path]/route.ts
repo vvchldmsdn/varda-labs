@@ -1,5 +1,5 @@
-import { getPreviewAuthRuntime } from "@/lib/auth/preview-auth-runtime";
-import { isPreviewAuthApiRequestAllowed } from "@/lib/auth/preview-auth-policy";
+import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
+import { isAuthTransportApiRequestAllowed } from "@/lib/auth/auth-transport-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ async function dispatchAuthRequest(
   const socialProvider = await readSocialProvider(request, method, path);
 
   if (
-    !isPreviewAuthApiRequestAllowed({
+    !isAuthTransportApiRequestAllowed({
       method,
       path,
       socialProvider,
@@ -33,7 +33,7 @@ async function dispatchAuthRequest(
     return notFoundResponse();
   }
 
-  const runtime = getPreviewAuthRuntime();
+  const runtime = getAuthTransportRuntime();
 
   if (runtime.state === "disabled") {
     return notFoundResponse();

@@ -393,3 +393,10 @@ Phase 1G1-B1b now adds the next authority layer as a pure synthetic dry-run in
 independent operator, explicit provisioning-user target, verified subject
 binding, and short-lived single-use intent, but grants no runtime trust and
 performs no identity, intent, or app-user mutation.
+
+Phase 1G1-B1c generalizes the verified session transport for a separately
+reviewed Production deployment in
+`docs/auth-tenant-phase1g1b1c-production-session-transport.md`. The temporary
+Basic Auth boundary still gates sign-in initiation and the Auth API, while the
+OAuth session callback remains isolated from product data. Identity pairing,
+activation, tenant resolution, owner filtering, and RLS remain closed.
