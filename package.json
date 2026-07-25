@@ -46,6 +46,8 @@
     "audit:session-resolver-contract": "node --no-warnings scripts/audit-session-resolver-contract.mjs",
     "audit:initial-identity-link-planner": "node --no-warnings scripts/audit-initial-identity-link-planner.mjs",
     "audit:identity-pairing-authority": "node --no-warnings scripts/audit-identity-pairing-authority.mjs",
+    "audit:identity-bootstrap-claim-authority": "node --no-warnings scripts/audit-identity-bootstrap-claim-authority.mjs",
+    "audit:identity-pairing-schema": "node --no-warnings scripts/audit-identity-pairing-schema.mjs",
     "audit:preview-auth-readiness": "node --no-warnings scripts/audit-preview-auth-readiness.mjs",
     "audit:auth-transport": "node --no-warnings scripts/audit-auth-transport-runtime.mjs",
     "audit:preview-auth-runtime": "npm run audit:auth-transport",

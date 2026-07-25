@@ -129,6 +129,7 @@ import "./runtime-writer-convergence.test.mjs";
 import "./session-resolver-contract.test.mjs";
 import "./initial-identity-link-planner.test.mjs";
 import "./identity-pairing-authority.test.mjs";
+import "./identity-bootstrap-claim-authority.test.mjs";
 import "./identity-pairing-intent-schema.test.mjs";
 import "./preview-auth-readiness.test.mjs";
 import "./auth-transport-runtime.test.mjs";

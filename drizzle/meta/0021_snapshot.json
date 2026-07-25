@@ -1,5 +1,5 @@
 {
-  "id": "9786f88c-3e2a-4100-b142-f128e48f636c",
+  "id": "a11e589b-248e-4f44-93d2-25e0d1f633c6",
   "prevId": "29f0361d-0cf8-4ea6-93e2-31d600b26b2a",
   "version": "7",
   "dialect": "postgresql",
@@ -4204,6 +4204,36 @@
           "primaryKey": false,
           "notNull": false
         },
+        "subject_binding_version": {
+          "name": "subject_binding_version",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subject_binding": {
+          "name": "subject_binding",
+          "type": "varchar(96)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "identity_link_planner_policy_id": {
+          "name": "identity_link_planner_policy_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "identity_link_plan_binding_version": {
+          "name": "identity_link_plan_binding_version",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "identity_link_plan_binding": {
+          "name": "identity_link_plan_binding",
+          "type": "varchar(112)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "occurred_at": {
           "name": "occurred_at",
           "type": "timestamp with time zone",
@@ -4233,6 +4263,21 @@
           "columns": [
             {
               "expression": "auth_identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "id_pair_intent_events_subject_binding_idx": {
+          "name": "id_pair_intent_events_subject_binding_idx",
+          "columns": [
+            {
+              "expression": "subject_binding",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4282,7 +4327,7 @@
         },
         "id_pair_intent_events_identity_state_check": {
           "name": "id_pair_intent_events_identity_state_check",
-          "value": "(\"identity_pairing_intent_events\".\"event_type\" = 'consumed' and \"identity_pairing_intent_events\".\"auth_identity_id\" is not null) or (\"identity_pairing_intent_events\".\"event_type\" = 'revoked' and \"identity_pairing_intent_events\".\"auth_identity_id\" is null)"
+          "value": "(\"identity_pairing_intent_events\".\"event_type\" = 'consumed' and \"identity_pairing_intent_events\".\"auth_identity_id\" is not null and \"identity_pairing_intent_events\".\"subject_binding_version\" is not null and \"identity_pairing_intent_events\".\"subject_binding_version\" = 'provider_subject_hmac_sha256_v1' and \"identity_pairing_intent_events\".\"subject_binding\" is not null and \"identity_pairing_intent_events\".\"subject_binding\" ~ '^hmac-sha256-v1:[0-9a-f]{64}$' and \"identity_pairing_intent_events\".\"identity_link_planner_policy_id\" is not null and \"identity_pairing_intent_events\".\"identity_link_planner_policy_id\" = 'initial_identity_link_planner_v1' and \"identity_pairing_intent_events\".\"identity_link_plan_binding_version\" is not null and \"identity_pairing_intent_events\".\"identity_link_plan_binding_version\" = 'identity_link_plan_hmac_sha256_v1' and \"identity_pairing_intent_events\".\"identity_link_plan_binding\" is not null and \"identity_pairing_intent_events\".\"identity_link_plan_binding\" ~ '^identity-link-plan-hmac-sha256-v1:[0-9a-f]{64}$') or (\"identity_pairing_intent_events\".\"event_type\" = 'revoked' and \"identity_pairing_intent_events\".\"auth_identity_id\" is null and \"identity_pairing_intent_events\".\"subject_binding_version\" is null and \"identity_pairing_intent_events\".\"subject_binding\" is null and \"identity_pairing_intent_events\".\"identity_link_planner_policy_id\" is null and \"identity_pairing_intent_events\".\"identity_link_plan_binding_version\" is null and \"identity_pairing_intent_events\".\"identity_link_plan_binding\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -4316,75 +4361,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "subject_binding_version": {
-          "name": "subject_binding_version",
+        "claim_digest_version": {
+          "name": "claim_digest_version",
           "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
-        "subject_binding": {
-          "name": "subject_binding",
+        "claim_digest": {
+          "name": "claim_digest",
           "type": "varchar(96)",
           "primaryKey": false,
           "notNull": true
         },
-        "operator_principal_binding_version": {
-          "name": "operator_principal_binding_version",
+        "target_review_policy_id": {
+          "name": "target_review_policy_id",
           "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "operator_principal_binding": {
-          "name": "operator_principal_binding",
-          "type": "varchar(96)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_principal_binding_version": {
-          "name": "subject_principal_binding_version",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_principal_binding": {
-          "name": "subject_principal_binding",
-          "type": "varchar(96)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "operator_binding_version": {
-          "name": "operator_binding_version",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "operator_binding": {
-          "name": "operator_binding",
-          "type": "varchar(96)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "identity_link_planner_policy_id": {
-          "name": "identity_link_planner_policy_id",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "identity_link_plan_binding_version": {
-          "name": "identity_link_plan_binding_version",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "identity_link_plan_binding": {
-          "name": "identity_link_plan_binding",
-          "type": "varchar(112)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "challenge_digest": {
-          "name": "challenge_digest",
-          "type": "varchar(96)",
           "primaryKey": false,
           "notNull": true
         },
@@ -4409,11 +4400,11 @@
         }
       },
       "indexes": {
-        "id_pair_intents_challenge_digest_unique": {
-          "name": "id_pair_intents_challenge_digest_unique",
+        "id_pair_intents_claim_digest_unique": {
+          "name": "id_pair_intents_claim_digest_unique",
           "columns": [
             {
-              "expression": "challenge_digest",
+              "expression": "claim_digest",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4429,27 +4420,6 @@
           "columns": [
             {
               "expression": "target_app_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "id_pair_intents_subject_binding_idx": {
-          "name": "id_pair_intents_subject_binding_idx",
-          "columns": [
-            {
-              "expression": "provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "subject_binding",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4482,39 +4452,19 @@
       "checkConstraints": {
         "id_pair_intents_policy_check": {
           "name": "id_pair_intents_policy_check",
-          "value": "\"identity_pairing_intents\".\"authority_policy_id\" = 'identity_pairing_authority_v1'"
+          "value": "\"identity_pairing_intents\".\"authority_policy_id\" = 'preissued_bootstrap_claim_authority_v1'"
         },
         "id_pair_intents_provider_check": {
           "name": "id_pair_intents_provider_check",
           "value": "\"identity_pairing_intents\".\"provider\" = 'neon_auth'"
         },
-        "id_pair_intents_subject_binding_check": {
-          "name": "id_pair_intents_subject_binding_check",
-          "value": "\"identity_pairing_intents\".\"subject_binding_version\" = 'provider_subject_hmac_sha256_v1' and \"identity_pairing_intents\".\"subject_binding\" ~ '^hmac-sha256-v1:[0-9a-f]{64}$'"
+        "id_pair_intents_claim_digest_check": {
+          "name": "id_pair_intents_claim_digest_check",
+          "value": "\"identity_pairing_intents\".\"claim_digest_version\" = 'bootstrap_claim_sha256_v1' and \"identity_pairing_intents\".\"claim_digest\" ~ '^bootstrap-claim-sha256-v1:[0-9a-f]{64}$'"
         },
-        "id_pair_intents_operator_principal_check": {
-          "name": "id_pair_intents_operator_principal_check",
-          "value": "\"identity_pairing_intents\".\"operator_principal_binding_version\" = 'auth_principal_hmac_sha256_v1' and \"identity_pairing_intents\".\"operator_principal_binding\" ~ '^principal-hmac-sha256-v1:[0-9a-f]{64}$'"
-        },
-        "id_pair_intents_subject_principal_check": {
-          "name": "id_pair_intents_subject_principal_check",
-          "value": "\"identity_pairing_intents\".\"subject_principal_binding_version\" = 'auth_principal_hmac_sha256_v1' and \"identity_pairing_intents\".\"subject_principal_binding\" ~ '^principal-hmac-sha256-v1:[0-9a-f]{64}$'"
-        },
-        "id_pair_intents_operator_binding_check": {
-          "name": "id_pair_intents_operator_binding_check",
-          "value": "\"identity_pairing_intents\".\"operator_binding_version\" = 'operator_session_hmac_sha256_v1' and \"identity_pairing_intents\".\"operator_binding\" ~ '^operator-hmac-sha256-v1:[0-9a-f]{64}$'"
-        },
-        "id_pair_intents_planner_policy_check": {
-          "name": "id_pair_intents_planner_policy_check",
-          "value": "\"identity_pairing_intents\".\"identity_link_planner_policy_id\" = 'initial_identity_link_planner_v1'"
-        },
-        "id_pair_intents_plan_binding_check": {
-          "name": "id_pair_intents_plan_binding_check",
-          "value": "\"identity_pairing_intents\".\"identity_link_plan_binding_version\" = 'identity_link_plan_hmac_sha256_v1' and \"identity_pairing_intents\".\"identity_link_plan_binding\" ~ '^identity-link-plan-hmac-sha256-v1:[0-9a-f]{64}$'"
-        },
-        "id_pair_intents_challenge_digest_check": {
-          "name": "id_pair_intents_challenge_digest_check",
-          "value": "\"identity_pairing_intents\".\"challenge_digest\" ~ '^challenge-sha256-v1:[0-9a-f]{64}$'"
+        "id_pair_intents_target_review_policy_check": {
+          "name": "id_pair_intents_target_review_policy_check",
+          "value": "\"identity_pairing_intents\".\"target_review_policy_id\" = 'single_provisioning_user_explicit_review_v1'"
         },
         "id_pair_intents_lifetime_check": {
           "name": "id_pair_intents_lifetime_check",

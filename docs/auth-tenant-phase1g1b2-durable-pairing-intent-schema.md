@@ -1,79 +1,101 @@
-# Auth/Tenant Phase 1G1-B2: Durable Pairing Intent Schema
+# Auth/Tenant Phase 1G1-B2: Durable Bootstrap Claim Schema
 
 Last updated: 2026-07-25
 
-Status: implemented and verified locally. Migration `0021` is generated but
-not applied to any database.
+Status: corrected and verified locally. Migration
+`0021_strange_sinister_six.sql` is generated but not applied to any database.
 
-Migration SHA-256:
-`ef49f7d2b9074daf10dbb2d7890875cc895cf6dd87a4d9b39d01c8a9df0a3c50`.
+Normalized file SHA-256:
+`d912d7692a856fb0fc097462fd8a97102533d84471d30524040e456dcf8fc0d0`.
 
 ## Purpose
 
-This phase gives the B1b single-use pairing contract a durable physical shape.
-It does not create an intent, connect a Google identity, activate an app user,
-or expose a mutation route.
+Preview and Production Google sign-in prove that Neon Auth can establish and
+clear a server session. A session does not prove which existing provisioning
+portfolio user the subject may claim. Basic Auth is also an application access
+boundary, not identity-link authority.
+
+This phase gives a future, separately preissued bootstrap claim a durable
+physical shape. It does not issue a claim, connect an identity, activate an app
+user, or expose a mutation route.
 
 ## Storage Model
 
-`identity_pairing_intents` is the immutable approval header. It binds:
+`identity_pairing_intents` is an immutable claim header. It stores:
 
-- one explicitly reviewed provisioning app user;
-- the fixed pairing and planner policy versions;
-- server-derived HMAC bindings for the subject, operator, and principals;
-- the verified identity-link plan commitment;
-- a unique digest of a high-entropy challenge;
-- an issue time and expiry no more than ten minutes apart.
+- one explicitly reviewed provisioning app-user target;
+- the fixed bootstrap-claim authority and target-review policies;
+- provider `neon_auth`;
+- a unique SHA-256 digest of a high-entropy one-time claim;
+- issue and expiry timestamps no more than ten minutes apart.
 
-It stores no raw provider subject, email, token, cookie, profile, or Basic Auth
-credential. The challenge value itself remains only in a future secure,
-HTTP-only, SameSite cookie.
+It does not store the raw claim, provider subject, email, token, cookie,
+profile, Basic Auth credential, operator session, or identity-link plan. A
+future local preissue tool may reveal the raw claim once through an
+out-of-band channel, but that tool is not implemented here.
 
-`identity_pairing_intent_events` is the append-only terminal record. It permits
-only:
+`identity_pairing_intent_events` is the append-only terminal evidence:
 
-- `consumed`, with a required `auth_identity_id`;
-- `revoked`, without an identity.
+- `consumed` requires the created `auth_identity_id`, server-derived subject
+  HMAC, and exact G1-A plan commitment;
+- `revoked` requires those consume-only fields to remain null.
 
-A unique index permits at most one terminal event per intent. Expiry is derived
-from `expires_at`; it is not a mutable status or cleanup write.
+A unique index permits at most one terminal event per claim. Expiry is derived
+from `expires_at`; it is not represented by mutable status. Database triggers
+reject `UPDATE`, `DELETE`, and `TRUNCATE` on both evidence tables.
 
-## Transaction Boundary
+## Authority Boundary
 
-The schema makes a future atomic consume transaction possible:
+The separate factors are:
 
-1. lock and re-read the exact intent;
-2. verify the unexpired challenge, independent operator, subject bindings,
-   reviewed target, and current G1-A commitment;
-3. insert the active `auth_identities` row;
-4. append the `consumed` event;
-5. commit both writes together.
+1. possession of the preissued one-time claim;
+2. a current server-verified Neon Auth subject session;
+3. one explicitly reviewed `provisioning/user` target;
+4. a current G1-A plan commitment bound to that subject and target.
 
-No part of that repository or transaction is implemented here. The future
-writer must also re-check that the target remains exactly one
-`provisioning/user` row because a cross-table check constraint cannot enforce
-that condition.
+There is no synthetic operator principal in this model. Operator-subject
+inequality is therefore not a stored invariant; the separately preissued claim
+is the independent authority factor. Session-only, Basic Auth-only, machine
+secret-only, singleton-row, email, or request-target claims remain
+insufficient.
+
+## Future Atomic Consume
+
+A future writer must perform one reviewed transaction:
+
+1. hash the presented raw claim and lock the exact pending header;
+2. re-check DB time, expiry, target role/status/cardinality, and terminal-event
+   absence;
+3. verify the server session and current G1-A commitment;
+4. insert the active identity;
+5. activate the exact target;
+6. append the `consumed` event;
+7. commit all changes together.
+
+None of that writer, claim preissuer, repository, or transaction exists in this
+phase.
 
 ## Verification
 
-`tests/identity-pairing-intent-schema.test.mjs` checks:
+`tests/identity-pairing-intent-schema.test.mjs` pins:
 
-- the exact two-table migration scope;
-- fixed policy and HMAC formats;
-- unique challenge and terminal-event constraints;
-- the ten-minute lifetime limit;
+- the exact two-table migration and file hash;
+- claim-header and consume-event field separation;
+- fixed policy and digest formats;
+- one terminal event and ten-minute lifetime;
 - restrictive foreign keys;
-- absence of identity DML, destructive DDL, RLS, and secret columns.
+- exactly one append-only function and two triggers;
+- absence of identity DML, destructive DDL, RLS, and secrets.
 
-The read-only Production ownership audits also pass against the current
-27-table schema. They classify the three existing simulation approval tables
-as user-owned authority data (one direct owner and two parent-FK owner paths).
-The future post-`0021` schema resolves to 29 classified tables without changing
-the 14-table transitional owner-column set.
+`npm run audit:identity-pairing-schema` is SELECT-only. Before migration it must
+report `state=absent`. After a separately approved migration it will verify the
+exact columns, constraints, indexes, triggers, function, zero rows, and Drizzle
+ledger hash. Its product-row-count digest can be passed back as
+`--expect-product-row-counts-sha256` for same-window pre/post comparison.
 
 ## Still Closed
 
-This phase does not apply migration `0021`, read or write the new tables, create
-an operator authority, issue a challenge, resolve a product tenant, activate an
-app user, backfill ownership, enable RLS, change Basic Auth, or alter any
-portfolio, Investment Lab, Simulation, provider-history, job, or Cron path.
+Migration `0021`, claim issuance, identity linking, app-user activation,
+ownership backfill, RLS, Basic Auth changes, product DB reads, and every
+portfolio, Investment Lab, Simulation, provider-history, job, and Cron path
+remain unchanged and unapproved.

@@ -2,9 +2,11 @@
 
 Last updated: 2026-07-25
 
-Status: implemented as a pure synthetic dry-run contract. The separate B2
-phase now defines its local-only physical persistence shape, but this contract
-still has no runtime, provider, route, or identity-write integration.
+Status: preserved as a pure historical synthetic contract. Its assumed
+`server_verified_operator_session` producer does not exist, so it is
+superseded for the durable bootstrap path by
+`preissued_bootstrap_claim_authority_v1`. It remains disconnected from runtime,
+provider, routes, and identity writes.
 
 ## Purpose
 
@@ -79,6 +81,7 @@ UI, writer, identity row, app-user activation, TenantContext, owner filtering,
 RLS, product DB access, or Basic Auth removal. The B2 schema and generated
 migration remain unapplied until separately reviewed.
 
-The next gate is not an identity write. It is review and application of the B2
-empty schema migration. A repository and the atomic consume transaction remain
-later, separate gates.
+This contract must not be used to justify the B2 migration or a runtime writer.
+The corrected B2 schema uses a separately preissued one-time claim rather than
+fabricating an operator session. Migration review, claim issuance, repository,
+and atomic consume remain later, separate gates.

@@ -103,43 +103,12 @@ export const identityPairingIntents = pgTable(
     }).notNull(),
     targetAppUserId: uuid("target_app_user_id").notNull(),
     provider: varchar("provider", { length: 50 }).notNull(),
-    subjectBindingVersion: varchar("subject_binding_version", {
+    claimDigestVersion: varchar("claim_digest_version", {
       length: 64,
     }).notNull(),
-    subjectBinding: varchar("subject_binding", { length: 96 }).notNull(),
-    operatorPrincipalBindingVersion: varchar(
-      "operator_principal_binding_version",
-      { length: 64 },
-    ).notNull(),
-    operatorPrincipalBinding: varchar("operator_principal_binding", {
-      length: 96,
-    }).notNull(),
-    subjectPrincipalBindingVersion: varchar(
-      "subject_principal_binding_version",
-      { length: 64 },
-    ).notNull(),
-    subjectPrincipalBinding: varchar("subject_principal_binding", {
-      length: 96,
-    }).notNull(),
-    operatorBindingVersion: varchar("operator_binding_version", {
+    claimDigest: varchar("claim_digest", { length: 96 }).notNull(),
+    targetReviewPolicyId: varchar("target_review_policy_id", {
       length: 64,
-    }).notNull(),
-    operatorBinding: varchar("operator_binding", {
-      length: 96,
-    }).notNull(),
-    identityLinkPlannerPolicyId: varchar(
-      "identity_link_planner_policy_id",
-      { length: 64 },
-    ).notNull(),
-    identityLinkPlanBindingVersion: varchar(
-      "identity_link_plan_binding_version",
-      { length: 64 },
-    ).notNull(),
-    identityLinkPlanBinding: varchar("identity_link_plan_binding", {
-      length: 112,
-    }).notNull(),
-    challengeDigest: varchar("challenge_digest", {
-      length: 96,
     }).notNull(),
     issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -155,53 +124,29 @@ export const identityPairingIntents = pgTable(
     }).onDelete("restrict"),
     authorityPolicyCheck: check(
       "id_pair_intents_policy_check",
-      sql`${table.authorityPolicyId} = 'identity_pairing_authority_v1'`,
+      sql`${table.authorityPolicyId} = 'preissued_bootstrap_claim_authority_v1'`,
     ),
     providerCheck: check(
       "id_pair_intents_provider_check",
       sql`${table.provider} = 'neon_auth'`,
     ),
-    subjectBindingCheck: check(
-      "id_pair_intents_subject_binding_check",
-      sql`${table.subjectBindingVersion} = 'provider_subject_hmac_sha256_v1' and ${table.subjectBinding} ~ '^hmac-sha256-v1:[0-9a-f]{64}$'`,
+    claimDigestCheck: check(
+      "id_pair_intents_claim_digest_check",
+      sql`${table.claimDigestVersion} = 'bootstrap_claim_sha256_v1' and ${table.claimDigest} ~ '^bootstrap-claim-sha256-v1:[0-9a-f]{64}$'`,
     ),
-    operatorPrincipalBindingCheck: check(
-      "id_pair_intents_operator_principal_check",
-      sql`${table.operatorPrincipalBindingVersion} = 'auth_principal_hmac_sha256_v1' and ${table.operatorPrincipalBinding} ~ '^principal-hmac-sha256-v1:[0-9a-f]{64}$'`,
-    ),
-    subjectPrincipalBindingCheck: check(
-      "id_pair_intents_subject_principal_check",
-      sql`${table.subjectPrincipalBindingVersion} = 'auth_principal_hmac_sha256_v1' and ${table.subjectPrincipalBinding} ~ '^principal-hmac-sha256-v1:[0-9a-f]{64}$'`,
-    ),
-    operatorBindingCheck: check(
-      "id_pair_intents_operator_binding_check",
-      sql`${table.operatorBindingVersion} = 'operator_session_hmac_sha256_v1' and ${table.operatorBinding} ~ '^operator-hmac-sha256-v1:[0-9a-f]{64}$'`,
-    ),
-    plannerPolicyCheck: check(
-      "id_pair_intents_planner_policy_check",
-      sql`${table.identityLinkPlannerPolicyId} = 'initial_identity_link_planner_v1'`,
-    ),
-    planBindingCheck: check(
-      "id_pair_intents_plan_binding_check",
-      sql`${table.identityLinkPlanBindingVersion} = 'identity_link_plan_hmac_sha256_v1' and ${table.identityLinkPlanBinding} ~ '^identity-link-plan-hmac-sha256-v1:[0-9a-f]{64}$'`,
-    ),
-    challengeDigestCheck: check(
-      "id_pair_intents_challenge_digest_check",
-      sql`${table.challengeDigest} ~ '^challenge-sha256-v1:[0-9a-f]{64}$'`,
+    targetReviewPolicyCheck: check(
+      "id_pair_intents_target_review_policy_check",
+      sql`${table.targetReviewPolicyId} = 'single_provisioning_user_explicit_review_v1'`,
     ),
     lifetimeCheck: check(
       "id_pair_intents_lifetime_check",
       sql`${table.expiresAt} > ${table.issuedAt} and ${table.expiresAt} <= ${table.issuedAt} + interval '10 minutes'`,
     ),
-    challengeDigestUnique: uniqueIndex(
-      "id_pair_intents_challenge_digest_unique",
-    ).on(table.challengeDigest),
+    claimDigestUnique: uniqueIndex(
+      "id_pair_intents_claim_digest_unique",
+    ).on(table.claimDigest),
     targetAppUserIdx: index("id_pair_intents_target_app_user_idx").on(
       table.targetAppUserId,
-    ),
-    subjectBindingIdx: index("id_pair_intents_subject_binding_idx").on(
-      table.provider,
-      table.subjectBinding,
     ),
   }),
 );
@@ -213,6 +158,21 @@ export const identityPairingIntentEvents = pgTable(
     identityPairingIntentId: uuid("identity_pairing_intent_id").notNull(),
     eventType: varchar("event_type", { length: 20 }).notNull(),
     authIdentityId: uuid("auth_identity_id"),
+    subjectBindingVersion: varchar("subject_binding_version", {
+      length: 64,
+    }),
+    subjectBinding: varchar("subject_binding", { length: 96 }),
+    identityLinkPlannerPolicyId: varchar(
+      "identity_link_planner_policy_id",
+      { length: 64 },
+    ),
+    identityLinkPlanBindingVersion: varchar(
+      "identity_link_plan_binding_version",
+      { length: 64 },
+    ),
+    identityLinkPlanBinding: varchar("identity_link_plan_binding", {
+      length: 112,
+    }),
     occurredAt: timestamp("occurred_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -234,13 +194,16 @@ export const identityPairingIntentEvents = pgTable(
     ),
     identityStateCheck: check(
       "id_pair_intent_events_identity_state_check",
-      sql`(${table.eventType} = 'consumed' and ${table.authIdentityId} is not null) or (${table.eventType} = 'revoked' and ${table.authIdentityId} is null)`,
+      sql`(${table.eventType} = 'consumed' and ${table.authIdentityId} is not null and ${table.subjectBindingVersion} is not null and ${table.subjectBindingVersion} = 'provider_subject_hmac_sha256_v1' and ${table.subjectBinding} is not null and ${table.subjectBinding} ~ '^hmac-sha256-v1:[0-9a-f]{64}$' and ${table.identityLinkPlannerPolicyId} is not null and ${table.identityLinkPlannerPolicyId} = 'initial_identity_link_planner_v1' and ${table.identityLinkPlanBindingVersion} is not null and ${table.identityLinkPlanBindingVersion} = 'identity_link_plan_hmac_sha256_v1' and ${table.identityLinkPlanBinding} is not null and ${table.identityLinkPlanBinding} ~ '^identity-link-plan-hmac-sha256-v1:[0-9a-f]{64}$') or (${table.eventType} = 'revoked' and ${table.authIdentityId} is null and ${table.subjectBindingVersion} is null and ${table.subjectBinding} is null and ${table.identityLinkPlannerPolicyId} is null and ${table.identityLinkPlanBindingVersion} is null and ${table.identityLinkPlanBinding} is null)`,
     ),
     terminalEventUnique: uniqueIndex(
       "id_pair_intent_events_terminal_unique",
     ).on(table.identityPairingIntentId),
     authIdentityIdx: index("id_pair_intent_events_auth_identity_idx").on(
       table.authIdentityId,
+    ),
+    subjectBindingIdx: index("id_pair_intent_events_subject_binding_idx").on(
+      table.subjectBinding,
     ),
   }),
 );

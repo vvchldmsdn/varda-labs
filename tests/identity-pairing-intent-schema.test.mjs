@@ -5,14 +5,10 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 const ROOT = process.cwd();
-const MIGRATION_NAME = "0021_previous_deathbird.sql";
+const MIGRATION_NAME = "0021_strange_sinister_six.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "ef49f7d2b9074daf10dbb2d7890875cc895cf6dd87a4d9b39d01c8a9df0a3c50";
-const MIGRATION_PATH = join(
-  ROOT,
-  "drizzle",
-  MIGRATION_NAME,
-);
+  "d912d7692a856fb0fc097462fd8a97102533d84471d30524040e456dcf8fc0d0";
+const MIGRATION_PATH = join(ROOT, "drizzle", MIGRATION_NAME);
 const SCHEMA_PATH = join(ROOT, "src", "db", "schema.ts");
 const migration = readFileSync(MIGRATION_PATH, "utf8");
 const schema = readFileSync(SCHEMA_PATH, "utf8");
@@ -30,8 +26,8 @@ const statements = migration
   .map((statement) => statement.trim())
   .filter(Boolean);
 
-describe("durable identity pairing intent schema", () => {
-  it("adds only the immutable intent header and terminal event tables", () => {
+describe("durable identity bootstrap claim schema", () => {
+  it("adds only the immutable claim header and terminal event tables", () => {
     assert.deepEqual(
       readdirSync(join(ROOT, "drizzle")).filter((name) =>
         /^0021_[a-z0-9_]+\.sql$/.test(name),
@@ -45,60 +41,106 @@ describe("durable identity pairing intent schema", () => {
       migration,
       /CREATE TABLE "identity_pairing_intent_events"/,
     );
-    assert.equal(statements.length, 10);
+    assert.equal(statements.length, 13);
 
     const intentTable = extractCreateTable(
       migration,
       "identity_pairing_intents",
     );
     assert.match(intentTable, /"target_app_user_id" uuid NOT NULL/);
-    assert.match(intentTable, /"subject_binding" varchar\(96\) NOT NULL/);
-    assert.match(intentTable, /"challenge_digest" varchar\(96\) NOT NULL/);
+    assert.match(intentTable, /"claim_digest" varchar\(96\) NOT NULL/);
+    assert.match(intentTable, /"target_review_policy_id" varchar\(64\) NOT NULL/);
     assert.match(intentTable, /"issued_at" timestamp with time zone NOT NULL/);
     assert.match(intentTable, /"expires_at" timestamp with time zone NOT NULL/);
     assert.doesNotMatch(intentTable, /"status"/);
     assert.doesNotMatch(intentTable, /"updated_at"/);
+    assert.doesNotMatch(
+      intentTable,
+      /operator|subject_binding|identity_link_plan|challenge_digest/i,
+    );
   });
 
   it("preserves the generated Drizzle migration chain", () => {
     assert.equal(snapshot.prevId, priorSnapshot.id);
     const matchingEntries = journal.entries.filter(
-      (entry) => entry.tag === "0021_previous_deathbird",
+      (entry) => entry.tag === "0021_strange_sinister_six",
     );
     assert.equal(matchingEntries.length, 1);
     assert.equal(matchingEntries[0].idx, 21);
     assert.equal(matchingEntries[0].version, "7");
   });
 
-  it("stores only reviewed bindings and never raw identity credentials", () => {
+  it("stores only a reviewed target and one-way claim digest in the header", () => {
     for (const constraint of [
       "id_pair_intents_policy_check",
       "id_pair_intents_provider_check",
-      "id_pair_intents_subject_binding_check",
-      "id_pair_intents_operator_principal_check",
-      "id_pair_intents_subject_principal_check",
-      "id_pair_intents_operator_binding_check",
-      "id_pair_intents_planner_policy_check",
-      "id_pair_intents_plan_binding_check",
-      "id_pair_intents_challenge_digest_check",
+      "id_pair_intents_claim_digest_check",
+      "id_pair_intents_target_review_policy_check",
+      "id_pair_intents_lifetime_check",
     ]) {
       assert.match(migration, new RegExp(`CONSTRAINT "${constraint}"`));
     }
 
-    assert.match(migration, /identity_pairing_authority_v1/);
-    assert.match(migration, /provider_subject_hmac_sha256_v1/);
-    assert.match(migration, /operator_session_hmac_sha256_v1/);
-    assert.match(migration, /initial_identity_link_planner_v1/);
-    assert.match(migration, /identity_link_plan_hmac_sha256_v1/);
-    assert.match(migration, /challenge-sha256-v1/);
+    assert.match(migration, /preissued_bootstrap_claim_authority_v1/);
+    assert.match(migration, /bootstrap_claim_sha256_v1/);
+    assert.match(migration, /bootstrap-claim-sha256-v1/);
+    assert.match(
+      migration,
+      /single_provisioning_user_explicit_review_v1/,
+    );
+    assert.match(
+      migration,
+      /CREATE UNIQUE INDEX "id_pair_intents_claim_digest_unique".*"claim_digest"/,
+    );
 
     assert.doesNotMatch(
       migration,
       /"provider_subject"|"email"|"token"|"cookie"|"profile"|"authorization"/i,
     );
+    assert.doesNotMatch(
+      migration,
+      /operator_session|operator_principal|subject_principal|operator_binding/i,
+    );
   });
 
-  it("enforces a ten-minute lifetime and exactly one terminal event", () => {
+  it("requires consume-time subject and identity-link evidence", () => {
+    const eventTable = extractCreateTable(
+      migration,
+      "identity_pairing_intent_events",
+    );
+    assert.match(eventTable, /"subject_binding" varchar\(96\)/);
+    assert.match(
+      eventTable,
+      /"identity_link_plan_binding" varchar\(112\)/,
+    );
+    assert.match(
+      eventTable,
+      /"event_type" = 'consumed'.*"auth_identity_id" is not null.*provider_subject_hmac_sha256_v1.*initial_identity_link_planner_v1.*identity_link_plan_hmac_sha256_v1/s,
+    );
+    for (const column of [
+      "subject_binding_version",
+      "subject_binding",
+      "identity_link_planner_policy_id",
+      "identity_link_plan_binding_version",
+      "identity_link_plan_binding",
+    ]) {
+      assert.match(
+        eventTable,
+        new RegExp(`"${column}" is not null`),
+        `${column} must be required for consumed events`,
+      );
+    }
+    assert.match(
+      eventTable,
+      /"event_type" = 'revoked'.*"auth_identity_id" is null.*"subject_binding" is null.*"identity_link_plan_binding" is null/s,
+    );
+    assert.match(
+      migration,
+      /CREATE UNIQUE INDEX "id_pair_intent_events_terminal_unique".*"identity_pairing_intent_id"/,
+    );
+  });
+
+  it("enforces a ten-minute lifetime and restrictive foreign keys", () => {
     assert.match(
       migration,
       /"expires_at" > "identity_pairing_intents"\."issued_at"/,
@@ -107,30 +149,11 @@ describe("durable identity pairing intent schema", () => {
       migration,
       /"expires_at" <= "identity_pairing_intents"\."issued_at" \+ interval '10 minutes'/,
     );
-    assert.match(
-      migration,
-      /"event_type" in \('consumed', 'revoked'\)/,
-    );
-    assert.match(
-      migration,
-      /"event_type" = 'consumed'.*"auth_identity_id" is not null.*"event_type" = 'revoked'.*"auth_identity_id" is null/s,
-    );
-    assert.match(
-      migration,
-      /CREATE UNIQUE INDEX "id_pair_intent_events_terminal_unique".*"identity_pairing_intent_id"/,
-    );
-    assert.match(
-      migration,
-      /CREATE UNIQUE INDEX "id_pair_intents_challenge_digest_unique".*"challenge_digest"/,
-    );
-  });
 
-  it("binds targets and consumed identities without cascading deletes", () => {
     const foreignKeys = statements.filter((statement) =>
       statement.includes("FOREIGN KEY"),
     );
     assert.equal(foreignKeys.length, 3);
-
     assert.match(
       migration,
       /"target_app_user_id"\) REFERENCES "public"\."app_users"\("id"\) ON DELETE restrict/,
@@ -144,6 +167,36 @@ describe("durable identity pairing intent schema", () => {
       /"auth_identity_id"\) REFERENCES "public"\."auth_identities"\("id"\) ON DELETE restrict/,
     );
     assert.doesNotMatch(migration, /ON DELETE cascade/i);
+  });
+
+  it("enforces append-only evidence with exactly one function and two triggers", () => {
+    const functions = statements.filter((statement) =>
+      statement.startsWith("CREATE FUNCTION"),
+    );
+    const triggers = statements.filter((statement) =>
+      statement.startsWith("CREATE TRIGGER"),
+    );
+    assert.equal(functions.length, 1);
+    assert.equal(triggers.length, 2);
+    assert.match(
+      functions[0],
+      /^CREATE FUNCTION "prevent_identity_pairing_evidence_mutation"\(\) RETURNS trigger[\s\S]*RAISE EXCEPTION 'identity pairing evidence is append-only'/,
+    );
+
+    for (const [triggerName, tableName] of [
+      ["identity_pairing_intents_append_only", "identity_pairing_intents"],
+      [
+        "identity_pairing_intent_events_append_only",
+        "identity_pairing_intent_events",
+      ],
+    ]) {
+      assert.match(
+        migration,
+        new RegExp(
+          `CREATE TRIGGER "${triggerName}"\\s+BEFORE UPDATE OR DELETE OR TRUNCATE ON "${tableName}"\\s+FOR EACH STATEMENT\\s+EXECUTE FUNCTION "prevent_identity_pairing_evidence_mutation"\\(\\)`,
+        ),
+      );
+    }
   });
 
   it("contains no identity DML, destructive DDL, RLS, or auth secret", () => {
