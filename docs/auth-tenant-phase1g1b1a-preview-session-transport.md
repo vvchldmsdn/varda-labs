@@ -2,9 +2,11 @@
 
 Last updated: 2026-07-25
 
-Status: Preview-only Google session transport is implemented and interactively
-verified. Product identity resolution, tenant access, and production auth remain
-closed.
+Status: Preview-only Google session transport is implemented and passes
+automated verification. The predecessor Preview flow was interactively
+verified; one final browser round trip remains pending on the latest allowlisted
+deployment. Product identity resolution, tenant access, and production auth
+remain closed.
 
 ## Scope
 
@@ -76,13 +78,19 @@ Automated evidence on 2026-07-25:
 - the reviewed API allowlist contains exactly three method/path entries;
 - the social sign-in entry is restricted to Google.
 
-Interactive evidence on 2026-07-25:
+Interactive evidence on 2026-07-25, before the endpoint allowlist was added:
 
 - Google sign-in completed on the reviewed Preview deployment;
 - `/auth/session` displayed `Authenticated session: Present`;
 - no email, name, image, provider subject, token, or product identifier was
   exposed;
 - sign-out completed and the authenticated session was no longer present.
+
+The latest commit adds endpoint admission before the otherwise unchanged
+managed handler. Therefore the prior interactive result is retained as
+predecessor evidence, not reused as proof of the latest commit. A final
+Google sign-in, `Present`, sign-out, and unauthenticated refresh round trip is
+still required on the latest Preview deployment before merge.
 
 Only the pass/fail classifications above are retained. No cookie, token,
 provider subject, authorization header, environment value, or user identifier
