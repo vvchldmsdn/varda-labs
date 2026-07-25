@@ -2,10 +2,10 @@ import {
   evaluateSchemaManifest,
   readWriterReadiness,
 } from "./initial-app-user-readiness.mjs";
-import { USER_OWNED_TABLE_NAMES } from "./tenant-ownership-policy.mjs";
+import { TRANSITIONAL_OWNER_TABLE_NAMES } from "./tenant-ownership-policy.mjs";
 
 export async function readInitialProvisioningState(sql, root = process.cwd()) {
-  const canonicalStatsSql = USER_OWNED_TABLE_NAMES.map(
+  const canonicalStatsSql = TRANSITIONAL_OWNER_TABLE_NAMES.map(
     (table) => `
       select count(*) filter (
         where canonical_owner_user_id is not null

@@ -2,8 +2,9 @@
 
 Last updated: 2026-07-25
 
-Status: implemented as a pure synthetic dry-run contract. It has no runtime,
-database, provider, route, or identity-write integration.
+Status: implemented as a pure synthetic dry-run contract. The separate B2
+phase now defines its local-only physical persistence shape, but this contract
+still has no runtime, provider, route, or identity-write integration.
 
 ## Purpose
 
@@ -73,11 +74,11 @@ boundary remains present.
 
 ## Still Closed
 
-This phase does not add a pairing table, schema, migration, repository, operator
-login, session adapter, route, UI, writer, identity row, app-user activation,
-TenantContext, owner filtering, RLS, product DB access, Production Neon Auth,
-or Basic Auth removal.
+This phase does not add a repository, operator login, session adapter, route,
+UI, writer, identity row, app-user activation, TenantContext, owner filtering,
+RLS, product DB access, or Basic Auth removal. The B2 schema and generated
+migration remain unapplied until separately reviewed.
 
-The next gate is not an identity write. It is a separate review of the minimum
-durable intent schema and transaction semantics needed to make the currently
-synthetic single-use guarantee real.
+The next gate is not an identity write. It is review and application of the B2
+empty schema migration. A repository and the atomic consume transaction remain
+later, separate gates.

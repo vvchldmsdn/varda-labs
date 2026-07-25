@@ -5,8 +5,10 @@ import { config } from "dotenv";
 
 import {
   EXPANDED_TENANT_TABLE_POLICIES,
+  PAIRING_IDENTITY_SYSTEM_TABLE_POLICIES,
+  resolveTenantTablePolicies,
   TRANSITIONAL_OWNER_COLUMN,
-  USER_OWNED_TABLE_NAMES,
+  TRANSITIONAL_OWNER_TABLE_NAMES,
 } from "./lib/tenant-ownership-policy.mjs";
 import { classifyTenantExpandPhase } from "./lib/tenant-expand-phase.mjs";
 
@@ -19,10 +21,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const expectedPublicTables = EXPANDED_TENANT_TABLE_POLICIES.map(
-  ({ table }) => table,
-).sort();
-const expectedOwnerTables = [...USER_OWNED_TABLE_NAMES].sort();
+const expectedOwnerTables = [...TRANSITIONAL_OWNER_TABLE_NAMES].sort();
 const expectedOwnerIndexes = expectedOwnerTables
   .map((table) => `${table}_${TRANSITIONAL_OWNER_COLUMN}_idx`)
   .sort();
@@ -47,11 +46,41 @@ const publicTables = await sql.query(`
     and table_type = 'BASE TABLE'
   order by table_name
 `);
-assert.deepEqual(
-  publicTables.map(({ table_name }) => table_name),
-  expectedPublicTables,
-  "Phase 1C must leave exactly 24 classified public tables",
+const publicTableNames = publicTables.map(({ table_name }) => table_name);
+const activePolicies = resolveTenantTablePolicies(publicTableNames);
+assert.ok(
+  activePolicies.length >= EXPANDED_TENANT_TABLE_POLICIES.length,
+  "Phase 1C core identity tables are missing",
 );
+assert.deepEqual(
+  publicTableNames,
+  activePolicies.map(({ table }) => table).sort(),
+  "tenant policy must classify every expanded public table",
+);
+
+const pairingTableNames = PAIRING_IDENTITY_SYSTEM_TABLE_POLICIES.map(
+  ({ table }) => table,
+);
+const pairingSchemaPresent = pairingTableNames.every((table) =>
+  publicTableNames.includes(table),
+);
+const pairingRows = pairingSchemaPresent
+  ? await sql.query(
+      pairingTableNames
+        .map(
+          (table) =>
+            `select '${table}'::text as table_name, count(*)::int as row_count from "${table}"`,
+        )
+        .join(" union all "),
+    )
+  : [];
+for (const row of pairingRows) {
+  assert.equal(
+    Number(row.row_count),
+    0,
+    `${row.table_name} must remain empty before pairing writers are approved`,
+  );
+}
 
 const ownerColumns = await sql.query(`
   select table_name, data_type, is_nullable, column_default
@@ -194,8 +223,13 @@ console.log(
       tenantPhase,
       readOnly: true,
       databaseSideEffects: false,
-      selectCount: 7,
+      selectCount: 7 + (pairingSchemaPresent ? 1 : 0),
       publicTableCount: publicTables.length,
+      pairingSchemaPresent,
+      pairingIntentRows: pairingRows.reduce(
+        (sum, row) => sum + Number(row.row_count),
+        0,
+      ),
       identityTableRows: {
         appUsers: Number(identityRows.app_users),
         authIdentities: Number(identityRows.auth_identities),

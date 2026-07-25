@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { TENANT_WRITER_REGISTRY } from "../../src/lib/tenant-writer-registry.ts";
-import { USER_OWNED_TABLE_NAMES } from "./tenant-ownership-policy.mjs";
+import { TRANSITIONAL_OWNER_TABLE_NAMES } from "./tenant-ownership-policy.mjs";
 
 const EXPECTED_IDENTITY_COLUMNS = Object.freeze({
   "app_users.id": column("uuid", "NO", null, "gen_random_uuid"),
@@ -65,7 +65,7 @@ export function evaluateSchemaManifest({
     sameStrings(indexNames, EXPECTED_IDENTITY_INDEXES) &&
     identityIndexes.every(matchesIdentityIndex);
 
-  const expectedOwnerTables = [...USER_OWNED_TABLE_NAMES].sort();
+  const expectedOwnerTables = [...TRANSITIONAL_OWNER_TABLE_NAMES].sort();
   const canonicalColumnContract =
     canonicalColumns.length === expectedOwnerTables.length &&
     sameStrings(

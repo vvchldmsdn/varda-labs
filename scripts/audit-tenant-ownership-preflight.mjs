@@ -5,7 +5,7 @@ import { config } from "dotenv";
 
 import {
   CANONICAL_OWNER_CONTRACT,
-  EXPANDED_TENANT_TABLE_POLICIES,
+  FULLY_EXPANDED_TENANT_TABLE_POLICIES,
   resolveTenantTablePolicies,
   summarizeTenantClassifications,
 } from "./lib/tenant-ownership-policy.mjs";
@@ -19,10 +19,16 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
 
-for (const policy of EXPANDED_TENANT_TABLE_POLICIES) {
+for (const policy of FULLY_EXPANDED_TENANT_TABLE_POLICIES) {
   assert.match(policy.table, /^[a-z][a-z0-9_]*$/);
   if (policy.currentOwnerColumn) {
     assert.match(policy.currentOwnerColumn, /^[a-z][a-z0-9_]*$/);
+  }
+  if (policy.ownerVia) {
+    assert.equal(policy.ownerVia.kind, "parent_foreign_key");
+    assert.match(policy.ownerVia.column, /^[a-z][a-z0-9_]*$/);
+    assert.match(policy.ownerVia.parentTable, /^[a-z][a-z0-9_]*$/);
+    assert.match(policy.ownerVia.parentColumn, /^[a-z][a-z0-9_]*$/);
   }
 }
 
@@ -52,11 +58,25 @@ const ownerColumns = await sql.query(`
 `);
 
 const foreignKeys = await sql.query(`
-  select table_name, constraint_name
-  from information_schema.table_constraints
-  where table_schema = 'public'
-    and constraint_type = 'FOREIGN KEY'
-  order by table_name, constraint_name
+  select
+    constraint_definition.table_name,
+    constraint_definition.constraint_name,
+    local_column.column_name,
+    referenced_column.table_name as foreign_table_name,
+    referenced_column.column_name as foreign_column_name
+  from information_schema.table_constraints constraint_definition
+  join information_schema.key_column_usage local_column
+    on local_column.constraint_schema = constraint_definition.constraint_schema
+   and local_column.constraint_name = constraint_definition.constraint_name
+  join information_schema.constraint_column_usage referenced_column
+    on referenced_column.constraint_schema = constraint_definition.constraint_schema
+   and referenced_column.constraint_name = constraint_definition.constraint_name
+  where constraint_definition.table_schema = 'public'
+    and constraint_definition.constraint_type = 'FOREIGN KEY'
+  order by
+    constraint_definition.table_name,
+    constraint_definition.constraint_name,
+    local_column.ordinal_position
 `);
 
 const rowCounts = await sql.query(
@@ -100,6 +120,20 @@ const ownerStatsByKey = new Map(
     stats,
   ]),
 );
+const foreignKeyByPath = new Map(
+  foreignKeys.map((foreignKey) => [
+    [
+      foreignKey.table_name,
+      foreignKey.column_name,
+      foreignKey.foreign_table_name,
+      foreignKey.foreign_column_name,
+    ].join(":"),
+    foreignKey,
+  ]),
+);
+const policyByTable = new Map(
+  activePolicies.map((policy) => [policy.table, policy]),
+);
 
 const tables = activePolicies.map((policy) => {
   const currentColumn = policy.currentOwnerColumn
@@ -113,12 +147,44 @@ const tables = activePolicies.map((policy) => {
     assert.ok(currentColumn, `${policy.table} owner column is missing`);
     assert.ok(currentStats, `${policy.table} owner stats are missing`);
   }
+  const ownerViaForeignKey = policy.ownerVia
+    ? foreignKeyByPath.get(
+        [
+          policy.table,
+          policy.ownerVia.column,
+          policy.ownerVia.parentTable,
+          policy.ownerVia.parentColumn,
+        ].join(":"),
+      )
+    : null;
+  if (policy.ownerVia) {
+    assert.ok(ownerViaForeignKey, `${policy.table} owner path is missing`);
+  }
+  const parentOwnerPolicy = policy.ownerVia
+    ? policyByTable.get(policy.ownerVia.parentTable)
+    : null;
+  const parentOwnerColumn = parentOwnerPolicy?.currentOwnerColumn
+    ? columnByKey.get(
+        `${parentOwnerPolicy.table}:${parentOwnerPolicy.currentOwnerColumn}`,
+      )
+    : null;
+  const canonicalOwnerReady =
+    (currentColumn?.column_name === CANONICAL_OWNER_CONTRACT.ownerColumn &&
+      currentColumn?.data_type === CANONICAL_OWNER_CONTRACT.ownerColumnType &&
+      currentColumn?.is_nullable === "NO") ||
+    (ownerViaForeignKey !== null &&
+      parentOwnerColumn?.column_name ===
+        CANONICAL_OWNER_CONTRACT.ownerColumn &&
+      parentOwnerColumn?.data_type ===
+        CANONICAL_OWNER_CONTRACT.ownerColumnType &&
+      parentOwnerColumn?.is_nullable === "NO");
 
   return {
     table: policy.table,
     classification: policy.classification,
     rows: rowCountByTable.get(policy.table) ?? 0,
     canonicalOwnerRequired: policy.canonicalOwnerRequired,
+    ownerVia: policy.ownerVia,
     currentOwner: currentColumn
       ? {
           column: currentColumn.column_name,
@@ -129,10 +195,7 @@ const tables = activePolicies.map((policy) => {
           distinctValues: Number(currentStats.distinct_values),
         }
       : null,
-    canonicalOwnerReady:
-      currentColumn?.column_name === CANONICAL_OWNER_CONTRACT.ownerColumn &&
-      currentColumn?.data_type === CANONICAL_OWNER_CONTRACT.ownerColumnType &&
-      currentColumn?.is_nullable === "NO",
+    canonicalOwnerReady,
   };
 });
 

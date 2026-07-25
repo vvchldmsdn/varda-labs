@@ -14,7 +14,7 @@ import {
   buildLockedProvisioningQuery,
 } from "./lib/initial-app-user-write.mjs";
 import { readInitialProvisioningState } from "./lib/initial-app-user-state.mjs";
-import { USER_OWNED_TABLE_NAMES } from "./lib/tenant-ownership-policy.mjs";
+import { TRANSITIONAL_OWNER_TABLE_NAMES } from "./lib/tenant-ownership-policy.mjs";
 
 config({ path: ".env.local", quiet: true });
 
@@ -70,7 +70,7 @@ async function main() {
 
     const insertQuery = buildLockedProvisioningQuery(
       args.initialOwnerId,
-      USER_OWNED_TABLE_NAMES,
+      TRANSITIONAL_OWNER_TABLE_NAMES,
     );
     const results = await sql.transaction((txn) => [
       txn.query("set local lock_timeout = '5s'"),

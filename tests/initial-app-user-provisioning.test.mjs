@@ -15,7 +15,7 @@ import {
   buildLockedProvisioningQuery,
 } from "../scripts/lib/initial-app-user-write.mjs";
 import { readWriterReadiness } from "../scripts/lib/initial-app-user-readiness.mjs";
-import { USER_OWNED_TABLE_NAMES } from "../scripts/lib/tenant-ownership-policy.mjs";
+import { TRANSITIONAL_OWNER_TABLE_NAMES } from "../scripts/lib/tenant-ownership-policy.mjs";
 
 const ROOT = process.cwd();
 const OWNER_A = "11111111-1111-4111-8111-111111111111";
@@ -167,7 +167,7 @@ describe("initial app-user provisioning", () => {
   it("freezes one parameterized insert and no other table DML", () => {
     const query = buildLockedProvisioningQuery(
       OWNER_A,
-      USER_OWNED_TABLE_NAMES,
+      TRANSITIONAL_OWNER_TABLE_NAMES,
     );
     const normalized = query.text.replace(/\s+/g, " ").toLowerCase();
 
@@ -177,7 +177,7 @@ describe("initial app-user provisioning", () => {
     assert.doesNotMatch(normalized, /on conflict/);
     assert.equal(query.text.includes(OWNER_A), false);
     assert.deepEqual(query.params, [OWNER_A]);
-    for (const table of USER_OWNED_TABLE_NAMES) {
+    for (const table of TRANSITIONAL_OWNER_TABLE_NAMES) {
       assert.match(normalized, new RegExp(`from "${table}"`));
     }
   });

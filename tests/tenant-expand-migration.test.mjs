@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 
 import {
   TRANSITIONAL_OWNER_COLUMN,
-  USER_OWNED_TABLE_NAMES,
+  TRANSITIONAL_OWNER_TABLE_NAMES,
 } from "../scripts/lib/tenant-ownership-policy.mjs";
 
 const ROOT = process.cwd();
@@ -18,7 +18,7 @@ const statements = migration
   .map((statement) => statement.trim())
   .filter(Boolean);
 
-const expectedOwnerTables = [...USER_OWNED_TABLE_NAMES].sort();
+const expectedOwnerTables = [...TRANSITIONAL_OWNER_TABLE_NAMES].sort();
 const expectedOwnerIndexes = expectedOwnerTables
   .map((table) => `${table}_${TRANSITIONAL_OWNER_COLUMN}_idx`)
   .sort();

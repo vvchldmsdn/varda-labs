@@ -94,6 +94,157 @@ export const authIdentities = pgTable(
   }),
 );
 
+export const identityPairingIntents = pgTable(
+  "identity_pairing_intents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    authorityPolicyId: varchar("authority_policy_id", {
+      length: 64,
+    }).notNull(),
+    targetAppUserId: uuid("target_app_user_id").notNull(),
+    provider: varchar("provider", { length: 50 }).notNull(),
+    subjectBindingVersion: varchar("subject_binding_version", {
+      length: 64,
+    }).notNull(),
+    subjectBinding: varchar("subject_binding", { length: 96 }).notNull(),
+    operatorPrincipalBindingVersion: varchar(
+      "operator_principal_binding_version",
+      { length: 64 },
+    ).notNull(),
+    operatorPrincipalBinding: varchar("operator_principal_binding", {
+      length: 96,
+    }).notNull(),
+    subjectPrincipalBindingVersion: varchar(
+      "subject_principal_binding_version",
+      { length: 64 },
+    ).notNull(),
+    subjectPrincipalBinding: varchar("subject_principal_binding", {
+      length: 96,
+    }).notNull(),
+    operatorBindingVersion: varchar("operator_binding_version", {
+      length: 64,
+    }).notNull(),
+    operatorBinding: varchar("operator_binding", {
+      length: 96,
+    }).notNull(),
+    identityLinkPlannerPolicyId: varchar(
+      "identity_link_planner_policy_id",
+      { length: 64 },
+    ).notNull(),
+    identityLinkPlanBindingVersion: varchar(
+      "identity_link_plan_binding_version",
+      { length: 64 },
+    ).notNull(),
+    identityLinkPlanBinding: varchar("identity_link_plan_binding", {
+      length: 112,
+    }).notNull(),
+    challengeDigest: varchar("challenge_digest", {
+      length: 96,
+    }).notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    targetAppUserFk: foreignKey({
+      name: "id_pair_intents_target_app_user_fk",
+      columns: [table.targetAppUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    authorityPolicyCheck: check(
+      "id_pair_intents_policy_check",
+      sql`${table.authorityPolicyId} = 'identity_pairing_authority_v1'`,
+    ),
+    providerCheck: check(
+      "id_pair_intents_provider_check",
+      sql`${table.provider} = 'neon_auth'`,
+    ),
+    subjectBindingCheck: check(
+      "id_pair_intents_subject_binding_check",
+      sql`${table.subjectBindingVersion} = 'provider_subject_hmac_sha256_v1' and ${table.subjectBinding} ~ '^hmac-sha256-v1:[0-9a-f]{64}$'`,
+    ),
+    operatorPrincipalBindingCheck: check(
+      "id_pair_intents_operator_principal_check",
+      sql`${table.operatorPrincipalBindingVersion} = 'auth_principal_hmac_sha256_v1' and ${table.operatorPrincipalBinding} ~ '^principal-hmac-sha256-v1:[0-9a-f]{64}$'`,
+    ),
+    subjectPrincipalBindingCheck: check(
+      "id_pair_intents_subject_principal_check",
+      sql`${table.subjectPrincipalBindingVersion} = 'auth_principal_hmac_sha256_v1' and ${table.subjectPrincipalBinding} ~ '^principal-hmac-sha256-v1:[0-9a-f]{64}$'`,
+    ),
+    operatorBindingCheck: check(
+      "id_pair_intents_operator_binding_check",
+      sql`${table.operatorBindingVersion} = 'operator_session_hmac_sha256_v1' and ${table.operatorBinding} ~ '^operator-hmac-sha256-v1:[0-9a-f]{64}$'`,
+    ),
+    plannerPolicyCheck: check(
+      "id_pair_intents_planner_policy_check",
+      sql`${table.identityLinkPlannerPolicyId} = 'initial_identity_link_planner_v1'`,
+    ),
+    planBindingCheck: check(
+      "id_pair_intents_plan_binding_check",
+      sql`${table.identityLinkPlanBindingVersion} = 'identity_link_plan_hmac_sha256_v1' and ${table.identityLinkPlanBinding} ~ '^identity-link-plan-hmac-sha256-v1:[0-9a-f]{64}$'`,
+    ),
+    challengeDigestCheck: check(
+      "id_pair_intents_challenge_digest_check",
+      sql`${table.challengeDigest} ~ '^challenge-sha256-v1:[0-9a-f]{64}$'`,
+    ),
+    lifetimeCheck: check(
+      "id_pair_intents_lifetime_check",
+      sql`${table.expiresAt} > ${table.issuedAt} and ${table.expiresAt} <= ${table.issuedAt} + interval '10 minutes'`,
+    ),
+    challengeDigestUnique: uniqueIndex(
+      "id_pair_intents_challenge_digest_unique",
+    ).on(table.challengeDigest),
+    targetAppUserIdx: index("id_pair_intents_target_app_user_idx").on(
+      table.targetAppUserId,
+    ),
+    subjectBindingIdx: index("id_pair_intents_subject_binding_idx").on(
+      table.provider,
+      table.subjectBinding,
+    ),
+  }),
+);
+
+export const identityPairingIntentEvents = pgTable(
+  "identity_pairing_intent_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    identityPairingIntentId: uuid("identity_pairing_intent_id").notNull(),
+    eventType: varchar("event_type", { length: 20 }).notNull(),
+    authIdentityId: uuid("auth_identity_id"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    intentFk: foreignKey({
+      name: "id_pair_intent_events_intent_fk",
+      columns: [table.identityPairingIntentId],
+      foreignColumns: [identityPairingIntents.id],
+    }).onDelete("restrict"),
+    authIdentityFk: foreignKey({
+      name: "id_pair_intent_events_identity_fk",
+      columns: [table.authIdentityId],
+      foreignColumns: [authIdentities.id],
+    }).onDelete("restrict"),
+    eventTypeCheck: check(
+      "id_pair_intent_events_type_check",
+      sql`${table.eventType} in ('consumed', 'revoked')`,
+    ),
+    identityStateCheck: check(
+      "id_pair_intent_events_identity_state_check",
+      sql`(${table.eventType} = 'consumed' and ${table.authIdentityId} is not null) or (${table.eventType} = 'revoked' and ${table.authIdentityId} is null)`,
+    ),
+    terminalEventUnique: uniqueIndex(
+      "id_pair_intent_events_terminal_unique",
+    ).on(table.identityPairingIntentId),
+    authIdentityIdx: index("id_pair_intent_events_auth_identity_idx").on(
+      table.authIdentityId,
+    ),
+  }),
+);
+
 export const simulationScenarioApprovalRevisions = pgTable(
   "simulation_scenario_approval_revisions",
   {
@@ -1456,6 +1607,16 @@ export type NewAppUser = typeof appUsers.$inferInsert;
 
 export type AuthIdentity = typeof authIdentities.$inferSelect;
 export type NewAuthIdentity = typeof authIdentities.$inferInsert;
+
+export type IdentityPairingIntent =
+  typeof identityPairingIntents.$inferSelect;
+export type NewIdentityPairingIntent =
+  typeof identityPairingIntents.$inferInsert;
+
+export type IdentityPairingIntentEvent =
+  typeof identityPairingIntentEvents.$inferSelect;
+export type NewIdentityPairingIntentEvent =
+  typeof identityPairingIntentEvents.$inferInsert;
 
 export type SimulationScenarioApprovalRevision =
   typeof simulationScenarioApprovalRevisions.$inferSelect;
