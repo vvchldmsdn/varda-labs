@@ -27,6 +27,7 @@ function holding(overrides = {}) {
     name: "KODEX 200",
     ticker: "069500",
     account: "brokerage",
+    market: "korea",
     currency: "KRW",
     quantity: 10,
     currentPrice: 95,
@@ -550,6 +551,8 @@ describe("portfolio movement builder", () => {
       holdings: [holding()],
       priceRows: [
         {
+          market: "korea",
+          currency: "KRW",
           ticker: "069500",
           priceDate: "2026-07-07",
           adjustedClosePrice: 100,
@@ -579,6 +582,7 @@ describe("portfolio movement builder", () => {
           legacyBase44Id: "legacy-us",
           name: "VOO",
           ticker: "VOO",
+          market: "us",
           currency: "USD",
           quantity: 10,
           currentPrice: 105,
@@ -587,6 +591,8 @@ describe("portfolio movement builder", () => {
       ],
       priceRows: [
         {
+          market: "us",
+          currency: "USD",
           ticker: "VOO",
           priceDate: "2026-07-07",
           adjustedClosePrice: 100,
@@ -608,5 +614,40 @@ describe("portfolio movement builder", () => {
     assertClose(contribution?.changeKrw, 61_021.958);
     assertClose(contribution?.fxChangeKrw, -15_564.19095);
     assert.deepEqual(result.contributionRows, [contribution]);
+  });
+
+  it("does not select a same-ticker close from another market or currency", () => {
+    const result = buildPreviousCloseMovement({
+      holdings: [holding()],
+      priceRows: [
+        {
+          market: "us",
+          currency: "USD",
+          ticker: "069500",
+          priceDate: "2026-07-07",
+          adjustedClosePrice: 500,
+          closePrice: 500,
+          closePriceKrw: 750_000,
+          fxRate: 1500,
+        },
+        {
+          market: "korea",
+          currency: "KRW",
+          ticker: "069500",
+          priceDate: "2026-07-07",
+          adjustedClosePrice: 100,
+          closePrice: 100,
+          closePriceKrw: 100,
+          fxRate: null,
+        },
+      ],
+      referenceDate: "2026-07-08",
+      usdKrwRate: 1516.89994,
+      movementCycle,
+    });
+
+    assert.equal(result.ready, true);
+    assert.equal(result.previousTotalKrw, 1000);
+    assert.equal(result.changeKrw, -50);
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "./portfolio-math.ts";
 import { portfolioEventAccount } from "./portfolio-return-metrics-core.ts";
 import { MANUAL_ASSET_PRICE_POLICY } from "./market-data/manual-asset-price.ts";
+import { isSamePriceInstrument } from "./market-data/price-instrument-identity.ts";
 
 const MOVEMENT_INVESTMENT_ASSET_TYPES = new Set([
   "etf",
@@ -35,6 +36,7 @@ export type PortfolioMovementHoldingInput = {
   name: string;
   ticker: string | null;
   account: string;
+  market: string;
   currency: string;
   quantity: number;
   currentPrice: number;
@@ -81,6 +83,8 @@ export type PortfolioMovementEventInput = {
 };
 
 export type PortfolioMovementPriceSnapshotInput = {
+  market: string | null;
+  currency: string | null;
   ticker: string | null;
   priceDate: string;
   adjustedClosePrice: string | number | null;
@@ -546,7 +550,11 @@ function calculatePreviousCloseContribution(
   const ticker = normalizeTicker(holding.ticker);
   if (!ticker || !referenceDate) return null;
 
-  const previousRow = findPreviousClosePriceRow(priceRows, ticker, referenceDate);
+  const previousRow = findPreviousClosePriceRow(
+    priceRows,
+    holding,
+    referenceDate,
+  );
   if (!previousRow) return null;
 
   const closePrice =
@@ -584,11 +592,11 @@ function calculatePreviousCloseContribution(
 
 function findPreviousClosePriceRow(
   rows: PortfolioMovementPriceSnapshotInput[],
-  ticker: string,
+  holding: PortfolioMovementHoldingInput,
   referenceDate: string,
 ) {
   return rows
-    .filter((row) => normalizeTicker(row.ticker) === ticker)
+    .filter((row) => isSamePriceInstrument(row, holding))
     .filter((row) => row.priceDate < referenceDate)
     .filter((row) => {
       const ageDays = diffDays(referenceDate, row.priceDate);

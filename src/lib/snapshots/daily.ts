@@ -1,8 +1,9 @@
 import "server-only";
 
-import { and, desc, eq, inArray, lt, lte } from "drizzle-orm";
+import { and, desc, eq, lt, lte } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
 import {
   accounts,
   assetGroups,
@@ -24,6 +25,10 @@ import {
   type NewDailyPortfolioSnapshot,
   type NewDailyPositionSnapshot,
 } from "@/db/schema";
+import {
+  groupPriceRowsByInstrument,
+  priceRowsForInstrument,
+} from "@/lib/market-data/price-instrument-identity";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -1303,7 +1308,7 @@ async function resolveSnapshotFx(snapshotDate: string): Promise<ResolvedFxRate> 
 }
 
 type CloseContext = {
-  rowsByTicker: Map<string, PriceRow[]>;
+  rowsByInstrument: Map<string, PriceRow[]>;
   selectedByAssetId: Map<string, PriceSelection>;
   referencesByMarket: Map<string, CloseReferenceSummary>;
   closeReferences: CloseReferenceSummary[];
@@ -1316,31 +1321,27 @@ async function buildCloseContext({
   snapshotDate: string;
   assets: AssetRow[];
 }): Promise<CloseContext> {
-  const tickers = uniqueStrings(
-    targetAssets
-      .map((asset) => normalizeTicker(asset.ticker))
-      .filter((ticker): ticker is string => Boolean(ticker)),
-  );
+  const instruments = targetAssets.map(({ market, currency, ticker }) => ({
+    market,
+    currency,
+    ticker,
+  }));
   const priceRows =
-    tickers.length > 0
+    instruments.length > 0
       ? await db
           .select()
           .from(assetPriceSnapshots)
-          .where(inArray(assetPriceSnapshots.ticker, tickers))
+          .where(assetPriceSnapshotInstrumentCondition(instruments))
           .orderBy(desc(assetPriceSnapshots.priceDate))
-          .limit(Math.max(400, tickers.length * 40))
+          .limit(Math.max(400, instruments.length * 40))
       : [];
-  const rowsByTicker = new Map<string, PriceRow[]>();
+  const rowsByInstrument = groupPriceRowsByInstrument(priceRows);
 
-  for (const row of priceRows) {
-    const ticker = normalizeTicker(row.ticker);
-    if (!ticker) continue;
-    const rows = rowsByTicker.get(ticker) ?? [];
-    rows.push(row);
-    rowsByTicker.set(ticker, rows);
-  }
-
-  const closeReferences = buildCloseReferences(targetAssets, rowsByTicker, snapshotDate);
+  const closeReferences = buildCloseReferences(
+    targetAssets,
+    rowsByInstrument,
+    snapshotDate,
+  );
   const referencesByMarket = new Map(
     closeReferences.map((reference) => [reference.market, reference]),
   );
@@ -1348,16 +1349,26 @@ async function buildCloseContext({
   for (const asset of targetAssets) {
     selectedByAssetId.set(
       asset.id,
-      selectClosePriceForAsset(asset, snapshotDate, rowsByTicker, referencesByMarket),
+      selectClosePriceForAsset(
+        asset,
+        snapshotDate,
+        rowsByInstrument,
+        referencesByMarket,
+      ),
     );
   }
 
-  return { rowsByTicker, selectedByAssetId, referencesByMarket, closeReferences };
+  return {
+    rowsByInstrument,
+    selectedByAssetId,
+    referencesByMarket,
+    closeReferences,
+  };
 }
 
 function buildCloseReferences(
   targetAssets: AssetRow[],
-  rowsByTicker: Map<string, PriceRow[]>,
+  rowsByInstrument: Map<string, PriceRow[]>,
   snapshotDate: string,
 ): CloseReferenceSummary[] {
   const requiredAssets = targetAssets.filter((asset) => normalizeTicker(asset.ticker));
@@ -1388,7 +1399,7 @@ function buildCloseReferences(
         const ticker = normalizeTicker(asset.ticker);
         if (!ticker) continue;
 
-        for (const row of rowsByTicker.get(ticker) ?? []) {
+        for (const row of priceRowsForInstrument(rowsByInstrument, asset)) {
           if (row.priceDate > calendarReferenceDate) continue;
           if (!isPositiveCloseRow(row)) continue;
           if (!isFreshCloseRow(row.priceDate, calendarReferenceDate)) continue;
@@ -1458,7 +1469,7 @@ function fallbackCloseReferenceForAsset(
 function selectClosePriceForAsset(
   asset: AssetRow,
   snapshotDate: string,
-  rowsByTicker: Map<string, PriceRow[]>,
+  rowsByInstrument: Map<string, PriceRow[]>,
   referencesByMarket: Map<string, CloseReferenceSummary>,
 ): PriceSelection {
   const ticker = normalizeTicker(asset.ticker);
@@ -1480,7 +1491,7 @@ function selectClosePriceForAsset(
     referencesByMarket.get(closeMarketKeyForAsset(asset)) ??
     fallbackCloseReferenceForAsset(asset, snapshotDate);
   const referenceDate = closeReference.expectedCloseDate;
-  const row = (rowsByTicker.get(ticker) ?? [])
+  const row = priceRowsForInstrument(rowsByInstrument, asset)
     .filter((item) => item.priceDate <= referenceDate)
     .filter((item) => (toNumber(item.adjustedClosePrice) ?? toNumber(item.closePrice) ?? 0) > 0)
     .filter((item) => isFreshCloseRow(item.priceDate, referenceDate))

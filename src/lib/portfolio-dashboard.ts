@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
 import {
   accounts,
   assetGroups,
@@ -310,19 +311,17 @@ export async function getPortfolioDashboard(
   const selectedInvestmentAssetRows = valuationAssetRows.filter(
     (asset) => selectedAccount === "all" || asset.account === selectedAccount,
   );
-  const priceTickers = uniqueStrings(
-    selectedInvestmentAssetRows
-      .map((asset) => normalizeTicker(asset.ticker))
-      .filter((ticker): ticker is string => Boolean(ticker)),
+  const priceInstruments = selectedInvestmentAssetRows.map(
+    ({ market, currency, ticker }) => ({ market, currency, ticker }),
   );
   const recentPriceRows =
-    priceTickers.length > 0
+    priceInstruments.length > 0
       ? await db
           .select()
           .from(assetPriceSnapshots)
-          .where(inArray(assetPriceSnapshots.ticker, priceTickers))
+          .where(assetPriceSnapshotInstrumentCondition(priceInstruments))
           .orderBy(desc(assetPriceSnapshots.priceDate))
-          .limit(Math.max(200, priceTickers.length * 20))
+          .limit(Math.max(200, priceInstruments.length * 20))
       : [];
 
   const setting = settingsRows[0] ?? null;
