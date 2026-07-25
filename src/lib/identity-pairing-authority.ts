@@ -11,7 +11,8 @@ export type PairingOperatorAuthorityPort =
   | Readonly<{
       state: "authorized";
       authorizationSource: PairingOperatorAuthorizationSource;
-      actorSeparation: "verified_distinct" | "not_verified";
+      principalBindingVersion: "auth_principal_hmac_sha256_v1";
+      principalBinding: string;
       operatorBindingVersion: "operator_session_hmac_sha256_v1";
       operatorBinding: string;
       reviewedTargetAppUserId: string;
@@ -24,6 +25,8 @@ export type VerifiedPairingSubjectBindingPort =
       provider: string;
       subjectBindingVersion: "provider_subject_hmac_sha256_v1";
       subjectBinding: string;
+      principalBindingVersion: "auth_principal_hmac_sha256_v1";
+      principalBinding: string;
       verificationSource: "server_verified_session";
     }>;
 
@@ -48,6 +51,10 @@ export type PairingIntentPort =
       provider: string;
       subjectBindingVersion: "provider_subject_hmac_sha256_v1";
       subjectBinding: string;
+      operatorPrincipalBindingVersion: "auth_principal_hmac_sha256_v1";
+      operatorPrincipalBinding: string;
+      subjectPrincipalBindingVersion: "auth_principal_hmac_sha256_v1";
+      subjectPrincipalBinding: string;
       operatorBindingVersion: "operator_session_hmac_sha256_v1";
       operatorBinding: string;
       targetAppUserId: string;
@@ -60,18 +67,22 @@ export type PairingIntentPort =
       challengeTransport: PairingChallengeTransport;
     }>;
 
-export type IdentityLinkDryRunEvidence = Readonly<{
-  outcome: "planned_link" | "already_linked" | "blocked";
-  identityDmlEnabled: false;
-  appUserMutation: "none";
-  plannerPolicyId: "initial_identity_link_planner_v1";
-  provider: string;
-  subjectBindingVersion: "provider_subject_hmac_sha256_v1";
-  subjectBinding: string;
-  targetAppUserId: string;
-  planBindingVersion: "identity_link_plan_hmac_sha256_v1";
-  planBinding: string;
-}>;
+export type IdentityLinkPlanCommitmentPort =
+  | Readonly<{ state: "missing" | "unverified" }>
+  | Readonly<{
+      state: "verified";
+      outcome: "planned_link" | "already_linked" | "blocked";
+      identityDmlEnabled: false;
+      appUserMutation: "none";
+      plannerPolicyId: "initial_identity_link_planner_v1";
+      provider: string;
+      subjectBindingVersion: "provider_subject_hmac_sha256_v1";
+      subjectBinding: string;
+      targetAppUserId: string;
+      planBindingVersion: "identity_link_plan_hmac_sha256_v1";
+      planBinding: string;
+      commitmentSource: "server_verified_g1a_commitment";
+    }>;
 
 export type IdentityPairingAuthorityBlockedReason =
   | "operator_authority_required"
@@ -90,6 +101,7 @@ export type IdentityPairingAuthorityBlockedReason =
   | "pairing_intent_binding_mismatch"
   | "pairing_intent_not_yet_valid"
   | "pairing_intent_lifetime_exceeded"
+  | "identity_link_plan_required"
   | "identity_link_plan_invalid"
   | "identity_link_plan_binding_mismatch"
   | "identity_link_plan_blocked"
@@ -115,7 +127,7 @@ export type IdentityPairingAuthorityInput = Readonly<{
   subjectSession: VerifiedPairingSubjectBindingPort;
   reviewedTarget: PairingReviewedTargetPort;
   pairingIntent: PairingIntentPort;
-  identityLinkPlan: IdentityLinkDryRunEvidence;
+  identityLinkPlan: IdentityLinkPlanCommitmentPort;
   evaluationTime: string;
 }>;
 
@@ -123,6 +135,8 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SUBJECT_BINDING_PATTERN =
   /^hmac-sha256-v1:[0-9a-f]{64}$/;
+const PRINCIPAL_BINDING_PATTERN =
+  /^principal-hmac-sha256-v1:[0-9a-f]{64}$/;
 const OPERATOR_BINDING_PATTERN =
   /^operator-hmac-sha256-v1:[0-9a-f]{64}$/;
 const IDENTITY_LINK_PLAN_BINDING_PATTERN =
@@ -135,14 +149,10 @@ export function planIdentityPairingAuthority(
   if (operator === null) {
     if (
       input.operator.state === "authorized" &&
-      input.operator.actorSeparation !==
-        IDENTITY_PAIRING_AUTHORITY_POLICY.operatorSeparation
-    ) {
-      return blocked("operator_subject_separation_required");
-    }
-    if (
-      input.operator.state === "authorized" &&
-      (input.operator.operatorBindingVersion !==
+      (input.operator.principalBindingVersion !==
+        IDENTITY_PAIRING_AUTHORITY_POLICY.principalBindingVersion ||
+        !PRINCIPAL_BINDING_PATTERN.test(input.operator.principalBinding) ||
+        input.operator.operatorBindingVersion !==
         IDENTITY_PAIRING_AUTHORITY_POLICY.operatorBindingVersion ||
         !OPERATOR_BINDING_PATTERN.test(input.operator.operatorBinding))
     ) {
@@ -158,6 +168,12 @@ export function planIdentityPairingAuthority(
   const subject = readVerifiedSubjectBinding(input.subjectSession);
   if (subject === null) {
     return blocked("verified_subject_binding_required");
+  }
+  if (
+    operator.principalBindingVersion !== subject.principalBindingVersion ||
+    operator.principalBinding === subject.principalBinding
+  ) {
+    return blocked("operator_subject_separation_required");
   }
 
   const target = readReviewedTarget(input.reviewedTarget);
@@ -186,6 +202,12 @@ export function planIdentityPairingAuthority(
     intent.provider !== subject.provider ||
     intent.subjectBindingVersion !== subject.subjectBindingVersion ||
     intent.subjectBinding !== subject.subjectBinding ||
+    intent.operatorPrincipalBindingVersion !==
+      operator.principalBindingVersion ||
+    intent.operatorPrincipalBinding !== operator.principalBinding ||
+    intent.subjectPrincipalBindingVersion !==
+      subject.principalBindingVersion ||
+    intent.subjectPrincipalBinding !== subject.principalBinding ||
     intent.operatorBindingVersion !== operator.operatorBindingVersion ||
     intent.operatorBinding !== operator.operatorBinding ||
     normalizeUuid(intent.targetAppUserId) !== target
@@ -218,7 +240,10 @@ export function planIdentityPairingAuthority(
   }
 
   const identityLinkPlan = input.identityLinkPlan;
-  if (!isValidIdentityLinkPlanEvidence(identityLinkPlan)) {
+  if (identityLinkPlan.state !== "verified") {
+    return blocked("identity_link_plan_required");
+  }
+  if (!isValidIdentityLinkPlanCommitment(identityLinkPlan)) {
     return blocked("identity_link_plan_invalid");
   }
   if (
@@ -261,8 +286,9 @@ function readAuthorizedOperator(port: PairingOperatorAuthorityPort) {
   if (
     port.state !== "authorized" ||
     !canAuthorizeIdentityPairing(port.authorizationSource) ||
-    port.actorSeparation !==
-      IDENTITY_PAIRING_AUTHORITY_POLICY.operatorSeparation ||
+    port.principalBindingVersion !==
+      IDENTITY_PAIRING_AUTHORITY_POLICY.principalBindingVersion ||
+    !PRINCIPAL_BINDING_PATTERN.test(port.principalBinding) ||
     port.operatorBindingVersion !==
       IDENTITY_PAIRING_AUTHORITY_POLICY.operatorBindingVersion ||
     !OPERATOR_BINDING_PATTERN.test(port.operatorBinding)
@@ -273,6 +299,8 @@ function readAuthorizedOperator(port: PairingOperatorAuthorityPort) {
   if (targetAppUserId === null) return null;
   return Object.freeze({
     targetAppUserId,
+    principalBindingVersion: port.principalBindingVersion,
+    principalBinding: port.principalBinding,
     operatorBindingVersion: port.operatorBindingVersion,
     operatorBinding: port.operatorBinding,
   });
@@ -286,8 +314,11 @@ function readVerifiedSubjectBinding(
     port.provider !== IDENTITY_PAIRING_AUTHORITY_POLICY.provider ||
     port.subjectBindingVersion !==
       IDENTITY_PAIRING_AUTHORITY_POLICY.subjectBindingVersion ||
+    port.principalBindingVersion !==
+      IDENTITY_PAIRING_AUTHORITY_POLICY.principalBindingVersion ||
     port.verificationSource !== "server_verified_session" ||
-    !SUBJECT_BINDING_PATTERN.test(port.subjectBinding)
+    !SUBJECT_BINDING_PATTERN.test(port.subjectBinding) ||
+    !PRINCIPAL_BINDING_PATTERN.test(port.principalBinding)
   ) {
     return null;
   }
@@ -326,6 +357,12 @@ function isValidPendingIntent(
     intent.subjectBindingVersion ===
       IDENTITY_PAIRING_AUTHORITY_POLICY.subjectBindingVersion &&
     SUBJECT_BINDING_PATTERN.test(intent.subjectBinding) &&
+    intent.operatorPrincipalBindingVersion ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.principalBindingVersion &&
+    PRINCIPAL_BINDING_PATTERN.test(intent.operatorPrincipalBinding) &&
+    intent.subjectPrincipalBindingVersion ===
+      IDENTITY_PAIRING_AUTHORITY_POLICY.principalBindingVersion &&
+    PRINCIPAL_BINDING_PATTERN.test(intent.subjectPrincipalBinding) &&
     intent.operatorBindingVersion ===
       IDENTITY_PAIRING_AUTHORITY_POLICY.operatorBindingVersion &&
     OPERATOR_BINDING_PATTERN.test(intent.operatorBinding) &&
@@ -343,10 +380,14 @@ function isValidPendingIntent(
   );
 }
 
-function isValidIdentityLinkPlanEvidence(
-  evidence: IdentityLinkDryRunEvidence,
+function isValidIdentityLinkPlanCommitment(
+  evidence: Extract<
+    IdentityLinkPlanCommitmentPort,
+    { state: "verified" }
+  >,
 ) {
   return (
+    evidence.commitmentSource === "server_verified_g1a_commitment" &&
     evidence.identityDmlEnabled === false &&
     evidence.appUserMutation === "none" &&
     evidence.plannerPolicyId ===

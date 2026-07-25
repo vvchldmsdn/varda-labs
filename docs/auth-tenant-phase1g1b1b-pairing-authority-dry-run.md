@@ -12,19 +12,24 @@ exist. It must not automatically claim the existing provisioning portfolio
 user. This phase adds the missing authority checks before any future identity
 link:
 
-1. an independently authenticated operator explicitly reviews one target and
-   is represented by a server-created, domain-separated opaque binding;
-2. the signed-in subject is represented only by a server-created HMAC binding;
+1. an independently authenticated operator explicitly reviews one target;
+2. a future trusted producer represents the operator and signed-in subject in
+   the same canonical principal-binding namespace, and the two values differ;
 3. a target- and subject-bound pairing intent is pending and no more than ten
    minutes old;
 4. the challenge is carried only by a secure HTTP-only SameSite cookie;
-5. the existing G1-A identity-link planner independently reports
-   `planned_link` with a server-created commitment bound to its policy,
-   provider, subject binding, and target.
+5. a future server-only producer runs the existing G1-A identity-link planner
+   and provides a verified commitment bound to its policy, provider, subject
+   binding, target, and result.
 
 The signed-in subject session, Basic Auth, a machine secret, a singleton
 `app_users` row, email, account scope, or request-provided owner cannot approve
 the pairing.
+
+This phase does not implement either trusted producer. Its fixtures validate
+the required port shape, canonical-principal inequality, and exact commitment
+equality only. The current G1-A planner itself still returns only its
+outcome/reason/mutation flags and does not create a commitment.
 
 ## Single-Use Boundary
 
