@@ -1,10 +1,14 @@
-import { createHash } from "node:crypto";
-
 import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "./preview-database-target.ts";
+import {
+  assertCanonicalSha256Fingerprint,
+  assertOneNeonDatabaseTarget,
+  parseNeonDatabaseUrl,
+  sha256Fingerprint,
+} from "./neon-database-target.ts";
 
-const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
-const NEON_ENDPOINT_PATTERN = /^ep-[a-z0-9-]+$/;
 const NEON_BRANCH_PATTERN = /^br-[a-z0-9-]+$/;
+
+export { sha256Fingerprint };
 
 export const IDENTITY_PAIRING_REHEARSAL_TARGET_POLICY = Object.freeze({
   policyId: "identity_pairing_non_production_rehearsal_endpoint_v2",
@@ -59,14 +63,20 @@ export function guardIdentityPairingRehearsalTarget(
       env.IDENTITY_PAIRING_REHEARSAL_DATABASE_URL,
       "IDENTITY_PAIRING_REHEARSAL_DATABASE_URL",
     ),
+    "A rehearsal database",
   );
   const rehearsalUnpooled = parseNeonDatabaseUrl(
     requiredValue(
       env.IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED,
       "IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED",
     ),
+    "A rehearsal database",
   );
-  assertOneTarget(rehearsalPooled, rehearsalUnpooled, "rehearsal");
+  assertOneNeonDatabaseTarget(
+    rehearsalPooled,
+    rehearsalUnpooled,
+    "rehearsal",
+  );
   if (!rehearsalPooled.pooled || rehearsalUnpooled.pooled) {
     throw new Error(
       "The rehearsal target requires one pooled URL and one unpooled URL.",
@@ -75,17 +85,23 @@ export function guardIdentityPairingRehearsalTarget(
 
   const productionPooled = parseNeonDatabaseUrl(
     requiredValue(env.DATABASE_URL, "DATABASE_URL"),
+    "A Production database",
   );
   const productionUnpooled = parseNeonDatabaseUrl(
     requiredValue(env.DATABASE_URL_UNPOOLED, "DATABASE_URL_UNPOOLED"),
+    "A Production database",
   );
-  assertOneTarget(productionPooled, productionUnpooled, "Production");
+  assertOneNeonDatabaseTarget(
+    productionPooled,
+    productionUnpooled,
+    "Production",
+  );
 
-  assertSha256(
+  assertCanonicalSha256Fingerprint(
     policy.expectedNeonIntegrationProjectSha256,
     "expected integration project fingerprint",
   );
-  assertSha256(
+  assertCanonicalSha256Fingerprint(
     policy.productionEndpointSha256,
     "production endpoint fingerprint",
   );
@@ -137,81 +153,8 @@ export function guardIdentityPairingRehearsalTarget(
   };
 }
 
-export function sha256Fingerprint(value: string) {
-  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
-}
-
-type ParsedNeonDatabaseUrl = {
-  endpointId: string;
-  pooled: boolean;
-  username: string;
-  password: string;
-  databaseName: string;
-};
-
-function parseNeonDatabaseUrl(rawUrl: string): ParsedNeonDatabaseUrl {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    throw new Error("A database URL is not a valid URL.");
-  }
-
-  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) {
-    throw new Error("A rehearsal database URL must use PostgreSQL.");
-  }
-  if (!parsed.hostname.endsWith(".neon.tech")) {
-    throw new Error("A rehearsal database URL is not a Neon endpoint.");
-  }
-
-  const hostLabel = parsed.hostname.split(".")[0];
-  const pooled = hostLabel.endsWith("-pooler");
-  const endpointId = hostLabel.replace(/-pooler$/, "");
-  if (!NEON_ENDPOINT_PATTERN.test(endpointId)) {
-    throw new Error("A rehearsal database URL has an invalid endpoint.");
-  }
-
-  const databaseName = decodeURIComponent(
-    parsed.pathname.replace(/^\/+/, ""),
-  );
-  if (!parsed.username || !parsed.password || !databaseName) {
-    throw new Error("A rehearsal database URL is missing connection identity.");
-  }
-
-  return {
-    endpointId,
-    pooled,
-    username: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-    databaseName,
-  };
-}
-
-function assertOneTarget(
-  pooled: ParsedNeonDatabaseUrl,
-  unpooled: ParsedNeonDatabaseUrl,
-  label: string,
-) {
-  if (
-    pooled.endpointId !== unpooled.endpointId ||
-    pooled.username !== unpooled.username ||
-    pooled.password !== unpooled.password ||
-    pooled.databaseName !== unpooled.databaseName
-  ) {
-    throw new Error(
-      `${label} pooled and unpooled URLs do not identify one database target.`,
-    );
-  }
-}
-
 function requiredValue(value: string | undefined, name: string) {
   const normalized = value?.trim();
   if (!normalized) throw new Error(`${name} is required.`);
   return normalized;
-}
-
-function assertSha256(value: string, label: string) {
-  if (!SHA256_PATTERN.test(value)) {
-    throw new Error(`${label} must be a canonical SHA-256 fingerprint.`);
-  }
 }

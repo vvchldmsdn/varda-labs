@@ -10,6 +10,10 @@ import {
   parseIdentityBootstrapClaimIssuerArgs,
 } from "./lib/identity-bootstrap-claim-issuer.mjs";
 import { readIdentityBootstrapClaimIssuerState } from "./lib/identity-bootstrap-claim-issuer-state.mjs";
+import {
+  IdentityBootstrapClaimIssuerTargetError,
+  guardIdentityBootstrapClaimIssuerTarget,
+} from "./lib/identity-bootstrap-claim-issuer-target.mjs";
 import { buildIdentityBootstrapClaimIssueQueries } from "./lib/identity-bootstrap-claim-issuer-write.mjs";
 
 config({ path: ".env.local", quiet: true });
@@ -30,18 +34,34 @@ async function main() {
     return;
   }
 
-  const databaseUrl =
-    process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    print(
-      blockedIdentityBootstrapClaimIssuerOutput("database_not_configured"),
-    );
-    process.exitCode = 1;
-    return;
-  }
+  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrlUnpooled = process.env.DATABASE_URL_UNPOOLED;
 
   try {
-    const sql = neon(databaseUrl);
+    let targetEvidence;
+    try {
+      targetEvidence = guardIdentityBootstrapClaimIssuerTarget({
+        databaseUrl,
+        databaseUrlUnpooled,
+        targetAppUserId: args.targetAppUserId,
+        reviewedTargetFingerprint: args.reviewedTargetFingerprint,
+      });
+    } catch (error) {
+      const blocker =
+        error instanceof IdentityBootstrapClaimIssuerTargetError
+          ? error.code
+          : "issuer_database_target_invalid";
+      print(
+        blockedIdentityBootstrapClaimIssuerOutput(
+          blocker,
+          args.write ? "write" : "dry_run",
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const sql = neon(databaseUrlUnpooled);
     const state = await readIdentityBootstrapClaimIssuerState(
       sql,
       args.targetAppUserId,
@@ -49,6 +69,7 @@ async function main() {
     const plan = buildIdentityBootstrapClaimIssuerPlan({
       targetAppUserId: args.targetAppUserId,
       state,
+      targetEvidence,
     });
 
     if (!args.write) {

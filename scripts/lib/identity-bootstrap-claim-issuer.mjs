@@ -13,6 +13,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLAIM_DIGEST_PATTERN =
   /^bootstrap-claim-sha256-v1:[0-9a-f]{64}$/;
+const SHA256_FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
 export class IdentityBootstrapClaimIssuerArgumentError extends Error {
   constructor(code) {
@@ -26,6 +27,7 @@ export function parseIdentityBootstrapClaimIssuerArgs(argv) {
   let targetAppUserId = null;
   let write = false;
   let confirmation = null;
+  let reviewedTargetFingerprint = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -40,6 +42,14 @@ export function parseIdentityBootstrapClaimIssuerArgs(argv) {
     }
     if (argument === "--confirm" && confirmation === null) {
       confirmation = argv[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+    if (
+      argument === "--reviewed-target-fingerprint" &&
+      reviewedTargetFingerprint === null
+    ) {
+      reviewedTargetFingerprint = argv[index + 1] ?? null;
       index += 1;
       continue;
     }
@@ -63,16 +73,28 @@ export function parseIdentityBootstrapClaimIssuerArgs(argv) {
       "confirmation_without_write",
     );
   }
+  if (write && !isCanonicalSha256Fingerprint(reviewedTargetFingerprint)) {
+    throw new IdentityBootstrapClaimIssuerArgumentError(
+      "missing_reviewed_target_fingerprint",
+    );
+  }
+  if (!write && reviewedTargetFingerprint !== null) {
+    throw new IdentityBootstrapClaimIssuerArgumentError(
+      "reviewed_target_fingerprint_without_write",
+    );
+  }
 
   return Object.freeze({
     targetAppUserId: targetAppUserId.trim().toLowerCase(),
     write,
+    reviewedTargetFingerprint,
   });
 }
 
 export function buildIdentityBootstrapClaimIssuerPlan({
   targetAppUserId,
   state,
+  targetEvidence = null,
 }) {
   const validTarget = isCanonicalUuid(targetAppUserId);
   const blockers = [];
@@ -100,9 +122,22 @@ export function buildIdentityBootstrapClaimIssuerPlan({
     operation: "preissued_bootstrap_claim_issuer_v1",
     mode: "dry_run",
     result,
-    targetFingerprint: validTarget
-      ? fingerprint(targetAppUserId.trim().toLowerCase())
-      : null,
+    targetFingerprint:
+      targetEvidence?.targetFingerprint ??
+      (validTarget
+        ? fingerprint(targetAppUserId.trim().toLowerCase())
+        : null),
+    databaseTarget:
+      targetEvidence === null
+        ? null
+        : Object.freeze({
+            policyId: targetEvidence.policyId,
+            status: targetEvidence.status,
+            reviewStatus: targetEvidence.reviewStatus,
+            endpointFingerprint: targetEvidence.endpointFingerprint,
+            databaseTargetFingerprint:
+              targetEvidence.databaseTargetFingerprint,
+          }),
     policy: Object.freeze({
       authorityPolicyId: IDENTITY_BOOTSTRAP_CLAIM_AUTHORITY_POLICY.policyId,
       targetReviewPolicyId:
@@ -223,10 +258,13 @@ export function buildIdentityBootstrapClaimIssueOutput({
   });
 }
 
-export function blockedIdentityBootstrapClaimIssuerOutput(blocker) {
+export function blockedIdentityBootstrapClaimIssuerOutput(
+  blocker,
+  mode = "dry_run",
+) {
   return Object.freeze({
     operation: "preissued_bootstrap_claim_issuer_v1",
-    mode: "dry_run",
+    mode,
     result: "blocked",
     targetFingerprint: null,
     policy: null,
@@ -245,6 +283,12 @@ export function isCanonicalUuid(value) {
 
 export function isCanonicalClaimDigest(value) {
   return typeof value === "string" && CLAIM_DIGEST_PATTERN.test(value);
+}
+
+export function isCanonicalSha256Fingerprint(value) {
+  return (
+    typeof value === "string" && SHA256_FINGERPRINT_PATTERN.test(value)
+  );
 }
 
 function zeroWrites() {
@@ -266,10 +310,7 @@ function normalizeTimestamp(value) {
 }
 
 function fingerprint(value) {
-  return `sha256:${createHash("sha256")
-    .update(value)
-    .digest("hex")
-    .slice(0, 16)}`;
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 
 function escapeRegExp(value) {

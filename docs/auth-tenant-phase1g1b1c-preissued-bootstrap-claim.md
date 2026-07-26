@@ -53,6 +53,10 @@ product runtime integration. It:
 
 - requires one explicit `target_app_user_id` and never infers a singleton;
 - defaults to dry-run and requires a fixed confirmation for an actual write;
+- requires pooled and unpooled URLs to identify one target and pins that target
+  to the reviewed Production endpoint before any database read or write;
+- returns one combined database-and-app-user target fingerprint in dry-run and
+  requires that exact fingerprint again in the same write invocation;
 - locks only the reviewed target row, then evaluates current intent state in a
   second `READ COMMITTED` statement in the same transaction;
 - rejects a non-`provisioning/user` target, an existing provider identity, or
@@ -68,7 +72,9 @@ transaction's committed intent before deciding whether it may insert.
 
 The writer is implemented but has not been run. An actual Production issue
 requires a separate approval naming the exact reviewed target and command
-boundary.
+boundary. The approved write command must carry both
+`--reviewed-target-fingerprint <dry-run fingerprint>` and the fixed
+confirmation.
 
 ## Still Closed
 

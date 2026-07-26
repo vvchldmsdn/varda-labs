@@ -1,7 +1,11 @@
-import { createHash } from "node:crypto";
+import {
+  assertCanonicalSha256Fingerprint,
+  assertOneNeonDatabaseTarget,
+  parseNeonDatabaseUrl,
+  sha256Fingerprint,
+} from "./neon-database-target.ts";
 
-const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
-const NEON_ENDPOINT_PATTERN = /^ep-[a-z0-9-]+$/;
+export { sha256Fingerprint };
 
 export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   policyId: "preview_database_target_operational_guard_v2",
@@ -68,28 +72,21 @@ export function guardPreviewDatabaseTarget(
     env.NEON_PROJECT_ID,
     "NEON_PROJECT_ID",
   );
-  assertSha256(
+  assertCanonicalSha256Fingerprint(
     policy.expectedNeonIntegrationProjectSha256,
     "expected integration project fingerprint",
   );
-  assertSha256(
+  assertCanonicalSha256Fingerprint(
     policy.productionEndpointSha256,
     "production endpoint fingerprint",
   );
 
-  const pooled = parseNeonDatabaseUrl(databaseUrl);
-  const unpooled = parseNeonDatabaseUrl(unpooledDatabaseUrl);
-
-  if (
-    pooled.endpointId !== unpooled.endpointId ||
-    pooled.username !== unpooled.username ||
-    pooled.password !== unpooled.password ||
-    pooled.databaseName !== unpooled.databaseName
-  ) {
-    throw new Error(
-      "Preview pooled and unpooled database URLs do not identify one database target.",
-    );
-  }
+  const pooled = parseNeonDatabaseUrl(databaseUrl, "Preview database");
+  const unpooled = parseNeonDatabaseUrl(
+    unpooledDatabaseUrl,
+    "Preview database",
+  );
+  assertOneNeonDatabaseTarget(pooled, unpooled, "Preview");
 
   const integrationProjectFingerprint = sha256Fingerprint(neonProjectId);
   if (
@@ -126,55 +123,10 @@ export function guardPreviewDatabaseTarget(
   };
 }
 
-export function sha256Fingerprint(value: string) {
-  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
-}
-
-function parseNeonDatabaseUrl(rawUrl: string) {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    throw new Error("Preview database URL is not a valid URL.");
-  }
-
-  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) {
-    throw new Error("Preview database URL must use a PostgreSQL protocol.");
-  }
-  if (!parsed.hostname.endsWith(".neon.tech")) {
-    throw new Error("Preview database URL is not a Neon endpoint.");
-  }
-
-  const endpointId = parsed.hostname
-    .split(".")[0]
-    .replace(/-pooler$/, "");
-  if (!NEON_ENDPOINT_PATTERN.test(endpointId)) {
-    throw new Error("Preview database URL has an invalid Neon endpoint.");
-  }
-
-  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-  if (!parsed.username || !parsed.password || !databaseName) {
-    throw new Error("Preview database URL is missing connection identity.");
-  }
-
-  return {
-    endpointId,
-    username: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-    databaseName,
-  };
-}
-
 function requiredValue(value: string | undefined, name: string) {
   const normalized = value?.trim();
   if (!normalized) {
     throw new Error(`${name} is required for the Preview database guard.`);
   }
   return normalized;
-}
-
-function assertSha256(value: string, label: string) {
-  if (!SHA256_PATTERN.test(value)) {
-    throw new Error(`${label} must be a canonical SHA-256 fingerprint.`);
-  }
 }

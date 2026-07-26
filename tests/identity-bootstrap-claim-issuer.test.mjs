@@ -11,15 +11,28 @@ import {
   buildIdentityBootstrapClaimIssuerPlan,
   createOneTimeIdentityBootstrapClaim,
   digestIdentityBootstrapClaim,
+  isCanonicalSha256Fingerprint,
   parseIdentityBootstrapClaimIssuerArgs,
 } from "../scripts/lib/identity-bootstrap-claim-issuer.mjs";
 import { readIdentityBootstrapClaimIssuerState } from "../scripts/lib/identity-bootstrap-claim-issuer-state.mjs";
+import {
+  IDENTITY_BOOTSTRAP_CLAIM_ISSUER_TARGET_POLICY,
+  IdentityBootstrapClaimIssuerTargetError,
+  guardIdentityBootstrapClaimIssuerTarget,
+} from "../scripts/lib/identity-bootstrap-claim-issuer-target.mjs";
 import { buildIdentityBootstrapClaimIssueQueries } from "../scripts/lib/identity-bootstrap-claim-issuer-write.mjs";
+import { sha256Fingerprint } from "../src/lib/deployment/neon-database-target.ts";
 import { TENANT_WRITER_REGISTRY } from "../src/lib/tenant-writer-registry.ts";
 
 const ROOT = process.cwd();
 const TARGET = "11111111-1111-4111-8111-111111111111";
 const OTHER_TARGET = "22222222-2222-4222-8222-222222222222";
+const PRODUCTION_ENDPOINT = "ep-production-synthetic";
+const OTHER_ENDPOINT = "ep-other-synthetic";
+const TARGET_POLICY = {
+  policyId: "bootstrap_claim_issuer_target_guard_v1",
+  productionEndpointSha256: sha256Fingerprint(PRODUCTION_ENDPOINT),
+};
 
 describe("server-only identity bootstrap claim issuer", () => {
   it("defaults to dry-run and requires an explicit target and write confirmation", () => {
@@ -28,8 +41,13 @@ describe("server-only identity bootstrap claim issuer", () => {
         "--target-app-user-id",
         TARGET,
       ]),
-      { targetAppUserId: TARGET, write: false },
+      {
+        targetAppUserId: TARGET,
+        write: false,
+        reviewedTargetFingerprint: null,
+      },
     );
+    const reviewedTargetFingerprint = sha256Fingerprint("reviewed-target");
     assert.deepEqual(
       parseIdentityBootstrapClaimIssuerArgs([
         "--target-app-user-id",
@@ -37,8 +55,14 @@ describe("server-only identity bootstrap claim issuer", () => {
         "--write",
         "--confirm",
         IDENTITY_BOOTSTRAP_CLAIM_WRITE_CONFIRMATION,
+        "--reviewed-target-fingerprint",
+        reviewedTargetFingerprint,
       ]),
-      { targetAppUserId: TARGET, write: true },
+      {
+        targetAppUserId: TARGET,
+        write: true,
+        reviewedTargetFingerprint,
+      },
     );
     assertArgumentError([], "invalid_target_app_user_id");
     assertArgumentError(
@@ -49,17 +73,175 @@ describe("server-only identity bootstrap claim issuer", () => {
       [
         "--target-app-user-id",
         TARGET,
+        "--write",
+        "--confirm",
+        IDENTITY_BOOTSTRAP_CLAIM_WRITE_CONFIRMATION,
+      ],
+      "missing_reviewed_target_fingerprint",
+    );
+    assertArgumentError(
+      [
+        "--target-app-user-id",
+        TARGET,
         "--confirm",
         IDENTITY_BOOTSTRAP_CLAIM_WRITE_CONFIRMATION,
       ],
       "confirmation_without_write",
     );
+    assertArgumentError(
+      [
+        "--target-app-user-id",
+        TARGET,
+        "--reviewed-target-fingerprint",
+        reviewedTargetFingerprint,
+      ],
+      "reviewed_target_fingerprint_without_write",
+    );
+  });
+
+  it("binds dry-run and write to one reviewed Production database and app user", () => {
+    const dryRunTarget = guardIdentityBootstrapClaimIssuerTarget(
+      targetEnvironment(TARGET),
+      TARGET_POLICY,
+    );
+
+    assert.equal(
+      dryRunTarget.status,
+      "production_issuer_target_guard_passed",
+    );
+    assert.equal(dryRunTarget.reviewStatus, "dry_run_review_required");
+    assert.equal(
+      dryRunTarget.endpointFingerprint,
+      sha256Fingerprint(PRODUCTION_ENDPOINT),
+    );
+    assert.match(
+      dryRunTarget.databaseTargetFingerprint,
+      /^sha256:[0-9a-f]{64}$/,
+    );
+    assert.match(dryRunTarget.targetFingerprint, /^sha256:[0-9a-f]{64}$/);
+    assert.equal(
+      isCanonicalSha256Fingerprint(dryRunTarget.targetFingerprint),
+      true,
+    );
+
+    const reviewedTarget = guardIdentityBootstrapClaimIssuerTarget(
+      {
+        ...targetEnvironment(TARGET),
+        reviewedTargetFingerprint: dryRunTarget.targetFingerprint,
+      },
+      TARGET_POLICY,
+    );
+    assert.equal(reviewedTarget.reviewStatus, "reviewed_target_match");
+    assert.equal(
+      reviewedTarget.targetFingerprint,
+      dryRunTarget.targetFingerprint,
+    );
+
+    const serialized = JSON.stringify(reviewedTarget);
+    assert.doesNotMatch(
+      serialized,
+      /synthetic_(?:user|password)|neondb|\.neon\.tech/,
+    );
+    assert.doesNotMatch(
+      JSON.stringify(IDENTITY_BOOTSTRAP_CLAIM_ISSUER_TARGET_POLICY),
+      /postgres(?:ql)?:\/\/|\.neon\.tech/i,
+    );
+  });
+
+  it("fails closed on database, pooling, credential, endpoint, or review drift", () => {
+    const dryRunTarget = guardIdentityBootstrapClaimIssuerTarget(
+      targetEnvironment(TARGET),
+      TARGET_POLICY,
+    );
+    const scenarios = [
+      [
+        {
+          ...targetEnvironment(TARGET),
+          databaseUrlUnpooled: databaseUrl(OTHER_ENDPOINT, false),
+        },
+        "issuer_database_target_invalid",
+      ],
+      [
+        {
+          ...targetEnvironment(TARGET),
+          databaseUrlUnpooled: databaseUrl(
+            PRODUCTION_ENDPOINT,
+            false,
+            "other_user",
+          ),
+        },
+        "issuer_database_target_invalid",
+      ],
+      [
+        {
+          ...targetEnvironment(TARGET),
+          databaseUrlUnpooled: databaseUrl(PRODUCTION_ENDPOINT, true),
+        },
+        "issuer_database_pooling_mismatch",
+      ],
+      [
+        {
+          ...targetEnvironment(TARGET),
+          databaseUrl: databaseUrl(OTHER_ENDPOINT, true),
+          databaseUrlUnpooled: databaseUrl(OTHER_ENDPOINT, false),
+        },
+        "issuer_database_not_pinned_production",
+      ],
+      [
+        {
+          ...targetEnvironment(OTHER_TARGET),
+          reviewedTargetFingerprint: dryRunTarget.targetFingerprint,
+        },
+        "reviewed_target_fingerprint_mismatch",
+      ],
+      [
+        {
+          ...targetEnvironment(TARGET),
+          databaseUrl: databaseUrl(
+            PRODUCTION_ENDPOINT,
+            true,
+            "synthetic_user",
+            "otherdb",
+          ),
+          databaseUrlUnpooled: databaseUrl(
+            PRODUCTION_ENDPOINT,
+            false,
+            "synthetic_user",
+            "otherdb",
+          ),
+          reviewedTargetFingerprint: dryRunTarget.targetFingerprint,
+        },
+        "reviewed_target_fingerprint_mismatch",
+      ],
+      [
+        {
+          ...targetEnvironment(TARGET),
+          reviewedTargetFingerprint: sha256Fingerprint("wrong-target"),
+        },
+        "reviewed_target_fingerprint_mismatch",
+      ],
+    ];
+
+    for (const [input, expectedCode] of scenarios) {
+      assert.throws(
+        () =>
+          guardIdentityBootstrapClaimIssuerTarget(input, TARGET_POLICY),
+        (error) =>
+          error instanceof IdentityBootstrapClaimIssuerTargetError &&
+          error.code === expectedCode,
+      );
+    }
   });
 
   it("plans one intent only for the explicit provisioning user", () => {
+    const targetEvidence = guardIdentityBootstrapClaimIssuerTarget(
+      targetEnvironment(TARGET),
+      TARGET_POLICY,
+    );
     const plan = buildIdentityBootstrapClaimIssuerPlan({
       targetAppUserId: TARGET,
       state: readyState(),
+      targetEvidence,
     });
 
     assert.equal(plan.result, "ready");
@@ -73,6 +255,15 @@ describe("server-only identity bootstrap claim issuer", () => {
     });
     assert.equal(plan.committed, false);
     assert.equal(JSON.stringify(plan).includes(TARGET), false);
+    assert.equal(plan.targetFingerprint, targetEvidence.targetFingerprint);
+    assert.deepEqual(plan.databaseTarget, {
+      policyId: targetEvidence.policyId,
+      status: targetEvidence.status,
+      reviewStatus: targetEvidence.reviewStatus,
+      endpointFingerprint: targetEvidence.endpointFingerprint,
+      databaseTargetFingerprint:
+        targetEvidence.databaseTargetFingerprint,
+    });
   });
 
   it("blocks target drift, existing identity, and an unexpired intent", () => {
@@ -262,10 +453,21 @@ describe("server-only identity bootstrap claim issuer", () => {
     const readyAt = script.indexOf('plan.result !== "ready"');
     const targetLockAt = script.indexOf("issueQueries.targetLock.text");
     const issueAt = script.indexOf("issueQueries.issue.text");
+    const guardAt = script.indexOf(
+      "guardIdentityBootstrapClaimIssuerTarget",
+    );
+    const connectAt = script.indexOf("neon(databaseUrlUnpooled)");
 
     assert.ok(readyAt >= 0 && generateAt > readyAt);
     assert.ok(targetLockAt >= 0 && issueAt > targetLockAt);
+    assert.ok(guardAt >= 0 && connectAt > guardAt);
     assert.match(script, /sql\.transaction/);
+    assert.match(script, /process\.env\.DATABASE_URL\b/);
+    assert.match(script, /process\.env\.DATABASE_URL_UNPOOLED\b/);
+    assert.doesNotMatch(
+      script,
+      /DATABASE_URL_UNPOOLED\s*\?\?\s*process\.env\.DATABASE_URL/,
+    );
     assert.match(script, /set local lock_timeout = '5s'/);
     assert.match(script, /set local statement_timeout = '30s'/);
     assert.doesNotMatch(script, /pg_advisory|setTimeout|retry|while\s*\(/i);
@@ -314,6 +516,7 @@ describe("server-only identity bootstrap claim issuer", () => {
       "scripts/issue-identity-bootstrap-claim.mjs",
       "scripts/lib/identity-bootstrap-claim-issuer.mjs",
       "scripts/lib/identity-bootstrap-claim-issuer-state.mjs",
+      "scripts/lib/identity-bootstrap-claim-issuer-target.mjs",
       "scripts/lib/identity-bootstrap-claim-issuer-write.mjs",
     ]
       .map((path) => readFileSync(join(ROOT, path), "utf8"))
@@ -348,4 +551,21 @@ function assertArgumentError(argv, expectedCode) {
       error instanceof IdentityBootstrapClaimIssuerArgumentError &&
       error.code === expectedCode,
   );
+}
+
+function targetEnvironment(targetAppUserId) {
+  return {
+    databaseUrl: databaseUrl(PRODUCTION_ENDPOINT, true),
+    databaseUrlUnpooled: databaseUrl(PRODUCTION_ENDPOINT, false),
+    targetAppUserId,
+  };
+}
+
+function databaseUrl(
+  endpoint,
+  pooled,
+  username = "synthetic_user",
+  databaseName = "neondb",
+) {
+  return `postgresql://${username}:synthetic_password@${endpoint}${pooled ? "-pooler" : ""}.us-east-1.aws.neon.tech/${databaseName}?sslmode=require`;
 }
