@@ -18,6 +18,7 @@ export type IdentityPairingClaimPresentationBlockReason =
   | "body_unreadable"
   | "body_not_json"
   | "body_shape_invalid"
+  | "body_not_canonical"
   | "claim_format_invalid";
 
 export type IdentityPairingClaimPresentationMetadataResult =
@@ -108,6 +109,9 @@ export async function readIdentityPairingClaimPresentationBody(
   const claim = (input as { claim?: unknown }).claim;
   if (typeof claim !== "string" || !CLAIM_PATTERN.test(claim)) {
     return blocked("claim_format_invalid");
+  }
+  if (text !== JSON.stringify({ claim })) {
+    return blocked("body_not_canonical");
   }
 
   return Object.freeze({ state: "accepted", claim });

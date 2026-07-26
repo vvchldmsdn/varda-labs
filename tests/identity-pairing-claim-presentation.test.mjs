@@ -75,6 +75,21 @@ describe("disabled identity pairing claim presentation transport", () => {
     }
   });
 
+  it("rejects duplicate keys and non-canonical JSON", async () => {
+    const claim = syntheticClaim();
+    for (const body of [
+      `{"claim":"not-a-claim","claim":${JSON.stringify(claim)}}`,
+      `{ "claim": ${JSON.stringify(claim)} }`,
+    ]) {
+      assert.deepEqual(
+        await readIdentityPairingClaimPresentationBody(
+          presentationRequest(body),
+        ),
+        { state: "blocked", reason: "body_not_canonical" },
+      );
+    }
+  });
+
   it("enforces the body cap while streaming", async () => {
     const chunk = new Uint8Array(600);
     const request = presentationRequest(
@@ -116,7 +131,20 @@ describe("disabled identity pairing claim presentation transport", () => {
     );
     assert.match(route, /^import "server-only";/);
     assert.match(route, /export const runtime = "nodejs"/);
-    assert.match(route, /export async function POST\(\)/);
+    for (const method of [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "HEAD",
+      "OPTIONS",
+    ]) {
+      assert.match(
+        route,
+        new RegExp(`export async function ${method}\\(\\)`),
+      );
+    }
     assert.match(
       route,
       /createDisabledIdentityPairingClaimPresentationResponse\(\)/,
