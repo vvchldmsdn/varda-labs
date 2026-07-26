@@ -4,9 +4,10 @@ import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
 import {
-  EXPANDED_TENANT_TABLE_POLICIES,
+  CORE_EXPANDED_TENANT_TABLE_POLICIES,
   TRANSITIONAL_OWNER_COLUMN,
   USER_OWNED_TABLE_NAMES,
+  resolveTenantTablePolicies,
 } from "./lib/tenant-ownership-policy.mjs";
 import { classifyTenantExpandPhase } from "./lib/tenant-expand-phase.mjs";
 
@@ -19,9 +20,6 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const expectedPublicTables = EXPANDED_TENANT_TABLE_POLICIES.map(
-  ({ table }) => table,
-).sort();
 const expectedOwnerTables = [...USER_OWNED_TABLE_NAMES].sort();
 const expectedOwnerIndexes = expectedOwnerTables
   .map((table) => `${table}_${TRANSITIONAL_OWNER_COLUMN}_idx`)
@@ -47,10 +45,17 @@ const publicTables = await sql.query(`
     and table_type = 'BASE TABLE'
   order by table_name
 `);
+const publicTableNames = publicTables.map(({ table_name }) => table_name);
+const activePolicies = resolveTenantTablePolicies(publicTableNames);
+assert.ok(
+  activePolicies.length >= CORE_EXPANDED_TENANT_TABLE_POLICIES.length,
+  "Phase 1C identity core tables are missing",
+);
+const expectedPublicTables = activePolicies.map(({ table }) => table).sort();
 assert.deepEqual(
-  publicTables.map(({ table_name }) => table_name),
+  publicTableNames,
   expectedPublicTables,
-  "Phase 1C must leave exactly 24 classified public tables",
+  "Phase 1C and later identity tables must all remain classified",
 );
 
 const ownerColumns = await sql.query(`

@@ -47,7 +47,7 @@ export type PreviewDatabaseTargetGuard = {
   endpointProjectBinding: "external_vercel_neon_integration_control";
 };
 
-type PreviewDatabaseTargetGuardPolicy = {
+export type PreviewDatabaseTargetGuardPolicy = {
   policyId: typeof PREVIEW_DATABASE_TARGET_GUARD_POLICY.policyId;
   expectedNeonIntegrationProjectSha256: string;
   productionEndpointSha256: string;

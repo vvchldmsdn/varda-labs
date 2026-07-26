@@ -55,6 +55,26 @@ describe("disabled identity pairing claim presentation transport", () => {
     assert.deepEqual(result, { state: "accepted", claim });
   });
 
+  it("rejects a noncanonical base64url alias", async () => {
+    const canonicalClaim = syntheticClaim();
+    const noncanonicalAlias = `${canonicalClaim.slice(0, -1)}B`;
+    assert.equal(
+      Buffer.from(noncanonicalAlias.split(".")[1], "base64url").equals(
+        Buffer.alloc(32),
+      ),
+      true,
+    );
+
+    assert.deepEqual(
+      await readIdentityPairingClaimPresentationBody(
+        presentationRequest(
+          JSON.stringify({ claim: noncanonicalAlias }),
+        ),
+      ),
+      { state: "blocked", reason: "claim_format_invalid" },
+    );
+  });
+
   it("rejects malformed JSON, extra fields, and invalid claims", async () => {
     for (const [body, reason] of [
       ["{", "body_not_json"],

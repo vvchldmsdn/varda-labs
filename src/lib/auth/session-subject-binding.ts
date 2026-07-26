@@ -76,6 +76,19 @@ export async function readSessionSubjectBinding(input: Readonly<{
     return unavailable();
   }
 
+  return createSessionSubjectBinding({
+    evidence,
+    hmacKey: input.hmacKey,
+  });
+}
+
+export function createSessionSubjectBinding(input: Readonly<{
+  evidence: VerifiedSessionSubjectEvidence;
+  hmacKey: Uint8Array;
+}>): SessionSubjectBindingResult {
+  if (!isValidHmacKey(input.hmacKey)) return unavailable();
+
+  const { evidence } = input;
   if (
     evidence.state === "disabled" ||
     evidence.state === "missing" ||
@@ -91,7 +104,7 @@ export async function readSessionSubjectBinding(input: Readonly<{
   ) {
     return unavailable();
   }
-  if (!isCanonicalProviderSubject(evidence.subject)) {
+  if (!isCanonicalSessionProviderSubject(evidence.subject)) {
     return Object.freeze({ state: "missing" });
   }
 
@@ -99,14 +112,21 @@ export async function readSessionSubjectBinding(input: Readonly<{
     provider: SESSION_SUBJECT_BINDING_POLICY.provider,
     subject: evidence.subject,
   });
-  const subjectBinding = `${SESSION_SUBJECT_BINDING_POLICY.subjectBindingPrefix}${createHmac(
-    SESSION_SUBJECT_BINDING_POLICY.hmacAlgorithm,
-    Buffer.from(input.hmacKey),
-  )
-    .update(SESSION_SUBJECT_BINDING_POLICY.hmacDomain, "utf8")
-    .update("\u0000", "utf8")
-    .update(payload, "utf8")
-    .digest("hex")}` as const;
+  const key = Buffer.from(input.hmacKey);
+  let subjectBinding: `hmac-sha256-v1:${string}`;
+  try {
+    subjectBinding =
+      `${SESSION_SUBJECT_BINDING_POLICY.subjectBindingPrefix}${createHmac(
+        SESSION_SUBJECT_BINDING_POLICY.hmacAlgorithm,
+        key,
+      )
+        .update(SESSION_SUBJECT_BINDING_POLICY.hmacDomain, "utf8")
+        .update("\u0000", "utf8")
+        .update(payload, "utf8")
+        .digest("hex")}`;
+  } finally {
+    key.fill(0);
+  }
 
   return Object.freeze({
     state: "verified",
@@ -126,7 +146,7 @@ function isValidHmacKey(value: Uint8Array) {
   );
 }
 
-function isCanonicalProviderSubject(value: string) {
+export function isCanonicalSessionProviderSubject(value: unknown) {
   if (
     typeof value !== "string" ||
     value.length === 0 ||

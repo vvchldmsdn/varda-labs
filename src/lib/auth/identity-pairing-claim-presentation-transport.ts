@@ -1,11 +1,11 @@
+import { isCanonicalIdentityBootstrapClaim } from "../identity-bootstrap-claim.ts";
+
 export const IDENTITY_PAIRING_CLAIM_PRESENTATION_PATH =
   "/api/identity/bootstrap-claim/present";
 export const IDENTITY_PAIRING_CLAIM_PRESENTATION_PRODUCTION_ORIGIN =
   "https://varda-labs.vercel.app";
 export const IDENTITY_PAIRING_CLAIM_PRESENTATION_MAX_BODY_BYTES = 1_024;
 
-const CLAIM_PATTERN =
-  /^varda-bootstrap-claim-v1\.[A-Za-z0-9_-]{43}$/;
 const UTF8_BOM = Object.freeze([0xef, 0xbb, 0xbf]);
 
 export type IdentityPairingClaimPresentationBlockReason =
@@ -109,7 +109,7 @@ export async function readIdentityPairingClaimPresentationBody(
   }
 
   const claim = (input as { claim?: unknown }).claim;
-  if (typeof claim !== "string" || !CLAIM_PATTERN.test(claim)) {
+  if (!isCanonicalIdentityBootstrapClaim(claim)) {
     return blocked("claim_format_invalid");
   }
   if (text !== JSON.stringify({ claim })) {
