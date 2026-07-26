@@ -134,6 +134,7 @@ import "./identity-bootstrap-claim-issuer.test.mjs";
 import "./identity-pairing-intent-schema.test.mjs";
 import "./identity-pairing-rehearsal.test.mjs";
 import "./identity-pairing-consume-writer.test.mjs";
+import "./identity-pairing-claim-presentation.test.mjs";
 import "./preview-auth-readiness.test.mjs";
 import "./auth-transport-runtime.test.mjs";
 import "./preview-database-target.test.mjs";
