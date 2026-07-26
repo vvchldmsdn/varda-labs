@@ -15,6 +15,11 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
     sha256:
       "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553",
   }),
+  reviewedMigrationLedger: Object.freeze({
+    entryCount: 22,
+    sha256:
+      "sha256:7733283ad3e1a3b4ae89cd761a370ca2a3cc488c085597fb34573055ca033808",
+  }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
       tag: "0021_strange_sinister_six",

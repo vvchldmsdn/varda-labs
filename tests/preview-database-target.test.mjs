@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { readMigrationFiles } from "drizzle-orm/migrator";
+
 import {
   PREVIEW_DATABASE_TARGET_GUARD_POLICY,
   guardPreviewDatabaseTarget,
@@ -130,6 +132,14 @@ describe("Preview database target operational guard", () => {
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
       [PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration],
     );
+    assert.deepEqual(
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
+      {
+        entryCount: 22,
+        sha256:
+          "sha256:7733283ad3e1a3b4ae89cd761a370ca2a3cc488c085597fb34573055ca033808",
+      },
+    );
   });
 
   it("keeps runtime evidence Preview-only, read-only, and access-gated", () => {
@@ -169,34 +179,79 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v3",
+        evidenceVersion: "preview_database_evidence_v4",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
       },
     );
     assert.equal(
-      publicPreviewDatabaseEvidence(reviewed).catalogStatus,
+      publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
+      "reviewed_0021_present",
+    );
+    assert.equal(
+      publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
       "reviewed_0020_present",
     );
 
-    const pending = { ...reviewed, latestMigration: null };
+    const appliedMigrations = reviewed.appliedMigrations.slice(0, -1);
+    const pending = {
+      ...reviewed,
+      latestMigration: appliedMigrations.at(-1) ?? null,
+      appliedMigrations,
+    };
     assert.doesNotThrow(() =>
       assertReviewedPreviewDatabaseCatalog(pending),
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseState(pending),
-      /latest migration/,
+      /migration ledger/,
     );
     assert.deepEqual(
       {
         latestReviewedMigration:
           publicPreviewDatabaseEvidence(pending).latestReviewedMigration,
-        catalogStatus: publicPreviewDatabaseEvidence(pending).catalogStatus,
+        migrationLedgerStatus:
+          publicPreviewDatabaseEvidence(pending).migrationLedgerStatus,
+        assetPriceCatalogStatus:
+          publicPreviewDatabaseEvidence(pending).assetPriceCatalogStatus,
       },
       {
         latestReviewedMigration: null,
-        catalogStatus: "reviewed_0020_not_present",
+        migrationLedgerStatus: "reviewed_0021_not_present",
+        assetPriceCatalogStatus: "reviewed_0020_present",
+      },
+    );
+  });
+
+  it("rejects an earlier ledger divergence even when migration 0021 is latest", () => {
+    const reviewed = reviewedState();
+    const diverged = {
+      ...reviewed,
+      appliedMigrations: reviewed.appliedMigrations.map((migration, index) =>
+        index === 0
+          ? { ...migration, sha256: "0".repeat(64) }
+          : migration,
+      ),
+    };
+
+    assert.throws(
+      () => assertReviewedPreviewDatabaseState(diverged),
+      /migration ledger/,
+    );
+    assert.deepEqual(
+      {
+        latestReviewedMigration:
+          publicPreviewDatabaseEvidence(diverged).latestReviewedMigration,
+        migrationLedgerStatus:
+          publicPreviewDatabaseEvidence(diverged).migrationLedgerStatus,
+        assetPriceCatalogStatus:
+          publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
+      },
+      {
+        latestReviewedMigration: "0021_strange_sinister_six",
+        migrationLedgerStatus: "reviewed_0021_not_present",
+        assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );
   });
@@ -219,7 +274,7 @@ describe("Preview database target operational guard", () => {
         /catalog is incomplete/,
       );
       assert.equal(
-        publicPreviewDatabaseEvidence(drifted).catalogStatus,
+        publicPreviewDatabaseEvidence(drifted).assetPriceCatalogStatus,
         "reviewed_0020_not_present",
       );
     }
@@ -260,6 +315,7 @@ function databaseUrl(endpoint, pooled) {
 }
 
 function reviewedState() {
+  const appliedMigrations = reviewedLocalMigrationLedger();
   return {
     target: {
       policyId: "preview_database_target_operational_guard_v2",
@@ -281,6 +337,7 @@ function reviewedState() {
       sha256:
         PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.sha256,
     },
+    appliedMigrations,
     reviewedCatalog: {
       adjustedClosePriceNullable: true,
       presentColumns: [
@@ -297,4 +354,17 @@ function reviewedState() {
       legacyTickerDateIndexPresent: false,
     },
   };
+}
+
+function reviewedLocalMigrationLedger() {
+  const journal = JSON.parse(
+    readFileSync("drizzle/meta/_journal.json", "utf8"),
+  );
+  const migrations = readMigrationFiles({
+    migrationsFolder: "drizzle",
+  });
+  return journal.entries.map((entry, index) => ({
+    createdAt: entry.when,
+    sha256: migrations[index].hash,
+  }));
 }

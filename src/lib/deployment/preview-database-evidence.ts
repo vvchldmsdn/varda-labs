@@ -1,8 +1,10 @@
 import {
   PREVIEW_DATABASE_TARGET_GUARD_POLICY,
   guardPreviewDatabaseTarget,
+  sha256Fingerprint,
   type PreviewDatabaseTargetGuardEnvironment,
 } from "./preview-database-target.ts";
+import type { AppliedMigrationEvidence } from "./preview-migration-plan.ts";
 
 const REVIEWED_COLUMNS = Object.freeze([
   "adjusted_close_basis",
@@ -38,6 +40,7 @@ export type PreviewDatabaseState = {
     createdAt: number;
     sha256: string;
   } | null;
+  appliedMigrations: AppliedMigrationEvidence[];
   reviewedCatalog: {
     adjustedClosePriceNullable: boolean;
     presentColumns: string[];
@@ -66,8 +69,7 @@ export async function readPreviewDatabaseState(input: {
     input.query(`
       select hash, created_at::text as created_at
         from drizzle.__drizzle_migrations
-       order by created_at desc
-       limit 1
+       order by created_at asc
     `),
     input.query(`
       select column_name, is_nullable
@@ -146,6 +148,16 @@ export async function readPreviewDatabaseState(input: {
     columnRows.some(({ column_name }) => column_name === columnName),
   );
 
+  const appliedMigrations = migrationRows.map((row) => ({
+    createdAt: integerValue(
+      row.created_at,
+      "applied migration timestamp",
+    ),
+    sha256: String(row.hash ?? ""),
+  }));
+  const latestMigration =
+    appliedMigrations[appliedMigrations.length - 1] ?? null;
+
   return {
     target,
     rowCounts: {
@@ -160,16 +172,8 @@ export async function readPreviewDatabaseState(input: {
         "approval revisions",
       ),
     },
-    latestMigration:
-      migrationRows.length === 1
-        ? {
-            createdAt: integerValue(
-              migrationRows[0].created_at,
-              "latest migration timestamp",
-            ),
-            sha256: String(migrationRows[0].hash ?? ""),
-          }
-        : null,
+    latestMigration,
+    appliedMigrations,
     reviewedCatalog: {
       adjustedClosePriceNullable:
         adjustedClosePrice?.is_nullable === "YES",
@@ -193,6 +197,11 @@ export async function readPreviewDatabaseState(input: {
 export function assertReviewedPreviewDatabaseState(
   state: PreviewDatabaseState,
 ) {
+  if (!hasReviewedMigrationLedger(state)) {
+    throw new Error(
+      "Preview database migration ledger does not match the reviewed 0021 ledger.",
+    );
+  }
   if (!hasReviewedLatestMigration(state)) {
     throw new Error(
       `Preview database latest migration is not ${PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag}.`,
@@ -212,10 +221,12 @@ export function assertReviewedPreviewDatabaseCatalog(
 }
 
 export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
+  const reviewedMigrationLedgerPresent =
+    hasReviewedMigrationLedger(state);
   const reviewedMigrationPresent = hasReviewedLatestMigration(state);
   const reviewedCatalogPresent = hasReviewedCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v3",
+    evidenceVersion: "preview_database_evidence_v4",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -223,11 +234,29 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     latestReviewedMigration: reviewedMigrationPresent
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
-    catalogStatus:
-      reviewedMigrationPresent && reviewedCatalogPresent
-        ? "reviewed_0020_present"
-        : "reviewed_0020_not_present",
+    migrationLedgerStatus: reviewedMigrationLedgerPresent
+      ? "reviewed_0021_present"
+      : "reviewed_0021_not_present",
+    assetPriceCatalogStatus: reviewedCatalogPresent
+      ? "reviewed_0020_present"
+      : "reviewed_0020_not_present",
   };
+}
+
+function hasReviewedMigrationLedger(state: PreviewDatabaseState) {
+  const reviewed =
+    PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger;
+  return (
+    state.appliedMigrations.length === reviewed.entryCount &&
+    sha256Fingerprint(
+      JSON.stringify(
+        state.appliedMigrations.map(({ createdAt, sha256 }) => ({
+          createdAt,
+          sha256,
+        })),
+      ),
+    ) === reviewed.sha256
+  );
 }
 
 function hasReviewedLatestMigration(state: PreviewDatabaseState) {

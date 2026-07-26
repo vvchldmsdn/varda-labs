@@ -18,7 +18,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v3.json",
+  "varda-preview-database-preflight-v4.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -41,14 +41,14 @@ async function run() {
 
   const sql = neon(databaseUrl);
   const query = (text) => sql.query(text);
-  const [state, appliedMigrations] = await Promise.all([
-    readPreviewDatabaseState({ env: process.env, query }),
-    readAppliedMigrations(query),
-  ]);
+  const state = await readPreviewDatabaseState({
+    env: process.env,
+    query,
+  });
   const localMigrations = readLocalMigrations();
   const plan = planPreviewMigrations({
     localMigrations,
-    appliedMigrations,
+    appliedMigrations: state.appliedMigrations,
     allowedPendingMigrations:
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
   });
@@ -56,7 +56,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v3",
+      evidenceVersion: "preview_database_build_preflight_v4",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
     };
@@ -78,7 +78,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v3",
+    "preview_database_build_preflight_v4",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -122,18 +122,6 @@ function assertPreflightCatalog(plan, state, localMigrations) {
     "Preview state and migration ledger disagree before migration 0021",
   );
   assertReviewedPreviewDatabaseCatalog(state);
-}
-
-async function readAppliedMigrations(query) {
-  const rows = await query(`
-    select hash, created_at::text as created_at
-      from drizzle.__drizzle_migrations
-     order by created_at asc
-  `);
-  return rows.map((row) => ({
-    createdAt: Number(row.created_at),
-    sha256: String(row.hash ?? ""),
-  }));
 }
 
 function readLocalMigrations() {
