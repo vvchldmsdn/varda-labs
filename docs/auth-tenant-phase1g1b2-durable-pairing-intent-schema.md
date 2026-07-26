@@ -135,6 +135,10 @@ function bodies and execution
 attributes; zero rows; and the Drizzle ledger hash. Its product-row-count
 digest can be passed back as
 `--expect-product-row-counts-sha256` for same-window pre/post comparison.
+The audit compares the complete applied ledger with the local journal. In the
+absent state it permits only reviewed `0021` as the exact pending suffix; in
+the present state it requires no pending migration. Migration SQL files are
+kept LF-only so platform checkout behavior cannot change their Drizzle hashes.
 
 The disposable-branch rehearsal verified absent and present catalog states,
 zero initial pairing rows, rejection of constraint deferral, claim-window and

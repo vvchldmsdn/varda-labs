@@ -7,6 +7,8 @@ import { neon } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { config } from "dotenv";
 
+import { planReviewedMigrations } from "../src/lib/deployment/migration-ledger-plan.ts";
+
 config({ path: ".env.local", quiet: true });
 
 const MIGRATIONS_FOLDER = join(process.cwd(), "drizzle");
@@ -22,7 +24,17 @@ if (!process.env.DATABASE_URL) {
 }
 
 const sql = neon(process.env.DATABASE_URL);
-const localMigration = readLatestLocalMigration();
+const localMigrations = readLocalMigrations();
+const latestLocalMigration = localMigrations.at(-1);
+assert.ok(latestLocalMigration, "local migration journal is empty");
+const localMigration = {
+  tag: latestLocalMigration.tag,
+  createdAt: latestLocalMigration.createdAt,
+  drizzleHash: latestLocalMigration.sha256,
+  fileSha256: normalizedFileSha256(
+    join(MIGRATIONS_FOLDER, `${latestLocalMigration.tag}.sql`),
+  ),
+};
 const publicTables = await sql.query(`
   select table_name
   from information_schema.tables
@@ -48,6 +60,19 @@ const appliedMigrations = await sql.query(`
   from drizzle.__drizzle_migrations
   order by created_at asc
 `);
+const migrationPlan = planReviewedMigrations({
+  localMigrations,
+  appliedMigrations: appliedMigrations.map(({ created_at, hash }) => ({
+    createdAt: Number(created_at),
+    sha256: String(hash),
+  })),
+  allowedPendingMigrations: state === "absent" ? [latestLocalMigration] : [],
+});
+assert.deepEqual(
+  migrationPlan.pendingTags,
+  state === "absent" ? [latestLocalMigration.tag] : [],
+  "identity pairing migration is not the exact pending suffix",
+);
 const appliedLocalMigration = appliedMigrations.find(
   ({ created_at }) => Number(created_at) === localMigration.createdAt,
 );
@@ -103,6 +128,7 @@ console.log(
       readOnly: true,
       databaseWrites: 0,
       localMigration,
+      migrationPlan,
       appliedMigration:
         appliedLocalMigration === undefined
           ? null
@@ -405,7 +431,7 @@ async function auditPresentSchema(query) {
   };
 }
 
-function readLatestLocalMigration() {
+function readLocalMigrations() {
   const journal = JSON.parse(
     readFileSync(join(MIGRATIONS_FOLDER, "meta", "_journal.json"), "utf8"),
   );
@@ -417,17 +443,19 @@ function readLatestLocalMigration() {
     migrations.length,
     "Drizzle journal and migration files differ",
   );
-  const index = journal.entries.length - 1;
-  const entry = journal.entries[index];
-  assert.equal(entry.idx, 21, "latest local migration is not 0021");
-  return {
+  const latestEntry = journal.entries.at(-1);
+  assert.ok(latestEntry, "Drizzle journal is empty");
+  assert.equal(latestEntry.idx, 21, "latest local migration is not 0021");
+  assert.equal(
+    latestEntry.tag,
+    "0021_strange_sinister_six",
+    "latest local migration tag drifted",
+  );
+  return journal.entries.map((entry, index) => ({
     tag: entry.tag,
     createdAt: entry.when,
-    drizzleHash: migrations[index].hash,
-    fileSha256: normalizedFileSha256(
-      join(MIGRATIONS_FOLDER, `${entry.tag}.sql`),
-    ),
-  };
+    sha256: migrations[index].hash,
+  }));
 }
 
 function expectedColumns() {

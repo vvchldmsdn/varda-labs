@@ -264,6 +264,14 @@ describe("durable identity bootstrap claim schema", () => {
   });
 
   it("pins full catalog semantics for the postflight audit", () => {
+    assert.match(
+      audit,
+      /planReviewedMigrations\(\{[\s\S]*allowedPendingMigrations:\s*state === "absent"\s*\? \[latestLocalMigration\]\s*:\s*\[\]/,
+    );
+    assert.match(
+      audit,
+      /migrationPlan\.pendingTags[\s\S]*state === "absent"\s*\? \[latestLocalMigration\.tag\]\s*:\s*\[\]/,
+    );
     for (const catalogField of [
       "convalidated",
       "condeferrable",
