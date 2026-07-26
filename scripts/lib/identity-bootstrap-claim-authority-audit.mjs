@@ -10,6 +10,14 @@ const AUDIT_PATHS = [
   "scripts/lib/identity-bootstrap-claim-authority-audit.mjs",
 ];
 const CONTRACT_IMPORT_PATTERN = /identity-bootstrap-claim-authority/;
+const CONTRACT_IMPORT_STATEMENT_PATTERN =
+  /^import[\s\S]*?from\s+["'][^"']*identity-bootstrap-claim-authority[^"']*["'];/gm;
+const APPROVED_ISSUER_POLICY_IMPORT_PATHS = new Set([
+  "scripts/lib/identity-bootstrap-claim-issuer.mjs",
+  "scripts/lib/identity-bootstrap-claim-issuer-write.mjs",
+]);
+const APPROVED_ISSUER_POLICY_IMPORT =
+  /from\s+["']\.\.\/\.\.\/src\/lib\/identity-bootstrap-claim-authority-policy\.ts["']/;
 const ALLOWED_LOCAL_IMPORT =
   /from\s+["']\.\/identity-bootstrap-claim-authority-policy\.ts["']/;
 const PURE_CONTRACT_FORBIDDEN_PATTERN =
@@ -60,14 +68,43 @@ export function auditIdentityBootstrapClaimAuthority({
   }
 
   let productionImports = 0;
+  let approvedIssuerPolicyImports = 0;
   for (const path of productionPaths) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) continue;
-    if (CONTRACT_IMPORT_PATTERN.test(readFileSync(absolutePath, "utf8"))) {
-      productionImports += 1;
+    const source = readFileSync(absolutePath, "utf8");
+    if (CONTRACT_IMPORT_PATTERN.test(source)) {
+      const authorityImports =
+        source.match(CONTRACT_IMPORT_STATEMENT_PATTERN) ?? [];
+      if (
+        APPROVED_ISSUER_POLICY_IMPORT_PATHS.has(path) &&
+        authorityImports.length === 1 &&
+        APPROVED_ISSUER_POLICY_IMPORT.test(authorityImports[0])
+      ) {
+        approvedIssuerPolicyImports += 1;
+      } else {
+        productionImports += 1;
+      }
     }
   }
   if (productionImports !== 0) findings.push("production_contract_import");
+  const issuerWriters = writerRegistry.filter(
+    ({ id }) => id === "identity_bootstrap_claim_issuer",
+  );
+  const issuerWriterContractValid =
+    issuerWriters.length === 1 &&
+    issuerWriters[0].authorization === "migration_cli" &&
+    issuerWriters[0].entrypoints.length === 1 &&
+    issuerWriters[0].entrypoints[0] ===
+      "scripts/issue-identity-bootstrap-claim.mjs" &&
+    issuerWriters[0].targets.length === 1 &&
+    issuerWriters[0].targets[0].table === "identity_pairing_intents" &&
+    issuerWriters[0].targets[0].classification === "identity_system" &&
+    issuerWriters[0].targets[0].operations.length === 1 &&
+    issuerWriters[0].targets[0].operations[0] === "insert";
+  if (!issuerWriterContractValid) {
+    findings.push("claim_issuer_writer_contract_invalid");
+  }
 
   const auditCliSource = readFileSync(join(root, AUDIT_PATHS[0]), "utf8");
   const claimEntrypoints = CLAIM_ENTRYPOINT_PATTERN.test(auditCliSource)
@@ -85,12 +122,14 @@ export function auditIdentityBootstrapClaimAuthority({
       identityDmlMatches,
       unexpectedImports,
       productionImports,
+      approvedIssuerPolicyImports,
+      claimIssuerWriters: issuerWriters.length,
       claimEntrypoints,
       databaseQueries: 0,
       databaseWrites: 0,
       providerCalls: 0,
       routeCalls: 0,
-      claimWrites: 0,
+      claimWrites: issuerWriterContractValid ? 1 : 0,
       identityWrites: 0,
       appUserStatusChanges: 0,
     },

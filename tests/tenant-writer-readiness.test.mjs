@@ -15,6 +15,7 @@ import {
 import {
   CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES,
   EXPANDED_TENANT_TABLE_POLICIES,
+  FULLY_EXPANDED_TENANT_TABLE_POLICIES,
   LEGACY_EXCLUDED_USER_TABLE_NAMES,
 } from "../scripts/lib/tenant-ownership-policy.mjs";
 
@@ -55,8 +56,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 17);
-    assert.equal(registeredPaths.length, 23);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 18);
+    assert.equal(registeredPaths.length, 24);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -69,7 +70,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
   it("keeps writer target classes aligned with the table ownership policy", () => {
     const policyByTable = new Map(
-      EXPANDED_TENANT_TABLE_POLICIES.map(({ table, classification }) => [
+      FULLY_EXPANDED_TENANT_TABLE_POLICIES.map(({ table, classification }) => [
         table,
         classification,
       ]),
@@ -127,7 +128,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 11,
       intentionally_skipped_legacy: 1,
-      not_applicable: 5,
+      not_applicable: 6,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(

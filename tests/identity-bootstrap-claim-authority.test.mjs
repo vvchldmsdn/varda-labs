@@ -263,7 +263,7 @@ describe("preissued identity bootstrap claim authority", () => {
     });
   });
 
-  it("remains disconnected from production runtime and writers", () => {
+  it("admits only the reviewed server CLI issuer, not a consume writer", () => {
     const audit = auditIdentityBootstrapClaimAuthority({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -273,6 +273,10 @@ describe("preissued identity bootstrap claim authority", () => {
     assert.deepEqual(
       {
         productionImports: audit.evidence.productionImports,
+        approvedIssuerPolicyImports:
+          audit.evidence.approvedIssuerPolicyImports,
+        claimIssuerWriters: audit.evidence.claimIssuerWriters,
+        claimWrites: audit.evidence.claimWrites,
         databaseQueries: audit.evidence.databaseQueries,
         databaseWrites: audit.evidence.databaseWrites,
         identityWrites: audit.evidence.identityWrites,
@@ -280,6 +284,9 @@ describe("preissued identity bootstrap claim authority", () => {
       },
       {
         productionImports: 0,
+        approvedIssuerPolicyImports: 2,
+        claimIssuerWriters: 1,
+        claimWrites: 1,
         databaseQueries: 0,
         databaseWrites: 0,
         identityWrites: 0,

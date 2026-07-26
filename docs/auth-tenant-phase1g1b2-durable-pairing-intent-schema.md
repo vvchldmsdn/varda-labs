@@ -2,9 +2,8 @@
 
 Last updated: 2026-07-26
 
-Status: corrected locally and verified on a deleted disposable Neon branch.
-Migration `0021_strange_sinister_six.sql` is not applied to Production or any
-surviving Neon branch.
+Status: applied to Production as an empty expand migration and verified
+SELECT-only on 2026-07-26.
 
 Normalized file SHA-256:
 `e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553`.
@@ -31,9 +30,9 @@ user, or expose a mutation route.
 - issue and expiry timestamps no more than ten minutes apart.
 
 It does not store the raw claim, provider subject, email, token, cookie,
-profile, Basic Auth credential, operator session, or identity-link plan. A
-future local preissue tool may reveal the raw claim once through an
-out-of-band channel, but that tool is not implemented here.
+profile, Basic Auth credential, operator session, or identity-link plan. The
+server-only local preissue tool may reveal the raw claim once through its
+reviewed local stdout boundary, but never stores it.
 
 `identity_pairing_intent_events` is the append-only terminal evidence:
 
@@ -100,8 +99,9 @@ The database can compare owner and provider, but cannot recompute the subject
 HMAC without the server secret. Therefore subject-to-session equality is a
 mandatory writer invariant, not a database claim.
 
-This writer, claim preissuer, repository, and transaction are not implemented
-in this phase.
+The claim preissuer is now implemented as a separate server-only CLI. It has
+not been run. The atomic consume writer is not implemented; neither are the
+session-bound repository and runtime transaction.
 
 ## Rehearsal Target Evidence
 
@@ -144,12 +144,17 @@ The disposable-branch rehearsal verified absent and present catalog states,
 zero initial pairing rows, rejection of constraint deferral, claim-window and
 relationship failures, append-only enforcement, database-clock behavior under
 lock wait, and concurrent consume/rebind serialization. The branch was deleted
-after the rehearsal. Production remained in the absent state with the same
-product-row-count digest and zero writes.
+after the rehearsal.
+
+Production migration `0021` was then applied exactly once from commit
+`90d14da3ae6bca6cb2a6750ff69b06b50f538af9`. Postflight verified ledger
+`22/22`, no pending migration, 29 public tables, exact catalog counts of 20
+columns, 12 constraints, 7 indexes, 4 triggers, and 2 functions, zero intent
+and event rows, and an unchanged existing-product row-count digest.
 
 ## Still Closed
 
-Migration `0021`, claim issuance, identity linking, app-user activation,
-ownership backfill, RLS, Basic Auth changes, product DB reads, and every
+Claim issuance execution, identity linking, app-user activation, ownership
+backfill, RLS, Basic Auth changes, product DB reads, and every
 portfolio, Investment Lab, Simulation, provider-history, job, and Cron path
 remain unchanged and unapproved.

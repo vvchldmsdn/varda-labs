@@ -1,8 +1,9 @@
 # Auth/Tenant Phase 1G1-B1c: Preissued Bootstrap Claim Authority
 
-Last updated: 2026-07-25
+Last updated: 2026-07-26
 
-Status: pure synthetic contract only. Runtime trust remains unestablished.
+Status: server-only issuer implemented locally; no claim has been issued.
+Runtime consume trust remains unestablished.
 
 ## Decision
 
@@ -45,9 +46,33 @@ The contract rejects these as substitutes for the preissued claim:
 It also stores or exposes no raw claim, provider subject, email, token, cookie,
 target UUID, subject HMAC, or plan binding at a public boundary.
 
+## Server-Only Issuer
+
+`scripts/issue-identity-bootstrap-claim.mjs` is a local CLI, not a route or
+product runtime integration. It:
+
+- requires one explicit `target_app_user_id` and never infers a singleton;
+- defaults to dry-run and requires a fixed confirmation for an actual write;
+- locks only the reviewed target row, then evaluates current intent state in a
+  second `READ COMMITTED` statement in the same transaction;
+- rejects a non-`provisioning/user` target, an existing provider identity, or
+  an unexpired unterminated intent;
+- generates 256 bits with the Node CSPRNG and stores only the versioned SHA-256
+  digest for ten minutes using the database clock;
+- reveals the raw claim once only after one intent row was committed;
+- performs no automatic retry and uses no global or advisory lock.
+
+Different targets do not block one another. Two issuers for the same target
+serialize on that target row, and the second statement sees the first
+transaction's committed intent before deciding whether it may insert.
+
+The writer is implemented but has not been run. An actual Production issue
+requires a separate approval naming the exact reviewed target and command
+boundary.
+
 ## Still Closed
 
-There is no claim generator, secure delivery channel, repository, session
-adapter, route, UI, DB read/write, identity insertion, target activation,
-ownership backfill, or RLS change. The corrected empty schema migration remains
-unapplied pending review.
+There is no claim consume writer, session adapter, route, UI, identity
+insertion, target activation, ownership backfill, or RLS change. Local stdout
+is only the one-time operator handoff boundary; no general delivery system is
+claimed. No raw claim is stored.
