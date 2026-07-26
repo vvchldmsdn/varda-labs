@@ -213,7 +213,7 @@ describe("durable identity bootstrap claim schema", () => {
     assert.doesNotMatch(migration, /\bDEFERRABLE\b/);
   });
 
-  it("pins the future consume writer transaction without enabling it", () => {
+  it("pins the atomic consume transaction without enabling runtime use", () => {
     for (const requiredContract of [
       /READ COMMITTED/,
       /claim header.*FOR UPDATE/is,
@@ -228,7 +228,11 @@ describe("durable identity bootstrap claim schema", () => {
     ]) {
       assert.match(contract, requiredContract);
     }
-    assert.match(contract, /writer.*not implemented/i);
+    assert.match(contract, /atomic consume writer.*implemented/is);
+    assert.match(contract, /isolated Preview transaction rehearsal/i);
+    assert.match(contract, /No runtime route invokes them/i);
+    assert.match(contract, /no\s+Production claim has been consumed/i);
+    assert.doesNotMatch(contract, /writer.*not implemented/i);
   });
 
   it("enforces append-only evidence with exact functions and triggers", () => {

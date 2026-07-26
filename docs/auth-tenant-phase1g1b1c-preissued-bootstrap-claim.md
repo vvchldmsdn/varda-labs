@@ -78,7 +78,10 @@ confirmation.
 
 ## Still Closed
 
-There is no claim consume writer, session adapter, route, UI, identity
-insertion, target activation, ownership backfill, or RLS change. Local stdout
-is only the one-time operator handoff boundary; no general delivery system is
-claimed. No raw claim is stored.
+The atomic claim consume writer and the server-verified Neon session subject
+port are implemented and have passed local tests plus an isolated Preview
+transaction rehearsal. They are not connected to a runtime route, and no
+Production claim has been consumed. Claim presentation, UI, Production
+identity insertion and target activation, ownership backfill, and RLS changes
+remain closed. Local stdout is only the one-time operator handoff boundary; no
+general delivery system is claimed. No raw claim is stored.

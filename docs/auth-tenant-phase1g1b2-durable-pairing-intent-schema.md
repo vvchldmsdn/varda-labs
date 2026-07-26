@@ -99,9 +99,12 @@ The database can compare owner and provider, but cannot recompute the subject
 HMAC without the server secret. Therefore subject-to-session equality is a
 mandatory writer invariant, not a database claim.
 
-The claim preissuer is now implemented as a separate server-only CLI. It has
-not been run. The atomic consume writer is not implemented; neither are the
-session-bound repository and runtime transaction.
+The claim preissuer is implemented as a separate server-only CLI and has not
+been run in Production. The atomic consume writer and server-verified Neon
+session subject port are implemented and have passed local tests plus an
+isolated Preview transaction rehearsal. No runtime route invokes them, no
+Production claim has been consumed, and runtime claim presentation remains
+closed.
 
 ## Rehearsal Target Evidence
 
