@@ -52,6 +52,7 @@ export const config = {
   matcher: [
     "/",
     "/api/auth/:path*",
+    "/api/identity/bootstrap-claim/present",
     "/auth/callback",
     "/auth/sign-in",
     "/auth/session",
