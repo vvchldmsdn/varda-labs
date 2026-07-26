@@ -1,6 +1,7 @@
 import {
   createSessionSubjectBinding,
   SESSION_SUBJECT_BINDING_POLICY,
+  snapshotSessionSubjectEvidence,
 } from "../../src/lib/auth/session-subject-binding.ts";
 import {
   digestIdentityBootstrapClaim,
@@ -283,7 +284,11 @@ async function readVerifiedSessionSubject({
     );
   }
 
-  const binding = createSessionSubjectBinding({ evidence, hmacKey });
+  const evidenceSnapshot = snapshotSessionSubjectEvidence(evidence);
+  const binding = createSessionSubjectBinding({
+    evidence: evidenceSnapshot,
+    hmacKey,
+  });
   if (binding.state !== "verified") {
     throw new IdentityPairingConsumeError(
       binding.state === "disabled"
@@ -296,7 +301,7 @@ async function readVerifiedSessionSubject({
 
   return Object.freeze({
     provider: binding.provider,
-    rawSubject: evidence.subject,
+    rawSubject: evidenceSnapshot.subject,
     subjectBindingVersion: binding.subjectBindingVersion,
     subjectBinding: binding.subjectBinding,
   });

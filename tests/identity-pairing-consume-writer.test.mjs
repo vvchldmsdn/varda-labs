@@ -217,6 +217,36 @@ describe("identity pairing atomic consume writer", () => {
     }
   });
 
+  it("rejects accessor-backed subjects before opening a transaction", async () => {
+    let subjectReads = 0;
+    const evidence = {
+      state: "verified",
+      provider: "neon_auth",
+      verificationSource: "server_verified_session",
+    };
+    Object.defineProperty(evidence, "subject", {
+      enumerable: true,
+      get() {
+        subjectReads += 1;
+        return subjectReads === 1 ? SUBJECT : `${SUBJECT}-changed`;
+      },
+    });
+    const database = fakeDatabase();
+
+    await assert.rejects(
+      () =>
+        consumeIdentityPairingClaim({
+          pool: database.pool,
+          rawClaim: RAW_CLAIM,
+          verifiedSessionSubjectPort: syntheticSessionPort(evidence),
+          hmacKey: HMAC_KEY,
+        }),
+      isConsumeError("verified_subject_unavailable"),
+    );
+    assert.equal(subjectReads, 0);
+    assert.equal(database.connects, 0);
+  });
+
   it("rolls back terminal, expiry, target drift, and identity conflicts", async () => {
     const cases = [
       [

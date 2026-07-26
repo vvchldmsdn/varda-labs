@@ -88,7 +88,7 @@ export function createSessionSubjectBinding(input: Readonly<{
 }>): SessionSubjectBindingResult {
   if (!isValidHmacKey(input.hmacKey)) return unavailable();
 
-  const { evidence } = input;
+  const evidence = snapshotSessionSubjectEvidence(input.evidence);
   if (
     evidence.state === "disabled" ||
     evidence.state === "missing" ||
@@ -139,11 +139,64 @@ export function createSessionSubjectBinding(input: Readonly<{
   });
 }
 
+export function snapshotSessionSubjectEvidence(
+  value: unknown,
+): VerifiedSessionSubjectEvidence {
+  if (value === null || typeof value !== "object") {
+    return Object.freeze({ state: "unavailable" });
+  }
+
+  const state = readOwnDataProperty(value, "state");
+  if (
+    state === "disabled" ||
+    state === "missing" ||
+    state === "unavailable"
+  ) {
+    return Object.freeze({ state });
+  }
+  if (state !== "verified") {
+    return Object.freeze({ state: "unavailable" });
+  }
+
+  const provider = readOwnDataProperty(value, "provider");
+  const subject = readOwnDataProperty(value, "subject");
+  const verificationSource = readOwnDataProperty(
+    value,
+    "verificationSource",
+  );
+  if (
+    provider !== SESSION_SUBJECT_BINDING_POLICY.provider ||
+    typeof subject !== "string" ||
+    verificationSource !==
+      SESSION_SUBJECT_BINDING_POLICY.verificationSource
+  ) {
+    return Object.freeze({ state: "unavailable" });
+  }
+
+  return Object.freeze({
+    state,
+    provider,
+    subject,
+    verificationSource,
+  });
+}
+
 function isValidHmacKey(value: Uint8Array) {
   return (
     value instanceof Uint8Array &&
     value.byteLength === SESSION_SUBJECT_BINDING_POLICY.hmacKeyBytes
   );
+}
+
+function readOwnDataProperty(value: object, key: string) {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && "value" in descriptor
+      ? descriptor.value
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function isCanonicalSessionProviderSubject(value: unknown) {
