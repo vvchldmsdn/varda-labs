@@ -797,7 +797,10 @@ async function readCounts() {
       "external_vercel_neon_integration_control",
     );
     assert.equal(evidence.catalogStatus, "reviewed_0020_present");
-    assert.equal(evidence.latestReviewedMigration, "0020_rainy_northstar");
+    assert.equal(
+      evidence.latestReviewedMigration,
+      "0021_strange_sinister_six",
+    );
     assert.match(evidence.targetFingerprint, /^sha256:[0-9a-f]{64}$/);
     return {
       assets: evidence.rowCounts.assets,

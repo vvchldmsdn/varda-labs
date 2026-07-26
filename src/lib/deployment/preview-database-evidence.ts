@@ -198,6 +198,12 @@ export function assertReviewedPreviewDatabaseState(
       `Preview database latest migration is not ${PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag}.`,
     );
   }
+  assertReviewedPreviewDatabaseCatalog(state);
+}
+
+export function assertReviewedPreviewDatabaseCatalog(
+  state: PreviewDatabaseState,
+) {
   if (!hasReviewedCatalog(state)) {
     throw new Error(
       "Preview database reviewed 0020 catalog is incomplete.",

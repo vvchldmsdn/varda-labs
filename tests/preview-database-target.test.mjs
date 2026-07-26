@@ -8,6 +8,7 @@ import {
   sha256Fingerprint,
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
+  assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
 } from "../src/lib/deployment/preview-database-evidence.ts";
@@ -116,6 +117,19 @@ describe("Preview database target operational guard", () => {
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.productionEndpointSha256,
       /^sha256:[0-9a-f]{64}$/,
     );
+    assert.deepEqual(
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
+      {
+        tag: "0021_strange_sinister_six",
+        createdAt: 1784991961050,
+        sha256:
+          "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553",
+      },
+    );
+    assert.deepEqual(
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
+      [PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration],
+    );
   });
 
   it("keeps runtime evidence Preview-only, read-only, and access-gated", () => {
@@ -167,6 +181,9 @@ describe("Preview database target operational guard", () => {
     );
 
     const pending = { ...reviewed, latestMigration: null };
+    assert.doesNotThrow(() =>
+      assertReviewedPreviewDatabaseCatalog(pending),
+    );
     assert.throws(
       () => assertReviewedPreviewDatabaseState(pending),
       /latest migration/,

@@ -10,17 +10,17 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     "sha256:e47003b830425b835f435c9149931906a1e3df40307b7462a222755a923981a2",
   latestReviewedMigration: Object.freeze({
-    tag: "0020_rainy_northstar",
-    createdAt: 1784893393803,
+    tag: "0021_strange_sinister_six",
+    createdAt: 1784991961050,
     sha256:
-      "fd8b0fe786f19f2b77849873a4c643c05254c7a00604b1a7ab3f3bc2210eb7d7",
+      "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553",
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
-      tag: "0020_rainy_northstar",
-      createdAt: 1784893393803,
+      tag: "0021_strange_sinister_six",
+      createdAt: 1784991961050,
       sha256:
-        "fd8b0fe786f19f2b77849873a4c643c05254c7a00604b1a7ab3f3bc2210eb7d7",
+        "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553",
     }),
   ]),
 });
