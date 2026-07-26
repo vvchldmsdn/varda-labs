@@ -7,6 +7,7 @@ import { neon } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
 import {
+  assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
   readPreviewDatabaseState,
@@ -17,7 +18,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v3.json",
+  "varda-preview-database-preflight-v4.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -40,22 +41,22 @@ async function run() {
 
   const sql = neon(databaseUrl);
   const query = (text) => sql.query(text);
-  const [state, appliedMigrations] = await Promise.all([
-    readPreviewDatabaseState({ env: process.env, query }),
-    readAppliedMigrations(query),
-  ]);
+  const state = await readPreviewDatabaseState({
+    env: process.env,
+    query,
+  });
   const localMigrations = readLocalMigrations();
   const plan = planPreviewMigrations({
     localMigrations,
-    appliedMigrations,
+    appliedMigrations: state.appliedMigrations,
     allowedPendingMigrations:
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
   });
 
   if (PHASE === "preflight") {
-    assertPreflightCatalog(plan, state);
+    assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v3",
+      evidenceVersion: "preview_database_build_preflight_v4",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
     };
@@ -77,7 +78,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v3",
+    "preview_database_build_preflight_v4",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -95,7 +96,7 @@ async function run() {
   logEvidence(PHASE, state, plan);
 }
 
-function assertPreflightCatalog(plan, state) {
+function assertPreflightCatalog(plan, state, localMigrations) {
   if (plan.pendingTags.length === 0) {
     assertReviewedPreviewDatabaseState(state);
     return;
@@ -103,54 +104,24 @@ function assertPreflightCatalog(plan, state) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0020_rainy_northstar"],
-    "Only reviewed migration 0020 may be pending",
+    ["0021_strange_sinister_six"],
+    "Only reviewed migration 0021 may be pending",
   );
   assert.equal(
-    state.reviewedCatalog.adjustedClosePriceNullable,
-    true,
-    "Pending 0020 target lost reviewed adjusted-close nullability",
+    plan.latestAppliedTag,
+    "0020_rainy_northstar",
+    "Pending 0021 target must start from reviewed migration 0020",
   );
+  const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
-    state.reviewedCatalog.presentColumns,
-    [
-      "adjusted_close_basis",
-      "adjusted_close_provider",
-      "adjusted_close_source",
-      "adjusted_close_fetched_at",
-      "provider_symbol",
-      "provider_exchange",
-      "fetched_at",
-    ],
-    "Pending 0020 target lost reviewed provenance columns",
+    state.latestMigration,
+    {
+      createdAt: latestApplied.createdAt,
+      sha256: latestApplied.sha256,
+    },
+    "Preview state and migration ledger disagree before migration 0021",
   );
-  assert.equal(
-    state.reviewedCatalog.instrumentDateUniqueIndexExact,
-    true,
-    "Pending 0020 target lost the exact instrument/date unique index",
-  );
-  assert.equal(
-    state.reviewedCatalog.legacyTickerDateUniqueIndexExact,
-    true,
-    "Pending 0020 target does not have the reviewed legacy unique index",
-  );
-  assert.equal(
-    state.reviewedCatalog.legacyTickerDateIndexPresent,
-    true,
-    "Pending 0020 target already removed the legacy unique index",
-  );
-}
-
-async function readAppliedMigrations(query) {
-  const rows = await query(`
-    select hash, created_at::text as created_at
-      from drizzle.__drizzle_migrations
-     order by created_at asc
-  `);
-  return rows.map((row) => ({
-    createdAt: Number(row.created_at),
-    sha256: String(row.hash ?? ""),
-  }));
+  assertReviewedPreviewDatabaseCatalog(state);
 }
 
 function readLocalMigrations() {
