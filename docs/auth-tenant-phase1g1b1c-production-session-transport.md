@@ -2,8 +2,9 @@
 
 Last updated: 2026-07-25
 
-Status: implementation candidate. The code is not yet merged or deployed to
-Production.
+Status: implemented, merged, deployed to Production, and verified by the
+interactive session/sign-out smoke. Product identity and database authority
+remain disconnected.
 
 ## Decision
 
