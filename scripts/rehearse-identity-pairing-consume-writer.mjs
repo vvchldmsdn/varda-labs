@@ -342,7 +342,7 @@ async function insertIntent(pool, targetAppUserId, timing) {
   const claim = createOneTimeIdentityBootstrapClaim();
   const clockSql =
     timing === "expired"
-      ? "clock_timestamp() - interval '11 minutes', clock_timestamp() - interval '1 minute'"
+      ? "clock_timestamp() - interval '9 minutes', clock_timestamp() - interval '1 minute'"
       : "clock_timestamp(), clock_timestamp() + interval '9 minutes'";
   await pool.query(
     `
