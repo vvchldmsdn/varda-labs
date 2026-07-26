@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { createHmac } from "node:crypto";
 
 export const SESSION_SUBJECT_BINDING_POLICY = Object.freeze({
@@ -35,6 +36,32 @@ export type SessionSubjectBindingResult =
       subjectBinding: `hmac-sha256-v1:${string}`;
       verificationSource: "server_verified_session";
     }>;
+
+const CANONICAL_BASE64URL_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+export function decodeSessionSubjectBindingHmacKey(
+  encoded: string | undefined,
+): Uint8Array | null {
+  if (
+    typeof encoded !== "string" ||
+    !CANONICAL_BASE64URL_PATTERN.test(encoded)
+  ) {
+    return null;
+  }
+
+  const decoded = Buffer.from(encoded, "base64url");
+  if (
+    decoded.byteLength !== SESSION_SUBJECT_BINDING_POLICY.hmacKeyBytes ||
+    decoded.toString("base64url") !== encoded
+  ) {
+    decoded.fill(0);
+    return null;
+  }
+
+  const key = Uint8Array.from(decoded);
+  decoded.fill(0);
+  return key;
+}
 
 export async function readSessionSubjectBinding(input: Readonly<{
   sessionPort: VerifiedSessionSubjectPort;

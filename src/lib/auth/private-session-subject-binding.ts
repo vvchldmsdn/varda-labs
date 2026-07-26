@@ -1,9 +1,8 @@
 import "server-only";
 
-import { Buffer } from "node:buffer";
-
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 import {
+  decodeSessionSubjectBindingHmacKey,
   readSessionSubjectBinding,
   type SessionSubjectBindingResult,
   type VerifiedSessionSubjectPort,
@@ -11,9 +10,6 @@ import {
 
 const IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_ENV =
   "IDENTITY_PAIRING_EVIDENCE_HMAC_KEY";
-const IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_PATTERN =
-  /^[A-Za-z0-9_-]{43}$/;
-const IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_BYTES = 32;
 
 export async function readPrivateSessionSubjectBinding(): Promise<SessionSubjectBindingResult> {
   let runtime: ReturnType<typeof getAuthTransportRuntime>;
@@ -63,24 +59,9 @@ export async function readPrivateSessionSubjectBinding(): Promise<SessionSubject
 }
 
 function loadEvidenceHmacKey() {
-  const encoded =
-    process.env[IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_ENV]?.trim();
-  if (
-    !encoded ||
-    !IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_PATTERN.test(encoded)
-  ) {
-    return null;
-  }
-
-  const decoded = Buffer.from(encoded, "base64url");
-  if (decoded.byteLength !== IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_BYTES) {
-    decoded.fill(0);
-    return null;
-  }
-
-  const key = Uint8Array.from(decoded);
-  decoded.fill(0);
-  return key;
+  return decodeSessionSubjectBindingHmacKey(
+    process.env[IDENTITY_PAIRING_EVIDENCE_HMAC_KEY_ENV],
+  );
 }
 
 function unavailable(): SessionSubjectBindingResult {

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  decodeSessionSubjectBindingHmacKey,
   readSessionSubjectBinding,
   SESSION_SUBJECT_BINDING_POLICY,
 } from "../src/lib/auth/session-subject-binding.ts";
@@ -18,6 +19,8 @@ const HMAC_KEY = Uint8Array.from(
 const SUBJECT = "user_01J0M0TESTSUBJECT";
 const EXPECTED_BINDING =
   "hmac-sha256-v1:7042e1034f9d7d990e41e16c9bc1a4f157fb62312c73743ca10de60cd65381a4";
+const BASE64URL_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 describe("private session subject binding", () => {
   it("binds a mock verified session to the pinned HMAC fixture", async () => {
@@ -105,6 +108,42 @@ describe("private session subject binding", () => {
       );
     }
     assert.equal(sessionReads, 0);
+  });
+
+  it("decodes only the canonical unpadded base64url key", () => {
+    const encoded = Buffer.from(HMAC_KEY).toString("base64url");
+    const lastIndex = BASE64URL_ALPHABET.indexOf(encoded.at(-1));
+    const noncanonical = `${encoded.slice(0, -1)}${
+      BASE64URL_ALPHABET[lastIndex + 1]
+    }`;
+
+    assert.deepEqual(
+      decodeSessionSubjectBindingHmacKey(encoded),
+      HMAC_KEY,
+    );
+    assert.deepEqual(
+      Buffer.from(noncanonical, "base64url"),
+      Buffer.from(HMAC_KEY),
+    );
+    assert.equal(
+      decodeSessionSubjectBindingHmacKey(noncanonical),
+      null,
+    );
+
+    for (const candidate of [
+      undefined,
+      "",
+      `${encoded}=`,
+      ` ${encoded}`,
+      `${encoded} `,
+      Buffer.alloc(31).toString("base64url"),
+      Buffer.alloc(33).toString("base64url"),
+    ]) {
+      assert.equal(
+        decodeSessionSubjectBindingHmacKey(candidate),
+        null,
+      );
+    }
   });
 
   it("rejects malformed or noncanonical provider subjects", async () => {
