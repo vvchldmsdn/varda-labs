@@ -263,7 +263,7 @@ describe("preissued identity bootstrap claim authority", () => {
     });
   });
 
-  it("admits only the reviewed server CLI issuer, not a consume writer", () => {
+  it("admits the reviewed issuer and unbound atomic consume writer only", () => {
     const audit = auditIdentityBootstrapClaimAuthority({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -275,7 +275,12 @@ describe("preissued identity bootstrap claim authority", () => {
         productionImports: audit.evidence.productionImports,
         approvedIssuerPolicyImports:
           audit.evidence.approvedIssuerPolicyImports,
+        approvedConsumePolicyImports:
+          audit.evidence.approvedConsumePolicyImports,
         claimIssuerWriters: audit.evidence.claimIssuerWriters,
+        consumeWriters: audit.evidence.consumeWriters,
+        consumeRuntimeEntrypoints:
+          audit.evidence.consumeRuntimeEntrypoints,
         claimWrites: audit.evidence.claimWrites,
         databaseQueries: audit.evidence.databaseQueries,
         databaseWrites: audit.evidence.databaseWrites,
@@ -285,12 +290,15 @@ describe("preissued identity bootstrap claim authority", () => {
       {
         productionImports: 0,
         approvedIssuerPolicyImports: 2,
+        approvedConsumePolicyImports: 1,
         claimIssuerWriters: 1,
+        consumeWriters: 1,
+        consumeRuntimeEntrypoints: 0,
         claimWrites: 1,
         databaseQueries: 0,
         databaseWrites: 0,
-        identityWrites: 0,
-        appUserStatusChanges: 0,
+        identityWrites: 1,
+        appUserStatusChanges: 1,
       },
     );
   });

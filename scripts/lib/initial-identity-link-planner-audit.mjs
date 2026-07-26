@@ -10,6 +10,10 @@ const AUDIT_PATHS = [
   "scripts/lib/initial-identity-link-planner-audit.mjs",
 ];
 const CONTRACT_IMPORT_PATTERN = /initial-identity-link-(?:planner|policy)/;
+const APPROVED_CONSUME_WRITER_PATH =
+  "scripts/lib/identity-pairing-consume-writer.mjs";
+const APPROVED_CONSUME_PLANNER_IMPORT =
+  /from\s+["']\.\.\/\.\.\/src\/lib\/initial-identity-link-planner\.ts["']/;
 const PURE_CONTRACT_FORBIDDEN_PATTERN =
   /^\s*import\s|@neondatabase|drizzle|DATABASE_URL|process\.env|process\.argv|\bfetch\s*\(|\bcookies\s*\(|\bheaders\s*\(|next\/server|from\s+["']react["']|\bcache\s*\(/m;
 const IDENTITY_DML_PATTERN =
@@ -52,14 +56,46 @@ export function auditInitialIdentityLinkPlanner({ root, writerRegistry }) {
   }
 
   let productionImports = 0;
+  let approvedConsumePlannerImports = 0;
   for (const path of productionPaths) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) continue;
-    if (CONTRACT_IMPORT_PATTERN.test(readFileSync(absolutePath, "utf8"))) {
-      productionImports += 1;
+    const source = readFileSync(absolutePath, "utf8");
+    if (CONTRACT_IMPORT_PATTERN.test(source)) {
+      if (
+        path === APPROVED_CONSUME_WRITER_PATH &&
+        APPROVED_CONSUME_PLANNER_IMPORT.test(source)
+      ) {
+        approvedConsumePlannerImports += 1;
+      } else {
+        productionImports += 1;
+      }
     }
   }
   if (productionImports !== 0) findings.push("production_contract_import");
+  if (approvedConsumePlannerImports !== 1) {
+    findings.push("consume_planner_import_invalid");
+  }
+
+  const consumeWriters = writerRegistry.filter(
+    ({ id }) => id === "identity_pairing_atomic_consume",
+  );
+  const consumeWriterContractValid =
+    consumeWriters.length === 1 &&
+    consumeWriters[0].authorization === "server_verified_session" &&
+    consumeWriters[0].entrypoints.length === 0 &&
+    consumeWriters[0].implementationPaths.length === 1 &&
+    consumeWriters[0].implementationPaths[0] ===
+      APPROVED_CONSUME_WRITER_PATH &&
+    JSON.stringify(consumeWriters[0].targets) ===
+      JSON.stringify([
+        identityTarget("auth_identities", "insert"),
+        identityTarget("app_users", "update"),
+        identityTarget("identity_pairing_intent_events", "insert"),
+      ]);
+  if (!consumeWriterContractValid) {
+    findings.push("consume_writer_contract_invalid");
+  }
 
   const auditCliSource = readFileSync(join(root, AUDIT_PATHS[0]), "utf8");
   const subjectCliEntrypoints = SUBJECT_CLI_PATTERN.test(auditCliSource) ? 1 : 0;
@@ -98,6 +134,9 @@ export function auditInitialIdentityLinkPlanner({ root, writerRegistry }) {
       pureContractViolations,
       identityDmlMatches,
       productionImports,
+      approvedConsumePlannerImports,
+      consumeWriters: consumeWriters.length,
+      consumeRuntimeEntrypoints: consumeWriters[0]?.entrypoints.length ?? 0,
       subjectCliEntrypoints,
       authSdkDependencies: authSdkDependencies.length,
       unexpectedAuthSdkDependencies: unexpectedAuthSdkDependencies.length,
@@ -108,6 +147,15 @@ export function auditInitialIdentityLinkPlanner({ root, writerRegistry }) {
       routeCalls: 0,
       appUserStatusChanges: 0,
     },
+  };
+}
+
+function identityTarget(table, operation) {
+  return {
+    table,
+    classification: "identity_system",
+    operations: [operation],
+    ownerPolicy: "owner_forbidden",
   };
 }
 

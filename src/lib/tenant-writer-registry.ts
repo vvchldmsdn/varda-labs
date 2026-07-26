@@ -5,7 +5,10 @@ export type WriterClassification =
   | "identity_system"
   | "mixed";
 
-export type WriterAuthorization = "migration_cli" | "machine_admin";
+export type WriterAuthorization =
+  | "migration_cli"
+  | "machine_admin"
+  | "server_verified_session";
 
 export type WriterOperation = "insert" | "update" | "delete";
 
@@ -36,7 +39,8 @@ export type WriterTransitionPolicy = Readonly<{
     | "keep_owner_absent"
     | "keep_frozen_legacy"
     | "single_identity_insert"
-    | "single_claim_intent_insert";
+    | "single_claim_intent_insert"
+    | "atomic_identity_pairing_consume";
   freeze:
     | "freeze_without_verified_owner"
     | "freeze_user_targets_only"
@@ -118,6 +122,28 @@ export const TENANT_WRITER_REGISTRY = [
     transition: {
       prepare: "dry_run_only",
       activate: "single_claim_intent_insert",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "identity_pairing_atomic_consume",
+    classification: "identity_system",
+    authorization: "server_verified_session",
+    entrypoints: [],
+    implementationPaths: [
+      "scripts/lib/identity-pairing-consume-writer.mjs",
+    ],
+    targets: [
+      identityTarget("auth_identities", "insert"),
+      identityTarget("app_users", "update"),
+      identityTarget("identity_pairing_intent_events", "insert"),
+    ],
+    transition: {
+      prepare: "dry_run_only",
+      activate: "atomic_identity_pairing_consume",
       freeze: "not_required",
     },
     canonicalOwnerRolloutScope: "not_applicable",

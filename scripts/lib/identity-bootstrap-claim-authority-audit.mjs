@@ -16,6 +16,8 @@ const APPROVED_ISSUER_POLICY_IMPORT_PATHS = new Set([
   "scripts/lib/identity-bootstrap-claim-issuer.mjs",
   "scripts/lib/identity-bootstrap-claim-issuer-write.mjs",
 ]);
+const APPROVED_CONSUME_WRITER_PATH =
+  "scripts/lib/identity-pairing-consume-writer.mjs";
 const APPROVED_ISSUER_POLICY_IMPORT =
   /from\s+["']\.\.\/\.\.\/src\/lib\/identity-bootstrap-claim-authority-policy\.ts["']/;
 const ALLOWED_LOCAL_IMPORT =
@@ -69,6 +71,7 @@ export function auditIdentityBootstrapClaimAuthority({
 
   let productionImports = 0;
   let approvedIssuerPolicyImports = 0;
+  let approvedConsumePolicyImports = 0;
   for (const path of productionPaths) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) continue;
@@ -82,6 +85,12 @@ export function auditIdentityBootstrapClaimAuthority({
         APPROVED_ISSUER_POLICY_IMPORT.test(authorityImports[0])
       ) {
         approvedIssuerPolicyImports += 1;
+      } else if (
+        path === APPROVED_CONSUME_WRITER_PATH &&
+        authorityImports.length === 1 &&
+        APPROVED_ISSUER_POLICY_IMPORT.test(authorityImports[0])
+      ) {
+        approvedConsumePolicyImports += 1;
       } else {
         productionImports += 1;
       }
@@ -105,6 +114,25 @@ export function auditIdentityBootstrapClaimAuthority({
   if (!issuerWriterContractValid) {
     findings.push("claim_issuer_writer_contract_invalid");
   }
+  const consumeWriters = writerRegistry.filter(
+    ({ id }) => id === "identity_pairing_atomic_consume",
+  );
+  const consumeWriterContractValid =
+    consumeWriters.length === 1 &&
+    consumeWriters[0].authorization === "server_verified_session" &&
+    consumeWriters[0].entrypoints.length === 0 &&
+    consumeWriters[0].implementationPaths.length === 1 &&
+    consumeWriters[0].implementationPaths[0] ===
+      APPROVED_CONSUME_WRITER_PATH &&
+    JSON.stringify(consumeWriters[0].targets) ===
+      JSON.stringify([
+        identityTarget("auth_identities", "insert"),
+        identityTarget("app_users", "update"),
+        identityTarget("identity_pairing_intent_events", "insert"),
+      ]);
+  if (!consumeWriterContractValid) {
+    findings.push("consume_writer_contract_invalid");
+  }
 
   const auditCliSource = readFileSync(join(root, AUDIT_PATHS[0]), "utf8");
   const claimEntrypoints = CLAIM_ENTRYPOINT_PATTERN.test(auditCliSource)
@@ -123,16 +151,28 @@ export function auditIdentityBootstrapClaimAuthority({
       unexpectedImports,
       productionImports,
       approvedIssuerPolicyImports,
+      approvedConsumePolicyImports,
       claimIssuerWriters: issuerWriters.length,
+      consumeWriters: consumeWriters.length,
+      consumeRuntimeEntrypoints: consumeWriters[0]?.entrypoints.length ?? 0,
       claimEntrypoints,
       databaseQueries: 0,
       databaseWrites: 0,
       providerCalls: 0,
       routeCalls: 0,
       claimWrites: issuerWriterContractValid ? 1 : 0,
-      identityWrites: 0,
-      appUserStatusChanges: 0,
+      identityWrites: consumeWriterContractValid ? 1 : 0,
+      appUserStatusChanges: consumeWriterContractValid ? 1 : 0,
     },
+  };
+}
+
+function identityTarget(table, operation) {
+  return {
+    table,
+    classification: "identity_system",
+    operations: [operation],
+    ownerPolicy: "owner_forbidden",
   };
 }
 

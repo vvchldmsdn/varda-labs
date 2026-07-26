@@ -296,7 +296,7 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
     });
   });
 
-  it("keeps identity linking unimplemented despite the isolated Preview auth SDK", () => {
+  it("allows only the reviewed unbound consume writer to import the planner", () => {
     const result = auditInitialIdentityLinkPlanner({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -308,6 +308,9 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
       pureContractViolations: 0,
       identityDmlMatches: 0,
       productionImports: 0,
+      approvedConsumePlannerImports: 1,
+      consumeWriters: 1,
+      consumeRuntimeEntrypoints: 0,
       subjectCliEntrypoints: 0,
       authSdkDependencies: 1,
       unexpectedAuthSdkDependencies: 0,

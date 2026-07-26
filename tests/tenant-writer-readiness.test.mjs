@@ -40,6 +40,7 @@ const LEGACY_TABLE_LITERAL_PATTERN =
 const LEGACY_RAW_SQL_TABLE_PATTERN =
   /\b(?:from|join|into|update|delete\s+from)\s+["']?(?:goals|transactions|fixed_transactions|monthly_incomes)\b/i;
 const ISOLATED_REHEARSAL_DML_PATHS = new Set([
+  "scripts/rehearse-identity-pairing-consume-writer.mjs",
   "scripts/rehearse-identity-pairing-schema.mjs",
   "scripts/rehearse-tenant-expand.mjs",
 ]);
@@ -56,8 +57,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 18);
-    assert.equal(registeredPaths.length, 24);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 19);
+    assert.equal(registeredPaths.length, 25);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -128,7 +129,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 11,
       intentionally_skipped_legacy: 1,
-      not_applicable: 6,
+      not_applicable: 7,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
