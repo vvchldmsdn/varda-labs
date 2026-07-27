@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   createIdentityPairingRehearsalEvidence,
+  IdentityPairingRehearsalFixtureError,
+  IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES,
   IDENTITY_PAIRING_REHEARSAL_STAGES,
 } from "../scripts/lib/identity-pairing-rehearsal-evidence.mjs";
 import {
@@ -154,6 +156,34 @@ describe("identity pairing rehearsal failure evidence", () => {
     );
   });
 
+  it("preserves only typed allowlisted lock-wait fixture codes", () => {
+    for (const code of IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES) {
+      assert.equal(
+        progressToLockWaitExpiry().failure(
+          new IdentityPairingRehearsalFixtureError(code),
+        ).code,
+        code,
+      );
+    }
+
+    assert.equal(
+      progressToLockWaitExpiry().failure(
+        new IdentityPairingRehearsalFixtureError(
+          "lock_wait_secret_internal_reason",
+        ),
+      ).code,
+      "lock_wait_expiry_failed",
+    );
+    assert.equal(
+      progressToLockWaitExpiry().failure(
+        Object.assign(new Error("secret"), {
+          code: "lock_wait_post_state_invalid",
+        }),
+      ).code,
+      "lock_wait_expiry_failed",
+    );
+  });
+
   it("tracks Pool readiness and the first disposable DML boundary", () => {
     const evidence = progressToSuccessfulConsume();
     const beforeDml = evidence.failure(new Error("synthetic"));
@@ -226,5 +256,26 @@ function progressToCatalogPreflight() {
   evidence.begin("target_guard");
   evidence.complete("target_guard");
   evidence.begin("catalog_preflight");
+  return evidence;
+}
+
+function progressToLockWaitExpiry() {
+  const evidence = createIdentityPairingRehearsalEvidence();
+  for (const stage of [
+    "target_guard",
+    "catalog_preflight",
+    "pool_readiness",
+    "schema_empty",
+    "successful_consume",
+    "expired_claim",
+  ]) {
+    evidence.begin(stage);
+    if (stage === "pool_readiness") evidence.markPoolReady();
+    if (stage === "successful_consume") {
+      evidence.markDisposableBranchDmlAttempted();
+    }
+    evidence.complete(stage);
+  }
+  evidence.begin("lock_wait_expiry");
   return evidence;
 }

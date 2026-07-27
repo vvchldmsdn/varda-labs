@@ -23,6 +23,7 @@ import {
 } from "./lib/identity-pairing-consume-writer.mjs";
 import {
   createIdentityPairingRehearsalEvidence,
+  IdentityPairingRehearsalFixtureError,
 } from "./lib/identity-pairing-rehearsal-evidence.mjs";
 import {
   runIdentityPairingCatalogAuditProcess,
@@ -242,13 +243,21 @@ async function rehearseExpiredClaim(pool, hmacKey) {
 
 async function rehearseLockWaitExpiry(pool, hmacKey) {
   const targetAppUserId = await insertAppUser(pool);
-  const claim = await insertIntent(pool, targetAppUserId, "short_lived");
   const subject = syntheticSubject("lock-wait-expiry");
   const blocker = await pool.connect();
+  let lockObservation = null;
+  let claim = null;
+  let expiresAt = null;
   let blockerTransactionOpen = false;
   let consumeObservation = null;
+  let primaryFailure = null;
+  let cleanupFailure = null;
+  let consumeOutcome = null;
+  let destroyBlockerConnection = false;
 
   try {
+    lockObservation = await createIntentLockObservedPool(pool);
+    claim = await insertIntent(pool, targetAppUserId, "short_lived");
     await blocker.query("begin");
     blockerTransactionOpen = true;
     const { rows } = await blocker.query(
@@ -263,79 +272,105 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       `,
       [claim.claimDigest],
     );
-    assert.equal(rows.length, 1);
-    assert.ok(
+    assertLockWaitFixture(
+      rows.length === 1,
+      "lock_wait_blocker_session_invalid",
+    );
+    expiresAt = rows[0].expires_at;
+    assertLockWaitFixture(
       new Date(rows[0].expires_at).getTime() -
         new Date(rows[0].locked_at).getTime() >=
         750,
+      "lock_wait_claim_timing_invalid",
     );
     const blockerBackendPid = Number(rows[0].blocker_pid);
-    assert.ok(
+    assertLockWaitFixture(
       Number.isInteger(blockerBackendPid) && blockerBackendPid > 0,
+      "lock_wait_blocker_session_invalid",
     );
 
-    const lockObservation = createIntentLockObservedPool(pool);
-    consumeObservation = expectConsumeError(
-      () =>
-        consume(
-          lockObservation.pool,
-          hmacKey,
-          claim.rawClaim,
-          subject,
-        ),
-      ["claim_intent_expired"],
-    ).then(
-      () => null,
-      (error) => error,
+    consumeObservation = observeConsumeOutcome(
+      consume(
+        lockObservation.pool,
+        hmacKey,
+        claim.rawClaim,
+        subject,
+      ),
     );
 
-    const writerBackendPid = await withTimeout(
-      lockObservation.writerBackendPid,
-      1_000,
-      "The writer database session was not established.",
-    );
     await withTimeout(
       lockObservation.intentLockDispatched,
       1_000,
-      "The writer did not dispatch the intent row lock.",
+      fixtureError("lock_wait_intent_dispatch_unobserved"),
     );
     const lockWaitObservedAt = await assertBackendWaitingOnLock(
       pool,
-      writerBackendPid,
+      lockObservation.writerBackendPid,
       blockerBackendPid,
     );
-    assert.ok(
+    assertLockWaitFixture(
       new Date(rows[0].expires_at).getTime() -
         new Date(lockWaitObservedAt).getTime() >
         0,
+      "lock_wait_observed_after_expiry",
     );
     await waitUntilAfterDatabaseExpiry(pool, rows[0].expires_at);
 
     await blocker.query("commit");
     blockerTransactionOpen = false;
-
-    const consumeFailure = await consumeObservation;
-    if (consumeFailure) throw consumeFailure;
+  } catch (error) {
+    primaryFailure = error;
   } finally {
     if (blockerTransactionOpen) {
+      if (consumeObservation !== null && expiresAt !== null) {
+        try {
+          await waitUntilAfterDatabaseExpiry(pool, expiresAt);
+        } catch {
+          cleanupFailure = fixtureError(
+            "lock_wait_expiry_not_confirmed",
+          );
+        }
+      }
       try {
         await blocker.query("rollback");
       } catch {
-        // Preserve the original rehearsal failure.
+        cleanupFailure = fixtureError("lock_wait_release_failed");
+        destroyBlockerConnection = true;
+      }
+      blockerTransactionOpen = false;
+    }
+    blocker.release(destroyBlockerConnection);
+    if (lockObservation !== null) {
+      lockObservation.releaseIfUnused();
+    }
+    if (consumeObservation !== null) {
+      try {
+        consumeOutcome = await withTimeout(
+          consumeObservation,
+          9_000,
+          fixtureError("lock_wait_writer_settlement_timeout"),
+        );
+      } catch (error) {
+        cleanupFailure ??= error;
       }
     }
-    blocker.release();
-    if (consumeObservation && blockerTransactionOpen) {
-      await consumeObservation;
+    if (claim !== null) {
+      try {
+        await assertUnconsumedState(
+          pool,
+          targetAppUserId,
+          [claim.claimDigest],
+          [subject],
+        );
+      } catch {
+        cleanupFailure = fixtureError("lock_wait_post_state_invalid");
+      }
     }
   }
 
-  await assertUnconsumedState(
-    pool,
-    targetAppUserId,
-    [claim.claimDigest],
-    [subject],
-  );
+  if (cleanupFailure !== null) throw cleanupFailure;
+  if (primaryFailure !== null) throw primaryFailure;
+  assertExpectedConsumeFailure(consumeOutcome, ["claim_intent_expired"]);
 }
 
 async function rehearseDuplicateConsume(pool, hmacKey) {
@@ -722,28 +757,39 @@ function delay(milliseconds) {
   });
 }
 
-function createIntentLockObservedPool(pool) {
-  const writerBackendPid = deferred();
+async function createIntentLockObservedPool(pool) {
+  let client;
+  try {
+    client = await pool.connect();
+    const { rows } = await client.query(`
+      select pg_backend_pid()::integer as backend_pid
+    `);
+    const writerBackendPid = Number(rows[0]?.backend_pid);
+    assertLockWaitFixture(
+      Number.isInteger(writerBackendPid) && writerBackendPid > 0,
+      "lock_wait_writer_session_unavailable",
+    );
+    return createPreconnectedIntentLockPool(client, writerBackendPid);
+  } catch (error) {
+    if (client) client.release();
+    if (error instanceof IdentityPairingRehearsalFixtureError) throw error;
+    throw fixtureError("lock_wait_writer_session_unavailable");
+  }
+}
+
+function createPreconnectedIntentLockPool(client, writerBackendPid) {
   const intentLockDispatched = deferred();
+  let connected = false;
+  let released = false;
 
   return {
     pool: Object.freeze({
       async connect() {
-        let client;
-        try {
-          client = await pool.connect();
-          const { rows } = await client.query(`
-            select pg_backend_pid()::integer as backend_pid
-          `);
-          const backendPid = Number(rows[0]?.backend_pid);
-          assert.ok(Number.isInteger(backendPid) && backendPid > 0);
-          writerBackendPid.resolve(backendPid);
-        } catch (error) {
-          writerBackendPid.reject(error);
-          if (client) client.release();
-          throw error;
-        }
-
+        assertLockWaitFixture(
+          connected === false && released === false,
+          "lock_wait_writer_session_unavailable",
+        );
+        connected = true;
         return Object.freeze({
           query(query, parameters) {
             const pendingQuery = client.query(query, parameters);
@@ -753,13 +799,22 @@ function createIntentLockObservedPool(pool) {
             return pendingQuery;
           },
           release() {
-            client.release();
+            if (released === false) {
+              released = true;
+              client.release();
+            }
           },
         });
       },
     }),
-    writerBackendPid: writerBackendPid.promise,
+    writerBackendPid,
     intentLockDispatched: intentLockDispatched.promise,
+    releaseIfUnused() {
+      if (connected === false && released === false) {
+        released = true;
+        client.release();
+      }
+    },
   };
 }
 
@@ -800,7 +855,7 @@ async function assertBackendWaitingOnLock(
     }
     await delay(25);
   }
-  throw new Error("The writer was not observed waiting on a DB lock.");
+  throw fixtureError("lock_wait_not_observed");
 }
 
 async function waitUntilAfterDatabaseExpiry(pool, expiresAt) {
@@ -817,10 +872,11 @@ async function waitUntilAfterDatabaseExpiry(pool, expiresAt) {
     [expiresAt],
   );
   const remainingMilliseconds = Number(rows[0]?.remaining_ms);
-  assert.ok(
+  assertLockWaitFixture(
     Number.isInteger(remainingMilliseconds) &&
       remainingMilliseconds >= 0 &&
       remainingMilliseconds <= 1_250,
+    "lock_wait_expiry_not_confirmed",
   );
   await delay(remainingMilliseconds + 100);
 }
@@ -839,11 +895,11 @@ function deferred() {
   };
 }
 
-async function withTimeout(promise, milliseconds, message) {
+async function withTimeout(promise, milliseconds, timeoutError) {
   let timeoutId;
   const timeout = new Promise((_, rejectTimeout) => {
     timeoutId = setTimeout(
-      () => rejectTimeout(new Error(message)),
+      () => rejectTimeout(timeoutError),
       milliseconds,
     );
   });
@@ -943,10 +999,51 @@ function assertSingleConsume(attempts, allowedFailureCodes) {
 }
 
 async function expectConsumeError(operation, expectedCodes) {
-  await assert.rejects(
-    operation,
-    (error) =>
+  let outcome;
+  try {
+    outcome = await operation();
+  } catch (error) {
+    if (
       error instanceof IdentityPairingConsumeError &&
-      expectedCodes.includes(error.code),
+      expectedCodes.includes(error.code)
+    ) {
+      return;
+    }
+    throw error;
+  }
+  assert.fail(`Expected consume failure, received ${typeof outcome}.`);
+}
+
+function observeConsumeOutcome(operation) {
+  return Promise.resolve(operation).then(
+    (value) => Object.freeze({ status: "fulfilled", value }),
+    (error) => Object.freeze({ status: "rejected", error }),
   );
+}
+
+function assertExpectedConsumeFailure(outcome, expectedCodes) {
+  if (outcome?.status === "fulfilled") {
+    throw fixtureError("lock_wait_writer_unexpected_success");
+  }
+  if (outcome?.status !== "rejected") {
+    throw fixtureError("lock_wait_writer_unexpected_failure");
+  }
+  if (
+    outcome.error instanceof IdentityPairingConsumeError &&
+    expectedCodes.includes(outcome.error.code)
+  ) {
+    return;
+  }
+  if (outcome.error instanceof IdentityPairingConsumeError) {
+    throw outcome.error;
+  }
+  throw fixtureError("lock_wait_writer_unexpected_failure");
+}
+
+function assertLockWaitFixture(condition, code) {
+  if (!condition) throw fixtureError(code);
+}
+
+function fixtureError(code) {
+  return new IdentityPairingRehearsalFixtureError(code);
 }

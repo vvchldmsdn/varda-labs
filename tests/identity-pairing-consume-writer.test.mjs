@@ -371,6 +371,30 @@ describe("identity pairing atomic consume writer", () => {
       /identity-pairing-consume-writer|consumeIdentityPairingClaim|getSession|DATABASE_URL/,
     );
   });
+
+  it("preconnects lock-wait sessions and settles before post-state evidence", () => {
+    const rehearsal = readFileSync(
+      "scripts/rehearse-identity-pairing-consume-writer.mjs",
+      "utf8",
+    );
+
+    assert.match(
+      rehearsal,
+      /lockObservation = await createIntentLockObservedPool\(pool\);[\s\S]*claim = await insertIntent\(pool, targetAppUserId, "short_lived"\);/,
+    );
+    assert.match(
+      rehearsal,
+      /consumeOutcome = await withTimeout\([\s\S]*lock_wait_writer_settlement_timeout/,
+    );
+    assert.match(
+      rehearsal,
+      /await assertUnconsumedState\([\s\S]*lock_wait_post_state_invalid/,
+    );
+    assert.doesNotMatch(
+      rehearsal,
+      /consumeObservation && blockerTransactionOpen/,
+    );
+  });
 });
 
 function verifiedSubjectEvidence() {

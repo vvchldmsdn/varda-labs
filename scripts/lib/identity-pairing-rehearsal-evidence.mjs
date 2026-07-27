@@ -22,6 +22,34 @@ export const IDENTITY_PAIRING_REHEARSAL_STAGES = Object.freeze([
   "terminal_insert_full_rollback",
 ]);
 
+export const IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES = Object.freeze([
+  "lock_wait_blocker_session_invalid",
+  "lock_wait_claim_timing_invalid",
+  "lock_wait_intent_dispatch_unobserved",
+  "lock_wait_not_observed",
+  "lock_wait_observed_after_expiry",
+  "lock_wait_expiry_not_confirmed",
+  "lock_wait_release_failed",
+  "lock_wait_writer_session_unavailable",
+  "lock_wait_writer_settlement_timeout",
+  "lock_wait_writer_unexpected_failure",
+  "lock_wait_writer_unexpected_success",
+  "lock_wait_post_state_invalid",
+]);
+
+export class IdentityPairingRehearsalFixtureError extends Error {
+  constructor(code) {
+    super("Identity pairing rehearsal fixture failed");
+    this.name = "IdentityPairingRehearsalFixtureError";
+    Object.defineProperty(this, "code", {
+      configurable: false,
+      enumerable: true,
+      value: code,
+      writable: false,
+    });
+  }
+}
+
 const SAFE_CONSUME_ERROR_CODES = new Set([
   "binding_key_invalid",
   "claim_format_invalid",
@@ -67,6 +95,9 @@ const SAFE_SQLSTATES = new Set([
 ]);
 const SAFE_CATALOG_PREFLIGHT_FAILURE_CODES = new Set(
   IDENTITY_PAIRING_CATALOG_PREFLIGHT_FAILURE_CODES,
+);
+const SAFE_LOCK_WAIT_FAILURE_CODES = new Set(
+  IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES,
 );
 
 const STAGE_INDEX = new Map(
@@ -156,6 +187,14 @@ function safeFailureCode(error, stage) {
   ) {
     return `consume_${code}`;
   }
+  if (
+    stage === "lock_wait_expiry" &&
+    isIdentityPairingRehearsalFixtureError(error) &&
+    code !== null &&
+    SAFE_LOCK_WAIT_FAILURE_CODES.has(code)
+  ) {
+    return code;
+  }
 
   if (code !== null && SAFE_SQLSTATES.has(code)) {
     return `sqlstate_${code.toLowerCase()}`;
@@ -179,6 +218,14 @@ function readOwnPrimitiveStringCode(error) {
 function isIdentityPairingConsumeError(error) {
   try {
     return error instanceof IdentityPairingConsumeError;
+  } catch {
+    return false;
+  }
+}
+
+function isIdentityPairingRehearsalFixtureError(error) {
+  try {
+    return error instanceof IdentityPairingRehearsalFixtureError;
   } catch {
     return false;
   }
