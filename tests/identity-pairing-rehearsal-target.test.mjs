@@ -103,8 +103,37 @@ describe("identity pairing rehearsal target guard", () => {
     assert.match(source, /productionDatabaseWrites: 0/);
     assert.match(source, /branchDeletionRequired: true/);
     assert.match(source, /assertSchemaReadyAndEmpty\(pool\)/);
+    assert.match(source, /planPreviewMigrations/);
+    assert.match(source, /readMigrationFiles/);
+    assert.match(source, /allowedPendingMigrations: \[\]/);
+    assert.match(source, /lock_wait_expiry/);
+    assert.match(source, /audit-identity-pairing-schema\.mjs/);
+    assert.match(source, /assertReviewedCatalogPreflight\(\)/);
+    assert.match(
+      source,
+      /clock_timestamp\(\) \+ interval '1 second'/,
+    );
     assert.doesNotMatch(
       source,
+      /process\.env\.(?:DATABASE_URL|DATABASE_URL_UNPOOLED)\b/,
+    );
+
+    const catalogAudit = readFileSync(
+      "scripts/audit-identity-pairing-schema.mjs",
+      "utf8",
+    );
+    assert.match(catalogAudit, /guardIdentityPairingRehearsalTarget/);
+    assert.match(
+      catalogAudit,
+      /IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED/,
+    );
+    assert.match(catalogAudit, /expectedColumns\(\)/);
+    assert.match(catalogAudit, /expectedConstraints\(\)/);
+    assert.match(catalogAudit, /expectedIndexes\(\)/);
+    assert.match(catalogAudit, /expectedTriggers\(\)/);
+    assert.match(catalogAudit, /expectedFunctions\(\)/);
+    assert.doesNotMatch(
+      catalogAudit,
       /process\.env\.(?:DATABASE_URL|DATABASE_URL_UNPOOLED)\b/,
     );
   });

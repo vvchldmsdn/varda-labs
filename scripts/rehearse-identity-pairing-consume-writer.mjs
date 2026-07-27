@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { Pool } from "@neondatabase/serverless";
 import { config } from "dotenv";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 
 import {
   guardIdentityPairingRehearsalTarget,
 } from "../src/lib/deployment/identity-pairing-rehearsal-target.ts";
+import {
+  planPreviewMigrations,
+} from "../src/lib/deployment/preview-migration-plan.ts";
 import {
   digestIdentityBootstrapClaim,
   IDENTITY_BOOTSTRAP_CLAIM_POLICY,
@@ -20,6 +27,8 @@ const CONFIRMATION =
   "--confirm-isolated-identity-pairing-rehearsal";
 const EXPECTED_MIGRATION_SHA256 =
   "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553";
+const EXPECTED_MIGRATION_TAG = "0021_strange_sinister_six";
+const MIGRATIONS_FOLDER = resolve("drizzle");
 const REJECTION_FUNCTION =
   "identity_pairing_rehearsal_reject_consume_event";
 const REJECTION_TRIGGER =
@@ -53,6 +62,7 @@ async function main() {
   const connectionString =
     process.env.IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED;
   assert.ok(connectionString, "The guarded rehearsal URL is unavailable.");
+  assertReviewedCatalogPreflight();
 
   const pool = new Pool({ connectionString, max: 8 });
   pool.on("error", () => {});
@@ -67,6 +77,9 @@ async function main() {
 
     await rehearseExpiredClaim(pool, hmacKey);
     checks.push("expired_claim");
+
+    await rehearseLockWaitExpiry(pool, hmacKey);
+    checks.push("lock_wait_expiry");
 
     await rehearseDuplicateConsume(pool, hmacKey);
     checks.push("duplicate_consume");
@@ -110,6 +123,43 @@ async function main() {
   }
 }
 
+function assertReviewedCatalogPreflight() {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--no-warnings",
+      "scripts/audit-identity-pairing-schema.mjs",
+      "--expect-state",
+      "present",
+    ],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      encoding: "utf8",
+      windowsHide: true,
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error("The reviewed identity pairing catalog audit failed.");
+  }
+
+  let evidence;
+  try {
+    evidence = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("The reviewed catalog audit output is invalid.");
+  }
+  assert.equal(evidence.status, "passed");
+  assert.equal(evidence.state, "present");
+  assert.equal(evidence.readOnly, true);
+  assert.equal(evidence.databaseWrites, 0);
+  assert.deepEqual(evidence.migrationPlan?.pendingTags, []);
+  assert.deepEqual(evidence.pairingRows, {
+    intents: 0,
+    events: 0,
+  });
+}
+
 async function rehearseSuccessfulConsume(pool, hmacKey) {
   const targetAppUserId = await insertAppUser(pool);
   const claim = await insertIntent(pool, targetAppUserId, "current");
@@ -134,6 +184,67 @@ async function rehearseExpiredClaim(pool, hmacKey) {
     () => consume(pool, hmacKey, claim.rawClaim, subject),
     ["claim_intent_expired"],
   );
+  await assertUnconsumedState(
+    pool,
+    targetAppUserId,
+    [claim.claimDigest],
+    [subject],
+  );
+}
+
+async function rehearseLockWaitExpiry(pool, hmacKey) {
+  const targetAppUserId = await insertAppUser(pool);
+  const claim = await insertIntent(pool, targetAppUserId, "current");
+  const subject = syntheticSubject("lock-wait-expiry");
+  const blocker = await pool.connect();
+  let blockerTransactionOpen = false;
+
+  try {
+    await blocker.query("begin");
+    blockerTransactionOpen = true;
+    const { rows } = await blocker.query(
+      `
+        update identity_pairing_intents
+        set expires_at = clock_timestamp() + interval '1 second'
+        where claim_digest = $1
+        returning
+          expires_at,
+          clock_timestamp() as locked_at
+      `,
+      [claim.claimDigest],
+    );
+    assert.equal(rows.length, 1);
+    assert.ok(
+      new Date(rows[0].expires_at).getTime() -
+        new Date(rows[0].locked_at).getTime() >=
+        900,
+    );
+
+    const consumeObservation = expectConsumeError(
+      () => consume(pool, hmacKey, claim.rawClaim, subject),
+      ["claim_intent_expired"],
+    ).then(
+      () => null,
+      (error) => error,
+    );
+
+    await delay(1_250);
+    await blocker.query("commit");
+    blockerTransactionOpen = false;
+
+    const consumeFailure = await consumeObservation;
+    if (consumeFailure) throw consumeFailure;
+  } finally {
+    if (blockerTransactionOpen) {
+      try {
+        await blocker.query("rollback");
+      } catch {
+        // Preserve the original rehearsal failure.
+      }
+    }
+    blocker.release();
+  }
+
   await assertUnconsumedState(
     pool,
     targetAppUserId,
@@ -355,18 +466,14 @@ async function rehearseTerminalInsertRollback(pool, hmacKey) {
 }
 
 async function assertSchemaReadyAndEmpty(pool) {
+  await assertExactMigrationLedger(pool);
+
   const { rows } = await pool.query(`
     select
       to_regclass('public.identity_pairing_intents')::text
         as intents_table,
       to_regclass('public.identity_pairing_intent_events')::text
         as events_table,
-      (
-        select hash
-        from drizzle.__drizzle_migrations
-        order by created_at desc
-        limit 1
-      ) as latest_migration_hash,
       (
         select count(*)::integer
         from identity_pairing_intents
@@ -389,14 +496,53 @@ async function assertSchemaReadyAndEmpty(pool) {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].intents_table, "identity_pairing_intents");
   assert.equal(rows[0].events_table, "identity_pairing_intent_events");
-  assert.equal(
-    rows[0].latest_migration_hash,
-    EXPECTED_MIGRATION_SHA256,
-  );
   assert.equal(Number(rows[0].intent_count), 0);
   assert.equal(Number(rows[0].event_count), 0);
   assert.equal(Number(rows[0].required_index_count), 3);
   await assertRejectionTriggerAbsent(pool);
+}
+
+async function assertExactMigrationLedger(pool) {
+  const localMigrations = readLocalMigrations();
+  const expectedLatest = localMigrations.at(-1);
+  assert.equal(expectedLatest?.tag, EXPECTED_MIGRATION_TAG);
+  assert.equal(expectedLatest?.sha256, EXPECTED_MIGRATION_SHA256);
+
+  const { rows } = await pool.query(`
+    select
+      created_at as "createdAt",
+      hash as sha256
+    from drizzle.__drizzle_migrations
+    order by created_at asc
+  `);
+  const plan = planPreviewMigrations({
+    localMigrations,
+    appliedMigrations: rows,
+    allowedPendingMigrations: [],
+  });
+  assert.equal(plan.appliedCount, localMigrations.length);
+  assert.equal(plan.localCount, localMigrations.length);
+  assert.equal(plan.latestAppliedTag, EXPECTED_MIGRATION_TAG);
+  assert.deepEqual(plan.pendingTags, []);
+}
+
+function readLocalMigrations() {
+  const journal = JSON.parse(
+    readFileSync(
+      join(MIGRATIONS_FOLDER, "meta", "_journal.json"),
+      "utf8",
+    ),
+  );
+  const migrations = readMigrationFiles({
+    migrationsFolder: MIGRATIONS_FOLDER,
+  });
+  assert.equal(journal.entries.length, migrations.length);
+
+  return journal.entries.map((entry, index) => ({
+    tag: entry.tag,
+    createdAt: entry.when,
+    sha256: migrations[index].hash,
+  }));
 }
 
 async function assertRejectionTriggerAbsent(pool) {
@@ -481,6 +627,12 @@ function consume(pool, hmacKey, rawClaim, subject) {
 
 function syntheticSubject(label) {
   return `rehearsal-${label}-${randomUUID()}`;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolveDelay) => {
+    setTimeout(resolveDelay, milliseconds);
+  });
 }
 
 async function assertConsumedState(
