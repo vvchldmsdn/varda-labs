@@ -111,7 +111,12 @@ describe("identity pairing rehearsal target guard", () => {
     assert.match(source, /assertReviewedCatalogPreflight\(\)/);
     assert.match(
       source,
-      /clock_timestamp\(\) \+ interval '1 second'/,
+      /clock_timestamp\(\) \+ interval '1\.25 seconds'/,
+    );
+    assert.match(source, /from identity_pairing_intents[\s\S]*for update/);
+    assert.doesNotMatch(
+      source,
+      /update identity_pairing_intents[\s\S]*set expires_at/,
     );
     assert.doesNotMatch(
       source,

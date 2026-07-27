@@ -194,7 +194,7 @@ async function rehearseExpiredClaim(pool, hmacKey) {
 
 async function rehearseLockWaitExpiry(pool, hmacKey) {
   const targetAppUserId = await insertAppUser(pool);
-  const claim = await insertIntent(pool, targetAppUserId, "current");
+  const claim = await insertIntent(pool, targetAppUserId, "short_lived");
   const subject = syntheticSubject("lock-wait-expiry");
   const blocker = await pool.connect();
   let blockerTransactionOpen = false;
@@ -204,12 +204,12 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
     blockerTransactionOpen = true;
     const { rows } = await blocker.query(
       `
-        update identity_pairing_intents
-        set expires_at = clock_timestamp() + interval '1 second'
-        where claim_digest = $1
-        returning
+        select
           expires_at,
           clock_timestamp() as locked_at
+        from identity_pairing_intents
+        where claim_digest = $1
+        for update
       `,
       [claim.claimDigest],
     );
@@ -217,7 +217,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
     assert.ok(
       new Date(rows[0].expires_at).getTime() -
         new Date(rows[0].locked_at).getTime() >=
-        900,
+        750,
     );
 
     const consumeObservation = expectConsumeError(
@@ -228,7 +228,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       (error) => error,
     );
 
-    await delay(1_250);
+    await delay(1_500);
     await blocker.query("commit");
     blockerTransactionOpen = false;
 
@@ -580,7 +580,9 @@ async function insertIntent(pool, targetAppUserId, timing) {
   const clockSql =
     timing === "expired"
       ? "clock_timestamp() - interval '9 minutes', clock_timestamp() - interval '1 minute'"
-      : "clock_timestamp(), clock_timestamp() + interval '9 minutes'";
+      : timing === "short_lived"
+        ? "clock_timestamp(), clock_timestamp() + interval '1.25 seconds'"
+        : "clock_timestamp(), clock_timestamp() + interval '9 minutes'";
 
   await pool.query(
     `
