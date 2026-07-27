@@ -114,6 +114,14 @@ describe("identity pairing rehearsal target guard", () => {
       /clock_timestamp\(\) \+ interval '1\.25 seconds'/,
     );
     assert.match(source, /from identity_pairing_intents[\s\S]*for update/);
+    assert.match(source, /select pg_backend_pid\(\)::integer/);
+    assert.match(source, /from pg_stat_activity/);
+    assert.match(source, /wait_event_type === "Lock"/);
+    assert.match(source, /pg_blocking_pids\(pid\)/);
+    assert.match(source, /blocked_by_expected_session === true/);
+    assert.match(source, /clock_timestamp\(\) as observed_at/);
+    assert.match(source, /new Date\(lockWaitObservedAt\)/);
+    assert.match(source, /waitUntilAfterDatabaseExpiry/);
     assert.doesNotMatch(
       source,
       /update identity_pairing_intents[\s\S]*set expires_at/,

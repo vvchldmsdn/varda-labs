@@ -198,6 +198,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   const subject = syntheticSubject("lock-wait-expiry");
   const blocker = await pool.connect();
   let blockerTransactionOpen = false;
+  let consumeObservation = null;
 
   try {
     await blocker.query("begin");
@@ -206,7 +207,8 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       `
         select
           expires_at,
-          clock_timestamp() as locked_at
+          clock_timestamp() as locked_at,
+          pg_backend_pid()::integer as blocker_pid
         from identity_pairing_intents
         where claim_digest = $1
         for update
@@ -219,16 +221,48 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
         new Date(rows[0].locked_at).getTime() >=
         750,
     );
+    const blockerBackendPid = Number(rows[0].blocker_pid);
+    assert.ok(
+      Number.isInteger(blockerBackendPid) && blockerBackendPid > 0,
+    );
 
-    const consumeObservation = expectConsumeError(
-      () => consume(pool, hmacKey, claim.rawClaim, subject),
+    const lockObservation = createIntentLockObservedPool(pool);
+    consumeObservation = expectConsumeError(
+      () =>
+        consume(
+          lockObservation.pool,
+          hmacKey,
+          claim.rawClaim,
+          subject,
+        ),
       ["claim_intent_expired"],
     ).then(
       () => null,
       (error) => error,
     );
 
-    await delay(1_500);
+    const writerBackendPid = await withTimeout(
+      lockObservation.writerBackendPid,
+      1_000,
+      "The writer database session was not established.",
+    );
+    await withTimeout(
+      lockObservation.intentLockDispatched,
+      1_000,
+      "The writer did not dispatch the intent row lock.",
+    );
+    const lockWaitObservedAt = await assertBackendWaitingOnLock(
+      pool,
+      writerBackendPid,
+      blockerBackendPid,
+    );
+    assert.ok(
+      new Date(rows[0].expires_at).getTime() -
+        new Date(lockWaitObservedAt).getTime() >
+        0,
+    );
+    await waitUntilAfterDatabaseExpiry(pool, rows[0].expires_at);
+
     await blocker.query("commit");
     blockerTransactionOpen = false;
 
@@ -243,6 +277,9 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       }
     }
     blocker.release();
+    if (consumeObservation && blockerTransactionOpen) {
+      await consumeObservation;
+    }
   }
 
   await assertUnconsumedState(
@@ -635,6 +672,138 @@ function delay(milliseconds) {
   return new Promise((resolveDelay) => {
     setTimeout(resolveDelay, milliseconds);
   });
+}
+
+function createIntentLockObservedPool(pool) {
+  const writerBackendPid = deferred();
+  const intentLockDispatched = deferred();
+
+  return {
+    pool: Object.freeze({
+      async connect() {
+        let client;
+        try {
+          client = await pool.connect();
+          const { rows } = await client.query(`
+            select pg_backend_pid()::integer as backend_pid
+          `);
+          const backendPid = Number(rows[0]?.backend_pid);
+          assert.ok(Number.isInteger(backendPid) && backendPid > 0);
+          writerBackendPid.resolve(backendPid);
+        } catch (error) {
+          writerBackendPid.reject(error);
+          if (client) client.release();
+          throw error;
+        }
+
+        return Object.freeze({
+          query(query, parameters) {
+            const pendingQuery = client.query(query, parameters);
+            if (isIntentLockQuery(query)) {
+              intentLockDispatched.resolve();
+            }
+            return pendingQuery;
+          },
+          release() {
+            client.release();
+          },
+        });
+      },
+    }),
+    writerBackendPid: writerBackendPid.promise,
+    intentLockDispatched: intentLockDispatched.promise,
+  };
+}
+
+function isIntentLockQuery(query) {
+  return (
+    typeof query === "string" &&
+    /\bfrom identity_pairing_intents\b/i.test(query) &&
+    /\bfor update\b/i.test(query)
+  );
+}
+
+async function assertBackendWaitingOnLock(
+  pool,
+  backendPid,
+  blockerBackendPid,
+) {
+  const deadline = Date.now() + 1_000;
+  while (Date.now() < deadline) {
+    const { rows } = await pool.query(
+      `
+        select
+          state,
+          wait_event_type,
+          $2::integer = any(pg_blocking_pids(pid))
+            as blocked_by_expected_session,
+          clock_timestamp() as observed_at
+        from pg_stat_activity
+        where pid = $1
+      `,
+      [backendPid, blockerBackendPid],
+    );
+    if (
+      rows[0]?.state === "active" &&
+      rows[0]?.wait_event_type === "Lock" &&
+      rows[0]?.blocked_by_expected_session === true
+    ) {
+      return rows[0].observed_at;
+    }
+    await delay(25);
+  }
+  throw new Error("The writer was not observed waiting on a DB lock.");
+}
+
+async function waitUntilAfterDatabaseExpiry(pool, expiresAt) {
+  const { rows } = await pool.query(
+    `
+      select greatest(
+        0,
+        ceil(
+          extract(epoch from ($1::timestamptz - clock_timestamp())) *
+          1000
+        )
+      )::integer as remaining_ms
+    `,
+    [expiresAt],
+  );
+  const remainingMilliseconds = Number(rows[0]?.remaining_ms);
+  assert.ok(
+    Number.isInteger(remainingMilliseconds) &&
+      remainingMilliseconds >= 0 &&
+      remainingMilliseconds <= 1_250,
+  );
+  await delay(remainingMilliseconds + 100);
+}
+
+function deferred() {
+  let resolveDeferred;
+  let rejectDeferred;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolveDeferred = resolvePromise;
+    rejectDeferred = rejectPromise;
+  });
+  return {
+    promise,
+    resolve: resolveDeferred,
+    reject: rejectDeferred,
+  };
+}
+
+async function withTimeout(promise, milliseconds, message) {
+  let timeoutId;
+  const timeout = new Promise((_, rejectTimeout) => {
+    timeoutId = setTimeout(
+      () => rejectTimeout(new Error(message)),
+      milliseconds,
+    );
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function assertConsumedState(
