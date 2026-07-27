@@ -26,6 +26,10 @@ import {
   IdentityPairingRehearsalFixtureError,
 } from "./lib/identity-pairing-rehearsal-evidence.mjs";
 import {
+  confirmIdentityPairingDatabaseExpiry,
+  finalizeIdentityPairingLockWaitFixture,
+} from "./lib/identity-pairing-lock-wait-fixture.mjs";
+import {
   runIdentityPairingCatalogAuditProcess,
 } from "./lib/identity-pairing-catalog-preflight.mjs";
 
@@ -251,9 +255,6 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   let blockerTransactionOpen = false;
   let consumeObservation = null;
   let primaryFailure = null;
-  let cleanupFailure = null;
-  let consumeOutcome = null;
-  let destroyBlockerConnection = false;
 
   try {
     lockObservation = await createIntentLockObservedPool(pool);
@@ -321,56 +322,33 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   } catch (error) {
     primaryFailure = error;
   } finally {
-    if (blockerTransactionOpen) {
-      if (consumeObservation !== null && expiresAt !== null) {
-        try {
-          await waitUntilAfterDatabaseExpiry(pool, expiresAt);
-        } catch {
-          cleanupFailure = fixtureError(
-            "lock_wait_expiry_not_confirmed",
-          );
-        }
-      }
-      try {
-        await blocker.query("rollback");
-      } catch {
-        cleanupFailure = fixtureError("lock_wait_release_failed");
-        destroyBlockerConnection = true;
-      }
-      blockerTransactionOpen = false;
-    }
-    blocker.release(destroyBlockerConnection);
-    if (lockObservation !== null) {
-      lockObservation.releaseIfUnused();
-    }
-    if (consumeObservation !== null) {
-      try {
-        consumeOutcome = await withTimeout(
+    await finalizeIdentityPairingLockWaitFixture({
+      blockerTransactionOpen,
+      writerStarted: consumeObservation !== null,
+      claimCreated: claim !== null,
+      expiresAt,
+      primaryFailure,
+      confirmExpiry: () =>
+        waitUntilAfterDatabaseExpiry(pool, expiresAt),
+      rollbackBlocker: () => blocker.query("rollback"),
+      releaseBlocker: (destroy) => blocker.release(destroy),
+      releaseWriterIfUnused: () =>
+        lockObservation?.releaseIfUnused(),
+      settleWriter: () =>
+        withTimeout(
           consumeObservation,
           9_000,
           fixtureError("lock_wait_writer_settlement_timeout"),
-        );
-      } catch (error) {
-        cleanupFailure ??= error;
-      }
-    }
-    if (claim !== null) {
-      try {
-        await assertUnconsumedState(
+        ),
+      assertPostState: () =>
+        assertUnconsumedState(
           pool,
           targetAppUserId,
           [claim.claimDigest],
           [subject],
-        );
-      } catch {
-        cleanupFailure = fixtureError("lock_wait_post_state_invalid");
-      }
-    }
+        ),
+    });
   }
-
-  if (cleanupFailure !== null) throw cleanupFailure;
-  if (primaryFailure !== null) throw primaryFailure;
-  assertExpectedConsumeFailure(consumeOutcome, ["claim_intent_expired"]);
 }
 
 async function rehearseDuplicateConsume(pool, hmacKey) {
@@ -859,26 +837,35 @@ async function assertBackendWaitingOnLock(
 }
 
 async function waitUntilAfterDatabaseExpiry(pool, expiresAt) {
-  const { rows } = await pool.query(
-    `
-      select greatest(
-        0,
-        ceil(
-          extract(epoch from ($1::timestamptz - clock_timestamp())) *
-          1000
-        )
-      )::integer as remaining_ms
-    `,
-    [expiresAt],
-  );
-  const remainingMilliseconds = Number(rows[0]?.remaining_ms);
-  assertLockWaitFixture(
-    Number.isInteger(remainingMilliseconds) &&
-      remainingMilliseconds >= 0 &&
-      remainingMilliseconds <= 1_250,
-    "lock_wait_expiry_not_confirmed",
-  );
-  await delay(remainingMilliseconds + 100);
+  await confirmIdentityPairingDatabaseExpiry({
+    async readRemainingMilliseconds() {
+      const { rows } = await pool.query(
+        `
+          select greatest(
+            0,
+            ceil(
+              extract(epoch from (
+                $1::timestamptz - clock_timestamp()
+              )) * 1000
+            )
+          )::integer as remaining_ms
+        `,
+        [expiresAt],
+      );
+      return rows[0]?.remaining_ms;
+    },
+    delay,
+    async readExpiryReached() {
+      const { rows } = await pool.query(
+        `
+          select clock_timestamp() >= $1::timestamptz
+            as expiry_reached
+        `,
+        [expiresAt],
+      );
+      return rows[0]?.expiry_reached;
+    },
+  });
 }
 
 function deferred() {
@@ -1019,25 +1006,6 @@ function observeConsumeOutcome(operation) {
     (value) => Object.freeze({ status: "fulfilled", value }),
     (error) => Object.freeze({ status: "rejected", error }),
   );
-}
-
-function assertExpectedConsumeFailure(outcome, expectedCodes) {
-  if (outcome?.status === "fulfilled") {
-    throw fixtureError("lock_wait_writer_unexpected_success");
-  }
-  if (outcome?.status !== "rejected") {
-    throw fixtureError("lock_wait_writer_unexpected_failure");
-  }
-  if (
-    outcome.error instanceof IdentityPairingConsumeError &&
-    expectedCodes.includes(outcome.error.code)
-  ) {
-    return;
-  }
-  if (outcome.error instanceof IdentityPairingConsumeError) {
-    throw outcome.error;
-  }
-  throw fixtureError("lock_wait_writer_unexpected_failure");
 }
 
 function assertLockWaitFixture(condition, code) {
