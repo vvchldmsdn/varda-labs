@@ -1,6 +1,9 @@
 import {
   IdentityPairingConsumeError,
 } from "./identity-pairing-consume-writer.mjs";
+import {
+  IDENTITY_PAIRING_CATALOG_PREFLIGHT_FAILURE_CODES,
+} from "./identity-pairing-catalog-preflight.mjs";
 
 export const IDENTITY_PAIRING_REHEARSAL_STAGES = Object.freeze([
   "target_guard",
@@ -62,6 +65,9 @@ const SAFE_SQLSTATES = new Set([
   "55P03",
   "57014",
 ]);
+const SAFE_CATALOG_PREFLIGHT_FAILURE_CODES = new Set(
+  IDENTITY_PAIRING_CATALOG_PREFLIGHT_FAILURE_CODES,
+);
 
 const STAGE_INDEX = new Map(
   IDENTITY_PAIRING_REHEARSAL_STAGES.map((stage, index) => [stage, index]),
@@ -136,6 +142,13 @@ export function createIdentityPairingRehearsalEvidence() {
 
 function safeFailureCode(error, stage) {
   const code = readOwnPrimitiveStringCode(error);
+  if (
+    stage === "catalog_preflight" &&
+    code !== null &&
+    SAFE_CATALOG_PREFLIGHT_FAILURE_CODES.has(code)
+  ) {
+    return code;
+  }
   if (
     isIdentityPairingConsumeError(error) &&
     code !== null &&

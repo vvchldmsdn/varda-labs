@@ -132,6 +132,28 @@ describe("identity pairing rehearsal failure evidence", () => {
     assert.equal(codeCoercions, 0);
   });
 
+  it("preserves only allowlisted catalog preflight codes", () => {
+    const allowlisted = progressToCatalogPreflight();
+    assert.equal(
+      allowlisted.failure(
+        Object.assign(new Error("secret"), {
+          code: "catalog_preflight_child_database_read_failed",
+        }),
+      ).code,
+      "catalog_preflight_child_database_read_failed",
+    );
+
+    const unknown = progressToCatalogPreflight();
+    assert.equal(
+      unknown.failure(
+        Object.assign(new Error("secret"), {
+          code: "catalog_preflight_secret_internal_reason",
+        }),
+      ).code,
+      "catalog_preflight_failed",
+    );
+  });
+
   it("tracks Pool readiness and the first disposable DML boundary", () => {
     const evidence = progressToSuccessfulConsume();
     const beforeDml = evidence.failure(new Error("synthetic"));
@@ -196,5 +218,13 @@ function progressToSuccessfulConsume() {
     evidence.complete(stage);
   }
   evidence.begin("successful_consume");
+  return evidence;
+}
+
+function progressToCatalogPreflight() {
+  const evidence = createIdentityPairingRehearsalEvidence();
+  evidence.begin("target_guard");
+  evidence.complete("target_guard");
+  evidence.begin("catalog_preflight");
   return evidence;
 }

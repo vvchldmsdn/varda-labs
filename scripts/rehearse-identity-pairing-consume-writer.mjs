@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -25,6 +24,9 @@ import {
 import {
   createIdentityPairingRehearsalEvidence,
 } from "./lib/identity-pairing-rehearsal-evidence.mjs";
+import {
+  runIdentityPairingCatalogAuditProcess,
+} from "./lib/identity-pairing-catalog-preflight.mjs";
 
 const CONFIRMATION =
   "--confirm-isolated-identity-pairing-rehearsal";
@@ -171,31 +173,19 @@ async function assertPoolReady(pool) {
 }
 
 function assertReviewedCatalogPreflight() {
-  const result = spawnSync(
-    process.execPath,
-    [
-      "--no-warnings",
-      "scripts/audit-identity-pairing-schema.mjs",
-      "--expect-state",
-      "present",
-    ],
-    {
-      cwd: process.cwd(),
-      env: process.env,
-      encoding: "utf8",
-      windowsHide: true,
-    },
-  );
-  if (result.status !== 0) {
-    throw new Error("The reviewed identity pairing catalog audit failed.");
+  const result = runIdentityPairingCatalogAuditProcess();
+  if (result.status === "failed") {
+    throw catalogPreflightError(result.code);
   }
 
-  let evidence;
   try {
-    evidence = JSON.parse(result.stdout);
+    assertReviewedCatalogEvidence(result.evidence);
   } catch {
-    throw new Error("The reviewed catalog audit output is invalid.");
+    throw catalogPreflightError("catalog_preflight_evidence_invalid");
   }
+}
+
+function assertReviewedCatalogEvidence(evidence) {
   assert.equal(evidence.status, "passed");
   assert.equal(evidence.state, "present");
   assert.equal(evidence.readOnly, true);
@@ -205,6 +195,17 @@ function assertReviewedCatalogPreflight() {
     intents: 0,
     events: 0,
   });
+}
+
+function catalogPreflightError(code) {
+  const error = new Error("The reviewed identity pairing catalog audit failed.");
+  Object.defineProperty(error, "code", {
+    configurable: false,
+    enumerable: true,
+    value: code,
+    writable: false,
+  });
+  return error;
 }
 
 async function rehearseSuccessfulConsume(pool, hmacKey) {

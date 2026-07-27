@@ -112,7 +112,7 @@ describe("identity pairing rehearsal target guard", () => {
     assert.match(source, /readMigrationFiles/);
     assert.match(source, /allowedPendingMigrations: \[\]/);
     assert.match(source, /lock_wait_expiry/);
-    assert.match(source, /audit-identity-pairing-schema\.mjs/);
+    assert.match(source, /runIdentityPairingCatalogAuditProcess/);
     assert.match(source, /assertReviewedCatalogPreflight\(\)/);
     assert.match(
       source,
@@ -154,6 +154,17 @@ describe("identity pairing rehearsal target guard", () => {
       catalogAudit,
       /process\.env\.(?:DATABASE_URL|DATABASE_URL_UNPOOLED)\b/,
     );
+
+    const catalogPreflight = readFileSync(
+      "scripts/lib/identity-pairing-catalog-preflight.mjs",
+      "utf8",
+    );
+    assert.match(
+      catalogPreflight,
+      /audit-identity-pairing-schema\.mjs/,
+    );
+    assert.match(catalogPreflight, /runIdentityPairingCatalogAuditProcess/);
+    assert.doesNotMatch(catalogPreflight, /console\.(?:log|error)/);
   });
 });
 

@@ -13,6 +13,9 @@ import {
 import {
   planPreviewMigrations as planReviewedMigrations,
 } from "../src/lib/deployment/preview-migration-plan.ts";
+import {
+  createIdentityPairingCatalogAuditFailure,
+} from "./lib/identity-pairing-catalog-preflight.mjs";
 
 config({ path: ".env.local", quiet: true });
 
@@ -22,135 +25,157 @@ const PAIRING_TABLES = [
   "identity_pairing_intents",
 ];
 const TRUNCATE_TRIGGER_EVENT = ["TRUN", "CATE"].join("");
-const options = readOptions(process.argv.slice(2));
+let auditStage = "options";
 
-guardIdentityPairingRehearsalTarget(process.env);
-const connectionString =
-  process.env.IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED;
-assert.ok(connectionString, "The guarded rehearsal URL is unavailable.");
-const sql = neon(connectionString);
-const localMigrations = readLocalMigrations();
-const latestLocalMigration = localMigrations.at(-1);
-assert.ok(latestLocalMigration, "local migration journal is empty");
-const localMigration = {
-  tag: latestLocalMigration.tag,
-  createdAt: latestLocalMigration.createdAt,
-  drizzleHash: latestLocalMigration.sha256,
-  fileSha256: normalizedFileSha256(
-    join(MIGRATIONS_FOLDER, `${latestLocalMigration.tag}.sql`),
-  ),
-};
-const publicTables = await sql.query(`
-  select table_name
-  from information_schema.tables
-  where table_schema = 'public'
-    and table_type = 'BASE TABLE'
-  order by table_name
-`);
-const publicTableNames = publicTables.map(({ table_name }) => table_name);
-const pairingPresence = PAIRING_TABLES.map((table) =>
-  publicTableNames.includes(table),
-);
-assert.ok(
-  pairingPresence.every(Boolean) || pairingPresence.every((value) => !value),
-  "identity pairing schema is partially present",
-);
-const state = pairingPresence.every(Boolean) ? "present" : "absent";
-if (options.expectedState !== null) {
-  assert.equal(state, options.expectedState, "pairing schema state mismatch");
+try {
+  await runAudit();
+} catch {
+  console.error(
+    JSON.stringify(createIdentityPairingCatalogAuditFailure(auditStage)),
+  );
+  process.exitCode = 1;
 }
 
-const appliedMigrations = await sql.query(`
-  select hash, created_at::text as created_at
-  from drizzle.__drizzle_migrations
-  order by created_at asc
-`);
-const migrationPlan = planReviewedMigrations({
-  localMigrations,
-  appliedMigrations: appliedMigrations.map(({ created_at, hash }) => ({
-    createdAt: Number(created_at),
-    sha256: String(hash),
-  })),
-  allowedPendingMigrations: state === "absent" ? [latestLocalMigration] : [],
-});
-assert.deepEqual(
-  migrationPlan.pendingTags,
-  state === "absent" ? [latestLocalMigration.tag] : [],
-  "identity pairing migration is not the exact pending suffix",
-);
-const appliedLocalMigration = appliedMigrations.find(
-  ({ created_at }) => Number(created_at) === localMigration.createdAt,
-);
+async function runAudit() {
+  const options = readOptions(process.argv.slice(2));
 
-const productRowCounts = [];
-for (const table of publicTableNames.filter(
-  (table) => !PAIRING_TABLES.includes(table),
-)) {
-  assert.match(table, /^[a-z0-9_]+$/, `unsafe table identifier: ${table}`);
-  const [row] = await sql.query(
-    `select count(*)::int as row_count from "${table}"`,
-  );
-  productRowCounts.push({
-    table,
-    rowCount: Number(row.row_count),
-  });
-}
-const productRowCountsSha256 = canonicalSha256(productRowCounts);
-if (options.expectedProductRowCountsSha256 !== null) {
-  assert.equal(
-    productRowCountsSha256,
-    options.expectedProductRowCountsSha256,
-    "existing product row counts changed during migration",
-  );
-}
+  auditStage = "target_guard";
+  guardIdentityPairingRehearsalTarget(process.env);
+  const connectionString =
+    process.env.IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED;
+  assert.ok(connectionString, "The guarded rehearsal URL is unavailable.");
 
-let catalogEvidence = null;
-if (state === "absent") {
-  assert.equal(
-    appliedLocalMigration,
-    undefined,
-    "migration ledger contains 0021 while pairing tables are absent",
+  auditStage = "local_evidence";
+  const localMigrations = readLocalMigrations();
+  const latestLocalMigration = localMigrations.at(-1);
+  assert.ok(latestLocalMigration, "local migration journal is empty");
+  const localMigration = {
+    tag: latestLocalMigration.tag,
+    createdAt: latestLocalMigration.createdAt,
+    drizzleHash: latestLocalMigration.sha256,
+    fileSha256: normalizedFileSha256(
+      join(MIGRATIONS_FOLDER, `${latestLocalMigration.tag}.sql`),
+    ),
+  };
+
+  auditStage = "database_read";
+  const sql = neon(connectionString);
+  const publicTables = await sql.query(`
+    select table_name
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_type = 'BASE TABLE'
+    order by table_name
+  `);
+  const publicTableNames = publicTables.map(({ table_name }) => table_name);
+  const pairingPresence = PAIRING_TABLES.map((table) =>
+    publicTableNames.includes(table),
   );
-} else {
   assert.ok(
-    appliedLocalMigration,
-    "pairing tables exist without the reviewed 0021 ledger entry",
+    pairingPresence.every(Boolean) ||
+      pairingPresence.every((value) => !value),
+    "identity pairing schema is partially present",
   );
-  assert.equal(
-    String(appliedLocalMigration.hash),
-    localMigration.drizzleHash,
-    "applied 0021 hash differs from the local migration",
-  );
-  catalogEvidence = await auditPresentSchema(sql);
-}
+  const state = pairingPresence.every(Boolean) ? "present" : "absent";
+  if (options.expectedState !== null) {
+    assert.equal(state, options.expectedState, "pairing schema state mismatch");
+  }
 
-console.log(
-  JSON.stringify(
-    {
-      audit: "identity_pairing_schema_catalog",
-      status: "passed",
-      state,
-      readOnly: true,
-      databaseWrites: 0,
-      localMigration,
-      migrationPlan,
-      appliedMigration:
-        appliedLocalMigration === undefined
-          ? null
-          : {
-              createdAt: Number(appliedLocalMigration.created_at),
-              drizzleHash: String(appliedLocalMigration.hash),
-            },
-      publicTableCount: publicTableNames.length,
-      pairingRows: catalogEvidence?.pairingRows ?? null,
-      catalogEvidence,
-      productRowCounts,
+  const appliedMigrations = await sql.query(`
+    select hash, created_at::text as created_at
+    from drizzle.__drizzle_migrations
+    order by created_at asc
+  `);
+  const productRowCounts = [];
+  for (const table of publicTableNames.filter(
+    (table) => !PAIRING_TABLES.includes(table),
+  )) {
+    assert.match(table, /^[a-z0-9_]+$/, `unsafe table identifier: ${table}`);
+    const [row] = await sql.query(
+      `select count(*)::int as row_count from "${table}"`,
+    );
+    productRowCounts.push({
+      table,
+      rowCount: Number(row.row_count),
+    });
+  }
+
+  auditStage = "migration_plan";
+  const migrationPlan = planReviewedMigrations({
+    localMigrations,
+    appliedMigrations: appliedMigrations.map(({ created_at, hash }) => ({
+      createdAt: Number(created_at),
+      sha256: String(hash),
+    })),
+    allowedPendingMigrations: state === "absent" ? [latestLocalMigration] : [],
+  });
+  assert.deepEqual(
+    migrationPlan.pendingTags,
+    state === "absent" ? [latestLocalMigration.tag] : [],
+    "identity pairing migration is not the exact pending suffix",
+  );
+  const appliedLocalMigration = appliedMigrations.find(
+    ({ created_at }) => Number(created_at) === localMigration.createdAt,
+  );
+  const productRowCountsSha256 = canonicalSha256(productRowCounts);
+  if (options.expectedProductRowCountsSha256 !== null) {
+    assert.equal(
       productRowCountsSha256,
-    },
-    null,
-    2,
-  ),
-);
+      options.expectedProductRowCountsSha256,
+      "existing product row counts changed during migration",
+    );
+  }
+
+  auditStage = "catalog_validation";
+  let catalogEvidence = null;
+  if (state === "absent") {
+    assert.equal(
+      appliedLocalMigration,
+      undefined,
+      "migration ledger contains 0021 while pairing tables are absent",
+    );
+  } else {
+    assert.ok(
+      appliedLocalMigration,
+      "pairing tables exist without the reviewed 0021 ledger entry",
+    );
+    assert.equal(
+      String(appliedLocalMigration.hash),
+      localMigration.drizzleHash,
+      "applied 0021 hash differs from the local migration",
+    );
+    catalogEvidence = await auditPresentSchema(sql);
+  }
+
+  auditStage = "output";
+  console.log(
+    JSON.stringify(
+      {
+        audit: "identity_pairing_schema_catalog",
+        status: "passed",
+        state,
+        readOnly: true,
+        databaseWrites: 0,
+        localMigration,
+        migrationPlan,
+        appliedMigration:
+          appliedLocalMigration === undefined
+            ? null
+            : {
+                createdAt: Number(appliedLocalMigration.created_at),
+                drizzleHash: String(appliedLocalMigration.hash),
+              },
+        publicTableCount: publicTableNames.length,
+        pairingRows: catalogEvidence?.pairingRows ?? null,
+        catalogEvidence,
+        productRowCounts,
+        productRowCountsSha256,
+      },
+      null,
+      2,
+    ),
+  );
+}
 
 async function auditPresentSchema(query) {
   const columns = await query.query(`
