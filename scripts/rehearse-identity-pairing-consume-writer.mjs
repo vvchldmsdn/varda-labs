@@ -22,6 +22,9 @@ import {
   consumeIdentityPairingClaim,
   IdentityPairingConsumeError,
 } from "./lib/identity-pairing-consume-writer.mjs";
+import {
+  createIdentityPairingRehearsalEvidence,
+} from "./lib/identity-pairing-rehearsal-evidence.mjs";
 
 const CONFIRMATION =
   "--confirm-isolated-identity-pairing-rehearsal";
@@ -36,19 +39,14 @@ const REJECTION_TRIGGER =
 
 config({ path: ".env.local", quiet: true });
 
-main().catch((error) => {
-  console.error(
-    JSON.stringify({
-      rehearsal: "identity_pairing_atomic_consume_disposable_branch",
-      status: "failed",
-      code: safeErrorCode(error),
-      productionDatabaseWrites: 0,
-    }),
-  );
+const rehearsalEvidence = createIdentityPairingRehearsalEvidence();
+
+main(rehearsalEvidence).catch((error) => {
+  console.error(JSON.stringify(rehearsalEvidence.failure(error)));
   process.exitCode = 1;
 });
 
-async function main() {
+async function main(evidence) {
   if (
     process.argv.slice(2).length !== 1 ||
     process.argv.slice(2)[0] !== CONFIRMATION
@@ -59,10 +57,14 @@ async function main() {
   }
 
   const target = guardIdentityPairingRehearsalTarget(process.env);
+  evidence.complete("target_guard");
   const connectionString =
     process.env.IDENTITY_PAIRING_REHEARSAL_DATABASE_URL_UNPOOLED;
   assert.ok(connectionString, "The guarded rehearsal URL is unavailable.");
+
+  evidence.begin("catalog_preflight");
   assertReviewedCatalogPreflight();
+  evidence.complete("catalog_preflight");
 
   const pool = new Pool({ connectionString, max: 8 });
   pool.on("error", () => {});
@@ -70,43 +72,72 @@ async function main() {
   const checks = [];
 
   try {
-    await assertSchemaReadyAndEmpty(pool);
+    evidence.begin("pool_readiness");
+    await assertPoolReady(pool);
+    evidence.markPoolReady();
+    evidence.complete("pool_readiness");
 
+    evidence.begin("schema_empty");
+    await assertSchemaReadyAndEmpty(pool);
+    evidence.complete("schema_empty");
+
+    evidence.begin("successful_consume");
+    evidence.markDisposableBranchDmlAttempted();
     await rehearseSuccessfulConsume(pool, hmacKey);
     checks.push("successful_consume");
+    evidence.complete("successful_consume");
 
+    evidence.begin("expired_claim");
     await rehearseExpiredClaim(pool, hmacKey);
     checks.push("expired_claim");
+    evidence.complete("expired_claim");
 
+    evidence.begin("lock_wait_expiry");
     await rehearseLockWaitExpiry(pool, hmacKey);
     checks.push("lock_wait_expiry");
+    evidence.complete("lock_wait_expiry");
 
+    evidence.begin("duplicate_consume");
     await rehearseDuplicateConsume(pool, hmacKey);
     checks.push("duplicate_consume");
+    evidence.complete("duplicate_consume");
 
+    evidence.begin("subject_collision");
     await rehearseSubjectCollision(pool, hmacKey);
     checks.push("subject_collision");
+    evidence.complete("subject_collision");
 
+    evidence.begin("target_drift");
     await rehearseTargetDrift(pool, hmacKey);
     checks.push("target_drift");
+    evidence.complete("target_drift");
 
+    evidence.begin("same_claim_race");
     await rehearseSameClaimRace(pool, hmacKey);
     checks.push("same_claim_race");
+    evidence.complete("same_claim_race");
 
+    evidence.begin("same_subject_different_targets_race");
     await rehearseSameSubjectDifferentTargetsRace(pool, hmacKey);
     checks.push("same_subject_different_targets_race");
+    evidence.complete("same_subject_different_targets_race");
 
+    evidence.begin("same_target_different_subjects_race");
     await rehearseSameTargetDifferentSubjectsRace(pool, hmacKey);
     checks.push("same_target_different_subjects_race");
+    evidence.complete("same_target_different_subjects_race");
 
+    evidence.begin("terminal_insert_full_rollback");
     await rehearseTerminalInsertRollback(pool, hmacKey);
     checks.push("terminal_insert_full_rollback");
+    evidence.complete("terminal_insert_full_rollback");
 
     console.log(
       JSON.stringify({
         rehearsal: "identity_pairing_atomic_consume_disposable_branch",
         status: "passed",
         checks,
+        ...evidence.success(),
         productionDatabaseWrites: 0,
         controlPlaneVerificationRequired:
           target.controlPlaneVerificationRequired,
@@ -120,6 +151,19 @@ async function main() {
   } finally {
     hmacKey.fill(0);
     await pool.end();
+  }
+}
+
+async function assertPoolReady(pool) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      "select 1::integer as rehearsal_pool_ready",
+    );
+    assert.equal(result.rowCount, 1);
+    assert.equal(Number(result.rows[0]?.rehearsal_pool_ready), 1);
+  } finally {
+    client.release();
   }
 }
 
@@ -901,17 +945,4 @@ async function expectConsumeError(operation, expectedCodes) {
       error instanceof IdentityPairingConsumeError &&
       expectedCodes.includes(error.code),
   );
-}
-
-function safeErrorCode(error) {
-  if (error instanceof IdentityPairingConsumeError) return error.code;
-  if (
-    error &&
-    typeof error === "object" &&
-    "code" in error &&
-    /^[A-Za-z0-9_]+$/.test(String(error.code))
-  ) {
-    return String(error.code);
-  }
-  return "rehearsal_failed";
 }
