@@ -5,6 +5,7 @@ import {
   IdentityPairingConsumeError,
 } from "../scripts/lib/identity-pairing-consume-writer.mjs";
 import {
+  classifyIdentityPairingLockObservation,
   confirmIdentityPairingDatabaseExpiry,
   finalizeIdentityPairingLockWaitFixture,
 } from "../scripts/lib/identity-pairing-lock-wait-fixture.mjs";
@@ -13,6 +14,66 @@ import {
 } from "../scripts/lib/identity-pairing-rehearsal-evidence.mjs";
 
 describe("identity pairing lock-wait rehearsal fixture", () => {
+  it("classifies the lock observation boundary without changing expiry policy", () => {
+    const lockedAt = "2026-07-27T00:00:00.000Z";
+    const expiresAt = "2026-07-27T00:00:01.250Z";
+
+    assert.deepEqual(
+      classifyIdentityPairingLockObservation({
+        lockedAt,
+        expiresAt,
+        observedAt: "2026-07-27T00:00:01.249Z",
+      }),
+      {
+        status: "observed_before_expiry",
+        remainingMilliseconds: 1,
+      },
+    );
+    assert.deepEqual(
+      classifyIdentityPairingLockObservation({
+        lockedAt,
+        expiresAt,
+        observedAt: expiresAt,
+      }),
+      {
+        status: "observer_late_before_expiry_proof",
+        remainingMilliseconds: 0,
+      },
+    );
+    assert.deepEqual(
+      classifyIdentityPairingLockObservation({
+        lockedAt,
+        expiresAt,
+        observedAt: "2026-07-27T00:00:01.251Z",
+      }),
+      {
+        status: "observer_late_before_expiry_proof",
+        remainingMilliseconds: -1,
+      },
+    );
+  });
+
+  it("rejects invalid or undersized claim timing", () => {
+    assert.throws(
+      () =>
+        classifyIdentityPairingLockObservation({
+          lockedAt: "2026-07-27T00:00:00.000Z",
+          expiresAt: "2026-07-27T00:00:00.749Z",
+          observedAt: "2026-07-27T00:00:00.100Z",
+        }),
+      isFixtureError("lock_wait_claim_timing_invalid"),
+    );
+    assert.throws(
+      () =>
+        classifyIdentityPairingLockObservation({
+          lockedAt: "not-a-date",
+          expiresAt: "2026-07-27T00:00:01.250Z",
+          observedAt: "2026-07-27T00:00:00.100Z",
+        }),
+      isFixtureError("lock_wait_claim_timing_invalid"),
+    );
+  });
+
   it("re-reads the database clock after the local delay", async () => {
     const calls = [];
     let databaseNow = 1_000;
@@ -68,6 +129,7 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
       "confirm-expiry",
       "rollback-blocker",
       "release-blocker:false",
+      "release-observer",
       "release-unused-writer",
       "settle-writer",
       "assert-post-state",
@@ -94,6 +156,7 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
       "confirm-expiry",
       "rollback-blocker",
       "release-blocker:true",
+      "release-observer",
       "release-unused-writer",
       "settle-writer",
       "assert-post-state",
@@ -146,6 +209,57 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
 
     assert.equal(calls.at(-1), "assert-post-state");
   });
+
+  it("preserves late-observer diagnostics after the writer rejects expiry", async () => {
+    const calls = [];
+
+    await assert.rejects(
+      () =>
+        finalizeIdentityPairingLockWaitFixture(
+          fixturePorts(calls, {
+            primaryFailure: new IdentityPairingRehearsalFixtureError(
+              "lock_wait_observed_after_expiry",
+            ),
+          }),
+        ),
+      (error) => {
+        assert.equal(
+          isFixtureError("lock_wait_observed_after_expiry")(error),
+          true,
+        );
+        assert.deepEqual(error.lockWaitOutcome, {
+          observationStatus: "observer_late_before_expiry_proof",
+          writerStatus: "claim_intent_expired",
+          postStateStatus: "unconsumed",
+        });
+        return true;
+      },
+    );
+  });
+
+  it("does not treat a database timeout as expected expiry rejection", async () => {
+    const calls = [];
+
+    await assert.rejects(
+      () =>
+        finalizeIdentityPairingLockWaitFixture(
+          fixturePorts(calls, {
+            async settleWriter() {
+              calls.push("settle-writer");
+              return Object.freeze({
+                status: "rejected",
+                error: new IdentityPairingConsumeError(
+                  "database_timeout",
+                ),
+              });
+            },
+          }),
+        ),
+      (error) =>
+        error instanceof IdentityPairingConsumeError &&
+        error.code === "database_timeout",
+    );
+  });
 });
 
 function fixturePorts(calls, overrides = {}) {
@@ -163,6 +277,9 @@ function fixturePorts(calls, overrides = {}) {
     },
     releaseBlocker(destroy) {
       calls.push(`release-blocker:${destroy}`);
+    },
+    releaseObserver() {
+      calls.push("release-observer");
     },
     releaseWriterIfUnused() {
       calls.push("release-unused-writer");

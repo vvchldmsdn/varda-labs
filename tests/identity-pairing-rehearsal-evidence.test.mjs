@@ -184,6 +184,43 @@ describe("identity pairing rehearsal failure evidence", () => {
     );
   });
 
+  it("exposes only the exact late-observer outcome statuses", () => {
+    const error = new IdentityPairingRehearsalFixtureError(
+      "lock_wait_observed_after_expiry",
+    );
+    Object.defineProperty(error, "lockWaitOutcome", {
+      value: Object.freeze({
+        observationStatus: "observer_late_before_expiry_proof",
+        writerStatus: "claim_intent_expired",
+        postStateStatus: "unconsumed",
+      }),
+    });
+
+    const result = progressToLockWaitExpiry().failure(error);
+    assert.deepEqual(result.lockWaitOutcome, {
+      observationStatus: "observer_late_before_expiry_proof",
+      writerStatus: "claim_intent_expired",
+      postStateStatus: "unconsumed",
+    });
+
+    let accessorReads = 0;
+    const accessorError = new IdentityPairingRehearsalFixtureError(
+      "lock_wait_observed_after_expiry",
+    );
+    Object.defineProperty(accessorError, "lockWaitOutcome", {
+      get() {
+        accessorReads += 1;
+        return result.lockWaitOutcome;
+      },
+    });
+    assert.equal(
+      progressToLockWaitExpiry().failure(accessorError)
+        .lockWaitOutcome,
+      undefined,
+    );
+    assert.equal(accessorReads, 0);
+  });
+
   it("tracks Pool readiness and the first disposable DML boundary", () => {
     const evidence = progressToSuccessfulConsume();
     const beforeDml = evidence.failure(new Error("synthetic"));

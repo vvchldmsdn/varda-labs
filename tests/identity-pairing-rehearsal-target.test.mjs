@@ -125,7 +125,10 @@ describe("identity pairing rehearsal target guard", () => {
     assert.match(source, /pg_blocking_pids\(pid\)/);
     assert.match(source, /blocked_by_expected_session === true/);
     assert.match(source, /clock_timestamp\(\) as observed_at/);
-    assert.match(source, /new Date\(lockWaitObservedAt\)/);
+    assert.match(
+      source,
+      /classifyIdentityPairingLockObservation/,
+    );
     assert.match(source, /waitUntilAfterDatabaseExpiry/);
     assert.doesNotMatch(
       source,

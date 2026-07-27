@@ -148,6 +148,12 @@ export function createIdentityPairingRehearsalEvidence() {
       disposableBranchDmlAttempted = true;
     },
     failure(error) {
+      const code = safeFailureCode(error, stage);
+      const lockWaitOutcome = safeLockWaitOutcome(
+        error,
+        stage,
+        code,
+      );
       return Object.freeze({
         rehearsal: "identity_pairing_atomic_consume_disposable_branch",
         status: "failed",
@@ -155,7 +161,10 @@ export function createIdentityPairingRehearsalEvidence() {
         lastCompletedCheck,
         poolReadiness,
         disposableBranchDmlAttempted,
-        code: safeFailureCode(error, stage),
+        code,
+        ...(lockWaitOutcome === null
+          ? {}
+          : { lockWaitOutcome }),
         productionDatabaseWrites: 0,
         branchDeletionRequired: true,
       });
@@ -204,15 +213,69 @@ function safeFailureCode(error, stage) {
 }
 
 function readOwnPrimitiveStringCode(error) {
-  if (!error || typeof error !== "object") return null;
+  return readOwnPrimitiveString(error, "code");
+}
+
+function readOwnPrimitiveString(value, property) {
+  if (!value || typeof value !== "object") return null;
   let descriptor;
   try {
-    descriptor = Object.getOwnPropertyDescriptor(error, "code");
+    descriptor = Object.getOwnPropertyDescriptor(value, property);
   } catch {
     return null;
   }
   if (!descriptor || !("value" in descriptor)) return null;
-  return typeof descriptor.value === "string" ? descriptor.value : null;
+  return typeof descriptor.value === "string"
+    ? descriptor.value
+    : null;
+}
+
+function safeLockWaitOutcome(error, stage, code) {
+  if (
+    stage !== "lock_wait_expiry" ||
+    code !== "lock_wait_observed_after_expiry" ||
+    !isIdentityPairingRehearsalFixtureError(error)
+  ) {
+    return null;
+  }
+
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(
+      error,
+      "lockWaitOutcome",
+    );
+  } catch {
+    return null;
+  }
+  if (!descriptor || !("value" in descriptor)) return null;
+
+  const outcome = descriptor.value;
+  const observationStatus = readOwnPrimitiveString(
+    outcome,
+    "observationStatus",
+  );
+  const writerStatus = readOwnPrimitiveString(
+    outcome,
+    "writerStatus",
+  );
+  const postStateStatus = readOwnPrimitiveString(
+    outcome,
+    "postStateStatus",
+  );
+  if (
+    observationStatus !== "observer_late_before_expiry_proof" ||
+    writerStatus !== "claim_intent_expired" ||
+    postStateStatus !== "unconsumed"
+  ) {
+    return null;
+  }
+
+  return Object.freeze({
+    observationStatus,
+    writerStatus,
+    postStateStatus,
+  });
 }
 
 function isIdentityPairingConsumeError(error) {

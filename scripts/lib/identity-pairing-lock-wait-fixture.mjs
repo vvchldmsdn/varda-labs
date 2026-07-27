@@ -7,6 +7,34 @@ import {
 
 const MAX_EXPIRY_WAIT_MILLISECONDS = 1_250;
 const EXPIRY_SETTLEMENT_MARGIN_MILLISECONDS = 100;
+const MINIMUM_LOCK_LIFETIME_MILLISECONDS = 750;
+
+export function classifyIdentityPairingLockObservation({
+  lockedAt,
+  expiresAt,
+  observedAt,
+}) {
+  const lockedAtMilliseconds = readTimestampMilliseconds(lockedAt);
+  const expiresAtMilliseconds = readTimestampMilliseconds(expiresAt);
+  const observedAtMilliseconds = readTimestampMilliseconds(observedAt);
+
+  assertFixture(
+    expiresAtMilliseconds - lockedAtMilliseconds >=
+      MINIMUM_LOCK_LIFETIME_MILLISECONDS &&
+      observedAtMilliseconds >= lockedAtMilliseconds,
+    "lock_wait_claim_timing_invalid",
+  );
+
+  const remainingMilliseconds =
+    expiresAtMilliseconds - observedAtMilliseconds;
+  return Object.freeze({
+    status:
+      remainingMilliseconds > 0
+        ? "observed_before_expiry"
+        : "observer_late_before_expiry_proof",
+    remainingMilliseconds,
+  });
+}
 
 export async function confirmIdentityPairingDatabaseExpiry({
   readRemainingMilliseconds,
@@ -42,6 +70,7 @@ export async function finalizeIdentityPairingLockWaitFixture({
   confirmExpiry,
   rollbackBlocker,
   releaseBlocker,
+  releaseObserver,
   releaseWriterIfUnused,
   settleWriter,
   assertPostState,
@@ -77,6 +106,12 @@ export async function finalizeIdentityPairingLockWaitFixture({
   }
 
   try {
+    releaseObserver();
+  } catch {
+    cleanupFailure ??= fixtureError("lock_wait_release_failed");
+  }
+
+  try {
     releaseWriterIfUnused();
   } catch {
     cleanupFailure ??= fixtureError(
@@ -102,9 +137,10 @@ export async function finalizeIdentityPairingLockWaitFixture({
   }
 
   let writerFailure = null;
+  let writerStatus = null;
   if (writerStarted && writerSettlementCompleted) {
     try {
-      assertExpectedConsumeFailure(writerOutcome, [
+      writerStatus = assertExpectedConsumeFailure(writerOutcome, [
         "claim_intent_expired",
       ]);
     } catch (error) {
@@ -114,7 +150,17 @@ export async function finalizeIdentityPairingLockWaitFixture({
 
   if (cleanupFailure !== null) throw cleanupFailure;
   if (writerFailure !== null) throw writerFailure;
-  if (primaryFailure !== null) throw primaryFailure;
+  if (primaryFailure !== null) {
+    if (
+      primaryFailure instanceof IdentityPairingRehearsalFixtureError &&
+      primaryFailure.code === "lock_wait_observed_after_expiry" &&
+      writerStatus === "claim_intent_expired" &&
+      claimCreated
+    ) {
+      throw lateObservationError();
+    }
+    throw primaryFailure;
+  }
 }
 
 function assertExpectedConsumeFailure(outcome, expectedCodes) {
@@ -128,7 +174,7 @@ function assertExpectedConsumeFailure(outcome, expectedCodes) {
     outcome.error instanceof IdentityPairingConsumeError &&
     expectedCodes.includes(outcome.error.code)
   ) {
-    return;
+    return outcome.error.code;
   }
   if (outcome.error instanceof IdentityPairingConsumeError) {
     throw outcome.error;
@@ -142,4 +188,36 @@ function assertFixture(condition, code) {
 
 function fixtureError(code) {
   return new IdentityPairingRehearsalFixtureError(code);
+}
+
+function lateObservationError() {
+  const error = fixtureError("lock_wait_observed_after_expiry");
+  Object.defineProperty(error, "lockWaitOutcome", {
+    configurable: false,
+    enumerable: true,
+    value: Object.freeze({
+      observationStatus: "observer_late_before_expiry_proof",
+      writerStatus: "claim_intent_expired",
+      postStateStatus: "unconsumed",
+    }),
+    writable: false,
+  });
+  return error;
+}
+
+function readTimestampMilliseconds(value) {
+  let milliseconds = Number.NaN;
+  try {
+    milliseconds =
+      value instanceof Date
+        ? value.getTime()
+        : new Date(value).getTime();
+  } catch {
+    milliseconds = Number.NaN;
+  }
+  assertFixture(
+    Number.isFinite(milliseconds),
+    "lock_wait_claim_timing_invalid",
+  );
+  return milliseconds;
 }

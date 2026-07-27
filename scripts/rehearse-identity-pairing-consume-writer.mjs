@@ -26,6 +26,7 @@ import {
   IdentityPairingRehearsalFixtureError,
 } from "./lib/identity-pairing-rehearsal-evidence.mjs";
 import {
+  classifyIdentityPairingLockObservation,
   confirmIdentityPairingDatabaseExpiry,
   finalizeIdentityPairingLockWaitFixture,
 } from "./lib/identity-pairing-lock-wait-fixture.mjs";
@@ -249,6 +250,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   const targetAppUserId = await insertAppUser(pool);
   const subject = syntheticSubject("lock-wait-expiry");
   const blocker = await pool.connect();
+  let observer = null;
   let lockObservation = null;
   let claim = null;
   let expiresAt = null;
@@ -257,6 +259,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   let primaryFailure = null;
 
   try {
+    observer = await pool.connect();
     lockObservation = await createIntentLockObservedPool(pool);
     claim = await insertIntent(pool, targetAppUserId, "short_lived");
     await blocker.query("begin");
@@ -278,12 +281,11 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       "lock_wait_blocker_session_invalid",
     );
     expiresAt = rows[0].expires_at;
-    assertLockWaitFixture(
-      new Date(rows[0].expires_at).getTime() -
-        new Date(rows[0].locked_at).getTime() >=
-        750,
-      "lock_wait_claim_timing_invalid",
-    );
+    classifyIdentityPairingLockObservation({
+      lockedAt: rows[0].locked_at,
+      expiresAt: rows[0].expires_at,
+      observedAt: rows[0].locked_at,
+    });
     const blockerBackendPid = Number(rows[0].blocker_pid);
     assertLockWaitFixture(
       Number.isInteger(blockerBackendPid) && blockerBackendPid > 0,
@@ -305,17 +307,24 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       fixtureError("lock_wait_intent_dispatch_unobserved"),
     );
     const lockWaitObservedAt = await assertBackendWaitingOnLock(
-      pool,
+      observer,
       lockObservation.writerBackendPid,
       blockerBackendPid,
     );
+    const lockObservationTiming =
+      classifyIdentityPairingLockObservation({
+        lockedAt: rows[0].locked_at,
+        expiresAt: rows[0].expires_at,
+        observedAt: lockWaitObservedAt,
+      });
     assertLockWaitFixture(
-      new Date(rows[0].expires_at).getTime() -
-        new Date(lockWaitObservedAt).getTime() >
-        0,
+      lockObservationTiming.status === "observed_before_expiry",
       "lock_wait_observed_after_expiry",
     );
-    await waitUntilAfterDatabaseExpiry(pool, rows[0].expires_at);
+    await waitUntilAfterDatabaseExpiry(
+      observer,
+      rows[0].expires_at,
+    );
 
     await blocker.query("commit");
     blockerTransactionOpen = false;
@@ -329,9 +338,10 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       expiresAt,
       primaryFailure,
       confirmExpiry: () =>
-        waitUntilAfterDatabaseExpiry(pool, expiresAt),
+        waitUntilAfterDatabaseExpiry(observer ?? pool, expiresAt),
       rollbackBlocker: () => blocker.query("rollback"),
       releaseBlocker: (destroy) => blocker.release(destroy),
+      releaseObserver: () => observer?.release(),
       releaseWriterIfUnused: () =>
         lockObservation?.releaseIfUnused(),
       settleWriter: () =>

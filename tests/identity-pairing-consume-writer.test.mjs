@@ -380,7 +380,7 @@ describe("identity pairing atomic consume writer", () => {
 
     assert.match(
       rehearsal,
-      /lockObservation = await createIntentLockObservedPool\(pool\);[\s\S]*claim = await insertIntent\(pool, targetAppUserId, "short_lived"\);/,
+      /observer = await pool\.connect\(\);[\s\S]*lockObservation = await createIntentLockObservedPool\(pool\);[\s\S]*claim = await insertIntent\(pool, targetAppUserId, "short_lived"\);/,
     );
     assert.doesNotMatch(
       rehearsal,
