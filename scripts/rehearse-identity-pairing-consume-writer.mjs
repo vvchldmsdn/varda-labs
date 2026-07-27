@@ -33,6 +33,9 @@ import {
 import {
   runIdentityPairingCatalogAuditProcess,
 } from "./lib/identity-pairing-catalog-preflight.mjs";
+import {
+  IDENTITY_PAIRING_HOST_ENV_SOURCE,
+} from "./lib/identity-pairing-host-target.mjs";
 
 const CONFIRMATION =
   "--confirm-isolated-identity-pairing-rehearsal";
@@ -45,7 +48,12 @@ const REJECTION_FUNCTION =
 const REJECTION_TRIGGER =
   "identity_pairing_rehearsal_reject_consume_event";
 
-config({ path: ".env.local", quiet: true });
+if (
+  process.env.IDENTITY_PAIRING_HOST_ENV_SOURCE !==
+  IDENTITY_PAIRING_HOST_ENV_SOURCE
+) {
+  config({ path: ".env.local", quiet: true });
+}
 
 const rehearsalEvidence = createIdentityPairingRehearsalEvidence();
 

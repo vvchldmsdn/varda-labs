@@ -134,6 +134,7 @@ import "./private-session-subject-binding.test.mjs";
 import "./identity-pairing-consume-writer.test.mjs";
 import "./identity-pairing-lock-wait-fixture.test.mjs";
 import "./identity-pairing-catalog-preflight.test.mjs";
+import "./identity-pairing-host-launcher.test.mjs";
 import "./identity-pairing-rehearsal-evidence.test.mjs";
 import "./identity-pairing-rehearsal-target.test.mjs";
 import "./preview-auth-readiness.test.mjs";

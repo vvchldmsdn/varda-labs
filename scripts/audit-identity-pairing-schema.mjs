@@ -16,8 +16,16 @@ import {
 import {
   createIdentityPairingCatalogAuditFailure,
 } from "./lib/identity-pairing-catalog-preflight.mjs";
+import {
+  IDENTITY_PAIRING_HOST_ENV_SOURCE,
+} from "./lib/identity-pairing-host-target.mjs";
 
-config({ path: ".env.local", quiet: true });
+if (
+  process.env.IDENTITY_PAIRING_HOST_ENV_SOURCE !==
+  IDENTITY_PAIRING_HOST_ENV_SOURCE
+) {
+  config({ path: ".env.local", quiet: true });
+}
 
 const MIGRATIONS_FOLDER = join(process.cwd(), "drizzle");
 const PAIRING_TABLES = [
