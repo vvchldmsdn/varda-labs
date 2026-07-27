@@ -155,10 +155,9 @@ export async function finalizeIdentityPairingLockWaitFixture({
   }
 
   let writerFailure = null;
-  let writerStatus = null;
   if (writerStarted && writerSettlementCompleted) {
     try {
-      writerStatus = assertExpectedConsumeFailure(writerOutcome, [
+      assertExpectedConsumeFailure(writerOutcome, [
         "claim_intent_expired",
       ]);
     } catch (error) {
@@ -168,17 +167,7 @@ export async function finalizeIdentityPairingLockWaitFixture({
 
   if (cleanupFailure !== null) throw cleanupFailure;
   if (writerFailure !== null) throw writerFailure;
-  if (primaryFailure !== null) {
-    if (
-      primaryFailure instanceof IdentityPairingRehearsalFixtureError &&
-      primaryFailure.code === "lock_wait_observed_after_expiry" &&
-      writerStatus === "claim_intent_expired" &&
-      claimCreated
-    ) {
-      throw lateObservationError();
-    }
-    throw primaryFailure;
-  }
+  if (primaryFailure !== null) throw primaryFailure;
 }
 
 function assertExpectedConsumeFailure(outcome, expectedCodes) {
@@ -206,21 +195,6 @@ function assertFixture(condition, code) {
 
 function fixtureError(code) {
   return new IdentityPairingRehearsalFixtureError(code);
-}
-
-function lateObservationError() {
-  const error = fixtureError("lock_wait_observed_after_expiry");
-  Object.defineProperty(error, "lockWaitOutcome", {
-    configurable: false,
-    enumerable: true,
-    value: Object.freeze({
-      observationStatus: "observer_late_before_expiry_proof",
-      writerStatus: "claim_intent_expired",
-      postStateStatus: "unconsumed",
-    }),
-    writable: false,
-  });
-  return error;
 }
 
 function readTimestampMilliseconds(

@@ -246,33 +246,6 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
     assert.equal(calls.at(-1), "assert-post-state");
   });
 
-  it("preserves late-observer diagnostics after the writer rejects expiry", async () => {
-    const calls = [];
-
-    await assert.rejects(
-      () =>
-        finalizeIdentityPairingLockWaitFixture(
-          fixturePorts(calls, {
-            primaryFailure: new IdentityPairingRehearsalFixtureError(
-              "lock_wait_observed_after_expiry",
-            ),
-          }),
-        ),
-      (error) => {
-        assert.equal(
-          isFixtureError("lock_wait_observed_after_expiry")(error),
-          true,
-        );
-        assert.deepEqual(error.lockWaitOutcome, {
-          observationStatus: "observer_late_before_expiry_proof",
-          writerStatus: "claim_intent_expired",
-          postStateStatus: "unconsumed",
-        });
-        return true;
-      },
-    );
-  });
-
   it("does not treat a database timeout as expected expiry rejection", async () => {
     const calls = [];
 

@@ -27,7 +27,6 @@ export const IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES = Object.freeze([
   "lock_wait_claim_timing_invalid",
   "lock_wait_intent_dispatch_unobserved",
   "lock_wait_not_observed",
-  "lock_wait_observed_after_expiry",
   "lock_wait_query_start_invalid",
   "lock_wait_query_started_at_or_after_expiry",
   "lock_wait_expiry_not_confirmed",
@@ -151,11 +150,6 @@ export function createIdentityPairingRehearsalEvidence() {
     },
     failure(error) {
       const code = safeFailureCode(error, stage);
-      const lockWaitOutcome = safeLockWaitOutcome(
-        error,
-        stage,
-        code,
-      );
       return Object.freeze({
         rehearsal: "identity_pairing_atomic_consume_disposable_branch",
         status: "failed",
@@ -164,9 +158,6 @@ export function createIdentityPairingRehearsalEvidence() {
         poolReadiness,
         disposableBranchDmlAttempted,
         code,
-        ...(lockWaitOutcome === null
-          ? {}
-          : { lockWaitOutcome }),
         productionDatabaseWrites: 0,
         branchDeletionRequired: true,
       });
@@ -230,54 +221,6 @@ function readOwnPrimitiveString(value, property) {
   return typeof descriptor.value === "string"
     ? descriptor.value
     : null;
-}
-
-function safeLockWaitOutcome(error, stage, code) {
-  if (
-    stage !== "lock_wait_expiry" ||
-    code !== "lock_wait_observed_after_expiry" ||
-    !isIdentityPairingRehearsalFixtureError(error)
-  ) {
-    return null;
-  }
-
-  let descriptor;
-  try {
-    descriptor = Object.getOwnPropertyDescriptor(
-      error,
-      "lockWaitOutcome",
-    );
-  } catch {
-    return null;
-  }
-  if (!descriptor || !("value" in descriptor)) return null;
-
-  const outcome = descriptor.value;
-  const observationStatus = readOwnPrimitiveString(
-    outcome,
-    "observationStatus",
-  );
-  const writerStatus = readOwnPrimitiveString(
-    outcome,
-    "writerStatus",
-  );
-  const postStateStatus = readOwnPrimitiveString(
-    outcome,
-    "postStateStatus",
-  );
-  if (
-    observationStatus !== "observer_late_before_expiry_proof" ||
-    writerStatus !== "claim_intent_expired" ||
-    postStateStatus !== "unconsumed"
-  ) {
-    return null;
-  }
-
-  return Object.freeze({
-    observationStatus,
-    writerStatus,
-    postStateStatus,
-  });
 }
 
 function isIdentityPairingConsumeError(error) {
