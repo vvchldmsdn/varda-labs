@@ -92,6 +92,10 @@ describe("identity pairing rehearsal target guard", () => {
       "scripts/rehearse-identity-pairing-consume-writer.mjs",
       "utf8",
     );
+    const lockWaitFixture = readFileSync(
+      "scripts/lib/identity-pairing-lock-wait-fixture.mjs",
+      "utf8",
+    );
     assert.match(
       source,
       /--confirm-isolated-identity-pairing-rehearsal/,
@@ -124,7 +128,13 @@ describe("identity pairing rehearsal target guard", () => {
     assert.match(source, /wait_event_type === "Lock"/);
     assert.match(source, /pg_blocking_pids\(pid\)/);
     assert.match(source, /blocked_by_expected_session === true/);
+    assert.match(source, /query_start as query_started_at/);
     assert.match(source, /clock_timestamp\(\) as observed_at/);
+    assert.match(source, /query_started_before_expiry/);
+    assert.match(
+      lockWaitFixture,
+      /observer_late_after_query_start_proof/,
+    );
     assert.match(
       source,
       /classifyIdentityPairingLockObservation/,

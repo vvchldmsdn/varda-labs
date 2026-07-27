@@ -14,7 +14,7 @@ import {
 } from "../scripts/lib/identity-pairing-rehearsal-evidence.mjs";
 
 describe("identity pairing lock-wait rehearsal fixture", () => {
-  it("classifies the lock observation boundary without changing expiry policy", () => {
+  it("uses query start for proof and observer time only for diagnostics", () => {
     const lockedAt = "2026-07-27T00:00:00.000Z";
     const expiresAt = "2026-07-27T00:00:01.250Z";
 
@@ -22,33 +22,43 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
       classifyIdentityPairingLockObservation({
         lockedAt,
         expiresAt,
+        queryStartedAt: "2026-07-27T00:00:00.200Z",
         observedAt: "2026-07-27T00:00:01.249Z",
       }),
       {
-        status: "observed_before_expiry",
-        remainingMilliseconds: 1,
+        status: "query_started_before_expiry",
+        queryStartRemainingMilliseconds: 1_050,
+        observationStatus: "observed_before_expiry",
+        observationRemainingMilliseconds: 1,
       },
     );
     assert.deepEqual(
       classifyIdentityPairingLockObservation({
         lockedAt,
         expiresAt,
+        queryStartedAt: "2026-07-27T00:00:00.200Z",
         observedAt: expiresAt,
       }),
       {
-        status: "observer_late_before_expiry_proof",
-        remainingMilliseconds: 0,
+        status: "query_started_before_expiry",
+        queryStartRemainingMilliseconds: 1_050,
+        observationStatus: "observer_late_after_query_start_proof",
+        observationRemainingMilliseconds: 0,
       },
     );
     assert.deepEqual(
       classifyIdentityPairingLockObservation({
         lockedAt,
         expiresAt,
+        queryStartedAt: expiresAt,
         observedAt: "2026-07-27T00:00:01.251Z",
       }),
       {
-        status: "observer_late_before_expiry_proof",
-        remainingMilliseconds: -1,
+        status: "query_started_at_or_after_expiry",
+        queryStartRemainingMilliseconds: 0,
+        observationStatus:
+          "observer_late_without_pre_expiry_query_start",
+        observationRemainingMilliseconds: -1,
       },
     );
   });
@@ -59,6 +69,7 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
         classifyIdentityPairingLockObservation({
           lockedAt: "2026-07-27T00:00:00.000Z",
           expiresAt: "2026-07-27T00:00:00.749Z",
+          queryStartedAt: "2026-07-27T00:00:00.100Z",
           observedAt: "2026-07-27T00:00:00.100Z",
         }),
       isFixtureError("lock_wait_claim_timing_invalid"),
@@ -68,10 +79,35 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
         classifyIdentityPairingLockObservation({
           lockedAt: "not-a-date",
           expiresAt: "2026-07-27T00:00:01.250Z",
+          queryStartedAt: "2026-07-27T00:00:00.100Z",
           observedAt: "2026-07-27T00:00:00.100Z",
         }),
       isFixtureError("lock_wait_claim_timing_invalid"),
     );
+  });
+
+  it("fails closed for missing, malformed, or out-of-order query start", () => {
+    const input = {
+      lockedAt: "2026-07-27T00:00:00.000Z",
+      expiresAt: "2026-07-27T00:00:01.250Z",
+      observedAt: "2026-07-27T00:00:00.500Z",
+    };
+
+    for (const queryStartedAt of [
+      null,
+      "not-a-date",
+      "2026-07-26T23:59:59.999Z",
+      "2026-07-27T00:00:00.501Z",
+    ]) {
+      assert.throws(
+        () =>
+          classifyIdentityPairingLockObservation({
+            ...input,
+            queryStartedAt,
+          }),
+        isFixtureError("lock_wait_query_start_invalid"),
+      );
+    }
   });
 
   it("re-reads the database clock after the local delay", async () => {

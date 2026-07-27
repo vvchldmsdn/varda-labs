@@ -76,6 +76,7 @@ async function main(evidence) {
 
   const hmacKey = randomBytes(32);
   const checks = [];
+  let lockWaitProof = null;
   let pool = null;
 
   evidence.begin("pool_readiness");
@@ -102,7 +103,7 @@ async function main(evidence) {
     evidence.complete("expired_claim");
 
     evidence.begin("lock_wait_expiry");
-    await rehearseLockWaitExpiry(pool, hmacKey);
+    lockWaitProof = await rehearseLockWaitExpiry(pool, hmacKey);
     checks.push("lock_wait_expiry");
     evidence.complete("lock_wait_expiry");
 
@@ -146,6 +147,7 @@ async function main(evidence) {
         rehearsal: "identity_pairing_atomic_consume_disposable_branch",
         status: "passed",
         checks,
+        lockWaitProof,
         ...evidence.success(),
         productionDatabaseWrites: 0,
         controlPlaneVerificationRequired:
@@ -256,6 +258,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   let expiresAt = null;
   let blockerTransactionOpen = false;
   let consumeObservation = null;
+  let lockObservationTiming = null;
   let primaryFailure = null;
 
   try {
@@ -284,6 +287,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
     classifyIdentityPairingLockObservation({
       lockedAt: rows[0].locked_at,
       expiresAt: rows[0].expires_at,
+      queryStartedAt: rows[0].locked_at,
       observedAt: rows[0].locked_at,
     });
     const blockerBackendPid = Number(rows[0].blocker_pid);
@@ -306,20 +310,21 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       1_000,
       fixtureError("lock_wait_intent_dispatch_unobserved"),
     );
-    const lockWaitObservedAt = await assertBackendWaitingOnLock(
+    const lockWaitObservation = await assertBackendWaitingOnLock(
       observer,
       lockObservation.writerBackendPid,
       blockerBackendPid,
     );
-    const lockObservationTiming =
+    lockObservationTiming =
       classifyIdentityPairingLockObservation({
         lockedAt: rows[0].locked_at,
         expiresAt: rows[0].expires_at,
-        observedAt: lockWaitObservedAt,
+        queryStartedAt: lockWaitObservation.queryStartedAt,
+        observedAt: lockWaitObservation.observedAt,
       });
     assertLockWaitFixture(
-      lockObservationTiming.status === "observed_before_expiry",
-      "lock_wait_observed_after_expiry",
+      lockObservationTiming.status === "query_started_before_expiry",
+      "lock_wait_query_started_at_or_after_expiry",
     );
     await waitUntilAfterDatabaseExpiry(
       observer,
@@ -359,6 +364,8 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
         ),
     });
   }
+
+  return lockObservationTiming;
 }
 
 async function rehearseDuplicateConsume(pool, hmacKey) {
@@ -828,6 +835,7 @@ async function assertBackendWaitingOnLock(
           wait_event_type,
           $2::integer = any(pg_blocking_pids(pid))
             as blocked_by_expected_session,
+          query_start as query_started_at,
           clock_timestamp() as observed_at
         from pg_stat_activity
         where pid = $1
@@ -839,7 +847,10 @@ async function assertBackendWaitingOnLock(
       rows[0]?.wait_event_type === "Lock" &&
       rows[0]?.blocked_by_expected_session === true
     ) {
-      return rows[0].observed_at;
+      return Object.freeze({
+        queryStartedAt: rows[0].query_started_at,
+        observedAt: rows[0].observed_at,
+      });
     }
     await delay(25);
   }

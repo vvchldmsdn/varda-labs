@@ -28,6 +28,8 @@ export const IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES = Object.freeze([
   "lock_wait_intent_dispatch_unobserved",
   "lock_wait_not_observed",
   "lock_wait_observed_after_expiry",
+  "lock_wait_query_start_invalid",
+  "lock_wait_query_started_at_or_after_expiry",
   "lock_wait_expiry_not_confirmed",
   "lock_wait_release_failed",
   "lock_wait_writer_session_unavailable",

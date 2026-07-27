@@ -12,27 +12,45 @@ const MINIMUM_LOCK_LIFETIME_MILLISECONDS = 750;
 export function classifyIdentityPairingLockObservation({
   lockedAt,
   expiresAt,
+  queryStartedAt,
   observedAt,
 }) {
   const lockedAtMilliseconds = readTimestampMilliseconds(lockedAt);
   const expiresAtMilliseconds = readTimestampMilliseconds(expiresAt);
+  const queryStartedAtMilliseconds = readTimestampMilliseconds(
+    queryStartedAt,
+    "lock_wait_query_start_invalid",
+  );
   const observedAtMilliseconds = readTimestampMilliseconds(observedAt);
 
   assertFixture(
     expiresAtMilliseconds - lockedAtMilliseconds >=
-      MINIMUM_LOCK_LIFETIME_MILLISECONDS &&
-      observedAtMilliseconds >= lockedAtMilliseconds,
+      MINIMUM_LOCK_LIFETIME_MILLISECONDS,
     "lock_wait_claim_timing_invalid",
   );
+  assertFixture(
+    queryStartedAtMilliseconds >= lockedAtMilliseconds &&
+      observedAtMilliseconds >= queryStartedAtMilliseconds,
+    "lock_wait_query_start_invalid",
+  );
 
-  const remainingMilliseconds =
+  const queryStartRemainingMilliseconds =
+    expiresAtMilliseconds - queryStartedAtMilliseconds;
+  const observationRemainingMilliseconds =
     expiresAtMilliseconds - observedAtMilliseconds;
   return Object.freeze({
     status:
-      remainingMilliseconds > 0
+      queryStartRemainingMilliseconds > 0
+        ? "query_started_before_expiry"
+        : "query_started_at_or_after_expiry",
+    queryStartRemainingMilliseconds,
+    observationStatus:
+      observationRemainingMilliseconds > 0
         ? "observed_before_expiry"
-        : "observer_late_before_expiry_proof",
-    remainingMilliseconds,
+        : queryStartRemainingMilliseconds > 0
+          ? "observer_late_after_query_start_proof"
+          : "observer_late_without_pre_expiry_query_start",
+    observationRemainingMilliseconds,
   });
 }
 
@@ -205,19 +223,25 @@ function lateObservationError() {
   return error;
 }
 
-function readTimestampMilliseconds(value) {
+function readTimestampMilliseconds(
+  value,
+  errorCode = "lock_wait_claim_timing_invalid",
+) {
   let milliseconds = Number.NaN;
   try {
-    milliseconds =
-      value instanceof Date
-        ? value.getTime()
-        : new Date(value).getTime();
+    if (
+      value instanceof Date ||
+      typeof value === "string" ||
+      typeof value === "number"
+    ) {
+      milliseconds =
+        value instanceof Date
+          ? value.getTime()
+          : new Date(value).getTime();
+    }
   } catch {
     milliseconds = Number.NaN;
   }
-  assertFixture(
-    Number.isFinite(milliseconds),
-    "lock_wait_claim_timing_invalid",
-  );
+  assertFixture(Number.isFinite(milliseconds), errorCode);
   return milliseconds;
 }
