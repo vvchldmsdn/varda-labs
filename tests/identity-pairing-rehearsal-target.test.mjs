@@ -103,6 +103,11 @@ describe("identity pairing rehearsal target guard", () => {
     assert.match(source, /productionDatabaseWrites: 0/);
     assert.match(source, /branchDeletionRequired: true/);
     assert.match(source, /assertSchemaReadyAndEmpty\(pool\)/);
+    assert.match(
+      source,
+      /begin\("pool_readiness"\)[\s\S]*new Pool\(/,
+    );
+    assert.match(source, /if \(pool !== null\)[\s\S]*pool\.end\(\)/);
     assert.match(source, /planPreviewMigrations/);
     assert.match(source, /readMigrationFiles/);
     assert.match(source, /allowedPendingMigrations: \[\]/);

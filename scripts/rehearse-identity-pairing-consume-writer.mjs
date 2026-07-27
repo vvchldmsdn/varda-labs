@@ -66,13 +66,14 @@ async function main(evidence) {
   assertReviewedCatalogPreflight();
   evidence.complete("catalog_preflight");
 
-  const pool = new Pool({ connectionString, max: 8 });
-  pool.on("error", () => {});
   const hmacKey = randomBytes(32);
   const checks = [];
+  let pool = null;
 
+  evidence.begin("pool_readiness");
   try {
-    evidence.begin("pool_readiness");
+    pool = new Pool({ connectionString, max: 8 });
+    pool.on("error", () => {});
     await assertPoolReady(pool);
     evidence.markPoolReady();
     evidence.complete("pool_readiness");
@@ -150,7 +151,9 @@ async function main(evidence) {
     );
   } finally {
     hmacKey.fill(0);
-    await pool.end();
+    if (pool !== null) {
+      await pool.end();
+    }
   }
 }
 

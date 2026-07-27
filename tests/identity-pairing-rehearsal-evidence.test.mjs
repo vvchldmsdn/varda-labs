@@ -96,6 +96,40 @@ describe("identity pairing rehearsal failure evidence", () => {
       "successful_consume_failed",
     );
     assert.equal(codeReads, 0);
+
+    let consumeCodeReads = 0;
+    const accessorConsume = new IdentityPairingConsumeError(
+      "claim_intent_expired",
+    );
+    delete accessorConsume.code;
+    Object.defineProperty(accessorConsume, "code", {
+      enumerable: true,
+      get() {
+        consumeCodeReads += 1;
+        return "claim_intent_expired";
+      },
+    });
+    assert.equal(
+      progressToSuccessfulConsume().failure(accessorConsume).code,
+      "successful_consume_failed",
+    );
+    assert.equal(consumeCodeReads, 0);
+
+    let codeCoercions = 0;
+    const objectCode = new Error("secret");
+    Object.defineProperty(objectCode, "code", {
+      value: {
+        toString() {
+          codeCoercions += 1;
+          return "08006";
+        },
+      },
+    });
+    assert.equal(
+      progressToSuccessfulConsume().failure(objectCode).code,
+      "successful_consume_failed",
+    );
+    assert.equal(codeCoercions, 0);
   });
 
   it("tracks Pool readiness and the first disposable DML boundary", () => {

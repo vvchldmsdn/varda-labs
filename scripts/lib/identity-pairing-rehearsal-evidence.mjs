@@ -135,27 +135,40 @@ export function createIdentityPairingRehearsalEvidence() {
 }
 
 function safeFailureCode(error, stage) {
+  const code = readOwnPrimitiveStringCode(error);
   if (
-    error instanceof IdentityPairingConsumeError &&
-    SAFE_CONSUME_ERROR_CODES.has(error.code)
+    isIdentityPairingConsumeError(error) &&
+    code !== null &&
+    SAFE_CONSUME_ERROR_CODES.has(code)
   ) {
-    return `consume_${error.code}`;
+    return `consume_${code}`;
   }
 
-  const sqlstate = readSafeSqlstate(error);
-  if (sqlstate !== null) {
-    return `sqlstate_${sqlstate.toLowerCase()}`;
+  if (code !== null && SAFE_SQLSTATES.has(code)) {
+    return `sqlstate_${code.toLowerCase()}`;
   }
 
   return `${stage}_failed`;
 }
 
-function readSafeSqlstate(error) {
+function readOwnPrimitiveStringCode(error) {
   if (!error || typeof error !== "object") return null;
-  const descriptor = Object.getOwnPropertyDescriptor(error, "code");
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(error, "code");
+  } catch {
+    return null;
+  }
   if (!descriptor || !("value" in descriptor)) return null;
-  const code = String(descriptor.value);
-  return SAFE_SQLSTATES.has(code) ? code : null;
+  return typeof descriptor.value === "string" ? descriptor.value : null;
+}
+
+function isIdentityPairingConsumeError(error) {
+  try {
+    return error instanceof IdentityPairingConsumeError;
+  } catch {
+    return false;
+  }
 }
 
 function assertStage(stage) {
