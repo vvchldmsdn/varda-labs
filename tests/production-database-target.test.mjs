@@ -97,6 +97,9 @@ describe("Production database target operational guard", () => {
         username: "other_user",
       }),
       databaseUrl(PRODUCTION_ENDPOINT, false, {
+        password: "other_password",
+      }),
+      databaseUrl(PRODUCTION_ENDPOINT, false, {
         databaseName: "other_database",
       }),
     ]) {
@@ -157,6 +160,7 @@ function environment(endpoint) {
 
 function databaseUrl(endpoint, pooled, overrides = {}) {
   const username = overrides.username ?? "production_user";
+  const password = overrides.password ?? "production_password";
   const databaseName = overrides.databaseName ?? "neondb";
-  return `postgresql://${username}:production_password@${endpoint}${pooled ? "-pooler" : ""}.us-east-1.aws.neon.tech/${databaseName}?sslmode=require`;
+  return `postgresql://${username}:${password}@${endpoint}${pooled ? "-pooler" : ""}.us-east-1.aws.neon.tech/${databaseName}?sslmode=require`;
 }

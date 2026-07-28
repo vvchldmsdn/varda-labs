@@ -63,6 +63,8 @@ The next evidence step is deliberately narrower than that rollout:
   role, and database before any query is created;
 - the pinned Neon integration project and sanitized database target fingerprint
   are part of the evidence;
+- the endpoint/project relationship is attested by pinned Vercel-Neon
+  integration control fingerprints, not by a live Neon API binding lookup;
 - the repeatable-read transaction is database-enforced read-only;
 - only `accounts` are classified as `eligible`, `already_assigned`,
   `foreign_owner_conflict`, `missing_legacy_evidence`, or `unresolved`;
