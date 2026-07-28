@@ -51,8 +51,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 18);
-    assert.equal(registeredPaths.length, 24);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 19);
+    assert.equal(registeredPaths.length, 25);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -121,7 +121,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 11,
+      in_scope: 12,
       intentionally_skipped_legacy: 1,
       not_applicable: 6,
     });
@@ -243,22 +243,40 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
   });
 
-  it("keeps every registered writer free of canonical owner DML", () => {
+  it("limits canonical owner DML to the reviewed one-use writer", () => {
+    const canonicalOwnerWriters = [];
+
     for (const writer of TENANT_WRITER_REGISTRY) {
       for (const path of writer.implementationPaths) {
         const source = readFileSync(join(ROOT, path), "utf8");
-        assert.doesNotMatch(
-          source,
-          RAW_CANONICAL_OWNER_DML_PATTERN,
-          `${writer.id}:${path} raw canonical owner DML`,
-        );
-        assert.doesNotMatch(
-          source,
-          DRIZZLE_CANONICAL_OWNER_DML_PATTERN,
+        const hasRawCanonicalOwnerDml =
+          RAW_CANONICAL_OWNER_DML_PATTERN.test(source);
+        const hasDrizzleCanonicalOwnerDml =
+          DRIZZLE_CANONICAL_OWNER_DML_PATTERN.test(source);
+
+        if (
+          writer.id === "post_consume_account_owner_assignment" &&
+          hasRawCanonicalOwnerDml
+        ) {
+          canonicalOwnerWriters.push(writer.id);
+        } else {
+          assert.equal(
+            hasRawCanonicalOwnerDml,
+            false,
+            `${writer.id}:${path} raw canonical owner DML`,
+          );
+        }
+        assert.equal(
+          hasDrizzleCanonicalOwnerDml,
+          false,
           `${writer.id}:${path} Drizzle canonical owner DML`,
         );
       }
     }
+
+    assert.deepEqual(canonicalOwnerWriters, [
+      "post_consume_account_owner_assignment",
+    ]);
   });
 
   it("separates legacy import evidence from verified canonical ownership", () => {

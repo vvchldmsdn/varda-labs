@@ -39,7 +39,8 @@ export type WriterTransitionPolicy = Readonly<{
     | "keep_owner_absent"
     | "keep_frozen_legacy"
     | "single_identity_insert"
-    | "atomic_identity_pairing_consume";
+    | "atomic_identity_pairing_consume"
+    | "post_consume_owner_assignment";
   freeze:
     | "freeze_without_verified_owner"
     | "freeze_user_targets_only"
@@ -130,6 +131,24 @@ export const TENANT_WRITER_REGISTRY = [
     canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "post_consume_account_owner_assignment",
+    classification: "user_owned",
+    authorization: "migration_cli",
+    entrypoints: [],
+    implementationPaths: [
+      "scripts/lib/legacy-account-owner-assignment-writer.mjs",
+    ],
+    targets: [userTarget("accounts", "update")],
+    transition: {
+      prepare: "dry_run_only",
+      activate: "post_consume_owner_assignment",
+      freeze: "freeze_after_initial_user",
+    },
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "separate",
   },
   {
     id: "base44_core_import",
