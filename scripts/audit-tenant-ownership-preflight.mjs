@@ -130,9 +130,12 @@ const tables = activePolicies.map((policy) => {
         }
       : null,
     canonicalOwnerReady:
-      currentColumn?.column_name === CANONICAL_OWNER_CONTRACT.ownerColumn &&
-      currentColumn?.data_type === CANONICAL_OWNER_CONTRACT.ownerColumnType &&
-      currentColumn?.is_nullable === "NO",
+      policy.ownershipPath === "parent_fk" ||
+      (currentColumn?.column_name ===
+        CANONICAL_OWNER_CONTRACT.ownerColumn &&
+        currentColumn?.data_type ===
+          CANONICAL_OWNER_CONTRACT.ownerColumnType &&
+        currentColumn?.is_nullable === "NO"),
   };
 });
 

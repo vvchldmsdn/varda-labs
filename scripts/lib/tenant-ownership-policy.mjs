@@ -79,26 +79,109 @@ export const LEGACY_EXCLUDED_USER_TABLE_NAMES = Object.freeze(
   ).map(({ table }) => table),
 );
 
-export const IDENTITY_SYSTEM_TABLE_POLICIES = Object.freeze([
+export const IDENTITY_CORE_TABLE_POLICIES = Object.freeze([
   identitySystem("app_users"),
   identitySystem("auth_identities"),
 ]);
 
-export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+export const IDENTITY_PAIRING_TABLE_POLICIES = Object.freeze([
+  identitySystem("identity_pairing_intents"),
+  identitySystem("identity_pairing_intent_events"),
+]);
+
+export const SIMULATION_APPROVAL_TABLE_POLICIES = Object.freeze([
+  userOwned(
+    "simulation_scenario_approval_revisions",
+    "owner_user_id",
+    "not_applicable",
+  ),
+  userOwnedViaParent(
+    "simulation_scenario_approval_vector_rows",
+    "simulation_scenario_approval_revisions",
+    "approval_revision_id",
+  ),
+  userOwnedViaParent(
+    "simulation_scenario_approval_lifecycle_events",
+    "simulation_scenario_approval_revisions",
+    "approval_revision_id",
+  ),
+]);
+
+export const IDENTITY_SYSTEM_TABLE_POLICIES = Object.freeze([
+  ...IDENTITY_CORE_TABLE_POLICIES,
+  ...IDENTITY_PAIRING_TABLE_POLICIES,
+]);
+
+export const CORE_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...TENANT_TABLE_POLICIES,
-  ...IDENTITY_SYSTEM_TABLE_POLICIES,
+  ...IDENTITY_CORE_TABLE_POLICIES,
+]);
+
+export const SIMULATION_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...CORE_EXPANDED_TENANT_TABLE_POLICIES,
+  ...SIMULATION_APPROVAL_TABLE_POLICIES,
+]);
+
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
+  ...IDENTITY_PAIRING_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
-  const presentIdentityTables = IDENTITY_SYSTEM_TABLE_POLICIES.filter(
+  const presentCoreTables = IDENTITY_CORE_TABLE_POLICIES.filter(
     ({ table }) => publicTableSet.has(table),
   );
+  const presentPairingTables = IDENTITY_PAIRING_TABLE_POLICIES.filter(
+    ({ table }) => publicTableSet.has(table),
+  );
+  const presentSimulationTables =
+    SIMULATION_APPROVAL_TABLE_POLICIES.filter(({ table }) =>
+      publicTableSet.has(table),
+    );
 
-  if (presentIdentityTables.length === 0) return TENANT_TABLE_POLICIES;
+  if (
+    (presentPairingTables.length > 0 ||
+      presentSimulationTables.length > 0) &&
+    presentCoreTables.length !== IDENTITY_CORE_TABLE_POLICIES.length
+  ) {
+    throw new Error(
+      "dependent tenant tables require the complete identity core",
+    );
+  }
 
-  if (presentIdentityTables.length !== IDENTITY_SYSTEM_TABLE_POLICIES.length) {
-    throw new Error("identity system tables must be expanded atomically");
+  if (presentCoreTables.length === 0) return TENANT_TABLE_POLICIES;
+
+  if (presentCoreTables.length !== IDENTITY_CORE_TABLE_POLICIES.length) {
+    throw new Error("identity core tables must be expanded atomically");
+  }
+
+  if (presentSimulationTables.length === 0) {
+    if (presentPairingTables.length > 0) {
+      throw new Error(
+        "identity pairing tables require the simulation approval expansion",
+      );
+    }
+    return CORE_EXPANDED_TENANT_TABLE_POLICIES;
+  }
+
+  if (
+    presentSimulationTables.length !==
+    SIMULATION_APPROVAL_TABLE_POLICIES.length
+  ) {
+    throw new Error(
+      "simulation approval tables must be expanded atomically",
+    );
+  }
+
+  if (presentPairingTables.length === 0) {
+    return SIMULATION_EXPANDED_TENANT_TABLE_POLICIES;
+  }
+
+  if (
+    presentPairingTables.length !== IDENTITY_PAIRING_TABLE_POLICIES.length
+  ) {
+    throw new Error("identity pairing tables must be expanded atomically");
   }
 
   return EXPANDED_TENANT_TABLE_POLICIES;
@@ -127,6 +210,20 @@ function userOwned(
     currentOwnerColumn,
     canonicalOwnerRequired: true,
     canonicalOwnerRolloutScope,
+    ownershipPath: "direct_column",
+  });
+}
+
+function userOwnedViaParent(table, parentTable, parentForeignKeyColumn) {
+  return Object.freeze({
+    table,
+    classification: "user_owned",
+    currentOwnerColumn: null,
+    canonicalOwnerRequired: false,
+    canonicalOwnerRolloutScope: "not_applicable",
+    ownershipPath: "parent_fk",
+    parentTable,
+    parentForeignKeyColumn,
   });
 }
 
@@ -137,6 +234,7 @@ function sharedReference(table) {
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
     canonicalOwnerRolloutScope: "not_applicable",
+    ownershipPath: "not_applicable",
   });
 }
 
@@ -147,6 +245,7 @@ function adminSystem(table) {
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
     canonicalOwnerRolloutScope: "not_applicable",
+    ownershipPath: "not_applicable",
   });
 }
 
@@ -157,5 +256,6 @@ function identitySystem(table) {
     currentOwnerColumn: null,
     canonicalOwnerRequired: false,
     canonicalOwnerRolloutScope: "not_applicable",
+    ownershipPath: "not_applicable",
   });
 }

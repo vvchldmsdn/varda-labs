@@ -296,7 +296,7 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
     });
   });
 
-  it("keeps identity linking unimplemented despite the isolated Preview auth SDK", () => {
+  it("keeps the pure planner limited to one registered disconnected writer", () => {
     const result = auditInitialIdentityLinkPlanner({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -307,7 +307,11 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
     assert.deepEqual(result.evidence, {
       pureContractViolations: 0,
       identityDmlMatches: 0,
-      productionImports: 0,
+      productionImports: 1,
+      reviewedWriterImports: 1,
+      unexpectedProductionImports: 0,
+      productRuntimeImports: 0,
+      reviewedWriterRegistered: true,
       subjectCliEntrypoints: 0,
       authSdkDependencies: 1,
       unexpectedAuthSdkDependencies: 0,

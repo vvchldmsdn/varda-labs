@@ -198,6 +198,31 @@ describe("private session subject binding", () => {
     }
   });
 
+  it("does not invoke accessors while snapshotting session evidence", async () => {
+    let subjectReads = 0;
+    const evidence = {
+      state: "verified",
+      provider: "neon_auth",
+      verificationSource: "server_verified_session",
+    };
+    Object.defineProperty(evidence, "subject", {
+      enumerable: true,
+      get() {
+        subjectReads += 1;
+        return SUBJECT;
+      },
+    });
+
+    assert.deepEqual(
+      await readSessionSubjectBinding({
+        sessionPort: mockPort(evidence),
+        hmacKey: HMAC_KEY,
+      }),
+      { state: "unavailable" },
+    );
+    assert.equal(subjectReads, 0);
+  });
+
   it("keeps the Production adapter private, server-only, and disconnected", () => {
     const adapterPath =
       "src/lib/auth/private-session-subject-binding.ts";

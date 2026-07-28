@@ -51,8 +51,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 17);
-    assert.equal(registeredPaths.length, 23);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 18);
+    assert.equal(registeredPaths.length, 24);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -123,7 +123,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 11,
       intentionally_skipped_legacy: 1,
-      not_applicable: 5,
+      not_applicable: 6,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
@@ -511,6 +511,12 @@ function discoverDmlPaths() {
   return [join(ROOT, "src"), join(ROOT, "scripts")]
     .flatMap(walkFiles)
     .filter((path) => !path.endsWith("rehearse-tenant-expand.mjs"))
+    .filter(
+      (path) =>
+        !path.endsWith(
+          "rehearse-identity-pairing-consume-writer.mjs",
+        ),
+    )
     .filter((path) => {
       const source = readFileSync(path, "utf8");
       return (

@@ -5,9 +5,14 @@ import {
   CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES,
   CANONICAL_OWNER_CONTRACT,
   CANONICAL_OWNER_ROLLOUT_SCOPES,
+  CORE_EXPANDED_TENANT_TABLE_POLICIES,
   EXPANDED_TENANT_TABLE_POLICIES,
+  IDENTITY_CORE_TABLE_POLICIES,
+  IDENTITY_PAIRING_TABLE_POLICIES,
   IDENTITY_SYSTEM_TABLE_POLICIES,
   LEGACY_EXCLUDED_USER_TABLE_NAMES,
+  SIMULATION_APPROVAL_TABLE_POLICIES,
+  SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
   TENANT_TABLE_POLICIES,
   resolveTenantTablePolicies,
   summarizeTenantClassifications,
@@ -28,33 +33,87 @@ describe("tenant ownership policy", () => {
     });
   });
 
-  it("prepares an atomic identity-system expansion", () => {
+  it("resolves the staged atomic identity-system expansions", () => {
     const currentNames = TENANT_TABLE_POLICIES.map((policy) => policy.table);
+    const coreExpandedNames = CORE_EXPANDED_TENANT_TABLE_POLICIES.map(
+      (policy) => policy.table,
+    );
+    const simulationExpandedNames =
+      SIMULATION_EXPANDED_TENANT_TABLE_POLICIES.map(
+        (policy) => policy.table,
+      );
     const expandedNames = EXPANDED_TENANT_TABLE_POLICIES.map(
       (policy) => policy.table,
     );
 
     assert.deepEqual(
-      IDENTITY_SYSTEM_TABLE_POLICIES.map((policy) => policy.table),
+      IDENTITY_CORE_TABLE_POLICIES.map((policy) => policy.table),
       ["app_users", "auth_identities"],
     );
-    assert.equal(expandedNames.length, 24);
+    assert.deepEqual(
+      IDENTITY_PAIRING_TABLE_POLICIES.map((policy) => policy.table),
+      ["identity_pairing_intents", "identity_pairing_intent_events"],
+    );
+    assert.equal(IDENTITY_SYSTEM_TABLE_POLICIES.length, 4);
+    assert.equal(coreExpandedNames.length, 24);
+    assert.equal(simulationExpandedNames.length, 27);
+    assert.equal(expandedNames.length, 29);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
+    assert.deepEqual(
+      resolveTenantTablePolicies(coreExpandedNames),
+      CORE_EXPANDED_TENANT_TABLE_POLICIES,
+    );
+    assert.deepEqual(
+      resolveTenantTablePolicies(simulationExpandedNames),
+      SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
+    );
     assert.deepEqual(
       resolveTenantTablePolicies(expandedNames),
       EXPANDED_TENANT_TABLE_POLICIES,
     );
     assert.throws(
       () => resolveTenantTablePolicies([...currentNames, "app_users"]),
-      /expanded atomically/,
+      /identity core tables must be expanded atomically/,
+    );
+    assert.throws(
+      () =>
+        resolveTenantTablePolicies([
+          ...simulationExpandedNames,
+          "identity_pairing_intents",
+        ]),
+      /identity pairing tables must be expanded atomically/,
+    );
+    assert.throws(
+      () =>
+        resolveTenantTablePolicies([
+          ...currentNames,
+          "identity_pairing_intents",
+        ]),
+      /require the complete identity core/,
+    );
+    assert.throws(
+      () =>
+        resolveTenantTablePolicies([
+          ...coreExpandedNames,
+          "simulation_scenario_approval_revisions",
+        ]),
+      /simulation approval tables must be expanded atomically/,
+    );
+    assert.throws(
+      () =>
+        resolveTenantTablePolicies([
+          ...coreExpandedNames,
+          ...IDENTITY_PAIRING_TABLE_POLICIES.map(({ table }) => table),
+        ]),
+      /require the simulation approval expansion/,
     );
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 14,
+        user_owned: 17,
         shared_reference: 7,
         admin_system: 1,
-        identity_system: 2,
+        identity_system: 4,
         unresolved: 0,
       },
     );
@@ -84,6 +143,41 @@ describe("tenant ownership policy", () => {
         (policy) => policy.table === "app_users",
       )?.classification,
       "identity_system",
+    );
+    assert.deepEqual(
+      SIMULATION_APPROVAL_TABLE_POLICIES.map(
+        ({
+          table,
+          classification,
+          ownershipPath,
+          parentTable,
+        }) => ({
+          table,
+          classification,
+          ownershipPath,
+          parentTable: parentTable ?? null,
+        }),
+      ),
+      [
+        {
+          table: "simulation_scenario_approval_revisions",
+          classification: "user_owned",
+          ownershipPath: "direct_column",
+          parentTable: null,
+        },
+        {
+          table: "simulation_scenario_approval_vector_rows",
+          classification: "user_owned",
+          ownershipPath: "parent_fk",
+          parentTable: "simulation_scenario_approval_revisions",
+        },
+        {
+          table: "simulation_scenario_approval_lifecycle_events",
+          classification: "user_owned",
+          ownershipPath: "parent_fk",
+          parentTable: "simulation_scenario_approval_revisions",
+        },
+      ],
     );
   });
 

@@ -9,6 +9,9 @@ const AUDIT_PATHS = [
   "scripts/audit-initial-identity-link-planner.mjs",
   "scripts/lib/initial-identity-link-planner-audit.mjs",
 ];
+const REVIEWED_WRITER_PATH =
+  "scripts/lib/identity-pairing-consume-writer.mjs";
+const REVIEWED_WRITER_ID = "identity_pairing_atomic_consume";
 const CONTRACT_IMPORT_PATTERN = /initial-identity-link-(?:planner|policy)/;
 const PURE_CONTRACT_FORBIDDEN_PATTERN =
   /^\s*import\s|@neondatabase|drizzle|DATABASE_URL|process\.env|process\.argv|\bfetch\s*\(|\bcookies\s*\(|\bheaders\s*\(|next\/server|from\s+["']react["']|\bcache\s*\(/m;
@@ -51,15 +54,38 @@ export function auditInitialIdentityLinkPlanner({ root, writerRegistry }) {
     for (const path of writer.implementationPaths) productionPaths.add(path);
   }
 
-  let productionImports = 0;
+  const productionImportPaths = [];
   for (const path of productionPaths) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) continue;
     if (CONTRACT_IMPORT_PATTERN.test(readFileSync(absolutePath, "utf8"))) {
-      productionImports += 1;
+      productionImportPaths.push(path);
     }
   }
-  if (productionImports !== 0) findings.push("production_contract_import");
+  const reviewedWriterImports = productionImportPaths.filter(
+    (path) => path === REVIEWED_WRITER_PATH,
+  ).length;
+  const unexpectedProductionImports = productionImportPaths.filter(
+    (path) => path !== REVIEWED_WRITER_PATH,
+  ).length;
+  const productRuntimeImports = productionImportPaths.filter((path) =>
+    path.startsWith("src/"),
+  ).length;
+  const reviewedWriterRegistered = writerRegistry.some(
+    ({ id, implementationPaths }) =>
+      id === REVIEWED_WRITER_ID &&
+      implementationPaths.includes(REVIEWED_WRITER_PATH),
+  );
+
+  if (reviewedWriterImports !== 1 || !reviewedWriterRegistered) {
+    findings.push("reviewed_writer_registration_drift");
+  }
+  if (unexpectedProductionImports !== 0) {
+    findings.push("unexpected_production_contract_import");
+  }
+  if (productRuntimeImports !== 0) {
+    findings.push("product_runtime_contract_import");
+  }
 
   const auditCliSource = readFileSync(join(root, AUDIT_PATHS[0]), "utf8");
   const subjectCliEntrypoints = SUBJECT_CLI_PATTERN.test(auditCliSource) ? 1 : 0;
@@ -97,7 +123,11 @@ export function auditInitialIdentityLinkPlanner({ root, writerRegistry }) {
     evidence: {
       pureContractViolations,
       identityDmlMatches,
-      productionImports,
+      productionImports: productionImportPaths.length,
+      reviewedWriterImports,
+      unexpectedProductionImports,
+      productRuntimeImports,
+      reviewedWriterRegistered,
       subjectCliEntrypoints,
       authSdkDependencies: authSdkDependencies.length,
       unexpectedAuthSdkDependencies: unexpectedAuthSdkDependencies.length,
