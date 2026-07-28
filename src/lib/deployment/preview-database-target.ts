@@ -3,12 +3,19 @@ import { createHash } from "node:crypto";
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const NEON_ENDPOINT_PATTERN = /^ep-[a-z0-9-]+$/;
 
-export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
-  policyId: "preview_database_target_operational_guard_v2",
+export const NEON_DATABASE_TARGET_PINNING = Object.freeze({
   expectedNeonIntegrationProjectSha256:
     "sha256:715beb5ee1546f662b876ab7af2ca37da852332bcbc3d93863e95be4d9952a87",
   productionEndpointSha256:
     "sha256:e47003b830425b835f435c9149931906a1e3df40307b7462a222755a923981a2",
+});
+
+export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
+  policyId: "preview_database_target_operational_guard_v2",
+  expectedNeonIntegrationProjectSha256:
+    NEON_DATABASE_TARGET_PINNING.expectedNeonIntegrationProjectSha256,
+  productionEndpointSha256:
+    NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
     tag: "0021_strange_sinister_six",
     createdAt: 1784991961050,
@@ -135,7 +142,7 @@ export function sha256Fingerprint(value: string) {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 
-function parseNeonDatabaseUrl(rawUrl: string) {
+export function parseNeonDatabaseUrl(rawUrl: string) {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);

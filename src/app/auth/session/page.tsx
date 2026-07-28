@@ -52,6 +52,14 @@ export default async function SessionPage() {
           >
             Sign-in screen
           </Link>
+          {evidence === "authenticated" ? (
+            <Link
+              href="/portfolio/accounts?account=all"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              Owner-scoped accounts
+            </Link>
+          ) : null}
         </div>
       </section>
     </main>

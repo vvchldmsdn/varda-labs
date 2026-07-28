@@ -199,7 +199,9 @@ function readOwnDataProperty(value: object, key: string) {
   }
 }
 
-export function isCanonicalSessionProviderSubject(value: unknown) {
+export function isCanonicalSessionProviderSubject(
+  value: unknown,
+): value is string {
   if (
     typeof value !== "string" ||
     value.length === 0 ||
