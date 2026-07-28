@@ -9,6 +9,75 @@ const MAX_EXPIRY_WAIT_MILLISECONDS = 1_250;
 const EXPIRY_SETTLEMENT_MARGIN_MILLISECONDS = 100;
 const MINIMUM_LOCK_LIFETIME_MILLISECONDS = 750;
 
+export function createIdentityPairingLockWaitWriterPool({
+  client,
+  writerBackendPid,
+}) {
+  assertFixture(
+    client !== null &&
+      typeof client === "object" &&
+      typeof client.query === "function" &&
+      typeof client.release === "function" &&
+      Number.isInteger(writerBackendPid) &&
+      writerBackendPid > 0,
+    "lock_wait_writer_session_unavailable",
+  );
+
+  const intentLockGateReached = deferred();
+  const intentLockGateRelease = deferred();
+  const targetLockDispatched = deferred();
+  let connected = false;
+  let released = false;
+  let gateReleased = false;
+
+  return Object.freeze({
+    pool: Object.freeze({
+      async connect() {
+        assertFixture(
+          connected === false && released === false,
+          "lock_wait_writer_session_unavailable",
+        );
+        connected = true;
+        return Object.freeze({
+          async query(query, parameters) {
+            if (isIntentLockQuery(query)) {
+              intentLockGateReached.resolve();
+              await intentLockGateRelease.promise;
+            }
+
+            const pendingQuery = client.query(query, parameters);
+            if (isTargetLockQuery(query)) {
+              targetLockDispatched.resolve();
+            }
+            return pendingQuery;
+          },
+          release() {
+            if (released === false) {
+              released = true;
+              client.release();
+            }
+          },
+        });
+      },
+    }),
+    writerBackendPid,
+    intentLockGateReached: intentLockGateReached.promise,
+    targetLockDispatched: targetLockDispatched.promise,
+    releaseIntentLockGate() {
+      if (gateReleased === false) {
+        gateReleased = true;
+        intentLockGateRelease.resolve();
+      }
+    },
+    releaseIfUnused() {
+      if (connected === false && released === false) {
+        released = true;
+        client.release();
+      }
+    },
+  });
+}
+
 export function classifyIdentityPairingLockObservation({
   lockedAt,
   expiresAt,
@@ -89,9 +158,11 @@ export async function finalizeIdentityPairingLockWaitFixture({
   rollbackBlocker,
   releaseBlocker,
   releaseObserver,
+  releaseWriterGate,
   releaseWriterIfUnused,
   settleWriter,
   assertPostState,
+  expectedWriterFailureCodes = ["claim_intent_expired"],
 }) {
   let cleanupFailure = null;
   let writerOutcome = null;
@@ -130,6 +201,12 @@ export async function finalizeIdentityPairingLockWaitFixture({
   }
 
   try {
+    releaseWriterGate();
+  } catch {
+    cleanupFailure ??= fixtureError("lock_wait_release_failed");
+  }
+
+  try {
     releaseWriterIfUnused();
   } catch {
     cleanupFailure ??= fixtureError(
@@ -157,9 +234,10 @@ export async function finalizeIdentityPairingLockWaitFixture({
   let writerFailure = null;
   if (writerStarted && writerSettlementCompleted) {
     try {
-      assertExpectedConsumeFailure(writerOutcome, [
-        "claim_intent_expired",
-      ]);
+      assertExpectedConsumeFailure(
+        writerOutcome,
+        expectedWriterFailureCodes,
+      );
     } catch (error) {
       writerFailure = error;
     }
@@ -218,4 +296,31 @@ function readTimestampMilliseconds(
   }
   assertFixture(Number.isFinite(milliseconds), errorCode);
   return milliseconds;
+}
+
+function isIntentLockQuery(query) {
+  return (
+    typeof query === "string" &&
+    /\bfrom identity_pairing_intents\b/i.test(query) &&
+    /\bfor update\b/i.test(query)
+  );
+}
+
+function isTargetLockQuery(query) {
+  return (
+    typeof query === "string" &&
+    /\bfrom app_users\b/i.test(query) &&
+    /\bfor update\b/i.test(query)
+  );
+}
+
+function deferred() {
+  let resolvePromise;
+  const promise = new Promise((resolve) => {
+    resolvePromise = resolve;
+  });
+  return Object.freeze({
+    promise,
+    resolve: resolvePromise,
+  });
 }

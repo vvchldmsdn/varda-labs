@@ -122,7 +122,23 @@ describe("identity pairing rehearsal target guard", () => {
       source,
       /clock_timestamp\(\) \+ interval '1\.25 seconds'/,
     );
-    assert.match(source, /from identity_pairing_intents[\s\S]*for update/);
+    assert.match(source, /from app_users[\s\S]*for no key update/);
+    assert.match(
+      lockWaitFixture,
+      /from identity_pairing_intents[\s\S]*for update/,
+    );
+    assert.match(
+      lockWaitFixture,
+      /from app_users[\s\S]*for update/,
+    );
+    assert.match(source, /intentLockGateReached/);
+    assert.match(source, /releaseIntentLockGate/);
+    assert.match(source, /targetLockDispatched/);
+    assert.match(
+      source,
+      /from app_users[\s\S]*for no key update[\s\S]*intentLockGateReached[\s\S]*insertIntent\([\s\S]*releaseIntentLockGate\(\)[\s\S]*targetLockDispatched/,
+    );
+    assert.doesNotMatch(source, /intentLockDispatched/);
     assert.match(source, /select pg_backend_pid\(\)::integer/);
     assert.match(source, /from pg_stat_activity/);
     assert.match(source, /wait_event_type === "Lock"/);

@@ -28,6 +28,7 @@ import {
 import {
   classifyIdentityPairingLockObservation,
   confirmIdentityPairingDatabaseExpiry,
+  createIdentityPairingLockWaitWriterPool,
   finalizeIdentityPairingLockWaitFixture,
 } from "./lib/identity-pairing-lock-wait-fixture.mjs";
 import {
@@ -259,6 +260,7 @@ async function rehearseExpiredClaim(pool, hmacKey) {
 async function rehearseLockWaitExpiry(pool, hmacKey) {
   const targetAppUserId = await insertAppUser(pool);
   const subject = syntheticSubject("lock-wait-expiry");
+  const pendingClaim = createSyntheticClaim();
   const blocker = await pool.connect();
   let observer = null;
   let lockObservation = null;
@@ -272,32 +274,23 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
   try {
     observer = await pool.connect();
     lockObservation = await createIntentLockObservedPool(pool);
-    claim = await insertIntent(pool, targetAppUserId, "short_lived");
     await blocker.query("begin");
     blockerTransactionOpen = true;
     const { rows } = await blocker.query(
       `
         select
-          expires_at,
           clock_timestamp() as locked_at,
           pg_backend_pid()::integer as blocker_pid
-        from identity_pairing_intents
-        where claim_digest = $1
-        for update
+        from app_users
+        where id = $1::uuid
+        for no key update
       `,
-      [claim.claimDigest],
+      [targetAppUserId],
     );
     assertLockWaitFixture(
       rows.length === 1,
       "lock_wait_blocker_session_invalid",
     );
-    expiresAt = rows[0].expires_at;
-    classifyIdentityPairingLockObservation({
-      lockedAt: rows[0].locked_at,
-      expiresAt: rows[0].expires_at,
-      queryStartedAt: rows[0].locked_at,
-      observedAt: rows[0].locked_at,
-    });
     const blockerBackendPid = Number(rows[0].blocker_pid);
     assertLockWaitFixture(
       Number.isInteger(blockerBackendPid) && blockerBackendPid > 0,
@@ -308,15 +301,33 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       consume(
         lockObservation.pool,
         hmacKey,
-        claim.rawClaim,
+        pendingClaim.rawClaim,
         subject,
       ),
     );
 
     await withTimeout(
-      lockObservation.intentLockDispatched,
+      lockObservation.intentLockGateReached,
       1_000,
-      fixtureError("lock_wait_intent_dispatch_unobserved"),
+      fixtureError("lock_wait_intent_gate_unobserved"),
+    );
+    claim = await insertIntent(
+      pool,
+      targetAppUserId,
+      "short_lived",
+      pendingClaim,
+    );
+    expiresAt = claim.expiresAt;
+    assertLockWaitFixture(
+      new Date(rows[0].locked_at).getTime() <=
+        new Date(claim.issuedAt).getTime(),
+      "lock_wait_claim_timing_invalid",
+    );
+    lockObservation.releaseIntentLockGate();
+    await withTimeout(
+      lockObservation.targetLockDispatched,
+      1_000,
+      fixtureError("lock_wait_target_dispatch_unobserved"),
     );
     const lockWaitObservation = await assertBackendWaitingOnLock(
       observer,
@@ -325,8 +336,8 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
     );
     lockObservationTiming =
       classifyIdentityPairingLockObservation({
-        lockedAt: rows[0].locked_at,
-        expiresAt: rows[0].expires_at,
+        lockedAt: claim.issuedAt,
+        expiresAt: claim.expiresAt,
         queryStartedAt: lockWaitObservation.queryStartedAt,
         observedAt: lockWaitObservation.observedAt,
       });
@@ -336,7 +347,7 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
     );
     await waitUntilAfterDatabaseExpiry(
       observer,
-      rows[0].expires_at,
+      claim.expiresAt,
     );
 
     await blocker.query("commit");
@@ -355,6 +366,8 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
       rollbackBlocker: () => blocker.query("rollback"),
       releaseBlocker: (destroy) => blocker.release(destroy),
       releaseObserver: () => observer?.release(),
+      releaseWriterGate: () =>
+        lockObservation?.releaseIntentLockGate(),
       releaseWriterIfUnused: () =>
         lockObservation?.releaseIfUnused(),
       settleWriter: () =>
@@ -370,6 +383,10 @@ async function rehearseLockWaitExpiry(pool, hmacKey) {
           [claim.claimDigest],
           [subject],
         ),
+      expectedWriterFailureCodes:
+        claim === null
+          ? ["claim_intent_not_found"]
+          : ["claim_intent_expired"],
     });
   }
 
@@ -693,13 +710,22 @@ async function insertAppUser(pool, status = "provisioning") {
   return id;
 }
 
-async function insertIntent(pool, targetAppUserId, timing) {
+function createSyntheticClaim() {
   const rawClaim =
     IDENTITY_BOOTSTRAP_CLAIM_POLICY.claimPrefix +
     randomBytes(
       IDENTITY_BOOTSTRAP_CLAIM_POLICY.claimEntropyBytes,
     ).toString("base64url");
   const claimDigest = digestIdentityBootstrapClaim(rawClaim);
+  return Object.freeze({ rawClaim, claimDigest });
+}
+
+async function insertIntent(
+  pool,
+  targetAppUserId,
+  timing,
+  claim = createSyntheticClaim(),
+) {
   const clockSql =
     timing === "expired"
       ? "clock_timestamp() - interval '9 minutes', clock_timestamp() - interval '1 minute'"
@@ -707,7 +733,7 @@ async function insertIntent(pool, targetAppUserId, timing) {
         ? "clock_timestamp(), clock_timestamp() + interval '1.25 seconds'"
         : "clock_timestamp(), clock_timestamp() + interval '9 minutes'";
 
-  await pool.query(
+  const { rows } = await pool.query(
     `
       insert into identity_pairing_intents (
         authority_policy_id,
@@ -719,17 +745,26 @@ async function insertIntent(pool, targetAppUserId, timing) {
         issued_at,
         expires_at
       ) values ($1, $2::uuid, $3, $4, $5, $6, ${clockSql})
+      returning issued_at, expires_at
     `,
     [
       IDENTITY_BOOTSTRAP_CLAIM_POLICY.authorityPolicyId,
       targetAppUserId,
       IDENTITY_BOOTSTRAP_CLAIM_POLICY.provider,
       IDENTITY_BOOTSTRAP_CLAIM_POLICY.claimDigestVersion,
-      claimDigest,
+      claim.claimDigest,
       IDENTITY_BOOTSTRAP_CLAIM_POLICY.targetReviewPolicyId,
     ],
   );
-  return { rawClaim, claimDigest };
+  assertLockWaitFixture(
+    rows.length === 1,
+    "lock_wait_claim_timing_invalid",
+  );
+  return Object.freeze({
+    ...claim,
+    issuedAt: rows[0].issued_at,
+    expiresAt: rows[0].expires_at,
+  });
 }
 
 function consume(pool, hmacKey, rawClaim, subject) {
@@ -772,61 +807,15 @@ async function createIntentLockObservedPool(pool) {
       Number.isInteger(writerBackendPid) && writerBackendPid > 0,
       "lock_wait_writer_session_unavailable",
     );
-    return createPreconnectedIntentLockPool(client, writerBackendPid);
+    return createIdentityPairingLockWaitWriterPool({
+      client,
+      writerBackendPid,
+    });
   } catch (error) {
     if (client) client.release();
     if (error instanceof IdentityPairingRehearsalFixtureError) throw error;
     throw fixtureError("lock_wait_writer_session_unavailable");
   }
-}
-
-function createPreconnectedIntentLockPool(client, writerBackendPid) {
-  const intentLockDispatched = deferred();
-  let connected = false;
-  let released = false;
-
-  return {
-    pool: Object.freeze({
-      async connect() {
-        assertLockWaitFixture(
-          connected === false && released === false,
-          "lock_wait_writer_session_unavailable",
-        );
-        connected = true;
-        return Object.freeze({
-          query(query, parameters) {
-            const pendingQuery = client.query(query, parameters);
-            if (isIntentLockQuery(query)) {
-              intentLockDispatched.resolve();
-            }
-            return pendingQuery;
-          },
-          release() {
-            if (released === false) {
-              released = true;
-              client.release();
-            }
-          },
-        });
-      },
-    }),
-    writerBackendPid,
-    intentLockDispatched: intentLockDispatched.promise,
-    releaseIfUnused() {
-      if (connected === false && released === false) {
-        released = true;
-        client.release();
-      }
-    },
-  };
-}
-
-function isIntentLockQuery(query) {
-  return (
-    typeof query === "string" &&
-    /\bfrom identity_pairing_intents\b/i.test(query) &&
-    /\bfor update\b/i.test(query)
-  );
 }
 
 async function assertBackendWaitingOnLock(
@@ -895,20 +884,6 @@ async function waitUntilAfterDatabaseExpiry(pool, expiresAt) {
       return rows[0]?.expiry_reached;
     },
   });
-}
-
-function deferred() {
-  let resolveDeferred;
-  let rejectDeferred;
-  const promise = new Promise((resolvePromise, rejectPromise) => {
-    resolveDeferred = resolvePromise;
-    rejectDeferred = rejectPromise;
-  });
-  return {
-    promise,
-    resolve: resolveDeferred,
-    reject: rejectDeferred,
-  };
 }
 
 async function withTimeout(promise, milliseconds, timeoutError) {

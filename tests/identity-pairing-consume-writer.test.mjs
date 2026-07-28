@@ -372,7 +372,7 @@ describe("identity pairing atomic consume writer", () => {
     );
   });
 
-  it("preconnects lock-wait sessions before the short-lived intent", () => {
+  it("gates the writer before creating the short-lived intent", () => {
     const rehearsal = readFileSync(
       "scripts/rehearse-identity-pairing-consume-writer.mjs",
       "utf8",
@@ -380,7 +380,7 @@ describe("identity pairing atomic consume writer", () => {
 
     assert.match(
       rehearsal,
-      /observer = await pool\.connect\(\);[\s\S]*lockObservation = await createIntentLockObservedPool\(pool\);[\s\S]*claim = await insertIntent\(pool, targetAppUserId, "short_lived"\);/,
+      /observer = await pool\.connect\(\);[\s\S]*lockObservation = await createIntentLockObservedPool\(pool\);[\s\S]*from app_users[\s\S]*for no key update[\s\S]*intentLockGateReached[\s\S]*claim = await insertIntent\([\s\S]*"short_lived",[\s\S]*pendingClaim,[\s\S]*releaseIntentLockGate\(\);[\s\S]*targetLockDispatched/,
     );
     assert.doesNotMatch(
       rehearsal,

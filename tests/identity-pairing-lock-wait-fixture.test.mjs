@@ -7,6 +7,7 @@ import {
 import {
   classifyIdentityPairingLockObservation,
   confirmIdentityPairingDatabaseExpiry,
+  createIdentityPairingLockWaitWriterPool,
   finalizeIdentityPairingLockWaitFixture,
 } from "../scripts/lib/identity-pairing-lock-wait-fixture.mjs";
 import {
@@ -14,6 +15,50 @@ import {
 } from "../scripts/lib/identity-pairing-rehearsal-evidence.mjs";
 
 describe("identity pairing lock-wait rehearsal fixture", () => {
+  it("gates the intent lock before transmission and observes the target lock", async () => {
+    const calls = [];
+    let releaseCount = 0;
+    const observedPool = createIdentityPairingLockWaitWriterPool({
+      client: {
+        async query(query) {
+          calls.push(query.trim().replace(/\s+/g, " "));
+          return Object.freeze({ rows: [] });
+        },
+        release() {
+          releaseCount += 1;
+        },
+      },
+      writerBackendPid: 42,
+    });
+    const writerClient = await observedPool.pool.connect();
+
+    await writerClient.query("begin");
+    const intentQuery = writerClient.query(`
+      select *
+      from identity_pairing_intents
+      for update
+    `);
+    await observedPool.intentLockGateReached;
+
+    assert.deepEqual(calls, ["begin"]);
+    observedPool.releaseIntentLockGate();
+    await intentQuery;
+    assert.match(calls[1], /from identity_pairing_intents for update/i);
+
+    const targetQuery = writerClient.query(`
+      select *
+      from app_users
+      for update
+    `);
+    await observedPool.targetLockDispatched;
+    await targetQuery;
+    assert.match(calls[2], /from app_users for update/i);
+
+    writerClient.release();
+    observedPool.releaseIfUnused();
+    assert.equal(releaseCount, 1);
+  });
+
   it("uses query start for proof and observer time only for diagnostics", () => {
     const lockedAt = "2026-07-27T00:00:00.000Z";
     const expiresAt = "2026-07-27T00:00:01.250Z";
@@ -166,6 +211,7 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
       "rollback-blocker",
       "release-blocker:false",
       "release-observer",
+      "release-writer-gate",
       "release-unused-writer",
       "settle-writer",
       "assert-post-state",
@@ -193,6 +239,7 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
       "rollback-blocker",
       "release-blocker:true",
       "release-observer",
+      "release-writer-gate",
       "release-unused-writer",
       "settle-writer",
       "assert-post-state",
@@ -269,6 +316,44 @@ describe("identity pairing lock-wait rehearsal fixture", () => {
         error.code === "database_timeout",
     );
   });
+
+  it("unblocks an early writer and preserves the primary fixture failure", async () => {
+    const calls = [];
+    const primaryFailure = new Error("synthetic intent insert failure");
+
+    await assert.rejects(
+      () =>
+        finalizeIdentityPairingLockWaitFixture(
+          fixturePorts(calls, {
+            claimCreated: false,
+            expiresAt: null,
+            primaryFailure,
+            expectedWriterFailureCodes: [
+              "claim_intent_not_found",
+            ],
+            async settleWriter() {
+              calls.push("settle-writer");
+              return Object.freeze({
+                status: "rejected",
+                error: new IdentityPairingConsumeError(
+                  "claim_intent_not_found",
+                ),
+              });
+            },
+          }),
+        ),
+      (error) => error === primaryFailure,
+    );
+
+    assert.deepEqual(calls, [
+      "rollback-blocker",
+      "release-blocker:false",
+      "release-observer",
+      "release-writer-gate",
+      "release-unused-writer",
+      "settle-writer",
+    ]);
+  });
 });
 
 function fixturePorts(calls, overrides = {}) {
@@ -289,6 +374,9 @@ function fixturePorts(calls, overrides = {}) {
     },
     releaseObserver() {
       calls.push("release-observer");
+    },
+    releaseWriterGate() {
+      calls.push("release-writer-gate");
     },
     releaseWriterIfUnused() {
       calls.push("release-unused-writer");

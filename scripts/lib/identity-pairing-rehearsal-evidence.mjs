@@ -26,6 +26,7 @@ export const IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES = Object.freeze([
   "lock_wait_blocker_session_invalid",
   "lock_wait_claim_timing_invalid",
   "lock_wait_intent_dispatch_unobserved",
+  "lock_wait_intent_gate_unobserved",
   "lock_wait_not_observed",
   "lock_wait_query_start_invalid",
   "lock_wait_query_started_at_or_after_expiry",
@@ -36,6 +37,7 @@ export const IDENTITY_PAIRING_LOCK_WAIT_FAILURE_CODES = Object.freeze([
   "lock_wait_writer_unexpected_failure",
   "lock_wait_writer_unexpected_success",
   "lock_wait_post_state_invalid",
+  "lock_wait_target_dispatch_unobserved",
 ]);
 
 export class IdentityPairingRehearsalFixtureError extends Error {
