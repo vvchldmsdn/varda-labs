@@ -131,6 +131,7 @@ import "./tenant-account-read-model.test.mjs";
 import "./current-tenant-read-scope.test.mjs";
 import "./legacy-account-ownership-preflight.test.mjs";
 import "./legacy-account-owner-assignment-writer.test.mjs";
+import "./legacy-account-owner-assignment-rehearsal.test.mjs";
 import "./initial-identity-link-planner.test.mjs";
 import "./identity-pairing-authority.test.mjs";
 import "./identity-pairing-claim-presentation.test.mjs";

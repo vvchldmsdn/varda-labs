@@ -38,6 +38,12 @@ const LEGACY_TABLE_LITERAL_PATTERN =
   /["'](?:goals|transactions|fixed_transactions|monthly_incomes)["']/;
 const LEGACY_RAW_SQL_TABLE_PATTERN =
   /\b(?:from|join|into|update|delete\s+from)\s+["']?(?:goals|transactions|fixed_transactions|monthly_incomes)\b/i;
+const REHEARSAL_ONLY_DML_PATHS = new Set([
+  "scripts/rehearse-tenant-expand.mjs",
+  "scripts/rehearse-identity-pairing-consume-writer.mjs",
+  "scripts/lib/legacy-account-owner-assignment-rehearsal-cases.mjs",
+  "scripts/lib/legacy-account-owner-assignment-rehearsal-fixture.mjs",
+]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
   it("registers every current DML implementation exactly once by path", () => {
@@ -60,6 +66,13 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     for (const path of registeredPaths) {
       assert.equal(existsSync(join(ROOT, path)), true, `${path} must exist`);
+    }
+    for (const path of REHEARSAL_ONLY_DML_PATHS) {
+      assert.equal(
+        existsSync(join(ROOT, path)),
+        true,
+        `${path} rehearsal allowlist entry must exist`,
+      );
     }
   });
 
@@ -528,13 +541,7 @@ function capturePolicyError(action) {
 function discoverDmlPaths() {
   return [join(ROOT, "src"), join(ROOT, "scripts")]
     .flatMap(walkFiles)
-    .filter((path) => !path.endsWith("rehearse-tenant-expand.mjs"))
-    .filter(
-      (path) =>
-        !path.endsWith(
-          "rehearse-identity-pairing-consume-writer.mjs",
-        ),
-    )
+    .filter((path) => !REHEARSAL_ONLY_DML_PATHS.has(relativePath(path)))
     .filter((path) => {
       const source = readFileSync(path, "utf8");
       return (

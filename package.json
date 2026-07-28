@@ -22,6 +22,7 @@
     "rehearse:curated-vector-schema": "node --no-warnings scripts/rehearse-curated-vector-schema.mjs",
     "rehearse:curated-vector-hash-version": "node --no-warnings scripts/rehearse-curated-vector-hash-version.mjs",
     "rehearse:identity-pairing-consume": "node --no-warnings scripts/rehearse-identity-pairing-consume-writer.mjs",
+    "rehearse:legacy-account-owner-assignment": "node --no-warnings scripts/rehearse-legacy-account-owner-assignment.mjs",
     "preflight:identity-pairing-consume": "node --no-warnings scripts/preflight-identity-pairing-catalog.mjs",
     "preflight:legacy-account-ownership": "node --no-warnings scripts/preflight-legacy-account-ownership.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
