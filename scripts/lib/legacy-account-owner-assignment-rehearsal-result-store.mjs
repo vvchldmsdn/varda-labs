@@ -1,0 +1,193 @@
+import { randomUUID } from "node:crypto";
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, isAbsolute, join } from "node:path";
+
+import {
+  assertResultEvidenceSourceSha,
+  createResultEvidenceSnapshot,
+  isResultEvidenceSessionCode,
+  projectRehearsalCleanupResult,
+  projectRehearsalHarnessResult,
+  projectResultControlPlane,
+  resultEvidenceError,
+  resultInvocationCounts,
+} from "./legacy-account-owner-assignment-rehearsal-result-policy.mjs";
+
+const EVIDENCE_FILE_PATTERN =
+  /^legacy-account-owner-assignment-rehearsal-[a-z0-9-]+\.json$/;
+
+export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+  evidenceFile,
+  sourceSha,
+  writeSnapshot = writeAtomicEvidenceSnapshot,
+} = {}) {
+  assertEvidenceFile(evidenceFile);
+  assertResultEvidenceSourceSha(sourceSha);
+  if (typeof writeSnapshot !== "function") {
+    throw resultEvidenceError("prepared_result_invalid");
+  }
+
+  let latestSnapshot = null;
+  let persistedSnapshot = null;
+
+  function persist(snapshot, failureCode) {
+    latestSnapshot = snapshot;
+    try {
+      writeSnapshot(evidenceFile, snapshot);
+      persistedSnapshot = snapshot;
+    } catch {
+      throw resultEvidenceError(failureCode);
+    }
+    return snapshot;
+  }
+
+  return Object.freeze({
+    recordPrepared(value) {
+      if (latestSnapshot !== null) {
+        throw resultEvidenceError("prepared_result_invalid");
+      }
+      const controlPlane = projectResultControlPlane(value);
+      return persist(
+        createResultEvidenceSnapshot({
+          sourceSha,
+          phase: "prepared",
+          status: "in_progress",
+          code: null,
+          invocationCounts: resultInvocationCounts(1, 0, 0, 0),
+          controlPlane,
+          harness: null,
+          cleanup: null,
+        }),
+        "prepared_evidence_write_failed",
+      );
+    },
+    recordHarnessResult(value) {
+      if (latestSnapshot?.phase !== "prepared") {
+        throw resultEvidenceError("harness_result_invalid");
+      }
+      const harness = projectRehearsalHarnessResult(
+        value,
+        latestSnapshot.controlPlane,
+      );
+      return persist(
+        createResultEvidenceSnapshot({
+          sourceSha,
+          phase: "harness_result",
+          status:
+            harness.status === "passed" ? "in_progress" : "failed",
+          code: harness.status === "failed" ? harness.code : null,
+          invocationCounts: resultInvocationCounts(1, 1, 0, 0),
+          controlPlane: latestSnapshot.controlPlane,
+          harness,
+          cleanup: null,
+        }),
+        "harness_result_evidence_write_failed",
+      );
+    },
+    recordCleanupResult(value, { sessionCode = null } = {}) {
+      if (
+        !["prepared", "harness_result"].includes(
+          latestSnapshot?.phase,
+        ) ||
+        (sessionCode !== null &&
+          !isResultEvidenceSessionCode(sessionCode))
+      ) {
+        throw resultEvidenceError("cleanup_result_invalid");
+      }
+      const cleanup = projectRehearsalCleanupResult(value);
+      const harness = latestSnapshot.harness;
+      const code =
+        sessionCode ??
+        (harness?.status === "failed" ? harness.code : null) ??
+        (cleanup.status === "failed" ? cleanup.code : null) ??
+        (harness === null ? "harness_execution_failed" : null);
+      return persist(
+        createResultEvidenceSnapshot({
+          sourceSha,
+          phase: "cleanup_result",
+          status: code === null ? "passed" : "failed",
+          code,
+          invocationCounts: resultInvocationCounts(
+            1,
+            harness === null ? 0 : 1,
+            cleanup.deleteInvocations,
+            cleanup.exactIdGetInvocations,
+          ),
+          controlPlane: latestSnapshot.controlPlane,
+          harness,
+          cleanup,
+        }),
+        "cleanup_result_evidence_write_failed",
+      );
+    },
+    latest() {
+      return latestSnapshot;
+    },
+    persisted() {
+      return persistedSnapshot;
+    },
+  });
+}
+
+function writeAtomicEvidenceSnapshot(evidenceFile, snapshot) {
+  assertEvidenceFile(evidenceFile);
+  if (!snapshot || typeof snapshot !== "object") {
+    throw resultEvidenceError("cleanup_result_invalid");
+  }
+  if (existsSync(evidenceFile)) {
+    const stat = lstatSync(evidenceFile);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw resultEvidenceError("cleanup_result_invalid");
+    }
+  }
+
+  const temporaryFile = join(
+    dirname(evidenceFile),
+    `.${basename(evidenceFile)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  let descriptor = null;
+  try {
+    descriptor = openSync(temporaryFile, "wx", 0o600);
+    writeFileSync(
+      descriptor,
+      `${JSON.stringify(snapshot)}\n`,
+      { encoding: "utf8" },
+    );
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = null;
+    renameSync(temporaryFile, evidenceFile);
+  } finally {
+    if (descriptor !== null) {
+      try {
+        closeSync(descriptor);
+      } catch {
+        // The primary filesystem failure remains authoritative.
+      }
+    }
+    try {
+      unlinkSync(temporaryFile);
+    } catch {
+      // The rename path no longer exists after a successful replace.
+    }
+  }
+}
+
+function assertEvidenceFile(value) {
+  if (
+    typeof value !== "string" ||
+    !isAbsolute(value) ||
+    !EVIDENCE_FILE_PATTERN.test(basename(value))
+  ) {
+    throw resultEvidenceError("prepared_result_invalid");
+  }
+}
