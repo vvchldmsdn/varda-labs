@@ -164,6 +164,9 @@ export function createLegacyAccountOwnerAssignmentRehearsalEvidence() {
         retryCount: 0,
         dbMigrateInvocations: 0,
         productionDatabaseWrites: 0,
+        syntheticRowsMayRemainUntilBranchDeletion:
+          disposableBranchDmlAttempted,
+        cleanupAuthority: "exact_branch_deletion",
         branchDeletionRequired: true,
       });
     },

@@ -10,6 +10,9 @@ import {
   readLegacyAccountOwnerAssignmentRehearsalOptions,
 } from "../src/lib/deployment/legacy-account-owner-assignment-rehearsal-target.ts";
 import {
+  guardProductionDatabaseTarget,
+} from "../src/lib/deployment/production-database-target.ts";
+import {
   executeLegacyAccountOwnerAssignmentRehearsal,
   runLegacyAccountOwnerAssignmentRehearsalCli,
 } from "../scripts/rehearse-legacy-account-owner-assignment.mjs";
@@ -23,6 +26,7 @@ import {
 
 const PROJECT_ID = "synthetic-project";
 const ENDPOINT_ID = "ep-synthetic-owner-rehearsal";
+const PRODUCTION_ENDPOINT_ID = "ep-production";
 const USERNAME = "synthetic-user";
 const PASSWORD = "synthetic-password";
 const DATABASE = "synthetic-db";
@@ -32,8 +36,18 @@ const BRANCH_NAME =
 const PREVIEW_POLICY = {
   policyId: "preview_database_target_operational_guard_v2",
   expectedNeonIntegrationProjectSha256: fingerprint(PROJECT_ID),
-  productionEndpointSha256: fingerprint("ep-production"),
+  productionEndpointSha256: fingerprint(PRODUCTION_ENDPOINT_ID),
 };
+const PRODUCTION_POLICY = {
+  policyId: "production_database_target_operational_guard_v1",
+  expectedNeonIntegrationProjectSha256: fingerprint(PROJECT_ID),
+  productionEndpointSha256: fingerprint(PRODUCTION_ENDPOINT_ID),
+};
+const PRODUCTION_SOURCE_TARGET_FINGERPRINT =
+  guardProductionDatabaseTarget(
+    productionEnvironment(),
+    PRODUCTION_POLICY,
+  ).targetFingerprint;
 
 describe("legacy account owner-assignment disposable rehearsal", () => {
   it("accepts only one named non-Production Neon target", () => {
@@ -51,6 +65,10 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     assert.equal(result.branchEndpointAttestation, "not_established");
     assert.match(result.branchIdFingerprint, /^sha256:[0-9a-f]{64}$/);
     assert.match(result.branchNameFingerprint, /^sha256:[0-9a-f]{64}$/);
+    assert.equal(
+      result.sourceTargetFingerprint,
+      PRODUCTION_SOURCE_TARGET_FINGERPRINT,
+    );
     assert.match(result.endpointFingerprint, /^sha256:[0-9a-f]{64}$/);
 
     const serialized = JSON.stringify(result);
@@ -113,9 +131,9 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     const env =
       prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
         baseEnv: {
-          DATABASE_URL: databaseUrl("ep-production", true),
+          DATABASE_URL: databaseUrl(PRODUCTION_ENDPOINT_ID, true),
           DATABASE_URL_UNPOOLED: databaseUrl(
-            "ep-production",
+            PRODUCTION_ENDPOINT_ID,
             false,
           ),
           NEON_PROJECT_ID: PROJECT_ID,
@@ -125,6 +143,9 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
             "stale-target",
         },
         options,
+        productionDatabasePolicy: PRODUCTION_POLICY,
+        expectedProductionSourceTargetFingerprint:
+          PRODUCTION_SOURCE_TARGET_FINGERPRINT,
       });
 
     assert.equal(
@@ -146,6 +167,11 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     );
     assert.equal("KIS_APP_SECRET" in env, false);
     assert.equal("ADMIN_JOB_SECRET" in env, false);
+    assert.equal(
+      env
+        .LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT,
+      PRODUCTION_SOURCE_TARGET_FINGERPRINT,
+    );
     assert.throws(() =>
       readLegacyAccountOwnerAssignmentRehearsalOptions([
         "--branch-id",
@@ -170,6 +196,60 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     );
   });
 
+  it("blocks Production source drift before endpoint rewrite or Pool creation", async () => {
+    const options =
+      readLegacyAccountOwnerAssignmentRehearsalOptions(validArgs());
+
+    assert.throws(
+      () =>
+        prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
+          baseEnv: productionEnvironment({
+            endpointId: "ep-stale-source",
+          }),
+          options,
+          productionDatabasePolicy: PRODUCTION_POLICY,
+          expectedProductionSourceTargetFingerprint:
+            PRODUCTION_SOURCE_TARGET_FINGERPRINT,
+        }),
+      /pinned Production endpoint/,
+    );
+    assert.throws(
+      () =>
+        prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
+          baseEnv: productionEnvironment({
+            username: "stale-role",
+          }),
+          options,
+          productionDatabasePolicy: PRODUCTION_POLICY,
+          expectedProductionSourceTargetFingerprint:
+            PRODUCTION_SOURCE_TARGET_FINGERPRINT,
+        }),
+      /source role or database identity drifted/,
+    );
+
+    let poolCreates = 0;
+    const result = await runLegacyAccountOwnerAssignmentRehearsalCli({
+      args: validArgs(),
+      baseEnv: productionEnvironment({
+        databaseName: "stale-database",
+      }),
+      loadEnvironment() {},
+      productionDatabasePolicy: PRODUCTION_POLICY,
+      expectedProductionSourceTargetFingerprint:
+        PRODUCTION_SOURCE_TARGET_FINGERPRINT,
+      previewDatabasePolicy: PREVIEW_POLICY,
+      poolFactory() {
+        poolCreates += 1;
+        throw new Error("must not run");
+      },
+      writeError() {},
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.code, "rehearsal_configuration_invalid");
+    assert.equal(poolCreates, 0);
+  });
+
   it("sanitizes failures and preserves only reviewed error codes", () => {
     const evidence = progressToSuccessfulAssignment();
     const secretError = new Error(
@@ -186,6 +266,11 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     assert.equal(failure.retryCount, 0);
     assert.equal(failure.dbMigrateInvocations, 0);
     assert.equal(failure.productionDatabaseWrites, 0);
+    assert.equal(
+      failure.syntheticRowsMayRemainUntilBranchDeletion,
+      true,
+    );
+    assert.equal(failure.cleanupAuthority, "exact_branch_deletion");
     assert.equal(failure.branchDeletionRequired, true);
     const serialized = JSON.stringify(failure);
     for (const forbidden of [
@@ -248,6 +333,11 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     assert.equal(result.poolReadiness, false);
     assert.equal(result.disposableBranchDmlAttempted, false);
     assert.equal(result.productionDatabaseWrites, 0);
+    assert.equal(
+      result.syntheticRowsMayRemainUntilBranchDeletion,
+      false,
+    );
+    assert.equal(result.cleanupAuthority, "exact_branch_deletion");
     assert.equal(result.branchDeletionRequired, true);
   });
 
@@ -339,8 +429,26 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
       source,
       /guardLegacyAccountOwnerAssignmentRehearsalTarget/,
     );
+    const sourceGuardIndex = targetSource.indexOf(
+      "guardProductionDatabaseTarget(",
+    );
+    const endpointRewriteIndex = targetSource.indexOf(
+      "rewriteNeonEndpoint(",
+    );
+    assert.ok(sourceGuardIndex >= 0);
+    assert.ok(endpointRewriteIndex > sourceGuardIndex);
+    assert.match(targetSource, /productionSourceTargetSha256/);
+    assert.match(source, /sourceTargetFingerprint/);
     assert.match(source, /productionDatabaseWrites: 0/);
     assert.match(source, /branchDeletionRequired: true/);
+    assert.match(
+      source,
+      /cleanupAuthority: "exact_branch_deletion"/,
+    );
+    assert.match(
+      source,
+      /syntheticRowsMayRemainUntilBranchDeletion: true/,
+    );
     assert.match(source, /retryCount: 0/);
     assert.match(source, /dbMigrateInvocations: 0/);
     assert.match(source, /restoreOwnerAssignmentAccountBaseline/);
@@ -363,7 +471,7 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
     }
     assert.doesNotMatch(
       `${source}\n${casesSource}\n${fixtureSource}`,
-      /db:migrate|guardProductionDatabaseTarget|consumeIdentityPairingClaim/,
+      /db:migrate|consumeIdentityPairingClaim/,
     );
     assert.doesNotMatch(
       `${source}\n${casesSource}\n${fixtureSource}`,
@@ -385,6 +493,7 @@ function progressToSuccessfulAssignment() {
     evidence.complete(stage);
   }
   evidence.begin("successful_assignment");
+  evidence.markDisposableBranchDmlAttempted();
   return evidence;
 }
 
@@ -397,13 +506,44 @@ function fixtureEnvironment() {
       databaseUrl(ENDPOINT_ID, true),
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL_UNPOOLED:
       databaseUrl(ENDPOINT_ID, false),
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT:
+      PRODUCTION_SOURCE_TARGET_FINGERPRINT,
     NEON_PROJECT_ID: PROJECT_ID,
   };
 }
 
-function databaseUrl(endpointId, pooled) {
+function productionEnvironment(overrides = {}) {
+  const endpointId =
+    overrides.endpointId ?? PRODUCTION_ENDPOINT_ID;
+  return {
+    NEON_PROJECT_ID: PROJECT_ID,
+    DATABASE_URL: databaseUrl(endpointId, true, overrides),
+    DATABASE_URL_UNPOOLED: databaseUrl(
+      endpointId,
+      false,
+      overrides,
+    ),
+  };
+}
+
+function databaseUrl(endpointId, pooled, overrides = {}) {
+  const username = overrides.username ?? USERNAME;
+  const password = overrides.password ?? PASSWORD;
+  const databaseName = overrides.databaseName ?? DATABASE;
   const host = `${endpointId}${pooled ? "-pooler" : ""}.us-east-1.aws.neon.tech`;
-  return `postgresql://${USERNAME}:${PASSWORD}@${host}/${DATABASE}?sslmode=require`;
+  return `postgresql://${username}:${password}@${host}/${databaseName}?sslmode=require`;
+}
+
+function validArgs() {
+  return [
+    "--branch-id",
+    BRANCH_ID,
+    "--branch-name",
+    BRANCH_NAME,
+    "--endpoint-id",
+    ENDPOINT_ID,
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_CONFIRMATION,
+  ];
 }
 
 function fingerprint(value) {

@@ -6,7 +6,13 @@ import {
   type PreviewDatabaseTargetGuardEnvironment,
   type PreviewDatabaseTargetGuardPolicy,
 } from "./preview-database-target.ts";
+import {
+  PRODUCTION_DATABASE_TARGET_GUARD_POLICY,
+  guardProductionDatabaseTarget,
+  type ProductionDatabaseTargetGuardPolicy,
+} from "./production-database-target.ts";
 
+const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const NEON_BRANCH_ID_PATTERN = /^br-[a-z0-9-]+$/;
 const NEON_ENDPOINT_ID_PATTERN = /^ep-[a-z0-9-]+$/;
 const REHEARSAL_BRANCH_NAME_PATTERN =
@@ -21,6 +27,9 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_TARGET_POLICY =
   Object.freeze({
     policyId: "legacy_account_owner_assignment_rehearsal_target_v1",
     previewDatabasePolicy: PREVIEW_DATABASE_TARGET_GUARD_POLICY,
+    productionDatabasePolicy: PRODUCTION_DATABASE_TARGET_GUARD_POLICY,
+    productionSourceTargetSha256:
+      "sha256:ec111c76efbab437f6e948ec32faa2f4890c593dd523eafb47bdebceaeab3755",
   } as const);
 
 export type LegacyAccountOwnerAssignmentRehearsalEnvironment = {
@@ -29,6 +38,7 @@ export type LegacyAccountOwnerAssignmentRehearsalEnvironment = {
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_NAME?: string;
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL?: string;
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL_UNPOOLED?: string;
+  LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT?: string;
   NEON_PROJECT_ID?: string;
 };
 
@@ -51,11 +61,21 @@ export function guardLegacyAccountOwnerAssignmentRehearsalTarget(
     env.LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_NAME,
     "LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_NAME",
   );
+  const sourceTargetFingerprint = requiredValue(
+    env
+      .LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT,
+    "LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT",
+  );
   if (!NEON_BRANCH_ID_PATTERN.test(branchId)) {
     throw new Error("The owner-assignment rehearsal branch id is invalid.");
   }
   if (!REHEARSAL_BRANCH_NAME_PATTERN.test(branchName)) {
     throw new Error("The owner-assignment rehearsal branch name is invalid.");
+  }
+  if (!SHA256_PATTERN.test(sourceTargetFingerprint)) {
+    throw new Error(
+      "The owner-assignment rehearsal source target fingerprint is invalid.",
+    );
   }
 
   const previewEnvironment: PreviewDatabaseTargetGuardEnvironment = {
@@ -88,6 +108,7 @@ export function guardLegacyAccountOwnerAssignmentRehearsalTarget(
     controlPlaneVerificationRequired: true as const,
     branchIdFingerprint,
     branchNameFingerprint,
+    sourceTargetFingerprint,
     integrationProjectFingerprint:
       databaseTarget.integrationProjectFingerprint,
     endpointFingerprint: databaseTarget.endpointFingerprint,
@@ -97,6 +118,7 @@ export function guardLegacyAccountOwnerAssignmentRehearsalTarget(
           LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_TARGET_POLICY.policyId,
         branchIdFingerprint,
         branchNameFingerprint,
+        sourceTargetFingerprint,
         databaseTargetFingerprint: databaseTarget.targetFingerprint,
       }),
     ),
@@ -167,9 +189,17 @@ export function readLegacyAccountOwnerAssignmentRehearsalOptions(
 export function prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
   baseEnv,
   options,
+  productionDatabasePolicy =
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_TARGET_POLICY
+      .productionDatabasePolicy,
+  expectedProductionSourceTargetFingerprint =
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_TARGET_POLICY
+      .productionSourceTargetSha256,
 }: {
   baseEnv: Record<string, unknown>;
   options: LegacyAccountOwnerAssignmentRehearsalOptions;
+  productionDatabasePolicy?: ProductionDatabaseTargetGuardPolicy;
+  expectedProductionSourceTargetFingerprint?: string;
 }): LegacyAccountOwnerAssignmentRehearsalEnvironment {
   const pooled = ownPrimitiveString(baseEnv, "DATABASE_URL");
   const unpooled = ownPrimitiveString(
@@ -182,6 +212,28 @@ export function prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
       "Owner-assignment rehearsal source configuration is incomplete.",
     );
   }
+  if (!SHA256_PATTERN.test(expectedProductionSourceTargetFingerprint)) {
+    throw new Error(
+      "Owner-assignment rehearsal source target policy is invalid.",
+    );
+  }
+
+  const productionTarget = guardProductionDatabaseTarget(
+    {
+      DATABASE_URL: pooled,
+      DATABASE_URL_UNPOOLED: unpooled,
+      NEON_PROJECT_ID: projectId,
+    },
+    productionDatabasePolicy,
+  );
+  if (
+    productionTarget.targetFingerprint !==
+    expectedProductionSourceTargetFingerprint
+  ) {
+    throw new Error(
+      "Owner-assignment rehearsal source role or database identity drifted.",
+    );
+  }
 
   return Object.freeze({
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_ID:
@@ -192,6 +244,8 @@ export function prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
       rewriteNeonEndpoint(pooled, options.endpointId),
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL_UNPOOLED:
       rewriteNeonEndpoint(unpooled, options.endpointId),
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT:
+      productionTarget.targetFingerprint,
     NEON_PROJECT_ID: projectId,
   });
 }

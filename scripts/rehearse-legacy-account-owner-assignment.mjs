@@ -46,6 +46,9 @@ export async function runLegacyAccountOwnerAssignmentRehearsalCli({
     }),
   poolFactory = (connectionString) =>
     new Pool({ connectionString, max: 8 }),
+  productionDatabasePolicy,
+  expectedProductionSourceTargetFingerprint,
+  previewDatabasePolicy,
   write = (value) => console.log(JSON.stringify(value)),
   writeError = (value) => console.error(JSON.stringify(value)),
 } = {}) {
@@ -66,6 +69,8 @@ export async function runLegacyAccountOwnerAssignmentRehearsalCli({
       prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
         baseEnv,
         options,
+        productionDatabasePolicy,
+        expectedProductionSourceTargetFingerprint,
       });
   } catch {
     const failure = cliFailure("rehearsal_configuration_invalid");
@@ -76,6 +81,7 @@ export async function runLegacyAccountOwnerAssignmentRehearsalCli({
   const result = await executeLegacyAccountOwnerAssignmentRehearsal({
     env,
     poolFactory,
+    previewDatabasePolicy,
   });
   if (result.status === "passed") write(result);
   else writeError(result);
@@ -212,10 +218,13 @@ async function runRehearsal({
     retryCount: 0,
     dbMigrateInvocations: 0,
     productionDatabaseWrites: 0,
+    syntheticRowsMayRemainUntilBranchDeletion: true,
+    cleanupAuthority: "exact_branch_deletion",
     controlPlaneVerificationRequired:
       target.controlPlaneVerificationRequired,
     branchIdFingerprint: target.branchIdFingerprint,
     branchNameFingerprint: target.branchNameFingerprint,
+    sourceTargetFingerprint: target.sourceTargetFingerprint,
     endpointFingerprint: target.endpointFingerprint,
     targetFingerprint: target.targetFingerprint,
     branchDeletionRequired: true,
@@ -236,6 +245,8 @@ function cliFailure(code) {
     retryCount: 0,
     dbMigrateInvocations: 0,
     productionDatabaseWrites: 0,
+    syntheticRowsMayRemainUntilBranchDeletion: false,
+    cleanupAuthority: "exact_branch_deletion",
     branchDeletionRequired: true,
   });
 }
