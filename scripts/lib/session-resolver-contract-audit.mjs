@@ -5,6 +5,8 @@ const CONTRACT_PATHS = [
   "src/lib/session-resolver-contract.ts",
   "src/lib/session-resolver-policy.ts",
 ];
+const RUNTIME_ADAPTER_PATH =
+  "src/lib/auth/current-tenant-context.ts";
 const CONTRACT_IMPORT_PATTERN = /session-resolver-(?:contract|policy)/;
 const IMPORT_FROM_PATTERN =
   /^\s*import\s+([\s\S]*?)\s+from\s+["']([^"']+)["'];?[ \t]*(?:\r?\n|$)/gm;
@@ -47,7 +49,7 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
     for (const path of writer.implementationPaths) productionPaths.add(path);
   }
 
-  let productionImports = 0;
+  const productionImportPaths = [];
   for (const path of productionPaths) {
     const absolutePath = join(root, path);
     if (!existsSync(absolutePath)) continue;
@@ -55,10 +57,39 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
       readFileSync(absolutePath, "utf8"),
     );
     if (CONTRACT_IMPORT_PATTERN.test(sourceWithoutTypeOnlyImports)) {
-      productionImports += 1;
+      productionImportPaths.push(path);
     }
   }
-  if (productionImports !== 0) findings.push("production_contract_import");
+  const unexpectedProductionImports = productionImportPaths.filter(
+    (path) => path !== RUNTIME_ADAPTER_PATH,
+  );
+  if (
+    productionImportPaths.length !== 1 ||
+    unexpectedProductionImports.length !== 0
+  ) {
+    findings.push("production_contract_import_boundary");
+  }
+
+  const runtimeSource = readFileSync(
+    join(root, RUNTIME_ADAPTER_PATH),
+    "utf8",
+  );
+  const runtimeBoundaryIntact =
+    runtimeSource.startsWith('import "server-only";') &&
+    [
+      "cache(",
+      "getAuthTransportRuntime",
+      "auth.getSession()",
+      "authIdentities",
+      "appUsers",
+      "resolveSessionToAppUser",
+      ".limit(2)",
+    ].every((marker) => runtimeSource.includes(marker)) &&
+    !IDENTITY_DML_PATTERN.test(runtimeSource) &&
+    !/console\.|NextResponse|Response\(|\bfetch\s*\(/.test(runtimeSource);
+  if (!runtimeBoundaryIntact) {
+    findings.push("runtime_adapter_boundary_drift");
+  }
 
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const dependencyNames = Object.keys({
@@ -92,15 +123,17 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
     evidence: {
       pureContractViolations,
       identityDmlMatches,
-      productionImports,
+      productionImports: productionImportPaths.length,
+      unexpectedProductionImports: unexpectedProductionImports.length,
+      runtimeBoundaryIntact,
       authSdkDependencies: authSdkDependencies.length,
       unexpectedAuthSdkDependencies: unexpectedAuthSdkDependencies.length,
       basicAuthBoundaryIntact,
-      databaseQueries: 0,
+      databaseQueries: 1,
       databaseWrites: 0,
-      providerCalls: 0,
+      providerCalls: 1,
       routeCalls: 0,
-      cacheImplementations: 0,
+      cacheImplementations: 1,
     },
   };
 }

@@ -8,6 +8,8 @@ export type ProviderSessionPortResult =
 
 export type IdentityMappingPortResult =
   | Readonly<{ state: "not_requested" }>
+  | Readonly<{ state: "unavailable" }>
+  | Readonly<{ state: "invalid" }>
   | Readonly<{ state: "unlinked" }>
   | Readonly<{ state: "collision" }>
   | Readonly<{
@@ -34,6 +36,7 @@ export type TenantContext = Readonly<{
 export type SessionResolutionFailureCode =
   | "unauthenticated"
   | "auth_provider_unavailable"
+  | "identity_store_unavailable"
   | "identity_unlinked"
   | "identity_mapping_collision"
   | "identity_not_active"
@@ -67,6 +70,7 @@ export type SessionResolverInput = Readonly<{
 export const SESSION_RESOLUTION_FAILURE_CONTRACT = Object.freeze([
   Object.freeze({ code: "unauthenticated", httpStatus: 401 }),
   Object.freeze({ code: "auth_provider_unavailable", httpStatus: 503 }),
+  Object.freeze({ code: "identity_store_unavailable", httpStatus: 503 }),
   Object.freeze({ code: "identity_unlinked", httpStatus: 403 }),
   Object.freeze({ code: "identity_mapping_collision", httpStatus: 500 }),
   Object.freeze({ code: "identity_not_active", httpStatus: 403 }),
@@ -121,6 +125,16 @@ export function resolveSessionToAppUser(
   if (identityMapping.state === "not_requested") {
     return failure("resolver_state_invalid");
   }
+  if (identityMapping.state === "unavailable") {
+    return appUser.state === "not_requested"
+      ? failure("identity_store_unavailable")
+      : failure("resolver_state_invalid");
+  }
+  if (identityMapping.state === "invalid") {
+    return appUser.state === "not_requested"
+      ? failure("identity_mapping_integrity")
+      : failure("resolver_state_invalid");
+  }
   if (identityMapping.state === "unlinked") {
     return appUser.state === "not_requested"
       ? failure("identity_unlinked")
@@ -160,6 +174,12 @@ export function resolveSessionToAppUser(
     return failure("identity_mapping_integrity");
   }
   if (appUser.status !== "active") {
+    if (
+      appUser.status !== "provisioning" &&
+      appUser.status !== "disabled"
+    ) {
+      return failure("identity_mapping_integrity");
+    }
     return failure("app_user_not_active");
   }
   if (appUser.role !== "user" && appUser.role !== "admin") {

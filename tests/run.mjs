@@ -127,6 +127,8 @@ import "./tenant-expand-phase.test.mjs";
 import "./tenant-writer-readiness.test.mjs";
 import "./runtime-writer-convergence.test.mjs";
 import "./session-resolver-contract.test.mjs";
+import "./tenant-account-read-model.test.mjs";
+import "./current-tenant-read-scope.test.mjs";
 import "./initial-identity-link-planner.test.mjs";
 import "./identity-pairing-authority.test.mjs";
 import "./identity-pairing-claim-presentation.test.mjs";

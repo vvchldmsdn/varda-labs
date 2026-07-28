@@ -2,19 +2,20 @@
 
 Last updated: 2026-07-11
 
-Status: completed as a pure executable contract. No production route, proxy,
-query, writer, or auth provider imports it.
+Status: completed as a pure executable contract. Phase 1G2 now imports it
+through one reviewed server-only DAL adapter; see
+`auth-tenant-phase1g2-read-scope-v1.md`.
 
 ## Scope
 
-Phase 1G0 fixes the state machine that a future `getCurrentAppUser()` adapter
-must follow. It does not implement that adapter. Provider session access,
-identity lookup, app-user lookup, request cookies, and provider caching remain
-external ports.
+Phase 1G0 fixed the state machine that a future `getCurrentAppUser()` adapter
+must follow. It did not implement that adapter. Provider session access,
+identity lookup, app-user lookup, request cookies, and provider caching
+remained external ports until Phase 1G2.
 
-The current database state remains one provisioning app user, no identity
-mapping, and no canonical owner assignment. Consequently, no current request
-can produce a successful tenant context.
+At G0 close, the database state was one provisioning app user, no identity
+mapping, and no canonical owner assignment. Consequently, no request could
+produce a successful tenant context at that phase.
 
 ## Internal And Public Results
 
@@ -30,8 +31,8 @@ not to the private server capability itself:
 - public failure: typed code and HTTP status only.
 
 The public projection never includes app-user UUID, provider subject, email,
-token, cookie, provider profile, or authorization material. Production source
-does not import either result yet.
+token, cookie, provider profile, or authorization material. Phase 1G2 permits
+only the server-only current-tenant adapter to consume the internal result.
 
 ## Input Ports
 
@@ -54,6 +55,7 @@ may use the authenticated provider subject only to perform the explicit
 | --- | --- | ---: |
 | Clean unauthenticated | `unauthenticated` | 401 |
 | Provider or SDK unavailable | `auth_provider_unavailable` | 503 |
+| Identity store unavailable | `identity_store_unavailable` | 503 |
 | No identity mapping | `identity_unlinked` | 403 |
 | Mapping collision | `identity_mapping_collision` | 500 |
 | Disabled identity | `identity_not_active` | 403 |
@@ -81,13 +83,13 @@ secret cannot resolve a product tenant. Basic Auth does neither.
 
 ## Cache Boundary
 
-Phase 1G0 defines only a request-scoped `getOrLoad()` interface contract:
+Phase 1G0 defined only a request-scoped `getOrLoad()` interface contract.
+Phase 1G2 implements it with React `cache()`:
 
 - deduplication scope is one request;
 - cross-request result caching is forbidden at this layer;
-- provider cookie/session TTL remains deferred until the selected SDK is
-  installed and verified;
-- React `cache()`, cookies, headers, and SDK calls are absent.
+- provider session caching is pinned to 60 seconds by the auth adapter;
+- React `cache()` deduplicates only within the current render request.
 
 ## Static Audit
 
@@ -101,14 +103,15 @@ The audit verifies:
 
 - the contract has no runtime imports, DB/provider/env/cookie/header/cache call,
   or identity DML;
-- production `src`, registered writers, and proxy do not import the contract;
-- no auth SDK dependency is installed;
+- exactly one reviewed production DAL adapter imports the contract;
+- no other production source, writer, or proxy imports it directly;
+- the reviewed auth SDK dependency remains pinned;
 - the existing Basic Auth proxy markers remain intact;
-- audit execution performs zero DB, provider, route, or cache calls.
+- audit execution performs no DB, provider, route, or cache calls itself.
 
 ## Explicit Non-Actions
 
-Phase 1G0 does not:
+At its close, Phase 1G0 did not:
 
 - install Neon Auth or another auth SDK;
 - add auth handlers, sign-in UI, cookies, or secrets;

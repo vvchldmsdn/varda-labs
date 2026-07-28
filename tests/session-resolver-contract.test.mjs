@@ -25,6 +25,7 @@ describe("provider-neutral session resolver Phase 1G0", () => {
     assert.deepEqual(SESSION_RESOLUTION_FAILURE_CONTRACT, [
       { code: "unauthenticated", httpStatus: 401 },
       { code: "auth_provider_unavailable", httpStatus: 503 },
+      { code: "identity_store_unavailable", httpStatus: 503 },
       { code: "identity_unlinked", httpStatus: 403 },
       { code: "identity_mapping_collision", httpStatus: 500 },
       { code: "identity_not_active", httpStatus: 403 },
@@ -48,6 +49,13 @@ describe("provider-neutral session resolver Phase 1G0", () => {
   });
 
   it("fails closed for unlinked, collision, and disabled identity states", () => {
+    assertFailure(
+      resolveSessionToAppUser(
+        authenticated({ state: "unavailable" }),
+      ),
+      "identity_store_unavailable",
+      503,
+    );
     assertFailure(
       resolveSessionToAppUser(authenticated({ state: "unlinked" })),
       "identity_unlinked",
@@ -263,17 +271,18 @@ describe("provider-neutral session resolver Phase 1G0", () => {
     );
   });
 
-  it("leaves request dedupe and provider cookie TTL as interface-only work", () => {
+  it("pins request-only resolver memoization and provider session caching", () => {
     assert.deepEqual(REQUEST_SCOPED_RESOLVER_CACHE_CONTRACT, {
-      implementationStatus: "interface_only",
+      implementationStatus: "active",
       scope: "request_only",
       dedupeKey: "implicit_current_request",
-      providerCookieTtl: "deferred_until_sdk_integration",
+      resolverMemoization: "react_cache_request_scope_v1",
+      providerSessionCacheSeconds: 60,
       crossRequestCache: "forbidden",
     });
   });
 
-  it("keeps the resolver unimplemented despite the isolated Preview auth SDK", () => {
+  it("admits only the reviewed server-only runtime adapter", () => {
     const result = auditSessionResolverContract({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -284,15 +293,17 @@ describe("provider-neutral session resolver Phase 1G0", () => {
     assert.deepEqual(result.evidence, {
       pureContractViolations: 0,
       identityDmlMatches: 0,
-      productionImports: 0,
+      productionImports: 1,
+      unexpectedProductionImports: 0,
+      runtimeBoundaryIntact: true,
       authSdkDependencies: 1,
       unexpectedAuthSdkDependencies: 0,
       basicAuthBoundaryIntact: true,
-      databaseQueries: 0,
+      databaseQueries: 1,
       databaseWrites: 0,
-      providerCalls: 0,
+      providerCalls: 1,
       routeCalls: 0,
-      cacheImplementations: 0,
+      cacheImplementations: 1,
     });
 
     const auditCliSource = readFileSync(

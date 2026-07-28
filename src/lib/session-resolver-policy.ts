@@ -80,10 +80,11 @@ export const SESSION_CREDENTIAL_BOUNDARY = Object.freeze([
 ] as const);
 
 export const REQUEST_SCOPED_RESOLVER_CACHE_CONTRACT = Object.freeze({
-  implementationStatus: "interface_only",
+  implementationStatus: "active",
   scope: "request_only",
   dedupeKey: "implicit_current_request",
-  providerCookieTtl: "deferred_until_sdk_integration",
+  resolverMemoization: "react_cache_request_scope_v1",
+  providerSessionCacheSeconds: 60,
   crossRequestCache: "forbidden",
 } as const);
 
