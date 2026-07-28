@@ -59,6 +59,10 @@ The next evidence step is deliberately narrower than that rollout:
   full SHA-256 fingerprints and aggregate account counts;
 - evaluation requires both an explicit app-user fingerprint and an explicit
   legacy-owner fingerprint;
+- both pooled and unpooled URLs must resolve to the pinned Production endpoint,
+  role, and database before any query is created;
+- the pinned Neon integration project and sanitized database target fingerprint
+  are part of the evidence;
 - the repeatable-read transaction is database-enforced read-only;
 - only `accounts` are classified as `eligible`, `already_assigned`,
   `foreign_owner_conflict`, `missing_legacy_evidence`, or `unresolved`;

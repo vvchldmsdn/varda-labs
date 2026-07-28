@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import { guardProductionDatabaseTarget } from "../src/lib/deployment/production-database-target.ts";
 import { LEGACY_EXCLUDED_USER_TABLE_NAMES } from "./lib/tenant-ownership-policy.mjs";
 import {
   LegacyAccountOwnershipArgumentError,
@@ -30,6 +31,14 @@ async function main() {
     process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
   if (!databaseUrl) {
     printBlocked("database_not_configured");
+    return;
+  }
+
+  let databaseTarget;
+  try {
+    databaseTarget = guardProductionDatabaseTarget(process.env);
+  } catch {
+    printBlocked("production_database_target_guard_failed");
     return;
   }
 
@@ -68,7 +77,16 @@ async function main() {
             intentionallySkippedTables: LEGACY_EXCLUDED_USER_TABLE_NAMES,
           });
 
-    console.log(JSON.stringify(output, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          ...output,
+          targetFingerprint: databaseTarget.targetFingerprint,
+        },
+        null,
+        2,
+      ),
+    );
     if (output.result === "blocked") process.exitCode = 1;
   } catch {
     printBlocked("database_preflight_failed");
