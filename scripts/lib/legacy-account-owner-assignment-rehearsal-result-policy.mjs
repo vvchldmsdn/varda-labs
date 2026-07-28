@@ -8,6 +8,8 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL =
   "legacy_account_owner_assignment_disposable_branch_v1";
 
 const SOURCE_SHA_PATTERN = /^[0-9a-f]{40}$/;
+const RUN_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const SAFE_CODE_PATTERN = /^[a-z0-9_]{1,96}$/;
 const MISSING = Symbol("missing");
@@ -88,6 +90,7 @@ export class LegacyAccountOwnerAssignmentResultEvidenceError extends Error {
 }
 
 export function createResultEvidenceSnapshot({
+  runId,
   sourceSha,
   phase,
   status,
@@ -101,6 +104,7 @@ export function createResultEvidenceSnapshot({
     evidenceVersion:
       LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
     rehearsal: LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL,
+    runId,
     sourceSha,
     phase,
     status,
@@ -296,6 +300,15 @@ export function assertResultEvidenceSourceSha(value) {
   if (
     typeof value !== "string" ||
     !SOURCE_SHA_PATTERN.test(value)
+  ) {
+    throw resultEvidenceError("prepared_result_invalid");
+  }
+}
+
+export function assertResultEvidenceRunId(value) {
+  if (
+    typeof value !== "string" ||
+    !RUN_ID_PATTERN.test(value)
   ) {
     throw resultEvidenceError("prepared_result_invalid");
   }

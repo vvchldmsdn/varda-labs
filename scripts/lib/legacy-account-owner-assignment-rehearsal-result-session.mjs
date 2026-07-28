@@ -8,6 +8,7 @@ import {
 
 export async function runLegacyAccountOwnerAssignmentResultEvidenceSession({
   evidenceFile,
+  runId,
   sourceSha,
   prepare,
   runHarness,
@@ -26,7 +27,7 @@ export async function runLegacyAccountOwnerAssignmentResultEvidenceSession({
 
   let journal;
   try {
-    journal = createJournal({ evidenceFile, sourceSha });
+    journal = createJournal({ evidenceFile, runId, sourceSha });
   } catch (error) {
     return resultEvidenceSessionFailure(
       safeResultEvidenceSessionCode(
@@ -79,10 +80,7 @@ export async function runLegacyAccountOwnerAssignmentResultEvidenceSession({
   } finally {
     let cleanupValue;
     try {
-      cleanupValue = await cleanup({
-        prepared: preparedValue,
-        harness: harnessValue,
-      });
+      cleanupValue = await cleanup();
     } catch {
       cleanupValue = Object.freeze({
         status: "failed",
@@ -98,7 +96,7 @@ export async function runLegacyAccountOwnerAssignmentResultEvidenceSession({
       try {
         journal.recordCleanupResult(cleanupValue, { sessionCode });
       } catch (error) {
-        sessionCode = safeResultEvidenceSessionCode(
+        sessionCode ??= safeResultEvidenceSessionCode(
           error,
           "cleanup_result_evidence_write_failed",
         );

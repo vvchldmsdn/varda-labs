@@ -3,6 +3,7 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  linkSync,
   lstatSync,
   openSync,
   renameSync,
@@ -12,6 +13,7 @@ import {
 import { basename, dirname, isAbsolute, join } from "node:path";
 
 import {
+  assertResultEvidenceRunId,
   assertResultEvidenceSourceSha,
   createResultEvidenceSnapshot,
   isResultEvidenceSessionCode,
@@ -27,10 +29,12 @@ const EVIDENCE_FILE_PATTERN =
 
 export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
   evidenceFile,
+  runId,
   sourceSha,
   writeSnapshot = writeAtomicEvidenceSnapshot,
 } = {}) {
-  assertEvidenceFile(evidenceFile);
+  assertResultEvidenceRunId(runId);
+  assertEvidenceFile(evidenceFile, runId);
   assertResultEvidenceSourceSha(sourceSha);
   if (typeof writeSnapshot !== "function") {
     throw resultEvidenceError("prepared_result_invalid");
@@ -38,11 +42,16 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
 
   let latestSnapshot = null;
   let persistedSnapshot = null;
+  let evidenceFileOwned = false;
 
-  function persist(snapshot, failureCode) {
+  function persist(snapshot, failureCode, { create = false } = {}) {
     latestSnapshot = snapshot;
     try {
-      writeSnapshot(evidenceFile, snapshot);
+      if (!create && !evidenceFileOwned) {
+        throw resultEvidenceError(failureCode);
+      }
+      writeSnapshot(evidenceFile, snapshot, { create });
+      if (create) evidenceFileOwned = true;
       persistedSnapshot = snapshot;
     } catch {
       throw resultEvidenceError(failureCode);
@@ -58,6 +67,7 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
       const controlPlane = projectResultControlPlane(value);
       return persist(
         createResultEvidenceSnapshot({
+          runId,
           sourceSha,
           phase: "prepared",
           status: "in_progress",
@@ -68,6 +78,7 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           cleanup: null,
         }),
         "prepared_evidence_write_failed",
+        { create: true },
       );
     },
     recordHarnessResult(value) {
@@ -80,6 +91,7 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
       );
       return persist(
         createResultEvidenceSnapshot({
+          runId,
           sourceSha,
           phase: "harness_result",
           status:
@@ -112,6 +124,7 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
         (harness === null ? "harness_execution_failed" : null);
       return persist(
         createResultEvidenceSnapshot({
+          runId,
           sourceSha,
           phase: "cleanup_result",
           status: code === null ? "passed" : "failed",
@@ -138,12 +151,21 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
   });
 }
 
-function writeAtomicEvidenceSnapshot(evidenceFile, snapshot) {
-  assertEvidenceFile(evidenceFile);
+function writeAtomicEvidenceSnapshot(
+  evidenceFile,
+  snapshot,
+  { create = false } = {},
+) {
   if (!snapshot || typeof snapshot !== "object") {
     throw resultEvidenceError("cleanup_result_invalid");
   }
-  if (existsSync(evidenceFile)) {
+  if (create && existsSync(evidenceFile)) {
+    throw resultEvidenceError("prepared_evidence_write_failed");
+  }
+  if (!create && !existsSync(evidenceFile)) {
+    throw resultEvidenceError("cleanup_result_evidence_write_failed");
+  }
+  if (!create) {
     const stat = lstatSync(evidenceFile);
     if (!stat.isFile() || stat.isSymbolicLink()) {
       throw resultEvidenceError("cleanup_result_invalid");
@@ -165,7 +187,12 @@ function writeAtomicEvidenceSnapshot(evidenceFile, snapshot) {
     fsyncSync(descriptor);
     closeSync(descriptor);
     descriptor = null;
-    renameSync(temporaryFile, evidenceFile);
+    if (create) {
+      linkSync(temporaryFile, evidenceFile);
+      unlinkSync(temporaryFile);
+    } else {
+      renameSync(temporaryFile, evidenceFile);
+    }
   } finally {
     if (descriptor !== null) {
       try {
@@ -182,11 +209,13 @@ function writeAtomicEvidenceSnapshot(evidenceFile, snapshot) {
   }
 }
 
-function assertEvidenceFile(value) {
+function assertEvidenceFile(value, runId) {
   if (
     typeof value !== "string" ||
     !isAbsolute(value) ||
-    !EVIDENCE_FILE_PATTERN.test(basename(value))
+    !EVIDENCE_FILE_PATTERN.test(basename(value)) ||
+    basename(value) !==
+      `legacy-account-owner-assignment-rehearsal-${runId}.json`
   ) {
     throw resultEvidenceError("prepared_result_invalid");
   }

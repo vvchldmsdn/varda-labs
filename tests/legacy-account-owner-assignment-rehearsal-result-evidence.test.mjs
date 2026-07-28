@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +18,7 @@ import {
 } from "../scripts/lib/legacy-account-owner-assignment-rehearsal-result-evidence.mjs";
 
 const SOURCE_SHA = "d5d7a82d44f8b2b5517462f3bf5f9bb1e74a6698";
+const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const CHECKS = Object.freeze([
   "successful_assignment",
   "already_applied",
@@ -33,6 +36,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const journal =
         createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
         });
 
@@ -52,6 +56,7 @@ describe("legacy account owner-assignment result evidence", () => {
         stored.evidenceVersion,
         LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
       );
+      assert.equal(stored.runId, RUN_ID);
       assert.equal(stored.phase, "cleanup_result");
       assert.equal(stored.status, "passed");
       assert.deepEqual(stored.invocationCounts, {
@@ -88,6 +93,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const journal =
         createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
         });
       journal.recordPrepared(prepared);
@@ -124,6 +130,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const journal =
         createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
         });
       assert.throws(
@@ -142,6 +149,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const result =
         await runLegacyAccountOwnerAssignmentResultEvidenceSession({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
           async prepare() {
             prepareCalls += 1;
@@ -184,6 +192,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const result =
         await runLegacyAccountOwnerAssignmentResultEvidenceSession({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
           prepare: async () => preparedEvidence(),
           async runHarness() {
@@ -208,12 +217,12 @@ describe("legacy account owner-assignment result evidence", () => {
 
       assert.equal(harnessCalls, 0);
       assert.equal(cleanupCalls, 1);
-      assert.equal(writeCalls, 2);
+      assert.equal(writeCalls, 1);
       assert.equal(result.status, "failed");
       assert.equal(result.code, "prepared_evidence_write_failed");
-      assert.equal(result.evidencePersisted, true);
-      assert.equal(snapshots.at(-1).phase, "cleanup_result");
-      assert.equal(snapshots.at(-1).harness, null);
+      assert.equal(result.evidencePersisted, false);
+      assert.equal(result.lastPersistedPhase, "none");
+      assert.equal(snapshots.at(-1).phase, "prepared");
     });
   });
 
@@ -224,6 +233,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const result =
         await runLegacyAccountOwnerAssignmentResultEvidenceSession({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
           prepare: async () => preparedEvidence(),
           runHarness: async () => passedHarnessEvidence(),
@@ -262,6 +272,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const result =
         await runLegacyAccountOwnerAssignmentResultEvidenceSession({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
           prepare: async () => preparedEvidence(),
           async runHarness() {
@@ -291,6 +302,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const result =
         await runLegacyAccountOwnerAssignmentResultEvidenceSession({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
           prepare: async () => preparedEvidence(),
           runHarness: async () => passedHarnessEvidence(),
@@ -324,6 +336,7 @@ describe("legacy account owner-assignment result evidence", () => {
       const result =
         await runLegacyAccountOwnerAssignmentResultEvidenceSession({
           evidenceFile,
+          runId: RUN_ID,
           sourceSha: SOURCE_SHA,
           async prepare() {
             prepareCalls += 1;
@@ -359,6 +372,43 @@ describe("legacy account owner-assignment result evidence", () => {
       );
       assert.equal(result.evidencePersisted, false);
       assert.equal(result.lastPersistedPhase, "harness_result");
+    });
+  });
+
+  it("refuses a stale run file without replacing it", () => {
+    withEvidenceFile((evidenceFile) => {
+      writeFileSync(evidenceFile, "stale-evidence\n", "utf8");
+      const journal =
+        createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+          evidenceFile,
+          runId: RUN_ID,
+          sourceSha: SOURCE_SHA,
+        });
+
+      assert.throws(
+        () => journal.recordPrepared(preparedEvidence()),
+        (error) =>
+          error.code === "prepared_evidence_write_failed",
+      );
+      assert.equal(
+        readFileSync(evidenceFile, "utf8"),
+        "stale-evidence\n",
+      );
+    });
+  });
+
+  it("requires the run id to match the evidence file name", () => {
+    withEvidenceFile((evidenceFile) => {
+      assert.throws(
+        () =>
+          createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+            evidenceFile,
+            runId: "22222222-2222-4222-8222-222222222222",
+            sourceSha: SOURCE_SHA,
+          }),
+        (error) => error.code === "prepared_result_invalid",
+      );
+      assert.equal(existsSync(evidenceFile), false);
     });
   });
 });
@@ -435,7 +485,7 @@ function withEvidenceFile(run) {
   );
   const evidenceFile = join(
     directory,
-    "legacy-account-owner-assignment-rehearsal-test.json",
+    `legacy-account-owner-assignment-rehearsal-${RUN_ID}.json`,
   );
   try {
     return run(evidenceFile);
@@ -450,7 +500,7 @@ async function withEvidenceFileAsync(run) {
   );
   const evidenceFile = join(
     directory,
-    "legacy-account-owner-assignment-rehearsal-test.json",
+    `legacy-account-owner-assignment-rehearsal-${RUN_ID}.json`,
   );
   try {
     return await run(evidenceFile);
