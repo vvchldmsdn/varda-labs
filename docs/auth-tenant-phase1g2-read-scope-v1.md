@@ -53,6 +53,23 @@ the separately reviewed bootstrap flow:
 
 None of those writes are performed here.
 
+The next evidence step is deliberately narrower than that rollout:
+
+- `npm run preflight:legacy-account-ownership -- --discover` returns only
+  full SHA-256 fingerprints and aggregate account counts;
+- evaluation requires both an explicit app-user fingerprint and an explicit
+  legacy-owner fingerprint;
+- the repeatable-read transaction is database-enforced read-only;
+- only `accounts` are classified as `eligible`, `already_assigned`,
+  `foreign_owner_conflict`, `missing_legacy_evidence`, or `unresolved`;
+- raw app-user IDs, legacy owner values, account IDs, and account details are
+  included only inside stable digests and are never returned;
+- intentionally skipped legacy tables and every non-account product table
+  remain outside this preflight.
+
+This evidence does not approve identity consumption, app-user activation,
+owner updates, RLS, or product-screen cutover.
+
 ## Explicit Non-Actions
 
 - no schema or migration;
