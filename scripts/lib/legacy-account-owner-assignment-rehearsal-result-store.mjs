@@ -15,6 +15,7 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import {
   assertResultEvidenceRunId,
   assertResultEvidenceSourceSha,
+  createBranchCreateReconciliationEvidenceSnapshot,
   createBranchCreateRequestedEvidenceSnapshot,
   createRecoveryCleanupEvidenceSnapshot,
   createResultEvidenceSnapshot,
@@ -75,6 +76,20 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
         }),
         "create_requested_evidence_write_failed",
         { create: true },
+      );
+    },
+    recordCreateReconciliationOutcome(value) {
+      if (latestSnapshot?.phase !== "create_requested") {
+        throw resultEvidenceError("prepared_result_invalid");
+      }
+      return persist(
+        createBranchCreateReconciliationEvidenceSnapshot({
+          runId,
+          sourceSha,
+          recovery: latestSnapshot.recovery,
+          reconciliation: value,
+        }),
+        "create_reconciliation_result_evidence_write_failed",
       );
     },
     recordChildCreatedUnattested(

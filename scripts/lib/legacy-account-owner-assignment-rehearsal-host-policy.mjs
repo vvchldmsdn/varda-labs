@@ -31,6 +31,7 @@ const SAFE_HOST_ERROR_CODES = new Set([
   "child_created_unattested_evidence_write_failed",
   "child_attestation_evidence_write_failed",
   "cleanup_result_evidence_write_failed",
+  "create_reconciliation_result_evidence_write_failed",
   "create_requested_evidence_write_failed",
   "harness_context_invalid",
   "host_options_invalid",

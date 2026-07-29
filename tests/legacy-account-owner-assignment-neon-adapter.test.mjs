@@ -154,52 +154,57 @@ describe("legacy account owner-assignment Neon adapter", () => {
     });
   });
 
-  it("reconciles a branch name through the list search API and exact matching", async () => {
-    const calls = [];
-    const adapter = createAdapter({
-      calls,
-      responses: [
-        ok("2.38.1\n"),
-        json({
-          branches: [
-            {
-              ...childBranch(),
-              id: "br-synthetic-partial-match",
-              name: `${BRANCH_NAME}-other`,
-            },
-            childBranch(),
-          ],
-          pagination: { next: null, previous: null },
-        }),
-      ],
-    });
+  it("reconciles exact names across valid terminal pagination shapes", async () => {
+    for (const paginationShape of [
+      {},
+      { pagination: {} },
+      { pagination: { next: null } },
+    ]) {
+      const calls = [];
+      const adapter = createAdapter({
+        calls,
+        responses: [
+          ok("2.38.1\n"),
+          json({
+            branches: [
+              {
+                ...childBranch(),
+                id: "br-synthetic-partial-match",
+                name: `${BRANCH_NAME}-other`,
+              },
+              childBranch(),
+            ],
+            ...paginationShape,
+          }),
+        ],
+      });
 
-    const child = await adapter.reconcileChildByExactName({
-      projectId: PROJECT_ID,
-      branchName: BRANCH_NAME,
-      timeoutMs: 1_000,
-    });
+      const child = await adapter.reconcileChildByExactName({
+        projectId: PROJECT_ID,
+        branchName: BRANCH_NAME,
+        timeoutMs: 1_000,
+      });
 
-    assert.deepEqual(child, {
-      branchId: CHILD_BRANCH_ID,
-      branchName: BRANCH_NAME,
-    });
-    const requestPath = calls[1].args.find((value) =>
-      value.startsWith(`/projects/${PROJECT_ID}/branches?`),
-    );
-    assert.equal(
-      requestPath,
-      `/projects/${PROJECT_ID}/branches?search=${encodeURIComponent(
-        BRANCH_NAME,
-      )}&limit=10000&include_deleted=false`,
-    );
-    assert.equal(
-      calls[1].args.some((value) =>
-        value.includes(encodeURIComponent(BRANCH_NAME)) &&
-        !value.includes("?search="),
-      ),
-      false,
-    );
+      assert.deepEqual(child, {
+        branchId: CHILD_BRANCH_ID,
+        branchName: BRANCH_NAME,
+      });
+      const apiIndex = calls[1].args.indexOf("api");
+      assert.deepEqual(calls[1].args.slice(apiIndex, apiIndex + 8), [
+        "api",
+        `/projects/${PROJECT_ID}/branches`,
+        "-Q",
+        `search=${BRANCH_NAME}`,
+        "-Q",
+        "limit=10000",
+        "-Q",
+        "include_deleted=false",
+      ]);
+      assert.equal(
+        calls[1].args.some((value) => value.includes("?search=")),
+        false,
+      );
+    }
   });
 
   it("returns null when a complete branch list has no exact name match", async () => {
@@ -214,7 +219,6 @@ describe("legacy account owner-assignment Neon adapter", () => {
               name: `${BRANCH_NAME}-other`,
             },
           ],
-          pagination: { next: null, previous: null },
         }),
       ],
     });
@@ -239,7 +243,6 @@ describe("legacy account owner-assignment Neon adapter", () => {
             id: "br-synthetic-duplicate",
           },
         ],
-        pagination: { next: null, previous: null },
       },
       {
         branches: [childBranch()],

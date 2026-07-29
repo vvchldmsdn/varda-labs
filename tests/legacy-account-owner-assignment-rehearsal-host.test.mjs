@@ -977,29 +977,103 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
       assert.equal(calls.get, 0);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(
+        evidence.phase,
+        "create_reconciliation_result",
+      );
+      assert.equal(evidence.code, "branch_create_ambiguous");
+      assert.deepEqual(evidence.reconciliation, {
+        outcome: "not_found",
+        pollCount: 8,
+      });
+      assert.equal(
+        evidence.resolution,
+        "exact_name_not_visible_before_deadline",
+      );
     });
   });
 
   it("fails an exact-name reconciliation read error without polling again", async () => {
+    for (const reason of [
+      "execution_failed",
+      "response_invalid",
+    ]) {
+      await withEvidenceDirectory(async (evidenceDirectory) => {
+        const calls = callCounts();
+        const options = hostOptions(evidenceDirectory, calls);
+        const result =
+          await runLegacyAccountOwnerAssignmentRehearsalHost({
+            ...options,
+            async createChild() {
+              calls.create += 1;
+              throw new Error("ambiguous provider output");
+            },
+            async reconcileChildByExactName() {
+              calls.reconcile += 1;
+              throw Object.assign(
+                new Error(
+                  "synthetic list read failure raw-provider-secret",
+                ),
+                {
+                  stage: "branch_list_search",
+                  reason,
+                },
+              );
+            },
+          });
+
+        assert.equal(result.status, "failed");
+        assert.equal(
+          result.code,
+          "branch_create_reconciliation_failed",
+        );
+        assert.equal(calls.create, 1);
+        assert.equal(calls.reconcile, 1);
+        assert.equal(calls.attest, 0);
+        assert.equal(calls.harness, 0);
+        assert.equal(calls.delete, 0);
+        assert.equal(calls.get, 0);
+        const evidence = readEvidence(evidenceDirectory);
+        assert.equal(
+          evidence.phase,
+          "create_reconciliation_result",
+        );
+        assert.deepEqual(evidence.reconciliation, {
+          outcome: "read_failed",
+          pollCount: 1,
+          readDiagnostic: {
+            stage: "branch_list_search",
+            reason,
+          },
+        });
+        assert.equal(
+          JSON.stringify(evidence).includes(
+            "raw-provider-secret",
+          ),
+          false,
+        );
+      });
+    }
+  });
+
+  it("records an exact-name reconciliation timeout without cleanup authority", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();
+      let clock = 0;
       const options = hostOptions(evidenceDirectory, calls);
       const result =
         await runLegacyAccountOwnerAssignmentRehearsalHost({
           ...options,
+          readinessMonotonicNow: () => clock,
           async createChild() {
             calls.create += 1;
             throw new Error("ambiguous provider output");
           },
           async reconcileChildByExactName() {
             calls.reconcile += 1;
-            throw Object.assign(
-              new Error("synthetic list read failure"),
-              {
-                stage: "branch_list_search",
-                reason: "execution_failed",
-              },
-            );
+            clock = 30_000;
+            return null;
           },
         });
 
@@ -1014,6 +1088,11 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
       assert.equal(calls.get, 0);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.deepEqual(evidence.reconciliation, {
+        outcome: "timeout",
+        pollCount: 1,
+      });
     });
   });
 

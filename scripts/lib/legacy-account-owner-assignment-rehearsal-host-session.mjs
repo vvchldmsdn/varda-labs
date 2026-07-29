@@ -457,22 +457,60 @@ async function handleAmbiguousCreate({
   }
 
   if (reconciliation.status === "failed") {
+    let reconciliationEvidence;
+    try {
+      reconciliationEvidence =
+        evidenceJournal.recordCreateReconciliationOutcome(
+          readinessEvidence(reconciliation),
+        );
+    } catch {
+      return ownerAssignmentHostFailure(
+        "create_reconciliation_result_evidence_write_failed",
+        {
+          runId: run.runId,
+          branchCreateInvocations: 1,
+          exactNameReconciliations: 1,
+          ...journalEvidenceState(evidenceJournal),
+        },
+      );
+    }
     return ownerAssignmentHostFailure(
       "branch_create_reconciliation_failed",
       {
         runId: run.runId,
         branchCreateInvocations: 1,
         exactNameReconciliations: 1,
-        ...journalEvidenceState(evidenceJournal),
+        evidencePersisted: true,
+        lastPersistedPhase: reconciliationEvidence.phase,
+        evidence: reconciliationEvidence,
       },
     );
   }
   if (reconciliation.status === "not_found") {
+    let reconciliationEvidence;
+    try {
+      reconciliationEvidence =
+        evidenceJournal.recordCreateReconciliationOutcome(
+          readinessEvidence(reconciliation),
+        );
+    } catch {
+      return ownerAssignmentHostFailure(
+        "create_reconciliation_result_evidence_write_failed",
+        {
+          runId: run.runId,
+          branchCreateInvocations: 1,
+          exactNameReconciliations: 1,
+          ...journalEvidenceState(evidenceJournal),
+        },
+      );
+    }
     return ownerAssignmentHostFailure("branch_create_ambiguous", {
       runId: run.runId,
       branchCreateInvocations: 1,
       exactNameReconciliations: 1,
-      ...journalEvidenceState(evidenceJournal),
+      evidencePersisted: true,
+      lastPersistedPhase: reconciliationEvidence.phase,
+      evidence: reconciliationEvidence,
     });
   }
 

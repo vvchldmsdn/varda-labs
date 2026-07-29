@@ -13,6 +13,7 @@ import { describe, it } from "node:test";
 
 import {
   createLegacyAccountOwnerAssignmentResultEvidenceJournal,
+  LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_RECONCILIATION_EVIDENCE_VERSION,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_REQUEST_EVIDENCE_VERSION,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
@@ -131,6 +132,132 @@ describe("legacy account owner-assignment result evidence", () => {
         pollCount: 1,
       });
       assert.deepEqual(readEvidence(evidenceFile), final);
+    });
+  });
+
+  it("records terminal create reconciliation outcomes without raw diagnostics", () => {
+    for (const testCase of [
+      {
+        outcome: "read_failed",
+        pollCount: 1,
+        readDiagnostic: {
+          stage: "branch_list_search",
+          reason: "execution_failed",
+          stderr: "raw-provider-secret",
+        },
+        expectedCode: "branch_create_reconciliation_failed",
+        expectedResolution: "manual_or_auto_expiry_unverified",
+      },
+      {
+        outcome: "read_failed",
+        pollCount: 1,
+        readDiagnostic: {
+          stage: "branch_list_search",
+          reason: "response_invalid",
+          response: "raw-provider-secret",
+        },
+        expectedCode: "branch_create_reconciliation_failed",
+        expectedResolution: "manual_or_auto_expiry_unverified",
+      },
+      {
+        outcome: "timeout",
+        pollCount: 1,
+        expectedCode: "branch_create_reconciliation_failed",
+        expectedResolution: "manual_or_auto_expiry_unverified",
+      },
+      {
+        outcome: "not_found",
+        pollCount: 8,
+        expectedCode: "branch_create_ambiguous",
+        expectedResolution:
+          "exact_name_not_visible_before_deadline",
+      },
+    ]) {
+      withEvidenceFile((evidenceFile) => {
+        const journal =
+          createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+            evidenceFile,
+            runId: RUN_ID,
+            sourceSha: SOURCE_SHA,
+          });
+
+        journal.recordCreateRequested(createRequestEvidence());
+        const snapshot =
+          journal.recordCreateReconciliationOutcome(testCase);
+
+        assert.equal(
+          snapshot.evidenceVersion,
+          LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_RECONCILIATION_EVIDENCE_VERSION,
+        );
+        assert.equal(
+          snapshot.phase,
+          "create_reconciliation_result",
+        );
+        assert.equal(snapshot.code, testCase.expectedCode);
+        assert.equal(
+          snapshot.resolution,
+          testCase.expectedResolution,
+        );
+        assert.deepEqual(snapshot.invocationCounts, {
+          branchCreate: 1,
+          exactNameReconciliation: 1,
+          harness: 0,
+          branchDelete: 0,
+          exactIdNotFoundCheck: 0,
+        });
+        assert.deepEqual(snapshot.reconciliation, {
+          outcome: testCase.outcome,
+          pollCount: testCase.pollCount,
+          ...(testCase.readDiagnostic === undefined
+            ? {}
+            : {
+                readDiagnostic: {
+                  stage: testCase.readDiagnostic.stage,
+                  reason: testCase.readDiagnostic.reason,
+                },
+              }),
+        });
+        assert.equal(
+          JSON.stringify(snapshot).includes("raw-provider-secret"),
+          false,
+        );
+        assert.deepEqual(readEvidence(evidenceFile), snapshot);
+      });
+    }
+  });
+
+  it("blocks create reconciliation accessors without invoking them", () => {
+    withEvidenceFile((evidenceFile) => {
+      let getterCalls = 0;
+      const reconciliation = {
+        outcome: "read_failed",
+        pollCount: 1,
+      };
+      Object.defineProperty(reconciliation, "readDiagnostic", {
+        get() {
+          getterCalls += 1;
+          return {
+            stage: "branch_list_search",
+            reason: "execution_failed",
+          };
+        },
+      });
+      const journal =
+        createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+          evidenceFile,
+          runId: RUN_ID,
+          sourceSha: SOURCE_SHA,
+        });
+
+      journal.recordCreateRequested(createRequestEvidence());
+      assert.throws(
+        () =>
+          journal.recordCreateReconciliationOutcome(
+            reconciliation,
+          ),
+        (error) => error.code === "prepared_result_invalid",
+      );
+      assert.equal(getterCalls, 0);
     });
   });
 

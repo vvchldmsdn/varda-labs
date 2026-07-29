@@ -366,9 +366,13 @@ function branchGetArgs(projectId, branchIdOrName) {
 function branchListSearchArgs(projectId, branchName) {
   return [
     "api",
-    `/projects/${projectId}/branches?search=${encodeURIComponent(
-      branchName,
-    )}&limit=10000&include_deleted=false`,
+    `/projects/${projectId}/branches`,
+    "-Q",
+    `search=${branchName}`,
+    "-Q",
+    "limit=10000",
+    "-Q",
+    "include_deleted=false",
   ];
 }
 
@@ -418,12 +422,25 @@ function projectCreatedBranchFromExactNameList(
   expectedBranchName,
 ) {
   const branches = ownDataValue(response, "branches");
-  const pagination = requireObject(response, "pagination");
-  if (
-    !Array.isArray(branches) ||
-    ownDataValue(pagination, "next") !== null
-  ) {
+  const pagination = optionalOwnDataValue(response, "pagination");
+  if (!Array.isArray(branches) || pagination === INVALID) {
     throw adapterError("neon_cli_response_invalid");
+  }
+  if (pagination !== MISSING) {
+    if (
+      !pagination ||
+      typeof pagination !== "object" ||
+      Array.isArray(pagination)
+    ) {
+      throw adapterError("neon_cli_response_invalid");
+    }
+    const next = optionalOwnDataValue(pagination, "next");
+    if (
+      next === INVALID ||
+      (next !== MISSING && next !== null)
+    ) {
+      throw adapterError("neon_cli_response_invalid");
+    }
   }
 
   const exactMatches = [];
@@ -759,6 +776,19 @@ function ownDataValue(value, key) {
     return INVALID;
   }
   if (!descriptor || !("value" in descriptor)) return INVALID;
+  return descriptor.value;
+}
+
+function optionalOwnDataValue(value, key) {
+  if (!value || typeof value !== "object") return INVALID;
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, key);
+  } catch {
+    return INVALID;
+  }
+  if (!descriptor) return MISSING;
+  if (!("value" in descriptor)) return INVALID;
   return descriptor.value;
 }
 

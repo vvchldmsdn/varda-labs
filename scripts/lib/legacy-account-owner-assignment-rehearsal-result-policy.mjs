@@ -6,6 +6,8 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION =
   "legacy_account_owner_assignment_rehearsal_result_evidence_v1";
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_REQUEST_EVIDENCE_VERSION =
   "legacy_account_owner_assignment_create_request_evidence_v1";
+export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_RECONCILIATION_EVIDENCE_VERSION =
+  "legacy_account_owner_assignment_create_reconciliation_evidence_v1";
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION =
   "legacy_account_owner_assignment_unattested_child_evidence_v1";
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL =
@@ -35,7 +37,13 @@ const READINESS_OUTCOMES = new Set([
   "state_invalid",
   "timeout",
 ]);
+const CREATE_RECONCILIATION_OUTCOMES = new Set([
+  "not_found",
+  "read_failed",
+  "timeout",
+]);
 const CHILD_READ_STAGES = new Set([
+  "branch_list_search",
   "branch_get",
   "endpoint_list_get",
 ]);
@@ -58,6 +66,7 @@ const EXPECTED_CHECKS = Object.freeze([
 const SESSION_CODES = new Set([
   "cleanup_execution_failed",
   "cleanup_result_evidence_write_failed",
+  "create_reconciliation_result_evidence_write_failed",
   "cleanup_result_invalid",
   "harness_execution_failed",
   "harness_result_evidence_write_failed",
@@ -186,6 +195,46 @@ export function createBranchCreateRequestedEvidenceSnapshot({
     ),
     cleanup: "unattempted",
     resolution: "exact_name_reconciliation_required",
+  });
+}
+
+export function createBranchCreateReconciliationEvidenceSnapshot({
+  runId,
+  sourceSha,
+  recovery,
+  reconciliation,
+}) {
+  assertResultEvidenceRunId(runId);
+  assertResultEvidenceSourceSha(sourceSha);
+  const projectedReconciliation =
+    projectCreateReconciliationEvidence(
+      reconciliation,
+      "prepared_result_invalid",
+    );
+  const exactNameNotFound =
+    projectedReconciliation.outcome === "not_found";
+  return deepFreeze({
+    evidenceVersion:
+      LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_RECONCILIATION_EVIDENCE_VERSION,
+    rehearsal: LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL,
+    runId,
+    sourceSha,
+    phase: "create_reconciliation_result",
+    status: "failed",
+    code: exactNameNotFound
+      ? "branch_create_ambiguous"
+      : "branch_create_reconciliation_failed",
+    invocationCounts: recoveryInvocationCounts(1, 1, 0, 0, 0),
+    recovery: projectFields(
+      recovery,
+      CREATE_REQUEST_FIELDS,
+      "prepared_result_invalid",
+    ),
+    reconciliation: projectedReconciliation,
+    cleanup: "unattempted",
+    resolution: exactNameNotFound
+      ? "exact_name_not_visible_before_deadline"
+      : "manual_or_auto_expiry_unverified",
   });
 }
 
@@ -560,6 +609,38 @@ function projectReadinessEvidence(value, code) {
     pollCount < 0 ||
     pollCount > 32 ||
     ((outcome === "unattempted") !== (pollCount === 0)) ||
+    readDiagnostic === INVALID ||
+    (outcome !== "read_failed" && readDiagnostic !== MISSING)
+  ) {
+    throw resultEvidenceError(code);
+  }
+  return deepFreeze({
+    outcome,
+    pollCount,
+    ...(readDiagnostic === MISSING
+      ? {}
+      : {
+          readDiagnostic: projectReadDiagnostic(
+            readDiagnostic,
+            code,
+          ),
+        }),
+  });
+}
+
+function projectCreateReconciliationEvidence(value, code) {
+  const outcome = ownDataValue(value, "outcome");
+  const pollCount = ownDataValue(value, "pollCount");
+  const readDiagnostic = optionalOwnDataValue(
+    value,
+    "readDiagnostic",
+  );
+  if (
+    !CREATE_RECONCILIATION_OUTCOMES.has(outcome) ||
+    !Number.isInteger(pollCount) ||
+    pollCount < 0 ||
+    pollCount > 32 ||
+    (outcome === "not_found" && pollCount < 1) ||
     readDiagnostic === INVALID ||
     (outcome !== "read_failed" && readDiagnostic !== MISSING)
   ) {
