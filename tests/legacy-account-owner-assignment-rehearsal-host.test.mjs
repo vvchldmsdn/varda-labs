@@ -521,6 +521,39 @@ describe("legacy account owner-assignment rehearsal host", () => {
     });
   });
 
+  it("rejects a ready response that arrives after the hard deadline", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let clock = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep() {
+            throw new Error("sleep must not run");
+          },
+          async attestChild({ branchName }) {
+            calls.attest += 1;
+            clock = 30_000;
+            return verifiedAttestation(branchName);
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_timeout");
+      assert.equal(calls.create, 1);
+      assert.equal(calls.attest, 1);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.phase, "recovery_cleanup_result");
+      assert.equal(evidence.readiness.outcome, "timeout");
+      assert.equal(evidence.readiness.pollCount, 1);
+    });
+  });
+
   it("times out bounded readiness, cleans the verified child, and never runs the harness", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();

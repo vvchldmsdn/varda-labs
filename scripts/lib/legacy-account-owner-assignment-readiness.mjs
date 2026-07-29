@@ -86,6 +86,16 @@ export async function waitForOwnerAssignmentChildReadiness({
     }
     lastStaticAttestation = staticAttestation;
 
+    const remainingAfterRead =
+      deadline - readMonotonicNow(monotonicNow);
+    if (remainingAfterRead < 1) {
+      return failedReadiness(
+        "timeout",
+        pollCount,
+        staticAttestation,
+      );
+    }
+
     let readiness;
     try {
       readiness =
@@ -112,12 +122,7 @@ export async function waitForOwnerAssignmentChildReadiness({
       });
     }
 
-    const remainingAfterRead =
-      deadline - readMonotonicNow(monotonicNow);
-    if (
-      pollCount === policy.maxPolls ||
-      remainingAfterRead < 1
-    ) {
+    if (pollCount === policy.maxPolls) {
       return failedReadiness(
         "timeout",
         pollCount,
