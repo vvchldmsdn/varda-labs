@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 import {
+  guardLegacyAccountOwnerAssignmentProductionSource,
   guardLegacyAccountOwnerAssignmentRehearsalTarget,
   prepareLegacyAccountOwnerAssignmentRehearsalEnvironment,
 } from "../../src/lib/deployment/legacy-account-owner-assignment-rehearsal-target.ts";
@@ -19,6 +20,7 @@ import {
   ownerAssignmentHostFailure,
   projectCreatedOwnerAssignmentChild,
   projectVerifiedOwnerAssignmentChild,
+  projectVerifiedOwnerAssignmentProductionSource,
   safeOwnerAssignmentHostErrorCode,
 } from "./legacy-account-owner-assignment-rehearsal-host-policy.mjs";
 
@@ -30,6 +32,7 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
   projectId,
   parentBranchId,
   productionEndpointId,
+  attestProductionSource,
   createChild,
   reconcileChildByExactName,
   attestChild,
@@ -47,6 +50,7 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
   if (
     ![
       createChild,
+      attestProductionSource,
       reconcileChildByExactName,
       attestChild,
       deleteChild,
@@ -102,6 +106,40 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
     );
   }
 
+  let sourceAttestation;
+  try {
+    const guardedSource =
+      guardLegacyAccountOwnerAssignmentProductionSource({
+        baseEnv,
+        productionDatabasePolicy,
+        expectedProductionSourceTargetFingerprint,
+      });
+    if (guardedSource.projectId !== target.projectId) {
+      throw hostError("production_source_attestation_invalid");
+    }
+    sourceAttestation =
+      projectVerifiedOwnerAssignmentProductionSource(
+        await attestProductionSource({
+          projectId: target.projectId,
+          parentBranchId: target.parentBranchId,
+          productionEndpointId: target.productionEndpointId,
+        }),
+        {
+          expectedProjectId: target.projectId,
+          expectedParentBranchId: target.parentBranchId,
+          expectedProductionEndpointId:
+            target.productionEndpointId,
+          expectedSourceTargetFingerprint:
+            guardedSource.sourceTargetFingerprint,
+        },
+      );
+  } catch {
+    return ownerAssignmentHostFailure(
+      "production_source_attestation_invalid",
+      { runId: run.runId },
+    );
+  }
+
   let createdChild;
   try {
     createdChild = projectCreatedOwnerAssignmentChild(
@@ -112,12 +150,14 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
         parentBranchId: target.parentBranchId,
       }),
       run.branchName,
+      target.parentBranchId,
     );
   } catch {
     return handleAmbiguousCreate({
       run,
-      projectId: target.projectId,
+      target,
       reconcileChildByExactName,
+      attestChild,
       deleteChild,
       checkChildNotFound,
     });
@@ -140,16 +180,9 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
       },
     );
   } catch {
-    const cleanup = await cleanupExactChild({
-      projectId: target.projectId,
-      branchId: createdChild.branchId,
-      deleteChild,
-      checkChildNotFound,
-    });
     return ownerAssignmentHostFailure("branch_attestation_invalid", {
       runId: run.runId,
       branchCreateInvocations: 1,
-      cleanup,
     });
   }
 
@@ -175,6 +208,7 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
     preparedControlPlane =
       createOwnerAssignmentPreparedControlPlaneEvidence({
         attestation,
+        sourceAttestation,
         targetGuard,
       });
   } catch {
@@ -259,21 +293,23 @@ export function readRepositoryHeadSha({
 
 async function handleAmbiguousCreate({
   run,
-  projectId,
+  target,
   reconcileChildByExactName,
+  attestChild,
   deleteChild,
   checkChildNotFound,
 }) {
   let reconciled = null;
   try {
     const value = await reconcileChildByExactName({
-      projectId,
+      projectId: target.projectId,
       branchName: run.branchName,
     });
     if (value !== null) {
       reconciled = projectCreatedOwnerAssignmentChild(
         value,
         run.branchName,
+        target.parentBranchId,
       );
     }
   } catch {
@@ -287,15 +323,47 @@ async function handleAmbiguousCreate({
     );
   }
 
-  const cleanup =
-    reconciled === null
-      ? null
-      : await cleanupExactChild({
-          projectId,
-          branchId: reconciled.branchId,
-          deleteChild,
-          checkChildNotFound,
-        });
+  if (reconciled === null) {
+    return ownerAssignmentHostFailure("branch_create_ambiguous", {
+      runId: run.runId,
+      branchCreateInvocations: 1,
+      exactNameReconciliations: 1,
+    });
+  }
+
+  let attestation;
+  try {
+    attestation = projectVerifiedOwnerAssignmentChild(
+      await attestChild({
+        projectId: target.projectId,
+        branchId: reconciled.branchId,
+        branchName: reconciled.branchName,
+      }),
+      {
+        createdChild: reconciled,
+        expectedProjectId: target.projectId,
+        expectedParentBranchId: target.parentBranchId,
+        expectedProductionEndpointId:
+          target.productionEndpointId,
+      },
+    );
+  } catch {
+    return ownerAssignmentHostFailure(
+      "branch_create_reconciliation_unresolved",
+      {
+        runId: run.runId,
+        branchCreateInvocations: 1,
+        exactNameReconciliations: 1,
+      },
+    );
+  }
+
+  const cleanup = await cleanupExactChild({
+    projectId: target.projectId,
+    branchId: attestation.branchId,
+    deleteChild,
+    checkChildNotFound,
+  });
   return ownerAssignmentHostFailure("branch_create_ambiguous", {
     runId: run.runId,
     branchCreateInvocations: 1,

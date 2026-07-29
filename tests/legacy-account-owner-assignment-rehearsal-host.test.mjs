@@ -69,6 +69,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(result.runId, RUN_ID);
       assert.deepEqual(calls, {
         sourceSha: 1,
+        sourceAttest: 1,
         create: 1,
         reconcile: 0,
         attest: 1,
@@ -118,6 +119,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(readFileSync(evidenceFile, "utf8"), "stale-run\n");
       assert.deepEqual(calls, {
         sourceSha: 1,
+        sourceAttest: 0,
         create: 0,
         reconcile: 0,
         attest: 0,
@@ -141,6 +143,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(result.code, "host_options_invalid");
       assert.deepEqual(calls, {
         sourceSha: 0,
+        sourceAttest: 0,
         create: 0,
         reconcile: 0,
         attest: 0,
@@ -232,9 +235,115 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(result.status, "failed");
       assert.equal(result.code, "source_sha_mismatch");
       assert.equal(calls.sourceSha, 1);
+      assert.equal(calls.sourceAttest, 0);
       assert.equal(calls.create, 0);
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
+    });
+  });
+
+  it("guards the Production database source before any control-plane mutation", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...hostOptions(evidenceDirectory, calls),
+          baseEnv: {
+            ...productionEnvironment(),
+            DATABASE_URL: databaseUrl(
+              "ep-different-production",
+              true,
+            ),
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.code,
+        "production_source_attestation_invalid",
+      );
+      assert.equal(calls.sourceAttest, 0);
+      assert.equal(calls.create, 0);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+    });
+  });
+
+  it("rejects stale Production control-plane ownership before child creation", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestProductionSource() {
+            calls.sourceAttest += 1;
+            return {
+              ...verifiedProductionAttestation(),
+              endpointBranchId: "br-stale-production",
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.code,
+        "production_source_attestation_invalid",
+      );
+      assert.equal(calls.sourceAttest, 1);
+      assert.equal(calls.create, 0);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+    });
+  });
+
+  it("leaves an unattested created child unresolved without deleting it", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestChild({ branchName }) {
+            calls.attest += 1;
+            return {
+              ...verifiedAttestation(branchName),
+              endpointBranchId: "br-foreign-child",
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_attestation_invalid");
+      assert.equal(calls.create, 1);
+      assert.equal(calls.attest, 1);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+    });
+  });
+
+  it("uses one exact-ID read as authority after an ambiguous delete", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async deleteChild({ branchId }) {
+            calls.delete += 1;
+            assert.equal(branchId, CHILD_BRANCH_ID);
+            throw new Error("ambiguous delete response");
+          },
+        });
+
+      assert.equal(result.status, "passed");
+      assert.equal(result.cleanup.status, "passed");
+      assert.equal(result.cleanup.deleteInvocations, 1);
+      assert.equal(result.cleanup.exactIdGetInvocations, 1);
+      assert.equal(result.cleanup.exactIdNotFound, true);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
     });
   });
 
@@ -268,10 +377,51 @@ describe("legacy account owner-assignment rehearsal host", () => {
       });
       assert.equal(calls.create, 1);
       assert.equal(calls.reconcile, 1);
-      assert.equal(calls.attest, 0);
+      assert.equal(calls.attest, 1);
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 1);
       assert.equal(calls.get, 1);
+    });
+  });
+
+  it("does not delete an ambiguously created child that fails full attestation", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async createChild() {
+            calls.create += 1;
+            throw new Error("ambiguous provider output");
+          },
+          async reconcileChildByExactName({ branchName }) {
+            calls.reconcile += 1;
+            return {
+              branchId: CHILD_BRANCH_ID,
+              branchName,
+            };
+          },
+          async attestChild({ branchName }) {
+            calls.attest += 1;
+            return {
+              ...verifiedAttestation(branchName),
+              endpointBranchId: "br-foreign-child",
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.code,
+        "branch_create_reconciliation_unresolved",
+      );
+      assert.equal(calls.create, 1);
+      assert.equal(calls.reconcile, 1);
+      assert.equal(calls.attest, 1);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
     });
   });
 });
@@ -293,6 +443,10 @@ function hostOptions(evidenceDirectory, calls) {
     async readSourceSha() {
       calls.sourceSha += 1;
       return SOURCE_SHA;
+    },
+    async attestProductionSource() {
+      calls.sourceAttest += 1;
+      return verifiedProductionAttestation();
     },
     async createChild({ branchName }) {
       calls.create += 1;
@@ -332,6 +486,7 @@ function verifiedAttestation(branchName) {
     branchId: CHILD_BRANCH_ID,
     branchName,
     endpointId: CHILD_ENDPOINT_ID,
+    endpointBranchId: CHILD_BRANCH_ID,
     productionEndpointId: PRODUCTION_ENDPOINT_ID,
     endpointType: "read_write",
     branchReady: true,
@@ -340,6 +495,22 @@ function verifiedAttestation(branchName) {
     primary: false,
     protected: false,
     autoExpires: true,
+  };
+}
+
+function verifiedProductionAttestation() {
+  return {
+    projectId: PROJECT_ID,
+    branchId: PARENT_BRANCH_ID,
+    branchName: "main",
+    endpointId: PRODUCTION_ENDPOINT_ID,
+    endpointBranchId: PARENT_BRANCH_ID,
+    endpointType: "read_write",
+    branchReady: true,
+    endpointReady: true,
+    default: true,
+    primary: true,
+    protected: false,
   };
 }
 
@@ -406,6 +577,7 @@ function readEvidence(evidenceDirectory) {
 function callCounts() {
   return {
     sourceSha: 0,
+    sourceAttest: 0,
     create: 0,
     reconcile: 0,
     attest: 0,

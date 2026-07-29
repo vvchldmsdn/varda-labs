@@ -12,6 +12,7 @@ const HOST =
 const PROJECT_ID_PATTERN = /^[a-z][a-z0-9-]{2,63}$/;
 const BRANCH_ID_PATTERN = /^br-[a-z0-9-]+$/;
 const ENDPOINT_ID_PATTERN = /^ep-[a-z0-9-]+$/;
+const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BRANCH_NAME_PREFIX =
   "preview/codex/legacy-account-owner-assignment-rehearsal-";
 const MISSING = Symbol("missing");
@@ -20,9 +21,11 @@ const SAFE_HOST_ERROR_CODES = new Set([
   "branch_attestation_invalid",
   "branch_create_ambiguous",
   "branch_create_reconciliation_failed",
+  "branch_create_reconciliation_unresolved",
   "branch_create_result_invalid",
   "harness_context_invalid",
   "host_options_invalid",
+  "production_source_attestation_invalid",
   "source_sha_invalid",
   "source_sha_mismatch",
   "stale_evidence_path",
@@ -115,6 +118,7 @@ export function assertOwnerAssignmentHostTarget({
 export function projectCreatedOwnerAssignmentChild(
   value,
   expectedBranchName,
+  expectedParentBranchId,
 ) {
   const branchId = requirePattern(
     value,
@@ -128,7 +132,96 @@ export function projectCreatedOwnerAssignmentChild(
     expectedBranchName,
     "branch_create_result_invalid",
   );
+  if (branchId === expectedParentBranchId) {
+    throw hostError("branch_create_result_invalid");
+  }
   return Object.freeze({ branchId, branchName });
+}
+
+export function projectVerifiedOwnerAssignmentProductionSource(
+  value,
+  {
+    expectedProjectId,
+    expectedParentBranchId,
+    expectedProductionEndpointId,
+    expectedSourceTargetFingerprint,
+  },
+) {
+  const result = {
+    projectId: requireExact(
+      value,
+      "projectId",
+      expectedProjectId,
+      "production_source_attestation_invalid",
+    ),
+    branchId: requireExact(
+      value,
+      "branchId",
+      expectedParentBranchId,
+      "production_source_attestation_invalid",
+    ),
+    branchName: requireExact(
+      value,
+      "branchName",
+      "main",
+      "production_source_attestation_invalid",
+    ),
+    endpointId: requireExact(
+      value,
+      "endpointId",
+      expectedProductionEndpointId,
+      "production_source_attestation_invalid",
+    ),
+    endpointBranchId: requireExact(
+      value,
+      "endpointBranchId",
+      expectedParentBranchId,
+      "production_source_attestation_invalid",
+    ),
+    endpointType: requireExact(
+      value,
+      "endpointType",
+      "read_write",
+      "production_source_attestation_invalid",
+    ),
+    branchReady: requireExact(
+      value,
+      "branchReady",
+      true,
+      "production_source_attestation_invalid",
+    ),
+    endpointReady: requireExact(
+      value,
+      "endpointReady",
+      true,
+      "production_source_attestation_invalid",
+    ),
+    default: requireExact(
+      value,
+      "default",
+      true,
+      "production_source_attestation_invalid",
+    ),
+    primary: requireExact(
+      value,
+      "primary",
+      true,
+      "production_source_attestation_invalid",
+    ),
+    protected: requireExact(
+      value,
+      "protected",
+      false,
+      "production_source_attestation_invalid",
+    ),
+    sourceTargetFingerprint: requirePattern(
+      { sourceTargetFingerprint: expectedSourceTargetFingerprint },
+      "sourceTargetFingerprint",
+      FINGERPRINT_PATTERN,
+      "production_source_attestation_invalid",
+    ),
+  };
+  return Object.freeze(result);
 }
 
 export function projectVerifiedOwnerAssignmentChild(
@@ -190,6 +283,12 @@ export function projectVerifiedOwnerAssignmentChild(
       ENDPOINT_ID_PATTERN,
       "branch_attestation_invalid",
     ),
+    endpointBranchId: requireExact(
+      value,
+      "endpointBranchId",
+      createdChild.branchId,
+      "branch_attestation_invalid",
+    ),
     productionEndpointId: requireExact(
       value,
       "productionEndpointId",
@@ -247,6 +346,7 @@ export function projectVerifiedOwnerAssignmentChild(
 
 export function createOwnerAssignmentPreparedControlPlaneEvidence({
   attestation,
+  sourceAttestation,
   targetGuard,
 }) {
   const projectFingerprint = fingerprint(attestation.projectId);
@@ -258,7 +358,9 @@ export function createOwnerAssignmentPreparedControlPlaneEvidence({
       projectFingerprint ||
     targetGuard?.branchIdFingerprint !== branchIdFingerprint ||
     targetGuard?.branchNameFingerprint !== branchNameFingerprint ||
-    targetGuard?.endpointFingerprint !== endpointFingerprint
+    targetGuard?.endpointFingerprint !== endpointFingerprint ||
+    targetGuard?.sourceTargetFingerprint !==
+      sourceAttestation?.sourceTargetFingerprint
   ) {
     throw hostError("harness_context_invalid");
   }

@@ -48,6 +48,30 @@ export type LegacyAccountOwnerAssignmentRehearsalOptions = {
   endpointId: string;
 };
 
+export function guardLegacyAccountOwnerAssignmentProductionSource({
+  baseEnv,
+  productionDatabasePolicy =
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_TARGET_POLICY
+      .productionDatabasePolicy,
+  expectedProductionSourceTargetFingerprint =
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_TARGET_POLICY
+      .productionSourceTargetSha256,
+}: {
+  baseEnv: Record<string, unknown>;
+  productionDatabasePolicy?: ProductionDatabaseTargetGuardPolicy;
+  expectedProductionSourceTargetFingerprint?: string;
+}) {
+  const source = readProductionSource({
+    baseEnv,
+    productionDatabasePolicy,
+    expectedProductionSourceTargetFingerprint,
+  });
+  return Object.freeze({
+    projectId: source.projectId,
+    sourceTargetFingerprint: source.targetFingerprint,
+  });
+}
+
 export function guardLegacyAccountOwnerAssignmentRehearsalTarget(
   env: LegacyAccountOwnerAssignmentRehearsalEnvironment,
   previewDatabasePolicy: PreviewDatabaseTargetGuardPolicy =
@@ -201,6 +225,35 @@ export function prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
   productionDatabasePolicy?: ProductionDatabaseTargetGuardPolicy;
   expectedProductionSourceTargetFingerprint?: string;
 }): LegacyAccountOwnerAssignmentRehearsalEnvironment {
+  const source = readProductionSource({
+    baseEnv,
+    productionDatabasePolicy,
+    expectedProductionSourceTargetFingerprint,
+  });
+  return Object.freeze({
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_ID:
+      options.branchId,
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_NAME:
+      options.branchName,
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL:
+      rewriteNeonEndpoint(source.pooled, options.endpointId),
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL_UNPOOLED:
+      rewriteNeonEndpoint(source.unpooled, options.endpointId),
+    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT:
+      source.targetFingerprint,
+    NEON_PROJECT_ID: source.projectId,
+  });
+}
+
+function readProductionSource({
+  baseEnv,
+  productionDatabasePolicy,
+  expectedProductionSourceTargetFingerprint,
+}: {
+  baseEnv: Record<string, unknown>;
+  productionDatabasePolicy: ProductionDatabaseTargetGuardPolicy;
+  expectedProductionSourceTargetFingerprint: string;
+}) {
   const pooled = ownPrimitiveString(baseEnv, "DATABASE_URL");
   const unpooled = ownPrimitiveString(
     baseEnv,
@@ -235,19 +288,12 @@ export function prepareLegacyAccountOwnerAssignmentRehearsalEnvironment({
     );
   }
 
-  return Object.freeze({
-    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_ID:
-      options.branchId,
-    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_BRANCH_NAME:
-      options.branchName,
-    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL:
-      rewriteNeonEndpoint(pooled, options.endpointId),
-    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_DATABASE_URL_UNPOOLED:
-      rewriteNeonEndpoint(unpooled, options.endpointId),
-    LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_SOURCE_TARGET_FINGERPRINT:
-      productionTarget.targetFingerprint,
-    NEON_PROJECT_ID: projectId,
-  });
+  return {
+    pooled,
+    unpooled,
+    projectId,
+    targetFingerprint: productionTarget.targetFingerprint,
+  };
 }
 
 function rewriteNeonEndpoint(rawUrl: string, endpointId: string) {

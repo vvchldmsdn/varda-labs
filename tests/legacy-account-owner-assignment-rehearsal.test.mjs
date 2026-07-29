@@ -429,14 +429,21 @@ describe("legacy account owner-assignment disposable rehearsal", () => {
       source,
       /guardLegacyAccountOwnerAssignmentRehearsalTarget/,
     );
-    const sourceGuardIndex = targetSource.indexOf(
-      "guardProductionDatabaseTarget(",
+    const prepareIndex = targetSource.indexOf(
+      "export function prepareLegacyAccountOwnerAssignmentRehearsalEnvironment",
+    );
+    const sourceReadIndex = targetSource.indexOf(
+      "const source = readProductionSource({",
+      prepareIndex,
     );
     const endpointRewriteIndex = targetSource.indexOf(
       "rewriteNeonEndpoint(",
+      sourceReadIndex,
     );
-    assert.ok(sourceGuardIndex >= 0);
-    assert.ok(endpointRewriteIndex > sourceGuardIndex);
+    assert.ok(prepareIndex >= 0);
+    assert.ok(sourceReadIndex > prepareIndex);
+    assert.ok(endpointRewriteIndex > sourceReadIndex);
+    assert.match(targetSource, /guardProductionDatabaseTarget\(/);
     assert.match(targetSource, /productionSourceTargetSha256/);
     assert.match(source, /sourceTargetFingerprint/);
     assert.match(source, /productionDatabaseWrites: 0/);
