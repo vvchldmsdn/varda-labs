@@ -11,7 +11,7 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY =
   Object.freeze({
     totalTimeoutMs: 30_000,
     maxPolls: 8,
-    pollIntervalMs: 500,
+    pollIntervalMs: 4_000,
     controlPlaneReadTimeoutMs: 8_000,
   });
 const CHILD_READ_STAGES = new Set([
@@ -45,12 +45,21 @@ export async function waitForOwnerAssignmentChildReadiness({
   const deadline =
     readMonotonicNow(monotonicNow) + policy.totalTimeoutMs;
   let lastStaticAttestation = null;
+  let lastReadDiagnostic = null;
   let completedPolls = 0;
 
   for (let pollCount = 1; pollCount <= policy.maxPolls; pollCount += 1) {
     const remainingBeforeRead =
       deadline - readMonotonicNow(monotonicNow);
     if (remainingBeforeRead < 1) {
+      if (isRetryableVisibilityMiss(lastReadDiagnostic)) {
+        return failedReadiness(
+          "read_failed",
+          completedPolls,
+          lastStaticAttestation,
+          lastReadDiagnostic,
+        );
+      }
       return failedReadiness(
         "timeout",
         completedPolls,
@@ -73,14 +82,51 @@ export async function waitForOwnerAssignmentChildReadiness({
         ),
       });
     } catch (error) {
+      const readDiagnostic = projectReadDiagnostic(error);
+      completedPolls = pollCount;
+      lastReadDiagnostic = readDiagnostic;
+      if (
+        isRetryableVisibilityMiss(readDiagnostic) &&
+        pollCount < policy.maxPolls
+      ) {
+        const remainingAfterRead =
+          deadline - readMonotonicNow(monotonicNow);
+        if (remainingAfterRead < 1) {
+          return failedReadiness(
+            "read_failed",
+            pollCount,
+            lastStaticAttestation,
+            readDiagnostic,
+          );
+        }
+        try {
+          await sleep(
+            Math.max(
+              1,
+              Math.min(
+                policy.pollIntervalMs,
+                Math.floor(remainingAfterRead),
+              ),
+            ),
+          );
+        } catch {
+          return failedReadiness(
+            "read_failed",
+            pollCount,
+            lastStaticAttestation,
+          );
+        }
+        continue;
+      }
       return failedReadiness(
         "read_failed",
         pollCount,
         lastStaticAttestation,
-        projectReadDiagnostic(error),
+        readDiagnostic,
       );
     }
     completedPolls = pollCount;
+    lastReadDiagnostic = null;
 
     let staticAttestation;
     try {
@@ -240,6 +286,10 @@ function projectReadDiagnostic(error) {
     return null;
   }
   return Object.freeze({ stage, reason });
+}
+
+function isRetryableVisibilityMiss(readDiagnostic) {
+  return readDiagnostic?.reason === "exact_not_found";
 }
 
 function readOwnPrimitiveString(value, property) {

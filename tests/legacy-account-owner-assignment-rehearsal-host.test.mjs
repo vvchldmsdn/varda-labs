@@ -582,10 +582,86 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 1);
       assert.equal(calls.get, 1);
+      assert.equal(clock, 28_000);
       const evidence = readEvidence(evidenceDirectory);
       assert.equal(evidence.phase, "recovery_cleanup_result");
       assert.equal(evidence.readiness.outcome, "timeout");
       assert.equal(evidence.readiness.pollCount, 8);
+    });
+  });
+
+  for (const stage of ["branch_get", "endpoint_list_get"]) {
+    it(`waits for definite-create visibility after a transient ${stage} exact-not-found`, async () => {
+      await withEvidenceDirectory(async (evidenceDirectory) => {
+        const calls = callCounts();
+        let clock = 0;
+        const options = hostOptions(evidenceDirectory, calls);
+        const result =
+          await runLegacyAccountOwnerAssignmentRehearsalHost({
+            ...options,
+            readinessMonotonicNow: () => clock,
+            async readinessSleep(milliseconds) {
+              clock += milliseconds;
+            },
+            async attestChild({ branchName }) {
+              calls.attest += 1;
+              if (calls.attest === 1) {
+                throw childReadFailure(stage, "exact_not_found");
+              }
+              return verifiedAttestation(branchName);
+            },
+          });
+
+        assert.equal(result.status, "passed");
+        assert.equal(calls.attest, 2);
+        assert.equal(calls.harness, 1);
+        assert.equal(calls.delete, 1);
+        assert.equal(calls.get, 1);
+        assert.equal(clock, 4_000);
+        const evidence = readEvidence(evidenceDirectory);
+        assert.equal(evidence.controlPlane.readinessOutcome, "ready");
+        assert.equal(evidence.controlPlane.readinessPollCount, 2);
+      });
+    });
+  }
+
+  it("keeps a never-visible definite child unresolved after the bounded visibility window", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let clock = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep(milliseconds) {
+            clock += milliseconds;
+          },
+          async attestChild() {
+            calls.attest += 1;
+            throw childReadFailure(
+              "branch_get",
+              "exact_not_found",
+            );
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(calls.attest, 8);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+      assert.equal(clock, 28_000);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.deepEqual(evidence.readiness, {
+        outcome: "read_failed",
+        pollCount: 8,
+        readDiagnostic: {
+          stage: "branch_get",
+          reason: "exact_not_found",
+        },
+      });
     });
   });
 
@@ -642,6 +718,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
 
       assert.equal(result.status, "failed");
       assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(calls.attest, 1);
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
       assert.equal(calls.get, 0);
@@ -985,6 +1062,15 @@ function verifiedAttestation(branchName) {
     protected: false,
     autoExpires: true,
   };
+}
+
+function childReadFailure(stage, reason) {
+  const error = new Error("synthetic child read failure");
+  Object.defineProperties(error, {
+    stage: { value: stage },
+    reason: { value: reason },
+  });
+  return error;
 }
 
 function verifiedProductionAttestation() {
