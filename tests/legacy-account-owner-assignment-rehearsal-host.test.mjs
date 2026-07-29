@@ -484,6 +484,167 @@ describe("legacy account owner-assignment rehearsal host", () => {
     });
   });
 
+  it("polls a statically verified pending child until it is ready", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const timeouts = [];
+      let clock = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep(milliseconds) {
+            clock += milliseconds;
+          },
+          async attestChild({ branchName, timeoutMs }) {
+            calls.attest += 1;
+            timeouts.push(timeoutMs);
+            return {
+              ...verifiedAttestation(branchName),
+              endpointState:
+                calls.attest === 1 ? "init" : "active",
+            };
+          },
+        });
+
+      assert.equal(result.status, "passed");
+      assert.equal(calls.create, 1);
+      assert.equal(calls.attest, 2);
+      assert.equal(calls.harness, 1);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
+      assert.deepEqual(timeouts, [8_000, 8_000]);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.controlPlane.readinessOutcome, "ready");
+      assert.equal(evidence.controlPlane.readinessPollCount, 2);
+    });
+  });
+
+  it("times out bounded readiness, cleans the verified child, and never runs the harness", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let clock = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep(milliseconds) {
+            clock += milliseconds;
+          },
+          async attestChild({ branchName }) {
+            calls.attest += 1;
+            return {
+              ...verifiedAttestation(branchName),
+              endpointState: "init",
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_timeout");
+      assert.equal(calls.create, 1);
+      assert.equal(calls.attest, 8);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.phase, "recovery_cleanup_result");
+      assert.equal(evidence.readiness.outcome, "timeout");
+      assert.equal(evidence.readiness.pollCount, 8);
+    });
+  });
+
+  it("keeps a child unresolved when the first readiness read fails before static attestation", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestChild() {
+            calls.attest += 1;
+            throw new Error("synthetic read failure");
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(calls.attest, 1);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.readiness.outcome, "read_failed");
+      assert.equal(evidence.readiness.pollCount, 1);
+    });
+  });
+
+  it("cleans a statically verified child when a later readiness read fails", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let clock = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep(milliseconds) {
+            clock += milliseconds;
+          },
+          async attestChild({ branchName }) {
+            calls.attest += 1;
+            if (calls.attest === 2) {
+              throw new Error("synthetic later read failure");
+            }
+            return {
+              ...verifiedAttestation(branchName),
+              endpointState: "init",
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(calls.attest, 2);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.readiness.outcome, "read_failed");
+      assert.equal(evidence.readiness.pollCount, 2);
+    });
+  });
+
+  it("fails closed on an unknown readiness state after static attestation", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestChild({ branchName }) {
+            calls.attest += 1;
+            return {
+              ...verifiedAttestation(branchName),
+              endpointState: "unknown-provider-state",
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_invalid");
+      assert.equal(calls.attest, 1);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.readiness.outcome, "state_invalid");
+      assert.equal(evidence.readiness.pollCount, 1);
+    });
+  });
+
   it("uses one exact-ID read as authority after an ambiguous delete", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();
@@ -553,6 +714,10 @@ describe("legacy account owner-assignment rehearsal host", () => {
         evidence.invocationCounts.exactNameReconciliation,
         1,
       );
+      assert.deepEqual(evidence.readiness, {
+        outcome: "ready",
+        pollCount: 1,
+      });
     });
   });
 
@@ -668,11 +833,12 @@ function verifiedAttestation(branchName) {
     branchId: CHILD_BRANCH_ID,
     branchName,
     endpointId: CHILD_ENDPOINT_ID,
+    endpointProjectId: PROJECT_ID,
     endpointBranchId: CHILD_BRANCH_ID,
-    productionEndpointId: PRODUCTION_ENDPOINT_ID,
     endpointType: "read_write",
-    branchReady: true,
-    endpointReady: true,
+    endpointDisabled: false,
+    branchState: "ready",
+    endpointState: "active",
     default: false,
     primary: false,
     protected: false,

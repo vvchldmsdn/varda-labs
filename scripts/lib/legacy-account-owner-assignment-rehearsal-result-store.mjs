@@ -99,6 +99,25 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
         { create: createsEvidenceFile },
       );
     },
+    recordChildAttestationOutcome(readiness) {
+      if (
+        latestSnapshot?.phase !== "child_created_unattested"
+      ) {
+        throw resultEvidenceError("prepared_result_invalid");
+      }
+      return persist(
+        createUnattestedChildEvidenceSnapshot({
+          runId,
+          sourceSha,
+          recovery: latestSnapshot.recovery,
+          exactNameReconciliations:
+            latestSnapshot.invocationCounts
+              .exactNameReconciliation,
+          readiness,
+        }),
+        "child_attestation_evidence_write_failed",
+      );
+    },
     recordPrepared(value) {
       const createsEvidenceFile = latestSnapshot === null;
       if (
@@ -138,6 +157,7 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           exactNameReconciliations:
             latestSnapshot.invocationCounts
               .exactNameReconciliation,
+          readiness: latestSnapshot.readiness,
         }),
         "cleanup_result_evidence_write_failed",
       );

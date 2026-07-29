@@ -21,11 +21,15 @@ const MISSING = Symbol("missing");
 const INVALID = Symbol("invalid");
 const SAFE_HOST_ERROR_CODES = new Set([
   "branch_attestation_invalid",
+  "branch_readiness_invalid",
+  "branch_readiness_read_failed",
+  "branch_readiness_timeout",
   "branch_create_ambiguous",
   "branch_create_reconciliation_failed",
   "branch_create_reconciliation_unresolved",
   "branch_create_result_invalid",
   "child_created_unattested_evidence_write_failed",
+  "child_attestation_evidence_write_failed",
   "cleanup_result_evidence_write_failed",
   "create_requested_evidence_write_failed",
   "harness_context_invalid",
@@ -231,7 +235,7 @@ export function projectVerifiedOwnerAssignmentProductionSource(
   return Object.freeze(result);
 }
 
-export function projectVerifiedOwnerAssignmentChild(
+export function projectVerifiedOwnerAssignmentChildStatic(
   value,
   {
     createdChild,
@@ -290,34 +294,39 @@ export function projectVerifiedOwnerAssignmentChild(
       ENDPOINT_ID_PATTERN,
       "branch_attestation_invalid",
     ),
+    endpointProjectId: requireExact(
+      value,
+      "endpointProjectId",
+      expectedProjectId,
+      "branch_attestation_invalid",
+    ),
     endpointBranchId: requireExact(
       value,
       "endpointBranchId",
       createdChild.branchId,
       "branch_attestation_invalid",
     ),
-    productionEndpointId: requireExact(
-      value,
-      "productionEndpointId",
-      expectedProductionEndpointId,
-      "branch_attestation_invalid",
-    ),
+    productionEndpointId: expectedProductionEndpointId,
     endpointType: requireExact(
       value,
       "endpointType",
       "read_write",
       "branch_attestation_invalid",
     ),
-    branchReady: requireExact(
+    endpointDisabled: requireExact(
       value,
-      "branchReady",
-      true,
+      "endpointDisabled",
+      false,
       "branch_attestation_invalid",
     ),
-    endpointReady: requireExact(
+    branchState: requireString(
       value,
-      "endpointReady",
-      true,
+      "branchState",
+      "branch_attestation_invalid",
+    ),
+    endpointState: requireString(
+      value,
+      "endpointState",
       "branch_attestation_invalid",
     ),
     default: requireExact(
@@ -351,8 +360,35 @@ export function projectVerifiedOwnerAssignmentChild(
   return Object.freeze(result);
 }
 
+export function projectOwnerAssignmentChildReadiness(value) {
+  const branchState = requireString(
+    value,
+    "branchState",
+    "branch_readiness_invalid",
+  );
+  const endpointState = requireString(
+    value,
+    "endpointState",
+    "branch_readiness_invalid",
+  );
+  if (
+    branchState === "ready" &&
+    ["active", "idle"].includes(endpointState)
+  ) {
+    return Object.freeze({ outcome: "ready" });
+  }
+  if (
+    ["init", "ready"].includes(branchState) &&
+    ["init", "active", "idle"].includes(endpointState)
+  ) {
+    return Object.freeze({ outcome: "pending" });
+  }
+  throw hostError("branch_readiness_invalid");
+}
+
 export function createOwnerAssignmentPreparedControlPlaneEvidence({
   attestation,
+  readinessPollCount,
   sourceAttestation,
   targetGuard,
 }) {
@@ -387,6 +423,13 @@ export function createOwnerAssignmentPreparedControlPlaneEvidence({
     targetFingerprint: targetGuard.targetFingerprint,
     endpointType: "read_write",
     endpointReady: true,
+    readinessOutcome: "ready",
+    readinessPollCount: requireIntegerInRange(
+      readinessPollCount,
+      1,
+      32,
+      "harness_context_invalid",
+    ),
     productionEndpointSeparated: true,
     default: false,
     primary: false,
@@ -566,6 +609,25 @@ function requireExact(value, key, expected, code) {
   const item = ownDataValue(value, key);
   if (item !== expected) throw hostError(code);
   return item;
+}
+
+function requireString(value, key, code) {
+  const item = ownDataValue(value, key);
+  if (typeof item !== "string" || item.length === 0) {
+    throw hostError(code);
+  }
+  return item;
+}
+
+function requireIntegerInRange(value, minimum, maximum, code) {
+  if (
+    !Number.isInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
+    throw hostError(code);
+  }
+  return value;
 }
 
 function ownDataValue(value, key) {

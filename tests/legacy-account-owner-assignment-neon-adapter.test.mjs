@@ -81,8 +81,12 @@ describe("legacy account owner-assignment Neon adapter", () => {
       branchId: PARENT_BRANCH_ID,
       branchName: "main",
       endpointId: PRODUCTION_ENDPOINT_ID,
+      endpointProjectId: PROJECT_ID,
       endpointBranchId: PARENT_BRANCH_ID,
       endpointType: "read_write",
+      branchState: "ready",
+      endpointState: "idle",
+      endpointDisabled: false,
       branchReady: true,
       endpointReady: true,
       default: true,
@@ -243,9 +247,68 @@ describe("legacy account owner-assignment Neon adapter", () => {
       },
     );
   });
+
+  it("bounds both readiness GETs by one remaining monotonic budget", async () => {
+    const calls = [];
+    let clock = 0;
+    const adapter = createAdapter({
+      calls,
+      responses: [
+        ok("2.38.1\n"),
+        json({ branch: childBranch() }),
+        json(childEndpointResponse()),
+      ],
+      monotonicNow: () => clock,
+      afterSpawn(callIndex) {
+        clock = [100, 700, 700][callIndex] ?? clock;
+      },
+    });
+
+    await adapter.attestChild({
+      projectId: PROJECT_ID,
+      branchId: CHILD_BRANCH_ID,
+      branchName: BRANCH_NAME,
+      timeoutMs: 1_000,
+    });
+
+    assert.deepEqual(
+      calls.map(({ options }) => options.timeout),
+      [1_000, 900, 300],
+    );
+  });
+
+  it("classifies a direct Node process timeout without exposing provider output", async () => {
+    const adapter = createAdapter({
+      calls: [],
+      responses: [
+        ok("2.38.1\n"),
+        timedOut(`private provider output ${RAW_SECRET}`),
+      ],
+    });
+
+    await assert.rejects(
+      () =>
+        adapter.attestChild({
+          projectId: PROJECT_ID,
+          branchId: CHILD_BRANCH_ID,
+          branchName: BRANCH_NAME,
+          timeoutMs: 1_000,
+        }),
+      (error) => {
+        assert.equal(error.code, "neon_cli_timeout");
+        assert.equal(JSON.stringify(error).includes(RAW_SECRET), false);
+        return true;
+      },
+    );
+  });
 });
 
-function createAdapter({ calls, responses }) {
+function createAdapter({
+  calls,
+  responses,
+  monotonicNow,
+  afterSpawn,
+}) {
   return createLegacyAccountOwnerAssignmentNeonAdapter({
     npxCliPath: NPX_CLI_PATH,
     configDirectory: CONFIG_DIRECTORY,
@@ -261,8 +324,10 @@ function createAdapter({ calls, responses }) {
     },
     nodeExecutable: NODE_EXECUTABLE,
     now: () => new Date(NOW),
+    ...(monotonicNow === undefined ? {} : { monotonicNow }),
     spawn(command, args, options) {
       calls.push({ command, args, options });
+      afterSpawn?.(calls.length - 1);
       const response = responses.shift();
       if (!response) {
         throw new Error("Unexpected fake process invocation.");
@@ -293,6 +358,7 @@ function sourceEndpointResponse() {
     endpoints: [
       {
         id: PRODUCTION_ENDPOINT_ID,
+        project_id: PROJECT_ID,
         branch_id: PARENT_BRANCH_ID,
         type: "read_write",
         current_state: "idle",
@@ -319,6 +385,7 @@ function childBranch() {
 function childEndpoint() {
   return {
     id: CHILD_ENDPOINT_ID,
+    project_id: PROJECT_ID,
     branch_id: CHILD_BRANCH_ID,
     type: "read_write",
     current_state: "active",
@@ -349,5 +416,17 @@ function failed(stderr) {
     signal: null,
     stdout: "",
     stderr,
+  };
+}
+
+function timedOut(stderr) {
+  return {
+    status: null,
+    signal: "SIGTERM",
+    stdout: "",
+    stderr,
+    error: Object.assign(new Error("timed out"), {
+      code: "ETIMEDOUT",
+    }),
   };
 }

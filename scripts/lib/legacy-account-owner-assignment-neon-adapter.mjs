@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { isAbsolute } from "node:path";
+import { performance } from "node:perf_hooks";
 
 const NEON_CLI_PACKAGE = "neonctl@2.38.1";
 const NEON_CLI_VERSION = "2.38.1";
@@ -11,6 +12,7 @@ const BRANCH_NAME_PATTERN =
 const NOT_FOUND_PATTERN =
   /^ERROR: FetchBranchWithParent(?:\r?\n|$)/;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
+const DEFAULT_PROCESS_TIMEOUT_MS = 120_000;
 const MISSING = Symbol("missing");
 const INVALID = Symbol("invalid");
 const PROCESS_ENV_KEYS = new Set([
@@ -57,6 +59,7 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
   nodeExecutable = process.execPath,
   spawn = spawnSync,
   now = () => new Date(),
+  monotonicNow = () => performance.now(),
 } = {}) {
   if (
     typeof npxCliPath !== "string" ||
@@ -69,6 +72,7 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     !isAbsolute(nodeExecutable) ||
     typeof spawn !== "function" ||
     typeof now !== "function" ||
+    typeof monotonicNow !== "function" ||
     !processEnvironment ||
     typeof processEnvironment !== "object"
   ) {
@@ -79,9 +83,12 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     createMinimalNeonProcessEnvironment(processEnvironment);
   let versionVerified = false;
 
-  function execute(args, mode) {
+  function execute(args, mode, deadline = null) {
     if (!versionVerified) {
-      const version = runProcess(["--version"]);
+      const version = runProcess(
+        ["--version"],
+        remainingProcessTimeout(deadline),
+      );
       if (
         version.status !== 0 ||
         version.signal !== null ||
@@ -92,15 +99,18 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
       versionVerified = true;
     }
 
-    const result = runProcess([
-      ...args,
-      "--config-dir",
-      configDirectory,
-      "--output",
-      "json",
-      "--no-color",
-      "--no-analytics",
-    ]);
+    const result = runProcess(
+      [
+        ...args,
+        "--config-dir",
+        configDirectory,
+        "--output",
+        "json",
+        "--no-color",
+        "--no-analytics",
+      ],
+      remainingProcessTimeout(deadline),
+    );
     if (mode === "status") {
       if (result.status !== 0 || result.signal !== null) {
         throw adapterError("neon_cli_execution_failed");
@@ -124,7 +134,7 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     }
   }
 
-  function runProcess(args) {
+  function runProcess(args, timeoutMs) {
     let result;
     try {
       result = spawn(
@@ -141,14 +151,25 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
           env: childEnvironment,
           maxBuffer: MAX_OUTPUT_BYTES,
           shell: false,
-          timeout: 120_000,
+          timeout: timeoutMs,
           windowsHide: true,
         },
       );
     } catch {
       throw adapterError("neon_cli_execution_failed");
     }
+    if (isTimedOutProcessResult(result)) {
+      throw adapterError("neon_cli_timeout");
+    }
     return projectProcessResult(result);
+  }
+
+  function remainingProcessTimeout(deadline) {
+    if (deadline === null) return DEFAULT_PROCESS_TIMEOUT_MS;
+    const current = readMonotonicNow(monotonicNow);
+    const remaining = Math.floor(deadline - current);
+    if (remaining < 1) throw adapterError("neon_cli_timeout");
+    return Math.min(remaining, DEFAULT_PROCESS_TIMEOUT_MS);
   }
 
   return Object.freeze({
@@ -213,18 +234,29 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
         ? null
         : projectCreatedBranch(response);
     },
-    async attestChild({ projectId, branchId, branchName }) {
+    async attestChild({
+      projectId,
+      branchId,
+      branchName,
+      timeoutMs = DEFAULT_PROCESS_TIMEOUT_MS,
+    }) {
       assertProjectId(projectId);
       assertBranchId(branchId);
       assertBranchName(branchName);
+      const deadline = createProcessDeadline({
+        timeoutMs,
+        monotonicNow,
+      });
       return projectControlPlaneAttestation({
         branchResponse: execute(
           branchGetArgs(projectId, branchId),
           "json",
+          deadline,
         ),
         endpointResponse: execute(
           branchEndpointsArgs(projectId, branchId),
           "json",
+          deadline,
         ),
         expectedEndpointId: null,
         expectedExpiresAt: expiration,
@@ -354,6 +386,20 @@ function projectControlPlaneAttestation({
     ENDPOINT_ID_PATTERN,
     "neon_cli_response_invalid",
   );
+  const branchState = requireString(
+    branch,
+    "current_state",
+    "neon_cli_response_invalid",
+  );
+  const endpointState = requireString(
+    endpoint,
+    "current_state",
+    "neon_cli_response_invalid",
+  );
+  const endpointDisabled = ownDataValue(endpoint, "disabled");
+  if (typeof endpointDisabled !== "boolean") {
+    throw adapterError("neon_cli_response_invalid");
+  }
   if (
     expectedEndpointId !== null &&
     endpointId !== expectedEndpointId
@@ -389,6 +435,12 @@ function projectControlPlaneAttestation({
       "neon_cli_response_invalid",
     ),
     endpointId,
+    endpointProjectId: requirePattern(
+      endpoint,
+      "project_id",
+      PROJECT_ID_PATTERN,
+      "neon_cli_response_invalid",
+    ),
     endpointBranchId: requirePattern(
       endpoint,
       "branch_id",
@@ -396,12 +448,13 @@ function projectControlPlaneAttestation({
       "neon_cli_response_invalid",
     ),
     endpointType: "read_write",
-    branchReady:
-      ownDataValue(branch, "current_state") === "ready",
+    branchState,
+    endpointState,
+    endpointDisabled,
+    branchReady: branchState === "ready",
     endpointReady:
-      ["active", "idle"].includes(
-        ownDataValue(endpoint, "current_state"),
-      ) && ownDataValue(endpoint, "disabled") === false,
+      ["active", "idle"].includes(endpointState) &&
+      endpointDisabled === false,
     default: ownDataValue(branch, "default"),
     primary: ownDataValue(branch, "primary"),
     protected: ownDataValue(branch, "protected"),
@@ -430,6 +483,39 @@ function projectProcessResult(result) {
     throw adapterError("neon_cli_execution_failed");
   }
   return { status, signal, stdout, stderr };
+}
+
+function isTimedOutProcessResult(result) {
+  const error = ownDataValue(result, "error");
+  return (
+    error &&
+    typeof error === "object" &&
+    ownDataValue(error, "code") === "ETIMEDOUT"
+  );
+}
+
+function createProcessDeadline({ timeoutMs, monotonicNow }) {
+  if (
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > DEFAULT_PROCESS_TIMEOUT_MS
+  ) {
+    throw adapterError("neon_adapter_input_invalid");
+  }
+  return readMonotonicNow(monotonicNow) + timeoutMs;
+}
+
+function readMonotonicNow(monotonicNow) {
+  let value;
+  try {
+    value = monotonicNow();
+  } catch {
+    throw adapterError("neon_adapter_options_invalid");
+  }
+  if (!Number.isFinite(value) || value < 0) {
+    throw adapterError("neon_adapter_options_invalid");
+  }
+  return value;
 }
 
 function isExactNotFound(result) {

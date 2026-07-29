@@ -1,0 +1,213 @@
+import { performance } from "node:perf_hooks";
+import { setTimeout as delay } from "node:timers/promises";
+
+import {
+  hostError,
+  projectOwnerAssignmentChildReadiness,
+  projectVerifiedOwnerAssignmentChildStatic,
+} from "./legacy-account-owner-assignment-rehearsal-host-policy.mjs";
+
+export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY =
+  Object.freeze({
+    totalTimeoutMs: 30_000,
+    maxPolls: 8,
+    pollIntervalMs: 500,
+    controlPlaneReadTimeoutMs: 8_000,
+  });
+
+export async function waitForOwnerAssignmentChildReadiness({
+  attestChild,
+  createdChild,
+  target,
+  monotonicNow = () => performance.now(),
+  sleep = delay,
+  policy = LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY,
+} = {}) {
+  assertOptions({
+    attestChild,
+    createdChild,
+    target,
+    monotonicNow,
+    sleep,
+    policy,
+  });
+
+  const deadline =
+    readMonotonicNow(monotonicNow) + policy.totalTimeoutMs;
+  let lastStaticAttestation = null;
+  let completedPolls = 0;
+
+  for (let pollCount = 1; pollCount <= policy.maxPolls; pollCount += 1) {
+    const remainingBeforeRead =
+      deadline - readMonotonicNow(monotonicNow);
+    if (remainingBeforeRead < 1) {
+      return failedReadiness(
+        "timeout",
+        completedPolls,
+        lastStaticAttestation,
+      );
+    }
+
+    let value;
+    try {
+      value = await attestChild({
+        projectId: target.projectId,
+        branchId: createdChild.branchId,
+        branchName: createdChild.branchName,
+        timeoutMs: Math.max(
+          1,
+          Math.min(
+            policy.controlPlaneReadTimeoutMs,
+            Math.floor(remainingBeforeRead),
+          ),
+        ),
+      });
+    } catch {
+      return failedReadiness(
+        "read_failed",
+        pollCount,
+        lastStaticAttestation,
+      );
+    }
+    completedPolls = pollCount;
+
+    let staticAttestation;
+    try {
+      staticAttestation =
+        projectVerifiedOwnerAssignmentChildStatic(value, {
+          createdChild,
+          expectedProjectId: target.projectId,
+          expectedParentBranchId: target.parentBranchId,
+          expectedProductionEndpointId:
+            target.productionEndpointId,
+        });
+    } catch {
+      return failedReadiness("static_invalid", pollCount, null);
+    }
+    lastStaticAttestation = staticAttestation;
+
+    let readiness;
+    try {
+      readiness =
+        projectOwnerAssignmentChildReadiness(
+          staticAttestation,
+        );
+    } catch {
+      return failedReadiness(
+        "state_invalid",
+        pollCount,
+        staticAttestation,
+      );
+    }
+    if (readiness.outcome === "ready") {
+      return Object.freeze({
+        status: "ready",
+        outcome: "ready",
+        pollCount,
+        attestation: Object.freeze({
+          ...staticAttestation,
+          branchReady: true,
+          endpointReady: true,
+        }),
+      });
+    }
+
+    const remainingAfterRead =
+      deadline - readMonotonicNow(monotonicNow);
+    if (
+      pollCount === policy.maxPolls ||
+      remainingAfterRead < 1
+    ) {
+      return failedReadiness(
+        "timeout",
+        pollCount,
+        staticAttestation,
+      );
+    }
+
+    try {
+      await sleep(
+        Math.max(
+          1,
+          Math.min(
+            policy.pollIntervalMs,
+            Math.floor(remainingAfterRead),
+          ),
+        ),
+      );
+    } catch {
+      return failedReadiness(
+        "read_failed",
+        pollCount,
+        staticAttestation,
+      );
+    }
+  }
+
+  return failedReadiness(
+    "timeout",
+    completedPolls,
+    lastStaticAttestation,
+  );
+}
+
+function assertOptions({
+  attestChild,
+  createdChild,
+  target,
+  monotonicNow,
+  sleep,
+  policy,
+}) {
+  if (
+    typeof attestChild !== "function" ||
+    typeof monotonicNow !== "function" ||
+    typeof sleep !== "function" ||
+    !createdChild ||
+    typeof createdChild !== "object" ||
+    !target ||
+    typeof target !== "object" ||
+    !policy ||
+    typeof policy !== "object" ||
+    !Number.isInteger(policy.totalTimeoutMs) ||
+    policy.totalTimeoutMs < 1 ||
+    policy.totalTimeoutMs > 60_000 ||
+    !Number.isInteger(policy.maxPolls) ||
+    policy.maxPolls < 1 ||
+    policy.maxPolls > 32 ||
+    !Number.isInteger(policy.pollIntervalMs) ||
+    policy.pollIntervalMs < 1 ||
+    policy.pollIntervalMs > policy.totalTimeoutMs ||
+    !Number.isInteger(policy.controlPlaneReadTimeoutMs) ||
+    policy.controlPlaneReadTimeoutMs < 1 ||
+    policy.controlPlaneReadTimeoutMs > policy.totalTimeoutMs
+  ) {
+    throw hostError("host_options_invalid");
+  }
+}
+
+function readMonotonicNow(monotonicNow) {
+  let value;
+  try {
+    value = monotonicNow();
+  } catch {
+    throw hostError("host_options_invalid");
+  }
+  if (!Number.isFinite(value) || value < 0) {
+    throw hostError("host_options_invalid");
+  }
+  return value;
+}
+
+function failedReadiness(
+  outcome,
+  pollCount,
+  staticAttestation,
+) {
+  return Object.freeze({
+    status: "failed",
+    outcome,
+    pollCount,
+    staticAttestation,
+  });
+}

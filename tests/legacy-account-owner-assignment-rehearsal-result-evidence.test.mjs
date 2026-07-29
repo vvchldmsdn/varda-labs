@@ -65,6 +65,10 @@ describe("legacy account owner-assignment result evidence", () => {
       assert.equal(recovery.phase, "child_created_unattested");
       assert.equal(recovery.status, "failed");
       assert.equal(recovery.code, "branch_attestation_invalid");
+      assert.deepEqual(recovery.readiness, {
+        outcome: "unattempted",
+        pollCount: 0,
+      });
       assert.equal(recovery.cleanup, "unattempted");
       assert.equal(
         recovery.resolution,
@@ -102,6 +106,10 @@ describe("legacy account owner-assignment result evidence", () => {
         unattestedChildEvidence(),
         { exactNameReconciliations: 1 },
       );
+      journal.recordChildAttestationOutcome({
+        outcome: "ready",
+        pollCount: 1,
+      });
       const final = journal.recordRecoveryCleanupResult(
         passedCleanup(),
         { code: "branch_create_ambiguous" },
@@ -118,6 +126,10 @@ describe("legacy account owner-assignment result evidence", () => {
         1,
       );
       assert.equal(final.cleanup.exactIdNotFound, true);
+      assert.deepEqual(final.readiness, {
+        outcome: "ready",
+        pollCount: 1,
+      });
       assert.deepEqual(readEvidence(evidenceFile), final);
     });
   });
@@ -518,6 +530,8 @@ function preparedEvidence() {
     targetFingerprint: fingerprint("target"),
     endpointType: "read_write",
     endpointReady: true,
+    readinessOutcome: "ready",
+    readinessPollCount: 2,
     productionEndpointSeparated: true,
     default: false,
     primary: false,

@@ -27,6 +27,14 @@ const SAFE_LAST_COMPLETED_CHECKS = new Set([
   "none",
   ...LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_STAGES,
 ]);
+const READINESS_OUTCOMES = new Set([
+  "unattempted",
+  "ready",
+  "static_invalid",
+  "read_failed",
+  "state_invalid",
+  "timeout",
+]);
 const EXPECTED_CHECKS = Object.freeze([
   "successful_assignment",
   "already_applied",
@@ -58,6 +66,8 @@ const CONTROL_PLANE_FIELDS = Object.freeze([
   ["targetFingerprint", isFingerprint],
   ["endpointType", isExact("read_write")],
   ["endpointReady", isExact(true)],
+  ["readinessOutcome", isExact("ready")],
+  ["readinessPollCount", isIntegerBetween(1, 32)],
   ["productionEndpointSeparated", isExact(true)],
   ["default", isExact(false)],
   ["primary", isExact(false)],
@@ -81,6 +91,9 @@ const UNATTESTED_CHILD_FIELDS = Object.freeze([
 ]);
 const RECOVERY_CLEANUP_CODES = new Set([
   "branch_create_ambiguous",
+  "branch_readiness_invalid",
+  "branch_readiness_read_failed",
+  "branch_readiness_timeout",
   "harness_context_invalid",
 ]);
 const HARNESS_BOOLEAN_FIELDS = Object.freeze([
@@ -171,6 +184,10 @@ export function createUnattestedChildEvidenceSnapshot({
   sourceSha,
   recovery,
   exactNameReconciliations = 0,
+  readiness = Object.freeze({
+    outcome: "unattempted",
+    pollCount: 0,
+  }),
 }) {
   assertResultEvidenceRunId(runId);
   assertResultEvidenceSourceSha(sourceSha);
@@ -185,7 +202,7 @@ export function createUnattestedChildEvidenceSnapshot({
     sourceSha,
     phase: "child_created_unattested",
     status: "failed",
-    code: "branch_attestation_invalid",
+    code: readinessFailureCode(readiness),
     invocationCounts: recoveryInvocationCounts(
       1,
       exactNameReconciliations,
@@ -196,6 +213,10 @@ export function createUnattestedChildEvidenceSnapshot({
     recovery: projectFields(
       recovery,
       UNATTESTED_CHILD_FIELDS,
+      "prepared_result_invalid",
+    ),
+    readiness: projectReadinessEvidence(
+      readiness,
       "prepared_result_invalid",
     ),
     cleanup: "unattempted",
@@ -210,6 +231,7 @@ export function createRecoveryCleanupEvidenceSnapshot({
   cleanup,
   code,
   exactNameReconciliations = 0,
+  readiness,
 }) {
   assertResultEvidenceRunId(runId);
   assertResultEvidenceSourceSha(sourceSha);
@@ -239,6 +261,10 @@ export function createRecoveryCleanupEvidenceSnapshot({
     recovery: projectFields(
       recovery,
       UNATTESTED_CHILD_FIELDS,
+      "cleanup_result_invalid",
+    ),
+    readiness: projectReadinessEvidence(
+      readiness,
       "cleanup_result_invalid",
     ),
     cleanup: projectedCleanup,
@@ -511,6 +537,35 @@ function projectFields(value, policies, code) {
   return deepFreeze(result);
 }
 
+function projectReadinessEvidence(value, code) {
+  const outcome = ownDataValue(value, "outcome");
+  const pollCount = ownDataValue(value, "pollCount");
+  if (
+    !READINESS_OUTCOMES.has(outcome) ||
+    !Number.isInteger(pollCount) ||
+    pollCount < 0 ||
+    pollCount > 32 ||
+    ((outcome === "unattempted") !== (pollCount === 0))
+  ) {
+    throw resultEvidenceError(code);
+  }
+  return deepFreeze({ outcome, pollCount });
+}
+
+function readinessFailureCode(value) {
+  const outcome = ownDataValue(value, "outcome");
+  if (outcome === "read_failed") {
+    return "branch_readiness_read_failed";
+  }
+  if (outcome === "state_invalid") {
+    return "branch_readiness_invalid";
+  }
+  if (outcome === "timeout") {
+    return "branch_readiness_timeout";
+  }
+  return "branch_attestation_invalid";
+}
+
 function projectBooleanFields(value, keys, code) {
   const result = {};
   for (const key of keys) {
@@ -592,6 +647,13 @@ function isFingerprint(value) {
 
 function isExact(expected) {
   return (value) => value === expected;
+}
+
+function isIntegerBetween(minimum, maximum) {
+  return (value) =>
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum;
 }
 
 function deepFreeze(value) {
