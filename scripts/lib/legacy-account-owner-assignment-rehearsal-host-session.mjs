@@ -9,6 +9,7 @@ import {
   executeLegacyAccountOwnerAssignmentRehearsal,
 } from "../rehearse-legacy-account-owner-assignment.mjs";
 import {
+  createLegacyAccountOwnerAssignmentResultEvidenceJournal,
   runLegacyAccountOwnerAssignmentResultEvidenceSession,
 } from "./legacy-account-owner-assignment-rehearsal-result-evidence.mjs";
 import {
@@ -16,6 +17,7 @@ import {
   assertOwnerAssignmentHostSourceSha,
   createLegacyAccountOwnerAssignmentHostRunIdentity,
   createOwnerAssignmentPreparedControlPlaneEvidence,
+  createOwnerAssignmentUnattestedChildEvidence,
   hostError,
   ownerAssignmentHostFailure,
   projectCreatedOwnerAssignmentChild,
@@ -164,6 +166,35 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
   }
 
   let attestation;
+  let evidenceJournal;
+  let unattestedChildEvidence;
+  try {
+    evidenceJournal =
+      createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+        evidenceFile: run.evidenceFile,
+        runId: run.runId,
+        sourceSha,
+      });
+    unattestedChildEvidence =
+      evidenceJournal.recordChildCreatedUnattested(
+        createOwnerAssignmentUnattestedChildEvidence({
+          createdChild,
+          sourceAttestation,
+          target,
+        }),
+      );
+  } catch {
+    return ownerAssignmentHostFailure(
+      "child_created_unattested_evidence_write_failed",
+      {
+        runId: run.runId,
+        branchCreateInvocations: 1,
+        evidencePersisted: false,
+        lastPersistedPhase: "none",
+      },
+    );
+  }
+
   try {
     attestation = projectVerifiedOwnerAssignmentChild(
       await attestChild({
@@ -183,6 +214,9 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
     return ownerAssignmentHostFailure("branch_attestation_invalid", {
       runId: run.runId,
       branchCreateInvocations: 1,
+      evidencePersisted: true,
+      lastPersistedPhase: unattestedChildEvidence.phase,
+      evidence: unattestedChildEvidence,
     });
   }
 
@@ -250,6 +284,7 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
         });
         return cleanupResult;
       },
+      createJournal: () => evidenceJournal,
     });
 
   return Object.freeze({

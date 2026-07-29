@@ -1,5 +1,6 @@
 export {
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
+  LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
   LegacyAccountOwnerAssignmentResultEvidenceError,
 } from "./legacy-account-owner-assignment-rehearsal-result-policy.mjs";
 export {

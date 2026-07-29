@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 import {
   createLegacyAccountOwnerAssignmentResultEvidenceJournal,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
+  LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
   runLegacyAccountOwnerAssignmentResultEvidenceSession,
 } from "../scripts/lib/legacy-account-owner-assignment-rehearsal-result-evidence.mjs";
 
@@ -31,6 +32,42 @@ const CHECKS = Object.freeze([
 ]);
 
 describe("legacy account owner-assignment result evidence", () => {
+  it("atomically replaces pessimistic child recovery evidence after attestation", () => {
+    withEvidenceFile((evidenceFile) => {
+      const journal =
+        createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+          evidenceFile,
+          runId: RUN_ID,
+          sourceSha: SOURCE_SHA,
+        });
+
+      journal.recordChildCreatedUnattested(
+        unattestedChildEvidence(),
+      );
+      const recovery = readEvidence(evidenceFile);
+      assert.equal(
+        recovery.evidenceVersion,
+        LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
+      );
+      assert.equal(recovery.phase, "child_created_unattested");
+      assert.equal(recovery.status, "failed");
+      assert.equal(recovery.code, "branch_attestation_invalid");
+      assert.equal(recovery.cleanup, "unattempted");
+      assert.equal(
+        recovery.resolution,
+        "manual_or_auto_expiry_unverified",
+      );
+
+      journal.recordPrepared(preparedEvidence());
+      const prepared = readEvidence(evidenceFile);
+      assert.equal(
+        prepared.evidenceVersion,
+        LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
+      );
+      assert.equal(prepared.phase, "prepared");
+    });
+  });
+
   it("atomically replaces one fixed-schema file through all phases", () => {
     withEvidenceFile((evidenceFile) => {
       const journal =
@@ -432,6 +469,19 @@ function preparedEvidence() {
     primary: false,
     protected: false,
     autoExpires: true,
+  };
+}
+
+function unattestedChildEvidence() {
+  return {
+    projectFingerprint: fingerprint("project"),
+    parentBranchFingerprint: fingerprint("parent"),
+    branchIdFingerprint: fingerprint("child-branch"),
+    branchNameFingerprint: fingerprint("child-name"),
+    productionEndpointFingerprint: fingerprint(
+      "production-endpoint",
+    ),
+    sourceTargetFingerprint: fingerprint("source-target"),
   };
 }
 

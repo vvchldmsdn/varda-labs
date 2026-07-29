@@ -16,6 +16,7 @@ import {
   assertResultEvidenceRunId,
   assertResultEvidenceSourceSha,
   createResultEvidenceSnapshot,
+  createUnattestedChildEvidenceSnapshot,
   isResultEvidenceSessionCode,
   projectRehearsalCleanupResult,
   projectRehearsalHarnessResult,
@@ -60,8 +61,26 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
   }
 
   return Object.freeze({
-    recordPrepared(value) {
+    recordChildCreatedUnattested(value) {
       if (latestSnapshot !== null) {
+        throw resultEvidenceError("prepared_result_invalid");
+      }
+      return persist(
+        createUnattestedChildEvidenceSnapshot({
+          runId,
+          sourceSha,
+          recovery: value,
+        }),
+        "child_created_unattested_evidence_write_failed",
+        { create: true },
+      );
+    },
+    recordPrepared(value) {
+      const createsEvidenceFile = latestSnapshot === null;
+      if (
+        !createsEvidenceFile &&
+        latestSnapshot?.phase !== "child_created_unattested"
+      ) {
         throw resultEvidenceError("prepared_result_invalid");
       }
       const controlPlane = projectResultControlPlane(value);
@@ -78,7 +97,7 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           cleanup: null,
         }),
         "prepared_evidence_write_failed",
-        { create: true },
+        { create: createsEvidenceFile },
       );
     },
     recordHarnessResult(value) {

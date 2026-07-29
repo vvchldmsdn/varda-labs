@@ -4,6 +4,8 @@ import {
 
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION =
   "legacy_account_owner_assignment_rehearsal_result_evidence_v1";
+export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION =
+  "legacy_account_owner_assignment_unattested_child_evidence_v1";
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL =
   "legacy_account_owner_assignment_disposable_branch_v1";
 
@@ -60,6 +62,14 @@ const CONTROL_PLANE_FIELDS = Object.freeze([
   ["protected", isExact(false)],
   ["autoExpires", isExact(true)],
 ]);
+const UNATTESTED_CHILD_FIELDS = Object.freeze([
+  ["projectFingerprint", isFingerprint],
+  ["parentBranchFingerprint", isFingerprint],
+  ["branchIdFingerprint", isFingerprint],
+  ["branchNameFingerprint", isFingerprint],
+  ["productionEndpointFingerprint", isFingerprint],
+  ["sourceTargetFingerprint", isFingerprint],
+]);
 const HARNESS_BOOLEAN_FIELDS = Object.freeze([
   "poolReadiness",
   "disposableBranchDmlAttempted",
@@ -113,6 +123,33 @@ export function createResultEvidenceSnapshot({
     controlPlane,
     harness,
     cleanup,
+  });
+}
+
+export function createUnattestedChildEvidenceSnapshot({
+  runId,
+  sourceSha,
+  recovery,
+}) {
+  assertResultEvidenceRunId(runId);
+  assertResultEvidenceSourceSha(sourceSha);
+  return deepFreeze({
+    evidenceVersion:
+      LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
+    rehearsal: LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL,
+    runId,
+    sourceSha,
+    phase: "child_created_unattested",
+    status: "failed",
+    code: "branch_attestation_invalid",
+    invocationCounts: resultInvocationCounts(1, 0, 0, 0),
+    recovery: projectFields(
+      recovery,
+      UNATTESTED_CHILD_FIELDS,
+      "prepared_result_invalid",
+    ),
+    cleanup: "unattempted",
+    resolution: "manual_or_auto_expiry_unverified",
   });
 }
 

@@ -23,6 +23,7 @@ const SAFE_HOST_ERROR_CODES = new Set([
   "branch_create_reconciliation_failed",
   "branch_create_reconciliation_unresolved",
   "branch_create_result_invalid",
+  "child_created_unattested_evidence_write_failed",
   "harness_context_invalid",
   "host_options_invalid",
   "production_source_attestation_invalid",
@@ -388,6 +389,59 @@ export function createOwnerAssignmentPreparedControlPlaneEvidence({
   });
 }
 
+export function createOwnerAssignmentUnattestedChildEvidence({
+  createdChild,
+  sourceAttestation,
+  target,
+}) {
+  const projectId = requirePattern(
+    target,
+    "projectId",
+    PROJECT_ID_PATTERN,
+    "branch_create_result_invalid",
+  );
+  const parentBranchId = requirePattern(
+    target,
+    "parentBranchId",
+    BRANCH_ID_PATTERN,
+    "branch_create_result_invalid",
+  );
+  const productionEndpointId = requirePattern(
+    target,
+    "productionEndpointId",
+    ENDPOINT_ID_PATTERN,
+    "branch_create_result_invalid",
+  );
+  const branchId = requirePattern(
+    createdChild,
+    "branchId",
+    BRANCH_ID_PATTERN,
+    "branch_create_result_invalid",
+  );
+  const branchName = requirePattern(
+    createdChild,
+    "branchName",
+    new RegExp(`^${BRANCH_NAME_PREFIX}[0-9a-f-]+$`),
+    "branch_create_result_invalid",
+  );
+  const sourceTargetFingerprint = requirePattern(
+    sourceAttestation,
+    "sourceTargetFingerprint",
+    FINGERPRINT_PATTERN,
+    "branch_create_result_invalid",
+  );
+  return Object.freeze({
+    projectFingerprint: fingerprint(projectId),
+    parentBranchFingerprint: fingerprint(parentBranchId),
+    branchIdFingerprint: fingerprint(branchId),
+    branchNameFingerprint: fingerprint(branchName),
+    productionEndpointFingerprint: fingerprint(
+      productionEndpointId,
+    ),
+    sourceTargetFingerprint,
+  });
+}
+
 export function ownerAssignmentHostFailure(
   code,
   {
@@ -395,6 +449,9 @@ export function ownerAssignmentHostFailure(
     branchCreateInvocations = 0,
     exactNameReconciliations = 0,
     cleanup = null,
+    evidencePersisted = null,
+    lastPersistedPhase = null,
+    evidence = null,
   } = {},
 ) {
   return Object.freeze({
@@ -410,6 +467,14 @@ export function ownerAssignmentHostFailure(
         cleanup?.exactIdGetInvocations ?? 0,
     }),
     cleanup,
+    ...(evidencePersisted === null
+      ? {}
+      : {
+          evidencePersisted,
+          lastPersistedPhase:
+            lastPersistedPhase ?? "none",
+          ...(evidence === null ? {} : { evidence }),
+        }),
   });
 }
 

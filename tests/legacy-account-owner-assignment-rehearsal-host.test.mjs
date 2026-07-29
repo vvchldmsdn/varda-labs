@@ -154,7 +154,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
     });
   });
 
-  it("fails closed when the evidence path appears after child creation", async () => {
+  it("does not attest or delete when the unattested-child evidence write fails", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();
       const options = hostOptions(evidenceDirectory, calls);
@@ -173,19 +173,23 @@ describe("legacy account owner-assignment rehearsal host", () => {
         });
 
       assert.equal(result.status, "failed");
-      assert.equal(result.code, "prepared_evidence_write_failed");
+      assert.equal(
+        result.code,
+        "child_created_unattested_evidence_write_failed",
+      );
       assert.equal(result.evidencePersisted, false);
       assert.deepEqual(result.invocationCounts, {
         branchCreate: 1,
-        harness: 0,
-        branchDelete: 1,
-        exactIdNotFoundCheck: 1,
+        exactNameReconciliation: 0,
+        branchDelete: 0,
+        exactIdNotFoundCheck: 0,
       });
-      assert.equal(result.cleanup.status, "passed");
+      assert.equal(result.cleanup, null);
       assert.equal(readFileSync(evidenceFile, "utf8"), "raced-run\n");
+      assert.equal(calls.attest, 0);
       assert.equal(calls.harness, 0);
-      assert.equal(calls.delete, 1);
-      assert.equal(calls.get, 1);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
     });
   });
 
@@ -315,11 +319,55 @@ describe("legacy account owner-assignment rehearsal host", () => {
 
       assert.equal(result.status, "failed");
       assert.equal(result.code, "branch_attestation_invalid");
+      assert.equal(result.evidencePersisted, true);
+      assert.equal(
+        result.lastPersistedPhase,
+        "child_created_unattested",
+      );
       assert.equal(calls.create, 1);
       assert.equal(calls.attest, 1);
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
       assert.equal(calls.get, 0);
+
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.phase, "child_created_unattested");
+      assert.equal(evidence.status, "failed");
+      assert.equal(evidence.code, "branch_attestation_invalid");
+      assert.equal(evidence.cleanup, "unattempted");
+      assert.equal(
+        evidence.resolution,
+        "manual_or_auto_expiry_unverified",
+      );
+      assert.deepEqual(evidence.invocationCounts, {
+        branchCreate: 1,
+        harness: 0,
+        branchDelete: 0,
+        exactIdNotFoundCheck: 0,
+      });
+      assert.equal(
+        evidence.recovery.branchIdFingerprint,
+        fingerprint(CHILD_BRANCH_ID),
+      );
+      assert.equal(
+        evidence.recovery.branchNameFingerprint,
+        fingerprint(
+          `preview/codex/legacy-account-owner-assignment-rehearsal-${RUN_ID}`,
+        ),
+      );
+      const raw = readFileSync(
+        expectedEvidenceFile(evidenceDirectory),
+        "utf8",
+      );
+      for (const forbidden of [
+        CHILD_BRANCH_ID,
+        CHILD_ENDPOINT_ID,
+        PRODUCTION_ENDPOINT_ID,
+        USERNAME,
+        PASSWORD,
+      ]) {
+        assert.equal(raw.includes(forbidden), false, forbidden);
+      }
     });
   });
 
