@@ -15,6 +15,7 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY =
     controlPlaneReadTimeoutMs: 8_000,
   });
 const CHILD_READ_STAGES = new Set([
+  "branch_list_search",
   "branch_get",
   "endpoint_list_get",
 ]);
@@ -213,6 +214,92 @@ export async function waitForOwnerAssignmentChildReadiness({
   );
 }
 
+export async function waitForOwnerAssignmentChildByExactName({
+  reconcileChildByExactName,
+  branchName,
+  target,
+  monotonicNow = () => performance.now(),
+  sleep = delay,
+  policy = LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY,
+} = {}) {
+  assertReconciliationOptions({
+    reconcileChildByExactName,
+    branchName,
+    target,
+    monotonicNow,
+    sleep,
+    policy,
+  });
+
+  const deadline =
+    readMonotonicNow(monotonicNow) + policy.totalTimeoutMs;
+  for (let pollCount = 1; pollCount <= policy.maxPolls; pollCount += 1) {
+    const remainingBeforeRead =
+      deadline - readMonotonicNow(monotonicNow);
+    if (remainingBeforeRead < 1) {
+      return failedReconciliation("timeout", pollCount - 1);
+    }
+
+    let child;
+    try {
+      child = await reconcileChildByExactName({
+        projectId: target.projectId,
+        branchName,
+        timeoutMs: Math.max(
+          1,
+          Math.min(
+            policy.controlPlaneReadTimeoutMs,
+            Math.floor(remainingBeforeRead),
+          ),
+        ),
+      });
+    } catch (error) {
+      return failedReconciliation(
+        "read_failed",
+        pollCount,
+        projectReadDiagnostic(error),
+      );
+    }
+
+    const remainingAfterRead =
+      deadline - readMonotonicNow(monotonicNow);
+    if (remainingAfterRead < 1) {
+      return failedReconciliation("timeout", pollCount);
+    }
+    if (child !== null) {
+      return Object.freeze({
+        status: "found",
+        outcome: "found",
+        pollCount,
+        child,
+      });
+    }
+    if (pollCount === policy.maxPolls) {
+      return Object.freeze({
+        status: "not_found",
+        outcome: "not_found",
+        pollCount,
+      });
+    }
+
+    try {
+      await sleep(
+        Math.max(
+          1,
+          Math.min(
+            policy.pollIntervalMs,
+            Math.floor(remainingAfterRead),
+          ),
+        ),
+      );
+    } catch {
+      return failedReconciliation("read_failed", pollCount);
+    }
+  }
+
+  return failedReconciliation("timeout", policy.maxPolls);
+}
+
 function assertOptions({
   attestChild,
   createdChild,
@@ -223,12 +310,44 @@ function assertOptions({
 }) {
   if (
     typeof attestChild !== "function" ||
-    typeof monotonicNow !== "function" ||
-    typeof sleep !== "function" ||
     !createdChild ||
     typeof createdChild !== "object" ||
     !target ||
-    typeof target !== "object" ||
+    typeof target !== "object"
+  ) {
+    throw hostError("host_options_invalid");
+  }
+  assertPollingOptions({ monotonicNow, sleep, policy });
+}
+
+function assertReconciliationOptions({
+  reconcileChildByExactName,
+  branchName,
+  target,
+  monotonicNow,
+  sleep,
+  policy,
+}) {
+  if (
+    typeof reconcileChildByExactName !== "function" ||
+    typeof branchName !== "string" ||
+    branchName.length === 0 ||
+    !target ||
+    typeof target !== "object"
+  ) {
+    throw hostError("host_options_invalid");
+  }
+  assertPollingOptions({ monotonicNow, sleep, policy });
+}
+
+function assertPollingOptions({
+  monotonicNow,
+  sleep,
+  policy,
+}) {
+  if (
+    typeof monotonicNow !== "function" ||
+    typeof sleep !== "function" ||
     !policy ||
     typeof policy !== "object" ||
     !Number.isInteger(policy.totalTimeoutMs) ||
@@ -272,6 +391,19 @@ function failedReadiness(
     outcome,
     pollCount,
     staticAttestation,
+    ...(readDiagnostic === null ? {} : { readDiagnostic }),
+  });
+}
+
+function failedReconciliation(
+  outcome,
+  pollCount,
+  readDiagnostic = null,
+) {
+  return Object.freeze({
+    status: "failed",
+    outcome,
+    pollCount,
     ...(readDiagnostic === null ? {} : { readDiagnostic }),
   });
 }

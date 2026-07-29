@@ -887,6 +887,136 @@ describe("legacy account owner-assignment rehearsal host", () => {
     });
   });
 
+  it("waits for an exact-name list match before attesting an ambiguous create", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let clock = 0;
+      const reconciliationTimeouts = [];
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep(milliseconds) {
+            clock += milliseconds;
+          },
+          async createChild() {
+            calls.create += 1;
+            throw new Error("ambiguous provider output");
+          },
+          async reconcileChildByExactName({
+            branchName,
+            timeoutMs,
+          }) {
+            calls.reconcile += 1;
+            reconciliationTimeouts.push(timeoutMs);
+            if (calls.reconcile < 3) return null;
+            return {
+              branchId: CHILD_BRANCH_ID,
+              branchName,
+            };
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_create_ambiguous");
+      assert.equal(calls.create, 1);
+      assert.equal(calls.reconcile, 3);
+      assert.deepEqual(reconciliationTimeouts, [
+        8_000,
+        8_000,
+        8_000,
+      ]);
+      assert.equal(calls.attest, 1);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 1);
+      assert.equal(calls.get, 1);
+    });
+  });
+
+  it("bounds an exact-name visibility miss without creating or deleting again", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let clock = 0;
+      const reconciliationTimeouts = [];
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          readinessMonotonicNow: () => clock,
+          async readinessSleep(milliseconds) {
+            clock += milliseconds;
+          },
+          async createChild() {
+            calls.create += 1;
+            throw new Error("ambiguous provider output");
+          },
+          async reconcileChildByExactName({ timeoutMs }) {
+            calls.reconcile += 1;
+            reconciliationTimeouts.push(timeoutMs);
+            return null;
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_create_ambiguous");
+      assert.equal(clock, 28_000);
+      assert.equal(calls.create, 1);
+      assert.equal(calls.reconcile, 8);
+      assert.deepEqual(reconciliationTimeouts, [
+        8_000,
+        8_000,
+        8_000,
+        8_000,
+        8_000,
+        8_000,
+        6_000,
+        2_000,
+      ]);
+      assert.equal(calls.attest, 0);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+    });
+  });
+
+  it("fails an exact-name reconciliation read error without polling again", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async createChild() {
+            calls.create += 1;
+            throw new Error("ambiguous provider output");
+          },
+          async reconcileChildByExactName() {
+            calls.reconcile += 1;
+            throw Object.assign(
+              new Error("synthetic list read failure"),
+              {
+                stage: "branch_list_search",
+                reason: "execution_failed",
+              },
+            );
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.code,
+        "branch_create_reconciliation_failed",
+      );
+      assert.equal(calls.create, 1);
+      assert.equal(calls.reconcile, 1);
+      assert.equal(calls.attest, 0);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+    });
+  });
+
   it("reconciles an ambiguous create once, cleans the exact child, and never runs the harness", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();

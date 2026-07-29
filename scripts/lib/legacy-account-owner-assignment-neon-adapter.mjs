@@ -16,6 +16,7 @@ const DEFAULT_PROCESS_TIMEOUT_MS = 120_000;
 const MISSING = Symbol("missing");
 const INVALID = Symbol("invalid");
 const CHILD_READ_STAGES = new Set([
+  "branch_list_search",
   "branch_get",
   "endpoint_list_get",
 ]);
@@ -255,16 +256,26 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     async reconcileChildByExactName({
       projectId,
       branchName,
+      timeoutMs = DEFAULT_PROCESS_TIMEOUT_MS,
     }) {
       assertProjectId(projectId);
       assertBranchName(branchName);
-      const response = execute(
-        branchGetArgs(projectId, branchName),
-        "maybe_json",
-      );
-      return response === null
-        ? null
-        : projectCreatedBranch(response);
+      const deadline = createProcessDeadline({
+        timeoutMs,
+        monotonicNow,
+      });
+      try {
+        return projectCreatedBranchFromExactNameList(
+          executeChildRead(
+            branchListSearchArgs(projectId, branchName),
+            deadline,
+            "branch_list_search",
+          ),
+          branchName,
+        );
+      } catch (error) {
+        throw childReadError(error, "branch_list_search");
+      }
     },
     async attestChild({
       projectId,
@@ -352,6 +363,15 @@ function branchGetArgs(projectId, branchIdOrName) {
   ];
 }
 
+function branchListSearchArgs(projectId, branchName) {
+  return [
+    "api",
+    `/projects/${projectId}/branches?search=${encodeURIComponent(
+      branchName,
+    )}&limit=10000&include_deleted=false`,
+  ];
+}
+
 function branchEndpointsArgs(projectId, branchId) {
   return [
     "api",
@@ -391,6 +411,44 @@ function projectCreatedBranch(response) {
       "neon_cli_response_invalid",
     ),
   });
+}
+
+function projectCreatedBranchFromExactNameList(
+  response,
+  expectedBranchName,
+) {
+  const branches = ownDataValue(response, "branches");
+  const pagination = requireObject(response, "pagination");
+  if (
+    !Array.isArray(branches) ||
+    ownDataValue(pagination, "next") !== null
+  ) {
+    throw adapterError("neon_cli_response_invalid");
+  }
+
+  const exactMatches = [];
+  for (const branch of branches) {
+    if (
+      !branch ||
+      typeof branch !== "object" ||
+      Array.isArray(branch)
+    ) {
+      throw adapterError("neon_cli_response_invalid");
+    }
+    const branchName = requireString(
+      branch,
+      "name",
+      "neon_cli_response_invalid",
+    );
+    if (branchName === expectedBranchName) {
+      exactMatches.push(branch);
+    }
+  }
+  if (exactMatches.length === 0) return null;
+  if (exactMatches.length !== 1) {
+    throw adapterError("neon_cli_response_invalid");
+  }
+  return projectCreatedBranch({ branch: exactMatches[0] });
 }
 
 function projectControlPlaneAttestation({

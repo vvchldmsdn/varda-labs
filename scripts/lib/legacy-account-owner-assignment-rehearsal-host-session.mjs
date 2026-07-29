@@ -13,6 +13,7 @@ import {
   runLegacyAccountOwnerAssignmentResultEvidenceSession,
 } from "./legacy-account-owner-assignment-rehearsal-result-evidence.mjs";
 import {
+  waitForOwnerAssignmentChildByExactName,
   waitForOwnerAssignmentChildReadiness,
 } from "./legacy-account-owner-assignment-readiness.mjs";
 import {
@@ -429,19 +430,20 @@ async function handleAmbiguousCreate({
   readinessMonotonicNow,
   readinessSleep,
 }) {
-  let reconciled = null;
+  let reconciliation;
   try {
-    const value = await reconcileChildByExactName({
-      projectId: target.projectId,
-      branchName: run.branchName,
-    });
-    if (value !== null) {
-      reconciled = projectCreatedOwnerAssignmentChild(
-        value,
-        run.branchName,
-        target.parentBranchId,
-      );
-    }
+    reconciliation =
+      await waitForOwnerAssignmentChildByExactName({
+        reconcileChildByExactName,
+        branchName: run.branchName,
+        target,
+        ...(readinessMonotonicNow === undefined
+          ? {}
+          : { monotonicNow: readinessMonotonicNow }),
+        ...(readinessSleep === undefined
+          ? {}
+          : { sleep: readinessSleep }),
+      });
   } catch {
     return ownerAssignmentHostFailure(
       "branch_create_reconciliation_failed",
@@ -454,13 +456,43 @@ async function handleAmbiguousCreate({
     );
   }
 
-  if (reconciled === null) {
+  if (reconciliation.status === "failed") {
+    return ownerAssignmentHostFailure(
+      "branch_create_reconciliation_failed",
+      {
+        runId: run.runId,
+        branchCreateInvocations: 1,
+        exactNameReconciliations: 1,
+        ...journalEvidenceState(evidenceJournal),
+      },
+    );
+  }
+  if (reconciliation.status === "not_found") {
     return ownerAssignmentHostFailure("branch_create_ambiguous", {
       runId: run.runId,
       branchCreateInvocations: 1,
       exactNameReconciliations: 1,
       ...journalEvidenceState(evidenceJournal),
     });
+  }
+
+  let reconciled;
+  try {
+    reconciled = projectCreatedOwnerAssignmentChild(
+      reconciliation.child,
+      run.branchName,
+      target.parentBranchId,
+    );
+  } catch {
+    return ownerAssignmentHostFailure(
+      "branch_create_reconciliation_failed",
+      {
+        runId: run.runId,
+        branchCreateInvocations: 1,
+        exactNameReconciliations: 1,
+        ...journalEvidenceState(evidenceJournal),
+      },
+    );
   }
 
   try {

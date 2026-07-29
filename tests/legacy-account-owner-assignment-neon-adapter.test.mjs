@@ -154,6 +154,126 @@ describe("legacy account owner-assignment Neon adapter", () => {
     });
   });
 
+  it("reconciles a branch name through the list search API and exact matching", async () => {
+    const calls = [];
+    const adapter = createAdapter({
+      calls,
+      responses: [
+        ok("2.38.1\n"),
+        json({
+          branches: [
+            {
+              ...childBranch(),
+              id: "br-synthetic-partial-match",
+              name: `${BRANCH_NAME}-other`,
+            },
+            childBranch(),
+          ],
+          pagination: { next: null, previous: null },
+        }),
+      ],
+    });
+
+    const child = await adapter.reconcileChildByExactName({
+      projectId: PROJECT_ID,
+      branchName: BRANCH_NAME,
+      timeoutMs: 1_000,
+    });
+
+    assert.deepEqual(child, {
+      branchId: CHILD_BRANCH_ID,
+      branchName: BRANCH_NAME,
+    });
+    const requestPath = calls[1].args.find((value) =>
+      value.startsWith(`/projects/${PROJECT_ID}/branches?`),
+    );
+    assert.equal(
+      requestPath,
+      `/projects/${PROJECT_ID}/branches?search=${encodeURIComponent(
+        BRANCH_NAME,
+      )}&limit=10000&include_deleted=false`,
+    );
+    assert.equal(
+      calls[1].args.some((value) =>
+        value.includes(encodeURIComponent(BRANCH_NAME)) &&
+        !value.includes("?search="),
+      ),
+      false,
+    );
+  });
+
+  it("returns null when a complete branch list has no exact name match", async () => {
+    const adapter = createAdapter({
+      calls: [],
+      responses: [
+        ok("2.38.1\n"),
+        json({
+          branches: [
+            {
+              ...childBranch(),
+              name: `${BRANCH_NAME}-other`,
+            },
+          ],
+          pagination: { next: null, previous: null },
+        }),
+      ],
+    });
+
+    assert.equal(
+      await adapter.reconcileChildByExactName({
+        projectId: PROJECT_ID,
+        branchName: BRANCH_NAME,
+        timeoutMs: 1_000,
+      }),
+      null,
+    );
+  });
+
+  it("fails closed on duplicate exact matches or incomplete pagination", async () => {
+    for (const response of [
+      {
+        branches: [
+          childBranch(),
+          {
+            ...childBranch(),
+            id: "br-synthetic-duplicate",
+          },
+        ],
+        pagination: { next: null, previous: null },
+      },
+      {
+        branches: [childBranch()],
+        pagination: {
+          next: "private-cursor",
+          previous: null,
+        },
+      },
+    ]) {
+      const adapter = createAdapter({
+        calls: [],
+        responses: [ok("2.38.1\n"), json(response)],
+      });
+
+      await assert.rejects(
+        () =>
+          adapter.reconcileChildByExactName({
+            projectId: PROJECT_ID,
+            branchName: BRANCH_NAME,
+            timeoutMs: 1_000,
+          }),
+        (error) => {
+          assert.equal(
+            error.code,
+            "neon_cli_response_invalid",
+          );
+          assert.equal(error.stage, "branch_list_search");
+          assert.equal(error.reason, "response_invalid");
+          return true;
+        },
+      );
+    }
+  });
+
   it("does not invoke accessors on process results", async () => {
     let stdoutAccessorInvocations = 0;
     const result = {
