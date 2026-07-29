@@ -15,6 +15,8 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import {
   assertResultEvidenceRunId,
   assertResultEvidenceSourceSha,
+  createBranchCreateRequestedEvidenceSnapshot,
+  createRecoveryCleanupEvidenceSnapshot,
   createResultEvidenceSnapshot,
   createUnattestedChildEvidenceSnapshot,
   isResultEvidenceSessionCode,
@@ -61,8 +63,29 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
   }
 
   return Object.freeze({
-    recordChildCreatedUnattested(value) {
+    recordCreateRequested(value) {
       if (latestSnapshot !== null) {
+        throw resultEvidenceError("prepared_result_invalid");
+      }
+      return persist(
+        createBranchCreateRequestedEvidenceSnapshot({
+          runId,
+          sourceSha,
+          recovery: value,
+        }),
+        "create_requested_evidence_write_failed",
+        { create: true },
+      );
+    },
+    recordChildCreatedUnattested(
+      value,
+      { exactNameReconciliations = 0 } = {},
+    ) {
+      const createsEvidenceFile = latestSnapshot === null;
+      if (
+        !createsEvidenceFile &&
+        latestSnapshot?.phase !== "create_requested"
+      ) {
         throw resultEvidenceError("prepared_result_invalid");
       }
       return persist(
@@ -70,9 +93,10 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
           runId,
           sourceSha,
           recovery: value,
+          exactNameReconciliations,
         }),
         "child_created_unattested_evidence_write_failed",
-        { create: true },
+        { create: createsEvidenceFile },
       );
     },
     recordPrepared(value) {
@@ -98,6 +122,24 @@ export function createLegacyAccountOwnerAssignmentResultEvidenceJournal({
         }),
         "prepared_evidence_write_failed",
         { create: createsEvidenceFile },
+      );
+    },
+    recordRecoveryCleanupResult(value, { code } = {}) {
+      if (latestSnapshot?.phase !== "child_created_unattested") {
+        throw resultEvidenceError("cleanup_result_invalid");
+      }
+      return persist(
+        createRecoveryCleanupEvidenceSnapshot({
+          runId,
+          sourceSha,
+          recovery: latestSnapshot.recovery,
+          cleanup: value,
+          code,
+          exactNameReconciliations:
+            latestSnapshot.invocationCounts
+              .exactNameReconciliation,
+        }),
+        "cleanup_result_evidence_write_failed",
       );
     },
     recordHarnessResult(value) {

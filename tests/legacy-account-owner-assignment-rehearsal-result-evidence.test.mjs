@@ -13,6 +13,7 @@ import { describe, it } from "node:test";
 
 import {
   createLegacyAccountOwnerAssignmentResultEvidenceJournal,
+  LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_REQUEST_EVIDENCE_VERSION,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
   runLegacyAccountOwnerAssignmentResultEvidenceSession,
@@ -41,6 +42,18 @@ describe("legacy account owner-assignment result evidence", () => {
           sourceSha: SOURCE_SHA,
         });
 
+      journal.recordCreateRequested(createRequestEvidence());
+      const requested = readEvidence(evidenceFile);
+      assert.equal(
+        requested.evidenceVersion,
+        LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_REQUEST_EVIDENCE_VERSION,
+      );
+      assert.equal(requested.phase, "create_requested");
+      assert.equal(
+        requested.resolution,
+        "exact_name_reconciliation_required",
+      );
+
       journal.recordChildCreatedUnattested(
         unattestedChildEvidence(),
       );
@@ -57,6 +70,13 @@ describe("legacy account owner-assignment result evidence", () => {
         recovery.resolution,
         "manual_or_auto_expiry_unverified",
       );
+      assert.deepEqual(recovery.invocationCounts, {
+        branchCreate: 1,
+        exactNameReconciliation: 0,
+        harness: 0,
+        branchDelete: 0,
+        exactIdNotFoundCheck: 0,
+      });
 
       journal.recordPrepared(preparedEvidence());
       const prepared = readEvidence(evidenceFile);
@@ -65,6 +85,40 @@ describe("legacy account owner-assignment result evidence", () => {
         LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION,
       );
       assert.equal(prepared.phase, "prepared");
+    });
+  });
+
+  it("records final exact-child cleanup after ambiguous create reconciliation", () => {
+    withEvidenceFile((evidenceFile) => {
+      const journal =
+        createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+          evidenceFile,
+          runId: RUN_ID,
+          sourceSha: SOURCE_SHA,
+        });
+
+      journal.recordCreateRequested(createRequestEvidence());
+      journal.recordChildCreatedUnattested(
+        unattestedChildEvidence(),
+        { exactNameReconciliations: 1 },
+      );
+      const final = journal.recordRecoveryCleanupResult(
+        passedCleanup(),
+        { code: "branch_create_ambiguous" },
+      );
+
+      assert.equal(final.phase, "recovery_cleanup_result");
+      assert.equal(final.code, "branch_create_ambiguous");
+      assert.equal(
+        final.resolution,
+        "exact_child_not_found_confirmed",
+      );
+      assert.equal(
+        final.invocationCounts.exactNameReconciliation,
+        1,
+      );
+      assert.equal(final.cleanup.exactIdNotFound, true);
+      assert.deepEqual(readEvidence(evidenceFile), final);
     });
   });
 
@@ -469,6 +523,18 @@ function preparedEvidence() {
     primary: false,
     protected: false,
     autoExpires: true,
+  };
+}
+
+function createRequestEvidence() {
+  return {
+    projectFingerprint: fingerprint("project"),
+    parentBranchFingerprint: fingerprint("parent"),
+    branchNameFingerprint: fingerprint("child-name"),
+    productionEndpointFingerprint: fingerprint(
+      "production-endpoint",
+    ),
+    sourceTargetFingerprint: fingerprint("source-target"),
   };
 }
 

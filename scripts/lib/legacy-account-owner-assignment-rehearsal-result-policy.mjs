@@ -4,6 +4,8 @@ import {
 
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_EVIDENCE_VERSION =
   "legacy_account_owner_assignment_rehearsal_result_evidence_v1";
+export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_REQUEST_EVIDENCE_VERSION =
+  "legacy_account_owner_assignment_create_request_evidence_v1";
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION =
   "legacy_account_owner_assignment_unattested_child_evidence_v1";
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL =
@@ -62,6 +64,13 @@ const CONTROL_PLANE_FIELDS = Object.freeze([
   ["protected", isExact(false)],
   ["autoExpires", isExact(true)],
 ]);
+const CREATE_REQUEST_FIELDS = Object.freeze([
+  ["projectFingerprint", isFingerprint],
+  ["parentBranchFingerprint", isFingerprint],
+  ["branchNameFingerprint", isFingerprint],
+  ["productionEndpointFingerprint", isFingerprint],
+  ["sourceTargetFingerprint", isFingerprint],
+]);
 const UNATTESTED_CHILD_FIELDS = Object.freeze([
   ["projectFingerprint", isFingerprint],
   ["parentBranchFingerprint", isFingerprint],
@@ -69,6 +78,10 @@ const UNATTESTED_CHILD_FIELDS = Object.freeze([
   ["branchNameFingerprint", isFingerprint],
   ["productionEndpointFingerprint", isFingerprint],
   ["sourceTargetFingerprint", isFingerprint],
+]);
+const RECOVERY_CLEANUP_CODES = new Set([
+  "branch_create_ambiguous",
+  "harness_context_invalid",
 ]);
 const HARNESS_BOOLEAN_FIELDS = Object.freeze([
   "poolReadiness",
@@ -126,13 +139,44 @@ export function createResultEvidenceSnapshot({
   });
 }
 
-export function createUnattestedChildEvidenceSnapshot({
+export function createBranchCreateRequestedEvidenceSnapshot({
   runId,
   sourceSha,
   recovery,
 }) {
   assertResultEvidenceRunId(runId);
   assertResultEvidenceSourceSha(sourceSha);
+  return deepFreeze({
+    evidenceVersion:
+      LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CREATE_REQUEST_EVIDENCE_VERSION,
+    rehearsal: LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL,
+    runId,
+    sourceSha,
+    phase: "create_requested",
+    status: "failed",
+    code: "branch_create_ambiguous",
+    invocationCounts: recoveryInvocationCounts(0, 0, 0, 0, 0),
+    recovery: projectFields(
+      recovery,
+      CREATE_REQUEST_FIELDS,
+      "prepared_result_invalid",
+    ),
+    cleanup: "unattempted",
+    resolution: "exact_name_reconciliation_required",
+  });
+}
+
+export function createUnattestedChildEvidenceSnapshot({
+  runId,
+  sourceSha,
+  recovery,
+  exactNameReconciliations = 0,
+}) {
+  assertResultEvidenceRunId(runId);
+  assertResultEvidenceSourceSha(sourceSha);
+  if (![0, 1].includes(exactNameReconciliations)) {
+    throw resultEvidenceError("prepared_result_invalid");
+  }
   return deepFreeze({
     evidenceVersion:
       LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
@@ -142,7 +186,13 @@ export function createUnattestedChildEvidenceSnapshot({
     phase: "child_created_unattested",
     status: "failed",
     code: "branch_attestation_invalid",
-    invocationCounts: resultInvocationCounts(1, 0, 0, 0),
+    invocationCounts: recoveryInvocationCounts(
+      1,
+      exactNameReconciliations,
+      0,
+      0,
+      0,
+    ),
     recovery: projectFields(
       recovery,
       UNATTESTED_CHILD_FIELDS,
@@ -150,6 +200,52 @@ export function createUnattestedChildEvidenceSnapshot({
     ),
     cleanup: "unattempted",
     resolution: "manual_or_auto_expiry_unverified",
+  });
+}
+
+export function createRecoveryCleanupEvidenceSnapshot({
+  runId,
+  sourceSha,
+  recovery,
+  cleanup,
+  code,
+  exactNameReconciliations = 0,
+}) {
+  assertResultEvidenceRunId(runId);
+  assertResultEvidenceSourceSha(sourceSha);
+  if (
+    !RECOVERY_CLEANUP_CODES.has(code) ||
+    ![0, 1].includes(exactNameReconciliations)
+  ) {
+    throw resultEvidenceError("cleanup_result_invalid");
+  }
+  const projectedCleanup = projectRehearsalCleanupResult(cleanup);
+  return deepFreeze({
+    evidenceVersion:
+      LEGACY_ACCOUNT_OWNER_ASSIGNMENT_UNATTESTED_CHILD_EVIDENCE_VERSION,
+    rehearsal: LEGACY_ACCOUNT_OWNER_ASSIGNMENT_RESULT_REHEARSAL,
+    runId,
+    sourceSha,
+    phase: "recovery_cleanup_result",
+    status: "failed",
+    code,
+    invocationCounts: recoveryInvocationCounts(
+      1,
+      exactNameReconciliations,
+      0,
+      projectedCleanup.deleteInvocations,
+      projectedCleanup.exactIdGetInvocations,
+    ),
+    recovery: projectFields(
+      recovery,
+      UNATTESTED_CHILD_FIELDS,
+      "cleanup_result_invalid",
+    ),
+    cleanup: projectedCleanup,
+    resolution:
+      projectedCleanup.status === "passed"
+        ? "exact_child_not_found_confirmed"
+        : "exact_child_cleanup_unverified",
   });
 }
 
@@ -310,6 +406,22 @@ export function resultInvocationCounts(
 ) {
   return deepFreeze({
     branchCreate,
+    harness,
+    branchDelete,
+    exactIdNotFoundCheck,
+  });
+}
+
+function recoveryInvocationCounts(
+  branchCreate,
+  exactNameReconciliation,
+  harness,
+  branchDelete,
+  exactIdNotFoundCheck,
+) {
+  return deepFreeze({
+    branchCreate,
+    exactNameReconciliation,
     harness,
     branchDelete,
     exactIdNotFoundCheck,

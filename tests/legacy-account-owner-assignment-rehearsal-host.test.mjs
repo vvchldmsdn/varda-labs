@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -17,6 +18,10 @@ import {
   guardProductionDatabaseTarget,
 } from "../src/lib/deployment/production-database-target.ts";
 import {
+  createLegacyAccountOwnerAssignmentResultEvidenceJournal,
+} from "../scripts/lib/legacy-account-owner-assignment-rehearsal-result-evidence.mjs";
+import {
+  readRepositoryTrackedWorktreeClean,
   runLegacyAccountOwnerAssignmentRehearsalHost,
 } from "../scripts/lib/legacy-account-owner-assignment-rehearsal-host.mjs";
 
@@ -69,6 +74,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(result.runId, RUN_ID);
       assert.deepEqual(calls, {
         sourceSha: 1,
+        sourceClean: 1,
         sourceAttest: 1,
         create: 1,
         reconcile: 0,
@@ -119,6 +125,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(readFileSync(evidenceFile, "utf8"), "stale-run\n");
       assert.deepEqual(calls, {
         sourceSha: 1,
+        sourceClean: 1,
         sourceAttest: 0,
         create: 0,
         reconcile: 0,
@@ -143,6 +150,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(result.code, "host_options_invalid");
       assert.deepEqual(calls, {
         sourceSha: 0,
+        sourceClean: 0,
         sourceAttest: 0,
         create: 0,
         reconcile: 0,
@@ -154,21 +162,63 @@ describe("legacy account owner-assignment rehearsal host", () => {
     });
   });
 
-  it("does not attest or delete when the unattested-child evidence write fails", async () => {
+  it("does not create a child when create-request evidence cannot be written", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();
       const options = hostOptions(evidenceDirectory, calls);
-      const evidenceFile = expectedEvidenceFile(evidenceDirectory);
       const result =
         await runLegacyAccountOwnerAssignmentRehearsalHost({
           ...options,
-          async createChild({ branchName }) {
-            calls.create += 1;
-            writeFileSync(evidenceFile, "raced-run\n", "utf8");
-            return {
-              branchId: CHILD_BRANCH_ID,
-              branchName,
-            };
+          createEvidenceJournal(journalOptions) {
+            const journal =
+              createLegacyAccountOwnerAssignmentResultEvidenceJournal(
+                journalOptions,
+              );
+            return Object.freeze({
+              ...journal,
+              recordCreateRequested() {
+                throw new Error("synthetic write failure");
+              },
+            });
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.code,
+        "create_requested_evidence_write_failed",
+      );
+      assert.equal(result.evidencePersisted, false);
+      assert.equal(calls.create, 0);
+      assert.equal(calls.attest, 0);
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+      assert.equal(
+        existsSync(expectedEvidenceFile(evidenceDirectory)),
+        false,
+      );
+    });
+  });
+
+  it("keeps create-request evidence when the child recovery transition fails", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          createEvidenceJournal(journalOptions) {
+            const journal =
+              createLegacyAccountOwnerAssignmentResultEvidenceJournal(
+                journalOptions,
+              );
+            return Object.freeze({
+              ...journal,
+              recordChildCreatedUnattested() {
+                throw new Error("synthetic transition failure");
+              },
+            });
           },
         });
 
@@ -177,7 +227,8 @@ describe("legacy account owner-assignment rehearsal host", () => {
         result.code,
         "child_created_unattested_evidence_write_failed",
       );
-      assert.equal(result.evidencePersisted, false);
+      assert.equal(result.evidencePersisted, true);
+      assert.equal(result.lastPersistedPhase, "create_requested");
       assert.deepEqual(result.invocationCounts, {
         branchCreate: 1,
         exactNameReconciliation: 0,
@@ -185,11 +236,16 @@ describe("legacy account owner-assignment rehearsal host", () => {
         exactIdNotFoundCheck: 0,
       });
       assert.equal(result.cleanup, null);
-      assert.equal(readFileSync(evidenceFile, "utf8"), "raced-run\n");
       assert.equal(calls.attest, 0);
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
       assert.equal(calls.get, 0);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.phase, "create_requested");
+      assert.equal(
+        evidence.resolution,
+        "exact_name_reconciliation_required",
+      );
     });
   });
 
@@ -239,11 +295,67 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(result.status, "failed");
       assert.equal(result.code, "source_sha_mismatch");
       assert.equal(calls.sourceSha, 1);
+      assert.equal(calls.sourceClean, 1);
       assert.equal(calls.sourceAttest, 0);
       assert.equal(calls.create, 0);
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
     });
+  });
+
+  it("blocks a tracked dirty worktree before control-plane reads", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...hostOptions(evidenceDirectory, calls),
+          async readTrackedWorktreeClean() {
+            calls.sourceClean += 1;
+            return false;
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "source_worktree_dirty");
+      assert.equal(calls.sourceSha, 1);
+      assert.equal(calls.sourceClean, 1);
+      assert.equal(calls.sourceAttest, 0);
+      assert.equal(calls.create, 0);
+      assert.equal(calls.reconcile, 0);
+      assert.equal(
+        existsSync(expectedEvidenceFile(evidenceDirectory)),
+        false,
+      );
+    });
+  });
+
+  it("checks only tracked staged and unstaged Git diffs", () => {
+    const commands = [];
+    const clean = readRepositoryTrackedWorktreeClean({
+      repositoryRoot: process.cwd(),
+      spawn(command, args) {
+        commands.push([command, ...args]);
+        return {
+          status: 0,
+          signal: null,
+          stdout: "",
+          stderr: "",
+        };
+      },
+    });
+
+    assert.equal(clean, true);
+    assert.deepEqual(commands, [
+      ["git", "diff", "--quiet", "--no-ext-diff", "--"],
+      [
+        "git",
+        "diff",
+        "--cached",
+        "--quiet",
+        "--no-ext-diff",
+        "--",
+      ],
+    ]);
   });
 
   it("guards the Production database source before any control-plane mutation", async () => {
@@ -341,6 +453,7 @@ describe("legacy account owner-assignment rehearsal host", () => {
       );
       assert.deepEqual(evidence.invocationCounts, {
         branchCreate: 1,
+        exactNameReconciliation: 0,
         harness: 0,
         branchDelete: 0,
         exactIdNotFoundCheck: 0,
@@ -429,6 +542,17 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 1);
       assert.equal(calls.get, 1);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.phase, "recovery_cleanup_result");
+      assert.equal(evidence.code, "branch_create_ambiguous");
+      assert.equal(
+        evidence.resolution,
+        "exact_child_not_found_confirmed",
+      );
+      assert.equal(
+        evidence.invocationCounts.exactNameReconciliation,
+        1,
+      );
     });
   });
 
@@ -470,6 +594,12 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(calls.harness, 0);
       assert.equal(calls.delete, 0);
       assert.equal(calls.get, 0);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.equal(evidence.phase, "child_created_unattested");
+      assert.equal(
+        evidence.invocationCounts.exactNameReconciliation,
+        1,
+      );
     });
   });
 });
@@ -491,6 +621,10 @@ function hostOptions(evidenceDirectory, calls) {
     async readSourceSha() {
       calls.sourceSha += 1;
       return SOURCE_SHA;
+    },
+    async readTrackedWorktreeClean() {
+      calls.sourceClean += 1;
+      return true;
     },
     async attestProductionSource() {
       calls.sourceAttest += 1;
@@ -625,6 +759,7 @@ function readEvidence(evidenceDirectory) {
 function callCounts() {
   return {
     sourceSha: 0,
+    sourceClean: 0,
     sourceAttest: 0,
     create: 0,
     reconcile: 0,

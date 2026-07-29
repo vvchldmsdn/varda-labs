@@ -5,5 +5,6 @@ export {
 } from "./legacy-account-owner-assignment-rehearsal-host-policy.mjs";
 export {
   readRepositoryHeadSha,
+  readRepositoryTrackedWorktreeClean,
   runLegacyAccountOwnerAssignmentRehearsalHost,
 } from "./legacy-account-owner-assignment-rehearsal-host-session.mjs";

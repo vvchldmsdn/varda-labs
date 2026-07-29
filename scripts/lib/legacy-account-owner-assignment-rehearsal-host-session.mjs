@@ -16,6 +16,7 @@ import {
   assertOwnerAssignmentHostTarget,
   assertOwnerAssignmentHostSourceSha,
   createLegacyAccountOwnerAssignmentHostRunIdentity,
+  createOwnerAssignmentCreateRequestedEvidence,
   createOwnerAssignmentPreparedControlPlaneEvidence,
   createOwnerAssignmentUnattestedChildEvidence,
   hostError,
@@ -41,6 +42,8 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
   deleteChild,
   checkChildNotFound,
   readSourceSha = readRepositoryHeadSha,
+  readTrackedWorktreeClean =
+    readRepositoryTrackedWorktreeClean,
   createRunId,
   executeHarness =
     executeLegacyAccountOwnerAssignmentRehearsal,
@@ -48,6 +51,8 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
   expectedProductionSourceTargetFingerprint,
   previewDatabasePolicy,
   poolFactory,
+  createEvidenceJournal =
+    createLegacyAccountOwnerAssignmentResultEvidenceJournal,
 } = {}) {
   if (
     ![
@@ -58,7 +63,9 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
       deleteChild,
       checkChildNotFound,
       readSourceSha,
+      readTrackedWorktreeClean,
       executeHarness,
+      createEvidenceJournal,
     ].every((item) => typeof item === "function") ||
     (createRunId !== undefined &&
       typeof createRunId !== "function") ||
@@ -86,8 +93,20 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
     sourceSha = assertOwnerAssignmentHostSourceSha(
       await readSourceSha({ repositoryRoot }),
     );
-  } catch {
-    return ownerAssignmentHostFailure("source_sha_invalid");
+    if (
+      (await readTrackedWorktreeClean({
+        repositoryRoot,
+      })) !== true
+    ) {
+      throw hostError("source_worktree_dirty");
+    }
+  } catch (error) {
+    return ownerAssignmentHostFailure(
+      safeOwnerAssignmentHostErrorCode(
+        error,
+        "source_sha_invalid",
+      ),
+    );
   }
   if (sourceSha !== expectedSourceSha) {
     return ownerAssignmentHostFailure("source_sha_mismatch");
@@ -142,6 +161,30 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
     );
   }
 
+  let evidenceJournal;
+  try {
+    evidenceJournal = createEvidenceJournal({
+      evidenceFile: run.evidenceFile,
+      runId: run.runId,
+      sourceSha,
+    });
+    evidenceJournal.recordCreateRequested(
+      createOwnerAssignmentCreateRequestedEvidence({
+        branchName: run.branchName,
+        sourceAttestation,
+        target,
+      }),
+    );
+  } catch {
+    return ownerAssignmentHostFailure(
+      "create_requested_evidence_write_failed",
+      {
+        runId: run.runId,
+        ...journalEvidenceState(evidenceJournal),
+      },
+    );
+  }
+
   let createdChild;
   try {
     createdChild = projectCreatedOwnerAssignmentChild(
@@ -158,6 +201,8 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
     return handleAmbiguousCreate({
       run,
       target,
+      sourceAttestation,
+      evidenceJournal,
       reconcileChildByExactName,
       attestChild,
       deleteChild,
@@ -166,15 +211,8 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
   }
 
   let attestation;
-  let evidenceJournal;
   let unattestedChildEvidence;
   try {
-    evidenceJournal =
-      createLegacyAccountOwnerAssignmentResultEvidenceJournal({
-        evidenceFile: run.evidenceFile,
-        runId: run.runId,
-        sourceSha,
-      });
     unattestedChildEvidence =
       evidenceJournal.recordChildCreatedUnattested(
         createOwnerAssignmentUnattestedChildEvidence({
@@ -189,8 +227,7 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
       {
         runId: run.runId,
         branchCreateInvocations: 1,
-        evidencePersisted: false,
-        lastPersistedPhase: "none",
+        ...journalEvidenceState(evidenceJournal),
       },
     );
   }
@@ -252,10 +289,30 @@ export async function runLegacyAccountOwnerAssignmentRehearsalHost({
       deleteChild,
       checkChildNotFound,
     });
+    let recoveryEvidence;
+    try {
+      recoveryEvidence =
+        evidenceJournal.recordRecoveryCleanupResult(cleanup, {
+          code: "harness_context_invalid",
+        });
+    } catch {
+      return ownerAssignmentHostFailure(
+        "cleanup_result_evidence_write_failed",
+        {
+          runId: run.runId,
+          branchCreateInvocations: 1,
+          cleanup,
+          ...journalEvidenceState(evidenceJournal),
+        },
+      );
+    }
     return ownerAssignmentHostFailure("harness_context_invalid", {
       runId: run.runId,
       branchCreateInvocations: 1,
       cleanup,
+      evidencePersisted: true,
+      lastPersistedPhase: recoveryEvidence.phase,
+      evidence: recoveryEvidence,
     });
   }
 
@@ -326,9 +383,38 @@ export function readRepositoryHeadSha({
   return result.stdout.trim();
 }
 
+export function readRepositoryTrackedWorktreeClean({
+  repositoryRoot,
+  spawn = spawnSync,
+} = {}) {
+  for (const args of [
+    ["diff", "--quiet", "--no-ext-diff", "--"],
+    ["diff", "--cached", "--quiet", "--no-ext-diff", "--"],
+  ]) {
+    const result = spawn("git", args, {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    if (
+      !result ||
+      result.signal !== null ||
+      result.stdout !== "" ||
+      result.stderr !== "" ||
+      ![0, 1].includes(result.status)
+    ) {
+      throw hostError("source_worktree_state_invalid");
+    }
+    if (result.status === 1) return false;
+  }
+  return true;
+}
+
 async function handleAmbiguousCreate({
   run,
   target,
+  sourceAttestation,
+  evidenceJournal,
   reconcileChildByExactName,
   attestChild,
   deleteChild,
@@ -354,6 +440,7 @@ async function handleAmbiguousCreate({
         runId: run.runId,
         branchCreateInvocations: 1,
         exactNameReconciliations: 1,
+        ...journalEvidenceState(evidenceJournal),
       },
     );
   }
@@ -363,7 +450,31 @@ async function handleAmbiguousCreate({
       runId: run.runId,
       branchCreateInvocations: 1,
       exactNameReconciliations: 1,
+      ...journalEvidenceState(evidenceJournal),
     });
+  }
+
+  let unattestedChildEvidence;
+  try {
+    unattestedChildEvidence =
+      evidenceJournal.recordChildCreatedUnattested(
+        createOwnerAssignmentUnattestedChildEvidence({
+          createdChild: reconciled,
+          sourceAttestation,
+          target,
+        }),
+        { exactNameReconciliations: 1 },
+      );
+  } catch {
+    return ownerAssignmentHostFailure(
+      "child_created_unattested_evidence_write_failed",
+      {
+        runId: run.runId,
+        branchCreateInvocations: 1,
+        exactNameReconciliations: 1,
+        ...journalEvidenceState(evidenceJournal),
+      },
+    );
   }
 
   let attestation;
@@ -389,6 +500,9 @@ async function handleAmbiguousCreate({
         runId: run.runId,
         branchCreateInvocations: 1,
         exactNameReconciliations: 1,
+        evidencePersisted: true,
+        lastPersistedPhase: unattestedChildEvidence.phase,
+        evidence: unattestedChildEvidence,
       },
     );
   }
@@ -399,11 +513,46 @@ async function handleAmbiguousCreate({
     deleteChild,
     checkChildNotFound,
   });
+  let recoveryEvidence;
+  try {
+    recoveryEvidence =
+      evidenceJournal.recordRecoveryCleanupResult(cleanup, {
+        code: "branch_create_ambiguous",
+      });
+  } catch {
+    return ownerAssignmentHostFailure(
+      "cleanup_result_evidence_write_failed",
+      {
+        runId: run.runId,
+        branchCreateInvocations: 1,
+        exactNameReconciliations: 1,
+        cleanup,
+        ...journalEvidenceState(evidenceJournal),
+      },
+    );
+  }
   return ownerAssignmentHostFailure("branch_create_ambiguous", {
     runId: run.runId,
     branchCreateInvocations: 1,
     exactNameReconciliations: 1,
     cleanup,
+    evidencePersisted: true,
+    lastPersistedPhase: recoveryEvidence.phase,
+    evidence: recoveryEvidence,
+  });
+}
+
+function journalEvidenceState(journal) {
+  let evidence = null;
+  try {
+    evidence = journal?.persisted?.() ?? null;
+  } catch {
+    evidence = null;
+  }
+  return Object.freeze({
+    evidencePersisted: evidence !== null,
+    lastPersistedPhase: evidence?.phase ?? "none",
+    ...(evidence === null ? {} : { evidence }),
   });
 }
 

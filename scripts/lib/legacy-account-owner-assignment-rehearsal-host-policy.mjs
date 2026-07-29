@@ -13,6 +13,8 @@ const PROJECT_ID_PATTERN = /^[a-z][a-z0-9-]{2,63}$/;
 const BRANCH_ID_PATTERN = /^br-[a-z0-9-]+$/;
 const ENDPOINT_ID_PATTERN = /^ep-[a-z0-9-]+$/;
 const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const REHEARSAL_BRANCH_NAME_PATTERN =
+  /^preview\/codex\/legacy-account-owner-assignment-rehearsal-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const BRANCH_NAME_PREFIX =
   "preview/codex/legacy-account-owner-assignment-rehearsal-";
 const MISSING = Symbol("missing");
@@ -24,11 +26,15 @@ const SAFE_HOST_ERROR_CODES = new Set([
   "branch_create_reconciliation_unresolved",
   "branch_create_result_invalid",
   "child_created_unattested_evidence_write_failed",
+  "cleanup_result_evidence_write_failed",
+  "create_requested_evidence_write_failed",
   "harness_context_invalid",
   "host_options_invalid",
   "production_source_attestation_invalid",
   "source_sha_invalid",
   "source_sha_mismatch",
+  "source_worktree_dirty",
+  "source_worktree_state_invalid",
   "stale_evidence_path",
 ]);
 
@@ -421,7 +427,7 @@ export function createOwnerAssignmentUnattestedChildEvidence({
   const branchName = requirePattern(
     createdChild,
     "branchName",
-    new RegExp(`^${BRANCH_NAME_PREFIX}[0-9a-f-]+$`),
+    REHEARSAL_BRANCH_NAME_PATTERN,
     "branch_create_result_invalid",
   );
   const sourceTargetFingerprint = requirePattern(
@@ -435,6 +441,52 @@ export function createOwnerAssignmentUnattestedChildEvidence({
     parentBranchFingerprint: fingerprint(parentBranchId),
     branchIdFingerprint: fingerprint(branchId),
     branchNameFingerprint: fingerprint(branchName),
+    productionEndpointFingerprint: fingerprint(
+      productionEndpointId,
+    ),
+    sourceTargetFingerprint,
+  });
+}
+
+export function createOwnerAssignmentCreateRequestedEvidence({
+  branchName,
+  sourceAttestation,
+  target,
+}) {
+  const projectId = requirePattern(
+    target,
+    "projectId",
+    PROJECT_ID_PATTERN,
+    "host_options_invalid",
+  );
+  const parentBranchId = requirePattern(
+    target,
+    "parentBranchId",
+    BRANCH_ID_PATTERN,
+    "host_options_invalid",
+  );
+  const productionEndpointId = requirePattern(
+    target,
+    "productionEndpointId",
+    ENDPOINT_ID_PATTERN,
+    "host_options_invalid",
+  );
+  const verifiedBranchName = requirePattern(
+    { branchName },
+    "branchName",
+    REHEARSAL_BRANCH_NAME_PATTERN,
+    "host_options_invalid",
+  );
+  const sourceTargetFingerprint = requirePattern(
+    sourceAttestation,
+    "sourceTargetFingerprint",
+    FINGERPRINT_PATTERN,
+    "host_options_invalid",
+  );
+  return Object.freeze({
+    projectFingerprint: fingerprint(projectId),
+    parentBranchFingerprint: fingerprint(parentBranchId),
+    branchNameFingerprint: fingerprint(verifiedBranchName),
     productionEndpointFingerprint: fingerprint(
       productionEndpointId,
     ),
