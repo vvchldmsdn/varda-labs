@@ -614,6 +614,114 @@ describe("legacy account owner-assignment rehearsal host", () => {
     });
   });
 
+  it("persists only allowlisted child-read diagnostics", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestChild() {
+            calls.attest += 1;
+            const error = new Error(
+              `private provider output ${PASSWORD}`,
+            );
+            Object.defineProperties(error, {
+              stage: {
+                enumerable: true,
+                value: "endpoint_list_get",
+              },
+              reason: {
+                enumerable: true,
+                value: "execution_failed",
+              },
+            });
+            throw error;
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(calls.harness, 0);
+      assert.equal(calls.delete, 0);
+      assert.equal(calls.get, 0);
+      const evidence = readEvidence(evidenceDirectory);
+      assert.deepEqual(evidence.readiness, {
+        outcome: "read_failed",
+        pollCount: 1,
+        readDiagnostic: {
+          stage: "endpoint_list_get",
+          reason: "execution_failed",
+        },
+      });
+      assert.equal(JSON.stringify(evidence).includes(PASSWORD), false);
+    });
+  });
+
+  it("does not invoke diagnostic accessors from a thrown read error", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let accessorInvocations = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestChild() {
+            calls.attest += 1;
+            const error = new Error("synthetic read failure");
+            for (const key of ["stage", "reason"]) {
+              Object.defineProperty(error, key, {
+                get() {
+                  accessorInvocations += 1;
+                  return key === "stage"
+                    ? "branch_get"
+                    : "execution_failed";
+                },
+              });
+            }
+            throw error;
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(accessorInvocations, 0);
+      assert.deepEqual(readEvidence(evidenceDirectory).readiness, {
+        outcome: "read_failed",
+        pollCount: 1,
+      });
+    });
+  });
+
+  it("fails closed when diagnostic descriptor inspection throws", async () => {
+    await withEvidenceDirectory(async (evidenceDirectory) => {
+      const calls = callCounts();
+      let descriptorTraps = 0;
+      const options = hostOptions(evidenceDirectory, calls);
+      const result =
+        await runLegacyAccountOwnerAssignmentRehearsalHost({
+          ...options,
+          async attestChild() {
+            calls.attest += 1;
+            throw new Proxy(new Error("synthetic read failure"), {
+              getOwnPropertyDescriptor() {
+                descriptorTraps += 1;
+                throw new Error("descriptor trap");
+              },
+            });
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "branch_readiness_read_failed");
+      assert.equal(descriptorTraps, 2);
+      assert.deepEqual(readEvidence(evidenceDirectory).readiness, {
+        outcome: "read_failed",
+        pollCount: 1,
+      });
+    });
+  });
+
   it("cleans a statically verified child when a later readiness read fails", async () => {
     await withEvidenceDirectory(async (evidenceDirectory) => {
       const calls = callCounts();

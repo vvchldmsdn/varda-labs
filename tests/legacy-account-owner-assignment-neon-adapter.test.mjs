@@ -296,7 +296,153 @@ describe("legacy account owner-assignment Neon adapter", () => {
         }),
       (error) => {
         assert.equal(error.code, "neon_cli_timeout");
+        assert.equal(error.stage, "branch_get");
+        assert.equal(error.reason, "timeout");
         assert.equal(JSON.stringify(error).includes(RAW_SECRET), false);
+        return true;
+      },
+    );
+  });
+
+  it("classifies an exact child branch miss without exposing provider output", async () => {
+    const adapter = createAdapter({
+      calls: [],
+      responses: [
+        ok("2.38.1\n"),
+        failed(
+          "ERROR: FetchBranchWithParent\n" +
+            `private provider output ${RAW_SECRET}`,
+        ),
+      ],
+    });
+
+    await assert.rejects(
+      () =>
+        adapter.attestChild({
+          projectId: PROJECT_ID,
+          branchId: CHILD_BRANCH_ID,
+          branchName: BRANCH_NAME,
+          timeoutMs: 1_000,
+        }),
+      (error) => {
+        assert.deepEqual(
+          {
+            code: error.code,
+            stage: error.stage,
+            reason: error.reason,
+          },
+          {
+            code: "neon_cli_exact_not_found",
+            stage: "branch_get",
+            reason: "exact_not_found",
+          },
+        );
+        assert.equal(JSON.stringify(error).includes(RAW_SECRET), false);
+        return true;
+      },
+    );
+  });
+
+  it("classifies an endpoint-list execution failure without exposing stderr", async () => {
+    const adapter = createAdapter({
+      calls: [],
+      responses: [
+        ok("2.38.1\n"),
+        json({ branch: childBranch() }),
+        failed(`private endpoint failure ${RAW_SECRET}`),
+      ],
+    });
+
+    await assert.rejects(
+      () =>
+        adapter.attestChild({
+          projectId: PROJECT_ID,
+          branchId: CHILD_BRANCH_ID,
+          branchName: BRANCH_NAME,
+          timeoutMs: 1_000,
+        }),
+      (error) => {
+        assert.deepEqual(
+          {
+            code: error.code,
+            stage: error.stage,
+            reason: error.reason,
+          },
+          {
+            code: "neon_cli_execution_failed",
+            stage: "endpoint_list_get",
+            reason: "execution_failed",
+          },
+        );
+        assert.equal(JSON.stringify(error).includes(RAW_SECRET), false);
+        return true;
+      },
+    );
+  });
+
+  it("classifies malformed child branch JSON as a response failure", async () => {
+    const adapter = createAdapter({
+      calls: [],
+      responses: [ok("2.38.1\n"), ok("{not-json")],
+    });
+
+    await assert.rejects(
+      () =>
+        adapter.attestChild({
+          projectId: PROJECT_ID,
+          branchId: CHILD_BRANCH_ID,
+          branchName: BRANCH_NAME,
+          timeoutMs: 1_000,
+        }),
+      (error) => {
+        assert.deepEqual(
+          {
+            code: error.code,
+            stage: error.stage,
+            reason: error.reason,
+          },
+          {
+            code: "neon_cli_response_invalid",
+            stage: "branch_get",
+            reason: "response_invalid",
+          },
+        );
+        return true;
+      },
+    );
+  });
+
+  it("classifies an invalid endpoint response schema at its read stage", async () => {
+    const adapter = createAdapter({
+      calls: [],
+      responses: [
+        ok("2.38.1\n"),
+        json({ branch: childBranch() }),
+        json({ endpoints: "invalid" }),
+      ],
+    });
+
+    await assert.rejects(
+      () =>
+        adapter.attestChild({
+          projectId: PROJECT_ID,
+          branchId: CHILD_BRANCH_ID,
+          branchName: BRANCH_NAME,
+          timeoutMs: 1_000,
+        }),
+      (error) => {
+        assert.deepEqual(
+          {
+            code: error.code,
+            stage: error.stage,
+            reason: error.reason,
+          },
+          {
+            code: "neon_cli_response_invalid",
+            stage: "endpoint_list_get",
+            reason: "response_invalid",
+          },
+        );
         return true;
       },
     );

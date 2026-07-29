@@ -134,6 +134,43 @@ describe("legacy account owner-assignment result evidence", () => {
     });
   });
 
+  it("projects only allowlisted child-read diagnostics", () => {
+    withEvidenceFile((evidenceFile) => {
+      const journal =
+        createLegacyAccountOwnerAssignmentResultEvidenceJournal({
+          evidenceFile,
+          runId: RUN_ID,
+          sourceSha: SOURCE_SHA,
+        });
+
+      journal.recordChildCreatedUnattested(
+        unattestedChildEvidence(),
+      );
+      const snapshot = journal.recordChildAttestationOutcome({
+        outcome: "read_failed",
+        pollCount: 1,
+        readDiagnostic: {
+          stage: "branch_get",
+          reason: "exact_not_found",
+          stderr: "raw-provider-secret",
+        },
+      });
+
+      assert.deepEqual(snapshot.readiness, {
+        outcome: "read_failed",
+        pollCount: 1,
+        readDiagnostic: {
+          stage: "branch_get",
+          reason: "exact_not_found",
+        },
+      });
+      assert.equal(
+        JSON.stringify(snapshot).includes("raw-provider-secret"),
+        false,
+      );
+    });
+  });
+
   it("atomically replaces one fixed-schema file through all phases", () => {
     withEvidenceFile((evidenceFile) => {
       const journal =

@@ -499,10 +499,9 @@ async function handleAmbiguousCreate({
     let failureEvidence;
     try {
       failureEvidence =
-        evidenceJournal.recordChildAttestationOutcome({
-          outcome: readiness.outcome,
-          pollCount: readiness.pollCount,
-        });
+        evidenceJournal.recordChildAttestationOutcome(
+          readinessEvidence(readiness),
+        );
     } catch {
       return ownerAssignmentHostFailure(
         "child_attestation_evidence_write_failed",
@@ -566,10 +565,9 @@ async function handleAmbiguousCreate({
   }
   const attestation = readiness.attestation;
   try {
-    evidenceJournal.recordChildAttestationOutcome({
-      outcome: "ready",
-      pollCount: readiness.pollCount,
-    });
+    evidenceJournal.recordChildAttestationOutcome(
+      readinessEvidence(readiness),
+    );
   } catch {
     return ownerAssignmentHostFailure(
       "child_attestation_evidence_write_failed",
@@ -629,10 +627,9 @@ async function handleChildReadinessFailure({
   let failureEvidence;
   try {
     failureEvidence =
-      evidenceJournal.recordChildAttestationOutcome({
-        outcome: readiness.outcome,
-        pollCount: readiness.pollCount,
-      });
+      evidenceJournal.recordChildAttestationOutcome(
+        readinessEvidence(readiness),
+      );
   } catch {
     return ownerAssignmentHostFailure(
       "child_attestation_evidence_write_failed",
@@ -698,6 +695,16 @@ function readinessFailureCode(outcome) {
     return "branch_readiness_timeout";
   }
   return "branch_attestation_invalid";
+}
+
+function readinessEvidence(readiness) {
+  return Object.freeze({
+    outcome: readiness.outcome,
+    pollCount: readiness.pollCount,
+    ...(readiness.readDiagnostic === undefined
+      ? {}
+      : { readDiagnostic: readiness.readDiagnostic }),
+  });
 }
 
 function journalEvidenceState(journal) {

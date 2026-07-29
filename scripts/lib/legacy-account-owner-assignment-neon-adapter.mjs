@@ -15,6 +15,16 @@ const MAX_OUTPUT_BYTES = 1024 * 1024;
 const DEFAULT_PROCESS_TIMEOUT_MS = 120_000;
 const MISSING = Symbol("missing");
 const INVALID = Symbol("invalid");
+const CHILD_READ_STAGES = new Set([
+  "branch_get",
+  "endpoint_list_get",
+]);
+const CHILD_READ_REASONS = new Set([
+  "exact_not_found",
+  "execution_failed",
+  "response_invalid",
+  "timeout",
+]);
 const PROCESS_ENV_KEYS = new Set([
   "APPDATA",
   "COMSPEC",
@@ -38,7 +48,7 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_NEON_CLI =
   NEON_CLI_PACKAGE;
 
 export class LegacyAccountOwnerAssignmentNeonAdapterError extends Error {
-  constructor(code) {
+  constructor(code, readDiagnostic = null) {
     super("Legacy account owner-assignment Neon adapter failed.");
     this.name = "LegacyAccountOwnerAssignmentNeonAdapterError";
     Object.defineProperty(this, "code", {
@@ -47,6 +57,17 @@ export class LegacyAccountOwnerAssignmentNeonAdapterError extends Error {
       value: code,
       writable: false,
     });
+    const diagnostic = projectChildReadDiagnostic(readDiagnostic);
+    if (diagnostic !== null) {
+      for (const [key, value] of Object.entries(diagnostic)) {
+        Object.defineProperty(this, key, {
+          configurable: false,
+          enumerable: true,
+          value,
+          writable: false,
+        });
+      }
+    }
   }
 }
 
@@ -120,6 +141,9 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     if (mode === "maybe_json" && isExactNotFound(result)) {
       return null;
     }
+    if (mode === "child_json" && isExactNotFound(result)) {
+      throw adapterError("neon_cli_exact_not_found");
+    }
     if (
       result.status !== 0 ||
       result.signal !== null ||
@@ -170,6 +194,14 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     const remaining = Math.floor(deadline - current);
     if (remaining < 1) throw adapterError("neon_cli_timeout");
     return Math.min(remaining, DEFAULT_PROCESS_TIMEOUT_MS);
+  }
+
+  function executeChildRead(args, deadline, stage) {
+    try {
+      return execute(args, "child_json", deadline);
+    } catch (error) {
+      throw childReadError(error, stage);
+    }
   }
 
   return Object.freeze({
@@ -248,19 +280,20 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
         monotonicNow,
       });
       return projectControlPlaneAttestation({
-        branchResponse: execute(
+        branchResponse: executeChildRead(
           branchGetArgs(projectId, branchId),
-          "json",
           deadline,
+          "branch_get",
         ),
-        endpointResponse: execute(
+        endpointResponse: executeChildRead(
           branchEndpointsArgs(projectId, branchId),
-          "json",
           deadline,
+          "endpoint_list_get",
         ),
         expectedEndpointId: null,
         expectedExpiresAt: expiration,
         now,
+        diagnoseChildRead: true,
       });
     },
     async deleteChild({ projectId, branchId }) {
@@ -366,47 +399,8 @@ function projectControlPlaneAttestation({
   expectedEndpointId,
   expectedExpiresAt,
   now,
+  diagnoseChildRead = false,
 }) {
-  const branch = requireObject(branchResponse, "branch");
-  const endpoints = ownDataValue(endpointResponse, "endpoints");
-  if (!Array.isArray(endpoints)) {
-    throw adapterError("neon_cli_response_invalid");
-  }
-  const readWriteEndpoints = endpoints.filter(
-    (endpoint) =>
-      ownDataValue(endpoint, "type") === "read_write",
-  );
-  if (readWriteEndpoints.length !== 1) {
-    throw adapterError("neon_cli_response_invalid");
-  }
-  const endpoint = readWriteEndpoints[0];
-  const endpointId = requirePattern(
-    endpoint,
-    "id",
-    ENDPOINT_ID_PATTERN,
-    "neon_cli_response_invalid",
-  );
-  const branchState = requireString(
-    branch,
-    "current_state",
-    "neon_cli_response_invalid",
-  );
-  const endpointState = requireString(
-    endpoint,
-    "current_state",
-    "neon_cli_response_invalid",
-  );
-  const endpointDisabled = ownDataValue(endpoint, "disabled");
-  if (typeof endpointDisabled !== "boolean") {
-    throw adapterError("neon_cli_response_invalid");
-  }
-  if (
-    expectedEndpointId !== null &&
-    endpointId !== expectedEndpointId
-  ) {
-    throw adapterError("neon_cli_response_invalid");
-  }
-  const expiresAt = ownDataValue(branch, "expires_at");
   const currentTime = now();
   if (
     !(currentTime instanceof Date) ||
@@ -414,7 +408,59 @@ function projectControlPlaneAttestation({
   ) {
     throw adapterError("neon_adapter_options_invalid");
   }
+  const branch = projectControlPlaneRead(
+    () =>
+      projectControlPlaneBranch({
+        branchResponse,
+        expectedExpiresAt,
+        currentTime,
+      }),
+    "branch_get",
+    diagnoseChildRead,
+  );
+  const endpoint = projectControlPlaneRead(
+    () =>
+      projectControlPlaneEndpoint({
+        endpointResponse,
+        expectedEndpointId,
+      }),
+    "endpoint_list_get",
+    diagnoseChildRead,
+  );
 
+  return Object.freeze({
+    projectId: branch.projectId,
+    parentBranchId: branch.parentBranchId,
+    branchId: branch.branchId,
+    branchName: branch.branchName,
+    endpointId: endpoint.endpointId,
+    endpointProjectId: endpoint.endpointProjectId,
+    endpointBranchId: endpoint.endpointBranchId,
+    endpointType: "read_write",
+    branchState: branch.branchState,
+    endpointState: endpoint.endpointState,
+    endpointDisabled: endpoint.endpointDisabled,
+    branchReady: branch.branchReady,
+    endpointReady: endpoint.endpointReady,
+    default: branch.default,
+    primary: branch.primary,
+    protected: branch.protected,
+    autoExpires: branch.autoExpires,
+  });
+}
+
+function projectControlPlaneBranch({
+  branchResponse,
+  expectedExpiresAt,
+  currentTime,
+}) {
+  const branch = requireObject(branchResponse, "branch");
+  const branchState = requireString(
+    branch,
+    "current_state",
+    "neon_cli_response_invalid",
+  );
+  const expiresAt = ownDataValue(branch, "expires_at");
   return Object.freeze({
     projectId: requirePattern(
       branch,
@@ -434,6 +480,58 @@ function projectControlPlaneAttestation({
       "name",
       "neon_cli_response_invalid",
     ),
+    branchState,
+    branchReady: branchState === "ready",
+    default: ownDataValue(branch, "default"),
+    primary: ownDataValue(branch, "primary"),
+    protected: ownDataValue(branch, "protected"),
+    autoExpires:
+      expectedExpiresAt !== null &&
+      expiresAt === expectedExpiresAt &&
+      typeof expiresAt === "string" &&
+      Number.isFinite(Date.parse(expiresAt)) &&
+      Date.parse(expiresAt) > currentTime.valueOf(),
+  });
+}
+
+function projectControlPlaneEndpoint({
+  endpointResponse,
+  expectedEndpointId,
+}) {
+  const endpoints = ownDataValue(endpointResponse, "endpoints");
+  if (!Array.isArray(endpoints)) {
+    throw adapterError("neon_cli_response_invalid");
+  }
+  const readWriteEndpoints = endpoints.filter(
+    (endpoint) =>
+      ownDataValue(endpoint, "type") === "read_write",
+  );
+  if (readWriteEndpoints.length !== 1) {
+    throw adapterError("neon_cli_response_invalid");
+  }
+  const endpoint = readWriteEndpoints[0];
+  const endpointId = requirePattern(
+    endpoint,
+    "id",
+    ENDPOINT_ID_PATTERN,
+    "neon_cli_response_invalid",
+  );
+  const endpointState = requireString(
+    endpoint,
+    "current_state",
+    "neon_cli_response_invalid",
+  );
+  const endpointDisabled = ownDataValue(endpoint, "disabled");
+  if (typeof endpointDisabled !== "boolean") {
+    throw adapterError("neon_cli_response_invalid");
+  }
+  if (
+    expectedEndpointId !== null &&
+    endpointId !== expectedEndpointId
+  ) {
+    throw adapterError("neon_cli_response_invalid");
+  }
+  return Object.freeze({
     endpointId,
     endpointProjectId: requirePattern(
       endpoint,
@@ -447,24 +545,21 @@ function projectControlPlaneAttestation({
       BRANCH_ID_PATTERN,
       "neon_cli_response_invalid",
     ),
-    endpointType: "read_write",
-    branchState,
     endpointState,
     endpointDisabled,
-    branchReady: branchState === "ready",
     endpointReady:
       ["active", "idle"].includes(endpointState) &&
       endpointDisabled === false,
-    default: ownDataValue(branch, "default"),
-    primary: ownDataValue(branch, "primary"),
-    protected: ownDataValue(branch, "protected"),
-    autoExpires:
-      expectedExpiresAt !== null &&
-      expiresAt === expectedExpiresAt &&
-      typeof expiresAt === "string" &&
-      Number.isFinite(Date.parse(expiresAt)) &&
-      Date.parse(expiresAt) > currentTime.valueOf(),
   });
+}
+
+function projectControlPlaneRead(factory, stage, diagnoseChildRead) {
+  try {
+    return factory();
+  } catch (error) {
+    if (!diagnoseChildRead) throw error;
+    throw childReadError(error, stage);
+  }
 }
 
 function projectProcessResult(result) {
@@ -609,6 +704,42 @@ function ownDataValue(value, key) {
   return descriptor.value;
 }
 
-function adapterError(code) {
-  return new LegacyAccountOwnerAssignmentNeonAdapterError(code);
+function childReadError(error, stage) {
+  const code = ownDataValue(error, "code");
+  const reason = childReadReason(code);
+  return adapterError(
+    typeof code === "string" ? code : "neon_cli_execution_failed",
+    { stage, reason },
+  );
+}
+
+function childReadReason(code) {
+  if (code === "neon_cli_exact_not_found") {
+    return "exact_not_found";
+  }
+  if (code === "neon_cli_timeout") return "timeout";
+  if (code === "neon_cli_response_invalid") {
+    return "response_invalid";
+  }
+  return "execution_failed";
+}
+
+function projectChildReadDiagnostic(value) {
+  if (value === null) return null;
+  const stage = ownDataValue(value, "stage");
+  const reason = ownDataValue(value, "reason");
+  if (
+    !CHILD_READ_STAGES.has(stage) ||
+    !CHILD_READ_REASONS.has(reason)
+  ) {
+    return null;
+  }
+  return Object.freeze({ stage, reason });
+}
+
+function adapterError(code, readDiagnostic = null) {
+  return new LegacyAccountOwnerAssignmentNeonAdapterError(
+    code,
+    readDiagnostic,
+  );
 }

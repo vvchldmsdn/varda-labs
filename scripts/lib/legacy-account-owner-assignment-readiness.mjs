@@ -14,6 +14,16 @@ export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY =
     pollIntervalMs: 500,
     controlPlaneReadTimeoutMs: 8_000,
   });
+const CHILD_READ_STAGES = new Set([
+  "branch_get",
+  "endpoint_list_get",
+]);
+const CHILD_READ_REASONS = new Set([
+  "exact_not_found",
+  "execution_failed",
+  "response_invalid",
+  "timeout",
+]);
 
 export async function waitForOwnerAssignmentChildReadiness({
   attestChild,
@@ -62,11 +72,12 @@ export async function waitForOwnerAssignmentChildReadiness({
           ),
         ),
       });
-    } catch {
+    } catch (error) {
       return failedReadiness(
         "read_failed",
         pollCount,
         lastStaticAttestation,
+        projectReadDiagnostic(error),
       );
     }
     completedPolls = pollCount;
@@ -208,11 +219,39 @@ function failedReadiness(
   outcome,
   pollCount,
   staticAttestation,
+  readDiagnostic = null,
 ) {
   return Object.freeze({
     status: "failed",
     outcome,
     pollCount,
     staticAttestation,
+    ...(readDiagnostic === null ? {} : { readDiagnostic }),
   });
+}
+
+function projectReadDiagnostic(error) {
+  const stage = readOwnPrimitiveString(error, "stage");
+  const reason = readOwnPrimitiveString(error, "reason");
+  if (
+    !CHILD_READ_STAGES.has(stage) ||
+    !CHILD_READ_REASONS.has(reason)
+  ) {
+    return null;
+  }
+  return Object.freeze({ stage, reason });
+}
+
+function readOwnPrimitiveString(value, property) {
+  if (!value || typeof value !== "object") return null;
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, property);
+  } catch {
+    return null;
+  }
+  if (!descriptor || !("value" in descriptor)) return null;
+  return typeof descriptor.value === "string"
+    ? descriptor.value
+    : null;
 }

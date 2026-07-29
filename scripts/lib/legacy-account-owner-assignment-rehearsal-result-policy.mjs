@@ -35,6 +35,16 @@ const READINESS_OUTCOMES = new Set([
   "state_invalid",
   "timeout",
 ]);
+const CHILD_READ_STAGES = new Set([
+  "branch_get",
+  "endpoint_list_get",
+]);
+const CHILD_READ_REASONS = new Set([
+  "exact_not_found",
+  "execution_failed",
+  "response_invalid",
+  "timeout",
+]);
 const EXPECTED_CHECKS = Object.freeze([
   "successful_assignment",
   "already_applied",
@@ -540,16 +550,48 @@ function projectFields(value, policies, code) {
 function projectReadinessEvidence(value, code) {
   const outcome = ownDataValue(value, "outcome");
   const pollCount = ownDataValue(value, "pollCount");
+  const readDiagnostic = optionalOwnDataValue(
+    value,
+    "readDiagnostic",
+  );
   if (
     !READINESS_OUTCOMES.has(outcome) ||
     !Number.isInteger(pollCount) ||
     pollCount < 0 ||
     pollCount > 32 ||
-    ((outcome === "unattempted") !== (pollCount === 0))
+    ((outcome === "unattempted") !== (pollCount === 0)) ||
+    readDiagnostic === INVALID ||
+    (outcome !== "read_failed" && readDiagnostic !== MISSING)
   ) {
     throw resultEvidenceError(code);
   }
-  return deepFreeze({ outcome, pollCount });
+  return deepFreeze({
+    outcome,
+    pollCount,
+    ...(readDiagnostic === MISSING
+      ? {}
+      : {
+          readDiagnostic: projectReadDiagnostic(
+            readDiagnostic,
+            code,
+          ),
+        }),
+  });
+}
+
+function projectReadDiagnostic(value, code) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw resultEvidenceError(code);
+  }
+  const stage = ownDataValue(value, "stage");
+  const reason = ownDataValue(value, "reason");
+  if (
+    !CHILD_READ_STAGES.has(stage) ||
+    !CHILD_READ_REASONS.has(reason)
+  ) {
+    throw resultEvidenceError(code);
+  }
+  return deepFreeze({ stage, reason });
 }
 
 function readinessFailureCode(value) {
@@ -635,6 +677,19 @@ function ownDataValue(value, key) {
     return INVALID;
   }
   if (!descriptor || !("value" in descriptor)) return INVALID;
+  return descriptor.value;
+}
+
+function optionalOwnDataValue(value, key) {
+  if (!value || typeof value !== "object") return INVALID;
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, key);
+  } catch {
+    return INVALID;
+  }
+  if (!descriptor) return MISSING;
+  if (!("value" in descriptor)) return INVALID;
   return descriptor.value;
 }
 
