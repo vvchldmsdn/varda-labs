@@ -29,7 +29,41 @@ export class IdentityBootstrapClaimIssuerError extends Error {
   }
 }
 
-export async function issueIdentityBootstrapClaim({
+export function createIdentityBootstrapClaimIssuerPort({
+  pool,
+  targetAppUserId,
+  randomSource = randomBytes,
+}) {
+  const ownedReceipts = new WeakSet();
+
+  return Object.freeze({
+    async issue({ targetAppUserSha256 }) {
+      const result = await issueIdentityBootstrapClaim({
+        pool,
+        targetAppUserId,
+        targetAppUserSha256,
+        randomSource,
+      });
+      ownedReceipts.add(result);
+      return result;
+    },
+    take(result) {
+      if (
+        result === null ||
+        typeof result !== "object" ||
+        !ownedReceipts.has(result)
+      ) {
+        throw new IdentityBootstrapClaimIssuerError(
+          "claim_continuation_unavailable",
+        );
+      }
+      ownedReceipts.delete(result);
+      return takeIssuedIdentityBootstrapClaim(result);
+    },
+  });
+}
+
+async function issueIdentityBootstrapClaim({
   pool,
   targetAppUserId,
   targetAppUserSha256,
@@ -198,7 +232,7 @@ export function createOneTimeIdentityBootstrapClaim(
   });
 }
 
-export function takeIssuedIdentityBootstrapClaim(result) {
+function takeIssuedIdentityBootstrapClaim(result) {
   if (
     result === null ||
     typeof result !== "object" ||

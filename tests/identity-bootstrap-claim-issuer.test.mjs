@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 
 import {
+  createIdentityBootstrapClaimIssuerPort,
   IdentityBootstrapClaimIssuerError,
   createOneTimeIdentityBootstrapClaim,
-  issueIdentityBootstrapClaim,
-  takeIssuedIdentityBootstrapClaim,
 } from "../scripts/lib/identity-bootstrap-claim-issuer.mjs";
+import * as issuerModule from "../scripts/lib/identity-bootstrap-claim-issuer.mjs";
 import { fingerprintAppUserId } from "../scripts/lib/legacy-account-ownership-evidence.mjs";
 import { digestIdentityBootstrapClaim } from "../src/lib/identity-bootstrap-claim.ts";
 
@@ -42,11 +42,13 @@ describe("identity bootstrap claim issuer", () => {
 
   it("issues one immutable intent and keeps secrets out of serialized output", async () => {
     const { pool, calls } = mockIssuerPool();
-    const result = await issueIdentityBootstrapClaim({
+    const issuerPort = createIdentityBootstrapClaimIssuerPort({
       pool,
       targetAppUserId: TARGET,
-      targetAppUserSha256: TARGET_SHA256,
       randomSource: () => Buffer.alloc(32, 0xcd),
+    });
+    const result = await issuerPort.issue({
+      targetAppUserSha256: TARGET_SHA256,
     });
 
     assert.equal(result.result, "issued");
@@ -89,26 +91,62 @@ describe("identity bootstrap claim issuer", () => {
         .digest("hex")}`,
     });
 
-    const privateValue = takeIssuedIdentityBootstrapClaim(result);
+    const privateValue = issuerPort.take(result);
     assert.deepEqual(Object.keys(privateValue), ["rawClaim"]);
     assert.match(
       privateValue.rawClaim,
       /^varda-bootstrap-claim-v1\./,
     );
     assert.throws(
-      () => takeIssuedIdentityBootstrapClaim(result),
+      () => issuerPort.take(result),
       (error) =>
         error instanceof IdentityBootstrapClaimIssuerError &&
         error.code === "claim_continuation_unavailable",
     );
   });
 
+  it("keeps raw claim extraction scoped to the issuing capability", async () => {
+    assert.equal(
+      Object.hasOwn(issuerModule, "takeIssuedIdentityBootstrapClaim"),
+      false,
+    );
+
+    const firstPool = mockIssuerPool().pool;
+    const secondPool = mockIssuerPool().pool;
+    const firstPort = createIdentityBootstrapClaimIssuerPort({
+      pool: firstPool,
+      targetAppUserId: TARGET,
+      randomSource: () => Buffer.alloc(32, 0xaa),
+    });
+    const secondPort = createIdentityBootstrapClaimIssuerPort({
+      pool: secondPool,
+      targetAppUserId: TARGET,
+      randomSource: () => Buffer.alloc(32, 0xbb),
+    });
+    const result = await firstPort.issue({
+      targetAppUserSha256: TARGET_SHA256,
+    });
+
+    assert.throws(
+      () => secondPort.take(result),
+      (error) =>
+        error instanceof IdentityBootstrapClaimIssuerError &&
+        error.code === "claim_continuation_unavailable",
+    );
+    assert.match(
+      firstPort.take(result).rawClaim,
+      /^varda-bootstrap-claim-v1\./,
+    );
+  });
+
   it("rejects reviewed-target drift before opening a transaction", async () => {
     const { pool, calls } = mockIssuerPool();
+    const issuerPort = createIdentityBootstrapClaimIssuerPort({
+      pool,
+      targetAppUserId: TARGET,
+    });
     await assert.rejects(
-      issueIdentityBootstrapClaim({
-        pool,
-        targetAppUserId: TARGET,
+      issuerPort.issue({
         targetAppUserSha256: `sha256:${"0".repeat(64)}`,
       }),
       (error) =>
@@ -120,18 +158,20 @@ describe("identity bootstrap claim issuer", () => {
 
   it("fails closed before DML when the database connection is unavailable", async () => {
     const entropy = Buffer.alloc(32, 0xaa);
-    await assert.rejects(
-      issueIdentityBootstrapClaim({
-        pool: {
-          async connect() {
-            throw Object.assign(new Error("unavailable"), {
-              code: "08006",
-            });
-          },
+    const issuerPort = createIdentityBootstrapClaimIssuerPort({
+      pool: {
+        async connect() {
+          throw Object.assign(new Error("unavailable"), {
+            code: "08006",
+          });
         },
-        targetAppUserId: TARGET,
+      },
+      targetAppUserId: TARGET,
+      randomSource: () => entropy,
+    });
+    await assert.rejects(
+      issuerPort.issue({
         targetAppUserSha256: TARGET_SHA256,
-        randomSource: () => entropy,
       }),
       (error) =>
         error instanceof IdentityBootstrapClaimIssuerError &&
@@ -142,23 +182,25 @@ describe("identity bootstrap claim issuer", () => {
 
   it("does not invoke an accessor-backed database error code", async () => {
     let accessorCalls = 0;
-    await assert.rejects(
-      issueIdentityBootstrapClaim({
-        pool: {
-          async connect() {
-            const error = new Error("unavailable");
-            Object.defineProperty(error, "code", {
-              get() {
-                accessorCalls += 1;
-                return "57014";
-              },
-            });
-            throw error;
-          },
+    const issuerPort = createIdentityBootstrapClaimIssuerPort({
+      pool: {
+        async connect() {
+          const error = new Error("unavailable");
+          Object.defineProperty(error, "code", {
+            get() {
+              accessorCalls += 1;
+              return "57014";
+            },
+          });
+          throw error;
         },
-        targetAppUserId: TARGET,
+      },
+      targetAppUserId: TARGET,
+      randomSource: () => Buffer.alloc(32, 0xbb),
+    });
+    await assert.rejects(
+      issuerPort.issue({
         targetAppUserSha256: TARGET_SHA256,
-        randomSource: () => Buffer.alloc(32, 0xbb),
       }),
       (error) =>
         error instanceof IdentityBootstrapClaimIssuerError &&
@@ -173,12 +215,14 @@ describe("identity bootstrap claim issuer", () => {
       "unexpired_intent_exists",
     ]) {
       const { pool, calls } = mockIssuerPool({ blocker });
+      const issuerPort = createIdentityBootstrapClaimIssuerPort({
+        pool,
+        targetAppUserId: TARGET,
+        randomSource: () => Buffer.alloc(32, 0xef),
+      });
       await assert.rejects(
-        issueIdentityBootstrapClaim({
-          pool,
-          targetAppUserId: TARGET,
+        issuerPort.issue({
           targetAppUserSha256: TARGET_SHA256,
-          randomSource: () => Buffer.alloc(32, 0xef),
         }),
         (error) =>
           error instanceof IdentityBootstrapClaimIssuerError &&

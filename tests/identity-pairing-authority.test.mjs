@@ -338,6 +338,8 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       routeCalls: 0,
       registeredIntentWriters: 1,
       issuerRuntimeEntrypoints: 0,
+      claimExtractionExports: 0,
+      claimIssuerRuntimeImports: 0,
       auditIntentWrites: 0,
       appUserStatusChanges: 0,
     });
