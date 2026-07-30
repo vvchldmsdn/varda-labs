@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import {
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_HOST_EVIDENCE_DIRECTORY,
   LEGACY_ACCOUNT_OWNER_ASSIGNMENT_HOST_ROOT,
+  loadLegacyAccountOwnerAssignmentLocalEnvironment,
   readLegacyAccountOwnerAssignmentHostOptions,
   runLegacyAccountOwnerAssignmentHostCli,
 } from "../scripts/run-legacy-account-owner-assignment-rehearsal-host.mjs";
@@ -67,8 +68,53 @@ describe("legacy account owner-assignment host CLI", () => {
       "utf8",
     );
     assert.equal(source.includes("process.cwd()"), false);
+    assert.equal(source.includes("dotenv.config"), false);
+    assert.equal(source.includes("config({"), false);
     assert.equal(source.includes("npm.cmd"), false);
     assert.equal(source.includes("shell: true"), false);
+  });
+
+  it("loads only the exact local file even when DOTENV_KEY is ambient", () => {
+    const previousDotenvKey = process.env.DOTENV_KEY;
+    const reads = [];
+
+    try {
+      process.env.DOTENV_KEY =
+        "dotenv://:ambient-key-must-not-be-used@example.test/vault/.env.vault?environment=test";
+      const localEnvironment =
+        loadLegacyAccountOwnerAssignmentLocalEnvironment(ROOT, {
+          readFile(path, options) {
+            reads.push({ path, options });
+            return [
+              `NEON_API_KEY=${NEON_API_KEY}`,
+              "localOnly=local-value",
+            ].join("\n");
+          },
+        });
+
+      assert.equal(Object.getPrototypeOf(localEnvironment), null);
+      assert.deepEqual(reads, [
+        {
+          path: join(ROOT, ".env.local"),
+          options: { encoding: "utf8" },
+        },
+      ]);
+      assert.equal(localEnvironment.NEON_API_KEY, NEON_API_KEY);
+      assert.equal(localEnvironment.localOnly, "local-value");
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(
+          localEnvironment,
+          "DOTENV_KEY",
+        ),
+        false,
+      );
+    } finally {
+      if (previousDotenvKey === undefined) {
+        delete process.env.DOTENV_KEY;
+      } else {
+        process.env.DOTENV_KEY = previousDotenvKey;
+      }
+    }
   });
 
   it("wires the fixed paths and REST adapter into one host call", async () => {

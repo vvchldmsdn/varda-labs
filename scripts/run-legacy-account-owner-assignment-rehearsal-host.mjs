@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { config } from "dotenv";
+import { parse } from "dotenv";
 
 import {
   createLegacyAccountOwnerAssignmentNeonAdapter,
@@ -34,18 +34,8 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
   evidenceDirectory =
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_HOST_EVIDENCE_DIRECTORY,
   clock = () => new Date(),
-  loadEnvironment = () => {
-    const localEnvironment = Object.create(null);
-    const result = config({
-      path: join(repositoryRoot, ".env.local"),
-      quiet: true,
-      processEnv: localEnvironment,
-    });
-    if (ownDataValue(result, "error") !== undefined) {
-      throw new Error("Local environment is unavailable.");
-    }
-    return localEnvironment;
-  },
+  loadEnvironment = () =>
+    loadLegacyAccountOwnerAssignmentLocalEnvironment(repositoryRoot),
   makeEvidenceDirectory = ensureEvidenceDirectory,
   createAdapter =
     createLegacyAccountOwnerAssignmentNeonAdapter,
@@ -152,6 +142,30 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
   if (resultStatus === "passed") write(result);
   else writeError(result);
   return result;
+}
+
+export function loadLegacyAccountOwnerAssignmentLocalEnvironment(
+  repositoryRoot,
+  {
+    readFile = readFileSync,
+  } = {},
+) {
+  const parsed = parse(
+    readFile(join(repositoryRoot, ".env.local"), {
+      encoding: "utf8",
+    }),
+  );
+  const localEnvironment = Object.create(null);
+
+  for (const key of Object.keys(parsed)) {
+    const value = ownDataValue(parsed, key);
+    if (typeof value !== "string") {
+      throw new Error("Local environment is invalid.");
+    }
+    localEnvironment[key] = value;
+  }
+
+  return localEnvironment;
 }
 
 export function readLegacyAccountOwnerAssignmentHostOptions(args) {
