@@ -57,8 +57,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 19);
-    assert.equal(registeredPaths.length, 25);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 20);
+    assert.equal(registeredPaths.length, 26);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -136,7 +136,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 12,
       intentionally_skipped_legacy: 1,
-      not_applicable: 6,
+      not_applicable: 7,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
