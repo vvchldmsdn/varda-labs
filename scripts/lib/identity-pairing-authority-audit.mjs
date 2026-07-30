@@ -21,10 +21,18 @@ const SUBJECT_ENTRYPOINT_PATTERN =
 const CLAIM_ISSUER_ID = "identity_bootstrap_claim_issuer";
 const CLAIM_ISSUER_IMPLEMENTATION_PATH =
   "scripts/lib/identity-bootstrap-claim-issuer.mjs";
+const VERIFIED_SESSION_PRESENTATION_CORE_PATH =
+  "scripts/lib/verified-session-claim-presentation.mjs";
+const VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH =
+  "src/lib/auth/private-verified-session-claim-presentation.ts";
+const CLAIM_PRESENTATION_ROUTE_PATH =
+  "src/app/api/identity/bootstrap-claim/present/route.ts";
 const CLAIM_ISSUER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*identity-bootstrap-claim-issuer\.mjs["']/;
 const CLAIM_EXTRACTION_EXPORT_PATTERN =
   /(?:export\s+(?:(?:async\s+)?function|const|let|var)\s+takeIssuedIdentityBootstrapClaim\b|export\s*\{[^}]*\btakeIssuedIdentityBootstrapClaim\b)/;
+const VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-claim-presentation(?:\.ts)?["']/;
 
 export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   const findings = [];
@@ -127,6 +135,74 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     findings.push("claim_issuer_runtime_import");
   }
 
+  const verifiedSessionPresentationCore = readFileSync(
+    join(root, VERIFIED_SESSION_PRESENTATION_CORE_PATH),
+    "utf8",
+  );
+  const verifiedSessionPresentationAdapter = readFileSync(
+    join(root, VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH),
+    "utf8",
+  );
+  const claimPresentationRoute = readFileSync(
+    join(root, CLAIM_PRESENTATION_ROUTE_PATH),
+    "utf8",
+  );
+  const verifiedSessionPresentationBoundaryIntact =
+    verifiedSessionPresentationAdapter.startsWith(
+      'import "server-only";',
+    ) &&
+    verifiedSessionPresentationAdapter.includes(
+      "readPrivateSessionSubjectBinding",
+    ) &&
+    verifiedSessionPresentationAdapter.includes(
+      "executeVerifiedSessionClaimPresentation",
+    ) &&
+    verifiedSessionPresentationAdapter.includes(
+      "startOneUserBootstrapExecution",
+    ) &&
+    !CLAIM_ISSUER_IMPORT_PATTERN.test(
+      verifiedSessionPresentationAdapter,
+    ) &&
+    !/identity-pairing-consume-writer/.test(
+      verifiedSessionPresentationAdapter,
+    ) &&
+    !/(?:DATABASE_URL|process\.env|@\/db|drizzle)/.test(
+      verifiedSessionPresentationCore,
+    );
+  if (!verifiedSessionPresentationBoundaryIntact) {
+    findings.push("verified_session_presentation_boundary_drift");
+  }
+  const verifiedSessionPresentationConsumers = [
+    ...productionPaths,
+  ].filter((path) => {
+    if (path === VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH) {
+      return false;
+    }
+    const absolutePath = join(root, path);
+    return (
+      existsSync(absolutePath) &&
+      VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN.test(
+        readFileSync(absolutePath, "utf8"),
+      )
+    );
+  });
+  if (verifiedSessionPresentationConsumers.length !== 0) {
+    findings.push("verified_session_presentation_runtime_import");
+  }
+  const claimPresentationRouteEnabled =
+    VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN.test(
+      claimPresentationRoute,
+    ) ||
+    claimPresentationRoute.includes(
+      "executeVerifiedSessionClaimPresentation",
+    ) ||
+    !claimPresentationRoute.includes(
+      "createDisabledIdentityPairingClaimPresentationResponse()",
+    );
+  if (claimPresentationRouteEnabled) {
+    findings.push("claim_presentation_route_enabled");
+  }
+
   const proxySource = readFileSync(join(root, "src/proxy.ts"), "utf8");
   const basicAuthBoundaryIntact = [
     "VARDA_APP_PASSWORD",
@@ -155,6 +231,12 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       issuerRuntimeEntrypoints: claimIssuer?.entrypoints.length ?? 0,
       claimExtractionExports,
       claimIssuerRuntimeImports: claimIssuerConsumers.length,
+      verifiedSessionPresentationAdapters:
+        verifiedSessionPresentationBoundaryIntact ? 1 : 0,
+      verifiedSessionPresentationRuntimeImports:
+        verifiedSessionPresentationConsumers.length,
+      claimPresentationRouteEnabled:
+        claimPresentationRouteEnabled ? 1 : 0,
       auditIntentWrites: 0,
       appUserStatusChanges: 0,
     },
