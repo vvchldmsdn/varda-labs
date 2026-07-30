@@ -270,6 +270,79 @@ describe("verified-session claim presentation adapter", () => {
     assert.equal(JSON.stringify(result).includes(RAW_SUBJECT), false);
   });
 
+  it("requires the private receipt to match the exact issued claim binding", async () => {
+    const cases = [
+      [undefined, "claim_presentation_result_invalid"],
+      [
+        {
+          ...CLAIM_BINDING,
+          targetAppUserSha256: `sha256:${"5".repeat(64)}`,
+        },
+        "execution_binding_mismatch",
+      ],
+      [
+        {
+          ...CLAIM_BINDING,
+          provider: "other_provider",
+        },
+        "execution_binding_invalid",
+      ],
+      [
+        {
+          ...CLAIM_BINDING,
+          claimDigestVersion: "other_version",
+        },
+        "execution_binding_invalid",
+      ],
+      [
+        {
+          ...CLAIM_BINDING,
+          claimDigest:
+            `bootstrap-claim-sha256-v1:${"6".repeat(64)}`,
+        },
+        "execution_binding_mismatch",
+      ],
+      [
+        {
+          ...CLAIM_BINDING,
+          identityPairingIntentSha256:
+            `sha256:${"7".repeat(64)}`,
+        },
+        "execution_binding_mismatch",
+      ],
+    ];
+
+    for (const [executionBinding, blocker] of cases) {
+      const receipt = {
+        result: "presented",
+        committed: true,
+      };
+      if (executionBinding !== undefined) {
+        receipt.executionBinding = Object.freeze(executionBinding);
+      }
+      const result =
+        await executeVerifiedSessionClaimPresentation(
+          {
+            targetAppUserSha256: TARGET_SHA256,
+            createClaimIssuerPort() {
+              return issuerPort();
+            },
+            privateClaimPresentationPort: {
+              async present() {
+                return Object.freeze(receipt);
+              },
+            },
+          },
+          dependencies(async () => verifiedSessionBinding()),
+        );
+
+      assert.equal(result.result, "partial");
+      assert.equal(result.failedPhase, "claim_presentation");
+      assert.equal(result.blocker, blocker);
+      assert.deepEqual(result.committedPhases, ["claim_issue"]);
+    }
+  });
+
   it("keeps the concrete adapter server-only and the HTTP route disabled", () => {
     const adapter = readFileSync(
       "src/lib/auth/private-verified-session-claim-presentation.ts",

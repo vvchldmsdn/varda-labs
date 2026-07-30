@@ -1,6 +1,8 @@
 import { isCanonicalIdentityBootstrapClaim } from "../../src/lib/identity-bootstrap-claim.ts";
 import { SESSION_SUBJECT_BINDING_POLICY } from "../../src/lib/auth/session-subject-binding.ts";
 import {
+  assertBindingMatches,
+  CLAIM_BINDING_KEYS,
   OneUserBootstrapExecutionError,
   readClaimBinding,
   readRequiredBoolean,
@@ -127,6 +129,18 @@ export async function executeVerifiedSessionClaimPresentation(
           "claim_presentation_result_invalid",
         );
       }
+      const receiptBinding = readClaimBinding(
+        readRequiredObject(
+          privateReceipt,
+          "executionBinding",
+          "claim_presentation_result_invalid",
+        ),
+      );
+      assertBindingMatches(
+        receiptBinding,
+        claimBinding,
+        CLAIM_BINDING_KEYS,
+      );
 
       return Object.freeze({
         result: "presented",
