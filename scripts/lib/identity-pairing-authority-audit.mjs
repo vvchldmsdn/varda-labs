@@ -18,6 +18,13 @@ const IDENTITY_DML_PATTERN =
   /(?:\.insert|\.update|\.delete)\s*\(|(?:insert\s+into|update\s+|delete\s+from)\s+["']?(?:app_users|auth_identities)\b/i;
 const SUBJECT_ENTRYPOINT_PATTERN =
   /process\.argv|process\.env|--provider|--subject|readArgument\s*\(/;
+const CLAIM_ISSUER_ID = "identity_bootstrap_claim_issuer";
+const CLAIM_ISSUER_IMPLEMENTATION_PATH =
+  "scripts/lib/identity-bootstrap-claim-issuer.mjs";
+const CLAIM_ISSUER_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*identity-bootstrap-claim-issuer\.mjs["']/;
+const CLAIM_EXTRACTION_EXPORT_PATTERN =
+  /(?:export\s+(?:(?:async\s+)?function|const|let|var)\s+takeIssuedIdentityBootstrapClaim\b|export\s*\{[^}]*\btakeIssuedIdentityBootstrapClaim\b)/;
 
 export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   const findings = [];
@@ -71,6 +78,55 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     : 0;
   if (subjectEntrypoints !== 0) findings.push("subject_entrypoint");
 
+  const registeredIntentWriters = writerRegistry.filter((writer) =>
+    writer.targets.some(
+      (target) =>
+        target.table === "identity_pairing_intents" &&
+        target.operations.includes("insert"),
+    ),
+  );
+  if (registeredIntentWriters.length !== 1) {
+    findings.push("claim_issuer_writer_count_invalid");
+  }
+  const claimIssuer = registeredIntentWriters[0] ?? null;
+  const claimIssuerBoundaryIntact =
+    claimIssuer?.id === CLAIM_ISSUER_ID &&
+    claimIssuer.classification === "identity_system" &&
+    claimIssuer.authorization === "migration_cli" &&
+    claimIssuer.entrypoints.length === 0 &&
+    claimIssuer.implementationPaths.length === 1 &&
+    claimIssuer.implementationPaths[0] ===
+      CLAIM_ISSUER_IMPLEMENTATION_PATH &&
+    claimIssuer.transition.activate === "single_claim_intent_insert";
+  if (!claimIssuerBoundaryIntact) {
+    findings.push("claim_issuer_boundary_drift");
+  }
+  const claimIssuerSource = readFileSync(
+    join(root, CLAIM_ISSUER_IMPLEMENTATION_PATH),
+    "utf8",
+  );
+  const claimExtractionExports = CLAIM_EXTRACTION_EXPORT_PATTERN.test(
+    claimIssuerSource,
+  )
+    ? 1
+    : 0;
+  if (claimExtractionExports !== 0) {
+    findings.push("claim_extraction_exported");
+  }
+  const claimIssuerConsumers = [...productionPaths].filter((path) => {
+    if (path === CLAIM_ISSUER_IMPLEMENTATION_PATH) return false;
+    const absolutePath = join(root, path);
+    return (
+      existsSync(absolutePath) &&
+      CLAIM_ISSUER_IMPORT_PATTERN.test(
+        readFileSync(absolutePath, "utf8"),
+      )
+    );
+  });
+  if (claimIssuerConsumers.length !== 0) {
+    findings.push("claim_issuer_runtime_import");
+  }
+
   const proxySource = readFileSync(join(root, "src/proxy.ts"), "utf8");
   const basicAuthBoundaryIntact = [
     "VARDA_APP_PASSWORD",
@@ -95,7 +151,11 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       databaseWrites: 0,
       providerCalls: 0,
       routeCalls: 0,
-      intentWrites: 0,
+      registeredIntentWriters: registeredIntentWriters.length,
+      issuerRuntimeEntrypoints: claimIssuer?.entrypoints.length ?? 0,
+      claimExtractionExports,
+      claimIssuerRuntimeImports: claimIssuerConsumers.length,
+      auditIntentWrites: 0,
       appUserStatusChanges: 0,
     },
   };

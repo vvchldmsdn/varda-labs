@@ -317,7 +317,7 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
     }
   });
 
-  it("keeps the contract disconnected from runtime and persistence", () => {
+  it("keeps the contract pure and the registered issuer disconnected from runtime", () => {
     const result = auditIdentityPairingAuthority({
       root: process.cwd(),
       writerRegistry: TENANT_WRITER_REGISTRY,
@@ -336,7 +336,11 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       databaseWrites: 0,
       providerCalls: 0,
       routeCalls: 0,
-      intentWrites: 0,
+      registeredIntentWriters: 1,
+      issuerRuntimeEntrypoints: 0,
+      claimExtractionExports: 0,
+      claimIssuerRuntimeImports: 0,
+      auditIntentWrites: 0,
       appUserStatusChanges: 0,
     });
   });

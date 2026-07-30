@@ -39,6 +39,7 @@ export type WriterTransitionPolicy = Readonly<{
     | "keep_owner_absent"
     | "keep_frozen_legacy"
     | "single_identity_insert"
+    | "single_claim_intent_insert"
     | "atomic_identity_pairing_consume"
     | "post_consume_owner_assignment";
   freeze:
@@ -105,6 +106,24 @@ export const TENANT_WRITER_REGISTRY = [
       prepare: "dry_run_only",
       activate: "single_identity_insert",
       freeze: "freeze_after_initial_user",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "identity_bootstrap_claim_issuer",
+    classification: "identity_system",
+    authorization: "migration_cli",
+    entrypoints: [],
+    implementationPaths: [
+      "scripts/lib/identity-bootstrap-claim-issuer.mjs",
+    ],
+    targets: [identityTarget("identity_pairing_intents", "insert")],
+    transition: {
+      prepare: "dry_run_only",
+      activate: "single_claim_intent_insert",
+      freeze: "not_required",
     },
     canonicalOwnerRolloutScope: "not_applicable",
     canonicalOwnerHttpInput: "forbidden",
