@@ -136,6 +136,12 @@ export function readWriterReadiness(root = process.cwd()) {
     writer.targets.some(({ classification }) => classification === "user_owned"),
   ).every(({ canonicalOwnerRolloutScope, transition }) => {
     if (canonicalOwnerRolloutScope === "in_scope") {
+      if (transition.activate === "post_consume_owner_assignment") {
+        return (
+          transition.prepare === "dry_run_only" &&
+          transition.freeze === "freeze_after_initial_user"
+        );
+      }
       return ["shadow_trusted_context", "split_target_classes"].includes(
         transition.prepare,
       );
