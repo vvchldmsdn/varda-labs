@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import {
   digestIdentityBootstrapClaim,
@@ -11,6 +11,7 @@ import {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const PRIVATE_CLAIM_CONTINUATIONS = new WeakMap();
 
 export const IDENTITY_BOOTSTRAP_CLAIM_ISSUER_POLICY = Object.freeze({
   operation: "preissued_bootstrap_claim_issuer_v1",
@@ -64,17 +65,19 @@ export async function issueIdentityBootstrapClaim({
         issueResult.rows[0]?.blocker ?? "claim_intent_not_issuable",
       );
     }
+    const identityPairingIntentSha256 = fingerprintUuid(
+      issueResult.rows[0].id,
+    );
 
     await client.query("commit");
     transactionOpen = false;
 
     const continuation = createPrivateBootstrapContinuation({
-      identityPairingIntentId: issueResult.rows[0].id,
       rawClaim: oneTimeClaim.take(),
     });
     oneTimeClaim.destroy();
 
-    return Object.freeze({
+    const result = Object.freeze({
       operation: IDENTITY_BOOTSTRAP_CLAIM_ISSUER_POLICY.operation,
       result: "issued",
       policy: Object.freeze({
@@ -99,6 +102,14 @@ export async function issueIdentityBootstrapClaim({
         targetAppUserSha256,
         expiresAt: normalizeTimestamp(issueResult.rows[0].expires_at),
       }),
+      executionBinding: Object.freeze({
+        targetAppUserSha256,
+        provider: IDENTITY_BOOTSTRAP_CLAIM_POLICY.provider,
+        claimDigestVersion:
+          IDENTITY_BOOTSTRAP_CLAIM_POLICY.claimDigestVersion,
+        claimDigest: oneTimeClaim.claimDigest,
+        identityPairingIntentSha256,
+      }),
       actualWrites: Object.freeze({
         identityPairingIntents: 1,
         identityPairingIntentEvents: 0,
@@ -106,9 +117,10 @@ export async function issueIdentityBootstrapClaim({
         appUsers: 0,
         productTables: 0,
       }),
-      continuation,
       committed: true,
     });
+    PRIVATE_CLAIM_CONTINUATIONS.set(result, continuation);
+    return result;
   } catch (error) {
     oneTimeClaim.destroy();
     if (transactionOpen) {
@@ -184,6 +196,21 @@ export function createOneTimeIdentityBootstrapClaim(
       });
     },
   });
+}
+
+export function takeIssuedIdentityBootstrapClaim(result) {
+  if (
+    result === null ||
+    typeof result !== "object" ||
+    !PRIVATE_CLAIM_CONTINUATIONS.has(result)
+  ) {
+    throw new IdentityBootstrapClaimIssuerError(
+      "claim_continuation_unavailable",
+    );
+  }
+  const continuation = PRIVATE_CLAIM_CONTINUATIONS.get(result);
+  PRIVATE_CLAIM_CONTINUATIONS.delete(result);
+  return continuation.take();
 }
 
 function validateInput({
@@ -327,11 +354,8 @@ async function insertIntentIfEligible(
   );
 }
 
-function createPrivateBootstrapContinuation({
-  identityPairingIntentId,
-  rawClaim,
-}) {
-  let secret = Object.freeze({ identityPairingIntentId, rawClaim });
+function createPrivateBootstrapContinuation({ rawClaim }) {
+  let secret = Object.freeze({ rawClaim });
   return Object.freeze({
     take() {
       if (secret === null) {
@@ -352,6 +376,19 @@ function createPrivateBootstrapContinuation({
   });
 }
 
+function fingerprintUuid(value) {
+  if (
+    typeof value !== "string" ||
+    !UUID_PATTERN.test(value) ||
+    value !== value.toLowerCase()
+  ) {
+    throw new IdentityBootstrapClaimIssuerError(
+      "claim_intent_id_invalid",
+    );
+  }
+  return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
+}
+
 function normalizeTimestamp(value) {
   const timestamp = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(timestamp.getTime())) {
@@ -363,10 +400,7 @@ function normalizeTimestamp(value) {
 }
 
 function mapDatabaseError(error) {
-  const code =
-    error && typeof error === "object" && "code" in error
-      ? String(error.code)
-      : "";
+  const code = readOwnString(error, "code") ?? "";
   if (code === "23505" || code === "40P01") {
     return new IdentityBootstrapClaimIssuerError(
       "concurrent_state_conflict",
@@ -383,4 +417,19 @@ function mapDatabaseError(error) {
   return new IdentityBootstrapClaimIssuerError(
     "database_transaction_failed",
   );
+}
+
+function readOwnString(value, key) {
+  if (value === null || typeof value !== "object") return null;
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, key);
+  } catch {
+    return null;
+  }
+  return descriptor &&
+    "value" in descriptor &&
+    typeof descriptor.value === "string"
+    ? descriptor.value
+    : null;
 }

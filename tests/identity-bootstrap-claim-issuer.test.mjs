@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 
 import {
   IdentityBootstrapClaimIssuerError,
   createOneTimeIdentityBootstrapClaim,
   issueIdentityBootstrapClaim,
+  takeIssuedIdentityBootstrapClaim,
 } from "../scripts/lib/identity-bootstrap-claim-issuer.mjs";
 import { fingerprintAppUserId } from "../scripts/lib/legacy-account-ownership-evidence.mjs";
+import { digestIdentityBootstrapClaim } from "../src/lib/identity-bootstrap-claim.ts";
 
 const TARGET = "11111111-1111-4111-8111-111111111111";
 const TARGET_SHA256 = fingerprintAppUserId(TARGET);
@@ -73,18 +76,30 @@ describe("identity bootstrap claim issuer", () => {
     assert.doesNotMatch(serialized, /varda-bootstrap-claim-v1\./);
     assert.equal(serialized.includes(INTENT), false);
     assert.equal(serialized.includes(TARGET), false);
+    assert.equal(Object.hasOwn(result, "continuation"), false);
+    const expectedRawClaim =
+      `varda-bootstrap-claim-v1.${Buffer.alloc(32, 0xcd).toString("base64url")}`;
+    assert.deepEqual(result.executionBinding, {
+      targetAppUserSha256: TARGET_SHA256,
+      provider: "neon_auth",
+      claimDigestVersion: "bootstrap_claim_sha256_v1",
+      claimDigest: digestIdentityBootstrapClaim(expectedRawClaim),
+      identityPairingIntentSha256: `sha256:${createHash("sha256")
+        .update(INTENT, "utf8")
+        .digest("hex")}`,
+    });
 
-    const privateValue = result.continuation.take();
-    assert.equal(privateValue.identityPairingIntentId, INTENT);
+    const privateValue = takeIssuedIdentityBootstrapClaim(result);
+    assert.deepEqual(Object.keys(privateValue), ["rawClaim"]);
     assert.match(
       privateValue.rawClaim,
       /^varda-bootstrap-claim-v1\./,
     );
     assert.throws(
-      () => result.continuation.take(),
+      () => takeIssuedIdentityBootstrapClaim(result),
       (error) =>
         error instanceof IdentityBootstrapClaimIssuerError &&
-        error.code === "claim_continuation_already_taken",
+        error.code === "claim_continuation_unavailable",
     );
   });
 
@@ -123,6 +138,33 @@ describe("identity bootstrap claim issuer", () => {
         error.code === "database_transaction_failed",
     );
     assert.equal(entropy.every((byte) => byte === 0), true);
+  });
+
+  it("does not invoke an accessor-backed database error code", async () => {
+    let accessorCalls = 0;
+    await assert.rejects(
+      issueIdentityBootstrapClaim({
+        pool: {
+          async connect() {
+            const error = new Error("unavailable");
+            Object.defineProperty(error, "code", {
+              get() {
+                accessorCalls += 1;
+                return "57014";
+              },
+            });
+            throw error;
+          },
+        },
+        targetAppUserId: TARGET,
+        targetAppUserSha256: TARGET_SHA256,
+        randomSource: () => Buffer.alloc(32, 0xbb),
+      }),
+      (error) =>
+        error instanceof IdentityBootstrapClaimIssuerError &&
+        error.code === "database_transaction_failed",
+    );
+    assert.equal(accessorCalls, 0);
   });
 
   it("rolls back when a provider identity or open intent blocks issuance", async () => {
