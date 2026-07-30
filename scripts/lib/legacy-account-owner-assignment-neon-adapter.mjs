@@ -606,21 +606,66 @@ function remainingRequestTimeout({
 }
 
 async function readResponseText(response) {
-  if (
-    !response ||
-    typeof response !== "object" ||
-    typeof response.text !== "function"
-  ) {
+  if (!response || typeof response !== "object") {
     throw adapterError("neon_api_execution_failed");
   }
-  const value = await response.text();
-  if (
-    typeof value !== "string" ||
-    Buffer.byteLength(value, "utf8") > MAX_RESPONSE_BYTES
-  ) {
-    throw adapterError("neon_api_response_invalid");
+  let body;
+  try {
+    body = response.body;
+  } catch {
+    throw adapterError("neon_api_execution_failed");
   }
-  return value;
+  if (body === null) return "";
+  if (!body || typeof body.getReader !== "function") {
+    throw adapterError("neon_api_execution_failed");
+  }
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let byteLength = 0;
+  let text = "";
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (
+        !chunk ||
+        typeof chunk !== "object" ||
+        typeof chunk.done !== "boolean"
+      ) {
+        throw adapterError("neon_api_response_invalid");
+      }
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) {
+        throw adapterError("neon_api_response_invalid");
+      }
+      byteLength += chunk.value.byteLength;
+      if (byteLength > MAX_RESPONSE_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The bounded-response failure remains authoritative.
+        }
+        throw adapterError("neon_api_response_invalid");
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } catch (error) {
+    if (
+      error instanceof
+      LegacyAccountOwnerAssignmentNeonAdapterError
+    ) {
+      throw error;
+    }
+    throw adapterError("neon_api_response_invalid");
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // Releasing a consumed or canceled response must not change evidence.
+    }
+  }
 }
 
 function responseStatus(response) {

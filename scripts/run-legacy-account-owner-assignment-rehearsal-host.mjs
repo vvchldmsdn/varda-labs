@@ -34,11 +34,18 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
   evidenceDirectory =
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_HOST_EVIDENCE_DIRECTORY,
   clock = () => new Date(),
-  loadEnvironment = () =>
-    config({
+  loadEnvironment = () => {
+    const localEnvironment = Object.create(null);
+    const result = config({
       path: join(repositoryRoot, ".env.local"),
       quiet: true,
-    }),
+      processEnv: localEnvironment,
+    });
+    if (ownDataValue(result, "error") !== undefined) {
+      throw new Error("Local environment is unavailable.");
+    }
+    return localEnvironment;
+  },
   makeEvidenceDirectory = ensureEvidenceDirectory,
   createAdapter =
     createLegacyAccountOwnerAssignmentNeonAdapter,
@@ -60,8 +67,6 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
     ) {
       throw new Error("Host paths are invalid.");
     }
-    loadEnvironment();
-    makeEvidenceDirectory(evidenceDirectory);
   } catch {
     return outputFailure(
       hostCliFailure("host_options_invalid"),
@@ -70,11 +75,27 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
   }
 
   let neonApiKey;
+  let runtimeEnvironment;
   try {
-    neonApiKey = readRequiredNeonApiKey(baseEnv);
+    assertAmbientNeonApiKeyAbsent(baseEnv);
+    const localEnvironment = loadEnvironment();
+    neonApiKey = readRequiredNeonApiKey(localEnvironment);
+    runtimeEnvironment = mergeRuntimeEnvironment({
+      baseEnv,
+      localEnvironment,
+    });
   } catch {
     return outputFailure(
       hostCliFailure("neon_api_key_invalid"),
+      writeError,
+    );
+  }
+
+  try {
+    makeEvidenceDirectory(evidenceDirectory);
+  } catch {
+    return outputFailure(
+      hostCliFailure("host_options_invalid"),
       writeError,
     );
   }
@@ -105,7 +126,7 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
       expectedSourceSha: options.expectedSourceSha,
       repositoryRoot,
       evidenceDirectory,
-      baseEnv,
+      baseEnv: runtimeEnvironment,
       projectId: options.projectId,
       parentBranchId: options.parentBranchId,
       productionEndpointId: options.productionEndpointId,
@@ -248,6 +269,88 @@ function readRequiredNeonApiKey(source) {
     throw new Error("Neon API key is unavailable.");
   }
   return value;
+}
+
+function assertAmbientNeonApiKeyAbsent(source) {
+  if (!source || typeof source !== "object") {
+    throw new Error("Host environment is unavailable.");
+  }
+  let current = source;
+  const visited = new Set();
+  while (current !== null) {
+    if (visited.has(current)) {
+      throw new Error("Host environment is invalid.");
+    }
+    visited.add(current);
+    let descriptor;
+    let prototype;
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(
+        current,
+        "NEON_API_KEY",
+      );
+      prototype = Object.getPrototypeOf(current);
+    } catch {
+      throw new Error("Host environment is invalid.");
+    }
+    if (descriptor !== undefined) {
+      throw new Error("Ambient Neon API key is not allowed.");
+    }
+    current = prototype;
+  }
+}
+
+function mergeRuntimeEnvironment({
+  baseEnv,
+  localEnvironment,
+}) {
+  if (
+    !baseEnv ||
+    typeof baseEnv !== "object" ||
+    !localEnvironment ||
+    typeof localEnvironment !== "object"
+  ) {
+    throw new Error("Host environment is unavailable.");
+  }
+  const runtimeEnvironment = Object.create(null);
+  copyEnvironmentData(runtimeEnvironment, baseEnv, {
+    overwrite: false,
+  });
+  copyEnvironmentData(runtimeEnvironment, localEnvironment, {
+    overwrite: false,
+    excludedKeys: new Set(["NEON_API_KEY"]),
+  });
+  return runtimeEnvironment;
+}
+
+function copyEnvironmentData(
+  target,
+  source,
+  { overwrite, excludedKeys = new Set() },
+) {
+  let descriptors;
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(source);
+  } catch {
+    throw new Error("Host environment is invalid.");
+  }
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (
+      excludedKeys.has(key) ||
+      !("value" in descriptor) ||
+      typeof descriptor.value !== "string" ||
+      (!overwrite &&
+        Object.prototype.hasOwnProperty.call(target, key))
+    ) {
+      continue;
+    }
+    Object.defineProperty(target, key, {
+      configurable: false,
+      enumerable: true,
+      value: descriptor.value,
+      writable: false,
+    });
+  }
 }
 
 const entryUrl = process.argv[1]

@@ -434,6 +434,54 @@ describe("legacy account owner-assignment Neon adapter", () => {
       );
     }
   });
+
+  it("cancels a streamed response as soon as the byte cap is exceeded", async () => {
+    let reads = 0;
+    let cancellations = 0;
+    let releases = 0;
+    const response = {
+      status: 200,
+      body: {
+        getReader() {
+          return {
+            async read() {
+              reads += 1;
+              return {
+                done: false,
+                value: new Uint8Array(600 * 1024),
+              };
+            },
+            async cancel() {
+              cancellations += 1;
+            },
+            releaseLock() {
+              releases += 1;
+            },
+          };
+        },
+      },
+    };
+    const adapter = createAdapter({
+      calls: [],
+      responses: [response],
+    });
+
+    await assert.rejects(
+      adapter.reconcileChildByExactName({
+        projectId: PROJECT_ID,
+        branchName: BRANCH_NAME,
+      }),
+      (error) => {
+        assert.equal(error.code, "neon_api_response_invalid");
+        assert.equal(error.stage, "branch_list_search");
+        assert.equal(error.reason, "response_invalid");
+        return true;
+      },
+    );
+    assert.equal(reads, 2);
+    assert.equal(cancellations, 1);
+    assert.equal(releases, 1);
+  });
 });
 
 function createAdapter({ calls, responses }) {
@@ -457,12 +505,10 @@ function jsonResponse(status, value) {
 }
 
 function textResponse(status, value) {
-  return {
+  return new Response(status === 204 ? null : value, {
     status,
-    async text() {
-      return value;
-    },
-  };
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 function sourceBranchResponse() {

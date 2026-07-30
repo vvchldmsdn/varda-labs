@@ -93,7 +93,6 @@ describe("legacy account owner-assignment host CLI", () => {
     });
     const baseEnv = {
       synthetic: "base-env",
-      NEON_API_KEY,
     };
 
     const result = await runLegacyAccountOwnerAssignmentHostCli({
@@ -104,6 +103,11 @@ describe("legacy account owner-assignment host CLI", () => {
       clock: () => new Date(NOW),
       loadEnvironment() {
         events.push("load_environment");
+        return {
+          NEON_API_KEY,
+          synthetic: "local-must-not-override",
+          localOnly: "local-value",
+        };
       },
       makeEvidenceDirectory(value) {
         events.push("make_evidence_directory");
@@ -146,7 +150,20 @@ describe("legacy account owner-assignment host CLI", () => {
     assert.equal(hostOptions.expectedSourceSha, SOURCE_SHA);
     assert.equal(hostOptions.repositoryRoot, ROOT);
     assert.equal(hostOptions.evidenceDirectory, EVIDENCE_DIRECTORY);
-    assert.equal(hostOptions.baseEnv, baseEnv);
+    assert.notEqual(hostOptions.baseEnv, baseEnv);
+    assert.equal(
+      Object.getPrototypeOf(hostOptions.baseEnv),
+      null,
+    );
+    assert.equal(hostOptions.baseEnv.synthetic, "base-env");
+    assert.equal(hostOptions.baseEnv.localOnly, "local-value");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(
+        hostOptions.baseEnv,
+        "NEON_API_KEY",
+      ),
+      false,
+    );
     assert.equal(hostOptions.projectId, PROJECT_ID);
     assert.equal(hostOptions.parentBranchId, PARENT_BRANCH_ID);
     assert.equal(
@@ -196,8 +213,8 @@ describe("legacy account owner-assignment host CLI", () => {
     });
   });
 
-  it("rejects a missing or accessor-backed API key before adapter work", async () => {
-    for (const baseEnv of [
+  it("rejects a missing or accessor-backed local API key before adapter work", async () => {
+    for (const localEnvironment of [
       {},
       Object.defineProperty({}, "NEON_API_KEY", {
         get() {
@@ -210,10 +227,12 @@ describe("legacy account owner-assignment host CLI", () => {
       const result =
         await runLegacyAccountOwnerAssignmentHostCli({
           args: validArgs(),
-          baseEnv,
+          baseEnv: {},
           repositoryRoot: ROOT,
           evidenceDirectory: EVIDENCE_DIRECTORY,
-          loadEnvironment() {},
+          loadEnvironment() {
+            return localEnvironment;
+          },
           makeEvidenceDirectory() {},
           createAdapter() {
             adapterCalls += 1;
@@ -230,17 +249,62 @@ describe("legacy account owner-assignment host CLI", () => {
     }
   });
 
+  it("rejects ambient own and inherited API keys before loading the local file", async () => {
+    const inherited = Object.create({
+      NEON_API_KEY: "inherited-key-must-not-be-used",
+    });
+    for (const baseEnv of [
+      { NEON_API_KEY: "ambient-key-must-not-be-used" },
+      inherited,
+      Object.defineProperty({}, "NEON_API_KEY", {
+        get() {
+          assert.fail("The ambient key accessor must not be invoked.");
+        },
+      }),
+    ]) {
+      let loadCalls = 0;
+      let adapterCalls = 0;
+      let failure = null;
+      const result =
+        await runLegacyAccountOwnerAssignmentHostCli({
+          args: validArgs(),
+          baseEnv,
+          repositoryRoot: ROOT,
+          evidenceDirectory: EVIDENCE_DIRECTORY,
+          loadEnvironment() {
+            loadCalls += 1;
+            return { NEON_API_KEY };
+          },
+          makeEvidenceDirectory() {},
+          createAdapter() {
+            adapterCalls += 1;
+          },
+          writeError(value) {
+            failure = value;
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "neon_api_key_invalid");
+      assert.equal(failure, result);
+      assert.equal(loadCalls, 0);
+      assert.equal(adapterCalls, 0);
+    }
+  });
+
   it("converts an unexpected host failure into a sanitized envelope", async () => {
     const rawSecret =
       "postgresql://raw-user:raw-password@raw.example/db";
     let failure = null;
     const result = await runLegacyAccountOwnerAssignmentHostCli({
       args: validArgs(),
-      baseEnv: { NEON_API_KEY },
+      baseEnv: {},
       repositoryRoot: ROOT,
       evidenceDirectory: EVIDENCE_DIRECTORY,
       clock: () => new Date(NOW),
-      loadEnvironment() {},
+      loadEnvironment() {
+        return { NEON_API_KEY };
+      },
       makeEvidenceDirectory() {},
       createAdapter() {
         return {};
@@ -271,11 +335,13 @@ describe("legacy account owner-assignment host CLI", () => {
     });
     const result = await runLegacyAccountOwnerAssignmentHostCli({
       args: validArgs(),
-      baseEnv: { NEON_API_KEY },
+      baseEnv: {},
       repositoryRoot: ROOT,
       evidenceDirectory: EVIDENCE_DIRECTORY,
       clock: () => new Date(NOW),
-      loadEnvironment() {},
+      loadEnvironment() {
+        return { NEON_API_KEY };
+      },
       makeEvidenceDirectory() {},
       createAdapter() {
         return {};
