@@ -7,7 +7,9 @@ import {
 } from "../scripts/lib/legacy-account-owner-assignment-neon-adapter.mjs";
 
 const NOW = new Date("2026-07-29T00:00:00.000Z");
-const EXPIRES_AT = "2026-07-30T00:00:00.000Z";
+const EXPIRES_AT = "2026-07-30T00:00:00.987Z";
+const CANONICAL_EXPIRES_AT = "2026-07-30T00:00:00Z";
+const EQUIVALENT_EXPIRES_AT = "2026-07-30T09:00:00+09:00";
 const PROJECT_ID = "synthetic-project";
 const PARENT_BRANCH_ID = "br-synthetic-production";
 const PRODUCTION_ENDPOINT_ID = "ep-synthetic-production";
@@ -140,7 +142,7 @@ describe("legacy account owner-assignment Neon adapter", () => {
       branch: {
         name: BRANCH_NAME,
         parent_id: PARENT_BRANCH_ID,
-        expires_at: EXPIRES_AT,
+        expires_at: CANONICAL_EXPIRES_AT,
         protected: false,
       },
       endpoints: [{ type: "read_write" }],
@@ -520,7 +522,6 @@ function sourceBranchResponse() {
       parent_id: null,
       current_state: "ready",
       default: true,
-      primary: true,
       protected: false,
       expires_at: null,
     },
@@ -550,9 +551,8 @@ function childBranch() {
     parent_id: PARENT_BRANCH_ID,
     current_state: "ready",
     default: false,
-    primary: false,
     protected: false,
-    expires_at: EXPIRES_AT,
+    expires_at: EQUIVALENT_EXPIRES_AT,
   };
 }
 

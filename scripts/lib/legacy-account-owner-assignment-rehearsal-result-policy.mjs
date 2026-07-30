@@ -53,6 +53,25 @@ const CHILD_READ_REASONS = new Set([
   "response_invalid",
   "timeout",
 ]);
+const STATIC_ATTESTATION_DIAGNOSTICS = new Set([
+  "branch_project_mismatch",
+  "branch_parent_mismatch",
+  "branch_id_mismatch",
+  "branch_name_mismatch",
+  "branch_endpoint_id_invalid",
+  "branch_endpoint_project_mismatch",
+  "branch_endpoint_branch_mismatch",
+  "branch_endpoint_type_invalid",
+  "branch_endpoint_disabled_invalid",
+  "branch_state_invalid",
+  "branch_endpoint_state_invalid",
+  "branch_default_invalid",
+  "branch_primary_invalid",
+  "branch_protected_invalid",
+  "branch_expires_at_invalid",
+  "branch_endpoint_not_isolated",
+  "branch_attestation_invalid",
+]);
 const EXPECTED_CHECKS = Object.freeze([
   "successful_assignment",
   "already_applied",
@@ -603,6 +622,10 @@ function projectReadinessEvidence(value, code) {
     value,
     "readDiagnostic",
   );
+  const staticDiagnostic = optionalOwnDataValue(
+    value,
+    "staticDiagnostic",
+  );
   if (
     !READINESS_OUTCOMES.has(outcome) ||
     !Number.isInteger(pollCount) ||
@@ -610,7 +633,11 @@ function projectReadinessEvidence(value, code) {
     pollCount > 32 ||
     ((outcome === "unattempted") !== (pollCount === 0)) ||
     readDiagnostic === INVALID ||
-    (outcome !== "read_failed" && readDiagnostic !== MISSING)
+    (outcome !== "read_failed" && readDiagnostic !== MISSING) ||
+    staticDiagnostic === INVALID ||
+    (outcome === "static_invalid"
+      ? !STATIC_ATTESTATION_DIAGNOSTICS.has(staticDiagnostic)
+      : staticDiagnostic !== MISSING)
   ) {
     throw resultEvidenceError(code);
   }
@@ -625,6 +652,9 @@ function projectReadinessEvidence(value, code) {
             code,
           ),
         }),
+    ...(staticDiagnostic === MISSING
+      ? {}
+      : { staticDiagnostic }),
   });
 }
 

@@ -446,6 +446,11 @@ describe("legacy account owner-assignment rehearsal host", () => {
       assert.equal(evidence.phase, "child_created_unattested");
       assert.equal(evidence.status, "failed");
       assert.equal(evidence.code, "branch_attestation_invalid");
+      assert.deepEqual(evidence.readiness, {
+        outcome: "static_invalid",
+        pollCount: 1,
+        staticDiagnostic: "branch_endpoint_branch_mismatch",
+      });
       assert.equal(evidence.cleanup, "unattempted");
       assert.equal(
         evidence.resolution,

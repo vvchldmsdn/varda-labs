@@ -480,6 +480,14 @@ function projectControlPlaneBranch({
     "neon_api_response_invalid",
   );
   const expiresAt = ownDataValue(branch, "expires_at");
+  const defaultValue = ownDataValue(branch, "default");
+  const primaryValue = optionalOwnDataValue(branch, "primary");
+  const expectedExpiration =
+    typeof expectedExpiresAt === "string"
+      ? Date.parse(expectedExpiresAt)
+      : NaN;
+  const actualExpiration =
+    typeof expiresAt === "string" ? Date.parse(expiresAt) : NaN;
   return Object.freeze({
     projectId: requirePattern(
       branch,
@@ -501,15 +509,16 @@ function projectControlPlaneBranch({
     ),
     branchState,
     branchReady: branchState === "ready",
-    default: ownDataValue(branch, "default"),
-    primary: ownDataValue(branch, "primary"),
+    default: defaultValue,
+    primary:
+      primaryValue === MISSING ? defaultValue : primaryValue,
     protected: ownDataValue(branch, "protected"),
     autoExpires:
       expectedExpiresAt !== null &&
-      expiresAt === expectedExpiresAt &&
-      typeof expiresAt === "string" &&
-      Number.isFinite(Date.parse(expiresAt)) &&
-      Date.parse(expiresAt) > currentTime.valueOf(),
+      Number.isFinite(expectedExpiration) &&
+      Number.isFinite(actualExpiration) &&
+      actualExpiration === expectedExpiration &&
+      actualExpiration > currentTime.valueOf(),
   });
 }
 
@@ -704,15 +713,19 @@ function parseApiKey(value) {
 function parseExpiration(value, now) {
   const currentTime = now();
   const parsed = typeof value === "string" ? Date.parse(value) : NaN;
+  const normalized = Number.isFinite(parsed)
+    ? Math.floor(parsed / 1000) * 1000
+    : NaN;
   if (
     !(currentTime instanceof Date) ||
     !Number.isFinite(currentTime.valueOf()) ||
-    !Number.isFinite(parsed) ||
-    parsed <= currentTime.valueOf()
+    !Number.isFinite(normalized) ||
+    normalized <= currentTime.valueOf()
   ) {
     throw adapterError("neon_adapter_options_invalid");
   }
-  return new Date(parsed).toISOString();
+  const expiration = new Date(normalized);
+  return expiration.toISOString().replace(".000Z", "Z");
 }
 
 function assertProjectId(value) {

@@ -5,6 +5,7 @@ import {
   hostError,
   projectOwnerAssignmentChildReadiness,
   projectVerifiedOwnerAssignmentChildStatic,
+  safeOwnerAssignmentStaticDiagnostic,
 } from "./legacy-account-owner-assignment-rehearsal-host-policy.mjs";
 
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_READINESS_POLICY =
@@ -139,8 +140,14 @@ export async function waitForOwnerAssignmentChildReadiness({
           expectedProductionEndpointId:
             target.productionEndpointId,
         });
-    } catch {
-      return failedReadiness("static_invalid", pollCount, null);
+    } catch (error) {
+      return failedReadiness(
+        "static_invalid",
+        pollCount,
+        null,
+        null,
+        safeOwnerAssignmentStaticDiagnostic(error),
+      );
     }
     lastStaticAttestation = staticAttestation;
 
@@ -385,6 +392,7 @@ function failedReadiness(
   pollCount,
   staticAttestation,
   readDiagnostic = null,
+  staticDiagnostic = null,
 ) {
   return Object.freeze({
     status: "failed",
@@ -392,6 +400,9 @@ function failedReadiness(
     pollCount,
     staticAttestation,
     ...(readDiagnostic === null ? {} : { readDiagnostic }),
+    ...(staticDiagnostic === null
+      ? {}
+      : { staticDiagnostic }),
   });
 }
 

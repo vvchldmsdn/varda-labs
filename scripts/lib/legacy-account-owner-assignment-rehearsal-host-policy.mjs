@@ -42,6 +42,24 @@ const SAFE_HOST_ERROR_CODES = new Set([
   "source_worktree_state_invalid",
   "stale_evidence_path",
 ]);
+const STATIC_ATTESTATION_DIAGNOSTICS = new Set([
+  "branch_project_mismatch",
+  "branch_parent_mismatch",
+  "branch_id_mismatch",
+  "branch_name_mismatch",
+  "branch_endpoint_id_invalid",
+  "branch_endpoint_project_mismatch",
+  "branch_endpoint_branch_mismatch",
+  "branch_endpoint_type_invalid",
+  "branch_endpoint_disabled_invalid",
+  "branch_state_invalid",
+  "branch_endpoint_state_invalid",
+  "branch_default_invalid",
+  "branch_primary_invalid",
+  "branch_protected_invalid",
+  "branch_expires_at_invalid",
+  "branch_endpoint_not_isolated",
+]);
 
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_REHEARSAL_HOST = HOST;
 
@@ -269,94 +287,94 @@ export function projectVerifiedOwnerAssignmentChildStatic(
       value,
       "projectId",
       expectedProjectId,
-      "branch_attestation_invalid",
+      "branch_project_mismatch",
     ),
     parentBranchId: requireExact(
       value,
       "parentBranchId",
       expectedParentBranchId,
-      "branch_attestation_invalid",
+      "branch_parent_mismatch",
     ),
     branchId: requireExact(
       value,
       "branchId",
       createdChild.branchId,
-      "branch_attestation_invalid",
+      "branch_id_mismatch",
     ),
     branchName: requireExact(
       value,
       "branchName",
       createdChild.branchName,
-      "branch_attestation_invalid",
+      "branch_name_mismatch",
     ),
     endpointId: requirePattern(
       value,
       "endpointId",
       ENDPOINT_ID_PATTERN,
-      "branch_attestation_invalid",
+      "branch_endpoint_id_invalid",
     ),
     endpointProjectId: requireExact(
       value,
       "endpointProjectId",
       expectedProjectId,
-      "branch_attestation_invalid",
+      "branch_endpoint_project_mismatch",
     ),
     endpointBranchId: requireExact(
       value,
       "endpointBranchId",
       createdChild.branchId,
-      "branch_attestation_invalid",
+      "branch_endpoint_branch_mismatch",
     ),
     productionEndpointId: expectedProductionEndpointId,
     endpointType: requireExact(
       value,
       "endpointType",
       "read_write",
-      "branch_attestation_invalid",
+      "branch_endpoint_type_invalid",
     ),
     endpointDisabled: requireExact(
       value,
       "endpointDisabled",
       false,
-      "branch_attestation_invalid",
+      "branch_endpoint_disabled_invalid",
     ),
     branchState: requireString(
       value,
       "branchState",
-      "branch_attestation_invalid",
+      "branch_state_invalid",
     ),
     endpointState: requireString(
       value,
       "endpointState",
-      "branch_attestation_invalid",
+      "branch_endpoint_state_invalid",
     ),
     default: requireExact(
       value,
       "default",
       false,
-      "branch_attestation_invalid",
+      "branch_default_invalid",
     ),
     primary: requireExact(
       value,
       "primary",
       false,
-      "branch_attestation_invalid",
+      "branch_primary_invalid",
     ),
     protected: requireExact(
       value,
       "protected",
       false,
-      "branch_attestation_invalid",
+      "branch_protected_invalid",
     ),
     autoExpires: requireExact(
       value,
       "autoExpires",
       true,
-      "branch_attestation_invalid",
+      "branch_expires_at_invalid",
     ),
   };
   if (result.endpointId === result.productionEndpointId) {
-    throw hostError("branch_attestation_invalid");
+    throw hostError("branch_endpoint_not_isolated");
   }
   return Object.freeze(result);
 }
@@ -596,6 +614,14 @@ export function safeOwnerAssignmentHostErrorCode(
     SAFE_HOST_ERROR_CODES.has(code)
     ? code
     : fallback;
+}
+
+export function safeOwnerAssignmentStaticDiagnostic(error) {
+  const code = ownDataValue(error, "code");
+  return typeof code === "string" &&
+    STATIC_ATTESTATION_DIAGNOSTICS.has(code)
+    ? code
+    : "branch_attestation_invalid";
 }
 
 function requirePattern(value, key, pattern, code) {

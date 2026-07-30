@@ -774,6 +774,9 @@ function readinessEvidence(readiness) {
     ...(readiness.readDiagnostic === undefined
       ? {}
       : { readDiagnostic: readiness.readDiagnostic }),
+    ...(readiness.staticDiagnostic === undefined
+      ? {}
+      : { staticDiagnostic: readiness.staticDiagnostic }),
   });
 }
 
