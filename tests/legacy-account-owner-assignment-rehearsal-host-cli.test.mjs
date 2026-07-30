@@ -17,9 +17,7 @@ const PARENT_BRANCH_ID = "br-synthetic-production";
 const PRODUCTION_ENDPOINT_ID = "ep-synthetic-production";
 const ROOT = resolve("synthetic-owner-host-root");
 const EVIDENCE_DIRECTORY = join(ROOT, ".rehearsal-evidence");
-const NPX_CLI_PATH = join(ROOT, "runtime", "npx-cli.js");
-const CONFIG_DIRECTORY = join(ROOT, "neon-config");
-const NODE_EXECUTABLE = join(ROOT, "runtime", "node.exe");
+const NEON_API_KEY = "synthetic-neon-api-key-never-use";
 const NOW = new Date("2026-07-29T00:00:00.000Z");
 
 describe("legacy account owner-assignment host CLI", () => {
@@ -73,7 +71,7 @@ describe("legacy account owner-assignment host CLI", () => {
     assert.equal(source.includes("shell: true"), false);
   });
 
-  it("wires the fixed paths and direct-Node adapter into one host call", async () => {
+  it("wires the fixed paths and REST adapter into one host call", async () => {
     const events = [];
     let adapterOptions = null;
     let hostOptions = null;
@@ -93,9 +91,9 @@ describe("legacy account owner-assignment host CLI", () => {
       code: "completed",
       runId: "synthetic-run",
     });
-    const baseEnv = { synthetic: "base-env" };
-    const processEnvironment = {
-      Path: "C:\\Windows\\System32",
+    const baseEnv = {
+      synthetic: "base-env",
+      NEON_API_KEY,
     };
 
     const result = await runLegacyAccountOwnerAssignmentHostCli({
@@ -103,10 +101,6 @@ describe("legacy account owner-assignment host CLI", () => {
       baseEnv,
       repositoryRoot: ROOT,
       evidenceDirectory: EVIDENCE_DIRECTORY,
-      npxCliPath: NPX_CLI_PATH,
-      configDirectory: CONFIG_DIRECTORY,
-      nodeExecutable: NODE_EXECUTABLE,
-      processEnvironment,
       clock: () => new Date(NOW),
       loadEnvironment() {
         events.push("load_environment");
@@ -144,12 +138,8 @@ describe("legacy account owner-assignment host CLI", () => {
       "write",
     ]);
     assert.deepEqual(adapterOptions, {
-      npxCliPath: NPX_CLI_PATH,
-      configDirectory: CONFIG_DIRECTORY,
-      repositoryRoot: ROOT,
+      apiKey: NEON_API_KEY,
       expiresAt: "2026-07-30T00:00:00.000Z",
-      processEnvironment,
-      nodeExecutable: NODE_EXECUTABLE,
       now: adapterOptions.now,
     });
     assert.equal(typeof adapterOptions.now, "function");
@@ -206,17 +196,49 @@ describe("legacy account owner-assignment host CLI", () => {
     });
   });
 
+  it("rejects a missing or accessor-backed API key before adapter work", async () => {
+    for (const baseEnv of [
+      {},
+      Object.defineProperty({}, "NEON_API_KEY", {
+        get() {
+          assert.fail("The API key accessor must not be invoked.");
+        },
+      }),
+    ]) {
+      let adapterCalls = 0;
+      let failure = null;
+      const result =
+        await runLegacyAccountOwnerAssignmentHostCli({
+          args: validArgs(),
+          baseEnv,
+          repositoryRoot: ROOT,
+          evidenceDirectory: EVIDENCE_DIRECTORY,
+          loadEnvironment() {},
+          makeEvidenceDirectory() {},
+          createAdapter() {
+            adapterCalls += 1;
+          },
+          writeError(value) {
+            failure = value;
+          },
+        });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.code, "neon_api_key_invalid");
+      assert.equal(failure, result);
+      assert.equal(adapterCalls, 0);
+    }
+  });
+
   it("converts an unexpected host failure into a sanitized envelope", async () => {
     const rawSecret =
       "postgresql://raw-user:raw-password@raw.example/db";
     let failure = null;
     const result = await runLegacyAccountOwnerAssignmentHostCli({
       args: validArgs(),
+      baseEnv: { NEON_API_KEY },
       repositoryRoot: ROOT,
       evidenceDirectory: EVIDENCE_DIRECTORY,
-      npxCliPath: NPX_CLI_PATH,
-      configDirectory: CONFIG_DIRECTORY,
-      nodeExecutable: NODE_EXECUTABLE,
       clock: () => new Date(NOW),
       loadEnvironment() {},
       makeEvidenceDirectory() {},
@@ -249,11 +271,9 @@ describe("legacy account owner-assignment host CLI", () => {
     });
     const result = await runLegacyAccountOwnerAssignmentHostCli({
       args: validArgs(),
+      baseEnv: { NEON_API_KEY },
       repositoryRoot: ROOT,
       evidenceDirectory: EVIDENCE_DIRECTORY,
-      npxCliPath: NPX_CLI_PATH,
-      configDirectory: CONFIG_DIRECTORY,
-      nodeExecutable: NODE_EXECUTABLE,
       clock: () => new Date(NOW),
       loadEnvironment() {},
       makeEvidenceDirectory() {},

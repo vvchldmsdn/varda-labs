@@ -1,18 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { isAbsolute } from "node:path";
 import { performance } from "node:perf_hooks";
 
-const NEON_CLI_PACKAGE = "neonctl@2.38.1";
-const NEON_CLI_VERSION = "2.38.1";
+const NEON_API_BASE_URL = "https://console.neon.tech/api/v2/";
 const PROJECT_ID_PATTERN = /^[a-z][a-z0-9-]{2,63}$/;
 const BRANCH_ID_PATTERN = /^br-[a-z0-9-]+$/;
 const ENDPOINT_ID_PATTERN = /^ep-[a-z0-9-]+$/;
 const BRANCH_NAME_PATTERN =
   /^preview\/codex\/legacy-account-owner-assignment-rehearsal-[0-9a-f-]+$/;
-const NOT_FOUND_PATTERN =
-  /^ERROR: FetchBranchWithParent(?:\r?\n|$)/;
-const MAX_OUTPUT_BYTES = 1024 * 1024;
-const DEFAULT_PROCESS_TIMEOUT_MS = 120_000;
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 const MISSING = Symbol("missing");
 const INVALID = Symbol("invalid");
 const CHILD_READ_STAGES = new Set([
@@ -26,27 +21,8 @@ const CHILD_READ_REASONS = new Set([
   "response_invalid",
   "timeout",
 ]);
-const PROCESS_ENV_KEYS = new Set([
-  "APPDATA",
-  "COMSPEC",
-  "HOME",
-  "HTTP_PROXY",
-  "HTTPS_PROXY",
-  "LOCALAPPDATA",
-  "NODE_EXTRA_CA_CERTS",
-  "NO_PROXY",
-  "PATH",
-  "PATHEXT",
-  "SYSTEMROOT",
-  "TEMP",
-  "TMP",
-  "USERPROFILE",
-  "WINDIR",
-  "npm_config_cache",
-].map((key) => key.toLowerCase()));
-
-export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_NEON_CLI =
-  NEON_CLI_PACKAGE;
+export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_NEON_API_BASE_URL =
+  NEON_API_BASE_URL;
 
 export class LegacyAccountOwnerAssignmentNeonAdapterError extends Error {
   constructor(code, readDiagnostic = null) {
@@ -73,133 +49,115 @@ export class LegacyAccountOwnerAssignmentNeonAdapterError extends Error {
 }
 
 export function createLegacyAccountOwnerAssignmentNeonAdapter({
-  npxCliPath,
-  configDirectory,
-  repositoryRoot,
+  apiKey,
   expiresAt,
-  processEnvironment = process.env,
-  nodeExecutable = process.execPath,
-  spawn = spawnSync,
+  fetchImpl = globalThis.fetch,
   now = () => new Date(),
   monotonicNow = () => performance.now(),
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 } = {}) {
   if (
-    typeof npxCliPath !== "string" ||
-    !isAbsolute(npxCliPath) ||
-    typeof configDirectory !== "string" ||
-    !isAbsolute(configDirectory) ||
-    typeof repositoryRoot !== "string" ||
-    !isAbsolute(repositoryRoot) ||
-    typeof nodeExecutable !== "string" ||
-    !isAbsolute(nodeExecutable) ||
-    typeof spawn !== "function" ||
+    typeof fetchImpl !== "function" ||
     typeof now !== "function" ||
     typeof monotonicNow !== "function" ||
-    !processEnvironment ||
-    typeof processEnvironment !== "object"
+    !Number.isInteger(requestTimeoutMs) ||
+    requestTimeoutMs < 1 ||
+    requestTimeoutMs > DEFAULT_REQUEST_TIMEOUT_MS
   ) {
     throw adapterError("neon_adapter_options_invalid");
   }
+  const bearerToken = parseApiKey(apiKey);
   const expiration = parseExpiration(expiresAt, now);
-  const childEnvironment =
-    createMinimalNeonProcessEnvironment(processEnvironment);
-  let versionVerified = false;
 
-  function execute(args, mode, deadline = null) {
-    if (!versionVerified) {
-      const version = runProcess(
-        ["--version"],
-        remainingProcessTimeout(deadline),
-      );
-      if (
-        version.status !== 0 ||
-        version.signal !== null ||
-        version.stdout.trim() !== NEON_CLI_VERSION
-      ) {
-        throw adapterError("neon_cli_version_invalid");
-      }
-      versionVerified = true;
-    }
-
-    const result = runProcess(
-      [
-        ...args,
-        "--config-dir",
-        configDirectory,
-        "--output",
-        "json",
-        "--no-color",
-        "--no-analytics",
-      ],
-      remainingProcessTimeout(deadline),
+  async function request({
+    path,
+    method = "GET",
+    body,
+    expectedStatus = 200,
+    notFoundMode = "error",
+    deadline = null,
+    parseBody = true,
+  }) {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      remainingRequestTimeout({
+        deadline,
+        monotonicNow,
+        requestTimeoutMs,
+      }),
     );
-    if (mode === "status") {
-      if (result.status !== 0 || result.signal !== null) {
-        throw adapterError("neon_cli_execution_failed");
+    let response;
+    let text;
+    try {
+      const headers = {
+        Accept: "application/json",
+        Authorization: `Bearer ${bearerToken}`,
+      };
+      let serializedBody;
+      if (body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        serializedBody = JSON.stringify(body);
       }
-      return null;
-    }
-    if (mode === "maybe_json" && isExactNotFound(result)) {
-      return null;
-    }
-    if (mode === "child_json" && isExactNotFound(result)) {
-      throw adapterError("neon_cli_exact_not_found");
-    }
-    if (
-      result.status !== 0 ||
-      result.signal !== null ||
-      result.stdout.length === 0
-    ) {
-      throw adapterError("neon_cli_execution_failed");
-    }
-    try {
-      return JSON.parse(result.stdout);
-    } catch {
-      throw adapterError("neon_cli_response_invalid");
-    }
-  }
-
-  function runProcess(args, timeoutMs) {
-    let result;
-    try {
-      result = spawn(
-        nodeExecutable,
-        [
-          npxCliPath,
-          "--yes",
-          NEON_CLI_PACKAGE,
-          ...args,
-        ],
+      response = await fetchImpl(
+        new URL(path.replace(/^\/+/, ""), NEON_API_BASE_URL),
         {
-          cwd: repositoryRoot,
-          encoding: "utf8",
-          env: childEnvironment,
-          maxBuffer: MAX_OUTPUT_BYTES,
-          shell: false,
-          timeout: timeoutMs,
-          windowsHide: true,
+          method,
+          headers,
+          ...(serializedBody === undefined
+            ? {}
+            : { body: serializedBody }),
+          redirect: "error",
+          signal: controller.signal,
         },
       );
-    } catch {
-      throw adapterError("neon_cli_execution_failed");
+      text = await readResponseText(response);
+    } catch (error) {
+      if (
+        error instanceof
+        LegacyAccountOwnerAssignmentNeonAdapterError
+      ) {
+        throw error;
+      }
+      if (controller.signal.aborted) {
+        throw adapterError("neon_api_timeout");
+      }
+      throw adapterError("neon_api_execution_failed");
+    } finally {
+      clearTimeout(timeout);
     }
-    if (isTimedOutProcessResult(result)) {
-      throw adapterError("neon_cli_timeout");
+
+    const status = responseStatus(response);
+    if (status === 404 && notFoundMode === "null") return null;
+    if (status === 404 && notFoundMode === "throw") {
+      throw adapterError("neon_api_exact_not_found");
     }
-    return projectProcessResult(result);
-  }
-
-  function remainingProcessTimeout(deadline) {
-    if (deadline === null) return DEFAULT_PROCESS_TIMEOUT_MS;
-    const current = readMonotonicNow(monotonicNow);
-    const remaining = Math.floor(deadline - current);
-    if (remaining < 1) throw adapterError("neon_cli_timeout");
-    return Math.min(remaining, DEFAULT_PROCESS_TIMEOUT_MS);
-  }
-
-  function executeChildRead(args, deadline, stage) {
+    const acceptedStatuses = Array.isArray(expectedStatus)
+      ? expectedStatus
+      : [expectedStatus];
+    if (!acceptedStatuses.includes(status)) {
+      throw adapterError("neon_api_execution_failed");
+    }
+    if (!parseBody) return null;
+    if (
+      text.length === 0 ||
+      Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES
+    ) {
+      throw adapterError("neon_api_response_invalid");
+    }
     try {
-      return execute(args, "child_json", deadline);
+      return JSON.parse(text);
+    } catch {
+      throw adapterError("neon_api_response_invalid");
+    }
+  }
+
+  async function requestChildRead(options, stage) {
+    try {
+      return await request({
+        ...options,
+        notFoundMode: "throw",
+      });
     } catch (error) {
       throw childReadError(error, stage);
     }
@@ -214,15 +172,21 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
       assertProjectId(projectId);
       assertBranchId(parentBranchId);
       assertEndpointId(productionEndpointId);
+      const [branchResponse, endpointResponse] =
+        await Promise.all([
+          request({
+            path: branchGetPath(projectId, parentBranchId),
+          }),
+          request({
+            path: branchEndpointsPath(
+              projectId,
+              parentBranchId,
+            ),
+          }),
+        ]);
       return projectControlPlaneAttestation({
-        branchResponse: execute(
-          branchGetArgs(projectId, parentBranchId),
-          "json",
-        ),
-        endpointResponse: execute(
-          branchEndpointsArgs(projectId, parentBranchId),
-          "json",
-        ),
+        branchResponse,
+        endpointResponse,
         expectedEndpointId: productionEndpointId,
         expectedExpiresAt: null,
         now,
@@ -236,39 +200,39 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
       assertProjectId(projectId);
       assertBranchId(parentBranchId);
       assertBranchName(branchName);
-      const response = execute(
-        [
-          "api",
-          `/projects/${projectId}/branches`,
-          "--method",
-          "POST",
-          "--data",
-          createBranchRequest({
-            branchName,
-            parentBranchId,
-            expiresAt: expiration,
-          }),
-        ],
-        "json",
-      );
+      const response = await request({
+        path: branchesPath(projectId),
+        method: "POST",
+        expectedStatus: 201,
+        body: createBranchRequest({
+          branchName,
+          parentBranchId,
+          expiresAt: expiration,
+        }),
+      });
       return projectCreatedBranch(response);
     },
     async reconcileChildByExactName({
       projectId,
       branchName,
-      timeoutMs = DEFAULT_PROCESS_TIMEOUT_MS,
+      timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
     }) {
       assertProjectId(projectId);
       assertBranchName(branchName);
-      const deadline = createProcessDeadline({
+      const deadline = createRequestDeadline({
         timeoutMs,
         monotonicNow,
       });
       try {
         return projectCreatedBranchFromExactNameList(
-          executeChildRead(
-            branchListSearchArgs(projectId, branchName),
-            deadline,
+          await requestChildRead(
+            {
+              path: branchListSearchPath(
+                projectId,
+                branchName,
+              ),
+              deadline,
+            },
             "branch_list_search",
           ),
           branchName,
@@ -281,26 +245,38 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
       projectId,
       branchId,
       branchName,
-      timeoutMs = DEFAULT_PROCESS_TIMEOUT_MS,
+      timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
     }) {
       assertProjectId(projectId);
       assertBranchId(branchId);
       assertBranchName(branchName);
-      const deadline = createProcessDeadline({
+      const deadline = createRequestDeadline({
         timeoutMs,
         monotonicNow,
       });
+      const [branchResponse, endpointResponse] =
+        await Promise.all([
+          requestChildRead(
+            {
+              path: branchGetPath(projectId, branchId),
+              deadline,
+            },
+            "branch_get",
+          ),
+          requestChildRead(
+            {
+              path: branchEndpointsPath(
+                projectId,
+                branchId,
+              ),
+              deadline,
+            },
+            "endpoint_list_get",
+          ),
+        ]);
       return projectControlPlaneAttestation({
-        branchResponse: executeChildRead(
-          branchGetArgs(projectId, branchId),
-          deadline,
-          "branch_get",
-        ),
-        endpointResponse: executeChildRead(
-          branchEndpointsArgs(projectId, branchId),
-          deadline,
-          "endpoint_list_get",
-        ),
+        branchResponse,
+        endpointResponse,
         expectedEndpointId: null,
         expectedExpiresAt: expiration,
         now,
@@ -310,77 +286,45 @@ export function createLegacyAccountOwnerAssignmentNeonAdapter({
     async deleteChild({ projectId, branchId }) {
       assertProjectId(projectId);
       assertBranchId(branchId);
-      execute(
-        [
-          "api",
-          `/projects/${projectId}/branches/${branchId}`,
-          "--method",
-          "DELETE",
-        ],
-        "status",
-      );
+      await request({
+        path: branchGetPath(projectId, branchId),
+        method: "DELETE",
+        expectedStatus: [200, 204],
+        parseBody: false,
+      });
     },
     async checkChildNotFound({ projectId, branchId }) {
       assertProjectId(projectId);
       assertBranchId(branchId);
       return (
-        execute(
-          branchGetArgs(projectId, branchId),
-          "maybe_json",
-        ) === null
+        (await request({
+          path: branchGetPath(projectId, branchId),
+          notFoundMode: "null",
+        })) === null
       );
     },
   });
 }
 
-export function createMinimalNeonProcessEnvironment(source) {
-  if (!source || typeof source !== "object") {
-    throw adapterError("neon_adapter_options_invalid");
-  }
-  const result = Object.create(null);
-  let keys;
-  try {
-    keys = Object.getOwnPropertyNames(source);
-  } catch {
-    throw adapterError("neon_adapter_options_invalid");
-  }
-  for (const key of keys) {
-    if (!PROCESS_ENV_KEYS.has(key.toLowerCase())) continue;
-    const value = ownDataValue(source, key);
-    if (typeof value === "string" && value.length > 0) {
-      result[key] = value;
-    }
-  }
-  return result;
+function branchesPath(projectId) {
+  return `/projects/${projectId}/branches`;
 }
 
-function branchGetArgs(projectId, branchIdOrName) {
-  return [
-    "api",
-    `/projects/${projectId}/branches/${encodeURIComponent(
-      branchIdOrName,
-    )}`,
-  ];
+function branchGetPath(projectId, branchId) {
+  return `${branchesPath(projectId)}/${branchId}`;
 }
 
-function branchListSearchArgs(projectId, branchName) {
-  return [
-    "api",
-    `/projects/${projectId}/branches`,
-    "-Q",
-    `search=${branchName}`,
-    "-Q",
-    "limit=10000",
-    "-Q",
-    "include_deleted=false",
-  ];
+function branchListSearchPath(projectId, branchName) {
+  const query = new URLSearchParams({
+    search: branchName,
+    limit: "10000",
+    include_deleted: "false",
+  });
+  return `${branchesPath(projectId)}?${query.toString()}`;
 }
 
-function branchEndpointsArgs(projectId, branchId) {
-  return [
-    "api",
-    `/projects/${projectId}/branches/${branchId}/endpoints`,
-  ];
+function branchEndpointsPath(projectId, branchId) {
+  return `${branchGetPath(projectId, branchId)}/endpoints`;
 }
 
 function createBranchRequest({
@@ -388,7 +332,7 @@ function createBranchRequest({
   parentBranchId,
   expiresAt,
 }) {
-  return JSON.stringify({
+  return {
     branch: {
       name: branchName,
       parent_id: parentBranchId,
@@ -396,7 +340,7 @@ function createBranchRequest({
       protected: false,
     },
     endpoints: [{ type: "read_write" }],
-  });
+  };
 }
 
 function projectCreatedBranch(response) {
@@ -406,13 +350,13 @@ function projectCreatedBranch(response) {
       branch,
       "id",
       BRANCH_ID_PATTERN,
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
     branchName: requirePattern(
       branch,
       "name",
       BRANCH_NAME_PATTERN,
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
   });
 }
@@ -424,7 +368,7 @@ function projectCreatedBranchFromExactNameList(
   const branches = ownDataValue(response, "branches");
   const pagination = optionalOwnDataValue(response, "pagination");
   if (!Array.isArray(branches) || pagination === INVALID) {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   if (pagination !== MISSING) {
     if (
@@ -432,14 +376,14 @@ function projectCreatedBranchFromExactNameList(
       typeof pagination !== "object" ||
       Array.isArray(pagination)
     ) {
-      throw adapterError("neon_cli_response_invalid");
+      throw adapterError("neon_api_response_invalid");
     }
     const next = optionalOwnDataValue(pagination, "next");
     if (
       next === INVALID ||
       (next !== MISSING && next !== null)
     ) {
-      throw adapterError("neon_cli_response_invalid");
+      throw adapterError("neon_api_response_invalid");
     }
   }
 
@@ -450,12 +394,12 @@ function projectCreatedBranchFromExactNameList(
       typeof branch !== "object" ||
       Array.isArray(branch)
     ) {
-      throw adapterError("neon_cli_response_invalid");
+      throw adapterError("neon_api_response_invalid");
     }
     const branchName = requireString(
       branch,
       "name",
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     );
     if (branchName === expectedBranchName) {
       exactMatches.push(branch);
@@ -463,7 +407,7 @@ function projectCreatedBranchFromExactNameList(
   }
   if (exactMatches.length === 0) return null;
   if (exactMatches.length !== 1) {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   return projectCreatedBranch({ branch: exactMatches[0] });
 }
@@ -533,7 +477,7 @@ function projectControlPlaneBranch({
   const branchState = requireString(
     branch,
     "current_state",
-    "neon_cli_response_invalid",
+    "neon_api_response_invalid",
   );
   const expiresAt = ownDataValue(branch, "expires_at");
   return Object.freeze({
@@ -541,19 +485,19 @@ function projectControlPlaneBranch({
       branch,
       "project_id",
       PROJECT_ID_PATTERN,
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
     parentBranchId: ownStringOrNull(branch, "parent_id"),
     branchId: requirePattern(
       branch,
       "id",
       BRANCH_ID_PATTERN,
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
     branchName: requireString(
       branch,
       "name",
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
     branchState,
     branchReady: branchState === "ready",
@@ -575,36 +519,36 @@ function projectControlPlaneEndpoint({
 }) {
   const endpoints = ownDataValue(endpointResponse, "endpoints");
   if (!Array.isArray(endpoints)) {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   const readWriteEndpoints = endpoints.filter(
     (endpoint) =>
       ownDataValue(endpoint, "type") === "read_write",
   );
   if (readWriteEndpoints.length !== 1) {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   const endpoint = readWriteEndpoints[0];
   const endpointId = requirePattern(
     endpoint,
     "id",
     ENDPOINT_ID_PATTERN,
-    "neon_cli_response_invalid",
+    "neon_api_response_invalid",
   );
   const endpointState = requireString(
     endpoint,
     "current_state",
-    "neon_cli_response_invalid",
+    "neon_api_response_invalid",
   );
   const endpointDisabled = ownDataValue(endpoint, "disabled");
   if (typeof endpointDisabled !== "boolean") {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   if (
     expectedEndpointId !== null &&
     endpointId !== expectedEndpointId
   ) {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   return Object.freeze({
     endpointId,
@@ -612,13 +556,13 @@ function projectControlPlaneEndpoint({
       endpoint,
       "project_id",
       PROJECT_ID_PATTERN,
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
     endpointBranchId: requirePattern(
       endpoint,
       "branch_id",
       BRANCH_ID_PATTERN,
-      "neon_cli_response_invalid",
+      "neon_api_response_invalid",
     ),
     endpointState,
     endpointDisabled,
@@ -637,42 +581,54 @@ function projectControlPlaneRead(factory, stage, diagnoseChildRead) {
   }
 }
 
-function projectProcessResult(result) {
-  const status = ownDataValue(result, "status");
-  const signal = ownDataValue(result, "signal");
-  const stdout = ownDataValue(result, "stdout");
-  const stderr = ownDataValue(result, "stderr");
-  if (
-    !Number.isInteger(status) ||
-    !(signal === null || typeof signal === "string") ||
-    typeof stdout !== "string" ||
-    typeof stderr !== "string" ||
-    Buffer.byteLength(stdout, "utf8") > MAX_OUTPUT_BYTES ||
-    Buffer.byteLength(stderr, "utf8") > MAX_OUTPUT_BYTES
-  ) {
-    throw adapterError("neon_cli_execution_failed");
-  }
-  return { status, signal, stdout, stderr };
-}
-
-function isTimedOutProcessResult(result) {
-  const error = ownDataValue(result, "error");
-  return (
-    error &&
-    typeof error === "object" &&
-    ownDataValue(error, "code") === "ETIMEDOUT"
-  );
-}
-
-function createProcessDeadline({ timeoutMs, monotonicNow }) {
+function createRequestDeadline({ timeoutMs, monotonicNow }) {
   if (
     !Number.isInteger(timeoutMs) ||
     timeoutMs < 1 ||
-    timeoutMs > DEFAULT_PROCESS_TIMEOUT_MS
+    timeoutMs > DEFAULT_REQUEST_TIMEOUT_MS
   ) {
     throw adapterError("neon_adapter_input_invalid");
   }
   return readMonotonicNow(monotonicNow) + timeoutMs;
+}
+
+function remainingRequestTimeout({
+  deadline,
+  monotonicNow,
+  requestTimeoutMs,
+}) {
+  if (deadline === null) return requestTimeoutMs;
+  const remaining = Math.floor(
+    deadline - readMonotonicNow(monotonicNow),
+  );
+  if (remaining < 1) throw adapterError("neon_api_timeout");
+  return Math.min(remaining, requestTimeoutMs);
+}
+
+async function readResponseText(response) {
+  if (
+    !response ||
+    typeof response !== "object" ||
+    typeof response.text !== "function"
+  ) {
+    throw adapterError("neon_api_execution_failed");
+  }
+  const value = await response.text();
+  if (
+    typeof value !== "string" ||
+    Buffer.byteLength(value, "utf8") > MAX_RESPONSE_BYTES
+  ) {
+    throw adapterError("neon_api_response_invalid");
+  }
+  return value;
+}
+
+function responseStatus(response) {
+  const value = response?.status;
+  if (!Number.isInteger(value) || value < 100 || value > 599) {
+    throw adapterError("neon_api_execution_failed");
+  }
+  return value;
 }
 
 function readMonotonicNow(monotonicNow) {
@@ -688,13 +644,16 @@ function readMonotonicNow(monotonicNow) {
   return value;
 }
 
-function isExactNotFound(result) {
-  return (
-    result.status !== 0 &&
-    result.signal === null &&
-    result.stdout.length === 0 &&
-    NOT_FOUND_PATTERN.test(result.stderr)
-  );
+function parseApiKey(value) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 512 ||
+    /[\s\x00-\x1f\x7f]/.test(value)
+  ) {
+    throw adapterError("neon_adapter_options_invalid");
+  }
+  return value;
 }
 
 function parseExpiration(value, now) {
@@ -741,7 +700,7 @@ function assertBranchName(value) {
 function requireObject(value, key) {
   const result = ownDataValue(value, key);
   if (!result || typeof result !== "object" || Array.isArray(result)) {
-    throw adapterError("neon_cli_response_invalid");
+    throw adapterError("neon_api_response_invalid");
   }
   return result;
 }
@@ -796,17 +755,17 @@ function childReadError(error, stage) {
   const code = ownDataValue(error, "code");
   const reason = childReadReason(code);
   return adapterError(
-    typeof code === "string" ? code : "neon_cli_execution_failed",
+    typeof code === "string" ? code : "neon_api_execution_failed",
     { stage, reason },
   );
 }
 
 function childReadReason(code) {
-  if (code === "neon_cli_exact_not_found") {
+  if (code === "neon_api_exact_not_found") {
     return "exact_not_found";
   }
-  if (code === "neon_cli_timeout") return "timeout";
-  if (code === "neon_cli_response_invalid") {
+  if (code === "neon_api_timeout") return "timeout";
+  if (code === "neon_api_response_invalid") {
     return "response_invalid";
   }
   return "execution_failed";

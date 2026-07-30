@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -34,16 +33,6 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
   repositoryRoot = LEGACY_ACCOUNT_OWNER_ASSIGNMENT_HOST_ROOT,
   evidenceDirectory =
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_HOST_EVIDENCE_DIRECTORY,
-  npxCliPath = join(
-    dirname(process.execPath),
-    "node_modules",
-    "npm",
-    "bin",
-    "npx-cli.js",
-  ),
-  configDirectory = join(homedir(), ".config", "neonctl"),
-  nodeExecutable = process.execPath,
-  processEnvironment = process.env,
   clock = () => new Date(),
   loadEnvironment = () =>
     config({
@@ -67,10 +56,7 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
     options = readLegacyAccountOwnerAssignmentHostOptions(args);
     if (
       !isAbsolute(repositoryRoot) ||
-      !isAbsolute(evidenceDirectory) ||
-      !isAbsolute(npxCliPath) ||
-      !isAbsolute(configDirectory) ||
-      !isAbsolute(nodeExecutable)
+      !isAbsolute(evidenceDirectory)
     ) {
       throw new Error("Host paths are invalid.");
     }
@@ -83,6 +69,16 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
     );
   }
 
+  let neonApiKey;
+  try {
+    neonApiKey = readRequiredNeonApiKey(baseEnv);
+  } catch {
+    return outputFailure(
+      hostCliFailure("neon_api_key_invalid"),
+      writeError,
+    );
+  }
+
   let adapter;
   try {
     const now = clock();
@@ -90,14 +86,10 @@ export async function runLegacyAccountOwnerAssignmentHostCli({
       throw new Error("Host clock is invalid.");
     }
     adapter = createAdapter({
-      npxCliPath,
-      configDirectory,
-      repositoryRoot,
+      apiKey: neonApiKey,
       expiresAt: new Date(
         now.valueOf() + 24 * 60 * 60 * 1000,
       ).toISOString(),
-      processEnvironment,
-      nodeExecutable,
       now: clock,
     });
   } catch {
@@ -243,6 +235,19 @@ function ownDataValue(value, key) {
   }
   if (!descriptor || !("value" in descriptor)) return undefined;
   return descriptor.value;
+}
+
+function readRequiredNeonApiKey(source) {
+  const value = ownDataValue(source, "NEON_API_KEY");
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 512 ||
+    /[\s\x00-\x1f\x7f]/.test(value)
+  ) {
+    throw new Error("Neon API key is unavailable.");
+  }
+  return value;
 }
 
 const entryUrl = process.argv[1]
