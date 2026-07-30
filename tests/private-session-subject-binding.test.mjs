@@ -260,7 +260,10 @@ describe("private session subject binding", () => {
           "private-session-subject-binding",
         ),
       );
-    assert.deepEqual(importers, [presentationAdapterPath]);
+    assert.deepEqual(importers, [
+      presentationAdapterPath,
+      "src/lib/auth/private-verified-session-identity-consume.ts",
+    ]);
   });
 
   it("keeps policy and output semantics exact", () => {

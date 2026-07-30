@@ -25,6 +25,14 @@ const VERIFIED_SESSION_PRESENTATION_CORE_PATH =
   "scripts/lib/verified-session-claim-presentation.mjs";
 const VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH =
   "src/lib/auth/private-verified-session-claim-presentation.ts";
+const VERIFIED_SESSION_CONSUME_CORE_PATH =
+  "scripts/lib/verified-session-identity-consume.mjs";
+const VERIFIED_SESSION_CONSUME_CAPABILITY_PATH =
+  "scripts/lib/verified-session-consume-capability.mjs";
+const VERIFIED_SESSION_CONSUME_ADAPTER_PATH =
+  "src/lib/auth/private-verified-session-identity-consume.ts";
+const IDENTITY_CONSUME_WRITER_PATH =
+  "scripts/lib/identity-pairing-consume-writer.mjs";
 const CLAIM_PRESENTATION_ROUTE_PATH =
   "src/app/api/identity/bootstrap-claim/present/route.ts";
 const CLAIM_ISSUER_IMPORT_PATTERN =
@@ -33,6 +41,10 @@ const CLAIM_EXTRACTION_EXPORT_PATTERN =
   /(?:export\s+(?:(?:async\s+)?function|const|let|var)\s+takeIssuedIdentityBootstrapClaim\b|export\s*\{[^}]*\btakeIssuedIdentityBootstrapClaim\b)/;
 const VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-claim-presentation(?:\.ts)?["']/;
+const VERIFIED_SESSION_CONSUME_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-identity-consume(?:\.ts)?["']/;
+const ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*legacy-account-owner-assignment-writer\.mjs["']/;
 
 export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   const findings = [];
@@ -203,6 +215,87 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     findings.push("claim_presentation_route_enabled");
   }
 
+  const identityConsumeWriter = writerRegistry.find(
+    (writer) => writer.id === "identity_pairing_atomic_consume",
+  );
+  const identityConsumeAuthorityIntact =
+    identityConsumeWriter?.classification === "identity_system" &&
+    identityConsumeWriter.authorization === "server_verified_session" &&
+    identityConsumeWriter.entrypoints.length === 0 &&
+    identityConsumeWriter.implementationPaths.length === 1 &&
+    identityConsumeWriter.implementationPaths[0] ===
+      IDENTITY_CONSUME_WRITER_PATH &&
+    identityConsumeWriter.transition.activate ===
+      "atomic_identity_pairing_consume";
+  if (!identityConsumeAuthorityIntact) {
+    findings.push("identity_consume_authority_drift");
+  }
+
+  const verifiedSessionConsumeCore = readFileSync(
+    join(root, VERIFIED_SESSION_CONSUME_CORE_PATH),
+    "utf8",
+  );
+  const verifiedSessionConsumeCapability = readFileSync(
+    join(root, VERIFIED_SESSION_CONSUME_CAPABILITY_PATH),
+    "utf8",
+  );
+  const verifiedSessionConsumeAdapter = readFileSync(
+    join(root, VERIFIED_SESSION_CONSUME_ADAPTER_PATH),
+    "utf8",
+  );
+  const verifiedSessionConsumeBoundaryIntact =
+    verifiedSessionConsumeAdapter.startsWith('import "server-only";') &&
+    verifiedSessionConsumeAdapter.includes(
+      "createPrivateSessionConsumeCapability",
+    ) &&
+    verifiedSessionConsumeAdapter.includes(
+      "executeVerifiedSessionIdentityConsume",
+    ) &&
+    verifiedSessionConsumeAdapter.includes(
+      "consumeIdentityPairingClaim",
+    ) &&
+    !CLAIM_ISSUER_IMPORT_PATTERN.test(verifiedSessionConsumeAdapter) &&
+    !ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN.test(
+      verifiedSessionConsumeAdapter,
+    ) &&
+    !/(?:DATABASE_URL|@\/db|drizzle)/.test(
+      verifiedSessionConsumeAdapter,
+    ) &&
+    !/(?:DATABASE_URL|process\.env|@\/db|drizzle|@neondatabase)/.test(
+      verifiedSessionConsumeCore,
+    ) &&
+    !/(?:DATABASE_URL|process\.env|@\/db|drizzle|@neondatabase)/.test(
+      verifiedSessionConsumeCapability,
+    );
+  if (!verifiedSessionConsumeBoundaryIntact) {
+    findings.push("verified_session_consume_boundary_drift");
+  }
+  const verifiedSessionConsumeConsumers = [...productionPaths].filter(
+    (path) => {
+      if (path === VERIFIED_SESSION_CONSUME_ADAPTER_PATH) return false;
+      const absolutePath = join(root, path);
+      return (
+        existsSync(absolutePath) &&
+        VERIFIED_SESSION_CONSUME_IMPORT_PATTERN.test(
+          readFileSync(absolutePath, "utf8"),
+        )
+      );
+    },
+  );
+  if (verifiedSessionConsumeConsumers.length !== 0) {
+    findings.push("verified_session_consume_runtime_import");
+  }
+  const identityConsumeRouteEnabled =
+    VERIFIED_SESSION_CONSUME_IMPORT_PATTERN.test(
+      claimPresentationRoute,
+    ) ||
+    claimPresentationRoute.includes(
+      "executeVerifiedSessionIdentityConsume",
+    );
+  if (identityConsumeRouteEnabled) {
+    findings.push("identity_consume_route_enabled");
+  }
+
   const proxySource = readFileSync(join(root, "src/proxy.ts"), "utf8");
   const basicAuthBoundaryIntact = [
     "VARDA_APP_PASSWORD",
@@ -237,6 +330,13 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
         verifiedSessionPresentationConsumers.length,
       claimPresentationRouteEnabled:
         claimPresentationRouteEnabled ? 1 : 0,
+      identityConsumeAuthorityIntact,
+      verifiedSessionConsumeAdapters:
+        verifiedSessionConsumeBoundaryIntact ? 1 : 0,
+      verifiedSessionConsumeRuntimeImports:
+        verifiedSessionConsumeConsumers.length,
+      identityConsumeRouteEnabled:
+        identityConsumeRouteEnabled ? 1 : 0,
       auditIntentWrites: 0,
       appUserStatusChanges: 0,
     },

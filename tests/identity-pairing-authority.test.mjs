@@ -343,6 +343,10 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       verifiedSessionPresentationAdapters: 1,
       verifiedSessionPresentationRuntimeImports: 0,
       claimPresentationRouteEnabled: 0,
+      identityConsumeAuthorityIntact: true,
+      verifiedSessionConsumeAdapters: 1,
+      verifiedSessionConsumeRuntimeImports: 0,
+      identityConsumeRouteEnabled: 0,
       auditIntentWrites: 0,
       appUserStatusChanges: 0,
     });
