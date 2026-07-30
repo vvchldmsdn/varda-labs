@@ -223,16 +223,23 @@ describe("private session subject binding", () => {
     assert.equal(subjectReads, 0);
   });
 
-  it("keeps the Production adapter private, server-only, and disconnected", () => {
+  it("keeps the Production adapter private and limits it to the verified-session composition adapter", () => {
     const adapterPath =
       "src/lib/auth/private-session-subject-binding.ts";
+    const presentationAdapterPath =
+      "src/lib/auth/private-verified-session-claim-presentation.ts";
     const adapter = readFileSync(adapterPath, "utf8");
+    const presentationAdapter = readFileSync(
+      presentationAdapterPath,
+      "utf8",
+    );
     const core = readFileSync(
       "src/lib/auth/session-subject-binding.ts",
       "utf8",
     );
 
     assert.match(adapter, /^import "server-only";/);
+    assert.match(presentationAdapter, /^import "server-only";/);
     assert.match(adapter, /getAuthTransportRuntime/);
     assert.match(adapter, /auth\.getSession\(\)/);
     assert.match(adapter, /runtime\.state === "disabled"/);
@@ -253,7 +260,7 @@ describe("private session subject binding", () => {
           "private-session-subject-binding",
         ),
       );
-    assert.deepEqual(importers, []);
+    assert.deepEqual(importers, [presentationAdapterPath]);
   });
 
   it("keeps policy and output semantics exact", () => {

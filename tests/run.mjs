@@ -143,6 +143,7 @@ import "./private-session-subject-binding.test.mjs";
 import "./identity-pairing-consume-writer.test.mjs";
 import "./identity-bootstrap-claim-issuer.test.mjs";
 import "./one-user-bootstrap-execution.test.mjs";
+import "./verified-session-claim-presentation.test.mjs";
 import "./identity-pairing-lock-wait-fixture.test.mjs";
 import "./identity-pairing-catalog-preflight.test.mjs";
 import "./identity-pairing-host-launcher.test.mjs";
