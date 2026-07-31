@@ -21,6 +21,10 @@ const SUBJECT_ENTRYPOINT_PATTERN =
 const CLAIM_ISSUER_ID = "identity_bootstrap_claim_issuer";
 const CLAIM_ISSUER_IMPLEMENTATION_PATH =
   "scripts/lib/identity-bootstrap-claim-issuer.mjs";
+const CLAIM_ISSUER_MIGRATION_CLI_PATH =
+  "scripts/issue-identity-bootstrap-claim.mjs";
+const CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH =
+  "scripts/rehearse-identity-bootstrap-claim-handoff.mjs";
 const VERIFIED_SESSION_PRESENTATION_CORE_PATH =
   "scripts/lib/verified-session-claim-presentation.mjs";
 const VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH =
@@ -37,6 +41,8 @@ const CLAIM_PRESENTATION_ROUTE_PATH =
   "src/app/api/identity/bootstrap-claim/present/route.ts";
 const CLAIM_ISSUER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*identity-bootstrap-claim-issuer\.mjs["']/;
+const CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*issue-identity-bootstrap-claim\.mjs["']/;
 const CLAIM_EXTRACTION_EXPORT_PATTERN =
   /(?:export\s+(?:(?:async\s+)?function|const|let|var)\s+takeIssuedIdentityBootstrapClaim\b|export\s*\{[^}]*\btakeIssuedIdentityBootstrapClaim\b)/;
 const VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN =
@@ -45,6 +51,10 @@ const VERIFIED_SESSION_CONSUME_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-identity-consume(?:\.ts)?["']/;
 const ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*legacy-account-owner-assignment-writer\.mjs["']/;
+const CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN =
+  /verified-session|session-subject-binding|identity-pairing-consume|one-user-bootstrap-execution|legacy-account-owner-assignment|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(/;
+const CLAIM_ISSUER_DISPOSABLE_REHEARSAL_FORBIDDEN_PATTERN =
+  /production-database-target|NEON_API_KEY|identity-pairing-consume|one-user-bootstrap-execution|legacy-account-owner-assignment|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(|db:migrate/;
 
 export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   const findings = [];
@@ -113,7 +123,8 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     claimIssuer?.id === CLAIM_ISSUER_ID &&
     claimIssuer.classification === "identity_system" &&
     claimIssuer.authorization === "migration_cli" &&
-    claimIssuer.entrypoints.length === 0 &&
+    claimIssuer.entrypoints.length === 1 &&
+    claimIssuer.entrypoints[0] === CLAIM_ISSUER_MIGRATION_CLI_PATH &&
     claimIssuer.implementationPaths.length === 1 &&
     claimIssuer.implementationPaths[0] ===
       CLAIM_ISSUER_IMPLEMENTATION_PATH &&
@@ -143,8 +154,77 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       )
     );
   });
-  if (claimIssuerConsumers.length !== 0) {
+  const claimIssuerMigrationCliConsumers =
+    claimIssuerConsumers.filter(
+      (path) => path === CLAIM_ISSUER_MIGRATION_CLI_PATH,
+    );
+  const claimIssuerAuthorityConsumers = [...productionPaths].filter((path) => {
+    if (
+      path === CLAIM_ISSUER_IMPLEMENTATION_PATH ||
+      path === CLAIM_ISSUER_MIGRATION_CLI_PATH
+    ) {
+      return false;
+    }
+    const absolutePath = join(root, path);
+    return (
+      existsSync(absolutePath) &&
+      importsIdentityBootstrapClaimIssuerAuthority(
+        readFileSync(absolutePath, "utf8"),
+      )
+    );
+  });
+  const claimIssuerDisposableRehearsalConsumers =
+    claimIssuerAuthorityConsumers.filter(
+      (path) => path === CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH,
+    );
+  const claimIssuerRuntimeConsumers =
+    claimIssuerAuthorityConsumers.filter(
+      (path) => path !== CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH,
+    );
+  if (claimIssuerRuntimeConsumers.length !== 0) {
     findings.push("claim_issuer_runtime_import");
+  }
+  const claimIssuerMigrationCliSource = readFileSync(
+    join(root, CLAIM_ISSUER_MIGRATION_CLI_PATH),
+    "utf8",
+  );
+  const claimIssuerMigrationCliBoundaryIntact =
+    claimIssuerMigrationCliConsumers.length === 1 &&
+    CLAIM_ISSUER_IMPORT_PATTERN.test(
+      claimIssuerMigrationCliSource,
+    ) &&
+    /production-database-target/.test(
+      claimIssuerMigrationCliSource,
+    ) &&
+    !CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN.test(
+      claimIssuerMigrationCliSource,
+    );
+  if (!claimIssuerMigrationCliBoundaryIntact) {
+    findings.push("claim_issuer_migration_cli_boundary_drift");
+  }
+  const claimIssuerDisposableRehearsalSource = readFileSync(
+    join(root, CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH),
+    "utf8",
+  );
+  const claimIssuerDisposableRehearsalBoundaryIntact =
+    claimIssuerDisposableRehearsalConsumers.length === 1 &&
+    CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    /guardPreviewDatabaseTarget/.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    /in_memory_rehearsal_capture_only/.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    /migrationCount:\s*0/.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    !CLAIM_ISSUER_DISPOSABLE_REHEARSAL_FORBIDDEN_PATTERN.test(
+      claimIssuerDisposableRehearsalSource,
+    );
+  if (!claimIssuerDisposableRehearsalBoundaryIntact) {
+    findings.push("claim_issuer_disposable_rehearsal_boundary_drift");
   }
 
   const verifiedSessionPresentationCore = readFileSync(
@@ -321,9 +401,17 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       providerCalls: 0,
       routeCalls: 0,
       registeredIntentWriters: registeredIntentWriters.length,
-      issuerRuntimeEntrypoints: claimIssuer?.entrypoints.length ?? 0,
+      issuerRuntimeEntrypoints: 0,
+      issuerMigrationCliEntrypoints:
+        claimIssuer?.entrypoints.length ?? 0,
       claimExtractionExports,
-      claimIssuerRuntimeImports: claimIssuerConsumers.length,
+      claimIssuerRuntimeImports: claimIssuerRuntimeConsumers.length,
+      claimIssuerMigrationCliImports:
+        claimIssuerMigrationCliConsumers.length,
+      claimIssuerMigrationCliBoundaryIntact,
+      claimIssuerDisposableRehearsalImports:
+        claimIssuerDisposableRehearsalConsumers.length,
+      claimIssuerDisposableRehearsalBoundaryIntact,
       verifiedSessionPresentationAdapters:
         verifiedSessionPresentationBoundaryIntact ? 1 : 0,
       verifiedSessionPresentationRuntimeImports:
@@ -341,6 +429,14 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       appUserStatusChanges: 0,
     },
   };
+}
+
+export function importsIdentityBootstrapClaimIssuerAuthority(source) {
+  return (
+    typeof source === "string" &&
+    (CLAIM_ISSUER_IMPORT_PATTERN.test(source) ||
+      CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN.test(source))
+  );
 }
 
 function failedResult(findings, inspectedProductionFiles) {

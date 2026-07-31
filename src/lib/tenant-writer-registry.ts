@@ -115,7 +115,7 @@ export const TENANT_WRITER_REGISTRY = [
     id: "identity_bootstrap_claim_issuer",
     classification: "identity_system",
     authorization: "migration_cli",
-    entrypoints: [],
+    entrypoints: ["scripts/issue-identity-bootstrap-claim.mjs"],
     implementationPaths: [
       "scripts/lib/identity-bootstrap-claim-issuer.mjs",
     ],
