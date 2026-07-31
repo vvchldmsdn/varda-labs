@@ -525,6 +525,12 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     accountAssignmentMigrationCliSource.includes(
       "--confirm-post-consume-legacy-account-owner-assignment-v1",
     ) &&
+    accountAssignmentMigrationCliSource.includes(
+      "--reviewed-database-target-fingerprint",
+    ) &&
+    accountAssignmentMigrationCliSource.includes(
+      "reviewed_database_target_fingerprint_mismatch",
+    ) &&
     !ACCOUNT_ASSIGNMENT_MIGRATION_CLI_FORBIDDEN_PATTERN.test(
       accountAssignmentMigrationCliSource,
     ) &&

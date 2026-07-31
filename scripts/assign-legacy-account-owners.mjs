@@ -81,6 +81,15 @@ export async function runLegacyAccountOwnerAssignmentCli({
       "production_database_target_guard_failed",
     );
   }
+  if (
+    options.write &&
+    options.reviewedDatabaseTargetFingerprint !==
+      databaseTargetFingerprint
+  ) {
+    throw new LegacyAccountOwnerAssignmentCliError(
+      "reviewed_database_target_fingerprint_mismatch",
+    );
+  }
 
   const connectionString = readRequiredOwnString(
     environment,
@@ -161,6 +170,7 @@ export function readLegacyAccountOwnerAssignmentCliOptions(args) {
         "--legacy-owner-sha256",
         "--candidate-set-digest",
         "--eligible-set-digest",
+        "--reviewed-database-target-fingerprint",
       ].includes(key) ||
       values.has(key)
     ) {
@@ -189,8 +199,10 @@ export function readLegacyAccountOwnerAssignmentCliOptions(args) {
   const legacyOwnerSha256 = values.get("--legacy-owner-sha256");
   const candidateSetDigest = values.get("--candidate-set-digest");
   const eligibleSetDigest = values.get("--eligible-set-digest");
+  const reviewedDatabaseTargetFingerprint = values.get(
+    "--reviewed-database-target-fingerprint",
+  );
   if (
-    values.size !== 5 ||
     typeof claimDigest !== "string" ||
     !CLAIM_DIGEST_PATTERN.test(claimDigest) ||
     !isSha256Fingerprint(targetAppUserSha256) ||
@@ -215,6 +227,24 @@ export function readLegacyAccountOwnerAssignmentCliOptions(args) {
       "write_mode_required",
     );
   }
+  if (
+    write &&
+    !isSha256Fingerprint(reviewedDatabaseTargetFingerprint)
+  ) {
+    throw new LegacyAccountOwnerAssignmentCliError(
+      "reviewed_database_target_fingerprint_required",
+    );
+  }
+  if (!write && reviewedDatabaseTargetFingerprint !== undefined) {
+    throw new LegacyAccountOwnerAssignmentCliError(
+      "reviewed_database_target_fingerprint_requires_write",
+    );
+  }
+  if (values.size !== (write ? 6 : 5)) {
+    throw new LegacyAccountOwnerAssignmentCliError(
+      "reviewed_evidence_invalid",
+    );
+  }
 
   return Object.freeze({
     mode: write ? "write" : "dry_run",
@@ -224,6 +254,8 @@ export function readLegacyAccountOwnerAssignmentCliOptions(args) {
     legacyOwnerSha256,
     candidateSetDigest,
     eligibleSetDigest,
+    reviewedDatabaseTargetFingerprint:
+      reviewedDatabaseTargetFingerprint ?? null,
   });
 }
 

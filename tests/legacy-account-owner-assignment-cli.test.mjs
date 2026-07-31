@@ -30,6 +30,7 @@ describe("legacy account owner assignment migration CLI", () => {
         legacyOwnerSha256: LEGACY_OWNER_SHA256,
         candidateSetDigest: CANDIDATE_SET_DIGEST,
         eligibleSetDigest: ELIGIBLE_SET_DIGEST,
+        reviewedDatabaseTargetFingerprint: null,
       },
     );
     assert.deepEqual(
@@ -42,6 +43,7 @@ describe("legacy account owner assignment migration CLI", () => {
         legacyOwnerSha256: LEGACY_OWNER_SHA256,
         candidateSetDigest: CANDIDATE_SET_DIGEST,
         eligibleSetDigest: ELIGIBLE_SET_DIGEST,
+        reviewedDatabaseTargetFingerprint: DATABASE_TARGET_SHA256,
       },
     );
 
@@ -49,10 +51,20 @@ describe("legacy account owner assignment migration CLI", () => {
       [...baseArgs(), "--write"],
       [
         ...baseArgs(),
+        "--write",
+        LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CLI_POLICY.confirmation,
+      ],
+      [
+        ...baseArgs(),
         LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CLI_POLICY.confirmation,
       ],
       [...baseArgs(), "--identity-pairing-intent-id", PRIVATE_INTENT_ID],
       [...baseArgs(), "--claim-digest", CLAIM_DIGEST],
+      [
+        ...baseArgs(),
+        "--reviewed-database-target-fingerprint",
+        DATABASE_TARGET_SHA256,
+      ],
       baseArgs().filter((value) => value !== ELIGIBLE_SET_DIGEST),
     ]) {
       assert.throws(
@@ -172,6 +184,58 @@ describe("legacy account owner assignment migration CLI", () => {
     assert.equal(result.committed, true);
   });
 
+  it("requires the reviewed database target before any write dependency", async () => {
+    const calls = { environment: 0, pool: 0, writer: 0 };
+    await assert.rejects(
+      runLegacyAccountOwnerAssignmentCli({
+        args: [
+          ...baseArgs(),
+          "--write",
+          LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CLI_POLICY.confirmation,
+        ],
+        loadEnvironment() {
+          calls.environment += 1;
+          return environment();
+        },
+        createPool() {
+          calls.pool += 1;
+        },
+        async writeAssignment() {
+          calls.writer += 1;
+        },
+      }),
+      (error) =>
+        error instanceof LegacyAccountOwnerAssignmentCliError &&
+        error.code ===
+          "reviewed_database_target_fingerprint_required",
+    );
+    assert.deepEqual(calls, { environment: 0, pool: 0, writer: 0 });
+  });
+
+  it("blocks a changed database target before Pool or writer calls", async () => {
+    const calls = { pool: 0, writer: 0 };
+    await assert.rejects(
+      runLegacyAccountOwnerAssignmentCli({
+        args: writeArgs(),
+        loadEnvironment: () => environment(),
+        guardDatabaseTarget: () => ({
+          targetFingerprint: `sha256:${"0".repeat(64)}`,
+        }),
+        createPool() {
+          calls.pool += 1;
+        },
+        async writeAssignment() {
+          calls.writer += 1;
+        },
+      }),
+      (error) =>
+        error instanceof LegacyAccountOwnerAssignmentCliError &&
+        error.code ===
+          "reviewed_database_target_fingerprint_mismatch",
+    );
+    assert.deepEqual(calls, { pool: 0, writer: 0 });
+  });
+
   it("blocks target drift before Pool creation", async () => {
     let pools = 0;
     await assert.rejects(
@@ -265,6 +329,7 @@ describe("legacy account owner assignment migration CLI", () => {
     assert.match(source, /guardProductionDatabaseTarget/);
     assert.match(source, /planLegacyAccountOwnerAssignment/);
     assert.match(source, /assignLegacyAccountsToConsumedIdentity/);
+    assert.match(source, /--reviewed-database-target-fingerprint/);
     assert.doesNotMatch(
       source,
       /identity-bootstrap-claim-issuer|verified-session|session-subject-binding|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(|identityPairingIntentId|--identity-pairing-intent-id/,
@@ -295,6 +360,8 @@ function writeArgs() {
     ...baseArgs(),
     "--write",
     LEGACY_ACCOUNT_OWNER_ASSIGNMENT_CLI_POLICY.confirmation,
+    "--reviewed-database-target-fingerprint",
+    DATABASE_TARGET_SHA256,
   ];
 }
 
