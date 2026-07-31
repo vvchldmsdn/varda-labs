@@ -251,7 +251,7 @@ function destroyCapability(value) {
 function createSealedDatabasePort(value) {
   let current = value;
   const visited = new Set();
-  while (current !== null) {
+  while (current !== null && current !== Object.prototype) {
     if (visited.has(current)) {
       throw new OneUserBootstrapExecutionError(
         "database_port_invalid",

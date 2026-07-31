@@ -215,15 +215,16 @@ describe("verified session identity consume composition", () => {
     assert.equal(Object.isFrozen(writerPool), true);
   });
 
-  it("rejects an accessor-backed database method without invoking it", async () => {
+  it("rejects a prototype accessor database method without invoking it", async () => {
     let accessorReads = 0;
-    const pool = {};
-    Object.defineProperty(pool, "connect", {
+    const prototype = {};
+    Object.defineProperty(prototype, "connect", {
       get() {
         accessorReads += 1;
         return () => {};
       },
     });
+    const pool = Object.create(prototype);
 
     await assert.rejects(
       () =>
@@ -247,6 +248,61 @@ describe("verified session identity consume composition", () => {
       { code: "database_port_invalid" },
     );
     assert.equal(accessorReads, 0);
+  });
+
+  it("does not trust a connect method polluted onto Object.prototype", async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "connect",
+    );
+    const session = syntheticSessionPort();
+    const binding = executionBinding();
+    const continuation = syntheticClaimContinuation(
+      RAW_CLAIM,
+      binding,
+    );
+    let writerCalls = 0;
+    let pollutedMethodCalls = 0;
+    Object.defineProperty(Object.prototype, "connect", {
+      configurable: true,
+      value() {
+        pollutedMethodCalls += 1;
+      },
+    });
+
+    try {
+      await assert.rejects(
+        () =>
+          executeVerifiedSessionIdentityConsume(
+            {
+              executionBinding: binding,
+              claimContinuationPort: continuation.port,
+              pool: {},
+            },
+            dependencies({
+              session,
+              async writer() {
+                writerCalls += 1;
+              },
+            }),
+          ),
+        { code: "database_port_invalid" },
+      );
+      assert.equal(pollutedMethodCalls, 0);
+      assert.equal(session.readCount(), 0);
+      assert.equal(continuation.takeCount(), 0);
+      assert.equal(writerCalls, 0);
+    } finally {
+      if (originalDescriptor === undefined) {
+        delete Object.prototype.connect;
+      } else {
+        Object.defineProperty(
+          Object.prototype,
+          "connect",
+          originalDescriptor,
+        );
+      }
+    }
   });
 
   it("keeps issuer, owner assignment, and HTTP transport disconnected", () => {
