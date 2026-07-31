@@ -172,6 +172,83 @@ describe("verified session identity consume composition", () => {
     });
   });
 
+  it("seals a prototype-based Neon-style Pool method as an own database port", async () => {
+    class PrototypePool {
+      constructor() {
+        this.marker = "prototype-pool";
+      }
+
+      connect() {
+        return this.marker;
+      }
+    }
+
+    let writerPool;
+    const result = await executeVerifiedSessionIdentityConsume(
+      {
+        executionBinding: executionBinding(),
+        claimContinuationPort:
+          syntheticClaimContinuation(
+            RAW_CLAIM,
+            executionBinding(),
+          ).port,
+        pool: new PrototypePool(),
+      },
+      dependencies({
+        session: syntheticSessionPort(),
+        async writer(input) {
+          writerPool = input.pool;
+          assert.equal(
+            Object.hasOwn(input.pool, "connect"),
+            true,
+          );
+          assert.equal(input.pool.connect(), "prototype-pool");
+          return Object.freeze({
+            result: "consumed",
+            committed: true,
+          });
+        },
+      }),
+    );
+
+    assert.equal(result.result, "consumed");
+    assert.equal(Object.isFrozen(writerPool), true);
+  });
+
+  it("rejects an accessor-backed database method without invoking it", async () => {
+    let accessorReads = 0;
+    const pool = {};
+    Object.defineProperty(pool, "connect", {
+      get() {
+        accessorReads += 1;
+        return () => {};
+      },
+    });
+
+    await assert.rejects(
+      () =>
+        executeVerifiedSessionIdentityConsume(
+          {
+            executionBinding: executionBinding(),
+            claimContinuationPort:
+              syntheticClaimContinuation(
+                RAW_CLAIM,
+                executionBinding(),
+              ).port,
+            pool,
+          },
+          dependencies({
+            session: syntheticSessionPort(),
+            async writer() {
+              throw new Error("writer must not run");
+            },
+          }),
+        ),
+      { code: "database_port_invalid" },
+    );
+    assert.equal(accessorReads, 0);
+  });
+
   it("keeps issuer, owner assignment, and HTTP transport disconnected", () => {
     const adapter = readFileSync(
       "src/lib/auth/private-verified-session-identity-consume.ts",

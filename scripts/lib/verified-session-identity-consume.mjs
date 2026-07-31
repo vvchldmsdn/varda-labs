@@ -42,14 +42,13 @@ export async function executeVerifiedSessionIdentityConsume(
     "take",
     "claim_continuation_port_invalid",
   );
-  const pool = readRequiredObject(
-    input,
-    "pool",
-    "database_port_invalid",
+  const pool = createSealedDatabasePort(
+    readRequiredObject(
+      input,
+      "pool",
+      "database_port_invalid",
+    ),
   );
-  if (typeof readOwnDataValue(pool, "connect") !== "function") {
-    throw new OneUserBootstrapExecutionError("database_port_invalid");
-  }
 
   const createSessionCapability = readRequiredMethod(
     dependencies,
@@ -247,6 +246,53 @@ function destroyCapability(value) {
   } catch {
     // The original fail-closed outcome remains authoritative.
   }
+}
+
+function createSealedDatabasePort(value) {
+  let current = value;
+  const visited = new Set();
+  while (current !== null) {
+    if (visited.has(current)) {
+      throw new OneUserBootstrapExecutionError(
+        "database_port_invalid",
+      );
+    }
+    visited.add(current);
+
+    let descriptor;
+    let prototype;
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(
+        current,
+        "connect",
+      );
+      prototype = Object.getPrototypeOf(current);
+    } catch {
+      throw new OneUserBootstrapExecutionError(
+        "database_port_invalid",
+      );
+    }
+    if (descriptor !== undefined) {
+      if (
+        !("value" in descriptor) ||
+        typeof descriptor.value !== "function"
+      ) {
+        throw new OneUserBootstrapExecutionError(
+          "database_port_invalid",
+        );
+      }
+      const connect = descriptor.value;
+      return Object.freeze({
+        connect(...args) {
+          return Reflect.apply(connect, value, args);
+        },
+      });
+    }
+    current = prototype;
+  }
+  throw new OneUserBootstrapExecutionError(
+    "database_port_invalid",
+  );
 }
 
 function readOwnDataValue(value, key) {
