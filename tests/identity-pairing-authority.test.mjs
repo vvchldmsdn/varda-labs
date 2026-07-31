@@ -355,6 +355,7 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       claimPresentationEnabledPathWired: 1,
       crossProcessPresentationAdapters: 1,
       crossProcessPresentationRuntimeImports: 1,
+      crossProcessPresentationProductionTargetGuarded: true,
       identityConsumeAuthorityIntact: true,
       verifiedSessionConsumeAdapters: 1,
       verifiedSessionConsumeRuntimeImports: 0,

@@ -43,6 +43,8 @@ const CLAIM_PRESENTATION_POLICY_PATH =
   "src/lib/auth/identity-pairing-claim-presentation-policy.ts";
 const CROSS_PROCESS_PRESENTATION_CORE_PATH =
   "scripts/lib/cross-process-identity-pairing-claim-presentation.mjs";
+const CROSS_PROCESS_PRESENTATION_RUNTIME_PATH =
+  "scripts/lib/guarded-cross-process-claim-presentation-runtime.mjs";
 const CROSS_PROCESS_PRESENTATION_ADAPTER_PATH =
   "src/lib/auth/private-cross-process-claim-presentation.ts";
 const CLAIM_ISSUER_IMPORT_PATTERN =
@@ -255,6 +257,10 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     join(root, CROSS_PROCESS_PRESENTATION_CORE_PATH),
     "utf8",
   );
+  const crossProcessPresentationRuntime = readFileSync(
+    join(root, CROSS_PROCESS_PRESENTATION_RUNTIME_PATH),
+    "utf8",
+  );
   const crossProcessPresentationAdapter = readFileSync(
     join(root, CROSS_PROCESS_PRESENTATION_ADAPTER_PATH),
     "utf8",
@@ -337,6 +343,9 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     crossProcessPresentationAdapter.includes(
       "consumeIdentityPairingClaim",
     ) &&
+    crossProcessPresentationAdapter.includes(
+      "createGuardedCrossProcessClaimPresentationRuntime",
+    ) &&
     crossProcessPresentationAdapter.includes("@neondatabase/serverless") &&
     !CLAIM_ISSUER_IMPORT_PATTERN.test(
       crossProcessPresentationAdapter,
@@ -355,6 +364,38 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     crossProcessPresentationConsumers[0] !== CLAIM_PRESENTATION_ROUTE_PATH
   ) {
     findings.push("cross_process_presentation_runtime_import_drift");
+  }
+  const targetGuardIndex = crossProcessPresentationRuntime.indexOf(
+    "Reflect.apply(guardDatabaseTarget",
+  );
+  const poolCreationIndex = crossProcessPresentationRuntime.indexOf(
+    "Reflect.apply(createPoolPort",
+  );
+  const guardedPoolReadIndex = crossProcessPresentationRuntime.indexOf(
+    "const pool = getGuardedPoolPort()",
+  );
+  const presentationExecutionIndex =
+    crossProcessPresentationRuntime.indexOf(
+      "Reflect.apply(executePresentation",
+    );
+  const crossProcessPresentationProductionTargetGuarded =
+    crossProcessPresentationAdapter.includes(
+      "guardProductionDatabaseTarget",
+    ) &&
+    ["DATABASE_URL", "DATABASE_URL_UNPOOLED", "NEON_PROJECT_ID"].every(
+      (marker) => crossProcessPresentationRuntime.includes(marker),
+    ) &&
+    targetGuardIndex !== -1 &&
+    poolCreationIndex > targetGuardIndex &&
+    guardedPoolReadIndex !== -1 &&
+    presentationExecutionIndex > guardedPoolReadIndex &&
+    !/(?:process\.env|@\/db|drizzle|@neondatabase|next\/server)/.test(
+      crossProcessPresentationRuntime,
+    );
+  if (!crossProcessPresentationProductionTargetGuarded) {
+    findings.push(
+      "cross_process_presentation_production_target_guard_drift",
+    );
   }
 
   const gateIndex = claimPresentationRoute.indexOf(
@@ -531,6 +572,7 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
         crossProcessPresentationBoundaryIntact ? 1 : 0,
       crossProcessPresentationRuntimeImports:
         crossProcessPresentationConsumers.length,
+      crossProcessPresentationProductionTargetGuarded,
       identityConsumeAuthorityIntact,
       verifiedSessionConsumeAdapters:
         verifiedSessionConsumeBoundaryIntact ? 1 : 0,

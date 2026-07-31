@@ -7,14 +7,31 @@ import {
   executeCrossProcessIdentityPairingClaimPresentation,
 } from "../scripts/lib/cross-process-identity-pairing-claim-presentation.mjs";
 import {
+  createGuardedCrossProcessClaimPresentationRuntime,
+} from "../scripts/lib/guarded-cross-process-claim-presentation-runtime.mjs";
+import {
   createVerifiedSessionConsumeCapability,
 } from "../scripts/lib/verified-session-consume-capability.mjs";
+import {
+  guardProductionDatabaseTarget,
+} from "../src/lib/deployment/production-database-target.ts";
+import {
+  sha256Fingerprint,
+} from "../src/lib/deployment/preview-database-target.ts";
 
 const RAW_CLAIM = `varda-bootstrap-claim-v1.${Buffer.alloc(32, 5).toString(
   "base64url",
 )}`;
 const SUBJECT = "cross-process-presentation-subject";
 const HMAC_KEY = Uint8Array.from({ length: 32 }, () => 11);
+const PROJECT_ID = "cross-process-synthetic-project";
+const PRODUCTION_ENDPOINT = "ep-cross-process-production";
+const OTHER_ENDPOINT = "ep-cross-process-other";
+const DATABASE_TARGET_POLICY = Object.freeze({
+  policyId: "production_database_target_operational_guard_v1",
+  expectedNeonIntegrationProjectSha256: sha256Fingerprint(PROJECT_ID),
+  productionEndpointSha256: sha256Fingerprint(PRODUCTION_ENDPOINT),
+});
 
 describe("cross-process identity pairing claim presentation", () => {
   it("consumes one canonical claim with one session read and writer call", async () => {
@@ -155,6 +172,10 @@ describe("cross-process identity pairing claim presentation", () => {
       "scripts/lib/cross-process-identity-pairing-claim-presentation.mjs",
       "utf8",
     );
+    const guardedRuntime = readFileSync(
+      "scripts/lib/guarded-cross-process-claim-presentation-runtime.mjs",
+      "utf8",
+    );
     const route = readFileSync(
       "src/app/api/identity/bootstrap-claim/present/route.ts",
       "utf8",
@@ -163,6 +184,11 @@ describe("cross-process identity pairing claim presentation", () => {
     assert.match(adapter, /^import "server-only";/);
     assert.match(adapter, /createPrivateSessionConsumeCapability/);
     assert.match(adapter, /consumeIdentityPairingClaim/);
+    assert.match(adapter, /guardProductionDatabaseTarget/);
+    assert.match(
+      adapter,
+      /createGuardedCrossProcessClaimPresentationRuntime/,
+    );
     assert.match(
       adapter,
       /executeCrossProcessIdentityPairingClaimPresentation/,
@@ -175,6 +201,26 @@ describe("cross-process identity pairing claim presentation", () => {
       core,
       /DATABASE_URL|process\.env|@\/db|drizzle|@neondatabase|next\/server/,
     );
+    assert.doesNotMatch(
+      guardedRuntime,
+      /process\.env|@\/db|drizzle|@neondatabase|next\/server/,
+    );
+    const guardIndex = guardedRuntime.indexOf(
+      "Reflect.apply(guardDatabaseTarget",
+    );
+    const poolIndex = guardedRuntime.indexOf(
+      "Reflect.apply(createPoolPort",
+    );
+    const guardedPoolReadIndex = guardedRuntime.indexOf(
+      "const pool = getGuardedPoolPort()",
+    );
+    const presentationIndex = guardedRuntime.indexOf(
+      "Reflect.apply(executePresentation",
+    );
+    assert.ok(guardIndex >= 0);
+    assert.ok(poolIndex > guardIndex);
+    assert.ok(guardedPoolReadIndex >= 0);
+    assert.ok(presentationIndex > guardedPoolReadIndex);
     assert.doesNotMatch(
       route,
       /private-verified-session-claim-presentation|private-verified-session-identity-consume/,
@@ -193,6 +239,98 @@ describe("cross-process identity pairing claim presentation", () => {
         retryCount: 0,
       },
     );
+  });
+
+  it("guards the Production target before Pool, session, or writer work", async () => {
+    const validEnvironment = productionDatabaseEnvironment();
+    const invalidEnvironments = [
+      { ...validEnvironment, DATABASE_URL: undefined },
+      { ...validEnvironment, DATABASE_URL_UNPOOLED: undefined },
+      { ...validEnvironment, NEON_PROJECT_ID: "unexpected-project" },
+      {
+        ...validEnvironment,
+        DATABASE_URL: productionDatabaseUrl(OTHER_ENDPOINT, true),
+      },
+      {
+        ...validEnvironment,
+        DATABASE_URL_UNPOOLED: productionDatabaseUrl(
+          OTHER_ENDPOINT,
+          false,
+        ),
+      },
+    ];
+
+    for (const environment of invalidEnvironments) {
+      const calls = runtimeCallCounters();
+      const runtime = createGuardedCrossProcessClaimPresentationRuntime(
+        guardedRuntimeDependencies(environment, calls),
+      );
+
+      await assert.rejects(runtime.present(RAW_CLAIM));
+      assert.deepEqual(calls, {
+        environment: 1,
+        guard: 1,
+        pool: 0,
+        presentation: 0,
+        session: 0,
+        writer: 0,
+      });
+    }
+  });
+
+  it("uses only the guarded unpooled target before presentation", async () => {
+    const calls = runtimeCallCounters();
+    const events = [];
+    const environment = productionDatabaseEnvironment();
+    const runtime = createGuardedCrossProcessClaimPresentationRuntime(
+      guardedRuntimeDependencies(environment, calls, events),
+    );
+
+    const result = await runtime.present(RAW_CLAIM);
+
+    assert.deepEqual(result, { result: "consumed" });
+    assert.deepEqual(events, [
+      "read_environment",
+      "guard_database_target",
+      "create_pool_port",
+      "execute_presentation",
+      "create_session_capability",
+      "consume_identity_pairing_claim",
+    ]);
+    assert.deepEqual(calls, {
+      environment: 1,
+      guard: 1,
+      pool: 1,
+      presentation: 1,
+      session: 1,
+      writer: 1,
+    });
+  });
+
+  it("does not invoke accessor-backed database environment values", async () => {
+    let accessorReads = 0;
+    const environment = productionDatabaseEnvironment();
+    Object.defineProperty(environment, "DATABASE_URL_UNPOOLED", {
+      get() {
+        accessorReads += 1;
+        return productionDatabaseUrl(PRODUCTION_ENDPOINT, false);
+      },
+    });
+    const calls = runtimeCallCounters();
+    const runtime = createGuardedCrossProcessClaimPresentationRuntime(
+      guardedRuntimeDependencies(environment, calls),
+    );
+
+    await assert.rejects(runtime.present(RAW_CLAIM));
+    assert.equal(accessorReads, 0);
+    assert.deepEqual(calls, {
+      environment: 1,
+      guard: 1,
+      pool: 0,
+      presentation: 0,
+      session: 0,
+      writer: 0,
+    });
   });
 });
 
@@ -238,4 +376,77 @@ function verifiedEvidence() {
     subject: SUBJECT,
     verificationSource: "server_verified_session",
   });
+}
+
+function guardedRuntimeDependencies(environment, calls, events = []) {
+  return Object.freeze({
+    readEnvironment() {
+      calls.environment += 1;
+      events.push("read_environment");
+      return environment;
+    },
+    guardDatabaseTarget(candidate) {
+      calls.guard += 1;
+      events.push("guard_database_target");
+      return guardProductionDatabaseTarget(
+        candidate,
+        DATABASE_TARGET_POLICY,
+      );
+    },
+    createPoolPort(connectionString) {
+      calls.pool += 1;
+      events.push("create_pool_port");
+      assert.equal(
+        connectionString,
+        productionDatabaseUrl(PRODUCTION_ENDPOINT, false),
+      );
+      return Object.freeze({
+        async connect() {
+          throw new Error("Synthetic presentation does not connect");
+        },
+      });
+    },
+    async executePresentation(input, dependencies) {
+      calls.presentation += 1;
+      events.push("execute_presentation");
+      assert.equal(typeof input.pool.connect, "function");
+      await dependencies.createSessionCapability();
+      await dependencies.consumeIdentityPairingClaim();
+      return Object.freeze({ result: "consumed" });
+    },
+    async createSessionCapability() {
+      calls.session += 1;
+      events.push("create_session_capability");
+    },
+    async consumeIdentityPairingClaim() {
+      calls.writer += 1;
+      events.push("consume_identity_pairing_claim");
+    },
+  });
+}
+
+function runtimeCallCounters() {
+  return {
+    environment: 0,
+    guard: 0,
+    pool: 0,
+    presentation: 0,
+    session: 0,
+    writer: 0,
+  };
+}
+
+function productionDatabaseEnvironment() {
+  return {
+    DATABASE_URL: productionDatabaseUrl(PRODUCTION_ENDPOINT, true),
+    DATABASE_URL_UNPOOLED: productionDatabaseUrl(
+      PRODUCTION_ENDPOINT,
+      false,
+    ),
+    NEON_PROJECT_ID: PROJECT_ID,
+  };
+}
+
+function productionDatabaseUrl(endpoint, pooled) {
+  return `postgresql://runtime_user:runtime_password@${endpoint}${pooled ? "-pooler" : ""}.us-east-1.aws.neon.tech/neondb?sslmode=require`;
 }

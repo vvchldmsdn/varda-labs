@@ -3,45 +3,37 @@ import "server-only";
 import { Pool } from "@neondatabase/serverless";
 
 import { createPrivateSessionConsumeCapability } from "@/lib/auth/private-session-subject-binding";
+import { guardProductionDatabaseTarget } from "@/lib/deployment/production-database-target";
 import { executeCrossProcessIdentityPairingClaimPresentation } from "../../../scripts/lib/cross-process-identity-pairing-claim-presentation.mjs";
+import { createGuardedCrossProcessClaimPresentationRuntime } from "../../../scripts/lib/guarded-cross-process-claim-presentation-runtime.mjs";
 import { consumeIdentityPairingClaim } from "../../../scripts/lib/identity-pairing-consume-writer.mjs";
 
 type CrossProcessClaimPresentationResult = Readonly<{
   result: "consumed" | "blocked" | "failed";
 }>;
 
-type IdentityPairingPoolPort = Readonly<{
-  connect(): Promise<unknown>;
-}>;
-
-let poolPort: IdentityPairingPoolPort | undefined;
+const runtime = createGuardedCrossProcessClaimPresentationRuntime(
+  Object.freeze({
+    readEnvironment() {
+      return process.env;
+    },
+    guardDatabaseTarget: guardProductionDatabaseTarget,
+    createPoolPort,
+    executePresentation:
+      executeCrossProcessIdentityPairingClaimPresentation,
+    createSessionCapability:
+      createPrivateSessionConsumeCapability,
+    consumeIdentityPairingClaim,
+  }),
+);
 
 export async function presentIdentityBootstrapClaimForCurrentSession(
   rawClaim: string,
 ): Promise<CrossProcessClaimPresentationResult> {
-  return executeCrossProcessIdentityPairingClaimPresentation(
-    Object.freeze({
-      rawClaim,
-      pool: getIdentityPairingPoolPort(),
-    }),
-    Object.freeze({
-      createSessionCapability:
-        createPrivateSessionConsumeCapability,
-      consumeIdentityPairingClaim,
-    }),
-  ) as Promise<CrossProcessClaimPresentationResult>;
+  return runtime.present(rawClaim) as Promise<CrossProcessClaimPresentationResult>;
 }
 
-function getIdentityPairingPoolPort(): IdentityPairingPoolPort {
-  if (poolPort) return poolPort;
-
-  const connectionString =
-    process.env.DATABASE_URL_UNPOOLED?.trim() ||
-    process.env.DATABASE_URL?.trim();
-  if (!connectionString) {
-    throw new Error("Identity pairing database unavailable");
-  }
-
+function createPoolPort(connectionString: string) {
   const pool = new Pool({
     connectionString,
     max: 1,
@@ -49,10 +41,9 @@ function getIdentityPairingPoolPort(): IdentityPairingPoolPort {
     idleTimeoutMillis: 10_000,
   });
   const connect = pool.connect.bind(pool);
-  poolPort = Object.freeze({
+  return Object.freeze({
     connect() {
       return connect();
     },
   });
-  return poolPort;
 }
