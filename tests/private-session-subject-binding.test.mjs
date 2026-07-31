@@ -223,7 +223,7 @@ describe("private session subject binding", () => {
     assert.equal(subjectReads, 0);
   });
 
-  it("keeps the Production adapter private and limits it to the verified-session composition adapter", () => {
+  it("keeps the Production adapter private and limits its importers to reviewed session compositions", () => {
     const adapterPath =
       "src/lib/auth/private-session-subject-binding.ts";
     const presentationAdapterPath =
@@ -261,6 +261,7 @@ describe("private session subject binding", () => {
         ),
       );
     assert.deepEqual(importers, [
+      "src/lib/auth/private-cross-process-claim-presentation.ts",
       presentationAdapterPath,
       "src/lib/auth/private-verified-session-identity-consume.ts",
     ]);
