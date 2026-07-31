@@ -21,6 +21,8 @@ const SUBJECT_ENTRYPOINT_PATTERN =
 const CLAIM_ISSUER_ID = "identity_bootstrap_claim_issuer";
 const CLAIM_ISSUER_IMPLEMENTATION_PATH =
   "scripts/lib/identity-bootstrap-claim-issuer.mjs";
+const CLAIM_ISSUER_MIGRATION_CLI_PATH =
+  "scripts/issue-identity-bootstrap-claim.mjs";
 const VERIFIED_SESSION_PRESENTATION_CORE_PATH =
   "scripts/lib/verified-session-claim-presentation.mjs";
 const VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH =
@@ -45,6 +47,8 @@ const VERIFIED_SESSION_CONSUME_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-identity-consume(?:\.ts)?["']/;
 const ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*legacy-account-owner-assignment-writer\.mjs["']/;
+const CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN =
+  /verified-session|session-subject-binding|identity-pairing-consume|one-user-bootstrap-execution|legacy-account-owner-assignment|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(/;
 
 export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   const findings = [];
@@ -113,7 +117,8 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     claimIssuer?.id === CLAIM_ISSUER_ID &&
     claimIssuer.classification === "identity_system" &&
     claimIssuer.authorization === "migration_cli" &&
-    claimIssuer.entrypoints.length === 0 &&
+    claimIssuer.entrypoints.length === 1 &&
+    claimIssuer.entrypoints[0] === CLAIM_ISSUER_MIGRATION_CLI_PATH &&
     claimIssuer.implementationPaths.length === 1 &&
     claimIssuer.implementationPaths[0] ===
       CLAIM_ISSUER_IMPLEMENTATION_PATH &&
@@ -143,8 +148,33 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       )
     );
   });
-  if (claimIssuerConsumers.length !== 0) {
+  const claimIssuerMigrationCliConsumers =
+    claimIssuerConsumers.filter(
+      (path) => path === CLAIM_ISSUER_MIGRATION_CLI_PATH,
+    );
+  const claimIssuerRuntimeConsumers = claimIssuerConsumers.filter(
+    (path) => path !== CLAIM_ISSUER_MIGRATION_CLI_PATH,
+  );
+  if (claimIssuerRuntimeConsumers.length !== 0) {
     findings.push("claim_issuer_runtime_import");
+  }
+  const claimIssuerMigrationCliSource = readFileSync(
+    join(root, CLAIM_ISSUER_MIGRATION_CLI_PATH),
+    "utf8",
+  );
+  const claimIssuerMigrationCliBoundaryIntact =
+    claimIssuerMigrationCliConsumers.length === 1 &&
+    CLAIM_ISSUER_IMPORT_PATTERN.test(
+      claimIssuerMigrationCliSource,
+    ) &&
+    /production-database-target/.test(
+      claimIssuerMigrationCliSource,
+    ) &&
+    !CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN.test(
+      claimIssuerMigrationCliSource,
+    );
+  if (!claimIssuerMigrationCliBoundaryIntact) {
+    findings.push("claim_issuer_migration_cli_boundary_drift");
   }
 
   const verifiedSessionPresentationCore = readFileSync(
@@ -321,9 +351,14 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       providerCalls: 0,
       routeCalls: 0,
       registeredIntentWriters: registeredIntentWriters.length,
-      issuerRuntimeEntrypoints: claimIssuer?.entrypoints.length ?? 0,
+      issuerRuntimeEntrypoints: 0,
+      issuerMigrationCliEntrypoints:
+        claimIssuer?.entrypoints.length ?? 0,
       claimExtractionExports,
-      claimIssuerRuntimeImports: claimIssuerConsumers.length,
+      claimIssuerRuntimeImports: claimIssuerRuntimeConsumers.length,
+      claimIssuerMigrationCliImports:
+        claimIssuerMigrationCliConsumers.length,
+      claimIssuerMigrationCliBoundaryIntact,
       verifiedSessionPresentationAdapters:
         verifiedSessionPresentationBoundaryIntact ? 1 : 0,
       verifiedSessionPresentationRuntimeImports:

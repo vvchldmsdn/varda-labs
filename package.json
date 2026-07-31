@@ -26,6 +26,7 @@
     "rehearse:legacy-account-owner-assignment:host": "node --no-warnings scripts/run-legacy-account-owner-assignment-rehearsal-host.mjs",
     "preflight:identity-pairing-consume": "node --no-warnings scripts/preflight-identity-pairing-catalog.mjs",
     "preflight:legacy-account-ownership": "node --no-warnings scripts/preflight-legacy-account-ownership.mjs",
+    "identity:issue-bootstrap-claim": "node --no-warnings scripts/issue-identity-bootstrap-claim.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
     "audit:asset-price-consumer-admission": "node --no-warnings scripts/audit-asset-price-consumer-admission.mjs",
     "audit:data-integrity": "node scripts/audit-data-integrity.mjs",
