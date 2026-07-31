@@ -39,6 +39,8 @@ const CLAIM_PRESENTATION_ROUTE_PATH =
   "src/app/api/identity/bootstrap-claim/present/route.ts";
 const CLAIM_ISSUER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*identity-bootstrap-claim-issuer\.mjs["']/;
+const CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*issue-identity-bootstrap-claim\.mjs["']/;
 const CLAIM_EXTRACTION_EXPORT_PATTERN =
   /(?:export\s+(?:(?:async\s+)?function|const|let|var)\s+takeIssuedIdentityBootstrapClaim\b|export\s*\{[^}]*\btakeIssuedIdentityBootstrapClaim\b)/;
 const VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN =
@@ -152,9 +154,21 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     claimIssuerConsumers.filter(
       (path) => path === CLAIM_ISSUER_MIGRATION_CLI_PATH,
     );
-  const claimIssuerRuntimeConsumers = claimIssuerConsumers.filter(
-    (path) => path !== CLAIM_ISSUER_MIGRATION_CLI_PATH,
-  );
+  const claimIssuerRuntimeConsumers = [...productionPaths].filter((path) => {
+    if (
+      path === CLAIM_ISSUER_IMPLEMENTATION_PATH ||
+      path === CLAIM_ISSUER_MIGRATION_CLI_PATH
+    ) {
+      return false;
+    }
+    const absolutePath = join(root, path);
+    return (
+      existsSync(absolutePath) &&
+      importsIdentityBootstrapClaimIssuerAuthority(
+        readFileSync(absolutePath, "utf8"),
+      )
+    );
+  });
   if (claimIssuerRuntimeConsumers.length !== 0) {
     findings.push("claim_issuer_runtime_import");
   }
@@ -376,6 +390,14 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       appUserStatusChanges: 0,
     },
   };
+}
+
+export function importsIdentityBootstrapClaimIssuerAuthority(source) {
+  return (
+    typeof source === "string" &&
+    (CLAIM_ISSUER_IMPORT_PATTERN.test(source) ||
+      CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN.test(source))
+  );
 }
 
 function failedResult(findings, inspectedProductionFiles) {

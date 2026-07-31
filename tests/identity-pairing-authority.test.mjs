@@ -10,7 +10,10 @@ import {
   canTransportIdentityPairingChallenge,
   IDENTITY_PAIRING_AUTHORITY_POLICY,
 } from "../src/lib/identity-pairing-authority-policy.ts";
-import { auditIdentityPairingAuthority } from "../scripts/lib/identity-pairing-authority-audit.mjs";
+import {
+  auditIdentityPairingAuthority,
+  importsIdentityBootstrapClaimIssuerAuthority,
+} from "../scripts/lib/identity-pairing-authority-audit.mjs";
 import { TENANT_WRITER_REGISTRY } from "../src/lib/tenant-writer-registry.ts";
 
 const TARGET = "11111111-1111-4111-8111-111111111111";
@@ -353,6 +356,28 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       auditIntentWrites: 0,
       appUserStatusChanges: 0,
     });
+  });
+
+  it("detects static and dynamic imports of both issuer authority entrypoints", () => {
+    for (const source of [
+      'import { createIssuer } from "./identity-bootstrap-claim-issuer.mjs";',
+      'await import("./identity-bootstrap-claim-issuer.mjs");',
+      'require("./identity-bootstrap-claim-issuer.mjs");',
+      'import { runCli } from "./issue-identity-bootstrap-claim.mjs";',
+      'await import("./issue-identity-bootstrap-claim.mjs");',
+      'require("./issue-identity-bootstrap-claim.mjs");',
+    ]) {
+      assert.equal(
+        importsIdentityBootstrapClaimIssuerAuthority(source),
+        true,
+      );
+    }
+    assert.equal(
+      importsIdentityBootstrapClaimIssuerAuthority(
+        'import { runCli } from "./unrelated-script.mjs";',
+      ),
+      false,
+    );
   });
 });
 

@@ -202,10 +202,10 @@ describe("identity bootstrap claim migration CLI", () => {
       "take",
       "reveal",
     ]);
-    assert.equal(result.result, "delivered");
+    assert.equal(result.result, "revealed_to_tty");
     assert.equal(result.issued, true);
     assert.equal(result.committed, true);
-    assert.equal(result.deliveryStatus, "delivery_confirmed");
+    assert.equal(result.revealStatus, "tty_write_completed");
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
     assert.equal(JSON.stringify(result).includes(TARGET), false);
   });
@@ -244,7 +244,7 @@ describe("identity bootstrap claim migration CLI", () => {
     await Promise.resolve();
     assert.equal(revealCalls, 0);
     settleIssue(issuedResult());
-    assert.equal((await run).result, "delivered");
+    assert.equal((await run).result, "revealed_to_tty");
     assert.equal(revealCalls, 1);
   });
 
@@ -287,10 +287,10 @@ describe("identity bootstrap claim migration CLI", () => {
       take: 1,
       reveal: 1,
     });
-    assert.equal(result.result, "delivery_unconfirmed");
+    assert.equal(result.result, "tty_reveal_unconfirmed");
     assert.equal(result.issued, true);
     assert.equal(result.committed, true);
-    assert.equal(result.deliveryStatus, "delivery_unconfirmed");
+    assert.equal(result.revealStatus, "tty_write_unconfirmed");
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
   });
 
@@ -337,7 +337,8 @@ describe("identity bootstrap claim migration CLI", () => {
       reveal: 0,
       close: 1,
     });
-    assert.equal(result.result, "delivery_unconfirmed");
+    assert.equal(result.result, "tty_reveal_unconfirmed");
+    assert.equal(result.revealStatus, "tty_write_unconfirmed");
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
   });
 

@@ -148,15 +148,15 @@ export async function runIdentityBootstrapClaimMigrationCli({
   }
   if (issueError !== null) throw issueError;
   if (poolCloseFailed) {
-    return createDeliveryReceipt(
+    return createTtyRevealReceipt(
       issueResult,
-      "delivery_unconfirmed",
+      "tty_write_unconfirmed",
     );
   }
 
-  const receipt = createDeliveryReceipt(
+  const receipt = createTtyRevealReceipt(
     issueResult,
-    "delivery_confirmed",
+    "tty_write_completed",
   );
   let rawClaim = null;
   try {
@@ -184,9 +184,9 @@ export async function runIdentityBootstrapClaimMigrationCli({
     await Reflect.apply(reveal, revealPort, [rawClaim]);
     return receipt;
   } catch {
-    return createDeliveryReceipt(
+    return createTtyRevealReceipt(
       issueResult,
-      "delivery_unconfirmed",
+      "tty_write_unconfirmed",
     );
   } finally {
     rawClaim = null;
@@ -380,7 +380,7 @@ function assertInteractiveRevealPort(revealPort) {
   }
 }
 
-function createDeliveryReceipt(issueResult, deliveryStatus) {
+function createTtyRevealReceipt(issueResult, revealStatus) {
   if (
     readOwnDataValue(issueResult, "result") !== "issued" ||
     readOwnDataValue(issueResult, "committed") !== true
@@ -426,12 +426,12 @@ function createDeliveryReceipt(issueResult, deliveryStatus) {
       IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.operation,
     mode: "write",
     result:
-      deliveryStatus === "delivery_confirmed"
-        ? "delivered"
-        : "delivery_unconfirmed",
+      revealStatus === "tty_write_completed"
+        ? "revealed_to_tty"
+        : "tty_reveal_unconfirmed",
     issued: true,
     committed: true,
-    deliveryStatus,
+    revealStatus,
     expiresAt,
     claimBinding,
   });
@@ -504,7 +504,7 @@ function blockedOutput(error) {
         : "migration_cli_failed",
     issued: false,
     committed: false,
-    deliveryStatus: "not_attempted",
+    revealStatus: "not_attempted",
   });
 }
 
@@ -520,7 +520,7 @@ if (isDirectExecution()) {
     blockedOutput,
   );
   console.log(JSON.stringify(output, null, 2));
-  if (!["planned", "delivered"].includes(output.result)) {
+  if (!["planned", "revealed_to_tty"].includes(output.result)) {
     process.exitCode = 1;
   }
 }
