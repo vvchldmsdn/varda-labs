@@ -130,6 +130,21 @@ export function createDisabledIdentityPairingClaimPresentationResponse() {
   });
 }
 
+export function createInvalidIdentityPairingClaimPresentationResponse() {
+  return genericResponse("Invalid request", 400);
+}
+
+export function createProcessedIdentityPairingClaimPresentationResponse() {
+  return new Response(null, {
+    status: 204,
+    headers: genericHeaders(),
+  });
+}
+
+export function createUnavailableIdentityPairingClaimPresentationResponse() {
+  return genericResponse("Service unavailable", 503);
+}
+
 async function readBodyWithinLimit(
   request: Request,
 ): Promise<
@@ -196,4 +211,21 @@ function blocked(
 function isJsonContentType(value: string | null) {
   return value?.split(";", 1)[0]?.trim().toLowerCase() ===
     "application/json";
+}
+
+function genericResponse(body: string, status: number) {
+  return new Response(body, {
+    status,
+    headers: {
+      ...genericHeaders(),
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
+function genericHeaders() {
+  return {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  };
 }

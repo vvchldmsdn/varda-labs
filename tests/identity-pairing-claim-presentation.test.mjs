@@ -7,11 +7,64 @@ import {
   IDENTITY_PAIRING_CLAIM_PRESENTATION_PATH,
   IDENTITY_PAIRING_CLAIM_PRESENTATION_PRODUCTION_ORIGIN,
   createDisabledIdentityPairingClaimPresentationResponse,
+  createInvalidIdentityPairingClaimPresentationResponse,
+  createProcessedIdentityPairingClaimPresentationResponse,
+  createUnavailableIdentityPairingClaimPresentationResponse,
   readIdentityPairingClaimPresentationBody,
   validateIdentityPairingClaimPresentationMetadata,
 } from "../src/lib/auth/identity-pairing-claim-presentation-transport.ts";
+import {
+  assessIdentityPairingClaimPresentationEnvironment,
+  IDENTITY_PAIRING_CLAIM_PRESENTATION_DEFAULT_MODE,
+  IDENTITY_PAIRING_CLAIM_PRESENTATION_ENABLED_MODE,
+} from "../src/lib/auth/identity-pairing-claim-presentation-policy.ts";
 
-describe("disabled identity pairing claim presentation transport", () => {
+describe("identity pairing claim presentation transport", () => {
+  it("keeps the runtime disabled by default and enables only exact production configuration", () => {
+    assert.equal(IDENTITY_PAIRING_CLAIM_PRESENTATION_DEFAULT_MODE, "disabled");
+    assert.equal(
+      IDENTITY_PAIRING_CLAIM_PRESENTATION_ENABLED_MODE,
+      "enabled_v1",
+    );
+    assert.deepEqual(
+      assessIdentityPairingClaimPresentationEnvironment({}),
+      { state: "disabled" },
+    );
+    assert.deepEqual(
+      assessIdentityPairingClaimPresentationEnvironment({
+        VERCEL_ENV: "production",
+        IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE: "disabled",
+      }),
+      { state: "disabled" },
+    );
+    for (const environment of [
+      {
+        VERCEL_ENV: "preview",
+        IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE: "enabled_v1",
+      },
+      {
+        VERCEL_ENV: "production",
+        IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE: "true",
+      },
+      {
+        VERCEL_ENV: "production",
+        IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE: "   ",
+      },
+    ]) {
+      assert.deepEqual(
+        assessIdentityPairingClaimPresentationEnvironment(environment),
+        { state: "misconfigured" },
+      );
+    }
+    assert.deepEqual(
+      assessIdentityPairingClaimPresentationEnvironment({
+        VERCEL_ENV: "production",
+        IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE: "enabled_v1",
+      }),
+      { state: "enabled" },
+    );
+  });
+
   it("accepts only the reviewed same-origin POST metadata", () => {
     const request = presentationRequest(
       JSON.stringify({ claim: syntheticClaim() }),
@@ -162,7 +215,7 @@ describe("disabled identity pairing claim presentation transport", () => {
     );
   });
 
-  it("keeps every supported method disabled before sensitive work", async () => {
+  it("keeps non-POST methods disabled and gates POST before sensitive work", async () => {
     const response =
       createDisabledIdentityPairingClaimPresentationResponse();
     assert.equal(response.status, 404);
@@ -178,7 +231,6 @@ describe("disabled identity pairing claim presentation transport", () => {
     assert.match(route, /export const runtime = "nodejs"/);
     for (const method of [
       "GET",
-      "POST",
       "PUT",
       "PATCH",
       "DELETE",
@@ -194,10 +246,53 @@ describe("disabled identity pairing claim presentation transport", () => {
       route,
       /createDisabledIdentityPairingClaimPresentationResponse\(\)/,
     );
+    const gateIndex = route.indexOf(
+      "assessIdentityPairingClaimPresentationEnvironment",
+    );
+    const metadataIndex = route.indexOf(
+      "validateIdentityPairingClaimPresentationMetadata(request)",
+    );
+    const bodyIndex = route.indexOf(
+      "readIdentityPairingClaimPresentationBody(request)",
+    );
+    const adapterIndex = route.indexOf(
+      '"@/lib/auth/private-cross-process-claim-presentation"',
+    );
+    assert.ok(gateIndex !== -1);
+    assert.ok(metadataIndex > gateIndex);
+    assert.ok(bodyIndex > metadataIndex);
+    assert.ok(adapterIndex > bodyIndex);
     assert.doesNotMatch(
       route,
-      /request\.|getSession|verified-neon-subject|consumeIdentity|DATABASE_URL|process\.env|IDENTITY_PAIRING_EVIDENCE_HMAC_KEY/,
+      /getSession|verified-neon-subject|DATABASE_URL|IDENTITY_PAIRING_EVIDENCE_HMAC_KEY/,
     );
+  });
+
+  it("uses generic no-store responses without claim outcome details", async () => {
+    for (const [response, status, body] of [
+      [
+        createInvalidIdentityPairingClaimPresentationResponse(),
+        400,
+        "Invalid request",
+      ],
+      [
+        createUnavailableIdentityPairingClaimPresentationResponse(),
+        503,
+        "Service unavailable",
+      ],
+    ]) {
+      assert.equal(response.status, status);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+      assert.equal(await response.text(), body);
+    }
+
+    const processed =
+      createProcessedIdentityPairingClaimPresentationResponse();
+    assert.equal(processed.status, 204);
+    assert.equal(processed.headers.get("cache-control"), "no-store");
+    assert.equal(processed.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(await processed.text(), "");
   });
 
   it("keeps the exact route behind Basic Auth", () => {
@@ -212,16 +307,15 @@ describe("disabled identity pairing claim presentation transport", () => {
     );
   });
 
-  it("does not connect disabled transport to auth or persistence", () => {
-    for (const file of [
-      "src/app/api/identity/bootstrap-claim/present/route.ts",
+  it("keeps transport parsing separate from auth and persistence", () => {
+    const transport = readFileSync(
       "src/lib/auth/identity-pairing-claim-presentation-transport.ts",
-    ]) {
-      assert.doesNotMatch(
-        readFileSync(file, "utf8"),
-        /@\/db|drizzle|neon|getSession|verified-neon-subject|consumeIdentity|process\.env|IDENTITY_PAIRING_EVIDENCE_HMAC_KEY/,
-      );
-    }
+      "utf8",
+    );
+    assert.doesNotMatch(
+      transport,
+      /@\/db|drizzle|neon|getSession|verified-neon-subject|consumeIdentity|process\.env|IDENTITY_PAIRING_EVIDENCE_HMAC_KEY/,
+    );
   });
 });
 

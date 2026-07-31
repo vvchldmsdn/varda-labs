@@ -39,6 +39,12 @@ const IDENTITY_CONSUME_WRITER_PATH =
   "scripts/lib/identity-pairing-consume-writer.mjs";
 const CLAIM_PRESENTATION_ROUTE_PATH =
   "src/app/api/identity/bootstrap-claim/present/route.ts";
+const CLAIM_PRESENTATION_POLICY_PATH =
+  "src/lib/auth/identity-pairing-claim-presentation-policy.ts";
+const CROSS_PROCESS_PRESENTATION_CORE_PATH =
+  "scripts/lib/cross-process-identity-pairing-claim-presentation.mjs";
+const CROSS_PROCESS_PRESENTATION_ADAPTER_PATH =
+  "src/lib/auth/private-cross-process-claim-presentation.ts";
 const CLAIM_ISSUER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*identity-bootstrap-claim-issuer\.mjs["']/;
 const CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN =
@@ -49,6 +55,8 @@ const VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-claim-presentation(?:\.ts)?["']/;
 const VERIFIED_SESSION_CONSUME_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-verified-session-identity-consume(?:\.ts)?["']/;
+const CROSS_PROCESS_PRESENTATION_IMPORT_PATTERN =
+  /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-cross-process-claim-presentation(?:\.ts)?["']/;
 const ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*legacy-account-owner-assignment-writer\.mjs["']/;
 const CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN =
@@ -239,6 +247,18 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     join(root, CLAIM_PRESENTATION_ROUTE_PATH),
     "utf8",
   );
+  const claimPresentationPolicy = readFileSync(
+    join(root, CLAIM_PRESENTATION_POLICY_PATH),
+    "utf8",
+  );
+  const crossProcessPresentationCore = readFileSync(
+    join(root, CROSS_PROCESS_PRESENTATION_CORE_PATH),
+    "utf8",
+  );
+  const crossProcessPresentationAdapter = readFileSync(
+    join(root, CROSS_PROCESS_PRESENTATION_ADAPTER_PATH),
+    "utf8",
+  );
   const verifiedSessionPresentationBoundaryIntact =
     verifiedSessionPresentationAdapter.startsWith(
       'import "server-only";',
@@ -281,18 +301,101 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   if (verifiedSessionPresentationConsumers.length !== 0) {
     findings.push("verified_session_presentation_runtime_import");
   }
-  const claimPresentationRouteEnabled =
+  const legacyClaimPresentationRouteConnected =
     VERIFIED_SESSION_PRESENTATION_IMPORT_PATTERN.test(
       claimPresentationRoute,
     ) ||
     claimPresentationRoute.includes(
       "executeVerifiedSessionClaimPresentation",
-    ) ||
-    !claimPresentationRoute.includes(
-      "createDisabledIdentityPairingClaimPresentationResponse()",
     );
-  if (claimPresentationRouteEnabled) {
-    findings.push("claim_presentation_route_enabled");
+  if (legacyClaimPresentationRouteConnected) {
+    findings.push("legacy_claim_presentation_route_connected");
+  }
+
+  const crossProcessPresentationConsumers = [
+    ...productionPaths,
+  ].filter((path) => {
+    if (path === CROSS_PROCESS_PRESENTATION_ADAPTER_PATH) return false;
+    const absolutePath = join(root, path);
+    return (
+      existsSync(absolutePath) &&
+      CROSS_PROCESS_PRESENTATION_IMPORT_PATTERN.test(
+        readFileSync(absolutePath, "utf8"),
+      )
+    );
+  });
+  const crossProcessPresentationBoundaryIntact =
+    crossProcessPresentationAdapter.startsWith(
+      'import "server-only";',
+    ) &&
+    crossProcessPresentationAdapter.includes(
+      "createPrivateSessionConsumeCapability",
+    ) &&
+    crossProcessPresentationAdapter.includes(
+      "executeCrossProcessIdentityPairingClaimPresentation",
+    ) &&
+    crossProcessPresentationAdapter.includes(
+      "consumeIdentityPairingClaim",
+    ) &&
+    crossProcessPresentationAdapter.includes("@neondatabase/serverless") &&
+    !CLAIM_ISSUER_IMPORT_PATTERN.test(
+      crossProcessPresentationAdapter,
+    ) &&
+    !ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN.test(
+      crossProcessPresentationAdapter,
+    ) &&
+    !/(?:DATABASE_URL|process\.env|@\/db|drizzle|@neondatabase|next\/server)/.test(
+      crossProcessPresentationCore,
+    );
+  if (!crossProcessPresentationBoundaryIntact) {
+    findings.push("cross_process_presentation_boundary_drift");
+  }
+  if (
+    crossProcessPresentationConsumers.length !== 1 ||
+    crossProcessPresentationConsumers[0] !== CLAIM_PRESENTATION_ROUTE_PATH
+  ) {
+    findings.push("cross_process_presentation_runtime_import_drift");
+  }
+
+  const gateIndex = claimPresentationRoute.indexOf(
+    "assessIdentityPairingClaimPresentationEnvironment",
+  );
+  const metadataIndex = claimPresentationRoute.indexOf(
+    "validateIdentityPairingClaimPresentationMetadata(request)",
+  );
+  const bodyIndex = claimPresentationRoute.indexOf(
+    "readIdentityPairingClaimPresentationBody(request)",
+  );
+  const adapterImportIndex = claimPresentationRoute.indexOf(
+    '"@/lib/auth/private-cross-process-claim-presentation"',
+  );
+  const claimPresentationConfiguredDefaultDisabled =
+    claimPresentationPolicy.includes(
+      'IDENTITY_PAIRING_CLAIM_PRESENTATION_DEFAULT_MODE =\n  "disabled"',
+    ) &&
+    claimPresentationPolicy.includes(
+      'IDENTITY_PAIRING_CLAIM_PRESENTATION_ENABLED_MODE =\n  "enabled_v1"',
+    );
+  const claimPresentationEnabledPathWired =
+    gateIndex !== -1 &&
+    metadataIndex > gateIndex &&
+    bodyIndex > metadataIndex &&
+    adapterImportIndex > bodyIndex &&
+    claimPresentationRoute.includes(
+      "createDisabledIdentityPairingClaimPresentationResponse()",
+    ) &&
+    claimPresentationRoute.includes(
+      "createProcessedIdentityPairingClaimPresentationResponse()",
+    ) &&
+    !CLAIM_ISSUER_IMPORT_PATTERN.test(claimPresentationRoute) &&
+    !ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN.test(
+      claimPresentationRoute,
+    );
+  if (!claimPresentationConfiguredDefaultDisabled) {
+    findings.push("claim_presentation_default_mode_drift");
+  }
+  if (!claimPresentationEnabledPathWired) {
+    findings.push("claim_presentation_enabled_path_drift");
   }
 
   const identityConsumeWriter = writerRegistry.find(
@@ -365,15 +468,15 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   if (verifiedSessionConsumeConsumers.length !== 0) {
     findings.push("verified_session_consume_runtime_import");
   }
-  const identityConsumeRouteEnabled =
+  const legacyIdentityConsumeRouteConnected =
     VERIFIED_SESSION_CONSUME_IMPORT_PATTERN.test(
       claimPresentationRoute,
     ) ||
     claimPresentationRoute.includes(
       "executeVerifiedSessionIdentityConsume",
     );
-  if (identityConsumeRouteEnabled) {
-    findings.push("identity_consume_route_enabled");
+  if (legacyIdentityConsumeRouteConnected) {
+    findings.push("legacy_identity_consume_route_connected");
   }
 
   const proxySource = readFileSync(join(root, "src/proxy.ts"), "utf8");
@@ -417,14 +520,24 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       verifiedSessionPresentationRuntimeImports:
         verifiedSessionPresentationConsumers.length,
       claimPresentationRouteEnabled:
-        claimPresentationRouteEnabled ? 1 : 0,
+        claimPresentationConfiguredDefaultDisabled ? 0 : 1,
+      claimPresentationConfiguredState:
+        claimPresentationConfiguredDefaultDisabled
+          ? "disabled"
+          : "unknown",
+      claimPresentationEnabledPathWired:
+        claimPresentationEnabledPathWired ? 1 : 0,
+      crossProcessPresentationAdapters:
+        crossProcessPresentationBoundaryIntact ? 1 : 0,
+      crossProcessPresentationRuntimeImports:
+        crossProcessPresentationConsumers.length,
       identityConsumeAuthorityIntact,
       verifiedSessionConsumeAdapters:
         verifiedSessionConsumeBoundaryIntact ? 1 : 0,
       verifiedSessionConsumeRuntimeImports:
         verifiedSessionConsumeConsumers.length,
       identityConsumeRouteEnabled:
-        identityConsumeRouteEnabled ? 1 : 0,
+        legacyIdentityConsumeRouteConnected ? 1 : 0,
       auditIntentWrites: 0,
       appUserStatusChanges: 0,
     },
