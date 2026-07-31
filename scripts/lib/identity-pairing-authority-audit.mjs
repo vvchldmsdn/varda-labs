@@ -37,6 +37,10 @@ const VERIFIED_SESSION_CONSUME_ADAPTER_PATH =
   "src/lib/auth/private-verified-session-identity-consume.ts";
 const IDENTITY_CONSUME_WRITER_PATH =
   "scripts/lib/identity-pairing-consume-writer.mjs";
+const ACCOUNT_ASSIGNMENT_WRITER_PATH =
+  "scripts/lib/legacy-account-owner-assignment-writer.mjs";
+const ACCOUNT_ASSIGNMENT_MIGRATION_CLI_PATH =
+  "scripts/assign-legacy-account-owners.mjs";
 const CLAIM_PRESENTATION_ROUTE_PATH =
   "src/app/api/identity/bootstrap-claim/present/route.ts";
 const CLAIM_PRESENTATION_POLICY_PATH =
@@ -61,6 +65,14 @@ const CROSS_PROCESS_PRESENTATION_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*private-cross-process-claim-presentation(?:\.ts)?["']/;
 const ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*legacy-account-owner-assignment-writer\.mjs["']/;
+const ACCOUNT_ASSIGNMENT_ALLOWED_CONSUMERS = new Set([
+  ACCOUNT_ASSIGNMENT_MIGRATION_CLI_PATH,
+  "scripts/lib/legacy-account-owner-assignment-rehearsal-cases.mjs",
+  "scripts/lib/legacy-account-owner-assignment-rehearsal-evidence.mjs",
+  "scripts/lib/legacy-account-owner-assignment-rehearsal-fixture.mjs",
+]);
+const ACCOUNT_ASSIGNMENT_MIGRATION_CLI_FORBIDDEN_PATTERN =
+  /identity-bootstrap-claim-issuer|verified-session|session-subject-binding|identity-pairing-consume|one-user-bootstrap-execution|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(|identityPairingIntentId|--identity-pairing-intent-id|dotenv\.config|process\.env/;
 const CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN =
   /verified-session|session-subject-binding|identity-pairing-consume|one-user-bootstrap-execution|legacy-account-owner-assignment|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(/;
 const CLAIM_ISSUER_DISPOSABLE_REHEARSAL_FORBIDDEN_PATTERN =
@@ -455,6 +467,80 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     findings.push("identity_consume_authority_drift");
   }
 
+  const accountAssignmentWriter = writerRegistry.find(
+    (writer) => writer.id === "post_consume_account_owner_assignment",
+  );
+  const accountAssignmentAuthorityIntact =
+    accountAssignmentWriter?.classification === "user_owned" &&
+    accountAssignmentWriter.authorization === "migration_cli" &&
+    accountAssignmentWriter.entrypoints.length === 1 &&
+    accountAssignmentWriter.entrypoints[0] ===
+      ACCOUNT_ASSIGNMENT_MIGRATION_CLI_PATH &&
+    accountAssignmentWriter.implementationPaths.length === 1 &&
+    accountAssignmentWriter.implementationPaths[0] ===
+      ACCOUNT_ASSIGNMENT_WRITER_PATH &&
+    accountAssignmentWriter.transition.activate ===
+      "post_consume_owner_assignment";
+  if (!accountAssignmentAuthorityIntact) {
+    findings.push("account_assignment_authority_drift");
+  }
+
+  const accountAssignmentWriterSource = readFileSync(
+    join(root, ACCOUNT_ASSIGNMENT_WRITER_PATH),
+    "utf8",
+  );
+  const accountAssignmentMigrationCliSource = readFileSync(
+    join(root, ACCOUNT_ASSIGNMENT_MIGRATION_CLI_PATH),
+    "utf8",
+  );
+  const accountAssignmentWriterConsumers = [
+    ...productionPaths,
+  ].filter((path) => {
+    if (path === ACCOUNT_ASSIGNMENT_WRITER_PATH) return false;
+    const absolutePath = join(root, path);
+    return (
+      existsSync(absolutePath) &&
+      ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN.test(
+        readFileSync(absolutePath, "utf8"),
+      )
+    );
+  });
+  const accountAssignmentRuntimeConsumers =
+    accountAssignmentWriterConsumers.filter(
+      (path) => !ACCOUNT_ASSIGNMENT_ALLOWED_CONSUMERS.has(path),
+    );
+  const accountAssignmentMigrationCliBoundaryIntact =
+    accountAssignmentWriterConsumers.includes(
+      ACCOUNT_ASSIGNMENT_MIGRATION_CLI_PATH,
+    ) &&
+    ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN.test(
+      accountAssignmentMigrationCliSource,
+    ) &&
+    accountAssignmentMigrationCliSource.includes(
+      "guardProductionDatabaseTarget",
+    ) &&
+    accountAssignmentMigrationCliSource.includes(
+      "loadProductionDatabaseEnvironmentFromEnvLocal",
+    ) &&
+    accountAssignmentMigrationCliSource.includes(
+      "--confirm-post-consume-legacy-account-owner-assignment-v1",
+    ) &&
+    !ACCOUNT_ASSIGNMENT_MIGRATION_CLI_FORBIDDEN_PATTERN.test(
+      accountAssignmentMigrationCliSource,
+    ) &&
+    accountAssignmentWriterSource.includes(
+      "where claim_digest = $1",
+    ) &&
+    !accountAssignmentWriterSource.includes(
+      "identityPairingIntentId",
+    );
+  if (!accountAssignmentMigrationCliBoundaryIntact) {
+    findings.push("account_assignment_migration_cli_boundary_drift");
+  }
+  if (accountAssignmentRuntimeConsumers.length !== 0) {
+    findings.push("account_assignment_runtime_import");
+  }
+
   const verifiedSessionConsumeCore = readFileSync(
     join(root, VERIFIED_SESSION_CONSUME_CORE_PATH),
     "utf8",
@@ -574,6 +660,14 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
         crossProcessPresentationConsumers.length,
       crossProcessPresentationProductionTargetGuarded,
       identityConsumeAuthorityIntact,
+      accountAssignmentAuthorityIntact,
+      accountAssignmentMigrationCliImports:
+        accountAssignmentWriterConsumers.filter(
+          (path) => path === ACCOUNT_ASSIGNMENT_MIGRATION_CLI_PATH,
+        ).length,
+      accountAssignmentMigrationCliBoundaryIntact,
+      accountAssignmentRuntimeImports:
+        accountAssignmentRuntimeConsumers.length,
       verifiedSessionConsumeAdapters:
         verifiedSessionConsumeBoundaryIntact ? 1 : 0,
       verifiedSessionConsumeRuntimeImports:
