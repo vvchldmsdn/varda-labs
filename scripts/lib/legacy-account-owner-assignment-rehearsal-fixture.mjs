@@ -146,7 +146,7 @@ export async function withOwnerAssignmentFixture(
 export function assignOwnerAssignmentFixture(pool, fixture) {
   return assignLegacyAccountsToConsumedIdentity({
     pool,
-    identityPairingIntentId: fixture.intentId,
+    claimDigest: fixture.claimDigest,
     targetAppUserSha256: fixture.targetAppUserSha256,
     legacyOwnerSha256: fixture.legacyOwnerSha256,
     candidateSetDigest: fixture.candidateSetDigest,
@@ -431,6 +431,8 @@ async function createFixture(pool, baselineAccounts, options) {
     : null;
   const authIdentityId = randomUUID();
   const intentId = randomUUID();
+  const claimDigest =
+    `bootstrap-claim-sha256-v1:${randomHex(32)}`;
   const legacyOwnerValue = `rehearsal-owner-${randomUUID()}`;
   const accountIds = baselineAccounts.map(({ id }) => id);
   const client = await pool.connect();
@@ -514,7 +516,7 @@ async function createFixture(pool, baselineAccounts, options) {
       [
         intentId,
         targetAppUserId,
-        `bootstrap-claim-sha256-v1:${randomHex(32)}`,
+        claimDigest,
       ],
     );
     if (options.includeConsumedEvent !== false) {
@@ -593,6 +595,7 @@ async function createFixture(pool, baselineAccounts, options) {
     targetAppUserId,
     foreignOwnerAppUserId,
     intentId,
+    claimDigest,
     targetAppUserSha256,
     legacyOwnerSha256,
     candidateSetDigest: preflight.candidateSetDigest,

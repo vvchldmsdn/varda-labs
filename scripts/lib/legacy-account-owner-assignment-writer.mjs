@@ -10,6 +10,9 @@ import {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CLAIM_DIGEST_PATTERN =
+  /^bootstrap-claim-sha256-v1:[0-9a-f]{64}$/;
+const CLAIM_DIGEST_VERSION = "bootstrap_claim_sha256_v1";
 
 export const LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY = Object.freeze({
   operation: "post_consume_legacy_account_owner_assignment_v1",
@@ -36,9 +39,36 @@ export class LegacyAccountOwnerAssignmentError extends Error {
   }
 }
 
+export function planLegacyAccountOwnerAssignment(input) {
+  return executeLegacyAccountOwnerAssignment({
+    ...input,
+    mode: "dry_run",
+  });
+}
+
 export async function assignLegacyAccountsToConsumedIdentity({
   pool,
-  identityPairingIntentId,
+  claimDigest,
+  targetAppUserSha256,
+  legacyOwnerSha256,
+  candidateSetDigest,
+  eligibleSetDigest,
+}) {
+  return executeLegacyAccountOwnerAssignment({
+    pool,
+    mode: "write",
+    claimDigest,
+    targetAppUserSha256,
+    legacyOwnerSha256,
+    candidateSetDigest,
+    eligibleSetDigest,
+  });
+}
+
+async function executeLegacyAccountOwnerAssignment({
+  pool,
+  mode,
+  claimDigest,
   targetAppUserSha256,
   legacyOwnerSha256,
   candidateSetDigest,
@@ -46,7 +76,8 @@ export async function assignLegacyAccountsToConsumedIdentity({
 }) {
   validateInput({
     pool,
-    identityPairingIntentId,
+    mode,
+    claimDigest,
     targetAppUserSha256,
     legacyOwnerSha256,
     candidateSetDigest,
@@ -67,9 +98,9 @@ export async function assignLegacyAccountsToConsumedIdentity({
     await client.query("set local lock_timeout = '2s'");
     await client.query("set local statement_timeout = '8s'");
 
-    const intent = await lockIntent(client, identityPairingIntentId);
+    const intent = await lockIntent(client, claimDigest);
     validateIntent(intent, {
-      identityPairingIntentId,
+      claimDigest,
       targetAppUserSha256,
     });
 
@@ -101,14 +132,38 @@ export async function assignLegacyAccountsToConsumedIdentity({
       throw new LegacyAccountOwnerAssignmentError(snapshot.blocker);
     }
 
+    const plannedAccountWrites =
+      snapshot.state === "assignment_pending"
+        ? LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.expectedAccountCount
+        : 0;
+    if (mode === "dry_run") {
+      await client.query("rollback");
+      transactionOpen = false;
+      return buildResult({
+        mode,
+        result:
+          snapshot.state === "already_applied"
+            ? "already_applied"
+            : "planned",
+        plannedAccountWrites,
+        actualAccountWrites: 0,
+        candidateSetDigest,
+        eligibleSetDigest,
+        committed: false,
+      });
+    }
+
     if (snapshot.state === "already_applied") {
       await client.query("commit");
       transactionOpen = false;
       return buildResult({
+        mode,
         result: "already_applied",
+        plannedAccountWrites,
         actualAccountWrites: 0,
         candidateSetDigest,
         eligibleSetDigest,
+        committed: true,
       });
     }
 
@@ -144,11 +199,14 @@ export async function assignLegacyAccountsToConsumedIdentity({
     transactionOpen = false;
 
     return buildResult({
+      mode,
       result: "assigned",
+      plannedAccountWrites,
       actualAccountWrites:
         LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.expectedAccountCount,
       candidateSetDigest,
       eligibleSetDigest,
+      committed: true,
     });
   } catch (error) {
     if (transactionOpen) {
@@ -171,7 +229,8 @@ export async function assignLegacyAccountsToConsumedIdentity({
 
 function validateInput({
   pool,
-  identityPairingIntentId,
+  mode,
+  claimDigest,
   targetAppUserSha256,
   legacyOwnerSha256,
   candidateSetDigest,
@@ -180,14 +239,15 @@ function validateInput({
   if (!pool || typeof pool.connect !== "function") {
     throw new LegacyAccountOwnerAssignmentError("database_port_invalid");
   }
+  if (!["dry_run", "write"].includes(mode)) {
+    throw new LegacyAccountOwnerAssignmentError("assignment_mode_invalid");
+  }
   if (
-    typeof identityPairingIntentId !== "string" ||
-    !UUID_PATTERN.test(identityPairingIntentId.trim()) ||
-    identityPairingIntentId !==
-      identityPairingIntentId.trim().toLowerCase()
+    typeof claimDigest !== "string" ||
+    !CLAIM_DIGEST_PATTERN.test(claimDigest)
   ) {
     throw new LegacyAccountOwnerAssignmentError(
-      "identity_pairing_intent_id_invalid",
+      "claim_digest_invalid",
     );
   }
   for (const [value, code] of [
@@ -202,7 +262,7 @@ function validateInput({
   }
 }
 
-async function lockIntent(client, identityPairingIntentId) {
+async function lockIntent(client, claimDigest) {
   const result = await client.query(
     `
       select
@@ -210,12 +270,14 @@ async function lockIntent(client, identityPairingIntentId) {
         authority_policy_id,
         target_app_user_id,
         provider,
+        claim_digest_version,
+        claim_digest,
         target_review_policy_id
       from identity_pairing_intents
-      where id = $1::uuid
+      where claim_digest = $1
       for update
     `,
-    [identityPairingIntentId],
+    [claimDigest],
   );
   if (result.rowCount !== 1) {
     throw new LegacyAccountOwnerAssignmentError(
@@ -227,14 +289,18 @@ async function lockIntent(client, identityPairingIntentId) {
 
 function validateIntent(
   intent,
-  { identityPairingIntentId, targetAppUserSha256 },
+  { claimDigest, targetAppUserSha256 },
 ) {
   if (
-    intent.id !== identityPairingIntentId ||
+    typeof intent.id !== "string" ||
+    !UUID_PATTERN.test(intent.id) ||
+    intent.id !== intent.id.toLowerCase() ||
     intent.authority_policy_id !==
       LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.authorityPolicyId ||
     intent.provider !==
       LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.provider ||
+    intent.claim_digest_version !== CLAIM_DIGEST_VERSION ||
+    intent.claim_digest !== claimDigest ||
     intent.target_review_policy_id !==
       LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.targetReviewPolicyId ||
     fingerprintAppUserId(intent.target_app_user_id) !==
@@ -276,7 +342,7 @@ function validateTarget(target, targetAppUserSha256) {
   }
 }
 
-async function lockConsumedEvent(client, identityPairingIntentId) {
+async function lockConsumedEvent(client, intentId) {
   const result = await client.query(
     `
       select
@@ -292,7 +358,7 @@ async function lockConsumedEvent(client, identityPairingIntentId) {
       order by id
       for update
     `,
-    [identityPairingIntentId],
+    [intentId],
   );
   if (result.rowCount !== 1) {
     throw new LegacyAccountOwnerAssignmentError(
@@ -302,9 +368,9 @@ async function lockConsumedEvent(client, identityPairingIntentId) {
   return result.rows[0];
 }
 
-function validateConsumedEvent(event, identityPairingIntentId) {
+function validateConsumedEvent(event, intentId) {
   if (
-    event.identity_pairing_intent_id !== identityPairingIntentId ||
+    event.identity_pairing_intent_id !== intentId ||
     event.event_type !==
       LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.consumedEventType ||
     typeof event.auth_identity_id !== "string" ||
@@ -427,13 +493,17 @@ function validateAssignedRows(
 }
 
 function buildResult({
+  mode,
   result,
+  plannedAccountWrites,
   actualAccountWrites,
   candidateSetDigest,
   eligibleSetDigest,
+  committed,
 }) {
   return Object.freeze({
     operation: LEGACY_ACCOUNT_OWNER_ASSIGNMENT_POLICY.operation,
+    mode,
     result,
     policy: Object.freeze({
       expectedAccountCount:
@@ -450,12 +520,17 @@ function buildResult({
       candidateSetDigest,
       eligibleSetDigest,
     }),
+    plannedWrites: Object.freeze({
+      accounts: plannedAccountWrites,
+      identityTables: 0,
+      otherProductTables: 0,
+    }),
     actualWrites: Object.freeze({
       accounts: actualAccountWrites,
       identityTables: 0,
       otherProductTables: 0,
     }),
-    committed: true,
+    committed,
   });
 }
 

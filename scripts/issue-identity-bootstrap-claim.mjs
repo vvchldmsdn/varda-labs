@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Pool } from "@neondatabase/serverless";
-import { parse } from "dotenv";
 
 import {
   guardProductionDatabaseTarget,
@@ -18,6 +16,9 @@ import {
 import {
   readClaimBinding,
 } from "./lib/one-user-bootstrap-binding.mjs";
+import {
+  loadProductionDatabaseEnvironmentFromEnvLocal,
+} from "./lib/production-database-environment.mjs";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -28,11 +29,6 @@ const CONFIRMATION =
   "--confirm-issue-one-production-bootstrap-claim";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), "..");
-const ENV_KEYS = Object.freeze([
-  "DATABASE_URL",
-  "DATABASE_URL_UNPOOLED",
-  "NEON_PROJECT_ID",
-]);
 
 export const IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY =
   Object.freeze({
@@ -291,22 +287,12 @@ export function readIdentityBootstrapClaimMigrationCliOptions(args) {
 
 export function loadIdentityBootstrapClaimEnvironment(
   repositoryRoot,
-  {
-    readFile = readFileSync,
-    parseEnvironment = parse,
-  } = {},
+  dependencies,
 ) {
-  const parsed = parseEnvironment(
-    readFile(join(repositoryRoot, ".env.local"), {
-      encoding: "utf8",
-    }),
+  return loadProductionDatabaseEnvironmentFromEnvLocal(
+    repositoryRoot,
+    dependencies,
   );
-  const environment = Object.create(null);
-  for (const key of ENV_KEYS) {
-    const value = readOwnDataValue(parsed, key);
-    if (typeof value === "string") environment[key] = value;
-  }
-  return Object.freeze(environment);
 }
 
 export function createProcessTtyRevealPort(stream = process.stderr) {

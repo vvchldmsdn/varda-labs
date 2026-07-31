@@ -155,7 +155,7 @@ export const TENANT_WRITER_REGISTRY = [
     id: "post_consume_account_owner_assignment",
     classification: "user_owned",
     authorization: "migration_cli",
-    entrypoints: [],
+    entrypoints: ["scripts/assign-legacy-account-owners.mjs"],
     implementationPaths: [
       "scripts/lib/legacy-account-owner-assignment-writer.mjs",
     ],

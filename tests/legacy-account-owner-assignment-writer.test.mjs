@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import {
   assignLegacyAccountsToConsumedIdentity,
   LegacyAccountOwnerAssignmentError,
+  planLegacyAccountOwnerAssignment,
 } from "../scripts/lib/legacy-account-owner-assignment-writer.mjs";
 import {
   buildLegacyAccountOwnershipPreflight,
@@ -15,6 +16,8 @@ import {
 const TARGET = "11111111-1111-4111-8111-111111111111";
 const OTHER_TARGET = "22222222-2222-4222-8222-222222222222";
 const INTENT = "33333333-3333-4333-8333-333333333333";
+const CLAIM_DIGEST =
+  `bootstrap-claim-sha256-v1:${"a".repeat(64)}`;
 const EVENT = "44444444-4444-4444-8444-444444444444";
 const IDENTITY = "55555555-5555-4555-8555-555555555555";
 const LEGACY_OWNER = "base44-owner-synthetic";
@@ -45,7 +48,13 @@ describe("post-consume legacy account owner assignment writer", () => {
     );
 
     assert.equal(result.result, "assigned");
+    assert.equal(result.mode, "write");
     assert.equal(result.committed, true);
+    assert.deepEqual(result.plannedWrites, {
+      accounts: 4,
+      identityTables: 0,
+      otherProductTables: 0,
+    });
     assert.deepEqual(result.actualWrites, {
       accounts: 4,
       identityTables: 0,
@@ -96,10 +105,46 @@ describe("post-consume legacy account owner assignment writer", () => {
       EVENT,
       IDENTITY,
       LEGACY_OWNER,
+      CLAIM_DIGEST,
       "provider_subject",
     ]) {
       assert.equal(output.includes(privateValue), false, privateValue);
     }
+  });
+
+  it("uses the same locked evidence path for dry-run and rolls it back", async () => {
+    const database = fakeDatabase();
+    const result = await planLegacyAccountOwnerAssignment(
+      writerInput(database.pool),
+    );
+
+    assert.equal(result.mode, "dry_run");
+    assert.equal(result.result, "planned");
+    assert.equal(result.committed, false);
+    assert.deepEqual(result.plannedWrites, {
+      accounts: 4,
+      identityTables: 0,
+      otherProductTables: 0,
+    });
+    assert.deepEqual(result.actualWrites, {
+      accounts: 0,
+      identityTables: 0,
+      otherProductTables: 0,
+    });
+    assert.equal(database.commits, 0);
+    assert.equal(database.rollbacks, 1);
+    assert.equal(database.updateAttempts, 0);
+    assert.deepEqual(database.queries.map(queryKind), [
+      "begin",
+      "lock_timeout",
+      "statement_timeout",
+      "intent_lock",
+      "target_lock",
+      "event_lock",
+      "identity_lock",
+      "account_locks",
+      "rollback",
+    ]);
   });
 
   it("accepts only the all-four already-applied state as idempotent", async () => {
@@ -128,8 +173,8 @@ describe("post-consume legacy account owner assignment writer", () => {
   it("rejects invalid authority input before connecting", async () => {
     for (const [overrides, expectedCode] of [
       [
-        { identityPairingIntentId: `${INTENT} ` },
-        "identity_pairing_intent_id_invalid",
+        { claimDigest: `${CLAIM_DIGEST} ` },
+        "claim_digest_invalid",
       ],
       [
         { targetAppUserSha256: "sha256:not-a-digest" },
@@ -156,6 +201,13 @@ describe("post-consume legacy account owner assignment writer", () => {
     const cases = [
       [{ intentMissing: true }, "consumed_intent_not_found"],
       [{ intentTarget: OTHER_TARGET }, "consumed_intent_invalid"],
+      [
+        {
+          intentClaimDigest:
+            `bootstrap-claim-sha256-v1:${"b".repeat(64)}`,
+        },
+        "consumed_intent_invalid",
+      ],
       [{ targetStatus: "provisioning" }, "consumed_target_state_mismatch"],
       [{ eventMissing: true }, "consumed_event_not_found"],
       [{ eventType: "revoked" }, "consumed_event_invalid"],
@@ -294,13 +346,17 @@ describe("post-consume legacy account owner assignment writer", () => {
     );
 
     assert.match(source, /begin isolation level read committed/);
+    assert.match(
+      source,
+      /from identity_pairing_intents[\s\S]*where claim_digest = \$1[\s\S]*for update/,
+    );
     assert.match(source, /from identity_pairing_intent_events/);
     assert.match(source, /from auth_identities/);
     assert.match(source, /from accounts[\s\S]*order by id[\s\S]*for update/);
     assert.match(source, /update accounts/);
     assert.doesNotMatch(
       source,
-      /\bprovider_subject\b|session-subject-binding|identity-bootstrap-claim|consumeIdentityPairingClaim/,
+      /\bprovider_subject\b|session-subject-binding|identity-bootstrap-claim|consumeIdentityPairingClaim|identityPairingIntentId/,
     );
     assert.doesNotMatch(
       source,
@@ -320,7 +376,7 @@ describe("post-consume legacy account owner assignment writer", () => {
 function writerInput(pool, overrides = {}) {
   return {
     pool,
-    identityPairingIntentId: INTENT,
+    claimDigest: CLAIM_DIGEST,
     targetAppUserSha256: TARGET_SHA256,
     legacyOwnerSha256: LEGACY_OWNER_SHA256,
     candidateSetDigest: REVIEWED_EVIDENCE.candidateSetDigest,
@@ -385,6 +441,11 @@ function fakeDatabase(options = {}) {
                   "preissued_bootstrap_claim_authority_v1",
                 target_app_user_id: options.intentTarget ?? TARGET,
                 provider: "neon_auth",
+                claim_digest_version:
+                  options.claimDigestVersion ??
+                  "bootstrap_claim_sha256_v1",
+                claim_digest:
+                  options.intentClaimDigest ?? CLAIM_DIGEST,
                 target_review_policy_id:
                   "single_provisioning_user_explicit_review_v1",
               },
