@@ -41,6 +41,7 @@ const LEGACY_RAW_SQL_TABLE_PATTERN =
 const REHEARSAL_ONLY_DML_PATHS = new Set([
   "scripts/rehearse-tenant-expand.mjs",
   "scripts/rehearse-identity-pairing-consume-writer.mjs",
+  "scripts/rehearse-identity-bootstrap-claim-handoff.mjs",
   "scripts/lib/legacy-account-owner-assignment-rehearsal-cases.mjs",
   "scripts/lib/legacy-account-owner-assignment-rehearsal-fixture.mjs",
 ]);

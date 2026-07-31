@@ -346,6 +346,8 @@ describe("identity pairing authority Phase 1G1-B1b", () => {
       claimIssuerRuntimeImports: 0,
       claimIssuerMigrationCliImports: 1,
       claimIssuerMigrationCliBoundaryIntact: true,
+      claimIssuerDisposableRehearsalImports: 1,
+      claimIssuerDisposableRehearsalBoundaryIntact: true,
       verifiedSessionPresentationAdapters: 1,
       verifiedSessionPresentationRuntimeImports: 0,
       claimPresentationRouteEnabled: 0,

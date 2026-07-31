@@ -23,6 +23,8 @@ const CLAIM_ISSUER_IMPLEMENTATION_PATH =
   "scripts/lib/identity-bootstrap-claim-issuer.mjs";
 const CLAIM_ISSUER_MIGRATION_CLI_PATH =
   "scripts/issue-identity-bootstrap-claim.mjs";
+const CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH =
+  "scripts/rehearse-identity-bootstrap-claim-handoff.mjs";
 const VERIFIED_SESSION_PRESENTATION_CORE_PATH =
   "scripts/lib/verified-session-claim-presentation.mjs";
 const VERIFIED_SESSION_PRESENTATION_ADAPTER_PATH =
@@ -51,6 +53,8 @@ const ACCOUNT_ASSIGNMENT_WRITER_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*legacy-account-owner-assignment-writer\.mjs["']/;
 const CLAIM_ISSUER_MIGRATION_CLI_FORBIDDEN_PATTERN =
   /verified-session|session-subject-binding|identity-pairing-consume|one-user-bootstrap-execution|legacy-account-owner-assignment|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(/;
+const CLAIM_ISSUER_DISPOSABLE_REHEARSAL_FORBIDDEN_PATTERN =
+  /production-database-target|NEON_API_KEY|identity-pairing-consume|one-user-bootstrap-execution|legacy-account-owner-assignment|src\/app|next\/server|\bcookies\s*\(|\bheaders\s*\(|\bfetch\s*\(|db:migrate/;
 
 export function auditIdentityPairingAuthority({ root, writerRegistry }) {
   const findings = [];
@@ -154,7 +158,7 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     claimIssuerConsumers.filter(
       (path) => path === CLAIM_ISSUER_MIGRATION_CLI_PATH,
     );
-  const claimIssuerRuntimeConsumers = [...productionPaths].filter((path) => {
+  const claimIssuerAuthorityConsumers = [...productionPaths].filter((path) => {
     if (
       path === CLAIM_ISSUER_IMPLEMENTATION_PATH ||
       path === CLAIM_ISSUER_MIGRATION_CLI_PATH
@@ -169,6 +173,14 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       )
     );
   });
+  const claimIssuerDisposableRehearsalConsumers =
+    claimIssuerAuthorityConsumers.filter(
+      (path) => path === CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH,
+    );
+  const claimIssuerRuntimeConsumers =
+    claimIssuerAuthorityConsumers.filter(
+      (path) => path !== CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH,
+    );
   if (claimIssuerRuntimeConsumers.length !== 0) {
     findings.push("claim_issuer_runtime_import");
   }
@@ -189,6 +201,30 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     );
   if (!claimIssuerMigrationCliBoundaryIntact) {
     findings.push("claim_issuer_migration_cli_boundary_drift");
+  }
+  const claimIssuerDisposableRehearsalSource = readFileSync(
+    join(root, CLAIM_ISSUER_DISPOSABLE_REHEARSAL_PATH),
+    "utf8",
+  );
+  const claimIssuerDisposableRehearsalBoundaryIntact =
+    claimIssuerDisposableRehearsalConsumers.length === 1 &&
+    CLAIM_ISSUER_MIGRATION_CLI_IMPORT_PATTERN.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    /guardPreviewDatabaseTarget/.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    /in_memory_rehearsal_capture_only/.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    /migrationCount:\s*0/.test(
+      claimIssuerDisposableRehearsalSource,
+    ) &&
+    !CLAIM_ISSUER_DISPOSABLE_REHEARSAL_FORBIDDEN_PATTERN.test(
+      claimIssuerDisposableRehearsalSource,
+    );
+  if (!claimIssuerDisposableRehearsalBoundaryIntact) {
+    findings.push("claim_issuer_disposable_rehearsal_boundary_drift");
   }
 
   const verifiedSessionPresentationCore = readFileSync(
@@ -373,6 +409,9 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
       claimIssuerMigrationCliImports:
         claimIssuerMigrationCliConsumers.length,
       claimIssuerMigrationCliBoundaryIntact,
+      claimIssuerDisposableRehearsalImports:
+        claimIssuerDisposableRehearsalConsumers.length,
+      claimIssuerDisposableRehearsalBoundaryIntact,
       verifiedSessionPresentationAdapters:
         verifiedSessionPresentationBoundaryIntact ? 1 : 0,
       verifiedSessionPresentationRuntimeImports:

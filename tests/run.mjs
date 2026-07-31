@@ -143,6 +143,7 @@ import "./private-session-subject-binding.test.mjs";
 import "./identity-pairing-consume-writer.test.mjs";
 import "./identity-bootstrap-claim-issuer.test.mjs";
 import "./identity-bootstrap-claim-migration-cli.test.mjs";
+import "./identity-bootstrap-claim-handoff-rehearsal.test.mjs";
 import "./one-user-bootstrap-execution.test.mjs";
 import "./verified-session-claim-presentation.test.mjs";
 import "./verified-session-consume-capability.test.mjs";
