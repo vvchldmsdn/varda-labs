@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Pool } from "@neondatabase/serverless";
+import { neon } from "@neondatabase/serverless";
 
 import {
   guardProductionDatabaseTarget,
@@ -30,7 +30,7 @@ export async function runIdentityBootstrapLifecyclePreflight({
   loadEnvironment =
     loadProductionDatabaseEnvironmentFromEnvLocal,
   guardDatabaseTarget = guardProductionDatabaseTarget,
-  createPool = createProductionPool,
+  createSql = createProductionSql,
   readSnapshot = readIdentityBootstrapLifecycleSnapshot,
 } = {}) {
   const options = parseIdentityBootstrapLifecyclePreflightArgs(args);
@@ -76,139 +76,83 @@ export async function runIdentityBootstrapLifecyclePreflight({
     "DATABASE_URL_UNPOOLED",
     "database_not_configured",
   );
-  let pool;
-  let output;
-  let closeStatus = "not_attempted";
   try {
-    pool = createPool(connectionString);
-    const rows = await readSnapshot({ pool, options });
+    const sql = createSql(connectionString);
+    const rows = await readSnapshot({ sql, options });
     if (!Array.isArray(rows) || rows.length !== 1) {
       throw new IdentityBootstrapLifecyclePreflightError(
         "database_snapshot_cardinality_invalid",
       );
     }
-    output = buildIdentityBootstrapLifecyclePreflight({
+    return buildIdentityBootstrapLifecyclePreflight({
       row: rows[0],
       options,
       databaseTargetFingerprint,
     });
   } catch (error) {
     throw mapPreflightError(error, "database_preflight_failed");
-  } finally {
-    if (pool !== undefined) {
-      try {
-        await closeProductionPool(pool);
-        closeStatus = "closed";
-      } catch {
-        closeStatus = "unconfirmed";
-      }
-    }
   }
-
-  if (closeStatus !== "closed") {
-    throw new IdentityBootstrapLifecyclePreflightError(
-      "database_pool_close_unconfirmed",
-    );
-  }
-  return Object.freeze({
-    ...output,
-    connectionCloseStatus: closeStatus,
-  });
 }
 
 export async function readIdentityBootstrapLifecycleSnapshot({
-  pool,
+  sql,
   options,
 }) {
-  if (!pool || typeof pool.connect !== "function") {
+  const transaction = readOwnDataValue(sql, "transaction");
+  if (typeof sql !== "function" || typeof transaction !== "function") {
     throw new IdentityBootstrapLifecyclePreflightError(
       "database_port_invalid",
     );
   }
 
-  let client;
   try {
-    client = await pool.connect();
-  } catch {
-    throw new IdentityBootstrapLifecyclePreflightError(
-      "database_connection_failed",
-    );
-  }
-
-  let transactionOpen = false;
-  try {
-    await client.query(
-      "begin isolation level repeatable read read only",
-    );
-    transactionOpen = true;
-    await client.query("set local statement_timeout = '8s'");
-    const result = await client.query(
-      IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_SQL,
-      [
-        options.claimDigestVersion,
-        options.claimDigest,
-        options.targetAppUserId,
-        IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_POLICY.provider,
-      ],
-    );
-    await client.query("commit");
-    transactionOpen = false;
-    return result.rows;
-  } catch {
-    if (transactionOpen) {
-      try {
-        await client.query("rollback");
-      } catch {
-        // Preserve the original fail-closed result.
-      }
+    const results = await Reflect.apply(transaction, sql, [
+      (transactionSql) => {
+        const query = readOwnDataValue(transactionSql, "query");
+        if (typeof query !== "function") {
+          throw new IdentityBootstrapLifecyclePreflightError(
+            "database_port_invalid",
+          );
+        }
+        return [
+          Reflect.apply(query, transactionSql, [
+            "set local statement_timeout = '8s'",
+          ]),
+          Reflect.apply(query, transactionSql, [
+            IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_SQL,
+            [
+              options.claimDigestVersion,
+              options.claimDigest,
+              options.targetAppUserId,
+              IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_POLICY.provider,
+            ],
+          ]),
+        ];
+      },
+      {
+        isolationLevel: "RepeatableRead",
+        readOnly: true,
+      },
+    ]);
+    if (
+      !Array.isArray(results) ||
+      results.length !== 2 ||
+      !Array.isArray(results[1])
+    ) {
+      throw new IdentityBootstrapLifecyclePreflightError(
+        "database_snapshot_invalid",
+      );
     }
+    return results[1];
+  } catch {
     throw new IdentityBootstrapLifecyclePreflightError(
       "database_read_transaction_failed",
     );
-  } finally {
-    try {
-      client.release();
-    } catch {
-      // Pool close remains the outer lifecycle boundary.
-    }
   }
 }
 
-function createProductionPool(connectionString) {
-  return new Pool({
-    connectionString,
-    max: 1,
-  });
-}
-
-async function closeProductionPool(pool) {
-  let current = pool;
-  while (current !== null && current !== Object.prototype) {
-    let descriptor;
-    try {
-      descriptor = Object.getOwnPropertyDescriptor(current, "end");
-    } catch {
-      throw new IdentityBootstrapLifecyclePreflightError(
-        "database_pool_close_failed",
-      );
-    }
-    if (descriptor) {
-      if (
-        !("value" in descriptor) ||
-        typeof descriptor.value !== "function"
-      ) {
-        throw new IdentityBootstrapLifecyclePreflightError(
-          "database_pool_close_failed",
-        );
-      }
-      await Reflect.apply(descriptor.value, pool, []);
-      return;
-    }
-    current = Object.getPrototypeOf(current);
-  }
-  throw new IdentityBootstrapLifecyclePreflightError(
-    "database_pool_close_failed",
-  );
+function createProductionSql(connectionString) {
+  return neon(connectionString);
 }
 
 function readRequiredOwnString(value, key, code) {
@@ -281,7 +225,6 @@ function blockedOutput(error) {
       accounts: 0,
       productTables: 0,
     }),
-    connectionCloseStatus: "not_confirmed",
   });
 }
 
@@ -297,10 +240,7 @@ if (isDirectExecution()) {
     blockedOutput,
   );
   console.log(JSON.stringify(output, null, 2));
-  if (
-    output.result !== "ready_for_new_issue" ||
-    output.connectionCloseStatus !== "closed"
-  ) {
+  if (output.result !== "ready_for_new_issue") {
     process.exitCode = 1;
   }
 }

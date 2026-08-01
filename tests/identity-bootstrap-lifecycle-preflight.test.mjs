@@ -167,8 +167,8 @@ describe("identity bootstrap lifecycle preflight v1", () => {
     assert.equal(calls, 0);
   });
 
-  it("guards the reviewed Production target before creating a Pool", async () => {
-    let pools = 0;
+  it("guards the reviewed Production target before creating the HTTP client", async () => {
+    let clients = 0;
     await assert.rejects(
       runIdentityBootstrapLifecyclePreflight({
         args: baseArgs(),
@@ -176,8 +176,8 @@ describe("identity bootstrap lifecycle preflight v1", () => {
         guardDatabaseTarget: () => ({
           targetFingerprint: `sha256:${"0".repeat(64)}`,
         }),
-        createPool() {
-          pools += 1;
+        createSql() {
+          clients += 1;
         },
       }),
       (error) =>
@@ -185,10 +185,10 @@ describe("identity bootstrap lifecycle preflight v1", () => {
         error.code ===
           "reviewed_database_target_fingerprint_mismatch",
     );
-    assert.equal(pools, 0);
+    assert.equal(clients, 0);
   });
 
-  it("runs one guarded read and closes the Pool without exposing private binding values", async () => {
+  it("runs one guarded HTTP read without exposing private binding values", async () => {
     const events = [];
     const output = await runIdentityBootstrapLifecyclePreflight({
       args: baseArgs(),
@@ -200,14 +200,10 @@ describe("identity bootstrap lifecycle preflight v1", () => {
         events.push("guard_target");
         return { targetFingerprint: DATABASE_TARGET_SHA256 };
       },
-      createPool(connectionString) {
-        events.push("create_pool");
+      createSql(connectionString) {
+        events.push("create_sql");
         assert.equal(connectionString, "unpooled");
-        return {
-          async end() {
-            events.push("pool_end");
-          },
-        };
+        return function sql() {};
       },
       async readSnapshot({ options: receivedOptions }) {
         events.push("read_snapshot");
@@ -219,12 +215,10 @@ describe("identity bootstrap lifecycle preflight v1", () => {
     assert.deepEqual(events, [
       "load_environment",
       "guard_target",
-      "create_pool",
+      "create_sql",
       "read_snapshot",
-      "pool_end",
     ]);
     assert.equal(output.result, "ready_for_new_issue");
-    assert.equal(output.connectionCloseStatus, "closed");
     const serialized = JSON.stringify(output);
     assert.equal(serialized.includes(TARGET), false);
     assert.equal(serialized.includes(INTENT), false);
@@ -233,38 +227,36 @@ describe("identity bootstrap lifecycle preflight v1", () => {
 
   it("uses exactly one repeatable-read read-only transaction and no retry", async () => {
     const calls = [];
-    let released = 0;
-    const rows = await readIdentityBootstrapLifecycleSnapshot({
-      pool: {
-        async connect() {
-          return {
-            async query(query, params) {
-              calls.push({ query, params });
-              if (query === IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_SQL) {
-                return { rows: [readyRow()] };
-              }
-              return { rows: [] };
-            },
-            release() {
-              released += 1;
-            },
-          };
-        },
+    const sql = function sql() {};
+    Object.defineProperty(sql, "transaction", {
+      value: async (buildQueries, transactionOptions) => {
+        calls.push({ transactionOptions });
+        const transactionSql = function transactionSql() {};
+        Object.defineProperty(transactionSql, "query", {
+          value(query, params) {
+            calls.push({ query, params });
+            return { query, params };
+          },
+        });
+        const queries = buildQueries(transactionSql);
+        assert.equal(queries.length, 2);
+        return [[], [readyRow()]];
       },
+    });
+    const rows = await readIdentityBootstrapLifecycleSnapshot({
+      sql,
       options: options(),
     });
 
     assert.equal(rows.length, 1);
-    assert.equal(released, 1);
-    assert.deepEqual(
-      calls.map(({ query }) => query),
-      [
-        "begin isolation level repeatable read read only",
-        "set local statement_timeout = '8s'",
-        IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_SQL,
-        "commit",
-      ],
-    );
+    assert.deepEqual(calls[0].transactionOptions, {
+      isolationLevel: "RepeatableRead",
+      readOnly: true,
+    });
+    assert.deepEqual(calls.slice(1).map(({ query }) => query), [
+      "set local statement_timeout = '8s'",
+      IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_SQL,
+    ]);
     assert.deepEqual(calls[2].params, [
       IDENTITY_BOOTSTRAP_LIFECYCLE_PREFLIGHT_POLICY.claimDigestVersion,
       CLAIM_DIGEST,
@@ -282,7 +274,10 @@ describe("identity bootstrap lifecycle preflight v1", () => {
 
     assert.match(source, /loadProductionDatabaseEnvironmentFromEnvLocal/);
     assert.match(source, /guardProductionDatabaseTarget/);
-    assert.match(source, /repeatable read read only/);
+    assert.match(source, /isolationLevel: "RepeatableRead"/);
+    assert.match(source, /readOnly: true/);
+    assert.match(source, /\bneon\(/);
+    assert.doesNotMatch(source, /\bPool\b/);
     assert.doesNotMatch(source, /dotenv\.config|process\.env|\bfetch\s*\(/);
     assert.doesNotMatch(
       combined,
