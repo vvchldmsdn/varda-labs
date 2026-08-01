@@ -80,6 +80,7 @@ export async function runIdentityBootstrapClaimHandoffRehearsal({
   const targetAppUserSha256 = fingerprintAppUserId(targetAppUserId);
   const verificationPool = createPool(connectionString);
   let capturedRawClaim = null;
+  let receiptEvidenceStored = false;
 
   try {
     const before = await readRehearsalCounts(verificationPool);
@@ -94,6 +95,14 @@ export async function runIdentityBootstrapClaimHandoffRehearsal({
         targetAppUserId,
         "--target-app-user-sha256",
         targetAppUserSha256,
+        "--reviewed-database-target-fingerprint",
+        databaseTarget.targetFingerprint,
+        "--receipt-evidence-dir",
+        resolve(
+          repositoryRoot,
+          "..",
+          "varda-bootstrap-claim-rehearsal-evidence",
+        ),
         "--write",
         "--reveal-on-tty",
         IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.confirmation,
@@ -101,6 +110,27 @@ export async function runIdentityBootstrapClaimHandoffRehearsal({
       loadEnvironment: () => environment,
       guardDatabaseTarget,
       createPool,
+      createReceiptEvidencePort: () =>
+        Object.freeze({
+          store({ receipt, databaseTargetFingerprint }) {
+            assert.equal(
+              databaseTargetFingerprint,
+              databaseTarget.targetFingerprint,
+            );
+            const binding = requiredOwnObject(
+              receipt,
+              "claimBinding",
+              "receipt_evidence_invalid",
+            );
+            const receiptId = requiredOwnString(
+              binding,
+              "identityPairingIntentSha256",
+              "receipt_evidence_invalid",
+            );
+            receiptEvidenceStored = true;
+            return Object.freeze({ status: "stored", receiptId });
+          },
+        }),
       revealPort: Object.freeze({
         isTTY: true,
         async reveal(rawClaim) {
@@ -120,7 +150,9 @@ export async function runIdentityBootstrapClaimHandoffRehearsal({
 
     assert.equal(receipt.result, "revealed_to_tty");
     assert.equal(receipt.committed, true);
+    assert.equal(receipt.receiptEvidenceStatus, "stored");
     assert.equal(receipt.revealStatus, "tty_write_completed");
+    assert.equal(receiptEvidenceStored, true);
     assert.ok(capturedRawClaim !== null);
 
     const persisted = await readPersistedRehearsalEvidence(
@@ -384,6 +416,14 @@ async function closePool(pool) {
 function requiredOwnString(value, key, code) {
   const result = ownDataValue(value, key);
   if (typeof result !== "string" || result.trim().length === 0) {
+    throw rehearsalError(code);
+  }
+  return result;
+}
+
+function requiredOwnObject(value, key, code) {
+  const result = ownDataValue(value, key);
+  if (result === null || typeof result !== "object") {
     throw rehearsalError(code);
   }
   return result;

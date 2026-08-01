@@ -146,11 +146,28 @@ describe("identity bootstrap claim handoff rehearsal", () => {
         );
         assert.ok(options.args.includes("--write"));
         assert.ok(options.args.includes("--reveal-on-tty"));
+        assert.ok(
+          options.args.includes(
+            "--reviewed-database-target-fingerprint",
+          ),
+        );
+        assert.ok(options.args.includes("--receipt-evidence-dir"));
+        const evidencePort = options.createReceiptEvidencePort();
+        const stored = evidencePort.store({
+          receipt: {
+            claimBinding: {
+              identityPairingIntentSha256:
+                `sha256:${"b".repeat(64)}`,
+            },
+          },
+          databaseTargetFingerprint: `sha256:${"1".repeat(64)}`,
+        });
         state.intentInserted = true;
         await options.revealPort.reveal(RAW_CLAIM);
         return {
           result: "revealed_to_tty",
           committed: true,
+          receiptEvidenceStatus: stored.status,
           revealStatus: "tty_write_completed",
           claimBinding: {
             claimDigest: CLAIM_DIGEST,
