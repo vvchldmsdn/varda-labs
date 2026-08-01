@@ -26,6 +26,7 @@
     "rehearse:legacy-account-owner-assignment": "node --no-warnings scripts/rehearse-legacy-account-owner-assignment.mjs",
     "rehearse:legacy-account-owner-assignment:host": "node --no-warnings scripts/run-legacy-account-owner-assignment-rehearsal-host.mjs",
     "preflight:identity-pairing-consume": "node --no-warnings scripts/preflight-identity-pairing-catalog.mjs",
+    "preflight:identity-bootstrap-lifecycle": "node --no-warnings scripts/preflight-identity-bootstrap-lifecycle.mjs",
     "preflight:legacy-account-ownership": "node --no-warnings scripts/preflight-legacy-account-ownership.mjs",
     "identity:assign-legacy-account-owners": "node --no-warnings scripts/assign-legacy-account-owners.mjs",
     "identity:issue-bootstrap-claim": "node --no-warnings scripts/issue-identity-bootstrap-claim.mjs",
