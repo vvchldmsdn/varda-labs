@@ -138,6 +138,9 @@ describe("identity bootstrap claim migration CLI", () => {
         "interactive_tty_stderr_once_after_commit",
       receiptEvidencePersistence:
         "atomic_create_only_local_file",
+      receiptEvidenceAccessControl:
+        "owner_scoped_platform_acl_attested",
+      receiptEvidenceCrashDurability: "not_claimed",
       retryCount: 0,
     });
     assert.equal(JSON.stringify(result).includes(TARGET), false);
@@ -164,27 +167,32 @@ describe("identity bootstrap claim migration CLI", () => {
     assert.equal(pools, 0);
   });
 
-  it("requires a valid evidence destination before env or DB work", async () => {
-    const calls = { environment: 0, pool: 0 };
-    await assert.rejects(
-      runIdentityBootstrapClaimMigrationCli({
-        args: writeArgs(),
-        revealPort: ttyRevealPort(),
-        createReceiptEvidencePort() {
-          throw codedError("receipt_evidence_directory_invalid");
-        },
-        loadEnvironment() {
-          calls.environment += 1;
-        },
-        createPool() {
-          calls.pool += 1;
-        },
-      }),
-      (error) =>
-        error instanceof IdentityBootstrapClaimMigrationCliError &&
-        error.code === "receipt_evidence_directory_invalid",
-    );
-    assert.deepEqual(calls, { environment: 0, pool: 0 });
+  it("requires a valid protected evidence destination before env or DB work", async () => {
+    for (const code of [
+      "receipt_evidence_directory_invalid",
+      "receipt_evidence_access_control_invalid",
+    ]) {
+      const calls = { environment: 0, pool: 0 };
+      await assert.rejects(
+        runIdentityBootstrapClaimMigrationCli({
+          args: writeArgs(),
+          revealPort: ttyRevealPort(),
+          createReceiptEvidencePort() {
+            throw codedError(code);
+          },
+          loadEnvironment() {
+            calls.environment += 1;
+          },
+          createPool() {
+            calls.pool += 1;
+          },
+        }),
+        (error) =>
+          error instanceof IdentityBootstrapClaimMigrationCliError &&
+          error.code === code,
+      );
+      assert.deepEqual(calls, { environment: 0, pool: 0 });
+    }
   });
 
   it("rejects non-TTY and accessor-backed reveal ports before env or DB work", async () => {

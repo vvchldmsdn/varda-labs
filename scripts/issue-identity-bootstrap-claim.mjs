@@ -39,6 +39,9 @@ export const IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY =
     confirmation: CONFIRMATION,
     defaultMode: "dry_run",
     receiptEvidencePersistence: "atomic_create_only_local_file",
+    receiptEvidenceAccessControl:
+      "owner_scoped_platform_acl_attested",
+    receiptEvidenceCrashDurability: "not_claimed",
     revealTransport: "interactive_tty_stderr_once_after_commit",
     retryCount: 0,
   });
@@ -130,6 +133,12 @@ export async function runIdentityBootstrapClaimMigrationCli({
       receiptEvidencePersistence:
         IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY
           .receiptEvidencePersistence,
+      receiptEvidenceAccessControl:
+        IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY
+          .receiptEvidenceAccessControl,
+      receiptEvidenceCrashDurability:
+        IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY
+          .receiptEvidenceCrashDurability,
       retryCount:
         IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.retryCount,
     });

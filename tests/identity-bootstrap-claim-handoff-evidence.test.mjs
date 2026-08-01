@@ -15,6 +15,9 @@ import {
   createIdentityBootstrapClaimHandoffEvidencePort,
   IdentityBootstrapClaimHandoffEvidenceError,
 } from "../scripts/lib/identity-bootstrap-claim-handoff-evidence.mjs";
+import {
+  assertOwnerScopedPathSecurity,
+} from "../scripts/lib/operator-evidence-path-security.mjs";
 
 const TARGET_SHA256 = `sha256:${"1".repeat(64)}`;
 const CLAIM_DIGEST =
@@ -33,6 +36,7 @@ describe("identity bootstrap claim handoff evidence", () => {
         repositoryRoot,
         evidenceDirectory,
         now: () => new Date(RECORDED_AT),
+        attestPathAccess: allowPathAccess,
       });
 
       const result = port.store({
@@ -143,6 +147,7 @@ describe("identity bootstrap claim handoff evidence", () => {
           createIdentityBootstrapClaimHandoffEvidencePort({
             repositoryRoot,
             evidenceDirectory: insideRepository,
+            attestPathAccess: allowPathAccess,
           }),
         hasCode("receipt_evidence_directory_invalid"),
       );
@@ -157,6 +162,7 @@ describe("identity bootstrap claim handoff evidence", () => {
         repositoryRoot,
         evidenceDirectory,
         now: () => new Date(RECORDED_AT),
+        attestPathAccess: allowPathAccess,
       });
 
       assert.throws(
@@ -177,6 +183,7 @@ describe("identity bootstrap claim handoff evidence", () => {
         repositoryRoot,
         evidenceDirectory,
         now: () => new Date(RECORDED_AT),
+        attestPathAccess: allowPathAccess,
       });
       const input = {
         receipt: receipt(),
@@ -187,6 +194,125 @@ describe("identity bootstrap claim handoff evidence", () => {
       assert.throws(
         () => port.store(input),
         hasCode("receipt_evidence_reuse_blocked"),
+      );
+    });
+  });
+
+  it("requires an owner-scoped Windows directory ACL", () => {
+    const currentUserId = "S-1-5-21-1-2-3-1001";
+    const base = {
+      platform: "win32",
+      currentUserId,
+      ownerId: currentUserId,
+      accessRulesProtected: true,
+      allowPrincipalIds: [
+        currentUserId,
+        "S-1-5-18",
+        "S-1-5-32-544",
+      ],
+    };
+
+    assert.doesNotThrow(() =>
+      assertOwnerScopedPathSecurity(
+        base,
+        "directory",
+      ));
+    for (const security of [
+      { ...base, ownerId: "S-1-5-21-9-9-9-1002" },
+      { ...base, accessRulesProtected: false },
+      {
+        ...base,
+        allowPrincipalIds: [
+          ...base.allowPrincipalIds,
+          "S-1-5-32-545",
+        ],
+      },
+    ]) {
+      assert.throws(
+        () =>
+          assertOwnerScopedPathSecurity(
+            security,
+            "directory",
+          ),
+        /operator evidence path security invalid/,
+      );
+    }
+  });
+
+  it("requires exact owner-only POSIX modes", () => {
+    const base = {
+      platform: "posix",
+      currentUserId: "1000",
+      ownerId: "1000",
+    };
+    assert.doesNotThrow(() =>
+      assertOwnerScopedPathSecurity(
+        { ...base, mode: 0o700 },
+        "directory",
+      ));
+    assert.doesNotThrow(() =>
+      assertOwnerScopedPathSecurity(
+        { ...base, mode: 0o600 },
+        "file",
+      ));
+    assert.throws(
+      () =>
+        assertOwnerScopedPathSecurity(
+          { ...base, mode: 0o755 },
+          "directory",
+        ),
+      /operator evidence path security invalid/,
+    );
+  });
+
+  it("checks directory access before writing and file access after", () => {
+    withDirectories(({ repositoryRoot, evidenceDirectory }) => {
+      const checks = [];
+      const port = createIdentityBootstrapClaimHandoffEvidencePort({
+        repositoryRoot,
+        evidenceDirectory,
+        now: () => new Date(RECORDED_AT),
+        attestPathAccess(path, pathType) {
+          checks.push({ path, pathType });
+        },
+      });
+
+      port.store({
+        receipt: receipt(),
+        databaseTargetFingerprint: DATABASE_TARGET_SHA256,
+      });
+
+      assert.deepEqual(checks, [
+        { path: evidenceDirectory, pathType: "directory" },
+        { path: evidencePath(evidenceDirectory), pathType: "file" },
+      ]);
+    });
+  });
+
+  it("removes newly written evidence and fails before handoff when file ACL is broad", () => {
+    withDirectories(({ repositoryRoot, evidenceDirectory }) => {
+      const port = createIdentityBootstrapClaimHandoffEvidencePort({
+        repositoryRoot,
+        evidenceDirectory,
+        now: () => new Date(RECORDED_AT),
+        attestPathAccess(_path, pathType) {
+          if (pathType === "file") {
+            throw new Error("broad ACL");
+          }
+        },
+      });
+
+      assert.throws(
+        () =>
+          port.store({
+            receipt: receipt(),
+            databaseTargetFingerprint: DATABASE_TARGET_SHA256,
+          }),
+        hasCode("receipt_evidence_access_control_invalid"),
+      );
+      assert.equal(
+        readFileIfPresent(evidencePath(evidenceDirectory)),
+        null,
       );
     });
   });
@@ -221,6 +347,16 @@ function hasCode(code) {
   return (error) =>
     error instanceof IdentityBootstrapClaimHandoffEvidenceError &&
     error.code === code;
+}
+
+function allowPathAccess() {}
+
+function readFileIfPresent(path) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 function withDirectories(run) {

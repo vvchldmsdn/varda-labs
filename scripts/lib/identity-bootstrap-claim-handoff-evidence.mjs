@@ -1,15 +1,18 @@
 import { randomUUID } from "node:crypto";
 import {
+  constants,
   closeSync,
   fsyncSync,
   linkSync,
   lstatSync,
   openSync,
+  readFileSync,
   realpathSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import {
+  dirname,
   isAbsolute,
   join,
   relative,
@@ -17,6 +20,9 @@ import {
 } from "node:path";
 
 import { readClaimBinding } from "./one-user-bootstrap-binding.mjs";
+import {
+  attestOwnerScopedPathAccess,
+} from "./operator-evidence-path-security.mjs";
 
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
@@ -26,6 +32,8 @@ export const IDENTITY_BOOTSTRAP_CLAIM_HANDOFF_EVIDENCE_POLICY =
     state: "issued_not_presented",
     persistence: "atomic_create_only_local_file",
     fileMode: 0o600,
+    accessControl: "owner_scoped_platform_acl_attested",
+    crashDurability: "not_claimed",
   });
 
 export class IdentityBootstrapClaimHandoffEvidenceError extends Error {
@@ -41,16 +49,26 @@ export function createIdentityBootstrapClaimHandoffEvidencePort({
   evidenceDirectory,
   now = () => new Date(),
   writeEvidence = writeAtomicCreateOnlyEvidence,
+  attestPathAccess = attestOwnerScopedPathAccess,
 } = {}) {
-  const directory = assertEvidenceDirectory({
-    repositoryRoot,
-    evidenceDirectory,
-  });
-  if (typeof now !== "function" || typeof writeEvidence !== "function") {
+  if (
+    typeof now !== "function" ||
+    typeof writeEvidence !== "function" ||
+    typeof attestPathAccess !== "function"
+  ) {
     throw new IdentityBootstrapClaimHandoffEvidenceError(
       "receipt_evidence_port_invalid",
     );
   }
+  const directory = assertEvidenceDirectory({
+    repositoryRoot,
+    evidenceDirectory,
+  });
+  attestEvidencePathAccess({
+    path: directory,
+    pathType: "directory",
+    attestPathAccess,
+  });
   const storedReceiptIds = new Set();
 
   return Object.freeze({
@@ -78,6 +96,22 @@ export function createIdentityBootstrapClaimHandoffEvidencePort({
         }
         throw new IdentityBootstrapClaimHandoffEvidenceError(
           "receipt_evidence_write_failed",
+        );
+      }
+      try {
+        attestEvidencePathAccess({
+          path: evidenceFile,
+          pathType: "file",
+          attestPathAccess,
+        });
+      } catch {
+        try {
+          unlinkSync(evidenceFile);
+        } catch {
+          // The receipt is public evidence; fail closed before claim reveal.
+        }
+        throw new IdentityBootstrapClaimHandoffEvidenceError(
+          "receipt_evidence_access_control_invalid",
         );
       }
       storedReceiptIds.add(receiptId);
@@ -170,22 +204,37 @@ export function createIdentityBootstrapClaimHandoffEvidence({
 
 function writeAtomicCreateOnlyEvidence(evidenceFile, snapshot) {
   const temporaryFile = `${evidenceFile}.${process.pid}.${randomUUID()}.tmp`;
+  const serialized = `${JSON.stringify(snapshot)}\n`;
   let descriptor = null;
+  let finalFileCreated = false;
   try {
     descriptor = openSync(
       temporaryFile,
       "wx",
       IDENTITY_BOOTSTRAP_CLAIM_HANDOFF_EVIDENCE_POLICY.fileMode,
     );
-    writeFileSync(descriptor, `${JSON.stringify(snapshot)}\n`, {
+    writeFileSync(descriptor, serialized, {
       encoding: "utf8",
     });
     fsyncSync(descriptor);
     closeSync(descriptor);
     descriptor = null;
     linkSync(temporaryFile, evidenceFile);
+    finalFileCreated = true;
     unlinkSync(temporaryFile);
+    syncParentDirectoryWhenSupported(dirname(evidenceFile));
+    if (readFileSync(evidenceFile, "utf8") !== serialized) {
+      throw new Error("receipt evidence readback mismatch");
+    }
   } catch {
+    if (finalFileCreated) {
+      try {
+        unlinkSync(evidenceFile);
+        syncParentDirectoryWhenSupported(dirname(evidenceFile));
+      } catch {
+        // Keep the original persistence failure authoritative.
+      }
+    }
     throw new IdentityBootstrapClaimHandoffEvidenceError(
       "receipt_evidence_write_failed",
     );
@@ -202,6 +251,31 @@ function writeAtomicCreateOnlyEvidence(evidenceFile, snapshot) {
     } catch {
       // The temporary path is absent after a successful link.
     }
+  }
+}
+
+function syncParentDirectoryWhenSupported(directory) {
+  if (process.platform === "win32") return;
+  let descriptor = null;
+  try {
+    descriptor = openSync(directory, constants.O_RDONLY);
+    fsyncSync(descriptor);
+  } finally {
+    if (descriptor !== null) closeSync(descriptor);
+  }
+}
+
+function attestEvidencePathAccess({
+  path,
+  pathType,
+  attestPathAccess,
+}) {
+  try {
+    attestPathAccess(path, pathType);
+  } catch {
+    throw new IdentityBootstrapClaimHandoffEvidenceError(
+      "receipt_evidence_access_control_invalid",
+    );
   }
 }
 
