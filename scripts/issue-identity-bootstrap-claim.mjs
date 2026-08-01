@@ -10,6 +10,9 @@ import {
   createIdentityBootstrapClaimIssuerPort,
 } from "./lib/identity-bootstrap-claim-issuer.mjs";
 import {
+  createIdentityBootstrapClaimHandoffEvidencePort,
+} from "./lib/identity-bootstrap-claim-handoff-evidence.mjs";
+import {
   fingerprintAppUserId,
   isSha256Fingerprint,
 } from "./lib/legacy-account-ownership-evidence.mjs";
@@ -32,9 +35,10 @@ const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), "..");
 
 export const IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY =
   Object.freeze({
-    operation: "identity_bootstrap_claim_migration_cli_handoff_v1",
+    operation: "identity_bootstrap_claim_migration_cli_handoff_v2",
     confirmation: CONFIRMATION,
     defaultMode: "dry_run",
+    receiptEvidencePersistence: "atomic_create_only_local_file",
     revealTransport: "interactive_tty_stderr_once_after_commit",
     retryCount: 0,
   });
@@ -54,10 +58,27 @@ export async function runIdentityBootstrapClaimMigrationCli({
   guardDatabaseTarget = guardProductionDatabaseTarget,
   createPool = createProductionPool,
   createIssuerPort = createIdentityBootstrapClaimIssuerPort,
+  createReceiptEvidencePort =
+    createIdentityBootstrapClaimHandoffEvidencePort,
   revealPort = createProcessTtyRevealPort(),
 } = {}) {
   const options = readIdentityBootstrapClaimMigrationCliOptions(args);
   if (options.write) assertInteractiveRevealPort(revealPort);
+
+  let receiptEvidencePort = null;
+  if (options.write) {
+    try {
+      receiptEvidencePort = createReceiptEvidencePort({
+        repositoryRoot,
+        evidenceDirectory: options.receiptEvidenceDirectory,
+      });
+    } catch (error) {
+      throw mapMigrationCliError(
+        error,
+        "receipt_evidence_directory_invalid",
+      );
+    }
+  }
 
   let environment;
   try {
@@ -75,6 +96,19 @@ export async function runIdentityBootstrapClaimMigrationCli({
       "production_database_target_guard_failed",
     );
   }
+  const databaseTargetFingerprint = readRequiredOwnString(
+    databaseTarget,
+    "targetFingerprint",
+    "production_database_target_guard_failed",
+  );
+  if (
+    databaseTargetFingerprint !==
+    options.reviewedDatabaseTargetFingerprint
+  ) {
+    throw new IdentityBootstrapClaimMigrationCliError(
+      "reviewed_database_target_mismatch",
+    );
+  }
 
   if (!options.write) {
     return Object.freeze({
@@ -83,11 +117,7 @@ export async function runIdentityBootstrapClaimMigrationCli({
       mode: "dry_run",
       result: "planned",
       reviewedTargetAppUserSha256: options.targetAppUserSha256,
-      databaseTargetFingerprint: readRequiredOwnString(
-        databaseTarget,
-        "targetFingerprint",
-        "production_database_target_guard_failed",
-      ),
+      databaseTargetFingerprint,
       plannedWrites: Object.freeze({
         identityPairingIntents: 1,
         identityPairingIntentEvents: 0,
@@ -97,6 +127,9 @@ export async function runIdentityBootstrapClaimMigrationCli({
       }),
       revealTransport:
         IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.revealTransport,
+      receiptEvidencePersistence:
+        IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY
+          .receiptEvidencePersistence,
       retryCount:
         IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.retryCount,
     });
@@ -143,17 +176,54 @@ export async function runIdentityBootstrapClaimMigrationCli({
     }
   }
   if (issueError !== null) throw issueError;
+  const committedReceipt = readCommittedIssueReceipt(issueResult);
+  if (
+    committedReceipt.claimBinding.targetAppUserSha256 !==
+    options.targetAppUserSha256
+  ) {
+    return createHandoffReceipt(committedReceipt, {
+      result: "receipt_evidence_unconfirmed",
+      receiptEvidenceStatus: "binding_mismatch",
+      revealStatus: "not_attempted",
+    });
+  }
   if (poolCloseFailed) {
-    return createTtyRevealReceipt(
-      issueResult,
-      "tty_write_unconfirmed",
-    );
+    return createHandoffReceipt(committedReceipt, {
+      result: "receipt_evidence_unconfirmed",
+      receiptEvidenceStatus: "not_attempted",
+      revealStatus: "not_attempted",
+    });
   }
 
-  const receipt = createTtyRevealReceipt(
-    issueResult,
-    "tty_write_completed",
-  );
+  try {
+    const store = readRequiredOwnMethod(
+      receiptEvidencePort,
+      "store",
+      "receipt_evidence_port_invalid",
+    );
+    const stored = await Reflect.apply(store, receiptEvidencePort, [
+      {
+        receipt: committedReceipt,
+        databaseTargetFingerprint,
+      },
+    ]);
+    if (
+      readOwnDataValue(stored, "status") !== "stored" ||
+      readOwnDataValue(stored, "receiptId") !==
+        committedReceipt.claimBinding.identityPairingIntentSha256
+    ) {
+      throw new IdentityBootstrapClaimMigrationCliError(
+        "receipt_evidence_result_invalid",
+      );
+    }
+  } catch {
+    return createHandoffReceipt(committedReceipt, {
+      result: "receipt_evidence_unconfirmed",
+      receiptEvidenceStatus: "write_failed",
+      revealStatus: "not_attempted",
+    });
+  }
+
   let rawClaim = null;
   try {
     const take = readRequiredOwnMethod(
@@ -178,12 +248,17 @@ export async function runIdentityBootstrapClaimMigrationCli({
       "tty_reveal_required",
     );
     await Reflect.apply(reveal, revealPort, [rawClaim]);
-    return receipt;
+    return createHandoffReceipt(committedReceipt, {
+      result: "revealed_to_tty",
+      receiptEvidenceStatus: "stored",
+      revealStatus: "tty_write_completed",
+    });
   } catch {
-    return createTtyRevealReceipt(
-      issueResult,
-      "tty_write_unconfirmed",
-    );
+    return createHandoffReceipt(committedReceipt, {
+      result: "tty_reveal_unconfirmed",
+      receiptEvidenceStatus: "stored",
+      revealStatus: "tty_write_unconfirmed",
+    });
   } finally {
     rawClaim = null;
   }
@@ -224,6 +299,8 @@ export function readIdentityBootstrapClaimMigrationCliOptions(args) {
       ![
         "--target-app-user-id",
         "--target-app-user-sha256",
+        "--reviewed-database-target-fingerprint",
+        "--receipt-evidence-dir",
       ].includes(key) ||
       values.has(key)
     ) {
@@ -249,14 +326,21 @@ export function readIdentityBootstrapClaimMigrationCliOptions(args) {
   const targetAppUserSha256 = values.get(
     "--target-app-user-sha256",
   );
+  const reviewedDatabaseTargetFingerprint = values.get(
+    "--reviewed-database-target-fingerprint",
+  );
+  const receiptEvidenceDirectory = values.get(
+    "--receipt-evidence-dir",
+  );
   if (
-    values.size !== 2 ||
     typeof targetAppUserId !== "string" ||
     !UUID_PATTERN.test(targetAppUserId) ||
     targetAppUserId !== targetAppUserId.toLowerCase() ||
     typeof targetAppUserSha256 !== "string" ||
     !isSha256Fingerprint(targetAppUserSha256) ||
-    fingerprintAppUserId(targetAppUserId) !== targetAppUserSha256
+    fingerprintAppUserId(targetAppUserId) !== targetAppUserSha256 ||
+    typeof reviewedDatabaseTargetFingerprint !== "string" ||
+    !isSha256Fingerprint(reviewedDatabaseTargetFingerprint)
   ) {
     throw new IdentityBootstrapClaimMigrationCliError(
       "reviewed_target_invalid",
@@ -266,6 +350,27 @@ export function readIdentityBootstrapClaimMigrationCliOptions(args) {
   const write = flags.has("--write");
   const confirmed = flags.has(CONFIRMATION);
   const revealOnTty = flags.has("--reveal-on-tty");
+  if (
+    write &&
+    (typeof receiptEvidenceDirectory !== "string" ||
+      receiptEvidenceDirectory.length === 0)
+  ) {
+    throw new IdentityBootstrapClaimMigrationCliError(
+      "receipt_evidence_directory_required",
+    );
+  }
+  if (!write && receiptEvidenceDirectory !== undefined) {
+    throw new IdentityBootstrapClaimMigrationCliError(
+      "write_mode_required",
+    );
+  }
+  if (
+    values.size !== (write ? 4 : 3)
+  ) {
+    throw new IdentityBootstrapClaimMigrationCliError(
+      "arguments_invalid",
+    );
+  }
   if (write && (!confirmed || !revealOnTty)) {
     throw new IdentityBootstrapClaimMigrationCliError(
       "write_confirmation_required",
@@ -282,6 +387,9 @@ export function readIdentityBootstrapClaimMigrationCliOptions(args) {
     write,
     targetAppUserId,
     targetAppUserSha256,
+    reviewedDatabaseTargetFingerprint,
+    receiptEvidenceDirectory:
+      receiptEvidenceDirectory ?? null,
   });
 }
 
@@ -366,7 +474,7 @@ function assertInteractiveRevealPort(revealPort) {
   }
 }
 
-function createTtyRevealReceipt(issueResult, revealStatus) {
+function readCommittedIssueReceipt(issueResult) {
   if (
     readOwnDataValue(issueResult, "result") !== "issued" ||
     readOwnDataValue(issueResult, "committed") !== true
@@ -408,18 +516,26 @@ function createTtyRevealReceipt(issueResult, revealStatus) {
     );
   }
   return Object.freeze({
+    expiresAt,
+    claimBinding,
+  });
+}
+
+function createHandoffReceipt(
+  committedReceipt,
+  { result, receiptEvidenceStatus, revealStatus },
+) {
+  return Object.freeze({
     operation:
       IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.operation,
     mode: "write",
-    result:
-      revealStatus === "tty_write_completed"
-        ? "revealed_to_tty"
-        : "tty_reveal_unconfirmed",
+    result,
     issued: true,
     committed: true,
+    receiptEvidenceStatus,
     revealStatus,
-    expiresAt,
-    claimBinding,
+    expiresAt: committedReceipt.expiresAt,
+    claimBinding: committedReceipt.claimBinding,
   });
 }
 

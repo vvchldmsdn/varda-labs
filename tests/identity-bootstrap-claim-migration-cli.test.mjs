@@ -23,6 +23,7 @@ const CLAIM_DIGEST =
   `bootstrap-claim-sha256-v1:${"a".repeat(64)}`;
 const INTENT_SHA256 = `sha256:${"b".repeat(64)}`;
 const DATABASE_TARGET_SHA256 = `sha256:${"c".repeat(64)}`;
+const RECEIPT_EVIDENCE_DIRECTORY = "C:\\operator-evidence";
 
 describe("identity bootstrap claim migration CLI", () => {
   it("parses dry-run by default and requires the exact write gates", () => {
@@ -33,6 +34,9 @@ describe("identity bootstrap claim migration CLI", () => {
         write: false,
         targetAppUserId: TARGET,
         targetAppUserSha256: TARGET_SHA256,
+        reviewedDatabaseTargetFingerprint:
+          DATABASE_TARGET_SHA256,
+        receiptEvidenceDirectory: null,
       },
     );
     assert.deepEqual(
@@ -42,6 +46,9 @@ describe("identity bootstrap claim migration CLI", () => {
         write: true,
         targetAppUserId: TARGET,
         targetAppUserSha256: TARGET_SHA256,
+        reviewedDatabaseTargetFingerprint:
+          DATABASE_TARGET_SHA256,
+        receiptEvidenceDirectory: RECEIPT_EVIDENCE_DIRECTORY,
       },
     );
     for (const args of [
@@ -53,6 +60,7 @@ describe("identity bootstrap claim migration CLI", () => {
       ],
       [...baseArgs(), "--unknown"],
       [...baseArgs(), "--target-app-user-id", TARGET],
+      [...baseArgs(), "--receipt-evidence-dir", "C:\\unused"],
     ]) {
       assert.throws(
         () => readIdentityBootstrapClaimMigrationCliOptions(args),
@@ -128,10 +136,55 @@ describe("identity bootstrap claim migration CLI", () => {
       },
       revealTransport:
         "interactive_tty_stderr_once_after_commit",
+      receiptEvidencePersistence:
+        "atomic_create_only_local_file",
       retryCount: 0,
     });
     assert.equal(JSON.stringify(result).includes(TARGET), false);
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
+  });
+
+  it("rejects a database target fingerprint mismatch before creating a Pool", async () => {
+    let pools = 0;
+    await assert.rejects(
+      runIdentityBootstrapClaimMigrationCli({
+        args: baseArgs(),
+        loadEnvironment: () => environment(),
+        guardDatabaseTarget: () => ({
+          targetFingerprint: `sha256:${"d".repeat(64)}`,
+        }),
+        createPool() {
+          pools += 1;
+        },
+      }),
+      (error) =>
+        error instanceof IdentityBootstrapClaimMigrationCliError &&
+        error.code === "reviewed_database_target_mismatch",
+    );
+    assert.equal(pools, 0);
+  });
+
+  it("requires a valid evidence destination before env or DB work", async () => {
+    const calls = { environment: 0, pool: 0 };
+    await assert.rejects(
+      runIdentityBootstrapClaimMigrationCli({
+        args: writeArgs(),
+        revealPort: ttyRevealPort(),
+        createReceiptEvidencePort() {
+          throw codedError("receipt_evidence_directory_invalid");
+        },
+        loadEnvironment() {
+          calls.environment += 1;
+        },
+        createPool() {
+          calls.pool += 1;
+        },
+      }),
+      (error) =>
+        error instanceof IdentityBootstrapClaimMigrationCliError &&
+        error.code === "receipt_evidence_directory_invalid",
+    );
+    assert.deepEqual(calls, { environment: 0, pool: 0 });
   });
 
   it("rejects non-TTY and accessor-backed reveal ports before env or DB work", async () => {
@@ -179,7 +232,7 @@ describe("identity bootstrap claim migration CLI", () => {
     }
   });
 
-  it("reveals exactly once only after issue commit and pool close", async () => {
+  it("stores evidence before revealing exactly once", async () => {
     const events = [];
     const result = await runIdentityBootstrapClaimMigrationCli({
       ...writeDependencies(events),
@@ -193,18 +246,21 @@ describe("identity bootstrap claim migration CLI", () => {
     });
 
     assert.deepEqual(events, [
+      "create_evidence_port",
       "load_environment",
       "guard_target",
       "create_pool",
       "create_issuer",
       "issue",
       "pool_end",
+      "store_evidence",
       "take",
       "reveal",
     ]);
     assert.equal(result.result, "revealed_to_tty");
     assert.equal(result.issued, true);
     assert.equal(result.committed, true);
+    assert.equal(result.receiptEvidenceStatus, "stored");
     assert.equal(result.revealStatus, "tty_write_completed");
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
     assert.equal(JSON.stringify(result).includes(TARGET), false);
@@ -222,6 +278,7 @@ describe("identity bootstrap claim migration CLI", () => {
       guardDatabaseTarget: () => ({
         targetFingerprint: DATABASE_TARGET_SHA256,
       }),
+      createReceiptEvidencePort: () => receiptEvidencePort(),
       createPool: () => ({
         async end() {},
       }),
@@ -260,6 +317,7 @@ describe("identity bootstrap claim migration CLI", () => {
       guardDatabaseTarget: () => ({
         targetFingerprint: DATABASE_TARGET_SHA256,
       }),
+      createReceiptEvidencePort: () => receiptEvidencePort(),
       createPool: () => ({
         async end() {},
       }),
@@ -290,6 +348,7 @@ describe("identity bootstrap claim migration CLI", () => {
     assert.equal(result.result, "tty_reveal_unconfirmed");
     assert.equal(result.issued, true);
     assert.equal(result.committed, true);
+    assert.equal(result.receiptEvidenceStatus, "stored");
     assert.equal(result.revealStatus, "tty_write_unconfirmed");
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
   });
@@ -307,6 +366,7 @@ describe("identity bootstrap claim migration CLI", () => {
       guardDatabaseTarget: () => ({
         targetFingerprint: DATABASE_TARGET_SHA256,
       }),
+      createReceiptEvidencePort: () => receiptEvidencePort(),
       createPool: () => ({
         async end() {
           calls.close += 1;
@@ -337,9 +397,58 @@ describe("identity bootstrap claim migration CLI", () => {
       reveal: 0,
       close: 1,
     });
-    assert.equal(result.result, "tty_reveal_unconfirmed");
-    assert.equal(result.revealStatus, "tty_write_unconfirmed");
+    assert.equal(result.result, "receipt_evidence_unconfirmed");
+    assert.equal(result.receiptEvidenceStatus, "not_attempted");
+    assert.equal(result.revealStatus, "not_attempted");
     assert.equal(JSON.stringify(result).includes(RAW_CLAIM), false);
+  });
+
+  it("does not take or reveal when receipt evidence persistence fails", async () => {
+    const events = [];
+    const result = await runIdentityBootstrapClaimMigrationCli({
+      ...writeDependencies(events, { evidenceWriteFails: true }),
+      revealPort: {
+        isTTY: true,
+        async reveal() {
+          events.push("reveal");
+        },
+      },
+    });
+
+    assert.equal(result.result, "receipt_evidence_unconfirmed");
+    assert.equal(result.receiptEvidenceStatus, "write_failed");
+    assert.equal(result.revealStatus, "not_attempted");
+    assert.equal(events.includes("take"), false);
+    assert.equal(events.includes("reveal"), false);
+  });
+
+  it("blocks a mismatched target binding before evidence or reveal", async () => {
+    const events = [];
+    const result = await runIdentityBootstrapClaimMigrationCli({
+      ...writeDependencies(events, {
+        issueResult: issuedResult({
+          targetAppUserSha256: `sha256:${"9".repeat(64)}`,
+        }),
+      }),
+      revealPort: ttyRevealPort(),
+    });
+
+    assert.equal(result.result, "receipt_evidence_unconfirmed");
+    assert.equal(result.receiptEvidenceStatus, "binding_mismatch");
+    assert.equal(events.includes("store_evidence"), false);
+    assert.equal(events.includes("take"), false);
+  });
+
+  it("does not expose the local evidence path in results", async () => {
+    const result = await runIdentityBootstrapClaimMigrationCli({
+      ...writeDependencies([]),
+      revealPort: ttyRevealPort(),
+    });
+
+    assert.equal(
+      JSON.stringify(result).includes(RECEIPT_EVIDENCE_DIRECTORY),
+      false,
+    );
   });
 
   it("does not retry when an active intent blocks issuance", async () => {
@@ -356,6 +465,7 @@ describe("identity bootstrap claim migration CLI", () => {
         guardDatabaseTarget: () => ({
           targetFingerprint: DATABASE_TARGET_SHA256,
         }),
+        createReceiptEvidencePort: () => receiptEvidencePort(),
         createPool: () => ({
           async end() {
             calls.close += 1;
@@ -398,12 +508,16 @@ function baseArgs() {
     TARGET,
     "--target-app-user-sha256",
     TARGET_SHA256,
+    "--reviewed-database-target-fingerprint",
+    DATABASE_TARGET_SHA256,
   ];
 }
 
 function writeArgs() {
   return [
     ...baseArgs(),
+    "--receipt-evidence-dir",
+    RECEIPT_EVIDENCE_DIRECTORY,
     "--write",
     "--reveal-on-tty",
     IDENTITY_BOOTSTRAP_CLAIM_MIGRATION_CLI_POLICY.confirmation,
@@ -418,7 +532,7 @@ function environment() {
   };
 }
 
-function issuedResult() {
+function issuedResult({ targetAppUserSha256 = TARGET_SHA256 } = {}) {
   return Object.freeze({
     result: "issued",
     committed: true,
@@ -426,7 +540,7 @@ function issuedResult() {
       expiresAt: "2026-07-31T12:10:00.000Z",
     }),
     executionBinding: Object.freeze({
-      targetAppUserSha256: TARGET_SHA256,
+      targetAppUserSha256,
       provider: "neon_auth",
       claimDigestVersion: "bootstrap_claim_sha256_v1",
       claimDigest: CLAIM_DIGEST,
@@ -435,9 +549,19 @@ function issuedResult() {
   });
 }
 
-function writeDependencies(events) {
+function writeDependencies(
+  events,
+  { evidenceWriteFails = false, issueResult = issuedResult() } = {},
+) {
   return {
     args: writeArgs(),
+    createReceiptEvidencePort({ evidenceDirectory }) {
+      assert.equal(evidenceDirectory, RECEIPT_EVIDENCE_DIRECTORY);
+      events.push("create_evidence_port");
+      return receiptEvidencePort(events, {
+        writeFails: evidenceWriteFails,
+      });
+    },
     loadEnvironment() {
       events.push("load_environment");
       return environment();
@@ -459,7 +583,7 @@ function writeDependencies(events) {
       return {
         async issue() {
           events.push("issue");
-          return issuedResult();
+          return issueResult;
         },
         take() {
           events.push("take");
@@ -468,6 +592,43 @@ function writeDependencies(events) {
       };
     },
   };
+}
+
+function receiptEvidencePort(
+  events = [],
+  { writeFails = false } = {},
+) {
+  return {
+    store({ receipt, databaseTargetFingerprint }) {
+      events.push("store_evidence");
+      assert.equal(
+        receipt.claimBinding.identityPairingIntentSha256,
+        INTENT_SHA256,
+      );
+      assert.equal(
+        databaseTargetFingerprint,
+        DATABASE_TARGET_SHA256,
+      );
+      if (writeFails) {
+        throw codedError("receipt_evidence_write_failed");
+      }
+      return {
+        status: "stored",
+        receiptId: INTENT_SHA256,
+      };
+    },
+  };
+}
+
+function ttyRevealPort() {
+  return {
+    isTTY: true,
+    async reveal() {},
+  };
+}
+
+function codedError(code) {
+  return Object.assign(new Error(code), { code });
 }
 
 function accessorRevealPort() {
