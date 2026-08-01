@@ -140,6 +140,7 @@ import "./legacy-account-owner-assignment-rehearsal-host-cli.test.mjs";
 import "./initial-identity-link-planner.test.mjs";
 import "./identity-pairing-authority.test.mjs";
 import "./identity-pairing-claim-presentation.test.mjs";
+import "./identity-pairing-claim-presentation-audit.test.mjs";
 import "./private-session-subject-binding.test.mjs";
 import "./identity-pairing-consume-writer.test.mjs";
 import "./identity-bootstrap-claim-issuer.test.mjs";

@@ -12,6 +12,11 @@ import {
   assessIdentityPairingClaimPresentationEnvironment,
   IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE_ENV,
 } from "@/lib/auth/identity-pairing-claim-presentation-policy";
+import {
+  IDENTITY_PAIRING_CLAIM_PRESENTATION_STATIC_AUDITS,
+  projectIdentityPairingClaimPresentationAudit,
+  type IdentityPairingClaimPresentationAudit,
+} from "@/lib/auth/identity-pairing-claim-presentation-audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,20 +36,26 @@ export async function POST(request: Request) {
     return disabledResponse();
   }
   if (presentationRuntime.state === "misconfigured") {
-    recordAudit("misconfigured");
+    recordAudit(
+      IDENTITY_PAIRING_CLAIM_PRESENTATION_STATIC_AUDITS.runtimeMisconfigured,
+    );
     return createUnavailableIdentityPairingClaimPresentationResponse();
   }
 
   const metadata =
     validateIdentityPairingClaimPresentationMetadata(request);
   if (metadata.state === "blocked") {
-    recordAudit("transport_rejected");
+    recordAudit(
+      IDENTITY_PAIRING_CLAIM_PRESENTATION_STATIC_AUDITS.transportRejected,
+    );
     return createInvalidIdentityPairingClaimPresentationResponse();
   }
 
   const body = await readIdentityPairingClaimPresentationBody(request);
   if (body.state === "blocked") {
-    recordAudit("transport_rejected");
+    recordAudit(
+      IDENTITY_PAIRING_CLAIM_PRESENTATION_STATIC_AUDITS.transportRejected,
+    );
     return createInvalidIdentityPairingClaimPresentationResponse();
   }
 
@@ -56,12 +67,12 @@ export async function POST(request: Request) {
       );
     const result =
       await presentIdentityBootstrapClaimForCurrentSession(rawClaim);
-    recordAudit(
-      result.result === "consumed" ? "consumed" : "not_consumed",
-    );
+    recordAudit(projectIdentityPairingClaimPresentationAudit(result));
     return createProcessedIdentityPairingClaimPresentationResponse();
   } catch {
-    recordAudit("unavailable");
+    recordAudit(
+      IDENTITY_PAIRING_CLAIM_PRESENTATION_STATIC_AUDITS.runtimeUnavailable,
+    );
     return createUnavailableIdentityPairingClaimPresentationResponse();
   } finally {
     rawClaim = null;
@@ -92,15 +103,8 @@ function disabledResponse() {
   return createDisabledIdentityPairingClaimPresentationResponse();
 }
 
-function recordAudit(
-  outcome:
-    | "consumed"
-    | "not_consumed"
-    | "transport_rejected"
-    | "misconfigured"
-    | "unavailable",
-) {
+function recordAudit(audit: IdentityPairingClaimPresentationAudit) {
   console.info(
-    `[identity-pairing-claim-presentation-v1] ${outcome}`,
+    `[identity-pairing-claim-presentation-v1] outcome=${audit.outcome} phase=${audit.phase} category=${audit.category}`,
   );
 }
