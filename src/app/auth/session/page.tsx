@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SignOutButton } from "@/components/auth/auth-transport-controls";
+import { IdentityBootstrapClaimForm } from "@/components/auth/identity-bootstrap-claim-form";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
+import {
+  assessIdentityPairingClaimPresentationEnvironment,
+  IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE_ENV,
+} from "@/lib/auth/identity-pairing-claim-presentation-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +21,12 @@ export default async function SessionPage() {
   if (runtime.state === "disabled") notFound();
 
   const evidence = await readSessionEvidence(runtime);
+  const presentationRuntime =
+    assessIdentityPairingClaimPresentationEnvironment({
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE:
+        process.env[IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE_ENV],
+    });
 
   return (
     <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
@@ -42,6 +53,11 @@ export default async function SessionPage() {
           <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
             The server session is currently unavailable.
           </p>
+        ) : null}
+
+        {evidence === "authenticated" &&
+        presentationRuntime.state === "enabled" ? (
+          <IdentityBootstrapClaimForm />
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
