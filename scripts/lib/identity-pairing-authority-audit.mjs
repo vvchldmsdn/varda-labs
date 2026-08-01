@@ -423,11 +423,11 @@ export function auditIdentityPairingAuthority({ root, writerRegistry }) {
     '"@/lib/auth/private-cross-process-claim-presentation"',
   );
   const claimPresentationConfiguredDefaultDisabled =
-    claimPresentationPolicy.includes(
-      'IDENTITY_PAIRING_CLAIM_PRESENTATION_DEFAULT_MODE =\n  "disabled"',
+    /export const IDENTITY_PAIRING_CLAIM_PRESENTATION_DEFAULT_MODE\s*=\s*"disabled";/.test(
+      claimPresentationPolicy,
     ) &&
-    claimPresentationPolicy.includes(
-      'IDENTITY_PAIRING_CLAIM_PRESENTATION_ENABLED_MODE =\n  "enabled_v1"',
+    /export const IDENTITY_PAIRING_CLAIM_PRESENTATION_ENABLED_MODE\s*=\s*"enabled_v1";/.test(
+      claimPresentationPolicy,
     );
   const claimPresentationEnabledPathWired =
     gateIndex !== -1 &&
