@@ -8,6 +8,7 @@ describe("Simulation URL navigation", () => {
     const researchUniverse =
       "korea:KRW:069500:5000,us:USD:QQQ:5000";
     const href = buildSimulationHref({
+      account: "isa",
       endServiceDate: "2026-07-09",
       researchHorizon: 126,
       kodexWeightPct: 75,
@@ -16,6 +17,7 @@ describe("Simulation URL navigation", () => {
     const url = new URL(href, "https://example.test");
 
     assert.equal(url.pathname, "/simulation");
+    assert.equal(url.searchParams.get("account"), "isa");
     assert.equal(url.searchParams.get("end"), "2026-07-09");
     assert.equal(url.searchParams.get("horizon"), "126");
     assert.equal(url.searchParams.get("kodexWeight"), "75");
@@ -28,6 +30,7 @@ describe("Simulation URL navigation", () => {
   it("omits only absent optional state", () => {
     const url = new URL(
       buildSimulationHref({
+        account: null,
         endServiceDate: null,
         researchHorizon: 63,
         kodexWeightPct: null,
@@ -37,6 +40,7 @@ describe("Simulation URL navigation", () => {
     );
 
     assert.equal(url.searchParams.get("horizon"), "63");
+    assert.equal(url.searchParams.has("account"), false);
     assert.equal(url.searchParams.has("end"), false);
     assert.equal(url.searchParams.has("kodexWeight"), false);
     assert.equal(url.searchParams.has("researchUniverse"), false);

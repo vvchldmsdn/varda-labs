@@ -1,3 +1,4 @@
+import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
 import type { SimulationResearchUniversePreflightModel } from "@/lib/simulation-research-universe-preflight";
 
 export function ResearchUniversePreflightSection({
@@ -6,6 +7,7 @@ export function ResearchUniversePreflightSection({
 }: {
   model: SimulationResearchUniversePreflightModel;
   preservedQuery: Readonly<{
+    account: PortfolioAccountScope;
     end: string | null;
     horizon: string | null;
     kodexWeight: string | null;
@@ -43,6 +45,11 @@ export function ResearchUniversePreflightSection({
         className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
         method="get"
       >
+        <input
+          name="account"
+          type="hidden"
+          value={preservedQuery.account}
+        />
         {preservedQuery.end ? (
           <input name="end" type="hidden" value={preservedQuery.end} />
         ) : null}

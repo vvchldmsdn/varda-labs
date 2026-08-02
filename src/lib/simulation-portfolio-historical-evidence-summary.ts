@@ -1,8 +1,16 @@
-import type { SimulationHistoricalEvidenceAdmission } from "./simulation-historical-evidence-admission-types.ts";
+import type {
+  SimulationHistoricalEvidenceAdmission,
+  SimulationHistoricalEvidenceStatus,
+} from "./simulation-historical-evidence-admission-types.ts";
 
 export type SimulationPortfolioEvidenceEntry = Readonly<{
   weightBps: number;
   admission: SimulationHistoricalEvidenceAdmission;
+}>;
+
+export type SimulationPortfolioEvidenceStatusEntry = Readonly<{
+  weightBps: number;
+  admissionStatus: SimulationHistoricalEvidenceStatus;
 }>;
 
 export type SimulationPortfolioEvidenceSummary = Readonly<{
@@ -43,6 +51,17 @@ export type SimulationPortfolioEvidenceSummary = Readonly<{
 export function summarizeSimulationPortfolioHistoricalEvidence(
   entries: readonly SimulationPortfolioEvidenceEntry[],
 ): SimulationPortfolioEvidenceSummary {
+  return summarizeSimulationPortfolioHistoricalEvidenceStatuses(
+    entries.map((entry) => ({
+      weightBps: entry.weightBps,
+      admissionStatus: entry.admission.status,
+    })),
+  );
+}
+
+export function summarizeSimulationPortfolioHistoricalEvidenceStatuses(
+  entries: readonly SimulationPortfolioEvidenceStatusEntry[],
+): SimulationPortfolioEvidenceSummary {
   const positiveEntries = entries.filter(
     (entry) => Number.isFinite(entry.weightBps) && entry.weightBps > 0,
   );
@@ -50,23 +69,23 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
     (entry) => !Number.isFinite(entry.weightBps) || entry.weightBps < 0,
   );
   const admitted = positiveEntries.filter(
-    (entry) => entry.admission.status === "ready",
+    (entry) => entry.admissionStatus === "ready",
   );
   const explicitlyExcluded = positiveEntries.filter(
-    (entry) => entry.admission.status === "excluded_by_policy",
+    (entry) => entry.admissionStatus === "excluded_by_policy",
   );
   const manualHistoryRequired = positiveEntries.filter(
-    (entry) => entry.admission.status === "manual_history_required",
+    (entry) => entry.admissionStatus === "manual_history_required",
   );
   const incompleteModeled = positiveEntries.filter(
     (entry) =>
-      entry.admission.status !== "ready" &&
-      entry.admission.status !== "excluded_by_policy",
+      entry.admissionStatus !== "ready" &&
+      entry.admissionStatus !== "excluded_by_policy",
   );
   const blockers = new Set<string>();
 
   if (invalidWeight) blockers.add("invalid_weight");
-  for (const entry of incompleteModeled) blockers.add(entry.admission.status);
+  for (const entry of incompleteModeled) blockers.add(entry.admissionStatus);
   if (admitted.length === 0) {
     blockers.add("no_admitted_positive_weight_instrument");
   }
@@ -122,7 +141,7 @@ export function summarizeSimulationPortfolioHistoricalEvidence(
   });
 }
 
-function sumWeights(entries: readonly SimulationPortfolioEvidenceEntry[]) {
+function sumWeights(entries: readonly Readonly<{ weightBps: number }>[]) {
   return entries.reduce((sum, entry) => sum + entry.weightBps, 0);
 }
 

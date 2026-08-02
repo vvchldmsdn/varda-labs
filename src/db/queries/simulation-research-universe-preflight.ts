@@ -14,6 +14,7 @@ import {
   buildSimulationResearchUniversePreflight,
   resolveSimulationResearchUniverseSelection,
   type SimulationResearchUniversePriceRow,
+  type SimulationResearchUniverseSelection,
 } from "@/lib/simulation-research-universe-preflight";
 import type { SimulationReturnMatrixReadRepository } from "@/lib/simulation-return-matrix-read-loader";
 import type {
@@ -30,10 +31,24 @@ export async function getReadOnlySimulationResearchUniversePreflight(options?: {
   const selection = resolveSimulationResearchUniverseSelection(
     options?.researchUniverse,
   );
+
+  return getReadOnlySimulationResearchUniversePreflightForSelection({
+    selection,
+    endServiceDate: options?.endServiceDate,
+    now: options?.now,
+  });
+}
+
+export async function getReadOnlySimulationResearchUniversePreflightForSelection(options: {
+  selection: SimulationResearchUniverseSelection;
+  endServiceDate?: string | string[];
+  now?: Date;
+}) {
+  const selection = options.selection;
   const endSelection = resolveSimulationEndServiceDateSelection({
-    suppliedValue: options?.endServiceDate,
+    suppliedValue: options.endServiceDate,
     defaultEndServiceDate: resolveSnapshotCycle(
-      options?.now ?? new Date(),
+      options.now ?? new Date(),
     ).snapshotDate,
   });
   const requestedEndServiceDate =

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
+import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
 import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
@@ -11,15 +12,21 @@ import { SimulationInputReadinessView } from "@/components/simulation/simulation
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
+import { getReadOnlyTenantSimulationOwnerInputPreflight } from "@/db/queries/simulation-owner-input-preflight";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
 import { getReadOnlySimulationResearchUniversePreflight } from "@/db/queries/simulation-research-universe-preflight";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import {
+  normalizePortfolioAccountScope,
+  type PortfolioAccountScope,
+} from "@/lib/portfolio-account-scope";
 
 export const dynamic = "force-dynamic";
 
 type SimulationPageProps = {
   searchParams: Promise<{
+    account?: string | string[];
     end?: string | string[];
     horizon?: string | string[];
     kodexWeight?: string | string[];
@@ -51,6 +58,16 @@ export default async function SimulationPage({
     horizon: params.horizon,
     kodexWeight: params.kodexWeight,
   });
+  const selectedAccount = normalizePortfolioAccountScope(
+    params.account,
+    "all",
+  );
+  const ownerInputPreflightPromise =
+    getReadOnlyTenantSimulationOwnerInputPreflight({
+      account: selectedAccount,
+      endServiceDate: params.end,
+      tenantContext: resolution.tenantContext,
+    });
   const historicalOutcomeValidationPromise =
     getReadOnlySimulationHistoricalOutcomeValidation({
       endServiceDate: params.end,
@@ -70,6 +87,7 @@ export default async function SimulationPage({
       researchUniverse: params.researchUniverse,
     });
   const preservedQuery = Object.freeze({
+    account: selectedAccount,
     end: singleQueryValue(params.end),
     horizon: singleQueryValue(params.horizon),
     kodexWeight: singleQueryValue(params.kodexWeight),
@@ -83,6 +101,7 @@ export default async function SimulationPage({
           historicalOutcomeValidationPromise
         }
         modelPromise={modelPromise}
+        ownerInputPreflightPromise={ownerInputPreflightPromise}
         regimePromise={regimePromise}
         regimeHistoricalOutcomeValidationPromise={
           regimeHistoricalOutcomeValidationPromise
@@ -99,6 +118,7 @@ export default async function SimulationPage({
 async function SimulationContent({
   historicalOutcomeValidationPromise,
   modelPromise,
+  ownerInputPreflightPromise,
   regimePromise,
   regimeHistoricalOutcomeValidationPromise,
   researchUniversePreflightPromise,
@@ -108,6 +128,9 @@ async function SimulationContent({
     typeof getReadOnlySimulationHistoricalOutcomeValidation
   >;
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
+  ownerInputPreflightPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerInputPreflight
+  >;
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
   regimeHistoricalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
@@ -116,6 +139,7 @@ async function SimulationContent({
     typeof getReadOnlySimulationResearchUniversePreflight
   >;
   preservedQuery: Readonly<{
+    account: PortfolioAccountScope;
     end: string | null;
     horizon: string | null;
     kodexWeight: string | null;
@@ -140,7 +164,21 @@ async function SimulationContent({
         </SimulationSectionErrorBoundary>
       }
       model={model}
+      ownerInputPreflight={
+        <SimulationSectionErrorBoundary
+          section="owner-input-preflight"
+          title="내 포트폴리오 입력 점검"
+        >
+          <Suspense fallback={<OwnerInputPreflightSkeleton />}>
+            <OwnerInputPreflightContent
+              preservedQuery={preservedQuery}
+              resultPromise={ownerInputPreflightPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
       researchUniverse={preservedQuery.researchUniverse}
+      selectedAccount={preservedQuery.account}
       researchUniversePreflight={
         <SimulationSectionErrorBoundary
           section="research-universe-preflight"
@@ -186,11 +224,36 @@ async function SimulationContent({
   );
 }
 
+async function OwnerInputPreflightContent({
+  preservedQuery,
+  resultPromise,
+}: {
+  preservedQuery: Readonly<{
+    account: PortfolioAccountScope;
+    end: string | null;
+    horizon: string | null;
+    kodexWeight: string | null;
+    researchUniverse: string | null;
+  }>;
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerInputPreflight
+  >;
+}) {
+  const model = await resultPromise;
+  return (
+    <OwnerInputPreflightSection
+      model={model}
+      preservedQuery={preservedQuery}
+    />
+  );
+}
+
 async function ResearchUniversePreflightContent({
   preservedQuery,
   resultPromise,
 }: {
   preservedQuery: Readonly<{
+    account: PortfolioAccountScope;
     end: string | null;
     horizon: string | null;
     kodexWeight: string | null;
@@ -312,6 +375,19 @@ function ResearchUniversePreflightSkeleton() {
     >
       <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
       <div className="mt-4 h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
+  );
+}
+
+function OwnerInputPreflightSkeleton() {
+  return (
+    <section
+      aria-label="내 포트폴리오 입력 점검 로딩"
+      className="border-b border-[#d7ddcf] py-5"
+      data-owner-simulation-preflight-loading
+    >
+      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
     </section>
   );
 }
