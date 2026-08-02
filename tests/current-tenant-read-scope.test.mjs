@@ -93,6 +93,49 @@ describe("current tenant read scope runtime boundary", () => {
       /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,
     );
   });
+
+  it("authorizes position snapshots only through active owned accounts", () => {
+    const source = read("src/db/queries/tenant-position-snapshots.ts");
+
+    assert.match(source, /^import "server-only";/);
+    assert.match(
+      source,
+      /innerJoin\(\s*accounts,\s*eq\(dailyPositionSnapshots\.accountId,\s*accounts\.id\)/,
+    );
+    assert.match(
+      source,
+      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+    );
+    assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
+    assert.match(source, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(
+      source,
+      /eq\(dailyPositionSnapshots\.account,\s*accounts\.code\)/,
+    );
+    assert.match(source, /eq\(dailyPositionSnapshots\.isSample,\s*false\)/);
+    assert.doesNotMatch(
+      source,
+      /eq\(dailyPositionSnapshots\.(?:canonicalOwnerUserId|legacyAssetId|ticker)|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+    );
+  });
+
+  it("keeps the position-snapshot canary server-rendered and identity-minimal", () => {
+    const source = read("src/app/portfolio/position-snapshots/page.tsx");
+
+    assert.match(source, /resolveCurrentTenantContext\(\)/);
+    assert.match(source, /getReadOnlyTenantPositionSnapshots/);
+    assert.match(source, /parseTenantPositionSnapshotDateQuery/);
+    assert.match(source, /AccountScopeTabs/);
+    assert.match(source, /Partial evidence only/);
+    assert.match(
+      source,
+      /Do not use this\s+view for portfolio totals or decision support/,
+    );
+    assert.doesNotMatch(
+      source,
+      /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id|legacyAssetId/,
+    );
+  });
 });
 
 function read(path) {

@@ -54,6 +54,12 @@ export default async function TenantHoldingsPage({
               Accounts
             </Link>
             <Link
+              href="/portfolio/position-snapshots?account=all"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              Position snapshots
+            </Link>
+            <Link
               href="/auth/session"
               className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
             >
