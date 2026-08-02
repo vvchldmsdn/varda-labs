@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 
+import { PortfolioDashboardAccessBoundary } from "@/components/portfolio-dashboard-access-boundary";
 import { TodayMovement } from "@/components/today-movement";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
   getPortfolioDashboard,
   normalizeDashboardAccount,
@@ -18,10 +20,26 @@ type TodayPageProps = {
 };
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
-  const params = await searchParams;
+  const [params, resolution] = await Promise.all([
+    searchParams,
+    resolveCurrentTenantContext(),
+  ]);
   const selectedAccount = normalizeDashboardAccount(params.account);
   const detailQuery = normalizeTodayHoldingDetailQuery(params);
-  const dashboardPromise = getPortfolioDashboard(selectedAccount);
+
+  if (!resolution.ok) {
+    return (
+      <PortfolioDashboardAccessBoundary
+        resolution={resolution}
+        title="Today movement"
+      />
+    );
+  }
+
+  const dashboardPromise = getPortfolioDashboard({
+    selectedAccount,
+    tenantContext: resolution.tenantContext,
+  });
 
   return (
     <Suspense fallback={<TodaySkeleton />}>

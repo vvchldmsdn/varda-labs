@@ -51,7 +51,10 @@ describe("price instrument identity", () => {
       "utf8",
     );
     const daily = readFileSync("src/lib/snapshots/daily.ts", "utf8");
-    const dashboard = readFileSync("src/lib/portfolio-dashboard.ts", "utf8");
+    const dashboardQuery = readFileSync(
+      "src/db/queries/portfolio-dashboard.ts",
+      "utf8",
+    );
     const adminStatusQuery = readFileSync(
       "src/db/queries/admin-market-sync-status.ts",
       "utf8",
@@ -62,8 +65,8 @@ describe("price instrument identity", () => {
     assert.match(condition, /assetPriceSnapshots\.ticker/);
     assert.match(daily, /assetPriceSnapshotInstrumentCondition\(instruments\)/);
     assert.match(
-      dashboard,
-      /assetPriceSnapshotInstrumentCondition\(priceInstruments\)/,
+      dashboardQuery,
+      /assetPriceSnapshotInstrumentCondition\(selectedPriceInstruments\)/,
     );
     assert.match(
       adminStatusQuery,
@@ -74,7 +77,7 @@ describe("price instrument identity", () => {
       /inArray\(assetPriceSnapshots\.ticker/,
     );
     assert.doesNotMatch(
-      dashboard,
+      dashboardQuery,
       /inArray\(assetPriceSnapshots\.ticker/,
     );
     assert.doesNotMatch(
