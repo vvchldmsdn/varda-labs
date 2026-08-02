@@ -25,50 +25,30 @@ import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 
-export type ReadOnlyPortfolioStructureOptions = {
+export type ReadOnlyTenantPortfolioStructureOptions = {
   account?: string | string[] | null;
+  tenantContext: TenantContext;
 };
-
-export type ReadOnlyTenantPortfolioStructureOptions =
-  ReadOnlyPortfolioStructureOptions & {
-    tenantContext: TenantContext;
-  };
-
-export const getReadOnlyAllPortfolioStructure = cache(
-  loadReadOnlyAllPortfolioStructure,
-);
-
-/**
- * Temporary unscoped reader retained for Investment Lab migration only.
- * New user-facing routes must use getReadOnlyTenantPortfolioStructure.
- */
-export async function getReadOnlyPortfolioStructure({
-  account,
-}: ReadOnlyPortfolioStructureOptions = {}): Promise<PortfolioStructureResult> {
-  const selectedAccount = normalizePortfolioStructureAccount(account);
-  const [assetRows, groupRows, memberRows, latestFxRows, settingsRows] =
-    await Promise.all([
-      db.select().from(assets),
-      db.select().from(assetGroups),
-      db.select().from(assetGroupMembers),
-      db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
-      db.select().from(settings).orderBy(desc(settings.createdAt)).limit(1),
-    ]);
-  return buildStructureFromRows({
-    assetRows,
-    groupRows,
-    memberRows,
-    latestFxRows,
-    settingsRows,
-    selectedAccount,
-  });
-}
 
 export async function getReadOnlyTenantPortfolioStructure({
   account,
   tenantContext,
 }: ReadOnlyTenantPortfolioStructureOptions): Promise<PortfolioStructureResult> {
   const selectedAccount = normalizePortfolioStructureAccount(account);
+  return loadReadOnlyTenantPortfolioStructure(
+    tenantContext,
+    selectedAccount,
+  );
+}
+
+const loadReadOnlyTenantPortfolioStructure = cache(
+  loadTenantPortfolioStructure,
+);
+
+async function loadTenantPortfolioStructure(
+  tenantContext: TenantContext,
+  selectedAccount: PortfolioStructureAccount,
+): Promise<PortfolioStructureResult> {
   const [assetRows, groupRows, memberRows, latestFxRows, settingsRows] =
     await Promise.all([
       db
@@ -139,10 +119,6 @@ export function normalizePortfolioStructureAccount(
 ): PortfolioStructureAccount {
   const rawAccount = Array.isArray(account) ? account[0] : account;
   return normalizeStructureAccount(rawAccount);
-}
-
-function loadReadOnlyAllPortfolioStructure() {
-  return getReadOnlyPortfolioStructure({ account: "all" });
 }
 
 async function buildStructureFromRows({

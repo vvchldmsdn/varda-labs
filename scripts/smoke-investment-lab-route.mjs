@@ -47,29 +47,57 @@ const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
 const USERNAME = process.env.VARDA_APP_USER?.trim() || "varda";
+const SESSION_COOKIE =
+  readArgument("--session-cookie") ??
+  process.env.VARDA_SESSION_COOKIE?.trim() ??
+  null;
 const LEAK_PATTERN =
   /legacyBase44Id|holdingId|assetId|ownerUserId|api[_-]?key|authorization|password|secret|token|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 if (!["all", "brokerage", "isa", "irp"].includes(ACCOUNT)) {
   throw new Error(`Unsupported account scope: ${ACCOUNT}`);
 }
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
 
 async function main() {
-  const countsBefore = await readCounts();
   const unauthorized = await request("/investment-lab");
   assert.equal(unauthorized.status, 401, "no-auth route must return 401");
 
+  const routePath = investmentLabRoutePath();
+  if (!SESSION_COOKIE) {
+    const boundary = await request(routePath, true);
+    assert.equal(boundary.status, 200, "Basic-auth boundary must return 200");
+    assert.match(boundary.body, /Investment Lab/);
+    assert.match(boundary.body, /Portfolio user link/);
+    assert.match(boundary.body, /Product database read/);
+    assert.match(boundary.body, /Not attempted/);
+    assert.doesNotMatch(boundary.body, /data-page="investment-lab"/);
+    assert.doesNotMatch(boundary.body, LEAK_PATTERN);
+    console.log(
+      JSON.stringify(
+        {
+          status: "session_boundary_verified",
+          account: ACCOUNT,
+          databaseReadAttempted: false,
+          leakPatternMatches: 0,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (!sql) throw new Error("DATABASE_URL is required for session-bound smoke");
+  const countsBefore = await readCounts();
   const dashboard = await request("/", true);
   assert.equal(dashboard.status, 200, "authenticated dashboard must return 200");
   assert.match(dashboard.body, /href="\/investment-lab"/);
   assert.doesNotMatch(dashboard.body, LEAK_PATTERN);
 
-  const routePath = investmentLabRoutePath();
   const route = await request(routePath, true);
   assert.equal(route.status, 200, "authenticated route must return 200");
   assert.match(route.body, /data-page="investment-lab"/);
@@ -1395,8 +1423,14 @@ async function main() {
 }
 
 async function request(path, authenticated = false) {
+  const headers = authenticated
+    ? {
+        authorization,
+        ...(SESSION_COOKIE ? { cookie: SESSION_COOKIE } : {}),
+      }
+    : undefined;
   const response = await fetch(new URL(path, BASE_URL), {
-    headers: authenticated ? { authorization } : undefined,
+    headers,
     redirect: "manual",
     signal: AbortSignal.timeout(30_000),
   });
@@ -1422,6 +1456,7 @@ function fixedMixSelectionStatus() {
 }
 
 async function readCounts() {
+  assert.ok(sql, "DATABASE_URL is required for count verification");
   const [row] = await sql.query(`
     select
       (select count(*)::int from assets) as assets,

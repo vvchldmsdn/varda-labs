@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import {
   InvestmentLabDataAvailabilitySkeleton,
   InvestmentLabDataAvailabilityUnavailable,
@@ -20,10 +21,11 @@ import {
   InvestmentLabSmallAdjustmentUnavailable,
 } from "@/components/investment-lab/investment-lab-small-adjustment";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
-import { getReadOnlyInvestmentLabDataAvailability } from "@/db/queries/investment-lab-data-availability";
-import { getReadOnlyInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
-import { getReadOnlyInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
-import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { getReadOnlyTenantInvestmentLabDataAvailability } from "@/db/queries/investment-lab-data-availability";
+import { getReadOnlyTenantInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
+import { getReadOnlyTenantInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
+import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { applyInvestmentLabFountAvailabilityScope } from "@/lib/investment-lab-data-availability";
 import { buildInvestmentLabSmallAdjustmentModel } from "@/lib/investment-lab-small-adjustment";
 import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
@@ -50,7 +52,20 @@ type InvestmentLabPageProps = {
 export default async function InvestmentLabPage({
   searchParams,
 }: InvestmentLabPageProps) {
-  const params = await searchParams;
+  const [params, resolution] = await Promise.all([
+    searchParams,
+    resolveCurrentTenantContext(),
+  ]);
+
+  if (!resolution.ok) {
+    return (
+      <PortfolioReadAccessBoundary
+        resolution={resolution}
+        title="Investment Lab"
+      />
+    );
+  }
+
   const selectedAccount = normalizePortfolioAccountScope(
     params.account,
     "all",
@@ -64,26 +79,39 @@ export default async function InvestmentLabPage({
   const fixedMixSelection = resolveInvestmentLabFixedMixSelection(
     params.kodexWeight,
   );
-  const portfolioStructurePromise = getReadOnlyPortfolioStructure({
+  const tenantContext = resolution.tenantContext;
+  const portfolioStructurePromise = getReadOnlyTenantPortfolioStructure({
     account: selectedAccount,
+    tenantContext,
   });
   const dataAvailabilityPromise =
-    getReadOnlyInvestmentLabDataAvailability(selectedAccount);
-  const etfXrayPromise = getReadOnlyInvestmentLabEtfXray(selectedAccount);
-  const modelPromise = getReadOnlyInvestmentLabCounterfactual(
-    params.start === undefined && params.end === undefined
-      ? undefined
-      : {
-          startServiceDate: params.start,
-          endServiceDate: params.end,
-        },
+    getReadOnlyTenantInvestmentLabDataAvailability({
+      account: selectedAccount,
+      tenantContext,
+    });
+  const etfXrayPromise = getReadOnlyTenantInvestmentLabEtfXray({
+    account: selectedAccount,
+    tenantContext,
+  });
+  const modelPromise = getReadOnlyTenantInvestmentLabCounterfactual({
+    account: selectedAccount,
     fixedMixSelection,
-    normalizeSingleParam(params.basketAnchor),
-    selectedAccount,
-  );
+    request:
+      params.start === undefined && params.end === undefined
+        ? undefined
+        : {
+            startServiceDate: params.start,
+            endServiceDate: params.end,
+          },
+    requestedAnchorDate: normalizeSingleParam(params.basketAnchor),
+    tenantContext,
+  });
 
   return (
-    <div className="min-h-screen bg-[#f3f4ef] text-[#171916]">
+    <div
+      className="min-h-screen bg-[#f3f4ef] text-[#171916]"
+      data-page="investment-lab"
+    >
       <Suspense fallback={<InvestmentLabSkeleton />}>
         <InvestmentLabContent
           dataAvailabilityPromise={dataAvailabilityPromise}
@@ -115,10 +143,10 @@ async function InvestmentLabContent({
 }: {
   accountQuery: PortfolioAccountScopeQuery;
   dataAvailabilityPromise: ReturnType<
-    typeof getReadOnlyInvestmentLabDataAvailability
+    typeof getReadOnlyTenantInvestmentLabDataAvailability
   >;
   fixedMixSelection: InvestmentLabFixedMixSelection;
-  modelPromise: ReturnType<typeof getReadOnlyInvestmentLabCounterfactual>;
+  modelPromise: ReturnType<typeof getReadOnlyTenantInvestmentLabCounterfactual>;
   selectedAccount: PortfolioAccountScope;
 }) {
   const {
@@ -178,7 +206,9 @@ async function InvestmentLabDataAvailabilityContent({
   modelPromise,
 }: {
   fountScopeStatus: "not_applicable" | "applied" | "blocked";
-  modelPromise: ReturnType<typeof getReadOnlyInvestmentLabDataAvailability>;
+  modelPromise: ReturnType<
+    typeof getReadOnlyTenantInvestmentLabDataAvailability
+  >;
 }) {
   let model;
   try {
@@ -204,7 +234,7 @@ function normalizeSingleParam(value: string | string[] | undefined) {
 async function InvestmentLabEtfXrayContent({
   modelPromise,
 }: {
-  modelPromise: ReturnType<typeof getReadOnlyInvestmentLabEtfXray>;
+  modelPromise: ReturnType<typeof getReadOnlyTenantInvestmentLabEtfXray>;
 }) {
   let model;
   try {
@@ -219,7 +249,7 @@ async function InvestmentLabSmallAdjustmentContent({
   modelPromise,
   selectedAccount,
 }: {
-  modelPromise: ReturnType<typeof getReadOnlyPortfolioStructure>;
+  modelPromise: ReturnType<typeof getReadOnlyTenantPortfolioStructure>;
   selectedAccount: PortfolioAccountScope;
 }) {
   let portfolio;
