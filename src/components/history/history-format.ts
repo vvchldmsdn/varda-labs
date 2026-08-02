@@ -41,7 +41,8 @@ export function historyRowKindLabel(row: PortfolioHistoryDisplayRow) {
   const accounts = row.derivedFromAccounts
     .map(historyAccountLabel)
     .join(", ");
-  return `표시용 합산${accounts ? ` (${accounts})` : ""}`;
+  const label = row.rowKind === "partial" ? "부분 합산" : "표시용 합산";
+  return `${label}${accounts ? ` (${accounts})` : ""}`;
 }
 
 export function formatHistoryKrw(value: string | number | null) {

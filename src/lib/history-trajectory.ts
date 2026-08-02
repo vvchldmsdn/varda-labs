@@ -16,7 +16,7 @@ export const HISTORY_TRAJECTORY_POLICY = Object.freeze({
 } as const);
 
 export type HistoryTrajectoryLane = "balance" | "portfolio";
-export type HistoryTrajectoryRowKind = "stored" | "derived";
+export type HistoryTrajectoryRowKind = "stored" | "derived" | "partial";
 
 export type HistoryTrajectoryPoint = Readonly<{
   date: string;

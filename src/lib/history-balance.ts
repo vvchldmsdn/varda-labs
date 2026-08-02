@@ -34,7 +34,7 @@ export type PortfolioHistoryDisplayRow = {
   snapshotDate: string;
   account: HistoryAccount;
   source: string;
-  rowKind: "stored" | "derived";
+  rowKind: "stored" | "derived" | "partial";
   derivedFromAccounts: HistoryAccount[];
   cashValue: number | null;
   investedAmount: number | null;
@@ -142,32 +142,33 @@ function derivedAllPortfolioRow(
     }
   }
 
-  const sortedRows = REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.map((account) =>
-    rowsByAccount.get(account),
+  const availableAccounts = REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.filter(
+    (account) => rowsByAccount.has(account),
   );
+  const availableRows = availableAccounts.map(
+    (account) => rowsByAccount.get(account)!,
+  );
+  if (availableRows.length === 0) return null;
 
-  if (
-    sortedRows.some(
-      (row): row is undefined => row === undefined,
-    )
-  ) {
-    return null;
-  }
-
-  const completeRows = sortedRows as PortfolioHistoryRawRow[];
-  const representative = completeRows[0];
-  const totalMarketValue = sumNullable(completeRows, (row) => row.totalMarketValue);
-  const totalCost = sumNullable(completeRows, (row) => row.totalCost);
-  const totalPnl = sumNullable(completeRows, (row) => row.totalPnl);
+  const representative = availableRows[0];
+  const totalMarketValue = sumNullable(
+    availableRows,
+    (row) => row.totalMarketValue,
+  );
+  const totalCost = sumNullable(availableRows, (row) => row.totalCost);
+  const totalPnl = sumNullable(availableRows, (row) => row.totalPnl);
 
   return {
     snapshotDate: representative.snapshotDate,
     account: "all",
     source: representative.source,
-    rowKind: "derived",
-    derivedFromAccounts: [...REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS],
-    cashValue: sumNullable(completeRows, (row) => row.cashValue),
-    investedAmount: sumNullable(completeRows, (row) => row.investedAmount),
+    rowKind:
+      availableRows.length === REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.length
+        ? "derived"
+        : "partial",
+    derivedFromAccounts: [...availableAccounts],
+    cashValue: sumNullable(availableRows, (row) => row.cashValue),
+    investedAmount: sumNullable(availableRows, (row) => row.investedAmount),
     totalCost,
     totalMarketValue,
     totalPnl,

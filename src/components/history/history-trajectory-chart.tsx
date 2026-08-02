@@ -116,11 +116,11 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
               className="inline-block h-1 w-7"
               style={{
                 backgroundColor:
-                  group.rowKind === "derived"
+                  group.rowKind !== "stored"
                     ? "transparent"
                     : strokeColor(group.rowKind),
                 borderTop:
-                  group.rowKind === "derived"
+                  group.rowKind !== "stored"
                     ? `2px dashed ${strokeColor(group.rowKind)}`
                     : undefined,
               }}
@@ -184,7 +184,11 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                     points={points}
                     stroke={color}
                     strokeDasharray={
-                      segment.rowKind === "derived" ? "7 5" : undefined
+                      segment.rowKind === "derived"
+                        ? "7 5"
+                        : segment.rowKind === "partial"
+                          ? "3 4"
+                          : undefined
                     }
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -197,7 +201,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                     cx={toX(point.date)}
                     cy={toY(point.valueKrw)}
                     fill={
-                      segment.rowKind === "derived" ? "#ffffff" : color
+                      segment.rowKind === "stored" ? color : "#ffffff"
                     }
                     r="3.5"
                     stroke={color}
@@ -255,11 +259,15 @@ function uniqueDateLabels(dates: readonly string[]) {
 }
 
 function rowKindLabel(rowKind: HistoryTrajectoryRowKind) {
-  return rowKind === "derived" ? "표시용 합산" : "저장값";
+  if (rowKind === "derived") return "표시용 합산";
+  if (rowKind === "partial") return "부분 합산";
+  return "저장값";
 }
 
 function strokeColor(rowKind: HistoryTrajectoryRowKind) {
-  return rowKind === "derived" ? "#b66b35" : "#1e3a34";
+  if (rowKind === "derived") return "#b66b35";
+  if (rowKind === "partial") return "#9a6d23";
+  return "#1e3a34";
 }
 
 function formatCompactKrw(value: number) {

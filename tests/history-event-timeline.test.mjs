@@ -186,23 +186,27 @@ describe("stored named-account history event timeline", () => {
     assert.equal(model.duplicateIdentityCount, 2);
   });
 
-  it("keeps the query server-only, exact-account, bounded, and asset-join free", () => {
+  it("keeps the tenant query owner-scoped, bounded, and asset-join free", () => {
     const querySource = readFileSync(
-      new URL("../src/db/queries/history-balance.ts", import.meta.url),
+      new URL("../src/db/queries/tenant-events.ts", import.meta.url),
       "utf8",
     );
     const viewSource = readFileSync(
       new URL(
-        "../src/components/history/history-event-timeline.tsx",
+        "../src/components/events/tenant-event-table.tsx",
         import.meta.url,
       ),
       "utf8",
     );
 
     assert.match(querySource, /HISTORY_EVENT_QUERY_LIMIT/);
-    assert.match(querySource, /eventLedgerEntries\.account, account/);
+    assert.match(
+      querySource,
+      /accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId/,
+    );
+    assert.match(querySource, /eventLedgerEntries\.account, accounts\.code/);
+    assert.match(querySource, /innerJoin\(accounts/);
     assert.match(querySource, /eventLedgerEntries\.isSample, false/);
-    assert.match(querySource, /Promise\.all/);
     assert.doesNotMatch(querySource, /\.leftJoin\(assets|\.innerJoin\(assets/);
     assert.doesNotMatch(viewSource, /use client|fetch\(|\/api\//);
     assert.doesNotMatch(viewSource, /correctsEventId|legacyBase44Id|assetId/);
