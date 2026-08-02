@@ -259,6 +259,58 @@ describe("current tenant read scope runtime boundary", () => {
     }
   });
 
+  it("authorizes portfolio structure through owned accounts and owner-scoped groups", () => {
+    const source = read("src/db/queries/portfolio-structure.ts");
+
+    assert.match(source, /^import "server-only";/);
+    assert.match(source, /getReadOnlyTenantPortfolioStructure/);
+    assert.match(
+      source,
+      /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
+    );
+    assert.match(
+      source,
+      /eq\(accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
+    assert.match(source, /eq\(accounts\.isActive, true\)/);
+    assert.match(source, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(source, /eq\(assets\.account, accounts\.code\)/);
+    assert.match(
+      source,
+      /eq\(assetGroups\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
+    assert.match(
+      source,
+      /eq\(\s*assetGroupMembers\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId/,
+    );
+    assert.match(source, /eq\(assetGroupMembers\.groupId, assets\.groupId\)/);
+    assert.match(
+      source,
+      /eq\(settings\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
+    assert.doesNotMatch(
+      source,
+      /eq\(assets\.canonicalOwnerUserId|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+    );
+  });
+
+  it("keeps portfolio structure behind the resolved server session", () => {
+    const source = read("src/app/portfolio/structure/page.tsx");
+
+    assert.match(source, /resolveCurrentTenantContext\(\)/);
+    assert.match(source, /Promise\.all/);
+    assert.match(source, /if \(!resolution\.ok\)/);
+    assert.match(source, /PortfolioReadAccessBoundary/);
+    assert.match(
+      source,
+      /getReadOnlyTenantPortfolioStructure\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
+    );
+    assert.doesNotMatch(
+      source,
+      /getReadOnlyPortfolioStructure\(|fetch\(|\/api\/|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,
+    );
+  });
+
   it("smokes the unauthenticated history boundary without direct database reads", () => {
     const source = read("scripts/smoke-history-route.mjs");
 
