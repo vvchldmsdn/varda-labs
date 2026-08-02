@@ -311,6 +311,56 @@ describe("current tenant read scope runtime boundary", () => {
     );
   });
 
+  it("keeps portfolio risk behind the resolved server tenant", () => {
+    const pageSource = read("src/app/portfolio/risk/page.tsx");
+    const querySource = read("src/db/queries/portfolio-risk.ts");
+    const smokeSource = read("scripts/smoke-portfolio-risk-route.mjs");
+
+    assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
+    assert.match(pageSource, /Promise\.all/);
+    assert.match(pageSource, /if \(!resolution\.ok\)/);
+    assert.match(pageSource, /PortfolioReadAccessBoundary/);
+    assert.match(
+      pageSource,
+      /getReadOnlyTenantPortfolioRisk\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
+    );
+    assert.doesNotMatch(
+      pageSource,
+      /getReadOnlyPortfolioRisk\(|fetch\(|\/api\/|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,
+    );
+
+    assert.match(querySource, /^import "server-only";/);
+    assert.match(querySource, /getReadOnlyTenantPortfolioRisk/);
+    assert.match(
+      querySource,
+      /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
+    );
+    assert.match(
+      querySource,
+      /eq\(accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
+    assert.match(querySource, /eq\(accounts\.isActive, true\)/);
+    assert.match(querySource, /inArray\(accounts\.code, TRACKED_ACCOUNTS\)/);
+    assert.match(querySource, /eq\(assets\.account, accounts\.code\)/);
+    assert.doesNotMatch(
+      querySource,
+      /export async function getReadOnlyPortfolioRisk|accountCondition\(/,
+    );
+
+    assert.match(smokeSource, /const SESSION_COOKIE/);
+    assert.match(smokeSource, /if \(!SESSION_COOKIE\)/);
+    assert.match(
+      smokeSource,
+      /status: "portfolio_risk_session_boundary_verified"/,
+    );
+    assert.match(smokeSource, /databaseReadAttempted: false/);
+    assert.match(
+      smokeSource,
+      /assert\.doesNotMatch\(boundary\.body, \/data-page=/,
+    );
+    assert.match(smokeSource, /if \(!sql\) throw new Error/);
+  });
+
   it("authorizes every Investment Lab portfolio input through owned accounts", () => {
     const counterfactualSource = read("src/db/queries/investment-lab.ts");
     const availabilitySource = read(

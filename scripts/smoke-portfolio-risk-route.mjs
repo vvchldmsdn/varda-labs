@@ -10,6 +10,10 @@ const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
 const USERNAME = process.env.VARDA_APP_USER?.trim() || "varda";
+const SESSION_COOKIE =
+  readArgument("--session-cookie") ??
+  process.env.VARDA_SESSION_COOKIE?.trim() ??
+  null;
 const EXPECT_HISTORY_UNAVAILABLE = process.argv.includes(
   "--expect-history-unavailable",
 );
@@ -95,20 +99,43 @@ const scenarios = EXPECT_HISTORY_UNAVAILABLE
   : baseScenarios;
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
-
-const sql = neon(process.env.DATABASE_URL);
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
 
 async function main() {
-  const countsBefore = await readCounts();
   const unauthorizedRisk = await request("/portfolio/risk");
-  const unauthorizedDashboard = await request("/");
   assert.equal(
     unauthorizedRisk.status,
     401,
     "no-auth risk request must return 401",
   );
+
+  if (!SESSION_COOKIE) {
+    const boundary = await request("/portfolio/risk", true);
+    assert.equal(boundary.status, 200, "Basic-auth boundary must return 200");
+    assert.match(boundary.body, /Portfolio risk/);
+    assert.match(boundary.body, /Portfolio user link/);
+    assert.match(boundary.body, /Product database read/);
+    assert.match(boundary.body, /Not attempted/);
+    assert.doesNotMatch(boundary.body, /data-page="portfolio-risk"/);
+    assert.doesNotMatch(boundary.body, LEAK_PATTERN);
+    console.log(
+      JSON.stringify(
+        {
+          status: "portfolio_risk_session_boundary_verified",
+          databaseReadAttempted: false,
+          leakPatternMatches: 0,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (!sql) throw new Error("DATABASE_URL is required for session-bound smoke");
+  const countsBefore = await readCounts();
+  const unauthorizedDashboard = await request("/");
   assert.equal(
     unauthorizedDashboard.status,
     401,
@@ -218,8 +245,14 @@ async function main() {
 }
 
 async function request(path, authenticated = false) {
+  const headers = authenticated
+    ? {
+        authorization,
+        ...(SESSION_COOKIE ? { cookie: SESSION_COOKIE } : {}),
+      }
+    : undefined;
   const response = await fetch(new URL(path, BASE_URL), {
-    headers: authenticated ? { authorization } : undefined,
+    headers,
     redirect: "manual",
     signal: AbortSignal.timeout(30_000),
   });
@@ -227,6 +260,7 @@ async function request(path, authenticated = false) {
 }
 
 async function readCounts() {
+  assert.ok(sql, "DATABASE_URL is required for count verification");
   const [row] = await sql.query(`
     select
       (select count(*)::int from assets) as assets,
