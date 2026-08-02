@@ -50,9 +50,47 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /resolveCurrentTenantContext\(\)/);
     assert.match(source, /getReadOnlyTenantAccounts/);
     assert.match(source, /normalizePortfolioAccountScope/);
+    assert.match(source, /sessionResolutionEvidence\(resolution\)/);
     assert.doesNotMatch(
       source,
       /providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,
+    );
+  });
+
+  it("authorizes holdings through the owned account relationship", () => {
+    const source = read("src/db/queries/tenant-holdings.ts");
+
+    assert.match(source, /^import "server-only";/);
+    assert.match(
+      source,
+      /innerJoin\(accounts,\s*eq\(assets\.accountId,\s*accounts\.id\)\)/,
+    );
+    assert.match(
+      source,
+      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+    );
+    assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
+    assert.match(source, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(source, /eq\(assets\.account,\s*accounts\.code\)/);
+    assert.doesNotMatch(
+      source,
+      /eq\(assets\.canonicalOwnerUserId|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+    );
+  });
+
+  it("keeps the holdings canary server-rendered and identity-minimal", () => {
+    const source = read("src/app/portfolio/holdings/page.tsx");
+
+    assert.match(source, /resolveCurrentTenantContext\(\)/);
+    assert.match(source, /getReadOnlyTenantHoldings/);
+    assert.match(source, /normalizePortfolioAccountScope/);
+    assert.match(source, /Promise\.all/);
+    assert.match(source, /holdingReadEvidence\(result, resolution\)/);
+    assert.match(source, /result\.state === "partial"/);
+    assert.match(source, /must not be used for valuation totals/);
+    assert.doesNotMatch(
+      source,
+      /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,
     );
   });
 });

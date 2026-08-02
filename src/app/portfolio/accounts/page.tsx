@@ -10,7 +10,7 @@ import {
 } from "@/db/queries/tenant-accounts";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
-import type { SessionResolverResult } from "@/lib/session-resolver-contract";
+import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 
 export const dynamic = "force-dynamic";
 
@@ -48,18 +48,26 @@ export default async function AccountScopePage({
               Server session and canonical ownership only
             </p>
           </div>
-          <Link
-            href="/auth/session"
-            className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-          >
-            Session evidence
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/portfolio/holdings?account=all"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              Holdings
+            </Link>
+            <Link
+              href="/auth/session"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              Session evidence
+            </Link>
+          </div>
         </div>
 
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell
             label="Portfolio user link"
-            value={portfolioLinkEvidence(resolution)}
+            value={sessionResolutionEvidence(resolution)}
           />
           <EvidenceCell
             label="Product database read"
@@ -118,25 +126,6 @@ export default async function AccountScopePage({
       </section>
     </main>
   );
-}
-
-function portfolioLinkEvidence(resolution: SessionResolverResult) {
-  if (resolution.ok) return "Resolved";
-  switch (resolution.failure.code) {
-    case "identity_unlinked":
-      return "Not linked";
-    case "identity_not_active":
-    case "app_user_not_active":
-      return "Inactive";
-    case "unauthenticated":
-      return "Sign-in required";
-    case "auth_provider_unavailable":
-      return "Auth unavailable";
-    case "identity_store_unavailable":
-      return "Identity store unavailable";
-    default:
-      return "Blocked";
-  }
 }
 
 function productReadEvidence(result: TenantAccountQueryResult | null) {
