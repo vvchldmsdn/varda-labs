@@ -8,33 +8,14 @@ import {
   loadPortfolioRiskReadModel,
   type PortfolioRiskReadOptions,
 } from "@/lib/portfolio-risk-read-loader";
-import type {
-  PortfolioRiskAccount,
-  PortfolioRiskReadRepository,
-} from "@/lib/portfolio-risk-read-model-types";
+import type { PortfolioRiskReadRepository } from "@/lib/portfolio-risk-read-model-types";
 import { admitAdjustedHistoricalPriceRows } from "@/lib/market-data/asset-price-consumer-admission";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const TRACKED_ACCOUNTS = ["brokerage", "isa", "irp"];
 
-const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
-  async loadAssets(account) {
-    return db
-      .select({
-        account: sql<string>`lower(trim(${assets.account}))`,
-        ticker: sql<string | null>`upper(trim(${assets.ticker}))`,
-        name: assets.name,
-        market: sql<string>`lower(trim(${assets.market}))`,
-        currency: sql<string>`upper(trim(${assets.currency}))`,
-        assetType: sql<string | null>`lower(trim(${assets.assetType}))`,
-        quantity: assets.quantity,
-      })
-      .from(assets)
-      .where(accountCondition(account))
-      .orderBy(asc(assets.account), asc(assets.ticker), asc(assets.name));
-  },
-
-  async loadPrices({ tickers, sourceDateFrom, sourceDateTo }) {
+const loadSharedPortfolioRiskPrices: PortfolioRiskReadRepository["loadPrices"] =
+  async ({ tickers, sourceDateFrom, sourceDateTo }) => {
     if (tickers.length === 0) return [];
     const rows = await db
       .select({
@@ -72,9 +53,10 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
       );
 
     return [...admitAdjustedHistoricalPriceRows(rows).rows];
-  },
+  };
 
-  async loadFxRates({ sourceDateFrom, sourceDateTo }) {
+const loadSharedPortfolioRiskFxRates: PortfolioRiskReadRepository["loadFxRates"] =
+  async ({ sourceDateFrom, sourceDateTo }) => {
     return db
       .select({
         rateDate: fxRates.rateDate,
@@ -91,8 +73,7 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
         ),
       )
       .orderBy(asc(fxRates.rateDate));
-  },
-};
+  };
 
 function createTenantPortfolioRiskRepository(
   tenantContext: TenantContext,
@@ -122,15 +103,9 @@ function createTenantPortfolioRiskRepository(
         .where(and(...predicates))
         .orderBy(asc(accounts.sortOrder), asc(accounts.code), asc(assets.ticker));
     },
-    loadPrices: drizzlePortfolioRiskRepository.loadPrices,
-    loadFxRates: drizzlePortfolioRiskRepository.loadFxRates,
+    loadPrices: loadSharedPortfolioRiskPrices,
+    loadFxRates: loadSharedPortfolioRiskFxRates,
   };
-}
-
-export async function getReadOnlyPortfolioRisk(
-  options: PortfolioRiskReadOptions = {},
-) {
-  return loadPortfolioRiskReadModel(drizzlePortfolioRiskRepository, options);
 }
 
 export async function getReadOnlyTenantPortfolioRisk({
@@ -141,11 +116,4 @@ export async function getReadOnlyTenantPortfolioRisk({
     createTenantPortfolioRiskRepository(tenantContext),
     options,
   );
-}
-
-function accountCondition(account: PortfolioRiskAccount) {
-  const normalizedAccount = sql<string>`lower(trim(${assets.account}))`;
-  return account === "all"
-    ? inArray(normalizedAccount, TRACKED_ACCOUNTS)
-    : eq(normalizedAccount, account);
 }
