@@ -41,7 +41,7 @@ export type TenantHoldingDto = Readonly<{
 
 export type TenantHoldingReadResult =
   | Readonly<{
-      state: "ready";
+      state: "ready" | "partial";
       scope: PortfolioAccountScope;
       holdings: readonly TenantHoldingDto[];
       excludedHoldingCount: number;
@@ -144,7 +144,7 @@ export function projectTenantHoldingRows(
   );
 
   return Object.freeze({
-    state: "ready",
+    state: excludedHoldingCount === 0 ? "ready" : "partial",
     scope,
     holdings: Object.freeze(holdings.map(toPublicHolding)),
     excludedHoldingCount,

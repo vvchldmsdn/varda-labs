@@ -131,7 +131,7 @@ describe("tenant holding read model", () => {
       "all",
     );
 
-    assert.equal(result.state, "ready");
+    assert.equal(result.state, "partial");
     assert.equal(result.holdings.length, 1);
     assert.equal(result.holdings[0]?.accountCode, "isa");
     assert.equal(result.excludedHoldingCount, 1);

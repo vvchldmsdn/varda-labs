@@ -86,6 +86,8 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /normalizePortfolioAccountScope/);
     assert.match(source, /Promise\.all/);
     assert.match(source, /holdingReadEvidence\(result, resolution\)/);
+    assert.match(source, /result\.state === "partial"/);
+    assert.match(source, /must not be used for valuation totals/);
     assert.doesNotMatch(
       source,
       /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,

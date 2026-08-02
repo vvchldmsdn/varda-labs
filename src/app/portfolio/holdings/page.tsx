@@ -72,8 +72,14 @@ export default async function TenantHoldingsPage({
           />
         </div>
 
-        {result?.state === "ready" ? (
+        {result?.state === "ready" || result?.state === "partial" ? (
           <div className="mt-5 overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
+            {result.state === "partial" ? (
+              <p className="border-b border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+                This is a partial evidence list. Excluded rows remain visible in
+                the count, and this result must not be used for valuation totals.
+              </p>
+            ) : null}
             <table className="min-w-[760px] w-full border-collapse text-left text-sm">
               <thead className="bg-[#eef2e8] text-xs text-[#5e685e]">
                 <tr>
@@ -157,9 +163,9 @@ function holdingReadEvidence(
   const included = `${result.holdings.length} owned holding${
     result.holdings.length === 1 ? "" : "s"
   }`;
-  return result.excludedHoldingCount === 0
+  return result.state === "ready"
     ? included
-    : `${included}; ${result.excludedHoldingCount} invalid row${
+    : `${included}; partial evidence, ${result.excludedHoldingCount} invalid row${
         result.excludedHoldingCount === 1 ? "" : "s"
       } excluded`;
 }
