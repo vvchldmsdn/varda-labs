@@ -1,13 +1,13 @@
 import "server-only";
 
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
   accountBalanceSnapshots,
+  accounts,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
-  eventLedgerEntries,
 } from "@/db/schema";
 import {
   buildPortfolioHistoryDisplayRows,
@@ -30,13 +30,8 @@ import {
   type HistoryPositionComparisonRawRow,
   type HistoryPositionComparisonSelection,
 } from "@/lib/history-position-comparison";
-import {
-  buildHistoryEventTimeline,
-  HISTORY_EVENT_QUERY_LIMIT,
-  shouldLoadHistoryEvents,
-  type HistoryEventRawRow,
-  type HistoryEventTimelineModel,
-} from "@/lib/history-event-timeline";
+import { NAMED_PORTFOLIO_ACCOUNTS } from "@/lib/portfolio-account-scope";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type ReadOnlyBalanceHistoryRow = {
   balanceDate: string;
@@ -46,18 +41,26 @@ export type ReadOnlyBalanceHistoryRow = {
   irp: string | null;
 };
 
+export type HistoryReadSource =
+  | "balance"
+  | "portfolio"
+  | "position_detail"
+  | "position_comparison";
+
 export type ReadOnlyHistoryBalance = {
   account: HistoryAccount;
   lane: HistoryLane;
+  readStatus: "ready" | "partial" | "unavailable";
+  unavailableSources: readonly HistoryReadSource[];
   balanceRows: ReadOnlyBalanceHistoryRow[];
   portfolioRows: PortfolioHistoryDisplayRow[];
   positionDetail: HistoryPositionDetailModel;
   positionComparison: HistoryPositionComparisonModel;
-  eventTimeline: HistoryEventTimelineModel;
   summary: {
     balanceRowCount: number;
     portfolioRowCount: number;
     derivedPortfolioRowCount: number;
+    partialPortfolioRowCount: number;
     balanceDateRange: DateRangeSummary;
     portfolioDateRange: DateRangeSummary;
     overlappingDateCount: number;
@@ -69,47 +72,59 @@ export type DateRangeSummary = {
   maxDate: string | null;
 };
 
-export async function getReadOnlyHistoryBalance({
+type LoadResult<T> =
+  | Readonly<{ state: "not_requested" }>
+  | Readonly<{ state: "ready"; value: T }>
+  | Readonly<{ state: "unavailable" }>;
+
+export async function getReadOnlyTenantHistoryBalance({
+  tenantContext,
   account,
   lane,
   positionSelection,
   positionComparisonSelection,
 }: {
+  tenantContext: TenantContext;
   account: HistoryAccount;
   lane: HistoryLane;
   positionSelection: HistoryPositionSelection;
   positionComparisonSelection: HistoryPositionComparisonSelection;
 }): Promise<ReadOnlyHistoryBalance> {
-  const [
-    balanceRows,
-    portfolioRawRows,
-    positionRows,
-    positionComparisonRows,
-    eventRows,
-  ] =
+  const [balanceResult, portfolioResult, positionResult, comparisonResult] =
     await Promise.all([
-      lane === "events" ? Promise.resolve([]) : loadBalanceRows(),
-      lane === "events" ? Promise.resolve([]) : loadPortfolioRows(),
+      captureLoad(lane === "all" || lane === "balance", () =>
+        loadBalanceRows(tenantContext),
+      ),
+      captureLoad(lane === "all" || lane === "portfolio", () =>
+        loadPortfolioRows(tenantContext, account),
+      ),
       positionSelection.status === "requested"
-        ? loadPositionRows(positionSelection)
-        : Promise.resolve([]),
+        ? captureLoad(true, () =>
+            loadPositionRows(tenantContext, positionSelection),
+          )
+        : Promise.resolve(Object.freeze({ state: "not_requested" } as const)),
       positionComparisonSelection.status === "requested"
-        ? loadPositionComparisonRows(positionComparisonSelection)
-        : Promise.resolve({ fromRows: [], toRows: [] }),
-      shouldLoadHistoryEvents(account, lane) && account !== "all"
-        ? loadEventRows(account)
-        : Promise.resolve([]),
+        ? captureLoad(true, () =>
+            loadPositionComparisonRows(
+              tenantContext,
+              positionComparisonSelection,
+            ),
+          )
+        : Promise.resolve(Object.freeze({ state: "not_requested" } as const)),
     ]);
+
+  const balanceRows = loadedValue(balanceResult, []);
+  const portfolioRawRows = loadedValue(portfolioResult, []);
+  const positionRows = loadedValue(positionResult, []);
+  const positionComparisonRows = loadedValue(comparisonResult, {
+    fromRows: [],
+    toRows: [],
+  });
   const portfolioRows = buildPortfolioHistoryDisplayRows({
     rows: portfolioRawRows,
     account,
   });
-  const visibleBalanceRows =
-    lane === "all" || lane === "balance"
-      ? [...balanceRows].sort(compareBalanceRowsDesc)
-      : [];
-  const visiblePortfolioRows =
-    lane === "all" || lane === "portfolio" ? portfolioRows : [];
+  const visibleBalanceRows = [...balanceRows].sort(compareBalanceRowsDesc);
   const positionDetail = buildHistoryPositionDetail({
     account,
     lane,
@@ -125,25 +140,41 @@ export async function getReadOnlyHistoryBalance({
     fromRows: positionComparisonRows.fromRows,
     toRows: positionComparisonRows.toRows,
   });
-  const eventTimeline = buildHistoryEventTimeline({
-    account,
-    lane,
-    eventRows,
-  });
+  const sourceResults = [
+    ["balance", balanceResult],
+    ["portfolio", portfolioResult],
+    ["position_detail", positionResult],
+    ["position_comparison", comparisonResult],
+  ] as const;
+  const requestedSourceCount = sourceResults.filter(
+    ([, result]) => result.state !== "not_requested",
+  ).length;
+  const unavailableSources = sourceResults
+    .filter(([, result]) => result.state === "unavailable")
+    .map(([source]) => source);
 
   return {
     account,
     lane,
+    readStatus:
+      unavailableSources.length === 0
+        ? "ready"
+        : unavailableSources.length === requestedSourceCount
+          ? "unavailable"
+          : "partial",
+    unavailableSources: Object.freeze(unavailableSources),
     balanceRows: visibleBalanceRows,
-    portfolioRows: visiblePortfolioRows,
+    portfolioRows,
     positionDetail,
     positionComparison,
-    eventTimeline,
     summary: {
       balanceRowCount: balanceRows.length,
       portfolioRowCount: portfolioRows.length,
       derivedPortfolioRowCount: portfolioRows.filter(
         (row) => row.rowKind === "derived",
+      ).length,
+      partialPortfolioRowCount: portfolioRows.filter(
+        (row) => row.rowKind === "partial",
       ).length,
       balanceDateRange: summarizeDateRange(
         balanceRows,
@@ -162,6 +193,7 @@ export async function getReadOnlyHistoryBalance({
 }
 
 async function loadPositionComparisonRows(
+  tenantContext: TenantContext,
   selection: Extract<
     HistoryPositionComparisonSelection,
     { status: "requested" }
@@ -169,11 +201,13 @@ async function loadPositionComparisonRows(
 ) {
   const [fromRows, toRows] = await Promise.all([
     loadPositionComparisonEndpointRows({
+      tenantContext,
       account: selection.account,
       snapshotDate: selection.from.snapshotDate,
       source: selection.from.source,
     }),
     loadPositionComparisonEndpointRows({
+      tenantContext,
       account: selection.account,
       snapshotDate: selection.to.snapshotDate,
       source: selection.to.source,
@@ -183,10 +217,12 @@ async function loadPositionComparisonRows(
 }
 
 async function loadPositionComparisonEndpointRows({
+  tenantContext,
   account,
   snapshotDate,
   source,
 }: {
+  tenantContext: TenantContext;
   account: Exclude<HistoryAccount, "all">;
   snapshotDate: string;
   source: string;
@@ -206,10 +242,14 @@ async function loadPositionComparisonEndpointRows({
       marketValueKrw: dailyPositionSnapshots.marketValueKrw,
     })
     .from(dailyPositionSnapshots)
+    .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
     .where(
       and(
+        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+        eq(accounts.isActive, true),
+        eq(accounts.code, account),
+        eq(dailyPositionSnapshots.account, accounts.code),
         eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
-        eq(dailyPositionSnapshots.account, account),
         eq(dailyPositionSnapshots.source, source),
         eq(dailyPositionSnapshots.isSample, false),
       ),
@@ -221,49 +261,8 @@ async function loadPositionComparisonEndpointRows({
     .limit(HISTORY_POSITION_COMPARISON_QUERY_LIMIT);
 }
 
-async function loadEventRows(
-  account: Exclude<HistoryAccount, "all">,
-): Promise<HistoryEventRawRow[]> {
-  return db
-    .select({
-      internalId: eventLedgerEntries.id,
-      legacyBase44Id: eventLedgerEntries.legacyBase44Id,
-      eventDate: eventLedgerEntries.eventDate,
-      eventType: eventLedgerEntries.eventType,
-      source: eventLedgerEntries.source,
-      recordedAt: eventLedgerEntries.recordedAt,
-      ruleVersion: eventLedgerEntries.ruleVersion,
-      account: eventLedgerEntries.account,
-      assetId: eventLedgerEntries.assetId,
-      legacyAssetId: eventLedgerEntries.legacyAssetId,
-      ticker: eventLedgerEntries.ticker,
-      assetName: eventLedgerEntries.assetName,
-      groupName: eventLedgerEntries.groupName,
-      correctsEventId: eventLedgerEntries.correctsEventId,
-      legacyCorrectsEventId: eventLedgerEntries.legacyCorrectsEventId,
-      amountKrw: eventLedgerEntries.amountKrw,
-      quantityDelta: eventLedgerEntries.quantityDelta,
-      price: eventLedgerEntries.price,
-      fxRate: eventLedgerEntries.fxRate,
-    })
-    .from(eventLedgerEntries)
-    .where(
-      and(
-        eq(eventLedgerEntries.account, account),
-        eq(eventLedgerEntries.isSample, false),
-      ),
-    )
-    .orderBy(
-      desc(eventLedgerEntries.eventDate),
-      sql`${eventLedgerEntries.recordedAt} desc nulls last`,
-      desc(eventLedgerEntries.createdAt),
-      asc(eventLedgerEntries.legacyBase44Id),
-      asc(eventLedgerEntries.id),
-    )
-    .limit(HISTORY_EVENT_QUERY_LIMIT);
-}
-
 async function loadPositionRows(
+  tenantContext: TenantContext,
   selection: Extract<HistoryPositionSelection, { status: "requested" }>,
 ): Promise<HistoryPositionRawRow[]> {
   return db
@@ -290,10 +289,14 @@ async function loadPositionRows(
       priceBasis: dailyPositionSnapshots.priceBasis,
     })
     .from(dailyPositionSnapshots)
+    .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
     .where(
       and(
+        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+        eq(accounts.isActive, true),
+        eq(accounts.code, selection.account),
+        eq(dailyPositionSnapshots.account, accounts.code),
         eq(dailyPositionSnapshots.snapshotDate, selection.snapshotDate),
-        eq(dailyPositionSnapshots.account, selection.account),
         eq(dailyPositionSnapshots.source, selection.source),
         eq(dailyPositionSnapshots.isSample, false),
       ),
@@ -306,7 +309,9 @@ async function loadPositionRows(
     .limit(HISTORY_POSITION_DETAIL_QUERY_LIMIT);
 }
 
-async function loadBalanceRows(): Promise<ReadOnlyBalanceHistoryRow[]> {
+async function loadBalanceRows(
+  tenantContext: TenantContext,
+): Promise<ReadOnlyBalanceHistoryRow[]> {
   return db
     .select({
       balanceDate: accountBalanceSnapshots.balanceDate,
@@ -316,10 +321,31 @@ async function loadBalanceRows(): Promise<ReadOnlyBalanceHistoryRow[]> {
       irp: accountBalanceSnapshots.irp,
     })
     .from(accountBalanceSnapshots)
+    .where(
+      and(
+        eq(
+          accountBalanceSnapshots.canonicalOwnerUserId,
+          tenantContext.ownerUserId,
+        ),
+        eq(accountBalanceSnapshots.isSample, false),
+      ),
+    )
     .orderBy(asc(accountBalanceSnapshots.balanceDate));
 }
 
-async function loadPortfolioRows(): Promise<PortfolioHistoryRawRow[]> {
+async function loadPortfolioRows(
+  tenantContext: TenantContext,
+  account: HistoryAccount,
+): Promise<PortfolioHistoryRawRow[]> {
+  const predicates = [
+    eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+    eq(accounts.isActive, true),
+    inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
+    eq(dailyPortfolioSnapshots.account, accounts.code),
+    eq(dailyPortfolioSnapshots.isSample, false),
+  ];
+  if (account !== "all") predicates.push(eq(accounts.code, account));
+
   return db
     .select({
       snapshotDate: dailyPortfolioSnapshots.snapshotDate,
@@ -333,11 +359,30 @@ async function loadPortfolioRows(): Promise<PortfolioHistoryRawRow[]> {
       totalReturnPct: dailyPortfolioSnapshots.totalReturnPct,
     })
     .from(dailyPortfolioSnapshots)
+    .innerJoin(accounts, eq(dailyPortfolioSnapshots.accountId, accounts.id))
+    .where(and(...predicates))
     .orderBy(
       asc(dailyPortfolioSnapshots.snapshotDate),
-      asc(dailyPortfolioSnapshots.account),
+      asc(accounts.sortOrder),
+      asc(accounts.code),
       asc(dailyPortfolioSnapshots.source),
     );
+}
+
+async function captureLoad<T>(
+  requested: boolean,
+  load: () => Promise<T>,
+): Promise<LoadResult<T>> {
+  if (!requested) return Object.freeze({ state: "not_requested" });
+  try {
+    return Object.freeze({ state: "ready", value: await load() });
+  } catch {
+    return Object.freeze({ state: "unavailable" });
+  }
+}
+
+function loadedValue<T>(result: LoadResult<T>, fallback: T) {
+  return result.state === "ready" ? result.value : fallback;
 }
 
 function summarizeDateRange<T>(

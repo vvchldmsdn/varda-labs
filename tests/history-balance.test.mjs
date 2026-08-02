@@ -94,7 +94,7 @@ describe("history balance helpers", () => {
     ]);
   });
 
-  it("does not derive all rows from partial account groups", () => {
+  it("keeps partial account groups as explicitly partial display evidence", () => {
     const rows = buildPortfolioHistoryDisplayRows({
       account: "all",
       rows: [
@@ -110,7 +110,10 @@ describe("history balance helpers", () => {
       ],
     });
 
-    assert.equal(rows.length, 0);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].rowKind, "partial");
+    assert.equal(rows[0].totalMarketValue, 1800);
+    assert.deepEqual(rows[0].derivedFromAccounts, ["brokerage", "isa"]);
   });
 
   it("filters exact account rows for account-specific views", () => {

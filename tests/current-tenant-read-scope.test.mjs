@@ -184,6 +184,33 @@ describe("current tenant read scope runtime boundary", () => {
       /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,
     );
   });
+
+  it("keeps history server-rendered and scoped through the resolved tenant", () => {
+    const pageSource = read("src/app/history/page.tsx");
+    const querySource = read("src/db/queries/history-balance.ts");
+
+    assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
+    assert.match(pageSource, /getReadOnlyTenantHistoryBalance/);
+    assert.match(pageSource, /getReadOnlyTenantEvents/);
+    assert.match(pageSource, /if \(!resolution\.ok\)/);
+    assert.match(pageSource, /Promise\.all/);
+    assert.doesNotMatch(pageSource, /fetch\(|\/api\//);
+
+    assert.match(querySource, /^import "server-only";/);
+    assert.match(
+      querySource,
+      /accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId/,
+    );
+    assert.match(
+      querySource,
+      /accountBalanceSnapshots\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
+    );
+    assert.match(querySource, /innerJoin\(accounts/);
+    assert.match(querySource, /dailyPortfolioSnapshots\.account, accounts\.code/);
+    assert.match(querySource, /dailyPositionSnapshots\.account, accounts\.code/);
+    assert.match(querySource, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.doesNotMatch(querySource, /ownerUserId\s*:\s*string|headers\(\)|cookies\(\)/);
+  });
 });
 
 function read(path) {

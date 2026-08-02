@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
+import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 import {
   buildBalanceHistoryTrajectory,
   buildPortfolioHistoryTrajectory,
 } from "@/lib/history-trajectory";
 
 import { HistoryControls } from "./history-controls";
-import { HistoryEventTimeline } from "./history-event-timeline";
 import { formatHistoryDateRange } from "./history-format";
 import { HistoryPositionDetail } from "./history-position-detail";
 import { HistoryPositionComparison } from "./history-position-comparison";
@@ -17,8 +17,15 @@ import {
   BalanceHistoryTable,
   PortfolioHistoryTable,
 } from "./history-tables";
+import { TenantHistoryEvents } from "./tenant-history-events";
 
-export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
+export function HistoryView({
+  history,
+  events,
+}: {
+  history: ReadOnlyHistoryBalance;
+  events: TenantEventLedgerQueryResult | null;
+}) {
   const balanceTrajectory = buildBalanceHistoryTrajectory({
     rows: history.balanceRows,
     account: history.account,
@@ -62,6 +69,14 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
 
           <HistoryControls account={history.account} lane={history.lane} />
 
+          {history.unavailableSources.length > 0 ? (
+            <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] px-3 py-2 text-sm text-[#76591f]">
+              일부 기록을 읽지 못했습니다: {history.unavailableSources
+                .map(historyReadSourceLabel)
+                .join(", ")}. 읽을 수 있는 기록은 계속 표시합니다.
+            </p>
+          ) : null}
+
           {history.lane !== "events" ? (
             <div
               data-history-summary
@@ -82,7 +97,7 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
               <SummaryCell
                 label="표시용 합산"
                 value={String(history.summary.derivedPortfolioRowCount)}
-                detail="DB에 쓰지 않은 화면 계산"
+                detail={`부분 합산 ${history.summary.partialPortfolioRowCount}건`}
               />
               <SummaryCell
                 label="공통 날짜"
@@ -134,14 +149,29 @@ export function HistoryView({ history }: { history: ReadOnlyHistoryBalance }) {
           >
             <SectionHeader
               title="저장 이벤트"
-              detail="계정별 저장 근거 · 인과 해석 없음"
+              detail="소유 계정에 명시적으로 연결된 저장 근거"
             />
-            <HistoryEventTimeline model={history.eventTimeline} />
+            {events ? (
+              <TenantHistoryEvents result={events} />
+            ) : (
+              <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+                이벤트 조회가 시작되지 않았습니다.
+              </p>
+            )}
           </section>
         ) : null}
       </div>
     </main>
   );
+}
+
+function historyReadSourceLabel(
+  source: ReadOnlyHistoryBalance["unavailableSources"][number],
+) {
+  if (source === "balance") return "잔액";
+  if (source === "portfolio") return "포트폴리오";
+  if (source === "position_detail") return "포지션 상세";
+  return "포지션 비교";
 }
 
 function SummaryCell({
