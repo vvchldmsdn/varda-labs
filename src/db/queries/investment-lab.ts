@@ -4,6 +4,7 @@ import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
+  accounts,
   assetPriceSnapshots,
   assets,
   dailyPortfolioSnapshots,
@@ -22,7 +23,11 @@ import {
   DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
   attachBase44ImportedTickerEvidence,
 } from "@/lib/investment-lab-special-holding-authority";
-import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import {
+  NAMED_PORTFOLIO_ACCOUNTS,
+  accountsForPortfolioScope,
+  type PortfolioAccountScope,
+} from "@/lib/portfolio-account-scope";
 import {
   buildInvestmentLabHistoricalAccountConsensus,
   resolveInvestmentLabEventAccount,
@@ -31,17 +36,21 @@ import {
   admitAdjustedHistoricalPriceRows,
   admitRawHistoricalPriceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
-const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"];
 const LEGACY_ID_PATTERN = /^[0-9a-f]{24}$/;
 type InvestmentLabFountRuntimePositionRow = Extract<
   InvestmentLabFountRuntimeEvidence,
   { status: "ready" }
 >["positionRows"][number];
 
-// Basic Auth currently protects one migration tenant. A future multi-user
-// repository must add canonical owner predicates before this route is reused.
-const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository = {
+function createTenantInvestmentLabRepository(
+  tenantContext: TenantContext,
+  accountScope: PortfolioAccountScope,
+): InvestmentLabCounterfactualReadRepository {
+  const selectedAccounts = [...accountsForPortfolioScope(accountScope)];
+
+  return {
   async loadEvents() {
     const [rows, historicalPositionRows] = await Promise.all([
       db
@@ -63,8 +72,23 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
           legacyCorrectsEventId: eventLedgerEntries.legacyCorrectsEventId,
         })
         .from(eventLedgerEntries)
-        .leftJoin(assets, eq(eventLedgerEntries.assetId, assets.id))
-        .where(eq(eventLedgerEntries.isSample, false))
+        .innerJoin(accounts, eq(eventLedgerEntries.accountId, accounts.id))
+        .leftJoin(
+          assets,
+          and(
+            eq(eventLedgerEntries.assetId, assets.id),
+            eq(assets.accountId, accounts.id),
+            eq(assets.account, accounts.code),
+          ),
+        )
+        .where(
+          and(
+            ...activeOwnedAccountPredicates(tenantContext),
+            inArray(accounts.code, selectedAccounts),
+            eq(eventLedgerEntries.account, accounts.code),
+            eq(eventLedgerEntries.isSample, false),
+          ),
+        )
         .orderBy(
           asc(eventLedgerEntries.eventDate),
           sql`${eventLedgerEntries.recordedAt} asc nulls last`,
@@ -78,8 +102,12 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
           account: dailyPositionSnapshots.account,
         })
         .from(dailyPositionSnapshots)
+        .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
         .where(
           and(
+            ...activeOwnedAccountPredicates(tenantContext),
+            inArray(accounts.code, selectedAccounts),
+            eq(dailyPositionSnapshots.account, accounts.code),
             eq(dailyPositionSnapshots.isSample, false),
             isNotNull(dailyPositionSnapshots.legacyAssetId),
           ),
@@ -126,10 +154,13 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         ruleVersion: dailyPortfolioSnapshots.ruleVersion,
       })
       .from(dailyPortfolioSnapshots)
+      .innerJoin(accounts, eq(dailyPortfolioSnapshots.accountId, accounts.id))
       .where(
         and(
+          ...activeOwnedAccountPredicates(tenantContext),
+          inArray(accounts.code, selectedAccounts),
+          eq(dailyPortfolioSnapshots.account, accounts.code),
           eq(dailyPortfolioSnapshots.isSample, false),
-          inArray(dailyPortfolioSnapshots.account, SNAPSHOT_ACCOUNTS),
         ),
       )
       .orderBy(
@@ -165,8 +196,12 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
     const candidates = await db
       .select({ legacyAssetId: dailyPositionSnapshots.legacyAssetId })
       .from(dailyPositionSnapshots)
+      .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
       .where(
         and(
+          ...activeOwnedAccountPredicates(tenantContext),
+          inArray(accounts.code, selectedAccounts),
+          eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
           eq(
             sql<string>`lower(trim(${dailyPositionSnapshots.assetName}))`,
@@ -214,8 +249,12 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
           marketValueKrw: dailyPositionSnapshots.marketValueKrw,
         })
         .from(dailyPositionSnapshots)
+        .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
         .where(
           and(
+            ...activeOwnedAccountPredicates(tenantContext),
+            inArray(accounts.code, selectedAccounts),
+            eq(dailyPositionSnapshots.account, accounts.code),
             eq(dailyPositionSnapshots.isSample, false),
             eq(dailyPositionSnapshots.legacyAssetId, legacyAssetId),
           ),
@@ -228,8 +267,12 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
           assetName: eventLedgerEntries.assetName,
         })
         .from(eventLedgerEntries)
+        .innerJoin(accounts, eq(eventLedgerEntries.accountId, accounts.id))
         .where(
           and(
+            ...activeOwnedAccountPredicates(tenantContext),
+            inArray(accounts.code, selectedAccounts),
+            eq(eventLedgerEntries.account, accounts.code),
             eq(eventLedgerEntries.isSample, false),
             eq(eventLedgerEntries.legacyAssetId, legacyAssetId),
           ),
@@ -315,14 +358,13 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
         snapshotLegacyAssetId: dailyPositionSnapshots.legacyAssetId,
       })
       .from(dailyPositionSnapshots)
+      .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
       .where(
         and(
+          ...activeOwnedAccountPredicates(tenantContext),
+          inArray(accounts.code, selectedAccounts),
+          eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
-          inArray(dailyPositionSnapshots.account, [
-            "brokerage",
-            "isa",
-            "irp",
-          ]),
           inArray(dailyPositionSnapshots.snapshotDate, [...serviceDates]),
         ),
       )
@@ -418,7 +460,8 @@ const drizzleInvestmentLabRepository: InvestmentLabCounterfactualReadRepository 
       source: row.source,
     }));
   },
-};
+  };
+}
 
 async function loadAdjustedScenarioCloseRows(
   ticker: string,
@@ -516,19 +559,34 @@ async function loadRawScenarioCloseRows(
   }));
 }
 
-export async function getReadOnlyInvestmentLabCounterfactual(
-  request?: InvestmentLabPeriodRequest,
-  fixedMixSelection?: InvestmentLabFixedMixSelection,
-  requestedAnchorDate?: string | null,
-  account: PortfolioAccountScope = "all",
-) {
+export async function getReadOnlyTenantInvestmentLabCounterfactual({
+  account = "all",
+  fixedMixSelection,
+  request,
+  requestedAnchorDate,
+  tenantContext,
+}: {
+  account?: PortfolioAccountScope;
+  fixedMixSelection?: InvestmentLabFixedMixSelection;
+  request?: InvestmentLabPeriodRequest;
+  requestedAnchorDate?: string | null;
+  tenantContext: TenantContext;
+}) {
   return loadInvestmentLabCounterfactualReadModel(
-    drizzleInvestmentLabRepository,
+    createTenantInvestmentLabRepository(tenantContext, account),
     request,
     fixedMixSelection,
     requestedAnchorDate,
     account,
   );
+}
+
+function activeOwnedAccountPredicates(tenantContext: TenantContext) {
+  return [
+    eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+    eq(accounts.isActive, true),
+    inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
+  ];
 }
 
 function shiftIsoDate(value: string, days: number) {

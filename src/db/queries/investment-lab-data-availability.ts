@@ -3,8 +3,9 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { getReadOnlyPortfolioRisk } from "@/db/queries/portfolio-risk";
+import { getReadOnlyTenantPortfolioRisk } from "@/db/queries/portfolio-risk";
 import {
+  accounts,
   assets,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
@@ -14,15 +15,19 @@ import {
   DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
 } from "@/lib/investment-lab-special-holding-authority";
 import {
+  NAMED_PORTFOLIO_ACCOUNTS,
   accountsForPortfolioScope,
   type PortfolioAccountScope,
 } from "@/lib/portfolio-account-scope";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
-// This remains a single-tenant read while Basic Auth is the only runtime gate.
-// A future tenant repository must add the authenticated canonical owner filter.
-export async function getReadOnlyInvestmentLabDataAvailability(
-  account: PortfolioAccountScope,
-) {
+export async function getReadOnlyTenantInvestmentLabDataAvailability({
+  account,
+  tenantContext,
+}: {
+  account: PortfolioAccountScope;
+  tenantContext: TenantContext;
+}) {
   const selectedAccounts = [...accountsForPortfolioScope(account)];
   const goldDecision =
     DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
@@ -40,13 +45,13 @@ export async function getReadOnlyInvestmentLabDataAvailability(
         ruleVersion: dailyPortfolioSnapshots.ruleVersion,
       })
       .from(dailyPortfolioSnapshots)
+      .innerJoin(accounts, eq(dailyPortfolioSnapshots.accountId, accounts.id))
       .where(
         and(
+          ...activeOwnedAccountPredicates(tenantContext),
+          inArray(accounts.code, selectedAccounts),
+          eq(dailyPortfolioSnapshots.account, accounts.code),
           eq(dailyPortfolioSnapshots.isSample, false),
-          inArray(
-            sql<string>`lower(trim(${dailyPortfolioSnapshots.account}))`,
-            selectedAccounts,
-          ),
         ),
       )
       .orderBy(
@@ -68,14 +73,14 @@ export async function getReadOnlyInvestmentLabDataAvailability(
         priceStatus: assets.priceStatus,
       })
       .from(assets)
+      .innerJoin(accounts, eq(assets.accountId, accounts.id))
       .where(
         and(
-          inArray(
-            sql<string>`lower(trim(${assets.account}))`,
-            selectedAccounts,
-          ),
+          ...activeOwnedAccountPredicates(tenantContext),
+          inArray(accounts.code, selectedAccounts),
+          eq(assets.account, accounts.code),
           eq(assets.name, goldDecision.assetName),
-          eq(sql<string>`lower(trim(${assets.account}))`, goldDecision.account),
+          eq(accounts.code, goldDecision.account),
           eq(sql<string>`lower(trim(${assets.market}))`, goldDecision.market),
           eq(sql<string>`upper(trim(${assets.currency}))`, goldDecision.currency),
           eq(sql<string>`lower(trim(${assets.assetType}))`, goldDecision.assetType),
@@ -101,18 +106,15 @@ export async function getReadOnlyInvestmentLabDataAvailability(
         capturedAt: dailyPositionSnapshots.capturedAt,
       })
       .from(dailyPositionSnapshots)
+      .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
       .where(
         and(
+          ...activeOwnedAccountPredicates(tenantContext),
+          inArray(accounts.code, selectedAccounts),
+          eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
-          inArray(
-            sql<string>`lower(trim(${dailyPositionSnapshots.account}))`,
-            selectedAccounts,
-          ),
           eq(dailyPositionSnapshots.assetName, goldDecision.assetName),
-          eq(
-            sql<string>`lower(trim(${dailyPositionSnapshots.account}))`,
-            goldDecision.account,
-          ),
+          eq(accounts.code, goldDecision.account),
           eq(
             sql<string>`lower(trim(${dailyPositionSnapshots.market}))`,
             goldDecision.market,
@@ -132,7 +134,11 @@ export async function getReadOnlyInvestmentLabDataAvailability(
         asc(dailyPositionSnapshots.account),
         asc(dailyPositionSnapshots.assetName),
       ),
-    getReadOnlyPortfolioRisk({ account, window: 90 }),
+    getReadOnlyTenantPortfolioRisk({
+      account,
+      window: 90,
+      tenantContext,
+    }),
   ]);
 
   return buildInvestmentLabDataAvailability({
@@ -156,4 +162,12 @@ export async function getReadOnlyInvestmentLabDataAvailability(
       fxGapCount: riskModel.inputHealth.missingEvidence.fxGapCount,
     },
   });
+}
+
+function activeOwnedAccountPredicates(tenantContext: TenantContext) {
+  return [
+    eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+    eq(accounts.isActive, true),
+    inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
+  ];
 }

@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { assetPriceSnapshots, assets, fxRates } from "@/db/schema";
+import { accounts, assetPriceSnapshots, assets, fxRates } from "@/db/schema";
 import {
   loadPortfolioRiskReadModel,
   type PortfolioRiskReadOptions,
@@ -13,12 +13,10 @@ import type {
   PortfolioRiskReadRepository,
 } from "@/lib/portfolio-risk-read-model-types";
 import { admitAdjustedHistoricalPriceRows } from "@/lib/market-data/asset-price-consumer-admission";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const TRACKED_ACCOUNTS = ["brokerage", "isa", "irp"];
 
-// Current Basic Auth protects one migration tenant. Before multi-user auth,
-// add authenticated user ownership to every repository method; account is not
-// a tenant boundary.
 const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
   async loadAssets(account) {
     return db
@@ -96,10 +94,53 @@ const drizzlePortfolioRiskRepository: PortfolioRiskReadRepository = {
   },
 };
 
+function createTenantPortfolioRiskRepository(
+  tenantContext: TenantContext,
+): PortfolioRiskReadRepository {
+  return {
+    async loadAssets(account) {
+      const predicates = [
+        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+        eq(accounts.isActive, true),
+        inArray(accounts.code, TRACKED_ACCOUNTS),
+        eq(assets.account, accounts.code),
+      ];
+      if (account !== "all") predicates.push(eq(accounts.code, account));
+
+      return db
+        .select({
+          account: sql<string>`lower(trim(${assets.account}))`,
+          ticker: sql<string | null>`upper(trim(${assets.ticker}))`,
+          name: assets.name,
+          market: sql<string>`lower(trim(${assets.market}))`,
+          currency: sql<string>`upper(trim(${assets.currency}))`,
+          assetType: sql<string | null>`lower(trim(${assets.assetType}))`,
+          quantity: assets.quantity,
+        })
+        .from(assets)
+        .innerJoin(accounts, eq(assets.accountId, accounts.id))
+        .where(and(...predicates))
+        .orderBy(asc(accounts.sortOrder), asc(accounts.code), asc(assets.ticker));
+    },
+    loadPrices: drizzlePortfolioRiskRepository.loadPrices,
+    loadFxRates: drizzlePortfolioRiskRepository.loadFxRates,
+  };
+}
+
 export async function getReadOnlyPortfolioRisk(
   options: PortfolioRiskReadOptions = {},
 ) {
   return loadPortfolioRiskReadModel(drizzlePortfolioRiskRepository, options);
+}
+
+export async function getReadOnlyTenantPortfolioRisk({
+  tenantContext,
+  ...options
+}: PortfolioRiskReadOptions & { tenantContext: TenantContext }) {
+  return loadPortfolioRiskReadModel(
+    createTenantPortfolioRiskRepository(tenantContext),
+    options,
+  );
 }
 
 function accountCondition(account: PortfolioRiskAccount) {

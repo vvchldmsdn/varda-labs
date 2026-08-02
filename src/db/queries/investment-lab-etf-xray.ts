@@ -4,7 +4,7 @@ import { and, asc, eq, inArray, max, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { etfHoldings, etfMasters } from "@/db/schema";
-import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
 import {
   buildInvestmentLabEtfXray,
   selectInvestmentLabEtfXrayMasterIds,
@@ -14,12 +14,17 @@ import {
 import type { EtfHoldingRawRow } from "@/lib/etf-holdings";
 import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
 import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
-export async function getReadOnlyInvestmentLabEtfXray(
-  account: PortfolioAccountScope = "all",
-): Promise<InvestmentLabEtfXrayModel> {
+export async function getReadOnlyTenantInvestmentLabEtfXray({
+  account = "all",
+  tenantContext,
+}: {
+  account?: PortfolioAccountScope;
+  tenantContext: TenantContext;
+}): Promise<InvestmentLabEtfXrayModel> {
   const [portfolio, masters] = await Promise.all([
-    getReadOnlyPortfolioStructure({ account }),
+    getReadOnlyTenantPortfolioStructure({ account, tenantContext }),
     loadEtfMasters(),
   ]);
   const scopedPortfolio =

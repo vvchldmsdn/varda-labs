@@ -230,10 +230,14 @@ describe("investment lab small adjustment", () => {
     assert.match(componentSource, /^"use client";/);
     assert.doesNotMatch(componentSource, /\bfetch\s*\(/);
     assert.doesNotMatch(componentSource, /\.insert\s*\(|\.update\s*\(|\.delete\s*\(/);
+    assert.match(querySource, /^import "server-only";/);
     assert.match(
       querySource,
-      /cache\(\s*loadReadOnlyAllPortfolioStructure,\s*\)/,
+      /getReadOnlyTenantPortfolioStructure\s*\(\s*\{[\s\S]*tenantContext/,
     );
+    assert.match(querySource, /cache\(\s*loadTenantPortfolioStructure,\s*\)/);
+    assert.match(querySource, /tenantContext,\s*selectedAccount/);
+    assert.match(pageSource, /getReadOnlyTenantPortfolioStructure\s*\(\s*\{/);
     assert.match(pageSource, /InvestmentLabSmallAdjustmentSkeleton/);
     assert.match(pageSource, /InvestmentLabSmallAdjustmentUnavailable/);
   });

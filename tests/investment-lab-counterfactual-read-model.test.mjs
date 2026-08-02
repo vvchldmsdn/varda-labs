@@ -333,7 +333,7 @@ describe("investment lab counterfactual read model", () => {
       /\b(?:insert|update|delete|alter|create|drop|truncate)\b/i,
     );
     assert.doesNotMatch(page, /["']use client["']|\bfetch\s*\(/);
-    assert.match(page, /getReadOnlyInvestmentLabCounterfactual/);
+    assert.match(page, /getReadOnlyTenantInvestmentLabCounterfactual/);
     assert.match(contribution, /^["']use client["'];/);
     assert.match(contribution, /calculateInvestmentLabContributionExperiment/);
     assert.doesNotMatch(

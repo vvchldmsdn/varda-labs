@@ -311,6 +311,102 @@ describe("current tenant read scope runtime boundary", () => {
     );
   });
 
+  it("authorizes every Investment Lab portfolio input through owned accounts", () => {
+    const counterfactualSource = read("src/db/queries/investment-lab.ts");
+    const availabilitySource = read(
+      "src/db/queries/investment-lab-data-availability.ts",
+    );
+    const riskSource = read("src/db/queries/portfolio-risk.ts");
+    const xraySource = read("src/db/queries/investment-lab-etf-xray.ts");
+
+    for (const source of [counterfactualSource, availabilitySource, riskSource]) {
+      assert.match(source, /^import "server-only";/);
+      assert.match(
+        source,
+        /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+      );
+      assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
+      assert.match(source, /inArray\(accounts\.code,/);
+      assert.doesNotMatch(
+        source,
+        /ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+      );
+    }
+
+    for (const relation of [
+      /innerJoin\(accounts, eq\(eventLedgerEntries\.accountId, accounts\.id\)\)/,
+      /innerJoin\(accounts, eq\(dailyPortfolioSnapshots\.accountId, accounts\.id\)\)/,
+      /innerJoin\(accounts, eq\(dailyPositionSnapshots\.accountId, accounts\.id\)\)/,
+    ]) {
+      assert.match(counterfactualSource, relation);
+    }
+    assert.match(
+      counterfactualSource,
+      /eq\(eventLedgerEntries\.account, accounts\.code\)/,
+    );
+    assert.match(
+      counterfactualSource,
+      /eq\(dailyPortfolioSnapshots\.account, accounts\.code\)/,
+    );
+    assert.match(
+      counterfactualSource,
+      /eq\(dailyPositionSnapshots\.account, accounts\.code\)/,
+    );
+    assert.doesNotMatch(
+      counterfactualSource,
+      /eq\((?:eventLedgerEntries|dailyPortfolioSnapshots|dailyPositionSnapshots)\.canonicalOwnerUserId/,
+    );
+
+    for (const relation of [
+      /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
+      /innerJoin\(accounts, eq\(dailyPortfolioSnapshots\.accountId, accounts\.id\)\)/,
+      /innerJoin\(accounts, eq\(dailyPositionSnapshots\.accountId, accounts\.id\)\)/,
+    ]) {
+      assert.match(availabilitySource, relation);
+    }
+    assert.match(availabilitySource, /getReadOnlyTenantPortfolioRisk/);
+    assert.match(riskSource, /getReadOnlyTenantPortfolioRisk/);
+    assert.match(
+      riskSource,
+      /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
+    );
+    assert.match(xraySource, /getReadOnlyTenantPortfolioStructure/);
+    assert.doesNotMatch(xraySource, /getReadOnlyPortfolioStructure\(/);
+  });
+
+  it("keeps Investment Lab behind one resolved server tenant", () => {
+    const source = read("src/app/investment-lab/page.tsx");
+
+    assert.match(source, /resolveCurrentTenantContext\(\)/);
+    assert.match(source, /Promise\.all/);
+    assert.match(source, /if \(!resolution\.ok\)/);
+    assert.match(source, /PortfolioReadAccessBoundary/);
+    for (const reader of [
+      "getReadOnlyTenantInvestmentLabCounterfactual",
+      "getReadOnlyTenantInvestmentLabDataAvailability",
+      "getReadOnlyTenantInvestmentLabEtfXray",
+      "getReadOnlyTenantPortfolioStructure",
+    ]) {
+      assert.match(source, new RegExp(reader));
+    }
+    assert.match(source, /data-page="investment-lab"/);
+    assert.doesNotMatch(
+      source,
+      /getReadOnlyPortfolioStructure\(|\bfetch\s*\(|\/api\/|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,
+    );
+  });
+
+  it("smokes the Investment Lab session boundary without product DB reads", () => {
+    const source = read("scripts/smoke-investment-lab-route.mjs");
+
+    assert.match(source, /const SESSION_COOKIE/);
+    assert.match(source, /if \(!SESSION_COOKIE\)/);
+    assert.match(source, /status: "session_boundary_verified"/);
+    assert.match(source, /databaseReadAttempted: false/);
+    assert.match(source, /assert\.doesNotMatch\(boundary\.body, \/data-page=/);
+    assert.match(source, /if \(!sql\) throw new Error/);
+  });
+
   it("smokes the unauthenticated history boundary without direct database reads", () => {
     const source = read("scripts/smoke-history-route.mjs");
 
