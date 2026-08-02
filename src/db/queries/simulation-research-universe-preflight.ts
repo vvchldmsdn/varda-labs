@@ -4,6 +4,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshots, fxRates } from "@/db/schema";
+import { admitAdjustedHistoricalPriceRows } from "@/lib/market-data/asset-price-consumer-admission";
 import {
   SIMULATION_INPUT_READINESS_POLICY,
   resolveSimulationEndServiceDateSelection,
@@ -44,6 +45,18 @@ export async function getReadOnlySimulationResearchUniversePreflightForSelection
   endServiceDate?: string | string[];
   now?: Date;
 }) {
+  const bundle =
+    await getReadOnlySimulationResearchUniversePreflightBundleForSelection(
+      options,
+    );
+  return bundle.model;
+}
+
+export async function getReadOnlySimulationResearchUniversePreflightBundleForSelection(options: {
+  selection: SimulationResearchUniverseSelection;
+  endServiceDate?: string | string[];
+  now?: Date;
+}) {
   const selection = options.selection;
   const endSelection = resolveSimulationEndServiceDateSelection({
     suppliedValue: options.endServiceDate,
@@ -57,7 +70,7 @@ export async function getReadOnlySimulationResearchUniversePreflightForSelection
       : null;
 
   if (selection.status !== "valid" || !requestedEndServiceDate) {
-    return buildSimulationResearchUniversePreflight({
+    return buildPreflightBundle({
       selection,
       requestedEndServiceDate,
       preflight: null,
@@ -79,7 +92,7 @@ export async function getReadOnlySimulationResearchUniversePreflightForSelection
       ticker: row.ticker,
     }));
   if (candidates.length === 0) {
-    return buildSimulationResearchUniversePreflight({
+    return buildPreflightBundle({
       selection,
       requestedEndServiceDate,
       preflight: null,
@@ -95,7 +108,7 @@ export async function getReadOnlySimulationResearchUniversePreflightForSelection
   };
   const plan = planSimulationPeriodPreflightScan(request);
   if (plan.status !== "queryable" || !plan.queryRange) {
-    return buildSimulationResearchUniversePreflight({
+    return buildPreflightBundle({
       selection,
       requestedEndServiceDate,
       preflight: await loadSimulationPeriodPreflight(
@@ -130,12 +143,25 @@ export async function getReadOnlySimulationResearchUniversePreflightForSelection
     request,
   );
 
-  return buildSimulationResearchUniversePreflight({
+  return buildPreflightBundle({
     selection,
     requestedEndServiceDate,
     preflight,
     priceRows,
     fxRows,
+  });
+}
+
+function buildPreflightBundle(input: {
+  selection: SimulationResearchUniverseSelection;
+  requestedEndServiceDate: string | null;
+  preflight: Awaited<ReturnType<typeof loadSimulationPeriodPreflight>> | null;
+  priceRows: readonly SimulationResearchUniversePriceRow[];
+  fxRows: readonly SimulationReturnMatrixFxInput[];
+}) {
+  return Object.freeze({
+    model: buildSimulationResearchUniversePreflight(input),
+    periodPreflight: input.preflight,
   });
 }
 
@@ -207,6 +233,8 @@ function createSnapshotRepository(
   priceRows: readonly SimulationResearchUniversePriceRow[],
   fxRows: readonly SimulationReturnMatrixFxInput[],
 ): SimulationReturnMatrixReadRepository {
+  const admittedPriceRows = admitAdjustedHistoricalPriceRows(priceRows).rows;
+
   return {
     async loadPriceRows({ instruments, sourceDateFrom, sourceDateTo }) {
       const identities = new Set(
@@ -215,7 +243,7 @@ function createSnapshotRepository(
             `${row.market.toLowerCase()}|${row.currency.toUpperCase()}|${row.ticker.toUpperCase()}`,
         ),
       );
-      return priceRows
+      return admittedPriceRows
         .filter(
           (row) =>
             identities.has(

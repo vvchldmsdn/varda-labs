@@ -4,6 +4,7 @@ import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
+import { OwnerResearchExecutionSection } from "@/components/simulation/owner-research-execution-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
 import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
@@ -12,7 +13,7 @@ import { SimulationInputReadinessView } from "@/components/simulation/simulation
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
-import { getReadOnlyTenantSimulationOwnerInputPreflight } from "@/db/queries/simulation-owner-input-preflight";
+import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulation-owner-research";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
 import { getReadOnlySimulationResearchUniversePreflight } from "@/db/queries/simulation-research-universe-preflight";
@@ -62,10 +63,11 @@ export default async function SimulationPage({
     params.account,
     "all",
   );
-  const ownerInputPreflightPromise =
-    getReadOnlyTenantSimulationOwnerInputPreflight({
+  const ownerResearchPromise =
+    getReadOnlyTenantSimulationOwnerResearch({
       account: selectedAccount,
       endServiceDate: params.end,
+      horizon: params.horizon,
       tenantContext: resolution.tenantContext,
     });
   const historicalOutcomeValidationPromise =
@@ -101,7 +103,7 @@ export default async function SimulationPage({
           historicalOutcomeValidationPromise
         }
         modelPromise={modelPromise}
-        ownerInputPreflightPromise={ownerInputPreflightPromise}
+        ownerResearchPromise={ownerResearchPromise}
         regimePromise={regimePromise}
         regimeHistoricalOutcomeValidationPromise={
           regimeHistoricalOutcomeValidationPromise
@@ -118,7 +120,7 @@ export default async function SimulationPage({
 async function SimulationContent({
   historicalOutcomeValidationPromise,
   modelPromise,
-  ownerInputPreflightPromise,
+  ownerResearchPromise,
   regimePromise,
   regimeHistoricalOutcomeValidationPromise,
   researchUniversePreflightPromise,
@@ -128,8 +130,8 @@ async function SimulationContent({
     typeof getReadOnlySimulationHistoricalOutcomeValidation
   >;
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
-  ownerInputPreflightPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerInputPreflight
+  ownerResearchPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerResearch
   >;
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
   regimeHistoricalOutcomeValidationPromise: ReturnType<
@@ -172,7 +174,7 @@ async function SimulationContent({
           <Suspense fallback={<OwnerInputPreflightSkeleton />}>
             <OwnerInputPreflightContent
               preservedQuery={preservedQuery}
-              resultPromise={ownerInputPreflightPromise}
+              resultPromise={ownerResearchPromise}
             />
           </Suspense>
         </SimulationSectionErrorBoundary>
@@ -236,15 +238,18 @@ async function OwnerInputPreflightContent({
     researchUniverse: string | null;
   }>;
   resultPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerInputPreflight
+    typeof getReadOnlyTenantSimulationOwnerResearch
   >;
 }) {
-  const model = await resultPromise;
+  const result = await resultPromise;
   return (
-    <OwnerInputPreflightSection
-      model={model}
-      preservedQuery={preservedQuery}
-    />
+    <>
+      <OwnerInputPreflightSection
+        model={result.inputPreflight}
+        preservedQuery={preservedQuery}
+      />
+      <OwnerResearchExecutionSection execution={result.execution} />
+    </>
   );
 }
 

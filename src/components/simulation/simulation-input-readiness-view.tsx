@@ -97,8 +97,9 @@ export function SimulationInputReadinessView({
             </nav>
           </div>
           <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#62542c]">
-            기준일을 직접 선택하고 입력이 완전할 때만 연구용 재표본 경로를
-            계산합니다. 결과는 미래 예측, 비중 추천 또는 주문 근거가 아닙니다.
+            내 포트폴리오는 저장 이력의 최신 공통 기준일을 사용하고, 주소에서 기준일을
+            직접 고르면 그 날짜를 정확히 적용합니다. 고정 종목 연구는 직접 선택한
+            기준일만 실행합니다. 결과는 미래 예측, 비중 추천 또는 주문 근거가 아닙니다.
           </div>
         </header>
 
