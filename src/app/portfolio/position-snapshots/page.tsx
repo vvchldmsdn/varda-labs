@@ -63,6 +63,9 @@ export default async function TenantPositionSnapshotsPage({
             <PageLink href="/portfolio/holdings?account=all">
               Holdings
             </PageLink>
+            <PageLink href="/portfolio/portfolio-snapshots?account=all">
+              Portfolio snapshots
+            </PageLink>
             <PageLink href="/auth/session">Session evidence</PageLink>
           </div>
         </div>

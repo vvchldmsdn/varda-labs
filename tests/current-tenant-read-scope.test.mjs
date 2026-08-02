@@ -136,6 +136,54 @@ describe("current tenant read scope runtime boundary", () => {
       /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id|legacyAssetId/,
     );
   });
+
+  it("authorizes portfolio snapshots only through named active owned accounts", () => {
+    const source = read("src/db/queries/tenant-portfolio-snapshots.ts");
+
+    assert.match(source, /^import "server-only";/);
+    assert.match(
+      source,
+      /innerJoin\(\s*accounts,\s*eq\(dailyPortfolioSnapshots\.accountId,\s*accounts\.id\)/,
+    );
+    assert.match(
+      source,
+      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+    );
+    assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
+    assert.match(source, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(
+      source,
+      /eq\(dailyPortfolioSnapshots\.account,\s*accounts\.code\)/,
+    );
+    assert.match(source, /eq\(dailyPortfolioSnapshots\.isSample,\s*false\)/);
+    assert.doesNotMatch(
+      source,
+      /eq\(dailyPortfolioSnapshots\.canonicalOwnerUserId|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+    );
+  });
+
+  it("keeps the portfolio-snapshot canary server-rendered and identity-minimal", () => {
+    const source = read("src/app/portfolio/portfolio-snapshots/page.tsx");
+    const summarySource = read(
+      "src/components/portfolio-snapshots/portfolio-snapshot-summary.tsx",
+    );
+
+    assert.match(source, /resolveCurrentTenantContext\(\)/);
+    assert.match(source, /getReadOnlyTenantPortfolioSnapshots/);
+    assert.match(source, /parseTenantSnapshotDateQuery/);
+    assert.match(source, /PortfolioSnapshotControls/);
+    assert.match(source, /PortfolioSnapshotSummary/);
+    assert.match(source, /PortfolioSnapshotTable/);
+    assert.match(summarySource, /Available-account subtotal/);
+    assert.match(
+      summarySource,
+      /stored account=all row is not an ownership authority/,
+    );
+    assert.doesNotMatch(
+      `${source}\n${summarySource}`,
+      /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,
+    );
+  });
 });
 
 function read(path) {

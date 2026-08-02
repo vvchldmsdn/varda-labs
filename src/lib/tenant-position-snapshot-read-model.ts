@@ -3,6 +3,9 @@ import {
   type NamedPortfolioAccount,
   type PortfolioAccountScope,
 } from "./portfolio-account-scope.ts";
+export {
+  parseTenantSnapshotDateQuery as parseTenantPositionSnapshotDateQuery,
+} from "./tenant-snapshot-date-query.ts";
 
 export type TenantPositionSnapshotAccountRow = Readonly<{
   accountId: string;
@@ -91,25 +94,6 @@ export type TenantPositionSnapshotReadResult =
         | "sample_row_admitted"
         | "duplicate_position_row";
     }>;
-
-export function parseTenantPositionSnapshotDateQuery(
-  value: string | readonly string[] | null | undefined,
-): string | undefined | null {
-  if (value === null || value === undefined) return undefined;
-  if (typeof value !== "string") {
-    return value.length === 0 ? undefined : null;
-  }
-
-  const normalized = value.trim();
-  if (normalized === "") return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
-
-  const parsed = new Date(`${normalized}T00:00:00.000Z`);
-  return Number.isFinite(parsed.getTime()) &&
-    parsed.toISOString().slice(0, 10) === normalized
-    ? normalized
-    : null;
-}
 
 export function projectTenantPositionSnapshotRows({
   accountRows,
