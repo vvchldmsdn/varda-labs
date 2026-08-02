@@ -7,6 +7,8 @@ import {
 } from "@/db/queries/tenant-holdings";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
+import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +63,9 @@ export default async function TenantHoldingsPage({
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#dfe3d5] pt-6">
-          <p className="text-sm font-semibold">{holdingReadEvidence(result)}</p>
+          <p className="text-sm font-semibold">
+            {holdingReadEvidence(result, resolution)}
+          </p>
           <AccountScopeTabs
             basePath="/portfolio/holdings"
             selectedAccount={scope}
@@ -141,8 +145,13 @@ export default async function TenantHoldingsPage({
   );
 }
 
-function holdingReadEvidence(result: TenantHoldingQueryResult | null) {
-  if (result === null) return "Sign-in required; product data was not read.";
+function holdingReadEvidence(
+  result: TenantHoldingQueryResult | null,
+  resolution: SessionResolverResult,
+) {
+  if (result === null) {
+    return `${sessionResolutionEvidence(resolution)}; product data was not read.`;
+  }
   if (result.state === "unavailable") return "Holdings read unavailable.";
   if (result.state === "integrity_error") return "Holdings read blocked.";
   const included = `${result.holdings.length} owned holding${

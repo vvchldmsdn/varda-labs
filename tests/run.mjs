@@ -127,6 +127,7 @@ import "./tenant-expand-phase.test.mjs";
 import "./tenant-writer-readiness.test.mjs";
 import "./runtime-writer-convergence.test.mjs";
 import "./session-resolver-contract.test.mjs";
+import "./session-resolution-evidence.test.mjs";
 import "./tenant-account-read-model.test.mjs";
 import "./tenant-holding-read-model.test.mjs";
 import "./current-tenant-read-scope.test.mjs";

@@ -50,6 +50,7 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /resolveCurrentTenantContext\(\)/);
     assert.match(source, /getReadOnlyTenantAccounts/);
     assert.match(source, /normalizePortfolioAccountScope/);
+    assert.match(source, /sessionResolutionEvidence\(resolution\)/);
     assert.doesNotMatch(
       source,
       /providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,
@@ -84,6 +85,7 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /getReadOnlyTenantHoldings/);
     assert.match(source, /normalizePortfolioAccountScope/);
     assert.match(source, /Promise\.all/);
+    assert.match(source, /holdingReadEvidence\(result, resolution\)/);
     assert.doesNotMatch(
       source,
       /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,
