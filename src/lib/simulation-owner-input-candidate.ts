@@ -1,4 +1,5 @@
 import { applyInvestmentLabCurrentHoldingScope } from "./investment-lab-current-holding-scope.ts";
+import { allocateBasisPointsByValue } from "./basis-point-allocation.ts";
 import {
   DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
   resolveInvestmentLabSpecialHoldingIdentity,
@@ -133,7 +134,12 @@ export function buildSimulationOwnerInputCandidate(input: {
 
   const canDeriveWeights = blockers.size === 0;
   const weightRows = canDeriveWeights
-    ? deriveDisplayWeightBps(aggregated.rows)
+    ? allocateBasisPointsByValue(
+        aggregated.rows.map((row) => ({
+          key: row.instrumentKey,
+          value: row.currentValueKrw,
+        })),
+      )
     : null;
   if (canDeriveWeights && weightRows === null) {
     blockers.add("weight_derivation_failed");
@@ -326,46 +332,6 @@ function matchesApprovedSpecialHolding(
     row.currency.trim().toUpperCase() === decision.currency &&
     normalizeLower(row.assetType) === decision.assetType
   );
-}
-
-function deriveDisplayWeightBps(rows: readonly Readonly<{
-  instrumentKey: string;
-  currentValueKrw: number;
-}>[]) {
-  const total = rows.reduce((sum, row) => sum + row.currentValueKrw, 0);
-  if (!Number.isFinite(total) || total <= 0) return null;
-
-  const allocations = rows.map((row) => {
-    const ideal = (row.currentValueKrw / total) * 10_000;
-    if (!Number.isFinite(ideal) || ideal < 0) return null;
-    const floor = Math.floor(ideal);
-    return {
-      instrumentKey: row.instrumentKey,
-      weightBps: floor,
-      remainder: ideal - floor,
-    };
-  });
-  if (allocations.some((row) => row === null)) return null;
-
-  const typed = allocations as Array<{
-    instrumentKey: string;
-    weightBps: number;
-    remainder: number;
-  }>;
-  const remaining = 10_000 - typed.reduce((sum, row) => sum + row.weightBps, 0);
-  if (!Number.isSafeInteger(remaining) || remaining < 0 || remaining > typed.length) {
-    return null;
-  }
-  typed.sort(
-    (left, right) =>
-      right.remainder - left.remainder ||
-      left.instrumentKey.localeCompare(right.instrumentKey),
-  );
-  for (let index = 0; index < remaining; index += 1) {
-    typed[index].weightBps += 1;
-  }
-
-  return new Map(typed.map((row) => [row.instrumentKey, row.weightBps]));
 }
 
 function buildServerSelection(

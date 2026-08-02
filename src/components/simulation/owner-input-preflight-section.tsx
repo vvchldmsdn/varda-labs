@@ -30,8 +30,8 @@ export function OwnerInputPreflightSection({
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
             현재 보유 구성과 저장된 과거 가격 이력을 계좌별로 점검합니다. 이 비중은
-            진단용 현재 구성이며 아직 시뮬레이션 실행, 최적화, 추천 또는 주문에
-            사용되지 않습니다.
+            아래의 일회성 연구 계산에만 사용하며 저장된 목표 비중, 최적화, 추천 또는
+            주문 근거로 사용하지 않습니다.
           </p>
         </div>
         <AccountScopeTabs
@@ -155,8 +155,9 @@ export function OwnerInputPreflightSection({
       ) : null}
 
       <p className="mt-4 text-xs leading-5 text-[#687064]">
-        저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다. 다음 단계에서
-        승인된 가격 공급자 보강 경로를 연결하며, 보강 전에는 부족한 범위를 명시한 부분 진단만 제공합니다.
+        저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다. 부족한
+        상장 종목은 임의의 평균값이나 현재 가격으로 과거를 만들지 않으며, 공급자 보강
+        경로가 준비되기 전까지 부족한 범위를 명시한 진단을 제공합니다.
       </p>
     </section>
   );
