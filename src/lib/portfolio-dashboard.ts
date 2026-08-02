@@ -1,21 +1,18 @@
 import "server-only";
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
-
-import { db } from "@/db/client";
-import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
+import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
 import {
   accounts,
   assetGroups,
-  assetPriceSnapshots,
   assets,
-  dailyPortfolioSnapshots,
-  dailyPositionSnapshots,
   eventLedgerEntries,
-  fxRates,
   livePriceQuotes,
-  settings,
 } from "@/db/schema";
+import {
+  NAMED_PORTFOLIO_ACCOUNTS,
+  type NamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "@/lib/portfolio-account-scope";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -25,6 +22,7 @@ import {
   type AssetReturnMetrics,
   type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
+import { buildPortfolioDashboardSnapshotTrend } from "@/lib/portfolio-dashboard-snapshots";
 import {
   convertToKrw,
   diffDays,
@@ -44,6 +42,7 @@ import {
   type PortfolioMovementExclusion,
   type PortfolioMovementSource,
 } from "@/lib/portfolio-movement";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 import { buildCycleForSnapshotDate, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
@@ -52,15 +51,14 @@ const NON_INVESTMENT_ASSET_TYPES = new Set([
   "fixed_deposit",
   "housing_subscription",
 ]);
-const ASSET_ACCOUNT_CODES = ["brokerage", "isa", "irp"] as const;
+const ASSET_ACCOUNT_CODES = NAMED_PORTFOLIO_ACCOUNTS;
 const DEFAULT_TRIM_DRIFT_THRESHOLD = 12;
-export type AssetAccount = (typeof ASSET_ACCOUNT_CODES)[number];
-export type DashboardAccount = "all" | AssetAccount;
+export type AssetAccount = NamedPortfolioAccount;
+export type DashboardAccount = PortfolioAccountScope;
 
 type AssetRow = typeof assets.$inferSelect;
 type AssetGroupRow = typeof assetGroups.$inferSelect;
 type LivePriceQuoteRow = typeof livePriceQuotes.$inferSelect;
-type PortfolioSnapshotRow = typeof dailyPortfolioSnapshots.$inferSelect;
 type EventLedgerRow = typeof eventLedgerEntries.$inferSelect;
 
 type MovementSource = PortfolioMovementSource;
@@ -244,66 +242,40 @@ export function normalizeDashboardAccount(value: string | string[] | undefined) 
 }
 
 export async function getPortfolioDashboard(
-  selectedAccount: DashboardAccount,
+  {
+    selectedAccount,
+    tenantContext,
+  }: {
+    selectedAccount: DashboardAccount;
+    tenantContext: TenantContext;
+  },
 ): Promise<DashboardData> {
   const now = new Date();
   const movementCycle = buildDashboardMovementCycle(now);
-  const [
+  const {
     accountRows,
     assetGroupRows,
     assetRows,
     settingsRows,
     latestFxRows,
-    movementSnapshotRows,
+    latestPositionRows,
     recentPortfolioRows,
     eventRows,
     unmatchedSnapshotCountRows,
-  ] = await Promise.all([
-    db.select().from(accounts),
-    db.select().from(assetGroups),
-    db.select().from(assets),
-    db.select().from(settings).orderBy(desc(settings.createdAt)).limit(1),
-    db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
-    getPositionSnapshotDateForCycle(selectedAccount, movementCycle.snapshotDate),
-    db
-      .select()
-      .from(dailyPortfolioSnapshots)
-      .where(eq(dailyPortfolioSnapshots.account, selectedAccount))
-      .orderBy(desc(dailyPortfolioSnapshots.snapshotDate))
-      .limit(30),
-    db.select().from(eventLedgerEntries),
-    db
-      .select({
-        count: sql<number>`count(*) filter (where ${dailyPositionSnapshots.assetId} is null)::int`,
-      })
-      .from(dailyPositionSnapshots),
-  ]);
+    liveQuoteRows,
+    recentPriceRows,
+  } = await getReadOnlyTenantPortfolioDashboardSources({
+    tenantContext,
+    selectedAccount,
+    snapshotDate: movementCycle.snapshotDate,
+  });
 
-  const latestSnapshotDate = movementSnapshotRows[0]?.snapshotDate ?? null;
-  const latestPositionRows = latestSnapshotDate
-    ? await db
-        .select()
-        .from(dailyPositionSnapshots)
-        .where(eq(dailyPositionSnapshots.snapshotDate, latestSnapshotDate))
-    : [];
+  const latestSnapshotDate =
+    latestPositionRows.length > 0 ? movementCycle.snapshotDate : null;
 
   const investmentAssetRows = assetRows.filter((asset) =>
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
   );
-  const quoteTickers = uniqueStrings(
-    investmentAssetRows
-      .map((asset) => normalizeTicker(asset.ticker))
-      .filter((ticker): ticker is string => Boolean(ticker)),
-  );
-  const liveQuoteRows =
-    quoteTickers.length > 0
-      ? await db
-          .select()
-          .from(livePriceQuotes)
-          .where(inArray(livePriceQuotes.ticker, quoteTickers))
-          .orderBy(desc(livePriceQuotes.fetchedAt))
-          .limit(Math.max(100, quoteTickers.length * 4))
-      : [];
   const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
   const valuationAssetRows = investmentAssetRows.map((asset) =>
     applyLiveQuote(asset, liveQuotesByAssetKey.get(assetLiveQuoteKey(asset))),
@@ -311,19 +283,6 @@ export async function getPortfolioDashboard(
   const selectedInvestmentAssetRows = valuationAssetRows.filter(
     (asset) => selectedAccount === "all" || asset.account === selectedAccount,
   );
-  const priceInstruments = selectedInvestmentAssetRows.map(
-    ({ market, currency, ticker }) => ({ market, currency, ticker }),
-  );
-  const recentPriceRows =
-    priceInstruments.length > 0
-      ? await db
-          .select()
-          .from(assetPriceSnapshots)
-          .where(assetPriceSnapshotInstrumentCondition(priceInstruments))
-          .orderBy(desc(assetPriceSnapshots.priceDate))
-          .limit(Math.max(200, priceInstruments.length * 20))
-      : [];
-
   const setting = settingsRows[0] ?? null;
   const latestFxRow = latestFxRows[0] ?? null;
   const usdKrwRate =
@@ -458,14 +417,16 @@ export async function getPortfolioDashboard(
     totalPnlKrw,
     costBasisKrw + realizedCostBasisKrw,
   );
-  const latestPortfolioSnapshot = recentPortfolioRows[0] ?? null;
-  const latestPortfolioSnapshotValue = toNumber(
-    latestPortfolioSnapshot?.totalMarketValue,
+  const recentSnapshots = buildPortfolioDashboardSnapshotTrend(
+    recentPortfolioRows,
+    selectedAccount,
   );
-  const latestPortfolioSnapshotPnl = toNumber(latestPortfolioSnapshot?.totalPnl);
-  const latestPortfolioSnapshotReturnPct = toNumber(
-    latestPortfolioSnapshot?.totalReturnPct,
-  );
+  const latestPortfolioSnapshot = recentSnapshots.at(-1) ?? null;
+  const latestPortfolioSnapshotValue =
+    latestPortfolioSnapshot?.totalMarketValue ?? null;
+  const latestPortfolioSnapshotPnl = latestPortfolioSnapshot?.totalPnl ?? null;
+  const latestPortfolioSnapshotReturnPct =
+    latestPortfolioSnapshot?.totalReturnPct ?? null;
   const latestAccountPositions = latestPositionRows.filter(
     (position) => selectedAccount === "all" || position.account === selectedAccount,
   );
@@ -515,7 +476,7 @@ export async function getPortfolioDashboard(
       nonInvestmentAssets,
       (asset) => asset.valueKrw,
     ),
-    recentSnapshots: buildRecentSnapshots(recentPortfolioRows),
+    recentSnapshots,
     eventActivity: buildEventActivity({
       eventRows,
       assetRows: investmentAssetRows,
@@ -568,7 +529,7 @@ export async function getPortfolioDashboard(
       previousCloseCoveragePct: previousCloseFallback.coverage.previousCloseCoveragePct,
       headlineBasis: "current_assets_plus_event_ledger",
       trendBasis: "daily_portfolio_snapshots",
-      latestPortfolioSnapshotDate: latestPortfolioSnapshot?.snapshotDate ?? null,
+      latestPortfolioSnapshotDate: latestPortfolioSnapshot?.date ?? null,
       portfolioSnapshotValueDeltaKrw: deltaOrNull(
         totalValueKrw,
         latestPortfolioSnapshotValue,
@@ -600,30 +561,6 @@ function resolveFxFreshnessState(
 ): FxFreshnessState {
   if (usdKrwRate <= 0 || latestFxAgeDays === null) return "missing";
   return latestFxAgeDays <= 1 ? "fresh" : "stale";
-}
-
-function getPositionSnapshotDateForCycle(
-  selectedAccount: DashboardAccount,
-  snapshotDate: string,
-) {
-  if (selectedAccount === "all") {
-    return db
-      .select({ snapshotDate: dailyPositionSnapshots.snapshotDate })
-      .from(dailyPositionSnapshots)
-      .where(eq(dailyPositionSnapshots.snapshotDate, snapshotDate))
-      .limit(1);
-  }
-
-  return db
-    .select({ snapshotDate: dailyPositionSnapshots.snapshotDate })
-    .from(dailyPositionSnapshots)
-    .where(
-      and(
-        eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
-        eq(dailyPositionSnapshots.account, selectedAccount),
-      ),
-    )
-    .limit(1);
 }
 
 function buildDashboardMovementCycle(now: Date): DashboardMovementCycle {
@@ -853,18 +790,6 @@ function buildNonInvestmentAssets(
         (toNumber(asset.fractionalKrwValue) ?? 0),
     }))
     .sort((a, b) => b.valueKrw - a.valueKrw);
-}
-
-function buildRecentSnapshots(rows: PortfolioSnapshotRow[]) {
-  return [...rows]
-    .reverse()
-    .map((row) => ({
-      date: row.snapshotDate,
-      totalMarketValue: toNumber(row.totalMarketValue) ?? 0,
-      totalPnl: toNumber(row.totalPnl),
-      totalReturnPct: toNumber(row.totalReturnPct),
-    }))
-    .slice(-14);
 }
 
 function latestDate(values: string[]) {

@@ -58,6 +58,7 @@ import "./investment-lab-legacy-cycle-provenance.test.mjs";
 import "./portfolio-direct-holdings.test.mjs";
 import "./portfolio-fx-shock.test.mjs";
 import "./portfolio-special-holdings.test.mjs";
+import "./portfolio-dashboard-snapshots.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./simulation-return-matrix.test.mjs";

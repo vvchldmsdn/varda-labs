@@ -212,6 +212,53 @@ describe("current tenant read scope runtime boundary", () => {
     assert.doesNotMatch(querySource, /ownerUserId\s*:\s*string|headers\(\)|cookies\(\)/);
   });
 
+  it("authorizes dashboard-owned rows through active named accounts", () => {
+    const source = read("src/db/queries/portfolio-dashboard.ts");
+
+    assert.match(source, /^import "server-only";/);
+    assert.match(
+      source,
+      /eq\(accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
+    assert.match(source, /eq\(accounts\.isActive, true\)/);
+    assert.match(source, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
+    for (const relation of [
+      /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
+      /eq\(assets\.account, accounts\.code\)/,
+      /innerJoin\(accounts, eq\(eventLedgerEntries\.accountId, accounts\.id\)\)/,
+      /eq\(eventLedgerEntries\.account, accounts\.code\)/,
+      /innerJoin\(accounts, eq\(dailyPositionSnapshots\.accountId, accounts\.id\)\)/,
+      /eq\(dailyPositionSnapshots\.account, accounts\.code\)/,
+      /innerJoin\(accounts, eq\(dailyPortfolioSnapshots\.accountId, accounts\.id\)\)/,
+      /eq\(dailyPortfolioSnapshots\.account, accounts\.code\)/,
+    ]) {
+      assert.match(source, relation);
+    }
+    assert.doesNotMatch(
+      source,
+      /eq\((?:assets|eventLedgerEntries|dailyPositionSnapshots|dailyPortfolioSnapshots)\.canonicalOwnerUserId/,
+    );
+    assert.doesNotMatch(
+      source,
+      /ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+    );
+  });
+
+  it("keeps home and today reads behind the resolved server session", () => {
+    for (const path of ["src/app/page.tsx", "src/app/today/page.tsx"]) {
+      const source = read(path);
+
+      assert.match(source, /resolveCurrentTenantContext\(\)/);
+      assert.match(source, /if \(!resolution\.ok\)/);
+      assert.match(source, /PortfolioDashboardAccessBoundary/);
+      assert.match(
+        source,
+        /getPortfolioDashboard\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
+      );
+      assert.doesNotMatch(source, /fetch\(|\/api\//);
+    }
+  });
+
   it("smokes the unauthenticated history boundary without direct database reads", () => {
     const source = read("scripts/smoke-history-route.mjs");
 
