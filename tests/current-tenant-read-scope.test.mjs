@@ -211,6 +211,19 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(querySource, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
     assert.doesNotMatch(querySource, /ownerUserId\s*:\s*string|headers\(\)|cookies\(\)/);
   });
+
+  it("smokes the unauthenticated history boundary without direct database reads", () => {
+    const source = read("scripts/smoke-history-route.mjs");
+
+    assert.match(source, /history_session_boundary/);
+    assert.match(source, /productDataRead: "not_attempted"/);
+    assert.match(source, /unauthorizedHistory\.status,[\s\S]*401/);
+    assert.match(source, /history\.status, 200/);
+    assert.doesNotMatch(
+      source,
+      /@neondatabase|DATABASE_URL|neon\(|sql\.query|select\s+.+\s+from|insert\s+into|update\s+.+\s+set|delete\s+from/i,
+    );
+  });
 });
 
 function read(path) {
