@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
@@ -13,6 +14,7 @@ import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-inp
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
 import { getReadOnlySimulationResearchUniversePreflight } from "@/db/queries/simulation-research-universe-preflight";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,22 @@ type SimulationPageProps = {
 export default async function SimulationPage({
   searchParams,
 }: SimulationPageProps) {
-  const params = await searchParams;
+  const [params, resolution] = await Promise.all([
+    searchParams,
+    resolveCurrentTenantContext(),
+  ]);
+
+  if (!resolution.ok) {
+    return (
+      <PortfolioReadAccessBoundary
+        closedMessage="Simulation research remains closed until the session and user link are available."
+        description="This view reads shared market research only after the signed-in user is resolved on the server."
+        resolution={resolution}
+        title="Simulation validation"
+      />
+    );
+  }
+
   const modelPromise = getReadOnlySimulationInputReadiness({
     endServiceDate: params.end,
     horizon: params.horizon,
