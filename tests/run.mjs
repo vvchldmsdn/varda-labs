@@ -132,6 +132,7 @@ import "./tenant-account-read-model.test.mjs";
 import "./tenant-holding-read-model.test.mjs";
 import "./tenant-position-snapshot-read-model.test.mjs";
 import "./tenant-portfolio-snapshot-read-model.test.mjs";
+import "./tenant-event-ledger-read-model.test.mjs";
 import "./current-tenant-read-scope.test.mjs";
 import "./legacy-account-ownership-preflight.test.mjs";
 import "./legacy-account-owner-assignment-writer.test.mjs";
