@@ -327,7 +327,7 @@ describe("auth session transport smoke", () => {
     assert.deepEqual(result.evidence, {
       requiredFiles: 12,
       presentFiles: 12,
-      inspectedRuntimeGraphFiles: 12,
+      inspectedRuntimeGraphFiles: 14,
       productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       authSdkPinned: true,
