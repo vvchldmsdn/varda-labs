@@ -128,6 +128,7 @@ import "./tenant-writer-readiness.test.mjs";
 import "./runtime-writer-convergence.test.mjs";
 import "./session-resolver-contract.test.mjs";
 import "./tenant-account-read-model.test.mjs";
+import "./tenant-holding-read-model.test.mjs";
 import "./current-tenant-read-scope.test.mjs";
 import "./legacy-account-ownership-preflight.test.mjs";
 import "./legacy-account-owner-assignment-writer.test.mjs";

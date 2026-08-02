@@ -48,12 +48,20 @@ export default async function AccountScopePage({
               Server session and canonical ownership only
             </p>
           </div>
-          <Link
-            href="/auth/session"
-            className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-          >
-            Session evidence
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/portfolio/holdings?account=all"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              Holdings
+            </Link>
+            <Link
+              href="/auth/session"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              Session evidence
+            </Link>
+          </div>
         </div>
 
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
