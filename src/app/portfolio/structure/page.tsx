@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-baseline";
 import { PortfolioFxShock } from "@/components/portfolio/portfolio-fx-shock";
 import { SpecialHoldingsCoverage } from "@/components/portfolio/special-holdings-coverage";
-import { getReadOnlyPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
 import { buildPortfolioSpecialHoldingsModel } from "@/lib/portfolio-special-holdings";
 import type {
@@ -33,9 +35,23 @@ const accountTabs: { code: PortfolioStructureAccount; label: string }[] = [
 export default async function PortfolioStructurePage({
   searchParams,
 }: PortfolioStructurePageProps) {
-  const params = await searchParams;
-  const structure = await getReadOnlyPortfolioStructure({
+  const [params, resolution] = await Promise.all([
+    searchParams,
+    resolveCurrentTenantContext(),
+  ]);
+
+  if (!resolution.ok) {
+    return (
+      <PortfolioReadAccessBoundary
+        resolution={resolution}
+        title="Portfolio structure"
+      />
+    );
+  }
+
+  const structure = await getReadOnlyTenantPortfolioStructure({
     account: params.account,
+    tenantContext: resolution.tenantContext,
   });
   const directHoldingsBaseline =
     buildPortfolioDirectHoldingsBaseline(structure);

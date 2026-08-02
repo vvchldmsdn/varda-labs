@@ -1,12 +1,13 @@
 import "server-only";
 
-import { desc, inArray } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/db/client";
 import {
   assetGroupMembers,
   assetGroups,
+  accounts,
   assets,
   fxRates,
   livePriceQuotes,
@@ -18,7 +19,9 @@ import {
   type PortfolioStructureAccount,
   type PortfolioStructureResult,
 } from "@/lib/portfolio-structure";
+import { NAMED_PORTFOLIO_ACCOUNTS } from "@/lib/portfolio-account-scope";
 import { normalizeTicker, toNumber, uniqueStrings } from "@/lib/portfolio-math";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 
@@ -26,10 +29,19 @@ export type ReadOnlyPortfolioStructureOptions = {
   account?: string | string[] | null;
 };
 
+export type ReadOnlyTenantPortfolioStructureOptions =
+  ReadOnlyPortfolioStructureOptions & {
+    tenantContext: TenantContext;
+  };
+
 export const getReadOnlyAllPortfolioStructure = cache(
   loadReadOnlyAllPortfolioStructure,
 );
 
+/**
+ * Temporary unscoped reader retained for Investment Lab migration only.
+ * New user-facing routes must use getReadOnlyTenantPortfolioStructure.
+ */
 export async function getReadOnlyPortfolioStructure({
   account,
 }: ReadOnlyPortfolioStructureOptions = {}): Promise<PortfolioStructureResult> {
@@ -42,6 +54,112 @@ export async function getReadOnlyPortfolioStructure({
       db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
       db.select().from(settings).orderBy(desc(settings.createdAt)).limit(1),
     ]);
+  return buildStructureFromRows({
+    assetRows,
+    groupRows,
+    memberRows,
+    latestFxRows,
+    settingsRows,
+    selectedAccount,
+  });
+}
+
+export async function getReadOnlyTenantPortfolioStructure({
+  account,
+  tenantContext,
+}: ReadOnlyTenantPortfolioStructureOptions): Promise<PortfolioStructureResult> {
+  const selectedAccount = normalizePortfolioStructureAccount(account);
+  const [assetRows, groupRows, memberRows, latestFxRows, settingsRows] =
+    await Promise.all([
+      db
+        .select(getTableColumns(assets))
+        .from(assets)
+        .innerJoin(accounts, eq(assets.accountId, accounts.id))
+        .where(
+          and(
+            ...activeOwnedAccountPredicates(tenantContext),
+            eq(assets.account, accounts.code),
+          ),
+        ),
+      db
+        .select()
+        .from(assetGroups)
+        .where(
+          and(
+            eq(assetGroups.canonicalOwnerUserId, tenantContext.ownerUserId),
+            eq(assetGroups.isActive, true),
+          ),
+        ),
+      db
+        .select(getTableColumns(assetGroupMembers))
+        .from(assetGroupMembers)
+        .innerJoin(assetGroups, eq(assetGroupMembers.groupId, assetGroups.id))
+        .innerJoin(assets, eq(assetGroupMembers.assetId, assets.id))
+        .innerJoin(accounts, eq(assets.accountId, accounts.id))
+        .where(
+          and(
+            ...activeOwnedAccountPredicates(tenantContext),
+            eq(assets.account, accounts.code),
+            eq(assetGroupMembers.groupId, assets.groupId),
+            eq(
+              assetGroupMembers.canonicalOwnerUserId,
+              tenantContext.ownerUserId,
+            ),
+            eq(assetGroupMembers.isActive, true),
+            eq(assetGroups.canonicalOwnerUserId, tenantContext.ownerUserId),
+            eq(assetGroups.isActive, true),
+          ),
+        ),
+      db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
+      db
+        .select()
+        .from(settings)
+        .where(
+          and(
+            eq(settings.canonicalOwnerUserId, tenantContext.ownerUserId),
+            eq(settings.isSample, false),
+          ),
+        )
+        .orderBy(desc(settings.createdAt))
+        .limit(1),
+    ]);
+
+  return buildStructureFromRows({
+    assetRows,
+    groupRows,
+    memberRows,
+    latestFxRows,
+    settingsRows,
+    selectedAccount,
+  });
+}
+
+export function normalizePortfolioStructureAccount(
+  account: string | string[] | null | undefined,
+): PortfolioStructureAccount {
+  const rawAccount = Array.isArray(account) ? account[0] : account;
+  return normalizeStructureAccount(rawAccount);
+}
+
+function loadReadOnlyAllPortfolioStructure() {
+  return getReadOnlyPortfolioStructure({ account: "all" });
+}
+
+async function buildStructureFromRows({
+  assetRows,
+  groupRows,
+  memberRows,
+  latestFxRows,
+  settingsRows,
+  selectedAccount,
+}: {
+  assetRows: (typeof assets.$inferSelect)[];
+  groupRows: (typeof assetGroups.$inferSelect)[];
+  memberRows: (typeof assetGroupMembers.$inferSelect)[];
+  latestFxRows: (typeof fxRates.$inferSelect)[];
+  settingsRows: (typeof settings.$inferSelect)[];
+  selectedAccount: PortfolioStructureAccount;
+}) {
   const structureAssetRows = assetRows.filter((asset) =>
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
   );
@@ -59,17 +177,6 @@ export async function getReadOnlyPortfolioStructure({
     usdKrwRate,
     selectedAccount,
   });
-}
-
-export function normalizePortfolioStructureAccount(
-  account: string | string[] | null | undefined,
-): PortfolioStructureAccount {
-  const rawAccount = Array.isArray(account) ? account[0] : account;
-  return normalizeStructureAccount(rawAccount);
-}
-
-function loadReadOnlyAllPortfolioStructure() {
-  return getReadOnlyPortfolioStructure({ account: "all" });
 }
 
 async function loadLiveQuoteRows(
@@ -93,4 +200,12 @@ async function loadLiveQuoteRows(
       desc(livePriceQuotes.updatedAt),
     )
     .limit(Math.max(100, tickers.length * 4));
+}
+
+function activeOwnedAccountPredicates(tenantContext: TenantContext) {
+  return [
+    eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+    eq(accounts.isActive, true),
+    inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
+  ];
 }
