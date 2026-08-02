@@ -4,9 +4,15 @@ import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export function PortfolioReadAccessBoundary({
+  closedMessage =
+    "Portfolio data remains closed until the session and owner link are available.",
+  description =
+    "This view reads portfolio data only after the signed-in user and canonical account ownership are resolved on the server.",
   resolution,
   title,
 }: {
+  closedMessage?: string;
+  description?: string;
   resolution: SessionResolverResult;
   title: string;
 }) {
@@ -15,10 +21,7 @@ export function PortfolioReadAccessBoundary({
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
         <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal">{title}</h1>
-        <p className="mt-2 text-sm text-[#687064]">
-          This view reads portfolio data only after the signed-in user and
-          canonical account ownership are resolved on the server.
-        </p>
+        <p className="mt-2 text-sm text-[#687064]">{description}</p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell
             label="Portfolio user link"
@@ -27,8 +30,7 @@ export function PortfolioReadAccessBoundary({
           <EvidenceCell label="Product database read" value="Not attempted" />
         </dl>
         <p className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
-          Portfolio data remains closed until the session and owner link are
-          available.
+          {closedMessage}
         </p>
         <Link
           href="/auth/sign-in"

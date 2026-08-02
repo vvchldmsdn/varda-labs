@@ -35,6 +35,15 @@ describe("Simulation input readiness route boundary", () => {
     assert.doesNotMatch(page, /["']use client["']/);
     assert.doesNotMatch(view, /["']use client["']/);
     assert.doesNotMatch(`${page}\n${view}`, /\bfetch\s*\(|\/api\//);
+    assert.match(page, /resolveCurrentTenantContext\(\)/);
+    assert.match(page, /Promise\.all/);
+    assert.match(page, /if \(!resolution\.ok\)/);
+    assert.match(page, /PortfolioReadAccessBoundary/);
+    assert.ok(
+      page.indexOf("if (!resolution.ok)") <
+        page.indexOf("const modelPromise"),
+      "simulation data reads must start only after the session boundary",
+    );
     assert.match(query, /^import "server-only";/);
     assert.match(historicalOutcomeQuery, /^import "server-only";/);
     assert.match(regimeQuery, /^import "server-only";/);
@@ -360,6 +369,13 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.match(smoke, /EXPECT_REGIME_HISTORICAL_READY/);
     assert.match(smoke, /HAS_EXPLICIT_END/);
+    assert.match(smoke, /const SESSION_COOKIE/);
+    assert.match(smoke, /if \(!SESSION_COOKIE\)/);
+    assert.match(smoke, /simulation_session_boundary_verified/);
+    assert.match(smoke, /databaseReadAttempted: false/);
+    assert.match(smoke, /assert\.doesNotMatch\(/);
+    assert.match(smoke, /data-page="simulation-input-readiness"/);
+    assert.match(smoke, /if \(!sql\) throw new Error/);
     assert.match(
       smoke,
       /regimeHistoricalOutcomeReadyCount > 0/,

@@ -52,13 +52,21 @@ const PASSWORD =
   process.env.VARDA_APP_PASSWORD?.trim() ||
   process.env.APP_ACCESS_PASSWORD?.trim();
 const USERNAME = process.env.VARDA_APP_USER?.trim() || "varda";
+const SESSION_COOKIE =
+  readArgument("--session-cookie") ??
+  process.env.VARDA_SESSION_COOKIE?.trim() ??
+  null;
 const LEAK_PATTERN =
   /legacyBase44Id|holdingId|assetId|ownerUser|api[_-]?key|authorization|password|secret|token|scenarioVectorHash|matrixRequestHash|inputMatrixHash|drawPlanHash|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
-if (!USE_REMOTE_DATABASE_EVIDENCE && !process.env.DATABASE_URL) {
+if (
+  SESSION_COOKIE &&
+  !USE_REMOTE_DATABASE_EVIDENCE &&
+  !process.env.DATABASE_URL
+) {
   throw new Error(
-    "DATABASE_URL is required unless --remote-db-evidence is enabled",
+    "DATABASE_URL is required for session-bound smoke unless --remote-db-evidence is enabled",
   );
 }
 if (![63, 126].includes(EXPECT_HORIZON)) {
@@ -76,7 +84,9 @@ if (
 
 const sql = USE_REMOTE_DATABASE_EVIDENCE
   ? null
-  : neon(process.env.DATABASE_URL);
+  : process.env.DATABASE_URL
+    ? neon(process.env.DATABASE_URL)
+    : null;
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
 const simulationPath =
   RAW_QUERY !== null
@@ -86,6 +96,37 @@ const simulationPath =
       : "/simulation";
 
 async function main() {
+  const unauthorized = await request(simulationPath);
+  assert.equal(unauthorized.status, 401, "no-auth simulation must return 401");
+
+  if (!SESSION_COOKIE) {
+    const boundary = await request(simulationPath, true);
+    assert.equal(boundary.status, 200, "Basic-auth boundary must return 200");
+    assert.match(boundary.body, /Simulation validation/);
+    assert.match(boundary.body, /shared market research/);
+    assert.match(boundary.body, /Simulation research remains closed/);
+    assert.match(boundary.body, /Portfolio user link/);
+    assert.match(boundary.body, /Product database read/);
+    assert.match(boundary.body, /Not attempted/);
+    assert.doesNotMatch(
+      boundary.body,
+      /data-page="simulation-input-readiness"/,
+    );
+    assert.doesNotMatch(boundary.body, LEAK_PATTERN);
+    console.log(
+      JSON.stringify(
+        {
+          status: "simulation_session_boundary_verified",
+          databaseReadAttempted: false,
+          leakPatternMatches: 0,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
   if (USE_REMOTE_DATABASE_EVIDENCE) {
     const unauthorizedEvidence = await request(
       "/admin/preview-db-evidence",
@@ -97,9 +138,7 @@ async function main() {
     );
   }
   const countsBefore = await readCounts();
-  const unauthorized = await request(simulationPath);
   const unauthorizedDashboard = await request("/");
-  assert.equal(unauthorized.status, 401, "no-auth simulation must return 401");
   assert.equal(
     unauthorizedDashboard.status,
     401,
@@ -773,8 +812,14 @@ async function main() {
 }
 
 async function request(path, authenticated = false) {
+  const headers = authenticated
+    ? {
+        authorization,
+        ...(SESSION_COOKIE ? { cookie: SESSION_COOKIE } : {}),
+      }
+    : undefined;
   const response = await fetch(new URL(path, BASE_URL), {
-    headers: authenticated ? { authorization } : undefined,
+    headers,
     redirect: "manual",
     signal: AbortSignal.timeout(30_000),
   });
@@ -818,6 +863,7 @@ async function readCounts() {
     };
   }
 
+  if (!sql) throw new Error("DATABASE_URL is required for database evidence");
   const [row] = await sql.query(`
     select
       (select count(*)::int from assets) as assets,

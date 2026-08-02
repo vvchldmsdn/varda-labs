@@ -457,6 +457,38 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /if \(!sql\) throw new Error/);
   });
 
+  it("keeps Simulation shared research reads behind the resolved server session", () => {
+    const pageSource = read("src/app/simulation/page.tsx");
+    const smokeSource = read("scripts/smoke-simulation-route.mjs");
+
+    assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
+    assert.match(pageSource, /Promise\.all/);
+    assert.match(pageSource, /if \(!resolution\.ok\)/);
+    assert.match(pageSource, /PortfolioReadAccessBoundary/);
+    assert.ok(
+      pageSource.indexOf("if (!resolution.ok)") <
+        pageSource.indexOf("const modelPromise"),
+      "shared simulation evidence must not be read before session resolution",
+    );
+    assert.doesNotMatch(
+      pageSource,
+      /\bfetch\s*\(|\/api\/|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,
+    );
+
+    assert.match(smokeSource, /const SESSION_COOKIE/);
+    assert.match(smokeSource, /if \(!SESSION_COOKIE\)/);
+    assert.match(
+      smokeSource,
+      /status: "simulation_session_boundary_verified"/,
+    );
+    assert.match(smokeSource, /databaseReadAttempted: false/);
+    assert.match(
+      smokeSource,
+      /data-page="simulation-input-readiness"/,
+    );
+    assert.match(smokeSource, /if \(!sql\) throw new Error/);
+  });
+
   it("smokes the unauthenticated history boundary without direct database reads", () => {
     const source = read("scripts/smoke-history-route.mjs");
 
