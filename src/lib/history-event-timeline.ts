@@ -139,16 +139,59 @@ export function buildHistoryEventTimeline({
     );
   }
 
+  const projected = projectHistoryEventRows(compatibleRows);
+  const rowLimitExceeded =
+    projected.length > HISTORY_EVENT_TIMELINE_POLICY.rowLimit;
+  const rows = projected.slice(0, HISTORY_EVENT_TIMELINE_POLICY.rowLimit);
+  const duplicateIdentityCount = rows.filter(
+    (row) => row.evidenceStatus === "duplicate_identity",
+  ).length;
+  const partialCount = rows.filter(
+    (row) => row.evidenceStatus !== "complete",
+  ).length;
+  const partial =
+    rowLimitExceeded ||
+    incompatibleRowCount > 0 ||
+    partialCount > 0;
+
+  return Object.freeze({
+    policy: HISTORY_EVENT_TIMELINE_POLICY,
+    account,
+    lane,
+    status: partial ? "partial" : "ready",
+    reason: partial ? "partial_evidence" : "ready",
+    inputRowCount: eventRows.length,
+    eventCount: rows.length,
+    tradeCount: rows.filter((row) => row.eventKind === "trade").length,
+    lifecycleCount: rows.filter((row) => row.eventKind === "lifecycle").length,
+    partialCount,
+    legacyOnlyCount: rows.filter(
+      (row) => row.assetReferenceStatus === "legacy_only",
+    ).length,
+    correctionCount: rows.filter(
+      (row) => row.correctionStatus !== "none",
+    ).length,
+    incompatibleRowCount,
+    duplicateIdentityCount,
+    rowLimitExceeded,
+    dateRange: summarizeDateRange(rows),
+    rows: Object.freeze(rows),
+  });
+}
+
+export function projectHistoryEventRows(
+  eventRows: readonly HistoryEventRawRow[],
+): readonly HistoryEventDisplayRow[] {
   const identityCounts = new Map<string, number>();
-  for (const row of compatibleRows) {
-    const identity = internalIdentity(row);
+  for (const row of eventRows) {
+    const identity = getHistoryEventEvidenceIdentity(row);
     if (identity) {
       identityCounts.set(identity, (identityCounts.get(identity) ?? 0) + 1);
     }
   }
 
-  const projected = compatibleRows.map((row) => {
-    const identity = internalIdentity(row);
+  const projected = eventRows.map((row) => {
+    const identity = getHistoryEventEvidenceIdentity(row);
     const duplicateIdentity =
       identity !== null && (identityCounts.get(identity) ?? 0) > 1;
     const eventType = cleanText(row.eventType) ?? "unknown";
@@ -202,43 +245,7 @@ export function buildHistoryEventTimeline({
   });
 
   projected.sort(compareDisplayRows);
-  const rowLimitExceeded =
-    projected.length > HISTORY_EVENT_TIMELINE_POLICY.rowLimit;
-  const rows = projected.slice(0, HISTORY_EVENT_TIMELINE_POLICY.rowLimit);
-  const duplicateIdentityCount = rows.filter(
-    (row) => row.evidenceStatus === "duplicate_identity",
-  ).length;
-  const partialCount = rows.filter(
-    (row) => row.evidenceStatus !== "complete",
-  ).length;
-  const partial =
-    rowLimitExceeded ||
-    incompatibleRowCount > 0 ||
-    partialCount > 0;
-
-  return Object.freeze({
-    policy: HISTORY_EVENT_TIMELINE_POLICY,
-    account,
-    lane,
-    status: partial ? "partial" : "ready",
-    reason: partial ? "partial_evidence" : "ready",
-    inputRowCount: eventRows.length,
-    eventCount: rows.length,
-    tradeCount: rows.filter((row) => row.eventKind === "trade").length,
-    lifecycleCount: rows.filter((row) => row.eventKind === "lifecycle").length,
-    partialCount,
-    legacyOnlyCount: rows.filter(
-      (row) => row.assetReferenceStatus === "legacy_only",
-    ).length,
-    correctionCount: rows.filter(
-      (row) => row.correctionStatus !== "none",
-    ).length,
-    incompatibleRowCount,
-    duplicateIdentityCount,
-    rowLimitExceeded,
-    dateRange: summarizeDateRange(rows),
-    rows: Object.freeze(rows),
-  });
+  return Object.freeze(projected);
 }
 
 function emptyModel(
@@ -317,7 +324,7 @@ function classifyEventKind(
   return "unknown";
 }
 
-function internalIdentity(row: HistoryEventRawRow) {
+export function getHistoryEventEvidenceIdentity(row: HistoryEventRawRow) {
   const internalId = cleanText(row.internalId);
   if (internalId) return `event:${internalId}`;
   const legacyId = cleanText(row.legacyBase44Id);
