@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { AccountScopeTabs } from "@/components/account-scope-tabs";
+import { ManualKrxGoldPriceForm } from "@/components/manual-krx-gold-price-form";
 import {
   getReadOnlyTenantHoldings,
   type TenantHoldingQueryResult,
 } from "@/db/queries/tenant-holdings";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { isKrxGoldManualAssetCandidate } from "@/lib/market-data/manual-asset-price";
 import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
@@ -145,6 +147,12 @@ export default async function TenantHoldingsPage({
                         <p>{holding.priceStatus ?? "No status"}</p>
                         <p>{holding.priceSource ?? "No source"}</p>
                         <p>{formatPriceAsOf(holding.priceAsOf)}</p>
+                        {isKrxGoldManualAssetCandidate(holding) ? (
+                          <ManualKrxGoldPriceForm
+                            key={holding.currentPrice}
+                            currentPrice={holding.currentPrice}
+                          />
+                        ) : null}
                       </td>
                     </tr>
                   ))

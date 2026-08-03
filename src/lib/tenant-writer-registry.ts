@@ -357,6 +357,20 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "separate",
   },
   {
+    id: "session_manual_krx_gold_price",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["/portfolio/holdings#updateManualKrxGoldPrice"],
+    implementationPaths: [
+      "src/lib/market-data/manual-krx-gold-price-write.ts",
+    ],
+    targets: [userTarget("assets", "update")],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "separate",
+  },
+  {
     id: "entity_asset_groups_api",
     classification: "user_owned",
     authorization: "machine_admin",

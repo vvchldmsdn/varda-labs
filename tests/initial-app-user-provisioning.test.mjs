@@ -220,10 +220,10 @@ describe("initial app-user provisioning", () => {
     assertSafeOutput(second);
   });
 
-  it("keeps the live writer registry in shadow with no HTTP owner input", () => {
+  it("reports the reviewed session writer with no HTTP owner input or owner inference", () => {
     assert.deepEqual(readWriterReadiness(ROOT), {
-      registryShadow: true,
-      runtimeOwnerIntegrationCount: 0,
+      registryShadow: false,
+      runtimeOwnerIntegrationCount: 1,
       httpCanonicalOwnerInputCount: 0,
       ownerInferencePathCount: 0,
     });
