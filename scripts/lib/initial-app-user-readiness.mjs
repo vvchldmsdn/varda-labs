@@ -153,6 +153,13 @@ export function readWriterReadiness(root = process.cwd()) {
         transition.freeze === "freeze_legacy_writer"
       );
     }
+    if (canonicalOwnerRolloutScope === "not_applicable") {
+      return (
+        transition.prepare === "dry_run_only" &&
+        transition.activate === "atomic_target_policy_approval" &&
+        transition.freeze === "not_required"
+      );
+    }
     return false;
   });
 

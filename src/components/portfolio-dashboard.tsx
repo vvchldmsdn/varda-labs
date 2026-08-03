@@ -19,7 +19,7 @@ const accountTabs: { code: DashboardAccount; label: string }[] = [
 const navItems: { label: string; href?: string }[] = [
   { label: "홈", href: "/" },
   { label: "오늘 변동", href: "/today" },
-  { label: "추가 투입" },
+  { label: "추가 투입", href: "/additional-contribution" },
   { label: "자산 배분", href: "/portfolio/structure" },
   { label: "위험·분산", href: "/portfolio/risk" },
   { label: "히스토리", href: "/history" },

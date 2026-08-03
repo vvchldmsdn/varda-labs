@@ -10,6 +10,7 @@ import {
   sha256Fingerprint,
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
+  assertReviewedPreTargetPolicyPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
@@ -122,10 +123,10 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0021_strange_sinister_six",
-        createdAt: 1784991961050,
+        tag: "0022_hot_sir_ram",
+        createdAt: 1785713123604,
         sha256:
-          "e3590cbe4e787bb32ca6fa9fdb27ae6f50295701dcd22bfb9b3edd8997fb1553",
+          "81cfc350d89f2378f60e65731cc97c34cfc1dc1568858847373395142db12bcf",
       },
     );
     assert.deepEqual(
@@ -135,9 +136,9 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 22,
+        entryCount: 23,
         sha256:
-          "sha256:7733283ad3e1a3b4ae89cd761a370ca2a3cc488c085597fb34573055ca033808",
+          "sha256:c93ddb52adb86999292fc13c7980e9ac5bd735589969e8b8120167a64912bf00",
       },
     );
   });
@@ -179,7 +180,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v4",
+        evidenceVersion: "preview_database_evidence_v5",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
@@ -187,11 +188,15 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0021_present",
+      "reviewed_0022_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
       "reviewed_0020_present",
+    );
+    assert.equal(
+      publicPreviewDatabaseEvidence(reviewed).targetPolicyCatalogStatus,
+      "reviewed_0022_present",
     );
 
     const appliedMigrations = reviewed.appliedMigrations.slice(0, -1);
@@ -199,9 +204,23 @@ describe("Preview database target operational guard", () => {
       ...reviewed,
       latestMigration: appliedMigrations.at(-1) ?? null,
       appliedMigrations,
+      reviewedCatalog: {
+        ...reviewed.reviewedCatalog,
+        targetPolicyTables: [],
+        targetPolicyConstraints: [],
+        targetPolicyRows: null,
+        accountOwnerUniqueIndexExact: false,
+        targetPolicyIdentityRevisionIndexExact: false,
+        targetPolicyCurrentIndexExact: false,
+        targetPolicyEventSequenceIndexExact: false,
+      },
     };
     assert.doesNotThrow(() =>
-      assertReviewedPreviewDatabaseCatalog(pending),
+      assertReviewedPreTargetPolicyPreviewDatabaseCatalog(pending),
+    );
+    assert.throws(
+      () => assertReviewedPreviewDatabaseCatalog(pending),
+      /0022 catalog is incomplete/,
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseState(pending),
@@ -215,16 +234,19 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(pending).migrationLedgerStatus,
         assetPriceCatalogStatus:
           publicPreviewDatabaseEvidence(pending).assetPriceCatalogStatus,
+        targetPolicyCatalogStatus:
+          publicPreviewDatabaseEvidence(pending).targetPolicyCatalogStatus,
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0021_not_present",
+        migrationLedgerStatus: "reviewed_0022_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
+        targetPolicyCatalogStatus: "reviewed_0022_not_present",
       },
     );
   });
 
-  it("rejects an earlier ledger divergence even when migration 0021 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0022 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -249,8 +271,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0021_strange_sinister_six",
-        migrationLedgerStatus: "reviewed_0021_not_present",
+        latestReviewedMigration: "0022_hot_sir_ram",
+        migrationLedgerStatus: "reviewed_0022_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );
@@ -298,6 +320,9 @@ describe("Preview database target operational guard", () => {
     assert.match(source, /string_agg\([\s\S]*order by index_key\.ordinality/);
     assert.match(source, /asset_price_snapshots_instrument_date_unique/);
     assert.match(source, /asset_price_snapshots_ticker_date_unique/);
+    assert.match(source, /accounts_id_canonical_owner_unique/);
+    assert.match(source, /target_policy_revisions_current_unique/);
+    assert.match(source, /target_policy_revisions_account_owner_fk/);
   });
 });
 
@@ -352,6 +377,43 @@ function reviewedState() {
       instrumentDateUniqueIndexExact: true,
       legacyTickerDateUniqueIndexExact: false,
       legacyTickerDateIndexPresent: false,
+      targetPolicyTables: [
+        "target_policy_approval_revisions",
+        "target_policy_approval_vector_rows",
+        "target_policy_approval_lifecycle_events",
+      ],
+      targetPolicyConstraints: [
+        "target_policy_events_sequence_check",
+        "target_policy_events_audit_version_check",
+        "target_policy_events_transition_shape_check",
+        "target_policy_events_revision_fk",
+        "target_policy_events_replacement_fk",
+        "target_policy_revisions_policy_id_check",
+        "target_policy_revisions_version_check",
+        "target_policy_revisions_revision_check",
+        "target_policy_revisions_universe_hash_check",
+        "target_policy_revisions_vector_hash_check",
+        "target_policy_revisions_evidence_ref_check",
+        "target_policy_revisions_status_check",
+        "target_policy_revisions_terminal_state_check",
+        "target_policy_revisions_owner_user_fk",
+        "target_policy_revisions_account_owner_fk",
+        "target_policy_vector_rows_pk",
+        "target_policy_vector_rows_market_check",
+        "target_policy_vector_rows_currency_check",
+        "target_policy_vector_rows_ticker_check",
+        "target_policy_vector_rows_weight_check",
+        "target_policy_vector_rows_revision_fk",
+      ],
+      targetPolicyRows: {
+        revisions: 0,
+        vectorRows: 0,
+        lifecycleEvents: 0,
+      },
+      accountOwnerUniqueIndexExact: true,
+      targetPolicyIdentityRevisionIndexExact: true,
+      targetPolicyCurrentIndexExact: true,
+      targetPolicyEventSequenceIndexExact: true,
     },
   };
 }

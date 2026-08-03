@@ -41,7 +41,8 @@ export type WriterTransitionPolicy = Readonly<{
     | "single_identity_insert"
     | "single_claim_intent_insert"
     | "atomic_identity_pairing_consume"
-    | "post_consume_owner_assignment";
+    | "post_consume_owner_assignment"
+    | "atomic_target_policy_approval";
   freeze:
     | "freeze_without_verified_owner"
     | "freeze_user_targets_only"
@@ -168,6 +169,26 @@ export const TENANT_WRITER_REGISTRY = [
     canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "separate",
+  },
+  {
+    id: "approved_target_policy_record",
+    classification: "user_owned",
+    authorization: "migration_cli",
+    entrypoints: ["scripts/record-approved-target-policy.mjs"],
+    implementationPaths: ["scripts/record-approved-target-policy.mjs"],
+    targets: [
+      userTarget("target_policy_approval_revisions", "insert"),
+      userTarget("target_policy_approval_vector_rows", "insert"),
+      userTarget("target_policy_approval_lifecycle_events", "insert"),
+    ],
+    transition: {
+      prepare: "dry_run_only",
+      activate: "atomic_target_policy_approval",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
   },
   {
     id: "base44_core_import",

@@ -1,0 +1,36 @@
+{
+  "policyId": "account_scoped_explicit_instrument_targets_v1",
+  "account": "isa",
+  "policyVersion": "isa-v1",
+  "approvalRevision": 1,
+  "effectiveServiceDate": "2026-07-11",
+  "universeHash": "sha256:3dfed5a3d43ae4531227b5b75fabb295c2575f7959261b530e05fdde14596c66",
+  "vectorHash": "sha256:85e6181e6e5f54ca9d1eda2cc8940c6cd576970a5f5136fdc6920227f200f2ca",
+  "approvalEvidenceRef": "docs/target-policy-isa-v1-gate-b-approval.md",
+  "vector": [
+    {
+      "market": "korea",
+      "currency": "KRW",
+      "ticker": "133690",
+      "targetWeightBps": 3500
+    },
+    {
+      "market": "korea",
+      "currency": "KRW",
+      "ticker": "360200",
+      "targetWeightBps": 3500
+    },
+    {
+      "market": "korea",
+      "currency": "KRW",
+      "ticker": "475350",
+      "targetWeightBps": 1000
+    },
+    {
+      "market": "korea",
+      "currency": "KRW",
+      "ticker": "489250",
+      "targetWeightBps": 2000
+    }
+  ]
+}
