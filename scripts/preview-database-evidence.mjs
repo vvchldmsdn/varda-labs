@@ -7,6 +7,7 @@ import { neon } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
 import {
+  assertPreviewTargetPolicyRowsPreserved,
   assertReviewedPreTargetPolicyPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
@@ -56,9 +57,10 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v5",
+      evidenceVersion: "preview_database_build_preflight_v6",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
+      targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
     };
     writeFileSync(EVIDENCE_FILE, `${JSON.stringify(evidence)}\n`, {
       encoding: "utf8",
@@ -78,7 +80,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v5",
+    "preview_database_build_preflight_v6",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -90,6 +92,10 @@ async function run() {
     state.rowCounts,
     before.rowCounts,
     "Preview migration changed protected row counts",
+  );
+  assertPreviewTargetPolicyRowsPreserved(
+    before.targetPolicyRows ?? null,
+    state.reviewedCatalog.targetPolicyRows,
   );
 
   rmSync(EVIDENCE_FILE, { force: true });

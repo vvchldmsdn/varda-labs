@@ -111,16 +111,18 @@ export type PreviewDatabaseState = {
     legacyTickerDateIndexPresent: boolean;
     targetPolicyTables: string[];
     targetPolicyConstraints: string[];
-    targetPolicyRows: {
-      revisions: number;
-      vectorRows: number;
-      lifecycleEvents: number;
-    } | null;
+    targetPolicyRows: TargetPolicyRowCounts | null;
     accountOwnerUniqueIndexExact: boolean;
     targetPolicyIdentityRevisionIndexExact: boolean;
     targetPolicyCurrentIndexExact: boolean;
     targetPolicyEventSequenceIndexExact: boolean;
   };
+};
+
+export type TargetPolicyRowCounts = {
+  revisions: number;
+  vectorRows: number;
+  lifecycleEvents: number;
 };
 
 export async function readPreviewDatabaseState(input: {
@@ -379,6 +381,34 @@ export function assertReviewedPreTargetPolicyPreviewDatabaseCatalog(
   }
 }
 
+export function assertPreviewTargetPolicyRowsPreserved(
+  before: TargetPolicyRowCounts | null,
+  after: TargetPolicyRowCounts | null,
+) {
+  if (after === null) {
+    throw new Error(
+      "Preview postflight target-policy row evidence is unavailable.",
+    );
+  }
+
+  const expected = before ?? {
+    revisions: 0,
+    vectorRows: 0,
+    lifecycleEvents: 0,
+  };
+  if (
+    after.revisions !== expected.revisions ||
+    after.vectorRows !== expected.vectorRows ||
+    after.lifecycleEvents !== expected.lifecycleEvents
+  ) {
+    throw new Error(
+      before === null
+        ? "Preview migration unexpectedly seeded target-policy rows."
+        : "Preview migration changed inherited target-policy row counts.",
+    );
+  }
+}
+
 export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedMigrationLedgerPresent =
     hasReviewedMigrationLedger(state);
@@ -449,16 +479,12 @@ function hasReviewedAssetPriceCatalog(state: PreviewDatabaseState) {
 }
 
 function hasReviewedTargetPolicyCatalog(state: PreviewDatabaseState) {
-  const rows = state.reviewedCatalog.targetPolicyRows;
   return (
     state.reviewedCatalog.targetPolicyTables.length ===
       TARGET_POLICY_TABLES.length &&
     state.reviewedCatalog.targetPolicyConstraints.length ===
       TARGET_POLICY_CONSTRAINTS.length &&
-    rows !== null &&
-    rows.revisions === 0 &&
-    rows.vectorRows === 0 &&
-    rows.lifecycleEvents === 0 &&
+    state.reviewedCatalog.targetPolicyRows !== null &&
     state.reviewedCatalog.accountOwnerUniqueIndexExact &&
     state.reviewedCatalog.targetPolicyIdentityRevisionIndexExact &&
     state.reviewedCatalog.targetPolicyCurrentIndexExact &&
