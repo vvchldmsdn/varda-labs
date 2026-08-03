@@ -7,7 +7,7 @@ import { neon } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
 import {
-  assertReviewedPreviewDatabaseCatalog,
+  assertReviewedPreTargetPolicyPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
   readPreviewDatabaseState,
@@ -18,7 +18,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v4.json",
+  "varda-preview-database-preflight-v5.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -56,7 +56,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v4",
+      evidenceVersion: "preview_database_build_preflight_v5",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
     };
@@ -78,7 +78,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v4",
+    "preview_database_build_preflight_v5",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -104,13 +104,13 @@ function assertPreflightCatalog(plan, state, localMigrations) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0021_strange_sinister_six"],
-    "Only reviewed migration 0021 may be pending",
+    ["0022_hot_sir_ram"],
+    "Only reviewed migration 0022 may be pending",
   );
   assert.equal(
     plan.latestAppliedTag,
-    "0020_rainy_northstar",
-    "Pending 0021 target must start from reviewed migration 0020",
+    "0021_strange_sinister_six",
+    "Pending 0022 target must start from reviewed migration 0021",
   );
   const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
@@ -119,9 +119,9 @@ function assertPreflightCatalog(plan, state, localMigrations) {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0021",
+    "Preview state and migration ledger disagree before migration 0022",
   );
-  assertReviewedPreviewDatabaseCatalog(state);
+  assertReviewedPreTargetPolicyPreviewDatabaseCatalog(state);
 }
 
 function readLocalMigrations() {

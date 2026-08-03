@@ -107,6 +107,24 @@ export const SIMULATION_APPROVAL_TABLE_POLICIES = Object.freeze([
   ),
 ]);
 
+export const TARGET_POLICY_APPROVAL_TABLE_POLICIES = Object.freeze([
+  userOwned(
+    "target_policy_approval_revisions",
+    "owner_user_id",
+    "not_applicable",
+  ),
+  userOwnedViaParent(
+    "target_policy_approval_vector_rows",
+    "target_policy_approval_revisions",
+    "approval_revision_id",
+  ),
+  userOwnedViaParent(
+    "target_policy_approval_lifecycle_events",
+    "target_policy_approval_revisions",
+    "approval_revision_id",
+  ),
+]);
+
 export const IDENTITY_SYSTEM_TABLE_POLICIES = Object.freeze([
   ...IDENTITY_CORE_TABLE_POLICIES,
   ...IDENTITY_PAIRING_TABLE_POLICIES,
@@ -122,9 +140,14 @@ export const SIMULATION_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...SIMULATION_APPROVAL_TABLE_POLICIES,
 ]);
 
-export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+export const IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
   ...IDENTITY_PAIRING_TABLE_POLICIES,
+]);
+
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES,
+  ...TARGET_POLICY_APPROVAL_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
@@ -139,10 +162,15 @@ export function resolveTenantTablePolicies(publicTableNames) {
     SIMULATION_APPROVAL_TABLE_POLICIES.filter(({ table }) =>
       publicTableSet.has(table),
     );
+  const presentTargetPolicyTables =
+    TARGET_POLICY_APPROVAL_TABLE_POLICIES.filter(({ table }) =>
+      publicTableSet.has(table),
+    );
 
   if (
     (presentPairingTables.length > 0 ||
-      presentSimulationTables.length > 0) &&
+      presentSimulationTables.length > 0 ||
+      presentTargetPolicyTables.length > 0) &&
     presentCoreTables.length !== IDENTITY_CORE_TABLE_POLICIES.length
   ) {
     throw new Error(
@@ -157,9 +185,12 @@ export function resolveTenantTablePolicies(publicTableNames) {
   }
 
   if (presentSimulationTables.length === 0) {
-    if (presentPairingTables.length > 0) {
+    if (
+      presentPairingTables.length > 0 ||
+      presentTargetPolicyTables.length > 0
+    ) {
       throw new Error(
-        "identity pairing tables require the simulation approval expansion",
+        "later tenant tables require the simulation approval expansion",
       );
     }
     return CORE_EXPANDED_TENANT_TABLE_POLICIES;
@@ -175,6 +206,11 @@ export function resolveTenantTablePolicies(publicTableNames) {
   }
 
   if (presentPairingTables.length === 0) {
+    if (presentTargetPolicyTables.length > 0) {
+      throw new Error(
+        "target policy approval tables require the identity pairing expansion",
+      );
+    }
     return SIMULATION_EXPANDED_TENANT_TABLE_POLICIES;
   }
 
@@ -182,6 +218,19 @@ export function resolveTenantTablePolicies(publicTableNames) {
     presentPairingTables.length !== IDENTITY_PAIRING_TABLE_POLICIES.length
   ) {
     throw new Error("identity pairing tables must be expanded atomically");
+  }
+
+  if (presentTargetPolicyTables.length === 0) {
+    return IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES;
+  }
+
+  if (
+    presentTargetPolicyTables.length !==
+    TARGET_POLICY_APPROVAL_TABLE_POLICIES.length
+  ) {
+    throw new Error(
+      "target policy approval tables must be expanded atomically",
+    );
   }
 
   return EXPANDED_TENANT_TABLE_POLICIES;

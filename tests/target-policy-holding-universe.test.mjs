@@ -192,6 +192,9 @@ describe("target policy Gate B1 holding universe", () => {
     );
     assert.match(querySource, /assets\.quantity/);
     assert.match(querySource, /assets\.fractionalKrwValue/);
+    assert.match(querySource, /assets\.accountId/);
+    assert.match(querySource, /accounts\.canonicalOwnerUserId/);
+    assert.match(querySource, /tenantContext\.ownerUserId/);
     assert.match(querySource, /^import "server-only";/);
     assert.doesNotMatch(
       querySource,

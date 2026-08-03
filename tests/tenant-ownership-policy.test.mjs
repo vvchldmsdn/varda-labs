@@ -8,11 +8,13 @@ import {
   CORE_EXPANDED_TENANT_TABLE_POLICIES,
   EXPANDED_TENANT_TABLE_POLICIES,
   IDENTITY_CORE_TABLE_POLICIES,
+  IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES,
   IDENTITY_PAIRING_TABLE_POLICIES,
   IDENTITY_SYSTEM_TABLE_POLICIES,
   LEGACY_EXCLUDED_USER_TABLE_NAMES,
   SIMULATION_APPROVAL_TABLE_POLICIES,
   SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
+  TARGET_POLICY_APPROVAL_TABLE_POLICIES,
   TENANT_TABLE_POLICIES,
   resolveTenantTablePolicies,
   summarizeTenantClassifications,
@@ -45,6 +47,10 @@ describe("tenant ownership policy", () => {
     const expandedNames = EXPANDED_TENANT_TABLE_POLICIES.map(
       (policy) => policy.table,
     );
+    const pairingExpandedNames =
+      IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES.map(
+        (policy) => policy.table,
+      );
 
     assert.deepEqual(
       IDENTITY_CORE_TABLE_POLICIES.map((policy) => policy.table),
@@ -57,7 +63,8 @@ describe("tenant ownership policy", () => {
     assert.equal(IDENTITY_SYSTEM_TABLE_POLICIES.length, 4);
     assert.equal(coreExpandedNames.length, 24);
     assert.equal(simulationExpandedNames.length, 27);
-    assert.equal(expandedNames.length, 29);
+    assert.equal(pairingExpandedNames.length, 29);
+    assert.equal(expandedNames.length, 32);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
     assert.deepEqual(
       resolveTenantTablePolicies(coreExpandedNames),
@@ -66,6 +73,10 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       resolveTenantTablePolicies(simulationExpandedNames),
       SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
+    );
+    assert.deepEqual(
+      resolveTenantTablePolicies(pairingExpandedNames),
+      IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES,
     );
     assert.deepEqual(
       resolveTenantTablePolicies(expandedNames),
@@ -110,7 +121,7 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 17,
+        user_owned: 20,
         shared_reference: 7,
         admin_system: 1,
         identity_system: 4,
@@ -176,6 +187,32 @@ describe("tenant ownership policy", () => {
           classification: "user_owned",
           ownershipPath: "parent_fk",
           parentTable: "simulation_scenario_approval_revisions",
+        },
+      ],
+    );
+    assert.deepEqual(
+      TARGET_POLICY_APPROVAL_TABLE_POLICIES.map(
+        ({ table, ownershipPath, parentTable }) => ({
+          table,
+          ownershipPath,
+          parentTable: parentTable ?? null,
+        }),
+      ),
+      [
+        {
+          table: "target_policy_approval_revisions",
+          ownershipPath: "direct_column",
+          parentTable: null,
+        },
+        {
+          table: "target_policy_approval_vector_rows",
+          ownershipPath: "parent_fk",
+          parentTable: "target_policy_approval_revisions",
+        },
+        {
+          table: "target_policy_approval_lifecycle_events",
+          ownershipPath: "parent_fk",
+          parentTable: "target_policy_approval_revisions",
         },
       ],
     );

@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 20);
-    assert.equal(registeredPaths.length, 26);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 21);
+    assert.equal(registeredPaths.length, 27);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -119,11 +119,6 @@ describe("tenant writer Phase 1D-A readiness", () => {
         ({ classification }) => classification === "user_owned",
       );
 
-      if (writer.canonicalOwnerRolloutScope === "not_applicable") {
-        assert.equal(userTargets.length, 0, writer.id);
-        continue;
-      }
-
       const expectedTableScope = writer.canonicalOwnerRolloutScope;
       for (const target of userTargets) {
         assert.equal(
@@ -137,7 +132,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 12,
       intentionally_skipped_legacy: 1,
-      not_applicable: 7,
+      not_applicable: 8,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(

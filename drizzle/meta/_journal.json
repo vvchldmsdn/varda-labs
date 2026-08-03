@@ -155,6 +155,13 @@
       "when": 1784991961050,
       "tag": "0021_strange_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785713123604,
+      "tag": "0022_hot_sir_ram",
+      "breakpoints": true
     }
   ]
 }

@@ -478,9 +478,181 @@ export const accounts = pgTable(
       table.ownerUserId,
       table.code,
     ),
+    canonicalOwnerAccountUnique: uniqueIndex(
+      "accounts_id_canonical_owner_unique",
+    ).on(table.id, table.canonicalOwnerUserId),
     canonicalOwnerUserIdIdx: index(
       "accounts_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+  }),
+);
+
+export const targetPolicyApprovalRevisions = pgTable(
+  "target_policy_approval_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ownerUserId: uuid("owner_user_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    policyId: varchar("policy_id", { length: 100 }).notNull(),
+    policyVersion: varchar("policy_version", { length: 100 }).notNull(),
+    approvalRevision: integer("approval_revision").notNull(),
+    effectiveServiceDate: date("effective_service_date").notNull(),
+    universeHash: varchar("universe_hash", { length: 71 }).notNull(),
+    vectorHash: varchar("vector_hash", { length: 71 }).notNull(),
+    approvalEvidenceRef: varchar("approval_evidence_ref", {
+      length: 200,
+    }).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+    lifecycleStatus: varchar("lifecycle_status", { length: 20 }).notNull(),
+    terminalAt: timestamp("terminal_at", { withTimezone: true }),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "target_policy_revisions_owner_user_fk",
+      columns: [table.ownerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "target_policy_revisions_account_owner_fk",
+      columns: [table.accountId, table.ownerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    policyIdCheck: check(
+      "target_policy_revisions_policy_id_check",
+      sql`${table.policyId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'`,
+    ),
+    policyVersionCheck: check(
+      "target_policy_revisions_version_check",
+      sql`${table.policyVersion} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'`,
+    ),
+    revisionCheck: check(
+      "target_policy_revisions_revision_check",
+      sql`${table.approvalRevision} > 0`,
+    ),
+    universeHashCheck: check(
+      "target_policy_revisions_universe_hash_check",
+      sql`${table.universeHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    vectorHashCheck: check(
+      "target_policy_revisions_vector_hash_check",
+      sql`${table.vectorHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    approvalEvidenceRefCheck: check(
+      "target_policy_revisions_evidence_ref_check",
+      sql`${table.approvalEvidenceRef} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$'`,
+    ),
+    lifecycleStatusCheck: check(
+      "target_policy_revisions_status_check",
+      sql`${table.lifecycleStatus} in ('approved', 'revoked', 'superseded')`,
+    ),
+    terminalStateCheck: check(
+      "target_policy_revisions_terminal_state_check",
+      sql`(${table.lifecycleStatus} = 'approved' and ${table.terminalAt} is null) or (${table.lifecycleStatus} in ('revoked', 'superseded') and ${table.terminalAt} is not null and ${table.terminalAt} >= ${table.approvedAt})`,
+    ),
+    identityRevisionUnique: uniqueIndex(
+      "target_policy_revisions_identity_revision_unique",
+    ).on(
+      table.ownerUserId,
+      table.accountId,
+      table.policyId,
+      table.policyVersion,
+      table.approvalRevision,
+    ),
+    currentApprovedUnique: uniqueIndex(
+      "target_policy_revisions_current_unique",
+    )
+      .on(table.ownerUserId, table.accountId, table.policyId)
+      .where(sql`${table.lifecycleStatus} = 'approved'`),
+  }),
+);
+
+export const targetPolicyApprovalVectorRows = pgTable(
+  "target_policy_approval_vector_rows",
+  {
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    ticker: varchar("ticker", { length: 50 }).notNull(),
+    targetWeightBps: integer("target_weight_bps").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      name: "target_policy_vector_rows_pk",
+      columns: [
+        table.approvalRevisionId,
+        table.market,
+        table.currency,
+        table.ticker,
+      ],
+    }),
+    revisionFk: foreignKey({
+      name: "target_policy_vector_rows_revision_fk",
+      columns: [table.approvalRevisionId],
+      foreignColumns: [targetPolicyApprovalRevisions.id],
+    }).onDelete("restrict"),
+    marketCheck: check(
+      "target_policy_vector_rows_market_check",
+      sql`${table.market} = lower(btrim(${table.market})) and char_length(${table.market}) > 0`,
+    ),
+    currencyCheck: check(
+      "target_policy_vector_rows_currency_check",
+      sql`${table.currency} = upper(btrim(${table.currency})) and char_length(${table.currency}) > 0`,
+    ),
+    tickerCheck: check(
+      "target_policy_vector_rows_ticker_check",
+      sql`${table.ticker} = upper(btrim(${table.ticker})) and char_length(${table.ticker}) > 0`,
+    ),
+    targetWeightCheck: check(
+      "target_policy_vector_rows_weight_check",
+      sql`${table.targetWeightBps} between 0 and 10000`,
+    ),
+  }),
+);
+
+export const targetPolicyApprovalLifecycleEvents = pgTable(
+  "target_policy_approval_lifecycle_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    eventSequence: integer("event_sequence").notNull(),
+    auditVersion: varchar("audit_version", { length: 50 }).notNull(),
+    transitionKind: varchar("transition_kind", { length: 32 }).notNull(),
+    previousStatus: varchar("previous_status", { length: 20 }),
+    resultingStatus: varchar("resulting_status", { length: 20 }).notNull(),
+    transitionedAt: timestamp("transitioned_at", {
+      withTimezone: true,
+    }).notNull(),
+    replacementRevisionId: uuid("replacement_revision_id"),
+  },
+  (table) => ({
+    revisionFk: foreignKey({
+      name: "target_policy_events_revision_fk",
+      columns: [table.approvalRevisionId],
+      foreignColumns: [targetPolicyApprovalRevisions.id],
+    }).onDelete("restrict"),
+    replacementFk: foreignKey({
+      name: "target_policy_events_replacement_fk",
+      columns: [table.replacementRevisionId],
+      foreignColumns: [targetPolicyApprovalRevisions.id],
+    }).onDelete("restrict"),
+    revisionSequenceUnique: uniqueIndex(
+      "target_policy_events_revision_sequence_unique",
+    ).on(table.approvalRevisionId, table.eventSequence),
+    replacementIdx: index("target_policy_events_replacement_idx").on(
+      table.replacementRevisionId,
+    ),
+    sequenceCheck: check(
+      "target_policy_events_sequence_check",
+      sql`${table.eventSequence} in (1, 2)`,
+    ),
+    auditVersionCheck: check(
+      "target_policy_events_audit_version_check",
+      sql`${table.auditVersion} = 'target_policy_approval_audit_v1'`,
+    ),
+    transitionShapeCheck: check(
+      "target_policy_events_transition_shape_check",
+      sql`(${table.eventSequence} = 1 and ${table.transitionKind} = 'explicit_approval' and ${table.previousStatus} is null and ${table.resultingStatus} = 'approved' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'revocation' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'revoked' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'supersession' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'superseded' and ${table.replacementRevisionId} is not null and ${table.replacementRevisionId} <> ${table.approvalRevisionId})`,
+    ),
   }),
 );
 
@@ -1595,6 +1767,21 @@ export type SimulationScenarioApprovalLifecycleEvent =
   typeof simulationScenarioApprovalLifecycleEvents.$inferSelect;
 export type NewSimulationScenarioApprovalLifecycleEvent =
   typeof simulationScenarioApprovalLifecycleEvents.$inferInsert;
+
+export type TargetPolicyApprovalRevision =
+  typeof targetPolicyApprovalRevisions.$inferSelect;
+export type NewTargetPolicyApprovalRevision =
+  typeof targetPolicyApprovalRevisions.$inferInsert;
+
+export type TargetPolicyApprovalVectorRow =
+  typeof targetPolicyApprovalVectorRows.$inferSelect;
+export type NewTargetPolicyApprovalVectorRow =
+  typeof targetPolicyApprovalVectorRows.$inferInsert;
+
+export type TargetPolicyApprovalLifecycleEvent =
+  typeof targetPolicyApprovalLifecycleEvents.$inferSelect;
+export type NewTargetPolicyApprovalLifecycleEvent =
+  typeof targetPolicyApprovalLifecycleEvents.$inferInsert;
 
 export type AssetGroup = typeof assetGroups.$inferSelect;
 export type NewAssetGroup = typeof assetGroups.$inferInsert;

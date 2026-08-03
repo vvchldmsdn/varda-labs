@@ -835,7 +835,7 @@ async function readCounts() {
       "authenticated Preview database evidence must return 200",
     );
     const evidence = JSON.parse(response.body);
-    assert.equal(evidence.evidenceVersion, "preview_database_evidence_v4");
+    assert.equal(evidence.evidenceVersion, "preview_database_evidence_v5");
     assert.equal(evidence.status, "operational_guard_passed");
     assert.equal(
       evidence.endpointProjectBinding,
@@ -843,15 +843,19 @@ async function readCounts() {
     );
     assert.equal(
       evidence.migrationLedgerStatus,
-      "reviewed_0021_present",
+      "reviewed_0022_present",
     );
     assert.equal(
       evidence.assetPriceCatalogStatus,
       "reviewed_0020_present",
     );
     assert.equal(
+      evidence.targetPolicyCatalogStatus,
+      "reviewed_0022_present",
+    );
+    assert.equal(
       evidence.latestReviewedMigration,
-      "0021_strange_sinister_six",
+      "0022_hot_sir_ram",
     );
     assert.match(evidence.targetFingerprint, /^sha256:[0-9a-f]{64}$/);
     return {
