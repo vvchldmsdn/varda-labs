@@ -10,6 +10,7 @@ import {
   sha256Fingerprint,
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
+  assertPreviewTargetPolicyRowsPreserved,
   assertReviewedPreTargetPolicyPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
@@ -244,6 +245,58 @@ describe("Preview database target operational guard", () => {
         targetPolicyCatalogStatus: "reviewed_0022_not_present",
       },
     );
+  });
+
+  it("treats inherited target-policy rows as data and preserves them", () => {
+    const reviewed = reviewedState();
+    const inheritedRows = {
+      revisions: 1,
+      vectorRows: 4,
+      lifecycleEvents: 1,
+    };
+    const inherited = {
+      ...reviewed,
+      reviewedCatalog: {
+        ...reviewed.reviewedCatalog,
+        targetPolicyRows: inheritedRows,
+      },
+    };
+
+    assert.doesNotThrow(() => assertReviewedPreviewDatabaseState(inherited));
+    assert.equal(
+      publicPreviewDatabaseEvidence(inherited).targetPolicyCatalogStatus,
+      "reviewed_0022_present",
+    );
+    assert.doesNotThrow(() =>
+      assertPreviewTargetPolicyRowsPreserved(inheritedRows, inheritedRows),
+    );
+    assert.throws(
+      () =>
+        assertPreviewTargetPolicyRowsPreserved(inheritedRows, {
+          ...inheritedRows,
+          vectorRows: 5,
+        }),
+      /changed inherited target-policy row counts/,
+    );
+    assert.doesNotThrow(() =>
+      assertPreviewTargetPolicyRowsPreserved(null, {
+        revisions: 0,
+        vectorRows: 0,
+        lifecycleEvents: 0,
+      }),
+    );
+    assert.throws(
+      () => assertPreviewTargetPolicyRowsPreserved(null, inheritedRows),
+      /unexpectedly seeded target-policy rows/,
+    );
+
+    const buildScript = readFileSync(
+      "scripts/preview-database-evidence.mjs",
+      "utf8",
+    );
+    assert.match(buildScript, /preview_database_build_preflight_v6/);
+    assert.match(buildScript, /targetPolicyRows/);
+    assert.match(buildScript, /assertPreviewTargetPolicyRowsPreserved/);
   });
 
   it("rejects an earlier ledger divergence even when migration 0022 is latest", () => {
