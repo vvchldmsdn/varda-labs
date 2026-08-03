@@ -34,6 +34,41 @@ const REVIEWED_INDEXES = Object.freeze({
     unique: true,
     hasPredicate: false,
   }),
+  accountOwnerCode: Object.freeze({
+    name: "accounts_canonical_owner_code_unique",
+    columns: Object.freeze(["canonical_owner_user_id", "code"]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  assetAccount: Object.freeze({
+    name: "assets_id_account_unique",
+    columns: Object.freeze(["id", "account_id"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  portfolioSnapshotIdentity: Object.freeze({
+    name: "daily_portfolio_snapshots_date_account_source_unique",
+    columns: Object.freeze([
+      "canonical_owner_user_id",
+      "snapshot_date",
+      "account",
+      "source",
+    ]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  positionSnapshotIdentity: Object.freeze({
+    name: "daily_position_snapshots_date_account_asset_source_unique",
+    columns: Object.freeze([
+      "canonical_owner_user_id",
+      "snapshot_date",
+      "account",
+      "asset_id",
+      "source",
+    ]),
+    unique: true,
+    hasPredicate: true,
+  }),
   targetPolicyIdentityRevision: Object.freeze({
     name: "target_policy_revisions_identity_revision_unique",
     columns: Object.freeze([
@@ -87,6 +122,56 @@ const TARGET_POLICY_CONSTRAINTS = Object.freeze([
   "target_policy_vector_rows_weight_check",
   "target_policy_vector_rows_revision_fk",
 ]);
+const SNAPSHOT_OWNERSHIP_CONSTRAINTS = Object.freeze([
+  Object.freeze({
+    table: "daily_portfolio_snapshots",
+    name: "daily_portfolio_snapshots_owner_user_fk",
+    type: "f",
+    validated: true,
+  }),
+  Object.freeze({
+    table: "daily_portfolio_snapshots",
+    name: "daily_portfolio_snapshots_account_owner_fk",
+    type: "f",
+    validated: true,
+  }),
+  Object.freeze({
+    table: "daily_portfolio_snapshots",
+    name: "daily_portfolio_snapshots_generated_owner_check",
+    type: "c",
+    validated: null,
+  }),
+  Object.freeze({
+    table: "daily_position_snapshots",
+    name: "daily_position_snapshots_owner_user_fk",
+    type: "f",
+    validated: true,
+  }),
+  Object.freeze({
+    table: "daily_position_snapshots",
+    name: "daily_position_snapshots_account_owner_fk",
+    type: "f",
+    validated: true,
+  }),
+  Object.freeze({
+    table: "daily_position_snapshots",
+    name: "daily_position_snapshots_asset_account_fk",
+    type: "f",
+    validated: true,
+  }),
+  Object.freeze({
+    table: "daily_position_snapshots",
+    name: "daily_position_snapshots_generated_owner_check",
+    type: "c",
+    validated: null,
+  }),
+  Object.freeze({
+    table: "daily_position_snapshots",
+    name: "daily_position_snapshots_asset_identity_check",
+    type: "c",
+    validated: true,
+  }),
+]);
 
 type Query = (query: string) => Promise<Record<string, unknown>[]>;
 
@@ -97,6 +182,8 @@ export type PreviewDatabaseState = {
     priceSnapshots: number;
     fxRates: number;
     approvalRevisions: number;
+    dailyPortfolioSnapshots: number;
+    dailyPositionSnapshots: number;
   };
   latestMigration: {
     createdAt: number;
@@ -116,6 +203,12 @@ export type PreviewDatabaseState = {
     targetPolicyIdentityRevisionIndexExact: boolean;
     targetPolicyCurrentIndexExact: boolean;
     targetPolicyEventSequenceIndexExact: boolean;
+    dailyPositionLegacyAssetIdNullable: boolean;
+    snapshotOwnershipConstraints: string[];
+    accountOwnerCodeUniqueIndexExact: boolean;
+    assetAccountUniqueIndexExact: boolean;
+    portfolioSnapshotIdentityIndexExact: boolean;
+    positionSnapshotIdentityIndexExact: boolean;
   };
 };
 
@@ -136,7 +229,7 @@ export async function readPreviewDatabaseState(input: {
     columnRows,
     indexRows,
     targetPolicyTableRows,
-    targetPolicyConstraintRows,
+    constraintRows,
   ] = await Promise.all([
     input.query(`
       select
@@ -146,7 +239,15 @@ export async function readPreviewDatabaseState(input: {
         (
           select count(*)::integer
             from simulation_scenario_approval_revisions
-        ) as approval_revisions
+        ) as approval_revisions,
+        (
+          select count(*)::integer
+            from daily_portfolio_snapshots
+        ) as daily_portfolio_snapshots,
+        (
+          select count(*)::integer
+            from daily_position_snapshots
+        ) as daily_position_snapshots
     `),
     input.query(`
       select hash, created_at::text as created_at
@@ -154,21 +255,29 @@ export async function readPreviewDatabaseState(input: {
        order by created_at asc
     `),
     input.query(`
-      select column_name, is_nullable
+      select table_name, column_name, is_nullable
         from information_schema.columns
        where table_schema = 'public'
-         and table_name = 'asset_price_snapshots'
-         and column_name in (
-           'adjusted_close_price',
-           'adjusted_close_basis',
-           'adjusted_close_provider',
-           'adjusted_close_source',
-           'adjusted_close_fetched_at',
-           'provider_symbol',
-           'provider_exchange',
-           'fetched_at'
+         and (
+           (
+             table_name = 'asset_price_snapshots'
+             and column_name in (
+               'adjusted_close_price',
+               'adjusted_close_basis',
+               'adjusted_close_provider',
+               'adjusted_close_source',
+               'adjusted_close_fetched_at',
+               'provider_symbol',
+               'provider_exchange',
+               'fetched_at'
+             )
+           )
+           or (
+             table_name = 'daily_position_snapshots'
+             and column_name = 'legacy_asset_id'
+           )
          )
-       order by column_name
+       order by table_name, column_name
     `),
     input.query(`
       select
@@ -202,6 +311,9 @@ export async function readPreviewDatabaseState(input: {
         and table_class.relname in (
           'asset_price_snapshots',
           'accounts',
+          'assets',
+          'daily_portfolio_snapshots',
+          'daily_position_snapshots',
           'target_policy_approval_revisions',
           'target_policy_approval_lifecycle_events'
         )
@@ -209,6 +321,10 @@ export async function readPreviewDatabaseState(input: {
           'asset_price_snapshots_instrument_date_unique',
           'asset_price_snapshots_ticker_date_unique',
           'accounts_id_canonical_owner_unique',
+          'accounts_canonical_owner_code_unique',
+          'assets_id_account_unique',
+          'daily_portfolio_snapshots_date_account_source_unique',
+          'daily_position_snapshots_date_account_asset_source_unique',
           'target_policy_revisions_identity_revision_unique',
           'target_policy_revisions_current_unique',
           'target_policy_events_revision_sequence_unique'
@@ -237,7 +353,9 @@ export async function readPreviewDatabaseState(input: {
        order by table_name
     `),
     input.query(`
-      select constraint_definition.conname as constraint_name,
+      select table_class.relname as table_name,
+             constraint_definition.conname as constraint_name,
+             constraint_definition.contype as constraint_type,
              constraint_definition.convalidated as is_validated
         from pg_catalog.pg_constraint as constraint_definition
         join pg_catalog.pg_class as table_class
@@ -248,7 +366,9 @@ export async function readPreviewDatabaseState(input: {
          and table_class.relname in (
            'target_policy_approval_revisions',
            'target_policy_approval_vector_rows',
-           'target_policy_approval_lifecycle_events'
+           'target_policy_approval_lifecycle_events',
+           'daily_portfolio_snapshots',
+           'daily_position_snapshots'
          )
        order by constraint_definition.conname
     `),
@@ -260,21 +380,48 @@ export async function readPreviewDatabaseState(input: {
 
   const counts = countRows[0];
   const adjustedClosePrice = columnRows.find(
-    ({ column_name }) => column_name === "adjusted_close_price",
+    ({ table_name, column_name }) =>
+      table_name === "asset_price_snapshots" &&
+      column_name === "adjusted_close_price",
+  );
+  const dailyPositionLegacyAssetId = columnRows.find(
+    ({ table_name, column_name }) =>
+      table_name === "daily_position_snapshots" &&
+      column_name === "legacy_asset_id",
   );
   const presentColumns = REVIEWED_COLUMNS.filter((columnName) =>
-    columnRows.some(({ column_name }) => column_name === columnName),
+    columnRows.some(
+      ({ table_name, column_name }) =>
+        table_name === "asset_price_snapshots" &&
+        column_name === columnName,
+    ),
   );
   const presentTargetPolicyTables = TARGET_POLICY_TABLES.filter((tableName) =>
     targetPolicyTableRows.some(({ table_name }) => table_name === tableName),
   );
   const presentTargetPolicyConstraints = TARGET_POLICY_CONSTRAINTS.filter(
     (constraintName) =>
-      targetPolicyConstraintRows.some(
+      constraintRows.some(
         ({ constraint_name, is_validated }) =>
           constraint_name === constraintName && is_validated === true,
       ),
   );
+  const presentSnapshotOwnershipConstraints =
+    SNAPSHOT_OWNERSHIP_CONSTRAINTS.filter((expected) =>
+      constraintRows.some(
+        ({
+          table_name,
+          constraint_name,
+          constraint_type,
+          is_validated,
+        }) =>
+          table_name === expected.table &&
+          constraint_name === expected.name &&
+          constraint_type === expected.type &&
+          (expected.validated === null ||
+            is_validated === expected.validated),
+      ),
+    ).map(({ name }) => name);
   const targetPolicyRows =
     presentTargetPolicyTables.length === TARGET_POLICY_TABLES.length
       ? await readTargetPolicyRowCounts(input.query)
@@ -302,6 +449,14 @@ export async function readPreviewDatabaseState(input: {
       approvalRevisions: integerValue(
         counts.approval_revisions,
         "approval revisions",
+      ),
+      dailyPortfolioSnapshots: integerValue(
+        counts.daily_portfolio_snapshots,
+        "daily portfolio snapshots",
+      ),
+      dailyPositionSnapshots: integerValue(
+        counts.daily_position_snapshots,
+        "daily position snapshots",
       ),
     },
     latestMigration,
@@ -341,6 +496,26 @@ export async function readPreviewDatabaseState(input: {
         indexRows,
         REVIEWED_INDEXES.targetPolicyEventSequence,
       ),
+      dailyPositionLegacyAssetIdNullable:
+        dailyPositionLegacyAssetId?.is_nullable === "YES",
+      snapshotOwnershipConstraints:
+        presentSnapshotOwnershipConstraints,
+      accountOwnerCodeUniqueIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.accountOwnerCode,
+      ),
+      assetAccountUniqueIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.assetAccount,
+      ),
+      portfolioSnapshotIdentityIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.portfolioSnapshotIdentity,
+      ),
+      positionSnapshotIdentityIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.positionSnapshotIdentity,
+      ),
     },
   };
 }
@@ -350,7 +525,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0022 ledger.",
+      "Preview database migration ledger does not match the reviewed 0023 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -366,17 +541,20 @@ export function assertReviewedPreviewDatabaseCatalog(
 ) {
   if (!hasReviewedCatalog(state)) {
     throw new Error(
-      "Preview database reviewed 0022 catalog is incomplete.",
+      "Preview database reviewed 0023 catalog is incomplete.",
     );
   }
 }
 
-export function assertReviewedPreTargetPolicyPreviewDatabaseCatalog(
+export function assertReviewedPreSnapshotOwnerPreviewDatabaseCatalog(
   state: PreviewDatabaseState,
 ) {
-  if (!hasReviewedAssetPriceCatalog(state)) {
+  if (
+    !hasReviewedAssetPriceCatalog(state) ||
+    !hasReviewedTargetPolicyCatalog(state)
+  ) {
     throw new Error(
-      "Preview database reviewed 0021 prerequisite catalog is incomplete.",
+      "Preview database reviewed 0022 prerequisite catalog is incomplete.",
     );
   }
 }
@@ -417,8 +595,10 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     hasReviewedAssetPriceCatalog(state);
   const reviewedTargetPolicyCatalogPresent =
     hasReviewedTargetPolicyCatalog(state);
+  const reviewedSnapshotOwnershipCatalogPresent =
+    hasReviewedSnapshotOwnershipCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v5",
+    evidenceVersion: "preview_database_evidence_v6",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -427,14 +607,17 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0022_present"
-      : "reviewed_0022_not_present",
+      ? "reviewed_0023_present"
+      : "reviewed_0023_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",
     targetPolicyCatalogStatus: reviewedTargetPolicyCatalogPresent
       ? "reviewed_0022_present"
       : "reviewed_0022_not_present",
+    snapshotOwnershipCatalogStatus: reviewedSnapshotOwnershipCatalogPresent
+      ? "reviewed_0023_present"
+      : "reviewed_0023_not_present",
   };
 }
 
@@ -465,7 +648,8 @@ function hasReviewedLatestMigration(state: PreviewDatabaseState) {
 function hasReviewedCatalog(state: PreviewDatabaseState) {
   return (
     hasReviewedAssetPriceCatalog(state) &&
-    hasReviewedTargetPolicyCatalog(state)
+    hasReviewedTargetPolicyCatalog(state) &&
+    hasReviewedSnapshotOwnershipCatalog(state)
   );
 }
 
@@ -489,6 +673,18 @@ function hasReviewedTargetPolicyCatalog(state: PreviewDatabaseState) {
     state.reviewedCatalog.targetPolicyIdentityRevisionIndexExact &&
     state.reviewedCatalog.targetPolicyCurrentIndexExact &&
     state.reviewedCatalog.targetPolicyEventSequenceIndexExact
+  );
+}
+
+function hasReviewedSnapshotOwnershipCatalog(state: PreviewDatabaseState) {
+  return (
+    state.reviewedCatalog.dailyPositionLegacyAssetIdNullable &&
+    state.reviewedCatalog.snapshotOwnershipConstraints.length ===
+      SNAPSHOT_OWNERSHIP_CONSTRAINTS.length &&
+    state.reviewedCatalog.accountOwnerCodeUniqueIndexExact &&
+    state.reviewedCatalog.assetAccountUniqueIndexExact &&
+    state.reviewedCatalog.portfolioSnapshotIdentityIndexExact &&
+    state.reviewedCatalog.positionSnapshotIdentityIndexExact
   );
 }
 

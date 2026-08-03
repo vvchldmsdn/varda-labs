@@ -207,6 +207,66 @@ export type CronPreflightResponse = {
   warnings: string[];
 };
 
+type DailySnapshotJobLike = {
+  ok: boolean;
+  dryRun: boolean;
+  writeReady: boolean;
+  snapshotDate: string;
+  requestedAccount: CronPreflightAccount;
+  targetCount: number;
+  readyCount: number;
+  writtenCount: number;
+  blockedCount: number;
+  failedCount: number;
+  targets: Array<
+    | {
+        ownerUserId: string;
+        status: "ready" | "written" | "blocked";
+        result: DailySnapshotLike;
+      }
+    | {
+        ownerUserId: string;
+        status: "failed";
+        error: {
+          code: string;
+          message: string;
+          statusCode: number;
+        };
+      }
+  >;
+};
+
+export type CronPreflightJobResponse = {
+  ok: boolean;
+  routeMode: "preflight";
+  wouldWrite: false;
+  secretsIncluded: false;
+  snapshotDate: string;
+  cronScheduleUtc: string | null;
+  summary: {
+    targetCount: number;
+    readyCount: number;
+    blockedCount: number;
+    failedCount: number;
+  };
+  targets: Array<
+    | {
+        ownerUserId: string;
+        status: "ready" | "blocked";
+        preflight: CronPreflightResponse;
+      }
+    | {
+        ownerUserId: string;
+        status: "failed";
+        error: string;
+        message: string;
+        statusCode: number;
+      }
+  >;
+  blockingReasons: string[];
+  nextRecommendedAction: CronPreflightResponse["nextRecommendedAction"];
+};
+
 export function parseCronPreflightQuery(
   searchParams: URLSearchParams,
 ): CronPreflightQuery {
@@ -355,6 +415,93 @@ export function buildCronPreflightResponse({
     ),
     warnings: snapshot.warnings,
   };
+}
+
+export function buildCronPreflightJobResponse({
+  snapshotJob,
+  kisCooldown,
+  cronScheduleUtc,
+}: {
+  snapshotJob: DailySnapshotJobLike;
+  kisCooldown: KisCooldownLike;
+  cronScheduleUtc: string | null;
+}): CronPreflightJobResponse {
+  const targets: CronPreflightJobResponse["targets"] = snapshotJob.targets.map(
+    (target) => {
+      if (target.status === "failed") {
+        return {
+          ownerUserId: target.ownerUserId,
+          status: "failed",
+          error: target.error.code,
+          message: target.error.message,
+          statusCode: target.error.statusCode,
+        };
+      }
+
+      return {
+        ownerUserId: target.ownerUserId,
+        status: target.status === "ready" ? "ready" : "blocked",
+        preflight: buildCronPreflightResponse({
+          snapshot: target.result,
+          kisCooldown,
+          cronScheduleUtc,
+        }),
+      };
+    },
+  );
+  const blockingReasons = targets.flatMap((target) =>
+    target.status === "failed"
+      ? [`owner:${target.ownerUserId}:request_error:${target.error}`]
+      : target.preflight.blockingReasons.map(
+          (reason) => `owner:${target.ownerUserId}:${reason}`,
+        ),
+  );
+
+  return {
+    ok: snapshotJob.ok && blockingReasons.length === 0,
+    routeMode: "preflight",
+    wouldWrite: false,
+    secretsIncluded: false,
+    snapshotDate: snapshotJob.snapshotDate,
+    cronScheduleUtc,
+    summary: {
+      targetCount: snapshotJob.targetCount,
+      readyCount: snapshotJob.readyCount,
+      blockedCount: snapshotJob.blockedCount,
+      failedCount: snapshotJob.failedCount,
+    },
+    targets,
+    blockingReasons,
+    nextRecommendedAction: selectJobRecommendedAction(targets),
+  };
+}
+
+function selectJobRecommendedAction(
+  targets: CronPreflightJobResponse["targets"],
+): CronPreflightResponse["nextRecommendedAction"] {
+  if (targets.some((target) => target.status === "failed")) {
+    return "blocked_by_preflight_error";
+  }
+
+  const actions = targets.flatMap((target) =>
+    target.status === "failed"
+      ? []
+      : [target.preflight.nextRecommendedAction],
+  );
+  const priority: CronPreflightResponse["nextRecommendedAction"][] = [
+    "blocked_by_kis_cooldown",
+    "manual_kis_close_dry_run_required",
+    "blocked_by_missing_close_coverage",
+    "blocked_by_duplicate_or_unmanaged_rows",
+    "manual_daily_snapshot_dry_run_required",
+    "blocked_by_preflight_error",
+    "no_action_required",
+  ];
+
+  return (
+    priority.find((candidate) => actions.includes(candidate)) ??
+    "blocked_by_preflight_error"
+  );
 }
 
 function findRejectedQuery(searchParams: URLSearchParams) {

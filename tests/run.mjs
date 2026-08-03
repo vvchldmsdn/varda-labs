@@ -120,6 +120,7 @@ import "./history-event-timeline.test.mjs";
 import "./history-evidence-mapping.test.mjs";
 import "./history-coverage-manifest-validator.test.mjs";
 import "./cron-preflight.test.mjs";
+import "./daily-snapshot-tenant-job.test.mjs";
 import "./live-price-write.test.mjs";
 import "./fx-refresh.test.mjs";
 import "./admin-market-sync-status.test.mjs";

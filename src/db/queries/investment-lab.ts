@@ -223,6 +223,7 @@ function createTenantInvestmentLabRepository(
             sql<string>`lower(trim(coalesce(${dailyPositionSnapshots.assetType}, '')))`,
             decision.assetType,
           ),
+          isNotNull(dailyPositionSnapshots.legacyAssetId),
         ),
       )
       .groupBy(dailyPositionSnapshots.legacyAssetId);
@@ -232,7 +233,10 @@ function createTenantInvestmentLabRepository(
     }
 
     const legacyAssetId = candidates[0].legacyAssetId;
-    if (!LEGACY_ID_PATTERN.test(legacyAssetId)) {
+    if (
+      typeof legacyAssetId !== "string" ||
+      !LEGACY_ID_PATTERN.test(legacyAssetId)
+    ) {
       return { status: "unavailable", reason: "binding_invalid" } as const;
     }
     const [positionRows, bindingEventRows] = await Promise.all([
@@ -317,7 +321,7 @@ function createTenantInvestmentLabRepository(
         snapshotDate: row.snapshotDate,
         account: row.account,
         source: row.source,
-        snapshotLegacyAssetId: row.legacyAssetId,
+        snapshotLegacyAssetId: legacyAssetId,
         marketValueKrw: row.marketValueKrw,
       });
     }

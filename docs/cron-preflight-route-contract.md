@@ -1,6 +1,6 @@
 # Cron Preflight Route Contract
 
-Last updated: 2026-07-08
+Last updated: 2026-08-03
 
 This contract now has a Phase 1 read-only route skeleton. It does not enable
 Vercel Cron, add `vercel.json`, change any admin write route, or open any write
@@ -14,8 +14,15 @@ Implementation status:
 - no `vercel.json`
 - no KIS provider call
 - read-only KIS close cooldown visibility from `market_data_sync_runs`
-- no DB mutation beyond the existing `runDailySnapshot({ dryRun: true })`
-  read path and cooldown status select
+- no DB mutation beyond `runDailySnapshotJob({ dryRun: true })` and the
+  cooldown status select
+- active owners are enumerated from canonical `app_users -> accounts`
+  relationships; no owner query, body, or header selector is accepted
+- output is a per-owner target list with an aggregate readiness summary
+
+The preflight route remains read-only and `vercel.json` still has no Cron
+schedule. A blocked owner does not hide another owner's evidence, but aggregate
+`ok` remains false until every enumerated owner is ready.
 
 ## Candidate Route
 
@@ -119,7 +126,34 @@ because the daily snapshot writer already resolves portfolio cycles in KST.
 
 ## Output Contract
 
-Candidate JSON response shape:
+The current outer JSON response wraps the existing per-owner preflight shape:
+
+```json
+{
+  "ok": false,
+  "routeMode": "preflight",
+  "wouldWrite": false,
+  "secretsIncluded": false,
+  "snapshotDate": "YYYY-MM-DD",
+  "summary": {
+    "targetCount": 1,
+    "readyCount": 0,
+    "blockedCount": 1,
+    "failedCount": 0
+  },
+  "targets": [
+    {
+      "ownerUserId": "server-enumerated-id",
+      "status": "blocked",
+      "preflight": {}
+    }
+  ],
+  "blockingReasons": [],
+  "nextRecommendedAction": "string"
+}
+```
+
+Each `preflight` value retains the following per-owner response shape:
 
 ```json
 {

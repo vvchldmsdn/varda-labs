@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildCronPreflightJobResponse,
   buildCronPreflightResponse,
   parseCronPreflightQuery,
 } from "../src/lib/cron-preflight.ts";
@@ -254,6 +255,59 @@ describe("cron preflight helpers", () => {
     );
     assert.doesNotMatch(serialized, /targets/);
     assert.doesNotMatch(serialized, /confirmWrite=true/);
+  });
+
+  it("aggregates owner-scoped preflight results without collapsing failures", () => {
+    const response = buildCronPreflightJobResponse({
+      snapshotJob: {
+        ok: false,
+        dryRun: true,
+        writeReady: false,
+        snapshotDate: "2026-07-08",
+        requestedAccount: "all",
+        targetCount: 2,
+        readyCount: 1,
+        writtenCount: 0,
+        blockedCount: 0,
+        failedCount: 1,
+        targets: [
+          {
+            ownerUserId: "11111111-1111-4111-8111-111111111111",
+            status: "ready",
+            result: snapshotResult({ ok: true, writeReady: true }),
+          },
+          {
+            ownerUserId: "22222222-2222-4222-8222-222222222222",
+            status: "failed",
+            error: {
+              code: "snapshot_write_blocked",
+              message: "blocked",
+              statusCode: 409,
+            },
+          },
+        ],
+      },
+      kisCooldown: cooldownStatus({ active: false }),
+      cronScheduleUtc: "20 22 * * *",
+    });
+
+    assert.equal(response.ok, false);
+    assert.deepEqual(response.summary, {
+      targetCount: 2,
+      readyCount: 1,
+      blockedCount: 0,
+      failedCount: 1,
+    });
+    assert.equal(response.targets[0].status, "ready");
+    assert.equal(response.targets[1].status, "failed");
+    assert.equal(response.nextRecommendedAction, "blocked_by_preflight_error");
+    assert.ok(
+      response.blockingReasons.includes(
+        "owner:22222222-2222-4222-8222-222222222222:request_error:snapshot_write_blocked",
+      ),
+    );
+    assert.equal(response.wouldWrite, false);
+    assert.equal(response.secretsIncluded, false);
   });
 });
 

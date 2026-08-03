@@ -1,9 +1,27 @@
 # Price Sync and Snapshot Pipeline Plan
 
-Last updated: 2026-07-09
+Last updated: 2026-08-03
 
 This document records the current manual market-data and daily snapshot pipeline
 plus the remaining Cron plan. Vercel Cron is not enabled yet.
+
+## 2026-08-03 Tenant Writer Status
+
+The next snapshot writer version is owner-enumerated rather than singleton or
+caller-selected. The machine job derives active owners from canonical account
+ownership, runs one isolated calculation per owner, and persists owner-aware
+keys on generated portfolio and position snapshots. Native assets may use their
+UUID `asset_id` without inventing a Base44 legacy ID; unmatched imported history
+continues to retain its legacy ID.
+
+Production data is not mutated by the implementation branch. A SELECT-only
+audit confirms that all relationship and future-key checks pass except the
+expected 84 generated rows whose canonical owner is still null. The dry-run
+backfill maps all 84 deterministically (12 named portfolio, 4 derived `all`, 68
+positions). The expand migration adds the owner checks as `NOT VALID`; the
+guarded backfill validates them after its writes in the same transaction.
+Migration application, backfill write, deployment, and Cron remain separate
+operational steps.
 
 ## Decision
 

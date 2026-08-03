@@ -127,7 +127,7 @@ export function readWriterReadiness(root = process.cwd()) {
   ).length;
 
   const ownerInferencePattern =
-    /(?:legacy|created_by|createdBy|owner_user_id|ownerUserId)[^\n]{0,120}(?:canonical_owner_user_id|canonicalOwnerUserId)|(?:canonical_owner_user_id|canonicalOwnerUserId)[^\n]{0,120}(?:legacy|created_by|createdBy|owner_user_id|ownerUserId)/i;
+    /(?:legacy_owner_user_id|legacyOwnerUserId|created_by|createdBy)[^\n]{0,120}(?:canonical_owner_user_id|canonicalOwnerUserId)|(?:canonical_owner_user_id|canonicalOwnerUserId)[^\n]{0,120}(?:legacy_owner_user_id|legacyOwnerUserId|created_by|createdBy)/i;
   const ownerInferencePathCount = implementationSources.filter((source) =>
     ownerInferencePattern.test(source),
   ).length;

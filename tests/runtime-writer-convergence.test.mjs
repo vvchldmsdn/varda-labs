@@ -43,10 +43,20 @@ describe("runtime writer Phase 1F0 freeze and context convergence", () => {
         definition.currentAuthorization,
         registryById.get(definition.writerId)?.authorization,
       );
-      assert.equal(definition.canonicalOwnerDmlAllowed, false);
+      const activeSnapshotWriter =
+        definition.writerId === "admin_daily_snapshot";
+      assert.equal(
+        definition.canonicalOwnerDmlAllowed,
+        activeSnapshotWriter,
+      );
       assert.equal(definition.singletonOwnerFallbackAllowed, false);
       assert.equal(definition.legacyOwnerInferenceAllowed, false);
-      assert.equal(definition.productionContextIntegration, "not_connected");
+      assert.equal(
+        definition.productionContextIntegration,
+        activeSnapshotWriter
+          ? "owner_enumerated_machine_job"
+          : "not_connected",
+      );
     }
   });
 
@@ -120,7 +130,7 @@ describe("runtime writer Phase 1F0 freeze and context convergence", () => {
     }
   });
 
-  it("requires an explicit active machine target for one-owner snapshots", () => {
+  it("requires an explicit active machine target for each owner snapshot", () => {
     const context = activeMachineContext();
     assert.equal(
       evaluateFutureRuntimeWriterContext({
@@ -160,7 +170,7 @@ describe("runtime writer Phase 1F0 freeze and context convergence", () => {
     );
 
     const incompleteEvidence = ownerEvidence(OWNER_A);
-    delete incompleteEvidence.settings;
+    delete incompleteEvidence.accounts;
     assert.throws(
       () =>
         prepareFutureSnapshotOwnerScope({
@@ -184,18 +194,16 @@ describe("runtime writer Phase 1F0 freeze and context convergence", () => {
 
     assert.equal(result.status, "passed");
     assert.deepEqual(result.findings, []);
-    assert.deepEqual(result.evidence, {
-      canonicalOwnerReferences: 0,
-      canonicalOwnerDmlMatches: 0,
-      singletonOwnerFallbackMatches: 0,
-      legacyOwnerInferenceMatches: 0,
-      productionPolicyImports: 0,
-      cleanupGuardsIntact: true,
-      databaseQueries: 0,
-      databaseWrites: 0,
-      providerCalls: 0,
-      routeCalls: 0,
-    });
+    assert.ok(result.evidence.canonicalOwnerReferences > 0);
+    assert.ok(result.evidence.canonicalOwnerDmlMatches > 0);
+    assert.equal(result.evidence.singletonOwnerFallbackMatches, 0);
+    assert.equal(result.evidence.legacyOwnerInferenceMatches, 0);
+    assert.equal(result.evidence.productionPolicyImports, 0);
+    assert.equal(result.evidence.cleanupGuardsIntact, true);
+    assert.equal(result.evidence.databaseQueries, 0);
+    assert.equal(result.evidence.databaseWrites, 0);
+    assert.equal(result.evidence.providerCalls, 0);
+    assert.equal(result.evidence.routeCalls, 0);
 
     const auditSources = [
       "scripts/audit-runtime-writer-convergence.mjs",
