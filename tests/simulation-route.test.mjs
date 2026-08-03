@@ -227,6 +227,7 @@ describe("Simulation input readiness route boundary", () => {
   });
 
   it("exposes readiness and fixed research output behind the existing access gate", () => {
+    const page = read("src/app/simulation/page.tsx");
     const view = readSimulationView();
     const proxy = read("src/proxy.ts");
     const dashboard = read("src/components/portfolio-dashboard.tsx");
@@ -409,8 +410,9 @@ describe("Simulation input readiness route boundary", () => {
       view,
       /scenarioVectorHash|matrixRequestHash|inputMatrixHash|drawPlanHash|initialKrw|optimizer|adjustedClosePrice|usdKrw|sourcePriceDate|sourceFxDate/i,
     );
-    assert.match(proxy, /"\/simulation"/);
-    assert.match(proxy, /"\/simulation\/:path\*"/);
+    assert.match(page, /resolveCurrentTenantContext/);
+    assert.match(page, /if \(!resolution\.ok\)/);
+    assert.doesNotMatch(proxy, /"\/simulation(?:\/:path\*)?"/);
     assert.match(dashboard, /href: "\/simulation"/);
     assert.match(
       smoke,

@@ -111,7 +111,12 @@ describe("additional contribution tenant preview", () => {
     assert.doesNotMatch(route, /fetch\s*\(|\/api\//);
     assert.match(route, /searchParams: Promise/);
     assert.match(route, /method="get"/);
-    assert.match(proxy, /"\/additional-contribution\/:path\*"/);
+    assert.match(route, /resolveCurrentTenantContext/);
+    assert.match(route, /if \(!resolution\.ok\)/);
+    assert.doesNotMatch(
+      proxy,
+      /"\/additional-contribution(?:\/:path\*)?"/,
+    );
   });
 });
 

@@ -308,7 +308,7 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(serialized.includes("varda_manual_daily_snapshot"), false);
   });
 
-  it("keeps the route server-rendered, read-only, and Basic Auth protected", () => {
+  it("keeps the route server-rendered, read-only, and session protected", () => {
     const query = readFileSync("src/db/queries/investment-lab.ts", "utf8");
     const page = readFileSync("src/app/investment-lab/page.tsx", "utf8");
     const contribution = readFileSync(
@@ -334,6 +334,8 @@ describe("investment lab counterfactual read model", () => {
     );
     assert.doesNotMatch(page, /["']use client["']|\bfetch\s*\(/);
     assert.match(page, /getReadOnlyTenantInvestmentLabCounterfactual/);
+    assert.match(page, /resolveCurrentTenantContext/);
+    assert.match(page, /if \(!resolution\.ok\)/);
     assert.match(contribution, /^["']use client["'];/);
     assert.match(contribution, /calculateInvestmentLabContributionExperiment/);
     assert.doesNotMatch(
@@ -349,7 +351,7 @@ describe("investment lab counterfactual read model", () => {
     assert.match(view, /data-read-model-status/);
     assert.match(view, /data-source-authority-status/);
     assert.match(view, /data-source-transition-count/);
-    assert.match(proxy, /"\/investment-lab"/);
+    assert.doesNotMatch(proxy, /"\/investment-lab(?:\/:path\*)?"/);
   });
 });
 

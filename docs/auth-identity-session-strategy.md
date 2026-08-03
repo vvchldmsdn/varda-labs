@@ -255,7 +255,7 @@ either contract in Phase 1G0.
 
 | Boundary | Responsibility |
 | --- | --- |
-| `src/proxy.ts` | Temporary Basic Auth outer gate, then optional optimistic Neon Auth redirect. Never supplies owner identity and never replaces DAL authorization. |
+| `src/proxy.ts` | Basic Auth for `/admin/*` and bootstrap-claim presentation, plus the Neon Auth callback exchange. It never supplies owner identity and never replaces DAL authorization. |
 | Server Components/pages | Resolve current app user near the page/query boundary, then call owner-scoped server query helpers. Do not rely only on a layout because layouts do not re-check on every navigation. |
 | Server query/DAL modules | Require trusted `TenantContext`; filter every user-owned table before account/date/search filters; return sanitized DTOs. |
 | Route Handlers | Resolve session and ownership independently; return typed 401/403/503 results; treat request owner fields as untrusted. |

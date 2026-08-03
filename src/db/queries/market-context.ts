@@ -1,13 +1,16 @@
 import "server-only";
 
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
+  accounts,
   benchmarkSnapshots,
   globalMarketFactors,
   marketRegimeDaily,
 } from "@/db/schema";
+import { NAMED_PORTFOLIO_ACCOUNTS } from "@/lib/portfolio-account-scope";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 import {
   groupGlobalMarketFactorsByFamily,
   selectLatestBenchmarksByTicker,
@@ -96,17 +99,19 @@ export type ReadOnlyMarketContext = {
   factorFamilies: ReadOnlyMarketFactorFamily[];
 };
 
-export async function getReadOnlyMarketContext({
+export async function getReadOnlyTenantMarketContext({
+  tenantContext,
   benchmarkTickers = DEFAULT_MARKET_BENCHMARK_TICKERS,
 }: {
+  tenantContext: TenantContext;
   benchmarkTickers?: readonly string[];
-} = {}): Promise<ReadOnlyMarketContext> {
+}): Promise<ReadOnlyMarketContext> {
   const requestedBenchmarkTickers = benchmarkTickers.map((ticker) =>
     ticker.trim().toUpperCase(),
   );
   const [benchmarkRows, regimeRows, factorRows] = await Promise.all([
     loadBenchmarkRows(requestedBenchmarkTickers),
-    loadMarketRegimeRows(),
+    loadTenantMarketRegimeRows(tenantContext),
     loadGlobalMarketFactorRows(),
   ]);
 
@@ -223,7 +228,7 @@ function loadBenchmarkRows(tickers: string[]) {
     );
 }
 
-function loadMarketRegimeRows() {
+function loadTenantMarketRegimeRows(tenantContext: TenantContext) {
   return db
     .select({
       legacyBase44Id: marketRegimeDaily.legacyBase44Id,
@@ -246,6 +251,15 @@ function loadMarketRegimeRows() {
       updatedAt: marketRegimeDaily.updatedAt,
     })
     .from(marketRegimeDaily)
+    .innerJoin(accounts, eq(marketRegimeDaily.accountId, accounts.id))
+    .where(
+      and(
+        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
+        eq(accounts.isActive, true),
+        inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
+        eq(marketRegimeDaily.account, accounts.code),
+      ),
+    )
     .orderBy(asc(marketRegimeDaily.account), asc(marketRegimeDaily.regimeDate));
 }
 
