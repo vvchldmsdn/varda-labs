@@ -92,6 +92,7 @@ describe("additional contribution tenant preview", () => {
       "src/app/additional-contribution/page.tsx",
       "utf8",
     );
+    const proxy = readFileSync("src/proxy.ts", "utf8");
 
     for (const source of [universeQuery, policyQuery, previewQuery]) {
       assert.match(source, /^import "server-only";/);
@@ -110,6 +111,7 @@ describe("additional contribution tenant preview", () => {
     assert.doesNotMatch(route, /fetch\s*\(|\/api\//);
     assert.match(route, /searchParams: Promise/);
     assert.match(route, /method="get"/);
+    assert.match(proxy, /"\/additional-contribution\/:path\*"/);
   });
 });
 

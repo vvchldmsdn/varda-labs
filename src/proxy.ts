@@ -57,6 +57,7 @@ export const config = {
     "/auth/sign-in",
     "/auth/session",
     "/admin/:path*",
+    "/additional-contribution/:path*",
     "/portfolio/:path*",
     "/etfs",
     "/etfs/:path*",
