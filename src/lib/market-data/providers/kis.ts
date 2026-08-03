@@ -97,24 +97,31 @@ export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderP
 }
 
 export function createKisMarketDataProvider(): MarketDataProvider {
+  const session: KisProviderSession = { tokenCache: null };
+
   return {
     name: "kis",
     supportedMarkets: ["korea", "us"],
     async fetchLiveQuotes(targets, context) {
-      return fetchKisLiveQuotes(targets, context);
+      return fetchKisLiveQuotes(targets, context, session);
     },
     async fetchClosePrices(targets, context) {
-      return fetchKisClosePrices(targets, context);
+      return fetchKisClosePrices(targets, context, session);
     },
     async fetchHistoricalClosePrices(targets, context) {
-      return fetchKisHistoricalClosePrices(targets, context);
+      return fetchKisHistoricalClosePrices(targets, context, session);
     },
   };
 }
 
+type KisProviderSession = {
+  tokenCache: KisTokenCache | null;
+};
+
 async function fetchKisLiveQuotes(
   targets: PriceLookupTarget[],
   context: ProviderRequestContext,
+  session: KisProviderSession,
 ): Promise<ProviderResult<LiveQuote>> {
   const fetchedAt = context.requestedAt;
   const config = getKisConfig();
@@ -139,7 +146,7 @@ async function fetchKisLiveQuotes(
 
   let token: string;
   try {
-    token = await getKisAccessToken(config);
+    token = await getKisAccessToken(config, session);
   } catch (error) {
     const message = redactSensitiveText(toErrorMessage(error));
     return {
@@ -186,6 +193,7 @@ async function fetchKisLiveQuotes(
 async function fetchKisClosePrices(
   targets: PriceLookupTarget[],
   context: ProviderRequestContext,
+  session: KisProviderSession,
 ): Promise<ProviderResult<ClosePrice>> {
   const fetchedAt = context.requestedAt;
   const config = getKisConfig();
@@ -210,7 +218,7 @@ async function fetchKisClosePrices(
 
   let token: string;
   try {
-    token = await getKisAccessToken(config);
+    token = await getKisAccessToken(config, session);
   } catch (error) {
     const message = redactSensitiveText(toErrorMessage(error));
     return {
@@ -260,6 +268,7 @@ async function fetchKisClosePrices(
 async function fetchKisHistoricalClosePrices(
   targets: PriceLookupTarget[],
   context: HistoricalPriceRequestContext,
+  session: KisProviderSession,
 ): Promise<HistoricalPriceResult> {
   const fetchedAt = context.requestedAt;
   const plan = planKisRawHistoryRequests({
@@ -296,7 +305,7 @@ async function fetchKisHistoricalClosePrices(
 
   let token: string;
   try {
-    token = await getKisAccessToken(config);
+    token = await getKisAccessToken(config, session);
   } catch (error) {
     const message = redactSensitiveText(toErrorMessage(error));
     return {
@@ -432,13 +441,21 @@ async function fetchKisHistoricalClosePrices(
   };
 }
 
-async function getKisAccessToken(config: KisConfig) {
+async function getKisAccessToken(
+  config: KisConfig,
+  session: KisProviderSession,
+) {
   const now = Date.now();
+  if (session.tokenCache && session.tokenCache.expiresAt > now + 60_000) {
+    return session.tokenCache.accessToken;
+  }
+
   if (
     config.tokenPolicy === "memory_cache" &&
     memoryTokenCache &&
     memoryTokenCache.expiresAt > now + 60_000
   ) {
+    session.tokenCache = memoryTokenCache;
     return memoryTokenCache.accessToken;
   }
 
@@ -462,11 +479,12 @@ async function getKisAccessToken(config: KisConfig) {
   }
 
   const expiresInSeconds = toNumber(data.expires_in) ?? 23 * 60 * 60;
+  session.tokenCache = {
+    accessToken: token,
+    expiresAt: now + expiresInSeconds * 1000,
+  };
   if (config.tokenPolicy === "memory_cache") {
-    memoryTokenCache = {
-      accessToken: token,
-      expiresAt: now + expiresInSeconds * 1000,
-    };
+    memoryTokenCache = session.tokenCache;
   }
 
   return token;

@@ -1,16 +1,19 @@
 import "server-only";
 
 export function isAuthorizedAdminJob(headers: Headers) {
-  const configuredSecret = getConfiguredSecret();
+  const configuredSecrets = getConfiguredSecrets();
   const presentedSecret = getPresentedSecret(headers);
 
-  return configuredSecret !== null && presentedSecret === configuredSecret;
+  return (
+    presentedSecret !== null &&
+    configuredSecrets.some((secret) => presentedSecret === secret)
+  );
 }
 
-function getConfiguredSecret() {
-  const secret = process.env.ADMIN_JOB_SECRET ?? process.env.CRON_SECRET;
-  const normalized = secret?.trim();
-  return normalized ? normalized : null;
+function getConfiguredSecrets() {
+  return [process.env.ADMIN_JOB_SECRET, process.env.CRON_SECRET]
+    .map((secret) => secret?.trim())
+    .filter((secret): secret is string => Boolean(secret));
 }
 
 function getPresentedSecret(headers: Headers) {

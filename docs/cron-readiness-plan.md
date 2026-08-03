@@ -1,16 +1,18 @@
 # Cron Readiness Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-08-03
 
-This is a docs-only plan. It does not enable Vercel Cron, add `vercel.json`,
-change route handlers, change database schema, or broaden any write path.
+This is the implementation and activation boundary for the daily market-cycle
+controller. The guarded controller exists, but Vercel Cron scheduling and
+Production writes remain disabled.
 
 ## Current Status
 
-The production manual market cycle has now succeeded on two consecutive cycles:
+The production manual market cycle has succeeded on reviewed cycles including:
 
 - 2026-07-07 KST cycle
 - 2026-07-08 KST cycle
+- 2026-08-03 KST cycle
 
 Both cycles followed the same guarded runbook:
 
@@ -24,8 +26,20 @@ Both cycles followed the same guarded runbook:
 8. Write the daily snapshot only after fresh-close coverage is complete.
 9. Run post-write daily snapshot dry-run and confirm update-only behavior.
 
-The manual path is now validated enough to design automation. It is not enough
-to enable Cron directly.
+The reusable controller now implements the same order behind
+`MARKET_CYCLE_CRON_WRITE_ENABLED=true`:
+
+1. Claim the service-date cycle atomically in `market_data_sync_runs`.
+2. Refresh the shared USD/KRW row.
+3. Run owner-enumerated snapshot preflight.
+4. Deduplicate required KIS close targets across owners and sync bounded groups.
+5. Run snapshot preflight again.
+6. Write owner-scoped daily snapshots only when every target is ready.
+7. Finalize sanitized aggregate run metadata.
+
+The route is `GET /api/cron/market-cycle/run`. It accepts no query parameters,
+uses machine authorization only, and is fail-closed while the environment gate
+is absent. `vercel.json` still has no `crons` entry.
 
 ## Vercel Cron Constraints
 
@@ -53,43 +67,35 @@ References:
 - https://vercel.com/docs/cron-jobs
 - https://vercel.com/docs/cron-jobs/manage-cron-jobs
 
-## Current Blockers
+## Remaining Activation Gates
 
 Cron should stay disabled until these are resolved:
 
-- Existing admin write routes are `POST`-only:
-  - `POST /api/admin/market/prices/sync`
-  - `POST /api/admin/snapshots/daily`
-- Vercel Cron invokes `GET` paths, so the existing admin routes cannot be wired
-  directly to Cron.
-- There is no `vercel.json`.
-- KIS actual close writes are intentionally manual and capped at `limit <= 5`.
-- The KIS close route has a 90 second cooldown, and that cooldown also affects
-  dry-runs.
-- A single Cron invocation must not sleep through repeated 90 second cooldowns
-  just to process multiple KIS batches.
-- Overlapping run prevention is not implemented as a dedicated Cron contract.
-- A durable run status model for partial close sync progress is not designed.
+- Deploy the route with its write gate disabled and verify 401/409/no-secret
+  behavior in Production.
+- Verify that `CRON_SECRET` reaches the route as Vercel bearer authorization.
+- Add exactly one Hobby-compatible daily schedule only after disabled smoke.
+- Set `MARKET_CYCLE_CRON_WRITE_ENABLED=true` only with that activation change.
+- Observe the first automatic cycle and compare its run metadata and snapshot
+  counts with the manual runbook.
 
-## Future Design Decisions
+## Resolved Controller Decisions
 
-Before implementation, decide:
-
-- Whether to add a separate cron-only `GET /api/cron/...` controller surface.
-- Whether Phase 1 Cron routes are dry-run/preflight only.
-- How the controller derives required close targets from daily snapshot
-  `closeSyncPlan`.
-- How to process 15+ close targets without abusing the manual `limit <= 5`
-  route policy.
-- Whether KIS close automation uses repeated scheduled invocations, a durable
-  job table, or another queue/controller design.
-- How partial KIS failures are recorded and exposed without allowing partial
-  daily snapshot writes.
-- How to prevent overlapping Cron runs for the same market cycle.
-- Whether `market_data_sync_runs` is sufficient for run status, or whether a
-  future job table is required before automation.
-- How the snapshot route verifies complete close coverage before any actual
-  snapshot write.
+- One Cron-only `GET` controller orchestrates the existing server jobs directly;
+  it does not call internal HTTP routes.
+- The existing manual KIS route remains capped at five targets. The controller
+  has separate bounds of 25 targets per market/date group and 50 per cycle.
+- One provider instance reuses one KIS access token within an invocation. No
+  token is stored in Postgres.
+- Suggested close batches are deduplicated across owners by
+  market/date/ticker before provider calls.
+- One atomic advisory-lock claim prevents overlapping runs. An exact snapshot
+  date is single-attempt; blocked or failed automation requires operator review,
+  not automatic retry.
+- Partial close success is recorded, but no daily snapshot write occurs unless
+  the second preflight is fully ready.
+- Existing `market_data_sync_runs` is sufficient for this bounded v1; no schema
+  migration or new queue table is required.
 
 ## Non-Negotiable Safety Rules
 
@@ -132,10 +138,15 @@ Design and manually test a controller that can process close sync work without
 sleeping through cooldown windows in one serverless invocation. It must record
 state, respect KIS limits, and remain idempotent.
 
+Status: implemented behind the disabled write gate with atomic cycle claiming,
+bounded deduplicated groups, and request-scoped KIS token reuse.
+
 ### Phase 3: Snapshot dry-run automation
 
 Automate the daily snapshot dry-run only after close sync coverage can be
 observed reliably. Actual snapshot writes remain manual.
+
+Status: implemented inside the gated controller before and after close sync.
 
 ### Phase 4: Guarded snapshot write automation
 
@@ -147,6 +158,8 @@ Allow snapshot actual writes only when:
 - imported Base44 rows are not overwritten,
 - the operation is idempotent for already-generated varda rows.
 
+Status: implemented inside the gated controller; not activated by Vercel Cron.
+
 ### Phase 5: Vercel Cron enablement
 
 Add `vercel.json` and production Cron schedules only after the route design,
@@ -155,7 +168,8 @@ separate approval.
 
 ## Current Recommendation
 
-Do not enable Cron yet. The Phase 1 route skeleton exists, but the next gate is
-deployment smoke verification. Until Cron write automation is separately
-approved, keep using the manual runbook in
+Do not enable Cron in this change. First deploy the controller with the gate
+disabled and verify the Production boundary. The following activation change
+may then add one UTC schedule and enable the environment flag together. Until
+that smoke passes, keep using the manual runbook in
 `docs/price-sync-and-snapshot-pipeline.md`.
