@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, getTableColumns, lt, lte } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, lt, lte } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
@@ -55,6 +55,12 @@ import {
   resolveSnapshotCycle,
   type InternalCycle,
 } from "@/lib/snapshots/market-calendar";
+import {
+  previousCalendarDate,
+  SNAPSHOT_GAP_BACKFILL_POLICY,
+  validateSnapshotGapBackfillAuthorization,
+  type SnapshotGapBackfillAuthorization,
+} from "@/lib/snapshots/gap-backfill";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
@@ -98,7 +104,17 @@ export type DailySnapshotRunResult = {
   plannedWrites: PlannedSnapshotWrites;
   results: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan>;
   warnings: string[];
+  writePolicy: SnapshotWritePolicySummary;
 };
+
+type SnapshotWritePolicySummary = Readonly<{
+  mode: "current_cycle" | "historical_unchanged_holdings_backfill";
+  source: typeof SNAPSHOT_SOURCE;
+  ruleVersion: string;
+  insertOnly: boolean;
+  fxAsOfDate: string;
+  manualValuation: "asset_current" | "latest_prior_generated_snapshot_carry";
+}>;
 
 export type SnapshotCycle = {
   snapshotDate: string;
@@ -355,7 +371,11 @@ type AccountComputed = {
   realizedSellEventCount: number;
   unmatchedRealizedSellEventCount: number;
   missingCostRealizedSellEventCount: number;
+  provenance: SnapshotProvenance;
 };
+
+type SnapshotProvenance = SnapshotWritePolicySummary &
+  Readonly<{ descriptionTags: readonly string[] }>;
 
 type ExistingRows = {
   portfolios: PortfolioRow[];
@@ -369,6 +389,7 @@ type RunOptions = {
   snapshotDate?: string;
   account?: SnapshotAccount;
   now?: Date;
+  historicalWriteAuthorization?: SnapshotGapBackfillAuthorization;
 };
 
 export async function runDailySnapshot(
@@ -388,7 +409,30 @@ export async function runDailySnapshot(
     );
   }
 
-  if (!dryRun && snapshotDate !== resolvedCycle.snapshotDate) {
+  const historicalAuthorization = options.historicalWriteAuthorization;
+  const historicalValidation = historicalAuthorization
+    ? validateSnapshotGapBackfillAuthorization({
+        authorization: historicalAuthorization,
+        requestedDate: snapshotDate,
+        requestedOwnerUserId: options.tenantContext.ownerUserId,
+        currentCycleDate: resolvedCycle.snapshotDate,
+      })
+    : null;
+
+  if (historicalValidation && !historicalValidation.ok) {
+    throw new DailySnapshotRequestError(
+      "invalid_historical_write_authorization",
+      "Historical snapshot backfill authorization is invalid",
+      { snapshotDate, reason: historicalValidation.reason },
+      400,
+    );
+  }
+
+  if (
+    !dryRun &&
+    snapshotDate !== resolvedCycle.snapshotDate &&
+    !historicalValidation?.ok
+  ) {
     throw new DailySnapshotRequestError(
       "historical_write_not_enabled",
       "daily snapshot writes are only enabled for the current resolved cycle date",
@@ -399,6 +443,11 @@ export async function runDailySnapshot(
       400,
     );
   }
+
+  const provenance = buildSnapshotProvenance({
+    snapshotDate,
+    historicalBackfill: historicalValidation?.ok === true,
+  });
 
   const cycle = buildCycleForSnapshotDate(snapshotDate, options.now ?? new Date());
   const targetAccounts = requestedAccount === "all" ? [...ACCOUNT_CODES] : [requestedAccount];
@@ -430,7 +479,7 @@ export async function runDailySnapshot(
   const selectedAssets = openInvestmentAssets.filter((asset) =>
     targetAccounts.includes(asset.account as TrackedAccount),
   );
-  const fx = await resolveSnapshotFx(snapshotDate);
+  const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate);
   const unsupportedCurrencyAssets = selectedAssets.filter(
     (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
   );
@@ -447,6 +496,8 @@ export async function runDailySnapshot(
   const closeContext = await buildCloseContext({
     snapshotDate,
     assets: selectedAssets,
+    ownerUserId,
+    manualValuation: provenance.manualValuation,
   });
   const freshClose = summarizeFreshClose(selectedAssets, closeContext, snapshotDate);
   const closeSyncPlan = buildCloseSyncPlan({
@@ -491,6 +542,7 @@ export async function runDailySnapshot(
       snapshotDate,
       returnMetrics,
       priorPositions: existingRows.priorPositions,
+      provenance,
     });
     const build = buildAccountPlan({
       computed,
@@ -521,17 +573,25 @@ export async function runDailySnapshot(
       fx,
       cycle,
       snapshotDate,
+      provenance,
     });
     accumulateAllPlannedWrites(plannedWrites, allBuild);
     resultMap.all = publicAllAccountPlan(allBuild);
   }
 
+  const insertOnlyCollisionBlockers = provenance.insertOnly
+    ? buildInsertOnlyCollisionBlockers(plannedWrites)
+    : [];
   const blockers = [
     ...unsupportedCurrencyAssets.map(
       (asset) =>
         `unsupported_currency:${normalizeTicker(asset.ticker) ?? asset.name}:${normalizeCurrencyCode(asset.currency)}`,
     ),
     ...freshClose.missing.map((asset) => `missing_close:${asset.ticker}`),
+    ...closeContext.manualCarryMissing.map(
+      (asset) => `missing_manual_carry:${asset.account}:${asset.assetName}`,
+    ),
+    ...insertOnlyCollisionBlockers,
     ...accountBuilds.flatMap((build) => build.blockers),
     ...(allBuild?.blockers ?? []),
   ];
@@ -552,7 +612,7 @@ export async function runDailySnapshot(
   }
 
   if (!dryRun) {
-    await applySnapshotWrites(accountBuilds, allBuild);
+    await applySnapshotWrites(accountBuilds, allBuild, provenance.insertOnly);
     for (const build of accountBuilds) {
       build.status = build.status === "planned" ? "written" : build.status;
     }
@@ -586,7 +646,72 @@ export async function runDailySnapshot(
     plannedWrites,
     results: resultMap,
     warnings,
+    writePolicy: publicWritePolicy(provenance),
   };
+}
+
+function buildSnapshotProvenance({
+  snapshotDate,
+  historicalBackfill,
+}: {
+  snapshotDate: string;
+  historicalBackfill: boolean;
+}): SnapshotProvenance {
+  if (!historicalBackfill) {
+    return Object.freeze({
+      mode: "current_cycle" as const,
+      source: SNAPSHOT_SOURCE,
+      ruleVersion: SNAPSHOT_RULE_VERSION,
+      insertOnly: false,
+      fxAsOfDate: snapshotDate,
+      manualValuation: "asset_current" as const,
+      descriptionTags: Object.freeze([] as string[]),
+    });
+  }
+
+  return Object.freeze({
+    mode: "historical_unchanged_holdings_backfill" as const,
+    source: SNAPSHOT_SOURCE,
+    ruleVersion: SNAPSHOT_GAP_BACKFILL_POLICY.ruleVersion,
+    insertOnly: true,
+    fxAsOfDate: previousCalendarDate(snapshotDate),
+    manualValuation: "latest_prior_generated_snapshot_carry" as const,
+    descriptionTags: Object.freeze([
+      `backfill_policy=${SNAPSHOT_GAP_BACKFILL_POLICY.id}`,
+      "write_mode=historical_insert_only",
+      "holdings_basis=operator_confirmed_unchanged",
+      "event_ledger_basis=no_events_in_range",
+      `manual_valuation_basis=${SNAPSHOT_GAP_BACKFILL_POLICY.manualValuation}`,
+      "fractional_quantity_basis=latest_prior_generated_snapshot_carry",
+      `fx_as_of_policy=${SNAPSHOT_GAP_BACKFILL_POLICY.fxAsOf}`,
+    ]),
+  });
+}
+
+function publicWritePolicy(
+  provenance: SnapshotProvenance,
+): SnapshotWritePolicySummary {
+  return {
+    mode: provenance.mode,
+    source: provenance.source,
+    ruleVersion: provenance.ruleVersion,
+    insertOnly: provenance.insertOnly,
+    fxAsOfDate: provenance.fxAsOfDate,
+    manualValuation: provenance.manualValuation,
+  };
+}
+
+function buildInsertOnlyCollisionBlockers(
+  plannedWrites: PlannedSnapshotWrites,
+) {
+  const blockers: string[] = [];
+  if (plannedWrites.dailyPortfolioSnapshots.update > 0) {
+    blockers.push("insert_only_portfolio_collision");
+  }
+  if (plannedWrites.dailyPositionSnapshots.update > 0) {
+    blockers.push("insert_only_position_collision");
+  }
+  return blockers;
 }
 
 function buildAccountPlan({
@@ -664,6 +789,7 @@ function buildAllAccountPlan({
   fx,
   cycle,
   snapshotDate,
+  provenance,
 }: {
   accountBuilds: AccountSnapshotBuild[];
   existingRows: PortfolioRow[];
@@ -671,6 +797,7 @@ function buildAllAccountPlan({
   fx: ResolvedFxRate;
   cycle: InternalCycle;
   snapshotDate: string;
+  provenance: SnapshotProvenance;
 }): AllAccountSnapshotBuild {
   const blockers = findAllAccountWriteBlockers(accountBuilds, existingRows);
   const completed = accountBuilds.filter(
@@ -729,11 +856,11 @@ function buildAllAccountPlan({
           snapshotDate,
           account: "all",
           accountId: null,
-          source: SNAPSHOT_SOURCE,
-          ruleVersion: SNAPSHOT_RULE_VERSION,
+          source: provenance.source,
+          ruleVersion: provenance.ruleVersion,
           description: [
             "snapshot_status=complete",
-            `source=${SNAPSHOT_SOURCE}`,
+            `source=${provenance.source}`,
             "source_basis=account_position_sums",
             `accounts=${completed.length}`,
             "valuation_basis=close_price",
@@ -743,6 +870,7 @@ function buildAllAccountPlan({
             `realized_pnl_krw=${Math.round(realizedPnlKrw)}`,
             `realized_cost_basis_krw=${Math.round(realizedCostBasisKrw)}`,
             `realized_sell_events=${realizedSellEventCount}`,
+            ...provenance.descriptionTags,
           ].join("; "),
           isSample: false,
           cashValue: decimal(0),
@@ -822,6 +950,7 @@ function computeAccountSnapshot({
   snapshotDate,
   returnMetrics,
   priorPositions,
+  provenance,
 }: {
   account: TrackedAccount;
   assets: AssetRow[];
@@ -832,6 +961,7 @@ function computeAccountSnapshot({
   snapshotDate: string;
   returnMetrics: ReturnMetricsSummary;
   priorPositions: PositionRow[];
+  provenance: SnapshotProvenance;
 }): AccountComputed {
   const groupValueById = new Map<string, number>();
   const groupMembersById = new Map<string, AssetRow[]>();
@@ -864,11 +994,15 @@ function computeAccountSnapshot({
     const closePrice = selectedPrice.price;
     const fxResolution = resolveKrwFxRate(asset.currency, fx.usdKrw);
     const fxRate = fxResolution.ok ? fxResolution.rate : 0;
+    const prior = priorByAssetId.get(asset.id) ?? null;
     const quantity = toNumber(asset.quantity) ?? 0;
     const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
     const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? 0;
+    const priorFractionalQuantity = toNumber(prior?.estimatedFractionalQuantity);
     const estimatedFractionalQuantity =
-      fractionalKrwValue > 0 && closePrice > 0 && fxRate > 0
+      provenance.insertOnly && priorFractionalQuantity !== null
+        ? priorFractionalQuantity
+        : fractionalKrwValue > 0 && closePrice > 0 && fxRate > 0
         ? fractionalKrwValue / (closePrice * fxRate)
         : 0;
     const totalQuantity = quantity + estimatedFractionalQuantity;
@@ -885,7 +1019,6 @@ function computeAccountSnapshot({
           ? (marketValueKrw / groupValue) * (toNumber(group.targetWeight) ?? 0)
           : (toNumber(group.targetWeight) ?? 0) / Math.max(1, groupMembers.length)
         : targetWeightRaw;
-    const prior = priorByAssetId.get(asset.id) ?? null;
     const previousUnitPrice =
       toNumber(prior?.unitPrice) ?? toNumber(prior?.closePrice) ?? null;
     const previousFxRate =
@@ -955,7 +1088,7 @@ function computeAccountSnapshot({
       assetName: asset.name,
       account,
       accountId: context.accountRowsByCode.get(account) ?? null,
-      source: SNAPSHOT_SOURCE,
+      source: provenance.source,
       market: asset.market,
       currency: asset.currency,
       assetStatus: "active",
@@ -969,11 +1102,12 @@ function computeAccountSnapshot({
       priceSource: selectedPrice.source,
       priceBasis: selectedPrice.basis,
       description: [
-        `source=${SNAPSHOT_SOURCE}`,
+        `source=${provenance.source}`,
         `price_basis=${selectedPrice.basis}`,
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
         "cost_basis_source=asset_average_cost_fallback",
+        ...provenance.descriptionTags,
       ].join("; "),
       belowMa,
       isSample: false,
@@ -1070,6 +1204,7 @@ function computeAccountSnapshot({
     topHoldingName: topHolding.name,
     topHoldingWeight: topHolding.weight,
     groupCount: new Set(assets.map((asset) => asset.groupId).filter(Boolean)).size,
+    provenance,
   };
 }
 
@@ -1085,11 +1220,11 @@ function buildPortfolioSnapshot(
     snapshotDate: computed.positions[0]?.snapshotDate ?? "",
     account: computed.account,
     accountId: context.accountRowsByCode.get(computed.account) ?? null,
-    source: SNAPSHOT_SOURCE,
-    ruleVersion: SNAPSHOT_RULE_VERSION,
+    source: computed.provenance.source,
+    ruleVersion: computed.provenance.ruleVersion,
     description: [
       "snapshot_status=complete",
-      `source=${SNAPSHOT_SOURCE}`,
+      `source=${computed.provenance.source}`,
       `expected_positions=${computed.positions.length}`,
       "valuation_basis=close_price",
       `fx_source=${fx.source}`,
@@ -1098,6 +1233,7 @@ function buildPortfolioSnapshot(
       `realized_pnl_krw=${Math.round(computed.realizedPnlKrw)}`,
       `realized_cost_basis_krw=${Math.round(computed.realizedCostBasisKrw)}`,
       `realized_sell_events=${computed.realizedSellEventCount}`,
+      ...computed.provenance.descriptionTags,
     ].join("; "),
     isSample: false,
     cashValue: decimal(0),
@@ -1137,17 +1273,33 @@ function buildPortfolioSnapshot(
 async function applySnapshotWrites(
   accountBuilds: AccountSnapshotBuild[],
   allBuild: AllAccountSnapshotBuild | null,
+  insertOnly: boolean,
 ) {
   const queries: unknown[] = [];
 
   for (const build of accountBuilds) {
     if (build.status !== "planned" || !build.portfolio) continue;
-    pushPortfolioWriteQuery(queries, build.portfolio, build.existingPortfolio);
-    pushPositionWriteQueries(queries, build.positions, build.existingPositionsByKey);
+    pushPortfolioWriteQuery(
+      queries,
+      build.portfolio,
+      build.existingPortfolio,
+      insertOnly,
+    );
+    pushPositionWriteQueries(
+      queries,
+      build.positions,
+      build.existingPositionsByKey,
+      insertOnly,
+    );
   }
 
   if (allBuild?.status === "planned" && allBuild.portfolio) {
-    pushPortfolioWriteQuery(queries, allBuild.portfolio, allBuild.existingPortfolio);
+    pushPortfolioWriteQuery(
+      queries,
+      allBuild.portfolio,
+      allBuild.existingPortfolio,
+      insertOnly,
+    );
   }
 
   if (queries.length === 0) return;
@@ -1158,8 +1310,12 @@ function pushPortfolioWriteQuery(
   queries: unknown[],
   portfolio: NewDailyPortfolioSnapshot,
   existing: PortfolioRow | null,
+  insertOnly: boolean,
 ) {
   if (existing) {
+    if (insertOnly) {
+      throw new Error("insert-only snapshot backfill cannot update a portfolio row");
+    }
     queries.push(
       db
         .update(dailyPortfolioSnapshots)
@@ -1184,6 +1340,7 @@ function pushPositionWriteQueries(
   queries: unknown[],
   positions: NewDailyPositionSnapshot[],
   existingByKey: Map<string, PositionRow>,
+  insertOnly: boolean,
 ) {
   const inserts: NewDailyPositionSnapshot[] = [];
 
@@ -1192,6 +1349,10 @@ function pushPositionWriteQueries(
     if (!existing) {
       inserts.push(position);
       continue;
+    }
+
+    if (insertOnly) {
+      throw new Error("insert-only snapshot backfill cannot update a position row");
     }
 
     queries.push(
@@ -1364,11 +1525,14 @@ function buildRealizedReturnRunSummary(
   };
 }
 
-async function resolveSnapshotFx(snapshotDate: string): Promise<ResolvedFxRate> {
+async function resolveSnapshotFx(
+  snapshotDate: string,
+  fxAsOfDate = snapshotDate,
+): Promise<ResolvedFxRate> {
   const [row] = await db
     .select()
     .from(fxRates)
-    .where(lte(fxRates.rateDate, snapshotDate))
+    .where(lte(fxRates.rateDate, fxAsOfDate))
     .orderBy(desc(fxRates.rateDate))
     .limit(1);
 
@@ -1377,7 +1541,7 @@ async function resolveSnapshotFx(snapshotDate: string): Promise<ResolvedFxRate> 
     throw new DailySnapshotRequestError(
       "missing_fx_rate",
       "A USD/KRW FX rate is required before writing a daily snapshot",
-      { snapshotDate },
+      { snapshotDate, fxAsOfDate },
       409,
     );
   }
@@ -1395,14 +1559,23 @@ type CloseContext = {
   selectedByAssetId: Map<string, PriceSelection>;
   referencesByMarket: Map<string, CloseReferenceSummary>;
   closeReferences: CloseReferenceSummary[];
+  manualCarryMissing: ReadonlyArray<{
+    assetId: string;
+    assetName: string;
+    account: string;
+  }>;
 };
 
 async function buildCloseContext({
   snapshotDate,
   assets: targetAssets,
+  ownerUserId,
+  manualValuation,
 }: {
   snapshotDate: string;
   assets: AssetRow[];
+  ownerUserId: string;
+  manualValuation: SnapshotWritePolicySummary["manualValuation"];
 }): Promise<CloseContext> {
   const instruments = targetAssets.map(({ market, currency, ticker }) => ({
     market,
@@ -1428,16 +1601,36 @@ async function buildCloseContext({
   const referencesByMarket = new Map(
     closeReferences.map((reference) => [reference.market, reference]),
   );
+  const manualCarryByAssetId =
+    manualValuation === "latest_prior_generated_snapshot_carry"
+      ? await loadManualCarrySelections({
+          ownerUserId,
+          snapshotDate,
+          assets: targetAssets,
+        })
+      : new Map<string, PriceSelection>();
+  const manualCarryMissing =
+    manualValuation === "latest_prior_generated_snapshot_carry"
+      ? targetAssets
+          .filter((asset) => !normalizeTicker(asset.ticker))
+          .filter((asset) => !manualCarryByAssetId.has(asset.id))
+          .map((asset) => ({
+            assetId: asset.id,
+            assetName: asset.name,
+            account: asset.account,
+          }))
+      : [];
   const selectedByAssetId = new Map<string, PriceSelection>();
   for (const asset of targetAssets) {
     selectedByAssetId.set(
       asset.id,
-      selectClosePriceForAsset(
-        asset,
-        snapshotDate,
-        rowsByInstrument,
-        referencesByMarket,
-      ),
+      manualCarryByAssetId.get(asset.id) ??
+        selectClosePriceForAsset(
+          asset,
+          snapshotDate,
+          rowsByInstrument,
+          referencesByMarket,
+        ),
     );
   }
 
@@ -1446,7 +1639,59 @@ async function buildCloseContext({
     selectedByAssetId,
     referencesByMarket,
     closeReferences,
+    manualCarryMissing,
   };
+}
+
+async function loadManualCarrySelections({
+  ownerUserId,
+  snapshotDate,
+  assets: targetAssets,
+}: {
+  ownerUserId: string;
+  snapshotDate: string;
+  assets: AssetRow[];
+}) {
+  const manualAssetIds = targetAssets
+    .filter((asset) => !normalizeTicker(asset.ticker))
+    .map((asset) => asset.id);
+  const selections = new Map<string, PriceSelection>();
+  if (manualAssetIds.length === 0) return selections;
+
+  const rows = await db
+    .select()
+    .from(dailyPositionSnapshots)
+    .where(
+      and(
+        eq(dailyPositionSnapshots.canonicalOwnerUserId, ownerUserId),
+        eq(dailyPositionSnapshots.source, SNAPSHOT_SOURCE),
+        lt(dailyPositionSnapshots.snapshotDate, snapshotDate),
+        inArray(dailyPositionSnapshots.assetId, manualAssetIds),
+      ),
+    )
+    .orderBy(desc(dailyPositionSnapshots.snapshotDate));
+
+  for (const row of rows) {
+    if (!row.assetId || selections.has(row.assetId)) continue;
+    const price =
+      toNumber(row.currentPrice) ??
+      toNumber(row.unitPrice) ??
+      toNumber(row.closePrice);
+    const referenceDate = row.referenceDate ?? row.priceDate ?? row.snapshotDate;
+    if (price === null || price <= 0 || referenceDate > snapshotDate) continue;
+    selections.set(row.assetId, {
+      row: null,
+      price,
+      source: row.priceSource ?? "stored_manual_snapshot",
+      referenceDate,
+      calendarReferenceDate: null,
+      expectedCloseDate: null,
+      basis: "manual_current",
+      fromCloseSnapshot: false,
+    });
+  }
+
+  return selections;
 }
 
 function buildCloseReferences(

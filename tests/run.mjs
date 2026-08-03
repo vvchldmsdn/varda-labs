@@ -1,4 +1,6 @@
 import "./market-calendar.test.mjs";
+import "./snapshot-gap-backfill.test.mjs";
+import "./frankfurter-history.test.mjs";
 import "./portfolio-math.test.mjs";
 import "./portfolio-movement.test.mjs";
 import "./price-instrument-identity.test.mjs";

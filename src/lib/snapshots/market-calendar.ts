@@ -95,6 +95,7 @@ function koreaMarketHolidays(year: number) {
     `${year}-05-01`,
     observedFixedHoliday(year, 5, 5),
     `${year}-06-06`,
+    ...(year >= 2026 ? [observedFixedHoliday(year, 7, 17)] : []),
     observedFixedHoliday(year, 8, 15),
     observedFixedHoliday(year, 10, 3),
     `${year}-10-09`,
