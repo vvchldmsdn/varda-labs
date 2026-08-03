@@ -1,6 +1,6 @@
 # Frontend Surface Route Map
 
-Last updated: 2026-07-14
+Last updated: 2026-08-03
 
 Status: route inventory and verification log. This document does not itself
 call providers, execute dry-runs, write data, change Cron behavior, change
@@ -33,10 +33,18 @@ operator surfaces rather than additional primary product flows.
 
 ## Global Rules
 
-- All listed product/operator pages are protected by `src/proxy.ts` Basic Auth
-  in production. Neon Auth is selected only as a future identity/session
-  boundary in `docs/auth-identity-session-strategy.md`; no route has switched
-  auth behavior yet.
+- Product pages resolve the Neon server session to an active Varda Labs user
+  before starting any product-data query. User-owned rows are then filtered by
+  the trusted tenant context in server-only DALs. A failed resolution renders a
+  closed access boundary and records that the product database read was not
+  attempted.
+- `src/proxy.ts` Basic Auth is limited to human operator pages under `/admin/*`
+  and the temporary bootstrap-claim presentation endpoint. The OAuth callback
+  stays in Proxy for the Neon Auth exchange; sign-in, session, auth API, and
+  product routes are not Basic Auth matchers.
+- Shared ETF masters, ETF holdings, benchmarks, and global factors still
+  require an active product session. Account-derived market regime rows are
+  additionally scoped through active accounts owned by that user.
 - Server-rendered read views should load DB-backed data directly through server
   helpers. Do not introduce first-render browser REST refetching for these
   surfaces.
@@ -75,6 +83,11 @@ Current route decisions:
 | `/admin/market-sync` | Operator status surface. Operational ids and run metadata can be shown when useful, but secrets, auth headers, raw provider responses, and secret-shaped metadata remain prohibited. |
 
 ## Route Inventory
+
+The protection column records the route's historical verification context.
+For current runtime authorization, the Global Rules above are authoritative:
+product routes use the Neon session plus tenant-scoped DALs, while Basic Auth
+remains only on the explicit operator/bootstrap matchers.
 
 | Route | Purpose | Data source and helpers | Protection | Write behavior | Current smoke status | Known gaps | Next candidate |
 | --- | --- | --- | --- | --- | --- | --- | --- |

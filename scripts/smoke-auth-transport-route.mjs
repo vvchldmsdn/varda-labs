@@ -20,16 +20,28 @@ const authorization = `Basic ${Buffer.from(
 ).toString("base64")}`;
 
 const rootWithoutAuth = await request("/");
-assert.equal(rootWithoutAuth.status, 401);
+assert.equal(rootWithoutAuth.status, 200);
+assert.match(rootWithoutAuth.body, /Portfolio user link/);
+assert.match(rootWithoutAuth.body, /Product database read/);
+assert.match(rootWithoutAuth.body, /Not attempted/);
+assert.doesNotMatch(rootWithoutAuth.body, LEAK_PATTERN);
 
 const signInWithoutAuth = await request("/auth/sign-in");
-assert.equal(signInWithoutAuth.status, 401);
+assert.equal(signInWithoutAuth.status, 200);
+assert.match(signInWithoutAuth.body, />Sign in</);
+assert.match(signInWithoutAuth.body, /Portfolio access remains/);
+assert.doesNotMatch(signInWithoutAuth.body, LEAK_PATTERN);
 
 const sessionWithoutAuth = await request("/auth/session");
-assert.equal(sessionWithoutAuth.status, 401);
+assert.equal(sessionWithoutAuth.status, 200);
+assert.match(sessionWithoutAuth.body, /Server session evidence/);
+assert.match(sessionWithoutAuth.body, /Not present/);
+assert.match(sessionWithoutAuth.body, /Not attempted/);
+assert.doesNotMatch(sessionWithoutAuth.body, LEAK_PATTERN);
 
 const authApiWithoutAuth = await request("/api/auth/get-session");
-assert.equal(authApiWithoutAuth.status, 401);
+assert.equal(authApiWithoutAuth.status, 404);
+assert.doesNotMatch(authApiWithoutAuth.body, LEAK_PATTERN);
 
 const signOutWithoutAuth = await request("/api/auth/sign-out", false, {
   method: "POST",
@@ -39,24 +51,20 @@ const signOutWithoutAuth = await request("/api/auth/sign-out", false, {
   },
   body: "{}",
 });
-assert.equal(signOutWithoutAuth.status, 401);
+assert.equal(signOutWithoutAuth.status, 200);
+assert.deepEqual(JSON.parse(signOutWithoutAuth.body), { success: true });
 
-const signIn = await request("/auth/sign-in", true);
-assert.equal(signIn.status, 200);
-assert.match(signIn.body, />Sign in</);
-assert.match(signIn.body, /Portfolio access remains/);
-assert.doesNotMatch(signIn.body, LEAK_PATTERN);
+const adminWithoutAuth = await request("/admin/market-sync");
+assert.equal(adminWithoutAuth.status, 401);
 
-const rejectedAuthApi = await request("/api/auth/get-session", true);
-assert.equal(rejectedAuthApi.status, 404);
-assert.doesNotMatch(rejectedAuthApi.body, LEAK_PATTERN);
+const bootstrapPresentationWithoutAuth = await request(
+  "/api/identity/bootstrap-claim/present",
+);
+assert.equal(bootstrapPresentationWithoutAuth.status, 401);
 
-const session = await request("/auth/session", true);
-assert.equal(session.status, 200);
-assert.match(session.body, /Server session evidence/);
-assert.match(session.body, /Not present/);
-assert.match(session.body, /Not attempted/);
-assert.doesNotMatch(session.body, LEAK_PATTERN);
+const adminWithBasicAuth = await request("/admin/market-sync", true);
+assert.equal(adminWithBasicAuth.status, 200);
+assert.doesNotMatch(adminWithBasicAuth.body, LEAK_PATTERN);
 
 const signOut = await request("/api/auth/sign-out", true, {
   method: "POST",
@@ -100,9 +108,10 @@ console.log(
       sessionWithoutAuth: sessionWithoutAuth.status,
       authApiWithoutAuth: authApiWithoutAuth.status,
       signOutWithoutAuth: signOutWithoutAuth.status,
-      signInWithAuth: signIn.status,
-      rejectedAuthApiWithAuth: rejectedAuthApi.status,
-      sessionWithBasicAuth: session.status,
+      adminWithoutAuth: adminWithoutAuth.status,
+      bootstrapPresentationWithoutAuth:
+        bootstrapPresentationWithoutAuth.status,
+      adminWithBasicAuth: adminWithBasicAuth.status,
       signOutWithBasicAuthAndSessionCookie: signOut.status,
       callbackWithoutSession: callback.status,
       providerSessionCreated: false,

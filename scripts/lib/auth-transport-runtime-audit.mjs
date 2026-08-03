@@ -148,11 +148,11 @@ export function auditAuthTransportRuntime(root) {
   ].every((marker) => proxy.includes(marker));
   if (!basicAuthBoundaryIntact) findings.push("basic_auth_boundary_drift");
 
-  const basicAuthSignInApiGatePresent =
-    proxy.includes('"/auth/sign-in"') &&
-    proxy.includes('"/api/auth/:path*"');
-  if (!basicAuthSignInApiGatePresent) {
-    findings.push("auth_entry_basic_auth_gate_missing");
+  const authEntryOutsideBasicAuthMatcher =
+    !proxy.includes('"/auth/sign-in"') &&
+    !proxy.includes('"/api/auth/:path*"');
+  if (!authEntryOutsideBasicAuthMatcher) {
+    findings.push("auth_entry_still_behind_basic_auth");
   }
 
   const callbackBranchMarker =
@@ -168,11 +168,11 @@ export function auditAuthTransportRuntime(root) {
   if (!authCallbackBypassesBasicAuth) {
     findings.push("auth_callback_basic_auth_isolation_missing");
   }
-  const sessionEvidenceRequiresBasicAuth =
-    proxy.includes('"/auth/session"') &&
+  const sessionEvidenceOutsideBasicAuthMatcher =
+    !proxy.includes('"/auth/session"') &&
     !routes.includes('AUTH_TRANSPORT_CALLBACK_PATH = "/auth/session"');
-  if (!sessionEvidenceRequiresBasicAuth) {
-    findings.push("session_evidence_basic_auth_gate_missing");
+  if (!sessionEvidenceOutsideBasicAuthMatcher) {
+    findings.push("session_evidence_still_behind_basic_auth");
   }
 
   const oauthCallbackExchangeProxyPresent =
@@ -232,9 +232,9 @@ export function auditAuthTransportRuntime(root) {
       strictGoogleSocialSignInBody,
       basicAuthBoundaryIntact,
       oauthCallbackExchangeProxyPresent,
-      basicAuthSignInApiGatePresent,
+      authEntryOutsideBasicAuthMatcher,
       authCallbackBypassesBasicAuth,
-      sessionEvidenceRequiresBasicAuth,
+      sessionEvidenceOutsideBasicAuthMatcher,
       callbackFailureClosed,
       dashboardCredentialHeadersStripped,
       managedAuthSchemaOwnedByDrizzle,

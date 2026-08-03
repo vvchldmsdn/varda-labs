@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import {
   getReadOnlyEtfHoldings,
   searchReadOnlyEtfMasters,
@@ -11,6 +12,7 @@ import type {
   GroupedNumericValue,
   GroupedTextValue,
 } from "@/lib/etf-holdings";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,22 @@ type EtfsPageProps = {
 };
 
 export default async function EtfsPage({ searchParams }: EtfsPageProps) {
-  const params = await searchParams;
+  const [params, resolution] = await Promise.all([
+    searchParams,
+    resolveCurrentTenantContext(),
+  ]);
+
+  if (!resolution.ok) {
+    return (
+      <PortfolioReadAccessBoundary
+        closedMessage="ETF reference data remains closed until the signed-in product user is resolved."
+        description="ETF masters and holdings are shared reference data, but product access still requires an active Varda Labs user session."
+        resolution={resolution}
+        title="ETF Reference"
+      />
+    );
+  }
+
   const query = firstParam(params.q);
   const ticker = firstParam(params.ticker);
   const explicitMasterId = firstParam(params.etfMasterId) ?? firstParam(params.id);

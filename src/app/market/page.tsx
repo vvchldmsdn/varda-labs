@@ -1,19 +1,36 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import {
-  getReadOnlyMarketContext,
+  getReadOnlyTenantMarketContext,
   type ReadOnlyMarketBenchmark,
   type ReadOnlyMarketFactor,
   type ReadOnlyMarketFactorFamily,
   type ReadOnlyMarketRegime,
 } from "@/db/queries/market-context";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import type { MarketRegimeDuplicateGroup } from "@/lib/market-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function MarketPage() {
-  const marketContext = await getReadOnlyMarketContext();
+  const resolution = await resolveCurrentTenantContext();
+
+  if (!resolution.ok) {
+    return (
+      <PortfolioReadAccessBoundary
+        closedMessage="Market context remains closed until the signed-in product user is resolved."
+        description="Benchmarks and global factors are shared references. Account regime rows are selected only through accounts owned by the current user."
+        resolution={resolution}
+        title="Market Context"
+      />
+    );
+  }
+
+  const marketContext = await getReadOnlyTenantMarketContext({
+    tenantContext: resolution.tenantContext,
+  });
 
   return (
     <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">

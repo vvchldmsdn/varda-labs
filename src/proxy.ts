@@ -50,27 +50,9 @@ function enforceDashboardBasicAuth(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/",
-    "/api/auth/:path*",
     "/api/identity/bootstrap-claim/present",
     "/auth/callback",
-    "/auth/sign-in",
-    "/auth/session",
     "/admin/:path*",
-    "/additional-contribution/:path*",
-    "/portfolio/:path*",
-    "/etfs",
-    "/etfs/:path*",
-    "/history",
-    "/history/:path*",
-    "/investment-lab",
-    "/investment-lab/:path*",
-    "/market",
-    "/market/:path*",
-    "/simulation",
-    "/simulation/:path*",
-    "/today",
-    "/today/:path*",
   ],
 };
 
