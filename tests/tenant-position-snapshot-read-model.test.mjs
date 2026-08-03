@@ -121,6 +121,20 @@ describe("tenant position snapshot read model", () => {
     assert.equal(result.positions.length, 1);
   });
 
+  it("accepts a native linked asset without a Base44 identity", () => {
+    const result = projectTenantPositionSnapshotRows({
+      accountRows: [BROKERAGE_ACCOUNT],
+      rows: [{ ...BROKERAGE_POSITION, legacyAssetId: null }],
+      scope: "brokerage",
+      snapshotDate: "2026-07-02",
+    });
+
+    assert.equal(result.state, "ready");
+    assert.equal(result.linkedPositionCount, 1);
+    assert.equal(result.historicalOnlyPositionCount, 0);
+    assert.equal(result.positions[0]?.assetLinkStatus, "linked");
+  });
+
   it("excludes malformed display evidence without hiding valid positions", () => {
     const result = projectTenantPositionSnapshotRows({
       accountRows: [BROKERAGE_ACCOUNT, ISA_ACCOUNT],

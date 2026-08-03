@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, lt, lte } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, lt, lte } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
@@ -55,6 +55,7 @@ import {
   resolveSnapshotCycle,
   type InternalCycle,
 } from "@/lib/snapshots/market-calendar";
+import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const ACCOUNT_CODES = ["brokerage", "isa", "irp"] as const;
@@ -313,6 +314,7 @@ type AllAccountSnapshotBuild = AllAccountSnapshotPlan & {
 };
 
 type AccountContext = {
+  ownerUserId: string;
   accountRowsByCode: Map<string, string>;
   groupsById: Map<string, AssetGroupRow>;
   latestRegime: MarketRegimeDaily | null;
@@ -362,6 +364,7 @@ type ExistingRows = {
 };
 
 type RunOptions = {
+  tenantContext: TenantContext;
   dryRun?: boolean;
   snapshotDate?: string;
   account?: SnapshotAccount;
@@ -369,7 +372,7 @@ type RunOptions = {
 };
 
 export async function runDailySnapshot(
-  options: RunOptions = {},
+  options: RunOptions,
 ): Promise<DailySnapshotRunResult> {
   const dryRun = options.dryRun ?? true;
   const resolvedCycle = resolveSnapshotCycle(options.now);
@@ -399,8 +402,25 @@ export async function runDailySnapshot(
 
   const cycle = buildCycleForSnapshotDate(snapshotDate, options.now ?? new Date());
   const targetAccounts = requestedAccount === "all" ? [...ACCOUNT_CODES] : [requestedAccount];
-  const context = await loadAccountContext(snapshotDate);
-  const allAssetRows = await db.select().from(assets).orderBy(assets.account, assets.name);
+  const ownerUserId = options.tenantContext.ownerUserId;
+  const context = await loadAccountContext(snapshotDate, ownerUserId);
+  const allAssetRows = await db
+    .select(getTableColumns(assets))
+    .from(assets)
+    .innerJoin(
+      accounts,
+      and(
+        eq(assets.accountId, accounts.id),
+        eq(assets.account, accounts.code),
+      ),
+    )
+    .where(
+      and(
+        eq(accounts.canonicalOwnerUserId, ownerUserId),
+        eq(accounts.isActive, true),
+      ),
+    )
+    .orderBy(assets.account, assets.name);
   const investmentAssetRows = allAssetRows.filter((asset) =>
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
   );
@@ -414,7 +434,7 @@ export async function runDailySnapshot(
   const unsupportedCurrencyAssets = selectedAssets.filter(
     (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
   );
-  const eventRows = await loadEventRows(snapshotDate);
+  const eventRows = await loadEventRows(snapshotDate, ownerUserId);
   const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw, {
     asOfDate: snapshotDate,
   });
@@ -456,6 +476,7 @@ export async function runDailySnapshot(
   for (const account of targetAccounts) {
     const accountAssets = selectedAssets.filter((asset) => asset.account === account);
     const existingRows = await loadExistingRows({
+      ownerUserId,
       account,
       snapshotDate,
       assetCount: accountAssets.length,
@@ -489,7 +510,10 @@ export async function runDailySnapshot(
   let allBuild: AllAccountSnapshotBuild | null = null;
 
   if (requestedAccount === "all") {
-    const existingAllRows = await loadExistingAllPortfolioRows(snapshotDate);
+    const existingAllRows = await loadExistingAllPortfolioRows(
+      snapshotDate,
+      ownerUserId,
+    );
     allBuild = buildAllAccountPlan({
       accountBuilds,
       existingRows: existingAllRows,
@@ -701,6 +725,7 @@ function buildAllAccountPlan({
     completed.length > 0
       ? {
           legacyBase44Id: null,
+          canonicalOwnerUserId: context.ownerUserId,
           snapshotDate,
           account: "all",
           accountId: null,
@@ -751,7 +776,13 @@ function buildAllAccountPlan({
         }
       : null;
   const portfolioAction: SnapshotWriteAction =
-    blockers.length > 0 ? "blocked" : existingPortfolio ? "update" : "insert";
+    blockers.length > 0
+      ? "blocked"
+      : completed.length === 0
+        ? "skip"
+        : existingPortfolio
+          ? "update"
+          : "insert";
 
   return {
     account: "all",
@@ -912,19 +943,11 @@ function computeAccountSnapshot({
     if (exposureType === "US_LISTED") usdExposureValue += marketValueKrw;
     if (exposureType === "KR_UNHEDGED_GLOBAL") usdExposureValue += marketValueKrw * 0.5;
 
-    if (!asset.legacyBase44Id) {
-      throw new DailySnapshotRequestError(
-        "missing_legacy_asset_id",
-        "daily_position_snapshots.legacy_asset_id is required by the current schema",
-        { assetId: asset.id, assetName: asset.name },
-        409,
-      );
-    }
-
     const legacyGroup = asset.groupId ? context.groupsById.get(asset.groupId) : null;
 
     return {
       legacyBase44Id: null,
+      canonicalOwnerUserId: context.ownerUserId,
       snapshotDate,
       assetId: asset.id,
       legacyAssetId: asset.legacyBase44Id,
@@ -1058,6 +1081,7 @@ function buildPortfolioSnapshot(
   const benchmark = getBenchmarkFields(context);
   return {
     legacyBase44Id: null,
+    canonicalOwnerUserId: context.ownerUserId,
     snapshotDate: computed.positions[0]?.snapshotDate ?? "",
     account: computed.account,
     accountId: context.accountRowsByCode.get(computed.account) ?? null,
@@ -1140,7 +1164,15 @@ function pushPortfolioWriteQuery(
       db
         .update(dailyPortfolioSnapshots)
         .set({ ...portfolio, updatedAt: new Date() })
-        .where(eq(dailyPortfolioSnapshots.id, existing.id)),
+        .where(
+          and(
+            eq(dailyPortfolioSnapshots.id, existing.id),
+            eq(
+              dailyPortfolioSnapshots.canonicalOwnerUserId,
+              portfolio.canonicalOwnerUserId!,
+            ),
+          ),
+        ),
     );
     return;
   }
@@ -1166,7 +1198,15 @@ function pushPositionWriteQueries(
       db
         .update(dailyPositionSnapshots)
         .set({ ...position, updatedAt: new Date() })
-        .where(eq(dailyPositionSnapshots.id, existing.id)),
+        .where(
+          and(
+            eq(dailyPositionSnapshots.id, existing.id),
+            eq(
+              dailyPositionSnapshots.canonicalOwnerUserId,
+              position.canonicalOwnerUserId!,
+            ),
+          ),
+        ),
     );
   }
 
@@ -1175,7 +1215,10 @@ function pushPositionWriteQueries(
   }
 }
 
-async function loadAccountContext(snapshotDate: string): Promise<AccountContext> {
+async function loadAccountContext(
+  snapshotDate: string,
+  ownerUserId: string,
+): Promise<AccountContext> {
   const [
     accountRows,
     groupRows,
@@ -1183,14 +1226,39 @@ async function loadAccountContext(snapshotDate: string): Promise<AccountContext>
     kospiBenchmarkRows,
     vooBenchmarkRows,
   ] = await Promise.all([
-    db.select().from(accounts),
-    db.select().from(assetGroups),
+    db
+      .select()
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.canonicalOwnerUserId, ownerUserId),
+          eq(accounts.isActive, true),
+        ),
+      ),
+    db
+      .selectDistinct(getTableColumns(assetGroups))
+      .from(assetGroups)
+      .innerJoin(assets, eq(assets.groupId, assetGroups.id))
+      .innerJoin(
+        accounts,
+        and(
+          eq(assets.accountId, accounts.id),
+          eq(assets.account, accounts.code),
+        ),
+      )
+      .where(
+        and(
+          eq(accounts.canonicalOwnerUserId, ownerUserId),
+          eq(accounts.isActive, true),
+        ),
+      ),
     db
       .select()
       .from(marketRegimeDaily)
       .where(
         and(
           eq(marketRegimeDaily.account, "all"),
+          eq(marketRegimeDaily.canonicalOwnerUserId, ownerUserId),
           lte(marketRegimeDaily.regimeDate, snapshotDate),
         ),
       )
@@ -1221,6 +1289,7 @@ async function loadAccountContext(snapshotDate: string): Promise<AccountContext>
   ]);
 
   return {
+    ownerUserId,
     accountRowsByCode: new Map(accountRows.map((account) => [account.code, account.id])),
     groupsById: new Map(groupRows.map((group) => [group.id, group])),
     latestRegime: regimeRows[0] ?? null,
@@ -1232,11 +1301,24 @@ async function loadAccountContext(snapshotDate: string): Promise<AccountContext>
   };
 }
 
-async function loadEventRows(snapshotDate: string) {
+async function loadEventRows(snapshotDate: string, ownerUserId: string) {
   return db
-    .select()
+    .select(getTableColumns(eventLedgerEntries))
     .from(eventLedgerEntries)
-    .where(lte(eventLedgerEntries.eventDate, snapshotDate))
+    .innerJoin(
+      accounts,
+      and(
+        eq(eventLedgerEntries.accountId, accounts.id),
+        eq(eventLedgerEntries.account, accounts.code),
+      ),
+    )
+    .where(
+      and(
+        eq(accounts.canonicalOwnerUserId, ownerUserId),
+        eq(accounts.isActive, true),
+        lte(eventLedgerEntries.eventDate, snapshotDate),
+      ),
+    )
     .orderBy(eventLedgerEntries.eventDate);
 }
 
@@ -1788,10 +1870,12 @@ function buildSuggestedKisBatches(targets: CloseSyncPlanTarget[]) {
 }
 
 async function loadExistingRows({
+  ownerUserId,
   account,
   snapshotDate,
   assetCount,
 }: {
+  ownerUserId: string;
   account: TrackedAccount;
   snapshotDate: string;
   assetCount: number;
@@ -1802,6 +1886,7 @@ async function loadExistingRows({
       .from(dailyPortfolioSnapshots)
       .where(
         and(
+          eq(dailyPortfolioSnapshots.canonicalOwnerUserId, ownerUserId),
           eq(dailyPortfolioSnapshots.snapshotDate, snapshotDate),
           eq(dailyPortfolioSnapshots.account, account),
         ),
@@ -1811,6 +1896,7 @@ async function loadExistingRows({
       .from(dailyPositionSnapshots)
       .where(
         and(
+          eq(dailyPositionSnapshots.canonicalOwnerUserId, ownerUserId),
           eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
           eq(dailyPositionSnapshots.account, account),
         ),
@@ -1820,6 +1906,7 @@ async function loadExistingRows({
       .from(dailyPositionSnapshots)
       .where(
         and(
+          eq(dailyPositionSnapshots.canonicalOwnerUserId, ownerUserId),
           eq(dailyPositionSnapshots.account, account),
           lt(dailyPositionSnapshots.snapshotDate, snapshotDate),
         ),
@@ -1831,12 +1918,16 @@ async function loadExistingRows({
   return { portfolios, positions, priorPositions };
 }
 
-async function loadExistingAllPortfolioRows(snapshotDate: string) {
+async function loadExistingAllPortfolioRows(
+  snapshotDate: string,
+  ownerUserId: string,
+) {
   return db
     .select()
     .from(dailyPortfolioSnapshots)
     .where(
       and(
+        eq(dailyPortfolioSnapshots.canonicalOwnerUserId, ownerUserId),
         eq(dailyPortfolioSnapshots.snapshotDate, snapshotDate),
         eq(dailyPortfolioSnapshots.account, "all"),
       ),
@@ -1851,6 +1942,17 @@ function findAccountWriteBlockers(
 
   if (computed.totalMarketValue <= 0 && computed.assets.length > 0) {
     blockers.push("zero_account_valuation");
+  }
+
+  const expectedAccountId = computed.positions[0]?.accountId ?? null;
+  if (computed.assets.length > 0 && expectedAccountId === null) {
+    blockers.push("owned_account_row_missing");
+  }
+  if (
+    expectedAccountId !== null &&
+    computed.assets.some((asset) => asset.accountId !== expectedAccountId)
+  ) {
+    blockers.push("asset_account_owner_mismatch");
   }
 
   const importedPortfolioRows = existingRows.portfolios.filter(

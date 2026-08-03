@@ -1,9 +1,24 @@
 # Auth/Tenant Phase 1F0: Runtime Writer Freeze and Context Convergence
 
-Last updated: 2026-07-11
+Last updated: 2026-08-03
 
-Status: completed as a static, non-mutating audit. No production writer imports
-the F0 policy and no runtime authorization behavior changed.
+Status: the compatibility entity APIs remain frozen. The daily snapshot writer
+now has an owner-enumerated machine-job implementation under review. Its schema
+migration, legacy generated-row owner backfill, Production deployment, and Cron
+activation are not applied by this change.
+
+## 2026-08-03 Implementation Update
+
+The daily snapshot route no longer needs or accepts a caller-selected owner.
+`src/lib/snapshots/daily-job.ts` enumerates active owners from the canonical
+`app_users -> accounts` relationship, then invokes one isolated snapshot run per
+owner. The inner writer reads assets, groups, and events only through those
+owned accounts and writes the same canonical owner onto generated position and
+portfolio rows.
+
+This is deliberately different from the interactive entity APIs. Those APIs
+still require a trusted session repository before they may write user-owned
+rows and remain frozen.
 
 ## Scope
 
@@ -39,7 +54,7 @@ The current decisions are:
 | --- | --- | --- | --- |
 | Legacy nonportfolio cleanup | migration CLI | not applicable | Approved two-row cleanup is closed; future invocation frozen |
 | Four entity compatibility APIs | machine admin | future active server session | Frozen until active identity/session context and owner-aware repository exist |
-| Daily snapshot | machine admin | future explicit verified machine-job user target | Frozen until one active user can be selected by trusted server context |
+| Daily snapshot | machine admin | active owner enumeration from canonical product DB relationships | Implemented for review; Production schema/backfill and Cron remain disabled |
 
 The cleanup remains in the DML inventory because it still exists as source.
 Its target table remains part of the product ownership model, but the legacy
@@ -61,14 +76,14 @@ readiness evidence, not runtime activation.
 
 ## Future Snapshot Contract
 
-One snapshot run may operate for exactly one active owner. It may read only
-that owner's:
+The outer job may enumerate multiple active owners. Each inner snapshot run
+operates for exactly one owner and may read only that owner's:
 
 - assets;
 - accounts;
 - asset groups and memberships;
-- settings;
 - event ledger entries.
+- owner-scoped market regime rows when available.
 
 It may write that owner's daily position and portfolio snapshots for
 `brokerage`, `isa`, and `irp`, then derive the same owner's `all` aggregate.
@@ -89,7 +104,7 @@ fails on:
 
 - a missing or unregistered F0 writer;
 - authorization drift between the freeze matrix and writer registry;
-- canonical-owner references or DML in the production paths;
+- canonical-owner references or DML outside the exact active snapshot boundary;
 - app-user singleton fallback;
 - legacy-owner-to-canonical-owner inference;
 - production import of the F0 pure policy;
@@ -97,21 +112,23 @@ fails on:
 
 ## Explicit Non-Actions
 
-Phase 1F0 does not:
+This implementation does not:
 
 - execute or expand cleanup;
 - change entity API request shapes, responses, Basic Auth, or admin-secret
   behavior;
-- change daily snapshot, Cron, or provider code;
+- enable Vercel Cron or change provider write behavior;
 - link an identity or activate the provisioning user;
-- assign/backfill canonical owners, filter readers, add RLS, or migrate schema.
+- execute the generated-row owner backfill, apply its schema migration, add
+  RLS, or infer an owner from legacy identity fields.
 
 ## Next Approval Boundary
 
-Runtime owner activation remains blocked. The next decision must choose between
-keeping all user-owned runtime writers frozen or separately opening identity
-link plus active server-side session context. Machine snapshot targeting needs
-its own later approval even after interactive session identity exists.
+The next operational boundary is one reviewed bundle: apply the inspected
+expand migration with owner checks initially `NOT VALID`, run the deterministic
+84-row generated-snapshot owner backfill and validate both checks in the same
+transaction, deploy, and run read-only preflight smoke. Cron activation remains
+a separate later decision.
 
 The provider-neutral resolver prerequisite is now executable, without any
 production integration, in

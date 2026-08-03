@@ -19,7 +19,7 @@ export type TenantPositionSnapshotReadRow = Readonly<{
   source: string;
   isSample: boolean;
   assetId: string | null;
-  legacyAssetId: string;
+  legacyAssetId: string | null;
   snapshotAccountId: string | null;
   ownedAccountId: string;
   accountCode: string;
@@ -283,7 +283,8 @@ function positionIdentity(row: TenantPositionSnapshotReadRow) {
   if (row.assetId !== null) {
     return isCanonicalText(row.assetId) ? `asset:${row.assetId}` : null;
   }
-  return /^[0-9a-f]{24}$/.test(row.legacyAssetId)
+  return row.legacyAssetId !== null &&
+    /^[0-9a-f]{24}$/.test(row.legacyAssetId)
     ? `historical:${row.legacyAssetId}`
     : null;
 }

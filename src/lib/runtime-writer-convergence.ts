@@ -11,11 +11,13 @@ export type RuntimeWriterKind =
 export type RuntimeCanonicalOwnerSource =
   | "not_applicable_legacy_cleanup"
   | "future_active_session_context"
-  | "future_explicit_machine_job_target";
+  | "future_explicit_machine_job_target"
+  | "active_owner_enumeration_from_product_database";
 
 export type RuntimeWriterActivationStatus =
   | "legacy_cleanup_future_invocation_frozen"
-  | "frozen_until_active_server_side_tenant_context";
+  | "frozen_until_active_server_side_tenant_context"
+  | "active_owner_scoped_machine_context";
 
 export type RuntimeWriterFreezeDefinition = Readonly<{
   writerId: string;
@@ -26,10 +28,12 @@ export type RuntimeWriterFreezeDefinition = Readonly<{
   freezeCondition: string;
   unblockPrerequisite: string;
   boundaryPaths: readonly string[];
-  canonicalOwnerDmlAllowed: false;
+  canonicalOwnerDmlAllowed: boolean;
   singletonOwnerFallbackAllowed: false;
   legacyOwnerInferenceAllowed: false;
-  productionContextIntegration: "not_connected";
+  productionContextIntegration:
+    | "not_connected"
+    | "owner_enumerated_machine_job";
 }>;
 
 const ENTITY_API_FREEZE = {
@@ -97,19 +101,21 @@ export const RUNTIME_WRITER_FREEZE_MATRIX = [
     writerId: "admin_daily_snapshot",
     writerKind: "machine_snapshot",
     currentAuthorization: "machine_admin",
-    canonicalOwnerSource: "future_explicit_machine_job_target",
-    activationStatus: "frozen_until_active_server_side_tenant_context",
-    freezeCondition: "machine_secret_without_explicit_verified_user_target",
+    canonicalOwnerSource: "active_owner_enumeration_from_product_database",
+    activationStatus: "active_owner_scoped_machine_context",
+    freezeCondition: "unowned_or_owner_mismatched_snapshot_input",
     unblockPrerequisite:
-      "active_user_trusted_machine_target_and_owner_scoped_snapshot_repository",
+      "active_user_account_root_and_owner_scoped_snapshot_repository",
     boundaryPaths: [
       "src/app/api/admin/snapshots/daily/route.ts",
+      "src/lib/snapshots/daily-job.ts",
+      "src/lib/snapshots/daily-job-result.ts",
       "src/lib/snapshots/daily.ts",
     ],
-    canonicalOwnerDmlAllowed: false,
+    canonicalOwnerDmlAllowed: true,
     singletonOwnerFallbackAllowed: false,
     legacyOwnerInferenceAllowed: false,
-    productionContextIntegration: "not_connected",
+    productionContextIntegration: "owner_enumerated_machine_job",
   },
 ] as const satisfies readonly RuntimeWriterFreezeDefinition[];
 
@@ -118,9 +124,10 @@ export const FUTURE_SNAPSHOT_OWNER_CONTRACT = Object.freeze({
     "assets",
     "accounts",
     "asset_groups",
-    "asset_group_members",
-    "settings",
     "event_ledger_entries",
+    "market_regime_daily",
+    "daily_position_snapshots",
+    "daily_portfolio_snapshots",
   ] as const),
   writeTables: Object.freeze([
     "daily_position_snapshots",
@@ -128,7 +135,7 @@ export const FUTURE_SNAPSHOT_OWNER_CONTRACT = Object.freeze({
   ] as const),
   namedAccountOutputs: Object.freeze(["brokerage", "isa", "irp"] as const),
   derivedAccountOutputs: Object.freeze(["all"] as const),
-  ownerCardinality: "exactly_one_active_owner",
+  ownerCardinality: "one_context_per_active_owner",
 } as const);
 
 type SnapshotReadTable =

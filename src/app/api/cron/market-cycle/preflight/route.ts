@@ -2,15 +2,14 @@ import { NextResponse } from "next/server";
 
 import { isAuthorizedAdminJob } from "@/lib/admin-auth";
 import {
-  buildCronPreflightResponse,
+  buildCronPreflightJobResponse,
   parseCronPreflightQuery,
 } from "@/lib/cron-preflight";
 import { getKisPriceSyncCooldownStatus } from "@/lib/market-data/price-sync";
 import {
   DailySnapshotRequestError,
-  runDailySnapshot,
-  type SnapshotAccount,
 } from "@/lib/snapshots/daily";
+import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -44,15 +43,15 @@ export async function GET(request: Request) {
 
   try {
     const [snapshot, kisCooldown] = await Promise.all([
-      runDailySnapshot({
+      runDailySnapshotJob({
         dryRun: true,
         snapshotDate: query.snapshotDate,
-        account: query.account as SnapshotAccount,
+        account: query.account,
       }),
       getKisPriceSyncCooldownStatus("close"),
     ]);
-    const response = buildCronPreflightResponse({
-      snapshot,
+    const response = buildCronPreflightJobResponse({
+      snapshotJob: snapshot,
       kisCooldown,
       cronScheduleUtc: request.headers.get("x-vercel-cron-schedule"),
     });

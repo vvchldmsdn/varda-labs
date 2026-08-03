@@ -14,6 +14,8 @@ const CANONICAL_OWNER_PATTERN =
   /canonicalOwnerUserId|canonical_owner_user_id/;
 const CANONICAL_OWNER_DML_PATTERN =
   /(?:\.values|\.set)\s*\(\s*\{[\s\S]{0,2000}canonicalOwnerUserId\s*:|(?:insert\s+into|update\s+)[\s\S]{0,2000}canonical_owner_user_id/i;
+const SNAPSHOT_OWNER_ASSIGNMENT_PATTERN =
+  /canonicalOwnerUserId\s*:\s*context\.ownerUserId/;
 const SINGLETON_OWNER_FALLBACK_PATTERN =
   /(?:app_users|appUsers)[\s\S]{0,300}(?:limit\s*(?:\(\s*1\s*\)|1)|findFirst)|(?:limit\s*(?:\(\s*1\s*\)|1)|findFirst)[\s\S]{0,300}(?:app_users|appUsers)/i;
 const LEGACY_OWNER_INFERENCE_PATTERN =
@@ -55,11 +57,15 @@ export function auditRuntimeWriterConvergence({
     if (writer.authorization !== definition.currentAuthorization) {
       findings.push(`authorization_mismatch:${definition.writerId}`);
     }
+    const activeSnapshotWriter = definition.writerId === "admin_daily_snapshot";
     if (
-      definition.canonicalOwnerDmlAllowed !== false ||
+      definition.canonicalOwnerDmlAllowed !== activeSnapshotWriter ||
       definition.singletonOwnerFallbackAllowed !== false ||
       definition.legacyOwnerInferenceAllowed !== false ||
-      definition.productionContextIntegration !== "not_connected"
+      definition.productionContextIntegration !==
+        (activeSnapshotWriter
+          ? "owner_enumerated_machine_job"
+          : "not_connected")
     ) {
       findings.push(`unsafe_freeze_policy:${definition.writerId}`);
     }
@@ -78,20 +84,34 @@ export function auditRuntimeWriterConvergence({
       }
 
       const source = readFileSync(absolutePath, "utf8");
-      if (CANONICAL_OWNER_PATTERN.test(source)) canonicalOwnerReferences += 1;
-      if (CANONICAL_OWNER_DML_PATTERN.test(source)) canonicalOwnerDmlMatches += 1;
+      if (CANONICAL_OWNER_PATTERN.test(source)) {
+        canonicalOwnerReferences += 1;
+        if (!definition.canonicalOwnerDmlAllowed) {
+          findings.push(`canonical_owner_runtime_reference:${definition.writerId}`);
+        }
+      }
+      if (
+        CANONICAL_OWNER_DML_PATTERN.test(source) ||
+        SNAPSHOT_OWNER_ASSIGNMENT_PATTERN.test(source)
+      ) {
+        canonicalOwnerDmlMatches += 1;
+        if (!definition.canonicalOwnerDmlAllowed) {
+          findings.push(`canonical_owner_dml:${definition.writerId}`);
+        }
+      }
       if (SINGLETON_OWNER_FALLBACK_PATTERN.test(source)) {
         singletonOwnerFallbackMatches += 1;
       }
-      if (LEGACY_OWNER_INFERENCE_PATTERN.test(source)) {
+      if (
+        LEGACY_OWNER_INFERENCE_PATTERN.test(source) &&
+        !definition.canonicalOwnerDmlAllowed
+      ) {
         legacyOwnerInferenceMatches += 1;
       }
       if (F0_POLICY_IMPORT_PATTERN.test(source)) productionPolicyImports += 1;
     }
   }
 
-  if (canonicalOwnerReferences !== 0) findings.push("canonical_owner_runtime_reference");
-  if (canonicalOwnerDmlMatches !== 0) findings.push("canonical_owner_dml");
   if (singletonOwnerFallbackMatches !== 0) findings.push("singleton_owner_fallback");
   if (legacyOwnerInferenceMatches !== 0) findings.push("legacy_owner_inference");
   if (productionPolicyImports !== 0) findings.push("production_policy_integration");

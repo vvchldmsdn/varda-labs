@@ -8,11 +8,17 @@ import {
 } from "@/lib/http-query";
 import {
   DailySnapshotRequestError,
-  runDailySnapshot,
   type SnapshotAccount,
 } from "@/lib/snapshots/daily";
+import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
 
 const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"] as const;
+const ALLOWED_QUERY_KEYS = new Set([
+  "dryrun",
+  "confirmwrite",
+  "date",
+  "account",
+]);
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,6 +29,13 @@ export async function POST(request: Request) {
   }
 
   const url = new URL(request.url);
+  if (hasUnsupportedQuery(url.searchParams)) {
+    return NextResponse.json(
+      { error: "unsupported query parameter" },
+      { status: 400 },
+    );
+  }
+
   const dryRun = parseBooleanQuery(url.searchParams.get("dryRun"), true);
   const confirmWrite = parseBooleanQuery(
     url.searchParams.get("confirmWrite"),
@@ -72,12 +85,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runDailySnapshot({
+    const result = await runDailySnapshotJob({
       dryRun,
       snapshotDate,
       account,
     });
-    return NextResponse.json(result);
+    const status =
+      dryRun || result.ok ? 200 : result.writtenCount > 0 ? 207 : 409;
+    return NextResponse.json(result, { status });
   } catch (error) {
     if (error instanceof DailySnapshotRequestError) {
       return NextResponse.json(
@@ -99,4 +114,10 @@ export async function POST(request: Request) {
 
 function parseAccount(value: string | null): SnapshotAccount | null {
   return parseEnumQuery(value, SNAPSHOT_ACCOUNTS, "all");
+}
+
+function hasUnsupportedQuery(searchParams: URLSearchParams) {
+  return [...searchParams.keys()].some(
+    (key) => !ALLOWED_QUERY_KEYS.has(key.trim().toLowerCase()),
+  );
 }

@@ -449,6 +449,10 @@ export const assets = pgTable(
     canonicalOwnerUserIdIdx: index(
       "assets_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    assetAccountUnique: uniqueIndex("assets_id_account_unique").on(
+      table.id,
+      table.accountId,
+    ),
   }),
 );
 
@@ -481,6 +485,11 @@ export const accounts = pgTable(
     canonicalOwnerAccountUnique: uniqueIndex(
       "accounts_id_canonical_owner_unique",
     ).on(table.id, table.canonicalOwnerUserId),
+    canonicalOwnerCodeUnique: uniqueIndex(
+      "accounts_canonical_owner_code_unique",
+    )
+      .on(table.canonicalOwnerUserId, table.code)
+      .where(sql`${table.canonicalOwnerUserId} is not null`),
     canonicalOwnerUserIdIdx: index(
       "accounts_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
@@ -1517,10 +1526,31 @@ export const dailyPortfolioSnapshots = pgTable(
     ),
     snapshotAccountSourceUnique: uniqueIndex(
       "daily_portfolio_snapshots_date_account_source_unique",
-    ).on(table.snapshotDate, table.account, table.source),
+    )
+      .on(
+        table.canonicalOwnerUserId,
+        table.snapshotDate,
+        table.account,
+        table.source,
+      )
+      .where(sql`${table.canonicalOwnerUserId} is not null`),
     canonicalOwnerUserIdIdx: index(
       "daily_portfolio_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerUserFk: foreignKey({
+      name: "daily_portfolio_snapshots_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "daily_portfolio_snapshots_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    generatedOwnerCheck: check(
+      "daily_portfolio_snapshots_generated_owner_check",
+      sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ((${table.account} = 'all' and ${table.accountId} is null) or (${table.account} in ('brokerage', 'isa', 'irp') and ${table.accountId} is not null)))`,
+    ),
   }),
 );
 
@@ -1533,7 +1563,7 @@ export const dailyPositionSnapshots = pgTable(
 
     snapshotDate: date("snapshot_date").notNull(),
     assetId: uuid("asset_id"),
-    legacyAssetId: varchar("legacy_asset_id", { length: 24 }).notNull(),
+    legacyAssetId: varchar("legacy_asset_id", { length: 24 }),
     ticker: varchar("ticker", { length: 50 }),
     assetName: varchar("asset_name", { length: 255 }).notNull(),
     account: varchar("account", { length: 50 }).notNull(),
@@ -1653,11 +1683,42 @@ export const dailyPositionSnapshots = pgTable(
     snapshotAccountAssetSourceUnique: uniqueIndex(
       "daily_position_snapshots_date_account_asset_source_unique",
     )
-      .on(table.snapshotDate, table.account, table.assetId, table.source)
-      .where(sql`${table.assetId} is not null`),
+      .on(
+        table.canonicalOwnerUserId,
+        table.snapshotDate,
+        table.account,
+        table.assetId,
+        table.source,
+      )
+      .where(
+        sql`${table.assetId} is not null and ${table.canonicalOwnerUserId} is not null`,
+      ),
     canonicalOwnerUserIdIdx: index(
       "daily_position_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerUserFk: foreignKey({
+      name: "daily_position_snapshots_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "daily_position_snapshots_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "daily_position_snapshots_asset_account_fk",
+      columns: [table.assetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    generatedOwnerCheck: check(
+      "daily_position_snapshots_generated_owner_check",
+      sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.assetId} is not null and ${table.account} in ('brokerage', 'isa', 'irp'))`,
+    ),
+    assetIdentityCheck: check(
+      "daily_position_snapshots_asset_identity_check",
+      sql`${table.assetId} is not null or ${table.legacyAssetId} is not null`,
+    ),
   }),
 );
 
