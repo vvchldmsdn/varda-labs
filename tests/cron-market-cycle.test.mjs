@@ -126,7 +126,7 @@ describe("Cron market-cycle controller", () => {
     assert.ok(plan.blockers.includes("close_target_group_limit_exceeded"));
   });
 
-  it("keeps the deployed route disabled until an explicit env gate is set", () => {
+  it("keeps the scheduled route disabled until an explicit env gate is set", () => {
     const route = read("src/app/api/cron/market-cycle/run/route.ts");
     const runner = read("src/lib/cron-market-cycle-runner.ts");
     const repository = read("src/lib/cron-market-cycle-run-repository.ts");
@@ -153,7 +153,12 @@ describe("Cron market-cycle controller", () => {
     assert.match(kis, /const session: KisProviderSession/);
     assert.match(kis, /getKisAccessToken\(config, session\)/);
     assert.doesNotMatch(kis, /@\/db\/|access_token.*insert|access_token.*update/is);
-    assert.equal("crons" in vercel, false);
+    assert.deepEqual(vercel.crons, [
+      {
+        path: "/api/cron/market-cycle/run",
+        schedule: "0 22 * * *",
+      },
+    ]);
   });
 });
 

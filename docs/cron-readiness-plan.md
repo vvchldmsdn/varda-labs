@@ -3,8 +3,8 @@
 Last updated: 2026-08-03
 
 This is the implementation and activation boundary for the daily market-cycle
-controller. The guarded controller exists, but Vercel Cron scheduling and
-Production writes remain disabled.
+controller. The guarded controller exists and one daily Vercel Cron schedule is
+declared. Production writes remain disabled until the environment gate is set.
 
 ## Current Status
 
@@ -39,7 +39,9 @@ The reusable controller now implements the same order behind
 
 The route is `GET /api/cron/market-cycle/run`. It accepts no query parameters,
 uses machine authorization only, and is fail-closed while the environment gate
-is absent. `vercel.json` still has no `crons` entry.
+is absent. `vercel.json` declares exactly one daily schedule at `0 22 * * *`.
+On Hobby this means one invocation sometime during the 22:00 UTC hour, after
+the 07:00 KST service-date boundary.
 
 ## Vercel Cron Constraints
 
@@ -69,13 +71,15 @@ References:
 
 ## Remaining Activation Gates
 
-Cron should stay disabled until these are resolved:
+Cron writes should stay disabled until these are resolved:
 
 - Deploy the route with its write gate disabled and verify 401/409/no-secret
   behavior in Production.
 - Verify that `CRON_SECRET` reaches the route as Vercel bearer authorization.
-- Add exactly one Hobby-compatible daily schedule only after disabled smoke.
-- Set `MARKET_CYCLE_CRON_WRITE_ENABLED=true` only with that activation change.
+- Confirm `CRON_SECRET` is configured for Production before deploying the
+  schedule.
+- Set `MARKET_CYCLE_CRON_WRITE_ENABLED=true` immediately before deploying the
+  schedule so the first invocation is authenticated and intentional.
 - Observe the first automatic cycle and compare its run metadata and snapshot
   counts with the manual runbook.
 
@@ -158,18 +162,20 @@ Allow snapshot actual writes only when:
 - imported Base44 rows are not overwritten,
 - the operation is idempotent for already-generated varda rows.
 
-Status: implemented inside the gated controller; not activated by Vercel Cron.
+Status: implemented inside the gated controller; the daily schedule is declared
+but writes still require the Production environment gate.
 
 ### Phase 5: Vercel Cron enablement
 
-Add `vercel.json` and production Cron schedules only after the route design,
-manual controller tests, and safety review are complete. This phase requires a
-separate approval.
+Add one Hobby-compatible Production Cron schedule only after the route design,
+manual controller tests, and safety review are complete.
+
+Status: one `0 22 * * *` schedule is declared. Deployment and the Production
+write gate remain a coordinated activation step.
 
 ## Current Recommendation
 
-Do not enable Cron in this change. First deploy the controller with the gate
-disabled and verify the Production boundary. The following activation change
-may then add one UTC schedule and enable the environment flag together. Until
-that smoke passes, keep using the manual runbook in
-`docs/price-sync-and-snapshot-pipeline.md`.
+Deploy the schedule only after Production has both `CRON_SECRET` and
+`MARKET_CYCLE_CRON_WRITE_ENABLED=true`. Observe the first automatic cycle and
+compare its sanitized run metadata and snapshot counts with the manual runbook
+in `docs/price-sync-and-snapshot-pipeline.md`.
