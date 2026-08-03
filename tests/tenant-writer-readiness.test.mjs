@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 21);
-    assert.equal(registeredPaths.length, 27);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 22);
+    assert.equal(registeredPaths.length, 28);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -130,7 +130,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 12,
+      in_scope: 13,
       intentionally_skipped_legacy: 1,
       not_applicable: 8,
     });
@@ -238,18 +238,23 @@ describe("tenant writer Phase 1D-A readiness", () => {
     );
   });
 
-  it("keeps canonical owner values out of HTTP inputs and runtime writers", () => {
+  it("keeps owner input out of HTTP and limits active write context to the reviewed session writer", () => {
     for (const path of walkFiles(join(ROOT, "src", "app", "api"))) {
       const source = readFileSync(path, "utf8");
       assert.doesNotMatch(source, /canonicalOwnerUserId|canonical_owner_user_id/);
     }
 
+    const activeContextWriters = [];
     for (const writer of TENANT_WRITER_REGISTRY) {
       for (const path of writer.implementationPaths) {
         const source = readFileSync(join(ROOT, path), "utf8");
-        assert.doesNotMatch(source, /tenant-write-context/);
+        if (/tenant-write-context/.test(source)) {
+          activeContextWriters.push(writer.id);
+        }
       }
     }
+
+    assert.deepEqual(activeContextWriters, ["session_manual_krx_gold_price"]);
   });
 
   it("limits canonical owner DML to the reviewed one-use writer", () => {
