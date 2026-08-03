@@ -11,6 +11,6 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const sql = neon(databaseUrl);
+export const sqlClient = neon(databaseUrl);
 
-export const db = drizzle(sql, { schema });
+export const db = drizzle(sqlClient, { schema });

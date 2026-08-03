@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 22);
-    assert.equal(registeredPaths.length, 28);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 23);
+    assert.equal(registeredPaths.length, 29);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -130,7 +130,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 13,
+      in_scope: 14,
       intentionally_skipped_legacy: 1,
       not_applicable: 8,
     });
@@ -216,6 +216,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         "admin_market_price_sync",
         "base44_history_import",
         "base44_market_context_import",
+        "cron_market_cycle_controller",
       ],
     );
 

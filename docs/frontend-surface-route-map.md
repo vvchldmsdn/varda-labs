@@ -132,6 +132,7 @@ pass/fail model score.
 | `/api/admin/market/fx/sync` | Guarded FX refresh endpoint. | Dry-run by default; actual write requires explicit guard. Do not call during page render. |
 | `/api/admin/snapshots/daily` | Guarded daily snapshot endpoint. | Do not call from product pages. Preserve reviewed runbook boundaries. |
 | `/api/cron/market-cycle/preflight` | Read-only Cron/operator preflight contract. | Must not expose write-shaped or secret-shaped parameters. |
+| `/api/cron/market-cycle/run` | Guarded daily FX, close-price, and owner-scoped snapshot controller. | Machine auth only, no query selectors, and fail-closed unless `MARKET_CYCLE_CRON_WRITE_ENABLED=true`. Vercel schedule is not configured yet. |
 
 ## Current Sequencing Decision
 
