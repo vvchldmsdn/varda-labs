@@ -22,6 +22,9 @@ describe("Simulation input readiness route boundary", () => {
     const ownerInputQuery = read(
       "src/db/queries/simulation-owner-research.ts",
     );
+    const ownerPrivateHistoryQuery = read(
+      "src/db/queries/simulation-owner-private-history.ts",
+    );
     const fixedMixView = read(
       "src/components/simulation/fixed-mix-research-execution-section.tsx",
     );
@@ -54,6 +57,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeHistoricalOutcomeQuery, /^import "server-only";/);
     assert.match(researchUniverseQuery, /^import "server-only";/);
     assert.match(ownerInputQuery, /^import "server-only";/);
+    assert.match(ownerPrivateHistoryQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /horizon: params\.horizon/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
@@ -214,11 +218,19 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(ownerInputQuery, /buildSimulationOwnerInputCandidate/);
     assert.match(
       ownerInputQuery,
-      /getReadOnlySimulationResearchUniversePreflightBundleForSelection/,
+      /getReadOnlyPrivateOwnerRawHistoryBundle/,
     );
     assert.match(ownerInputQuery, /buildSimulationOwnerInputPreflightModel/);
     assert.match(ownerInputQuery, /buildSimulationOwnerResearchExecution/);
-    assert.match(ownerInputQuery, /getLatestCommonQualifiedStoredServiceDate/);
+    assert.match(ownerInputQuery, /getLatestCommonPrivateOwnerRawServiceDate/);
+    assert.match(ownerInputQuery, /getActivePortfolioOwnerUserIds/);
+    assert.match(ownerPrivateHistoryQuery, /eq\(accounts\.isActive, true\)/);
+    assert.match(ownerPrivateHistoryQuery, /eq\(appUsers\.status, "active"\)/);
+    assert.match(ownerPrivateHistoryQuery, /buildPrivateOwnerRawHistory/);
+    assert.doesNotMatch(
+      ownerPrivateHistoryQuery,
+      /\.insert\(|\.update\(|\.delete\(|cron|fetch\s*\(/i,
+    );
     assert.match(ownerInputQuery, /resolveSimulationResearchHorizon/);
     assert.doesNotMatch(
       ownerInputQuery,

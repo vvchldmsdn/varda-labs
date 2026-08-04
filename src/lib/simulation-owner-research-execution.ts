@@ -19,6 +19,7 @@ export const SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY = Object.freeze({
   sourceReturnStepCount: 90,
   defaultEndSelection: "latest_common_qualified_stored_observation",
   explicitEndSelection: "exact_query_date_only",
+  historicalPriceBasis: "matrix_policy_explicit",
   partialEvidencePolicy:
     "execute_positive_weight_listed_subset_and_disclose_omissions",
   subsetWeightPolicy: "largest_remainder_current_value_to_10000bps",
@@ -223,6 +224,21 @@ export function buildSimulationOwnerResearchExecution(input: {
       returnStepCount: matrix.matrix.length,
       firstServiceDate: matrix.requestedServiceDates[0] ?? null,
       lastServiceDate: matrixEndServiceDate,
+      priceBasis:
+        matrix.policy.version ===
+        "simulation_private_owner_raw_close_return_matrix_v1"
+          ? ("raw_price_return" as const)
+          : ("provider_adjusted_close" as const),
+      corporateActionAdjustment:
+        matrix.policy.version ===
+        "simulation_private_owner_raw_close_return_matrix_v1"
+          ? ("not_claimed" as const)
+          : ("provider_claimed" as const),
+      distributionAdjustment:
+        matrix.policy.version ===
+        "simulation_private_owner_raw_close_return_matrix_v1"
+          ? ("not_claimed" as const)
+          : ("provider_claimed" as const),
     }),
     executionWeights: Object.freeze(
       weights.map((row) => Object.freeze(row)),

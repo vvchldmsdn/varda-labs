@@ -115,6 +115,16 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
       </header>
 
       <SimulationTerminalRiskMetrics terminal={execution.terminal} />
+      {execution.source.priceBasis === "raw_price_return" ? (
+        <p
+          className="border-t border-[#e1e5da] bg-[#fff9e9] px-4 py-3 text-xs leading-5 text-[#6b5227]"
+          data-owner-research-raw-close-disclosure
+        >
+          이 연구 경로는 저장된 KIS 종가와 날짜별 환율로 계산합니다. 배당과
+          액면분할·병합을 조정한 총수익률은 아니므로 장기 성과 해석에는 차이가
+          생길 수 있습니다.
+        </p>
+      ) : null}
       <ResearchFanChart execution={execution} />
 
       <div className="overflow-x-auto border-t border-[#e1e5da]">
@@ -150,6 +160,9 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
 
       <p className="border-t border-[#e1e5da] px-4 py-3 text-xs leading-5 text-[#687064]">
         기준일 {formatDate(execution.source.endServiceDate)} · 입력 수익률 {execution.source.returnStepCount}개 ·
+        {execution.source.priceBasis === "raw_price_return"
+          ? " KIS 미조정 종가"
+          : " 조정종가"} ·
         평균 블록 5단계 · 수수료·세금·현금수익률 미포함
       </p>
     </article>

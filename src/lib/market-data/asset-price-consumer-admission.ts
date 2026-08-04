@@ -27,6 +27,17 @@ export const ASSET_PRICE_CONSUMER_ADMISSION_POLICY = Object.freeze({
     incompleteProvenance: "exclude_row",
     rightsNotAdmitted: "exclude_all_rows",
   }),
+  privateSingleTenantRawHistoricalReturn: Object.freeze({
+    priceField: "close_price",
+    priceBasis: "raw_price_return",
+    consumerPurpose: "owner_only_simulation_research",
+    tenantBoundary: "exactly_one_active_owner_matching_session",
+    providerBoundary: "kis_only_with_complete_provenance",
+    corporateActionAdjustment: "not_claimed",
+    distributionAdjustment: "not_claimed",
+    persistence: "forbidden",
+    recommendation: "forbidden",
+  }),
 } as const);
 
 type NumericInput = number | string | null | undefined;
@@ -88,6 +99,16 @@ export type RawHistoricalAdmissionIssue =
   | "invalid_instrument_identity"
   | "raw_history_consumer_rights_not_admitted";
 
+export type PrivateSingleTenantRawHistoricalAdmissionIssue =
+  | "private_single_tenant_scope_not_established"
+  | "invalid_instrument_identity"
+  | "raw_close_missing"
+  | "raw_source_not_kis"
+  | "provider_symbol_missing"
+  | "provider_exchange_missing"
+  | "fetched_at_invalid"
+  | "conflicting_provider_binding";
+
 export type RawHistoricalPriceAdmission<T> = Readonly<{
   policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.rawHistoricalReturn;
   rows: readonly T[];
@@ -99,6 +120,20 @@ export type RawHistoricalPriceAdmission<T> = Readonly<{
     excludedInstrumentCount: number;
   }>;
   issues: readonly RawHistoricalAdmissionIssue[];
+}>;
+
+export type PrivateSingleTenantRawHistoricalPriceAdmission<T> = Readonly<{
+  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn;
+  status: "ready" | "blocked";
+  rows: readonly T[];
+  summary: Readonly<{
+    suppliedRowCount: number;
+    admittedRowCount: number;
+    excludedRowCount: number;
+    admittedInstrumentCount: number;
+    excludedInstrumentCount: number;
+  }>;
+  issues: readonly PrivateSingleTenantRawHistoricalAdmissionIssue[];
 }>;
 
 export function resolveOperationalClosePrice(input: {
@@ -203,6 +238,105 @@ export function admitRawHistoricalPriceRows<
   });
 }
 
+export function admitPrivateSingleTenantRawHistoricalPriceRows<
+  T extends RawHistoricalPriceConsumerEvidenceRow,
+>(input: {
+  rows: readonly T[];
+  requestedOwnerUserId: string;
+  activeOwnerUserIds: readonly string[];
+}): PrivateSingleTenantRawHistoricalPriceAdmission<T> {
+  const suppliedRows = Array.isArray(input.rows) ? input.rows : [];
+  const activeOwnerUserIds = [
+    ...new Set(
+      (Array.isArray(input.activeOwnerUserIds)
+        ? input.activeOwnerUserIds
+        : []
+      )
+        .map((value) => normalizeText(value)?.toLowerCase())
+        .filter((value): value is string => value !== null),
+    ),
+  ];
+  const requestedOwnerUserId = normalizeText(
+    input.requestedOwnerUserId,
+  )?.toLowerCase();
+  if (
+    !requestedOwnerUserId ||
+    activeOwnerUserIds.length !== 1 ||
+    activeOwnerUserIds[0] !== requestedOwnerUserId
+  ) {
+    return Object.freeze({
+      policy:
+        ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn,
+      status: "blocked" as const,
+      rows: Object.freeze([]),
+      summary: Object.freeze({
+        suppliedRowCount: suppliedRows.length,
+        admittedRowCount: 0,
+        excludedRowCount: suppliedRows.length,
+        admittedInstrumentCount: 0,
+        excludedInstrumentCount: uniqueInstrumentCount(suppliedRows),
+      }),
+      issues: Object.freeze([
+        "private_single_tenant_scope_not_established" as const,
+      ]),
+    });
+  }
+
+  const issues = new Set<PrivateSingleTenantRawHistoricalAdmissionIssue>();
+  const groups = new Map<string, T[]>();
+  for (const row of suppliedRows) {
+    const instrumentKey = normalizeInstrumentKey(row);
+    if (!instrumentKey) {
+      issues.add("invalid_instrument_identity");
+      continue;
+    }
+    const group = groups.get(instrumentKey) ?? [];
+    group.push(row);
+    groups.set(instrumentKey, group);
+  }
+
+  const admittedRows: T[] = [];
+  let admittedInstrumentCount = 0;
+  let excludedInstrumentCount = 0;
+  for (const groupRows of groups.values()) {
+    const eligibleRows: T[] = [];
+    const bindingKeys = new Set<string>();
+    for (const row of groupRows) {
+      const rowIssues = validatePrivateSingleTenantRawRow(row);
+      for (const issue of rowIssues) issues.add(issue);
+      if (rowIssues.length > 0) continue;
+      eligibleRows.push(row);
+      bindingKeys.add(rawProviderBindingKey(row));
+    }
+    if (bindingKeys.size > 1) {
+      issues.add("conflicting_provider_binding");
+      excludedInstrumentCount += 1;
+      continue;
+    }
+    if (eligibleRows.length === 0) {
+      excludedInstrumentCount += 1;
+      continue;
+    }
+    admittedRows.push(...eligibleRows);
+    admittedInstrumentCount += 1;
+  }
+
+  return Object.freeze({
+    policy:
+      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn,
+    status: admittedRows.length > 0 ? ("ready" as const) : ("blocked" as const),
+    rows: Object.freeze(admittedRows),
+    summary: Object.freeze({
+      suppliedRowCount: suppliedRows.length,
+      admittedRowCount: admittedRows.length,
+      excludedRowCount: suppliedRows.length - admittedRows.length,
+      admittedInstrumentCount,
+      excludedInstrumentCount,
+    }),
+    issues: Object.freeze([...issues].sort()),
+  });
+}
+
 function validateAdjustedHistoricalRow(
   row: AdjustedHistoricalPriceConsumerEvidenceRow,
 ): AdjustedHistoricalAdmissionIssue[] {
@@ -235,6 +369,22 @@ function validateAdjustedHistoricalRow(
   return issues;
 }
 
+function validatePrivateSingleTenantRawRow(
+  row: RawHistoricalPriceConsumerEvidenceRow,
+): PrivateSingleTenantRawHistoricalAdmissionIssue[] {
+  const issues: PrivateSingleTenantRawHistoricalAdmissionIssue[] = [];
+  if (positiveNumber(row.closePrice) === null) issues.push("raw_close_missing");
+  if (!normalizeText(row.source)?.toLowerCase().startsWith("kis")) {
+    issues.push("raw_source_not_kis");
+  }
+  if (!normalizeText(row.providerSymbol)) issues.push("provider_symbol_missing");
+  if (!normalizeText(row.providerExchange)) {
+    issues.push("provider_exchange_missing");
+  }
+  if (!isValidTimestamp(row.fetchedAt)) issues.push("fetched_at_invalid");
+  return issues;
+}
+
 function normalizeInstrumentKey(row: AssetPriceInstrumentEvidenceRow) {
   const market = normalizeText(row.market)?.toLowerCase();
   const currency = normalizeText(row.currency)?.toUpperCase();
@@ -250,6 +400,19 @@ function providerBindingKey(row: AdjustedHistoricalPriceConsumerEvidenceRow) {
     normalizeText(row.providerSymbol)?.toUpperCase(),
     normalizeText(row.providerExchange)?.toUpperCase(),
   ].join("|");
+}
+
+function rawProviderBindingKey(row: RawHistoricalPriceConsumerEvidenceRow) {
+  return [
+    normalizeText(row.providerSymbol)?.toUpperCase(),
+    normalizeText(row.providerExchange)?.toUpperCase(),
+  ].join("|");
+}
+
+function uniqueInstrumentCount(
+  rows: readonly AssetPriceInstrumentEvidenceRow[],
+) {
+  return new Set(rows.map(normalizeInstrumentKey).filter(Boolean)).size;
 }
 
 function normalizeText(value: string | null | undefined) {

@@ -69,6 +69,7 @@ import "./simulation-historical-evidence-admission.test.mjs";
 import "./simulation-historical-evidence-schema.test.mjs";
 import "./simulation-owner-input-preflight.test.mjs";
 import "./simulation-owner-research-execution.test.mjs";
+import "./simulation-private-owner-raw-history.test.mjs";
 import "./simulation-navigation.test.mjs";
 import "./simulation-research-universe-preflight.test.mjs";
 import "./simulation-return-matrix-universe-evidence.test.mjs";

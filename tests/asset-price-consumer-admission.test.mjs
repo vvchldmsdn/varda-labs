@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import {
   admitAdjustedHistoricalPriceRows,
+  admitPrivateSingleTenantRawHistoricalPriceRows,
   admitRawHistoricalPriceRows,
   ASSET_PRICE_CONSUMER_ADMISSION_POLICY,
   resolveOperationalClosePrice,
@@ -95,6 +96,74 @@ describe("asset price consumer admission", () => {
     });
     assert.deepEqual(result.issues, [
       "raw_history_consumer_rights_not_admitted",
+    ]);
+  });
+
+  it("admits complete KIS raw rows only for the matching sole active owner", () => {
+    const ownerUserId = "11111111-1111-4111-8111-111111111111";
+    const result = admitPrivateSingleTenantRawHistoricalPriceRows({
+      requestedOwnerUserId: ownerUserId,
+      activeOwnerUserIds: [ownerUserId],
+      rows: [
+        providerRow({
+          adjustedClosePrice: null,
+          adjustedCloseBasis: null,
+          adjustedCloseProvider: null,
+          adjustedCloseSource: null,
+          adjustedCloseFetchedAt: null,
+          source: "kis_domestic_dailyitemchartprice",
+          fetchedAt: "2026-07-10T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.policy.priceBasis, "raw_price_return");
+    assert.equal(result.policy.corporateActionAdjustment, "not_claimed");
+    assert.equal(result.summary.admittedRowCount, 1);
+    assert.deepEqual(result.issues, []);
+  });
+
+  it("fails private raw history closed when another active owner exists", () => {
+    const result = admitPrivateSingleTenantRawHistoricalPriceRows({
+      requestedOwnerUserId: "11111111-1111-4111-8111-111111111111",
+      activeOwnerUserIds: [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+      ],
+      rows: [providerRow()],
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.rows, []);
+    assert.deepEqual(result.issues, [
+      "private_single_tenant_scope_not_established",
+    ]);
+  });
+
+  it("rejects incomplete or non-KIS private raw provenance", () => {
+    const ownerUserId = "11111111-1111-4111-8111-111111111111";
+    const result = admitPrivateSingleTenantRawHistoricalPriceRows({
+      requestedOwnerUserId: ownerUserId,
+      activeOwnerUserIds: [ownerUserId],
+      rows: [
+        providerRow({
+          closePrice: null,
+          source: "legacy_import",
+          providerSymbol: null,
+          providerExchange: null,
+          fetchedAt: null,
+        }),
+      ],
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.issues, [
+      "fetched_at_invalid",
+      "provider_exchange_missing",
+      "provider_symbol_missing",
+      "raw_close_missing",
+      "raw_source_not_kis",
     ]);
   });
 

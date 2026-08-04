@@ -16,6 +16,7 @@ import type {
   SimulationReturnMatrixInstrument,
   SimulationReturnMatrixInstrumentInput,
   SimulationReturnMatrixPriceInput,
+  SimulationRawCloseReturnMatrixPriceInput,
 } from "./simulation-return-matrix-types.ts";
 
 export function normalizeSimulationInstrumentUniverse(
@@ -135,6 +136,51 @@ export function normalizeSimulationPriceRows({
   serviceDates: readonly string[];
   maxCarryDays: number;
 }) {
+  return normalizeSimulationPriceRowsByBasis({
+    rows,
+    instruments,
+    serviceDates,
+    maxCarryDays,
+    priceBasis: "provider_adjusted_close",
+  });
+}
+
+export function normalizeSimulationRawClosePriceRows({
+  rows,
+  instruments,
+  serviceDates,
+  maxCarryDays,
+}: {
+  rows: readonly SimulationRawCloseReturnMatrixPriceInput[];
+  instruments: readonly SimulationReturnMatrixInstrument[];
+  serviceDates: readonly string[];
+  maxCarryDays: number;
+}) {
+  return normalizeSimulationPriceRowsByBasis({
+    rows,
+    instruments,
+    serviceDates,
+    maxCarryDays,
+    priceBasis: "private_owner_raw_close",
+  });
+}
+
+function normalizeSimulationPriceRowsByBasis({
+  rows,
+  instruments,
+  serviceDates,
+  maxCarryDays,
+  priceBasis,
+}: {
+  rows: readonly (
+    | SimulationReturnMatrixPriceInput
+    | SimulationRawCloseReturnMatrixPriceInput
+  )[];
+  instruments: readonly SimulationReturnMatrixInstrument[];
+  serviceDates: readonly string[];
+  maxCarryDays: number;
+  priceBasis: "provider_adjusted_close" | "private_owner_raw_close";
+}) {
   const blockers: SimulationReturnMatrixBlocker[] = [];
   const seriesByInstrument = new Map<string, SimulationPriceObservation[]>();
   const instrumentKeys = new Set(instruments.map((row) => row.instrumentKey));
@@ -150,7 +196,10 @@ export function normalizeSimulationPriceRows({
   let ignoredOutOfWindowRows = 0;
 
   for (const sourceRow of rows) {
-    const row = sourceRow as SimulationReturnMatrixPriceInput &
+    const row = sourceRow as (
+      | SimulationReturnMatrixPriceInput
+      | SimulationRawCloseReturnMatrixPriceInput
+    ) &
       Record<string, unknown>;
     const market = normalizeMarket(row?.market);
     const currency = normalizeCurrency(row?.currency);
@@ -175,9 +224,21 @@ export function normalizeSimulationPriceRows({
       ignoredOutOfWindowRows += 1;
       continue;
     }
+    const hasClosePrice = Object.prototype.hasOwnProperty.call(
+      row,
+      "closePrice",
+    );
+    const hasAdjustedClosePrice = Object.prototype.hasOwnProperty.call(
+      row,
+      "adjustedClosePrice",
+    );
+    const hasRawClosePrice = Object.prototype.hasOwnProperty.call(
+      row,
+      "rawClosePrice",
+    );
     if (
-      Object.prototype.hasOwnProperty.call(row, "closePrice") ||
-      Object.prototype.hasOwnProperty.call(row, "rawClosePrice")
+      priceBasis === "provider_adjusted_close" &&
+      (hasClosePrice || hasRawClosePrice)
     ) {
       addBlocker(
         blockers,
@@ -186,11 +247,27 @@ export function normalizeSimulationPriceRows({
         [row.priceDate],
       );
     }
-    const adjustedClosePrice = positiveNumber(row.adjustedClosePrice);
-    if (adjustedClosePrice === null) {
+    if (
+      priceBasis === "private_owner_raw_close" &&
+      (hasClosePrice || hasAdjustedClosePrice)
+    ) {
       addBlocker(
         blockers,
-        "invalid_adjusted_close",
+        "adjusted_close_field_forbidden",
+        instrumentKey,
+        [row.priceDate],
+      );
+    }
+    const priceValue =
+      priceBasis === "provider_adjusted_close"
+        ? positiveNumber(row.adjustedClosePrice)
+        : positiveNumber(row.rawClosePrice);
+    if (priceValue === null) {
+      addBlocker(
+        blockers,
+        priceBasis === "provider_adjusted_close"
+          ? "invalid_adjusted_close"
+          : "invalid_raw_close",
         instrumentKey,
         [row.priceDate],
       );
@@ -203,7 +280,7 @@ export function normalizeSimulationPriceRows({
       observation: {
         sourceDate: row.priceDate,
         serviceDate,
-        adjustedClosePrice,
+        priceValue,
       },
     });
     groups.set(groupKey, group);
@@ -369,8 +446,7 @@ export function alignSimulationValue({
     );
   }
 
-  const unitValueKrw =
-    price.row.adjustedClosePrice * (fx?.row.rate ?? 1);
+  const unitValueKrw = price.row.priceValue * (fx?.row.rate ?? 1);
   return {
     evidence: Object.freeze({
       status: "ready",

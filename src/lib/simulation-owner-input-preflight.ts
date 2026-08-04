@@ -4,7 +4,22 @@ import {
   summarizeSimulationPortfolioHistoricalEvidenceStatuses,
   type SimulationPortfolioEvidenceSummary,
 } from "./simulation-portfolio-historical-evidence-summary.ts";
-import type { SimulationResearchUniversePreflightModel } from "./simulation-research-universe-preflight.ts";
+
+export type SimulationOwnerHistoricalPreflight = Readonly<{
+  requestedEndServiceDate: string | null;
+  policy?: Readonly<{
+    priceBasis?: string;
+    corporateActionAdjustment?: string;
+    distributionAdjustment?: string;
+  }>;
+  instruments: readonly Readonly<{
+    instrumentKey: string;
+    status: string;
+    admissionStatus: SimulationHistoricalEvidenceStatus | null;
+    storedCoverage: unknown;
+    provenance: unknown;
+  }>[];
+}>;
 
 export type SimulationOwnerInputPreflightModel = ReturnType<
   typeof buildSimulationOwnerInputPreflightModel
@@ -12,7 +27,7 @@ export type SimulationOwnerInputPreflightModel = ReturnType<
 
 export function buildSimulationOwnerInputPreflightModel(input: {
   candidate: SimulationOwnerInputCandidate;
-  historicalPreflight: SimulationResearchUniversePreflightModel | null;
+  historicalPreflight: SimulationOwnerHistoricalPreflight | null;
 }) {
   const historicalByKey = new Map(
     (input.historicalPreflight?.instruments ?? []).map((row) => [
@@ -43,6 +58,12 @@ export function buildSimulationOwnerInputPreflightModel(input: {
         : evidenceSummary?.status ?? ("diagnostics_only" as const),
     requestedEndServiceDate:
       input.historicalPreflight?.requestedEndServiceDate ?? null,
+    historicalPriceBasis:
+      input.historicalPreflight?.policy?.priceBasis ?? null,
+    corporateActionAdjustment:
+      input.historicalPreflight?.policy?.corporateActionAdjustment ?? null,
+    distributionAdjustment:
+      input.historicalPreflight?.policy?.distributionAdjustment ?? null,
     summary: input.candidate.summary,
     evidenceSummary,
     instruments: Object.freeze(rows),

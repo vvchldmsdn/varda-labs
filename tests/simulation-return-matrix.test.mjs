@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
   SIMULATION_RETURN_MATRIX_POLICY,
+  buildPrivateOwnerRawCloseSimulationReturnMatrix,
   buildSimulationReturnMatrix,
 } from "../src/lib/simulation-return-matrix.ts";
 import {
@@ -180,6 +182,45 @@ describe("Simulation Validation return matrix Phase 0A", () => {
     assertBlocked(buildSimulationReturnMatrix(failedFx), "invalid_fx_status");
   });
 
+  it("keeps private raw-close returns in an explicit unadjusted policy", () => {
+    const result = buildPrivateOwnerRawCloseSimulationReturnMatrix({
+      requestedServiceDates: ["2026-07-04", "2026-07-07"],
+      instruments: [instrument("069500", "korea", "KRW")],
+      priceRows: [
+        rawPrice("069500", "korea", "KRW", "2026-07-03", 100),
+        rawPrice("069500", "korea", "KRW", "2026-07-06", 101),
+      ],
+      fxRows: [],
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.policy.priceBasis, "raw_price_return");
+    assert.equal(result.policy.corporateActionAdjustment, "not_claimed");
+    assert.equal(result.policy.distributionAdjustment, "not_claimed");
+    assertApprox(result.matrix[0].cells[0].value, 0.01);
+    assert.deepEqual(
+      result.policy,
+      PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
+    );
+  });
+
+  it("rejects adjusted-close fields from the private raw-close path", () => {
+    const result = buildPrivateOwnerRawCloseSimulationReturnMatrix({
+      requestedServiceDates: ["2026-07-04", "2026-07-07"],
+      instruments: [instrument("069500", "korea", "KRW")],
+      priceRows: [
+        {
+          ...rawPrice("069500", "korea", "KRW", "2026-07-03", 100),
+          adjustedClosePrice: 100,
+        },
+        rawPrice("069500", "korea", "KRW", "2026-07-06", 101),
+      ],
+      fxRows: [],
+    });
+
+    assertBlocked(result, "adjusted_close_field_forbidden");
+  });
+
   it("keeps unavailable KRX gold and managed-product history as explicit exclusions", () => {
     const fixture = crossMarketSimulationFixture();
     fixture.instruments.push(
@@ -298,6 +339,10 @@ describe("Simulation Validation return matrix Phase 0A", () => {
     assert.equal(SIMULATION_RETURN_MATRIX_POLICY.instrumentMinimum, "none");
   });
 });
+
+function rawPrice(ticker, market, currency, priceDate, rawClosePrice) {
+  return { ticker, market, currency, priceDate, rawClosePrice };
+}
 
 function assertBlocked(result, reason) {
   assert.equal(result.status, "blocked");
