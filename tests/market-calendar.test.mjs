@@ -69,6 +69,23 @@ describe("market calendar", () => {
     );
   });
 
+  it("backs up across the restored Constitution Day market holiday", () => {
+    assert.equal(
+      closeCalendarReferenceDateForAsset(
+        { market: "korea", currency: "KRW" },
+        "2026-07-18",
+      ),
+      "2026-07-16",
+    );
+    assert.equal(
+      closeCalendarReferenceDateForAsset(
+        { market: "korea", currency: "KRW" },
+        "2026-07-20",
+      ),
+      "2026-07-16",
+    );
+  });
+
   it("treats USD-denominated assets as US-listed for close coverage", () => {
     const asset = { market: "korea", currency: "USD" };
 

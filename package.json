@@ -30,6 +30,7 @@
     "preflight:legacy-account-ownership": "node --no-warnings scripts/preflight-legacy-account-ownership.mjs",
     "identity:assign-legacy-account-owners": "node --no-warnings scripts/assign-legacy-account-owners.mjs",
     "snapshots:backfill-owners": "node --no-warnings scripts/backfill-generated-snapshot-owners.mjs",
+    "snapshots:backfill-gap": "node --conditions=react-server --import tsx scripts/backfill-daily-snapshot-gap.ts",
     "identity:issue-bootstrap-claim": "node --no-warnings scripts/issue-identity-bootstrap-claim.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
     "audit:asset-price-consumer-admission": "node --no-warnings scripts/audit-asset-price-consumer-admission.mjs",
@@ -79,10 +80,12 @@
   "dependencies": {
     "@neondatabase/auth": "0.4.2-beta",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/speed-insights": "^2.0.0",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -95,6 +98,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.0",
     "typescript": "^5"
   }
 }
