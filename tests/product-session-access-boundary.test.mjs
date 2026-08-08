@@ -115,8 +115,10 @@ describe("product session access boundary", () => {
       /getReadOnlyTenantPortfolioStructure\(\{[\s\S]*tenantContext: options\.tenantContext,[\s\S]*account: options\.account/,
     );
     assert.ok(
-      query.indexOf("getReadOnlyTenantPortfolioStructure({") <
-        query.indexOf("getLatestCommonQualifiedStoredServiceDate(candidate)"),
+      query.indexOf("buildSimulationOwnerInputCandidate({") <
+        query.indexOf("getLatestCommonPrivateOwnerRawServiceDate({") &&
+        query.indexOf("buildSimulationOwnerInputCandidate({") <
+          query.indexOf("getReadOnlyPrivateOwnerRawHistoryBundle({"),
       "shared price and FX evidence must be selected after the owned portfolio candidate",
     );
     assert.doesNotMatch(

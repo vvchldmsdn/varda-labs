@@ -23,6 +23,16 @@ export type SimulationReturnMatrixPriceInput = Readonly<{
   rawClosePrice?: never;
 }>;
 
+export type SimulationRawCloseReturnMatrixPriceInput = Readonly<{
+  market: string;
+  currency: string;
+  ticker: string;
+  priceDate: string;
+  rawClosePrice: SimulationNumericInput;
+  closePrice?: never;
+  adjustedClosePrice?: never;
+}>;
+
 export type SimulationReturnMatrixFxInput = Readonly<{
   rateDate: string;
   usdKrw: SimulationNumericInput;
@@ -60,7 +70,9 @@ export type SimulationReturnMatrixBlockerReason =
   | "invalid_price_date"
   | "duplicate_price_date"
   | "raw_close_field_forbidden"
+  | "adjusted_close_field_forbidden"
   | "invalid_adjusted_close"
+  | "invalid_raw_close"
   | "invalid_fx_date"
   | "duplicate_fx_date"
   | "invalid_fx_rate"
@@ -122,18 +134,35 @@ export type SimulationReturnMatrixSourceSummary = Readonly<{
 
 export type SimulationReturnMatrixResult = Readonly<{
   status: SimulationReturnMatrixStatus;
-  policy: Readonly<{
-    version: "simulation_return_matrix_v1";
-    returnKind: "krw_investor_simple_return";
-    priceField: "adjusted_close_price_only";
-    fxPolicy: "date_specific_usdkrw";
-    serviceDatePolicy: "stored_close_evidence_d_plus_1";
-    maxPriceCarryDays: 7;
-    maxFxCarryDays: 3;
-    missingCellPolicy: "preserve_null_without_row_drop_or_zero_fill";
-    instrumentMinimum: "none";
-    stochasticConsumer: "blocked_when_incomplete";
-  }>;
+  policy:
+    | Readonly<{
+        version: "simulation_return_matrix_v1";
+        returnKind: "krw_investor_simple_return";
+        priceField: "adjusted_close_price_only";
+        fxPolicy: "date_specific_usdkrw";
+        serviceDatePolicy: "stored_close_evidence_d_plus_1";
+        maxPriceCarryDays: 7;
+        maxFxCarryDays: 3;
+        missingCellPolicy: "preserve_null_without_row_drop_or_zero_fill";
+        instrumentMinimum: "none";
+        stochasticConsumer: "blocked_when_incomplete";
+      }>
+    | Readonly<{
+        version: "simulation_private_owner_raw_close_return_matrix_v1";
+        returnKind: "krw_investor_simple_return";
+        priceField: "raw_close_price_only";
+        priceBasis: "raw_price_return";
+        corporateActionAdjustment: "not_claimed";
+        distributionAdjustment: "not_claimed";
+        tenantBoundary: "exactly_one_active_owner_matching_session";
+        fxPolicy: "date_specific_usdkrw";
+        serviceDatePolicy: "stored_close_evidence_d_plus_1";
+        maxPriceCarryDays: 7;
+        maxFxCarryDays: 3;
+        missingCellPolicy: "preserve_null_without_row_drop_or_zero_fill";
+        instrumentMinimum: "none";
+        stochasticConsumer: "blocked_when_incomplete";
+      }>;
   requestedServiceDates: readonly string[];
   instruments: readonly SimulationReturnMatrixInstrument[];
   exclusions: readonly SimulationReturnMatrixExclusion[];
@@ -147,7 +176,7 @@ export type SimulationReturnMatrixResult = Readonly<{
 export type SimulationPriceObservation = Readonly<{
   sourceDate: string;
   serviceDate: string;
-  adjustedClosePrice: number;
+  priceValue: number;
 }>;
 
 export type SimulationFxObservation = Readonly<{

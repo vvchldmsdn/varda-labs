@@ -60,6 +60,17 @@ export function OwnerInputPreflightSection({
         />
       </dl>
 
+      {model.historicalPriceBasis === "raw_price_return" ? (
+        <p
+          className="mt-3 rounded-md border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm leading-6 text-[#6b5227]"
+          data-owner-simulation-raw-close-basis
+        >
+          현재 단일 사용자 연구 모드는 저장된 KIS 종가를 사용합니다. 배당과
+          액면분할·병합 조정은 주장하지 않으며, 이 결과는 추천이나 주문 근거로
+          저장되지 않습니다.
+        </p>
+      ) : null}
+
       {model.summary.fountExcludedHoldingCount > 0 ? (
         <p
           className="mt-3 rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-4 py-3 text-sm text-[#596158]"

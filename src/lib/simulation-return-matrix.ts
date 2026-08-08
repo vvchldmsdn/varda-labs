@@ -3,6 +3,7 @@ import {
   normalizeSimulationFxRows,
   normalizeSimulationInstrumentUniverse,
   normalizeSimulationPriceRows,
+  normalizeSimulationRawClosePriceRows,
   sortSimulationBlockers,
   validateSimulationServiceDates,
 } from "./simulation-return-matrix-normalization.ts";
@@ -16,6 +17,7 @@ import type {
   SimulationReturnMatrixRow,
   SimulationReturnMatrixSourceSummary,
   SimulationReturnMatrixSummary,
+  SimulationRawCloseReturnMatrixPriceInput,
 } from "./simulation-return-matrix-types.ts";
 
 export type {
@@ -27,6 +29,7 @@ export type {
   SimulationReturnMatrixInstrument,
   SimulationReturnMatrixInstrumentInput,
   SimulationReturnMatrixPriceInput,
+  SimulationRawCloseReturnMatrixPriceInput,
   SimulationReturnMatrixResult,
   SimulationReturnMatrixRow,
   SimulationReturnMatrixStatus,
@@ -45,6 +48,24 @@ export const SIMULATION_RETURN_MATRIX_POLICY = Object.freeze({
   stochasticConsumer: "blocked_when_incomplete",
 } as const);
 
+export const PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY =
+  Object.freeze({
+    version: "simulation_private_owner_raw_close_return_matrix_v1",
+    returnKind: "krw_investor_simple_return",
+    priceField: "raw_close_price_only",
+    priceBasis: "raw_price_return",
+    corporateActionAdjustment: "not_claimed",
+    distributionAdjustment: "not_claimed",
+    tenantBoundary: "exactly_one_active_owner_matching_session",
+    fxPolicy: "date_specific_usdkrw",
+    serviceDatePolicy: "stored_close_evidence_d_plus_1",
+    maxPriceCarryDays: 7,
+    maxFxCarryDays: 3,
+    missingCellPolicy: "preserve_null_without_row_drop_or_zero_fill",
+    instrumentMinimum: "none",
+    stochasticConsumer: "blocked_when_incomplete",
+  } as const);
+
 export function buildSimulationReturnMatrix({
   requestedServiceDates,
   instruments: instrumentInputs,
@@ -55,6 +76,51 @@ export function buildSimulationReturnMatrix({
   instruments: readonly SimulationReturnMatrixInstrumentInput[];
   priceRows: readonly SimulationReturnMatrixPriceInput[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
+}): SimulationReturnMatrixResult {
+  return buildReturnMatrix({
+    requestedServiceDates,
+    instrumentInputs,
+    priceRows,
+    fxRows,
+    policy: SIMULATION_RETURN_MATRIX_POLICY,
+  });
+}
+
+export function buildPrivateOwnerRawCloseSimulationReturnMatrix({
+  requestedServiceDates,
+  instruments: instrumentInputs,
+  priceRows,
+  fxRows,
+}: {
+  requestedServiceDates: readonly string[];
+  instruments: readonly SimulationReturnMatrixInstrumentInput[];
+  priceRows: readonly SimulationRawCloseReturnMatrixPriceInput[];
+  fxRows: readonly SimulationReturnMatrixFxInput[];
+}): SimulationReturnMatrixResult {
+  return buildReturnMatrix({
+    requestedServiceDates,
+    instrumentInputs,
+    priceRows,
+    fxRows,
+    policy: PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
+  });
+}
+
+function buildReturnMatrix({
+  requestedServiceDates,
+  instrumentInputs,
+  priceRows,
+  fxRows,
+  policy,
+}: {
+  requestedServiceDates: readonly string[];
+  instrumentInputs: readonly SimulationReturnMatrixInstrumentInput[];
+  priceRows: readonly (
+    | SimulationReturnMatrixPriceInput
+    | SimulationRawCloseReturnMatrixPriceInput
+  )[];
+  fxRows: readonly SimulationReturnMatrixFxInput[];
+  policy: SimulationReturnMatrixResult["policy"];
 }): SimulationReturnMatrixResult {
   const serviceDateResult = validateSimulationServiceDates(
     requestedServiceDates,
@@ -69,6 +135,7 @@ export function buildSimulationReturnMatrix({
 
   if (initialBlockers.length > 0) {
     return buildResult({
+      policy,
       status: "blocked",
       requestedInstrumentCount: instrumentInputs.length,
       requestedServiceDates: safeServiceDates,
@@ -80,17 +147,25 @@ export function buildSimulationReturnMatrix({
     });
   }
 
-  const priceInput = normalizeSimulationPriceRows({
-    rows: priceRows,
-    instruments: universe.instruments,
-    serviceDates: safeServiceDates,
-    maxCarryDays: SIMULATION_RETURN_MATRIX_POLICY.maxPriceCarryDays,
-  });
+  const priceInput =
+    policy.version === "simulation_private_owner_raw_close_return_matrix_v1"
+      ? normalizeSimulationRawClosePriceRows({
+          rows: priceRows as readonly SimulationRawCloseReturnMatrixPriceInput[],
+          instruments: universe.instruments,
+          serviceDates: safeServiceDates,
+          maxCarryDays: policy.maxPriceCarryDays,
+        })
+      : normalizeSimulationPriceRows({
+          rows: priceRows as readonly SimulationReturnMatrixPriceInput[],
+          instruments: universe.instruments,
+          serviceDates: safeServiceDates,
+          maxCarryDays: policy.maxPriceCarryDays,
+        });
   const fxInput = normalizeSimulationFxRows({
     rows: fxRows,
     required: universe.instruments.some((row) => row.currency === "USD"),
     serviceDates: safeServiceDates,
-    maxCarryDays: SIMULATION_RETURN_MATRIX_POLICY.maxFxCarryDays,
+    maxCarryDays: policy.maxFxCarryDays,
   });
   const sourceSummary = Object.freeze({
     acceptedPriceRows: priceInput.acceptedRows,
@@ -105,6 +180,7 @@ export function buildSimulationReturnMatrix({
 
   if (sourceBlockers.length > 0) {
     return buildResult({
+      policy,
       status: "blocked",
       requestedInstrumentCount: instrumentInputs.length,
       requestedServiceDates: safeServiceDates,
@@ -127,8 +203,8 @@ export function buildSimulationReturnMatrix({
         priceSeries:
           priceInput.seriesByInstrument.get(instrument.instrumentKey) ?? [],
         fxSeries: fxInput.series,
-        maxPriceCarryDays: SIMULATION_RETURN_MATRIX_POLICY.maxPriceCarryDays,
-        maxFxCarryDays: SIMULATION_RETURN_MATRIX_POLICY.maxFxCarryDays,
+        maxPriceCarryDays: policy.maxPriceCarryDays,
+        maxFxCarryDays: policy.maxFxCarryDays,
       });
       if (aligned.evidence.status === "ready" && aligned.unitValueKrw === null) {
         calculationBlockers.push({
@@ -144,6 +220,7 @@ export function buildSimulationReturnMatrix({
 
   if (calculationBlockers.length > 0) {
     return buildResult({
+      policy,
       status: "blocked",
       requestedInstrumentCount: instrumentInputs.length,
       requestedServiceDates: safeServiceDates,
@@ -196,6 +273,7 @@ export function buildSimulationReturnMatrix({
 
   if (calculationBlockers.length > 0) {
     return buildResult({
+      policy,
       status: "blocked",
       requestedInstrumentCount: instrumentInputs.length,
       requestedServiceDates: safeServiceDates,
@@ -224,6 +302,7 @@ export function buildSimulationReturnMatrix({
       : "incomplete";
 
   return buildResult({
+    policy,
     status,
     requestedInstrumentCount: instrumentInputs.length,
     requestedServiceDates: safeServiceDates,
@@ -236,6 +315,7 @@ export function buildSimulationReturnMatrix({
 }
 
 function buildResult({
+  policy,
   status,
   requestedInstrumentCount,
   requestedServiceDates,
@@ -245,6 +325,7 @@ function buildResult({
   sourceSummary,
   blockers,
 }: {
+  policy: SimulationReturnMatrixResult["policy"];
   status: SimulationReturnMatrixResult["status"];
   requestedInstrumentCount: number;
   requestedServiceDates: readonly string[];
@@ -278,7 +359,7 @@ function buildResult({
 
   return Object.freeze({
     status,
-    policy: SIMULATION_RETURN_MATRIX_POLICY,
+    policy,
     requestedServiceDates: Object.freeze([...requestedServiceDates]),
     instruments: Object.freeze([...instruments]),
     exclusions: Object.freeze([...exclusions]),
