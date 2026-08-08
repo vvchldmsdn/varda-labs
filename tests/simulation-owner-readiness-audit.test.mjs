@@ -1,0 +1,124 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import { summarizeSimulationOwnerReadiness } from "../src/lib/simulation-owner-readiness-audit.ts";
+
+describe("simulation owner readiness audit", () => {
+  it("summarizes every scope without exposing row identifiers or values", () => {
+    const result = summarizeSimulationOwnerReadiness([
+      scope("isa", "ready"),
+      scope("all", "unavailable"),
+      scope("irp", "ready"),
+      scope("brokerage", "unavailable"),
+    ]);
+
+    assert.equal(result.scopeCount, 4);
+    assert.equal(result.readyScopeCount, 2);
+    assert.deepEqual(
+      result.scopes.map((row) => row.account),
+      ["all", "brokerage", "isa", "irp"],
+    );
+    assert.deepEqual(result.scopes[0].historicalStatusCounts, {
+      provenance_ready_for_separate_review: 1,
+      stored_coverage_incomplete: 1,
+    });
+    assert.deepEqual(result.scopes[0].admissionStatusCounts, {
+      price_history_incomplete: 1,
+      ready: 1,
+    });
+    assert.equal(result.scopes[0].modeledCoverage.currentValuePct, 93.27);
+    assert.equal(result.policy.providerCalls, "forbidden");
+    assert.equal(result.policy.databaseWrites, "forbidden");
+
+    const serialized = JSON.stringify(result);
+    for (const forbidden of [
+      "owner-secret-id",
+      "account-secret-id",
+      "069500",
+      "KODEX 200",
+      "26822502",
+    ]) {
+      assert.equal(serialized.includes(forbidden), false);
+    }
+  });
+
+  it("rejects missing, duplicate, and mismatched scopes", () => {
+    assert.throws(
+      () => summarizeSimulationOwnerReadiness([scope("all", "ready")]),
+      /missing readiness scope/,
+    );
+    assert.throws(
+      () =>
+        summarizeSimulationOwnerReadiness([
+          scope("all", "ready"),
+          scope("all", "ready"),
+          scope("brokerage", "ready"),
+          scope("isa", "ready"),
+          scope("irp", "ready"),
+        ]),
+      /duplicate readiness scope/,
+    );
+    const mismatched = scope("all", "ready");
+    mismatched.inputPreflight.account = "isa";
+    assert.throws(
+      () =>
+        summarizeSimulationOwnerReadiness([
+          mismatched,
+          scope("brokerage", "ready"),
+          scope("isa", "ready"),
+          scope("irp", "ready"),
+        ]),
+      /readiness scope mismatch/,
+    );
+  });
+});
+
+function scope(account, status) {
+  return {
+    account,
+    inputPreflight: {
+      account,
+      status: "ready_full_portfolio",
+      blockers: [],
+      summary: {
+        sourceHoldingCount: 2,
+        valuationGapCount: 0,
+        identityGapCount: 0,
+        fountExcludedHoldingCount: 0,
+      },
+      instruments: [
+        {
+          historicalStatus: "provenance_ready_for_separate_review",
+          admissionStatus: "ready",
+          ownerUserId: "owner-secret-id",
+          accountId: "account-secret-id",
+          ticker: "069500",
+          name: "KODEX 200",
+          currentValueKrw: 26_822_502,
+        },
+        {
+          historicalStatus: "stored_coverage_incomplete",
+          admissionStatus: "price_history_incomplete",
+        },
+      ],
+    },
+    execution: {
+      account,
+      status,
+      reason:
+        status === "unavailable" ? "historical_evidence_not_admitted" : null,
+      endSelection: {
+        status: "valid",
+        source: "latest_common_stored",
+        endServiceDate: "2026-08-03",
+      },
+      coverage: {
+        candidateInstrumentCount: 2,
+        modeledInstrumentCount: 2,
+        modeledCurrentValuePct: 93.274,
+        omittedWeightBps: 673,
+        manualHistoryWeightBps: 673,
+      },
+    },
+  };
+}

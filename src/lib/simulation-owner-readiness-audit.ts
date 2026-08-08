@@ -1,0 +1,112 @@
+import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
+import type { SimulationOwnerInputPreflightModel } from "./simulation-owner-input-preflight.ts";
+import type { SimulationOwnerResearchExecutionResult } from "./simulation-owner-research-execution.ts";
+
+export const SIMULATION_OWNER_READINESS_AUDIT_POLICY = Object.freeze({
+  version: "simulation_owner_research_readiness_audit_v1",
+  accountScopes: Object.freeze([
+    "all",
+    "brokerage",
+    "isa",
+    "irp",
+  ] as const),
+  databaseAccess: "select_only",
+  providerCalls: "forbidden",
+  databaseWrites: "forbidden",
+  outputBoundary: "aggregate_statuses_counts_and_dates_only",
+} as const);
+
+type ReadinessScopeInput = Readonly<{
+  account: PortfolioAccountScope;
+  inputPreflight: SimulationOwnerInputPreflightModel;
+  execution: SimulationOwnerResearchExecutionResult;
+}>;
+
+export function summarizeSimulationOwnerReadiness(
+  inputs: readonly ReadinessScopeInput[],
+) {
+  const byScope = new Map<PortfolioAccountScope, ReadinessScopeInput>();
+  for (const input of inputs) {
+    if (byScope.has(input.account)) {
+      throw new TypeError(`duplicate readiness scope: ${input.account}`);
+    }
+    if (
+      input.inputPreflight.account !== input.account ||
+      input.execution.account !== input.account
+    ) {
+      throw new TypeError(`readiness scope mismatch: ${input.account}`);
+    }
+    byScope.set(input.account, input);
+  }
+
+  const scopes = SIMULATION_OWNER_READINESS_AUDIT_POLICY.accountScopes.map(
+    (account) => {
+      const input = byScope.get(account);
+      if (!input) throw new TypeError(`missing readiness scope: ${account}`);
+      return summarizeScope(input);
+    },
+  );
+
+  return Object.freeze({
+    policy: SIMULATION_OWNER_READINESS_AUDIT_POLICY,
+    scopeCount: scopes.length,
+    readyScopeCount: scopes.filter((scope) => scope.executionStatus === "ready")
+      .length,
+    scopes: Object.freeze(scopes),
+  });
+}
+
+function summarizeScope(input: ReadinessScopeInput) {
+  const { inputPreflight, execution } = input;
+  return Object.freeze({
+    account: input.account,
+    inputStatus: inputPreflight.status,
+    executionStatus: execution.status,
+    executionReason:
+      execution.status === "unavailable" ? execution.reason : null,
+    inputBlockers: Object.freeze([...inputPreflight.blockers]),
+    endSelection: Object.freeze({ ...execution.endSelection }),
+    holdings: Object.freeze({
+      sourceHoldingCount: inputPreflight.summary.sourceHoldingCount,
+      candidateInstrumentCount: execution.coverage.candidateInstrumentCount,
+      modeledInstrumentCount: execution.coverage.modeledInstrumentCount,
+      valuationGapCount: inputPreflight.summary.valuationGapCount,
+      identityGapCount: inputPreflight.summary.identityGapCount,
+      fountExcludedHoldingCount:
+        inputPreflight.summary.fountExcludedHoldingCount,
+    }),
+    modeledCoverage: Object.freeze({
+      currentValuePct: roundPercentage(
+        execution.coverage.modeledCurrentValuePct,
+      ),
+      omittedWeightBps: execution.coverage.omittedWeightBps,
+      manualHistoryWeightBps: execution.coverage.manualHistoryWeightBps,
+    }),
+    historicalStatusCounts: countCodes(
+      inputPreflight.instruments.map((row) => row.historicalStatus),
+    ),
+    admissionStatusCounts: countCodes(
+      inputPreflight.instruments.map(
+        (row) => row.admissionStatus ?? "not_evaluated",
+      ),
+    ),
+  });
+}
+
+function countCodes(values: readonly string[]) {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return Object.freeze(
+    Object.fromEntries(
+      [...counts.entries()].sort(([left], [right]) =>
+        left.localeCompare(right),
+      ),
+    ),
+  );
+}
+
+function roundPercentage(value: number) {
+  return Math.round(value * 100) / 100;
+}
