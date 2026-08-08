@@ -96,12 +96,15 @@ const simulationPath =
       : "/simulation";
 
 async function main() {
-  const unauthorized = await request(simulationPath);
-  assert.equal(unauthorized.status, 401, "no-auth simulation must return 401");
+  const signedOutSimulation = await request(simulationPath);
+  assert.equal(
+    signedOutSimulation.status,
+    200,
+    "signed-out simulation shell must return 200",
+  );
 
   if (!SESSION_COOKIE) {
-    const boundary = await request(simulationPath, true);
-    assert.equal(boundary.status, 200, "Basic-auth boundary must return 200");
+    const boundary = signedOutSimulation;
     assert.match(boundary.body, /Simulation validation/);
     assert.match(boundary.body, /shared market research/);
     assert.match(boundary.body, /Simulation research remains closed/);
@@ -138,12 +141,17 @@ async function main() {
     );
   }
   const countsBefore = await readCounts();
-  const unauthorizedDashboard = await request("/");
+  const signedOutDashboard = await request("/");
   assert.equal(
-    unauthorizedDashboard.status,
-    401,
-    "no-auth dashboard must return 401",
+    signedOutDashboard.status,
+    200,
+    "signed-out dashboard shell must return 200",
   );
+  assert.match(signedOutDashboard.body, /Portfolio user link/);
+  assert.match(signedOutDashboard.body, /Product database read/);
+  assert.match(signedOutDashboard.body, /Not attempted/);
+  assert.doesNotMatch(signedOutDashboard.body, /data-page=/);
+  assert.doesNotMatch(signedOutDashboard.body, LEAK_PATTERN);
 
   const dashboard = await request("/", true);
   const simulation = await request(simulationPath, true);
@@ -754,8 +762,8 @@ async function main() {
         researchUniverseInstrumentStatuses,
         researchUniversePreservedLinkCount,
         noAuthStatus: {
-          dashboard: unauthorizedDashboard.status,
-          simulation: unauthorized.status,
+          dashboard: signedOutDashboard.status,
+          simulation: signedOutSimulation.status,
         },
         authStatus: {
           dashboard: dashboard.status,
