@@ -484,6 +484,14 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(smokeSource, /databaseReadAttempted: false/);
     assert.match(
       smokeSource,
+      /signedOutSimulation\.status,[\s\S]*200/,
+    );
+    assert.doesNotMatch(
+      smokeSource,
+      /no-auth simulation must return 401/,
+    );
+    assert.match(
+      smokeSource,
       /data-page="simulation-input-readiness"/,
     );
     assert.match(smokeSource, /if \(!sql\) throw new Error/);
