@@ -4,23 +4,22 @@ import {
   planSimulationHistoryCompletion,
   type SimulationHistoryHoldingInput,
 } from "../src/lib/market-data/simulation-history-completion.ts";
+import {
+  parseSimulationHistoryCommandArgs,
+} from "../src/lib/market-data/simulation-history-command.ts";
 import type { KisHistoryCacheSyncResult } from "../src/lib/market-data/kis-history-cache-sync.ts";
 import type { HistoricalPriceResult } from "../src/lib/market-data/providers/types.ts";
-
-const WRITE_CONFIRMATION = "--confirm-shared-history-write";
 
 async function main() {
   config({ path: ".env.local", quiet: true });
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
   const options = parseArgs(process.argv.slice(2));
-  const [{ and, asc, eq, gt, inArray, isNotNull }, client, schema, providerModule, syncModule] =
+  const [{ and, asc, eq, gt, inArray, isNotNull }, client, schema] =
     await Promise.all([
       import("drizzle-orm"),
       import("../src/db/client.ts"),
       import("../src/db/schema.ts"),
-      import("../src/lib/market-data/providers/kis.ts"),
-      import("../src/lib/market-data/kis-history-cache-sync.ts"),
     ]);
   const { accounts, appUsers, assets } = schema;
 
@@ -58,6 +57,15 @@ async function main() {
     endDate: options.endDate,
     holdings: holdingRows satisfies SimulationHistoryHoldingInput[],
   });
+  if (options.mode === "plan_only") {
+    console.log(JSON.stringify(summarizePlan(plan), null, 2));
+    return;
+  }
+
+  const [providerModule, syncModule] = await Promise.all([
+    import("../src/lib/market-data/providers/kis.ts"),
+    import("../src/lib/market-data/kis-history-cache-sync.ts"),
+  ]);
   const providerPolicy = providerModule.getKisProviderPolicy();
   if (!providerPolicy.configured) {
     throw new Error(
@@ -69,7 +77,7 @@ async function main() {
   const dryRunSummaries: HistoricalPriceResult[] = [];
   const writeSummaries: KisHistoryCacheSyncResult[] = [];
   for (const batch of plan.batches) {
-    if (options.write) {
+    if (options.mode === "write") {
       writeSummaries.push(
         await syncModule.runKisHistoryCacheSync({
           targets: batch.map((target) => ({ ...target })),
@@ -99,7 +107,7 @@ async function main() {
 
   console.log(
     JSON.stringify(
-      options.write
+      options.mode === "write"
         ? summarizeWrite(plan, writeSummaries)
         : summarizeDryRun(plan, dryRunSummaries),
       null,
@@ -109,43 +117,27 @@ async function main() {
 }
 
 function parseArgs(args: string[]) {
-  let startDate: string | null = null;
-  let endDate: string | null = null;
-  let write = false;
-  let confirmed = false;
+  return parseSimulationHistoryCommandArgs(args);
+}
 
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--from") {
-      startDate = args[index + 1] ?? null;
-      index += 1;
-      continue;
-    }
-    if (arg === "--to") {
-      endDate = args[index + 1] ?? null;
-      index += 1;
-      continue;
-    }
-    if (arg === "--write") {
-      write = true;
-      continue;
-    }
-    if (arg === WRITE_CONFIRMATION) {
-      confirmed = true;
-      continue;
-    }
-    throw new Error(`unknown argument: ${arg}`);
-  }
-
-  if (!startDate || !endDate) {
-    throw new Error("Usage: --from YYYY-MM-DD --to YYYY-MM-DD [--write --confirm-shared-history-write]");
-  }
-  if (write !== confirmed) {
-    throw new Error(
-      `writes require both --write and ${WRITE_CONFIRMATION}; dry-run accepts neither`,
-    );
-  }
-  return { startDate, endDate, write };
+function summarizePlan(
+  plan: ReturnType<typeof planSimulationHistoryCompletion>,
+) {
+  return {
+    operation: "simulation_kis_history_completion",
+    mode: "plan_only",
+    providerCalls: 0,
+    databaseWrites: 0,
+    policy: plan.policy.version,
+    startDate: plan.startDate,
+    endDate: plan.endDate,
+    targetCount: plan.targets.length,
+    batchCount: plan.batches.length,
+    batchSizes: plan.batches.map((batch) => batch.length),
+    excludedHoldingCount: plan.excludedHoldingCount,
+    excludedByReason: plan.excludedByReason,
+    instruments: plan.targets.map((target) => target.key),
+  };
 }
 
 function summarizeDryRun(
@@ -176,7 +168,11 @@ function summarizeDryRun(
 
   return {
     operation: "simulation_kis_history_completion",
-    mode: "dry_run",
+    mode: "provider_dry_run",
+    providerCalls: summaries.reduce(
+      (total, summary) => total + summary.requestCount,
+      0,
+    ),
     databaseWrites: 0,
     policy: plan.policy.version,
     startDate: plan.startDate,

@@ -128,6 +128,24 @@ Manual admin calls and future Cron jobs must respect this cooldown. A durable
 external token cache, such as Vercel KV, can be evaluated later if higher
 frequency KIS calls become necessary.
 
+## Historical Completion Preflight
+
+KIS access tokens are long-lived provider credentials, and the official KIS
+sample reuses a valid token instead of issuing one for every command. A
+historical completion review must therefore avoid consuming a token before the
+approved write command runs.
+
+- `simulation:complete-kis-history` defaults to `plan_only`.
+- Plan-only reads the owned holding universe and reports targets, exclusions,
+  and batch sizes without a provider call or database write.
+- `--provider-dry-run` is an explicit diagnostic action. It calls KIS and can
+  consume the provider's token-issuance window.
+- `--write --confirm-shared-history-write` remains the only write mode.
+- Do not use a provider dry-run as a same-window prerequisite for an approved
+  write. Use plan-only plus fixture tests, then perform the reviewed write once.
+- Provider authentication failures are terminal for that operator invocation;
+  do not retry automatically.
+
 ## Guarded KIS Close Writes
 
 KIS close writes are intentionally manual and narrow until the full daily
