@@ -3,7 +3,9 @@ import { isRiskDate } from "./portfolio-risk-calendar.ts";
 import type { SimulationOwnerInputCandidate } from "./simulation-owner-input-candidate.ts";
 import type { SimulationOwnerInputPreflightModel } from "./simulation-owner-input-preflight.ts";
 import {
-  executeSimulationResearchPaths,
+  executeSimulationResearchPathsFromPrepared,
+  prepareSimulationResearchPaths,
+  type PreparedSimulationResearchPaths,
   type SimulationResearchExecutionBlockerReason,
 } from "./simulation-research-execution-core.ts";
 import {
@@ -101,6 +103,7 @@ export function buildSimulationOwnerResearchExecution(input: {
   endSelection: SimulationOwnerExecutionEndSelection;
   horizonSelection: SimulationResearchHorizonSelection;
   matrix: SimulationReturnMatrixResult | null;
+  preparedPaths?: PreparedSimulationResearchPaths;
 }) {
   const base = {
     id: `owner-${input.candidate.account}`,
@@ -198,16 +201,24 @@ export function buildSimulationOwnerResearchExecution(input: {
     return unavailable(base, "weight_derivation_failed");
   }
 
-  const execution = executeSimulationResearchPaths({
-    matrix,
+  const prepared =
+    input.preparedPaths ??
+    prepareSimulationResearchPaths({
+      matrix,
+      seed: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.seed,
+      expectedBlockLength:
+        SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.expectedBlockLength,
+      horizon: input.horizonSelection.horizon,
+      pathCount: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount,
+    });
+  if (prepared.status !== "ready") {
+    return unavailable(base, prepared.reason);
+  }
+  const execution = executeSimulationResearchPathsFromPrepared({
+    prepared,
     scenarioId: `owner-current-${input.candidate.account}`,
     scenarioVersion: "v1",
     weights,
-    seed: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.seed,
-    expectedBlockLength:
-      SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.expectedBlockLength,
-    horizon: input.horizonSelection.horizon,
-    pathCount: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount,
     samplePathCount:
       SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.samplePathCount,
   });

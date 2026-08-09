@@ -13,10 +13,13 @@ import {
 } from "@/lib/simulation-owner-historical-outcome-validation";
 import { buildSimulationOwnerInputCandidate } from "@/lib/simulation-owner-input-candidate";
 import { buildSimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
+import { buildSimulationOwnerCandidateComparison } from "@/lib/simulation-owner-candidate-comparison";
 import {
   buildSimulationOwnerResearchExecution,
   resolveSimulationOwnerExecutionEndSelection,
+  SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY,
 } from "@/lib/simulation-owner-research-execution";
+import { prepareSimulationResearchPaths } from "@/lib/simulation-research-execution-core";
 import { resolveSimulationResearchHorizon } from "@/lib/simulation-research-horizon";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -80,15 +83,40 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     candidate,
     historicalPreflight: historicalBundle,
   });
+  const horizonSelection = resolveSimulationResearchHorizon(options.horizon);
+  const matrix =
+    endSelection.status === "valid"
+      ? historicalBundle?.matrix ?? null
+      : null;
+  const preparedPaths =
+    matrix?.status === "ready" &&
+    horizonSelection.status === "valid" &&
+    horizonSelection.horizon !== null
+      ? prepareSimulationResearchPaths({
+          matrix,
+          seed: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.seed,
+          expectedBlockLength:
+            SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.expectedBlockLength,
+          horizon: horizonSelection.horizon,
+          pathCount: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount,
+        })
+      : undefined;
   const execution = buildSimulationOwnerResearchExecution({
     candidate,
     inputPreflight,
     endSelection,
-    horizonSelection: resolveSimulationResearchHorizon(options.horizon),
-    matrix:
-      endSelection.status === "valid"
-        ? historicalBundle?.matrix ?? null
-        : null,
+    horizonSelection,
+    matrix,
+    preparedPaths,
+  });
+  const candidateComparison = buildSimulationOwnerCandidateComparison({
+    account: candidate.account,
+    prepared:
+      preparedPaths?.status === "ready" ? preparedPaths : null,
+    currentExecution: execution,
+    currentWeights: execution.executionWeights,
+    samplePathCount:
+      SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.samplePathCount,
   });
   const historicalValidation =
     buildSimulationOwnerHistoricalOutcomeValidation({
@@ -99,7 +127,12 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
       })),
     });
 
-  return Object.freeze({ inputPreflight, execution, historicalValidation });
+  return Object.freeze({
+    inputPreflight,
+    execution,
+    candidateComparison,
+    historicalValidation,
+  });
 }
 
 export async function getReadOnlyTenantSimulationOwnerInputPreflight(options: {

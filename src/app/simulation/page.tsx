@@ -5,6 +5,7 @@ import { DownsideOutcomeValidationSection } from "@/components/simulation/downsi
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
 import { OwnerHistoricalOutcomeValidationSection } from "@/components/simulation/owner-historical-outcome-validation-section";
+import { OwnerCandidateComparisonSection } from "@/components/simulation/owner-candidate-comparison-section";
 import { OwnerResearchExecutionSection } from "@/components/simulation/owner-research-execution-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
@@ -250,6 +251,9 @@ async function OwnerInputPreflightContent({
         preservedQuery={preservedQuery}
       />
       <OwnerResearchExecutionSection execution={result.execution} />
+      <OwnerCandidateComparisonSection
+        comparison={result.candidateComparison}
+      />
       <OwnerHistoricalOutcomeValidationSection
         result={result.historicalValidation}
       />
