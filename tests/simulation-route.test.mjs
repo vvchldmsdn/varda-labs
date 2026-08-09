@@ -221,6 +221,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(ownerInputQuery, /buildSimulationOwnerInputCandidate/);
     assert.match(ownerInputQuery, /buildSimulationOwnerInputPreflightModel/);
     assert.match(ownerInputQuery, /buildSimulationOwnerResearchExecution/);
+    assert.match(ownerInputQuery, /prepareSimulationResearchPaths/);
+    assert.match(ownerInputQuery, /buildSimulationOwnerCandidateComparison/);
     assert.match(
       ownerInputQuery,
       /buildSimulationOwnerHistoricalOutcomeValidation/,
@@ -336,6 +338,10 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-owner-research-status/);
     assert.match(view, /data-owner-research-end-source/);
     assert.match(view, /data-owner-research-partial-coverage/);
+    assert.match(view, /data-owner-candidate-comparison/);
+    assert.match(view, /data-owner-candidate-comparison-status/);
+    assert.match(view, /data-owner-candidate-common-random-numbers/);
+    assert.match(view, /data-owner-candidate-weight-row/);
     assert.match(view, /data-owner-historical-validation/);
     assert.match(view, /data-owner-historical-validation-account/);
     assert.match(view, /data-owner-historical-validation-status/);
@@ -348,6 +354,9 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /현재 평가액 비중을 시작 구성으로 삼고/);
     assert.match(view, /과거 이력을 꾸며내지 않고 제외했습니다/);
     assert.match(view, /조회 시 계산 · 저장 안 함/);
+    assert.match(view, /변동성 완화 후보 비교/);
+    assert.match(view, /동일한 날짜 추출·무작위 경로/);
+    assert.match(view, /별도의 시점별 검증을 통과하기 전에는 추천·주문 비중으로 사용할 수/);
     assert.match(view, /내 포트폴리오 입력 점검/);
     assert.match(view, /아래의 일회성 연구 계산에만 사용하며/);
     assert.match(view, /저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다/);
@@ -483,6 +492,7 @@ function readSimulationView() {
     "src/components/simulation/research-universe-preflight-section.tsx",
     "src/components/simulation/owner-input-preflight-section.tsx",
     "src/components/simulation/owner-research-execution-section.tsx",
+    "src/components/simulation/owner-candidate-comparison-section.tsx",
     "src/components/simulation/owner-historical-outcome-validation-section.tsx",
     "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",

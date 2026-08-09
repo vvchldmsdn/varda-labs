@@ -169,6 +169,37 @@ export function evaluateInvestmentLabOptimizerTrainingMetrics(input: Readonly<{
   return trainingMetrics(input.growthSeries, input.weights);
 }
 
+export function estimateCappedMinimumVarianceWeights(input: Readonly<{
+  returnSeries: readonly (readonly number[])[];
+  maximumWeight: number;
+}>) {
+  const instrumentCount = input.returnSeries.length;
+  const observationCount = input.returnSeries[0]?.length ?? 0;
+  if (
+    instrumentCount < 2 ||
+    instrumentCount > 20 ||
+    observationCount < 2 ||
+    !Number.isFinite(input.maximumWeight) ||
+    input.maximumWeight <= 0 ||
+    input.maximumWeight > 1 ||
+    instrumentCount * input.maximumWeight < 1 - SIMPLEX_TOLERANCE ||
+    input.returnSeries.some(
+      (series) =>
+        series.length !== observationCount ||
+        series.some(
+          (value) => !Number.isFinite(value) || value <= -1,
+        ),
+    )
+  ) {
+    return null;
+  }
+  const weights = projectedMinimumVariance(
+    input.returnSeries,
+    input.maximumWeight,
+  );
+  return weights ? Object.freeze(weights) : null;
+}
+
 function projectedMinimumVariance(
   returnSeries: readonly (readonly number[])[],
   maximumWeight: number,
