@@ -210,6 +210,27 @@ async function main() {
     route.body,
     /data-section="investment-lab-data-availability"/,
   );
+  assert.match(
+    route.body,
+    /data-section="investment-lab-preperiod-optimizer"/,
+  );
+  const optimizerStatus = readStringAttribute(
+    route.body,
+    "data-optimizer-status",
+  );
+  const optimizerCandidateCount = readIntegerAttribute(
+    route.body,
+    "data-optimizer-candidate-count",
+  );
+  assert.ok(
+    ["ready", "training_unavailable", "path_unavailable"].includes(
+      optimizerStatus,
+    ),
+  );
+  assert.equal(
+    optimizerCandidateCount,
+    optimizerStatus === "training_unavailable" ? 0 : 4,
+  );
   const dataAvailabilityStatus = readStringAttribute(
     route.body,
     "data-availability-status",

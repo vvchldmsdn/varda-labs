@@ -54,7 +54,7 @@ describe("investment lab stored manual valuation path", () => {
     assert.equal(JSON.stringify(scenario).includes("gold-asset-id"), false);
   });
 
-  it("keeps the basket unavailable when stored Gold rows lack manual provenance", async () => {
+  it("uses current-writer Gold captures as stored carry without backcasting", async () => {
     const input = goldFixture();
     input.positionRows = input.positionRows.map((row) =>
       row.assetName === GOLD.assetName
@@ -85,6 +85,40 @@ describe("investment lab stored manual valuation path", () => {
     });
 
     assert.equal(priceReads, 1);
+    assert.equal(scenario.status, "ready");
+    assert.equal(scenario.coverage.manualObservationRows, 0);
+    assert.equal(scenario.coverage.manualCarryRows, 3);
+    assert.equal(scenario.rows.length, 3);
+  });
+
+  it("keeps the basket unavailable for unrecognized writer price provenance", async () => {
+    const input = goldFixture();
+    input.positionRows = input.positionRows.map((row) =>
+      row.assetName === GOLD.assetName
+        ? {
+            ...row,
+            priceSource: "legacy_close",
+            priceDate: null,
+            referenceDate: null,
+          }
+        : row,
+    );
+
+    const scenario = await loadInvestmentLabAnchorBasketScenario({
+      account: "brokerage",
+      repository: {
+        async loadAnchorPositionRows() {
+          return input.positionRows;
+        },
+        async loadAnchorPriceRows() {
+          return input.priceRows;
+        },
+      },
+      model: readModel(input.actualPath),
+      source: source(input),
+      fxRows: [],
+    });
+
     assert.equal(scenario.status, "unavailable");
     assert.deepEqual(scenario.rows, []);
     assert.ok(

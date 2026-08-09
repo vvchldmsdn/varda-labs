@@ -14,6 +14,7 @@ import {
 import { InvestmentLabFixedMix } from "@/components/investment-lab/investment-lab-fixed-mix";
 import { InvestmentLabAnchorBasket } from "@/components/investment-lab/investment-lab-anchor-basket";
 import { InvestmentLabPreperiodMinVolatilityView } from "@/components/investment-lab/investment-lab-preperiod-min-volatility";
+import { InvestmentLabPreperiodOptimizerView } from "@/components/investment-lab/investment-lab-preperiod-optimizer";
 import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
 import {
   InvestmentLabSmallAdjustment,
@@ -157,6 +158,7 @@ async function InvestmentLabContent({
     fundingPreflight,
     model,
     period,
+    preperiodOptimizer,
     rollingComparison,
   } = await modelPromise;
   return (
@@ -190,6 +192,7 @@ async function InvestmentLabContent({
       <InvestmentLabPreperiodMinVolatilityView
         model={model.preperiodMinVolatility}
       />
+      <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
       <InvestmentLabAnchorBasket
         account={selectedAccount}
         fixedMixSelection={fixedMixSelection}

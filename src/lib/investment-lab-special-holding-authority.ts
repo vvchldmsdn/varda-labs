@@ -44,7 +44,8 @@ export const INVESTMENT_LAB_SPECIAL_HOLDING_AUTHORITY_POLICY = Object.freeze({
   currentValuation:
     KRX_GOLD_ACTIVE_VALUATION_POLICY.currentValuation.mode,
   currentPriceFallback: "forbidden_for_historical_backcast",
-  manualValuationHistory: "admit_explicit_observations_only",
+  manualValuationHistory:
+    "admit_current_writer_explicit_or_captured_stored_state_only",
   nameInference: "forbidden",
   partialBasket: "forbidden",
   productOwnerDecisionBinding:

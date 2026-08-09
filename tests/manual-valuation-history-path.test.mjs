@@ -43,13 +43,46 @@ describe("manual valuation history path", () => {
     assert.equal(JSON.stringify(result).includes("gold-asset-id"), false);
   });
 
-  it("rejects mutable current-price provenance instead of backcasting it", () => {
+  it("admits current-writer stored-state captures without claiming market observations", () => {
     const result = resolveManualValuationPath({
       target: TARGET,
       serviceDates: SERVICE_DATES,
       snapshotRows: SERVICE_DATES.map((date) => ({
         ...manualRow(date, date, 225_000),
         priceSource: "asset_current_price",
+        priceDate: null,
+        referenceDate: null,
+      })),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.deepEqual(result.coverage, {
+      requiredDateCount: 3,
+      sourceRowCount: 3,
+      admittedRowCount: 3,
+      manualObservationRowCount: 0,
+      carriedValuationRowCount: 3,
+    });
+    assert.deepEqual(
+      result.rows.map((row) => [
+        row.serviceDate,
+        row.referenceDate,
+        row.provenance,
+      ]),
+      SERVICE_DATES.map((date) => [date, date, "stored_manual_carry"]),
+    );
+  });
+
+  it("still rejects legacy current-price rows instead of treating them as writer captures", () => {
+    const result = resolveManualValuationPath({
+      target: TARGET,
+      serviceDates: SERVICE_DATES,
+      snapshotRows: SERVICE_DATES.map((date) => ({
+        ...manualRow(date, date, 225_000),
+        source: "base44_import",
+        priceSource: "asset_current_price",
+        priceDate: null,
+        referenceDate: null,
       })),
     });
 
