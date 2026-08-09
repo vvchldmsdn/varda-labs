@@ -15,8 +15,9 @@ import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
 export const INVESTMENT_LAB_RETURN_BASIS_POLICY = Object.freeze({
-  version: "price_only_comparable_close_basis_v1",
-  scenarioPriceRequirement: "close_equals_adjusted_close",
+  version: "price_only_single_admitted_close_basis_v2",
+  scenarioPriceRequirement:
+    "one_provider_adjusted_or_private_owner_kis_raw_basis",
   actualCashRequirement: "cash_excluded_from_invested_position_path",
   distributionTreatment: "not_separately_observed",
   feeTaxTreatment: "not_separately_observed",
@@ -52,6 +53,7 @@ type PriceBasisRow = Readonly<{
   priceDate: string;
   closePrice: string | number | null;
   adjustedClosePrice: string | number | null;
+  priceBasis?: "provider_adjusted_close" | "kis_raw_close" | null;
 }>;
 
 export type InvestmentLabReturnEstimateBlocker =
@@ -147,11 +149,22 @@ export function buildInvestmentLabReturnEstimate(input: {
   for (const row of basisRows) {
     const closePrice = positiveNumber(row.closePrice);
     const adjustedClosePrice = positiveNumber(row.adjustedClosePrice);
-    if (closePrice === null || adjustedClosePrice === null) {
+    const priceBasis =
+      row.priceBasis ??
+      (adjustedClosePrice !== null ? "provider_adjusted_close" : null);
+    if (
+      (priceBasis === "kis_raw_close" && closePrice === null) ||
+      (priceBasis === "provider_adjusted_close" &&
+        (closePrice === null || adjustedClosePrice === null)) ||
+      priceBasis === null
+    ) {
       basisUnavailableRows += 1;
       continue;
     }
-    if (!samePrice(closePrice, adjustedClosePrice)) {
+    if (
+      priceBasis === "provider_adjusted_close" &&
+      !samePrice(closePrice!, adjustedClosePrice!)
+    ) {
       basisMismatchRows += 1;
     }
   }

@@ -5,6 +5,7 @@ import {
 } from "./investment-lab-contribution-experiment.ts";
 import type { InvestmentLabVooComparison } from "./investment-lab-voo-comparison.ts";
 import type { InvestmentLabVooValuationEvidence } from "./investment-lab-voo-evidence.ts";
+import type { InvestmentLabClosePriceBasis } from "./investment-lab-counterfactual-read-model.ts";
 
 type KodexScenarioRow = Readonly<{
   serviceDate: string;
@@ -15,20 +16,27 @@ type KodexScenarioRow = Readonly<{
 
 export function buildInvestmentLabContributionScenarioEvidence(input: {
   kodexRows: readonly KodexScenarioRow[];
+  kodexPriceBasis: InvestmentLabClosePriceBasis | "unavailable";
   vooComparison: InvestmentLabVooComparison;
   vooValuations: readonly InvestmentLabVooValuationEvidence[];
 }): readonly InvestmentLabContributionScenarioEvidence[] {
   const scenarios: InvestmentLabContributionScenarioEvidence[] = [];
-  const kodex = createInvestmentLabContributionScenarioEvidence({
-    scenarioId: "kodex200",
-    priceBasis: "adjusted_close_krw",
-    points: input.kodexRows.map((row) => ({
-      serviceDate: row.serviceDate,
-      valuationPriceDate: row.valuationPriceDate,
-      unitValueKrw: row.adjustedClose,
-      baseScenarioValueKrw: row.investedMarketValueKrw,
-    })),
-  });
+  const kodex =
+    input.kodexPriceBasis === "unavailable"
+      ? null
+      : createInvestmentLabContributionScenarioEvidence({
+          scenarioId: "kodex200",
+          priceBasis:
+            input.kodexPriceBasis === "kis_raw_close"
+              ? "kis_raw_close_krw"
+              : "adjusted_close_krw",
+          points: input.kodexRows.map((row) => ({
+            serviceDate: row.serviceDate,
+            valuationPriceDate: row.valuationPriceDate,
+            unitValueKrw: row.adjustedClose,
+            baseScenarioValueKrw: row.investedMarketValueKrw,
+          })),
+        });
   if (kodex) scenarios.push(kodex);
   const voo = buildVooScenario(input.vooComparison, input.vooValuations);
   if (voo) scenarios.push(voo);

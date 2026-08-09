@@ -308,6 +308,38 @@ describe("investment lab counterfactual read model", () => {
     assert.equal(serialized.includes("varda_manual_daily_snapshot"), false);
   });
 
+  it("uses one disclosed KIS raw-close basis when adjusted history is unavailable", () => {
+    const source = fixture();
+    const result = buildInvestmentLabCounterfactualReadModel({
+      ...source,
+      closeRows: source.closeRows.map((row) => ({
+        ...row,
+        adjustedClosePrice: null,
+        priceBasis: "kis_raw_close",
+        source: "kis_history",
+      })),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.scenario.priceBasis, "kis_raw_close");
+    assert.equal(
+      result.scenario.executionPolicyVersion,
+      "eod_admitted_close_on_or_after_v2",
+    );
+    assert.equal(
+      result.returnEstimate.basis.version,
+      "price_only_single_admitted_close_basis_v2",
+    );
+    assert.equal(result.returnEstimate.basisMismatchRows, 0);
+    assert.equal(result.returnEstimate.basisUnavailableRows, 0);
+    assert.equal(
+      result.contributionExperimentScenarios.find(
+        (scenario) => scenario.scenarioId === "kodex200",
+      )?.priceBasis,
+      "kis_raw_close_krw",
+    );
+  });
+
   it("keeps the route server-rendered, read-only, and session protected", () => {
     const query = readFileSync("src/db/queries/investment-lab.ts", "utf8");
     const page = readFileSync("src/app/investment-lab/page.tsx", "utf8");
@@ -326,6 +358,8 @@ describe("investment lab counterfactual read model", () => {
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
     assert.match(query, /^import "server-only";/);
+    assert.match(query, /admitPrivateSingleTenantRawHistoricalPriceRows/);
+    assert.doesNotMatch(query, /admitRawHistoricalPriceRows/);
     assert.doesNotMatch(query, /\.select\(\s*\)/);
     assert.doesNotMatch(query, /\bfetch\s*\(|\/api\//);
     assert.doesNotMatch(

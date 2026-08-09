@@ -39,7 +39,8 @@ export function createInvestmentLabFixedMixContributionEvidence(input: {
   const kodex = kodexCandidates[0];
   const voo = vooCandidates[0];
   if (
-    kodex.priceBasis !== "adjusted_close_krw" ||
+    (kodex.priceBasis !== "adjusted_close_krw" &&
+      kodex.priceBasis !== "kis_raw_close_krw") ||
     voo.priceBasis !== "raw_close_usd_times_stored_snapshot_fx" ||
     !validComponentPoints(kodex.points) ||
     !validComponentPoints(voo.points) ||
@@ -75,6 +76,7 @@ export function createInvestmentLabFixedMixContributionEvidence(input: {
 
   return Object.freeze({
     weights: Object.freeze({ ...input.weights }),
+    kodexPriceBasis: kodex.priceBasis,
     points: Object.freeze(points),
   });
 }

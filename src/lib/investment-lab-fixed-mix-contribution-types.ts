@@ -13,7 +13,7 @@ export const INVESTMENT_LAB_FIXED_MIX_CONTRIBUTION_POLICY = Object.freeze({
   persistence: "none_client_memory_only",
   authority: "historical_research_only",
   componentPriceBasis: Object.freeze({
-    kodex200: "adjusted_close_krw",
+    kodex200: "admitted_adjusted_or_private_kis_raw_close_krw",
     voo: "raw_close_usd_times_stored_snapshot_fx",
   }),
 } as const);
@@ -29,6 +29,7 @@ export type InvestmentLabFixedMixContributionPoint = Readonly<{
 
 export type InvestmentLabFixedMixContributionEvidence = Readonly<{
   weights: InvestmentLabFixedMixWeights;
+  kodexPriceBasis: "adjusted_close_krw" | "kis_raw_close_krw";
   points: readonly InvestmentLabFixedMixContributionPoint[];
 }>;
 

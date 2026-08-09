@@ -6,8 +6,8 @@ import {
 import type { InvestmentLabFlowDirection } from "./investment-lab-event-flow.ts";
 
 export const INVESTMENT_LAB_EXECUTION_POLICY = Object.freeze({
-  version: "eod_adjusted_close_on_or_after_v1",
-  priceField: "adjusted_close",
+  version: "eod_admitted_close_on_or_after_v2",
+  priceField: "single_admitted_scenario_close",
   maxPendingCalendarDays: 7,
   pendingBuyAccounting: "zero_return_krw_cash_from_event_date",
   pendingSellAccounting: "krw_withdrawal_obligation_from_event_date",

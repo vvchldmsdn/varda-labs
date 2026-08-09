@@ -135,8 +135,8 @@ export function InvestmentLabFixedMix({
           과거 연구 비교입니다.
         </p>
         <p className="text-xs leading-5 text-[#73786c]">
-          KODEX 200은 조정종가, VOO는 원종가 × 저장 USD/KRW로 합산하며
-          VOO 배당은 반영하지 않습니다. 서로 다른 가격 기준을 결합한
+          KODEX 200과 VOO는 화면에 표시된 저장 가격 근거를 사용하며,
+          KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. 서로 다른 가격 기준을 결합한
           현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을
           의미하지 않습니다.
         </p>

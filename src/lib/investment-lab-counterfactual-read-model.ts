@@ -86,7 +86,12 @@ export type InvestmentLabSourceCloseRow = Readonly<{
   closePrice: string | number | null;
   adjustedClosePrice: string | number | null;
   source: string | null;
+  priceBasis?: InvestmentLabClosePriceBasis | null;
 }>;
+
+export type InvestmentLabClosePriceBasis =
+  | "provider_adjusted_close"
+  | "kis_raw_close";
 
 export type InvestmentLabCounterfactualReadInput = Readonly<{
   eventRows: readonly InvestmentLabSourceEventRow[];
@@ -129,7 +134,8 @@ export type InvestmentLabCounterfactualReadModel = Readonly<{
     instrumentKey: "korea:KRW:069500";
     label: "KODEX 200";
     pathPolicyVersion: "position_flow_counterfactual_v1";
-    executionPolicyVersion: "eod_adjusted_close_on_or_after_v1";
+    executionPolicyVersion: "eod_admitted_close_on_or_after_v2";
+    priceBasis: InvestmentLabClosePriceBasis | "unavailable";
   }>;
   summary: Readonly<{
     startServiceDate: string;
@@ -200,7 +206,8 @@ export function buildInvestmentLabCounterfactualReadModel(
   for (const blocker of flowResolution.blockers) baseBlockers.add(blocker);
   const events = flowResolution.flows;
   const kodexBlockers = new Set<InvestmentLabCounterfactualReadBlocker>();
-  const closes = buildScenarioCloses(input.closeRows, kodexBlockers);
+  const closeEvidence = buildScenarioCloses(input.closeRows, kodexBlockers);
+  const closes = closeEvidence.rows;
 
   const initialCoverage = coverage({
     actual,
@@ -255,6 +262,7 @@ export function buildInvestmentLabCounterfactualReadModel(
   const vooOnlyContributionScenarios =
     buildInvestmentLabContributionScenarioEvidence({
       kodexRows: [],
+      kodexPriceBasis: closeEvidence.priceBasis,
       vooComparison,
       vooValuations: vooEvidence.valuations,
     });
@@ -472,6 +480,7 @@ export function buildInvestmentLabCounterfactualReadModel(
   const contributionExperimentScenarios =
     buildInvestmentLabContributionScenarioEvidence({
       kodexRows: path.rows,
+      kodexPriceBasis: closeEvidence.priceBasis,
       vooComparison,
       vooValuations: vooEvidence.valuations,
     });
@@ -479,7 +488,7 @@ export function buildInvestmentLabCounterfactualReadModel(
   return Object.freeze({
     status: "ready",
     observedPath,
-    scenario: scenario(account),
+    scenario: scenario(account, closeEvidence.priceBasis),
     summary: Object.freeze({
       startServiceDate: rows[0].serviceDate,
       endServiceDate: latest.serviceDate,
@@ -695,11 +704,16 @@ function buildScenarioCloses(
   sourceRows: readonly InvestmentLabSourceCloseRow[],
   blockers: Set<InvestmentLabCounterfactualReadBlocker>,
 ) {
+  const priceBasis = resolveScenarioClosePriceBasis(sourceRows);
   const closes = sourceRows.map((row) => ({
     priceDate: row.priceDate,
-    adjustedClose: positiveNumber(row.adjustedClosePrice) ?? 0,
+    adjustedClose:
+      priceBasis === "kis_raw_close"
+        ? (positiveNumber(row.closePrice) ?? 0)
+        : (positiveNumber(row.adjustedClosePrice) ?? 0),
   }));
   if (
+    priceBasis === "unavailable" ||
     closes.length < 2 ||
     closes.some(
       (row) => !isRiskDate(row.priceDate) || row.adjustedClose <= 0,
@@ -707,9 +721,30 @@ function buildScenarioCloses(
   ) {
     blockers.add("scenario_close_evidence_invalid");
   }
-  return closes.sort((left, right) =>
-    left.priceDate.localeCompare(right.priceDate),
+  return Object.freeze({
+    rows: closes.sort((left, right) =>
+      left.priceDate.localeCompare(right.priceDate),
+    ),
+    priceBasis,
+  });
+}
+
+function resolveScenarioClosePriceBasis(
+  rows: readonly InvestmentLabSourceCloseRow[],
+): InvestmentLabClosePriceBasis | "unavailable" {
+  const bases = new Set(
+    rows.map((row) =>
+      row.priceBasis === "kis_raw_close" ||
+      row.priceBasis === "provider_adjusted_close"
+        ? row.priceBasis
+        : positiveNumber(row.adjustedClosePrice) !== null
+          ? "provider_adjusted_close"
+          : "unavailable",
+    ),
   );
+  return bases.size === 1
+    ? ([...bases][0] as InvestmentLabClosePriceBasis | "unavailable")
+    : "unavailable";
 }
 
 function resolveEventAmount(row: InvestmentLabSourceEventRow): Readonly<{
@@ -886,13 +921,17 @@ function unavailableFixedMixComparison(
   });
 }
 
-function scenario(account: PortfolioAccountScope) {
+function scenario(
+  account: PortfolioAccountScope,
+  priceBasis: InvestmentLabClosePriceBasis | "unavailable" = "unavailable",
+) {
   return Object.freeze({
     account,
     instrumentKey: "korea:KRW:069500",
     label: "KODEX 200",
     pathPolicyVersion: "position_flow_counterfactual_v1",
-    executionPolicyVersion: "eod_adjusted_close_on_or_after_v1",
+    executionPolicyVersion: "eod_admitted_close_on_or_after_v2",
+    priceBasis,
   } as const);
 }
 
