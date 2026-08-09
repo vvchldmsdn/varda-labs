@@ -278,7 +278,6 @@ function buildInstrumentEvidence(input: {
     admission.status === "ready" &&
     input.requestedServiceDates.length ===
       PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount + 1 &&
-    input.matrix?.status === "ready" &&
     cells?.length === PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount &&
     cells.every((cell) => cell.value !== null);
   const admissionStatus: SimulationHistoricalEvidenceStatus = complete

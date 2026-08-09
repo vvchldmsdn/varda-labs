@@ -63,6 +63,14 @@ describe("private owner KIS raw history", () => {
       result.instruments.find((row) => row.ticker === "069500").status,
       "stored_coverage_incomplete",
     );
+    assert.equal(
+      result.instruments.find((row) => row.ticker === "QQQ").status,
+      "provenance_ready_for_separate_review",
+    );
+    assert.equal(
+      result.instruments.find((row) => row.ticker === "QQQ").admissionStatus,
+      "ready",
+    );
   });
 
   it("keeps manual gold and managed sleeves out of the stochastic matrix", () => {

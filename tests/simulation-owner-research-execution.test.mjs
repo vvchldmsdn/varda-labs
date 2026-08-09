@@ -11,7 +11,7 @@ import {
   resolveSimulationOwnerExecutionEndSelection,
 } from "../src/lib/simulation-owner-research-execution.ts";
 import { resolveSimulationResearchHorizon } from "../src/lib/simulation-research-horizon.ts";
-import { SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
+import { PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
 
 describe("owner-scoped portfolio research execution", () => {
   it("allocates equal remainders deterministically by canonical key", () => {
@@ -295,7 +295,7 @@ function readyMatrix(instruments) {
 
   return {
     status: "ready",
-    policy: SIMULATION_RETURN_MATRIX_POLICY,
+    policy: PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
     requestedServiceDates,
     instruments: matrixInstruments,
     exclusions: [],

@@ -20,8 +20,11 @@ The output is a reproducible draw plan. It is not a simulated wealth result.
 
 The policy id is `stationary_bootstrap_v1`.
 
-- input matrix: `simulation_return_matrix_v1` with
-  `consumerStatus=matrix_ready`;
+- input matrix: `simulation_return_matrix_v1` or
+  `simulation_private_owner_raw_close_return_matrix_v1`, each with
+  `consumerStatus=matrix_ready`; the matrix policy version remains part of the
+  canonical input hash and the raw-close basis does not inherit adjusted-close
+  claims;
 - sampling unit: one whole return row;
 - first source index: uniform over all source rows;
 - restart probability: `1 / expectedBlockLength`;
