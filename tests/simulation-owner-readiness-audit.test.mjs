@@ -14,6 +14,7 @@ describe("simulation owner readiness audit", () => {
 
     assert.equal(result.scopeCount, 4);
     assert.equal(result.readyScopeCount, 2);
+    assert.equal(result.historicalValidationReadyScopeCount, 2);
     assert.deepEqual(
       result.scopes.map((row) => row.account),
       ["all", "brokerage", "isa", "irp"],
@@ -27,6 +28,14 @@ describe("simulation owner readiness audit", () => {
       ready: 1,
     });
     assert.equal(result.scopes[0].modeledCoverage.currentValuePct, 93.27);
+    assert.deepEqual(result.scopes[0].historicalValidation, {
+      status: "unavailable",
+      reason: "all_endpoints_unavailable",
+      latestOutcomeEndServiceDate: "2026-08-03",
+      endpointCount: 7,
+      readyEndpointCount: 0,
+      unavailableEndpointCount: 7,
+    });
     assert.equal(result.policy.providerCalls, "forbidden");
     assert.equal(result.policy.databaseWrites, "forbidden");
 
@@ -118,6 +127,17 @@ function scope(account, status) {
         modeledCurrentValuePct: 93.274,
         omittedWeightBps: 673,
         manualHistoryWeightBps: 673,
+      },
+    },
+    historicalValidation: {
+      account,
+      status: status === "ready" ? "ready" : "unavailable",
+      reason: status === "ready" ? null : "all_endpoints_unavailable",
+      latestOutcomeEndServiceDate: "2026-08-03",
+      summary: {
+        endpointCount: 7,
+        readyEndpointCount: status === "ready" ? 7 : 0,
+        unavailableEndpointCount: status === "ready" ? 0 : 7,
       },
     },
   };

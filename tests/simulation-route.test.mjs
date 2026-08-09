@@ -219,12 +219,13 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.match(ownerInputQuery, /getReadOnlyTenantPortfolioStructure/);
     assert.match(ownerInputQuery, /buildSimulationOwnerInputCandidate/);
-    assert.match(
-      ownerInputQuery,
-      /getReadOnlyPrivateOwnerRawHistoryBundle/,
-    );
     assert.match(ownerInputQuery, /buildSimulationOwnerInputPreflightModel/);
     assert.match(ownerInputQuery, /buildSimulationOwnerResearchExecution/);
+    assert.match(
+      ownerInputQuery,
+      /buildSimulationOwnerHistoricalOutcomeValidation/,
+    );
+    assert.match(ownerInputQuery, /getReadOnlyPrivateOwnerRawHistoryBatch/);
     assert.match(ownerInputQuery, /getLatestCommonPrivateOwnerRawServiceDate/);
     assert.match(ownerInputQuery, /getActivePortfolioOwnerUserIds/);
     assert.match(activePortfolioOwnersQuery, /^import "server-only";/);
@@ -335,6 +336,14 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-owner-research-status/);
     assert.match(view, /data-owner-research-end-source/);
     assert.match(view, /data-owner-research-partial-coverage/);
+    assert.match(view, /data-owner-historical-validation/);
+    assert.match(view, /data-owner-historical-validation-account/);
+    assert.match(view, /data-owner-historical-validation-status/);
+    assert.match(view, /data-owner-historical-validation-ready-count/);
+    assert.match(view, /data-owner-historical-validation-row/);
+    assert.match(view, /내 포트폴리오 예측 범위와 실제 결과/);
+    assert.match(view, /당시 실제\s*보유량·매매 내역을 재현한 성과가 아니며/);
+    assert.match(view, /데이터가 부족한 행만 제외하고/);
     assert.match(view, /내 포트폴리오 확률 경로/);
     assert.match(view, /현재 평가액 비중을 시작 구성으로 삼고/);
     assert.match(view, /과거 이력을 꾸며내지 않고 제외했습니다/);
@@ -474,6 +483,7 @@ function readSimulationView() {
     "src/components/simulation/research-universe-preflight-section.tsx",
     "src/components/simulation/owner-input-preflight-section.tsx",
     "src/components/simulation/owner-research-execution-section.tsx",
+    "src/components/simulation/owner-historical-outcome-validation-section.tsx",
     "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",

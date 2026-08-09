@@ -118,7 +118,7 @@ describe("product session access boundary", () => {
       query.indexOf("buildSimulationOwnerInputCandidate({") <
         query.indexOf("getLatestCommonPrivateOwnerRawServiceDate({") &&
         query.indexOf("buildSimulationOwnerInputCandidate({") <
-          query.indexOf("getReadOnlyPrivateOwnerRawHistoryBundle({"),
+          query.indexOf("getReadOnlyPrivateOwnerRawHistoryBatch({"),
       "shared price and FX evidence must be selected after the owned portfolio candidate",
     );
     assert.doesNotMatch(
