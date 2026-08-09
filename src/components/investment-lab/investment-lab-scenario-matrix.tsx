@@ -86,8 +86,10 @@ export function InvestmentLabScenarioMatrix({
         연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만
         표시합니다. 변동성은 최소 {MINIMUM_VOLATILITY_PERIODS}개의 연속 1일
         기간수익률이 있을 때만 {VOLATILITY_ANNUALIZATION_FACTOR}일 기준으로
-        연환산합니다. KODEX 200은 adjusted close, VOO는 raw close와 저장
-        USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가 아닙니다.
+        연환산합니다. KODEX 200과 VOO는 각 행에 표시된 단일 가격 근거를
+        사용하며, KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. USD
+        경로는 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가
+        아닙니다.
       </p>
     </section>
   );
