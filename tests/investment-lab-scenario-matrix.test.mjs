@@ -249,6 +249,11 @@ describe("investment lab scenario comparison matrix", () => {
       /data-section="investment-lab-scenario-matrix"/,
     );
     assert.match(componentSource, /관측 기준 MDD/);
+    assert.doesNotMatch(componentSource, /KODEX 200은 adjusted close/);
+    assert.match(
+      componentSource,
+      /KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다/,
+    );
     assert.match(componentSource, /minimumAnnualizedVolatilityPeriods/);
     assert.match(componentSource, /annualizationFactor/);
     assert.match(componentSource, /연속 1일/);
