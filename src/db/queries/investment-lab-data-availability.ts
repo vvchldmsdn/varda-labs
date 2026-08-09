@@ -3,7 +3,10 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { getReadOnlyTenantPortfolioRisk } from "@/db/queries/portfolio-risk";
+import {
+  createTenantPortfolioRiskRepository,
+  loadPortfolioRiskPriceCandidates,
+} from "@/db/queries/portfolio-risk";
 import {
   accounts,
   assets,
@@ -19,7 +22,16 @@ import {
   accountsForPortfolioScope,
   type PortfolioAccountScope,
 } from "@/lib/portfolio-account-scope";
+import {
+  admitAdjustedHistoricalPriceRows,
+  admitPrivateSingleTenantRawHistoricalPriceRows,
+  selectPreferredPrivateHistoricalPriceRows,
+} from "@/lib/market-data/asset-price-consumer-admission";
+import {
+  loadPortfolioRiskReadModel,
+} from "@/lib/portfolio-risk-read-loader";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
 
 export async function getReadOnlyTenantInvestmentLabDataAvailability({
   account,
@@ -29,6 +41,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
   tenantContext: TenantContext;
 }) {
   const selectedAccounts = [...accountsForPortfolioScope(account)];
+  const activeOwnerUserIdsPromise = getActivePortfolioOwnerUserIds();
   const goldDecision =
     DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
   const [
@@ -134,11 +147,13 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
         asc(dailyPositionSnapshots.account),
         asc(dailyPositionSnapshots.assetName),
       ),
-    getReadOnlyTenantPortfolioRisk({
-      account,
-      window: 90,
-      tenantContext,
-    }),
+    loadPortfolioRiskReadModel(
+      createTenantInvestmentLabMarketHistoryRepository(
+        tenantContext,
+        activeOwnerUserIdsPromise,
+      ),
+      { account, window: 90 },
+    ),
   ]);
 
   return buildInvestmentLabDataAvailability({
@@ -162,6 +177,45 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
       fxGapCount: riskModel.inputHealth.missingEvidence.fxGapCount,
     },
   });
+}
+
+function createTenantInvestmentLabMarketHistoryRepository(
+  tenantContext: TenantContext,
+  activeOwnerUserIdsPromise: Promise<readonly string[]>,
+) {
+  return createTenantPortfolioRiskRepository(
+    tenantContext,
+    async (input) => {
+      const rows = await loadPortfolioRiskPriceCandidates(input);
+      const adjustedRows = admitAdjustedHistoricalPriceRows(rows).rows;
+      const privateRawRows = admitPrivateSingleTenantRawHistoricalPriceRows({
+        rows,
+        requestedOwnerUserId: tenantContext.ownerUserId,
+        activeOwnerUserIds: await activeOwnerUserIdsPromise,
+      }).rows;
+      const preferred = selectPreferredPrivateHistoricalPriceRows({
+        adjustedRows,
+        privateRawRows,
+      });
+
+      return preferred.rows.map(({ row, priceBasis }) => ({
+        ticker: row.ticker,
+        market: row.market,
+        currency: row.currency,
+        priceDate: row.priceDate,
+        closePrice: row.closePrice,
+        adjustedClosePrice:
+          priceBasis === "provider_adjusted_close"
+            ? row.adjustedClosePrice
+            : null,
+        source:
+          priceBasis === "provider_adjusted_close"
+            ? row.adjustedCloseSource
+            : row.source,
+        isSample: row.isSample,
+      }));
+    },
+  );
 }
 
 function activeOwnedAccountPredicates(tenantContext: TenantContext) {

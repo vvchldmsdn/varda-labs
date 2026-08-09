@@ -35,6 +35,7 @@ import {
 import {
   admitAdjustedHistoricalPriceRows,
   admitPrivateSingleTenantRawHistoricalPriceRows,
+  selectPreferredPrivateHistoricalPriceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
@@ -554,17 +555,26 @@ async function loadPreferredScenarioCloseRows(input: {
     requestedOwnerUserId: input.tenantContext.ownerUserId,
     activeOwnerUserIds: input.activeOwnerUserIds,
   });
-  const useAdjusted = hasAtLeastRawCoverage(adjustedRows, rawAdmission.rows);
-  const selectedRows = useAdjusted ? adjustedRows : rawAdmission.rows;
+  const preferred = selectPreferredPrivateHistoricalPriceRows({
+    adjustedRows,
+    privateRawRows: rawAdmission.rows,
+  });
 
-  return selectedRows.map((row) => ({
+  return preferred.rows.map(({ row, priceBasis }) => ({
     priceDate: row.priceDate,
     closePrice: row.closePrice,
-    adjustedClosePrice: row.adjustedClosePrice,
-    source: useAdjusted ? row.adjustedCloseSource : row.source,
-    priceBasis: useAdjusted
-      ? ("provider_adjusted_close" as const)
-      : ("kis_raw_close" as const),
+    adjustedClosePrice:
+      priceBasis === "provider_adjusted_close"
+        ? row.adjustedClosePrice
+        : null,
+    source:
+      priceBasis === "provider_adjusted_close"
+        ? row.adjustedCloseSource
+        : row.source,
+    priceBasis:
+      priceBasis === "provider_adjusted_close"
+        ? ("provider_adjusted_close" as const)
+        : ("kis_raw_close" as const),
   }));
 }
 
@@ -593,18 +603,6 @@ async function loadPrivateRawScenarioCloseRows(input: {
     source: row.source,
     priceBasis: "kis_raw_close" as const,
   }));
-}
-
-function hasAtLeastRawCoverage(
-  adjustedRows: readonly Readonly<{ priceDate: string }>[],
-  rawRows: readonly Readonly<{ priceDate: string }>[],
-) {
-  if (adjustedRows.length < 2) return false;
-  if (rawRows.length < 2) return true;
-  return (
-    adjustedRows[0].priceDate <= rawRows[0].priceDate &&
-    adjustedRows.at(-1)!.priceDate >= rawRows.at(-1)!.priceDate
-  );
 }
 
 export async function getReadOnlyTenantInvestmentLabCounterfactual({

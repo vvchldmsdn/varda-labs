@@ -8,6 +8,7 @@ import {
   admitRawHistoricalPriceRows,
   ASSET_PRICE_CONSUMER_ADMISSION_POLICY,
   resolveOperationalClosePrice,
+  selectPreferredPrivateHistoricalPriceRows,
 } from "../src/lib/market-data/asset-price-consumer-admission.ts";
 
 describe("asset price consumer admission", () => {
@@ -186,6 +187,77 @@ describe("asset price consumer admission", () => {
     ]);
   });
 
+  it("uses private KIS raw rows when adjusted history covers less of an instrument", () => {
+    const result = selectPreferredPrivateHistoricalPriceRows({
+      adjustedRows: [
+        providerRow({ priceDate: "2026-07-02" }),
+        providerRow({ priceDate: "2026-07-03" }),
+      ],
+      privateRawRows: [
+        providerRow({ priceDate: "2026-07-01" }),
+        providerRow({ priceDate: "2026-07-02" }),
+        providerRow({ priceDate: "2026-07-03" }),
+      ],
+    });
+
+    assert.deepEqual(result.summary, {
+      selectedInstrumentCount: 1,
+      adjustedInstrumentCount: 0,
+      privateRawInstrumentCount: 1,
+    });
+    assert.deepEqual(
+      result.rows.map(({ row, priceBasis }) => [row.priceDate, priceBasis]),
+      [
+        ["2026-07-01", "private_kis_raw_close"],
+        ["2026-07-02", "private_kis_raw_close"],
+        ["2026-07-03", "private_kis_raw_close"],
+      ],
+    );
+  });
+
+  it("chooses the preferred price basis independently for each instrument", () => {
+    const adjustedRows = [
+      providerRow({ priceDate: "2026-07-01" }),
+      providerRow({ priceDate: "2026-07-02" }),
+      providerRow({ priceDate: "2026-07-03" }),
+    ];
+    const result = selectPreferredPrivateHistoricalPriceRows({
+      adjustedRows,
+      privateRawRows: [
+        providerRow({ priceDate: "2026-07-02" }),
+        providerRow({ priceDate: "2026-07-03" }),
+        providerRow({
+          market: "us",
+          currency: "USD",
+          ticker: "VOO",
+          priceDate: "2026-07-01",
+        }),
+        providerRow({
+          market: "us",
+          currency: "USD",
+          ticker: "VOO",
+          priceDate: "2026-07-02",
+        }),
+      ],
+    });
+
+    assert.deepEqual(result.summary, {
+      selectedInstrumentCount: 2,
+      adjustedInstrumentCount: 1,
+      privateRawInstrumentCount: 1,
+    });
+    assert.deepEqual(
+      result.rows.map(({ row, priceBasis }) => [row.ticker, priceBasis]),
+      [
+        ["069500", "provider_adjusted_close"],
+        ["069500", "provider_adjusted_close"],
+        ["069500", "provider_adjusted_close"],
+        ["VOO", "private_kis_raw_close"],
+        ["VOO", "private_kis_raw_close"],
+      ],
+    );
+  });
+
   it("fails closed when one instrument has conflicting provider bindings", () => {
     const result = admitAdjustedHistoricalPriceRows([
       providerRow({ priceDate: "2026-07-09" }),
@@ -236,6 +308,10 @@ describe("asset price consumer admission", () => {
       "src/db/queries/investment-lab.ts",
       "utf8",
     );
+    const investmentLabAvailabilityAdapter = readFileSync(
+      "src/db/queries/investment-lab-data-availability.ts",
+      "utf8",
+    );
     const operationalConsumers = [
       "src/lib/portfolio-movement.ts",
       "src/lib/snapshots/daily.ts",
@@ -261,6 +337,26 @@ describe("asset price consumer admission", () => {
       )?.length,
       3,
       "investment lab KODEX fallback, VOO, and anchor history must use owner-scoped raw admission",
+    );
+    assert.match(
+      investmentLabAvailabilityAdapter,
+      /getActivePortfolioOwnerUserIds/,
+    );
+    assert.match(
+      investmentLabAvailabilityAdapter,
+      /admitAdjustedHistoricalPriceRows/,
+    );
+    assert.match(
+      investmentLabAvailabilityAdapter,
+      /admitPrivateSingleTenantRawHistoricalPriceRows/,
+    );
+    assert.match(
+      investmentLabAvailabilityAdapter,
+      /selectPreferredPrivateHistoricalPriceRows/,
+    );
+    assert.doesNotMatch(
+      investmentLabAvailabilityAdapter,
+      /getReadOnlyTenantPortfolioRisk/,
     );
     for (const source of operationalConsumers) {
       assert.match(source, /resolveOperationalClosePrice/);

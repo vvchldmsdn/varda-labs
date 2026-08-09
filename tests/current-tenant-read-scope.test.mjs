@@ -414,7 +414,14 @@ describe("current tenant read scope runtime boundary", () => {
     ]) {
       assert.match(availabilitySource, relation);
     }
-    assert.match(availabilitySource, /getReadOnlyTenantPortfolioRisk/);
+    assert.match(
+      availabilitySource,
+      /selectPreferredPrivateHistoricalPriceRows/,
+    );
+    assert.doesNotMatch(
+      availabilitySource,
+      /getReadOnlyTenantPortfolioRisk/,
+    );
     assert.match(riskSource, /getReadOnlyTenantPortfolioRisk/);
     assert.match(
       riskSource,
