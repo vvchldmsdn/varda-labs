@@ -17,6 +17,11 @@ import { InvestmentLabPreperiodMinVolatilityView } from "@/components/investment
 import { InvestmentLabPreperiodOptimizerView } from "@/components/investment-lab/investment-lab-preperiod-optimizer";
 import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
 import {
+  InvestmentLabStressReplaySkeleton,
+  InvestmentLabStressReplayUnavailable,
+  InvestmentLabStressReplayView,
+} from "@/components/investment-lab/investment-lab-stress-replay";
+import {
   InvestmentLabSmallAdjustment,
   InvestmentLabSmallAdjustmentSkeleton,
   InvestmentLabSmallAdjustmentUnavailable,
@@ -25,6 +30,7 @@ import { InvestmentLabView } from "@/components/investment-lab/investment-lab-vi
 import { getReadOnlyTenantInvestmentLabDataAvailability } from "@/db/queries/investment-lab-data-availability";
 import { getReadOnlyTenantInvestmentLabCounterfactual } from "@/db/queries/investment-lab";
 import { getReadOnlyTenantInvestmentLabEtfXray } from "@/db/queries/investment-lab-etf-xray";
+import { getReadOnlyTenantInvestmentLabStressReplay } from "@/db/queries/investment-lab-stress-replay";
 import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { applyInvestmentLabFountAvailabilityScope } from "@/lib/investment-lab-data-availability";
@@ -107,6 +113,11 @@ export default async function InvestmentLabPage({
     requestedAnchorDate: normalizeSingleParam(params.basketAnchor),
     tenantContext,
   });
+  const stressReplayPromise = getReadOnlyTenantInvestmentLabStressReplay({
+    account: selectedAccount,
+    portfolioStructurePromise,
+    tenantContext,
+  });
 
   return (
     <div
@@ -125,6 +136,9 @@ export default async function InvestmentLabPage({
       <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
         <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
       </Suspense>
+      <Suspense fallback={<InvestmentLabStressReplaySkeleton />}>
+        <InvestmentLabStressReplayContent modelPromise={stressReplayPromise} />
+      </Suspense>
       <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
         <InvestmentLabSmallAdjustmentContent
           modelPromise={portfolioStructurePromise}
@@ -133,6 +147,20 @@ export default async function InvestmentLabPage({
       </Suspense>
     </div>
   );
+}
+
+async function InvestmentLabStressReplayContent({
+  modelPromise,
+}: {
+  modelPromise: ReturnType<typeof getReadOnlyTenantInvestmentLabStressReplay>;
+}) {
+  let model;
+  try {
+    model = await modelPromise;
+  } catch {
+    return <InvestmentLabStressReplayUnavailable />;
+  }
+  return <InvestmentLabStressReplayView model={model} />;
 }
 
 async function InvestmentLabContent({

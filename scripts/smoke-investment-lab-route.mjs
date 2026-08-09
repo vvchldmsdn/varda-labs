@@ -979,6 +979,44 @@ async function main() {
     assert.match(route.body, /data-shock-selected-symbol=""/);
     assert.match(route.body, /data-shock-through-etf-exposure=""/);
   }
+  assert.match(
+    route.body,
+    /data-section="investment-lab-stress-replay"/,
+  );
+  const stressWindowCount = readIntegerAttribute(
+    route.body,
+    "data-window-count",
+  );
+  const stressWindowStatuses = [
+    ...route.body.matchAll(
+      /data-stress-window-status="(ready|partial|unavailable)"/g,
+    ),
+  ].map((match) => match[1]);
+  const stressCurrentValueCoverages = [
+    ...route.body.matchAll(
+      /data-current-value-coverage="(\d+(?:\.\d+)?)"/g,
+    ),
+  ].map((match) => Number(match[1]));
+  const stressEligibleInstruments = [
+    ...route.body.matchAll(/data-eligible-instruments="(\d+)"/g),
+  ].map((match) => Number(match[1]));
+  assert.equal(stressWindowCount, 3);
+  assert.equal(stressWindowStatuses.length, stressWindowCount);
+  assert.equal(stressCurrentValueCoverages.length, stressWindowCount);
+  assert.equal(stressEligibleInstruments.length, stressWindowCount);
+  assert.ok(
+    stressCurrentValueCoverages.every(
+      (coverage) => coverage >= 0 && coverage <= 100,
+    ),
+  );
+  assert.ok(stressEligibleInstruments.every((count) => count >= 0));
+  for (const marker of [
+    "지금 구성으로 과거를 다시 지나갔다면",
+    "당시 상장 전이거나 가격 근거가 부족한 종목",
+    "투자 추천이 아닙니다",
+  ]) {
+    assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
+  }
   assert.doesNotMatch(route.body, LEAK_PATTERN);
   assert.doesNotMatch(
     route.body,
@@ -1123,6 +1161,10 @@ async function main() {
           etfPortfolioWeight,
           observedEtfExposure,
           uncoveredEtfExposure,
+          stressWindowCount,
+          stressWindowStatuses,
+          stressCurrentValueCoverages,
+          stressEligibleInstruments,
           adjustmentAccountCount,
           adjustmentReadyAccounts,
           adjustmentPolicy,
@@ -1490,6 +1532,10 @@ async function main() {
         shockDirectExposure,
         shockCoveredExposure,
         shockEstimatedChangeKrw,
+        stressWindowCount,
+        stressWindowStatuses,
+        stressCurrentValueCoverages,
+        stressEligibleInstruments,
         adjustmentAccountCount,
         adjustmentReadyAccounts,
         adjustmentPolicy,

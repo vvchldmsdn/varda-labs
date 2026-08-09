@@ -45,6 +45,8 @@ import "./investment-lab-period-selection.test.mjs";
 import "./investment-lab-etf-xray.test.mjs";
 import "./investment-lab-etf-shock.test.mjs";
 import "./investment-lab-rolling-comparison.test.mjs";
+import "./investment-lab-stress-replay.test.mjs";
+import "./investment-lab-stress-history-completion.test.mjs";
 import "./investment-lab-contribution-experiment.test.mjs";
 import "./investment-lab-small-adjustment.test.mjs";
 import "./investment-lab-fixed-mix.test.mjs";
