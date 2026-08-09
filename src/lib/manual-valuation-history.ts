@@ -6,13 +6,17 @@ import {
 
 const CURRENT_SNAPSHOT_SOURCE = "varda_manual_daily_snapshot";
 const MANUAL_PRICE_BASIS = "manual_current";
+const CAPTURED_STORED_STATE_PRICE_SOURCE = "asset_current_price";
 
 export const MANUAL_VALUATION_HISTORY_POLICY = Object.freeze({
-  version: "manual_valuation_history_v1",
+  version: "manual_valuation_history_v2",
   currentSnapshotSource: CURRENT_SNAPSHOT_SOURCE,
-  priceSource: MANUAL_ASSET_PRICE_POLICY.source,
+  explicitObservationPriceSource: MANUAL_ASSET_PRICE_POLICY.source,
+  capturedStoredStatePriceSource: CAPTURED_STORED_STATE_PRICE_SOURCE,
   priceBasis: MANUAL_PRICE_BASIS,
   carryMeaning: "stored_valuation_not_market_observation",
+  missingReferenceDateHandling:
+    "current_writer_captured_state_uses_snapshot_date_without_claiming_market_observation",
   sameDateWriteMeaning: "latest_snapshot_state_not_immutable_input_event",
   researchAdmission: "current_segment_candidate_only",
 } as const);
@@ -143,9 +147,9 @@ export function resolveManualValuationPath(input: Readonly<{
     }
 
     const row = writerRows[0];
+    const priceSourceKind = manualSnapshotPriceSourceKind(row);
     if (
-      normalizeText(row.priceSource).toLowerCase() !==
-        MANUAL_ASSET_PRICE_POLICY.source ||
+      priceSourceKind === null ||
       normalizeText(row.priceBasis).toLowerCase() !== MANUAL_PRICE_BASIS
     ) {
       blockers.push(
@@ -163,7 +167,7 @@ export function resolveManualValuationPath(input: Readonly<{
       continue;
     }
 
-    const referenceDate = row.referenceDate ?? row.priceDate;
+    const referenceDate = manualSnapshotReferenceDate(row, priceSourceKind);
     if (!referenceDate || !isIsoDate(referenceDate)) {
       blockers.push(
         manualPathBlocker(
@@ -207,9 +211,10 @@ export function resolveManualValuationPath(input: Readonly<{
         referenceDate,
         unitPriceKrw: price,
         provenance:
-          referenceDate === serviceDate
-            ? ("manual_observation" as const)
-            : ("stored_manual_carry" as const),
+          priceSourceKind === "captured_stored_state" ||
+          referenceDate < serviceDate
+            ? ("stored_manual_carry" as const)
+            : ("manual_observation" as const),
         capturedAt: timestampIso(row.capturedAt)!,
       }),
     );
@@ -278,9 +283,9 @@ export function buildManualValuationHistoryCoverage(input: {
       nonCurrentWriterRowCount += 1;
       continue;
     }
+    const priceSourceKind = manualSnapshotPriceSourceKind(row);
     if (
-      normalizeText(row.priceSource).toLowerCase() !==
-        MANUAL_ASSET_PRICE_POLICY.source ||
+      priceSourceKind === null ||
       normalizeText(row.priceBasis).toLowerCase() !== MANUAL_PRICE_BASIS
     ) {
       nonManualValuationRowCount += 1;
@@ -290,7 +295,7 @@ export function buildManualValuationHistoryCoverage(input: {
       invalidRowCount += 1;
       continue;
     }
-    const referenceDate = row.referenceDate ?? row.priceDate;
+    const referenceDate = manualSnapshotReferenceDate(row, priceSourceKind);
     if (!referenceDate) {
       invalidRowCount += 1;
       continue;
@@ -312,8 +317,13 @@ export function buildManualValuationHistoryCoverage(input: {
     trustedRows.push({
       snapshotDate: row.snapshotDate,
       referenceDate,
-      observationKey: `${identity}\u0000${referenceDate}\u0000${price}`,
-      carried: referenceDate < row.snapshotDate,
+      observationKey:
+        priceSourceKind === "captured_stored_state"
+          ? `${identity}\u0000captured_stored_state\u0000${price}`
+          : `${identity}\u0000${referenceDate}\u0000${price}`,
+      carried:
+        priceSourceKind === "captured_stored_state" ||
+        referenceDate < row.snapshotDate,
     });
   }
 
@@ -428,6 +438,28 @@ function isCurrentManualValuation(row: ManualValuationCurrentRow) {
     finitePositiveNumber(row.currentPrice) !== null &&
     timestampMs(row.priceAsOf) > 0
   );
+}
+
+function manualSnapshotPriceSourceKind(row: ManualValuationSnapshotRow) {
+  const source = normalizeText(row.priceSource).toLowerCase();
+  if (source === MANUAL_ASSET_PRICE_POLICY.source) {
+    return "explicit_manual_observation" as const;
+  }
+  if (source === CAPTURED_STORED_STATE_PRICE_SOURCE) {
+    return "captured_stored_state" as const;
+  }
+  return null;
+}
+
+function manualSnapshotReferenceDate(
+  row: ManualValuationSnapshotRow,
+  priceSourceKind: NonNullable<
+    ReturnType<typeof manualSnapshotPriceSourceKind>
+  >,
+) {
+  const explicitReferenceDate = row.referenceDate ?? row.priceDate;
+  if (explicitReferenceDate) return explicitReferenceDate;
+  return priceSourceKind === "captured_stored_state" ? row.snapshotDate : null;
 }
 
 function isValidSnapshotEnvelope(row: ManualValuationSnapshotRow) {

@@ -17,6 +17,10 @@ import {
   type InvestmentLabAnchorValueWeightScenario,
 } from "./investment-lab-anchor-value-weight-scenario.ts";
 import {
+  buildInvestmentLabPreperiodOptimizer,
+  type InvestmentLabPreperiodOptimizer,
+} from "./investment-lab-preperiod-optimizer.ts";
+import {
   resolveInvestmentLabBoundaryFlows,
   type InvestmentLabCounterfactualReadInput,
   type InvestmentLabCounterfactualReadModel,
@@ -58,22 +62,30 @@ export type InvestmentLabAnchorScenarioLoadInput = Readonly<{
   fxRows: readonly InvestmentLabAnchorFxRow[];
   requestedAnchorDate?: string | null;
   fountScopeAdjustment?: InvestmentLabAnchorFountScope;
+  includePreperiodOptimizer?: boolean;
 }>;
 
 export type InvestmentLabAnchorScenarios = Readonly<{
   equalWeight: InvestmentLabAnchorBasketScenario;
   valueWeight: InvestmentLabAnchorValueWeightScenario;
+  preperiodOptimizer: InvestmentLabPreperiodOptimizer | null;
 }>;
 
 export async function loadInvestmentLabAnchorBasketScenario(
   input: InvestmentLabAnchorScenarioLoadInput,
 ): Promise<InvestmentLabAnchorBasketScenario> {
-  return (await loadInvestmentLabAnchorScenarios(input)).equalWeight;
+  return (
+    await loadInvestmentLabAnchorScenarios({
+      ...input,
+      includePreperiodOptimizer: false,
+    })
+  ).equalWeight;
 }
 
 export async function loadInvestmentLabAnchorScenarios(
   input: InvestmentLabAnchorScenarioLoadInput,
 ): Promise<InvestmentLabAnchorScenarios> {
+  const includePreperiodOptimizer = input.includePreperiodOptimizer ?? true;
   const observedRows = input.model.observedPath.rows;
   const serviceDates = observedRows.map(
     (row) => row.serviceDate,
@@ -101,6 +113,7 @@ export async function loadInvestmentLabAnchorScenarios(
       actualPath: [],
       evidence: null,
       actualReturn: null,
+      includePreperiodOptimizer,
     });
   }
 
@@ -126,19 +139,26 @@ export async function loadInvestmentLabAnchorScenarios(
       actualPath,
       evidence: null,
       actualReturn: null,
+      includePreperiodOptimizer,
     });
   }
 
   const priceRows = await input.repository.loadAnchorPriceRows({
     instruments: anchor.instruments,
-    startServiceDate: anchor.selectedAnchorDate,
+    startServiceDate: includePreperiodOptimizer
+      ? shiftIsoDate(anchor.selectedAnchorDate, -280)
+      : anchor.selectedAnchorDate,
     endServiceDate: actualPath.at(-1)?.serviceDate ?? anchor.selectedAnchorDate,
   });
+  const holdoutPriceStartDate = shiftIsoDate(anchor.selectedAnchorDate, -10);
+  const holdoutPriceRows = priceRows.filter(
+    (row) => row.priceDate >= holdoutPriceStartDate,
+  );
   const evidence = resolveInvestmentLabAnchorBasketEvidence({
     account: input.account,
     anchor,
     serviceDates: actualPath.map((row) => row.serviceDate),
-    priceRows,
+    priceRows: holdoutPriceRows,
     manualValuationRows: scopedPositionRows,
     snapshotRows: selectedSnapshotRows,
     fxRows: input.fxRows,
@@ -157,16 +177,37 @@ export async function loadInvestmentLabAnchorScenarios(
     evidence,
     actualReturn: actualReturn?.totalReturn ?? null,
     actualPeriods: actualReturn?.periods ?? [],
+    optimizerPriceRows: priceRows,
+    optimizerFxRows: input.fxRows,
+    includePreperiodOptimizer,
   });
 }
 
 function buildAnchorScenarios(
-  input: Parameters<typeof buildInvestmentLabAnchorBasketScenario>[0],
+  input: Parameters<typeof buildInvestmentLabAnchorBasketScenario>[0] &
+    Readonly<{
+      optimizerPriceRows?: readonly InvestmentLabAnchorPriceRow[];
+      optimizerFxRows?: readonly InvestmentLabAnchorFxRow[];
+      includePreperiodOptimizer: boolean;
+    }>,
 ): InvestmentLabAnchorScenarios {
   return Object.freeze({
     equalWeight: buildInvestmentLabAnchorBasketScenario(input),
     valueWeight: buildInvestmentLabAnchorValueWeightScenario(input),
+    preperiodOptimizer: input.includePreperiodOptimizer
+      ? buildInvestmentLabPreperiodOptimizer({
+          ...input,
+          priceRows: input.optimizerPriceRows ?? [],
+          fxRows: input.optimizerFxRows ?? [],
+        })
+      : null,
   });
+}
+
+function shiftIsoDate(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
 }
 
 function applyAnchorPositionScope(input: Readonly<{

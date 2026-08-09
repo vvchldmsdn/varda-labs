@@ -50,6 +50,7 @@
     "audit:investment-lab-legacy-reconstruction-candidate": "node --no-warnings scripts/audit-investment-lab-legacy-reconstruction-candidate.mjs",
     "audit:investment-lab-source-transition": "node --no-warnings scripts/audit-investment-lab-source-transition.mjs",
     "audit:investment-lab-event-flow": "node --no-warnings scripts/audit-investment-lab-event-flow.mjs",
+    "audit:investment-lab-preperiod-optimizer": "node --conditions=react-server --import tsx scripts/audit-investment-lab-preperiod-optimizer.ts",
     "audit:portfolio-risk": "node --no-warnings scripts/audit-portfolio-risk-readiness.mjs",
     "audit:portfolio-risk-read-model": "node --no-warnings scripts/audit-portfolio-risk-read-model.mjs",
     "audit:provider-adjusted-history-readiness": "node --no-warnings scripts/audit-provider-adjusted-history-readiness.mjs",

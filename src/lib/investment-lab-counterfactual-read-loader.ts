@@ -30,6 +30,7 @@ import {
 } from "./investment-lab-anchor-basket-read-loader.ts";
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import type { InvestmentLabPreperiodOptimizer } from "./investment-lab-preperiod-optimizer.ts";
 import {
   listInvestmentLabCompleteSnapshotDates,
   listInvestmentLabLatestCurrentWriterDates,
@@ -74,6 +75,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   rollingComparison: InvestmentLabRollingComparison;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  preperiodOptimizer: InvestmentLabPreperiodOptimizer;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   accountComposition: InvestmentLabAccountComposition;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
@@ -148,6 +150,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   let accountComposition = notApplicableInvestmentLabAccountComposition();
   let anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   let anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  let preperiodOptimizer: InvestmentLabPreperiodOptimizer;
   let fundingPreflight: InvestmentLabAccountFundingPreflight;
 
   if (account === "all") {
@@ -174,7 +177,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
           repository: cachedAnchorRepository,
           model: pooledModel,
           source: fountScope.source,
-          fxRows: fountScope.source.fxRows,
+          fxRows,
           requestedAnchorDate,
           fountScopeAdjustment: anchorFountScope,
         }),
@@ -184,12 +187,13 @@ export async function loadInvestmentLabCounterfactualReadModel(
             repository: cachedAnchorRepository,
             model: namedModels[namedAccount],
             source: fountScope.source,
-            fxRows: fountScope.source.fxRows,
+            fxRows,
             requestedAnchorDate,
             fountScopeAdjustment:
               namedAccount === "irp"
                 ? anchorFountScope
                 : Object.freeze({ status: "not_applicable" }),
+            includePreperiodOptimizer: false,
           }),
         ),
       ]);
@@ -223,6 +227,9 @@ export async function loadInvestmentLabCounterfactualReadModel(
     model = composed.model;
     anchorBasketScenario = composed.anchorBasketScenario;
     anchorValueWeightScenario = composed.anchorValueWeightScenario;
+    preperiodOptimizer = requirePreperiodOptimizer(
+      pooledAnchorScenarios.preperiodOptimizer,
+    );
     accountComposition = composed.composition;
     fundingPreflight = buildInvestmentLabAllAccountFundingPreflight({
       namedModels,
@@ -236,12 +243,15 @@ export async function loadInvestmentLabCounterfactualReadModel(
       repository: cachedAnchorRepository,
       model,
       source: fountScope.source,
-      fxRows: fountScope.source.fxRows,
+      fxRows,
       requestedAnchorDate,
       fountScopeAdjustment: anchorFountScope,
     });
     anchorBasketScenario = anchorScenarios.equalWeight;
     anchorValueWeightScenario = anchorScenarios.valueWeight;
+    preperiodOptimizer = requirePreperiodOptimizer(
+      anchorScenarios.preperiodOptimizer,
+    );
     fundingPreflight = buildInvestmentLabNamedAccountFundingPreflight({
       account,
       model,
@@ -275,10 +285,20 @@ export async function loadInvestmentLabCounterfactualReadModel(
     period: resolvedPeriod,
     anchorBasketScenario,
     anchorValueWeightScenario,
+    preperiodOptimizer,
     fountScopeAdjustment: fountScope.scope,
     accountComposition,
     fundingPreflight,
   });
+}
+
+function requirePreperiodOptimizer(
+  value: InvestmentLabPreperiodOptimizer | null,
+) {
+  if (!value) {
+    throw new Error("pre-period optimizer was omitted from a public read model");
+  }
+  return value;
 }
 
 function resolveAnchorFountScope(
