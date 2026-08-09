@@ -17,6 +17,10 @@ import {
   type InvestmentLabAnchorValueWeightScenario,
 } from "./investment-lab-anchor-value-weight-scenario.ts";
 import {
+  buildInvestmentLabAnchorScheduledRebalanceScenario,
+  type InvestmentLabAnchorScheduledRebalanceScenario,
+} from "./investment-lab-anchor-scheduled-rebalance.ts";
+import {
   buildInvestmentLabPreperiodOptimizer,
   type InvestmentLabPreperiodOptimizer,
 } from "./investment-lab-preperiod-optimizer.ts";
@@ -68,6 +72,8 @@ export type InvestmentLabAnchorScenarioLoadInput = Readonly<{
 export type InvestmentLabAnchorScenarios = Readonly<{
   equalWeight: InvestmentLabAnchorBasketScenario;
   valueWeight: InvestmentLabAnchorValueWeightScenario;
+  scheduledCurrentWeight: InvestmentLabAnchorScheduledRebalanceScenario;
+  scheduledEqualWeight: InvestmentLabAnchorScheduledRebalanceScenario;
   preperiodOptimizer: InvestmentLabPreperiodOptimizer | null;
 }>;
 
@@ -194,6 +200,16 @@ function buildAnchorScenarios(
   return Object.freeze({
     equalWeight: buildInvestmentLabAnchorBasketScenario(input),
     valueWeight: buildInvestmentLabAnchorValueWeightScenario(input),
+    scheduledCurrentWeight:
+      buildInvestmentLabAnchorScheduledRebalanceScenario({
+        ...input,
+        mode: "current_weight_monthly",
+      }),
+    scheduledEqualWeight:
+      buildInvestmentLabAnchorScheduledRebalanceScenario({
+        ...input,
+        mode: "equal_weight_monthly",
+      }),
     preperiodOptimizer: input.includePreperiodOptimizer
       ? buildInvestmentLabPreperiodOptimizer({
           ...input,

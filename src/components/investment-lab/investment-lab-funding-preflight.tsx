@@ -13,6 +13,8 @@ const SCENARIOS = Object.freeze([
   ["preperiod_min_volatility", "기간 전 최소변동성"],
   ["anchor_basket", "기준 바스켓"],
   ["anchor_value_weight", "기준일 비중"],
+  ["anchor_current_weight_monthly", "현재 비중 월간 유지"],
+  ["anchor_equal_weight_monthly", "동일 비중 월간 유지"],
 ] as const satisfies readonly (readonly [
   InvestmentLabAccountCompositionScenarioId,
   string,

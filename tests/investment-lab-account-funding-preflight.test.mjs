@@ -18,6 +18,8 @@ describe("investment lab account-local funding preflight", () => {
       model: readyModel({ fixedMix: null }),
       anchorBasketScenario: readyAnchor(),
       anchorValueWeightScenario: readyAnchor(),
+      anchorCurrentWeightMonthlyScenario: readyAnchor(),
+      anchorEqualWeightMonthlyScenario: readyAnchor(),
     });
 
     assert.equal(result.status, "ready");
@@ -26,8 +28,8 @@ describe("investment lab account-local funding preflight", () => {
     assert.equal(result.accountRows[0].scenarios.fixed_mix.status, "not_requested");
     assert.deepEqual(result.coverage, {
       accountCount: 1,
-      requestedScenarioCells: 7,
-      readyScenarioCells: 7,
+      requestedScenarioCells: 9,
+      readyScenarioCells: 9,
       unavailableScenarioCells: 0,
       notRequestedScenarioCells: 1,
     });
@@ -50,10 +52,14 @@ describe("investment lab account-local funding preflight", () => {
       isa: readyAnchor(),
       irp: readyAnchor(),
     };
+    const namedAnchorCurrentWeightMonthly = { ...namedAnchorValueWeights };
+    const namedAnchorEqualWeightMonthly = { ...namedAnchorValueWeights };
     const result = buildInvestmentLabAllAccountFundingPreflight({
       namedModels,
       namedAnchors,
       namedAnchorValueWeights,
+      namedAnchorCurrentWeightMonthly,
+      namedAnchorEqualWeightMonthly,
       composition: composition({ kodex200: false, fixed_mix: false }),
     });
 
@@ -108,6 +114,16 @@ describe("investment lab account-local funding preflight", () => {
         isa: readyAnchor(),
         irp: readyAnchor(),
       },
+      namedAnchorCurrentWeightMonthly: {
+        brokerage: readyAnchor(),
+        isa: readyAnchor(),
+        irp: readyAnchor(),
+      },
+      namedAnchorEqualWeightMonthly: {
+        brokerage: readyAnchor(),
+        isa: readyAnchor(),
+        irp: readyAnchor(),
+      },
       composition: composition({
         kodex200: false,
         zero_return: false,
@@ -129,6 +145,8 @@ describe("investment lab account-local funding preflight", () => {
       model: readyModel({ observed: false }),
       anchorBasketScenario: readyAnchor(),
       anchorValueWeightScenario: readyAnchor(),
+      anchorCurrentWeightMonthlyScenario: readyAnchor(),
+      anchorEqualWeightMonthlyScenario: readyAnchor(),
     });
 
     assert.equal(result.status, "unavailable");
@@ -209,6 +227,8 @@ function composition(overrides = {}) {
         "preperiod_min_volatility",
         "anchor_basket",
         "anchor_value_weight",
+        "anchor_current_weight_monthly",
+        "anchor_equal_weight_monthly",
       ].map(
         (id) => [id, overrides[id] === false ? unavailable() : ready()],
       ),

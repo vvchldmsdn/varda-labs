@@ -30,6 +30,7 @@ import {
 } from "./investment-lab-anchor-basket-read-loader.ts";
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import type { InvestmentLabAnchorScheduledRebalanceScenario } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import type { InvestmentLabPreperiodOptimizer } from "./investment-lab-preperiod-optimizer.ts";
 import {
   listInvestmentLabCompleteSnapshotDates,
@@ -75,6 +76,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
   rollingComparison: InvestmentLabRollingComparison;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   preperiodOptimizer: InvestmentLabPreperiodOptimizer;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   accountComposition: InvestmentLabAccountComposition;
@@ -150,6 +153,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
   let accountComposition = notApplicableInvestmentLabAccountComposition();
   let anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   let anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  let anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  let anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   let preperiodOptimizer: InvestmentLabPreperiodOptimizer;
   let fundingPreflight: InvestmentLabAccountFundingPreflight;
 
@@ -216,6 +221,28 @@ export async function loadInvestmentLabCounterfactualReadModel(
         InvestmentLabAnchorValueWeightScenario
       >,
     );
+    const namedAnchorCurrentWeightMonthly = Object.freeze(
+      Object.fromEntries(
+        NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount, index) => [
+          namedAccount,
+          namedAnchorScenarioValues[index].scheduledCurrentWeight,
+        ]),
+      ) as Record<
+        NamedPortfolioAccount,
+        InvestmentLabAnchorScheduledRebalanceScenario
+      >,
+    );
+    const namedAnchorEqualWeightMonthly = Object.freeze(
+      Object.fromEntries(
+        NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount, index) => [
+          namedAccount,
+          namedAnchorScenarioValues[index].scheduledEqualWeight,
+        ]),
+      ) as Record<
+        NamedPortfolioAccount,
+        InvestmentLabAnchorScheduledRebalanceScenario
+      >,
+    );
     const composed = composeInvestmentLabAllAccounts({
       pooledModel,
       namedModels,
@@ -223,10 +250,20 @@ export async function loadInvestmentLabCounterfactualReadModel(
       namedAnchors,
       pooledAnchorValueWeight: pooledAnchorScenarios.valueWeight,
       namedAnchorValueWeights,
+      pooledAnchorCurrentWeightMonthly:
+        pooledAnchorScenarios.scheduledCurrentWeight,
+      namedAnchorCurrentWeightMonthly,
+      pooledAnchorEqualWeightMonthly:
+        pooledAnchorScenarios.scheduledEqualWeight,
+      namedAnchorEqualWeightMonthly,
     });
     model = composed.model;
     anchorBasketScenario = composed.anchorBasketScenario;
     anchorValueWeightScenario = composed.anchorValueWeightScenario;
+    anchorCurrentWeightMonthlyScenario =
+      composed.anchorCurrentWeightMonthlyScenario;
+    anchorEqualWeightMonthlyScenario =
+      composed.anchorEqualWeightMonthlyScenario;
     preperiodOptimizer = requirePreperiodOptimizer(
       pooledAnchorScenarios.preperiodOptimizer,
     );
@@ -235,6 +272,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
       namedModels,
       namedAnchors,
       namedAnchorValueWeights,
+      namedAnchorCurrentWeightMonthly,
+      namedAnchorEqualWeightMonthly,
       composition: composed.composition,
     });
   } else {
@@ -249,6 +288,9 @@ export async function loadInvestmentLabCounterfactualReadModel(
     });
     anchorBasketScenario = anchorScenarios.equalWeight;
     anchorValueWeightScenario = anchorScenarios.valueWeight;
+    anchorCurrentWeightMonthlyScenario =
+      anchorScenarios.scheduledCurrentWeight;
+    anchorEqualWeightMonthlyScenario = anchorScenarios.scheduledEqualWeight;
     preperiodOptimizer = requirePreperiodOptimizer(
       anchorScenarios.preperiodOptimizer,
     );
@@ -257,6 +299,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
       model,
       anchorBasketScenario,
       anchorValueWeightScenario,
+      anchorCurrentWeightMonthlyScenario,
+      anchorEqualWeightMonthlyScenario,
     });
   }
   let resolvedPeriod = period;
@@ -285,6 +329,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
     period: resolvedPeriod,
     anchorBasketScenario,
     anchorValueWeightScenario,
+    anchorCurrentWeightMonthlyScenario,
+    anchorEqualWeightMonthlyScenario,
     preperiodOptimizer,
     fountScopeAdjustment: fountScope.scope,
     accountComposition,

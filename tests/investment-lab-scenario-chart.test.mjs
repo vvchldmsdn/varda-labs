@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { buildInvestmentLabScenarioChart } from "../src/lib/investment-lab-scenario-chart.ts";
+import { buildInvestmentLabScenarioChart as buildScenarioChart } from "../src/lib/investment-lab-scenario-chart.ts";
 
 describe("investment lab multi-scenario chart", () => {
   it("projects all ready scenarios on the observed date axis", () => {
@@ -24,6 +24,8 @@ describe("investment lab multi-scenario chart", () => {
         "preperiod_min_volatility",
         "anchor_basket",
         "anchor_value_weight",
+        "anchor_current_weight_monthly",
+        "anchor_equal_weight_monthly",
       ],
     );
     assert.equal(chart.period.comparisonDateCount, 3);
@@ -61,6 +63,8 @@ describe("investment lab multi-scenario chart", () => {
         "voo",
         "anchor_basket",
         "anchor_value_weight",
+        "anchor_current_weight_monthly",
+        "anchor_equal_weight_monthly",
       ],
     );
     assert.deepEqual(chart.unavailableScenarioIds, [
@@ -192,6 +196,37 @@ function readyValueWeight() {
     },
     rows: scenarioRows(dates, [1000, 1050, 1100], [1000, 1080, 1160]),
   };
+}
+
+function readyScheduled(mode) {
+  const dates = ["2026-01-02", "2026-01-05", "2026-01-06"];
+  return {
+    status: "ready",
+    mode,
+    summary: {
+      allocationBasis:
+        mode === "equal_weight_monthly"
+          ? "single_scope_equal_weight_monthly"
+          : "single_scope_current_weight_monthly",
+    },
+    rows: scenarioRows(
+      dates,
+      [1000, 1050, 1100],
+      mode === "equal_weight_monthly"
+        ? [1000, 1090, 1180]
+        : [1000, 1085, 1170],
+    ),
+  };
+}
+
+function buildInvestmentLabScenarioChart(input) {
+  return buildScenarioChart({
+    anchorCurrentWeightMonthlyScenario: readyScheduled(
+      "current_weight_monthly",
+    ),
+    anchorEqualWeightMonthlyScenario: readyScheduled("equal_weight_monthly"),
+    ...input,
+  });
 }
 
 function scenarioRows(dates, actual, scenario) {

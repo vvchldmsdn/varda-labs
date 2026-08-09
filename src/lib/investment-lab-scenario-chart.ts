@@ -1,5 +1,6 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import type { InvestmentLabAnchorScheduledRebalanceScenario } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import type { InvestmentLabScenarioMatrixId } from "./investment-lab-scenario-matrix.ts";
 
@@ -47,6 +48,8 @@ const SCENARIOS = Object.freeze([
   "preperiod_min_volatility",
   "anchor_basket",
   "anchor_value_weight",
+  "anchor_current_weight_monthly",
+  "anchor_equal_weight_monthly",
 ] as const satisfies readonly InvestmentLabScenarioMatrixId[]);
 
 const COLORS: Readonly<Record<InvestmentLabScenarioMatrixId, string>> = {
@@ -58,12 +61,16 @@ const COLORS: Readonly<Record<InvestmentLabScenarioMatrixId, string>> = {
   preperiod_min_volatility: "#a34f22",
   anchor_basket: "#b47a13",
   anchor_value_weight: "#2f7d68",
+  anchor_current_weight_monthly: "#6c55a3",
+  anchor_equal_weight_monthly: "#a35f75",
 };
 
 export function buildInvestmentLabScenarioChart(input: Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
 }>): InvestmentLabScenarioChart {
   if (input.model.observedPath.status !== "ready") {
     return unavailableChart();
@@ -162,6 +169,26 @@ export function buildInvestmentLabScenarioChart(input: Readonly<{
             "anchor_value_weight",
             anchorValueWeightLabel(input.anchorValueWeightScenario),
             input.anchorValueWeightScenario.rows.map(toScenarioPoint),
+          )
+        : null,
+    ],
+    [
+      "anchor_current_weight_monthly",
+      input.anchorCurrentWeightMonthlyScenario.status === "ready"
+        ? chartLine(
+            "anchor_current_weight_monthly",
+            scheduledAnchorLabel(input.anchorCurrentWeightMonthlyScenario),
+            input.anchorCurrentWeightMonthlyScenario.rows.map(toScenarioPoint),
+          )
+        : null,
+    ],
+    [
+      "anchor_equal_weight_monthly",
+      input.anchorEqualWeightMonthlyScenario.status === "ready"
+        ? chartLine(
+            "anchor_equal_weight_monthly",
+            scheduledAnchorLabel(input.anchorEqualWeightMonthlyScenario),
+            input.anchorEqualWeightMonthlyScenario.rows.map(toScenarioPoint),
           )
         : null,
     ],
@@ -278,6 +305,14 @@ function anchorValueWeightLabel(
     "named_account_anchor_value_weight_then_sum"
     ? "계좌별 기준일 비중"
     : "기준일 비중 유지";
+}
+
+function scheduledAnchorLabel(
+  scenario: InvestmentLabAnchorScheduledRebalanceScenario,
+) {
+  return scenario.mode === "equal_weight_monthly"
+    ? "동일 비중 월간 유지"
+    : "현재 비중 월간 유지";
 }
 
 function unavailableChart(): InvestmentLabScenarioChart {

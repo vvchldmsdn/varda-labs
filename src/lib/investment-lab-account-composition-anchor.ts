@@ -7,6 +7,10 @@ import {
   INVESTMENT_LAB_ANCHOR_VALUE_WEIGHT_SCENARIO_POLICY,
   type InvestmentLabAnchorValueWeightScenario,
 } from "./investment-lab-anchor-value-weight-scenario.ts";
+import {
+  INVESTMENT_LAB_ANCHOR_SCHEDULED_REBALANCE_POLICY,
+  type InvestmentLabAnchorScheduledRebalanceScenario,
+} from "./investment-lab-anchor-scheduled-rebalance.ts";
 import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
@@ -23,6 +27,7 @@ import {
   type InvestmentLabCompositionValue,
   type InvestmentLabNamedAnchors,
   type InvestmentLabNamedAnchorValueWeights,
+  type InvestmentLabNamedAnchorScheduledRebalances,
 } from "./investment-lab-account-composition-contract.ts";
 import {
   composeInvestmentLabNamedAccountReturns,
@@ -120,6 +125,176 @@ export function composeInvestmentLabAnchorValueWeight(input: Readonly<{
       });
     },
   });
+}
+
+export function composeInvestmentLabAnchorScheduledRebalance(input: Readonly<{
+  pooledAnchor: InvestmentLabAnchorScheduledRebalanceScenario;
+  namedAnchors: InvestmentLabNamedAnchorScheduledRebalances;
+}>): InvestmentLabCompositionValue<InvestmentLabAnchorScheduledRebalanceScenario> {
+  if (input.pooledAnchor.status !== "ready") {
+    return unavailableInvestmentLabCompositionValue([
+      "pooled_scenario_unavailable",
+    ]);
+  }
+  if (
+    NAMED_PORTFOLIO_ACCOUNTS.some(
+      (account) => input.namedAnchors[account].status !== "ready",
+    )
+  ) {
+    return unavailableInvestmentLabCompositionValue([
+      "named_account_scenario_unavailable",
+    ]);
+  }
+  const ready = NAMED_PORTFOLIO_ACCOUNTS.map(
+    (account) => input.namedAnchors[account],
+  ) as readonly (InvestmentLabAnchorScheduledRebalanceScenario &
+    Readonly<{
+      status: "ready";
+      summary: NonNullable<
+        InvestmentLabAnchorScheduledRebalanceScenario["summary"]
+      >;
+    }>)[];
+  const composed = composeInvestmentLabAccountRows(
+    (account) => input.namedAnchors[account].rows,
+  );
+  if (composed.status !== "ready") {
+    return unavailableInvestmentLabCompositionValue(composed.blockers);
+  }
+  if (
+    !investmentLabCompositionActualRowsMatchModel(
+      composed.rows,
+      input.pooledAnchor.rows,
+    )
+  ) {
+    return unavailableInvestmentLabCompositionValue([
+      "aggregate_value_mismatch",
+    ]);
+  }
+  if (
+    compensatedSum(
+      ready.map((scenario) => scenario.coverage.sourceFlowCount),
+    ) !== input.pooledAnchor.coverage.sourceFlowCount
+  ) {
+    return unavailableInvestmentLabCompositionValue(["flow_count_mismatch"]);
+  }
+
+  const actualReturn = composeInvestmentLabNamedAccountReturns(
+    ready.map((scenario) => scenario.returnEstimate?.actualPeriods ?? []),
+  );
+  const scenarioReturn = composeInvestmentLabNamedAccountReturns(
+    ready.map((scenario) => scenario.returnEstimate?.scenarioPeriods ?? []),
+  );
+  const returnEvidenceReady =
+    actualReturn.status === "ready" &&
+    scenarioReturn.status === "ready" &&
+    investmentLabReturnPeriodAxesMatch(
+      actualReturn.periods,
+      scenarioReturn.periods,
+    );
+  const returnEstimate = returnEvidenceReady
+    ? Object.freeze({
+        method: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+        actualReturn: actualReturn.totalReturn,
+        scenarioReturn: scenarioReturn.totalReturn,
+        differencePercentagePoints:
+          (scenarioReturn.totalReturn - actualReturn.totalReturn) * 100,
+        actualPeriods: actualReturn.periods,
+        scenarioPeriods: scenarioReturn.periods,
+        scenarioRiskMetrics: scenarioReturn.riskMetrics,
+      })
+    : null;
+  const rows = Object.freeze(
+    composed.rows.map((row, index) =>
+      Object.freeze({
+        ...row,
+        rebalanced: NAMED_PORTFOLIO_ACCOUNTS.some(
+          (account) => input.namedAnchors[account].rows[index].rebalanced,
+        ),
+      }),
+    ),
+  );
+  const summary = summarizeInvestmentLabCompositionRows(rows);
+  const mode = input.pooledAnchor.mode;
+
+  return readyInvestmentLabCompositionValue(
+    Object.freeze({
+      ...input.pooledAnchor,
+      status: "ready" as const,
+      policy: INVESTMENT_LAB_ANCHOR_SCHEDULED_REBALANCE_POLICY,
+      weights: [] as const,
+      summary: Object.freeze({
+        ...summary,
+        instrumentCount: compensatedSum(
+          ready.map((scenario) => scenario.summary.instrumentCount),
+        ),
+        listedInstrumentCount: compensatedSum(
+          ready.map((scenario) => scenario.summary.listedInstrumentCount),
+        ),
+        fixedManualInstrumentCount: compensatedSum(
+          ready.map((scenario) => scenario.summary.fixedManualInstrumentCount),
+        ),
+        allocationBasis:
+          mode === "equal_weight_monthly"
+            ? ("named_account_equal_weight_monthly_then_sum" as const)
+            : ("named_account_current_weight_monthly_then_sum" as const),
+        rebalanceCount: compensatedSum(
+          ready.map((scenario) => scenario.summary.rebalanceCount),
+        ),
+        deferredRebalanceCount: compensatedSum(
+          ready.map((scenario) => scenario.summary.deferredRebalanceCount),
+        ),
+      }),
+      returnEstimate,
+      rows,
+      coverage: Object.freeze({
+        componentCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.componentCount),
+        ),
+        listedComponentCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.listedComponentCount),
+        ),
+        fixedManualComponentCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.fixedManualComponentCount),
+        ),
+        sourceFlowCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.sourceFlowCount),
+        ),
+        scenarioFlowLegCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.scenarioFlowLegCount),
+        ),
+        splitExecutionDateRows: compensatedSum(
+          ready.map((scenario) => scenario.coverage.splitExecutionDateRows),
+        ),
+        delayedExecutionLegs: compensatedSum(
+          ready.map((scenario) => scenario.coverage.delayedExecutionLegs),
+        ),
+        pendingComparisonRows: rows.filter((row) => row.hasPendingExecution)
+          .length,
+        rebalanceCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.rebalanceCount),
+        ),
+        deferredRebalanceCount: compensatedSum(
+          ready.map((scenario) => scenario.coverage.deferredRebalanceCount),
+        ),
+        manualObservationRows: compensatedSum(
+          ready.map((scenario) => scenario.coverage.manualObservationRows),
+        ),
+        manualCarryRows: compensatedSum(
+          ready.map((scenario) => scenario.coverage.manualCarryRows),
+        ),
+      }),
+      evidenceBlockers: [] as const,
+      blockers: returnEstimate
+        ? ([] as const)
+        : ([
+            {
+              reason: "scenario_return_unavailable" as const,
+              instrumentKey: null,
+              detail: "account_composition_return_unavailable",
+            },
+          ] as const),
+    }),
+  );
 }
 
 function composeAnchorScenario<T extends AnchorScenario>(input: Readonly<{

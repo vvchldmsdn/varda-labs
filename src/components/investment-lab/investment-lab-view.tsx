@@ -14,6 +14,7 @@ import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
+import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
 import type { InvestmentLabAccountComposition } from "@/lib/investment-lab-account-composition";
 import type { InvestmentLabAccountFundingPreflight } from "@/lib/investment-lab-account-funding-preflight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
@@ -30,6 +31,8 @@ export function InvestmentLabView({
   accountComposition,
   anchorBasketScenario,
   anchorValueWeightScenario,
+  anchorCurrentWeightMonthlyScenario,
+  anchorEqualWeightMonthlyScenario,
   dataAvailability,
   fountScopeAdjustment,
   fundingPreflight,
@@ -41,6 +44,8 @@ export function InvestmentLabView({
   accountComposition: InvestmentLabAccountComposition;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
@@ -66,6 +71,32 @@ export function InvestmentLabView({
       }
       data-anchor-value-weight-status={
         periodReady ? anchorValueWeightScenario.status : "unavailable"
+      }
+      data-anchor-current-weight-monthly-status={
+        periodReady ? anchorCurrentWeightMonthlyScenario.status : "unavailable"
+      }
+      data-anchor-current-weight-monthly-comparison-dates={
+        periodReady && anchorCurrentWeightMonthlyScenario.status === "ready"
+          ? (anchorCurrentWeightMonthlyScenario.summary?.comparisonDateCount ?? 0)
+          : 0
+      }
+      data-anchor-current-weight-monthly-rebalances={
+        periodReady && anchorCurrentWeightMonthlyScenario.status === "ready"
+          ? (anchorCurrentWeightMonthlyScenario.summary?.rebalanceCount ?? 0)
+          : 0
+      }
+      data-anchor-equal-weight-monthly-status={
+        periodReady ? anchorEqualWeightMonthlyScenario.status : "unavailable"
+      }
+      data-anchor-equal-weight-monthly-comparison-dates={
+        periodReady && anchorEqualWeightMonthlyScenario.status === "ready"
+          ? (anchorEqualWeightMonthlyScenario.summary?.comparisonDateCount ?? 0)
+          : 0
+      }
+      data-anchor-equal-weight-monthly-rebalances={
+        periodReady && anchorEqualWeightMonthlyScenario.status === "ready"
+          ? (anchorEqualWeightMonthlyScenario.summary?.rebalanceCount ?? 0)
+          : 0
       }
       data-comparison-dates={
         periodReady ? model.coverage.completeComparisonDates : 0
@@ -195,6 +226,10 @@ export function InvestmentLabView({
           <ReadyView
             anchorBasketScenario={anchorBasketScenario}
             anchorValueWeightScenario={anchorValueWeightScenario}
+            anchorCurrentWeightMonthlyScenario={
+              anchorCurrentWeightMonthlyScenario
+            }
+            anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
             fountScopeAdjustment={fountScopeAdjustment}
             model={model}
             period={period}
@@ -211,6 +246,8 @@ export function InvestmentLabView({
 function ReadyView({
   anchorBasketScenario,
   anchorValueWeightScenario,
+  anchorCurrentWeightMonthlyScenario,
+  anchorEqualWeightMonthlyScenario,
   fountScopeAdjustment,
   model,
   period,
@@ -218,6 +255,8 @@ function ReadyView({
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
@@ -277,12 +316,16 @@ function ReadyView({
       <InvestmentLabScenarioChartView
         anchorBasketScenario={anchorBasketScenario}
         anchorValueWeightScenario={anchorValueWeightScenario}
+        anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
+        anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
         model={model}
       />
 
       <InvestmentLabScenarioMatrix
         anchorBasketScenario={anchorBasketScenario}
         anchorValueWeightScenario={anchorValueWeightScenario}
+        anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
+        anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
         model={model}
       />
 

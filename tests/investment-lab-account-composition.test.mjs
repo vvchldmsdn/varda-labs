@@ -17,7 +17,7 @@ import {
 import { NAMED_PORTFOLIO_ACCOUNTS } from "../src/lib/portfolio-account-scope.ts";
 
 describe("investment lab named-account composition", () => {
-  it("derives all eight all-account paths from complete named-account paths", () => {
+  it("derives all ten all-account paths from complete named-account paths", () => {
     const fixture = buildFixture();
     const result = compose(fixture);
 
@@ -38,6 +38,8 @@ describe("investment lab named-account composition", () => {
         preperiod_min_volatility: "ready",
         anchor_basket: "ready",
         anchor_value_weight: "ready",
+        anchor_current_weight_monthly: "ready",
+        anchor_equal_weight_monthly: "ready",
       },
     );
     assert.equal(result.model.status, "ready");
@@ -90,6 +92,14 @@ describe("investment lab named-account composition", () => {
       "named_account_anchor_value_weight_then_sum",
     );
     assert.equal(result.anchorValueWeightScenario.weights.length, 0);
+    assert.equal(
+      result.anchorCurrentWeightMonthlyScenario.summary.allocationBasis,
+      "named_account_current_weight_monthly_then_sum",
+    );
+    assert.equal(
+      result.anchorEqualWeightMonthlyScenario.summary.allocationBasis,
+      "named_account_equal_weight_monthly_then_sum",
+    );
   });
 
   it("keeps unrelated all-account scenarios when one named VOO path is unavailable", () => {
@@ -270,6 +280,11 @@ function compose(fixture) {
     namedAnchors: fixture.namedAnchors,
     pooledAnchorValueWeight: fixture.pooledAnchorValueWeight,
     namedAnchorValueWeights: fixture.namedAnchorValueWeights,
+    pooledAnchorCurrentWeightMonthly:
+      fixture.pooledAnchorCurrentWeightMonthly,
+    namedAnchorCurrentWeightMonthly: fixture.namedAnchorCurrentWeightMonthly,
+    pooledAnchorEqualWeightMonthly: fixture.pooledAnchorEqualWeightMonthly,
+    namedAnchorEqualWeightMonthly: fixture.namedAnchorEqualWeightMonthly,
   });
 }
 
@@ -319,6 +334,44 @@ function buildFixture() {
     1.25,
     3,
   );
+  const namedAnchorCurrentWeightMonthly = Object.fromEntries(
+    NAMED_PORTFOLIO_ACCOUNTS.map((account, index) => [
+      account,
+      anchorScheduledScenario(
+        account,
+        namedModels[account],
+        1 + (index + 1) / 300,
+        1,
+        "current_weight_monthly",
+      ),
+    ]),
+  );
+  const namedAnchorEqualWeightMonthly = Object.fromEntries(
+    NAMED_PORTFOLIO_ACCOUNTS.map((account, index) => [
+      account,
+      anchorScheduledScenario(
+        account,
+        namedModels[account],
+        1 + (index + 1) / 400,
+        1,
+        "equal_weight_monthly",
+      ),
+    ]),
+  );
+  const pooledAnchorCurrentWeightMonthly = anchorScheduledScenario(
+    "all",
+    pooledModel,
+    1.1,
+    3,
+    "current_weight_monthly",
+  );
+  const pooledAnchorEqualWeightMonthly = anchorScheduledScenario(
+    "all",
+    pooledModel,
+    1.1,
+    3,
+    "equal_weight_monthly",
+  );
   return {
     source,
     pooledModel,
@@ -327,6 +380,10 @@ function buildFixture() {
     namedAnchors,
     pooledAnchorValueWeight,
     namedAnchorValueWeights,
+    pooledAnchorCurrentWeightMonthly,
+    namedAnchorCurrentWeightMonthly,
+    pooledAnchorEqualWeightMonthly,
+    namedAnchorEqualWeightMonthly,
   };
 }
 
@@ -415,6 +472,45 @@ function anchorValueWeightScenario(
     summary: {
       ...scenario.summary,
       allocationBasis: "single_scope_anchor_value_weight",
+    },
+  };
+}
+
+function anchorScheduledScenario(
+  account,
+  model,
+  multiplier,
+  sourceFlowCount,
+  mode,
+) {
+  const scenario = anchorScenario(
+    account,
+    model,
+    multiplier,
+    sourceFlowCount,
+  );
+  return {
+    ...scenario,
+    mode,
+    weights: [],
+    rows: scenario.rows.map((row) => ({ ...row, rebalanced: false })),
+    summary: {
+      ...scenario.summary,
+      listedInstrumentCount: 2,
+      fixedManualInstrumentCount: 0,
+      allocationBasis:
+        mode === "equal_weight_monthly"
+          ? "single_scope_equal_weight_monthly"
+          : "single_scope_current_weight_monthly",
+      rebalanceCount: 0,
+      deferredRebalanceCount: 0,
+    },
+    coverage: {
+      ...scenario.coverage,
+      listedComponentCount: 2,
+      fixedManualComponentCount: 0,
+      rebalanceCount: 0,
+      deferredRebalanceCount: 0,
     },
   };
 }

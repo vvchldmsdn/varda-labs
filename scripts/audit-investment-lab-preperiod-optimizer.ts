@@ -88,13 +88,31 @@ async function main() {
       });
     const optimizer = readModel.preperiodOptimizer;
     const anchorScenario = readModel.anchorBasketScenario;
+    const currentWeightMonthly =
+      readModel.anchorCurrentWeightMonthlyScenario;
+    const equalWeightMonthly = readModel.anchorEqualWeightMonthlyScenario;
     results.push(
       Object.freeze({
         account,
         status: optimizer.status,
+        observedPath:
+          readModel.model.observedPath.status === "ready"
+            ? Object.freeze({
+                status: "ready" as const,
+                startServiceDate:
+                  readModel.model.observedPath.summary.startServiceDate,
+                endServiceDate:
+                  readModel.model.observedPath.summary.endServiceDate,
+                comparisonDateCount:
+                  readModel.model.observedPath.summary.comparisonDateCount,
+              })
+            : Object.freeze({ status: "blocked" as const }),
+        fountScopeAdjustment: readModel.fountScopeAdjustment.status,
         selectedAnchorDate: anchorScenario.anchor.selectedAnchorDate,
         candidateAnchorDateCount:
           anchorScenario.anchor.candidateAnchorDates.length,
+        anchorBlockers: anchorScenario.anchor.blockers,
+        anchorCoverage: anchorScenario.anchor.coverage,
         candidateCount: optimizer.candidates.length,
         readyPathCount: optimizer.candidates.filter(
           (candidate) => candidate.scenario.status === "ready",
@@ -107,6 +125,10 @@ async function main() {
           anchorScenario.coverage.manualValuationComponentCount,
         manualObservationRows: anchorScenario.coverage.manualObservationRows,
         manualCarryRows: anchorScenario.coverage.manualCarryRows,
+        scheduledScenarios: Object.freeze({
+          currentWeightMonthly: scheduledSummary(currentWeightMonthly),
+          equalWeightMonthly: scheduledSummary(equalWeightMonthly),
+        }),
         blockerCount: optimizer.blockers.length,
         blockers: optimizer.blockers,
         evidenceBlockers: [
@@ -133,6 +155,28 @@ async function main() {
       2,
     ),
   );
+}
+
+function scheduledSummary(
+  scenario: Readonly<{
+    status: "ready" | "unavailable";
+    summary: Readonly<{
+      comparisonDateCount: number;
+      rebalanceCount: number;
+      deferredRebalanceCount: number;
+    }> | null;
+    blockers: readonly Readonly<{ reason: string }>[];
+  }>,
+) {
+  return Object.freeze({
+    status: scenario.status,
+    comparisonDateCount: scenario.summary?.comparisonDateCount ?? 0,
+    rebalanceCount: scenario.summary?.rebalanceCount ?? 0,
+    deferredRebalanceCount: scenario.summary?.deferredRebalanceCount ?? 0,
+    blockers: Object.freeze(
+      [...new Set(scenario.blockers.map((row) => row.reason))].sort(),
+    ),
+  });
 }
 
 void main().catch((error: unknown) => {

@@ -27,6 +27,7 @@ import "./investment-lab-path-risk.test.mjs";
 import "./investment-lab-cash-comparison.test.mjs";
 import "./investment-lab-anchor-basket.test.mjs";
 import "./investment-lab-anchor-value-weight.test.mjs";
+import "./investment-lab-anchor-scheduled-rebalance.test.mjs";
 import "./investment-lab-scenario-matrix.test.mjs";
 import "./investment-lab-scenario-chart.test.mjs";
 import "./investment-lab-preperiod-min-volatility.test.mjs";

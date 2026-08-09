@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { buildInvestmentLabScenarioMatrix } from "../src/lib/investment-lab-scenario-matrix.ts";
+import { buildInvestmentLabScenarioMatrix as buildScenarioMatrix } from "../src/lib/investment-lab-scenario-matrix.ts";
 
 describe("investment lab scenario comparison matrix", () => {
-  it("projects eight existing scenarios in a fixed neutral order", () => {
+  it("projects ten existing scenarios in a fixed neutral order", () => {
     const matrix = buildInvestmentLabScenarioMatrix({
       model: readyModel(),
       anchorBasketScenario: readyAnchor(),
@@ -24,9 +24,11 @@ describe("investment lab scenario comparison matrix", () => {
         "preperiod_min_volatility",
         "anchor_basket",
         "anchor_value_weight",
+        "anchor_current_weight_monthly",
+        "anchor_equal_weight_monthly",
       ],
     );
-    assert.equal(matrix.coverage.readyRowCount, 8);
+    assert.equal(matrix.coverage.readyRowCount, 10);
     assert.equal(matrix.coverage.unavailableRowCount, 0);
     const rowsById = Object.fromEntries(
       matrix.rows.map((row) => [row.id, row]),
@@ -53,6 +55,8 @@ describe("investment lab scenario comparison matrix", () => {
       "anchor_instrument_raw_close",
     );
     assert.equal(rowsById.anchor_value_weight.flowCount, 2);
+    assert.equal(rowsById.anchor_current_weight_monthly.flowCount, 2);
+    assert.equal(rowsById.anchor_equal_weight_monthly.flowCount, 2);
   });
 
   it("labels a manual-valued anchor basket without claiming raw closes", () => {
@@ -111,7 +115,7 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(row.endValueKrw, null);
     assert.equal(row.flowCount, null);
     assert.ok(row.reasonCodes.includes("tickerless_anchor_holding"));
-    assert.equal(matrix.coverage.readyRowCount, 7);
+    assert.equal(matrix.coverage.readyRowCount, 9);
   });
 
   it("fails only a source row whose period differs from the common period", () => {
@@ -131,7 +135,7 @@ describe("investment lab scenario comparison matrix", () => {
 
     assert.equal(row?.status, "unavailable");
     assert.deepEqual(row?.reasonCodes, ["period_mismatch"]);
-    assert.equal(matrix.coverage.readyRowCount, 7);
+    assert.equal(matrix.coverage.readyRowCount, 9);
     assert.equal(matrix.rows[1].status, "ready");
   });
 
@@ -183,7 +187,7 @@ describe("investment lab scenario comparison matrix", () => {
 
     assert.equal(matrix.status, "unavailable");
     assert.equal(matrix.coverage.readyRowCount, 0);
-    assert.equal(matrix.coverage.unavailableRowCount, 8);
+    assert.equal(matrix.coverage.unavailableRowCount, 10);
     assert.ok(matrix.rows.every((row) => row.endValueKrw === null));
   });
 
@@ -219,6 +223,8 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(rows.voo.status, "ready");
     assert.equal(rows.anchor_basket.status, "ready");
     assert.equal(rows.anchor_value_weight.status, "ready");
+    assert.equal(rows.anchor_current_weight_monthly.status, "ready");
+    assert.equal(rows.anchor_equal_weight_monthly.status, "ready");
     assert.equal(rows.kodex200.status, "unavailable");
     assert.equal(rows.fixed_mix.status, "unavailable");
     assert.equal(rows.preperiod_min_volatility.status, "unavailable");
@@ -425,6 +431,43 @@ function readyValueWeight() {
       endDifferenceKrw: 75,
     },
   };
+}
+
+function readyScheduled(mode) {
+  const anchor = readyAnchor();
+  return {
+    ...anchor,
+    mode,
+    weights: [],
+    summary: {
+      ...anchor.summary,
+      listedInstrumentCount: 2,
+      fixedManualInstrumentCount: 0,
+      allocationBasis:
+        mode === "equal_weight_monthly"
+          ? "single_scope_equal_weight_monthly"
+          : "single_scope_current_weight_monthly",
+      rebalanceCount: 1,
+      deferredRebalanceCount: 0,
+    },
+    coverage: {
+      ...anchor.coverage,
+      listedComponentCount: 2,
+      fixedManualComponentCount: 0,
+      rebalanceCount: 1,
+      deferredRebalanceCount: 0,
+    },
+  };
+}
+
+function buildInvestmentLabScenarioMatrix(input) {
+  return buildScenarioMatrix({
+    anchorCurrentWeightMonthlyScenario: readyScheduled(
+      "current_weight_monthly",
+    ),
+    anchorEqualWeightMonthlyScenario: readyScheduled("equal_weight_monthly"),
+    ...input,
+  });
 }
 
 function scenarioSummary(scenarioEndValueKrw, endDifferenceKrw) {
