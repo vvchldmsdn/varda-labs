@@ -54,28 +54,27 @@ const SESSION_COOKIE =
 const LEAK_PATTERN =
   /legacyBase44Id|holdingId|assetId|ownerUserId|api[_-]?key|authorization|password|secret|token|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
-if (!PASSWORD) throw new Error("Dashboard access password is not configured");
 if (!["all", "brokerage", "isa", "irp"].includes(ACCOUNT)) {
   throw new Error(`Unsupported account scope: ${ACCOUNT}`);
 }
 
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
-const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
+const authorization = PASSWORD
+  ? `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`
+  : null;
 
 async function main() {
-  const unauthorized = await request("/investment-lab");
-  assert.equal(unauthorized.status, 401, "no-auth route must return 401");
-
   const routePath = investmentLabRoutePath();
+  const boundary = await request(routePath);
+  assert.equal(boundary.status, 200, "session boundary must return 200");
+  assert.match(boundary.body, /Investment Lab/);
+  assert.match(boundary.body, /Portfolio user link/);
+  assert.match(boundary.body, /Product database read/);
+  assert.match(boundary.body, /Not attempted/);
+  assert.doesNotMatch(boundary.body, /data-page="investment-lab"/);
+  assert.doesNotMatch(boundary.body, LEAK_PATTERN);
+
   if (!SESSION_COOKIE) {
-    const boundary = await request(routePath, true);
-    assert.equal(boundary.status, 200, "Basic-auth boundary must return 200");
-    assert.match(boundary.body, /Investment Lab/);
-    assert.match(boundary.body, /Portfolio user link/);
-    assert.match(boundary.body, /Product database read/);
-    assert.match(boundary.body, /Not attempted/);
-    assert.doesNotMatch(boundary.body, /data-page="investment-lab"/);
-    assert.doesNotMatch(boundary.body, LEAK_PATTERN);
     console.log(
       JSON.stringify(
         {
@@ -1446,7 +1445,7 @@ async function main() {
 async function request(path, authenticated = false) {
   const headers = authenticated
     ? {
-        authorization,
+        ...(authorization ? { authorization } : {}),
         ...(SESSION_COOKIE ? { cookie: SESSION_COOKIE } : {}),
       }
     : undefined;
