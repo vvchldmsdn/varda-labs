@@ -204,6 +204,48 @@ describe("investment lab period selection", () => {
       "current_writer_calculation_candidate",
     );
   });
+
+  it("uses complete named-account rows to scope an IRP Fount adjustment", async () => {
+    const source = fixture();
+    source.eventRows = [];
+    const scopedRepository = repository(source);
+    let requestedServiceDates = [];
+    scopedRepository.loadFountRuntimeEvidence = async (serviceDates) => {
+      requestedServiceDates = [...serviceDates];
+      return {
+        status: "ready",
+        binding: {
+          selectorBasis: "exact_snapshot_legacy_asset_id",
+          snapshotLegacyAssetId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+          account: "irp",
+        },
+        positionRows: serviceDates.map((snapshotDate) => ({
+          snapshotDate,
+          account: "irp",
+          source: "varda_manual_daily_snapshot",
+          snapshotLegacyAssetId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+          marketValueKrw: "10.000000",
+        })),
+      };
+    };
+
+    const result = await loadInvestmentLabCounterfactualReadModel(
+      scopedRepository,
+      undefined,
+      undefined,
+      undefined,
+      "irp",
+    );
+
+    assert.deepEqual(requestedServiceDates, [
+      "2026-01-02",
+      "2026-01-05",
+      "2026-01-06",
+      "2026-01-07",
+    ]);
+    assert.equal(result.fountScopeAdjustment.status, "applied");
+    assert.equal(result.model.status, "ready");
+  });
 });
 
 function repository(source) {
