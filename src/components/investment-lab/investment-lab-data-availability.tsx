@@ -236,7 +236,6 @@ function scenarioReasonLabel(reason: InvestmentLabScenarioAvailabilityReason) {
     manual_valuation_history_required:
       "금현물은 현재 수동 평가만 있고 과거 수동 평가 이력이 부족",
     special_holding_price_authority_required: "특수 보유자산의 별도 가격 권한이 필요",
-    scheduled_rebalance_contract_pending: "월간·분기 리밸런싱 규칙과 비용 계약이 미정",
     point_in_time_policy_receipts_missing: "과거 시점 목표·추천 승인 기록이 없음",
     walk_forward_cost_constraints_pending: "walk-forward·회전율·비용·계정 제약 검증 전",
     multivariate_history_unavailable: "다변량 분석에 필요한 완전한 종목 구성이 없음",

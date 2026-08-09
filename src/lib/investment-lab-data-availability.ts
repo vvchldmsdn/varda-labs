@@ -6,6 +6,7 @@ import {
   type PortfolioAccountScope,
 } from "./portfolio-account-scope.ts";
 import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
+import { INVESTMENT_LAB_ANCHOR_SCHEDULED_REBALANCE_POLICY } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import {
   buildManualValuationHistoryCoverage,
   type ManualValuationCurrentRow,
@@ -17,7 +18,7 @@ const CURRENT_SOURCE = "varda_manual_daily_snapshot";
 const CURRENT_RULE_VERSION = "varda-manual-daily-snapshot-v1";
 
 export const INVESTMENT_LAB_DATA_AVAILABILITY_POLICY = Object.freeze({
-  version: "investment_lab_data_availability_v1",
+  version: "investment_lab_data_availability_v2",
   marketReturnObservationTarget: 90,
   minimumActualComparisonDates: 2,
   actualCalculationAuthority: "current_writer_single_segment_only",
@@ -26,6 +27,8 @@ export const INVESTMENT_LAB_DATA_AVAILABILITY_POLICY = Object.freeze({
   silentInterpolation: "forbidden",
   providerCalls: "none",
   databaseWrites: "none",
+  scheduledRebalancePolicyVersion:
+    INVESTMENT_LAB_ANCHOR_SCHEDULED_REBALANCE_POLICY.version,
 } as const);
 
 export type InvestmentLabAvailabilitySnapshotRow = Readonly<{
@@ -78,7 +81,6 @@ export type InvestmentLabScenarioAvailabilityReason =
   | "fount_scope_adjustment_required"
   | "manual_valuation_history_required"
   | "special_holding_price_authority_required"
-  | "scheduled_rebalance_contract_pending"
   | "point_in_time_policy_receipts_missing"
   | "walk_forward_cost_constraints_pending"
   | "multivariate_history_unavailable";
@@ -235,7 +237,6 @@ export function buildInvestmentLabDataAvailability(input: {
           marketHistoryReady
             ? "authoritative_actual_history_pending"
             : "market_history_incomplete",
-          "scheduled_rebalance_contract_pending",
           ...(hasFount ? ["fount_scope_adjustment_required" as const] : []),
           ...specialHistoryReasons,
         ],

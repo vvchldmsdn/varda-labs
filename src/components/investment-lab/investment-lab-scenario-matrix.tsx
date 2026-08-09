@@ -1,5 +1,6 @@
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
+import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import { INVESTMENT_LAB_PATH_RISK_POLICY } from "@/lib/investment-lab-path-risk";
 import {
@@ -18,16 +19,22 @@ const VOLATILITY_ANNUALIZATION_FACTOR =
 export function InvestmentLabScenarioMatrix({
   anchorBasketScenario,
   anchorValueWeightScenario,
+  anchorCurrentWeightMonthlyScenario,
+  anchorEqualWeightMonthlyScenario,
   model,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   model: InvestmentLabCounterfactualReadModel;
 }) {
   const matrix = buildInvestmentLabScenarioMatrix({
     model,
     anchorBasketScenario,
     anchorValueWeightScenario,
+    anchorCurrentWeightMonthlyScenario,
+    anchorEqualWeightMonthlyScenario,
   });
 
   return (
@@ -206,6 +213,8 @@ function scenarioLabel(
     zero_return: "제로수익 동일흐름 현금 기준선",
     anchor_basket: "기준일 바스켓",
     anchor_value_weight: "기준일 비중 유지",
+    anchor_current_weight_monthly: "현재 비중 월간 유지",
+    anchor_equal_weight_monthly: "동일 비중 월간 유지",
   };
   return labels[id];
 }
@@ -244,6 +253,10 @@ function scenarioDetail(
     anchor_basket: "초기 동일비중·이후 흐름 균등배분",
     anchor_value_weight:
       "기준일 저장 평가액 비중으로 초기·외부 흐름 배분 · 리밸런싱 없음",
+    anchor_current_weight_monthly:
+      "계좌별 기준일 비중으로 월초 리밸런싱 · 비용·세금 미반영",
+    anchor_equal_weight_monthly:
+      "계좌별 동일 비중으로 월초 리밸런싱 · 비용·세금 미반영",
   };
   return details[id];
 }

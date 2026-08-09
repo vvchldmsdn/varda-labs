@@ -1,5 +1,6 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import type { InvestmentLabAnchorScheduledRebalanceScenario } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
@@ -29,7 +30,9 @@ export type InvestmentLabAccountCompositionScenarioId =
   | "fixed_mix"
   | "preperiod_min_volatility"
   | "anchor_basket"
-  | "anchor_value_weight";
+  | "anchor_value_weight"
+  | "anchor_current_weight_monthly"
+  | "anchor_equal_weight_monthly";
 
 export type InvestmentLabAccountCompositionBlocker =
   | "named_account_model_unavailable"
@@ -66,6 +69,10 @@ export type InvestmentLabNamedAnchors = Readonly<
 
 export type InvestmentLabNamedAnchorValueWeights = Readonly<
   Record<NamedPortfolioAccount, InvestmentLabAnchorValueWeightScenario>
+>;
+
+export type InvestmentLabNamedAnchorScheduledRebalances = Readonly<
+  Record<NamedPortfolioAccount, InvestmentLabAnchorScheduledRebalanceScenario>
 >;
 
 export type InvestmentLabComposableRow = Readonly<{

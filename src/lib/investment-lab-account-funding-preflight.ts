@@ -1,10 +1,12 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import type { InvestmentLabAnchorScheduledRebalanceScenario } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import type {
   InvestmentLabAccountComposition,
   InvestmentLabAccountCompositionScenarioId,
   InvestmentLabNamedAnchors,
   InvestmentLabNamedAnchorValueWeights,
+  InvestmentLabNamedAnchorScheduledRebalances,
   InvestmentLabNamedModels,
 } from "./investment-lab-account-composition-contract.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
@@ -82,6 +84,8 @@ const SCENARIO_IDS = Object.freeze([
   "preperiod_min_volatility",
   "anchor_basket",
   "anchor_value_weight",
+  "anchor_current_weight_monthly",
+  "anchor_equal_weight_monthly",
 ] as const satisfies readonly InvestmentLabAccountCompositionScenarioId[]);
 
 export function buildInvestmentLabNamedAccountFundingPreflight(input: Readonly<{
@@ -89,12 +93,16 @@ export function buildInvestmentLabNamedAccountFundingPreflight(input: Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
 }>): InvestmentLabAccountFundingPreflight {
   const row = accountRow(
     input.account,
     input.model,
     input.anchorBasketScenario,
     input.anchorValueWeightScenario,
+    input.anchorCurrentWeightMonthlyScenario,
+    input.anchorEqualWeightMonthlyScenario,
   );
   return preflight(input.account, [row], row.scenarios);
 }
@@ -103,6 +111,8 @@ export function buildInvestmentLabAllAccountFundingPreflight(input: Readonly<{
   namedModels: InvestmentLabNamedModels;
   namedAnchors: InvestmentLabNamedAnchors;
   namedAnchorValueWeights: InvestmentLabNamedAnchorValueWeights;
+  namedAnchorCurrentWeightMonthly: InvestmentLabNamedAnchorScheduledRebalances;
+  namedAnchorEqualWeightMonthly: InvestmentLabNamedAnchorScheduledRebalances;
   composition: InvestmentLabAccountComposition;
 }>): InvestmentLabAccountFundingPreflight {
   const rows = Object.freeze(
@@ -112,6 +122,8 @@ export function buildInvestmentLabAllAccountFundingPreflight(input: Readonly<{
         input.namedModels[account],
         input.namedAnchors[account],
         input.namedAnchorValueWeights[account],
+        input.namedAnchorCurrentWeightMonthly[account],
+        input.namedAnchorEqualWeightMonthly[account],
       ),
     ),
   );
@@ -129,6 +141,8 @@ function accountRow(
   model: InvestmentLabCounterfactualReadModel,
   anchor: InvestmentLabAnchorBasketScenario,
   anchorValueWeight: InvestmentLabAnchorValueWeightScenario,
+  anchorCurrentWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario,
+  anchorEqualWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario,
 ): InvestmentLabFundingAccountRow {
   const scenarios = scenarioRecord((scenarioId) => {
     switch (scenarioId) {
@@ -163,6 +177,14 @@ function accountRow(
           : unavailableResolution("upstream_scenario_unavailable");
       case "anchor_value_weight":
         return anchorValueWeight.status === "ready"
+          ? readyResolution()
+          : unavailableResolution("upstream_scenario_unavailable");
+      case "anchor_current_weight_monthly":
+        return anchorCurrentWeightMonthly.status === "ready"
+          ? readyResolution()
+          : unavailableResolution("upstream_scenario_unavailable");
+      case "anchor_equal_weight_monthly":
+        return anchorEqualWeightMonthly.status === "ready"
           ? readyResolution()
           : unavailableResolution("upstream_scenario_unavailable");
     }

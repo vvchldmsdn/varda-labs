@@ -154,6 +154,8 @@ async function InvestmentLabContent({
     accountComposition,
     anchorBasketScenario,
     anchorValueWeightScenario,
+    anchorCurrentWeightMonthlyScenario,
+    anchorEqualWeightMonthlyScenario,
     fountScopeAdjustment,
     fundingPreflight,
     model,
@@ -167,6 +169,10 @@ async function InvestmentLabContent({
         accountComposition={accountComposition}
         anchorBasketScenario={anchorBasketScenario}
         anchorValueWeightScenario={anchorValueWeightScenario}
+        anchorCurrentWeightMonthlyScenario={
+          anchorCurrentWeightMonthlyScenario
+        }
+        anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
         dataAvailability={
           <Suspense fallback={<InvestmentLabDataAvailabilitySkeleton />}>
             <InvestmentLabDataAvailabilityContent

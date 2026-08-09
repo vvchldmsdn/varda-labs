@@ -311,6 +311,30 @@ async function main() {
     route.body,
     "data-anchor-value-weight-status",
   );
+  const anchorCurrentWeightMonthlyStatus = readStringAttribute(
+    route.body,
+    "data-anchor-current-weight-monthly-status",
+  );
+  const anchorEqualWeightMonthlyStatus = readStringAttribute(
+    route.body,
+    "data-anchor-equal-weight-monthly-status",
+  );
+  const anchorCurrentWeightMonthlyComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-anchor-current-weight-monthly-comparison-dates",
+  );
+  const anchorEqualWeightMonthlyComparisonDates = readIntegerAttribute(
+    route.body,
+    "data-anchor-equal-weight-monthly-comparison-dates",
+  );
+  const anchorCurrentWeightMonthlyRebalances = readIntegerAttribute(
+    route.body,
+    "data-anchor-current-weight-monthly-rebalances",
+  );
+  const anchorEqualWeightMonthlyRebalances = readIntegerAttribute(
+    route.body,
+    "data-anchor-equal-weight-monthly-rebalances",
+  );
   const anchorValueWeightComparisonDates = readIntegerAttribute(
     route.body,
     "data-anchor-value-weight-comparison-dates",
@@ -354,6 +378,14 @@ async function main() {
     anchorValueWeightStatus === "ready" ||
       anchorValueWeightStatus === "unavailable",
   );
+  assert.ok(
+    anchorCurrentWeightMonthlyStatus === "ready" ||
+      anchorCurrentWeightMonthlyStatus === "unavailable",
+  );
+  assert.ok(
+    anchorEqualWeightMonthlyStatus === "ready" ||
+      anchorEqualWeightMonthlyStatus === "unavailable",
+  );
   assert.ok(anchorBasketCandidateDates >= 0);
   assert.ok(anchorBasketSourceRows >= anchorBasketEconomicInstruments);
   if (anchorBasketStatus === "ready") {
@@ -379,6 +411,26 @@ async function main() {
     );
   } else {
     assert.equal(anchorValueWeightComparisonDates, 0);
+  }
+  for (const [status, comparisonDates, rebalances] of [
+    [
+      anchorCurrentWeightMonthlyStatus,
+      anchorCurrentWeightMonthlyComparisonDates,
+      anchorCurrentWeightMonthlyRebalances,
+    ],
+    [
+      anchorEqualWeightMonthlyStatus,
+      anchorEqualWeightMonthlyComparisonDates,
+      anchorEqualWeightMonthlyRebalances,
+    ],
+  ]) {
+    if (status === "ready") {
+      assert.equal(comparisonDates, anchorBasketComparisonDates);
+      assert.ok(rebalances >= 0);
+    } else {
+      assert.equal(comparisonDates, 0);
+      assert.equal(rebalances, 0);
+    }
   }
   let anchorSpecialHoldingRows = 0;
   let anchorSpecialHoldingResolved = 0;
@@ -559,8 +611,8 @@ async function main() {
     assert.ok(
       scenarioChartStatus === "ready" || scenarioChartStatus === "partial",
     );
-    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 8);
-    assert.equal(scenarioChartLines + scenarioChartUnavailable, 8);
+    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 10);
+    assert.equal(scenarioChartLines + scenarioChartUnavailable, 10);
     assert.equal(
       scenarioChartStatus,
       scenarioChartUnavailable ? "partial" : "ready",
@@ -586,7 +638,7 @@ async function main() {
       "data-scenario-matrix-unavailable-rows",
     );
     assert.equal(scenarioMatrixStatus, "ready");
-    assert.equal(scenarioMatrixRows, 8);
+    assert.equal(scenarioMatrixRows, 10);
     assert.equal(
       scenarioMatrixReadyRows + scenarioMatrixUnavailableRows,
       scenarioMatrixRows,
@@ -600,6 +652,8 @@ async function main() {
       "zero_return",
       "anchor_basket",
       "anchor_value_weight",
+      "anchor_current_weight_monthly",
+      "anchor_equal_weight_monthly",
     ]) {
       assert.match(route.body, new RegExp(`data-scenario-row="${scenarioId}"`));
     }
@@ -1242,7 +1296,9 @@ async function main() {
     (cashComparisonStatus === "ready" ? 1 : 0) +
     (preperiodMinVolatilityStatus === "ready" ? 1 : 0) +
     (anchorBasketStatus === "ready" ? 1 : 0) +
-    (anchorValueWeightStatus === "ready" ? 1 : 0);
+    (anchorValueWeightStatus === "ready" ? 1 : 0) +
+    (anchorCurrentWeightMonthlyStatus === "ready" ? 1 : 0) +
+    (anchorEqualWeightMonthlyStatus === "ready" ? 1 : 0);
   assert.equal(scenarioMatrixReadyRows, expectedScenarioMatrixReadyRows);
   assert.equal(
     scenarioMatrixUnavailableRows,
@@ -1354,6 +1410,12 @@ async function main() {
         anchorBasketStatus,
         anchorValueWeightStatus,
         anchorValueWeightComparisonDates,
+        anchorCurrentWeightMonthlyStatus,
+        anchorCurrentWeightMonthlyComparisonDates,
+        anchorCurrentWeightMonthlyRebalances,
+        anchorEqualWeightMonthlyStatus,
+        anchorEqualWeightMonthlyComparisonDates,
+        anchorEqualWeightMonthlyRebalances,
         anchorBasketCandidateDates,
         anchorBasketSourceRows,
         anchorBasketEconomicInstruments,

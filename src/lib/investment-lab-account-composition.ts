@@ -1,9 +1,14 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
+import {
+  unavailableInvestmentLabAnchorScheduledRebalanceScenario,
+  type InvestmentLabAnchorScheduledRebalanceScenario,
+} from "./investment-lab-anchor-scheduled-rebalance.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import {
   composeInvestmentLabAnchor,
   composeInvestmentLabAnchorValueWeight,
+  composeInvestmentLabAnchorScheduledRebalance,
   unavailableInvestmentLabAnchor,
   unavailableInvestmentLabAnchorValueWeight,
 } from "./investment-lab-account-composition-anchor.ts";
@@ -15,6 +20,7 @@ import {
   type InvestmentLabCompositionValue,
   type InvestmentLabNamedAnchors,
   type InvestmentLabNamedAnchorValueWeights,
+  type InvestmentLabNamedAnchorScheduledRebalances,
   type InvestmentLabNamedModels,
 } from "./investment-lab-account-composition-contract.ts";
 import {
@@ -57,10 +63,16 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
   namedAnchors: InvestmentLabNamedAnchors;
   pooledAnchorValueWeight: InvestmentLabAnchorValueWeightScenario;
   namedAnchorValueWeights: InvestmentLabNamedAnchorValueWeights;
+  pooledAnchorCurrentWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario;
+  namedAnchorCurrentWeightMonthly: InvestmentLabNamedAnchorScheduledRebalances;
+  pooledAnchorEqualWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario;
+  namedAnchorEqualWeightMonthly: InvestmentLabNamedAnchorScheduledRebalances;
 }>): Readonly<{
   model: InvestmentLabCounterfactualReadModel;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
+  anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   composition: InvestmentLabAccountComposition;
 }> {
   const observed = composeInvestmentLabObservedPath(
@@ -109,6 +121,16 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     pooledAnchor: input.pooledAnchorValueWeight,
     namedAnchors: input.namedAnchorValueWeights,
   });
+  const anchorCurrentWeightMonthly =
+    composeInvestmentLabAnchorScheduledRebalance({
+      pooledAnchor: input.pooledAnchorCurrentWeightMonthly,
+      namedAnchors: input.namedAnchorCurrentWeightMonthly,
+    });
+  const anchorEqualWeightMonthly =
+    composeInvestmentLabAnchorScheduledRebalance({
+      pooledAnchor: input.pooledAnchorEqualWeightMonthly,
+      namedAnchors: input.namedAnchorEqualWeightMonthly,
+    });
 
   const scenarios = Object.freeze({
     actual: resolution(observed),
@@ -119,6 +141,8 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
     preperiod_min_volatility: resolution(preperiodMinVolatility),
     anchor_basket: resolution(anchor),
     anchor_value_weight: resolution(anchorValueWeight),
+    anchor_current_weight_monthly: resolution(anchorCurrentWeightMonthly),
+    anchor_equal_weight_monthly: resolution(anchorEqualWeightMonthly),
   });
   const required = Object.values(scenarios).filter(
     (scenario) => scenario.status !== "not_requested",
@@ -155,6 +179,14 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
               input.pooledAnchorValueWeight,
               anchorValueWeight.blockers,
             ),
+      anchorCurrentWeightMonthlyScenario: resolveScheduledComposition(
+        input.pooledAnchorCurrentWeightMonthly,
+        anchorCurrentWeightMonthly,
+      ),
+      anchorEqualWeightMonthlyScenario: resolveScheduledComposition(
+        input.pooledAnchorEqualWeightMonthly,
+        anchorEqualWeightMonthly,
+      ),
       composition,
     });
   }
@@ -246,6 +278,14 @@ export function composeInvestmentLabAllAccounts(input: Readonly<{
             input.pooledAnchorValueWeight,
             anchorValueWeight.blockers,
           ),
+    anchorCurrentWeightMonthlyScenario: resolveScheduledComposition(
+      input.pooledAnchorCurrentWeightMonthly,
+      anchorCurrentWeightMonthly,
+    ),
+    anchorEqualWeightMonthlyScenario: resolveScheduledComposition(
+      input.pooledAnchorEqualWeightMonthly,
+      anchorEqualWeightMonthly,
+    ),
     composition,
   });
 }
@@ -263,6 +303,8 @@ function scenarioRecord(
     "preperiod_min_volatility",
     "anchor_basket",
     "anchor_value_weight",
+    "anchor_current_weight_monthly",
+    "anchor_equal_weight_monthly",
   ];
   return Object.freeze(
     Object.fromEntries(
@@ -274,6 +316,23 @@ function scenarioRecord(
       InvestmentLabAccountCompositionScenarioId,
       InvestmentLabAccountCompositionScenarioResolution
     >,
+  );
+}
+
+function resolveScheduledComposition(
+  pooled: InvestmentLabAnchorScheduledRebalanceScenario,
+  composed: InvestmentLabCompositionValue<InvestmentLabAnchorScheduledRebalanceScenario>,
+) {
+  if (composed.status === "ready") return composed.value;
+  return unavailableInvestmentLabAnchorScheduledRebalanceScenario(
+    pooled,
+    hasCompositionBlocker(
+      composed.blockers,
+      "named_account_scenario_unavailable",
+    )
+      ? "account_composition_incomplete"
+      : "account_composition_mismatch",
+    composed.blockers.join(","),
   );
 }
 

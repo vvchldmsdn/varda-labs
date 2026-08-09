@@ -29,6 +29,10 @@ describe("investment lab data availability", () => {
     );
     assert.equal(model.marketHistory.status, "ready");
     assert.equal(model.marketHistory.multivariateStatus, "ready");
+    assert.equal(
+      model.policy.scheduledRebalancePolicyVersion,
+      "anchor_listed_sleeve_monthly_rebalance_same_flow_v1",
+    );
     assert.deepEqual(
       model.scenarioRows.map((row) => [row.id, row.status]),
       [
@@ -38,6 +42,11 @@ describe("investment lab data availability", () => {
         ["historical_policy_weights", "blocked"],
         ["hindsight_research", "research_only"],
       ],
+    );
+    assert.ok(
+      !scenario(model, "scheduled_weights").reasons.includes(
+        "scheduled_rebalance_contract_pending",
+      ),
     );
     assert.deepEqual(
       model.repairItems.map((row) => [row.id, row.status, row.affectedCount]),
