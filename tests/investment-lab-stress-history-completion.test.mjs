@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  INVESTMENT_LAB_STRESS_FX_WRITE_CONFIRMATION,
   INVESTMENT_LAB_STRESS_HISTORY_COMPLETION_POLICY,
   parseInvestmentLabStressHistoryCommandArgs,
   planInvestmentLabStressHistoryCompletion,
@@ -20,6 +21,17 @@ describe("investment lab stress history completion", () => {
     assert.equal(
       parseInvestmentLabStressHistoryCommandArgs(["--provider-dry-run"]).mode,
       "provider_dry_run",
+    );
+    assert.throws(
+      () => parseInvestmentLabStressHistoryCommandArgs(["--fx-write"]),
+      /FX-only writes require both/,
+    );
+    assert.equal(
+      parseInvestmentLabStressHistoryCommandArgs([
+        "--fx-write",
+        INVESTMENT_LAB_STRESS_FX_WRITE_CONFIRMATION,
+      ]).mode,
+      "fx_write",
     );
   });
 
@@ -60,7 +72,10 @@ describe("investment lab stress history completion", () => {
       "utf8",
     );
     assert.equal((script.match(/createKisMarketDataProvider\(\)/g) ?? []).length, 1);
-    assert.match(script, /existingDates\.has\(row\.rateDate\)/);
+    assert.match(script, /existing\.date = incoming\.rate_date/);
+    assert.match(script, /pg_advisory_xact_lock/);
+    assert.match(script, /where not exists/);
+    assert.doesNotMatch(script, /client\.db\.transaction/);
     assert.doesNotMatch(script, /retry|setTimeout|setInterval/i);
   });
 });

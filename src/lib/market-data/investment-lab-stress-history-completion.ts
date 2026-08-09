@@ -6,6 +6,8 @@ import {
 
 export const INVESTMENT_LAB_STRESS_HISTORY_WRITE_CONFIRMATION =
   "--confirm-investment-lab-stress-history-write";
+export const INVESTMENT_LAB_STRESS_FX_WRITE_CONFIRMATION =
+  "--confirm-investment-lab-stress-fx-write";
 
 export const INVESTMENT_LAB_STRESS_HISTORY_COMPLETION_POLICY = Object.freeze({
   version: "investment_lab_stress_history_completion_v1",
@@ -30,7 +32,8 @@ export const INVESTMENT_LAB_STRESS_HISTORY_COMPLETION_POLICY = Object.freeze({
 export type InvestmentLabStressHistoryCommandMode =
   | "plan_only"
   | "provider_dry_run"
-  | "write";
+  | "write"
+  | "fx_write";
 
 export function parseInvestmentLabStressHistoryCommandArgs(
   args: readonly string[],
@@ -38,26 +41,41 @@ export function parseInvestmentLabStressHistoryCommandArgs(
   let providerDryRun = false;
   let write = false;
   let confirmed = false;
+  let fxWrite = false;
+  let fxConfirmed = false;
   for (const arg of args) {
     if (arg === "--provider-dry-run") providerDryRun = true;
     else if (arg === "--write") write = true;
+    else if (arg === "--fx-write") fxWrite = true;
     else if (arg === INVESTMENT_LAB_STRESS_HISTORY_WRITE_CONFIRMATION) {
       confirmed = true;
+    } else if (arg === INVESTMENT_LAB_STRESS_FX_WRITE_CONFIRMATION) {
+      fxConfirmed = true;
     } else {
       throw new Error(`unknown argument: ${arg}`);
     }
   }
-  if (providerDryRun && (write || confirmed)) {
+  if (providerDryRun && (write || confirmed || fxWrite || fxConfirmed)) {
     throw new Error("--provider-dry-run cannot be combined with write flags");
+  }
+  if ((write || confirmed) && (fxWrite || fxConfirmed)) {
+    throw new Error("full and FX-only write flags cannot be combined");
   }
   if (write !== confirmed) {
     throw new Error(
       `writes require both --write and ${INVESTMENT_LAB_STRESS_HISTORY_WRITE_CONFIRMATION}`,
     );
   }
+  if (fxWrite !== fxConfirmed) {
+    throw new Error(
+      `FX-only writes require both --fx-write and ${INVESTMENT_LAB_STRESS_FX_WRITE_CONFIRMATION}`,
+    );
+  }
   return Object.freeze({
     mode: (write
       ? "write"
+      : fxWrite
+        ? "fx_write"
       : providerDryRun
         ? "provider_dry_run"
         : "plan_only") as InvestmentLabStressHistoryCommandMode,

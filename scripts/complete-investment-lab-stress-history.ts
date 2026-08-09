@@ -79,6 +79,22 @@ async function main() {
     return;
   }
 
+  if (options.mode === "fx_write") {
+    const fxRows = await fetchStressFxHistory();
+    const fxWrite = await insertMissingStressFxRows({
+      sqlClient: client.sqlClient,
+      rows: fxRows,
+    });
+    console.log(
+      JSON.stringify(
+        fxOnlyWriteSummary(fxRows.length, fxWrite),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
   const [providerModule, syncModule] = await Promise.all([
     import("../src/lib/market-data/providers/kis.ts"),
     import("../src/lib/market-data/kis-history-cache-sync.ts"),
@@ -128,61 +144,9 @@ async function main() {
   const fxRows = await fetchStressFxHistory();
   const fxWrite =
     options.mode === "write"
-      ? await client.db.transaction(async (tx) => {
-          const existingRows = await tx
-            .select({
-              rateDate: schema.fxRates.rateDate,
-              usdKrw: schema.fxRates.usdKrw,
-              status: schema.fxRates.status,
-            })
-            .from(schema.fxRates)
-            .where(eq(schema.fxRates.isSample, false));
-          const relevant = existingRows.filter(
-            (row) =>
-              row.rateDate >=
-                INVESTMENT_LAB_STRESS_HISTORY_COMPLETION_POLICY.fxRange
-                  .startDate &&
-              row.rateDate <=
-                INVESTMENT_LAB_STRESS_HISTORY_COMPLETION_POLICY.fxRange.endDate,
-          );
-          const existingDates = new Set(
-            relevant.map((row) => row.rateDate),
-          );
-          const invalidExistingDateCount = new Set(
-            relevant
-              .filter((row) => {
-                const rate = Number(row.usdKrw);
-                const status = row.status?.trim().toLowerCase();
-                return (
-                  !Number.isFinite(rate) ||
-                  rate <= 0 ||
-                  Boolean(status && status !== "ok")
-                );
-              })
-              .map((row) => row.rateDate),
-          ).size;
-          const missingRows = fxRows.filter(
-            (row) => !existingDates.has(row.rateDate),
-          );
-          const fetchedAt = new Date();
-          for (const batch of chunk(missingRows, 250)) {
-            if (batch.length === 0) continue;
-            await tx.insert(schema.fxRates).values(
-              batch.map((row) => ({
-                rateDate: row.rateDate,
-                usdKrw: row.usdKrw,
-                source: row.source,
-                status: "ok",
-                fetchedAt,
-                isSample: false,
-              })),
-            );
-          }
-          return {
-            insertedCount: missingRows.length,
-            existingDateCount: existingDates.size,
-            invalidExistingDateCount,
-          };
+      ? await insertMissingStressFxRows({
+          sqlClient: client.sqlClient,
+          rows: fxRows,
         })
       : { insertedCount: 0, existingDateCount: 0, invalidExistingDateCount: 0 };
 
@@ -205,6 +169,98 @@ async function fetchStressFxHistory() {
   );
   if (!response.ok) throw new Error(`Frankfurter history failed (${response.status})`);
   return parseFrankfurterV2UsdKrwHistory(await response.json());
+}
+
+async function insertMissingStressFxRows({
+  sqlClient,
+  rows,
+}: {
+  sqlClient: {
+    query: (
+      query: string,
+      params: unknown[],
+    ) => Promise<Record<string, unknown>[]>;
+  };
+  rows: readonly { rateDate: string; usdKrw: string; source: string }[];
+}) {
+  const range = INVESTMENT_LAB_STRESS_HISTORY_COMPLETION_POLICY.fxRange;
+  const payload = rows.map((row) => ({
+    rateDate: row.rateDate,
+    usdKrw: row.usdKrw,
+    source: row.source,
+  }));
+  const [result] = await sqlClient.query(
+    `
+      with write_lock as materialized (
+        select pg_advisory_xact_lock(
+          hashtext('investment_lab_stress_fx_history_write_v1')
+        ) as acquired
+      ),
+      incoming_raw as (
+        select
+          value->>'rateDate' as rate_date,
+          value->>'usdKrw' as usd_krw,
+          value->>'source' as source
+        from jsonb_array_elements($1::jsonb)
+      ),
+      incoming as materialized (
+        select distinct on (rate_date)
+          rate_date::date as rate_date,
+          usd_krw::numeric(20, 6) as usd_krw,
+          source::varchar(100) as source
+        from incoming_raw
+        order by rate_date
+      ),
+      existing as materialized (
+        select date, usdkrw, status
+        from fx_rates
+        cross join write_lock
+        where is_sample = false
+          and date between $2::date and $3::date
+      ),
+      inserted as (
+        insert into fx_rates (
+          date,
+          usdkrw,
+          source,
+          status,
+          fetched_at,
+          is_sample
+        )
+        select
+          incoming.rate_date,
+          incoming.usd_krw,
+          incoming.source,
+          'ok',
+          $4::timestamptz,
+          false
+        from incoming
+        cross join write_lock
+        where not exists (
+          select 1
+          from existing
+          where existing.date = incoming.rate_date
+        )
+        returning date
+      )
+      select
+        (select count(*)::int from inserted) as inserted_count,
+        (select count(distinct date)::int from existing) as existing_date_count,
+        (
+          select count(distinct date)::int
+          from existing
+          where usdkrw <= 0
+            or (status is not null and lower(trim(status)) <> 'ok')
+        ) as invalid_existing_date_count
+    `,
+    [JSON.stringify(payload), range.startDate, range.endDate, new Date().toISOString()],
+  );
+  if (!result) throw new Error("FX history insert returned no summary");
+  return {
+    insertedCount: Number(result.inserted_count),
+    existingDateCount: Number(result.existing_date_count),
+    invalidExistingDateCount: Number(result.invalid_existing_date_count),
+  };
 }
 
 function planSummary(plans: readonly InvestmentLabStressHistoryPlan[]) {
@@ -287,6 +343,27 @@ function writeSummary(
   };
 }
 
+function fxOnlyWriteSummary(
+  fxFetchedRowCount: number,
+  fxWrite: {
+    insertedCount: number;
+    existingDateCount: number;
+    invalidExistingDateCount: number;
+  },
+) {
+  return {
+    operation: "investment_lab_stress_history_completion",
+    mode: "fx_write",
+    providerInstances: 0,
+    priceProviderCalls: 0,
+    priceDatabaseWrites: 0,
+    fxFetchedRowCount,
+    fxInsertedCount: fxWrite.insertedCount,
+    fxExistingDateCount: fxWrite.existingDateCount,
+    fxInvalidExistingDateCount: fxWrite.invalidExistingDateCount,
+  };
+}
+
 function countBy(values: readonly string[]) {
   const counts = new Map<string, number>();
   for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
@@ -295,14 +372,6 @@ function countBy(values: readonly string[]) {
 
 function sumBy<T>(rows: readonly T[], select: (row: T) => number) {
   return rows.reduce((total, row) => total + select(row), 0);
-}
-
-function chunk<T>(rows: readonly T[], size: number) {
-  const result: T[][] = [];
-  for (let index = 0; index < rows.length; index += size) {
-    result.push(rows.slice(index, index + size));
-  }
-  return result;
 }
 
 main().catch((error) => {
