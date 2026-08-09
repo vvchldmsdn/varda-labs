@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { buildSimulationReturnMatrix } from "../src/lib/simulation-return-matrix.ts";
+import {
+  buildPrivateOwnerRawCloseSimulationReturnMatrix,
+  buildSimulationReturnMatrix,
+} from "../src/lib/simulation-return-matrix.ts";
 import {
   STATIONARY_BOOTSTRAP_POLICY,
   buildStationaryBootstrapDrawPlan,
@@ -154,6 +157,30 @@ describe("Simulation Validation stationary bootstrap Phase 1A", () => {
     assert.equal(matrix.status, "ready");
     assert.equal(result.status, "ready");
     assert.equal(result.instrumentCount, 1);
+  });
+
+  it("accepts an admitted private-owner raw-close matrix without changing its basis", () => {
+    const fixture = crossMarketSimulationFixture();
+    const matrix = buildPrivateOwnerRawCloseSimulationReturnMatrix({
+      ...fixture,
+      priceRows: fixture.priceRows.map(
+        ({ adjustedClosePrice, ...row }) => ({
+          ...row,
+          rawClosePrice: adjustedClosePrice,
+        }),
+      ),
+    });
+    const result = buildPlan({ matrix });
+
+    assert.equal(matrix.status, "ready");
+    assert.equal(
+      matrix.policy.version,
+      "simulation_private_owner_raw_close_return_matrix_v1",
+    );
+    assert.equal(result.status, "ready");
+    assert.ok(result.inputMatrixHash);
+    assert.ok(result.drawPlanHash);
+    assert.doesNotMatch(JSON.stringify(result), /private_owner|raw_close/i);
   });
 
   it("rejects incomplete, blocked, and tampered ready matrices", () => {

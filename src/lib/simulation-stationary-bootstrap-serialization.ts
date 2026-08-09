@@ -1,12 +1,18 @@
 import { createHash } from "node:crypto";
 
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
+import { STATIONARY_BOOTSTRAP_POLICY } from "./simulation-stationary-bootstrap-policy.ts";
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 import type {
   CanonicalReadyReturnMatrix,
   StationaryBootstrapBlocker,
   StationaryBootstrapPath,
 } from "./simulation-stationary-bootstrap-types.ts";
+
+const ADMITTED_MATRIX_POLICY_VERSIONS = new Set([
+  STATIONARY_BOOTSTRAP_POLICY.inputMatrixVersion,
+  "simulation_private_owner_raw_close_return_matrix_v1",
+]);
 
 export function validateAndHashReadyReturnMatrix(
   matrix: SimulationReturnMatrixResult,
@@ -17,7 +23,7 @@ export function validateAndHashReadyReturnMatrix(
   if (
     matrix?.status !== "ready" ||
     matrix?.consumerStatus !== "matrix_ready" ||
-    matrix?.policy?.version !== "simulation_return_matrix_v1" ||
+    !ADMITTED_MATRIX_POLICY_VERSIONS.has(matrix?.policy?.version) ||
     matrix?.blockers?.length !== 0 ||
     matrix?.exclusions?.length !== 0
   ) {

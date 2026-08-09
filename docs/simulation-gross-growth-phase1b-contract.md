@@ -22,8 +22,9 @@ chart, or a recommendation.
 
 The policy id is `simulation_gross_growth_v1`.
 
-- input matrix: `simulation_return_matrix_v1` with
-  `consumerStatus=matrix_ready`;
+- input matrix: `simulation_return_matrix_v1` or
+  `simulation_private_owner_raw_close_return_matrix_v1`, each with
+  `consumerStatus=matrix_ready` and its own policy-bound matrix hash;
 - input draw plan: ready `stationary_bootstrap_v1`;
 - baseline: every instrument is `1` at output step zero;
 - recurrence: `growth[t] = growth[t - 1] * (1 + sampledReturn)`;
