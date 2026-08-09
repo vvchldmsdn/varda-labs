@@ -136,6 +136,15 @@ export type PrivateSingleTenantRawHistoricalPriceAdmission<T> = Readonly<{
   issues: readonly PrivateSingleTenantRawHistoricalAdmissionIssue[];
 }>;
 
+export type PreferredPrivateHistoricalPriceBasis =
+  | "provider_adjusted_close"
+  | "private_kis_raw_close";
+
+export type PreferredPrivateHistoricalPriceRow<T> = Readonly<{
+  row: T;
+  priceBasis: PreferredPrivateHistoricalPriceBasis;
+}>;
+
 export function resolveOperationalClosePrice(input: {
   closePrice: NumericInput;
 }) {
@@ -337,6 +346,71 @@ export function admitPrivateSingleTenantRawHistoricalPriceRows<
   });
 }
 
+export function selectPreferredPrivateHistoricalPriceRows<
+  T extends AssetPriceInstrumentEvidenceRow,
+>(input: {
+  adjustedRows: readonly T[];
+  privateRawRows: readonly T[];
+}) {
+  const adjustedByInstrument = groupRowsByInstrument(input.adjustedRows);
+  const rawByInstrument = groupRowsByInstrument(input.privateRawRows);
+  const instrumentKeys = [
+    ...new Set([
+      ...adjustedByInstrument.keys(),
+      ...rawByInstrument.keys(),
+    ]),
+  ].sort();
+  const rows: PreferredPrivateHistoricalPriceRow<T>[] = [];
+  let adjustedInstrumentCount = 0;
+  let privateRawInstrumentCount = 0;
+
+  for (const instrumentKey of instrumentKeys) {
+    const adjustedRows = sortHistoricalRows(
+      adjustedByInstrument.get(instrumentKey) ?? [],
+    );
+    const rawRows = sortHistoricalRows(rawByInstrument.get(instrumentKey) ?? []);
+    const useAdjusted = adjustedHistoryCoversRawHistory(
+      adjustedRows,
+      rawRows,
+    );
+    const selectedRows = useAdjusted ? adjustedRows : rawRows;
+    if (selectedRows.length === 0) continue;
+
+    const priceBasis = useAdjusted
+      ? ("provider_adjusted_close" as const)
+      : ("private_kis_raw_close" as const);
+    if (useAdjusted) adjustedInstrumentCount += 1;
+    else privateRawInstrumentCount += 1;
+    rows.push(
+      ...selectedRows.map((row) => Object.freeze({ row, priceBasis })),
+    );
+  }
+
+  return Object.freeze({
+    rows: Object.freeze(rows),
+    summary: Object.freeze({
+      selectedInstrumentCount:
+        adjustedInstrumentCount + privateRawInstrumentCount,
+      adjustedInstrumentCount,
+      privateRawInstrumentCount,
+    }),
+  });
+}
+
+export function adjustedHistoryCoversRawHistory(
+  adjustedRows: readonly AssetPriceInstrumentEvidenceRow[],
+  rawRows: readonly AssetPriceInstrumentEvidenceRow[],
+) {
+  if (adjustedRows.length < 2) return false;
+  if (rawRows.length < 2) return true;
+  const adjusted = sortHistoricalRows(adjustedRows);
+  const raw = sortHistoricalRows(rawRows);
+  return (
+    adjusted[0].priceDate <= raw[0].priceDate &&
+    adjusted.at(-1)!.priceDate >= raw.at(-1)!.priceDate
+  );
+}
+
 function validateAdjustedHistoricalRow(
   row: AdjustedHistoricalPriceConsumerEvidenceRow,
 ): AdjustedHistoricalAdmissionIssue[] {
@@ -392,6 +466,28 @@ function normalizeInstrumentKey(row: AssetPriceInstrumentEvidenceRow) {
   return market && currency && ticker
     ? `${market}|${currency}|${ticker}`
     : null;
+}
+
+function groupRowsByInstrument<T extends AssetPriceInstrumentEvidenceRow>(
+  rows: readonly T[],
+) {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const instrumentKey = normalizeInstrumentKey(row);
+    if (!instrumentKey) continue;
+    const group = groups.get(instrumentKey) ?? [];
+    group.push(row);
+    groups.set(instrumentKey, group);
+  }
+  return groups;
+}
+
+function sortHistoricalRows<T extends AssetPriceInstrumentEvidenceRow>(
+  rows: readonly T[],
+) {
+  return [...rows].sort((left, right) =>
+    left.priceDate.localeCompare(right.priceDate),
+  );
 }
 
 function providerBindingKey(row: AdjustedHistoricalPriceConsumerEvidenceRow) {

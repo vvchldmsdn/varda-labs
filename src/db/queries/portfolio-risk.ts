@@ -14,45 +14,55 @@ import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const TRACKED_ACCOUNTS = ["brokerage", "isa", "irp"];
 
-const loadSharedPortfolioRiskPrices: PortfolioRiskReadRepository["loadPrices"] =
-  async ({ tickers, sourceDateFrom, sourceDateTo }) => {
-    if (tickers.length === 0) return [];
-    const rows = await db
-      .select({
-        ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
-        market: sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
-        currency: sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
-        priceDate: assetPriceSnapshots.priceDate,
-        closePrice: assetPriceSnapshots.closePrice,
-        adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
-        adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
-        adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
-        adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
-        adjustedCloseFetchedAt:
-          assetPriceSnapshots.adjustedCloseFetchedAt,
-        providerSymbol: assetPriceSnapshots.providerSymbol,
-        providerExchange: assetPriceSnapshots.providerExchange,
-        source: assetPriceSnapshots.source,
-        isSample: assetPriceSnapshots.isSample,
-      })
-      .from(assetPriceSnapshots)
-      .where(
-        and(
-          inArray(
-            sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
-            tickers,
-          ),
-          gte(assetPriceSnapshots.priceDate, sourceDateFrom),
-          lte(assetPriceSnapshots.priceDate, sourceDateTo),
-          eq(assetPriceSnapshots.isSample, false),
+export const loadPortfolioRiskPriceCandidates = async ({
+  tickers,
+  sourceDateFrom,
+  sourceDateTo,
+}: Parameters<PortfolioRiskReadRepository["loadPrices"]>[0]) => {
+  if (tickers.length === 0) return [];
+  return db
+    .select({
+      ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+      market: sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
+      currency: sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
+      priceDate: assetPriceSnapshots.priceDate,
+      closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+      adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
+      adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
+      adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
+      adjustedCloseFetchedAt: assetPriceSnapshots.adjustedCloseFetchedAt,
+      providerSymbol: assetPriceSnapshots.providerSymbol,
+      providerExchange: assetPriceSnapshots.providerExchange,
+      fetchedAt: assetPriceSnapshots.fetchedAt,
+      source: assetPriceSnapshots.source,
+      isSample: assetPriceSnapshots.isSample,
+    })
+    .from(assetPriceSnapshots)
+    .where(
+      and(
+        inArray(
+          sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+          tickers,
         ),
-      )
-      .orderBy(
-        asc(assetPriceSnapshots.priceDate),
-        asc(assetPriceSnapshots.ticker),
-      );
+        gte(assetPriceSnapshots.priceDate, sourceDateFrom),
+        lte(assetPriceSnapshots.priceDate, sourceDateTo),
+        eq(assetPriceSnapshots.isSample, false),
+      ),
+    )
+    .orderBy(
+      asc(assetPriceSnapshots.priceDate),
+      asc(assetPriceSnapshots.ticker),
+    );
+};
 
-    return [...admitAdjustedHistoricalPriceRows(rows).rows];
+const loadSharedPortfolioRiskPrices: PortfolioRiskReadRepository["loadPrices"] =
+  async (input) => {
+    return [
+      ...admitAdjustedHistoricalPriceRows(
+        await loadPortfolioRiskPriceCandidates(input),
+      ).rows,
+    ];
   };
 
 const loadSharedPortfolioRiskFxRates: PortfolioRiskReadRepository["loadFxRates"] =
@@ -75,8 +85,10 @@ const loadSharedPortfolioRiskFxRates: PortfolioRiskReadRepository["loadFxRates"]
       .orderBy(asc(fxRates.rateDate));
   };
 
-function createTenantPortfolioRiskRepository(
+export function createTenantPortfolioRiskRepository(
   tenantContext: TenantContext,
+  loadPrices: PortfolioRiskReadRepository["loadPrices"] =
+    loadSharedPortfolioRiskPrices,
 ): PortfolioRiskReadRepository {
   return {
     async loadAssets(account) {
@@ -103,7 +115,7 @@ function createTenantPortfolioRiskRepository(
         .where(and(...predicates))
         .orderBy(asc(accounts.sortOrder), asc(accounts.code), asc(assets.ticker));
     },
-    loadPrices: loadSharedPortfolioRiskPrices,
+    loadPrices,
     loadFxRates: loadSharedPortfolioRiskFxRates,
   };
 }
