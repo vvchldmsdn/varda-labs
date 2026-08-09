@@ -1,9 +1,10 @@
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 import type { SimulationOwnerInputPreflightModel } from "./simulation-owner-input-preflight.ts";
+import type { SimulationOwnerHistoricalOutcomeValidationResult } from "./simulation-owner-historical-outcome-validation.ts";
 import type { SimulationOwnerResearchExecutionResult } from "./simulation-owner-research-execution.ts";
 
 export const SIMULATION_OWNER_READINESS_AUDIT_POLICY = Object.freeze({
-  version: "simulation_owner_research_readiness_audit_v1",
+  version: "simulation_owner_research_readiness_audit_v2",
   accountScopes: Object.freeze([
     "all",
     "brokerage",
@@ -20,6 +21,7 @@ type ReadinessScopeInput = Readonly<{
   account: PortfolioAccountScope;
   inputPreflight: SimulationOwnerInputPreflightModel;
   execution: SimulationOwnerResearchExecutionResult;
+  historicalValidation: SimulationOwnerHistoricalOutcomeValidationResult;
 }>;
 
 export function summarizeSimulationOwnerReadiness(
@@ -32,7 +34,8 @@ export function summarizeSimulationOwnerReadiness(
     }
     if (
       input.inputPreflight.account !== input.account ||
-      input.execution.account !== input.account
+      input.execution.account !== input.account ||
+      input.historicalValidation.account !== input.account
     ) {
       throw new TypeError(`readiness scope mismatch: ${input.account}`);
     }
@@ -52,12 +55,15 @@ export function summarizeSimulationOwnerReadiness(
     scopeCount: scopes.length,
     readyScopeCount: scopes.filter((scope) => scope.executionStatus === "ready")
       .length,
+    historicalValidationReadyScopeCount: scopes.filter(
+      (scope) => scope.historicalValidation.status === "ready",
+    ).length,
     scopes: Object.freeze(scopes),
   });
 }
 
 function summarizeScope(input: ReadinessScopeInput) {
-  const { inputPreflight, execution } = input;
+  const { inputPreflight, execution, historicalValidation } = input;
   return Object.freeze({
     account: input.account,
     inputStatus: inputPreflight.status,
@@ -90,6 +96,17 @@ function summarizeScope(input: ReadinessScopeInput) {
         (row) => row.admissionStatus ?? "not_evaluated",
       ),
     ),
+    historicalValidation: Object.freeze({
+      status: historicalValidation.status,
+      reason: historicalValidation.reason,
+      latestOutcomeEndServiceDate:
+        historicalValidation.latestOutcomeEndServiceDate,
+      endpointCount: historicalValidation.summary.endpointCount,
+      readyEndpointCount:
+        historicalValidation.summary.readyEndpointCount,
+      unavailableEndpointCount:
+        historicalValidation.summary.unavailableEndpointCount,
+    }),
   });
 }
 

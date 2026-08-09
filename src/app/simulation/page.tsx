@@ -4,6 +4,7 @@ import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
+import { OwnerHistoricalOutcomeValidationSection } from "@/components/simulation/owner-historical-outcome-validation-section";
 import { OwnerResearchExecutionSection } from "@/components/simulation/owner-research-execution-section";
 import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
 import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
@@ -249,6 +250,9 @@ async function OwnerInputPreflightContent({
         preservedQuery={preservedQuery}
       />
       <OwnerResearchExecutionSection execution={result.execution} />
+      <OwnerHistoricalOutcomeValidationSection
+        result={result.historicalValidation}
+      />
     </>
   );
 }

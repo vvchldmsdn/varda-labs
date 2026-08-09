@@ -98,6 +98,30 @@ export async function getReadOnlyPrivateOwnerRawHistoryBundle(options: {
   activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   endServiceDate: string;
+  returnStepCount?: number;
+}) {
+  const [result] = await getReadOnlyPrivateOwnerRawHistoryBatch({
+    tenantContext: options.tenantContext,
+    activeOwnerUserIds: options.activeOwnerUserIds,
+    selection: options.selection,
+    requests: [
+      {
+        endServiceDate: options.endServiceDate,
+        returnStepCount: options.returnStepCount ?? 90,
+      },
+    ],
+  });
+  return result;
+}
+
+export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
+  tenantContext: TenantContext;
+  activeOwnerUserIds: readonly string[];
+  selection: SimulationResearchUniverseSelection;
+  requests: readonly Readonly<{
+    endServiceDate: string;
+    returnStepCount: number;
+  }>[];
 }) {
   const instruments =
     options.selection.status === "valid"
@@ -113,46 +137,49 @@ export async function getReadOnlyPrivateOwnerRawHistoryBundle(options: {
       currency: row.currency,
       ticker: row.ticker,
     }));
-  const request = {
-    candidates,
-    endServiceDate: options.endServiceDate,
-    returnStepCount: 90,
-  };
-  const plan = planSimulationPeriodPreflightScan(request);
-  if (plan.status !== "queryable" || !plan.queryRange) {
-    return buildPrivateOwnerRawHistory({
-      requestedOwnerUserId: options.tenantContext.ownerUserId,
-      activeOwnerUserIds: options.activeOwnerUserIds,
-      requestedEndServiceDate: options.endServiceDate,
-      instruments,
-      priceRows: [],
-      fxRows: [],
-    });
-  }
+  const plans = options.requests.map((request) =>
+    planSimulationPeriodPreflightScan({ candidates, ...request }),
+  );
+  const queryablePlans = plans.filter(
+    (plan) => plan.status === "queryable" && plan.queryRange,
+  );
+  const sourceDateFrom = queryablePlans
+    .map((plan) => plan.queryRange?.sourceDateFrom)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0];
+  const sourceDateTo = queryablePlans
+    .map((plan) => plan.queryRange?.sourceDateTo)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
 
   const tickers = [...new Set(candidates.map((row) => row.ticker))];
-  const [priceRows, fxRows] = await Promise.all([
-    loadRawPriceRows({
-      tickers,
-      sourceDateFrom: plan.queryRange.sourceDateFrom,
-      sourceDateTo: plan.queryRange.sourceDateTo,
-    }),
-    plan.requiresFx
-      ? loadFxRows({
-          sourceDateFrom: plan.queryRange.sourceDateFrom,
-          sourceDateTo: plan.queryRange.sourceDateTo,
-        })
-      : Promise.resolve([]),
-  ]);
+  const [priceRows, fxRows] =
+    sourceDateFrom && sourceDateTo
+      ? await Promise.all([
+          loadRawPriceRows({ tickers, sourceDateFrom, sourceDateTo }),
+          queryablePlans.some((plan) => plan.requiresFx)
+            ? loadFxRows({ sourceDateFrom, sourceDateTo })
+            : Promise.resolve([]),
+        ])
+      : [[], []];
 
-  return buildPrivateOwnerRawHistory({
-    requestedOwnerUserId: options.tenantContext.ownerUserId,
-    activeOwnerUserIds: options.activeOwnerUserIds,
-    requestedEndServiceDate: options.endServiceDate,
-    instruments,
-    priceRows,
-    fxRows,
-  });
+  return Object.freeze(
+    options.requests.map((request, index) => {
+      const plan = plans[index];
+      const hasQueryablePlan =
+        plan?.status === "queryable" && plan.queryRange !== null;
+      return buildPrivateOwnerRawHistory({
+        requestedOwnerUserId: options.tenantContext.ownerUserId,
+        activeOwnerUserIds: options.activeOwnerUserIds,
+        requestedEndServiceDate: request.endServiceDate,
+        returnStepCount: request.returnStepCount,
+        instruments,
+        priceRows: hasQueryablePlan ? priceRows : [],
+        fxRows: hasQueryablePlan ? fxRows : [],
+      });
+    }),
+  );
 }
 
 async function loadRawPriceRows(input: {

@@ -4,8 +4,13 @@ import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-stru
 import {
   getActivePortfolioOwnerUserIds,
   getLatestCommonPrivateOwnerRawServiceDate,
-  getReadOnlyPrivateOwnerRawHistoryBundle,
+  getReadOnlyPrivateOwnerRawHistoryBatch,
 } from "@/db/queries/simulation-owner-private-history";
+import {
+  buildSimulationOwnerHistoricalOutcomeValidation,
+  buildSimulationOwnerHistoricalValidationEndpointDates,
+  SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY,
+} from "@/lib/simulation-owner-historical-outcome-validation";
 import { buildSimulationOwnerInputCandidate } from "@/lib/simulation-owner-input-candidate";
 import { buildSimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
 import {
@@ -45,16 +50,32 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     suppliedValue: options.endServiceDate,
     latestCommonStoredServiceDate,
   });
-  const historicalBundle = candidate.selection
-    ? endSelection.status === "valid"
-      ? await getReadOnlyPrivateOwnerRawHistoryBundle({
+  const validationDates =
+    endSelection.status === "valid"
+      ? buildSimulationOwnerHistoricalValidationEndpointDates(
+          endSelection.endServiceDate,
+        )
+      : [];
+  const historyBatch =
+    candidate.selection && endSelection.status === "valid"
+      ? await getReadOnlyPrivateOwnerRawHistoryBatch({
           tenantContext: options.tenantContext,
           activeOwnerUserIds,
           selection: candidate.selection,
-          endServiceDate: endSelection.endServiceDate,
+          requests: [
+            {
+              endServiceDate: endSelection.endServiceDate,
+              returnStepCount: 90,
+            },
+            ...validationDates.map((endServiceDate) => ({
+              endServiceDate,
+              returnStepCount:
+                SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.sourceReturnStepCount,
+            })),
+          ],
         })
-      : null
-    : null;
+      : [];
+  const historicalBundle = historyBatch[0] ?? null;
   const inputPreflight = buildSimulationOwnerInputPreflightModel({
     candidate,
     historicalPreflight: historicalBundle,
@@ -69,8 +90,16 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
         ? historicalBundle?.matrix ?? null
         : null,
   });
+  const historicalValidation =
+    buildSimulationOwnerHistoricalOutcomeValidation({
+      execution,
+      endpoints: validationDates.map((outcomeEndServiceDate, index) => ({
+        outcomeEndServiceDate,
+        matrix: historyBatch[index + 1]?.matrix ?? null,
+      })),
+    });
 
-  return Object.freeze({ inputPreflight, execution });
+  return Object.freeze({ inputPreflight, execution, historicalValidation });
 }
 
 export async function getReadOnlyTenantSimulationOwnerInputPreflight(options: {

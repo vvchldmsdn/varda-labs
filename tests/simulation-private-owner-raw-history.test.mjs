@@ -27,6 +27,20 @@ describe("private owner KIS raw history", () => {
     assert.equal(PRIVATE_OWNER_RAW_HISTORY_POLICY.persistence, "forbidden");
   });
 
+  it("supports a pinned longer read window without changing the default policy", () => {
+    const fixture = readyFixture(111);
+    const result = buildPrivateOwnerRawHistory({
+      ...fixture,
+      returnStepCount: 111,
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.requestedReturnStepCount, 111);
+    assert.equal(result.matrix.matrix.length, 111);
+    assert.equal(result.instruments[0].storedCoverage.requiredReturnCount, 111);
+    assert.equal(PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount, 90);
+  });
+
   it("fails closed as soon as a second active portfolio owner exists", () => {
     const result = buildPrivateOwnerRawHistory({
       ...readyFixture(),
@@ -137,10 +151,10 @@ describe("private owner KIS raw history", () => {
   });
 });
 
-function readyFixture() {
+function readyFixture(returnStepCount = 90) {
   const requestedEndServiceDate = "2026-04-01";
-  const serviceDates = Array.from({ length: 91 }, (_, index) =>
-    shiftRiskDate(requestedEndServiceDate, index - 90),
+  const serviceDates = Array.from({ length: returnStepCount + 1 }, (_, index) =>
+    shiftRiskDate(requestedEndServiceDate, index - returnStepCount),
   );
   const instruments = [
     instrument("korea", "KRW", "069500", 5_000),

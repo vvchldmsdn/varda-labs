@@ -48,10 +48,12 @@ export function buildPrivateOwnerRawHistory(input: {
   requestedOwnerUserId: string;
   activeOwnerUserIds: readonly string[];
   requestedEndServiceDate: string;
+  returnStepCount?: number;
   instruments: readonly PrivateOwnerRawHistoryInstrumentInput[];
   priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
 }) {
+  const returnStepCount = resolveReturnStepCount(input.returnStepCount);
   const modeledInstruments = input.instruments.filter(
     (row) =>
       row.weightBps > 0 && row.classification === "listed_instrument",
@@ -64,7 +66,7 @@ export function buildPrivateOwnerRawHistory(input: {
   const admittedRows = scopeAdmission.rows;
   const requestedServiceDates = resolvePrivateOwnerRawServiceDates({
     endServiceDate: input.requestedEndServiceDate,
-    returnStepCount: PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount,
+    returnStepCount,
     priceRows: admittedRows,
     fxRows: input.fxRows,
     requiresFx: modeledInstruments.some((row) => row.currency === "USD"),
@@ -72,7 +74,7 @@ export function buildPrivateOwnerRawHistory(input: {
   const matrix =
     scopeAdmission.status === "ready" &&
     requestedServiceDates.length ===
-      PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount + 1 &&
+      returnStepCount + 1 &&
     modeledInstruments.length > 0
       ? buildPrivateOwnerRawCloseSimulationReturnMatrix({
           requestedServiceDates,
@@ -100,6 +102,7 @@ export function buildPrivateOwnerRawHistory(input: {
       priceRows: input.priceRows.filter((row) =>
         matchesInstrument(row, instrument),
       ),
+      returnStepCount,
       requestedServiceDates,
       matrix,
     }),
@@ -108,6 +111,7 @@ export function buildPrivateOwnerRawHistory(input: {
   return Object.freeze({
     policy: PRIVATE_OWNER_RAW_HISTORY_POLICY,
     requestedEndServiceDate: input.requestedEndServiceDate,
+    requestedReturnStepCount: returnStepCount,
     status:
       matrix?.status === "ready" &&
       instruments
@@ -233,6 +237,7 @@ function buildInstrumentEvidence(input: {
   requestedOwnerUserId: string;
   activeOwnerUserIds: readonly string[];
   priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  returnStepCount: number;
   requestedServiceDates: readonly string[];
   matrix: SimulationReturnMatrixResult | null;
 }) {
@@ -277,8 +282,8 @@ function buildInstrumentEvidence(input: {
   const complete =
     admission.status === "ready" &&
     input.requestedServiceDates.length ===
-      PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount + 1 &&
-    cells?.length === PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount &&
+      input.returnStepCount + 1 &&
+    cells?.length === input.returnStepCount &&
     cells.every((cell) => cell.value !== null);
   const admissionStatus: SimulationHistoricalEvidenceStatus = complete
     ? "ready"
@@ -311,7 +316,7 @@ function buildInstrumentEvidence(input: {
       status: complete ? ("ready" as const) : ("incomplete" as const),
       readyReturnCount: (cells ?? []).filter((cell) => cell.value !== null)
         .length,
-      requiredReturnCount: PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount,
+      requiredReturnCount: input.returnStepCount,
       reasons: Object.freeze(
         [...missingReasons].filter((value) => value !== null),
       ),
@@ -331,6 +336,12 @@ function buildInstrumentEvidence(input: {
       issues: admission.issues,
     }),
   });
+}
+
+function resolveReturnStepCount(value: number | undefined) {
+  return Number.isSafeInteger(value) && (value ?? 0) > 0
+    ? (value as number)
+    : PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount;
 }
 
 function terminalInstrument(

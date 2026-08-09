@@ -100,8 +100,23 @@ export function calculatePredictedHistoricalOutcome(
 export function calculateObservedHistoricalOutcome(
   rows: readonly SimulationReturnMatrixRow[],
 ) {
+  return calculateWeightedObservedHistoricalOutcome(rows, EQUAL_WEIGHTS_BPS);
+}
+
+export function calculateWeightedObservedHistoricalOutcome(
+  rows: readonly SimulationReturnMatrixRow[],
+  weightsBps: readonly number[],
+) {
   if (rows.length === 0) return null;
-  const cumulative = FIXED_MIX_INSTRUMENTS.map(() => 1);
+  const instrumentCount = rows[0]?.cells.length ?? 0;
+  if (
+    instrumentCount === 0 ||
+    weightsBps.length !== instrumentCount ||
+    weightsBps.reduce((sum, weight) => sum + weight, 0) !== 10_000
+  ) {
+    return null;
+  }
+  const cumulative = Array.from({ length: instrumentCount }, () => 1);
   let runningPeak = 1;
   let maxDrawdown = 0;
   let terminalNav = 1;
@@ -117,7 +132,7 @@ export function calculateObservedHistoricalOutcome(
       cumulative[index] = next;
     }
 
-    const pathNav = compensatedWeightedSum(cumulative, EQUAL_WEIGHTS_BPS);
+    const pathNav = compensatedWeightedSum(cumulative, weightsBps);
     if (pathNav === null) return null;
     terminalNav = pathNav;
     runningPeak = Math.max(runningPeak, pathNav);
