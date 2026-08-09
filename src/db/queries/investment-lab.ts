@@ -51,6 +51,10 @@ function createTenantInvestmentLabRepository(
   activeOwnerUserIdsPromise: Promise<readonly string[]>,
 ): InvestmentLabCounterfactualReadRepository {
   const selectedAccounts = [...accountsForPortfolioScope(accountScope)];
+  const snapshotAccounts =
+    accountScope === "irp"
+      ? [...NAMED_PORTFOLIO_ACCOUNTS]
+      : selectedAccounts;
 
   return {
   async loadEvents() {
@@ -160,7 +164,7 @@ function createTenantInvestmentLabRepository(
       .where(
         and(
           ...activeOwnedAccountPredicates(tenantContext),
-          inArray(accounts.code, selectedAccounts),
+          inArray(accounts.code, snapshotAccounts),
           eq(dailyPortfolioSnapshots.account, accounts.code),
           eq(dailyPortfolioSnapshots.isSample, false),
         ),
