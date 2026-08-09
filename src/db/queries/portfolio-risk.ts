@@ -65,7 +65,7 @@ const loadSharedPortfolioRiskPrices: PortfolioRiskReadRepository["loadPrices"] =
     ];
   };
 
-const loadSharedPortfolioRiskFxRates: PortfolioRiskReadRepository["loadFxRates"] =
+export const loadPortfolioRiskFxRates: PortfolioRiskReadRepository["loadFxRates"] =
   async ({ sourceDateFrom, sourceDateTo }) => {
     return db
       .select({
@@ -116,7 +116,7 @@ export function createTenantPortfolioRiskRepository(
         .orderBy(asc(accounts.sortOrder), asc(accounts.code), asc(assets.ticker));
     },
     loadPrices,
-    loadFxRates: loadSharedPortfolioRiskFxRates,
+    loadFxRates: loadPortfolioRiskFxRates,
   };
 }
 

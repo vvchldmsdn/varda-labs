@@ -406,6 +406,28 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "separate",
   },
   {
+    id: "operator_investment_lab_stress_history_completion",
+    classification: "mixed",
+    authorization: "migration_cli",
+    entrypoints: ["scripts/complete-investment-lab-stress-history.ts"],
+    implementationPaths: [
+      "scripts/complete-investment-lab-stress-history.ts",
+    ],
+    targets: [
+      adminTarget("market_data_sync_runs", "insert", "update"),
+      sharedTarget("asset_price_snapshots", "insert", "update"),
+      sharedTarget("fx_rates", "insert"),
+    ],
+    transition: {
+      prepare: "split_target_classes",
+      activate: "keep_owner_absent",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "admin_market_price_sync",
     classification: "mixed",
     authorization: "machine_admin",
