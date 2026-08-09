@@ -354,12 +354,25 @@ function ReadyView({
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <EvidenceCell label="완전한 비교일" value={`${model.coverage.completeComparisonDates}일`} />
           <EvidenceCell label="평가 스냅샷" value={`${model.coverage.snapshotSourceRows}행`} />
-          <EvidenceCell label="KODEX 200 종가" value={`${model.coverage.scenarioCloseRows}행`} />
+          <EvidenceCell
+            label={`KODEX 200 ${kodexPriceBasisLabel(model.scenario.priceBasis)}`}
+            value={`${model.coverage.scenarioCloseRows}행`}
+          />
           <EvidenceCell label="종료 시 대기 거래" value={`${model.coverage.pendingAtEndRows}건`} />
         </div>
       </section>
     </>
   );
+}
+
+function kodexPriceBasisLabel(
+  priceBasis: InvestmentLabCounterfactualReadModel["scenario"]["priceBasis"],
+) {
+  if (priceBasis === "kis_raw_close") {
+    return "KIS 원종가(배당·기업행사 미조정)";
+  }
+  if (priceBasis === "provider_adjusted_close") return "조정종가";
+  return "가격 근거";
 }
 
 function CurrentWriterSegmentNotice({

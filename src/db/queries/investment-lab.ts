@@ -34,9 +34,10 @@ import {
 } from "@/lib/investment-lab-event-account";
 import {
   admitAdjustedHistoricalPriceRows,
-  admitRawHistoricalPriceRows,
+  admitPrivateSingleTenantRawHistoricalPriceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
 
 const LEGACY_ID_PATTERN = /^[0-9a-f]{24}$/;
 type InvestmentLabFountRuntimePositionRow = Extract<
@@ -47,6 +48,7 @@ type InvestmentLabFountRuntimePositionRow = Extract<
 function createTenantInvestmentLabRepository(
   tenantContext: TenantContext,
   accountScope: PortfolioAccountScope,
+  activeOwnerUserIdsPromise: Promise<readonly string[]>,
 ): InvestmentLabCounterfactualReadRepository {
   const selectedAccounts = [...accountsForPortfolioScope(accountScope)];
 
@@ -170,11 +172,23 @@ function createTenantInvestmentLabRepository(
   },
 
   async loadScenarioCloses() {
-    return loadAdjustedScenarioCloseRows("069500", "korea", "KRW");
+    return loadPreferredScenarioCloseRows({
+      ticker: "069500",
+      market: "korea",
+      currency: "KRW",
+      tenantContext,
+      activeOwnerUserIds: await activeOwnerUserIdsPromise,
+    });
   },
 
   async loadVooCloses() {
-    return loadRawScenarioCloseRows("VOO", "us", "USD");
+    return loadPrivateRawScenarioCloseRows({
+      ticker: "VOO",
+      market: "us",
+      currency: "USD",
+      tenantContext,
+      activeOwnerUserIds: await activeOwnerUserIdsPromise,
+    });
   },
 
   async loadFxRows() {
@@ -455,7 +469,13 @@ function createTenantInvestmentLabRepository(
         asc(assetPriceSnapshots.ticker),
       );
 
-    return admitRawHistoricalPriceRows(rows).rows.map((row) => ({
+    const admission = admitPrivateSingleTenantRawHistoricalPriceRows({
+      rows,
+      requestedOwnerUserId: tenantContext.ownerUserId,
+      activeOwnerUserIds: await activeOwnerUserIdsPromise,
+    });
+
+    return admission.rows.map((row) => ({
       ticker: row.ticker,
       market: row.market,
       currency: row.currency,
@@ -467,7 +487,7 @@ function createTenantInvestmentLabRepository(
   };
 }
 
-async function loadAdjustedScenarioCloseRows(
+async function loadScenarioCloseCandidates(
   ticker: string,
   market: string,
   currency: string,
@@ -509,58 +529,78 @@ async function loadAdjustedScenarioCloseRows(
     )
     .orderBy(asc(assetPriceSnapshots.priceDate));
 
-  return admitAdjustedHistoricalPriceRows(rows).rows.map((row) => ({
+  return rows;
+}
+
+async function loadPreferredScenarioCloseRows(input: {
+  ticker: string;
+  market: string;
+  currency: string;
+  tenantContext: TenantContext;
+  activeOwnerUserIds: readonly string[];
+}) {
+  const rows = await loadScenarioCloseCandidates(
+    input.ticker,
+    input.market,
+    input.currency,
+  );
+  const adjustedRows = admitAdjustedHistoricalPriceRows(rows).rows;
+  const rawAdmission = admitPrivateSingleTenantRawHistoricalPriceRows({
+    rows,
+    requestedOwnerUserId: input.tenantContext.ownerUserId,
+    activeOwnerUserIds: input.activeOwnerUserIds,
+  });
+  const useAdjusted = hasAtLeastRawCoverage(adjustedRows, rawAdmission.rows);
+  const selectedRows = useAdjusted ? adjustedRows : rawAdmission.rows;
+
+  return selectedRows.map((row) => ({
     priceDate: row.priceDate,
     closePrice: row.closePrice,
     adjustedClosePrice: row.adjustedClosePrice,
-    source: row.adjustedCloseSource,
+    source: useAdjusted ? row.adjustedCloseSource : row.source,
+    priceBasis: useAdjusted
+      ? ("provider_adjusted_close" as const)
+      : ("kis_raw_close" as const),
   }));
 }
 
-async function loadRawScenarioCloseRows(
-  ticker: string,
-  market: string,
-  currency: string,
-) {
-  const rows = await db
-    .select({
-      ticker: assetPriceSnapshots.ticker,
-      market: assetPriceSnapshots.market,
-      currency: assetPriceSnapshots.currency,
-      priceDate: assetPriceSnapshots.priceDate,
-      closePrice: assetPriceSnapshots.closePrice,
-      adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
-      source: assetPriceSnapshots.source,
-      providerSymbol: assetPriceSnapshots.providerSymbol,
-      providerExchange: assetPriceSnapshots.providerExchange,
-      fetchedAt: assetPriceSnapshots.fetchedAt,
-    })
-    .from(assetPriceSnapshots)
-    .where(
-      and(
-        eq(assetPriceSnapshots.isSample, false),
-        eq(
-          sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
-          ticker.toUpperCase(),
-        ),
-        eq(
-          sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
-          market.toLowerCase(),
-        ),
-        eq(
-          sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
-          currency.toUpperCase(),
-        ),
-      ),
-    )
-    .orderBy(asc(assetPriceSnapshots.priceDate));
+async function loadPrivateRawScenarioCloseRows(input: {
+  ticker: string;
+  market: string;
+  currency: string;
+  tenantContext: TenantContext;
+  activeOwnerUserIds: readonly string[];
+}) {
+  const rows = await loadScenarioCloseCandidates(
+    input.ticker,
+    input.market,
+    input.currency,
+  );
+  const admission = admitPrivateSingleTenantRawHistoricalPriceRows({
+    rows,
+    requestedOwnerUserId: input.tenantContext.ownerUserId,
+    activeOwnerUserIds: input.activeOwnerUserIds,
+  });
 
-  return admitRawHistoricalPriceRows(rows).rows.map((row) => ({
+  return admission.rows.map((row) => ({
     priceDate: row.priceDate,
     closePrice: row.closePrice,
     adjustedClosePrice: row.adjustedClosePrice,
     source: row.source,
+    priceBasis: "kis_raw_close" as const,
   }));
+}
+
+function hasAtLeastRawCoverage(
+  adjustedRows: readonly Readonly<{ priceDate: string }>[],
+  rawRows: readonly Readonly<{ priceDate: string }>[],
+) {
+  if (adjustedRows.length < 2) return false;
+  if (rawRows.length < 2) return true;
+  return (
+    adjustedRows[0].priceDate <= rawRows[0].priceDate &&
+    adjustedRows.at(-1)!.priceDate >= rawRows.at(-1)!.priceDate
+  );
 }
 
 export async function getReadOnlyTenantInvestmentLabCounterfactual({
@@ -576,8 +616,13 @@ export async function getReadOnlyTenantInvestmentLabCounterfactual({
   requestedAnchorDate?: string | null;
   tenantContext: TenantContext;
 }) {
+  const activeOwnerUserIdsPromise = getActivePortfolioOwnerUserIds();
   return loadInvestmentLabCounterfactualReadModel(
-    createTenantInvestmentLabRepository(tenantContext, account),
+    createTenantInvestmentLabRepository(
+      tenantContext,
+      account,
+      activeOwnerUserIdsPromise,
+    ),
     request,
     fixedMixSelection,
     requestedAnchorDate,

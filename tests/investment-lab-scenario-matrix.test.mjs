@@ -35,6 +35,10 @@ describe("investment lab scenario comparison matrix", () => {
     assert.equal(rowsById.actual.endDifferenceKrw, 0);
     assert.equal(rowsById.kodex200.returnEstimate.value, 0.2);
     assert.equal(
+      rowsById.kodex200.priceBasis,
+      "kodex200_provider_adjusted_close",
+    );
+    assert.equal(
       rowsById.voo.fxBasis,
       "stored_snapshot_and_execution_usdkrw",
     );
@@ -260,6 +264,9 @@ describe("investment lab scenario comparison matrix", () => {
 function readyModel() {
   return {
     status: "ready",
+    scenario: {
+      priceBasis: "provider_adjusted_close",
+    },
     observedPath: {
       status: "ready",
       summary: {

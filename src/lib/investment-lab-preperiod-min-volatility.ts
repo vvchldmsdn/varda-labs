@@ -24,7 +24,7 @@ export const INVESTMENT_LAB_PREPERIOD_MIN_VOLATILITY_POLICY = Object.freeze({
   trainingReturnObservationCount: TRAINING_RETURN_OBSERVATIONS,
   requiredCommonPriceDateCount: REQUIRED_COMMON_PRICE_DATES,
   priceBasis: Object.freeze({
-    kodex200: "adjusted_close",
+    kodex200: "single_admitted_adjusted_or_private_kis_raw_close",
     voo: "raw_close_times_exact_same_date_usdkrw",
   }),
   missingDateHandling: "omit_invalid_or_ambiguous_date_without_interpolation",
@@ -45,6 +45,7 @@ export type InvestmentLabPreperiodPriceRow = Readonly<{
   closePrice: string | number | null;
   adjustedClosePrice: string | number | null;
   source: string | null;
+  priceBasis?: "provider_adjusted_close" | "kis_raw_close" | null;
 }>;
 
 export type InvestmentLabPreperiodFxRow = Readonly<{
@@ -135,7 +136,10 @@ export function buildInvestmentLabPreperiodMinVolatility(input: Readonly<{
     input.kodexPriceRows,
     input.observedStartServiceDate,
     (row) => row.priceDate,
-    (row) => positiveNumber(row.adjustedClosePrice),
+    (row) =>
+      row.priceBasis === "kis_raw_close"
+        ? positiveNumber(row.closePrice)
+        : positiveNumber(row.adjustedClosePrice),
     (row) => hasSource(row.source),
   );
   const voo = resolveUniqueDateValues(

@@ -223,7 +223,10 @@ export function InvestmentLabContributionExperiment({
 
           <p className="mt-3 text-xs leading-5 text-[#777e73]">
             {scenarioId === "fixed_mix" && fixedMixEvidence
-              ? fixedMixPriceBasisLabel(fixedMixEvidence.weights)
+              ? fixedMixPriceBasisLabel(
+                  fixedMixEvidence.weights,
+                  fixedMixEvidence.kodexPriceBasis,
+                )
               : scenario
                 ? priceBasisLabel(scenario.priceBasis)
                 : null} · 분수 수량 허용 · 수수료, 세금, 잔여 현금 0 가정
@@ -391,13 +394,22 @@ function scenarioLabel(scenarioId: InvestmentLabContributionScenarioId) {
 }
 
 function priceBasisLabel(priceBasis: InvestmentLabContributionPriceBasis) {
-  return priceBasis === "adjusted_close_krw"
-    ? "KODEX 200 조정종가(KRW) 기준"
-    : "VOO 원종가 × 저장 USD/KRW 기준(배당 미반영)";
+  if (priceBasis === "adjusted_close_krw") {
+    return "KODEX 200 조정종가(KRW) 기준";
+  }
+  if (priceBasis === "kis_raw_close_krw") {
+    return "KODEX 200 KIS 원종가(KRW) 기준(배당·기업행사 미조정)";
+  }
+  return "VOO 원종가 × 저장 USD/KRW 기준(배당 미반영)";
 }
 
-function fixedMixPriceBasisLabel(weights: InvestmentLabFixedMixWeights) {
-  return `KODEX 200 조정종가 ${weights.kodexWeightBps / 100}% + VOO 원종가 × 저장 USD/KRW ${weights.vooWeightBps / 100}% 기준(VOO 배당 미반영)`;
+function fixedMixPriceBasisLabel(
+  weights: InvestmentLabFixedMixWeights,
+  kodexPriceBasis: "adjusted_close_krw" | "kis_raw_close_krw",
+) {
+  const kodexLabel =
+    kodexPriceBasis === "kis_raw_close_krw" ? "KIS 원종가" : "조정종가";
+  return `KODEX 200 ${kodexLabel} ${weights.kodexWeightBps / 100}% + VOO 원종가 × 저장 USD/KRW ${weights.vooWeightBps / 100}% 기준(원종가 배당·기업행사 미조정)`;
 }
 
 function blockerLabel(

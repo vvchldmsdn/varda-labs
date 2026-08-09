@@ -270,10 +270,12 @@ function scenarioWeightConstraint(
 function priceBasisLabel(value: InvestmentLabScenarioPriceBasis) {
   const labels: Record<InvestmentLabScenarioPriceBasis, string> = {
     stored_position_market_value: "저장 포지션 원화 평가액",
-    kodex200_adjusted_close: "KODEX 200 adjusted close",
-    voo_raw_close: "VOO raw close",
-    kodex_adjusted_and_voo_raw_close:
-      "KODEX adjusted close + VOO raw close",
+    kodex200_provider_adjusted_close: "KODEX 200 provider adjusted close",
+    kodex200_kis_raw_close: "KODEX 200 KIS raw close",
+    voo_kis_raw_close: "VOO KIS raw close",
+    kodex_provider_adjusted_and_voo_kis_raw_close:
+      "KODEX provider adjusted close + VOO KIS raw close",
+    kodex_and_voo_kis_raw_close: "KODEX + VOO KIS raw close",
     zero_return_no_price: "가격 경로 미사용",
     anchor_instrument_raw_close: "기준일 종목별 raw close",
     anchor_instrument_close_and_stored_manual:

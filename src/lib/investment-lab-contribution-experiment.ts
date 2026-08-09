@@ -17,6 +17,7 @@ export type InvestmentLabContributionScenarioId = "kodex200" | "voo";
 
 export type InvestmentLabContributionPriceBasis =
   | "adjusted_close_krw"
+  | "kis_raw_close_krw"
   | "raw_close_usd_times_stored_snapshot_fx";
 
 export type InvestmentLabContributionScenarioPoint = Readonly<{
@@ -223,7 +224,9 @@ function expectedPriceBasis(
   priceBasis: InvestmentLabContributionPriceBasis,
 ) {
   return (
-    (scenarioId === "kodex200" && priceBasis === "adjusted_close_krw") ||
+    (scenarioId === "kodex200" &&
+      (priceBasis === "adjusted_close_krw" ||
+        priceBasis === "kis_raw_close_krw")) ||
     (scenarioId === "voo" &&
       priceBasis === "raw_close_usd_times_stored_snapshot_fx")
   );

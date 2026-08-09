@@ -13,8 +13,6 @@ import {
 
 import { db } from "@/db/client";
 import {
-  accounts,
-  appUsers,
   assetPriceSnapshots,
   fxRates,
 } from "@/db/schema";
@@ -27,27 +25,7 @@ import {
 import type { SimulationResearchUniverseSelection } from "@/lib/simulation-research-universe-preflight";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
-export async function getActivePortfolioOwnerUserIds() {
-  const rows = await db
-    .selectDistinct({ ownerUserId: accounts.canonicalOwnerUserId })
-    .from(accounts)
-    .innerJoin(appUsers, eq(accounts.canonicalOwnerUserId, appUsers.id))
-    .where(
-      and(
-        eq(accounts.isActive, true),
-        eq(appUsers.status, "active"),
-        inArray(appUsers.role, ["user", "admin"]),
-        isNotNull(accounts.canonicalOwnerUserId),
-      ),
-    )
-    .orderBy(asc(accounts.canonicalOwnerUserId));
-
-  return Object.freeze(
-    rows
-      .map((row) => row.ownerUserId)
-      .filter((value): value is string => value !== null),
-  );
-}
+export { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
 
 export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
   tenantContext: TenantContext;

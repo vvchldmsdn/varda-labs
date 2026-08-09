@@ -27,9 +27,11 @@ export type InvestmentLabScenarioMatrixId =
 
 export type InvestmentLabScenarioPriceBasis =
   | "stored_position_market_value"
-  | "kodex200_adjusted_close"
-  | "voo_raw_close"
-  | "kodex_adjusted_and_voo_raw_close"
+  | "kodex200_provider_adjusted_close"
+  | "kodex200_kis_raw_close"
+  | "voo_kis_raw_close"
+  | "kodex_provider_adjusted_and_voo_kis_raw_close"
+  | "kodex_and_voo_kis_raw_close"
   | "zero_return_no_price"
   | "anchor_instrument_raw_close"
   | "anchor_instrument_close_and_stored_manual";
@@ -209,7 +211,7 @@ function buildRows(
         model.status === "ready"
           ? model.coverage.pendingComparisonRows
           : null,
-      priceBasis: "kodex200_adjusted_close",
+      priceBasis: kodexPriceBasis(model),
       fxBasis: "krw_not_applicable",
       sourceReady: model.status === "ready" && model.summary !== null,
       sourceReasons:
@@ -242,7 +244,7 @@ function buildRows(
         model.vooComparison?.status === "ready"
           ? model.vooComparison.coverage.pendingComparisonRows
           : null,
-      priceBasis: "voo_raw_close",
+      priceBasis: "voo_kis_raw_close",
       fxBasis: "stored_snapshot_and_execution_usdkrw",
       sourceReady: model.vooComparison?.status === "ready",
       sourceReasons:
@@ -275,7 +277,7 @@ function buildRows(
         model.fixedMixScenario?.status === "ready"
           ? model.fixedMixScenario.coverage.pendingComparisonRows
           : null,
-      priceBasis: "kodex_adjusted_and_voo_raw_close",
+      priceBasis: combinedKodexVooPriceBasis(model),
       fxBasis: "krw_and_stored_usdkrw",
       sourceReady: model.fixedMixScenario?.status === "ready",
       sourceReasons:
@@ -311,7 +313,7 @@ function buildRows(
           ? model.preperiodMinVolatility.scenario.coverage
               .pendingComparisonRows
           : null,
-      priceBasis: "kodex_adjusted_and_voo_raw_close",
+      priceBasis: combinedKodexVooPriceBasis(model),
       fxBasis: "krw_and_stored_usdkrw",
       sourceReady: model.preperiodMinVolatility.status === "ready",
       sourceReasons: model.preperiodMinVolatility.blockers,
@@ -461,7 +463,7 @@ function unavailableRows(
     unavailableRow(
       {
         id: "kodex200",
-        priceBasis: "kodex200_adjusted_close",
+        priceBasis: kodexPriceBasis(model),
         fxBasis: "krw_not_applicable",
       },
       reasons,
@@ -469,7 +471,7 @@ function unavailableRows(
     unavailableRow(
       {
         id: "voo",
-        priceBasis: "voo_raw_close",
+        priceBasis: "voo_kis_raw_close",
         fxBasis: "stored_snapshot_and_execution_usdkrw",
       },
       reasons,
@@ -477,7 +479,7 @@ function unavailableRows(
     unavailableRow(
       {
         id: "fixed_mix",
-        priceBasis: "kodex_adjusted_and_voo_raw_close",
+        priceBasis: combinedKodexVooPriceBasis(model),
         fxBasis: "krw_and_stored_usdkrw",
       },
       reasons,
@@ -485,7 +487,7 @@ function unavailableRows(
     unavailableRow(
       {
         id: "preperiod_min_volatility",
-        priceBasis: "kodex_adjusted_and_voo_raw_close",
+        priceBasis: combinedKodexVooPriceBasis(model),
         fxBasis: "krw_and_stored_usdkrw",
       },
       [...reasons, ...model.preperiodMinVolatility.blockers],
@@ -507,6 +509,22 @@ function unavailableRows(
       [...reasons, ...anchorReasons(anchorValueWeight)],
     ),
   ];
+}
+
+function kodexPriceBasis(
+  model: InvestmentLabCounterfactualReadModel,
+): InvestmentLabScenarioPriceBasis {
+  return model.scenario?.priceBasis === "kis_raw_close"
+    ? "kodex200_kis_raw_close"
+    : "kodex200_provider_adjusted_close";
+}
+
+function combinedKodexVooPriceBasis(
+  model: InvestmentLabCounterfactualReadModel,
+): InvestmentLabScenarioPriceBasis {
+  return model.scenario?.priceBasis === "kis_raw_close"
+    ? "kodex_and_voo_kis_raw_close"
+    : "kodex_provider_adjusted_and_voo_kis_raw_close";
 }
 
 function resolvePeriod(model: InvestmentLabCounterfactualReadModel) {

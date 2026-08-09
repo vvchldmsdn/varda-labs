@@ -256,9 +256,11 @@ describe("asset price consumer admission", () => {
       "investment lab KODEX history must use adjusted admission",
     );
     assert.equal(
-      investmentLabAdapter.match(/admitRawHistoricalPriceRows/g)?.length,
+      investmentLabAdapter.match(
+        /admitPrivateSingleTenantRawHistoricalPriceRows\(\{/g,
+      )?.length,
       3,
-      "investment lab VOO and anchor history must use raw admission",
+      "investment lab KODEX fallback, VOO, and anchor history must use owner-scoped raw admission",
     );
     for (const source of operationalConsumers) {
       assert.match(source, /resolveOperationalClosePrice/);
