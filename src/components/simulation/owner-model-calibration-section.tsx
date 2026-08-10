@@ -17,7 +17,9 @@ export function OwnerModelCalibrationSection({
       data-owner-model-calibration-effective-windows={
         result.summary.effectiveNonOverlappingWindowCount
       }
+      data-owner-model-calibration-maximum={result.policy.maximumEndpointCount}
       data-owner-model-calibration-paired={result.summary.pairedEndpointCount}
+      data-owner-model-calibration-selected={result.summary.endpointCount}
       data-owner-model-calibration-selection="forbidden"
       data-owner-model-calibration-status={result.status}
     >
@@ -46,13 +48,13 @@ export function OwnerModelCalibrationSection({
 
       <dl className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         <Metric
-          detail={`전체 ${result.summary.endpointCount}개 중 비교 가능한 구간`}
+          detail={`저장 이력으로 구성한 ${result.summary.endpointCount}개 중 비교 가능 · 최대 ${result.policy.maximumEndpointCount}개`}
           label="비교 완료"
           value={`${result.summary.pairedEndpointCount}개`}
         />
         <Metric
-          detail="서로 겹치지 않는 21거래일 구간 수"
-          label="유효 독립 구간"
+          detail="수익률 관측치가 서로 겹치지 않는 21거래일 구간 수"
+          label="겹치지 않는 구간"
           value={`${result.summary.effectiveNonOverlappingWindowCount}개`}
         />
         <Metric
@@ -124,11 +126,26 @@ export function OwnerModelCalibrationSection({
         </p>
       ) : null}
 
+      {result.summary.endpointCount > 0 &&
+      result.summary.endpointCount < result.policy.maximumEndpointCount ? (
+        <p
+          className="mt-3 text-sm text-[#687064]"
+          data-owner-model-calibration-history-limited
+        >
+          현재 저장 이력으로는 서로 겹치지 않는 구간을 최대{" "}
+          {result.policy.maximumEndpointCount}개 중 {result.summary.endpointCount}
+          개 구성할 수 있습니다. 부족한 과거 구간은 평균값이나 현재 가격으로
+          만들지 않았습니다.
+        </p>
+      ) : null}
+
       <p className="mt-3 text-xs leading-5 text-[#687064]">
         현재 계좌 구성과 비중을 과거 구간에 소급 적용한 진단입니다. 21거래일
-        결과 구간은 서로 겹칠 수 있어 통계적 신뢰도나 모형 순위를 주장하지
-        않습니다. 요인 데이터는 당시 공개일 기준으로만 사용하지만 데이터의
-        과거 버전 기록은 보존되지 않아, 이후 정정된 값이 포함될 수 있습니다.
+        결과 구간은 저장된 서비스 날짜 축에서 수익률이 서로 겹치지 않게
+        구성합니다. 그래도 표본 수가 적으므로 통계적 신뢰도나 모형 순위를
+        주장하지 않습니다. 요인 데이터는 당시 공개일 기준으로만 사용하지만
+        데이터의 과거 버전 기록은 보존되지 않아, 이후 정정된 값이 포함될 수
+        있습니다.
       </p>
     </section>
   );

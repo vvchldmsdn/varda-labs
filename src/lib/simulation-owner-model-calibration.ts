@@ -1,15 +1,20 @@
 import type { SimulationOwnerFactorHistoricalValidationResult } from "./simulation-owner-factor-historical-validation.ts";
-import type { SimulationOwnerHistoricalOutcomeValidationResult } from "./simulation-owner-historical-outcome-validation.ts";
+import {
+  SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY,
+  type SimulationOwnerHistoricalOutcomeValidationResult,
+} from "./simulation-owner-historical-outcome-validation.ts";
 
 export const SIMULATION_OWNER_MODEL_CALIBRATION_POLICY = Object.freeze({
-  version: "simulation_owner_model_calibration_v1",
+  version: "simulation_owner_model_calibration_v2",
+  maximumEndpointCount:
+    SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.maximumEndpointCount,
   pairing:
     "same_account_weights_endpoint_training_window_outcome_window_and_observed_path",
   centralEstimateMetric: "mean_absolute_p50_error_percentage_points",
   intervalMetric: "p10_p90_empirical_coverage",
   lossProbabilityMetric: "brier_score",
   drawdownMetric: "mean_absolute_p50_drawdown_error_percentage_points",
-  outcomeWindowOverlap: "acknowledged_not_independent",
+  outcomeWindowOverlap: "forbidden_by_service_date_stride",
   statisticalConfidence: "not_established",
   modelSelection: "forbidden",
   probabilityAveraging: "forbidden",
@@ -19,7 +24,7 @@ export const SIMULATION_OWNER_MODEL_CALIBRATION_POLICY = Object.freeze({
   optimizer: "forbidden",
   orderAuthority: "forbidden",
   interpretation:
-    "retrospective_error_diagnostic_on_overlapping_short_windows_not_model_ranking",
+    "retrospective_error_diagnostic_on_non_overlapping_short_windows_not_model_ranking",
 } as const);
 
 export type SimulationOwnerModelCalibrationResult = ReturnType<
@@ -294,7 +299,7 @@ function countNonOverlappingWindows(
   let count = 0;
   let lastEnd: string | null = null;
   for (const row of sorted) {
-    if (lastEnd === null || row.outcomeStartServiceDate > lastEnd) {
+    if (lastEnd === null || row.outcomeStartServiceDate >= lastEnd) {
       count += 1;
       lastEnd = row.outcomeEndServiceDate;
     }

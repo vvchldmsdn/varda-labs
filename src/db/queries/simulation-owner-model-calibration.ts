@@ -17,6 +17,8 @@ export async function getReadOnlyTenantSimulationOwnerModelCalibration(options: 
   const factorValidation =
     buildSimulationOwnerFactorHistoricalValidation({
       execution: ownerResearch.execution,
+      availableServiceDates:
+        ownerResearch.modelCalibrationInput.availableServiceDates,
       endpoints: ownerResearch.modelCalibrationInput.endpoints,
       factorRows,
     });

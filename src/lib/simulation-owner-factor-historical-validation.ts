@@ -37,7 +37,7 @@ export const SIMULATION_OWNER_FACTOR_HISTORICAL_VALIDATION_POLICY =
     factorAvailabilityPolicy:
       "release_date_strictly_before_each_training_state_date",
     factorVintageAuthority: "not_preserved",
-    overlappingOutcomeWindows: "acknowledged_not_independent",
+    overlappingOutcomeWindows: "forbidden_by_service_date_stride",
     persistence: "forbidden",
     providerCalls: "forbidden",
     recommendation: "forbidden",
@@ -53,6 +53,7 @@ export type SimulationOwnerFactorHistoricalValidationResult = ReturnType<
 
 export function buildSimulationOwnerFactorHistoricalValidation(input: {
   execution: SimulationOwnerResearchExecutionResult;
+  availableServiceDates: readonly string[];
   endpoints: readonly SimulationOwnerHistoricalValidationEndpoint[];
   factorRows: readonly SimulationRegimeFactorObservation[];
 }) {
@@ -73,6 +74,7 @@ export function buildSimulationOwnerFactorHistoricalValidation(input: {
 
   const expectedDates = buildSimulationOwnerHistoricalValidationEndpointDates(
     input.execution.endSelection.endServiceDate,
+    input.availableServiceDates,
   );
   if (
     input.endpoints.length !== expectedDates.length ||

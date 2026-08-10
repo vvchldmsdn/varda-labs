@@ -18,8 +18,13 @@ import {
 } from "@/db/schema";
 import { planSimulationPeriodPreflightScan } from "@/lib/simulation-period-preflight-plan";
 import {
+  buildSimulationOwnerHistoricalValidationEndpointDates,
+  SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY,
+} from "@/lib/simulation-owner-historical-outcome-validation";
+import {
   buildPrivateOwnerRawHistory,
   resolveLatestCommonPrivateOwnerRawServiceDate,
+  resolvePrivateOwnerRawAvailableServiceDates,
   type PrivateOwnerRawHistoryInstrumentInput,
 } from "@/lib/simulation-private-owner-raw-history";
 import type { SimulationResearchUniverseSelection } from "@/lib/simulation-research-universe-preflight";
@@ -123,6 +128,112 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
     returnStepCount: number;
   }>[];
 }) {
+  const source = await loadPrivateOwnerRawHistorySource(options);
+
+  return Object.freeze(
+    options.requests.map((request, index) => {
+      const plan = source.plans[index];
+      const hasQueryablePlan =
+        plan?.status === "queryable" && plan.queryRange !== null;
+      return buildPrivateOwnerRawHistory({
+        requestedOwnerUserId: options.tenantContext.ownerUserId,
+        activeOwnerUserIds: options.activeOwnerUserIds,
+        requestedEndServiceDate: request.endServiceDate,
+        returnStepCount: request.returnStepCount,
+        instruments: source.instruments,
+        priceRows: hasQueryablePlan ? source.priceRows : [],
+        fxRows: hasQueryablePlan ? source.fxRows : [],
+      });
+    }),
+  );
+}
+
+export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
+  options: {
+    tenantContext: TenantContext;
+    activeOwnerUserIds: readonly string[];
+    selection: SimulationResearchUniverseSelection;
+    endServiceDate: string;
+    currentReturnStepCount?: number;
+  },
+) {
+  const policy = SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY;
+  const scheduleReturnStepCount =
+    policy.sourceReturnStepCount +
+    policy.outcomeReturnStepCount * (policy.maximumEndpointCount - 1);
+  const source = await loadPrivateOwnerRawHistorySource({
+    tenantContext: options.tenantContext,
+    activeOwnerUserIds: options.activeOwnerUserIds,
+    selection: options.selection,
+    requests: [
+      {
+        endServiceDate: options.endServiceDate,
+        returnStepCount: scheduleReturnStepCount,
+      },
+    ],
+  });
+  const plan = source.plans[0];
+  const hasQueryablePlan =
+    plan?.status === "queryable" && plan.queryRange !== null;
+  const ownerScopeReady =
+    options.activeOwnerUserIds.length === 1 &&
+    options.activeOwnerUserIds[0] === options.tenantContext.ownerUserId;
+  const priceRows = hasQueryablePlan ? source.priceRows : [];
+  const fxRows = hasQueryablePlan ? source.fxRows : [];
+  const availableServiceDates =
+    ownerScopeReady && hasQueryablePlan
+      ? resolvePrivateOwnerRawAvailableServiceDates({
+          endServiceDate: options.endServiceDate,
+          priceRows,
+          fxRows,
+          requiresFx: source.requiresFx,
+        })
+      : Object.freeze([] as string[]);
+  const endpointDates = buildSimulationOwnerHistoricalValidationEndpointDates(
+    options.endServiceDate,
+    availableServiceDates,
+  );
+  const buildResult = (endServiceDate: string, returnStepCount: number) =>
+    buildPrivateOwnerRawHistory({
+      requestedOwnerUserId: options.tenantContext.ownerUserId,
+      activeOwnerUserIds: options.activeOwnerUserIds,
+      requestedEndServiceDate: endServiceDate,
+      returnStepCount,
+      instruments: source.instruments,
+      priceRows,
+      fxRows,
+    });
+
+  return Object.freeze({
+    current: buildResult(
+      options.endServiceDate,
+      options.currentReturnStepCount ?? 90,
+    ),
+    availableServiceDates,
+    endpointDates,
+    endpoints: Object.freeze(
+      endpointDates.map((outcomeEndServiceDate) =>
+        Object.freeze({
+          outcomeEndServiceDate,
+          result: buildResult(
+            outcomeEndServiceDate,
+            policy.sourceReturnStepCount,
+          ),
+        }),
+      ),
+    ),
+  });
+}
+
+async function loadPrivateOwnerRawHistorySource(options: {
+  tenantContext: TenantContext;
+  activeOwnerUserIds: readonly string[];
+  selection: SimulationResearchUniverseSelection;
+  requests: readonly Readonly<{
+    endServiceDate: string;
+    returnStepCount: number;
+  }>[];
+}) {
   const instruments =
     options.selection.status === "valid"
       ? toPrivateHistoryInstruments(options.selection)
@@ -164,22 +275,13 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
         ])
       : [[], []];
 
-  return Object.freeze(
-    options.requests.map((request, index) => {
-      const plan = plans[index];
-      const hasQueryablePlan =
-        plan?.status === "queryable" && plan.queryRange !== null;
-      return buildPrivateOwnerRawHistory({
-        requestedOwnerUserId: options.tenantContext.ownerUserId,
-        activeOwnerUserIds: options.activeOwnerUserIds,
-        requestedEndServiceDate: request.endServiceDate,
-        returnStepCount: request.returnStepCount,
-        instruments,
-        priceRows: hasQueryablePlan ? priceRows : [],
-        fxRows: hasQueryablePlan ? fxRows : [],
-      });
-    }),
-  );
+  return Object.freeze({
+    instruments: Object.freeze(instruments),
+    plans: Object.freeze(plans),
+    priceRows: Object.freeze(priceRows),
+    fxRows: Object.freeze(fxRows),
+    requiresFx: queryablePlans.some((plan) => plan.requiresFx),
+  });
 }
 
 async function loadRawPriceRows(input: {

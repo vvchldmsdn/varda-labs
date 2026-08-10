@@ -4,13 +4,9 @@ import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-stru
 import {
   getActivePortfolioOwnerUserIds,
   getLatestCommonPrivateOwnerRawServiceDate,
-  getReadOnlyPrivateOwnerRawHistoryBatch,
+  getReadOnlyPrivateOwnerRawHistoryValidationBatch,
 } from "@/db/queries/simulation-owner-private-history";
-import {
-  buildSimulationOwnerHistoricalOutcomeValidation,
-  buildSimulationOwnerHistoricalValidationEndpointDates,
-  SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY,
-} from "@/lib/simulation-owner-historical-outcome-validation";
+import { buildSimulationOwnerHistoricalOutcomeValidation } from "@/lib/simulation-owner-historical-outcome-validation";
 import { buildSimulationOwnerInputCandidate } from "@/lib/simulation-owner-input-candidate";
 import { buildSimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
 import { buildSimulationOwnerCandidateComparison } from "@/lib/simulation-owner-candidate-comparison";
@@ -54,38 +50,27 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     suppliedValue: options.endServiceDate,
     latestCommonStoredServiceDate,
   });
-  const validationDates =
-    endSelection.status === "valid"
-      ? buildSimulationOwnerHistoricalValidationEndpointDates(
-          endSelection.endServiceDate,
-        )
-      : [];
-  const historyBatch =
+  const historyValidationBatch =
     candidate.selection && endSelection.status === "valid"
-      ? await getReadOnlyPrivateOwnerRawHistoryBatch({
+      ? await getReadOnlyPrivateOwnerRawHistoryValidationBatch({
           tenantContext: options.tenantContext,
           activeOwnerUserIds,
           selection: candidate.selection,
-          requests: [
-            {
-              endServiceDate: endSelection.endServiceDate,
-              returnStepCount: 90,
-            },
-            ...validationDates.map((endServiceDate) => ({
-              endServiceDate,
-              returnStepCount:
-                SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.sourceReturnStepCount,
-            })),
-          ],
+          endServiceDate: endSelection.endServiceDate,
+          currentReturnStepCount: 90,
         })
-      : [];
-  const historicalBundle = historyBatch[0] ?? null;
+      : null;
+  const historicalBundle = historyValidationBatch?.current ?? null;
+  const availableServiceDates =
+    historyValidationBatch?.availableServiceDates ??
+    Object.freeze([] as string[]);
   const historicalValidationEndpoints = Object.freeze(
-    validationDates.map((outcomeEndServiceDate, index) =>
-      Object.freeze({
-        outcomeEndServiceDate,
-        matrix: historyBatch[index + 1]?.matrix ?? null,
-      }),
+    (historyValidationBatch?.endpoints ?? []).map(
+      ({ outcomeEndServiceDate, result }) =>
+        Object.freeze({
+          outcomeEndServiceDate,
+          matrix: result.matrix ?? null,
+        }),
     ),
   );
   const inputPreflight = buildSimulationOwnerInputPreflightModel({
@@ -136,6 +121,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
   const historicalValidation =
     buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
+      availableServiceDates,
       endpoints: historicalValidationEndpoints,
     });
   const parametricFactorInput =
@@ -158,6 +144,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     modelCalibrationInput: Object.freeze({
       factorAsOfServiceDate:
         endSelection.status === "valid" ? endSelection.endServiceDate : null,
+      availableServiceDates,
       endpoints: historicalValidationEndpoints,
     }),
   });
