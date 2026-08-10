@@ -14,6 +14,7 @@ import {
 import { buildSimulationOwnerInputCandidate } from "@/lib/simulation-owner-input-candidate";
 import { buildSimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
 import { buildSimulationOwnerCandidateComparison } from "@/lib/simulation-owner-candidate-comparison";
+import { buildSimulationOwnerWalkForwardValidation } from "@/lib/simulation-owner-walk-forward-validation";
 import {
   buildSimulationOwnerResearchExecution,
   resolveSimulationOwnerExecutionEndSelection,
@@ -118,6 +119,12 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     samplePathCount:
       SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.samplePathCount,
   });
+  const walkForwardValidation = buildSimulationOwnerWalkForwardValidation({
+    account: candidate.account,
+    currentExecutionReady: execution.status === "ready",
+    matrix,
+    currentWeights: execution.executionWeights,
+  });
   const historicalValidation =
     buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
@@ -131,6 +138,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     inputPreflight,
     execution,
     candidateComparison,
+    walkForwardValidation,
     historicalValidation,
   });
 }
