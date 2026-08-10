@@ -357,6 +357,19 @@ async function main() {
   const ownerModelComparisonStatus = simulation.body.match(
     /data-owner-model-comparison-status="(ready|unavailable)"/,
   )?.[1];
+  const ownerModelCalibrationStatus = simulation.body.match(
+    /data-owner-model-calibration-status="(ready|partial|unavailable)"/,
+  )?.[1];
+  const ownerModelCalibrationPairedCount = Number(
+    simulation.body.match(
+      /data-owner-model-calibration-paired="(\d+)"/,
+    )?.[1] ?? 0,
+  );
+  const ownerModelCalibrationEffectiveWindowCount = Number(
+    simulation.body.match(
+      /data-owner-model-calibration-effective-windows="(\d+)"/,
+    )?.[1] ?? 0,
+  );
   const walkForwardStabilityStatus = simulation.body.match(
     /data-walk-forward-stability-status="(ready|partial|unavailable)"/,
   )?.[1];
@@ -479,6 +492,14 @@ async function main() {
   assert.ok(
     ownerModelComparisonStatus,
     "simulation must render one owner-scoped model comparison state",
+  );
+  assert.ok(
+    ownerModelCalibrationStatus,
+    "simulation must render one owner-scoped model calibration state",
+  );
+  assert.match(
+    simulation.body,
+    /data-owner-model-calibration-selection="forbidden"/,
   );
   assert.ok(
     walkForwardStabilityStatus,
@@ -814,6 +835,9 @@ async function main() {
         walkForwardReadyCount,
         ownerParametricFactorStatus,
         ownerModelComparisonStatus,
+        ownerModelCalibrationStatus,
+        ownerModelCalibrationPairedCount,
+        ownerModelCalibrationEffectiveWindowCount,
         walkForwardStabilityStatus,
         walkForwardStabilityRowCount: walkForwardStabilityRows.length,
         walkForwardStabilityReadyCount:
