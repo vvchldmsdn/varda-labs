@@ -3,9 +3,10 @@ import type { SimulationOwnerInputPreflightModel } from "./simulation-owner-inpu
 import type { SimulationOwnerHistoricalOutcomeValidationResult } from "./simulation-owner-historical-outcome-validation.ts";
 import type { SimulationOwnerResearchExecutionResult } from "./simulation-owner-research-execution.ts";
 import type { SimulationOwnerParametricFactorResult } from "./simulation-owner-parametric-factor.ts";
+import type { SimulationOwnerModelComparisonResult } from "./simulation-owner-model-comparison.ts";
 
 export const SIMULATION_OWNER_READINESS_AUDIT_POLICY = Object.freeze({
-  version: "simulation_owner_research_readiness_audit_v3",
+  version: "simulation_owner_research_readiness_audit_v4",
   accountScopes: Object.freeze([
     "all",
     "brokerage",
@@ -24,6 +25,7 @@ type ReadinessScopeInput = Readonly<{
   execution: SimulationOwnerResearchExecutionResult;
   historicalValidation: SimulationOwnerHistoricalOutcomeValidationResult;
   parametricFactor: SimulationOwnerParametricFactorResult;
+  modelComparison: SimulationOwnerModelComparisonResult;
 }>;
 
 export function summarizeSimulationOwnerReadiness(
@@ -38,7 +40,8 @@ export function summarizeSimulationOwnerReadiness(
       input.inputPreflight.account !== input.account ||
       input.execution.account !== input.account ||
       input.historicalValidation.account !== input.account ||
-      input.parametricFactor.account !== input.account
+      input.parametricFactor.account !== input.account ||
+      input.modelComparison.account !== input.account
     ) {
       throw new TypeError(`readiness scope mismatch: ${input.account}`);
     }
@@ -64,6 +67,9 @@ export function summarizeSimulationOwnerReadiness(
     parametricFactorReadyScopeCount: scopes.filter(
       (scope) => scope.parametricFactor.status === "ready",
     ).length,
+    modelComparisonReadyScopeCount: scopes.filter(
+      (scope) => scope.modelComparison.status === "ready",
+    ).length,
     scopes: Object.freeze(scopes),
   });
 }
@@ -74,6 +80,7 @@ function summarizeScope(input: ReadinessScopeInput) {
     execution,
     historicalValidation,
     parametricFactor,
+    modelComparison,
   } = input;
   return Object.freeze({
     account: input.account,
@@ -131,6 +138,29 @@ function summarizeScope(input: ReadinessScopeInput) {
         parametricFactor.source.firstAlignedServiceDate,
       lastAlignedServiceDate:
         parametricFactor.source.lastAlignedServiceDate,
+    }),
+    modelComparison: Object.freeze({
+      status: modelComparison.status,
+      reason:
+        modelComparison.status === "unavailable"
+          ? modelComparison.reason
+          : null,
+      agreementCode:
+        modelComparison.status === "ready"
+          ? modelComparison.agreement.code
+          : null,
+      terminalP10P90OverlapPct:
+        modelComparison.status === "ready"
+          ? roundPercentage(
+              modelComparison.agreement.terminalP10P90OverlapPct,
+            )
+          : null,
+      factorObservationCoveragePct:
+        modelComparison.status === "ready"
+          ? roundPercentage(
+              modelComparison.pairing.factorObservationCoveragePct,
+            )
+          : null,
     }),
   });
 }

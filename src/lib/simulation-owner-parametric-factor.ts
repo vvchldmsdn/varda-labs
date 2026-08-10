@@ -215,6 +215,9 @@ export function buildSimulationOwnerParametricFactorResearch(input: {
     terminal: summary.terminal,
     bands: summary.bands,
     samplePaths: summary.samplePaths,
+    executionWeights: Object.freeze(
+      input.weights.map((row) => Object.freeze({ ...row })),
+    ),
     source,
     factorSources: buildSimulationRegimeFactorSourceSummaries(
       factorSeries,

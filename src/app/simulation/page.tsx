@@ -4,6 +4,7 @@ import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
+import { OwnerModelComparisonSection } from "@/components/simulation/owner-model-comparison-section";
 import { OwnerParametricFactorSection } from "@/components/simulation/owner-parametric-factor-section";
 import { OwnerHistoricalOutcomeValidationSection } from "@/components/simulation/owner-historical-outcome-validation-section";
 import { OwnerCandidateComparisonSection } from "@/components/simulation/owner-candidate-comparison-section";
@@ -18,6 +19,7 @@ import { SimulationSectionErrorBoundary } from "@/components/simulation/simulati
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlyTenantSimulationOwnerParametricFactorResearch } from "@/db/queries/simulation-owner-parametric-factor";
+import { getReadOnlyTenantSimulationOwnerModelComparison } from "@/db/queries/simulation-owner-model-comparison";
 import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulation-owner-research";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
@@ -79,6 +81,11 @@ export default async function SimulationPage({
     getReadOnlyTenantSimulationOwnerParametricFactorResearch({
       ownerResearchPromise,
     });
+  const ownerModelComparisonPromise =
+    getReadOnlyTenantSimulationOwnerModelComparison({
+      ownerResearchPromise,
+      parametricFactorPromise: ownerParametricFactorPromise,
+    });
   const historicalOutcomeValidationPromise =
     getReadOnlySimulationHistoricalOutcomeValidation({
       endServiceDate: params.end,
@@ -114,6 +121,7 @@ export default async function SimulationPage({
         modelPromise={modelPromise}
         ownerResearchPromise={ownerResearchPromise}
         ownerParametricFactorPromise={ownerParametricFactorPromise}
+        ownerModelComparisonPromise={ownerModelComparisonPromise}
         regimePromise={regimePromise}
         regimeHistoricalOutcomeValidationPromise={
           regimeHistoricalOutcomeValidationPromise
@@ -132,6 +140,7 @@ async function SimulationContent({
   modelPromise,
   ownerResearchPromise,
   ownerParametricFactorPromise,
+  ownerModelComparisonPromise,
   regimePromise,
   regimeHistoricalOutcomeValidationPromise,
   researchUniversePreflightPromise,
@@ -146,6 +155,9 @@ async function SimulationContent({
   >;
   ownerParametricFactorPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerParametricFactorResearch
+  >;
+  ownerModelComparisonPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerModelComparison
   >;
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
   regimeHistoricalOutcomeValidationPromise: ReturnType<
@@ -201,6 +213,18 @@ async function SimulationContent({
           <Suspense fallback={<OwnerParametricFactorSkeleton />}>
             <OwnerParametricFactorContent
               resultPromise={ownerParametricFactorPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
+      ownerModelComparison={
+        <SimulationSectionErrorBoundary
+          section="owner-model-comparison"
+          title="두 확률모형 비교"
+        >
+          <Suspense fallback={<OwnerModelComparisonSkeleton />}>
+            <OwnerModelComparisonContent
+              resultPromise={ownerModelComparisonPromise}
             />
           </Suspense>
         </SimulationSectionErrorBoundary>
@@ -297,6 +321,17 @@ async function OwnerParametricFactorContent({
 }) {
   const result = await resultPromise;
   return <OwnerParametricFactorSection result={result} />;
+}
+
+async function OwnerModelComparisonContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerModelComparison
+  >;
+}) {
+  const result = await resultPromise;
+  return <OwnerModelComparisonSection result={result} />;
 }
 
 async function ResearchUniversePreflightContent({
@@ -451,6 +486,19 @@ function OwnerParametricFactorSkeleton() {
       data-owner-parametric-factor-loading
     >
       <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
+  );
+}
+
+function OwnerModelComparisonSkeleton() {
+  return (
+    <section
+      aria-label="두 확률모형 비교 로딩"
+      className="border-b border-[#d7ddcf] py-5"
+      data-owner-model-comparison-loading
+    >
+      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
       <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
     </section>
   );

@@ -449,3 +449,9 @@ separate future contracts.
     loss probability and MDD P50/P90 with each following observed loss event
     and MDD. It does not create an additional database read, simulation run,
     model score, or calibration authority.
+28. The owner/account-scoped stationary bootstrap and factor/residual Monte
+    Carlo results are now paired only when account, end service date, horizon,
+    path count, and owner-derived weights match. The read-only comparison shows
+    terminal-range overlap and metric deltas as assumption-sensitivity
+    evidence; it never averages model probabilities, ranks a winner, or creates
+    recommendation, order, persistence, or provider authority.

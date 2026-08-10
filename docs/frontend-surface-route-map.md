@@ -141,6 +141,15 @@ but they share one promise and result because their data source, freshness, and
 calculation lifecycle are identical. P90 comparison is descriptive, not a
 pass/fail model score.
 
+The owner-scoped stationary-bootstrap and factor/residual sections also feed a
+separate read-only comparison Server Component. The comparison requires the
+same account, end service date, horizon, path count, and owner-derived weights;
+otherwise it stays unavailable while each model's individual result remains
+visible. It reports terminal P10-P90 overlap and signed metric deltas on a
+shared chart scale. It does not average probabilities, choose a model, add a
+database/provider read, persist a run, or create recommendation or order
+authority.
+
 ## API And Operator Boundaries
 
 | Surface | Current role | Boundary |
