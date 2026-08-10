@@ -17,6 +17,8 @@ describe("simulation owner readiness audit", () => {
     assert.equal(result.historicalValidationReadyScopeCount, 2);
     assert.equal(result.parametricFactorReadyScopeCount, 2);
     assert.equal(result.modelComparisonReadyScopeCount, 2);
+    assert.equal(result.modelCalibrationReadyScopeCount, 2);
+    assert.equal(result.modelCalibrationPairedScopeCount, 2);
     assert.deepEqual(
       result.scopes.map((row) => row.account),
       ["all", "brokerage", "isa", "irp"],
@@ -52,6 +54,14 @@ describe("simulation owner readiness audit", () => {
       agreementCode: null,
       terminalP10P90OverlapPct: null,
       factorObservationCoveragePct: null,
+    });
+    assert.deepEqual(result.scopes[0].modelCalibration, {
+      status: "unavailable",
+      reason: "no_paired_endpoints",
+      endpointCount: 7,
+      pairedEndpointCount: 0,
+      unavailableEndpointCount: 7,
+      effectiveNonOverlappingWindowCount: 0,
     });
     assert.equal(result.policy.providerCalls, "forbidden");
     assert.equal(result.policy.databaseWrites, "forbidden");
@@ -183,6 +193,17 @@ function scope(account, status) {
         status === "ready"
           ? { factorObservationCoveragePct: 66.667 }
           : null,
+    },
+    modelCalibration: {
+      account,
+      status,
+      reason: status === "ready" ? null : "no_paired_endpoints",
+      summary: {
+        endpointCount: 7,
+        pairedEndpointCount: status === "ready" ? 7 : 0,
+        unavailableEndpointCount: status === "ready" ? 0 : 7,
+        effectiveNonOverlappingWindowCount: status === "ready" ? 1 : 0,
+      },
     },
   };
 }

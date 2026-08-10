@@ -28,6 +28,9 @@ describe("Simulation input readiness route boundary", () => {
     const ownerModelComparisonQuery = read(
       "src/db/queries/simulation-owner-model-comparison.ts",
     );
+    const ownerModelCalibrationQuery = read(
+      "src/db/queries/simulation-owner-model-calibration.ts",
+    );
     const ownerPrivateHistoryQuery = read(
       "src/db/queries/simulation-owner-private-history.ts",
     );
@@ -68,6 +71,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(ownerInputQuery, /^import "server-only";/);
     assert.match(ownerParametricFactorQuery, /^import "server-only";/);
     assert.match(ownerModelComparisonQuery, /^import "server-only";/);
+    assert.match(ownerModelCalibrationQuery, /^import "server-only";/);
     assert.match(ownerPrivateHistoryQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /horizon: params\.horizon/);
@@ -89,6 +93,10 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.match(
       page,
+      /getReadOnlyTenantSimulationOwnerModelCalibration/,
+    );
+    assert.match(
+      page,
       /researchUniverse=\{preservedQuery\.researchUniverse\}/,
     );
     assert.match(inputReadinessView, /buildSimulationHref/);
@@ -106,7 +114,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
     assert.equal(
       page.match(/<SimulationSectionErrorBoundary/g)?.length,
-      7,
+      8,
       "each independent simulation query section must have its own error boundary",
     );
     assert.match(sectionErrorBoundary, /^"use client";/);
@@ -273,6 +281,14 @@ describe("Simulation input readiness route boundary", () => {
       /buildSimulationOwnerModelComparison/,
     );
     assert.match(ownerModelComparisonQuery, /Promise\.all/);
+    assert.match(
+      ownerModelCalibrationQuery,
+      /buildSimulationOwnerFactorHistoricalValidation/,
+    );
+    assert.match(
+      ownerModelCalibrationQuery,
+      /buildSimulationOwnerModelCalibration/,
+    );
     assert.doesNotMatch(
       ownerInputQuery,
       /\.insert\(|\.update\(|\.delete\(|cron|fetch\s*\(/i,
@@ -283,6 +299,10 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.doesNotMatch(
       ownerModelComparisonQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      ownerModelCalibrationQuery,
       /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
   });
@@ -405,6 +425,13 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-owner-model-comparison-combination="forbidden"/);
     assert.match(view, /data-owner-model-comparison-agreement/);
     assert.match(view, /data-owner-model-comparison-factor-observations/);
+    assert.match(view, /data-owner-model-calibration/);
+    assert.match(view, /data-owner-model-calibration-account/);
+    assert.match(view, /data-owner-model-calibration-status/);
+    assert.match(view, /data-owner-model-calibration-selection="forbidden"/);
+    assert.match(view, /data-owner-model-calibration-effective-windows/);
+    assert.match(view, /data-owner-model-calibration-paired/);
+    assert.match(view, /과거 결과로 두 모형 점검/);
     assert.match(view, /두 확률모형 비교/);
     assert.match(view, /어느 한쪽을\s*정답으로 고르거나 두 확률을 평균내지 않습니다/);
     assert.match(view, /환율·금리 요인 확률모형/);
@@ -525,6 +552,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(smoke, /const SESSION_COOKIE/);
     assert.match(smoke, /if \(!SESSION_COOKIE\)/);
     assert.match(smoke, /simulation_session_boundary_verified/);
+    assert.match(smoke, /data-owner-model-calibration-status/);
+    assert.match(smoke, /ownerModelCalibrationPairedCount/);
     assert.match(smoke, /databaseReadAttempted: false/);
     assert.match(smoke, /assert\.doesNotMatch\(/);
     assert.match(smoke, /data-page="simulation-input-readiness"/);
@@ -565,6 +594,7 @@ function readSimulationView() {
     "src/components/simulation/owner-historical-outcome-validation-section.tsx",
     "src/components/simulation/owner-parametric-factor-section.tsx",
     "src/components/simulation/owner-model-comparison-section.tsx",
+    "src/components/simulation/owner-model-calibration-section.tsx",
     "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",

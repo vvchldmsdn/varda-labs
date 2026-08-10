@@ -13,6 +13,7 @@ async function main() {
     queryModule,
     parametricFactorQueryModule,
     modelComparisonQueryModule,
+    modelCalibrationQueryModule,
   ] =
     await Promise.all([
       import("drizzle-orm"),
@@ -21,6 +22,7 @@ async function main() {
       import("../src/db/queries/simulation-owner-research.ts"),
       import("../src/db/queries/simulation-owner-parametric-factor.ts"),
       import("../src/db/queries/simulation-owner-model-comparison.ts"),
+      import("../src/db/queries/simulation-owner-model-calibration.ts"),
     ]);
   const { accounts, appUsers } = schema;
   const ownerRows = await client.db
@@ -71,16 +73,27 @@ async function main() {
         modelComparisonQueryModule.getReadOnlyTenantSimulationOwnerModelComparison(
           { ownerResearchPromise, parametricFactorPromise },
         );
-      const [ownerResearch, parametricFactor, modelComparison] = await Promise.all([
+      const modelCalibrationPromise =
+        modelCalibrationQueryModule.getReadOnlyTenantSimulationOwnerModelCalibration(
+          { ownerResearchPromise },
+        );
+      const [
+        ownerResearch,
+        parametricFactor,
+        modelComparison,
+        modelCalibration,
+      ] = await Promise.all([
         ownerResearchPromise,
         parametricFactorPromise,
         modelComparisonPromise,
+        modelCalibrationPromise,
       ]);
       return {
         account,
         ...ownerResearch,
         parametricFactor,
         modelComparison,
+        modelCalibration,
       };
     }),
   );

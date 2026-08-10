@@ -217,7 +217,7 @@ function buildEndpointRow(input: {
   });
 }
 
-function isOwnerHistoricalValidationSourceMatrix(
+export function isOwnerHistoricalValidationSourceMatrix(
   matrix: SimulationReturnMatrixResult,
   outcomeEndServiceDate: string,
   weightsByKey: ReadonlyMap<string, number>,

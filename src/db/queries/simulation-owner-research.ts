@@ -80,6 +80,14 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
         })
       : [];
   const historicalBundle = historyBatch[0] ?? null;
+  const historicalValidationEndpoints = Object.freeze(
+    validationDates.map((outcomeEndServiceDate, index) =>
+      Object.freeze({
+        outcomeEndServiceDate,
+        matrix: historyBatch[index + 1]?.matrix ?? null,
+      }),
+    ),
+  );
   const inputPreflight = buildSimulationOwnerInputPreflightModel({
     candidate,
     historicalPreflight: historicalBundle,
@@ -128,10 +136,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
   const historicalValidation =
     buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
-      endpoints: validationDates.map((outcomeEndServiceDate, index) => ({
-        outcomeEndServiceDate,
-        matrix: historyBatch[index + 1]?.matrix ?? null,
-      })),
+      endpoints: historicalValidationEndpoints,
     });
   const parametricFactorInput =
     execution.status === "ready" && matrix?.status === "ready"
@@ -150,6 +155,11 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     walkForwardValidation,
     historicalValidation,
     parametricFactorInput,
+    modelCalibrationInput: Object.freeze({
+      factorAsOfServiceDate:
+        endSelection.status === "valid" ? endSelection.endServiceDate : null,
+      endpoints: historicalValidationEndpoints,
+    }),
   });
 }
 

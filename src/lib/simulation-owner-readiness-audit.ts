@@ -4,9 +4,10 @@ import type { SimulationOwnerHistoricalOutcomeValidationResult } from "./simulat
 import type { SimulationOwnerResearchExecutionResult } from "./simulation-owner-research-execution.ts";
 import type { SimulationOwnerParametricFactorResult } from "./simulation-owner-parametric-factor.ts";
 import type { SimulationOwnerModelComparisonResult } from "./simulation-owner-model-comparison.ts";
+import type { SimulationOwnerModelCalibrationResult } from "./simulation-owner-model-calibration.ts";
 
 export const SIMULATION_OWNER_READINESS_AUDIT_POLICY = Object.freeze({
-  version: "simulation_owner_research_readiness_audit_v4",
+  version: "simulation_owner_research_readiness_audit_v5",
   accountScopes: Object.freeze([
     "all",
     "brokerage",
@@ -26,6 +27,7 @@ type ReadinessScopeInput = Readonly<{
   historicalValidation: SimulationOwnerHistoricalOutcomeValidationResult;
   parametricFactor: SimulationOwnerParametricFactorResult;
   modelComparison: SimulationOwnerModelComparisonResult;
+  modelCalibration: SimulationOwnerModelCalibrationResult;
 }>;
 
 export function summarizeSimulationOwnerReadiness(
@@ -41,7 +43,8 @@ export function summarizeSimulationOwnerReadiness(
       input.execution.account !== input.account ||
       input.historicalValidation.account !== input.account ||
       input.parametricFactor.account !== input.account ||
-      input.modelComparison.account !== input.account
+      input.modelComparison.account !== input.account ||
+      input.modelCalibration.account !== input.account
     ) {
       throw new TypeError(`readiness scope mismatch: ${input.account}`);
     }
@@ -70,6 +73,12 @@ export function summarizeSimulationOwnerReadiness(
     modelComparisonReadyScopeCount: scopes.filter(
       (scope) => scope.modelComparison.status === "ready",
     ).length,
+    modelCalibrationReadyScopeCount: scopes.filter(
+      (scope) => scope.modelCalibration.status === "ready",
+    ).length,
+    modelCalibrationPairedScopeCount: scopes.filter(
+      (scope) => scope.modelCalibration.pairedEndpointCount > 0,
+    ).length,
     scopes: Object.freeze(scopes),
   });
 }
@@ -81,6 +90,7 @@ function summarizeScope(input: ReadinessScopeInput) {
     historicalValidation,
     parametricFactor,
     modelComparison,
+    modelCalibration,
   } = input;
   return Object.freeze({
     account: input.account,
@@ -161,6 +171,16 @@ function summarizeScope(input: ReadinessScopeInput) {
               modelComparison.pairing.factorObservationCoveragePct,
             )
           : null,
+    }),
+    modelCalibration: Object.freeze({
+      status: modelCalibration.status,
+      reason: modelCalibration.reason,
+      endpointCount: modelCalibration.summary.endpointCount,
+      pairedEndpointCount: modelCalibration.summary.pairedEndpointCount,
+      unavailableEndpointCount:
+        modelCalibration.summary.unavailableEndpointCount,
+      effectiveNonOverlappingWindowCount:
+        modelCalibration.summary.effectiveNonOverlappingWindowCount,
     }),
   });
 }
