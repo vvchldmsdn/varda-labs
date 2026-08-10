@@ -15,6 +15,7 @@ describe("simulation owner readiness audit", () => {
     assert.equal(result.scopeCount, 4);
     assert.equal(result.readyScopeCount, 2);
     assert.equal(result.historicalValidationReadyScopeCount, 2);
+    assert.equal(result.parametricFactorReadyScopeCount, 2);
     assert.deepEqual(
       result.scopes.map((row) => row.account),
       ["all", "brokerage", "isa", "irp"],
@@ -35,6 +36,14 @@ describe("simulation owner readiness audit", () => {
       endpointCount: 7,
       readyEndpointCount: 0,
       unavailableEndpointCount: 7,
+    });
+    assert.deepEqual(result.scopes[0].parametricFactor, {
+      status: "unavailable",
+      reason: "insufficient_factor_overlap",
+      alignedObservationCount: 40,
+      factorGapRowCount: 50,
+      firstAlignedServiceDate: "2026-04-01",
+      lastAlignedServiceDate: "2026-06-01",
     });
     assert.equal(result.policy.providerCalls, "forbidden");
     assert.equal(result.policy.databaseWrites, "forbidden");
@@ -138,6 +147,17 @@ function scope(account, status) {
         endpointCount: 7,
         readyEndpointCount: status === "ready" ? 7 : 0,
         unavailableEndpointCount: status === "ready" ? 0 : 7,
+      },
+    },
+    parametricFactor: {
+      account,
+      status,
+      reason: status === "ready" ? null : "insufficient_factor_overlap",
+      source: {
+        alignedObservationCount: status === "ready" ? 60 : 40,
+        factorGapRowCount: status === "ready" ? 30 : 50,
+        firstAlignedServiceDate: "2026-04-01",
+        lastAlignedServiceDate: "2026-06-01",
       },
     },
   };

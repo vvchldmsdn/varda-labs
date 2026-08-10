@@ -431,8 +431,16 @@ separate future contracts.
     covers both authorities.
 24. Add server-owned orchestration and the first read-only result UI only after
     auth, ownership, admission, resource, and persistence gates permit it.
-25. Add the separate parametric factor engine and point-in-time walk-forward
-    validation before any optimizer is labeled useful.
+25. The separate owner/account-scoped parametric factor engine now combines
+    aligned KRW log returns with USD/KRW, US 10-year yield, and the US 10Y-2Y
+    curve using EWMA covariance, disclosed shrinkage, Student-t factor shocks,
+    residual covariance, and a fixed seed. It is rendered independently from
+    stationary bootstrap so either model may remain available when the other
+    lacks evidence. Publication timestamps and factor vintages are not
+    preserved, so this remains retrospective research rather than point-in-time
+    forecast authority. The minimum-volatility candidate has a separate
+    train-only walk-forward validation and remains neither a recommendation nor
+    an order input.
 26. A read-only stationary fan-band validation history now scores the explicit
     50:50 KODEX 200/VOO research path against seven fixed 63-row observed
     outcomes. Tenant/account binding, persistence, tuning, provider backfill,

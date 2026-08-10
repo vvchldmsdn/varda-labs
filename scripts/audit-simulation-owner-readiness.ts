@@ -6,12 +6,19 @@ async function main() {
   config({ path: ".env.local", quiet: true });
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
-  const [{ and, asc, eq, inArray }, client, schema, queryModule] =
+  const [
+    { and, asc, eq, inArray },
+    client,
+    schema,
+    queryModule,
+    parametricFactorQueryModule,
+  ] =
     await Promise.all([
       import("drizzle-orm"),
       import("../src/db/client.ts"),
       import("../src/db/schema.ts"),
       import("../src/db/queries/simulation-owner-research.ts"),
+      import("../src/db/queries/simulation-owner-parametric-factor.ts"),
     ]);
   const { accounts, appUsers } = schema;
   const ownerRows = await client.db
@@ -48,13 +55,24 @@ async function main() {
   });
   const accountsToAudit = ["all", "brokerage", "isa", "irp"] as const;
   const results = await Promise.all(
-    accountsToAudit.map(async (account) => ({
-      account,
-      ...(await queryModule.getReadOnlyTenantSimulationOwnerResearch({
-        tenantContext,
+    accountsToAudit.map(async (account) => {
+      const ownerResearchPromise =
+        queryModule.getReadOnlyTenantSimulationOwnerResearch({
+          tenantContext,
+          account,
+        });
+      const [ownerResearch, parametricFactor] = await Promise.all([
+        ownerResearchPromise,
+        parametricFactorQueryModule.getReadOnlyTenantSimulationOwnerParametricFactorResearch(
+          { ownerResearchPromise },
+        ),
+      ]);
+      return {
         account,
-      })),
-    })),
+        ...ownerResearch,
+        parametricFactor,
+      };
+    }),
   );
   const summary = summarizeSimulationOwnerReadiness(results);
 

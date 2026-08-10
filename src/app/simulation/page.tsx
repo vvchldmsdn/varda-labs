@@ -4,6 +4,7 @@ import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
 import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
+import { OwnerParametricFactorSection } from "@/components/simulation/owner-parametric-factor-section";
 import { OwnerHistoricalOutcomeValidationSection } from "@/components/simulation/owner-historical-outcome-validation-section";
 import { OwnerCandidateComparisonSection } from "@/components/simulation/owner-candidate-comparison-section";
 import { OwnerWalkForwardValidationSection } from "@/components/simulation/owner-walk-forward-validation-section";
@@ -16,6 +17,7 @@ import { SimulationInputReadinessView } from "@/components/simulation/simulation
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
+import { getReadOnlyTenantSimulationOwnerParametricFactorResearch } from "@/db/queries/simulation-owner-parametric-factor";
 import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulation-owner-research";
 import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
@@ -73,6 +75,10 @@ export default async function SimulationPage({
       horizon: params.horizon,
       tenantContext: resolution.tenantContext,
     });
+  const ownerParametricFactorPromise =
+    getReadOnlyTenantSimulationOwnerParametricFactorResearch({
+      ownerResearchPromise,
+    });
   const historicalOutcomeValidationPromise =
     getReadOnlySimulationHistoricalOutcomeValidation({
       endServiceDate: params.end,
@@ -107,6 +113,7 @@ export default async function SimulationPage({
         }
         modelPromise={modelPromise}
         ownerResearchPromise={ownerResearchPromise}
+        ownerParametricFactorPromise={ownerParametricFactorPromise}
         regimePromise={regimePromise}
         regimeHistoricalOutcomeValidationPromise={
           regimeHistoricalOutcomeValidationPromise
@@ -124,6 +131,7 @@ async function SimulationContent({
   historicalOutcomeValidationPromise,
   modelPromise,
   ownerResearchPromise,
+  ownerParametricFactorPromise,
   regimePromise,
   regimeHistoricalOutcomeValidationPromise,
   researchUniversePreflightPromise,
@@ -135,6 +143,9 @@ async function SimulationContent({
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
   ownerResearchPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerResearch
+  >;
+  ownerParametricFactorPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerParametricFactorResearch
   >;
   regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
   regimeHistoricalOutcomeValidationPromise: ReturnType<
@@ -178,6 +189,18 @@ async function SimulationContent({
             <OwnerInputPreflightContent
               preservedQuery={preservedQuery}
               resultPromise={ownerResearchPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
+      ownerParametricFactor={
+        <SimulationSectionErrorBoundary
+          section="owner-parametric-factor"
+          title="환율·금리 요인 확률모형"
+        >
+          <Suspense fallback={<OwnerParametricFactorSkeleton />}>
+            <OwnerParametricFactorContent
+              resultPromise={ownerParametricFactorPromise}
             />
           </Suspense>
         </SimulationSectionErrorBoundary>
@@ -263,6 +286,17 @@ async function OwnerInputPreflightContent({
       />
     </>
   );
+}
+
+async function OwnerParametricFactorContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerParametricFactorResearch
+  >;
+}) {
+  const result = await resultPromise;
+  return <OwnerParametricFactorSection result={result} />;
 }
 
 async function ResearchUniversePreflightContent({
@@ -405,6 +439,19 @@ function OwnerInputPreflightSkeleton() {
     >
       <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
       <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
+  );
+}
+
+function OwnerParametricFactorSkeleton() {
+  return (
+    <section
+      aria-label="환율·금리 요인 확률모형 로딩"
+      className="border-b border-[#d7ddcf] py-5"
+      data-owner-parametric-factor-loading
+    >
+      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
     </section>
   );
 }

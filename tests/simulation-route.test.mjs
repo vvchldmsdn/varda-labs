@@ -22,6 +22,9 @@ describe("Simulation input readiness route boundary", () => {
     const ownerInputQuery = read(
       "src/db/queries/simulation-owner-research.ts",
     );
+    const ownerParametricFactorQuery = read(
+      "src/db/queries/simulation-owner-parametric-factor.ts",
+    );
     const ownerPrivateHistoryQuery = read(
       "src/db/queries/simulation-owner-private-history.ts",
     );
@@ -60,6 +63,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(regimeHistoricalOutcomeQuery, /^import "server-only";/);
     assert.match(researchUniverseQuery, /^import "server-only";/);
     assert.match(ownerInputQuery, /^import "server-only";/);
+    assert.match(ownerParametricFactorQuery, /^import "server-only";/);
     assert.match(ownerPrivateHistoryQuery, /^import "server-only";/);
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /horizon: params\.horizon/);
@@ -71,6 +75,10 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /account: selectedAccount/);
     assert.match(page, /tenantContext: resolution\.tenantContext/);
     assert.match(page, /getReadOnlyTenantSimulationOwnerResearch/);
+    assert.match(
+      page,
+      /getReadOnlyTenantSimulationOwnerParametricFactorResearch/,
+    );
     assert.match(
       page,
       /researchUniverse=\{preservedQuery\.researchUniverse\}/,
@@ -90,7 +98,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
     assert.equal(
       page.match(/<SimulationSectionErrorBoundary/g)?.length,
-      5,
+      6,
       "each independent simulation query section must have its own error boundary",
     );
     assert.match(sectionErrorBoundary, /^"use client";/);
@@ -243,9 +251,22 @@ describe("Simulation input readiness route boundary", () => {
       /\.insert\(|\.update\(|\.delete\(|cron|fetch\s*\(/i,
     );
     assert.match(ownerInputQuery, /resolveSimulationResearchHorizon/);
+    assert.match(ownerInputQuery, /parametricFactorInput/);
+    assert.match(
+      ownerParametricFactorQuery,
+      /loadSimulationFactorRows/,
+    );
+    assert.match(
+      ownerParametricFactorQuery,
+      /buildSimulationOwnerParametricFactorResearch/,
+    );
     assert.doesNotMatch(
       ownerInputQuery,
       /\.insert\(|\.update\(|\.delete\(|cron|fetch\s*\(/i,
+    );
+    assert.doesNotMatch(
+      ownerParametricFactorQuery,
+      /\.insert\(|\.update\(|\.delete\(|provider|cron|fetch\s*\(/i,
     );
   });
 
@@ -356,6 +377,14 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-owner-historical-validation-status/);
     assert.match(view, /data-owner-historical-validation-ready-count/);
     assert.match(view, /data-owner-historical-validation-row/);
+    assert.match(view, /data-owner-parametric-factor/);
+    assert.match(view, /data-owner-parametric-factor-account/);
+    assert.match(view, /data-owner-parametric-factor-status/);
+    assert.match(view, /data-owner-parametric-factor-fallback="forbidden"/);
+    assert.match(view, /data-owner-parametric-factor-aligned-count/);
+    assert.match(view, /환율·금리 요인 확률모형/);
+    assert.match(view, /부트스트랩과 합산하지 않음/);
+    assert.match(view, /정확한 공개 시각과 개정 이력이 없습니다/);
     assert.match(view, /내 포트폴리오 예측 범위와 실제 결과/);
     assert.match(view, /당시 실제\s*보유량·매매 내역을 재현한 성과가 아니며/);
     assert.match(view, /데이터가 부족한 행만 제외하고/);
@@ -509,6 +538,7 @@ function readSimulationView() {
     "src/components/simulation/owner-candidate-comparison-section.tsx",
     "src/components/simulation/owner-walk-forward-validation-section.tsx",
     "src/components/simulation/owner-historical-outcome-validation-section.tsx",
+    "src/components/simulation/owner-parametric-factor-section.tsx",
     "src/components/simulation/simulation-terminal-risk-metrics.tsx",
     "src/components/simulation/research-fan-chart.tsx",
     "src/components/simulation/observed-return-alignment-evidence-panel.tsx",
