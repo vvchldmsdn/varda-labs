@@ -253,6 +253,15 @@ async function main() {
     simulation.body,
     /data-owner-parametric-factor-fallback="forbidden"/,
   );
+  assert.match(simulation.body, /data-owner-model-comparison/);
+  assert.match(
+    simulation.body,
+    /data-owner-model-comparison-status="(?:ready|unavailable)"/,
+  );
+  assert.match(
+    simulation.body,
+    /data-owner-model-comparison-combination="forbidden"/,
+  );
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
@@ -344,6 +353,9 @@ async function main() {
   const walkForwardReadyCount = walkForwardStatus === "ready" ? 1 : 0;
   const ownerParametricFactorStatus = simulation.body.match(
     /data-owner-parametric-factor-status="(ready|unavailable)"/,
+  )?.[1];
+  const ownerModelComparisonStatus = simulation.body.match(
+    /data-owner-model-comparison-status="(ready|unavailable)"/,
   )?.[1];
   const walkForwardStabilityStatus = simulation.body.match(
     /data-walk-forward-stability-status="(ready|partial|unavailable)"/,
@@ -463,6 +475,10 @@ async function main() {
   assert.ok(
     ownerParametricFactorStatus,
     "simulation must render one owner-scoped parametric factor state",
+  );
+  assert.ok(
+    ownerModelComparisonStatus,
+    "simulation must render one owner-scoped model comparison state",
   );
   assert.ok(
     walkForwardStabilityStatus,
@@ -797,6 +813,7 @@ async function main() {
         walkForwardStatus,
         walkForwardReadyCount,
         ownerParametricFactorStatus,
+        ownerModelComparisonStatus,
         walkForwardStabilityStatus,
         walkForwardStabilityRowCount: walkForwardStabilityRows.length,
         walkForwardStabilityReadyCount:

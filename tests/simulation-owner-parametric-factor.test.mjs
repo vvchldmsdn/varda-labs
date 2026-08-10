@@ -31,6 +31,15 @@ describe("owner-scoped parametric factor research", () => {
     assert.equal(result.source.factorGapRowCount, 1);
     assert.equal(result.exposures.length, 3);
     assert.equal(result.factorSources.length, 3);
+    assert.deepEqual(
+      result.executionWeights.map(({ instrumentKey, weightBps }) => ({
+        instrumentKey,
+        weightBps,
+      })),
+      ownerWeights([5_000, 2_500, 2_500]).map(
+        ({ instrumentKey, weightBps }) => ({ instrumentKey, weightBps }),
+      ),
+    );
     assert.equal(result.policy.providerCalls, "forbidden");
     assert.equal(result.policy.persistence, "forbidden");
     assert.equal(result.policy.optimizer, "forbidden");
