@@ -133,6 +133,15 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
         matrix: historyBatch[index + 1]?.matrix ?? null,
       })),
     });
+  const parametricFactorInput =
+    execution.status === "ready" && matrix?.status === "ready"
+      ? Object.freeze({
+          account: candidate.account,
+          matrix,
+          weights: execution.executionWeights,
+          horizon: execution.assumptions.horizon,
+        })
+      : null;
 
   return Object.freeze({
     inputPreflight,
@@ -140,8 +149,13 @@ export async function getReadOnlyTenantSimulationOwnerResearch(options: {
     candidateComparison,
     walkForwardValidation,
     historicalValidation,
+    parametricFactorInput,
   });
 }
+
+export type ReadOnlyTenantSimulationOwnerResearchResult = Awaited<
+  ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch>
+>;
 
 export async function getReadOnlyTenantSimulationOwnerInputPreflight(options: {
   tenantContext: TenantContext;

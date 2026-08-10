@@ -26,6 +26,7 @@ export function SimulationInputReadinessView({
   model,
   historicalOutcomeValidation,
   ownerInputPreflight,
+  ownerParametricFactor,
   researchUniverse,
   researchUniversePreflight,
   regimeHistoricalOutcomeValidation,
@@ -35,6 +36,7 @@ export function SimulationInputReadinessView({
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
   ownerInputPreflight?: ReactNode;
+  ownerParametricFactor?: ReactNode;
   researchUniverse: string | null;
   researchUniversePreflight?: ReactNode;
   regimeHistoricalOutcomeValidation?: ReactNode;
@@ -124,6 +126,7 @@ export function SimulationInputReadinessView({
         ) : null}
 
         {ownerInputPreflight}
+        {ownerParametricFactor}
         <ResearchHorizonSelector
           account={selectedAccount}
           endServiceDate={explicitEndServiceDate}

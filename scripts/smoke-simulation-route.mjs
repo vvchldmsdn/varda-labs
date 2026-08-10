@@ -244,6 +244,15 @@ async function main() {
     simulation.body,
     /data-downside-outcome-validation-status="(?:ready|partial|unavailable)"/,
   );
+  assert.match(simulation.body, /data-owner-parametric-factor/);
+  assert.match(
+    simulation.body,
+    /data-owner-parametric-factor-status="(?:ready|unavailable)"/,
+  );
+  assert.match(
+    simulation.body,
+    /data-owner-parametric-factor-fallback="forbidden"/,
+  );
   assert.match(simulation.body, /data-regime-bootstrap-research/);
   assert.match(simulation.body, /data-regime-bootstrap-status="(?:ready|unavailable)"/);
   assert.match(simulation.body, /data-regime-fallback="forbidden"/);
@@ -333,6 +342,9 @@ async function main() {
     /data-walk-forward-min-volatility-status="(ready|unavailable)"/,
   )?.[1];
   const walkForwardReadyCount = walkForwardStatus === "ready" ? 1 : 0;
+  const ownerParametricFactorStatus = simulation.body.match(
+    /data-owner-parametric-factor-status="(ready|unavailable)"/,
+  )?.[1];
   const walkForwardStabilityStatus = simulation.body.match(
     /data-walk-forward-stability-status="(ready|partial|unavailable)"/,
   )?.[1];
@@ -447,6 +459,10 @@ async function main() {
   assert.ok(
     walkForwardStatus,
     "simulation must render one walk-forward minimum-volatility state",
+  );
+  assert.ok(
+    ownerParametricFactorStatus,
+    "simulation must render one owner-scoped parametric factor state",
   );
   assert.ok(
     walkForwardStabilityStatus,
@@ -780,6 +796,7 @@ async function main() {
         fixedMixComparisonReadyCount,
         walkForwardStatus,
         walkForwardReadyCount,
+        ownerParametricFactorStatus,
         walkForwardStabilityStatus,
         walkForwardStabilityRowCount: walkForwardStabilityRows.length,
         walkForwardStabilityReadyCount:

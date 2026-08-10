@@ -22,7 +22,7 @@ export const REGIME_RESEARCH_CANDIDATES = Object.freeze([
   }),
 ]);
 
-export const loadRegimeFactorRows = cache(
+export const loadSimulationFactorRows = cache(
   async (endServiceDate: string) => {
     const factorKeys = SIMULATION_REGIME_FACTOR_DEFINITIONS.map(
       (definition) => definition.factorKey,
@@ -52,3 +52,5 @@ export const loadRegimeFactorRows = cache(
       );
   },
 );
+
+export const loadRegimeFactorRows = loadSimulationFactorRows;

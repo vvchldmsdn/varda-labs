@@ -2,9 +2,10 @@ import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 import type { SimulationOwnerInputPreflightModel } from "./simulation-owner-input-preflight.ts";
 import type { SimulationOwnerHistoricalOutcomeValidationResult } from "./simulation-owner-historical-outcome-validation.ts";
 import type { SimulationOwnerResearchExecutionResult } from "./simulation-owner-research-execution.ts";
+import type { SimulationOwnerParametricFactorResult } from "./simulation-owner-parametric-factor.ts";
 
 export const SIMULATION_OWNER_READINESS_AUDIT_POLICY = Object.freeze({
-  version: "simulation_owner_research_readiness_audit_v2",
+  version: "simulation_owner_research_readiness_audit_v3",
   accountScopes: Object.freeze([
     "all",
     "brokerage",
@@ -22,6 +23,7 @@ type ReadinessScopeInput = Readonly<{
   inputPreflight: SimulationOwnerInputPreflightModel;
   execution: SimulationOwnerResearchExecutionResult;
   historicalValidation: SimulationOwnerHistoricalOutcomeValidationResult;
+  parametricFactor: SimulationOwnerParametricFactorResult;
 }>;
 
 export function summarizeSimulationOwnerReadiness(
@@ -35,7 +37,8 @@ export function summarizeSimulationOwnerReadiness(
     if (
       input.inputPreflight.account !== input.account ||
       input.execution.account !== input.account ||
-      input.historicalValidation.account !== input.account
+      input.historicalValidation.account !== input.account ||
+      input.parametricFactor.account !== input.account
     ) {
       throw new TypeError(`readiness scope mismatch: ${input.account}`);
     }
@@ -58,12 +61,20 @@ export function summarizeSimulationOwnerReadiness(
     historicalValidationReadyScopeCount: scopes.filter(
       (scope) => scope.historicalValidation.status === "ready",
     ).length,
+    parametricFactorReadyScopeCount: scopes.filter(
+      (scope) => scope.parametricFactor.status === "ready",
+    ).length,
     scopes: Object.freeze(scopes),
   });
 }
 
 function summarizeScope(input: ReadinessScopeInput) {
-  const { inputPreflight, execution, historicalValidation } = input;
+  const {
+    inputPreflight,
+    execution,
+    historicalValidation,
+    parametricFactor,
+  } = input;
   return Object.freeze({
     account: input.account,
     inputStatus: inputPreflight.status,
@@ -106,6 +117,20 @@ function summarizeScope(input: ReadinessScopeInput) {
         historicalValidation.summary.readyEndpointCount,
       unavailableEndpointCount:
         historicalValidation.summary.unavailableEndpointCount,
+    }),
+    parametricFactor: Object.freeze({
+      status: parametricFactor.status,
+      reason:
+        parametricFactor.status === "unavailable"
+          ? parametricFactor.reason
+          : null,
+      alignedObservationCount:
+        parametricFactor.source.alignedObservationCount,
+      factorGapRowCount: parametricFactor.source.factorGapRowCount,
+      firstAlignedServiceDate:
+        parametricFactor.source.firstAlignedServiceDate,
+      lastAlignedServiceDate:
+        parametricFactor.source.lastAlignedServiceDate,
     }),
   });
 }
