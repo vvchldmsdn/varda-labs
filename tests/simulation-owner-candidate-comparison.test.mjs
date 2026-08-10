@@ -9,11 +9,14 @@ import {
   executeSimulationResearchPathsFromPrepared,
   prepareSimulationResearchPaths,
 } from "../src/lib/simulation-research-execution-core.ts";
-import { PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY } from "../src/lib/simulation-return-matrix.ts";
+import {
+  ownerWeights,
+  readyOwnerMatrix,
+} from "./support/simulation-owner-ready-matrix.mjs";
 
 describe("owner simulation minimum-volatility candidate comparison", () => {
   it("uses one prepared draw plan and enforces turnover, FX and concentration constraints", () => {
-    const matrix = readyMatrix();
+    const matrix = readyOwnerMatrix();
     const prepared = prepareSimulationResearchPaths({
       matrix,
       seed: 0x56415244,
@@ -23,7 +26,7 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
     });
     assert.equal(prepared.status, "ready");
 
-    const currentWeights = weights([5_000, 2_500, 2_500]);
+    const currentWeights = ownerWeights([5_000, 2_500, 2_500]);
     const currentExecution = executeSimulationResearchPathsFromPrepared({
       prepared,
       scenarioId: "owner-current-all",
@@ -78,7 +81,7 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
   });
 
   it("is deterministic and keeps an explicit zero-cost research assumption", () => {
-    const matrix = readyMatrix();
+    const matrix = readyOwnerMatrix();
     const prepared = prepareSimulationResearchPaths({
       matrix,
       seed: 0x56415244,
@@ -87,7 +90,7 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
       pathCount: 500,
     });
     assert.equal(prepared.status, "ready");
-    const currentWeights = weights([5_000, 2_500, 2_500]);
+    const currentWeights = ownerWeights([5_000, 2_500, 2_500]);
     const currentExecution = executeSimulationResearchPathsFromPrepared({
       prepared,
       scenarioId: "owner-current-all",
@@ -120,7 +123,7 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
   });
 
   it("leaves a one-instrument account on its current simulation without inventing a candidate", () => {
-    const matrix = readyMatrix(1);
+    const matrix = readyOwnerMatrix({ instrumentCount: 1 });
     const prepared = prepareSimulationResearchPaths({
       matrix,
       seed: 0x56415244,
@@ -129,7 +132,7 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
       pathCount: 500,
     });
     assert.equal(prepared.status, "ready");
-    const currentWeights = weights([10_000]).slice(0, 1);
+    const currentWeights = ownerWeights([10_000], 1);
     const currentExecution = executeSimulationResearchPathsFromPrepared({
       prepared,
       scenarioId: "owner-current-irp",
@@ -152,95 +155,3 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
     assert.deepEqual(result.weights, []);
   });
 });
-
-function readyMatrix(instrumentCount = 3) {
-  const requestedServiceDates = Array.from({ length: 91 }, (_, index) =>
-    isoDate(index),
-  );
-  const allInstruments = [
-    instrument("korea|KRW|AAA", "korea", "KRW", "AAA"),
-    instrument("korea|KRW|BBB", "korea", "KRW", "BBB"),
-    instrument("us|USD|CCC", "us", "USD", "CCC"),
-  ];
-
-  return build(allInstruments.slice(0, instrumentCount));
-
-  function build(instruments) {
-    const matrix = Array.from({ length: 90 }, (_, index) => ({
-      previousServiceDate: requestedServiceDates[index],
-      serviceDate: requestedServiceDates[index + 1],
-      cells: instruments.map((row) => ({
-        instrumentKey: row.instrumentKey,
-        value: returnFor(row.ticker, index),
-        previous: evidence(requestedServiceDates[index]),
-        current: evidence(requestedServiceDates[index + 1]),
-      })),
-    }));
-    const result = {
-      status: "ready",
-      policy: PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
-      requestedServiceDates,
-      instruments,
-      exclusions: [],
-      matrix,
-      summary: {
-        requestedInstrumentCount: instruments.length,
-        includedInstrumentCount: instruments.length,
-        excludedInstrumentCount: 0,
-        requestedServiceDateCount: requestedServiceDates.length,
-        matrixRowCount: matrix.length,
-        totalCellCount: matrix.length * instruments.length,
-        readyCellCount: matrix.length * instruments.length,
-        incompleteCellCount: 0,
-        coveragePct: 100,
-      },
-      sourceSummary: {
-        acceptedPriceRows: requestedServiceDates.length * instruments.length,
-        acceptedFxRows: requestedServiceDates.length,
-        ignoredOutOfWindowPriceRows: 0,
-        ignoredOutOfWindowFxRows: 0,
-      },
-      consumerStatus: "matrix_ready",
-      blockers: [],
-    };
-    return result;
-  }
-}
-
-function weights(weightBps) {
-  const instruments = [
-    instrument("korea|KRW|AAA", "korea", "KRW", "AAA"),
-    instrument("korea|KRW|BBB", "korea", "KRW", "BBB"),
-    instrument("us|USD|CCC", "us", "USD", "CCC"),
-  ];
-  return instruments.map((row, index) => ({
-    ...row,
-    weightBps: weightBps[index],
-  }));
-}
-
-function instrument(instrumentKey, market, currency, ticker) {
-  return { instrumentKey, market, currency, ticker };
-}
-
-function returnFor(ticker, index) {
-  if (ticker === "AAA") return index % 2 === 0 ? 0.035 : -0.03;
-  if (ticker === "BBB") return 0.001 + (index % 3) * 0.0001;
-  return index % 4 === 0 ? 0.012 : -0.002;
-}
-
-function evidence(date) {
-  return {
-    status: "ready",
-    reason: null,
-    sourcePriceDate: date,
-    priceCarryDays: 0,
-    sourceFxDate: date,
-    fxCarryDays: 0,
-  };
-}
-
-function isoDate(offset) {
-  const date = new Date(Date.UTC(2026, 0, 1 + offset));
-  return date.toISOString().slice(0, 10);
-}
