@@ -255,7 +255,10 @@ describe("Simulation input readiness route boundary", () => {
       ownerInputQuery,
       /buildSimulationOwnerHistoricalOutcomeValidation/,
     );
-    assert.match(ownerInputQuery, /getReadOnlyPrivateOwnerRawHistoryBatch/);
+    assert.match(
+      ownerInputQuery,
+      /getReadOnlyPrivateOwnerRawHistoryValidationBatch/,
+    );
     assert.match(ownerInputQuery, /getLatestCommonPrivateOwnerRawServiceDate/);
     assert.match(ownerInputQuery, /getActivePortfolioOwnerUserIds/);
     assert.match(activePortfolioOwnersQuery, /^import "server-only";/);
@@ -430,7 +433,10 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-owner-model-calibration-status/);
     assert.match(view, /data-owner-model-calibration-selection="forbidden"/);
     assert.match(view, /data-owner-model-calibration-effective-windows/);
+    assert.match(view, /data-owner-model-calibration-maximum/);
     assert.match(view, /data-owner-model-calibration-paired/);
+    assert.match(view, /data-owner-model-calibration-selected/);
+    assert.match(view, /data-owner-model-calibration-history-limited/);
     assert.match(view, /과거 결과로 두 모형 점검/);
     assert.match(view, /두 확률모형 비교/);
     assert.match(view, /어느 한쪽을\s*정답으로 고르거나 두 확률을 평균내지 않습니다/);

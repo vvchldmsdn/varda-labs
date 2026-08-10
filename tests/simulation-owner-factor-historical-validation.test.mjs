@@ -13,11 +13,18 @@ import { PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY } from "../src/
 import { readyJointMatrix } from "./support/simulation-ready-joint-matrix.mjs";
 
 describe("owner factor model historical validation", () => {
-  it("evaluates the same seven 90-plus-21 windows as the bootstrap model", () => {
+  it("evaluates the same seven non-overlapping 90-plus-21 windows as the bootstrap model", () => {
     const execution = readyExecution();
-    const endpoints = readyEndpoints(execution.endSelection.endServiceDate);
+    const availableServiceDates = serviceDateAxis(
+      execution.endSelection.endServiceDate,
+    );
+    const endpoints = readyEndpoints(
+      execution.endSelection.endServiceDate,
+      availableServiceDates,
+    );
     const result = buildSimulationOwnerFactorHistoricalValidation({
       execution,
+      availableServiceDates,
       endpoints,
       factorRows: factorRowsForEndpoints(endpoints),
     });
@@ -38,10 +45,17 @@ describe("owner factor model historical validation", () => {
 
   it("keeps the other endpoint diagnostics when one source window is absent", () => {
     const execution = readyExecution();
-    const endpoints = readyEndpoints(execution.endSelection.endServiceDate);
+    const availableServiceDates = serviceDateAxis(
+      execution.endSelection.endServiceDate,
+    );
+    const endpoints = readyEndpoints(
+      execution.endSelection.endServiceDate,
+      availableServiceDates,
+    );
     endpoints[3] = { ...endpoints[3], matrix: null };
     const result = buildSimulationOwnerFactorHistoricalValidation({
       execution,
+      availableServiceDates,
       endpoints,
       factorRows: factorRowsForEndpoints(endpoints),
     });
@@ -54,15 +68,23 @@ describe("owner factor model historical validation", () => {
 
   it("does not let observations released after a training state alter its result", () => {
     const execution = readyExecution();
-    const endpoints = readyEndpoints(execution.endSelection.endServiceDate);
+    const availableServiceDates = serviceDateAxis(
+      execution.endSelection.endServiceDate,
+    );
+    const endpoints = readyEndpoints(
+      execution.endSelection.endServiceDate,
+      availableServiceDates,
+    );
     const baseRows = factorRowsForEndpoints(endpoints);
     const first = buildSimulationOwnerFactorHistoricalValidation({
       execution,
+      availableServiceDates,
       endpoints,
       factorRows: baseRows,
     });
     const withFutureRows = buildSimulationOwnerFactorHistoricalValidation({
       execution,
+      availableServiceDates,
       endpoints,
       factorRows: [
         ...baseRows,
@@ -79,7 +101,7 @@ describe("owner factor model historical validation", () => {
     const policy = SIMULATION_OWNER_FACTOR_HISTORICAL_VALIDATION_POLICY;
 
     assert.equal(policy.factorVintageAuthority, "not_preserved");
-    assert.equal(policy.overlappingOutcomeWindows, "acknowledged_not_independent");
+    assert.equal(policy.overlappingOutcomeWindows, "forbidden_by_service_date_stride");
     assert.equal(policy.providerCalls, "forbidden");
     assert.equal(policy.persistence, "forbidden");
     assert.equal(policy.optimizer, "forbidden");
@@ -126,9 +148,11 @@ function readyExecution() {
   };
 }
 
-function readyEndpoints(endServiceDate) {
-  return buildSimulationOwnerHistoricalValidationEndpointDates(endServiceDate).map(
-    (outcomeEndServiceDate) => ({
+function readyEndpoints(endServiceDate, availableServiceDates) {
+  return buildSimulationOwnerHistoricalValidationEndpointDates(
+    endServiceDate,
+    availableServiceDates,
+  ).map((outcomeEndServiceDate) => ({
       outcomeEndServiceDate,
       matrix: {
         ...readyJointMatrix({
@@ -138,7 +162,22 @@ function readyEndpoints(endServiceDate) {
         }),
         policy: PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
       },
-    }),
+    }));
+}
+
+function serviceDateAxis(
+  endServiceDate,
+  count =
+    SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.sourceReturnStepCount +
+    SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.outcomeReturnStepCount *
+      (SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.maximumEndpointCount - 1) +
+    1,
+) {
+  const end = Date.parse(`${endServiceDate}T00:00:00.000Z`);
+  return Array.from({ length: count }, (_, index) =>
+    new Date(end - (count - index - 1) * 86_400_000)
+      .toISOString()
+      .slice(0, 10),
   );
 }
 

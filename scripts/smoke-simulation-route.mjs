@@ -370,6 +370,16 @@ async function main() {
       /data-owner-model-calibration-effective-windows="(\d+)"/,
     )?.[1] ?? 0,
   );
+  const ownerModelCalibrationSelectedCount = Number(
+    simulation.body.match(
+      /data-owner-model-calibration-selected="(\d+)"/,
+    )?.[1] ?? 0,
+  );
+  const ownerModelCalibrationMaximumCount = Number(
+    simulation.body.match(
+      /data-owner-model-calibration-maximum="(\d+)"/,
+    )?.[1] ?? 0,
+  );
   const walkForwardStabilityStatus = simulation.body.match(
     /data-walk-forward-stability-status="(ready|partial|unavailable)"/,
   )?.[1];
@@ -500,6 +510,17 @@ async function main() {
   assert.match(
     simulation.body,
     /data-owner-model-calibration-selection="forbidden"/,
+  );
+  assert.equal(ownerModelCalibrationMaximumCount, 7);
+  assert.ok(
+    ownerModelCalibrationSelectedCount <= ownerModelCalibrationMaximumCount,
+  );
+  assert.ok(
+    ownerModelCalibrationPairedCount <= ownerModelCalibrationSelectedCount,
+  );
+  assert.ok(
+    ownerModelCalibrationEffectiveWindowCount <=
+      ownerModelCalibrationPairedCount,
   );
   assert.ok(
     walkForwardStabilityStatus,
@@ -836,6 +857,8 @@ async function main() {
         ownerParametricFactorStatus,
         ownerModelComparisonStatus,
         ownerModelCalibrationStatus,
+        ownerModelCalibrationSelectedCount,
+        ownerModelCalibrationMaximumCount,
         ownerModelCalibrationPairedCount,
         ownerModelCalibrationEffectiveWindowCount,
         walkForwardStabilityStatus,

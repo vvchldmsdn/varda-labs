@@ -10,11 +10,18 @@ import { PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY } from "../src/
 import { readyJointMatrix } from "./support/simulation-ready-joint-matrix.mjs";
 
 describe("owner current-composition historical validation", () => {
-  it("compares seven 21-return outcomes after exact 90-return training windows", () => {
+  it("compares seven non-overlapping 21-return outcomes after exact 90-return training windows", () => {
     const execution = readyExecution();
-    const endpoints = readyEndpoints(execution.endSelection.endServiceDate);
+    const availableServiceDates = serviceDateAxis(
+      execution.endSelection.endServiceDate,
+    );
+    const endpoints = readyEndpoints(
+      execution.endSelection.endServiceDate,
+      availableServiceDates,
+    );
     const result = buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
+      availableServiceDates,
       endpoints,
     });
 
@@ -35,10 +42,17 @@ describe("owner current-composition historical validation", () => {
 
   it("keeps ready endpoint rows when one historical window is incomplete", () => {
     const execution = readyExecution();
-    const endpoints = readyEndpoints(execution.endSelection.endServiceDate);
+    const availableServiceDates = serviceDateAxis(
+      execution.endSelection.endServiceDate,
+    );
+    const endpoints = readyEndpoints(
+      execution.endSelection.endServiceDate,
+      availableServiceDates,
+    );
     endpoints[2] = { ...endpoints[2], matrix: null };
     const result = buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
+      availableServiceDates,
       endpoints,
     });
 
@@ -55,6 +69,8 @@ describe("owner current-composition historical validation", () => {
     assert.equal(policy.trainingReturnStepCount, 90);
     assert.equal(policy.outcomeReturnStepCount, 21);
     assert.equal(policy.sourceReturnStepCount, 111);
+    assert.equal(policy.maximumEndpointCount, 7);
+    assert.equal(policy.endpointStrideReturnStepCount, 21);
     assert.equal(policy.automaticHorizonReduction, "forbidden");
     assert.equal(policy.interpolation, "forbidden");
     assert.equal(policy.providerCalls, "forbidden");
@@ -64,15 +80,42 @@ describe("owner current-composition historical validation", () => {
 
   it("blocks mismatched endpoint sets instead of choosing another date", () => {
     const execution = readyExecution();
-    const endpoints = readyEndpoints(execution.endSelection.endServiceDate);
+    const availableServiceDates = serviceDateAxis(
+      execution.endSelection.endServiceDate,
+    );
+    const endpoints = readyEndpoints(
+      execution.endSelection.endServiceDate,
+      availableServiceDates,
+    );
     const result = buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
+      availableServiceDates,
       endpoints: endpoints.slice(1),
     });
 
     assert.equal(result.status, "unavailable");
     assert.equal(result.reason, "endpoint_set_mismatch");
     assert.equal(result.rows.length, 0);
+  });
+
+  it("returns only the non-overlapping windows supported by stored dates", () => {
+    const endServiceDate = "2026-08-04";
+    const availableServiceDates = serviceDateAxis(endServiceDate, 133);
+
+    assert.deepEqual(
+      buildSimulationOwnerHistoricalValidationEndpointDates(
+        endServiceDate,
+        availableServiceDates,
+      ),
+      [availableServiceDates[132], availableServiceDates[111]],
+    );
+    assert.deepEqual(
+      buildSimulationOwnerHistoricalValidationEndpointDates(
+        endServiceDate,
+        [availableServiceDates[1], availableServiceDates[0]],
+      ),
+      [],
+    );
   });
 });
 
@@ -116,9 +159,11 @@ function readyExecution() {
   };
 }
 
-function readyEndpoints(endServiceDate) {
-  return buildSimulationOwnerHistoricalValidationEndpointDates(endServiceDate).map(
-    (outcomeEndServiceDate) => ({
+function readyEndpoints(endServiceDate, availableServiceDates) {
+  return buildSimulationOwnerHistoricalValidationEndpointDates(
+    endServiceDate,
+    availableServiceDates,
+  ).map((outcomeEndServiceDate) => ({
       outcomeEndServiceDate,
       matrix: {
         ...readyJointMatrix({
@@ -128,6 +173,21 @@ function readyEndpoints(endServiceDate) {
         }),
         policy: PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
       },
-    }),
+    }));
+}
+
+function serviceDateAxis(
+  endServiceDate,
+  count =
+    SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.sourceReturnStepCount +
+    SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.outcomeReturnStepCount *
+      (SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.maximumEndpointCount - 1) +
+    1,
+) {
+  const end = Date.parse(`${endServiceDate}T00:00:00.000Z`);
+  return Array.from({ length: count }, (_, index) =>
+    new Date(end - (count - index - 1) * 86_400_000)
+      .toISOString()
+      .slice(0, 10),
   );
 }

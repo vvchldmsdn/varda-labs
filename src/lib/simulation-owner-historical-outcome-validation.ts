@@ -1,5 +1,5 @@
 import { BASIS_POINT_TOTAL } from "./basis-point-allocation.ts";
-import { isRiskDate, shiftRiskDate } from "./portfolio-risk-calendar.ts";
+import { isRiskDate } from "./portfolio-risk-calendar.ts";
 import {
   calculateWeightedObservedHistoricalOutcome,
 } from "./simulation-historical-outcome-engine.ts";
@@ -17,12 +17,16 @@ import { executeSimulationResearchPaths } from "./simulation-research-execution-
 import type { SimulationReturnMatrixResult } from "./simulation-return-matrix-types.ts";
 
 export const SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY = Object.freeze({
-  version: "simulation_owner_current_composition_historical_validation_v1",
+  version: "simulation_owner_current_composition_historical_validation_v2",
   trainingReturnStepCount: 90,
   outcomeReturnStepCount: 21,
   sourceReturnStepCount: 111,
-  endpointCount: 7,
-  endpointPolicy: "latest_common_end_and_previous_six_calendar_service_dates",
+  maximumEndpointCount: 7,
+  endpointStrideReturnStepCount: 21,
+  endpointPolicy:
+    "latest_common_end_and_previous_non_overlapping_stored_service_windows",
+  insufficientHistoryPolicy:
+    "return_fewer_windows_without_fabrication_or_horizon_reduction",
   compositionPolicy:
     "current_listed_subset_weights_applied_retrospectively_without_rebalancing",
   compositionDisclosure:
@@ -58,18 +62,41 @@ export type SimulationOwnerHistoricalValidationEndpoint = Readonly<{
 
 export function buildSimulationOwnerHistoricalValidationEndpointDates(
   endServiceDate: string,
+  availableServiceDates: readonly string[],
 ) {
   if (!isRiskDate(endServiceDate)) return Object.freeze([] as string[]);
-  return Object.freeze(
-    Array.from(
-      { length: SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY.endpointCount },
-      (_, index) => shiftRiskDate(endServiceDate, -index),
-    ),
-  );
+  if (
+    availableServiceDates.length === 0 ||
+    availableServiceDates.some(
+      (date, index) =>
+        !isRiskDate(date) ||
+        (index > 0 && date <= availableServiceDates[index - 1]),
+    )
+  ) {
+    return Object.freeze([] as string[]);
+  }
+
+  const policy = SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY;
+  const latestIndex = availableServiceDates.indexOf(endServiceDate);
+  if (latestIndex < policy.sourceReturnStepCount) {
+    return Object.freeze([] as string[]);
+  }
+
+  const endpointDates: string[] = [];
+  for (
+    let index = latestIndex;
+    index >= policy.sourceReturnStepCount &&
+    endpointDates.length < policy.maximumEndpointCount;
+    index -= policy.endpointStrideReturnStepCount
+  ) {
+    endpointDates.push(availableServiceDates[index]);
+  }
+  return Object.freeze(endpointDates);
 }
 
 export function buildSimulationOwnerHistoricalOutcomeValidation(input: {
   execution: SimulationOwnerResearchExecutionResult;
+  availableServiceDates: readonly string[];
   endpoints: readonly SimulationOwnerHistoricalValidationEndpoint[];
 }) {
   const policy = SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY;
@@ -89,6 +116,7 @@ export function buildSimulationOwnerHistoricalOutcomeValidation(input: {
 
   const expectedDates = buildSimulationOwnerHistoricalValidationEndpointDates(
     input.execution.endSelection.endServiceDate,
+    input.availableServiceDates,
   );
   if (
     input.endpoints.length !== expectedDates.length ||

@@ -200,10 +200,28 @@ function resolvePrivateOwnerRawServiceDates(input: {
   fxRows: readonly SimulationReturnMatrixFxInput[];
   requiresFx: boolean;
 }) {
+  const sorted = resolvePrivateOwnerRawAvailableServiceDates(input);
+  const endIndex = sorted.indexOf(input.endServiceDate);
+  const requiredPointCount = input.returnStepCount + 1;
+  const startIndex = endIndex - requiredPointCount + 1;
+  return Object.freeze(
+    endIndex >= 0 && startIndex >= 0
+      ? sorted.slice(startIndex, endIndex + 1)
+      : [],
+  );
+}
+
+export function resolvePrivateOwnerRawAvailableServiceDates(input: {
+  endServiceDate: string;
+  priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  fxRows: readonly SimulationReturnMatrixFxInput[];
+  requiresFx: boolean;
+}) {
   if (!isRiskDate(input.endServiceDate)) return Object.freeze([] as string[]);
 
   const dates = new Set(
     input.priceRows
+      .filter((row) => isRiskDate(row.priceDate))
       .map((row) => mapRiskEvidenceDateToServiceDate(row.priceDate))
       .filter((date) => date <= input.endServiceDate),
   );
@@ -221,15 +239,7 @@ function resolvePrivateOwnerRawServiceDates(input: {
     }
   }
 
-  const sorted = [...dates].sort();
-  const endIndex = sorted.indexOf(input.endServiceDate);
-  const requiredPointCount = input.returnStepCount + 1;
-  const startIndex = endIndex - requiredPointCount + 1;
-  return Object.freeze(
-    endIndex >= 0 && startIndex >= 0
-      ? sorted.slice(startIndex, endIndex + 1)
-      : [],
-  );
+  return Object.freeze([...dates].sort());
 }
 
 function buildInstrumentEvidence(input: {

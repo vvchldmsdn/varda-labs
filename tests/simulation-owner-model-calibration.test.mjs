@@ -14,8 +14,8 @@ describe("owner simulation model calibration", () => {
 
     assert.equal(result.status, "ready");
     assert.equal(result.summary.pairedEndpointCount, 3);
-    assert.equal(result.summary.effectiveNonOverlappingWindowCount, 2);
-    assert.equal(result.summary.overlappingPairedEndpointCount, 1);
+    assert.equal(result.summary.effectiveNonOverlappingWindowCount, 3);
+    assert.equal(result.summary.overlappingPairedEndpointCount, 0);
     assert.equal(result.summary.bootstrap.meanAbsoluteP50ErrorPctPoints, 1);
     assert.equal(result.summary.factor.meanAbsoluteP50ErrorPctPoints, 0.5);
     assert.ok(
@@ -51,10 +51,11 @@ describe("owner simulation model calibration", () => {
     assert.equal(result.rows[0].reason, "observed_outcome_mismatch");
   });
 
-  it("forbids turning the short overlapping diagnostic into model selection", () => {
+  it("forbids turning the short non-overlapping diagnostic into model selection", () => {
     const policy = SIMULATION_OWNER_MODEL_CALIBRATION_POLICY;
 
-    assert.equal(policy.outcomeWindowOverlap, "acknowledged_not_independent");
+    assert.equal(policy.maximumEndpointCount, 7);
+    assert.equal(policy.outcomeWindowOverlap, "forbidden_by_service_date_stride");
     assert.equal(policy.statisticalConfidence, "not_established");
     assert.equal(policy.modelSelection, "forbidden");
     assert.equal(policy.probabilityAveraging, "forbidden");
@@ -77,8 +78,8 @@ function validationFixture(model) {
       factorLoss: 10,
     },
     {
-      outcomeStartServiceDate: "2026-01-08",
-      outcomeEndServiceDate: "2026-01-28",
+      outcomeStartServiceDate: "2026-01-21",
+      outcomeEndServiceDate: "2026-02-11",
       actualReturnPct: -1,
       actualTerminalLoss: true,
       actualMaxDrawdownPct: 5,
@@ -88,8 +89,8 @@ function validationFixture(model) {
       factorLoss: 80,
     },
     {
-      outcomeStartServiceDate: "2026-01-22",
-      outcomeEndServiceDate: "2026-02-11",
+      outcomeStartServiceDate: "2026-02-11",
+      outcomeEndServiceDate: "2026-03-04",
       actualReturnPct: 4,
       actualTerminalLoss: false,
       actualMaxDrawdownPct: 2,

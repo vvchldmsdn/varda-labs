@@ -6,6 +6,7 @@ import {
   PRIVATE_OWNER_RAW_HISTORY_POLICY,
   buildPrivateOwnerRawHistory,
   resolveLatestCommonPrivateOwnerRawServiceDate,
+  resolvePrivateOwnerRawAvailableServiceDates,
 } from "../src/lib/simulation-private-owner-raw-history.ts";
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
@@ -147,6 +148,49 @@ describe("private owner KIS raw history", () => {
         ),
       }),
       null,
+    );
+  });
+
+  it("derives a sorted unique stored service-date axis without filling gaps", () => {
+    const fixture = readyFixture(3);
+    const expected = Array.from({ length: 4 }, (_, index) =>
+      shiftRiskDate(fixture.requestedEndServiceDate, index - 3),
+    );
+    const fxOnlyServiceDate = shiftRiskDate(
+      fixture.requestedEndServiceDate,
+      -8,
+    );
+    const input = {
+      endServiceDate: fixture.requestedEndServiceDate,
+      priceRows: [
+        ...fixture.priceRows,
+        fixture.priceRows[0],
+        { ...fixture.priceRows[0], priceDate: "not-a-date" },
+      ],
+      fxRows: [
+        ...fixture.fxRows,
+        {
+          rateDate: shiftRiskDate(fxOnlyServiceDate, -1),
+          usdKrw: 1_250,
+          status: "ok",
+        },
+        { rateDate: "2026-01-01", usdKrw: 0, status: "empty" },
+      ],
+    };
+
+    assert.deepEqual(
+      resolvePrivateOwnerRawAvailableServiceDates({
+        ...input,
+        requiresFx: false,
+      }),
+      expected,
+    );
+    assert.deepEqual(
+      resolvePrivateOwnerRawAvailableServiceDates({
+        ...input,
+        requiresFx: true,
+      }),
+      [fxOnlyServiceDate, ...expected],
     );
   });
 });
