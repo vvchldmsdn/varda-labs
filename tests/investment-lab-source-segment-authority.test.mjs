@@ -10,6 +10,7 @@ import {
 const CURRENT_SOURCE = "varda_manual_daily_snapshot";
 const LEGACY_SOURCE = "base44_import";
 const CURRENT_RULE = "varda-manual-daily-snapshot-v1";
+const BACKFILL_RULE = "varda-daily-snapshot-gap-backfill-v1";
 
 describe("investment lab source segment authority", () => {
   it("admits only an all-current selected source axis", () => {
@@ -24,6 +25,26 @@ describe("investment lab source segment authority", () => {
     assert.equal(result.coverage.currentWriterDateCount, 2);
     assert.equal(result.coverage.sourceTransitionCount, 0);
     assert.deepEqual(result.blockers, []);
+  });
+
+  it("admits reviewed gap-backfill rows inside one current-writer segment", () => {
+    const rows = [
+      ...snapshotDate("2026-07-09", CURRENT_SOURCE, CURRENT_RULE),
+      ...snapshotDate("2026-07-10", CURRENT_SOURCE, BACKFILL_RULE),
+      ...snapshotDate("2026-07-11", CURRENT_SOURCE, BACKFILL_RULE),
+      ...snapshotDate("2026-07-12", CURRENT_SOURCE, CURRENT_RULE),
+    ];
+    const result = resolveInvestmentLabSourceSegmentAuthority(rows);
+
+    assert.equal(result.status, "eligible");
+    assert.equal(result.coverage.currentWriterDateCount, 4);
+    assert.deepEqual(result.blockers, []);
+    assert.deepEqual(listInvestmentLabLatestCurrentWriterDates(rows), [
+      "2026-07-09",
+      "2026-07-10",
+      "2026-07-11",
+      "2026-07-12",
+    ]);
   });
 
   it("keeps a legacy-only segment display-only", () => {

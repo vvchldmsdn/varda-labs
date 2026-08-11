@@ -9,6 +9,7 @@ import {
 const LEGACY_SOURCE = "base44_import";
 const CURRENT_SOURCE = "varda_manual_daily_snapshot";
 const CURRENT_RULE = "varda-manual-daily-snapshot-v1";
+const BACKFILL_RULE = "varda-daily-snapshot-gap-backfill-v1";
 
 describe("investment lab observed history segments", () => {
   it("sums named accounts and keeps a source transition disconnected", () => {
@@ -58,6 +59,21 @@ describe("investment lab observed history segments", () => {
       result.segments[0].rows.map((row) => row.totalMarketValueKrw),
       [22, 23],
     );
+  });
+
+  it("keeps reviewed gap-backfill rows in one current-writer segment", () => {
+    const result = buildInvestmentLabObservedHistory([
+      ...snapshotDate("2026-07-09", CURRENT_SOURCE, CURRENT_RULE, [100, 20, 10]),
+      ...snapshotDate("2026-07-10", CURRENT_SOURCE, BACKFILL_RULE, [101, 21, 11]),
+      ...snapshotDate("2026-07-11", CURRENT_SOURCE, BACKFILL_RULE, [102, 22, 12]),
+      ...snapshotDate("2026-07-12", CURRENT_SOURCE, CURRENT_RULE, [103, 23, 13]),
+    ]);
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.coverage.admittedDateCount, 4);
+    assert.equal(result.coverage.currentWriterDateCount, 4);
+    assert.equal(result.coverage.segmentCount, 1);
+    assert.deepEqual(result.blockers, []);
   });
 
   it("omits an incomplete date and does not bridge across the gap", () => {

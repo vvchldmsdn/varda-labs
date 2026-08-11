@@ -5,19 +5,26 @@ import {
   type NamedPortfolioAccount,
   type PortfolioAccountScope,
 } from "./portfolio-account-scope.ts";
+import { SNAPSHOT_GAP_BACKFILL_POLICY } from "./snapshots/gap-backfill.ts";
 
 export const INVESTMENT_LAB_LEGACY_SNAPSHOT_SOURCE = "base44_import";
 export const INVESTMENT_LAB_CURRENT_SNAPSHOT_SOURCE =
   "varda_manual_daily_snapshot";
 export const INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION =
   "varda-manual-daily-snapshot-v1";
+export const INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSIONS = Object.freeze([
+  INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
+  SNAPSHOT_GAP_BACKFILL_POLICY.ruleVersion,
+] as const);
 type SourceRole = "legacy_display" | "current_writer" | "unknown";
 
 export const INVESTMENT_LAB_SOURCE_SEGMENT_AUTHORITY_POLICY = Object.freeze({
-  version: "investment_lab_source_segment_authority_v1",
+  version: "investment_lab_source_segment_authority_v2",
   legacySegment: "display_only",
   currentWriterSegment:
     "calculation_candidate_only_for_an_entire_single_selected_segment",
+  currentWriterRuleAuthority: "explicit_reviewed_rule_allowlist",
+  gapBackfillPolicy: SNAPSHOT_GAP_BACKFILL_POLICY.id,
   mixedSegmentCalculation: "forbidden",
   sourceRebase: "forbidden",
   implicitFallback: "forbidden",
@@ -87,8 +94,7 @@ export function listInvestmentLabLatestCurrentWriterDates(
     const isCurrentWriterDate = dateRows.every(
       (row) =>
         sourceRole(row.source) === "current_writer" &&
-        stableText(row.ruleVersion) ===
-          INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
+        isInvestmentLabCurrentSnapshotRuleVersion(row.ruleVersion),
     );
     if (!isCurrentWriterDate) break;
     dates.unshift(axis.completeDates[index]);
@@ -133,9 +139,7 @@ export function resolveInvestmentLabSourceSegmentAuthority(
       currentWriterDateCount += 1;
       if (
         dateRows.some(
-          (row) =>
-            stableText(row.ruleVersion) !==
-            INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
+          (row) => !isInvestmentLabCurrentSnapshotRuleVersion(row.ruleVersion),
         )
       ) {
         blockers.add("current_writer_provenance_invalid");
@@ -254,6 +258,13 @@ function buildNamedAccountAxis(
     completeDates,
     completeRowsByDate,
   } as const;
+}
+
+export function isInvestmentLabCurrentSnapshotRuleVersion(value: unknown) {
+  const ruleVersion = stableText(value);
+  return INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSIONS.some(
+    (candidate) => candidate === ruleVersion,
+  );
 }
 
 function sourceRole(value: string | null): SourceRole {
