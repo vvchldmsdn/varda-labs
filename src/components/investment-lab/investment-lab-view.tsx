@@ -10,6 +10,7 @@ import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart"
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
 import { InvestmentLabContributionExperiment } from "./investment-lab-contribution-experiment";
 import { InvestmentLabFundingPreflightView } from "./investment-lab-funding-preflight";
+import { InvestmentLabObservedHistoryView } from "./investment-lab-observed-history";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
@@ -20,6 +21,7 @@ import type { InvestmentLabAccountFundingPreflight } from "@/lib/investment-lab-
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
+import type { InvestmentLabObservedHistory } from "@/lib/investment-lab-observed-history-segments";
 import {
   buildPortfolioAccountScopeHref,
   type PortfolioAccountScope,
@@ -37,6 +39,7 @@ export function InvestmentLabView({
   fountScopeAdjustment,
   fundingPreflight,
   model,
+  observedHistory,
   period,
   selectedAccount,
 }: {
@@ -50,6 +53,7 @@ export function InvestmentLabView({
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
   model: InvestmentLabCounterfactualReadModel;
+  observedHistory: InvestmentLabObservedHistory;
   period: InvestmentLabPeriodSelection;
   selectedAccount: PortfolioAccountScope;
 }) {
@@ -57,6 +61,10 @@ export function InvestmentLabView({
     period.status === "full" ||
     period.status === "current_writer" ||
     period.status === "selected";
+  const showSegmentedHistory =
+    period.status === "unavailable" &&
+    period.reason === "range_evidence_incomplete" &&
+    observedHistory.status !== "unavailable";
 
   return (
     <main
@@ -113,6 +121,8 @@ export function InvestmentLabView({
       data-fount-scope-adjustment={fountScopeAdjustment.status}
       data-output-authority="research_counterfactual_not_executable"
       data-observed-path-status={model.observedPath.status}
+      data-observed-history-status={observedHistory.status}
+      data-observed-history-segments={observedHistory.coverage.segmentCount}
       data-pending-at-end={periodReady ? model.coverage.pendingAtEndRows : 0}
       data-period-status={period.status}
       data-read-model-status={model.status}
@@ -201,7 +211,9 @@ export function InvestmentLabView({
               label="상태"
               value={
                 !periodReady
-                  ? "구간 확인 필요"
+                  ? showSegmentedHistory
+                    ? "부분 관측 표시"
+                    : "구간 확인 필요"
                   : model.observedPath.status !== "ready"
                     ? "관측 경로 차단"
                     : model.status === "ready"
@@ -219,6 +231,14 @@ export function InvestmentLabView({
           period={period}
           query={accountQuery}
         />
+
+        {showSegmentedHistory ? (
+          <InvestmentLabObservedHistoryView
+            account={selectedAccount}
+            model={observedHistory}
+            query={accountQuery}
+          />
+        ) : null}
 
         <InvestmentLabFundingPreflightView model={fundingPreflight} />
 

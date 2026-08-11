@@ -187,6 +187,7 @@ async function InvestmentLabContent({
     fountScopeAdjustment,
     fundingPreflight,
     model,
+    observedHistory,
     period,
     preperiodOptimizer,
     rollingComparison,
@@ -212,6 +213,7 @@ async function InvestmentLabContent({
         fountScopeAdjustment={fountScopeAdjustment}
         fundingPreflight={fundingPreflight}
         model={model}
+        observedHistory={observedHistory}
         period={period}
         accountQuery={accountQuery}
         selectedAccount={selectedAccount}

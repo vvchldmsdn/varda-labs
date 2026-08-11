@@ -171,7 +171,7 @@ function periodReasonLabel(reason: InvestmentLabPeriodSelectionReason | null) {
     end_not_observed:
       "종료일은 저장된 전체 계정 평가 관측일과 정확히 일치해야 합니다.",
     range_evidence_incomplete:
-      "선택 구간의 실제 평가액·거래·KODEX 200·VOO 가격 또는 환율 근거가 완전하지 않아 일부 결과 대신 구간 전체를 표시하지 않습니다.",
+      "선택 구간을 하나의 계산 경로로 연결할 근거가 부족합니다. 출처별 실제 관측은 아래에 분리해 표시하고, 시나리오 계산은 검증된 최신 구간에서만 제공합니다.",
   };
   return reason ? labels[reason] : "선택 구간을 확인해 주세요.";
 }

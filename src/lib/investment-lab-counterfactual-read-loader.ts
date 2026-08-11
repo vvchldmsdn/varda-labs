@@ -51,6 +51,11 @@ import {
   buildInvestmentLabNamedAccountFundingPreflight,
   type InvestmentLabAccountFundingPreflight,
 } from "./investment-lab-account-funding-preflight.ts";
+import {
+  buildInvestmentLabObservedHistory,
+  unavailableInvestmentLabObservedHistory,
+  type InvestmentLabObservedHistory,
+} from "./investment-lab-observed-history-segments.ts";
 
 export interface InvestmentLabCounterfactualReadRepository
   extends InvestmentLabAnchorBasketReadRepository {
@@ -82,6 +87,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   accountComposition: InvestmentLabAccountComposition;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
+  observedHistory: InvestmentLabObservedHistory;
 }>> {
   const [eventRows, snapshotRows, closeRows, vooCloseRows, fxRows] =
     await Promise.all([
@@ -135,6 +141,16 @@ export async function loadInvestmentLabCounterfactualReadModel(
     allEventRows: input.eventRows,
     evidence: fountEvidence,
   });
+  const observedHistory =
+    fountScope.scope.status === "blocked"
+      ? unavailableInvestmentLabObservedHistory(
+          account,
+          "fount_scope_adjustment_blocked",
+        )
+      : buildInvestmentLabObservedHistory(
+          fountScope.source.snapshotRows,
+          account,
+        );
   const anchorFountScope = resolveAnchorFountScope(
     fountScope.scope.status,
     fountEvidence,
@@ -335,6 +351,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
     fountScopeAdjustment: fountScope.scope,
     accountComposition,
     fundingPreflight,
+    observedHistory,
   });
 }
 

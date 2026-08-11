@@ -205,6 +205,48 @@ describe("investment lab period selection", () => {
     );
   });
 
+  it("returns disconnected observed segments when an explicit range crosses sources", async () => {
+    const source = fixture();
+    source.snapshotRows = source.snapshotRows.map((row) =>
+      row.snapshotDate <= "2026-01-05"
+        ? { ...row, source: "base44_import", ruleVersion: null }
+        : row,
+    );
+
+    const result = await loadInvestmentLabCounterfactualReadModel(
+      repository(source),
+      {
+        startServiceDate: "2026-01-02",
+        endServiceDate: "2026-01-07",
+      },
+    );
+
+    assert.equal(result.period.status, "unavailable");
+    assert.equal(result.period.reason, "range_evidence_incomplete");
+    assert.equal(result.model.status, "blocked");
+    assert.equal(result.observedHistory.status, "ready");
+    assert.equal(result.observedHistory.coverage.segmentCount, 2);
+    assert.deepEqual(
+      result.observedHistory.segments.map((segment) => ({
+        role: segment.role,
+        start: segment.startServiceDate,
+        end: segment.endServiceDate,
+      })),
+      [
+        {
+          role: "legacy_display",
+          start: "2026-01-02",
+          end: "2026-01-05",
+        },
+        {
+          role: "current_writer",
+          start: "2026-01-06",
+          end: "2026-01-07",
+        },
+      ],
+    );
+  });
+
   it("uses complete named-account rows to scope an IRP Fount adjustment", async () => {
     const source = fixture();
     source.eventRows = [];
