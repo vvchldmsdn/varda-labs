@@ -5,6 +5,7 @@ import {
   buildCronPreflightJobResponse,
   parseCronPreflightQuery,
 } from "@/lib/cron-preflight";
+import { buildCronRuntimeConfigStatus } from "@/lib/cron-runtime-config";
 import { getKisPriceSyncCooldownStatus } from "@/lib/market-data/price-sync";
 import {
   DailySnapshotRequestError,
@@ -56,7 +57,13 @@ export async function GET(request: Request) {
       cronScheduleUtc: request.headers.get("x-vercel-cron-schedule"),
     });
 
-    return NextResponse.json(response, { headers: NO_STORE_HEADERS });
+    return NextResponse.json(
+      {
+        ...response,
+        runtimeConfig: buildCronRuntimeConfigStatus(process.env),
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     if (error instanceof DailySnapshotRequestError) {
       return NextResponse.json(
