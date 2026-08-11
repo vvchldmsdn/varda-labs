@@ -8,17 +8,18 @@ import {
 import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
 import { INVESTMENT_LAB_ANCHOR_SCHEDULED_REBALANCE_POLICY } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import {
+  INVESTMENT_LAB_CURRENT_SNAPSHOT_SOURCE,
+  INVESTMENT_LAB_LEGACY_SNAPSHOT_SOURCE,
+  isInvestmentLabCurrentSnapshotRuleVersion,
+} from "./investment-lab-source-segment-authority.ts";
+import {
   buildManualValuationHistoryCoverage,
   type ManualValuationCurrentRow,
   type ManualValuationSnapshotRow,
 } from "./manual-valuation-history.ts";
 
-const LEGACY_SOURCE = "base44_import";
-const CURRENT_SOURCE = "varda_manual_daily_snapshot";
-const CURRENT_RULE_VERSION = "varda-manual-daily-snapshot-v1";
-
 export const INVESTMENT_LAB_DATA_AVAILABILITY_POLICY = Object.freeze({
-  version: "investment_lab_data_availability_v2",
+  version: "investment_lab_data_availability_v3",
   marketReturnObservationTarget: 90,
   minimumActualComparisonDates: 2,
   actualCalculationAuthority: "current_writer_single_segment_only",
@@ -456,14 +457,19 @@ function statusAfterFountAdjustment(
 function sourceRole(
   rows: readonly InvestmentLabAvailabilitySnapshotRow[],
 ): "legacy" | "current" | "invalid" {
-  if (rows.every((row) => normalizeText(row.source) === LEGACY_SOURCE)) {
+  if (
+    rows.every(
+      (row) =>
+        normalizeText(row.source) === INVESTMENT_LAB_LEGACY_SNAPSHOT_SOURCE,
+    )
+  ) {
     return "legacy";
   }
   if (
     rows.every(
       (row) =>
-        normalizeText(row.source) === CURRENT_SOURCE &&
-        normalizeText(row.ruleVersion) === CURRENT_RULE_VERSION,
+        normalizeText(row.source) === INVESTMENT_LAB_CURRENT_SNAPSHOT_SOURCE &&
+        isInvestmentLabCurrentSnapshotRuleVersion(row.ruleVersion),
     )
   ) {
     return "current";

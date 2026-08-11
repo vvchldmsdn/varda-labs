@@ -57,6 +57,36 @@ describe("investment lab data availability", () => {
     );
   });
 
+  it("includes reviewed gap backfill rows in the latest trusted segment", () => {
+    const model = buildInvestmentLabDataAvailability({
+      account: "brokerage",
+      snapshotRows: [
+        snapshot("2026-07-06", "brokerage", "current"),
+        {
+          ...snapshot("2026-07-07", "brokerage", "current"),
+          ruleVersion: "varda-daily-snapshot-gap-backfill-v1",
+        },
+        {
+          ...snapshot("2026-07-08", "brokerage", "current"),
+          ruleVersion: "varda-daily-snapshot-gap-backfill-v1",
+        },
+        snapshot("2026-07-09", "brokerage", "current"),
+      ],
+      marketHistory: marketHistory(),
+    });
+
+    assert.equal(model.actualHistory.latestCurrentWriterDateCount, 4);
+    assert.equal(
+      model.actualHistory.latestCurrentWriterStartServiceDate,
+      "2026-07-06",
+    );
+    assert.equal(
+      model.actualHistory.latestCurrentWriterEndServiceDate,
+      "2026-07-09",
+    );
+    assert.equal(scenario(model, "same_flow_baselines").status, "limited_input_ready");
+  });
+
   it("requires explicit manual KRX gold history without blocking same-flow baselines", () => {
     const model = buildInvestmentLabDataAvailability({
       account: "brokerage",
