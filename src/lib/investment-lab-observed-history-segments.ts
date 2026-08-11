@@ -1,8 +1,8 @@
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
 import {
-  INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
   INVESTMENT_LAB_CURRENT_SNAPSHOT_SOURCE,
   INVESTMENT_LAB_LEGACY_SNAPSHOT_SOURCE,
+  isInvestmentLabCurrentSnapshotRuleVersion,
 } from "./investment-lab-source-segment-authority.ts";
 import {
   accountsForPortfolioScope,
@@ -12,8 +12,9 @@ import {
 } from "./portfolio-account-scope.ts";
 
 export const INVESTMENT_LAB_OBSERVED_HISTORY_POLICY = Object.freeze({
-  version: "investment_lab_observed_history_segments_v1",
+  version: "investment_lab_observed_history_segments_v2",
   valueAuthority: "stored_named_account_portfolio_observations",
+  currentWriterRuleAuthority: "source_segment_authority_allowlist",
   sourceTransitions: "render_as_disconnected_segments",
   missingDates: "omit_without_interpolation",
   providerBackfill: "not_requested",
@@ -168,9 +169,7 @@ export function buildInvestmentLabObservedHistory(
     if (
       role === "current_writer" &&
       dateRows.some(
-        (row) =>
-          stableText(row.ruleVersion) !==
-          INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
+        (row) => !isInvestmentLabCurrentSnapshotRuleVersion(row.ruleVersion),
       )
     ) {
       blockers.add("current_writer_provenance_invalid");

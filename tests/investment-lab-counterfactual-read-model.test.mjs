@@ -68,6 +68,28 @@ describe("investment lab counterfactual read model", () => {
     );
   });
 
+  it("uses reviewed gap-backfill rows as current-writer calculation evidence", () => {
+    const source = fixture();
+    const result = buildInvestmentLabCounterfactualReadModel({
+      ...source,
+      snapshotRows: source.snapshotRows.map((row) =>
+        row.snapshotDate === "2026-01-05" ||
+        row.snapshotDate === "2026-01-06"
+          ? {
+              ...row,
+              ruleVersion: "varda-daily-snapshot-gap-backfill-v1",
+            }
+          : row,
+      ),
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.sourceAuthority.status, "eligible");
+    assert.equal(result.sourceAuthority.coverage.currentWriterDateCount, 4);
+    assert.equal(result.coverage.completeComparisonDates, 4);
+    assert.deepEqual(result.blockers, []);
+  });
+
   it("builds the fixed mix only when an explicit selection is requested", () => {
     const withoutSelection = buildInvestmentLabCounterfactualReadModel(
       fixture(),
