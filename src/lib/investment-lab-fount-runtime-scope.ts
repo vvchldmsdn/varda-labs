@@ -6,6 +6,7 @@ import {
 import type {
   InvestmentLabCounterfactualReadInput,
   InvestmentLabSourceEventRow,
+  InvestmentLabSourceSnapshotRow,
 } from "./investment-lab-counterfactual-read-model.ts";
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 
@@ -37,6 +38,14 @@ export type InvestmentLabFountRuntimeScope = Readonly<{
   status: "not_applicable" | "applied" | "blocked";
   policy: typeof INVESTMENT_LAB_FOUNT_RUNTIME_SCOPE_POLICY;
   adjustedDateCount: number;
+  excludedAccount: "irp" | null;
+}>;
+
+export type InvestmentLabFountObservedRuntimeScope = Readonly<{
+  status: "not_applicable" | "applied" | "partial" | "blocked";
+  policy: typeof INVESTMENT_LAB_FOUNT_RUNTIME_SCOPE_POLICY;
+  adjustedDateCount: number;
+  blockedServiceDates: readonly string[];
   excludedAccount: "irp" | null;
 }>;
 
@@ -104,6 +113,90 @@ export function applyInvestmentLabFountRuntimeScope(input: Readonly<{
   );
 }
 
+export function applyInvestmentLabFountObservedRuntimeScope(input: Readonly<{
+  account: PortfolioAccountScope;
+  serviceDates: readonly string[];
+  source: InvestmentLabCounterfactualReadInput;
+  allEventRows: readonly InvestmentLabSourceEventRow[];
+  evidence: InvestmentLabFountRuntimeEvidence;
+}>): Readonly<{
+  source: InvestmentLabCounterfactualReadInput;
+  scope: InvestmentLabFountObservedRuntimeScope;
+}> {
+  if (input.account !== "irp" && input.account !== "all") {
+    return observedResult(input.source, "not_applicable", 0, [], null);
+  }
+  if (input.evidence.status === "not_applicable") {
+    return observedResult(input.source, "not_applicable", 0, [], null);
+  }
+
+  const completeDateSet = new Set(input.serviceDates);
+  const sourceRowsByDate = groupBySnapshotDate(input.source.snapshotRows);
+  const observedDates = Object.freeze([...sourceRowsByDate.keys()].sort());
+  if (input.evidence.status !== "ready") {
+    return observedResult(
+      input.source,
+      "blocked",
+      0,
+      observedDates,
+      "irp",
+    );
+  }
+
+  const positionRowsByDate = groupBySnapshotDate(input.evidence.positionRows);
+  const snapshotRows: InvestmentLabSourceSnapshotRow[] = [];
+  const blockedServiceDates: string[] = [];
+  let adjustedDateCount = 0;
+  for (const serviceDate of observedDates) {
+    const sourceRows = sourceRowsByDate.get(serviceDate) ?? [];
+    if (!completeDateSet.has(serviceDate)) {
+      blockedServiceDates.push(serviceDate);
+      snapshotRows.push(...sourceRows);
+      continue;
+    }
+
+    const dateSource = Object.freeze({
+      ...input.source,
+      snapshotRows: Object.freeze(sourceRows),
+    });
+    const dateAdjustment = applyInvestmentLabFountRuntimeScope({
+      ...input,
+      serviceDates: Object.freeze([serviceDate]),
+      source: dateSource,
+      evidence: Object.freeze({
+        ...input.evidence,
+        positionRows: Object.freeze(
+          positionRowsByDate.get(serviceDate) ?? [],
+        ),
+      }),
+    });
+    if (dateAdjustment.scope.status !== "applied") {
+      blockedServiceDates.push(serviceDate);
+      snapshotRows.push(...sourceRows);
+      continue;
+    }
+    adjustedDateCount += 1;
+    snapshotRows.push(...dateAdjustment.source.snapshotRows);
+  }
+
+  const status =
+    adjustedDateCount === 0
+      ? "blocked"
+      : blockedServiceDates.length > 0
+        ? "partial"
+        : "applied";
+  return observedResult(
+    Object.freeze({
+      ...input.source,
+      snapshotRows: Object.freeze(snapshotRows),
+    }),
+    status,
+    adjustedDateCount,
+    blockedServiceDates,
+    "irp",
+  );
+}
+
 function result(
   source: InvestmentLabCounterfactualReadInput,
   status: InvestmentLabFountRuntimeScope["status"],
@@ -119,4 +212,35 @@ function result(
       excludedAccount,
     }),
   });
+}
+
+function observedResult(
+  source: InvestmentLabCounterfactualReadInput,
+  status: InvestmentLabFountObservedRuntimeScope["status"],
+  adjustedDateCount: number,
+  blockedServiceDates: readonly string[],
+  excludedAccount: InvestmentLabFountObservedRuntimeScope["excludedAccount"],
+) {
+  return Object.freeze({
+    source,
+    scope: Object.freeze({
+      status,
+      policy: INVESTMENT_LAB_FOUNT_RUNTIME_SCOPE_POLICY,
+      adjustedDateCount,
+      blockedServiceDates: Object.freeze([...blockedServiceDates]),
+      excludedAccount,
+    }),
+  });
+}
+
+function groupBySnapshotDate<T extends Readonly<{ snapshotDate: string }>>(
+  rows: readonly T[],
+) {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const matchingRows = grouped.get(row.snapshotDate) ?? [];
+    matchingRows.push(row);
+    grouped.set(row.snapshotDate, matchingRows);
+  }
+  return grouped;
 }

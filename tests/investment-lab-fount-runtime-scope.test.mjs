@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { applyInvestmentLabFountRuntimeScope } from "../src/lib/investment-lab-fount-runtime-scope.ts";
+import {
+  applyInvestmentLabFountObservedRuntimeScope,
+  applyInvestmentLabFountRuntimeScope,
+} from "../src/lib/investment-lab-fount-runtime-scope.ts";
 
 const FOUNT_ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
 const SOURCE = "varda_manual_daily_snapshot";
@@ -58,6 +61,32 @@ describe("investment lab Fount runtime scope", () => {
     assert.equal(result.scope.adjustedDateCount, 0);
     assert.equal(result.source, source);
   });
+
+  it("admits exact observed dates and marks only missing Fount dates as gaps", () => {
+    const source = fixtureWithThirdDate();
+    const evidence = readyEvidence();
+    evidence.positionRows = [
+      position("2026-07-08", "100.000000"),
+      position("2026-07-10", "130.000000"),
+    ];
+    const result = applyInvestmentLabFountObservedRuntimeScope({
+      account: "all",
+      serviceDates: ["2026-07-08", "2026-07-09", "2026-07-10"],
+      source,
+      allEventRows: [],
+      evidence,
+    });
+
+    assert.equal(result.scope.status, "partial");
+    assert.equal(result.scope.adjustedDateCount, 2);
+    assert.deepEqual(result.scope.blockedServiceDates, ["2026-07-09"]);
+    assert.deepEqual(
+      result.source.snapshotRows
+        .filter((row) => row.account === "irp")
+        .map((row) => row.totalMarketValue),
+      ["250.000000", "400.000000", "320.000000"],
+    );
+  });
 });
 
 function fixture() {
@@ -70,6 +99,17 @@ function fixture() {
     closeRows: Object.freeze([]),
     vooCloseRows: Object.freeze([]),
     fxRows: Object.freeze([]),
+  });
+}
+
+function fixtureWithThirdDate() {
+  const source = fixture();
+  return Object.freeze({
+    ...source,
+    snapshotRows: Object.freeze([
+      ...source.snapshotRows,
+      ...snapshotDate("2026-07-10", 600, 400, 450),
+    ]),
   });
 }
 
