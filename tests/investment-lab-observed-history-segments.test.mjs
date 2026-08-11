@@ -115,6 +115,31 @@ describe("investment lab observed history segments", () => {
     assert.deepEqual(result.blockers, ["fount_scope_adjustment_blocked"]);
     assert.equal(result.segments.length, 0);
   });
+
+  it("keeps exact Fount-adjusted dates visible while breaking blocked dates", () => {
+    const result = buildInvestmentLabObservedHistory(
+      [
+        ...snapshotDate("2026-07-01", CURRENT_SOURCE, CURRENT_RULE, [110, 22, 12]),
+        ...snapshotDate("2026-07-02", CURRENT_SOURCE, CURRENT_RULE, [115, 23, 13]),
+        ...snapshotDate("2026-07-03", CURRENT_SOURCE, CURRENT_RULE, [120, 24, 14]),
+      ],
+      "irp",
+      {
+        forcedGapServiceDates: ["2026-07-02"],
+        additionalBlockers: ["fount_scope_adjustment_blocked"],
+      },
+    );
+
+    assert.equal(result.status, "partial");
+    assert.equal(result.coverage.skippedDateCount, 1);
+    assert.deepEqual(
+      result.segments.map((segment) =>
+        segment.rows.map((row) => row.serviceDate),
+      ),
+      [["2026-07-01"], ["2026-07-03"]],
+    );
+    assert.deepEqual(result.blockers, ["fount_scope_adjustment_blocked"]);
+  });
 });
 
 function snapshotDate(snapshotDate, source, ruleVersion, values) {

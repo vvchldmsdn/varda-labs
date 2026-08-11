@@ -288,6 +288,49 @@ describe("investment lab period selection", () => {
     assert.equal(result.fountScopeAdjustment.status, "applied");
     assert.equal(result.model.status, "ready");
   });
+
+  it("keeps exact IRP observations visible when other Fount dates are unresolved", async () => {
+    const source = fixture();
+    source.eventRows = [];
+    const scopedRepository = repository(source);
+    scopedRepository.loadFountRuntimeEvidence = async () => ({
+      status: "ready",
+      binding: {
+        selectorBasis: "exact_snapshot_legacy_asset_id",
+        snapshotLegacyAssetId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+        account: "irp",
+      },
+      positionRows: ["2026-01-02", "2026-01-07"].map((snapshotDate) => ({
+        snapshotDate,
+        account: "irp",
+        source: "varda_manual_daily_snapshot",
+        snapshotLegacyAssetId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+        marketValueKrw: "10.000000",
+      })),
+    });
+
+    const result = await loadInvestmentLabCounterfactualReadModel(
+      scopedRepository,
+      undefined,
+      undefined,
+      undefined,
+      "irp",
+    );
+
+    assert.equal(result.fountScopeAdjustment.status, "blocked");
+    assert.equal(result.model.status, "blocked");
+    assert.equal(result.observedHistory.status, "partial");
+    assert.equal(result.observedHistory.coverage.skippedDateCount, 2);
+    assert.deepEqual(
+      result.observedHistory.segments.map((segment) =>
+        segment.rows.map((row) => row.serviceDate),
+      ),
+      [["2026-01-02"], ["2026-01-07"]],
+    );
+    assert.deepEqual(result.observedHistory.blockers, [
+      "fount_scope_adjustment_blocked",
+    ]);
+  });
 });
 
 function repository(source) {

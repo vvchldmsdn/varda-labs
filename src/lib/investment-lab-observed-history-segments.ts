@@ -73,6 +73,11 @@ export type InvestmentLabObservedHistoryInputRow = Readonly<{
   ruleVersion: string | null;
 }>;
 
+export type InvestmentLabObservedHistoryOptions = Readonly<{
+  forcedGapServiceDates?: readonly string[];
+  additionalBlockers?: readonly InvestmentLabObservedHistoryBlocker[];
+}>;
+
 type MutableSegment = {
   role: InvestmentLabObservedHistorySourceRole;
   rows: InvestmentLabObservedHistoryRow[];
@@ -81,10 +86,14 @@ type MutableSegment = {
 export function buildInvestmentLabObservedHistory(
   rows: readonly InvestmentLabObservedHistoryInputRow[],
   account: PortfolioAccountScope = "all",
+  options: InvestmentLabObservedHistoryOptions = {},
 ): InvestmentLabObservedHistory {
   const selectedAccounts = accountsForPortfolioScope(account);
   const selectedAccountSet = new Set<NamedPortfolioAccount>(selectedAccounts);
-  const blockers = new Set<InvestmentLabObservedHistoryBlocker>();
+  const blockers = new Set<InvestmentLabObservedHistoryBlocker>(
+    options.additionalBlockers,
+  );
+  const forcedGapServiceDates = new Set(options.forcedGapServiceDates);
   const rowsByDate = new Map<
     string,
     Map<NamedPortfolioAccount, InvestmentLabObservedHistoryInputRow[]>
@@ -135,6 +144,10 @@ export function buildInvestmentLabObservedHistory(
       }
     }
     if (dateBlocked) {
+      activeSegment = null;
+      continue;
+    }
+    if (forcedGapServiceDates.has(snapshotDate)) {
       activeSegment = null;
       continue;
     }

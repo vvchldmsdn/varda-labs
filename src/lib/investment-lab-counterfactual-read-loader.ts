@@ -37,6 +37,7 @@ import {
   listInvestmentLabLatestCurrentWriterDates,
 } from "./investment-lab-source-segment-authority.ts";
 import {
+  applyInvestmentLabFountObservedRuntimeScope,
   applyInvestmentLabFountRuntimeScope,
   type InvestmentLabFountRuntimeEvidence,
   type InvestmentLabFountRuntimeScope,
@@ -53,7 +54,6 @@ import {
 } from "./investment-lab-account-funding-preflight.ts";
 import {
   buildInvestmentLabObservedHistory,
-  unavailableInvestmentLabObservedHistory,
   type InvestmentLabObservedHistory,
 } from "./investment-lab-observed-history-segments.ts";
 
@@ -141,16 +141,26 @@ export async function loadInvestmentLabCounterfactualReadModel(
     allEventRows: input.eventRows,
     evidence: fountEvidence,
   });
-  const observedHistory =
-    fountScope.scope.status === "blocked"
-      ? unavailableInvestmentLabObservedHistory(
-          account,
-          "fount_scope_adjustment_blocked",
-        )
-      : buildInvestmentLabObservedHistory(
-          fountScope.source.snapshotRows,
-          account,
-        );
+  const observedFountScope = applyInvestmentLabFountObservedRuntimeScope({
+    account,
+    serviceDates: fountServiceDates,
+    source: selectedSource,
+    allEventRows: input.eventRows,
+    evidence: fountEvidence,
+  });
+  const observedFountBlocked =
+    observedFountScope.scope.status === "partial" ||
+    observedFountScope.scope.status === "blocked";
+  const observedHistory = buildInvestmentLabObservedHistory(
+    observedFountScope.source.snapshotRows,
+    account,
+    {
+      forcedGapServiceDates: observedFountScope.scope.blockedServiceDates,
+      additionalBlockers: observedFountBlocked
+        ? ["fount_scope_adjustment_blocked"]
+        : [],
+    },
+  );
   const anchorFountScope = resolveAnchorFountScope(
     fountScope.scope.status,
     fountEvidence,
