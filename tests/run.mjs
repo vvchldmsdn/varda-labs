@@ -58,6 +58,7 @@ import "./investment-lab-current-holding-scope.test.mjs";
 import "./investment-lab-fount-readiness.test.mjs";
 import "./investment-lab-source-transition.test.mjs";
 import "./investment-lab-source-segment-authority.test.mjs";
+import "./investment-lab-observed-history-segments.test.mjs";
 import "./investment-lab-legacy-reconciliation.test.mjs";
 import "./investment-lab-legacy-reconstruction-candidate.test.mjs";
 import "./investment-lab-legacy-cycle-provenance.test.mjs";

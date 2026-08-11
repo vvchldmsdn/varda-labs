@@ -6,9 +6,11 @@ import {
   type PortfolioAccountScope,
 } from "./portfolio-account-scope.ts";
 
-const LEGACY_SOURCE = "base44_import";
-const CURRENT_SOURCE = "varda_manual_daily_snapshot";
-const CURRENT_RULE_VERSION = "varda-manual-daily-snapshot-v1";
+export const INVESTMENT_LAB_LEGACY_SNAPSHOT_SOURCE = "base44_import";
+export const INVESTMENT_LAB_CURRENT_SNAPSHOT_SOURCE =
+  "varda_manual_daily_snapshot";
+export const INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION =
+  "varda-manual-daily-snapshot-v1";
 type SourceRole = "legacy_display" | "current_writer" | "unknown";
 
 export const INVESTMENT_LAB_SOURCE_SEGMENT_AUTHORITY_POLICY = Object.freeze({
@@ -85,7 +87,8 @@ export function listInvestmentLabLatestCurrentWriterDates(
     const isCurrentWriterDate = dateRows.every(
       (row) =>
         sourceRole(row.source) === "current_writer" &&
-        stableText(row.ruleVersion) === CURRENT_RULE_VERSION,
+        stableText(row.ruleVersion) ===
+          INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
     );
     if (!isCurrentWriterDate) break;
     dates.unshift(axis.completeDates[index]);
@@ -130,7 +133,9 @@ export function resolveInvestmentLabSourceSegmentAuthority(
       currentWriterDateCount += 1;
       if (
         dateRows.some(
-          (row) => stableText(row.ruleVersion) !== CURRENT_RULE_VERSION,
+          (row) =>
+            stableText(row.ruleVersion) !==
+            INVESTMENT_LAB_CURRENT_SNAPSHOT_RULE_VERSION,
         )
       ) {
         blockers.add("current_writer_provenance_invalid");
@@ -253,8 +258,12 @@ function buildNamedAccountAxis(
 
 function sourceRole(value: string | null): SourceRole {
   const source = stableText(value);
-  if (source === LEGACY_SOURCE) return "legacy_display";
-  if (source === CURRENT_SOURCE) return "current_writer";
+  if (source === INVESTMENT_LAB_LEGACY_SNAPSHOT_SOURCE) {
+    return "legacy_display";
+  }
+  if (source === INVESTMENT_LAB_CURRENT_SNAPSHOT_SOURCE) {
+    return "current_writer";
+  }
   return "unknown";
 }
 
