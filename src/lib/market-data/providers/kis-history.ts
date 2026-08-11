@@ -8,7 +8,7 @@ export const KIS_RAW_HISTORY_POLICY = Object.freeze({
   windowCalendarDays: 90,
   maximumRangeCalendarDays: 550,
   maximumInstrumentCount: 5,
-  requestDelayMilliseconds: 180,
+  requestDelayMilliseconds: 500,
   automaticRetryCount: 0,
   adjustedCloseClaim: "forbidden",
 } as const);

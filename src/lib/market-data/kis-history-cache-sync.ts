@@ -13,6 +13,7 @@ import {
 import { safeErrorMessage } from "@/lib/redaction";
 import type {
   HistoricalPriceFailure,
+  HistoricalPriceResult,
   MarketDataProvider,
   PriceLookupTarget,
 } from "@/lib/market-data/providers/types";
@@ -66,6 +67,7 @@ export async function runKisHistoryCacheSync(options: {
   startDate: string;
   endDate: string;
   provider: MarketDataProvider;
+  prefetchedResult?: HistoricalPriceResult;
 }): Promise<KisHistoryCacheSyncResult> {
   if (
     options.provider.name !== KIS_HISTORY_CACHE_SYNC_POLICY.provider ||
@@ -105,12 +107,16 @@ export async function runKisHistoryCacheSync(options: {
 
   try {
     const providerResult =
-      await options.provider.fetchHistoricalClosePrices(options.targets, {
+      options.prefetchedResult ??
+      (await options.provider.fetchHistoricalClosePrices(options.targets, {
         dryRun: false,
         requestedAt: startedAt,
         startDate: options.startDate,
         endDate: options.endDate,
-      });
+      }));
+    if (providerResult.provider !== KIS_HISTORY_CACHE_SYNC_POLICY.provider) {
+      throw new Error("KIS history returned an unsupported provider");
+    }
     providerDiagnostics =
       summarizeKisHistoryProviderResult(providerResult);
 

@@ -38,6 +38,9 @@ async function main() {
       import("../src/lib/market-data/providers/kis.ts"),
       import("../src/lib/market-data/kis-history-cache-sync.ts"),
     ]);
+  const { formatKisHistoryIncompleteError } = await import(
+    "../src/lib/market-data/kis-history-diagnostics.ts"
+  );
 
   const { and, asc, eq, gte, inArray, lte } = drizzle;
   const { db } = clientModule;
@@ -144,6 +147,7 @@ async function main() {
     targetBatches,
     startDate: priceFromDate,
     endDate: priceToDate,
+    dryRun: !options.writePriceData,
   });
   const fxPreview = await previewFrankfurterHistory(priceFromDate, priceToDate);
 
@@ -159,7 +163,7 @@ async function main() {
     selectedPriceTargetCount: selectedTargets.length,
     manualHoldingCount: holdingRows.length - targets.length,
     eventCount: eventRows.length,
-    kisPreview,
+    kisPreview: kisPreview.summary,
     fxPreview: {
       rowCount: fxPreview.rows.length,
       firstDate: fxPreview.rows[0]?.rateDate ?? null,
@@ -178,12 +182,13 @@ async function main() {
     let skippedCount = 0;
     let failedCount = 0;
     let providerFailureCount = 0;
-    for (const batch of targetBatches) {
+    for (const batch of kisPreview.batches) {
       const result = await kisSyncModule.runKisHistoryCacheSync({
-        targets: batch,
+        targets: batch.targets,
         startDate: priceFromDate,
         endDate: priceToDate,
         provider,
+        prefetchedResult: batch.result,
       });
       insertedCount += result.insertedCount;
       updatedCount += result.updatedCount;
@@ -468,21 +473,24 @@ async function main() {
     >;
     startDate: string;
     endDate: string;
+    dryRun: boolean;
   }) {
     let rowCount = 0;
     let requestCount = 0;
-    let failureCount = 0;
+    const failures = [];
     const covered = new Set<string>();
+    const batches = [];
     for (const batch of input.targetBatches) {
       const result = await input.provider.fetchHistoricalClosePrices!(batch, {
-        dryRun: true,
+        dryRun: input.dryRun,
         requestedAt: new Date(),
         startDate: input.startDate,
         endDate: input.endDate,
       });
+      batches.push({ targets: batch, result });
       rowCount += result.rows.length;
       requestCount += result.requestCount;
-      failureCount += result.failures.length;
+      failures.push(...result.failures);
       for (const row of result.rows) {
         covered.add(
           `${row.market.toLowerCase()}|${row.currency.toUpperCase()}|${row.ticker.toUpperCase()}`,
@@ -490,12 +498,22 @@ async function main() {
       }
     }
     const targetCount = input.targetBatches.flat().length;
-    if (failureCount > 0 || covered.size !== targetCount) {
-      throw new Error(
-        `KIS history preview incomplete: covered=${covered.size}/${targetCount}, failures=${failureCount}`,
-      );
+    if (failures.length > 0 || covered.size !== targetCount) {
+      throw new Error(formatKisHistoryIncompleteError({
+        coveredCount: covered.size,
+        targetCount,
+        failures,
+      }));
     }
-    return { targetCount, rowCount, requestCount, failureCount };
+    return {
+      summary: {
+        targetCount,
+        rowCount,
+        requestCount,
+        failureCount: failures.length,
+      },
+      batches,
+    };
   }
 
   async function previewFrankfurterHistory(fromDate: string, toDate: string) {
