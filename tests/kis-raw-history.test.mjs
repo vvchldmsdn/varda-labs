@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  KIS_RAW_HISTORY_POLICY,
   KisRawHistoryInputError,
   mergeKisRawHistoryRows,
   normalizeKisRawHistoryPayload,
@@ -15,6 +16,11 @@ import {
 } from "../src/lib/market-data/kis-history-preview.ts";
 
 describe("KIS raw close history", () => {
+  it("paces historical requests without automatic retries", () => {
+    assert.equal(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds, 500);
+    assert.equal(KIS_RAW_HISTORY_POLICY.automaticRetryCount, 0);
+  });
+
   it("plans bounded newest-first windows and explicit transport limits", () => {
     const plan = planKisRawHistoryRequests({
       targets: [

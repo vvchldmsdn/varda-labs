@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  formatKisHistoryIncompleteError,
   formatKisHistoryNoRowsError,
   summarizeKisHistoryProviderResult,
 } from "../src/lib/market-data/kis-history-diagnostics.ts";
@@ -49,6 +50,26 @@ describe("KIS history provider diagnostics", () => {
       formatKisHistoryNoRowsError(diagnostics),
       "KIS history returned no cacheable rows",
     );
+  });
+
+  it("identifies incomplete instruments without copying provider errors", () => {
+    const message = formatKisHistoryIncompleteError({
+      coveredCount: 14,
+      targetCount: 15,
+      failures: [
+        failure({
+          instrumentKey: "us|USD|VOO",
+          code: "transport_error",
+          error: "authorization=must-not-be-copied",
+        }),
+      ],
+    });
+
+    assert.equal(
+      message,
+      "KIS history preview incomplete: covered=14/15, failures=1 [us|USD|VOO:transport_error]",
+    );
+    assert.doesNotMatch(message, /must-not-be-copied/);
   });
 });
 

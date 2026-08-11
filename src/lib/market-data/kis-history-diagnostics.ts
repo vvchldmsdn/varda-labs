@@ -47,3 +47,17 @@ export function formatKisHistoryNoRowsError(
     ? `KIS history returned no cacheable rows (${failureSummary})`
     : "KIS history returned no cacheable rows";
 }
+
+export function formatKisHistoryIncompleteError(input: {
+  coveredCount: number;
+  targetCount: number;
+  failures: readonly HistoricalPriceFailure[];
+}) {
+  const failureSummary = input.failures
+    .map((failure) => `${failure.instrumentKey}:${failure.code}`)
+    .sort((left, right) => left.localeCompare(right))
+    .join(",");
+  const detail = failureSummary ? ` [${failureSummary}]` : "";
+
+  return `KIS history preview incomplete: covered=${input.coveredCount}/${input.targetCount}, failures=${input.failures.length}${detail}`;
+}
