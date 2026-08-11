@@ -75,6 +75,7 @@ import "./simulation-historical-evidence-schema.test.mjs";
 import "./simulation-owner-input-preflight.test.mjs";
 import "./simulation-owner-research-execution.test.mjs";
 import "./simulation-owner-candidate-comparison.test.mjs";
+import "./simulation-owner-outcome-optimizer.test.mjs";
 import "./simulation-owner-walk-forward-validation.test.mjs";
 import "./simulation-owner-historical-outcome-validation.test.mjs";
 import "./simulation-owner-factor-historical-validation.test.mjs";
