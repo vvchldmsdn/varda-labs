@@ -75,6 +75,18 @@ describe("owner simulation minimum-volatility candidate comparison", () => {
       result.training.candidateAnnualizedVolatilityPct <=
         result.training.currentAnnualizedVolatilityPct + 1e-10,
     );
+    assert.equal(result.outcomeCandidateStatus, "ready");
+    assert.ok(result.outcomeCandidates.length >= 2);
+    for (const candidate of result.outcomeCandidates) {
+      assert.equal(candidate.execution.status, "ready");
+      assert.deepEqual(
+        candidate.execution.samplePaths.map((row) => row.pathIndex),
+        result.currentExecution.samplePaths.map((row) => row.pathIndex),
+      );
+      assert.ok(candidate.confirmation.objectiveImprovementPctPoints > 0);
+      assert.ok(candidate.constraints.oneWayTurnoverBps <= 2_000);
+      assert.ok(candidate.constraints.fxExposureChangeBps <= 1_000);
+    }
     assert.equal(result.policy.recommendation, "forbidden");
     assert.equal(result.policy.persistence, "forbidden");
     assert.equal(result.policy.providerCalls, "forbidden");

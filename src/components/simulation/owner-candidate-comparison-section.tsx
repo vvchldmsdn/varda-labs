@@ -1,5 +1,6 @@
 import type { SimulationOwnerCandidateComparisonResult } from "@/lib/simulation-owner-candidate-comparison";
 
+import { OwnerOutcomeCandidateExplorer } from "./owner-outcome-candidate-explorer";
 import {
   ResearchFanChart,
   resolveResearchFanChartValueDomain,
@@ -187,6 +188,14 @@ function ReadyCandidateComparison({
           </tbody>
         </table>
       </div>
+
+      <OwnerOutcomeCandidateExplorer
+        account={comparison.account}
+        candidates={comparison.outcomeCandidates}
+        currentExecution={comparison.currentExecution}
+        reason={comparison.outcomeCandidateReason}
+        status={comparison.outcomeCandidateStatus}
+      />
 
       <p className="mt-3 text-xs leading-5 text-[#687064]">
         이 후보는 같은 90개 과거 행으로 비중을 추정하고 미래 경로도 만들기
