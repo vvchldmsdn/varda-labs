@@ -1,6 +1,7 @@
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
+import type { InvestmentLabApprovedTargetWeightScenario } from "@/lib/investment-lab-approved-target-weight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import { INVESTMENT_LAB_PATH_RISK_POLICY } from "@/lib/investment-lab-path-risk";
 import {
@@ -21,12 +22,14 @@ export function InvestmentLabScenarioMatrix({
   anchorValueWeightScenario,
   anchorCurrentWeightMonthlyScenario,
   anchorEqualWeightMonthlyScenario,
+  approvedTargetWeightScenario,
   model,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
   model: InvestmentLabCounterfactualReadModel;
 }) {
   const matrix = buildInvestmentLabScenarioMatrix({
@@ -35,6 +38,7 @@ export function InvestmentLabScenarioMatrix({
     anchorValueWeightScenario,
     anchorCurrentWeightMonthlyScenario,
     anchorEqualWeightMonthlyScenario,
+    approvedTargetWeightScenario,
   });
 
   return (
@@ -214,6 +218,7 @@ function scenarioLabel(
     anchor_basket: "기준일 바스켓",
     anchor_value_weight: "기준일 비중 유지",
     anchor_current_weight_monthly: "현재 비중 월간 유지",
+    approved_target_weight_monthly: "승인 목표 비중 월간 유지",
     anchor_equal_weight_monthly: "동일 비중 월간 유지",
   };
   return labels[id];
@@ -255,6 +260,8 @@ function scenarioDetail(
       "기준일 저장 평가액 비중으로 초기·외부 흐름 배분 · 리밸런싱 없음",
     anchor_current_weight_monthly:
       "계좌별 기준일 비중으로 월초 리밸런싱 · 비용·세금 미반영",
+    approved_target_weight_monthly:
+      "승인 정책 효력일 이후 목표 비중으로 월초 리밸런싱 · 비용·세금 미반영",
     anchor_equal_weight_monthly:
       "계좌별 동일 비중으로 월초 리밸런싱 · 비용·세금 미반영",
   };
@@ -312,6 +319,25 @@ function fxBasisLabel(value: InvestmentLabScenarioFxBasis) {
 }
 
 function reasonLabel(reasonCodes: readonly string[]) {
+  if (reasonCodes.includes("approved_target_policy_missing")) {
+    return "승인된 목표 비중 없음";
+  }
+  if (reasonCodes.includes("approved_target_policy_conflict")) {
+    return "승인 목표 비중이 둘 이상이라 확정 불가";
+  }
+  if (reasonCodes.includes("target_policy_not_effective")) {
+    return "선택 구간이 목표 정책 효력일보다 이름";
+  }
+  if (
+    reasonCodes.includes("target_policy_universe_mismatch") ||
+    reasonCodes.includes("target_policy_vector_mismatch") ||
+    reasonCodes.includes("target_weight_vector_mismatch")
+  ) {
+    return "현재 종목 집합과 승인 목표 비중 불일치";
+  }
+  if (reasonCodes.includes("named_account_target_policy_unavailable")) {
+    return "일부 계정의 승인 목표 비중 없음";
+  }
   if (reasonCodes.includes("period_mismatch")) return "공통 비교 기간 불일치";
   if (
     reasonCodes.includes("tickerless_anchor_holding") ||

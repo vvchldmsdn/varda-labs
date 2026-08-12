@@ -42,6 +42,46 @@ describe("investment lab scheduled anchor rebalance paths", () => {
     assert.equal(Math.round(equal.rows.at(-1).scenarioMarketValueKrw), 1_500);
   });
 
+  it("uses an exact approved target vector and preserves explicit zero-basis-point rows", () => {
+    const input = fixture();
+    const targeted = buildInvestmentLabAnchorScheduledRebalanceScenario({
+      ...input,
+      mode: "approved_target_weight_monthly",
+      targetWeights: [
+        { instrumentKey: "korea:KRW:AAA", targetWeightBps: 0 },
+        { instrumentKey: "us:USD:BBB", targetWeightBps: 10_000 },
+      ],
+    });
+
+    assert.equal(targeted.status, "ready");
+    assert.deepEqual(
+      targeted.weights.map((row) => [
+        row.instrumentKey,
+        row.targetListedSleeveWeight,
+      ]),
+      [
+        ["korea:KRW:AAA", 0],
+        ["us:USD:BBB", 1],
+      ],
+    );
+    assert.equal(targeted.summary.allocationBasis, "single_scope_approved_target_weight_monthly");
+    assert.deepEqual(
+      targeted.rows.map((row) => row.rebalanced),
+      [false, true, false],
+    );
+    assert.equal(Math.round(targeted.rows.at(-1).scenarioMarketValueKrw), 1_000);
+
+    const mismatched = buildInvestmentLabAnchorScheduledRebalanceScenario({
+      ...input,
+      mode: "approved_target_weight_monthly",
+      targetWeights: [
+        { instrumentKey: "korea:KRW:AAA", targetWeightBps: 10_000 },
+      ],
+    });
+    assert.equal(mismatched.status, "unavailable");
+    assert.equal(mismatched.blockers[0].reason, "target_weight_vector_mismatch");
+  });
+
   it("defers a month-boundary rebalance until pending flows execute at their evidence prices", () => {
     const input = fixture();
     input.evidence = {

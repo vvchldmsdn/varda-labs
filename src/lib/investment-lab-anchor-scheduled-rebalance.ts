@@ -32,7 +32,13 @@ export const INVESTMENT_LAB_ANCHOR_SCHEDULED_REBALANCE_POLICY = Object.freeze({
 
 export type InvestmentLabAnchorScheduledMode =
   | "current_weight_monthly"
-  | "equal_weight_monthly";
+  | "equal_weight_monthly"
+  | "approved_target_weight_monthly";
+
+export type InvestmentLabAnchorScheduledTargetWeight = Readonly<{
+  instrumentKey: string;
+  targetWeightBps: number;
+}>;
 
 export type InvestmentLabAnchorScheduledBlocker = Readonly<{
   reason:
@@ -43,6 +49,7 @@ export type InvestmentLabAnchorScheduledBlocker = Readonly<{
     | "invalid_component_valuation"
     | "no_listed_rebalance_sleeve"
     | "invalid_anchor_allocation"
+    | "target_weight_vector_mismatch"
     | "flow_evidence_mismatch"
     | "scenario_insolvent"
     | "unfinished_path"
@@ -74,8 +81,10 @@ export type InvestmentLabAnchorScheduledRebalanceScenario = Readonly<{
     allocationBasis:
       | "single_scope_current_weight_monthly"
       | "single_scope_equal_weight_monthly"
+      | "single_scope_approved_target_weight_monthly"
       | "named_account_current_weight_monthly_then_sum"
-      | "named_account_equal_weight_monthly_then_sum";
+      | "named_account_equal_weight_monthly_then_sum"
+      | "named_account_approved_target_weight_monthly_then_sum";
     rebalanceCount: number;
     deferredRebalanceCount: number;
     actualEndValueKrw: number;
@@ -141,6 +150,7 @@ export function buildInvestmentLabAnchorScheduledRebalanceScenario(
     evidence: InvestmentLabAnchorEvidenceResolution | null;
     actualReturn: number | null;
     actualPeriods?: readonly InvestmentLabModifiedDietzPeriod[];
+    targetWeights?: readonly InvestmentLabAnchorScheduledTargetWeight[];
   }>,
 ): InvestmentLabAnchorScheduledRebalanceScenario {
   if (input.anchor.status !== "ready") {
@@ -194,13 +204,15 @@ export function buildInvestmentLabAnchorScheduledRebalanceScenario(
     return unavailable(input, [blocker("invalid_anchor_allocation")]);
   }
 
-  const listedWithTargets: ReadyComponent[] = listed.map((component) => ({
-    ...component,
-    targetWeight:
-      input.mode === "equal_weight_monthly"
-        ? 1 / listed.length
-        : component.instrument.storedMarketValueKrw / listedAnchorValue,
-  }));
+  const listedWithTargets = resolveListedTargets({
+    input,
+    listed,
+    manual,
+    listedAnchorValue,
+  });
+  if (!listedWithTargets) {
+    return unavailable(input, [blocker("target_weight_vector_mismatch")]);
+  }
   if (
     listedWithTargets.some(
       (component) =>
@@ -410,7 +422,9 @@ export function buildInvestmentLabAnchorScheduledRebalanceScenario(
       allocationBasis:
         input.mode === "equal_weight_monthly"
           ? ("single_scope_equal_weight_monthly" as const)
-          : ("single_scope_current_weight_monthly" as const),
+          : input.mode === "approved_target_weight_monthly"
+            ? ("single_scope_approved_target_weight_monthly" as const)
+            : ("single_scope_current_weight_monthly" as const),
       rebalanceCount,
       deferredRebalanceCount,
       actualEndValueKrw: latest.actualMarketValueKrw,
@@ -442,6 +456,55 @@ export function buildInvestmentLabAnchorScheduledRebalanceScenario(
       ? ([] as const)
       : ([blocker("scenario_return_unavailable")] as const),
   });
+}
+
+function resolveListedTargets({
+  input,
+  listed,
+  manual,
+  listedAnchorValue,
+}: Readonly<{
+  input: Parameters<
+    typeof buildInvestmentLabAnchorScheduledRebalanceScenario
+  >[0];
+  listed: readonly InvestmentLabAnchorComponentEvidence[];
+  manual: readonly InvestmentLabAnchorComponentEvidence[];
+  listedAnchorValue: number;
+}>): readonly ReadyComponent[] | null {
+  if (input.mode !== "approved_target_weight_monthly") {
+    return listed.map((component) => ({
+      ...component,
+      targetWeight:
+        input.mode === "equal_weight_monthly"
+          ? 1 / listed.length
+          : component.instrument.storedMarketValueKrw / listedAnchorValue,
+    }));
+  }
+
+  const targetWeights = input.targetWeights ?? [];
+  if (manual.length > 0 || targetWeights.length !== listed.length) return null;
+  const targetsByKey = new Map<string, number>();
+  for (const row of targetWeights) {
+    if (
+      targetsByKey.has(row.instrumentKey) ||
+      !Number.isInteger(row.targetWeightBps) ||
+      row.targetWeightBps < 0 ||
+      row.targetWeightBps > 10_000
+    ) {
+      return null;
+    }
+    targetsByKey.set(row.instrumentKey, row.targetWeightBps / 10_000);
+  }
+  if (
+    listed.some((component) => !targetsByKey.has(component.instrument.key)) ||
+    !nearlyEqual(compensatedSum([...targetsByKey.values()]), 1)
+  ) {
+    return null;
+  }
+  return listed.map((component) => ({
+    ...component,
+    targetWeight: targetsByKey.get(component.instrument.key)!,
+  }));
 }
 
 function resolveFlowLegs(components: readonly ReadyComponent[]) {
