@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { buildAdditionalContributionPreview } from "../src/lib/additional-contribution-preview.ts";
+import {
+  additionalContributionMa120ReadFailure,
+  attachAdditionalContributionMa120Evidence,
+  buildAdditionalContributionPreview,
+} from "../src/lib/additional-contribution-preview.ts";
 import { buildTargetPolicyHoldingUniverse } from "../src/lib/target-policy-holding-universe.ts";
 import { buildTargetPolicyReviewPacket } from "../src/lib/target-policy-review-packet.ts";
 
@@ -75,6 +79,54 @@ describe("additional contribution tenant preview", () => {
     );
   });
 
+  it("attaches MA120 evidence without changing the baseline allocation", () => {
+    const baseline = buildAdditionalContributionPreview(validInput());
+    assert.equal(baseline.status, "ready");
+    const before = baseline.rows.map((row) => [row.ticker, row.allocationKrw]);
+    const attached = attachAdditionalContributionMa120Evidence({
+      preview: baseline,
+      ma120Read: {
+        policyVersion: "ma120-fixture-v1",
+        allocationEffect: "none",
+        status: "partial",
+        suppliedHoldingCount: 3,
+        evaluatedHoldingCount: 3,
+        usableCount: 1,
+        unavailableCount: 2,
+        rows: [ma120ReadRow("AAA")],
+      },
+    });
+
+    assert.equal(attached.status, "ready");
+    assert.equal(attached.ma120Evidence.allocationEffect, "none");
+    assert.deepEqual(
+      attached.rows.map((row) => [row.ticker, row.allocationKrw]),
+      before,
+    );
+    assert.equal(attached.totalAllocatedKrw, baseline.totalAllocatedKrw);
+    assert.equal(attached.residualCashKrw, baseline.residualCashKrw);
+    assert.equal(attached.rows[0].ma120Evidence.status, "above_ma");
+    assert.equal(attached.rows[1].ma120Evidence.status, "unavailable");
+  });
+
+  it("keeps a ready allocation visible when the MA120 read fails", () => {
+    const baseline = buildAdditionalContributionPreview(validInput());
+    assert.equal(baseline.status, "ready");
+    const attached = attachAdditionalContributionMa120Evidence({
+      preview: baseline,
+      ma120Read: additionalContributionMa120ReadFailure(3),
+    });
+
+    assert.equal(attached.status, "ready");
+    assert.equal(attached.ma120Evidence.status, "read_failed");
+    assert.equal(attached.rows.length, 3);
+    assert.ok(
+      attached.rows.every(
+        (row) => row.ma120Evidence.status === "unavailable",
+      ),
+    );
+  });
+
   it("keeps reads tenant-scoped, parallel, and server-only", () => {
     const universeQuery = readFileSync(
       "src/db/queries/target-policy-holding-universe.ts",
@@ -88,13 +140,22 @@ describe("additional contribution tenant preview", () => {
       "src/db/queries/additional-contribution.ts",
       "utf8",
     );
+    const ma120Query = readFileSync(
+      "src/db/queries/additional-contribution-ma120.ts",
+      "utf8",
+    );
     const route = readFileSync(
       "src/app/additional-contribution/page.tsx",
       "utf8",
     );
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
-    for (const source of [universeQuery, policyQuery, previewQuery]) {
+    for (const source of [
+      universeQuery,
+      policyQuery,
+      previewQuery,
+      ma120Query,
+    ]) {
       assert.match(source, /^import "server-only";/);
       assert.doesNotMatch(source, /fetch\s*\(|\/api\//);
       assert.doesNotMatch(
@@ -107,6 +168,14 @@ describe("additional contribution tenant preview", () => {
     assert.match(policyQuery, /tenantContext\.ownerUserId/);
     assert.match(policyQuery, /targetPolicyApprovalRevisions\.ownerUserId/);
     assert.match(previewQuery, /Promise\.all/);
+    assert.match(ma120Query, /Promise\.all/);
+    assert.match(ma120Query, /getActivePortfolioOwnerUserIds/);
+    assert.match(
+      ma120Query,
+      /admitPrivateSingleTenantRawTrendEvidenceRows/,
+    );
+    assert.match(ma120Query, /allocationEffect: "none"/);
+    assert.doesNotMatch(ma120Query, /assets\.ma_?120|daysAboveMa/i);
     assert.doesNotMatch(route, /^"use client";/);
     assert.doesNotMatch(route, /fetch\s*\(|\/api\//);
     assert.match(route, /searchParams: Promise/);
@@ -163,6 +232,44 @@ function validInput() {
     },
     currentUniverse: universe,
     structure: structureFixture(),
+  };
+}
+
+function ma120ReadRow(ticker) {
+  return {
+    instrumentKey: `korea:KRW:${ticker}`,
+    status: "above_ma",
+    priceBasis: "private_kis_raw_close",
+    evidence: {
+      status: "above_ma",
+      policy: {
+        version: "fixture",
+        mode: "evidence_only",
+        windowObservationCount: 120,
+        allowedPriceBases: [
+          "provider_adjusted_close",
+          "private_kis_raw_close",
+        ],
+        historyBoundary: "price_date_lte_as_of_price_date",
+        observationBasis:
+          "distinct_observed_price_dates_without_calendar_carry",
+        allocationEffect: "none",
+        recommendation: "forbidden",
+      },
+      instrumentKey: `korea:KRW:${ticker}`,
+      asOfPriceDate: "2026-07-12",
+      comparisonPrice: 120,
+      priceBasis: "private_kis_raw_close",
+      availableObservationCount: 120,
+      usedObservationCount: 120,
+      ignoredFutureObservationCount: 0,
+      oldestWindowPriceDate: "2026-01-01",
+      latestWindowPriceDate: "2026-07-11",
+      ma120: 100,
+      distanceFromMaPct: 20,
+      blockers: [],
+    },
+    unavailableReason: null,
   };
 }
 

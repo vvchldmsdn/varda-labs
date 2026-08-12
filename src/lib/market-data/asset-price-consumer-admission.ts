@@ -38,6 +38,18 @@ export const ASSET_PRICE_CONSUMER_ADMISSION_POLICY = Object.freeze({
     persistence: "forbidden",
     recommendation: "forbidden",
   }),
+  privateSingleTenantRawTrendEvidence: Object.freeze({
+    priceField: "close_price",
+    priceBasis: "raw_price_level",
+    consumerPurpose: "owner_only_descriptive_trend_evidence",
+    tenantBoundary: "exactly_one_active_owner_matching_session",
+    providerBoundary: "kis_only_with_complete_provenance",
+    corporateActionAdjustment: "not_claimed",
+    distributionAdjustment: "not_claimed",
+    persistence: "forbidden",
+    allocationEffect: "none",
+    recommendation: "forbidden",
+  }),
 } as const);
 
 type NumericInput = number | string | null | undefined;
@@ -124,6 +136,20 @@ export type RawHistoricalPriceAdmission<T> = Readonly<{
 
 export type PrivateSingleTenantRawHistoricalPriceAdmission<T> = Readonly<{
   policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn;
+  status: "ready" | "blocked";
+  rows: readonly T[];
+  summary: Readonly<{
+    suppliedRowCount: number;
+    admittedRowCount: number;
+    excludedRowCount: number;
+    admittedInstrumentCount: number;
+    excludedInstrumentCount: number;
+  }>;
+  issues: readonly PrivateSingleTenantRawHistoricalAdmissionIssue[];
+}>;
+
+export type PrivateSingleTenantRawTrendEvidenceAdmission<T> = Readonly<{
+  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawTrendEvidence;
   status: "ready" | "blocked";
   rows: readonly T[];
   summary: Readonly<{
@@ -254,6 +280,36 @@ export function admitPrivateSingleTenantRawHistoricalPriceRows<
   requestedOwnerUserId: string;
   activeOwnerUserIds: readonly string[];
 }): PrivateSingleTenantRawHistoricalPriceAdmission<T> {
+  const result = admitPrivateSingleTenantKisRawRows(input);
+  return Object.freeze({
+    policy:
+      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn,
+    ...result,
+  });
+}
+
+export function admitPrivateSingleTenantRawTrendEvidenceRows<
+  T extends RawHistoricalPriceConsumerEvidenceRow,
+>(input: {
+  rows: readonly T[];
+  requestedOwnerUserId: string;
+  activeOwnerUserIds: readonly string[];
+}): PrivateSingleTenantRawTrendEvidenceAdmission<T> {
+  const result = admitPrivateSingleTenantKisRawRows(input);
+  return Object.freeze({
+    policy:
+      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawTrendEvidence,
+    ...result,
+  });
+}
+
+function admitPrivateSingleTenantKisRawRows<
+  T extends RawHistoricalPriceConsumerEvidenceRow,
+>(input: {
+  rows: readonly T[];
+  requestedOwnerUserId: string;
+  activeOwnerUserIds: readonly string[];
+}) {
   const suppliedRows = Array.isArray(input.rows) ? input.rows : [];
   const activeOwnerUserIds = [
     ...new Set(
@@ -274,8 +330,6 @@ export function admitPrivateSingleTenantRawHistoricalPriceRows<
     activeOwnerUserIds[0] !== requestedOwnerUserId
   ) {
     return Object.freeze({
-      policy:
-        ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn,
       status: "blocked" as const,
       rows: Object.freeze([]),
       summary: Object.freeze({
@@ -331,8 +385,6 @@ export function admitPrivateSingleTenantRawHistoricalPriceRows<
   }
 
   return Object.freeze({
-    policy:
-      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn,
     status: admittedRows.length > 0 ? ("ready" as const) : ("blocked" as const),
     rows: Object.freeze(admittedRows),
     summary: Object.freeze({

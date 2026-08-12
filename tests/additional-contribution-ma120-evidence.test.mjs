@@ -7,6 +7,10 @@ import {
   evaluateAdditionalContributionMa120Evidence,
   pairBaselineWithMa120Evidence,
 } from "../src/lib/additional-contribution-ma120-evidence.ts";
+import {
+  ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY,
+  evaluateAdditionalContributionMa120OperationalEvidence,
+} from "../src/lib/additional-contribution-ma120-operational-evidence.ts";
 
 describe("additional contribution MA120 evidence Phase 2A", () => {
   it("classifies exactly 120 adjusted-close observations", () => {
@@ -236,9 +240,51 @@ describe("additional contribution MA120 evidence Phase 2A", () => {
     assert.deepEqual(result.baseline.allocations, before.allocations);
   });
 
+  it("evaluates admitted private KIS raw price levels as evidence only", () => {
+    const rows = observations(120, (index) => 100 + index / 100).map(
+      ({ priceDate, adjustedClosePrice }) => ({
+        priceDate,
+        price: adjustedClosePrice,
+      }),
+    );
+    const result = evaluateAdditionalContributionMa120OperationalEvidence({
+      instrumentKey: "korea:KRW:069500",
+      asOfPriceDate: rows.at(-1).priceDate,
+      comparisonPrice: 120,
+      priceBasis: "private_kis_raw_close",
+      observations: rows,
+    });
+
+    assert.equal(result.status, "above_ma");
+    assert.equal(result.priceBasis, "private_kis_raw_close");
+    assert.equal(result.usedObservationCount, 120);
+    assert.equal(
+      result.policy.allocationEffect,
+      ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.allocationEffect,
+    );
+    assert.equal(result.policy.recommendation, "forbidden");
+  });
+
+  it("rejects unsupported operational price bases", () => {
+    const result = evaluateAdditionalContributionMa120OperationalEvidence({
+      instrumentKey: "korea:KRW:069500",
+      asOfPriceDate: "2026-07-12",
+      comparisonPrice: 100,
+      priceBasis: "legacy_asset_ma120",
+      observations: [],
+    });
+
+    assert.equal(result.status, "invalid_history");
+    assert.deepEqual(result.blockers, ["unsupported_price_basis"]);
+  });
+
   it("has no legacy cache, settings, provider, DB, API, allocator, or ISA fixture dependency", () => {
-    const source = readFileSync(
+    const contractSource = readFileSync(
       "src/lib/additional-contribution-ma120-evidence.ts",
+      "utf8",
+    );
+    const operationalSource = readFileSync(
+      "src/lib/additional-contribution-ma120-operational-evidence.ts",
       "utf8",
     );
 
@@ -250,15 +296,20 @@ describe("additional contribution MA120 evidence Phase 2A", () => {
       ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY.rawCloseFallback,
       "forbidden",
     );
-    assert.doesNotMatch(source, /^\s*import\s/m);
-    assert.doesNotMatch(
-      source,
-      /assets?\.ma_?120|useTrendFilter|settings|drizzle|neon|@\/db|server-only|fetch\s*\(|\/api\//i,
+    assert.equal(
+      ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.allocationEffect,
+      "none",
     );
-    assert.doesNotMatch(
-      source,
-      /allocateAdditionalContribution|target-policy-resolver|isa-v1|133690|360200|475350|489250/i,
-    );
+    for (const source of [contractSource, operationalSource]) {
+      assert.doesNotMatch(
+        source,
+        /assets?\.ma_?120|useTrendFilter|settings|drizzle|neon|@\/db|server-only|fetch\s*\(|\/api\//i,
+      );
+      assert.doesNotMatch(
+        source,
+        /allocateAdditionalContribution|target-policy-resolver|isa-v1|133690|360200|475350|489250/i,
+      );
+    }
   });
 });
 

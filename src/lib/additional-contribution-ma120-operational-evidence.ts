@@ -5,53 +5,54 @@ import {
   normalizeMovingAveragePriceDate,
 } from "./moving-average-window.ts";
 
-export const ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY = Object.freeze({
-  version: "additional_contribution_ma120_evidence_phase2a_v1",
-  mode: "evidence_only",
-  windowObservationCount: 120,
-  historyPriceField: "adjusted_close_price",
-  historyBoundary: "price_date_lte_as_of_price_date",
-  observationBasis: "distinct_observed_price_dates_without_calendar_carry",
-  comparisonPriceBasis: "adjusted_close_compatible",
-  allocationEffect: "none",
-  baselineBehavior: "pass_through_same_reference",
-  rawCloseFallback: "forbidden",
-  legacyIndicatorRead: "forbidden",
-} as const);
+export const ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY =
+  Object.freeze({
+    version: "additional_contribution_ma120_operational_evidence_v1",
+    mode: "evidence_only",
+    windowObservationCount: 120,
+    allowedPriceBases: Object.freeze([
+      "provider_adjusted_close",
+      "private_kis_raw_close",
+    ] as const),
+    historyBoundary: "price_date_lte_as_of_price_date",
+    observationBasis: "distinct_observed_price_dates_without_calendar_carry",
+    allocationEffect: "none",
+    recommendation: "forbidden",
+  } as const);
 
-export type AdditionalContributionMa120EvidenceStatus =
+export type AdditionalContributionMa120OperationalPriceBasis =
+  (typeof ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.allowedPriceBases)[number];
+
+export type AdditionalContributionMa120OperationalEvidenceStatus =
   | "above_ma"
   | "at_ma"
   | "below_ma"
   | "insufficient_history"
   | "invalid_history";
 
-export type AdditionalContributionMa120EvidenceBlocker =
+export type AdditionalContributionMa120OperationalEvidenceBlocker =
   | "invalid_instrument_key"
   | "invalid_as_of_price_date"
   | "invalid_comparison_price"
-  | "incompatible_comparison_price_basis"
+  | "unsupported_price_basis"
   | "invalid_price_date"
-  | "invalid_adjusted_close"
-  | "raw_close_field_forbidden"
+  | "invalid_observation_price"
   | "duplicate_price_date"
   | "fewer_than_120_observations"
   | "invalid_ma_calculation";
 
-export type AdditionalContributionMa120Observation = Readonly<{
+export type AdditionalContributionMa120OperationalObservation = Readonly<{
   priceDate: string;
-  adjustedClosePrice: number;
-  closePrice?: never;
-  rawClosePrice?: never;
+  price: number;
 }>;
 
-export type AdditionalContributionMa120Evidence = Readonly<{
-  status: AdditionalContributionMa120EvidenceStatus;
-  policy: typeof ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY;
+export type AdditionalContributionMa120OperationalEvidence = Readonly<{
+  status: AdditionalContributionMa120OperationalEvidenceStatus;
+  policy: typeof ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY;
   instrumentKey: string | null;
   asOfPriceDate: string | null;
   comparisonPrice: number | null;
-  comparisonPriceBasis: "adjusted_close_compatible" | null;
+  priceBasis: AdditionalContributionMa120OperationalPriceBasis | null;
   availableObservationCount: number;
   usedObservationCount: number;
   ignoredFutureObservationCount: number;
@@ -59,17 +60,18 @@ export type AdditionalContributionMa120Evidence = Readonly<{
   latestWindowPriceDate: string | null;
   ma120: number | null;
   distanceFromMaPct: number | null;
-  blockers: readonly AdditionalContributionMa120EvidenceBlocker[];
+  blockers: readonly AdditionalContributionMa120OperationalEvidenceBlocker[];
 }>;
 
-export function evaluateAdditionalContributionMa120Evidence(input: {
+export function evaluateAdditionalContributionMa120OperationalEvidence(input: {
   instrumentKey: string;
   asOfPriceDate: string;
   comparisonPrice: number;
-  comparisonPriceBasis: string;
-  observations: readonly AdditionalContributionMa120Observation[];
-}): AdditionalContributionMa120Evidence {
-  const blockers = new Set<AdditionalContributionMa120EvidenceBlocker>();
+  priceBasis: string;
+  observations: readonly AdditionalContributionMa120OperationalObservation[];
+}): AdditionalContributionMa120OperationalEvidence {
+  const blockers =
+    new Set<AdditionalContributionMa120OperationalEvidenceBlocker>();
   const instrumentKey = normalizeMovingAverageInstrumentKey(
     input.instrumentKey,
   );
@@ -77,71 +79,52 @@ export function evaluateAdditionalContributionMa120Evidence(input: {
   const comparisonPrice = normalizeMovingAveragePositiveNumber(
     input.comparisonPrice,
   );
-  const comparisonPriceBasis =
-    input.comparisonPriceBasis ===
-    ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY.comparisonPriceBasis
-      ? input.comparisonPriceBasis
-      : null;
+  const priceBasis = isOperationalPriceBasis(input.priceBasis)
+    ? input.priceBasis
+    : null;
 
   if (!instrumentKey) blockers.add("invalid_instrument_key");
   if (!asOfPriceDate) blockers.add("invalid_as_of_price_date");
   if (comparisonPrice === null) blockers.add("invalid_comparison_price");
-  if (!comparisonPriceBasis) {
-    blockers.add("incompatible_comparison_price_basis");
-  }
-
+  if (!priceBasis) blockers.add("unsupported_price_basis");
   if (
     blockers.size > 0 ||
     !instrumentKey ||
     !asOfPriceDate ||
     comparisonPrice === null ||
-    !comparisonPriceBasis
+    !priceBasis
   ) {
-    return evidenceResult({
+    return result({
       status: "invalid_history",
       instrumentKey,
       asOfPriceDate,
       comparisonPrice,
-      comparisonPriceBasis,
+      priceBasis,
       blockers,
     });
   }
 
-  const observations = (Array.isArray(input.observations)
-    ? input.observations
-    : []).map((sourceRow) => {
-    const row = sourceRow as AdditionalContributionMa120Observation &
-      Record<string, unknown>;
-    if (
-      Object.prototype.hasOwnProperty.call(row, "closePrice") ||
-      Object.prototype.hasOwnProperty.call(row, "rawClosePrice")
-    ) {
-      blockers.add("raw_close_field_forbidden");
-    }
-    return Object.freeze({
-      priceDate: row?.priceDate,
-      price: row?.adjustedClosePrice,
-    });
-  });
   const window = evaluateMovingAverageWindow({
     asOfPriceDate,
     comparisonPrice,
-    observations,
+    observations: Array.isArray(input.observations)
+      ? input.observations
+      : [],
     windowObservationCount:
-      ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY.windowObservationCount,
+      ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.windowObservationCount,
     initialBlockers: blockers,
-    invalidPriceBlocker: "invalid_adjusted_close" as const,
+    invalidPriceBlocker: "invalid_observation_price" as const,
   });
   const mappedBlockers = new Set(
     [...window.blockers].map(mapWindowBlocker),
   );
 
-  return evidenceResult({
+  return result({
     status: window.status,
     instrumentKey,
     asOfPriceDate,
     comparisonPrice,
-    comparisonPriceBasis,
+    priceBasis,
     availableObservationCount: window.availableObservationCount,
     usedObservationCount: window.usedObservationCount,
     ignoredFutureObservationCount: window.ignoredFutureObservationCount,
@@ -153,28 +136,12 @@ export function evaluateAdditionalContributionMa120Evidence(input: {
   });
 }
 
-export function pairBaselineWithMa120Evidence<TBaseline>({
-  baseline,
-  evidence,
-}: {
-  baseline: TBaseline;
-  evidence: readonly AdditionalContributionMa120Evidence[];
-}) {
-  return Object.freeze({
-    mode: ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY.mode,
-    allocationEffect:
-      ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY.allocationEffect,
-    baseline,
-    evidence: Object.freeze([...evidence]),
-  } as const);
-}
-
-function evidenceResult({
+function result({
   status,
   instrumentKey,
   asOfPriceDate,
   comparisonPrice,
-  comparisonPriceBasis,
+  priceBasis,
   availableObservationCount = 0,
   usedObservationCount = 0,
   ignoredFutureObservationCount = 0,
@@ -184,11 +151,11 @@ function evidenceResult({
   distanceFromMaPct = null,
   blockers,
 }: {
-  status: AdditionalContributionMa120EvidenceStatus;
+  status: AdditionalContributionMa120OperationalEvidenceStatus;
   instrumentKey: string | null;
   asOfPriceDate: string | null;
   comparisonPrice: number | null;
-  comparisonPriceBasis: "adjusted_close_compatible" | null;
+  priceBasis: AdditionalContributionMa120OperationalPriceBasis | null;
   availableObservationCount?: number;
   usedObservationCount?: number;
   ignoredFutureObservationCount?: number;
@@ -196,15 +163,15 @@ function evidenceResult({
   latestWindowPriceDate?: string | null;
   ma120?: number | null;
   distanceFromMaPct?: number | null;
-  blockers: ReadonlySet<AdditionalContributionMa120EvidenceBlocker>;
-}): AdditionalContributionMa120Evidence {
+  blockers: ReadonlySet<AdditionalContributionMa120OperationalEvidenceBlocker>;
+}): AdditionalContributionMa120OperationalEvidence {
   return Object.freeze({
     status,
-    policy: ADDITIONAL_CONTRIBUTION_MA120_EVIDENCE_POLICY,
+    policy: ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY,
     instrumentKey,
     asOfPriceDate,
     comparisonPrice,
-    comparisonPriceBasis,
+    priceBasis,
     availableObservationCount,
     usedObservationCount,
     ignoredFutureObservationCount,
@@ -218,10 +185,10 @@ function evidenceResult({
 
 function mapWindowBlocker(
   blocker:
-    | AdditionalContributionMa120EvidenceBlocker
+    | AdditionalContributionMa120OperationalEvidenceBlocker
     | "fewer_than_required_observations"
     | "invalid_average_calculation",
-): AdditionalContributionMa120EvidenceBlocker {
+): AdditionalContributionMa120OperationalEvidenceBlocker {
   if (blocker === "fewer_than_required_observations") {
     return "fewer_than_120_observations";
   }
@@ -229,4 +196,13 @@ function mapWindowBlocker(
     return "invalid_ma_calculation";
   }
   return blocker;
+}
+
+function isOperationalPriceBasis(
+  value: string,
+): value is AdditionalContributionMa120OperationalPriceBasis {
+  return (
+    value === "provider_adjusted_close" ||
+    value === "private_kis_raw_close"
+  );
 }

@@ -1,10 +1,17 @@
 # Additional Contribution MA120 Phase 2A Contract
 
-Last updated: 2026-07-11
+Last updated: 2026-08-12
 
 Status: pure evidence-only validation implemented. No allocation multiplier,
-buy block, redistribution, target rewrite, persistence, database/provider read,
-route, UI, or recommendation behavior is enabled.
+buy block, redistribution, target rewrite, persistence, or recommendation
+behavior is enabled.
+
+Runtime note: an evidence-only read adapter and UI are now connected. They read
+stored price history without provider calls or writes, derive MA120 separately
+from `assets`, and leave every baseline allocation unchanged. KIS raw levels are
+admitted only for the matching sole active owner and only when the current
+comparison price is also KIS raw. Adjusted and raw price bases are never mixed.
+Missing, invalid, or unavailable MA120 evidence does not hide the allocation.
 
 ## Purpose
 
@@ -132,7 +139,7 @@ user must separately choose and approve at least:
 - a bounded multiplier or constraint;
 - comparison against the identical no-overlay baseline in Simulation
   Validation;
-- a point-in-time production read adapter with provenance and no look-ahead.
+- a stale-evidence threshold appropriate for an allocation overlay.
 
-No runtime adapter or allocator connection should be added before that policy
-gate.
+The evidence-only runtime adapter is not an overlay approval. No allocator
+connection should be added before that policy gate.
