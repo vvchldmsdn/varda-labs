@@ -70,6 +70,7 @@ import "./portfolio-dashboard-snapshots.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./additional-contribution-preview.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
+import "./additional-contribution-ma120-overlay.test.mjs";
 import "./simulation-return-matrix.test.mjs";
 import "./simulation-historical-evidence-admission.test.mjs";
 import "./simulation-historical-evidence-schema.test.mjs";
