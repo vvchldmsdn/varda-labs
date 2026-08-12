@@ -129,6 +129,24 @@ const REVIEWED_INDEXES = Object.freeze({
     unique: true,
     hasPredicate: false,
   }),
+  holdingOnboardingAsset: Object.freeze({
+    name: "holding_onboarding_evidence_asset_unique",
+    columns: Object.freeze(["asset_id"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  holdingOnboardingOwner: Object.freeze({
+    name: "holding_onboarding_evidence_owner_user_id_idx",
+    columns: Object.freeze(["canonical_owner_user_id"]),
+    unique: false,
+    hasPredicate: false,
+  }),
+  holdingOnboardingAccount: Object.freeze({
+    name: "holding_onboarding_evidence_account_id_idx",
+    columns: Object.freeze(["account_id"]),
+    unique: false,
+    hasPredicate: false,
+  }),
 });
 const TARGET_POLICY_TABLES = Object.freeze([
   "target_policy_approval_revisions",
@@ -227,6 +245,39 @@ const PORTFOLIO_SCOPE_CONSTRAINTS = Object.freeze([
   "portfolio_groups_owner_user_fk",
   "portfolio_groups_sort_order_check",
 ]);
+const HOLDING_ONBOARDING_TABLES = Object.freeze([
+  "holding_onboarding_evidence",
+]);
+const HOLDING_ONBOARDING_COLUMNS = Object.freeze([
+  "account_id",
+  "asset_id",
+  "average_cost",
+  "canonical_owner_user_id",
+  "created_at",
+  "currency",
+  "current_price",
+  "id",
+  "policy_version",
+  "price_as_of",
+  "price_source",
+  "quantity",
+  "recorded_at",
+  "reported_return_pct",
+]);
+const HOLDING_ONBOARDING_CONSTRAINTS = Object.freeze([
+  "holding_onboarding_evidence_account_owner_fk",
+  "holding_onboarding_evidence_asset_account_fk",
+  "holding_onboarding_evidence_asset_owner_fk",
+  "holding_onboarding_evidence_average_cost_check",
+  "holding_onboarding_evidence_currency_check",
+  "holding_onboarding_evidence_current_price_check",
+  "holding_onboarding_evidence_owner_user_fk",
+  "holding_onboarding_evidence_pkey",
+  "holding_onboarding_evidence_policy_version_check",
+  "holding_onboarding_evidence_price_source_check",
+  "holding_onboarding_evidence_quantity_check",
+  "holding_onboarding_evidence_reported_return_check",
+]);
 
 type Query = (query: string) => Promise<Record<string, unknown>[]>;
 
@@ -273,6 +324,15 @@ export type PreviewDatabaseState = {
     portfolioScopeRows: PortfolioScopeRowCounts | null;
     portfolioSnapshotIdentityIndexExact: boolean;
     positionSnapshotIdentityIndexExact: boolean;
+    holdingOnboardingTables: string[];
+    holdingOnboardingColumns: string[];
+    holdingOnboardingConstraints: string[];
+    holdingOnboardingEvidenceRows: number | null;
+    holdingOnboardingAssetIndexExact: boolean;
+    holdingOnboardingOwnerIndexExact: boolean;
+    holdingOnboardingAccountIndexExact: boolean;
+    assetOwnerAccountInstrumentIndexExact: boolean;
+    duplicateAssetIdentityGroups: number;
   };
 };
 
@@ -300,6 +360,7 @@ export async function readPreviewDatabaseState(input: {
     indexRows,
     targetPolicyTableRows,
     portfolioScopeTableRows,
+    holdingOnboardingTableRows,
     constraintRows,
   ] = await Promise.all([
     input.query(`
@@ -318,7 +379,24 @@ export async function readPreviewDatabaseState(input: {
         (
           select count(*)::integer
             from daily_position_snapshots
-        ) as daily_position_snapshots
+        ) as daily_position_snapshots,
+        (
+          select count(*)::integer
+            from (
+              select 1
+                from assets
+               where canonical_owner_user_id is not null
+                 and account_id is not null
+                 and ticker is not null
+               group by
+                 canonical_owner_user_id,
+                 account_id,
+                 lower(btrim(market)),
+                 upper(btrim(currency)),
+                 upper(btrim(ticker))
+              having count(*) > 1
+            ) as duplicate_asset_identity
+        ) as duplicate_asset_identity_groups
     `),
     input.query(`
       select hash, created_at::text as created_at
@@ -347,6 +425,7 @@ export async function readPreviewDatabaseState(input: {
              table_name = 'daily_position_snapshots'
              and column_name = 'legacy_asset_id'
            )
+           or table_name = 'holding_onboarding_evidence'
          )
        order by table_name, column_name
     `),
@@ -359,6 +438,14 @@ export async function readPreviewDatabaseState(input: {
         index_definition.indislive as is_live,
         (index_definition.indpred is null) as has_no_predicate,
         (index_definition.indexprs is null) as has_no_expressions,
+        pg_get_expr(
+          index_definition.indexprs,
+          index_definition.indrelid
+        ) as index_expressions,
+        pg_get_expr(
+          index_definition.indpred,
+          index_definition.indrelid
+        ) as index_predicate,
         index_definition.indnkeyatts::integer as key_attribute_count,
         index_definition.indnatts::integer as total_attribute_count,
         string_agg(
@@ -385,6 +472,7 @@ export async function readPreviewDatabaseState(input: {
           'assets',
           'daily_portfolio_snapshots',
           'daily_position_snapshots',
+          'holding_onboarding_evidence',
           'portfolio_group_account_memberships',
           'portfolio_group_asset_memberships',
           'portfolio_groups',
@@ -398,8 +486,12 @@ export async function readPreviewDatabaseState(input: {
           'accounts_canonical_owner_code_unique',
           'assets_id_account_unique',
           'assets_id_canonical_owner_unique',
+          'assets_owner_account_instrument_unique',
           'daily_portfolio_snapshots_date_account_source_unique',
           'daily_position_snapshots_date_account_asset_source_unique',
+          'holding_onboarding_evidence_asset_unique',
+          'holding_onboarding_evidence_owner_user_id_idx',
+          'holding_onboarding_evidence_account_id_idx',
           'portfolio_group_account_memberships_start_unique',
           'portfolio_group_account_memberships_active_unique',
           'portfolio_group_asset_memberships_start_unique',
@@ -417,6 +509,8 @@ export async function readPreviewDatabaseState(input: {
         index_definition.indislive,
         (index_definition.indpred is null),
         (index_definition.indexprs is null),
+        pg_get_expr(index_definition.indexprs, index_definition.indrelid),
+        pg_get_expr(index_definition.indpred, index_definition.indrelid),
         index_definition.indnkeyatts,
         index_definition.indnatts
       order by index_class.relname
@@ -430,6 +524,13 @@ export async function readPreviewDatabaseState(input: {
            'target_policy_approval_vector_rows',
            'target_policy_approval_lifecycle_events'
          )
+       order by table_name
+    `),
+    input.query(`
+      select table_name
+        from information_schema.tables
+       where table_schema = 'public'
+         and table_name = 'holding_onboarding_evidence'
        order by table_name
     `),
     input.query(`
@@ -460,6 +561,7 @@ export async function readPreviewDatabaseState(input: {
            'target_policy_approval_lifecycle_events',
            'daily_portfolio_snapshots',
            'daily_position_snapshots',
+           'holding_onboarding_evidence',
            'portfolio_group_account_memberships',
            'portfolio_group_asset_memberships',
            'portfolio_groups'
@@ -497,6 +599,20 @@ export async function readPreviewDatabaseState(input: {
     (tableName) =>
       portfolioScopeTableRows.some(({ table_name }) => table_name === tableName),
   );
+  const presentHoldingOnboardingTables = HOLDING_ONBOARDING_TABLES.filter(
+    (tableName) =>
+      holdingOnboardingTableRows.some(
+        ({ table_name }) => table_name === tableName,
+      ),
+  );
+  const presentHoldingOnboardingColumns = HOLDING_ONBOARDING_COLUMNS.filter(
+    (columnName) =>
+      columnRows.some(
+        ({ table_name, column_name }) =>
+          table_name === "holding_onboarding_evidence" &&
+          column_name === columnName,
+      ),
+  );
   const presentTargetPolicyConstraints = TARGET_POLICY_CONSTRAINTS.filter(
     (constraintName) =>
       constraintRows.some(
@@ -511,6 +627,13 @@ export async function readPreviewDatabaseState(input: {
           constraint_name === constraintName && is_validated === true,
       ),
   );
+  const presentHoldingOnboardingConstraints =
+    HOLDING_ONBOARDING_CONSTRAINTS.filter((constraintName) =>
+      constraintRows.some(
+        ({ constraint_name, is_validated }) =>
+          constraint_name === constraintName && is_validated === true,
+      ),
+    );
   const presentSnapshotOwnershipConstraints =
     SNAPSHOT_OWNERSHIP_CONSTRAINTS.filter((expected) =>
       constraintRows.some(
@@ -534,6 +657,10 @@ export async function readPreviewDatabaseState(input: {
   const portfolioScopeRows =
     presentPortfolioScopeTables.length === PORTFOLIO_SCOPE_TABLES.length
       ? await readPortfolioScopeRowCounts(input.query)
+      : null;
+  const holdingOnboardingEvidenceRows =
+    presentHoldingOnboardingTables.length === HOLDING_ONBOARDING_TABLES.length
+      ? await readHoldingOnboardingEvidenceRowCount(input.query)
       : null;
 
   const appliedMigrations = migrationRows.map((row) => ({
@@ -652,6 +779,28 @@ export async function readPreviewDatabaseState(input: {
         indexRows,
         REVIEWED_INDEXES.positionSnapshotIdentity,
       ),
+      holdingOnboardingTables: presentHoldingOnboardingTables,
+      holdingOnboardingColumns: presentHoldingOnboardingColumns,
+      holdingOnboardingConstraints: presentHoldingOnboardingConstraints,
+      holdingOnboardingEvidenceRows,
+      holdingOnboardingAssetIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.holdingOnboardingAsset,
+      ),
+      holdingOnboardingOwnerIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.holdingOnboardingOwner,
+      ),
+      holdingOnboardingAccountIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.holdingOnboardingAccount,
+      ),
+      assetOwnerAccountInstrumentIndexExact:
+        hasExactAssetOwnerAccountInstrumentIndex(indexRows),
+      duplicateAssetIdentityGroups: integerValue(
+        counts.duplicate_asset_identity_groups,
+        "duplicate asset identity groups",
+      ),
     },
   };
 }
@@ -661,7 +810,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0024 ledger.",
+      "Preview database migration ledger does not match the reviewed 0025 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -677,7 +826,20 @@ export function assertReviewedPreviewDatabaseCatalog(
 ) {
   if (!hasReviewedCatalog(state)) {
     throw new Error(
-      "Preview database reviewed 0024 catalog is incomplete.",
+      "Preview database reviewed 0025 catalog is incomplete.",
+    );
+  }
+}
+
+export function assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog(
+  state: PreviewDatabaseState,
+) {
+  if (
+    !hasReviewedPreHoldingOnboardingCatalog(state) ||
+    state.reviewedCatalog.duplicateAssetIdentityGroups !== 0
+  ) {
+    throw new Error(
+      "Preview database reviewed 0024 prerequisite catalog is incomplete.",
     );
   }
 }
@@ -761,6 +923,26 @@ export function assertPreviewPortfolioScopeRowsPreserved(
   }
 }
 
+export function assertPreviewHoldingOnboardingRowsPreserved(
+  before: number | null,
+  after: number | null,
+) {
+  if (after === null) {
+    throw new Error(
+      "Preview postflight holding-onboarding row evidence is unavailable.",
+    );
+  }
+
+  const expected = before ?? 0;
+  if (after !== expected) {
+    throw new Error(
+      before === null
+        ? "Preview migration unexpectedly seeded holding-onboarding rows."
+        : "Preview migration changed inherited holding-onboarding row counts.",
+    );
+  }
+}
+
 export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedMigrationLedgerPresent =
     hasReviewedMigrationLedger(state);
@@ -773,8 +955,10 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     hasReviewedSnapshotOwnershipCatalog(state);
   const reviewedPortfolioScopeCatalogPresent =
     hasReviewedPortfolioScopeCatalog(state);
+  const reviewedHoldingOnboardingCatalogPresent =
+    hasReviewedHoldingOnboardingCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v7",
+    evidenceVersion: "preview_database_evidence_v8",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -783,8 +967,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0024_present"
-      : "reviewed_0024_not_present",
+      ? "reviewed_0025_present"
+      : "reviewed_0025_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",
@@ -797,6 +981,9 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     portfolioScopeCatalogStatus: reviewedPortfolioScopeCatalogPresent
       ? "reviewed_0024_present"
       : "reviewed_0024_not_present",
+    holdingOnboardingCatalogStatus: reviewedHoldingOnboardingCatalogPresent
+      ? "reviewed_0025_present"
+      : "reviewed_0025_not_present",
   };
 }
 
@@ -825,6 +1012,13 @@ function hasReviewedLatestMigration(state: PreviewDatabaseState) {
 }
 
 function hasReviewedCatalog(state: PreviewDatabaseState) {
+  return (
+    hasReviewedPreHoldingOnboardingCatalog(state) &&
+    hasReviewedHoldingOnboardingCatalog(state)
+  );
+}
+
+function hasReviewedPreHoldingOnboardingCatalog(state: PreviewDatabaseState) {
   return (
     hasReviewedPrePortfolioScopeCatalog(state) &&
     hasReviewedPortfolioScopeCatalog(state)
@@ -890,6 +1084,23 @@ function hasReviewedPortfolioScopeCatalog(state: PreviewDatabaseState) {
   );
 }
 
+function hasReviewedHoldingOnboardingCatalog(state: PreviewDatabaseState) {
+  return (
+    state.reviewedCatalog.holdingOnboardingTables.length ===
+      HOLDING_ONBOARDING_TABLES.length &&
+    state.reviewedCatalog.holdingOnboardingColumns.length ===
+      HOLDING_ONBOARDING_COLUMNS.length &&
+    state.reviewedCatalog.holdingOnboardingConstraints.length ===
+      HOLDING_ONBOARDING_CONSTRAINTS.length &&
+    state.reviewedCatalog.holdingOnboardingEvidenceRows !== null &&
+    state.reviewedCatalog.holdingOnboardingAssetIndexExact &&
+    state.reviewedCatalog.holdingOnboardingOwnerIndexExact &&
+    state.reviewedCatalog.holdingOnboardingAccountIndexExact &&
+    state.reviewedCatalog.assetOwnerAccountInstrumentIndexExact &&
+    state.reviewedCatalog.duplicateAssetIdentityGroups === 0
+  );
+}
+
 function hasNamedIndex(rows: Record<string, unknown>[], name: string) {
   return rows.some(({ index_name }) => index_name === name);
 }
@@ -918,6 +1129,42 @@ function hasExactUniqueIndex(
     Number(row.total_attribute_count) === expected.columns.length &&
     row.key_columns === expected.columns.join(",")
   );
+}
+
+function hasExactAssetOwnerAccountInstrumentIndex(
+  rows: Record<string, unknown>[],
+) {
+  const matching = rows.filter(
+    ({ index_name }) => index_name === "assets_owner_account_instrument_unique",
+  );
+  if (matching.length !== 1) return false;
+
+  const row = matching[0];
+  const expressions = normalizeSqlEvidence(row.index_expressions);
+  const predicate = normalizeSqlEvidence(row.index_predicate);
+  return (
+    row.is_valid === true &&
+    row.is_unique === true &&
+    row.is_ready === true &&
+    row.is_live === true &&
+    row.has_no_predicate === false &&
+    row.has_no_expressions === false &&
+    Number(row.key_attribute_count) === 5 &&
+    Number(row.total_attribute_count) === 5 &&
+    row.key_columns === "canonical_owner_user_id,account_id,,," &&
+    expressions.includes("lower(btrim((market)::text))") &&
+    expressions.includes("upper(btrim((currency)::text))") &&
+    expressions.includes("upper(btrim((ticker)::text))") &&
+    predicate.includes("canonical_owner_user_id is not null") &&
+    predicate.includes("account_id is not null") &&
+    predicate.includes("ticker is not null")
+  );
+}
+
+function normalizeSqlEvidence(value: unknown) {
+  return typeof value === "string"
+    ? value.toLowerCase().replace(/\s+/g, " ").trim()
+    : "";
 }
 
 async function readTargetPolicyRowCounts(query: Query) {
@@ -981,6 +1228,22 @@ async function readPortfolioScopeRowCounts(query: Query) {
       "portfolio group asset memberships",
     ),
   };
+}
+
+async function readHoldingOnboardingEvidenceRowCount(query: Query) {
+  const rows = await query(`
+    select count(*)::integer as evidence_rows
+      from holding_onboarding_evidence
+  `);
+  if (rows.length !== 1) {
+    throw new Error(
+      "Preview database holding-onboarding row evidence is unavailable.",
+    );
+  }
+  return integerValue(
+    rows[0].evidence_rows,
+    "holding onboarding evidence rows",
+  );
 }
 
 function integerValue(value: unknown, label: string) {

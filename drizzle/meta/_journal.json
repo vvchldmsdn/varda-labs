@@ -176,6 +176,13 @@
       "when": 1786528850100,
       "tag": "0024_nebulous_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786550471417,
+      "tag": "0025_nebulous_the_phantom",
+      "breakpoints": true
     }
   ]
 }

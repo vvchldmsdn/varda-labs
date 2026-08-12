@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 24);
-    assert.equal(registeredPaths.length, 30);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 25);
+    assert.equal(registeredPaths.length, 31);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -130,7 +130,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 14,
+      in_scope: 15,
       intentionally_skipped_legacy: 1,
       not_applicable: 9,
     });
@@ -256,7 +256,10 @@ describe("tenant writer Phase 1D-A readiness", () => {
       }
     }
 
-    assert.deepEqual(activeContextWriters, ["session_manual_krx_gold_price"]);
+    assert.deepEqual(activeContextWriters, [
+      "session_manual_krx_gold_price",
+      "session_holding_onboarding",
+    ]);
   });
 
   it("limits canonical owner DML to the reviewed one-use writer", () => {

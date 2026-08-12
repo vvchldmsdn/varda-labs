@@ -11,10 +11,14 @@ import {
   IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES,
   IDENTITY_PAIRING_TABLE_POLICIES,
   IDENTITY_SYSTEM_TABLE_POLICIES,
+  HOLDING_ONBOARDING_TABLE_POLICIES,
   LEGACY_EXCLUDED_USER_TABLE_NAMES,
+  PORTFOLIO_ANALYSIS_SCOPE_TABLE_POLICIES,
+  PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES,
   SIMULATION_APPROVAL_TABLE_POLICIES,
   SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
   TARGET_POLICY_APPROVAL_TABLE_POLICIES,
+  TARGET_POLICY_EXPANDED_TENANT_TABLE_POLICIES,
   TENANT_TABLE_POLICIES,
   resolveTenantTablePolicies,
   summarizeTenantClassifications,
@@ -51,6 +55,14 @@ describe("tenant ownership policy", () => {
       IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES.map(
         (policy) => policy.table,
       );
+    const targetPolicyExpandedNames =
+      TARGET_POLICY_EXPANDED_TENANT_TABLE_POLICIES.map(
+        (policy) => policy.table,
+      );
+    const portfolioScopeExpandedNames =
+      PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES.map(
+        (policy) => policy.table,
+      );
 
     assert.deepEqual(
       IDENTITY_CORE_TABLE_POLICIES.map((policy) => policy.table),
@@ -64,7 +76,9 @@ describe("tenant ownership policy", () => {
     assert.equal(coreExpandedNames.length, 24);
     assert.equal(simulationExpandedNames.length, 27);
     assert.equal(pairingExpandedNames.length, 29);
-    assert.equal(expandedNames.length, 32);
+    assert.equal(targetPolicyExpandedNames.length, 32);
+    assert.equal(portfolioScopeExpandedNames.length, 35);
+    assert.equal(expandedNames.length, 36);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
     assert.deepEqual(
       resolveTenantTablePolicies(coreExpandedNames),
@@ -77,6 +91,14 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       resolveTenantTablePolicies(pairingExpandedNames),
       IDENTITY_PAIRING_EXPANDED_TENANT_TABLE_POLICIES,
+    );
+    assert.deepEqual(
+      resolveTenantTablePolicies(targetPolicyExpandedNames),
+      TARGET_POLICY_EXPANDED_TENANT_TABLE_POLICIES,
+    );
+    assert.deepEqual(
+      resolveTenantTablePolicies(portfolioScopeExpandedNames),
+      PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES,
     );
     assert.deepEqual(
       resolveTenantTablePolicies(expandedNames),
@@ -121,7 +143,7 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 20,
+        user_owned: 24,
         shared_reference: 7,
         admin_system: 1,
         identity_system: 4,
@@ -149,6 +171,18 @@ describe("tenant ownership policy", () => {
     assert.equal(classification("asset_price_snapshots"), "shared_reference");
     assert.equal(classification("live_price_quotes"), "shared_reference");
     assert.equal(classification("market_data_sync_runs"), "admin_system");
+    assert.deepEqual(
+      PORTFOLIO_ANALYSIS_SCOPE_TABLE_POLICIES.map(({ table }) => table),
+      [
+        "portfolio_groups",
+        "portfolio_group_account_memberships",
+        "portfolio_group_asset_memberships",
+      ],
+    );
+    assert.deepEqual(
+      HOLDING_ONBOARDING_TABLE_POLICIES.map(({ table }) => table),
+      ["holding_onboarding_evidence"],
+    );
     assert.equal(
       EXPANDED_TENANT_TABLE_POLICIES.find(
         (policy) => policy.table === "app_users",

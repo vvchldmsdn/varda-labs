@@ -50,6 +50,12 @@ export default async function TenantHoldingsPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/portfolio/holdings/new"
+              className="rounded-md bg-[#1e3a34] px-4 py-2 text-sm font-semibold text-white hover:bg-[#284b43]"
+            >
+              보유종목 추가
+            </Link>
+            <Link
               href="/portfolio/accounts?account=all"
               className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
             >

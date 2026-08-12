@@ -10,8 +10,10 @@ import {
   sha256Fingerprint,
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
+  assertPreviewHoldingOnboardingRowsPreserved,
   assertPreviewPortfolioScopeRowsPreserved,
   assertPreviewTargetPolicyRowsPreserved,
+  assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog,
   assertReviewedPrePortfolioScopePreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
@@ -125,10 +127,10 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0024_nebulous_tag",
-        createdAt: 1786528850100,
+        tag: "0025_nebulous_the_phantom",
+        createdAt: 1786550471417,
         sha256:
-          "34a74d7535dbaa397c040c80800276893394ec0492d217f649e3dc4c74b0daed",
+          "1fc4eecc860dc3d623d0a1d0deca90c610693a5f2e1d218cd17d3b817ea42f26",
       },
     );
     assert.deepEqual(
@@ -138,9 +140,9 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 25,
+        entryCount: 26,
         sha256:
-          "sha256:a67f63cd0c957ad3c8f312fc5c1b19435c3c69b5648b619afb932a1b6c9529af",
+          "sha256:1f37571ceaa460532cbaf06a605be0bed7540d20e48568f90a3e46e3ff47a2a9",
       },
     );
   });
@@ -182,7 +184,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v7",
+        evidenceVersion: "preview_database_evidence_v8",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
@@ -190,7 +192,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0024_present",
+      "reviewed_0025_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -209,6 +211,10 @@ describe("Preview database target operational guard", () => {
       publicPreviewDatabaseEvidence(reviewed).portfolioScopeCatalogStatus,
       "reviewed_0024_present",
     );
+    assert.equal(
+      publicPreviewDatabaseEvidence(reviewed).holdingOnboardingCatalogStatus,
+      "reviewed_0025_present",
+    );
 
     const appliedMigrations = reviewed.appliedMigrations.slice(0, -1);
     const pending = {
@@ -217,23 +223,22 @@ describe("Preview database target operational guard", () => {
       appliedMigrations,
       reviewedCatalog: {
         ...reviewed.reviewedCatalog,
-        assetCanonicalOwnerUniqueIndexExact: false,
-        portfolioGroupOwnerUniqueIndexExact: false,
-        portfolioGroupAccountStartIndexExact: false,
-        portfolioGroupAccountActiveIndexExact: false,
-        portfolioGroupAssetStartIndexExact: false,
-        portfolioGroupAssetActiveIndexExact: false,
-        portfolioScopeTables: [],
-        portfolioScopeConstraints: [],
-        portfolioScopeRows: null,
+        holdingOnboardingTables: [],
+        holdingOnboardingColumns: [],
+        holdingOnboardingConstraints: [],
+        holdingOnboardingEvidenceRows: null,
+        holdingOnboardingAssetIndexExact: false,
+        holdingOnboardingOwnerIndexExact: false,
+        holdingOnboardingAccountIndexExact: false,
+        assetOwnerAccountInstrumentIndexExact: false,
       },
     };
     assert.doesNotThrow(() =>
-      assertReviewedPrePortfolioScopePreviewDatabaseCatalog(pending),
+      assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog(pending),
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseCatalog(pending),
-      /0024 catalog is incomplete/,
+      /0025 catalog is incomplete/,
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseState(pending),
@@ -254,14 +259,17 @@ describe("Preview database target operational guard", () => {
             .snapshotOwnershipCatalogStatus,
         portfolioScopeCatalogStatus:
           publicPreviewDatabaseEvidence(pending).portfolioScopeCatalogStatus,
+        holdingOnboardingCatalogStatus:
+          publicPreviewDatabaseEvidence(pending).holdingOnboardingCatalogStatus,
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0024_not_present",
+        migrationLedgerStatus: "reviewed_0025_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
-        portfolioScopeCatalogStatus: "reviewed_0024_not_present",
+        portfolioScopeCatalogStatus: "reviewed_0024_present",
+        holdingOnboardingCatalogStatus: "reviewed_0025_not_present",
       },
     );
   });
@@ -313,12 +321,12 @@ describe("Preview database target operational guard", () => {
       "scripts/preview-database-evidence.mjs",
       "utf8",
     );
-    assert.match(buildScript, /preview_database_build_preflight_v8/);
+    assert.match(buildScript, /preview_database_build_preflight_v9/);
     assert.match(buildScript, /targetPolicyRows/);
     assert.match(buildScript, /assertPreviewTargetPolicyRowsPreserved/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0024 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0025 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -343,8 +351,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0024_nebulous_tag",
-        migrationLedgerStatus: "reviewed_0024_not_present",
+        latestReviewedMigration: "0025_nebulous_the_phantom",
+        migrationLedgerStatus: "reviewed_0025_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );
@@ -468,12 +476,47 @@ describe("Preview database target operational guard", () => {
     ]) {
       const drifted = { ...reviewed, reviewedCatalog };
       assert.throws(
-        () => assertReviewedPreviewDatabaseState(drifted),
-        /0024 catalog is incomplete/,
+        () =>
+          assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog(drifted),
+        /0024 prerequisite catalog is incomplete/,
       );
       assert.equal(
         publicPreviewDatabaseEvidence(drifted).portfolioScopeCatalogStatus,
         "reviewed_0024_not_present",
+      );
+    }
+  });
+
+  it("requires the reviewed holding-onboarding catalog", () => {
+    const reviewed = reviewedState();
+    for (const reviewedCatalog of [
+      {
+        ...reviewed.reviewedCatalog,
+        holdingOnboardingTables: [],
+      },
+      {
+        ...reviewed.reviewedCatalog,
+        holdingOnboardingConstraints:
+          reviewed.reviewedCatalog.holdingOnboardingConstraints.slice(1),
+      },
+      {
+        ...reviewed.reviewedCatalog,
+        assetOwnerAccountInstrumentIndexExact: false,
+      },
+      {
+        ...reviewed.reviewedCatalog,
+        duplicateAssetIdentityGroups: 1,
+      },
+    ]) {
+      const drifted = { ...reviewed, reviewedCatalog };
+      assert.throws(
+        () => assertReviewedPreviewDatabaseState(drifted),
+        /0025 catalog is incomplete/,
+      );
+      assert.equal(
+        publicPreviewDatabaseEvidence(drifted)
+          .holdingOnboardingCatalogStatus,
+        "reviewed_0025_not_present",
       );
     }
   });
@@ -513,6 +556,33 @@ describe("Preview database target operational guard", () => {
     );
     assert.match(buildScript, /portfolioScopeRows/);
     assert.match(buildScript, /assertPreviewPortfolioScopeRowsPreserved/);
+  });
+
+  it("preserves inherited holding-onboarding rows and keeps the expand migration empty", () => {
+    assert.doesNotThrow(() =>
+      assertPreviewHoldingOnboardingRowsPreserved(2, 2),
+    );
+    assert.throws(
+      () => assertPreviewHoldingOnboardingRowsPreserved(2, 3),
+      /changed inherited holding-onboarding row counts/,
+    );
+    assert.doesNotThrow(() =>
+      assertPreviewHoldingOnboardingRowsPreserved(null, 0),
+    );
+    assert.throws(
+      () => assertPreviewHoldingOnboardingRowsPreserved(null, 1),
+      /unexpectedly seeded holding-onboarding rows/,
+    );
+
+    const buildScript = readFileSync(
+      "scripts/preview-database-evidence.mjs",
+      "utf8",
+    );
+    assert.match(buildScript, /holdingOnboardingEvidenceRows/);
+    assert.match(
+      buildScript,
+      /assertPreviewHoldingOnboardingRowsPreserved/,
+    );
   });
 });
 
@@ -651,6 +721,43 @@ function reviewedState() {
       },
       portfolioSnapshotIdentityIndexExact: true,
       positionSnapshotIdentityIndexExact: true,
+      holdingOnboardingTables: ["holding_onboarding_evidence"],
+      holdingOnboardingColumns: [
+        "account_id",
+        "asset_id",
+        "average_cost",
+        "canonical_owner_user_id",
+        "created_at",
+        "currency",
+        "current_price",
+        "id",
+        "policy_version",
+        "price_as_of",
+        "price_source",
+        "quantity",
+        "recorded_at",
+        "reported_return_pct",
+      ],
+      holdingOnboardingConstraints: [
+        "holding_onboarding_evidence_account_owner_fk",
+        "holding_onboarding_evidence_asset_account_fk",
+        "holding_onboarding_evidence_asset_owner_fk",
+        "holding_onboarding_evidence_average_cost_check",
+        "holding_onboarding_evidence_currency_check",
+        "holding_onboarding_evidence_current_price_check",
+        "holding_onboarding_evidence_owner_user_fk",
+        "holding_onboarding_evidence_pkey",
+        "holding_onboarding_evidence_policy_version_check",
+        "holding_onboarding_evidence_price_source_check",
+        "holding_onboarding_evidence_quantity_check",
+        "holding_onboarding_evidence_reported_return_check",
+      ],
+      holdingOnboardingEvidenceRows: 0,
+      holdingOnboardingAssetIndexExact: true,
+      holdingOnboardingOwnerIndexExact: true,
+      holdingOnboardingAccountIndexExact: true,
+      assetOwnerAccountInstrumentIndexExact: true,
+      duplicateAssetIdentityGroups: 0,
     },
   };
 }

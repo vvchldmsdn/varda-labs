@@ -7,9 +7,10 @@ import { neon } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
 import {
+  assertPreviewHoldingOnboardingRowsPreserved,
   assertPreviewTargetPolicyRowsPreserved,
   assertPreviewPortfolioScopeRowsPreserved,
-  assertReviewedPrePortfolioScopePreviewDatabaseCatalog,
+  assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
   readPreviewDatabaseState,
@@ -20,7 +21,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v8.json",
+  "varda-preview-database-preflight-v9.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -58,11 +59,13 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v8",
+      evidenceVersion: "preview_database_build_preflight_v9",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
       portfolioScopeRows: state.reviewedCatalog.portfolioScopeRows,
+      holdingOnboardingEvidenceRows:
+        state.reviewedCatalog.holdingOnboardingEvidenceRows,
     };
     writeFileSync(EVIDENCE_FILE, `${JSON.stringify(evidence)}\n`, {
       encoding: "utf8",
@@ -82,7 +85,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v8",
+    "preview_database_build_preflight_v9",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -103,6 +106,10 @@ async function run() {
     before.portfolioScopeRows ?? null,
     state.reviewedCatalog.portfolioScopeRows,
   );
+  assertPreviewHoldingOnboardingRowsPreserved(
+    before.holdingOnboardingEvidenceRows ?? null,
+    state.reviewedCatalog.holdingOnboardingEvidenceRows,
+  );
 
   rmSync(EVIDENCE_FILE, { force: true });
   logEvidence(PHASE, state, plan);
@@ -116,13 +123,13 @@ function assertPreflightCatalog(plan, state, localMigrations) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0024_nebulous_tag"],
-    "Only reviewed migration 0024 may be pending",
+    ["0025_nebulous_the_phantom"],
+    "Only reviewed migration 0025 may be pending",
   );
   assert.equal(
     plan.latestAppliedTag,
-    "0023_nasty_overlord",
-    "Pending 0024 target must start from reviewed migration 0023",
+    "0024_nebulous_tag",
+    "Pending 0025 target must start from reviewed migration 0024",
   );
   const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
@@ -131,9 +138,9 @@ function assertPreflightCatalog(plan, state, localMigrations) {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0024",
+    "Preview state and migration ledger disagree before migration 0025",
   );
-  assertReviewedPrePortfolioScopePreviewDatabaseCatalog(state);
+  assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog(state);
 }
 
 function readLocalMigrations() {

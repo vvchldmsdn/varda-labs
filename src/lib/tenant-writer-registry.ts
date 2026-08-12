@@ -371,6 +371,23 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "separate",
   },
   {
+    id: "session_holding_onboarding",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["/portfolio/holdings/new#createHoldingOnboarding"],
+    implementationPaths: ["src/lib/holding-onboarding-write.ts"],
+    targets: [
+      userTarget("portfolio_groups", "insert"),
+      userTarget("assets", "insert"),
+      userTarget("holding_onboarding_evidence", "insert"),
+      userTarget("portfolio_group_asset_memberships", "insert"),
+    ],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "entity_asset_groups_api",
     classification: "user_owned",
     authorization: "machine_admin",
