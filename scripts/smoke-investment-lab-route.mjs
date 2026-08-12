@@ -536,6 +536,22 @@ async function main() {
     route.body,
     "data-preperiod-min-volatility-weight-constraint",
   );
+  const approvedTargetWeightStatus = readStringAttribute(
+    route.body,
+    "data-approved-target-weight-status",
+  );
+  const approvedTargetWeightPolicyBindings = readIntegerAttribute(
+    route.body,
+    "data-approved-target-weight-policy-bindings",
+  );
+  assert.ok(
+    approvedTargetWeightStatus === "ready" ||
+      approvedTargetWeightStatus === "unavailable",
+  );
+  assert.equal(
+    approvedTargetWeightPolicyBindings,
+    approvedTargetWeightStatus === "ready" ? (ACCOUNT === "all" ? 3 : 1) : 0,
+  );
   assert.ok(
     preperiodMinVolatilityStatus === "ready" ||
       preperiodMinVolatilityStatus === "path_unavailable" ||
@@ -611,8 +627,8 @@ async function main() {
     assert.ok(
       scenarioChartStatus === "ready" || scenarioChartStatus === "partial",
     );
-    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 10);
-    assert.equal(scenarioChartLines + scenarioChartUnavailable, 10);
+    assert.ok(scenarioChartLines >= 1 && scenarioChartLines <= 11);
+    assert.equal(scenarioChartLines + scenarioChartUnavailable, 11);
     assert.equal(
       scenarioChartStatus,
       scenarioChartUnavailable ? "partial" : "ready",
@@ -638,7 +654,7 @@ async function main() {
       "data-scenario-matrix-unavailable-rows",
     );
     assert.equal(scenarioMatrixStatus, "ready");
-    assert.equal(scenarioMatrixRows, 10);
+    assert.equal(scenarioMatrixRows, 11);
     assert.equal(
       scenarioMatrixReadyRows + scenarioMatrixUnavailableRows,
       scenarioMatrixRows,
@@ -653,6 +669,7 @@ async function main() {
       "anchor_basket",
       "anchor_value_weight",
       "anchor_current_weight_monthly",
+      "approved_target_weight_monthly",
       "anchor_equal_weight_monthly",
     ]) {
       assert.match(route.body, new RegExp(`data-scenario-row="${scenarioId}"`));
@@ -1340,6 +1357,7 @@ async function main() {
     (anchorBasketStatus === "ready" ? 1 : 0) +
     (anchorValueWeightStatus === "ready" ? 1 : 0) +
     (anchorCurrentWeightMonthlyStatus === "ready" ? 1 : 0) +
+    (approvedTargetWeightStatus === "ready" ? 1 : 0) +
     (anchorEqualWeightMonthlyStatus === "ready" ? 1 : 0);
   assert.equal(scenarioMatrixReadyRows, expectedScenarioMatrixReadyRows);
   assert.equal(
