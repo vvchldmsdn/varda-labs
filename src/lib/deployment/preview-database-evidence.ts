@@ -447,7 +447,7 @@ export async function readPreviewDatabaseState(input: {
         index_definition.indnkeyatts::integer as key_attribute_count,
         index_definition.indnatts::integer as total_attribute_count,
         string_agg(
-          table_attribute.attname,
+          coalesce(table_attribute.attname, ''),
           ','
           order by index_key.ordinality
         ) as key_columns
@@ -809,8 +809,32 @@ export function assertReviewedPreviewDatabaseCatalog(
   state: PreviewDatabaseState,
 ) {
   if (!hasReviewedCatalog(state)) {
+    const publicEvidence = publicPreviewDatabaseEvidence(state);
+    const catalog = state.reviewedCatalog;
     throw new Error(
-      "Preview database reviewed 0025 catalog is incomplete.",
+      `Preview database reviewed 0025 catalog is incomplete. ${JSON.stringify(
+        {
+          holdingOnboardingCatalogStatus:
+            publicEvidence.holdingOnboardingCatalogStatus,
+          holdingOnboardingTableCount: catalog.holdingOnboardingTables.length,
+          holdingOnboardingColumnCount:
+            catalog.holdingOnboardingColumns.length,
+          holdingOnboardingConstraintCount:
+            catalog.holdingOnboardingConstraints.length,
+          holdingOnboardingRowsAvailable:
+            catalog.holdingOnboardingEvidenceRows !== null,
+          holdingOnboardingAssetIndexExact:
+            catalog.holdingOnboardingAssetIndexExact,
+          holdingOnboardingOwnerIndexExact:
+            catalog.holdingOnboardingOwnerIndexExact,
+          holdingOnboardingAccountIndexExact:
+            catalog.holdingOnboardingAccountIndexExact,
+          assetOwnerAccountInstrumentIndexExact:
+            catalog.assetOwnerAccountInstrumentIndexExact,
+          duplicateAssetIdentityGroups:
+            catalog.duplicateAssetIdentityGroups,
+        },
+      )}`,
     );
   }
 }

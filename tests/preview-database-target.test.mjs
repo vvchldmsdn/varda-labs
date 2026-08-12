@@ -503,6 +503,19 @@ describe("Preview database target operational guard", () => {
     assert.doesNotMatch(source, /holdingOnboardingTableRows/);
   });
 
+  it("preserves expression slots when reading functional index columns", () => {
+    const source = readFileSync(
+      "src/lib/deployment/preview-database-evidence.ts",
+      "utf8",
+    );
+
+    assert.match(source, /coalesce\(table_attribute\.attname, ''\)/);
+    assert.match(
+      source,
+      /canonical_owner_user_id,account_id,,,/,
+    );
+  });
+
   it("requires the reviewed holding-onboarding catalog", () => {
     const reviewed = reviewedState();
     for (const reviewedCatalog of [
