@@ -51,6 +51,10 @@ The optional MA120 evidence-only Phase 2A boundary lives in
 `docs/additional-contribution-ma120-phase2a-contract.md`. It does not alter the
 Phase 1 allocation.
 
+The bounded pure comparison candidate lives in
+`docs/additional-contribution-ma120-overlay-candidate.md`. It keeps reduced
+budget as residual cash and has no runtime binding.
+
 ### Canonical v1 behavior
 
 1. Read current holdings, live/as-of prices, date-specific FX, and strategic
