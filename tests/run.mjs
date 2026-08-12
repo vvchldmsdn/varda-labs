@@ -128,6 +128,8 @@ import "./target-policy-resolver.test.mjs";
 import "./target-policy-persistence-schema.test.mjs";
 import "./instrument-identity.test.mjs";
 import "./manual-asset-price.test.mjs";
+import "./holding-onboarding.test.mjs";
+import "./holding-onboarding-schema.test.mjs";
 import "./manual-valuation-history-path.test.mjs";
 import "./investment-lab-manual-valuation-path.test.mjs";
 import "./krx-gold-close-cycle.test.mjs";

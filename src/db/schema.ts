@@ -456,6 +456,19 @@ export const assets = pgTable(
       table.id,
       table.accountId,
     ),
+    ownerAccountInstrumentUnique: uniqueIndex(
+      "assets_owner_account_instrument_unique",
+    )
+      .on(
+        table.canonicalOwnerUserId,
+        table.accountId,
+        sql`lower(btrim(${table.market}))`,
+        sql`upper(btrim(${table.currency}))`,
+        sql`upper(btrim(${table.ticker}))`,
+      )
+      .where(
+        sql`${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.ticker} is not null`,
+      ),
   }),
 );
 
@@ -498,6 +511,100 @@ export const accounts = pgTable(
     ).on(table.canonicalOwnerUserId),
   }),
 );
+
+export const holdingOnboardingEvidence = pgTable(
+  "holding_onboarding_evidence",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
+    averageCost: decimal("average_cost", { precision: 20, scale: 4 }).notNull(),
+    currentPrice: decimal("current_price", {
+      precision: 20,
+      scale: 4,
+    }).notNull(),
+    reportedReturnPct: decimal("reported_return_pct", {
+      precision: 20,
+      scale: 6,
+    }),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    priceSource: varchar("price_source", { length: 100 }).notNull(),
+    priceAsOf: timestamp("price_as_of", { withTimezone: true }),
+    policyVersion: varchar("policy_version", { length: 100 })
+      .default("holding_onboarding_v1")
+      .notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "holding_onboarding_evidence_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "holding_onboarding_evidence_asset_owner_fk",
+      columns: [table.assetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "holding_onboarding_evidence_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "holding_onboarding_evidence_asset_account_fk",
+      columns: [table.assetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    assetUnique: uniqueIndex("holding_onboarding_evidence_asset_unique").on(
+      table.assetId,
+    ),
+    ownerUserIdIdx: index(
+      "holding_onboarding_evidence_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
+    accountIdIdx: index("holding_onboarding_evidence_account_id_idx").on(
+      table.accountId,
+    ),
+    quantityCheck: check(
+      "holding_onboarding_evidence_quantity_check",
+      sql`${table.quantity} > 0`,
+    ),
+    averageCostCheck: check(
+      "holding_onboarding_evidence_average_cost_check",
+      sql`${table.averageCost} > 0`,
+    ),
+    currentPriceCheck: check(
+      "holding_onboarding_evidence_current_price_check",
+      sql`${table.currentPrice} > 0`,
+    ),
+    reportedReturnCheck: check(
+      "holding_onboarding_evidence_reported_return_check",
+      sql`${table.reportedReturnPct} is null or ${table.reportedReturnPct} > -100`,
+    ),
+    currencyCheck: check(
+      "holding_onboarding_evidence_currency_check",
+      sql`${table.currency} = upper(btrim(${table.currency})) and char_length(${table.currency}) > 0`,
+    ),
+    priceSourceCheck: check(
+      "holding_onboarding_evidence_price_source_check",
+      sql`${table.priceSource} = btrim(${table.priceSource}) and char_length(${table.priceSource}) > 0`,
+    ),
+    policyVersionCheck: check(
+      "holding_onboarding_evidence_policy_version_check",
+      sql`${table.policyVersion} = 'holding_onboarding_v1'`,
+    ),
+  }),
+);
+
+export type HoldingOnboardingEvidence =
+  typeof holdingOnboardingEvidence.$inferSelect;
+export type NewHoldingOnboardingEvidence =
+  typeof holdingOnboardingEvidence.$inferInsert;
 
 export const portfolioGroups = pgTable(
   "portfolio_groups",
