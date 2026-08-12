@@ -148,6 +148,10 @@ describe("holding onboarding contract", () => {
     assert.match(writerSource, /prepareTenantWriteContext\(/);
     assert.match(writerSource, /canonicalOwnerAssignment\(writeContext\)/);
     assert.match(writerSource, /await db\.batch\(/);
+    assert.match(
+      writerSource,
+      /validFrom:\s*resolveSnapshotCycle\(recordedAt\)\.snapshotDate/,
+    );
     assert.doesNotMatch(formSource, /name=["'](?:canonicalOwnerUserId|ownerUserId)["']/);
     assert.doesNotMatch(writerSource, /\bfetch\s*\(/);
   });

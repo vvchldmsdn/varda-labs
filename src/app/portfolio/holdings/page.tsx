@@ -1,37 +1,54 @@
 import Link from "next/link";
 
-import { AccountScopeTabs } from "@/components/account-scope-tabs";
 import { ManualKrxGoldPriceForm } from "@/components/manual-krx-gold-price-form";
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
+import {
+  getReadOnlyTenantPortfolioAnalysisScopeContext,
+  type TenantPortfolioAnalysisScopeContextResult,
+} from "@/db/queries/portfolio-analysis-scopes";
 import {
   getReadOnlyTenantHoldings,
   type TenantHoldingQueryResult,
 } from "@/db/queries/tenant-holdings";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { isKrxGoldManualAssetCandidate } from "@/lib/market-data/manual-asset-price";
-import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
 type TenantHoldingsPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    scope?: string | string[];
   }>;
 };
 
 export default async function TenantHoldingsPage({
   searchParams,
 }: TenantHoldingsPageProps) {
-  const [params, resolution] = await Promise.all([
+  const [params, tenantResolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const scope = normalizePortfolioAccountScope(params.account);
-  const result = resolution.ok
+  const scopeContext = tenantResolution.ok
+    ? await getReadOnlyTenantPortfolioAnalysisScopeContext({
+        account: params.account,
+        scope: params.scope,
+        tenantContext: tenantResolution.tenantContext,
+      })
+    : null;
+  const selectedScope =
+    scopeContext?.state === "ready" &&
+    scopeContext.resolution.state === "resolved"
+      ? scopeContext.resolution.scope
+      : null;
+  const result = tenantResolution.ok && selectedScope
     ? await getReadOnlyTenantHoldings({
-        tenantContext: resolution.tenantContext,
-        scope,
+        serviceDate: resolveSnapshotCycle().snapshotDate,
+        scope: selectedScope,
+        tenantContext: tenantResolution.tenantContext,
       })
     : null;
 
@@ -83,13 +100,26 @@ export default async function TenantHoldingsPage({
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#dfe3d5] pt-6">
-          <p className="text-sm font-semibold">
-            {holdingReadEvidence(result, resolution)}
-          </p>
-          <AccountScopeTabs
-            basePath="/portfolio/holdings"
-            selectedAccount={scope}
-          />
+          <div>
+            <p className="text-xs font-semibold text-[#687064]">조회 범위</p>
+            <p className="mt-1 text-sm font-semibold">
+              {selectedScope?.label ?? "범위를 확인할 수 없습니다"}
+            </p>
+            <p className="mt-1 text-xs text-[#687064]">
+              {holdingReadEvidence(
+                result,
+                tenantResolution,
+                scopeContext,
+              )}
+            </p>
+          </div>
+          {scopeContext?.state === "ready" ? (
+            <PortfolioAnalysisScopeTabs
+              basePath="/portfolio/holdings"
+              scopes={scopeContext.catalog.scopes}
+              selectedScopeKey={selectedScope?.key ?? null}
+            />
+          ) : null}
         </div>
 
         {result?.state === "ready" || result?.state === "partial" ? (
@@ -179,11 +209,22 @@ export default async function TenantHoldingsPage({
 
 function holdingReadEvidence(
   result: TenantHoldingQueryResult | null,
-  resolution: SessionResolverResult,
+  tenantResolution: SessionResolverResult,
+  scopeContext: TenantPortfolioAnalysisScopeContextResult | null,
 ) {
-  if (result === null) {
-    return `${sessionResolutionEvidence(resolution)}; product data was not read.`;
+  if (!tenantResolution.ok) {
+    return `${sessionResolutionEvidence(tenantResolution)}; product data was not read.`;
   }
+  if (scopeContext === null || scopeContext.state === "unavailable") {
+    return "Analysis scope read unavailable.";
+  }
+  if (scopeContext.state === "integrity_error") {
+    return "Analysis scope read blocked by catalog integrity checks.";
+  }
+  if (scopeContext.resolution.state === "blocked") {
+    return "Analysis scope input was blocked without falling back to all holdings.";
+  }
+  if (result === null) return "Holdings were not read.";
   if (result.state === "unavailable") return "Holdings read unavailable.";
   if (result.state === "integrity_error") return "Holdings read blocked.";
   const included = `${result.holdings.length} owned holding${

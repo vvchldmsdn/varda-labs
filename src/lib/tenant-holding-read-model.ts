@@ -1,8 +1,4 @@
-import {
-  isNamedPortfolioAccount,
-  type NamedPortfolioAccount,
-  type PortfolioAccountScope,
-} from "./portfolio-account-scope.ts";
+import type { PortfolioAnalysisScope } from "./portfolio-analysis-scope.ts";
 
 export type TenantHoldingReadRow = Readonly<{
   assetId: string;
@@ -25,7 +21,7 @@ export type TenantHoldingReadRow = Readonly<{
 }>;
 
 export type TenantHoldingDto = Readonly<{
-  accountCode: NamedPortfolioAccount;
+  accountCode: string;
   accountName: string;
   name: string;
   ticker: string | null;
@@ -42,7 +38,6 @@ export type TenantHoldingDto = Readonly<{
 export type TenantHoldingReadResult =
   | Readonly<{
       state: "ready" | "partial";
-      scope: PortfolioAccountScope;
       holdings: readonly TenantHoldingDto[];
       excludedHoldingCount: number;
     }>
@@ -50,14 +45,14 @@ export type TenantHoldingReadResult =
       state: "integrity_error";
       reason:
         | "invalid_account_relation"
-        | "noncanonical_account_code"
+        | "invalid_account_code"
         | "account_scope_mismatch"
         | "duplicate_asset_row";
     }>;
 
 export function projectTenantHoldingRows(
   rows: readonly TenantHoldingReadRow[],
-  scope: PortfolioAccountScope,
+  scope: PortfolioAnalysisScope,
 ): TenantHoldingReadResult {
   const seenAssetIds = new Set<string>();
   const holdings: Array<
@@ -74,13 +69,10 @@ export function projectTenantHoldingRows(
     ) {
       return integrityError("invalid_account_relation");
     }
-    if (
-      !isNamedPortfolioAccount(row.accountCode) ||
-      row.accountCode.trim().toLowerCase() !== row.accountCode
-    ) {
-      return integrityError("noncanonical_account_code");
+    if (!isCanonicalText(row.accountCode) || row.accountCode.includes(":")) {
+      return integrityError("invalid_account_code");
     }
-    if (scope !== "all" && row.accountCode !== scope) {
+    if (scope.kind === "account" && row.ownedAccountId !== scope.accountId) {
       return integrityError("account_scope_mismatch");
     }
     if (seenAssetIds.has(row.assetId)) {
@@ -145,7 +137,6 @@ export function projectTenantHoldingRows(
 
   return Object.freeze({
     state: excludedHoldingCount === 0 ? "ready" : "partial",
-    scope,
     holdings: Object.freeze(holdings.map(toPublicHolding)),
     excludedHoldingCount,
   });
