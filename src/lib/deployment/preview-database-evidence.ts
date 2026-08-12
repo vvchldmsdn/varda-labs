@@ -838,8 +838,37 @@ export function assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog(
     !hasReviewedPreHoldingOnboardingCatalog(state) ||
     state.reviewedCatalog.duplicateAssetIdentityGroups !== 0
   ) {
+    const publicEvidence = publicPreviewDatabaseEvidence(state);
+    const catalog = state.reviewedCatalog;
     throw new Error(
-      "Preview database reviewed 0024 prerequisite catalog is incomplete.",
+      `Preview database reviewed 0024 prerequisite catalog is incomplete. ${JSON.stringify(
+        {
+          assetPriceCatalogStatus: publicEvidence.assetPriceCatalogStatus,
+          targetPolicyCatalogStatus: publicEvidence.targetPolicyCatalogStatus,
+          snapshotOwnershipCatalogStatus:
+            publicEvidence.snapshotOwnershipCatalogStatus,
+          portfolioScopeCatalogStatus:
+            publicEvidence.portfolioScopeCatalogStatus,
+          portfolioScopeTableCount: catalog.portfolioScopeTables.length,
+          portfolioScopeConstraintCount:
+            catalog.portfolioScopeConstraints.length,
+          portfolioScopeRowsAvailable: catalog.portfolioScopeRows !== null,
+          assetCanonicalOwnerUniqueIndexExact:
+            catalog.assetCanonicalOwnerUniqueIndexExact,
+          portfolioGroupOwnerUniqueIndexExact:
+            catalog.portfolioGroupOwnerUniqueIndexExact,
+          portfolioGroupAccountStartIndexExact:
+            catalog.portfolioGroupAccountStartIndexExact,
+          portfolioGroupAccountActiveIndexExact:
+            catalog.portfolioGroupAccountActiveIndexExact,
+          portfolioGroupAssetStartIndexExact:
+            catalog.portfolioGroupAssetStartIndexExact,
+          portfolioGroupAssetActiveIndexExact:
+            catalog.portfolioGroupAssetActiveIndexExact,
+          duplicateAssetIdentityGroups:
+            catalog.duplicateAssetIdentityGroups,
+        },
+      )}`,
     );
   }
 }
