@@ -25,6 +25,7 @@ describe("investment lab multi-scenario chart", () => {
         "anchor_basket",
         "anchor_value_weight",
         "anchor_current_weight_monthly",
+        "approved_target_weight_monthly",
         "anchor_equal_weight_monthly",
       ],
     );
@@ -64,6 +65,7 @@ describe("investment lab multi-scenario chart", () => {
         "anchor_basket",
         "anchor_value_weight",
         "anchor_current_weight_monthly",
+        "approved_target_weight_monthly",
         "anchor_equal_weight_monthly",
       ],
     );
@@ -207,6 +209,8 @@ function readyScheduled(mode) {
       allocationBasis:
         mode === "equal_weight_monthly"
           ? "single_scope_equal_weight_monthly"
+          : mode === "approved_target_weight_monthly"
+            ? "single_scope_approved_target_weight_monthly"
           : "single_scope_current_weight_monthly",
     },
     rows: scenarioRows(
@@ -223,6 +227,9 @@ function buildInvestmentLabScenarioChart(input) {
   return buildScenarioChart({
     anchorCurrentWeightMonthlyScenario: readyScheduled(
       "current_weight_monthly",
+    ),
+    approvedTargetWeightScenario: readyScheduled(
+      "approved_target_weight_monthly",
     ),
     anchorEqualWeightMonthlyScenario: readyScheduled("equal_weight_monthly"),
     ...input,

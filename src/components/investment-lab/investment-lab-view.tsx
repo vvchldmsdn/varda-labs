@@ -16,6 +16,7 @@ import { InvestmentLabScenarioMatrix } from "./investment-lab-scenario-matrix";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
+import type { InvestmentLabApprovedTargetWeightScenario } from "@/lib/investment-lab-approved-target-weight";
 import type { InvestmentLabAccountComposition } from "@/lib/investment-lab-account-composition";
 import type { InvestmentLabAccountFundingPreflight } from "@/lib/investment-lab-account-funding-preflight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
@@ -35,6 +36,7 @@ export function InvestmentLabView({
   anchorValueWeightScenario,
   anchorCurrentWeightMonthlyScenario,
   anchorEqualWeightMonthlyScenario,
+  approvedTargetWeightScenario,
   dataAvailability,
   fountScopeAdjustment,
   fundingPreflight,
@@ -49,6 +51,7 @@ export function InvestmentLabView({
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
   dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
@@ -104,6 +107,14 @@ export function InvestmentLabView({
       data-anchor-equal-weight-monthly-rebalances={
         periodReady && anchorEqualWeightMonthlyScenario.status === "ready"
           ? (anchorEqualWeightMonthlyScenario.summary?.rebalanceCount ?? 0)
+          : 0
+      }
+      data-approved-target-weight-status={
+        periodReady ? approvedTargetWeightScenario.status : "unavailable"
+      }
+      data-approved-target-weight-policy-bindings={
+        periodReady && approvedTargetWeightScenario.status === "ready"
+          ? approvedTargetWeightScenario.policyBindings.length
           : 0
       }
       data-comparison-dates={
@@ -250,6 +261,7 @@ export function InvestmentLabView({
               anchorCurrentWeightMonthlyScenario
             }
             anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
+            approvedTargetWeightScenario={approvedTargetWeightScenario}
             fountScopeAdjustment={fountScopeAdjustment}
             model={model}
             period={period}
@@ -268,6 +280,7 @@ function ReadyView({
   anchorValueWeightScenario,
   anchorCurrentWeightMonthlyScenario,
   anchorEqualWeightMonthlyScenario,
+  approvedTargetWeightScenario,
   fountScopeAdjustment,
   model,
   period,
@@ -277,6 +290,7 @@ function ReadyView({
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
@@ -338,6 +352,7 @@ function ReadyView({
         anchorValueWeightScenario={anchorValueWeightScenario}
         anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
         anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
+        approvedTargetWeightScenario={approvedTargetWeightScenario}
         model={model}
       />
 
@@ -346,6 +361,7 @@ function ReadyView({
         anchorValueWeightScenario={anchorValueWeightScenario}
         anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
         anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
+        approvedTargetWeightScenario={approvedTargetWeightScenario}
         model={model}
       />
 

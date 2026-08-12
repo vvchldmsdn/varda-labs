@@ -33,6 +33,11 @@ import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-an
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "./investment-lab-anchor-scheduled-rebalance.ts";
 import type { InvestmentLabPreperiodOptimizer } from "./investment-lab-preperiod-optimizer.ts";
 import {
+  composeInvestmentLabApprovedTargetWeightScenario,
+  type InvestmentLabApprovedTargetPolicyContext,
+  type InvestmentLabApprovedTargetWeightScenario,
+} from "./investment-lab-approved-target-weight.ts";
+import {
   listInvestmentLabCompleteSnapshotDates,
   listInvestmentLabLatestCurrentWriterDates,
 } from "./investment-lab-source-segment-authority.ts";
@@ -67,6 +72,9 @@ export interface InvestmentLabCounterfactualReadRepository
   loadFountRuntimeEvidence(
     serviceDates: readonly string[],
   ): Promise<InvestmentLabFountRuntimeEvidence>;
+  loadApprovedTargetPolicyContext?(
+    account: NamedPortfolioAccount,
+  ): Promise<InvestmentLabApprovedTargetPolicyContext>;
 }
 
 export async function loadInvestmentLabCounterfactualReadModel(
@@ -83,19 +91,28 @@ export async function loadInvestmentLabCounterfactualReadModel(
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
   preperiodOptimizer: InvestmentLabPreperiodOptimizer;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   accountComposition: InvestmentLabAccountComposition;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
   observedHistory: InvestmentLabObservedHistory;
 }>> {
-  const [eventRows, snapshotRows, closeRows, vooCloseRows, fxRows] =
+  const [
+    eventRows,
+    snapshotRows,
+    closeRows,
+    vooCloseRows,
+    fxRows,
+    targetPolicyContexts,
+  ] =
     await Promise.all([
       repository.loadEvents(),
       repository.loadSnapshots(),
       repository.loadScenarioCloses(),
       repository.loadVooCloses(),
       repository.loadFxRows(),
+      loadApprovedTargetPolicyContexts(repository, account),
     ]);
 
   const input = Object.freeze({
@@ -181,6 +198,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
   let anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   let anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   let anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  let approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
   let preperiodOptimizer: InvestmentLabPreperiodOptimizer;
   let fundingPreflight: InvestmentLabAccountFundingPreflight;
 
@@ -211,6 +229,7 @@ export async function loadInvestmentLabCounterfactualReadModel(
           fxRows,
           requestedAnchorDate,
           fountScopeAdjustment: anchorFountScope,
+          approvedTargetPolicyContext: null,
         }),
         ...NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount) =>
           loadInvestmentLabAnchorScenarios({
@@ -225,6 +244,8 @@ export async function loadInvestmentLabCounterfactualReadModel(
                 ? anchorFountScope
                 : Object.freeze({ status: "not_applicable" }),
             includePreperiodOptimizer: false,
+            approvedTargetPolicyContext:
+              targetPolicyContexts[namedAccount] ?? null,
           }),
         ),
       ]);
@@ -269,6 +290,17 @@ export async function loadInvestmentLabCounterfactualReadModel(
         InvestmentLabAnchorScheduledRebalanceScenario
       >,
     );
+    const namedApprovedTargetWeights = Object.freeze(
+      Object.fromEntries(
+        NAMED_PORTFOLIO_ACCOUNTS.map((namedAccount, index) => [
+          namedAccount,
+          namedAnchorScenarioValues[index].approvedTargetWeight,
+        ]),
+      ) as Record<
+        NamedPortfolioAccount,
+        InvestmentLabApprovedTargetWeightScenario
+      >,
+    );
     const composed = composeInvestmentLabAllAccounts({
       pooledModel,
       namedModels,
@@ -290,6 +322,12 @@ export async function loadInvestmentLabCounterfactualReadModel(
       composed.anchorCurrentWeightMonthlyScenario;
     anchorEqualWeightMonthlyScenario =
       composed.anchorEqualWeightMonthlyScenario;
+    approvedTargetWeightScenario =
+      composeInvestmentLabApprovedTargetWeightScenario({
+        pooledModel: composed.model,
+        pooledAnchor: pooledAnchorScenarios.equalWeight.anchor,
+        named: namedApprovedTargetWeights,
+      });
     preperiodOptimizer = requirePreperiodOptimizer(
       pooledAnchorScenarios.preperiodOptimizer,
     );
@@ -311,12 +349,14 @@ export async function loadInvestmentLabCounterfactualReadModel(
       fxRows,
       requestedAnchorDate,
       fountScopeAdjustment: anchorFountScope,
+      approvedTargetPolicyContext: targetPolicyContexts[account] ?? null,
     });
     anchorBasketScenario = anchorScenarios.equalWeight;
     anchorValueWeightScenario = anchorScenarios.valueWeight;
     anchorCurrentWeightMonthlyScenario =
       anchorScenarios.scheduledCurrentWeight;
     anchorEqualWeightMonthlyScenario = anchorScenarios.scheduledEqualWeight;
+    approvedTargetWeightScenario = anchorScenarios.approvedTargetWeight;
     preperiodOptimizer = requirePreperiodOptimizer(
       anchorScenarios.preperiodOptimizer,
     );
@@ -357,12 +397,48 @@ export async function loadInvestmentLabCounterfactualReadModel(
     anchorValueWeightScenario,
     anchorCurrentWeightMonthlyScenario,
     anchorEqualWeightMonthlyScenario,
+    approvedTargetWeightScenario,
     preperiodOptimizer,
     fountScopeAdjustment: fountScope.scope,
     accountComposition,
     fundingPreflight,
     observedHistory,
   });
+}
+
+async function loadApprovedTargetPolicyContexts(
+  repository: InvestmentLabCounterfactualReadRepository,
+  account: PortfolioAccountScope,
+) {
+  if (!repository.loadApprovedTargetPolicyContext) {
+    return Object.freeze({}) as Readonly<
+      Partial<
+        Record<NamedPortfolioAccount, InvestmentLabApprovedTargetPolicyContext>
+      >
+    >;
+  }
+  const accounts =
+    account === "all"
+      ? NAMED_PORTFOLIO_ACCOUNTS
+      : ([account] as readonly NamedPortfolioAccount[]);
+  const values = await Promise.all(
+    accounts.map(async (namedAccount) =>
+      Object.freeze({
+        account: namedAccount,
+        context:
+          await repository.loadApprovedTargetPolicyContext!(namedAccount),
+      }),
+    ),
+  );
+  return Object.freeze(
+    Object.fromEntries(
+      values.map((value) => [value.account, value.context]),
+    ),
+  ) as Readonly<
+    Partial<
+      Record<NamedPortfolioAccount, InvestmentLabApprovedTargetPolicyContext>
+    >
+  >;
 }
 
 function requirePreperiodOptimizer(

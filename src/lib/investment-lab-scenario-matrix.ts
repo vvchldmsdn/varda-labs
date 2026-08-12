@@ -1,6 +1,7 @@
 import type { InvestmentLabAnchorBasketScenario } from "./investment-lab-anchor-basket-scenario.ts";
 import type { InvestmentLabAnchorValueWeightScenario } from "./investment-lab-anchor-value-weight-scenario.ts";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "./investment-lab-anchor-scheduled-rebalance.ts";
+import type { InvestmentLabApprovedTargetWeightScenario } from "./investment-lab-approved-target-weight.ts";
 import type { InvestmentLabCounterfactualReadModel } from "./investment-lab-counterfactual-read-model.ts";
 import { INVESTMENT_LAB_MODIFIED_DIETZ_POLICY } from "./investment-lab-modified-dietz.ts";
 import {
@@ -26,6 +27,7 @@ export type InvestmentLabScenarioMatrixId =
   | "anchor_basket"
   | "anchor_value_weight"
   | "anchor_current_weight_monthly"
+  | "approved_target_weight_monthly"
   | "anchor_equal_weight_monthly";
 
 export type InvestmentLabScenarioPriceBasis =
@@ -95,6 +97,7 @@ export function buildInvestmentLabScenarioMatrix(input: Readonly<{
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
 }>): InvestmentLabScenarioMatrix {
   const period = resolvePeriod(input.model);
   const rows = period
@@ -103,6 +106,7 @@ export function buildInvestmentLabScenarioMatrix(input: Readonly<{
         input.anchorBasketScenario,
         input.anchorValueWeightScenario,
         input.anchorCurrentWeightMonthlyScenario,
+        input.approvedTargetWeightScenario,
         input.anchorEqualWeightMonthlyScenario,
         period,
       )
@@ -111,6 +115,7 @@ export function buildInvestmentLabScenarioMatrix(input: Readonly<{
         input.anchorBasketScenario,
         input.anchorValueWeightScenario,
         input.anchorCurrentWeightMonthlyScenario,
+        input.approvedTargetWeightScenario,
         input.anchorEqualWeightMonthlyScenario,
       );
   const readyRowCount = rows.filter((row) => row.status === "ready").length;
@@ -133,6 +138,7 @@ function buildRows(
   anchor: InvestmentLabAnchorBasketScenario,
   anchorValueWeight: InvestmentLabAnchorValueWeightScenario,
   anchorCurrentWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario,
+  approvedTargetWeight: InvestmentLabApprovedTargetWeightScenario,
   anchorEqualWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario,
   period: NonNullable<InvestmentLabScenarioMatrix["period"]>,
 ) {
@@ -378,12 +384,43 @@ function buildRows(
       scenario: anchorCurrentWeightMonthly,
       period,
     }),
+    approvedTargetWeightRow({
+      scenario: approvedTargetWeight,
+      period,
+    }),
     scheduledAnchorRow({
       id: "anchor_equal_weight_monthly",
       scenario: anchorEqualWeightMonthly,
       period,
     }),
   ];
+}
+
+function approvedTargetWeightRow(input: Readonly<{
+  scenario: InvestmentLabApprovedTargetWeightScenario;
+  period: NonNullable<InvestmentLabScenarioMatrix["period"]>;
+}>) {
+  const { scenario } = input;
+  return scenarioRow({
+    id: "approved_target_weight_monthly",
+    summary: scenario.summary,
+    period: input.period,
+    returnEstimate: readReturn(
+      scenario.returnEstimate?.scenarioReturn ?? null,
+      scenario.returnEstimate?.method.version ?? null,
+    ),
+    riskMetrics: readRisk(scenario.returnEstimate?.scenarioRiskMetrics),
+    flowCount:
+      scenario.status === "ready" ? scenario.coverage.sourceFlowCount : null,
+    pendingComparisonCount:
+      scenario.status === "ready"
+        ? scenario.coverage.pendingComparisonRows
+        : null,
+    priceBasis: anchorPriceBasis(scenario),
+    fxBasis: "stored_usdkrw_for_usd_legs",
+    sourceReady: scenario.status === "ready",
+    sourceReasons: approvedTargetWeightReasons(scenario),
+  });
 }
 
 function scheduledAnchorRow(input: Readonly<{
@@ -493,6 +530,7 @@ function unavailableRows(
   anchor: InvestmentLabAnchorBasketScenario,
   anchorValueWeight: InvestmentLabAnchorValueWeightScenario,
   anchorCurrentWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario,
+  approvedTargetWeight: InvestmentLabApprovedTargetWeightScenario,
   anchorEqualWeightMonthly: InvestmentLabAnchorScheduledRebalanceScenario,
 ) {
   const reasons = ["base_period_unavailable", ...model.blockers];
@@ -571,6 +609,14 @@ function unavailableRows(
     ),
     unavailableRow(
       {
+        id: "approved_target_weight_monthly",
+        priceBasis: anchorPriceBasis(approvedTargetWeight),
+        fxBasis: "stored_usdkrw_for_usd_legs",
+      },
+      [...reasons, ...approvedTargetWeightReasons(approvedTargetWeight)],
+    ),
+    unavailableRow(
+      {
         id: "anchor_equal_weight_monthly",
         priceBasis: anchorPriceBasis(anchorEqualWeightMonthly),
         fxBasis: "stored_usdkrw_for_usd_legs",
@@ -620,7 +666,8 @@ function anchorPriceBasis(
   anchor:
     | InvestmentLabAnchorBasketScenario
     | InvestmentLabAnchorValueWeightScenario
-    | InvestmentLabAnchorScheduledRebalanceScenario,
+    | InvestmentLabAnchorScheduledRebalanceScenario
+    | InvestmentLabApprovedTargetWeightScenario,
 ): InvestmentLabScenarioPriceBasis {
   return anchor.anchor.instruments.some(
     (instrument) => instrument.valuationModel === "stored_manual",
@@ -663,6 +710,16 @@ function anchorReasons(
     ...anchor.anchor.blockers,
     ...anchor.evidenceBlockers.map((row) => row.reason),
     ...anchor.blockers.map((row) => row.reason),
+  ]);
+}
+
+function approvedTargetWeightReasons(
+  scenario: InvestmentLabApprovedTargetWeightScenario,
+) {
+  return unique([
+    ...scenario.anchor.blockers,
+    ...scenario.evidenceBlockers.map((row) => row.reason),
+    ...scenario.blockers,
   ]);
 }
 

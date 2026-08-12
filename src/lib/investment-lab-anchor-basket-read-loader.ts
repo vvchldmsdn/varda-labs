@@ -25,6 +25,12 @@ import {
   type InvestmentLabPreperiodOptimizer,
 } from "./investment-lab-preperiod-optimizer.ts";
 import {
+  buildInvestmentLabApprovedTargetWeightScenario,
+  unavailableInvestmentLabApprovedTargetWeightScenario,
+  type InvestmentLabApprovedTargetPolicyContext,
+  type InvestmentLabApprovedTargetWeightScenario,
+} from "./investment-lab-approved-target-weight.ts";
+import {
   resolveInvestmentLabBoundaryFlows,
   type InvestmentLabCounterfactualReadInput,
   type InvestmentLabCounterfactualReadModel,
@@ -32,7 +38,10 @@ import {
 import { calculateInvestmentLabModifiedDietz } from "./investment-lab-modified-dietz.ts";
 import { validateInvestmentLabReturnEvidence } from "./investment-lab-return-evidence.ts";
 import { mapRiskEvidenceDateToServiceDate } from "./portfolio-risk-calendar.ts";
-import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
+import {
+  isNamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "./portfolio-account-scope.ts";
 import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
 
 export interface InvestmentLabAnchorBasketReadRepository {
@@ -67,6 +76,7 @@ export type InvestmentLabAnchorScenarioLoadInput = Readonly<{
   requestedAnchorDate?: string | null;
   fountScopeAdjustment?: InvestmentLabAnchorFountScope;
   includePreperiodOptimizer?: boolean;
+  approvedTargetPolicyContext?: InvestmentLabApprovedTargetPolicyContext | null;
 }>;
 
 export type InvestmentLabAnchorScenarios = Readonly<{
@@ -74,6 +84,7 @@ export type InvestmentLabAnchorScenarios = Readonly<{
   valueWeight: InvestmentLabAnchorValueWeightScenario;
   scheduledCurrentWeight: InvestmentLabAnchorScheduledRebalanceScenario;
   scheduledEqualWeight: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeight: InvestmentLabApprovedTargetWeightScenario;
   preperiodOptimizer: InvestmentLabPreperiodOptimizer | null;
 }>;
 
@@ -115,10 +126,13 @@ export async function loadInvestmentLabAnchorScenarios(
   });
   if (anchor.status !== "ready" || !anchor.selectedAnchorDate) {
     return buildAnchorScenarios({
+      account: input.account ?? "all",
       anchor,
       actualPath: [],
       evidence: null,
       actualReturn: null,
+      approvedTargetPolicyContext:
+        input.approvedTargetPolicyContext ?? null,
       includePreperiodOptimizer,
     });
   }
@@ -141,10 +155,13 @@ export async function loadInvestmentLabAnchorScenarios(
   );
   if (flowResolution.status !== "ready") {
     return buildAnchorScenarios({
+      account: input.account ?? "all",
       anchor,
       actualPath,
       evidence: null,
       actualReturn: null,
+      approvedTargetPolicyContext:
+        input.approvedTargetPolicyContext ?? null,
       includePreperiodOptimizer,
     });
   }
@@ -178,11 +195,13 @@ export async function loadInvestmentLabAnchorScenarios(
     eventRows: selectedEventRows,
   });
   return buildAnchorScenarios({
+    account: input.account ?? "all",
     anchor,
     actualPath,
     evidence,
     actualReturn: actualReturn?.totalReturn ?? null,
     actualPeriods: actualReturn?.periods ?? [],
+    approvedTargetPolicyContext: input.approvedTargetPolicyContext ?? null,
     optimizerPriceRows: priceRows,
     optimizerFxRows: input.fxRows,
     includePreperiodOptimizer,
@@ -192,6 +211,8 @@ export async function loadInvestmentLabAnchorScenarios(
 function buildAnchorScenarios(
   input: Parameters<typeof buildInvestmentLabAnchorBasketScenario>[0] &
     Readonly<{
+      account: PortfolioAccountScope;
+      approvedTargetPolicyContext: InvestmentLabApprovedTargetPolicyContext | null;
       optimizerPriceRows?: readonly InvestmentLabAnchorPriceRow[];
       optimizerFxRows?: readonly InvestmentLabAnchorFxRow[];
       includePreperiodOptimizer: boolean;
@@ -210,6 +231,21 @@ function buildAnchorScenarios(
         ...input,
         mode: "equal_weight_monthly",
       }),
+    approvedTargetWeight: isNamedPortfolioAccount(input.account)
+      ? buildInvestmentLabApprovedTargetWeightScenario({
+          account: input.account,
+          anchor: input.anchor,
+          actualPath: input.actualPath,
+          evidence: input.evidence,
+          actualReturn: input.actualReturn,
+          actualPeriods: input.actualPeriods,
+          targetPolicyContext: input.approvedTargetPolicyContext,
+        })
+      : unavailableInvestmentLabApprovedTargetWeightScenario(
+          input.account,
+          input.anchor,
+          ["all_account_requires_named_target_policy_composition"],
+        ),
     preperiodOptimizer: input.includePreperiodOptimizer
       ? buildInvestmentLabPreperiodOptimizer({
           ...input,

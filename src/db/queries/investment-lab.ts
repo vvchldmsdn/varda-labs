@@ -39,6 +39,8 @@ import {
 } from "@/lib/market-data/asset-price-consumer-admission";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
+import { getReadOnlyTenantApprovedTargetPolicy } from "./target-policy";
+import { getReadOnlyTenantTargetPolicyHoldingUniverse } from "./target-policy-holding-universe";
 
 const LEGACY_ID_PATTERN = /^[0-9a-f]{24}$/;
 type InvestmentLabFountRuntimePositionRow = Extract<
@@ -58,6 +60,17 @@ function createTenantInvestmentLabRepository(
       : selectedAccounts;
 
   return {
+  async loadApprovedTargetPolicyContext(account) {
+    const [approvedPolicyRead, currentUniverse] = await Promise.all([
+      getReadOnlyTenantApprovedTargetPolicy({ account, tenantContext }),
+      getReadOnlyTenantTargetPolicyHoldingUniverse({
+        account,
+        tenantContext,
+      }),
+    ]);
+    return Object.freeze({ approvedPolicyRead, currentUniverse });
+  },
+
   async loadEvents() {
     const [rows, historicalPositionRows] = await Promise.all([
       db

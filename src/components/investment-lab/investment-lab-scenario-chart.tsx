@@ -1,6 +1,7 @@
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
+import type { InvestmentLabApprovedTargetWeightScenario } from "@/lib/investment-lab-approved-target-weight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import {
   buildInvestmentLabScenarioChart,
@@ -18,12 +19,14 @@ export function InvestmentLabScenarioChartView({
   anchorValueWeightScenario,
   anchorCurrentWeightMonthlyScenario,
   anchorEqualWeightMonthlyScenario,
+  approvedTargetWeightScenario,
   model,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
+  approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
   model: InvestmentLabCounterfactualReadModel;
 }) {
   const chart = buildInvestmentLabScenarioChart({
@@ -32,6 +35,7 @@ export function InvestmentLabScenarioChartView({
     anchorValueWeightScenario,
     anchorCurrentWeightMonthlyScenario,
     anchorEqualWeightMonthlyScenario,
+    approvedTargetWeightScenario,
   });
   if (!chart.period || chart.lines.length === 0) return null;
 
@@ -96,7 +100,7 @@ export function InvestmentLabScenarioChartView({
           </title>
           <desc id="investment-lab-scenario-chart-description">
             동일한 관측일에 계산할 수 있는 실제, 현금, KODEX 200, VOO,
-            고정혼합, 기준일 바스켓 경로만 표시합니다.
+            고정혼합, 기준일 바스켓, 승인 목표 비중 경로만 표시합니다.
           </desc>
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
             const lineY = PADDING_Y + ratio * (HEIGHT - PADDING_Y * 2);
