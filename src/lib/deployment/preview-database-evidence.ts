@@ -358,9 +358,7 @@ export async function readPreviewDatabaseState(input: {
     migrationRows,
     columnRows,
     indexRows,
-    targetPolicyTableRows,
-    portfolioScopeTableRows,
-    holdingOnboardingTableRows,
+    reviewedTableRows,
     constraintRows,
   ] = await Promise.all([
     input.query(`
@@ -520,27 +518,13 @@ export async function readPreviewDatabaseState(input: {
         from information_schema.tables
        where table_schema = 'public'
          and table_name in (
-           'target_policy_approval_revisions',
-           'target_policy_approval_vector_rows',
-           'target_policy_approval_lifecycle_events'
-         )
-       order by table_name
-    `),
-    input.query(`
-      select table_name
-        from information_schema.tables
-       where table_schema = 'public'
-         and table_name = 'holding_onboarding_evidence'
-       order by table_name
-    `),
-    input.query(`
-      select table_name
-        from information_schema.tables
-       where table_schema = 'public'
-         and table_name in (
+           'holding_onboarding_evidence',
            'portfolio_group_account_memberships',
            'portfolio_group_asset_memberships',
-           'portfolio_groups'
+           'portfolio_groups',
+           'target_policy_approval_lifecycle_events',
+           'target_policy_approval_revisions',
+           'target_policy_approval_vector_rows'
          )
        order by table_name
     `),
@@ -593,15 +577,15 @@ export async function readPreviewDatabaseState(input: {
     ),
   );
   const presentTargetPolicyTables = TARGET_POLICY_TABLES.filter((tableName) =>
-    targetPolicyTableRows.some(({ table_name }) => table_name === tableName),
+    reviewedTableRows.some(({ table_name }) => table_name === tableName),
   );
   const presentPortfolioScopeTables = PORTFOLIO_SCOPE_TABLES.filter(
     (tableName) =>
-      portfolioScopeTableRows.some(({ table_name }) => table_name === tableName),
+      reviewedTableRows.some(({ table_name }) => table_name === tableName),
   );
   const presentHoldingOnboardingTables = HOLDING_ONBOARDING_TABLES.filter(
     (tableName) =>
-      holdingOnboardingTableRows.some(
+      reviewedTableRows.some(
         ({ table_name }) => table_name === tableName,
       ),
   );

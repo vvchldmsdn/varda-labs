@@ -487,6 +487,22 @@ describe("Preview database target operational guard", () => {
     }
   });
 
+  it("reads reviewed table families from one named catalog result", () => {
+    const source = readFileSync(
+      "src/lib/deployment/preview-database-evidence.ts",
+      "utf8",
+    );
+
+    assert.equal(
+      source.match(/from information_schema\.tables/g)?.length,
+      1,
+    );
+    assert.match(source, /reviewedTableRows/);
+    assert.doesNotMatch(source, /targetPolicyTableRows/);
+    assert.doesNotMatch(source, /portfolioScopeTableRows/);
+    assert.doesNotMatch(source, /holdingOnboardingTableRows/);
+  });
+
   it("requires the reviewed holding-onboarding catalog", () => {
     const reviewed = reviewedState();
     for (const reviewedCatalog of [
