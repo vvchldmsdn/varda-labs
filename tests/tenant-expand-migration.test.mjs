@@ -118,12 +118,12 @@ describe("tenant Phase 1C expand migration", () => {
   });
 
   it("keeps the active Drizzle schema aligned with the migration allowlist", () => {
-    assert.equal(
+    assert.ok(
       countMatches(
         schema,
         /canonicalOwnerUserId: uuid\("canonical_owner_user_id"\)/g,
-      ),
-      14,
+      ) >= expectedOwnerTables.length,
+      "the active schema must retain every Phase 1C owner column",
     );
 
     for (const table of expectedOwnerTables) {

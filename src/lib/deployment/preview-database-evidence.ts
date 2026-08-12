@@ -46,6 +46,42 @@ const REVIEWED_INDEXES = Object.freeze({
     unique: true,
     hasPredicate: false,
   }),
+  assetCanonicalOwner: Object.freeze({
+    name: "assets_id_canonical_owner_unique",
+    columns: Object.freeze(["id", "canonical_owner_user_id"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  portfolioGroupOwner: Object.freeze({
+    name: "portfolio_groups_id_canonical_owner_unique",
+    columns: Object.freeze(["id", "canonical_owner_user_id"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  portfolioGroupAccountStart: Object.freeze({
+    name: "portfolio_group_account_memberships_start_unique",
+    columns: Object.freeze(["portfolio_group_id", "account_id", "valid_from"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  portfolioGroupAccountActive: Object.freeze({
+    name: "portfolio_group_account_memberships_active_unique",
+    columns: Object.freeze(["portfolio_group_id", "account_id"]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  portfolioGroupAssetStart: Object.freeze({
+    name: "portfolio_group_asset_memberships_start_unique",
+    columns: Object.freeze(["portfolio_group_id", "asset_id", "valid_from"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  portfolioGroupAssetActive: Object.freeze({
+    name: "portfolio_group_asset_memberships_active_unique",
+    columns: Object.freeze(["portfolio_group_id", "asset_id"]),
+    unique: true,
+    hasPredicate: true,
+  }),
   portfolioSnapshotIdentity: Object.freeze({
     name: "daily_portfolio_snapshots_date_account_source_unique",
     columns: Object.freeze([
@@ -172,6 +208,25 @@ const SNAPSHOT_OWNERSHIP_CONSTRAINTS = Object.freeze([
     validated: true,
   }),
 ]);
+const PORTFOLIO_SCOPE_TABLES = Object.freeze([
+  "portfolio_group_account_memberships",
+  "portfolio_group_asset_memberships",
+  "portfolio_groups",
+]);
+const PORTFOLIO_SCOPE_CONSTRAINTS = Object.freeze([
+  "portfolio_group_account_memberships_account_owner_fk",
+  "portfolio_group_account_memberships_group_owner_fk",
+  "portfolio_group_account_memberships_owner_user_fk",
+  "portfolio_group_account_memberships_valid_period_check",
+  "portfolio_group_asset_memberships_asset_owner_fk",
+  "portfolio_group_asset_memberships_group_owner_fk",
+  "portfolio_group_asset_memberships_owner_user_fk",
+  "portfolio_group_asset_memberships_valid_period_check",
+  "portfolio_groups_archived_at_check",
+  "portfolio_groups_name_check",
+  "portfolio_groups_owner_user_fk",
+  "portfolio_groups_sort_order_check",
+]);
 
 type Query = (query: string) => Promise<Record<string, unknown>[]>;
 
@@ -207,6 +262,15 @@ export type PreviewDatabaseState = {
     snapshotOwnershipConstraints: string[];
     accountOwnerCodeUniqueIndexExact: boolean;
     assetAccountUniqueIndexExact: boolean;
+    assetCanonicalOwnerUniqueIndexExact: boolean;
+    portfolioGroupOwnerUniqueIndexExact: boolean;
+    portfolioGroupAccountStartIndexExact: boolean;
+    portfolioGroupAccountActiveIndexExact: boolean;
+    portfolioGroupAssetStartIndexExact: boolean;
+    portfolioGroupAssetActiveIndexExact: boolean;
+    portfolioScopeTables: string[];
+    portfolioScopeConstraints: string[];
+    portfolioScopeRows: PortfolioScopeRowCounts | null;
     portfolioSnapshotIdentityIndexExact: boolean;
     positionSnapshotIdentityIndexExact: boolean;
   };
@@ -216,6 +280,12 @@ export type TargetPolicyRowCounts = {
   revisions: number;
   vectorRows: number;
   lifecycleEvents: number;
+};
+
+export type PortfolioScopeRowCounts = {
+  groups: number;
+  accountMemberships: number;
+  assetMemberships: number;
 };
 
 export async function readPreviewDatabaseState(input: {
@@ -229,6 +299,7 @@ export async function readPreviewDatabaseState(input: {
     columnRows,
     indexRows,
     targetPolicyTableRows,
+    portfolioScopeTableRows,
     constraintRows,
   ] = await Promise.all([
     input.query(`
@@ -314,6 +385,9 @@ export async function readPreviewDatabaseState(input: {
           'assets',
           'daily_portfolio_snapshots',
           'daily_position_snapshots',
+          'portfolio_group_account_memberships',
+          'portfolio_group_asset_memberships',
+          'portfolio_groups',
           'target_policy_approval_revisions',
           'target_policy_approval_lifecycle_events'
         )
@@ -323,8 +397,14 @@ export async function readPreviewDatabaseState(input: {
           'accounts_id_canonical_owner_unique',
           'accounts_canonical_owner_code_unique',
           'assets_id_account_unique',
+          'assets_id_canonical_owner_unique',
           'daily_portfolio_snapshots_date_account_source_unique',
           'daily_position_snapshots_date_account_asset_source_unique',
+          'portfolio_group_account_memberships_start_unique',
+          'portfolio_group_account_memberships_active_unique',
+          'portfolio_group_asset_memberships_start_unique',
+          'portfolio_group_asset_memberships_active_unique',
+          'portfolio_groups_id_canonical_owner_unique',
           'target_policy_revisions_identity_revision_unique',
           'target_policy_revisions_current_unique',
           'target_policy_events_revision_sequence_unique'
@@ -353,6 +433,17 @@ export async function readPreviewDatabaseState(input: {
        order by table_name
     `),
     input.query(`
+      select table_name
+        from information_schema.tables
+       where table_schema = 'public'
+         and table_name in (
+           'portfolio_group_account_memberships',
+           'portfolio_group_asset_memberships',
+           'portfolio_groups'
+         )
+       order by table_name
+    `),
+    input.query(`
       select table_class.relname as table_name,
              constraint_definition.conname as constraint_name,
              constraint_definition.contype as constraint_type,
@@ -368,7 +459,10 @@ export async function readPreviewDatabaseState(input: {
            'target_policy_approval_vector_rows',
            'target_policy_approval_lifecycle_events',
            'daily_portfolio_snapshots',
-           'daily_position_snapshots'
+           'daily_position_snapshots',
+           'portfolio_group_account_memberships',
+           'portfolio_group_asset_memberships',
+           'portfolio_groups'
          )
        order by constraint_definition.conname
     `),
@@ -399,7 +493,18 @@ export async function readPreviewDatabaseState(input: {
   const presentTargetPolicyTables = TARGET_POLICY_TABLES.filter((tableName) =>
     targetPolicyTableRows.some(({ table_name }) => table_name === tableName),
   );
+  const presentPortfolioScopeTables = PORTFOLIO_SCOPE_TABLES.filter(
+    (tableName) =>
+      portfolioScopeTableRows.some(({ table_name }) => table_name === tableName),
+  );
   const presentTargetPolicyConstraints = TARGET_POLICY_CONSTRAINTS.filter(
+    (constraintName) =>
+      constraintRows.some(
+        ({ constraint_name, is_validated }) =>
+          constraint_name === constraintName && is_validated === true,
+      ),
+  );
+  const presentPortfolioScopeConstraints = PORTFOLIO_SCOPE_CONSTRAINTS.filter(
     (constraintName) =>
       constraintRows.some(
         ({ constraint_name, is_validated }) =>
@@ -425,6 +530,10 @@ export async function readPreviewDatabaseState(input: {
   const targetPolicyRows =
     presentTargetPolicyTables.length === TARGET_POLICY_TABLES.length
       ? await readTargetPolicyRowCounts(input.query)
+      : null;
+  const portfolioScopeRows =
+    presentPortfolioScopeTables.length === PORTFOLIO_SCOPE_TABLES.length
+      ? await readPortfolioScopeRowCounts(input.query)
       : null;
 
   const appliedMigrations = migrationRows.map((row) => ({
@@ -508,6 +617,33 @@ export async function readPreviewDatabaseState(input: {
         indexRows,
         REVIEWED_INDEXES.assetAccount,
       ),
+      assetCanonicalOwnerUniqueIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.assetCanonicalOwner,
+      ),
+      portfolioGroupOwnerUniqueIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.portfolioGroupOwner,
+      ),
+      portfolioGroupAccountStartIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.portfolioGroupAccountStart,
+      ),
+      portfolioGroupAccountActiveIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.portfolioGroupAccountActive,
+      ),
+      portfolioGroupAssetStartIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.portfolioGroupAssetStart,
+      ),
+      portfolioGroupAssetActiveIndexExact: hasExactUniqueIndex(
+        indexRows,
+        REVIEWED_INDEXES.portfolioGroupAssetActive,
+      ),
+      portfolioScopeTables: presentPortfolioScopeTables,
+      portfolioScopeConstraints: presentPortfolioScopeConstraints,
+      portfolioScopeRows,
       portfolioSnapshotIdentityIndexExact: hasExactUniqueIndex(
         indexRows,
         REVIEWED_INDEXES.portfolioSnapshotIdentity,
@@ -525,7 +661,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0023 ledger.",
+      "Preview database migration ledger does not match the reviewed 0024 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -541,7 +677,17 @@ export function assertReviewedPreviewDatabaseCatalog(
 ) {
   if (!hasReviewedCatalog(state)) {
     throw new Error(
-      "Preview database reviewed 0023 catalog is incomplete.",
+      "Preview database reviewed 0024 catalog is incomplete.",
+    );
+  }
+}
+
+export function assertReviewedPrePortfolioScopePreviewDatabaseCatalog(
+  state: PreviewDatabaseState,
+) {
+  if (!hasReviewedPrePortfolioScopeCatalog(state)) {
+    throw new Error(
+      "Preview database reviewed 0023 prerequisite catalog is incomplete.",
     );
   }
 }
@@ -587,6 +733,34 @@ export function assertPreviewTargetPolicyRowsPreserved(
   }
 }
 
+export function assertPreviewPortfolioScopeRowsPreserved(
+  before: PortfolioScopeRowCounts | null,
+  after: PortfolioScopeRowCounts | null,
+) {
+  if (after === null) {
+    throw new Error(
+      "Preview postflight portfolio-scope row evidence is unavailable.",
+    );
+  }
+
+  const expected = before ?? {
+    groups: 0,
+    accountMemberships: 0,
+    assetMemberships: 0,
+  };
+  if (
+    after.groups !== expected.groups ||
+    after.accountMemberships !== expected.accountMemberships ||
+    after.assetMemberships !== expected.assetMemberships
+  ) {
+    throw new Error(
+      before === null
+        ? "Preview migration unexpectedly seeded portfolio-scope rows."
+        : "Preview migration changed inherited portfolio-scope row counts.",
+    );
+  }
+}
+
 export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedMigrationLedgerPresent =
     hasReviewedMigrationLedger(state);
@@ -597,8 +771,10 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     hasReviewedTargetPolicyCatalog(state);
   const reviewedSnapshotOwnershipCatalogPresent =
     hasReviewedSnapshotOwnershipCatalog(state);
+  const reviewedPortfolioScopeCatalogPresent =
+    hasReviewedPortfolioScopeCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v6",
+    evidenceVersion: "preview_database_evidence_v7",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -607,8 +783,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0023_present"
-      : "reviewed_0023_not_present",
+      ? "reviewed_0024_present"
+      : "reviewed_0024_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",
@@ -618,6 +794,9 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     snapshotOwnershipCatalogStatus: reviewedSnapshotOwnershipCatalogPresent
       ? "reviewed_0023_present"
       : "reviewed_0023_not_present",
+    portfolioScopeCatalogStatus: reviewedPortfolioScopeCatalogPresent
+      ? "reviewed_0024_present"
+      : "reviewed_0024_not_present",
   };
 }
 
@@ -646,6 +825,13 @@ function hasReviewedLatestMigration(state: PreviewDatabaseState) {
 }
 
 function hasReviewedCatalog(state: PreviewDatabaseState) {
+  return (
+    hasReviewedPrePortfolioScopeCatalog(state) &&
+    hasReviewedPortfolioScopeCatalog(state)
+  );
+}
+
+function hasReviewedPrePortfolioScopeCatalog(state: PreviewDatabaseState) {
   return (
     hasReviewedAssetPriceCatalog(state) &&
     hasReviewedTargetPolicyCatalog(state) &&
@@ -685,6 +871,22 @@ function hasReviewedSnapshotOwnershipCatalog(state: PreviewDatabaseState) {
     state.reviewedCatalog.assetAccountUniqueIndexExact &&
     state.reviewedCatalog.portfolioSnapshotIdentityIndexExact &&
     state.reviewedCatalog.positionSnapshotIdentityIndexExact
+  );
+}
+
+function hasReviewedPortfolioScopeCatalog(state: PreviewDatabaseState) {
+  return (
+    state.reviewedCatalog.portfolioScopeTables.length ===
+      PORTFOLIO_SCOPE_TABLES.length &&
+    state.reviewedCatalog.portfolioScopeConstraints.length ===
+      PORTFOLIO_SCOPE_CONSTRAINTS.length &&
+    state.reviewedCatalog.portfolioScopeRows !== null &&
+    state.reviewedCatalog.assetCanonicalOwnerUniqueIndexExact &&
+    state.reviewedCatalog.portfolioGroupOwnerUniqueIndexExact &&
+    state.reviewedCatalog.portfolioGroupAccountStartIndexExact &&
+    state.reviewedCatalog.portfolioGroupAccountActiveIndexExact &&
+    state.reviewedCatalog.portfolioGroupAssetStartIndexExact &&
+    state.reviewedCatalog.portfolioGroupAssetActiveIndexExact
   );
 }
 
@@ -743,6 +945,40 @@ async function readTargetPolicyRowCounts(query: Query) {
     lifecycleEvents: integerValue(
       rows[0].lifecycle_events,
       "target policy lifecycle events",
+    ),
+  };
+}
+
+async function readPortfolioScopeRowCounts(query: Query) {
+  const rows = await query(`
+    select
+      (
+        select count(*)::integer
+          from portfolio_groups
+      ) as groups,
+      (
+        select count(*)::integer
+          from portfolio_group_account_memberships
+      ) as account_memberships,
+      (
+        select count(*)::integer
+          from portfolio_group_asset_memberships
+      ) as asset_memberships
+  `);
+  if (rows.length !== 1) {
+    throw new Error(
+      "Preview database portfolio-scope row evidence is unavailable.",
+    );
+  }
+  return {
+    groups: integerValue(rows[0].groups, "portfolio groups"),
+    accountMemberships: integerValue(
+      rows[0].account_memberships,
+      "portfolio group account memberships",
+    ),
+    assetMemberships: integerValue(
+      rows[0].asset_memberships,
+      "portfolio group asset memberships",
     ),
   };
 }

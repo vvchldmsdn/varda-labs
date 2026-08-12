@@ -449,6 +449,9 @@ export const assets = pgTable(
     canonicalOwnerUserIdIdx: index(
       "assets_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    assetCanonicalOwnerUnique: uniqueIndex(
+      "assets_id_canonical_owner_unique",
+    ).on(table.id, table.canonicalOwnerUserId),
     assetAccountUnique: uniqueIndex("assets_id_account_unique").on(
       table.id,
       table.accountId,
@@ -495,6 +498,165 @@ export const accounts = pgTable(
     ).on(table.canonicalOwnerUserId),
   }),
 );
+
+export const portfolioGroups = pgTable(
+  "portfolio_groups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "portfolio_groups_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    groupCanonicalOwnerUnique: uniqueIndex(
+      "portfolio_groups_id_canonical_owner_unique",
+    ).on(table.id, table.canonicalOwnerUserId),
+    activeOwnerNameUnique: uniqueIndex(
+      "portfolio_groups_active_owner_name_unique",
+    )
+      .on(table.canonicalOwnerUserId, sql`lower(${table.name})`)
+      .where(sql`${table.archivedAt} is null`),
+    canonicalOwnerUserIdIdx: index(
+      "portfolio_groups_canonical_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
+    nameCheck: check(
+      "portfolio_groups_name_check",
+      sql`${table.name} = btrim(${table.name}) and char_length(${table.name}) > 0`,
+    ),
+    sortOrderCheck: check(
+      "portfolio_groups_sort_order_check",
+      sql`${table.sortOrder} >= 0`,
+    ),
+    archivedAtCheck: check(
+      "portfolio_groups_archived_at_check",
+      sql`${table.archivedAt} is null or ${table.archivedAt} >= ${table.createdAt}`,
+    ),
+  }),
+);
+
+export const portfolioGroupAccountMemberships = pgTable(
+  "portfolio_group_account_memberships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    portfolioGroupId: uuid("portfolio_group_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    validFrom: date("valid_from").notNull(),
+    validTo: date("valid_to"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "portfolio_group_account_memberships_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    groupOwnerFk: foreignKey({
+      name: "portfolio_group_account_memberships_group_owner_fk",
+      columns: [table.portfolioGroupId, table.canonicalOwnerUserId],
+      foreignColumns: [portfolioGroups.id, portfolioGroups.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "portfolio_group_account_memberships_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    membershipStartUnique: uniqueIndex(
+      "portfolio_group_account_memberships_start_unique",
+    ).on(table.portfolioGroupId, table.accountId, table.validFrom),
+    activeMembershipUnique: uniqueIndex(
+      "portfolio_group_account_memberships_active_unique",
+    )
+      .on(table.portfolioGroupId, table.accountId)
+      .where(sql`${table.validTo} is null`),
+    ownerUserIdIdx: index(
+      "portfolio_group_account_memberships_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
+    accountIdIdx: index(
+      "portfolio_group_account_memberships_account_id_idx",
+    ).on(table.accountId),
+    validPeriodCheck: check(
+      "portfolio_group_account_memberships_valid_period_check",
+      sql`${table.validTo} is null or ${table.validTo} > ${table.validFrom}`,
+    ),
+  }),
+);
+
+export const portfolioGroupAssetMemberships = pgTable(
+  "portfolio_group_asset_memberships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    portfolioGroupId: uuid("portfolio_group_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    validFrom: date("valid_from").notNull(),
+    validTo: date("valid_to"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "portfolio_group_asset_memberships_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    groupOwnerFk: foreignKey({
+      name: "portfolio_group_asset_memberships_group_owner_fk",
+      columns: [table.portfolioGroupId, table.canonicalOwnerUserId],
+      foreignColumns: [portfolioGroups.id, portfolioGroups.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "portfolio_group_asset_memberships_asset_owner_fk",
+      columns: [table.assetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    membershipStartUnique: uniqueIndex(
+      "portfolio_group_asset_memberships_start_unique",
+    ).on(table.portfolioGroupId, table.assetId, table.validFrom),
+    activeMembershipUnique: uniqueIndex(
+      "portfolio_group_asset_memberships_active_unique",
+    )
+      .on(table.portfolioGroupId, table.assetId)
+      .where(sql`${table.validTo} is null`),
+    ownerUserIdIdx: index(
+      "portfolio_group_asset_memberships_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
+    assetIdIdx: index("portfolio_group_asset_memberships_asset_id_idx").on(
+      table.assetId,
+    ),
+    validPeriodCheck: check(
+      "portfolio_group_asset_memberships_valid_period_check",
+      sql`${table.validTo} is null or ${table.validTo} > ${table.validFrom}`,
+    ),
+  }),
+);
+
+export type PortfolioGroup = typeof portfolioGroups.$inferSelect;
+export type NewPortfolioGroup = typeof portfolioGroups.$inferInsert;
+export type PortfolioGroupAccountMembership =
+  typeof portfolioGroupAccountMemberships.$inferSelect;
+export type NewPortfolioGroupAccountMembership =
+  typeof portfolioGroupAccountMemberships.$inferInsert;
+export type PortfolioGroupAssetMembership =
+  typeof portfolioGroupAssetMemberships.$inferSelect;
+export type NewPortfolioGroupAssetMembership =
+  typeof portfolioGroupAssetMemberships.$inferInsert;
 
 export const targetPolicyApprovalRevisions = pgTable(
   "target_policy_approval_revisions",
