@@ -70,11 +70,19 @@ describe("current tenant read scope runtime boundary", () => {
       /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
     );
     assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(source, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(
+      source,
+      /eq\(assets\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+    );
     assert.match(source, /eq\(assets\.account,\s*accounts\.code\)/);
+    assert.match(source, /portfolioGroupAccountMemberships/);
+    assert.match(source, /portfolioGroupAssetMemberships/);
+    assert.match(source, /selectDistinct/);
+    assert.match(source, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
+    assert.match(source, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
     assert.doesNotMatch(
       source,
-      /eq\(assets\.canonicalOwnerUserId|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+      /NAMED_PORTFOLIO_ACCOUNTS|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
     );
   });
 
@@ -83,14 +91,16 @@ describe("current tenant read scope runtime boundary", () => {
 
     assert.match(source, /resolveCurrentTenantContext\(\)/);
     assert.match(source, /getReadOnlyTenantHoldings/);
-    assert.match(source, /normalizePortfolioAccountScope/);
+    assert.match(source, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
+    assert.match(source, /PortfolioAnalysisScopeTabs/);
+    assert.match(source, /resolveSnapshotCycle\(\)\.snapshotDate/);
     assert.match(source, /Promise\.all/);
-    assert.match(source, /holdingReadEvidence\(result, resolution\)/);
+    assert.match(source, /holdingReadEvidence\(/);
     assert.match(source, /result\.state === "partial"/);
     assert.match(source, /must not be used for valuation totals/);
     assert.doesNotMatch(
       source,
-      /"use client"|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId|legacyBase44Id/,
+      /"use client"|providerSubject|canonicalOwnerUserId|legacyBase44Id/,
     );
   });
 

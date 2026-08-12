@@ -1,6 +1,6 @@
 # Dynamic Portfolio Analysis Scopes
 
-Status: local expand-schema candidate, no runtime or database application yet
+Status: Production schema applied; first owner-scoped holdings read slice in implementation
 
 ## Product Decision
 
@@ -43,8 +43,10 @@ path. It resolves a code only through active accounts already filtered by the
 authenticated owner. Unknown, duplicate, inactive, malformed, or conflicting
 inputs are blocked; they never silently fall back to `all`.
 
-`src/lib/portfolio-analysis-scope.ts` implements this pure boundary. It does
-not read the database and is not connected to a page yet.
+`src/lib/portfolio-analysis-scope.ts` implements this pure boundary. The
+`/portfolio/holdings` Server Component is the first consumer: it loads only the
+authenticated owner's active accounts and portfolio groups, resolves the URL,
+and then reads the selected holdings without a browser REST round trip.
 
 ## Proposed Normalized Tables
 
@@ -119,21 +121,21 @@ are effective-dated so changing a group today does not rewrite past charts.
 
 ## Migration Sequence
 
-1. **Foundation (this change)**
+1. **Foundation (complete)**
    - Add the pure canonical scope catalog, resolver, URL builder, and tests.
    - Keep all current routes and writes unchanged.
-2. **Expand schema**
+2. **Expand schema (complete)**
    - Add the three empty portfolio-group tables and owner-qualified integrity
      constraints. This change includes the local schema candidate.
    - Rehearse on a disposable Neon branch before Production migration.
-3. **Seed compatibility groups**
+3. **Seed compatibility groups (superseded by user onboarding)**
    - For each current owner, create groups corresponding to the current
      brokerage/ISA/IRP presentation only after reviewing membership dates.
    - Preserve the exact legacy split with direct asset membership first.
    - Link a real account by UUID only after its provider-account identity is
      established. Do not treat the imported code as a global enum or proof of
      a custody account.
-4. **Server read path**
+4. **Server read path (holdings slice in implementation)**
    - Load the owner-scoped scope catalog in Server Components.
    - Resolve `scope`, then fetch independent sections in parallel.
    - Keep `account=` only as a redirect/compatibility input.

@@ -3,6 +3,22 @@ import { describe, it } from "node:test";
 
 import { projectTenantHoldingRows } from "../src/lib/tenant-holding-read-model.ts";
 
+const ALL_SCOPE = Object.freeze({ kind: "all", key: "all", label: "전체" });
+const BROKERAGE_SCOPE = Object.freeze({
+  kind: "account",
+  key: "account:11111111-1111-4111-8111-111111111111",
+  label: "Brokerage",
+  accountId: "account-brokerage",
+  accountCode: "brokerage",
+});
+const ISA_SCOPE = Object.freeze({
+  kind: "account",
+  key: "account:22222222-2222-4222-8222-222222222222",
+  label: "ISA",
+  accountId: "account-isa",
+  accountCode: "isa",
+});
+
 const BROKERAGE = Object.freeze({
   assetId: "asset-brokerage-1",
   assetAccountId: "account-brokerage",
@@ -40,11 +56,10 @@ const ISA = Object.freeze({
 
 describe("tenant holding read model", () => {
   it("projects sorted minimal DTOs without database or owner identities", () => {
-    const result = projectTenantHoldingRows([ISA, BROKERAGE], "all");
+    const result = projectTenantHoldingRows([ISA, BROKERAGE], ALL_SCOPE);
 
     assert.deepEqual(result, {
       state: "ready",
-      scope: "all",
       holdings: [
         {
           accountCode: "brokerage",
@@ -97,7 +112,7 @@ describe("tenant holding read model", () => {
           priceStatus: null,
         },
       ],
-      "brokerage",
+      BROKERAGE_SCOPE,
     );
 
     assert.equal(result.state, "ready");
@@ -108,11 +123,11 @@ describe("tenant holding read model", () => {
     assert.deepEqual(
       projectTenantHoldingRows(
         [{ ...BROKERAGE, assetAccountId: "foreign-account" }],
-        "all",
+        ALL_SCOPE,
       ),
       { state: "integrity_error", reason: "invalid_account_relation" },
     );
-    assert.deepEqual(projectTenantHoldingRows([BROKERAGE], "isa"), {
+    assert.deepEqual(projectTenantHoldingRows([BROKERAGE], ISA_SCOPE), {
       state: "integrity_error",
       reason: "account_scope_mismatch",
     });
@@ -120,7 +135,7 @@ describe("tenant holding read model", () => {
 
   it("fails closed for duplicate authority rows", () => {
     assert.deepEqual(
-      projectTenantHoldingRows([BROKERAGE, BROKERAGE], "all"),
+      projectTenantHoldingRows([BROKERAGE, BROKERAGE], ALL_SCOPE),
       { state: "integrity_error", reason: "duplicate_asset_row" },
     );
   });
@@ -128,12 +143,29 @@ describe("tenant holding read model", () => {
   it("keeps valid holdings when one display-evidence row is malformed", () => {
     const result = projectTenantHoldingRows(
       [{ ...BROKERAGE, currentPrice: "NaN" }, ISA],
-      "all",
+      ALL_SCOPE,
     );
 
     assert.equal(result.state, "partial");
     assert.equal(result.holdings.length, 1);
     assert.equal(result.holdings[0]?.accountCode, "isa");
     assert.equal(result.excludedHoldingCount, 1);
+  });
+
+  it("accepts owner-scoped account codes beyond the imported fixed labels", () => {
+    const result = projectTenantHoldingRows(
+      [
+        {
+          ...BROKERAGE,
+          accountCode: "future-broker-2",
+          legacyAccountCode: "future-broker-2",
+          accountName: "두 번째 증권 계좌",
+        },
+      ],
+      ALL_SCOPE,
+    );
+
+    assert.equal(result.state, "ready");
+    assert.equal(result.holdings[0]?.accountCode, "future-broker-2");
   });
 });

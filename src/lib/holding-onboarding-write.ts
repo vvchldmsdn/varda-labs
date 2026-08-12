@@ -27,6 +27,7 @@ import {
   canonicalOwnerAssignment,
   prepareTenantWriteContext,
 } from "@/lib/tenant-write-context";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 type PriceEvidence = Readonly<{
   currentPrice: string;
@@ -169,7 +170,7 @@ export async function writeSessionHoldingOnboarding(
         canonicalOwnerUserId,
         portfolioGroupId: group.id,
         assetId,
-        validFrom: kstCalendarDate(recordedAt),
+        validFrom: resolveSnapshotCycle(recordedAt).snapshotDate,
         createdAt: recordedAt,
       });
 
@@ -381,18 +382,6 @@ async function resolvePriceEvidence(
     priceAsOf: new Date(`${closeRows[0].priceDate}T00:00:00.000Z`),
     priceQuoteType: "close",
   });
-}
-
-function kstCalendarDate(value: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(value);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((candidate) => candidate.type === type)?.value;
-  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function isUniqueViolation(error: unknown) {
