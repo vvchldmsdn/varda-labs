@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import {
   admitAdjustedHistoricalPriceRows,
   admitPrivateSingleTenantRawHistoricalPriceRows,
+  admitPrivateSingleTenantRawTrendEvidenceRows,
   admitRawHistoricalPriceRows,
   ASSET_PRICE_CONSUMER_ADMISSION_POLICY,
   resolveOperationalClosePrice,
@@ -127,6 +128,50 @@ describe("asset price consumer admission", () => {
 
   it("fails private raw history closed when another active owner exists", () => {
     const result = admitPrivateSingleTenantRawHistoricalPriceRows({
+      requestedOwnerUserId: "11111111-1111-4111-8111-111111111111",
+      activeOwnerUserIds: [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+      ],
+      rows: [providerRow()],
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.rows, []);
+    assert.deepEqual(result.issues, [
+      "private_single_tenant_scope_not_established",
+    ]);
+  });
+
+  it("admits KIS raw levels as descriptive trend evidence without allocation authority", () => {
+    const ownerUserId = "11111111-1111-4111-8111-111111111111";
+    const result = admitPrivateSingleTenantRawTrendEvidenceRows({
+      requestedOwnerUserId: ownerUserId,
+      activeOwnerUserIds: [ownerUserId],
+      rows: [
+        providerRow({
+          adjustedClosePrice: null,
+          adjustedCloseBasis: null,
+          adjustedCloseProvider: null,
+          adjustedCloseSource: null,
+          adjustedCloseFetchedAt: null,
+          source: "kis_domestic_dailyitemchartprice",
+        }),
+      ],
+    });
+
+    assert.equal(result.status, "ready");
+    assert.equal(result.summary.admittedRowCount, 1);
+    assert.equal(
+      result.policy.consumerPurpose,
+      "owner_only_descriptive_trend_evidence",
+    );
+    assert.equal(result.policy.allocationEffect, "none");
+    assert.equal(result.policy.recommendation, "forbidden");
+  });
+
+  it("fails descriptive raw trend evidence closed for multiple owners", () => {
+    const result = admitPrivateSingleTenantRawTrendEvidenceRows({
       requestedOwnerUserId: "11111111-1111-4111-8111-111111111111",
       activeOwnerUserIds: [
         "11111111-1111-4111-8111-111111111111",

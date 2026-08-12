@@ -2,6 +2,10 @@ import {
   allocateAdditionalContribution,
   type AdditionalContributionBlockerReason,
 } from "./additional-contribution-allocator.ts";
+import type {
+  AdditionalContributionMa120OperationalEvidence,
+  AdditionalContributionMa120OperationalPriceBasis,
+} from "./additional-contribution-ma120-operational-evidence.ts";
 import {
   normalizeTargetPolicyUniverseAccount,
   type TargetPolicyUniverseSourceRow,
@@ -25,6 +29,25 @@ export type AdditionalContributionPreviewBlocker =
 export type AdditionalContributionApprovedPolicyPort = Readonly<{
   status: "available" | "missing" | "conflict";
   policy: ApprovedTargetPolicyPort | null;
+}>;
+
+export type AdditionalContributionMa120ReadPort = Readonly<{
+  policyVersion: string;
+  allocationEffect: "none";
+  status: "ready" | "partial" | "unavailable" | "read_failed";
+  suppliedHoldingCount: number;
+  evaluatedHoldingCount: number;
+  usableCount: number;
+  unavailableCount: number;
+  rows: readonly Readonly<{
+    instrumentKey: string;
+    status:
+      | AdditionalContributionMa120OperationalEvidence["status"]
+      | "unavailable";
+    priceBasis: AdditionalContributionMa120OperationalPriceBasis | null;
+    evidence: AdditionalContributionMa120OperationalEvidence | null;
+    unavailableReason: string | null;
+  }>[];
 }>;
 
 export function buildAdditionalContributionPreview({
@@ -172,6 +195,66 @@ export function buildAdditionalContributionPreview({
   } as const);
 }
 
+export function attachAdditionalContributionMa120Evidence({
+  preview,
+  ma120Read,
+}: {
+  preview: ReturnType<typeof buildAdditionalContributionPreview>;
+  ma120Read: AdditionalContributionMa120ReadPort;
+}) {
+  if (preview.status !== "ready") return preview;
+
+  const evidenceByInstrument = new Map(
+    ma120Read.rows.map((row) => [row.instrumentKey, row] as const),
+  );
+  return Object.freeze({
+    ...preview,
+    ma120Evidence: Object.freeze({
+      policyVersion: ma120Read.policyVersion,
+      allocationEffect: ma120Read.allocationEffect,
+      status: ma120Read.status,
+      suppliedHoldingCount: ma120Read.suppliedHoldingCount,
+      evaluatedHoldingCount: ma120Read.evaluatedHoldingCount,
+      usableCount: ma120Read.usableCount,
+      unavailableCount: ma120Read.unavailableCount,
+    }),
+    rows: Object.freeze(
+      preview.rows.map((row) => {
+        const evidence = evidenceByInstrument.get(instrumentKey(row) ?? "");
+        return Object.freeze({
+          ...row,
+          ma120Evidence: evidence
+            ? compactMa120Evidence(evidence)
+            : Object.freeze({
+                status: "unavailable" as const,
+                priceBasis: null,
+                availableObservationCount: 0,
+                latestWindowPriceDate: null,
+                ma120: null,
+                distanceFromMaPct: null,
+                unavailableReason: "evidence_row_missing",
+              }),
+        });
+      }),
+    ),
+  });
+}
+
+export function additionalContributionMa120ReadFailure(
+  suppliedHoldingCount: number,
+): AdditionalContributionMa120ReadPort {
+  return Object.freeze({
+    policyVersion: "additional_contribution_ma120_operational_evidence_v1",
+    allocationEffect: "none",
+    status: "read_failed",
+    suppliedHoldingCount,
+    evaluatedHoldingCount: 0,
+    usableCount: 0,
+    unavailableCount: suppliedHoldingCount,
+    rows: Object.freeze([]),
+  });
+}
+
 function blocked(
   account: ReturnType<typeof normalizeTargetPolicyUniverseAccount>,
   policyVersion: string | null,
@@ -191,6 +274,21 @@ function blocked(
     rows: Object.freeze([]),
     blockers: Object.freeze([...new Set(blockers)].sort()),
   } as const);
+}
+
+function compactMa120Evidence(
+  row: AdditionalContributionMa120ReadPort["rows"][number],
+) {
+  return Object.freeze({
+    status: row.status,
+    priceBasis: row.priceBasis,
+    availableObservationCount:
+      row.evidence?.availableObservationCount ?? 0,
+    latestWindowPriceDate: row.evidence?.latestWindowPriceDate ?? null,
+    ma120: row.evidence?.ma120 ?? null,
+    distanceFromMaPct: row.evidence?.distanceFromMaPct ?? null,
+    unavailableReason: row.unavailableReason,
+  });
 }
 
 function instrumentKey(row: {

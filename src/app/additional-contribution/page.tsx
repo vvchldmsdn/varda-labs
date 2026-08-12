@@ -169,7 +169,7 @@ function ReadyPreview({
 }) {
   return (
     <>
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <SummaryCell
           label="현재 평가액"
           value={formatKrw(preview.currentPortfolioTotalKrw)}
@@ -187,10 +187,15 @@ function ReadyPreview({
           value={preview.policyVersion}
           detail={`${preview.effectiveServiceDate}부터 · 기준일 ${preview.serviceDate}`}
         />
+        <SummaryCell
+          label="MA120 근거"
+          value={`${preview.ma120Evidence.usableCount}/${preview.rows.length} 종목`}
+          detail={ma120SummaryDetail(preview.ma120Evidence.status)}
+        />
       </dl>
 
       <div className="mt-5 overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
-        <table className="w-full min-w-[900px] border-collapse text-sm">
+        <table className="w-full min-w-[1080px] border-collapse text-sm">
           <thead className="bg-[#edf1e8] text-left text-xs text-[#596257]">
             <tr>
               <th className="px-3 py-3">종목</th>
@@ -198,6 +203,7 @@ function ReadyPreview({
               <th className="px-3 py-3 text-right">현재 평가액</th>
               <th className="px-3 py-3 text-right">현재 비중</th>
               <th className="px-3 py-3 text-right">목표 비중</th>
+              <th className="px-3 py-3 text-right">MA120 참고</th>
               <th className="px-3 py-3 text-right">투입 금액</th>
               <th className="px-3 py-3 text-right">투입 후 비중</th>
             </tr>
@@ -224,6 +230,12 @@ function ReadyPreview({
                 <td className="px-3 py-3 text-right">
                   {formatPercent(row.targetWeightPct)}
                 </td>
+                <td className="px-3 py-3 text-right">
+                  <Ma120EvidenceCell
+                    currency={row.currency}
+                    evidence={row.ma120Evidence}
+                  />
+                </td>
                 <td className="px-3 py-3 text-right font-semibold text-[#1e5d49]">
                   {formatKrw(row.allocationKrw)}
                 </td>
@@ -236,6 +248,75 @@ function ReadyPreview({
         </table>
       </div>
     </>
+  );
+}
+
+function Ma120EvidenceCell({
+  currency,
+  evidence,
+}: {
+  currency: string | null;
+  evidence: {
+    status:
+      | "above_ma"
+      | "at_ma"
+      | "below_ma"
+      | "insufficient_history"
+      | "invalid_history"
+      | "unavailable";
+    priceBasis: "provider_adjusted_close" | "private_kis_raw_close" | null;
+    availableObservationCount: number;
+    latestWindowPriceDate: string | null;
+    ma120: number | null;
+    distanceFromMaPct: number | null;
+  };
+}) {
+  if (evidence.status === "insufficient_history") {
+    return (
+      <span data-ma120-status={evidence.status} className="text-[#76591f]">
+        이력 부족 {evidence.availableObservationCount}/120
+      </span>
+    );
+  }
+  if (
+    evidence.status === "unavailable" ||
+    evidence.status === "invalid_history" ||
+    evidence.ma120 === null ||
+    evidence.distanceFromMaPct === null
+  ) {
+    return (
+      <span data-ma120-status={evidence.status} className="text-[#7a8178]">
+        근거 없음
+      </span>
+    );
+  }
+
+  const tone =
+    evidence.status === "below_ma"
+      ? "text-[#b83c3c]"
+      : evidence.status === "above_ma"
+        ? "text-[#1e6a4a]"
+        : "text-[#4f5850]";
+  return (
+    <div data-ma120-status={evidence.status}>
+      <p className={`font-semibold ${tone}`}>
+        {evidence.status === "above_ma"
+          ? "위"
+          : evidence.status === "below_ma"
+            ? "아래"
+            : "근접"}{" "}
+        {formatSignedPercent(evidence.distanceFromMaPct)}
+      </p>
+      <p className="mt-0.5 text-xs text-[#687064]">
+        MA120 {formatPrice(evidence.ma120, currency)} ·{" "}
+        {evidence.priceBasis === "provider_adjusted_close"
+          ? "조정 종가"
+          : "KIS 원종가"}
+        {evidence.latestWindowPriceDate
+          ? ` · ${evidence.latestWindowPriceDate}`
+          : ""}
+      </p>
+    </div>
   );
 }
 
@@ -345,4 +426,27 @@ function formatPercent(value: number) {
   return `${new Intl.NumberFormat("ko-KR", {
     maximumFractionDigits: 2,
   }).format(value)}%`;
+}
+
+function formatSignedPercent(value: number) {
+  const formatted = new Intl.NumberFormat("ko-KR", {
+    maximumFractionDigits: 2,
+    signDisplay: "always",
+  }).format(value);
+  return `${formatted}%`;
+}
+
+function formatPrice(value: number, currency: string | null) {
+  return new Intl.NumberFormat(currency === "KRW" ? "ko-KR" : "en-US", {
+    maximumFractionDigits: currency === "KRW" ? 0 : 4,
+  }).format(value);
+}
+
+function ma120SummaryDetail(
+  status: "ready" | "partial" | "unavailable" | "read_failed",
+) {
+  if (status === "read_failed") return "근거 조회 실패 · 분배액은 정상 표시";
+  if (status === "unavailable") return "사용 가능한 가격 이력 없음 · 분배 미반영";
+  if (status === "partial") return "일부 종목만 계산 · 분배 미반영";
+  return "최근 120개 관측치 · 분배 미반영";
 }
