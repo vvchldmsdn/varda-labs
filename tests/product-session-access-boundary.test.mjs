@@ -7,7 +7,7 @@ const PRODUCT_PAGES = Object.freeze([
   ["src/app/today/page.tsx", ["getPortfolioDashboard({"]],
   [
     "src/app/additional-contribution/page.tsx",
-    ["getReadOnlyTenantAdditionalContributionPreview({"],
+    ["getReadOnlyTenantAdditionalContributionPreviewForScope({"],
   ],
   [
     "src/app/portfolio/structure/page.tsx",

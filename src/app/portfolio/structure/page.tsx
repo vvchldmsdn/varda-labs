@@ -12,6 +12,7 @@ import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfo
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
 import { buildPortfolioSpecialHoldingsModel } from "@/lib/portfolio-special-holdings";
+import { buildPortfolioAnalysisScopeHref } from "@/lib/portfolio-analysis-scope";
 import type {
   PortfolioStructureExclusion,
   PortfolioStructureGroupRow,
@@ -95,6 +96,14 @@ export default async function PortfolioStructurePage({
               <NavLink href="/">Dashboard</NavLink>
               <NavLink href="/today">Today Movement</NavLink>
               <NavLink href="/history">History</NavLink>
+              <NavLink
+                href={buildPortfolioAnalysisScopeHref(
+                  "/portfolio/targets",
+                  selectedScope.key,
+                )}
+              >
+                목표비중
+              </NavLink>
               <NavLink href="/etfs">ETF Reference</NavLink>
               <NavLink href="/market">Market Context</NavLink>
             </nav>

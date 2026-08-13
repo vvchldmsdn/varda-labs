@@ -934,6 +934,255 @@ export const targetPolicyApprovalLifecycleEvents = pgTable(
   }),
 );
 
+export const portfolioTargetPolicyRevisions = pgTable(
+  "portfolio_target_policy_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    scopeKind: varchar("scope_kind", { length: 24 }).notNull(),
+    scopeAccountId: uuid("scope_account_id"),
+    scopePortfolioGroupId: uuid("scope_portfolio_group_id"),
+    policyVersion: varchar("policy_version", { length: 100 }).notNull(),
+    approvalRevision: integer("approval_revision").notNull(),
+    effectiveServiceDate: date("effective_service_date").notNull(),
+    universeHash: varchar("universe_hash", { length: 71 }).notNull(),
+    vectorHash: varchar("vector_hash", { length: 71 }).notNull(),
+    authoritySource: varchar("authority_source", { length: 64 }).notNull(),
+    lifecycleStatus: varchar("lifecycle_status", { length: 20 }).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+    terminalAt: timestamp("terminal_at", { withTimezone: true }),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "portfolio_target_revisions_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    scopeAccountOwnerFk: foreignKey({
+      name: "portfolio_target_revisions_account_owner_fk",
+      columns: [table.scopeAccountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    scopeGroupOwnerFk: foreignKey({
+      name: "portfolio_target_revisions_group_owner_fk",
+      columns: [table.scopePortfolioGroupId, table.canonicalOwnerUserId],
+      foreignColumns: [portfolioGroups.id, portfolioGroups.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    revisionOwnerUnique: uniqueIndex(
+      "portfolio_target_revisions_id_owner_unique",
+    ).on(table.id, table.canonicalOwnerUserId),
+    scopeKindCheck: check(
+      "portfolio_target_revisions_scope_kind_check",
+      sql`${table.scopeKind} in ('all', 'account', 'portfolio_group')`,
+    ),
+    scopeShapeCheck: check(
+      "portfolio_target_revisions_scope_shape_check",
+      sql`(${table.scopeKind} = 'all' and ${table.scopeAccountId} is null and ${table.scopePortfolioGroupId} is null) or (${table.scopeKind} = 'account' and ${table.scopeAccountId} is not null and ${table.scopePortfolioGroupId} is null) or (${table.scopeKind} = 'portfolio_group' and ${table.scopeAccountId} is null and ${table.scopePortfolioGroupId} is not null)`,
+    ),
+    policyVersionCheck: check(
+      "portfolio_target_revisions_policy_version_check",
+      sql`${table.policyVersion} = 'portfolio_target_policy_v1'`,
+    ),
+    approvalRevisionCheck: check(
+      "portfolio_target_revisions_revision_check",
+      sql`${table.approvalRevision} > 0`,
+    ),
+    universeHashCheck: check(
+      "portfolio_target_revisions_universe_hash_check",
+      sql`${table.universeHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    vectorHashCheck: check(
+      "portfolio_target_revisions_vector_hash_check",
+      sql`${table.vectorHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    authoritySourceCheck: check(
+      "portfolio_target_revisions_authority_check",
+      sql`${table.authoritySource} = 'session_user_explicit_v1'`,
+    ),
+    lifecycleStatusCheck: check(
+      "portfolio_target_revisions_status_check",
+      sql`${table.lifecycleStatus} in ('approved', 'revoked', 'superseded')`,
+    ),
+    terminalStateCheck: check(
+      "portfolio_target_revisions_terminal_state_check",
+      sql`(${table.lifecycleStatus} = 'approved' and ${table.terminalAt} is null) or (${table.lifecycleStatus} in ('revoked', 'superseded') and ${table.terminalAt} is not null and ${table.terminalAt} >= ${table.approvedAt})`,
+    ),
+    allRevisionUnique: uniqueIndex(
+      "portfolio_target_revisions_all_revision_unique",
+    )
+      .on(table.canonicalOwnerUserId, table.approvalRevision)
+      .where(sql`${table.scopeKind} = 'all'`),
+    accountRevisionUnique: uniqueIndex(
+      "portfolio_target_revisions_account_revision_unique",
+    )
+      .on(
+        table.canonicalOwnerUserId,
+        table.scopeAccountId,
+        table.approvalRevision,
+      )
+      .where(sql`${table.scopeKind} = 'account'`),
+    groupRevisionUnique: uniqueIndex(
+      "portfolio_target_revisions_group_revision_unique",
+    )
+      .on(
+        table.canonicalOwnerUserId,
+        table.scopePortfolioGroupId,
+        table.approvalRevision,
+      )
+      .where(sql`${table.scopeKind} = 'portfolio_group'`),
+    currentAllUnique: uniqueIndex("portfolio_target_current_all_unique")
+      .on(table.canonicalOwnerUserId)
+      .where(
+        sql`${table.scopeKind} = 'all' and ${table.lifecycleStatus} = 'approved'`,
+      ),
+    currentAccountUnique: uniqueIndex(
+      "portfolio_target_current_account_unique",
+    )
+      .on(table.canonicalOwnerUserId, table.scopeAccountId)
+      .where(
+        sql`${table.scopeKind} = 'account' and ${table.lifecycleStatus} = 'approved'`,
+      ),
+    currentGroupUnique: uniqueIndex("portfolio_target_current_group_unique")
+      .on(table.canonicalOwnerUserId, table.scopePortfolioGroupId)
+      .where(
+        sql`${table.scopeKind} = 'portfolio_group' and ${table.lifecycleStatus} = 'approved'`,
+      ),
+  }),
+);
+
+export const portfolioTargetPolicyRows = pgTable(
+  "portfolio_target_policy_rows",
+  {
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    assetName: varchar("asset_name", { length: 255 }).notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    ticker: varchar("ticker", { length: 50 }),
+    buyability: varchar("buyability", { length: 32 }).notNull(),
+    targetWeightBps: integer("target_weight_bps").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      name: "portfolio_target_policy_rows_pk",
+      columns: [table.approvalRevisionId, table.assetId],
+    }),
+    revisionOwnerFk: foreignKey({
+      name: "portfolio_target_rows_revision_owner_fk",
+      columns: [table.approvalRevisionId, table.canonicalOwnerUserId],
+      foreignColumns: [
+        portfolioTargetPolicyRevisions.id,
+        portfolioTargetPolicyRevisions.canonicalOwnerUserId,
+      ],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "portfolio_target_rows_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "portfolio_target_rows_asset_owner_fk",
+      columns: [table.assetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "portfolio_target_rows_asset_account_fk",
+      columns: [table.assetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    ownerIdx: index("portfolio_target_rows_owner_idx").on(
+      table.canonicalOwnerUserId,
+    ),
+    accountIdx: index("portfolio_target_rows_account_idx").on(table.accountId),
+    assetIdx: index("portfolio_target_rows_asset_idx").on(table.assetId),
+    assetNameCheck: check(
+      "portfolio_target_rows_asset_name_check",
+      sql`${table.assetName} = btrim(${table.assetName}) and char_length(${table.assetName}) > 0`,
+    ),
+    marketCheck: check(
+      "portfolio_target_rows_market_check",
+      sql`${table.market} = lower(btrim(${table.market})) and char_length(${table.market}) > 0`,
+    ),
+    currencyCheck: check(
+      "portfolio_target_rows_currency_check",
+      sql`${table.currency} = upper(btrim(${table.currency})) and char_length(${table.currency}) > 0`,
+    ),
+    tickerCheck: check(
+      "portfolio_target_rows_ticker_check",
+      sql`${table.ticker} is null or (${table.ticker} = upper(btrim(${table.ticker})) and char_length(${table.ticker}) > 0)`,
+    ),
+    buyabilityCheck: check(
+      "portfolio_target_rows_buyability_check",
+      sql`${table.buyability} in ('buyable', 'not_buyable', 'tickerless', 'unsupported_market', 'unsupported_currency')`,
+    ),
+    targetWeightCheck: check(
+      "portfolio_target_rows_weight_check",
+      sql`${table.targetWeightBps} between 0 and 10000`,
+    ),
+    positiveTargetBuyabilityCheck: check(
+      "portfolio_target_rows_positive_buyability_check",
+      sql`${table.targetWeightBps} = 0 or ${table.buyability} = 'buyable'`,
+    ),
+  }),
+);
+
+export const portfolioTargetPolicyLifecycleEvents = pgTable(
+  "portfolio_target_policy_lifecycle_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    eventSequence: integer("event_sequence").notNull(),
+    auditVersion: varchar("audit_version", { length: 64 }).notNull(),
+    transitionKind: varchar("transition_kind", { length: 32 }).notNull(),
+    previousStatus: varchar("previous_status", { length: 20 }),
+    resultingStatus: varchar("resulting_status", { length: 20 }).notNull(),
+    transitionedAt: timestamp("transitioned_at", { withTimezone: true }).notNull(),
+    replacementRevisionId: uuid("replacement_revision_id"),
+  },
+  (table) => ({
+    revisionOwnerFk: foreignKey({
+      name: "portfolio_target_events_revision_owner_fk",
+      columns: [table.approvalRevisionId, table.canonicalOwnerUserId],
+      foreignColumns: [
+        portfolioTargetPolicyRevisions.id,
+        portfolioTargetPolicyRevisions.canonicalOwnerUserId,
+      ],
+    }).onDelete("restrict"),
+    replacementOwnerFk: foreignKey({
+      name: "portfolio_target_events_replacement_owner_fk",
+      columns: [table.replacementRevisionId, table.canonicalOwnerUserId],
+      foreignColumns: [
+        portfolioTargetPolicyRevisions.id,
+        portfolioTargetPolicyRevisions.canonicalOwnerUserId,
+      ],
+    }).onDelete("restrict"),
+    revisionSequenceUnique: uniqueIndex(
+      "portfolio_target_events_revision_sequence_unique",
+    ).on(table.approvalRevisionId, table.eventSequence),
+    ownerIdx: index("portfolio_target_events_owner_idx").on(
+      table.canonicalOwnerUserId,
+    ),
+    replacementIdx: index("portfolio_target_events_replacement_idx").on(
+      table.replacementRevisionId,
+    ),
+    sequenceCheck: check(
+      "portfolio_target_events_sequence_check",
+      sql`${table.eventSequence} in (1, 2)`,
+    ),
+    auditVersionCheck: check(
+      "portfolio_target_events_audit_version_check",
+      sql`${table.auditVersion} = 'portfolio_target_policy_audit_v1'`,
+    ),
+    transitionShapeCheck: check(
+      "portfolio_target_events_transition_shape_check",
+      sql`(${table.eventSequence} = 1 and ${table.transitionKind} = 'explicit_approval' and ${table.previousStatus} is null and ${table.resultingStatus} = 'approved' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'revocation' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'revoked' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'supersession' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'superseded' and ${table.replacementRevisionId} is not null and ${table.replacementRevisionId} <> ${table.approvalRevisionId})`,
+    ),
+  }),
+);
+
 export const assetGroups = pgTable(
   "asset_groups",
   {
@@ -2112,6 +2361,21 @@ export type TargetPolicyApprovalLifecycleEvent =
   typeof targetPolicyApprovalLifecycleEvents.$inferSelect;
 export type NewTargetPolicyApprovalLifecycleEvent =
   typeof targetPolicyApprovalLifecycleEvents.$inferInsert;
+
+export type PortfolioTargetPolicyRevision =
+  typeof portfolioTargetPolicyRevisions.$inferSelect;
+export type NewPortfolioTargetPolicyRevision =
+  typeof portfolioTargetPolicyRevisions.$inferInsert;
+
+export type PortfolioTargetPolicyRow =
+  typeof portfolioTargetPolicyRows.$inferSelect;
+export type NewPortfolioTargetPolicyRow =
+  typeof portfolioTargetPolicyRows.$inferInsert;
+
+export type PortfolioTargetPolicyLifecycleEvent =
+  typeof portfolioTargetPolicyLifecycleEvents.$inferSelect;
+export type NewPortfolioTargetPolicyLifecycleEvent =
+  typeof portfolioTargetPolicyLifecycleEvents.$inferInsert;
 
 export type AssetGroup = typeof assetGroups.$inferSelect;
 export type NewAssetGroup = typeof assetGroups.$inferInsert;
