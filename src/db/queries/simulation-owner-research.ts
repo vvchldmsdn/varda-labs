@@ -1,6 +1,9 @@
 import "server-only";
 
-import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
+import {
+  getReadOnlyTenantPortfolioStructure,
+  getReadOnlyTenantPortfolioStructureForScope,
+} from "@/db/queries/portfolio-structure";
 import {
   getActivePortfolioOwnerUserIds,
   getLatestCommonPrivateOwnerRawServiceDate,
@@ -18,26 +21,56 @@ import {
 } from "@/lib/simulation-owner-research-execution";
 import { prepareSimulationResearchPaths } from "@/lib/simulation-research-execution-core";
 import { resolveSimulationResearchHorizon } from "@/lib/simulation-research-horizon";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
-export async function getReadOnlyTenantSimulationOwnerResearch(options: {
+type SimulationOwnerResearchBaseOptions = Readonly<{
   tenantContext: TenantContext;
-  account?: string | string[] | null;
   endServiceDate?: string | string[];
   horizon?: string | string[];
   now?: Date;
-}) {
+}>;
+
+type SimulationOwnerResearchOptions = SimulationOwnerResearchBaseOptions &
+  (
+    | Readonly<{
+        account?: string | string[] | null;
+        scope?: never;
+        serviceDate?: never;
+      }>
+    | Readonly<{
+        account?: never;
+        scope: PortfolioAnalysisScope;
+        serviceDate: string;
+      }>
+  );
+
+export async function getReadOnlyTenantSimulationOwnerResearch(
+  options: SimulationOwnerResearchOptions,
+) {
+  const portfolioPromise = options.scope
+    ? getReadOnlyTenantPortfolioStructureForScope({
+        scope: options.scope,
+        serviceDate: options.serviceDate,
+        tenantContext: options.tenantContext,
+      })
+    : getReadOnlyTenantPortfolioStructure({
+        tenantContext: options.tenantContext,
+        account: options.account,
+      });
   const [portfolio, activeOwnerUserIds] = await Promise.all([
-    getReadOnlyTenantPortfolioStructure({
-      tenantContext: options.tenantContext,
-      account: options.account,
-    }),
+    portfolioPromise,
     getActivePortfolioOwnerUserIds(),
   ]);
-  const candidate = buildSimulationOwnerInputCandidate({
-    account: portfolio.selectedAccount,
-    portfolio,
-  });
+  const candidate = options.scope
+    ? buildSimulationOwnerInputCandidate({
+        scopeKey: options.scope.key,
+        portfolio,
+      })
+    : buildSimulationOwnerInputCandidate({
+        account: portfolio.selectedAccount,
+        portfolio,
+      });
   const latestCommonStoredServiceDate =
     options.endServiceDate === undefined && candidate.selection
       ? await getLatestCommonPrivateOwnerRawServiceDate({

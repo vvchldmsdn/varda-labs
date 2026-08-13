@@ -80,7 +80,9 @@ describe("Simulation input readiness route boundary", () => {
       page,
       /researchUniverse: params\.researchUniverse/,
     );
-    assert.match(page, /account: selectedAccount/);
+    assert.match(page, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
+    assert.match(page, /scope: selectedScope/);
+    assert.match(page, /serviceDate: resolveSnapshotCycle/);
     assert.match(page, /tenantContext: resolution\.tenantContext/);
     assert.match(page, /getReadOnlyTenantSimulationOwnerResearch/);
     assert.match(
@@ -105,6 +107,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(fixedMixView, /name="researchUniverse"/);
     assert.doesNotMatch(fixedMixView, /new URLSearchParams/);
     assert.match(navigation, /params\.set\("researchUniverse"/);
+    assert.match(navigation, /params\.set\("scope"/);
     assert.match(navigation, /params\.set\("account"/);
     assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
     assert.match(
@@ -242,6 +245,10 @@ describe("Simulation input readiness route boundary", () => {
       /getReadOnlySimulationResearchUniversePreflightForSelection/,
     );
     assert.match(ownerInputQuery, /getReadOnlyTenantPortfolioStructure/);
+    assert.match(
+      ownerInputQuery,
+      /getReadOnlyTenantPortfolioStructureForScope/,
+    );
     assert.match(ownerInputQuery, /buildSimulationOwnerInputCandidate/);
     assert.match(ownerInputQuery, /buildSimulationOwnerInputPreflightModel/);
     assert.match(ownerInputQuery, /buildSimulationOwnerResearchExecution/);
@@ -393,7 +400,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /data-research-universe-instrument/);
     assert.match(view, /data-research-universe-result-boundary/);
     assert.match(view, /data-owner-simulation-preflight/);
-    assert.match(view, /data-owner-simulation-account/);
+    assert.match(view, /data-owner-simulation-scope/);
     assert.match(view, /data-owner-simulation-status/);
     assert.match(view, /data-owner-simulation-instrument/);
     assert.match(view, /data-owner-simulation-history-status/);
@@ -461,7 +468,9 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /내 포트폴리오 입력 점검/);
     assert.match(view, /아래의 일회성 연구 계산에만 사용하며/);
     assert.match(view, /저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다/);
-    assert.match(view, /name="account"/);
+    assert.match(view, /PortfolioAnalysisScopeTabs/);
+    assert.match(view, /name="scope"/);
+    assert.doesNotMatch(view, /name="account"/);
     assert.match(view, /name="researchUniverse"/);
     assert.match(view, /시뮬레이션은 실행하지 않습니다/);
     assert.match(view, /비중을 다시 나누거나 전체 포트폴리오 결과로 표시하지 않습니다/);
@@ -561,7 +570,15 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(smoke, /data-owner-model-calibration-status/);
     assert.match(smoke, /ownerModelCalibrationPairedCount/);
     assert.match(smoke, /databaseReadAttempted: false/);
-    assert.match(smoke, /assert\.doesNotMatch\(/);
+    assert.match(smoke, /const CANONICAL_SCOPE_PATTERN/);
+    assert.match(smoke, /const RAW_DYNAMIC_SCOPE_PATTERN/);
+    assert.match(smoke, /const ENCODED_DYNAMIC_SCOPE_PATTERN/);
+    assert.match(smoke, /assertCanonicalSimulationScopes/);
+    assert.match(smoke, /assertNoSensitiveLeaks/);
+    assert.doesNotMatch(
+      smoke,
+      /assert\.doesNotMatch\(simulation\.body, LEAK_PATTERN\)/,
+    );
     assert.match(smoke, /data-page="simulation-input-readiness"/);
     assert.match(smoke, /if \(!sql\) throw new Error/);
     assert.match(

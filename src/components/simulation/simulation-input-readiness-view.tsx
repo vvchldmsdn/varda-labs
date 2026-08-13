@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 import { buildSimulationHref } from "@/lib/simulation-navigation";
-import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import { SIMULATION_RESEARCH_HORIZON_POLICY } from "@/lib/simulation-research-horizon";
 
 import { FixedMixResearchComparisonSection } from "./fixed-mix-research-comparison-section";
@@ -33,7 +33,7 @@ export function SimulationInputReadinessView({
   researchUniversePreflight,
   regimeHistoricalOutcomeValidation,
   regimeBootstrap,
-  selectedAccount,
+  selectedScopeKey,
 }: {
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
@@ -45,7 +45,7 @@ export function SimulationInputReadinessView({
   researchUniversePreflight?: ReactNode;
   regimeHistoricalOutcomeValidation?: ReactNode;
   regimeBootstrap?: ReactNode;
-  selectedAccount: PortfolioAccountScope;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
   const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
@@ -134,7 +134,7 @@ export function SimulationInputReadinessView({
         {ownerModelComparison}
         {ownerModelCalibration}
         <ResearchHorizonSelector
-          account={selectedAccount}
+          scopeKey={selectedScopeKey}
           endServiceDate={explicitEndServiceDate}
           kodexWeightPct={selectedKodexWeightPct}
           researchUniverse={researchUniverse}
@@ -186,7 +186,7 @@ export function SimulationInputReadinessView({
                   selectedKodexWeightPct,
                   selectedResearchHorizon,
                   researchUniverse,
-                  selectedAccount,
+                  selectedScopeKey,
                 )
               : null
           }
@@ -194,7 +194,7 @@ export function SimulationInputReadinessView({
           researchHorizon={selectedResearchHorizon}
         />
         <FixedMixResearchExecutionSection
-          account={selectedAccount}
+          scopeKey={selectedScopeKey}
           endServiceDate={model.requestedEndServiceDate}
           execution={model.fixedMixResearchExecution}
           researchHorizon={selectedResearchHorizon}
@@ -229,7 +229,7 @@ export function SimulationInputReadinessView({
               returnScaleMode={sharedReturnScale ? "shared" : "individual"}
               selectedKodexWeightPct={selectedKodexWeightPct}
               selectedResearchHorizon={selectedResearchHorizon}
-              selectedAccount={selectedAccount}
+              selectedScopeKey={selectedScopeKey}
               researchUniverse={researchUniverse}
             />
           ))}
@@ -240,7 +240,7 @@ export function SimulationInputReadinessView({
             rows={model.history}
             selectedKodexWeightPct={selectedKodexWeightPct}
             selectedResearchHorizon={selectedResearchHorizon}
-            selectedAccount={selectedAccount}
+            selectedScopeKey={selectedScopeKey}
             selectedServiceDate={model.requestedEndServiceDate}
             researchUniverse={researchUniverse}
           />
@@ -268,13 +268,13 @@ function sharedNearestPriorDate(inputs: readonly InputReadiness[]) {
 }
 
 function ResearchHorizonSelector({
-  account,
+  scopeKey,
   endServiceDate,
   kodexWeightPct,
   researchUniverse,
   selectedHorizon,
 }: {
-  account: PortfolioAccountScope;
+  scopeKey: PortfolioAnalysisScopeKey;
   endServiceDate: string | null;
   kodexWeightPct: number | null;
   researchUniverse: string | null;
@@ -305,7 +305,7 @@ function ResearchHorizonSelector({
                   : "rounded px-3 py-2 text-sm font-semibold text-[#33423a] hover:bg-[#eef1e8]"
               }
               href={buildSimulationHref({
-                account,
+                scope: scopeKey,
                 endServiceDate,
                 kodexWeightPct,
                 researchHorizon: horizon,
@@ -327,14 +327,14 @@ function ReadinessHistory({
   rows,
   selectedKodexWeightPct,
   selectedResearchHorizon,
-  selectedAccount,
+  selectedScopeKey,
   selectedServiceDate,
   researchUniverse,
 }: {
   rows: readonly HistoryRow[];
   selectedKodexWeightPct: number | null;
   selectedResearchHorizon: 63 | 126;
-  selectedAccount: PortfolioAccountScope;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
   selectedServiceDate: string;
   researchUniverse: string | null;
 }) {
@@ -406,7 +406,7 @@ function ReadinessHistory({
                           selectedKodexWeightPct,
                           selectedResearchHorizon,
                           researchUniverse,
-                          selectedAccount,
+                          selectedScopeKey,
                         )}
                         className="inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-xs font-semibold text-[#253029] hover:bg-[#eef1e8]"
                       >
@@ -464,7 +464,7 @@ function InputPanel({
   returnScaleMode,
   selectedKodexWeightPct,
   selectedResearchHorizon,
-  selectedAccount,
+  selectedScopeKey,
 }: {
   input: InputReadiness;
   observedReturnScale: number;
@@ -472,7 +472,7 @@ function InputPanel({
   returnScaleMode: "shared" | "individual";
   selectedKodexWeightPct: number | null;
   selectedResearchHorizon: 63 | 126;
-  selectedAccount: PortfolioAccountScope;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   const ready = input.status === "matrix_ready";
 
@@ -582,7 +582,7 @@ function InputPanel({
               selectedKodexWeightPct,
               selectedResearchHorizon,
               researchUniverse,
-              selectedAccount,
+              selectedScopeKey,
             )}
             className="mt-4 inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-semibold text-[#253029] hover:bg-[#eef1e8]"
           >
@@ -676,10 +676,10 @@ function simulationDateHref(
   kodexWeightPct: number | null,
   horizon: 63 | 126,
   researchUniverse: string | null,
-  account: PortfolioAccountScope,
+  scopeKey: PortfolioAnalysisScopeKey,
 ) {
   return buildSimulationHref({
-    account,
+    scope: scopeKey,
     endServiceDate,
     kodexWeightPct,
     researchHorizon: horizon,

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
 import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
@@ -17,6 +18,7 @@ import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-read
 import { ResearchUniversePreflightSection } from "@/components/simulation/research-universe-preflight-section";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlyTenantSimulationOwnerParametricFactorResearch } from "@/db/queries/simulation-owner-parametric-factor";
@@ -27,22 +29,32 @@ import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-re
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
 import { getReadOnlySimulationResearchUniversePreflight } from "@/db/queries/simulation-research-universe-preflight";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import {
-  normalizePortfolioAccountScope,
-  type PortfolioAccountScope,
-} from "@/lib/portfolio-account-scope";
+import type {
+  PortfolioAnalysisScope,
+  PortfolioAnalysisScopeKey,
+} from "@/lib/portfolio-analysis-scope";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
 type SimulationPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    scope?: string | string[];
     end?: string | string[];
     horizon?: string | string[];
     kodexWeight?: string | string[];
     researchUniverse?: string | string[];
   }>;
 };
+
+type SimulationPreservedQuery = Readonly<{
+  scope: PortfolioAnalysisScopeKey;
+  end: string | null;
+  horizon: string | null;
+  kodexWeight: string | null;
+  researchUniverse: string | null;
+}>;
 
 export default async function SimulationPage({
   searchParams,
@@ -63,20 +75,36 @@ export default async function SimulationPage({
     );
   }
 
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
+    account: params.account,
+    scope: params.scope,
+    tenantContext: resolution.tenantContext,
+  });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/simulation"
+        context={scopeContext}
+        title="Simulation validation"
+      />
+    );
+  }
+
+  const selectedScope = scopeContext.resolution.scope;
   const modelPromise = getReadOnlySimulationInputReadiness({
     endServiceDate: params.end,
     horizon: params.horizon,
     kodexWeight: params.kodexWeight,
   });
-  const selectedAccount = normalizePortfolioAccountScope(
-    params.account,
-    "all",
-  );
   const ownerResearchPromise =
     getReadOnlyTenantSimulationOwnerResearch({
-      account: selectedAccount,
       endServiceDate: params.end,
       horizon: params.horizon,
+      scope: selectedScope,
+      serviceDate: resolveSnapshotCycle(new Date()).snapshotDate,
       tenantContext: resolution.tenantContext,
     });
   const ownerParametricFactorPromise =
@@ -111,7 +139,7 @@ export default async function SimulationPage({
       researchUniverse: params.researchUniverse,
     });
   const preservedQuery = Object.freeze({
-    account: selectedAccount,
+    scope: selectedScope.key,
     end: singleQueryValue(params.end),
     horizon: singleQueryValue(params.horizon),
     kodexWeight: singleQueryValue(params.kodexWeight),
@@ -137,6 +165,8 @@ export default async function SimulationPage({
           researchUniversePreflightPromise
         }
         preservedQuery={preservedQuery}
+        scopeCatalog={scopeContext.catalog.scopes}
+        selectedScope={selectedScope}
       />
     </Suspense>
   );
@@ -153,6 +183,8 @@ async function SimulationContent({
   regimeHistoricalOutcomeValidationPromise,
   researchUniversePreflightPromise,
   preservedQuery,
+  scopeCatalog,
+  selectedScope,
 }: {
   historicalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationHistoricalOutcomeValidation
@@ -177,13 +209,9 @@ async function SimulationContent({
   researchUniversePreflightPromise: ReturnType<
     typeof getReadOnlySimulationResearchUniversePreflight
   >;
-  preservedQuery: Readonly<{
-    account: PortfolioAccountScope;
-    end: string | null;
-    horizon: string | null;
-    kodexWeight: string | null;
-    researchUniverse: string | null;
-  }>;
+  preservedQuery: SimulationPreservedQuery;
+  scopeCatalog: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const model = await modelPromise;
   return (
@@ -212,6 +240,8 @@ async function SimulationContent({
             <OwnerInputPreflightContent
               preservedQuery={preservedQuery}
               resultPromise={ownerResearchPromise}
+              scopeCatalog={scopeCatalog}
+              selectedScope={selectedScope}
             />
           </Suspense>
         </SimulationSectionErrorBoundary>
@@ -253,7 +283,7 @@ async function SimulationContent({
         </SimulationSectionErrorBoundary>
       }
       researchUniverse={preservedQuery.researchUniverse}
-      selectedAccount={preservedQuery.account}
+      selectedScopeKey={preservedQuery.scope}
       researchUniversePreflight={
         <SimulationSectionErrorBoundary
           section="research-universe-preflight"
@@ -302,17 +332,15 @@ async function SimulationContent({
 async function OwnerInputPreflightContent({
   preservedQuery,
   resultPromise,
+  scopeCatalog,
+  selectedScope,
 }: {
-  preservedQuery: Readonly<{
-    account: PortfolioAccountScope;
-    end: string | null;
-    horizon: string | null;
-    kodexWeight: string | null;
-    researchUniverse: string | null;
-  }>;
+  preservedQuery: SimulationPreservedQuery;
   resultPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerResearch
   >;
+  scopeCatalog: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const result = await resultPromise;
   return (
@@ -320,6 +348,8 @@ async function OwnerInputPreflightContent({
       <OwnerInputPreflightSection
         model={result.inputPreflight}
         preservedQuery={preservedQuery}
+        scopes={scopeCatalog}
+        selectedScope={selectedScope}
       />
       <OwnerResearchExecutionSection execution={result.execution} />
       <OwnerCandidateComparisonSection
@@ -372,13 +402,7 @@ async function ResearchUniversePreflightContent({
   preservedQuery,
   resultPromise,
 }: {
-  preservedQuery: Readonly<{
-    account: PortfolioAccountScope;
-    end: string | null;
-    horizon: string | null;
-    kodexWeight: string | null;
-    researchUniverse: string | null;
-  }>;
+  preservedQuery: SimulationPreservedQuery;
   resultPromise: ReturnType<
     typeof getReadOnlySimulationResearchUniversePreflight
   >;
