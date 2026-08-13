@@ -1,7 +1,3 @@
-import {
-  NAMED_PORTFOLIO_ACCOUNTS,
-  type PortfolioAccountScope,
-} from "./portfolio-account-scope.ts";
 import { percentOrNull, sumBy, toNumber } from "./portfolio-math.ts";
 
 export type PortfolioDashboardSnapshotTrendRow = Readonly<{
@@ -15,7 +11,6 @@ export type PortfolioDashboardSnapshotTrendRow = Readonly<{
 
 export function buildPortfolioDashboardSnapshotTrend(
   rows: readonly PortfolioDashboardSnapshotTrendRow[],
-  selectedAccount: PortfolioAccountScope,
 ) {
   const rowsByDate = new Map<
     string,
@@ -23,11 +18,7 @@ export function buildPortfolioDashboardSnapshotTrend(
   >();
 
   for (const row of rows) {
-    if (!NAMED_PORTFOLIO_ACCOUNTS.some((account) => account === row.account)) {
-      continue;
-    }
-    if (selectedAccount !== "all" && row.account !== selectedAccount) continue;
-
+    if (row.account === "all") continue;
     const rowsByAccount = rowsByDate.get(row.snapshotDate) ?? new Map();
     if (!rowsByAccount.has(row.account)) rowsByAccount.set(row.account, row);
     rowsByDate.set(row.snapshotDate, rowsByAccount);

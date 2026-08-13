@@ -1,18 +1,18 @@
 import { Suspense } from "react";
 
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioDashboard } from "@/components/portfolio-dashboard";
 import { PortfolioDashboardAccessBoundary } from "@/components/portfolio-dashboard-access-boundary";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import {
-  getPortfolioDashboard,
-  normalizeDashboardAccount,
-} from "@/lib/portfolio-dashboard";
+import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 
 export const dynamic = "force-dynamic";
 
 type HomeProps = {
   searchParams: Promise<{
     account?: string | string[];
+    scope?: string | string[];
   }>;
 };
 
@@ -21,8 +21,6 @@ export default async function Home({ searchParams }: HomeProps) {
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const selectedAccount = normalizeDashboardAccount(params.account);
-
   if (!resolution.ok) {
     return (
       <PortfolioDashboardAccessBoundary
@@ -32,8 +30,27 @@ export default async function Home({ searchParams }: HomeProps) {
     );
   }
 
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
+    account: params.account,
+    scope: params.scope,
+    tenantContext: resolution.tenantContext,
+  });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/"
+        context={scopeContext}
+        title="포트폴리오 요약"
+      />
+    );
+  }
+
   const dashboardPromise = getPortfolioDashboard({
-    selectedAccount,
+    analysisScopes: scopeContext.catalog.scopes,
+    scope: scopeContext.resolution.scope,
     tenantContext: resolution.tenantContext,
   });
 

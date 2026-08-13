@@ -59,6 +59,9 @@ describe("current tenant read scope runtime boundary", () => {
 
   it("authorizes holdings through the owned account relationship", () => {
     const source = read("src/db/queries/tenant-holdings.ts");
+    const targetSource = read(
+      "src/db/queries/portfolio-analysis-scope-targets.ts",
+    );
 
     assert.match(source, /^import "server-only";/);
     assert.match(
@@ -75,11 +78,13 @@ describe("current tenant read scope runtime boundary", () => {
       /eq\(assets\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
     );
     assert.match(source, /eq\(assets\.account,\s*accounts\.code\)/);
-    assert.match(source, /portfolioGroupAccountMemberships/);
-    assert.match(source, /portfolioGroupAssetMemberships/);
-    assert.match(source, /selectDistinct/);
-    assert.match(source, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
-    assert.match(source, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
+    assert.match(source, /getPortfolioAnalysisScopeTargets/);
+    assert.match(targetSource, /^import "server-only";/);
+    assert.match(targetSource, /portfolioGroupAccountMemberships/);
+    assert.match(targetSource, /portfolioGroupAssetMemberships/);
+    assert.match(targetSource, /selectDistinct/);
+    assert.match(targetSource, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
+    assert.match(targetSource, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
     assert.doesNotMatch(
       source,
       /NAMED_PORTFOLIO_ACCOUNTS|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
@@ -222,8 +227,11 @@ describe("current tenant read scope runtime boundary", () => {
     assert.doesNotMatch(querySource, /ownerUserId\s*:\s*string|headers\(\)|cookies\(\)/);
   });
 
-  it("authorizes dashboard-owned rows through active named accounts", () => {
+  it("authorizes dashboard rows through dynamic accounts and effective group targets", () => {
     const source = read("src/db/queries/portfolio-dashboard.ts");
+    const targetSource = read(
+      "src/db/queries/portfolio-analysis-scope-targets.ts",
+    );
 
     assert.match(source, /^import "server-only";/);
     assert.match(
@@ -231,7 +239,16 @@ describe("current tenant read scope runtime boundary", () => {
       /eq\(accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
     );
     assert.match(source, /eq\(accounts\.isActive, true\)/);
-    assert.match(source, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(source, /getPortfolioAnalysisScopeTargets/);
+    assert.match(source, /targets\.wholeAccountIds/);
+    assert.match(source, /targets\.directAssetIds/);
+    assert.match(
+      source,
+      /eq\(assets\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
+    assert.doesNotMatch(source, /NAMED_PORTFOLIO_ACCOUNTS/);
+    assert.match(targetSource, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
+    assert.match(targetSource, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
     for (const relation of [
       /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
       /eq\(assets\.account, accounts\.code\)/,
@@ -246,10 +263,6 @@ describe("current tenant read scope runtime boundary", () => {
     }
     assert.doesNotMatch(
       source,
-      /eq\((?:assets|eventLedgerEntries|dailyPositionSnapshots|dailyPortfolioSnapshots)\.canonicalOwnerUserId/,
-    );
-    assert.doesNotMatch(
-      source,
       /ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
     );
   });
@@ -261,11 +274,30 @@ describe("current tenant read scope runtime boundary", () => {
       assert.match(source, /resolveCurrentTenantContext\(\)/);
       assert.match(source, /if \(!resolution\.ok\)/);
       assert.match(source, /PortfolioDashboardAccessBoundary/);
+      assert.match(source, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
+      assert.match(source, /PortfolioAnalysisScopeBoundary/);
       assert.match(
         source,
-        /getPortfolioDashboard\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
+        /getPortfolioDashboard\(\{[\s\S]*analysisScopes:[\s\S]*scope:[\s\S]*tenantContext: resolution\.tenantContext/,
       );
       assert.doesNotMatch(source, /fetch\(|\/api\//);
+    }
+  });
+
+  it("keeps home and today navigation on the shared dynamic scope catalog", () => {
+    for (const path of [
+      "src/components/portfolio-dashboard.tsx",
+      "src/components/today-movement.tsx",
+    ]) {
+      const source = read(path);
+
+      assert.match(source, /PortfolioAnalysisScopeTabs/);
+      assert.match(source, /data\.analysisScopes/);
+      assert.match(source, /data\.selectedScope\.key/);
+      assert.doesNotMatch(
+        source,
+        /DASHBOARD_ACCOUNT_TABS|TODAY_ACCOUNT_TABS|NAMED_PORTFOLIO_ACCOUNTS/,
+      );
     }
   });
 

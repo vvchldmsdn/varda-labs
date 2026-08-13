@@ -12,7 +12,6 @@ describe("owner-scoped portfolio dashboard snapshot trend", () => {
         row("2026-07-09", "irp", 25, 20, 5, 25),
         row("2026-07-09", "all", 9999, 1, 9998, 999800),
       ],
-      "all",
     );
 
     assert.deepEqual(result, [
@@ -25,13 +24,9 @@ describe("owner-scoped portfolio dashboard snapshot trend", () => {
     ]);
   });
 
-  it("keeps one selected account and preserves its stored return evidence", () => {
+  it("preserves one already-scoped account's stored return evidence", () => {
     const result = buildPortfolioDashboardSnapshotTrend(
-      [
-        row("2026-07-08", "brokerage", 100, 80, 20, 24.5),
-        row("2026-07-08", "isa", 50, 40, 10, 25),
-      ],
-      "brokerage",
+      [row("2026-07-08", "brokerage", 100, 80, 20, 24.5)],
     );
 
     assert.deepEqual(result, [
@@ -50,7 +45,6 @@ describe("owner-scoped portfolio dashboard snapshot trend", () => {
         row("2026-07-09", "brokerage", 110, 90, 20, 22.22),
         row("2026-07-09", "brokerage", 100, 80, 20, 25),
       ],
-      "all",
     );
 
     assert.equal(result[0]?.totalMarketValue, 110);
@@ -59,7 +53,6 @@ describe("owner-scoped portfolio dashboard snapshot trend", () => {
   it("returns partial numeric evidence instead of dropping the date", () => {
     const result = buildPortfolioDashboardSnapshotTrend(
       [row("2026-07-09", "brokerage", 100, null, null, null)],
-      "all",
     );
 
     assert.deepEqual(result, [

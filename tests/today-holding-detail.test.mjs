@@ -64,7 +64,6 @@ function exclusion(overrides = {}) {
 
 function dashboard(overrides = {}) {
   return {
-    selectedAccount: "brokerage",
     holdings: [holding()],
     todayMovement: {
       contributionRows: [contribution()],
@@ -88,15 +87,17 @@ describe("today holding detail selector", () => {
   it("normalizes ticker and market query values", () => {
     assert.deepEqual(
       normalizeTodayHoldingDetailQuery({
+        holdingAccount: " brokerage ",
         ticker: [" voo "],
         market: " US ",
       }),
-      { ticker: "VOO", market: "us" },
+      { holdingAccount: "brokerage", ticker: "VOO", market: "us" },
     );
   });
 
   it("selects a contribution row without exposing internal ids", () => {
     const result = selectTodayHoldingDetail(dashboard(), {
+      holdingAccount: null,
       ticker: "069500",
       market: "korea",
     });
@@ -118,7 +119,7 @@ describe("today holding detail selector", () => {
           exclusions: [exclusion()],
         },
       }),
-      { ticker: "069500", market: "korea" },
+      { holdingAccount: null, ticker: "069500", market: "korea" },
     );
 
     assert.equal(result.status, "selected");
@@ -131,19 +132,23 @@ describe("today holding detail selector", () => {
 
   it("returns not found when no current holding matches", () => {
     const result = selectTodayHoldingDetail(dashboard(), {
+      holdingAccount: null,
       ticker: "VOO",
       market: "us",
     });
 
     assert.equal(result.status, "not_found");
-    assert.deepEqual(result.query, { ticker: "VOO", market: "us" });
+    assert.deepEqual(result.query, {
+      holdingAccount: null,
+      ticker: "VOO",
+      market: "us",
+    });
     assertNoInternalIds(result);
   });
 
   it("requires account disambiguation for duplicate tickers under all accounts", () => {
     const result = selectTodayHoldingDetail(
       dashboard({
-        selectedAccount: "all",
         holdings: [
           holding(),
           holding({
@@ -154,7 +159,7 @@ describe("today holding detail selector", () => {
           }),
         ],
       }),
-      { ticker: "069500", market: "korea" },
+      { holdingAccount: null, ticker: "069500", market: "korea" },
     );
 
     assert.equal(result.status, "ambiguous");
@@ -166,12 +171,24 @@ describe("today holding detail selector", () => {
     assertNoInternalIds(result);
   });
 
-  it("builds detail links from account, ticker, and market only", () => {
-    assert.equal(
-      todayHoldingDetailHref("brokerage", holding()),
-      "/today?ticker=069500&market=korea",
+  it("builds canonical scope detail links with account disambiguation", () => {
+    const accountUrl = new URL(
+      todayHoldingDetailHref(
+        "account:11111111-1111-4111-8111-111111111111",
+        holding(),
+      ),
+      "https://example.test",
     );
     assert.equal(
+      accountUrl.searchParams.get("scope"),
+      "account:11111111-1111-4111-8111-111111111111",
+    );
+    assert.equal(accountUrl.searchParams.get("holdingAccount"), "brokerage");
+    assert.equal(accountUrl.searchParams.get("ticker"), "069500");
+    assert.equal(accountUrl.searchParams.get("market"), "korea");
+    assert.equal(accountUrl.searchParams.has("account"), false);
+
+    const allUrl = new URL(
       todayHoldingDetailHref(
         "all",
         holding({
@@ -181,7 +198,10 @@ describe("today holding detail selector", () => {
           market: "us",
         }),
       ),
-      "/today?account=all&ticker=VOO&market=us",
+      "https://example.test",
     );
+    assert.equal(allUrl.searchParams.get("scope"), "all");
+    assert.equal(allUrl.searchParams.get("ticker"), "VOO");
+    assert.equal(allUrl.searchParams.get("market"), "us");
   });
 });
