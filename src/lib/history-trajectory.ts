@@ -46,7 +46,7 @@ export type HistoryTrajectoryEvidenceGroup = Readonly<{
 export type HistoryTrajectoryModel = Readonly<{
   policy: typeof HISTORY_TRAJECTORY_POLICY;
   lane: HistoryTrajectoryLane;
-  account: HistoryAccount;
+  account: string;
   status: "ready" | "unavailable";
   reason: "ready" | "no_valid_stored_points";
   inputRowCount: number;
@@ -92,7 +92,7 @@ export function buildPortfolioHistoryTrajectory({
   account,
 }: {
   rows: readonly PortfolioHistoryDisplayRow[];
-  account: HistoryAccount;
+  account: string;
 }): HistoryTrajectoryModel {
   return buildHistoryTrajectory({
     lane: "portfolio",
@@ -114,7 +114,7 @@ function buildHistoryTrajectory({
   candidates,
 }: {
   lane: HistoryTrajectoryLane;
-  account: HistoryAccount;
+  account: string;
   inputRowCount: number;
   candidates: readonly {
     date: string;

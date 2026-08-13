@@ -22,6 +22,8 @@ export type PortfolioHistoryRawRow = {
   snapshotDate: string;
   account: string;
   source: string;
+  rowKind?: "stored" | "derived" | "partial";
+  derivedFromAccounts?: readonly string[];
   cashValue: string | null;
   investedAmount: string | null;
   totalCost: string | null;
@@ -32,10 +34,10 @@ export type PortfolioHistoryRawRow = {
 
 export type PortfolioHistoryDisplayRow = {
   snapshotDate: string;
-  account: HistoryAccount;
+  account: string;
   source: string;
   rowKind: "stored" | "derived" | "partial";
-  derivedFromAccounts: HistoryAccount[];
+  derivedFromAccounts: string[];
   cashValue: number | null;
   investedAmount: number | null;
   totalCost: number | null;
@@ -77,11 +79,13 @@ export function historyBalanceValueForAccount(
 }
 
 export function buildPortfolioHistoryDisplayRows({
+  expectedAccounts = REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS,
   rows,
   account,
 }: {
   rows: PortfolioHistoryRawRow[];
-  account: HistoryAccount;
+  account: string;
+  expectedAccounts?: readonly string[];
 }): PortfolioHistoryDisplayRow[] {
   if (account !== "all") {
     return rows
@@ -106,7 +110,7 @@ export function buildPortfolioHistoryDisplayRows({
     .map((groupRows) => {
       const storedAll = groupRows.find((row) => row.account === "all");
       if (storedAll) return storedPortfolioRow(storedAll, "all");
-      return derivedAllPortfolioRow(groupRows);
+      return derivedAllPortfolioRow(groupRows, expectedAccounts);
     })
     .filter((row): row is PortfolioHistoryDisplayRow => row !== null)
     .sort(comparePortfolioDisplayRows);
@@ -114,14 +118,14 @@ export function buildPortfolioHistoryDisplayRows({
 
 function storedPortfolioRow(
   row: PortfolioHistoryRawRow,
-  account: HistoryAccount,
+  account: string,
 ): PortfolioHistoryDisplayRow {
   return {
     snapshotDate: row.snapshotDate,
     account,
     source: row.source,
-    rowKind: "stored",
-    derivedFromAccounts: [],
+    rowKind: row.rowKind ?? "stored",
+    derivedFromAccounts: [...(row.derivedFromAccounts ?? [])],
     cashValue: numberOrNull(row.cashValue),
     investedAmount: numberOrNull(row.investedAmount),
     totalCost: numberOrNull(row.totalCost),
@@ -133,16 +137,17 @@ function storedPortfolioRow(
 
 function derivedAllPortfolioRow(
   rows: PortfolioHistoryRawRow[],
+  expectedAccounts: readonly string[],
 ): PortfolioHistoryDisplayRow | null {
   const rowsByAccount = new Map<string, PortfolioHistoryRawRow>();
 
   for (const row of rows) {
-    if (isRequiredPortfolioAggregateAccount(row.account)) {
+    if (expectedAccounts.includes(row.account)) {
       rowsByAccount.set(row.account, row);
     }
   }
 
-  const availableAccounts = REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.filter(
+  const availableAccounts = expectedAccounts.filter(
     (account) => rowsByAccount.has(account),
   );
   const availableRows = availableAccounts.map(
@@ -163,7 +168,7 @@ function derivedAllPortfolioRow(
     account: "all",
     source: representative.source,
     rowKind:
-      availableRows.length === REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.length
+      availableRows.length === expectedAccounts.length
         ? "derived"
         : "partial",
     derivedFromAccounts: [...availableAccounts],
@@ -216,12 +221,4 @@ function isHistoryAccount(value: string | null): value is HistoryAccount {
 
 function isHistoryLane(value: string | null): value is HistoryLane {
   return HISTORY_LANES.includes(value as HistoryLane);
-}
-
-function isRequiredPortfolioAggregateAccount(
-  value: string,
-): value is (typeof REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS)[number] {
-  return REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS.includes(
-    value as (typeof REQUIRED_PORTFOLIO_AGGREGATE_ACCOUNTS)[number],
-  );
 }

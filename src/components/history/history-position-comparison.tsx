@@ -1,14 +1,17 @@
 import Link from "next/link";
 
 import type { HistoryPositionComparisonModel } from "@/lib/history-position-comparison";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 
 import { historySourceLabel } from "./history-format";
 import { HistoryPositionComparisonResult } from "./history-position-comparison-result";
 
 export function HistoryPositionComparison({
   model,
+  scopeKey,
 }: {
   model: HistoryPositionComparisonModel;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   const defaults = comparisonDefaults(model);
   const canCompare = defaults.from !== null && defaults.to !== null;
@@ -45,7 +48,7 @@ export function HistoryPositionComparison({
         </div>
         {model.selection.status !== "idle" ? (
           <Link
-            href={baseHistoryHref(model)}
+            href={baseHistoryHref(model, scopeKey)}
             className="w-fit rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-xs font-semibold text-[#4d574b] hover:bg-[#eef2e8]"
           >
             비교 닫기
@@ -57,6 +60,7 @@ export function HistoryPositionComparison({
         model={model}
         defaults={defaults}
         canCompare={canCompare}
+        scopeKey={scopeKey}
       />
 
       {model.status === "ready" || model.status === "partial" ? (
@@ -74,10 +78,12 @@ function ComparisonForm({
   model,
   defaults,
   canCompare,
+  scopeKey,
 }: {
   model: HistoryPositionComparisonModel;
   defaults: ReturnType<typeof comparisonDefaults>;
   canCompare: boolean;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
     <form
@@ -85,7 +91,7 @@ function ComparisonForm({
       method="get"
       className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
     >
-      <input type="hidden" name="account" value={model.account} />
+      <input type="hidden" name="scope" value={scopeKey} />
       <input type="hidden" name="lane" value={model.lane} />
       <EndpointSelect
         label="이전 저장점"
@@ -208,9 +214,12 @@ function selectedSource(model: HistoryPositionComparisonModel) {
     : undefined;
 }
 
-function baseHistoryHref(model: HistoryPositionComparisonModel) {
+function baseHistoryHref(
+  model: HistoryPositionComparisonModel,
+  scopeKey: PortfolioAnalysisScopeKey,
+) {
   return `/history?${new URLSearchParams({
-    account: model.account,
+    scope: scopeKey,
     lane: model.lane,
   }).toString()}`;
 }

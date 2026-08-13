@@ -203,10 +203,16 @@ describe("current tenant read scope runtime boundary", () => {
   it("keeps history server-rendered and scoped through the resolved tenant", () => {
     const pageSource = read("src/app/history/page.tsx");
     const querySource = read("src/db/queries/history-balance.ts");
+    const controlsSource = read("src/components/history/history-controls.tsx");
 
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.match(pageSource, /getReadOnlyTenantHistoryBalance/);
     assert.match(pageSource, /getReadOnlyTenantEvents/);
+    assert.match(
+      pageSource,
+      /getReadOnlyTenantPortfolioAnalysisScopeContext/,
+    );
+    assert.match(pageSource, /PortfolioAnalysisScopeBoundary/);
     assert.match(pageSource, /if \(!resolution\.ok\)/);
     assert.match(pageSource, /Promise\.all/);
     assert.doesNotMatch(pageSource, /fetch\(|\/api\//);
@@ -223,8 +229,14 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(querySource, /innerJoin\(accounts/);
     assert.match(querySource, /dailyPortfolioSnapshots\.account, accounts\.code/);
     assert.match(querySource, /dailyPositionSnapshots\.account, accounts\.code/);
-    assert.match(querySource, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(querySource, /buildPortfolioGroupHistoryRows/);
+    assert.match(querySource, /portfolioGroupAccountMemberships\.validFrom/);
+    assert.match(querySource, /portfolioGroupAssetMemberships\.validFrom/);
+    assert.doesNotMatch(querySource, /NAMED_PORTFOLIO_ACCOUNTS/);
     assert.doesNotMatch(querySource, /ownerUserId\s*:\s*string|headers\(\)|cookies\(\)/);
+    assert.match(controlsSource, /PortfolioAnalysisScopeTabs/);
+    assert.match(controlsSource, /name="scope"/);
+    assert.doesNotMatch(controlsSource, /name="account"/);
   });
 
   it("authorizes dashboard rows through dynamic accounts and effective group targets", () => {
@@ -557,10 +569,13 @@ describe("current tenant read scope runtime boundary", () => {
   it("smokes the unauthenticated history boundary without direct database reads", () => {
     const source = read("scripts/smoke-history-route.mjs");
 
+    assert.match(source, /const SESSION_COOKIE/);
     assert.match(source, /history_session_boundary/);
     assert.match(source, /productDataRead: "not_attempted"/);
-    assert.match(source, /unauthorizedHistory\.status,[\s\S]*401/);
-    assert.match(source, /history\.status, 200/);
+    assert.match(source, /historyBoundary\.status, 200/);
+    assert.match(source, /if \(!SESSION_COOKIE\)/);
+    assert.match(source, /data-page="history"/);
+    assert.doesNotMatch(source, /no-auth history request must return 401/);
     assert.doesNotMatch(
       source,
       /@neondatabase|DATABASE_URL|neon\(|sql\.query|select\s+.+\s+from|insert\s+into|update\s+.+\s+set|delete\s+from/i,

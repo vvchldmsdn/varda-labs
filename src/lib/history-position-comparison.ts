@@ -1,5 +1,4 @@
 import type {
-  HistoryAccount,
   HistoryLane,
   PortfolioHistoryDisplayRow,
 } from "./history-balance.ts";
@@ -38,7 +37,7 @@ export function normalizeHistoryPositionComparisonSelection({
   comparisonFrom,
   comparisonTo,
 }: {
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   comparisonFrom: string | string[] | undefined;
   comparisonTo: string | string[] | undefined;
@@ -98,7 +97,7 @@ export function buildHistoryPositionComparison({
   fromRows,
   toRows,
 }: {
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   selection: HistoryPositionComparisonSelection;
   portfolioRows: readonly PortfolioHistoryDisplayRow[];
@@ -180,7 +179,7 @@ export function historyPositionComparisonToken(
 }
 
 function buildOptions(
-  account: HistoryAccount,
+  account: string,
   portfolioRows: readonly PortfolioHistoryDisplayRow[],
 ) {
   if (account === "all") return Object.freeze([]);
@@ -220,7 +219,7 @@ function emptyModel({
   from = null,
   to = null,
 }: {
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   selection: HistoryPositionComparisonSelection;
   status: HistoryPositionComparisonModel["status"];

@@ -22,17 +22,21 @@ import { TenantHistoryEvents } from "./tenant-history-events";
 export function HistoryView({
   history,
   events,
+  eventsSupported,
 }: {
   history: ReadOnlyHistoryBalance;
   events: TenantEventLedgerQueryResult | null;
+  eventsSupported: boolean;
 }) {
-  const balanceTrajectory = buildBalanceHistoryTrajectory({
-    rows: history.balanceRows,
-    account: history.account,
-  });
+  const balanceTrajectory = history.balanceAccount
+    ? buildBalanceHistoryTrajectory({
+        rows: history.balanceRows,
+        account: history.balanceAccount,
+      })
+    : null;
   const portfolioTrajectory = buildPortfolioHistoryTrajectory({
     rows: history.portfolioRows,
-    account: history.account,
+    account: history.selectedScope.key,
   });
 
   return (
@@ -62,12 +66,16 @@ export function HistoryView({
             data-history-semantic="stored-evidence-not-recomputed"
             className="mt-4 rounded-md border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-sm text-[#6f561c]"
           >
-            저장 당시의 기록을 그대로 읽습니다. 현재 보유 자산 정책으로
-            과거 값을 다시 계산하지 않으며, 잔액 기록과 포트폴리오 성과를
-            하나의 연속 시계열로 합치거나 보간하지 않습니다.
+            계좌 성과는 저장된 계좌 스냅샷을 읽고, 자산그룹 성과는 각
+            기준일에 유효했던 멤버십과 포지션 스냅샷으로 계산합니다. 누락값을
+            임의 보간하지 않으며 잔액 기록과 성과 시계열을 합치지 않습니다.
           </p>
 
-          <HistoryControls account={history.account} lane={history.lane} />
+          <HistoryControls
+            lane={history.lane}
+            scopes={history.analysisScopes}
+            selectedScope={history.selectedScope}
+          />
 
           {history.unavailableSources.length > 0 ? (
             <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] px-3 py-2 text-sm text-[#76591f]">
@@ -114,11 +122,20 @@ export function HistoryView({
             className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
           >
             <SectionHeader title="잔액 기록" detail="저장된 잔액 증거" />
-            <HistoryTrajectoryChart model={balanceTrajectory} />
-            <BalanceHistoryTable
-              rows={history.balanceRows}
-              account={history.account}
-            />
+            {balanceTrajectory && history.balanceAccount ? (
+              <>
+                <HistoryTrajectoryChart model={balanceTrajectory} />
+                <BalanceHistoryTable
+                  rows={history.balanceRows}
+                  account={history.balanceAccount}
+                />
+              </>
+            ) : (
+              <UnsupportedScopeMessage>
+                이 범위에는 배분 기준이 없는 레거시 잔액 기록을 적용하지
+                않습니다. 포트폴리오 성과 기록은 아래에서 확인할 수 있습니다.
+              </UnsupportedScopeMessage>
+            )}
           </section>
         ) : null}
 
@@ -132,12 +149,28 @@ export function HistoryView({
               detail="저장값과 표시용 합산을 구분"
             />
             <HistoryTrajectoryChart model={portfolioTrajectory} />
-            <HistoryPositionComparison model={history.positionComparison} />
-            <HistoryPositionDetail model={history.positionDetail} />
+            {history.selectedScope.kind === "account" ? (
+              <>
+                <HistoryPositionComparison
+                  model={history.positionComparison}
+                  scopeKey={history.selectedScope.key}
+                />
+                <HistoryPositionDetail
+                  model={history.positionDetail}
+                  scopeKey={history.selectedScope.key}
+                />
+              </>
+            ) : (
+              <UnsupportedScopeMessage>
+                전체·자산그룹의 과거 보유 상세 비교는 계좌 경계를 넘어서는
+                별도 증거 모델이 필요해 이번 단계에서는 표시하지 않습니다.
+              </UnsupportedScopeMessage>
+            )}
             <PortfolioHistoryTable
               rows={history.portfolioRows}
               lane={history.lane}
               positionDetail={history.positionDetail}
+              selectedScope={history.selectedScope}
             />
           </section>
         ) : null}
@@ -153,6 +186,11 @@ export function HistoryView({
             />
             {events ? (
               <TenantHistoryEvents result={events} />
+            ) : !eventsSupported ? (
+              <UnsupportedScopeMessage>
+                이 자산그룹의 이벤트 포함 규칙은 아직 정의되지 않아 기존 계좌
+                이벤트를 임의로 합산하지 않습니다.
+              </UnsupportedScopeMessage>
             ) : (
               <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
                 이벤트 조회가 시작되지 않았습니다.
@@ -162,6 +200,14 @@ export function HistoryView({
         ) : null}
       </div>
     </main>
+  );
+}
+
+function UnsupportedScopeMessage({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+      {children}
+    </p>
   );
 }
 

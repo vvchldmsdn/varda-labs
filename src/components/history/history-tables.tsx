@@ -9,6 +9,7 @@ import type {
 } from "@/lib/history-balance";
 import { historyBalanceValueForAccount } from "@/lib/history-balance";
 import type { HistoryPositionDetailModel } from "@/lib/history-position-detail";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 
 import {
   HistoryTableCell as TableCell,
@@ -76,10 +77,12 @@ export function PortfolioHistoryTable({
   rows,
   lane,
   positionDetail,
+  selectedScope,
 }: {
   rows: PortfolioHistoryDisplayRow[];
   lane: HistoryLane;
   positionDetail: HistoryPositionDetailModel;
+  selectedScope: PortfolioAnalysisScope;
 }) {
   if (rows.length === 0) {
     return <EmptyTableMessage>포트폴리오 기록이 없습니다.</EmptyTableMessage>;
@@ -124,7 +127,7 @@ export function PortfolioHistoryTable({
                 )}
               >
                 <TableCell strong>{row.snapshotDate}</TableCell>
-                <TableCell>{historyAccountLabel(row.account)}</TableCell>
+                <TableCell>{portfolioRowScopeLabel(selectedScope)}</TableCell>
                 <TableCell>{historySourceLabel(row.source)}</TableCell>
                 <TableCell>{historyRowKindLabel(row)}</TableCell>
                 <TableCell align="right">
@@ -146,14 +149,19 @@ export function PortfolioHistoryTable({
                   {formatHistoryPercent(row.totalReturnPct)}
                 </TableCell>
                 <TableCell>
-                  {row.account === "all" || row.rowKind === "derived" ? (
+                  {selectedScope.kind !== "account" ||
+                  row.rowKind !== "stored" ? (
                     <span className="text-xs text-[#687064]">
-                      계정별 선택 필요
+                      범위 상세 준비 중
                     </span>
                   ) : (
                     <Link
                       aria-current={selected ? "page" : undefined}
-                      href={positionDetailHref(row, lane)}
+                      href={positionDetailHref(
+                        row,
+                        lane,
+                        selectedScope.key,
+                      )}
                       className="inline-flex rounded-md border border-[#d7ddcf] bg-white px-2 py-1 text-xs font-semibold text-[#1e3a34] hover:bg-[#eef2e8]"
                     >
                       {selected ? "선택됨" : "보유 상세"}
@@ -185,14 +193,19 @@ function isSelectedPositionRow(
 function positionDetailHref(
   row: PortfolioHistoryDisplayRow,
   lane: HistoryLane,
+  scopeKey: PortfolioAnalysisScope["key"],
 ) {
   const params = new URLSearchParams({
-    account: row.account,
+    scope: scopeKey,
     lane,
     positionDate: row.snapshotDate,
     positionSource: row.source,
   });
   return `/history?${params.toString()}`;
+}
+
+function portfolioRowScopeLabel(scope: PortfolioAnalysisScope) {
+  return scope.kind === "all" ? historyAccountLabel("all") : scope.label;
 }
 
 function EmptyTableMessage({ children }: { children: ReactNode }) {

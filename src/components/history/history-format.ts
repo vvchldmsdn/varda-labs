@@ -1,5 +1,4 @@
 import type {
-  HistoryAccount,
   HistoryLane,
   PortfolioHistoryDisplayRow,
 } from "@/lib/history-balance";
@@ -16,7 +15,7 @@ const NUMBER_FORMATTER = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 8,
 });
 
-export function historyAccountLabel(account: HistoryAccount) {
+export function historyAccountLabel(account: string) {
   if (account === "all") return "전체";
   if (account === "brokerage") return "증권";
   return account.toUpperCase();

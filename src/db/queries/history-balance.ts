@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
@@ -8,6 +8,8 @@ import {
   accounts,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
+  portfolioGroupAccountMemberships,
+  portfolioGroupAssetMemberships,
 } from "@/db/schema";
 import {
   buildPortfolioHistoryDisplayRows,
@@ -30,7 +32,11 @@ import {
   type HistoryPositionComparisonRawRow,
   type HistoryPositionComparisonSelection,
 } from "@/lib/history-position-comparison";
-import { NAMED_PORTFOLIO_ACCOUNTS } from "@/lib/portfolio-account-scope";
+import {
+  buildPortfolioGroupHistoryRows,
+  type HistoryMembershipPeriod,
+} from "@/lib/history-portfolio-scope";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type ReadOnlyBalanceHistoryRow = {
@@ -48,7 +54,9 @@ export type HistoryReadSource =
   | "position_comparison";
 
 export type ReadOnlyHistoryBalance = {
-  account: HistoryAccount;
+  analysisScopes: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
+  balanceAccount: HistoryAccount | null;
   lane: HistoryLane;
   readStatus: "ready" | "partial" | "unavailable";
   unavailableSources: readonly HistoryReadSource[];
@@ -78,35 +86,44 @@ type LoadResult<T> =
   | Readonly<{ state: "unavailable" }>;
 
 export async function getReadOnlyTenantHistoryBalance({
+  analysisScopes,
   tenantContext,
-  account,
+  scope,
   lane,
   positionSelection,
   positionComparisonSelection,
 }: {
+  analysisScopes: readonly PortfolioAnalysisScope[];
   tenantContext: TenantContext;
-  account: HistoryAccount;
+  scope: PortfolioAnalysisScope;
   lane: HistoryLane;
   positionSelection: HistoryPositionSelection;
   positionComparisonSelection: HistoryPositionComparisonSelection;
 }): Promise<ReadOnlyHistoryBalance> {
+  const balanceAccount = balanceAccountForScope(scope);
+  const portfolioAccount = portfolioAccountForScope(scope);
+  const expectedAccountCodes = analysisScopes.flatMap((candidate) =>
+    candidate.kind === "account" ? [candidate.accountCode] : [],
+  );
   const [balanceResult, portfolioResult, positionResult, comparisonResult] =
     await Promise.all([
-      captureLoad(lane === "all" || lane === "balance", () =>
-        loadBalanceRows(tenantContext),
+      captureLoad(
+        balanceAccount !== null && (lane === "all" || lane === "balance"),
+        () => loadBalanceRows(tenantContext),
       ),
       captureLoad(lane === "all" || lane === "portfolio", () =>
-        loadPortfolioRows(tenantContext, account),
+        loadPortfolioRows(tenantContext, scope),
       ),
       positionSelection.status === "requested"
         ? captureLoad(true, () =>
-            loadPositionRows(tenantContext, positionSelection),
+            loadPositionRows(tenantContext, scope, positionSelection),
           )
         : Promise.resolve(Object.freeze({ state: "not_requested" } as const)),
       positionComparisonSelection.status === "requested"
         ? captureLoad(true, () =>
             loadPositionComparisonRows(
               tenantContext,
+              scope,
               positionComparisonSelection,
             ),
           )
@@ -122,18 +139,19 @@ export async function getReadOnlyTenantHistoryBalance({
   });
   const portfolioRows = buildPortfolioHistoryDisplayRows({
     rows: portfolioRawRows,
-    account,
+    account: portfolioAccount,
+    expectedAccounts: expectedAccountCodes,
   });
   const visibleBalanceRows = [...balanceRows].sort(compareBalanceRowsDesc);
   const positionDetail = buildHistoryPositionDetail({
-    account,
+    account: portfolioAccount,
     lane,
     selection: positionSelection,
     portfolioRows,
     positionRows,
   });
   const positionComparison = buildHistoryPositionComparison({
-    account,
+    account: portfolioAccount,
     lane,
     selection: positionComparisonSelection,
     portfolioRows,
@@ -154,7 +172,9 @@ export async function getReadOnlyTenantHistoryBalance({
     .map(([source]) => source);
 
   return {
-    account,
+    analysisScopes,
+    selectedScope: scope,
+    balanceAccount,
     lane,
     readStatus:
       unavailableSources.length === 0
@@ -194,20 +214,26 @@ export async function getReadOnlyTenantHistoryBalance({
 
 async function loadPositionComparisonRows(
   tenantContext: TenantContext,
+  scope: PortfolioAnalysisScope,
   selection: Extract<
     HistoryPositionComparisonSelection,
     { status: "requested" }
   >,
 ) {
+  if (scope.kind !== "account" || scope.accountCode !== selection.account) {
+    throw new Error("History position comparison scope mismatch");
+  }
   const [fromRows, toRows] = await Promise.all([
     loadPositionComparisonEndpointRows({
       tenantContext,
+      accountId: scope.accountId,
       account: selection.account,
       snapshotDate: selection.from.snapshotDate,
       source: selection.from.source,
     }),
     loadPositionComparisonEndpointRows({
       tenantContext,
+      accountId: scope.accountId,
       account: selection.account,
       snapshotDate: selection.to.snapshotDate,
       source: selection.to.source,
@@ -218,12 +244,14 @@ async function loadPositionComparisonRows(
 
 async function loadPositionComparisonEndpointRows({
   tenantContext,
+  accountId,
   account,
   snapshotDate,
   source,
 }: {
   tenantContext: TenantContext;
-  account: Exclude<HistoryAccount, "all">;
+  accountId: string;
+  account: string;
   snapshotDate: string;
   source: string;
 }): Promise<HistoryPositionComparisonRawRow[]> {
@@ -247,6 +275,7 @@ async function loadPositionComparisonEndpointRows({
       and(
         eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
         eq(accounts.isActive, true),
+        eq(accounts.id, accountId),
         eq(accounts.code, account),
         eq(dailyPositionSnapshots.account, accounts.code),
         eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
@@ -263,8 +292,12 @@ async function loadPositionComparisonEndpointRows({
 
 async function loadPositionRows(
   tenantContext: TenantContext,
+  scope: PortfolioAnalysisScope,
   selection: Extract<HistoryPositionSelection, { status: "requested" }>,
 ): Promise<HistoryPositionRawRow[]> {
+  if (scope.kind !== "account" || scope.accountCode !== selection.account) {
+    throw new Error("History position detail scope mismatch");
+  }
   return db
     .select({
       snapshotDate: dailyPositionSnapshots.snapshotDate,
@@ -294,6 +327,7 @@ async function loadPositionRows(
       and(
         eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
         eq(accounts.isActive, true),
+        eq(accounts.id, scope.accountId),
         eq(accounts.code, selection.account),
         eq(dailyPositionSnapshots.account, accounts.code),
         eq(dailyPositionSnapshots.snapshotDate, selection.snapshotDate),
@@ -335,16 +369,21 @@ async function loadBalanceRows(
 
 async function loadPortfolioRows(
   tenantContext: TenantContext,
-  account: HistoryAccount,
+  scope: PortfolioAnalysisScope,
 ): Promise<PortfolioHistoryRawRow[]> {
+  if (scope.kind === "portfolio_group") {
+    return loadPortfolioGroupRows(tenantContext, scope);
+  }
+
   const predicates = [
     eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
     eq(accounts.isActive, true),
-    inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
     eq(dailyPortfolioSnapshots.account, accounts.code),
     eq(dailyPortfolioSnapshots.isSample, false),
   ];
-  if (account !== "all") predicates.push(eq(accounts.code, account));
+  if (scope.kind === "account") {
+    predicates.push(eq(accounts.id, scope.accountId));
+  }
 
   return db
     .select({
@@ -367,6 +406,130 @@ async function loadPortfolioRows(
       asc(accounts.code),
       asc(dailyPortfolioSnapshots.source),
     );
+}
+
+async function loadPortfolioGroupRows(
+  tenantContext: TenantContext,
+  scope: Extract<PortfolioAnalysisScope, { kind: "portfolio_group" }>,
+): Promise<PortfolioHistoryRawRow[]> {
+  const [accountMemberships, assetMemberships] = await Promise.all([
+    db
+      .select({
+        targetId: portfolioGroupAccountMemberships.accountId,
+        validFrom: portfolioGroupAccountMemberships.validFrom,
+        validTo: portfolioGroupAccountMemberships.validTo,
+      })
+      .from(portfolioGroupAccountMemberships)
+      .where(
+        and(
+          eq(
+            portfolioGroupAccountMemberships.canonicalOwnerUserId,
+            tenantContext.ownerUserId,
+          ),
+          eq(
+            portfolioGroupAccountMemberships.portfolioGroupId,
+            scope.portfolioGroupId,
+          ),
+        ),
+      ),
+    db
+      .select({
+        targetId: portfolioGroupAssetMemberships.assetId,
+        validFrom: portfolioGroupAssetMemberships.validFrom,
+        validTo: portfolioGroupAssetMemberships.validTo,
+      })
+      .from(portfolioGroupAssetMemberships)
+      .where(
+        and(
+          eq(
+            portfolioGroupAssetMemberships.canonicalOwnerUserId,
+            tenantContext.ownerUserId,
+          ),
+          eq(
+            portfolioGroupAssetMemberships.portfolioGroupId,
+            scope.portfolioGroupId,
+          ),
+        ),
+      ),
+  ]);
+
+  const accountIds = uniqueTargets(accountMemberships);
+  const assetIds = uniqueTargets(assetMemberships);
+  if (accountIds.length === 0 && assetIds.length === 0) return [];
+
+  const candidatePredicates = [];
+  if (accountIds.length > 0) {
+    candidatePredicates.push(inArray(dailyPositionSnapshots.accountId, accountIds));
+  }
+  if (assetIds.length > 0) {
+    candidatePredicates.push(inArray(dailyPositionSnapshots.assetId, assetIds));
+  }
+  const membershipPredicate =
+    candidatePredicates.length === 1
+      ? candidatePredicates[0]
+      : or(...candidatePredicates);
+  const earliestMembershipDate = [...accountMemberships, ...assetMemberships]
+    .map((membership) => membership.validFrom)
+    .sort()[0]!;
+
+  const rows = await db
+    .select({
+      snapshotDate: dailyPositionSnapshots.snapshotDate,
+      source: dailyPositionSnapshots.source,
+      account: dailyPositionSnapshots.account,
+      accountId: dailyPositionSnapshots.accountId,
+      assetId: dailyPositionSnapshots.assetId,
+      marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+      costKrw: dailyPositionSnapshots.costKrw,
+      pnlKrw: dailyPositionSnapshots.pnlKrw,
+    })
+    .from(dailyPositionSnapshots)
+    .where(
+      and(
+        eq(
+          dailyPositionSnapshots.canonicalOwnerUserId,
+          tenantContext.ownerUserId,
+        ),
+        eq(dailyPositionSnapshots.isSample, false),
+        gte(dailyPositionSnapshots.snapshotDate, earliestMembershipDate),
+        membershipPredicate,
+      ),
+    )
+    .orderBy(
+      asc(dailyPositionSnapshots.snapshotDate),
+      asc(dailyPositionSnapshots.source),
+      asc(dailyPositionSnapshots.account),
+      asc(dailyPositionSnapshots.assetName),
+    );
+
+  return buildPortfolioGroupHistoryRows({
+    accountMemberships,
+    assetMemberships,
+    rows,
+    scopeKey: scope.key,
+  });
+}
+
+function uniqueTargets(rows: readonly HistoryMembershipPeriod[]) {
+  return [...new Set(rows.map((row) => row.targetId))];
+}
+
+function balanceAccountForScope(
+  scope: PortfolioAnalysisScope,
+): HistoryAccount | null {
+  if (scope.kind === "all") return "all";
+  if (scope.kind !== "account") return null;
+  return isHistoryAccount(scope.accountCode) ? scope.accountCode : null;
+}
+
+function portfolioAccountForScope(scope: PortfolioAnalysisScope) {
+  if (scope.kind === "all") return "all";
+  if (scope.kind === "account") return scope.accountCode;
+  return scope.key;
+}
+
+function isHistoryAccount(value: string): value is HistoryAccount {
+  return value === "brokerage" || value === "isa" || value === "irp";
 }
 
 async function captureLoad<T>(

@@ -1,11 +1,10 @@
 import type {
-  HistoryAccount,
   HistoryLane,
 } from "./history-balance.ts";
 
 export const HISTORY_POSITION_COMPARISON_POLICY = Object.freeze({
-  version: "stored_named_account_position_change_v1",
-  supportedAccounts: "brokerage_isa_irp_only",
+  version: "stored_owned_account_position_change_v2",
+  supportedAccounts: "resolved_owned_account_scope",
   endpointMatch: "exact_snapshot_date_account_source",
   sourceMatch: "same_exact_stored_source",
   identityBasis: "exact_stored_legacy_asset_id",
@@ -19,7 +18,7 @@ export const HISTORY_POSITION_COMPARISON_POLICY = Object.freeze({
 export const HISTORY_POSITION_COMPARISON_QUERY_LIMIT =
   HISTORY_POSITION_COMPARISON_POLICY.endpointRowLimit + 1;
 
-export type HistoryPositionComparisonAccount = Exclude<HistoryAccount, "all">;
+export type HistoryPositionComparisonAccount = string;
 
 export type HistoryPositionComparisonEndpoint = Readonly<{
   snapshotDate: string;
@@ -119,7 +118,7 @@ export type HistoryPositionComparisonRow = Readonly<{
 
 export type HistoryPositionComparisonModel = Readonly<{
   policy: typeof HISTORY_POSITION_COMPARISON_POLICY;
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   selection: HistoryPositionComparisonSelection;
   status: "idle" | "blocked" | "unavailable" | "partial" | "ready";

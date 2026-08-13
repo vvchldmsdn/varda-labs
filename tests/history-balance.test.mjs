@@ -116,6 +116,30 @@ describe("history balance helpers", () => {
     assert.deepEqual(rows[0].derivedFromAccounts, ["brokerage", "isa"]);
   });
 
+  it("derives all-account history from the current dynamic account catalog", () => {
+    const rows = buildPortfolioHistoryDisplayRows({
+      account: "all",
+      expectedAccounts: ["brokerage", "family-trust"],
+      rows: [
+        portfolioRow({ account: "brokerage" }),
+        portfolioRow({
+          account: "family-trust",
+          totalCost: "400",
+          totalMarketValue: "500",
+          totalPnl: "100",
+        }),
+      ],
+    });
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].rowKind, "derived");
+    assert.equal(rows[0].totalMarketValue, 1600);
+    assert.deepEqual(rows[0].derivedFromAccounts, [
+      "brokerage",
+      "family-trust",
+    ]);
+  });
+
   it("filters exact account rows for account-specific views", () => {
     const rows = buildPortfolioHistoryDisplayRows({
       account: "isa",

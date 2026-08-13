@@ -4,6 +4,7 @@ import type {
   HistoryPositionDetailModel,
   HistoryPositionDisplayRow,
 } from "@/lib/history-position-detail";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 
 import {
   formatHistoryKrw,
@@ -23,8 +24,10 @@ const PERCENT_FORMATTER = new Intl.NumberFormat("ko-KR", {
 
 export function HistoryPositionDetail({
   model,
+  scopeKey,
 }: {
   model: HistoryPositionDetailModel;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
     <section
@@ -57,7 +60,7 @@ export function HistoryPositionDetail({
         </div>
         {model.selection.status !== "idle" ? (
           <Link
-            href={clearDetailHref(model)}
+            href={clearDetailHref(model, scopeKey)}
             className="w-fit rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-xs font-semibold text-[#4d574b] hover:bg-[#eef2e8]"
           >
             상세 닫기
@@ -259,9 +262,12 @@ function formatPercent(value: number | null) {
     : `${PERCENT_FORMATTER.format(value)}%`;
 }
 
-function clearDetailHref(model: HistoryPositionDetailModel) {
+function clearDetailHref(
+  model: HistoryPositionDetailModel,
+  scopeKey: PortfolioAnalysisScopeKey,
+) {
   const params = new URLSearchParams({
-    account: model.account,
+    scope: scopeKey,
     lane: model.lane,
   });
   return `/history?${params.toString()}`;
