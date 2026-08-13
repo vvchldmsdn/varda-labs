@@ -182,6 +182,10 @@ describe("additional contribution tenant preview", () => {
     assert.match(route, /method="get"/);
     assert.match(route, /resolveCurrentTenantContext/);
     assert.match(route, /if \(!resolution\.ok\)/);
+    assert.match(route, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
+    assert.match(route, /PortfolioAnalysisScopeTabs/);
+    assert.match(route, /resolveAdditionalContributionScope/);
+    assert.match(route, /name="scope"/);
     assert.doesNotMatch(
       proxy,
       /"\/additional-contribution(?:\/:path\*)?"/,

@@ -6,6 +6,9 @@ import {
 } from "./portfolio-math.ts";
 
 export type PortfolioStructureAccount = "all" | "brokerage" | "isa" | "irp";
+export type PortfolioStructureIdentityScope =
+  | "account_scoped"
+  | "cross_account_exposure";
 
 export type PortfolioStructureAssetInput = {
   id: string;
@@ -121,6 +124,7 @@ export type PortfolioStructureExclusion = {
 
 export type PortfolioStructureResult = {
   selectedAccount: PortfolioStructureAccount;
+  identityScope: PortfolioStructureIdentityScope;
   usdKrwRate: number | null;
   totalValueKrw: number;
   includedHoldingCount: number;
@@ -147,6 +151,8 @@ export type BuildPortfolioStructureInput = {
   liveQuotes?: PortfolioStructureLiveQuoteInput[];
   usdKrwRate?: string | number | null;
   selectedAccount?: PortfolioStructureAccount;
+  assetSelection?: "legacy_account_filter" | "preselected";
+  identityScope?: PortfolioStructureIdentityScope;
 };
 
 type HoldingCandidate =
@@ -163,17 +169,22 @@ export function buildPortfolioStructure({
   liveQuotes = [],
   usdKrwRate,
   selectedAccount = "brokerage",
+  assetSelection = "legacy_account_filter",
+  identityScope,
 }: BuildPortfolioStructureInput): PortfolioStructureResult {
   const normalizedAccount = normalizeStructureAccount(selectedAccount);
   const usdKrw = toNumber(usdKrwRate);
   const activeGroupsById = buildActiveGroupsById(groups);
   const activeMembersByAssetGroup = buildActiveMembersByAssetGroup(groupMembers);
   const quotesByKey = buildUsableQuotesByKey(liveQuotes);
-  const selectedAssets = assets.filter((asset) =>
-    normalizedAccount === "all"
-      ? TRACKED_ACCOUNTS.has(asset.account)
-      : asset.account === normalizedAccount,
-  );
+  const selectedAssets =
+    assetSelection === "preselected"
+      ? assets
+      : assets.filter((asset) =>
+          normalizedAccount === "all"
+            ? TRACKED_ACCOUNTS.has(asset.account)
+            : asset.account === normalizedAccount,
+        );
 
   const candidateRows = selectedAssets.map((asset) =>
     buildHoldingCandidate({
@@ -208,6 +219,11 @@ export function buildPortfolioStructure({
 
   return {
     selectedAccount: normalizedAccount,
+    identityScope:
+      identityScope ??
+      (normalizedAccount === "all"
+        ? "cross_account_exposure"
+        : "account_scoped"),
     usdKrwRate: usdKrw,
     totalValueKrw,
     includedHoldingCount: weightedHoldingRows.length,

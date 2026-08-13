@@ -280,4 +280,24 @@ describe("portfolio structure read model", () => {
     assert.equal(result.groupRows[1].currentValueKrw, 75_000);
     assertNoInternalIds(result);
   });
+
+  it("accepts an already owner-scoped dynamic-account selection", () => {
+    const result = buildPortfolioStructure({
+      assets: [
+        asset({
+          account: "second-broker",
+          groupId: null,
+        }),
+      ],
+      liveQuotes: [quote()],
+      usdKrwRate: 1500,
+      selectedAccount: "all",
+      assetSelection: "preselected",
+      identityScope: "account_scoped",
+    });
+
+    assert.equal(result.includedHoldingCount, 1);
+    assert.equal(result.holdingRows[0].account, "second-broker");
+    assert.equal(result.identityScope, "account_scoped");
+  });
 });

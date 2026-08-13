@@ -1,36 +1,33 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-baseline";
 import { PortfolioFxShock } from "@/components/portfolio/portfolio-fx-shock";
 import { SpecialHoldingsCoverage } from "@/components/portfolio/special-holdings-coverage";
-import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfolio-structure";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
 import { buildPortfolioSpecialHoldingsModel } from "@/lib/portfolio-special-holdings";
 import type {
-  PortfolioStructureAccount,
   PortfolioStructureExclusion,
   PortfolioStructureGroupRow,
   PortfolioStructureHoldingRow,
   PortfolioStructureResult,
 } from "@/lib/portfolio-structure";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
 type PortfolioStructurePageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    scope?: string | string[];
   }>;
 };
-
-const accountTabs: { code: PortfolioStructureAccount; label: string }[] = [
-  { code: "brokerage", label: "Brokerage" },
-  { code: "isa", label: "ISA" },
-  { code: "irp", label: "IRP" },
-  { code: "all", label: "All" },
-];
 
 export default async function PortfolioStructurePage({
   searchParams,
@@ -49,8 +46,28 @@ export default async function PortfolioStructurePage({
     );
   }
 
-  const structure = await getReadOnlyTenantPortfolioStructure({
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
     account: params.account,
+    scope: params.scope,
+    tenantContext: resolution.tenantContext,
+  });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/portfolio/structure"
+        context={scopeContext}
+        title="포트 구조"
+      />
+    );
+  }
+
+  const selectedScope = scopeContext.resolution.scope;
+  const structure = await getReadOnlyTenantPortfolioStructureForScope({
+    scope: selectedScope,
+    serviceDate: resolveSnapshotCycle(new Date()).snapshotDate,
     tenantContext: resolution.tenantContext,
   });
   const directHoldingsBaseline =
@@ -83,25 +100,12 @@ export default async function PortfolioStructurePage({
             </nav>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2 rounded-md border border-[#dce2d2] bg-white p-1">
-            {accountTabs.map((tab) => (
-              <Link
-                key={tab.code}
-                href={
-                  tab.code === "brokerage"
-                    ? "/portfolio/structure"
-                    : `/portfolio/structure?account=${tab.code}`
-                }
-                className={[
-                  "rounded-md px-3 py-2 text-sm font-semibold transition",
-                  structure.selectedAccount === tab.code
-                    ? "bg-[#1e3a34] text-white"
-                    : "text-[#5d665b] hover:bg-[#edf1e8]",
-                ].join(" ")}
-              >
-                {tab.label}
-              </Link>
-            ))}
+          <div className="mt-4">
+            <PortfolioAnalysisScopeTabs
+              basePath="/portfolio/structure"
+              scopes={scopeContext.catalog.scopes}
+              selectedScopeKey={selectedScope.key}
+            />
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -118,7 +122,7 @@ export default async function PortfolioStructurePage({
             <SummaryCell
               label="Groups"
               value={String(structure.groupRows.length)}
-              detail={`account ${structure.selectedAccount}`}
+              detail={`${selectedScope.label} · ${scopeKindLabel(selectedScope.kind)}`}
             />
             <SummaryCell
               label="Policy status"
@@ -128,7 +132,10 @@ export default async function PortfolioStructurePage({
           </div>
         </section>
 
-        <DirectHoldingsBaseline model={directHoldingsBaseline} />
+        <DirectHoldingsBaseline
+          model={directHoldingsBaseline}
+          scopeLabel={selectedScope.label}
+        />
 
         <PortfolioFxShock
           baseline={directHoldingsBaseline}
@@ -427,6 +434,12 @@ function policyStatusSummary(structure: PortfolioStructureResult) {
     structure.holdingRows.map((row) => row.targetPolicyStatus),
   );
   return statuses.size > 0 ? String(statuses.size) : "0";
+}
+
+function scopeKindLabel(kind: "all" | "account" | "portfolio_group") {
+  if (kind === "account") return "계좌";
+  if (kind === "portfolio_group") return "자산그룹";
+  return "전체 자산";
 }
 
 function formatMoney(value: number | null) {
