@@ -1,7 +1,9 @@
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
+import type { PortfolioAnalysisScopeKey } from "./portfolio-analysis-scope.ts";
 
 export type SimulationNavigationInput = Readonly<{
   account?: PortfolioAccountScope | null;
+  scope?: PortfolioAnalysisScopeKey | null;
   endServiceDate: string | null;
   researchHorizon: 63 | 126;
   kodexWeightPct: number | null;
@@ -12,7 +14,9 @@ export function buildSimulationHref(input: SimulationNavigationInput) {
   const params = new URLSearchParams({
     horizon: String(input.researchHorizon),
   });
-  if (input.account) {
+  if (input.scope) {
+    params.set("scope", input.scope);
+  } else if (input.account) {
     params.set("account", input.account);
   }
   if (input.endServiceDate) {

@@ -106,13 +106,17 @@ describe("product session access boundary", () => {
 
     assert.match(
       page,
-      /getReadOnlyTenantSimulationOwnerResearch\(\{[\s\S]*account: selectedAccount,[\s\S]*tenantContext: resolution\.tenantContext/,
+      /getReadOnlyTenantSimulationOwnerResearch\(\{[\s\S]*scope: selectedScope,[\s\S]*tenantContext: resolution\.tenantContext/,
     );
     assert.match(query, /^import "server-only";/);
     assert.match(query, /tenantContext: TenantContext/);
     assert.match(
       query,
       /getReadOnlyTenantPortfolioStructure\(\{[\s\S]*tenantContext: options\.tenantContext,[\s\S]*account: options\.account/,
+    );
+    assert.match(
+      query,
+      /getReadOnlyTenantPortfolioStructureForScope\(\{[\s\S]*scope: options\.scope,[\s\S]*serviceDate: options\.serviceDate/,
     );
     assert.ok(
       query.indexOf("buildSimulationOwnerInputCandidate({") <

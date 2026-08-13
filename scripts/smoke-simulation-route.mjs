@@ -56,6 +56,20 @@ const SESSION_COOKIE =
   readArgument("--session-cookie") ??
   process.env.VARDA_SESSION_COOKIE?.trim() ??
   null;
+const UUID_FRAGMENT =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const CANONICAL_SCOPE_PATTERN = new RegExp(
+  `^(?:all|(?:account|portfolio):${UUID_FRAGMENT})$`,
+  "i",
+);
+const RAW_DYNAMIC_SCOPE_PATTERN = new RegExp(
+  `(?:account|portfolio):${UUID_FRAGMENT}`,
+  "gi",
+);
+const ENCODED_DYNAMIC_SCOPE_PATTERN = new RegExp(
+  `(?:account|portfolio)%3A${UUID_FRAGMENT}`,
+  "gi",
+);
 const LEAK_PATTERN =
   /legacyBase44Id|holdingId|assetId|ownerUser|api[_-]?key|authorization|password|secret|token|scenarioVectorHash|matrixRequestHash|inputMatrixHash|drawPlanHash|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
@@ -115,7 +129,7 @@ async function main() {
       boundary.body,
       /data-page="simulation-input-readiness"/,
     );
-    assert.doesNotMatch(boundary.body, LEAK_PATTERN);
+    assertNoSensitiveLeaks(boundary.body);
     console.log(
       JSON.stringify(
         {
@@ -151,7 +165,7 @@ async function main() {
   assert.match(signedOutDashboard.body, /Product database read/);
   assert.match(signedOutDashboard.body, /Not attempted/);
   assert.doesNotMatch(signedOutDashboard.body, /data-page=/);
-  assert.doesNotMatch(signedOutDashboard.body, LEAK_PATTERN);
+  assertNoSensitiveLeaks(signedOutDashboard.body);
 
   const dashboard = await request("/", true);
   const simulation = await request(simulationPath, true);
@@ -161,6 +175,13 @@ async function main() {
   assert.match(simulation.body, /data-page="simulation-input-readiness"/);
   assert.match(simulation.body, /data-runtime-trust-status="not_established"/);
   assert.match(simulation.body, /data-research-universe-preflight/);
+  const simulationHrefs = [
+    ...simulation.body.matchAll(/href="(\/simulation\?[^"]+)"/g),
+  ].map((match) => match[1].replaceAll("&amp;", "&"));
+  const renderedScopeValues = assertCanonicalSimulationScopes(
+    simulation.body,
+    simulationHrefs,
+  );
   const researchUniverseSelectionStatus = simulation.body.match(
     /data-research-universe-selection="([^"]+)"/,
   )?.[1];
@@ -193,9 +214,6 @@ async function main() {
       researchUniverseInstrumentStatuses.length > 0,
       "valid research universe must preserve per-instrument diagnostics",
     );
-    const simulationHrefs = [
-      ...simulation.body.matchAll(/href="(\/simulation\?[^"]+)"/g),
-    ].map((match) => match[1].replaceAll("&amp;", "&"));
     assert.ok(
       simulationHrefs.length > 0,
       "valid research universe must render internal simulation state links",
@@ -319,7 +337,7 @@ async function main() {
     simulation.body,
     /결과는 미래 예측, 비중 추천 또는 주문 근거가 아닙니다/,
   );
-  assert.doesNotMatch(simulation.body, LEAK_PATTERN);
+  assertNoSensitiveLeaks(simulation.body);
 
   const inputCount =
     simulation.body.match(/data-simulation-input="(?:kodex200|voo)"/g)
@@ -835,6 +853,7 @@ async function main() {
         researchUniverseStatus,
         researchUniverseInstrumentStatuses,
         researchUniversePreservedLinkCount,
+        renderedScopeValues,
         noAuthStatus: {
           dashboard: signedOutDashboard.status,
           simulation: signedOutSimulation.status,
@@ -996,6 +1015,43 @@ function numberArgument(name) {
     throw new Error(`${name} must be a non-negative integer`);
   }
   return value;
+}
+
+function assertCanonicalSimulationScopes(body, hrefs) {
+  assert.ok(hrefs.length > 0, "simulation must render internal state links");
+
+  const scopeValues = hrefs.map((href) => {
+    const value = new URL(href, BASE_URL).searchParams.get("scope");
+    assert.ok(value, `simulation state link omitted scope: ${href}`);
+    assert.match(
+      value,
+      CANONICAL_SCOPE_PATTERN,
+      `simulation state link used a non-canonical scope: ${href}`,
+    );
+    return value;
+  });
+  const ownerScope = body.match(
+    /data-owner-simulation-scope="([^"]+)"/,
+  )?.[1];
+  assert.ok(ownerScope, "simulation owner evidence must expose its scope key");
+  assert.match(
+    ownerScope,
+    CANONICAL_SCOPE_PATTERN,
+    "simulation owner evidence used a non-canonical scope key",
+  );
+  assert.ok(
+    scopeValues.includes(ownerScope),
+    "selected owner scope must remain present in simulation state links",
+  );
+
+  return [...new Set(scopeValues)];
+}
+
+function assertNoSensitiveLeaks(body) {
+  const inspectedBody = body
+    .replace(RAW_DYNAMIC_SCOPE_PATTERN, "authorized_scope")
+    .replace(ENCODED_DYNAMIC_SCOPE_PATTERN, "authorized_scope");
+  assert.doesNotMatch(inspectedBody, LEAK_PATTERN);
 }
 
 await main();

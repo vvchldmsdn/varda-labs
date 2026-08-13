@@ -4,6 +4,7 @@ import {
   DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
   resolveInvestmentLabSpecialHoldingIdentity,
 } from "./investment-lab-special-holding-authority.ts";
+import type { PortfolioAnalysisScopeKey } from "./portfolio-analysis-scope.ts";
 import type { PortfolioAccountScope } from "./portfolio-account-scope.ts";
 import type {
   PortfolioStructureExclusion,
@@ -22,6 +23,8 @@ export const SIMULATION_OWNER_INPUT_PREFLIGHT_POLICY = Object.freeze({
   sourceKindCandidate: "observed_current_baseline",
   ownerAuthority: "resolved_server_tenant_context",
   accountAuthority: "bounded_server_validated_query_filter",
+  analysisScopeAuthority:
+    "owner_scoped_catalog_and_effective_dated_membership",
   valuationBasis: "owner_scoped_current_portfolio_display_evidence",
   weightDerivation: "largest_remainder_display_value_diagnostics_v1",
   maximumInstrumentCount: 64,
@@ -73,7 +76,7 @@ type OwnerIdentityGap = Readonly<{
 }>;
 
 export type SimulationOwnerInputCandidate = Readonly<{
-  account: PortfolioAccountScope;
+  account: SimulationOwnerScopeKey;
   status: "ready_for_historical_preflight" | "diagnostics_only";
   policy: typeof SIMULATION_OWNER_INPUT_PREFLIGHT_POLICY;
   runtimeTrustStatus: "not_established";
@@ -98,12 +101,29 @@ export type SimulationOwnerInputCandidate = Readonly<{
   }>;
 }>;
 
-export function buildSimulationOwnerInputCandidate(input: {
-  account: PortfolioAccountScope;
-  portfolio: PortfolioStructureResult;
-}): SimulationOwnerInputCandidate {
+export type SimulationOwnerScopeKey =
+  | PortfolioAccountScope
+  | PortfolioAnalysisScopeKey;
+
+type SimulationOwnerInputCandidateInput =
+  | Readonly<{
+      account: PortfolioAccountScope;
+      portfolio: PortfolioStructureResult;
+    }>
+  | Readonly<{
+      scopeKey: PortfolioAnalysisScopeKey;
+      portfolio: PortfolioStructureResult;
+    }>;
+
+export function buildSimulationOwnerInputCandidate(
+  input: SimulationOwnerInputCandidateInput,
+): SimulationOwnerInputCandidate {
+  const scopeKey = "scopeKey" in input ? input.scopeKey : input.account;
   const blockers = new Set<CandidateBlocker>();
-  if (input.portfolio.selectedAccount !== input.account) {
+  if (
+    "account" in input &&
+    input.portfolio.selectedAccount !== input.account
+  ) {
     blockers.add("account_scope_mismatch");
   }
 
@@ -167,7 +187,7 @@ export function buildSimulationOwnerInputCandidate(input: {
   );
 
   return Object.freeze({
-    account: input.account,
+    account: scopeKey,
     status:
       blockers.size === 0 && selection
         ? "ready_for_historical_preflight"

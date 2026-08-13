@@ -2,7 +2,7 @@ import Form from "next/form";
 import Link from "next/link";
 
 import type { KodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-selection";
-import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import type { FixedMixResearchSimulationResult } from "@/lib/simulation-fixed-mix-research-execution";
 import { buildSimulationHref } from "@/lib/simulation-navigation";
 
@@ -15,14 +15,14 @@ type ReadyExecution = Extract<
 >;
 
 export function FixedMixResearchExecutionSection({
-  account,
+  scopeKey,
   endServiceDate,
   execution,
   researchHorizon,
   researchUniverse,
   selection,
 }: {
-  account: PortfolioAccountScope;
+  scopeKey: PortfolioAnalysisScopeKey;
   endServiceDate: string;
   execution: FixedMixResearchSimulationResult | null;
   researchHorizon: 63 | 126;
@@ -61,7 +61,7 @@ export function FixedMixResearchExecutionSection({
 
       <div className="mt-4 flex flex-col gap-3 border-y border-[#e1e5da] py-4 lg:flex-row lg:items-end lg:justify-between">
         <MixForm
-          account={account}
+          scopeKey={scopeKey}
           endServiceDate={endServiceDate}
           kodexWeightPct={kodexWeightPct}
           researchHorizon={researchHorizon}
@@ -69,7 +69,7 @@ export function FixedMixResearchExecutionSection({
           vooWeightPct={vooWeightPct}
         />
         <PresetLinks
-          account={account}
+          scopeKey={scopeKey}
           endServiceDate={endServiceDate}
           researchHorizon={researchHorizon}
           researchUniverse={researchUniverse}
@@ -177,14 +177,14 @@ function unavailableReasonLabel(
 }
 
 function MixForm({
-  account,
+  scopeKey,
   endServiceDate,
   kodexWeightPct,
   researchHorizon,
   researchUniverse,
   vooWeightPct,
 }: {
-  account: PortfolioAccountScope;
+  scopeKey: PortfolioAnalysisScopeKey;
   endServiceDate: string;
   kodexWeightPct: number;
   researchHorizon: 63 | 126;
@@ -193,7 +193,7 @@ function MixForm({
 }) {
   return (
     <Form action="/simulation" className="flex flex-wrap items-end gap-2" scroll={false}>
-      <input name="account" type="hidden" value={account} />
+      <input name="scope" type="hidden" value={scopeKey} />
       {isDateKey(endServiceDate) ? (
         <input name="end" type="hidden" value={endServiceDate} />
       ) : null}
@@ -235,12 +235,12 @@ function MixForm({
 }
 
 function PresetLinks({
-  account,
+  scopeKey,
   endServiceDate,
   researchHorizon,
   researchUniverse,
 }: {
-  account: PortfolioAccountScope;
+  scopeKey: PortfolioAnalysisScopeKey;
   endServiceDate: string;
   researchHorizon: 63 | 126;
   researchUniverse: string | null;
@@ -251,7 +251,7 @@ function PresetLinks({
         <Link
           className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
           href={buildSimulationHref({
-            account,
+            scope: scopeKey,
             endServiceDate: isDateKey(endServiceDate)
               ? endServiceDate
               : null,

@@ -1,13 +1,20 @@
-import { AccountScopeTabs, portfolioAccountScopeLabel } from "@/components/account-scope-tabs";
-import type { PortfolioAccountScopeQuery } from "@/lib/portfolio-account-scope";
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
+import type {
+  PortfolioAnalysisScope,
+  PortfolioAnalysisScopeQuery,
+} from "@/lib/portfolio-analysis-scope";
 import type { SimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
 
 export function OwnerInputPreflightSection({
   model,
   preservedQuery,
+  scopes,
+  selectedScope,
 }: {
   model: SimulationOwnerInputPreflightModel;
-  preservedQuery: PortfolioAccountScopeQuery;
+  preservedQuery: PortfolioAnalysisScopeQuery;
+  scopes: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const positiveHistoryWeight = model.evidenceSummary?.admittedWeightBps ?? 0;
 
@@ -16,7 +23,7 @@ export function OwnerInputPreflightSection({
       aria-labelledby="owner-simulation-input-title"
       className="border-b border-[#d7ddcf] py-5"
       data-owner-simulation-preflight
-      data-owner-simulation-account={model.account}
+      data-owner-simulation-scope={model.account}
       data-owner-simulation-status={model.status}
       data-owner-simulation-runtime-trust={model.runtimeTrustStatus}
     >
@@ -34,15 +41,16 @@ export function OwnerInputPreflightSection({
             주문 근거로 사용하지 않습니다.
           </p>
         </div>
-        <AccountScopeTabs
+        <PortfolioAnalysisScopeTabs
           basePath="/simulation"
           query={preservedQuery}
-          selectedAccount={model.account}
+          scopes={scopes}
+          selectedScopeKey={selectedScope.key}
         />
       </div>
 
       <dl className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="계좌 범위" value={portfolioAccountScopeLabel(model.account)} />
+        <Metric label="분석 범위" value={selectedScope.label} />
         <Metric
           detail={`${model.summary.sourceHoldingCount}개 보유 행에서 집계`}
           label="분석 종목"

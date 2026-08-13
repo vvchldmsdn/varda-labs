@@ -136,6 +136,25 @@ describe("simulation owner input preflight", () => {
     assert.deepEqual(candidate.blockers, ["account_scope_mismatch"]);
   });
 
+  it("accepts an owner-resolved portfolio group without treating all-account query shape as a mismatch", () => {
+    const scopeKey =
+      "portfolio:11111111-1111-4111-8111-111111111111";
+    const candidate = buildSimulationOwnerInputCandidate({
+      scopeKey,
+      portfolio: portfolio({
+        selectedAccount: "all",
+        holdingRows: [
+          holding({ ticker: "069500", account: "brokerage", value: 1_000 }),
+        ],
+      }),
+    });
+
+    assert.equal(candidate.account, scopeKey);
+    assert.equal(candidate.status, "ready_for_historical_preflight");
+    assert.deepEqual(candidate.blockers, []);
+    assert.equal(candidate.selection?.totalWeightBps, 10_000);
+  });
+
   it("preserves unresolved positive holdings as visible diagnostics", () => {
     const candidate = buildSimulationOwnerInputCandidate({
       account: "brokerage",

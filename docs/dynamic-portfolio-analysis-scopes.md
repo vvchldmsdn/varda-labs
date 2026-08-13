@@ -1,6 +1,6 @@
 # Dynamic Portfolio Analysis Scopes
 
-Status: Production schema and shared feature scopes applied; user group management implemented
+Status: Production schema and user group management applied; feature conversion in progress
 
 ## Product Decision
 
@@ -111,8 +111,10 @@ are effective-dated so changing a group today does not rewrite past charts.
   snapshots plus membership periods for the requested service date.
 - A materialized group snapshot is an optional later optimization, not the
   initial authority.
-- Dashboard, today movement, risk, Investment Lab, and simulation consume the
-  same resolved holdings universe for a scope.
+- Dashboard, today movement, additional contribution, risk, and simulation
+  consume the same resolved current-holdings universe for a scope.
+- History and Investment Lab need separate effective-dated membership
+  semantics because their results span past service dates.
 - Additional contribution requires an approved target policy for the selected
   portfolio group. Existing account-bound target policies need an explicit
   migration; they must not be inferred from a matching display name.
@@ -139,10 +141,12 @@ are effective-dated so changing a group today does not rewrite past charts.
    - Load the owner-scoped scope catalog in Server Components.
    - Resolve `scope`, then fetch independent sections in parallel.
    - Keep `account=` only as a redirect/compatibility input.
-5. **Feature conversion (complete)**
-   - Convert dashboard, today movement, history, portfolio structure/risk,
-     Investment Lab, and simulation to the shared holdings resolver.
-   - Convert additional contribution after target-policy scope migration.
+5. **Feature conversion (in progress)**
+   - Dashboard, today movement, additional contribution, portfolio
+     structure/risk, and simulation use the shared holdings resolver.
+   - History and Investment Lab still require an explicit historical
+     membership policy before conversion. Their current legacy `account=`
+     filters must not be described as dynamic portfolio-group support.
 6. **User management (complete)**
    - Add create, rename, archive, and membership editing with Server Actions or
      narrow mutation handlers protected by the current tenant context.

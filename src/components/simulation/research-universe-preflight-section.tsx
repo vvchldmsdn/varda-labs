@@ -1,4 +1,4 @@
-import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import type { SimulationResearchUniversePreflightModel } from "@/lib/simulation-research-universe-preflight";
 
 export function ResearchUniversePreflightSection({
@@ -7,7 +7,7 @@ export function ResearchUniversePreflightSection({
 }: {
   model: SimulationResearchUniversePreflightModel;
   preservedQuery: Readonly<{
-    account: PortfolioAccountScope;
+    scope: PortfolioAnalysisScopeKey;
     end: string | null;
     horizon: string | null;
     kodexWeight: string | null;
@@ -46,9 +46,9 @@ export function ResearchUniversePreflightSection({
         method="get"
       >
         <input
-          name="account"
+          name="scope"
           type="hidden"
-          value={preservedQuery.account}
+          value={preservedQuery.scope}
         />
         {preservedQuery.end ? (
           <input name="end" type="hidden" value={preservedQuery.end} />
