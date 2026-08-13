@@ -16,8 +16,11 @@ export async function createHoldingOnboarding(
       "/",
       "/today",
       "/additional-contribution",
+      "/portfolio/groups",
       "/portfolio/holdings",
+      "/portfolio/risk",
       "/portfolio/structure",
+      "/portfolio/targets",
       "/investment-lab",
       "/simulation",
     ]) {

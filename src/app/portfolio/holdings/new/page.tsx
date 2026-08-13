@@ -22,12 +22,20 @@ export default async function NewHoldingPage() {
               보유종목 추가
             </h1>
           </div>
-          <Link
-            className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-            href="/portfolio/holdings?account=all"
-          >
-            보유종목
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+              href="/portfolio/groups"
+            >
+              자산 그룹
+            </Link>
+            <Link
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+              href="/portfolio/holdings?account=all"
+            >
+              보유종목
+            </Link>
+          </div>
         </div>
 
         {!resolution.ok ? (

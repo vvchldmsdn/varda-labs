@@ -73,6 +73,12 @@ export default async function TenantHoldingsPage({
               보유종목 추가
             </Link>
             <Link
+              href="/portfolio/groups"
+              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+            >
+              자산 그룹
+            </Link>
+            <Link
               href="/portfolio/accounts?account=all"
               className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
             >

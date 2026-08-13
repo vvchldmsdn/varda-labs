@@ -79,6 +79,7 @@ export default async function PortfolioTargetsPage({
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
               <NavLink href="/portfolio/structure">포트 구조</NavLink>
               <NavLink href="/additional-contribution">추가 투입</NavLink>
+              <NavLink href="/portfolio/groups">자산 그룹</NavLink>
               <NavLink href="/portfolio/holdings/new">보유종목 추가</NavLink>
             </nav>
           </div>

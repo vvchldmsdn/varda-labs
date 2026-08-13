@@ -1,6 +1,6 @@
 # Dynamic Portfolio Analysis Scopes
 
-Status: Production schema applied; first owner-scoped holdings read slice in implementation
+Status: Production schema and shared feature scopes applied; user group management implemented
 
 ## Product Decision
 
@@ -135,17 +135,24 @@ are effective-dated so changing a group today does not rewrite past charts.
    - Link a real account by UUID only after its provider-account identity is
      established. Do not treat the imported code as a global enum or proof of
      a custody account.
-4. **Server read path (holdings slice in implementation)**
+4. **Server read path (complete)**
    - Load the owner-scoped scope catalog in Server Components.
    - Resolve `scope`, then fetch independent sections in parallel.
    - Keep `account=` only as a redirect/compatibility input.
-5. **Feature conversion**
+5. **Feature conversion (complete)**
    - Convert dashboard, today movement, history, portfolio structure/risk,
      Investment Lab, and simulation to the shared holdings resolver.
    - Convert additional contribution after target-policy scope migration.
-6. **User management**
+6. **User management (complete)**
    - Add create, rename, archive, and membership editing with Server Actions or
      narrow mutation handlers protected by the current tenant context.
+   - Treat browser-submitted group, account, and asset IDs as untrusted; every
+     write re-resolves the authenticated owner inside the Server Action.
+   - Serialize changes per owner, reject stale group versions, and update the
+     group plus effective-dated memberships atomically.
+   - Store whole-account membership instead of redundant direct-asset rows
+     when both are selected. UI deletion archives the group and closes current
+     membership periods rather than deleting historical evidence.
 7. **Contract cleanup**
    - Remove fixed account constants and fixed snapshot checks only after old
      rows, jobs, routes, and target policies have migrated and been audited.
