@@ -96,6 +96,7 @@ export default async function PortfolioStructurePage({
               <NavLink href="/">Dashboard</NavLink>
               <NavLink href="/today">Today Movement</NavLink>
               <NavLink href="/history">History</NavLink>
+              <NavLink href="/portfolio/groups">자산 그룹</NavLink>
               <NavLink
                 href={buildPortfolioAnalysisScopeHref(
                   "/portfolio/targets",

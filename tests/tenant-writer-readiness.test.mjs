@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 26);
-    assert.equal(registeredPaths.length, 32);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 27);
+    assert.equal(registeredPaths.length, 33);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -130,7 +130,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 16,
+      in_scope: 17,
       intentionally_skipped_legacy: 1,
       not_applicable: 9,
     });
@@ -259,6 +259,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(activeContextWriters, [
       "session_manual_krx_gold_price",
       "session_holding_onboarding",
+      "session_portfolio_group_management",
       "portfolio_target_policy_session_write",
     ]);
   });
@@ -277,6 +278,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         if (
           [
             "post_consume_account_owner_assignment",
+            "session_portfolio_group_management",
             "portfolio_target_policy_session_write",
           ].includes(writer.id) &&
           hasRawCanonicalOwnerDml
@@ -299,6 +301,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(canonicalOwnerWriters, [
       "post_consume_account_owner_assignment",
+      "session_portfolio_group_management",
       "portfolio_target_policy_session_write",
     ]);
   });

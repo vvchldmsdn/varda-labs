@@ -388,6 +388,32 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "not_applicable",
   },
   {
+    id: "session_portfolio_group_management",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["/portfolio/groups"],
+    implementationPaths: ["src/lib/portfolio-group-management-write.ts"],
+    targets: [
+      userTarget("portfolio_groups", "insert", "update"),
+      userTarget(
+        "portfolio_group_account_memberships",
+        "insert",
+        "update",
+        "delete",
+      ),
+      userTarget(
+        "portfolio_group_asset_memberships",
+        "insert",
+        "update",
+        "delete",
+      ),
+    ],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "entity_asset_groups_api",
     classification: "user_owned",
     authorization: "machine_admin",
