@@ -71,6 +71,7 @@ import "./portfolio-fx-shock.test.mjs";
 import "./portfolio-special-holdings.test.mjs";
 import "./portfolio-dashboard-snapshots.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
+import "./additional-contribution-scope.test.mjs";
 import "./additional-contribution-preview.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./additional-contribution-ma120-overlay.test.mjs";

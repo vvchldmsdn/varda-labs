@@ -1,17 +1,19 @@
 import Link from "next/link";
 
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { getReadOnlyTenantAdditionalContributionPreview } from "@/db/queries/additional-contribution";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import type { AdditionalContributionPreviewBlocker } from "@/lib/additional-contribution-preview";
-import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
-  isNamedPortfolioAccount,
-  type NamedPortfolioAccount,
-} from "@/lib/portfolio-account-scope";
+  resolveAdditionalContributionScope,
+  type AdditionalContributionScopeBlocker,
+} from "@/lib/additional-contribution-scope";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_ACCOUNT: NamedPortfolioAccount = "isa";
 const DEFAULT_AMOUNT_KRW = 3_000_000;
 const MAX_AMOUNT_KRW = 100_000_000_000;
 
@@ -19,17 +21,9 @@ type AdditionalContributionPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     amount?: string | string[];
+    scope?: string | string[];
   }>;
 };
-
-const accountTabs: ReadonlyArray<{
-  account: NamedPortfolioAccount;
-  label: string;
-}> = [
-  { account: "brokerage", label: "증권" },
-  { account: "isa", label: "ISA" },
-  { account: "irp", label: "IRP" },
-];
 
 export default async function AdditionalContributionPage({
   searchParams,
@@ -38,7 +32,6 @@ export default async function AdditionalContributionPage({
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const account = normalizeAccount(params.account);
   const amountKrw = normalizeAmount(params.amount);
 
   if (!resolution.ok) {
@@ -52,17 +45,43 @@ export default async function AdditionalContributionPage({
     );
   }
 
-  const preview = await getReadOnlyTenantAdditionalContributionPreview({
-    account,
-    cashAmountKrw: amountKrw,
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
+    account: params.account,
+    scope: params.scope,
     tenantContext: resolution.tenantContext,
   });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/additional-contribution"
+        context={scopeContext}
+        title="추가 투입"
+      />
+    );
+  }
+
+  const selectedScope = scopeContext.resolution.scope;
+  const scopeAdmission = resolveAdditionalContributionScope(selectedScope);
+  const preview =
+    scopeAdmission.state === "ready"
+      ? await getReadOnlyTenantAdditionalContributionPreview({
+          account: scopeAdmission.account,
+          cashAmountKrw: amountKrw,
+          tenantContext: resolution.tenantContext,
+        })
+      : null;
 
   return (
     <main
       className="min-h-screen bg-[#f3f4ef] px-4 py-4 text-[#171916]"
       data-page="additional-contribution"
-      data-preview-status={preview.status}
+      data-preview-status={
+        preview?.status ??
+        (scopeAdmission.state === "blocked" ? scopeAdmission.reason : "blocked")
+      }
     >
       <div className="mx-auto w-full max-w-[1400px] space-y-4">
         <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
@@ -85,29 +104,19 @@ export default async function AdditionalContributionPage({
           </div>
 
           <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex w-full max-w-md gap-1 rounded-md border border-[#dce2d2] bg-white p-1">
-              {accountTabs.map((tab) => (
-                <Link
-                  key={tab.account}
-                  href={accountHref(tab.account, amountKrw)}
-                  className={[
-                    "flex-1 rounded-md px-3 py-2 text-center text-sm font-semibold",
-                    account === tab.account
-                      ? "bg-[#1e3a34] text-white"
-                      : "text-[#5d665b] hover:bg-[#edf1e8]",
-                  ].join(" ")}
-                >
-                  {tab.label}
-                </Link>
-              ))}
-            </div>
+            <PortfolioAnalysisScopeTabs
+              basePath="/additional-contribution"
+              query={{ amount: String(amountKrw || DEFAULT_AMOUNT_KRW) }}
+              scopes={scopeContext.catalog.scopes}
+              selectedScopeKey={selectedScope.key}
+            />
 
             <form
               action="/additional-contribution"
               method="get"
               className="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-end"
             >
-              <input type="hidden" name="account" value={account} />
+              <input type="hidden" name="scope" value={selectedScope.key} />
               <label className="min-w-0 flex-1 text-sm font-semibold">
                 투입 금액
                 <span className="mt-1 flex items-center rounded-md border border-[#cfd6c8] bg-white px-3">
@@ -144,15 +153,17 @@ export default async function AdditionalContributionPage({
               </p>
             </div>
             <span className="rounded-md border border-[#d8dfd0] bg-white px-3 py-2 text-sm font-semibold text-[#445248]">
-              {accountLabel(account)} · {formatKrw(amountKrw)}
+              {selectedScope.label} · {formatKrw(amountKrw)}
             </span>
           </div>
 
-          {preview.status === "ready" ? (
+          {scopeAdmission.state === "blocked" ? (
+            <ScopeBlockedPreview reason={scopeAdmission.reason} />
+          ) : preview?.status === "ready" ? (
             <ReadyPreview preview={preview} />
-          ) : (
+          ) : preview ? (
             <BlockedPreview blockers={preview.blockers} />
-          )}
+          ) : null}
         </section>
       </div>
     </main>
@@ -337,6 +348,28 @@ function BlockedPreview({
   );
 }
 
+function ScopeBlockedPreview({
+  reason,
+}: {
+  reason: AdditionalContributionScopeBlocker;
+}) {
+  const messages: Record<AdditionalContributionScopeBlocker, string> = {
+    aggregate_target_policy_not_defined:
+      "전체 자산을 하나로 합친 승인 목표비중이 아직 없습니다. 목표비중이 승인된 개별 계좌를 선택해 주세요.",
+    portfolio_group_target_policy_not_defined:
+      "이 자산그룹에 귀속된 승인 목표비중 모델이 아직 없습니다. 다른 계좌의 목표비중을 대신 적용하지 않았습니다.",
+    account_target_policy_model_unsupported:
+      "이 계좌 유형은 현재 목표비중 정책 모델에서 아직 지원하지 않습니다.",
+  };
+
+  return (
+    <div className="mt-5 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
+      <p className="font-semibold">이 범위는 아직 계산할 수 없습니다.</p>
+      <p className="mt-2 leading-6">{messages[reason]}</p>
+    </div>
+  );
+}
+
 function SummaryCell({
   detail,
   label,
@@ -366,14 +399,6 @@ function NavLink({ href, children }: { href: string; children: string }) {
   );
 }
 
-function normalizeAccount(value: string | string[] | undefined) {
-  const raw = Array.isArray(value) ? value[0] : value;
-  const normalized = String(raw ?? "").trim().toLowerCase();
-  return isNamedPortfolioAccount(normalized)
-    ? normalized
-    : DEFAULT_ACCOUNT;
-}
-
 function normalizeAmount(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === undefined || raw === "") return DEFAULT_AMOUNT_KRW;
@@ -383,18 +408,6 @@ function normalizeAmount(value: string | string[] | undefined) {
     amount <= MAX_AMOUNT_KRW
     ? amount
     : 0;
-}
-
-function accountHref(account: NamedPortfolioAccount, amountKrw: number) {
-  const params = new URLSearchParams({
-    account,
-    amount: String(amountKrw > 0 ? amountKrw : DEFAULT_AMOUNT_KRW),
-  });
-  return `/additional-contribution?${params.toString()}`;
-}
-
-function accountLabel(account: NamedPortfolioAccount) {
-  return account === "brokerage" ? "증권" : account.toUpperCase();
 }
 
 function blockerLabel(blocker: AdditionalContributionPreviewBlocker) {

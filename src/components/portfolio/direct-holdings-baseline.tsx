@@ -12,8 +12,10 @@ const ACCOUNT_LABELS: Record<
 
 export function DirectHoldingsBaseline({
   model,
+  scopeLabel,
 }: {
   model: PortfolioDirectHoldingsBaseline;
+  scopeLabel?: string;
 }) {
   const metrics = model.metrics;
 
@@ -37,7 +39,7 @@ export function DirectHoldingsBaseline({
             직접 보유 집중도·통화 노출
           </h2>
           <p className="mt-1 text-sm leading-6 text-[#687064]">
-            {ACCOUNT_LABELS[model.selectedAccount]}의 현재 평가액을 직접 보유
+            {scopeLabel ?? ACCOUNT_LABELS[model.selectedAccount]}의 현재 평가액을 직접 보유
             종목 기준으로 계산했습니다. ETF 내부 구성, 목표비중, 추천, 주문은
             포함하지 않습니다.
           </p>

@@ -150,13 +150,15 @@ export function buildPortfolioDirectHoldingsBaseline(
   portfolio: Pick<
     PortfolioStructureResult,
     "selectedAccount" | "holdingRows" | "exclusions"
-  >,
+  > &
+    Partial<Pick<PortfolioStructureResult, "identityScope">>,
 ): PortfolioDirectHoldingsBaseline {
   const analysis = analyzePortfolioDirectHoldings(portfolio.holdingRows, {
     identityScope:
-      portfolio.selectedAccount === "all"
+      portfolio.identityScope ??
+      (portfolio.selectedAccount === "all"
         ? "cross_account_exposure"
-        : "account_scoped",
+        : "account_scoped"),
   });
   const excludedHoldingCount = portfolio.exclusions.length;
   const hasIncompleteEvidence =
