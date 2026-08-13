@@ -220,10 +220,10 @@ describe("initial app-user provisioning", () => {
     assertSafeOutput(second);
   });
 
-  it("reports the reviewed session writer with no HTTP owner input or owner inference", () => {
+  it("reports the reviewed session writers with no HTTP owner input or owner inference", () => {
     assert.deepEqual(readWriterReadiness(ROOT), {
       registryShadow: false,
-      runtimeOwnerIntegrationCount: 2,
+      runtimeOwnerIntegrationCount: 3,
       httpCanonicalOwnerInputCount: 0,
       ownerInferencePathCount: 0,
     });

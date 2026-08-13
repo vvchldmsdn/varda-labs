@@ -11,9 +11,11 @@ import {
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
   assertPreviewHoldingOnboardingRowsPreserved,
+  assertPreviewPortfolioTargetPolicyRowsPreserved,
   assertPreviewPortfolioScopeRowsPreserved,
   assertPreviewTargetPolicyRowsPreserved,
   assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog,
+  assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog,
   assertReviewedPrePortfolioScopePreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
@@ -127,10 +129,10 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0025_nebulous_the_phantom",
-        createdAt: 1786550471417,
+        tag: "0026_curved_raider",
+        createdAt: 1786588427095,
         sha256:
-          "1fc4eecc860dc3d623d0a1d0deca90c610693a5f2e1d218cd17d3b817ea42f26",
+          "7bdc6d663acf866dfba791691230a7370441a9e051f6f0cbde870674504bc27a",
       },
     );
     assert.deepEqual(
@@ -140,9 +142,9 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 26,
+        entryCount: 27,
         sha256:
-          "sha256:1f37571ceaa460532cbaf06a605be0bed7540d20e48568f90a3e46e3ff47a2a9",
+          "sha256:2dc9af8f95b9b81808c5e70715695657ade33bcd0f32b48ce138488a0f09f42f",
       },
     );
   });
@@ -184,7 +186,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v8",
+        evidenceVersion: "preview_database_evidence_v9",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
@@ -192,7 +194,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0025_present",
+      "reviewed_0026_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -215,6 +217,11 @@ describe("Preview database target operational guard", () => {
       publicPreviewDatabaseEvidence(reviewed).holdingOnboardingCatalogStatus,
       "reviewed_0025_present",
     );
+    assert.equal(
+      publicPreviewDatabaseEvidence(reviewed)
+        .portfolioTargetPolicyCatalogStatus,
+      "reviewed_0026_present",
+    );
 
     const appliedMigrations = reviewed.appliedMigrations.slice(0, -1);
     const pending = {
@@ -223,22 +230,18 @@ describe("Preview database target operational guard", () => {
       appliedMigrations,
       reviewedCatalog: {
         ...reviewed.reviewedCatalog,
-        holdingOnboardingTables: [],
-        holdingOnboardingColumns: [],
-        holdingOnboardingConstraints: [],
-        holdingOnboardingEvidenceRows: null,
-        holdingOnboardingAssetIndexExact: false,
-        holdingOnboardingOwnerIndexExact: false,
-        holdingOnboardingAccountIndexExact: false,
-        assetOwnerAccountInstrumentIndexExact: false,
+        portfolioTargetPolicyTables: [],
+        portfolioTargetPolicyConstraints: [],
+        portfolioTargetPolicyIndexes: [],
+        portfolioTargetPolicyRows: null,
       },
     };
     assert.doesNotThrow(() =>
-      assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog(pending),
+      assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog(pending),
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseCatalog(pending),
-      /0025 catalog is incomplete/,
+      /0026 catalog is incomplete/,
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseState(pending),
@@ -261,15 +264,19 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(pending).portfolioScopeCatalogStatus,
         holdingOnboardingCatalogStatus:
           publicPreviewDatabaseEvidence(pending).holdingOnboardingCatalogStatus,
+        portfolioTargetPolicyCatalogStatus:
+          publicPreviewDatabaseEvidence(pending)
+            .portfolioTargetPolicyCatalogStatus,
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0025_not_present",
+        migrationLedgerStatus: "reviewed_0026_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
         portfolioScopeCatalogStatus: "reviewed_0024_present",
-        holdingOnboardingCatalogStatus: "reviewed_0025_not_present",
+        holdingOnboardingCatalogStatus: "reviewed_0025_present",
+        portfolioTargetPolicyCatalogStatus: "reviewed_0026_not_present",
       },
     );
   });
@@ -321,12 +328,12 @@ describe("Preview database target operational guard", () => {
       "scripts/preview-database-evidence.mjs",
       "utf8",
     );
-    assert.match(buildScript, /preview_database_build_preflight_v9/);
+    assert.match(buildScript, /preview_database_build_preflight_v10/);
     assert.match(buildScript, /targetPolicyRows/);
     assert.match(buildScript, /assertPreviewTargetPolicyRowsPreserved/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0025 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0026 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -351,8 +358,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0025_nebulous_the_phantom",
-        migrationLedgerStatus: "reviewed_0025_not_present",
+        latestReviewedMigration: "0026_curved_raider",
+        migrationLedgerStatus: "reviewed_0026_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );
@@ -613,6 +620,82 @@ describe("Preview database target operational guard", () => {
       /assertPreviewHoldingOnboardingRowsPreserved/,
     );
   });
+
+  it("requires the reviewed portfolio target-policy catalog", () => {
+    const reviewed = reviewedState();
+    for (const reviewedCatalog of [
+      {
+        ...reviewed.reviewedCatalog,
+        portfolioTargetPolicyTables:
+          reviewed.reviewedCatalog.portfolioTargetPolicyTables.slice(1),
+      },
+      {
+        ...reviewed.reviewedCatalog,
+        portfolioTargetPolicyConstraints:
+          reviewed.reviewedCatalog.portfolioTargetPolicyConstraints.slice(1),
+      },
+      {
+        ...reviewed.reviewedCatalog,
+        portfolioTargetPolicyIndexes:
+          reviewed.reviewedCatalog.portfolioTargetPolicyIndexes.slice(1),
+      },
+    ]) {
+      const drifted = { ...reviewed, reviewedCatalog };
+      assert.throws(
+        () => assertReviewedPreviewDatabaseState(drifted),
+        /0026 catalog is incomplete/,
+      );
+      assert.equal(
+        publicPreviewDatabaseEvidence(drifted)
+          .portfolioTargetPolicyCatalogStatus,
+        "reviewed_0026_not_present",
+      );
+    }
+  });
+
+  it("preserves inherited portfolio target-policy rows and keeps the expand migration empty", () => {
+    const inheritedRows = {
+      revisions: 2,
+      rows: 8,
+      lifecycleEvents: 3,
+    };
+    assert.doesNotThrow(() =>
+      assertPreviewPortfolioTargetPolicyRowsPreserved(
+        inheritedRows,
+        inheritedRows,
+      ),
+    );
+    assert.throws(
+      () =>
+        assertPreviewPortfolioTargetPolicyRowsPreserved(inheritedRows, {
+          ...inheritedRows,
+          rows: 9,
+        }),
+      /changed inherited portfolio target-policy row counts/,
+    );
+    assert.doesNotThrow(() =>
+      assertPreviewPortfolioTargetPolicyRowsPreserved(null, {
+        revisions: 0,
+        rows: 0,
+        lifecycleEvents: 0,
+      }),
+    );
+    assert.throws(
+      () =>
+        assertPreviewPortfolioTargetPolicyRowsPreserved(null, inheritedRows),
+      /unexpectedly seeded portfolio target-policy rows/,
+    );
+
+    const buildScript = readFileSync(
+      "scripts/preview-database-evidence.mjs",
+      "utf8",
+    );
+    assert.match(buildScript, /portfolioTargetPolicyRows/);
+    assert.match(
+      buildScript,
+      /assertPreviewPortfolioTargetPolicyRowsPreserved/,
+    );
+  });
 });
 
 function environment(endpoint) {
@@ -786,6 +869,57 @@ function reviewedState() {
       holdingOnboardingOwnerIndexExact: true,
       holdingOnboardingAccountIndexExact: true,
       assetOwnerAccountInstrumentIndexExact: true,
+      portfolioTargetPolicyTables: [
+        "portfolio_target_policy_lifecycle_events",
+        "portfolio_target_policy_revisions",
+        "portfolio_target_policy_rows",
+      ],
+      portfolioTargetPolicyConstraints: [
+        "portfolio_target_events_audit_version_check",
+        "portfolio_target_events_replacement_owner_fk",
+        "portfolio_target_events_revision_owner_fk",
+        "portfolio_target_events_sequence_check",
+        "portfolio_target_events_transition_shape_check",
+        "portfolio_target_revisions_account_owner_fk",
+        "portfolio_target_revisions_authority_check",
+        "portfolio_target_revisions_group_owner_fk",
+        "portfolio_target_revisions_owner_user_fk",
+        "portfolio_target_revisions_policy_version_check",
+        "portfolio_target_revisions_revision_check",
+        "portfolio_target_revisions_scope_kind_check",
+        "portfolio_target_revisions_scope_shape_check",
+        "portfolio_target_revisions_status_check",
+        "portfolio_target_revisions_terminal_state_check",
+        "portfolio_target_revisions_universe_hash_check",
+        "portfolio_target_revisions_vector_hash_check",
+        "portfolio_target_rows_account_owner_fk",
+        "portfolio_target_rows_asset_account_fk",
+        "portfolio_target_rows_asset_name_check",
+        "portfolio_target_rows_asset_owner_fk",
+        "portfolio_target_rows_buyability_check",
+        "portfolio_target_rows_currency_check",
+        "portfolio_target_rows_market_check",
+        "portfolio_target_rows_positive_buyability_check",
+        "portfolio_target_rows_revision_owner_fk",
+        "portfolio_target_rows_ticker_check",
+        "portfolio_target_rows_weight_check",
+        "portfolio_target_policy_rows_pk",
+      ],
+      portfolioTargetPolicyIndexes: [
+        "portfolio_target_events_revision_sequence_unique",
+        "portfolio_target_revisions_id_owner_unique",
+        "portfolio_target_revisions_all_revision_unique",
+        "portfolio_target_revisions_account_revision_unique",
+        "portfolio_target_revisions_group_revision_unique",
+        "portfolio_target_current_all_unique",
+        "portfolio_target_current_account_unique",
+        "portfolio_target_current_group_unique",
+      ],
+      portfolioTargetPolicyRows: {
+        revisions: 0,
+        rows: 0,
+        lifecycleEvents: 0,
+      },
       duplicateAssetIdentityGroups: 0,
     },
   };
@@ -798,8 +932,10 @@ function reviewedLocalMigrationLedger() {
   const migrations = readMigrationFiles({
     migrationsFolder: "drizzle",
   });
-  return journal.entries.map((entry, index) => ({
-    createdAt: entry.when,
-    sha256: migrations[index].hash,
-  }));
+  return journal.entries
+    .slice(0, PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger.entryCount)
+    .map((entry, index) => ({
+      createdAt: entry.when,
+      sha256: migrations[index].hash,
+    }));
 }

@@ -3,14 +3,10 @@ import Link from "next/link";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
-import { getReadOnlyTenantAdditionalContributionPreview } from "@/db/queries/additional-contribution";
+import { getReadOnlyTenantAdditionalContributionPreviewForScope } from "@/db/queries/additional-contribution";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
-import type { AdditionalContributionPreviewBlocker } from "@/lib/additional-contribution-preview";
-import {
-  resolveAdditionalContributionScope,
-  type AdditionalContributionScopeBlocker,
-} from "@/lib/additional-contribution-scope";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { buildPortfolioAnalysisScopeHref } from "@/lib/portfolio-analysis-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -64,24 +60,17 @@ export default async function AdditionalContributionPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  const scopeAdmission = resolveAdditionalContributionScope(selectedScope);
-  const preview =
-    scopeAdmission.state === "ready"
-      ? await getReadOnlyTenantAdditionalContributionPreview({
-          account: scopeAdmission.account,
-          cashAmountKrw: amountKrw,
-          tenantContext: resolution.tenantContext,
-        })
-      : null;
+  const preview = await getReadOnlyTenantAdditionalContributionPreviewForScope({
+    cashAmountKrw: amountKrw,
+    scope: selectedScope,
+    tenantContext: resolution.tenantContext,
+  });
 
   return (
     <main
       className="min-h-screen bg-[#f3f4ef] px-4 py-4 text-[#171916]"
       data-page="additional-contribution"
-      data-preview-status={
-        preview?.status ??
-        (scopeAdmission.state === "blocked" ? scopeAdmission.reason : "blocked")
-      }
+      data-preview-status={preview.status}
     >
       <div className="mx-auto w-full max-w-[1400px] space-y-4">
         <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
@@ -99,6 +88,14 @@ export default async function AdditionalContributionPage({
               <NavLink href="/">홈</NavLink>
               <NavLink href="/today">오늘 변동</NavLink>
               <NavLink href="/portfolio/structure">포트 구조</NavLink>
+              <NavLink
+                href={buildPortfolioAnalysisScopeHref(
+                  "/portfolio/targets",
+                  selectedScope.key,
+                )}
+              >
+                목표비중
+              </NavLink>
               <NavLink href="/history">히스토리</NavLink>
             </nav>
           </div>
@@ -157,13 +154,11 @@ export default async function AdditionalContributionPage({
             </span>
           </div>
 
-          {scopeAdmission.state === "blocked" ? (
-            <ScopeBlockedPreview reason={scopeAdmission.reason} />
-          ) : preview?.status === "ready" ? (
+          {preview.status === "ready" ? (
             <ReadyPreview preview={preview} />
-          ) : preview ? (
+          ) : (
             <BlockedPreview blockers={preview.blockers} />
-          ) : null}
+          )}
         </section>
       </div>
     </main>
@@ -174,7 +169,11 @@ function ReadyPreview({
   preview,
 }: {
   preview: Extract<
-    Awaited<ReturnType<typeof getReadOnlyTenantAdditionalContributionPreview>>,
+    Awaited<
+      ReturnType<
+        typeof getReadOnlyTenantAdditionalContributionPreviewForScope
+      >
+    >,
     { status: "ready" }
   >;
 }) {
@@ -195,7 +194,7 @@ function ReadyPreview({
         />
         <SummaryCell
           label="적용 정책"
-          value={preview.policyVersion}
+          value={preview.policyLabel}
           detail={`${preview.effectiveServiceDate}부터 · 기준일 ${preview.serviceDate}`}
         />
         <SummaryCell
@@ -206,10 +205,11 @@ function ReadyPreview({
       </dl>
 
       <div className="mt-5 overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
-        <table className="w-full min-w-[1080px] border-collapse text-sm">
+        <table className="w-full min-w-[1160px] border-collapse text-sm">
           <thead className="bg-[#edf1e8] text-left text-xs text-[#596257]">
             <tr>
               <th className="px-3 py-3">종목</th>
+              <th className="px-3 py-3">계좌</th>
               <th className="px-3 py-3">시장</th>
               <th className="px-3 py-3 text-right">현재 평가액</th>
               <th className="px-3 py-3 text-right">현재 비중</th>
@@ -222,12 +222,15 @@ function ReadyPreview({
           <tbody>
             {preview.rows.map((row) => (
               <tr
-                key={`${row.market}:${row.currency}:${row.ticker}`}
+                key={`${row.accountCode}:${row.market}:${row.currency}:${row.ticker ?? row.name}`}
                 className="border-t border-[#e4e8de]"
               >
                 <td className="px-3 py-3">
                   <p className="font-semibold">{row.ticker}</p>
                   <p className="mt-0.5 text-xs text-[#687064]">{row.name}</p>
+                </td>
+                <td className="px-3 py-3 text-[#596257]">
+                  {row.accountName}
                 </td>
                 <td className="px-3 py-3 text-[#596257]">
                   {row.market} · {row.currency}
@@ -334,7 +337,7 @@ function Ma120EvidenceCell({
 function BlockedPreview({
   blockers,
 }: {
-  blockers: readonly AdditionalContributionPreviewBlocker[];
+  blockers: readonly string[];
 }) {
   return (
     <div className="mt-5 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
@@ -344,28 +347,6 @@ function BlockedPreview({
           <li key={blocker}>· {blockerLabel(blocker)}</li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function ScopeBlockedPreview({
-  reason,
-}: {
-  reason: AdditionalContributionScopeBlocker;
-}) {
-  const messages: Record<AdditionalContributionScopeBlocker, string> = {
-    aggregate_target_policy_not_defined:
-      "전체 자산을 하나로 합친 승인 목표비중이 아직 없습니다. 목표비중이 승인된 개별 계좌를 선택해 주세요.",
-    portfolio_group_target_policy_not_defined:
-      "이 자산그룹에 귀속된 승인 목표비중 모델이 아직 없습니다. 다른 계좌의 목표비중을 대신 적용하지 않았습니다.",
-    account_target_policy_model_unsupported:
-      "이 계좌 유형은 현재 목표비중 정책 모델에서 아직 지원하지 않습니다.",
-  };
-
-  return (
-    <div className="mt-5 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
-      <p className="font-semibold">이 범위는 아직 계산할 수 없습니다.</p>
-      <p className="mt-2 leading-6">{messages[reason]}</p>
     </div>
   );
 }
@@ -410,8 +391,20 @@ function normalizeAmount(value: string | string[] | undefined) {
     : 0;
 }
 
-function blockerLabel(blocker: AdditionalContributionPreviewBlocker) {
-  const labels: Partial<Record<AdditionalContributionPreviewBlocker, string>> = {
+function blockerLabel(blocker: string) {
+  const labels: Record<string, string> = {
+    portfolio_target_policy_missing:
+      "이 범위에 저장된 목표비중이 없습니다. 목표비중 화면에서 먼저 설정해 주세요.",
+    portfolio_target_policy_conflict:
+      "현재 목표비중 승인본이 하나로 확정되지 않았습니다.",
+    portfolio_target_policy_universe_changed:
+      "목표비중을 저장한 뒤 보유종목 구성이 바뀌었습니다. 목표비중을 다시 확인해 주세요.",
+    portfolio_target_policy_not_effective:
+      "저장된 목표비중의 적용 시작일 전입니다.",
+    portfolio_target_policy_integrity_error:
+      "저장된 목표비중의 무결성을 확인할 수 없습니다.",
+    valuation_universe_invalid:
+      "현재 범위의 보유종목 구성을 계산에 사용할 수 없습니다.",
     target_policy_missing: "이 계정에 승인된 목표비중이 없습니다.",
     target_policy_conflict: "승인된 목표비중 상태가 충돌합니다.",
     target_policy_not_effective: "목표비중의 적용 시작일 전입니다.",

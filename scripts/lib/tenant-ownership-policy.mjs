@@ -135,6 +135,12 @@ export const HOLDING_ONBOARDING_TABLE_POLICIES = Object.freeze([
   userOwned("holding_onboarding_evidence"),
 ]);
 
+export const PORTFOLIO_TARGET_POLICY_TABLE_POLICIES = Object.freeze([
+  userOwned("portfolio_target_policy_revisions"),
+  userOwned("portfolio_target_policy_rows"),
+  userOwned("portfolio_target_policy_lifecycle_events"),
+]);
+
 export const IDENTITY_SYSTEM_TABLE_POLICIES = Object.freeze([
   ...IDENTITY_CORE_TABLE_POLICIES,
   ...IDENTITY_PAIRING_TABLE_POLICIES,
@@ -165,9 +171,14 @@ export const PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...PORTFOLIO_ANALYSIS_SCOPE_TABLE_POLICIES,
 ]);
 
-export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+export const HOLDING_ONBOARDING_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES,
   ...HOLDING_ONBOARDING_TABLE_POLICIES,
+]);
+
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...HOLDING_ONBOARDING_EXPANDED_TENANT_TABLE_POLICIES,
+  ...PORTFOLIO_TARGET_POLICY_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
@@ -194,13 +205,18 @@ export function resolveTenantTablePolicies(publicTableNames) {
     HOLDING_ONBOARDING_TABLE_POLICIES.filter(({ table }) =>
       publicTableSet.has(table),
     );
+  const presentPortfolioTargetPolicyTables =
+    PORTFOLIO_TARGET_POLICY_TABLE_POLICIES.filter(({ table }) =>
+      publicTableSet.has(table),
+    );
 
   if (
     (presentPairingTables.length > 0 ||
       presentSimulationTables.length > 0 ||
       presentTargetPolicyTables.length > 0 ||
       presentPortfolioScopeTables.length > 0 ||
-      presentHoldingOnboardingTables.length > 0) &&
+      presentHoldingOnboardingTables.length > 0 ||
+      presentPortfolioTargetPolicyTables.length > 0) &&
     presentCoreTables.length !== IDENTITY_CORE_TABLE_POLICIES.length
   ) {
     throw new Error(
@@ -219,7 +235,8 @@ export function resolveTenantTablePolicies(publicTableNames) {
       presentPairingTables.length > 0 ||
       presentTargetPolicyTables.length > 0 ||
       presentPortfolioScopeTables.length > 0 ||
-      presentHoldingOnboardingTables.length > 0
+      presentHoldingOnboardingTables.length > 0 ||
+      presentPortfolioTargetPolicyTables.length > 0
     ) {
       throw new Error(
         "later tenant tables require the simulation approval expansion",
@@ -241,7 +258,8 @@ export function resolveTenantTablePolicies(publicTableNames) {
     if (
       presentTargetPolicyTables.length > 0 ||
       presentPortfolioScopeTables.length > 0 ||
-      presentHoldingOnboardingTables.length > 0
+      presentHoldingOnboardingTables.length > 0 ||
+      presentPortfolioTargetPolicyTables.length > 0
     ) {
       throw new Error(
         "target policy approval tables require the identity pairing expansion",
@@ -259,7 +277,8 @@ export function resolveTenantTablePolicies(publicTableNames) {
   if (presentTargetPolicyTables.length === 0) {
     if (
       presentPortfolioScopeTables.length > 0 ||
-      presentHoldingOnboardingTables.length > 0
+      presentHoldingOnboardingTables.length > 0 ||
+      presentPortfolioTargetPolicyTables.length > 0
     ) {
       throw new Error(
         "portfolio scope tables require the target policy approval expansion",
@@ -278,7 +297,10 @@ export function resolveTenantTablePolicies(publicTableNames) {
   }
 
   if (presentPortfolioScopeTables.length === 0) {
-    if (presentHoldingOnboardingTables.length > 0) {
+    if (
+      presentHoldingOnboardingTables.length > 0 ||
+      presentPortfolioTargetPolicyTables.length > 0
+    ) {
       throw new Error(
         "holding onboarding tables require the portfolio scope expansion",
       );
@@ -294,6 +316,11 @@ export function resolveTenantTablePolicies(publicTableNames) {
   }
 
   if (presentHoldingOnboardingTables.length === 0) {
+    if (presentPortfolioTargetPolicyTables.length > 0) {
+      throw new Error(
+        "portfolio target policy tables require the holding onboarding expansion",
+      );
+    }
     return PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES;
   }
 
@@ -302,6 +329,16 @@ export function resolveTenantTablePolicies(publicTableNames) {
     HOLDING_ONBOARDING_TABLE_POLICIES.length
   ) {
     throw new Error("holding onboarding tables must be expanded atomically");
+  }
+
+  if (presentPortfolioTargetPolicyTables.length === 0) {
+    return HOLDING_ONBOARDING_EXPANDED_TENANT_TABLE_POLICIES;
+  }
+  if (
+    presentPortfolioTargetPolicyTables.length !==
+    PORTFOLIO_TARGET_POLICY_TABLE_POLICIES.length
+  ) {
+    throw new Error("portfolio target policy tables must be expanded atomically");
   }
 
   return EXPANDED_TENANT_TABLE_POLICIES;

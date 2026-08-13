@@ -148,6 +148,67 @@ const REVIEWED_INDEXES = Object.freeze({
     hasPredicate: false,
   }),
 });
+const PORTFOLIO_TARGET_POLICY_INDEXES = Object.freeze([
+  Object.freeze({
+    name: "portfolio_target_events_revision_sequence_unique",
+    columns: Object.freeze(["approval_revision_id", "event_sequence"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  Object.freeze({
+    name: "portfolio_target_revisions_id_owner_unique",
+    columns: Object.freeze(["id", "canonical_owner_user_id"]),
+    unique: true,
+    hasPredicate: false,
+  }),
+  Object.freeze({
+    name: "portfolio_target_revisions_all_revision_unique",
+    columns: Object.freeze(["canonical_owner_user_id", "approval_revision"]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  Object.freeze({
+    name: "portfolio_target_revisions_account_revision_unique",
+    columns: Object.freeze([
+      "canonical_owner_user_id",
+      "scope_account_id",
+      "approval_revision",
+    ]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  Object.freeze({
+    name: "portfolio_target_revisions_group_revision_unique",
+    columns: Object.freeze([
+      "canonical_owner_user_id",
+      "scope_portfolio_group_id",
+      "approval_revision",
+    ]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  Object.freeze({
+    name: "portfolio_target_current_all_unique",
+    columns: Object.freeze(["canonical_owner_user_id"]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  Object.freeze({
+    name: "portfolio_target_current_account_unique",
+    columns: Object.freeze(["canonical_owner_user_id", "scope_account_id"]),
+    unique: true,
+    hasPredicate: true,
+  }),
+  Object.freeze({
+    name: "portfolio_target_current_group_unique",
+    columns: Object.freeze([
+      "canonical_owner_user_id",
+      "scope_portfolio_group_id",
+    ]),
+    unique: true,
+    hasPredicate: true,
+  }),
+]);
 const TARGET_POLICY_TABLES = Object.freeze([
   "target_policy_approval_revisions",
   "target_policy_approval_vector_rows",
@@ -278,6 +339,42 @@ const HOLDING_ONBOARDING_CONSTRAINTS = Object.freeze([
   "holding_onboarding_evidence_quantity_check",
   "holding_onboarding_evidence_reported_return_check",
 ]);
+const PORTFOLIO_TARGET_POLICY_TABLES = Object.freeze([
+  "portfolio_target_policy_lifecycle_events",
+  "portfolio_target_policy_revisions",
+  "portfolio_target_policy_rows",
+]);
+const PORTFOLIO_TARGET_POLICY_CONSTRAINTS = Object.freeze([
+  "portfolio_target_events_audit_version_check",
+  "portfolio_target_events_replacement_owner_fk",
+  "portfolio_target_events_revision_owner_fk",
+  "portfolio_target_events_sequence_check",
+  "portfolio_target_events_transition_shape_check",
+  "portfolio_target_revisions_account_owner_fk",
+  "portfolio_target_revisions_authority_check",
+  "portfolio_target_revisions_group_owner_fk",
+  "portfolio_target_revisions_owner_user_fk",
+  "portfolio_target_revisions_policy_version_check",
+  "portfolio_target_revisions_revision_check",
+  "portfolio_target_revisions_scope_kind_check",
+  "portfolio_target_revisions_scope_shape_check",
+  "portfolio_target_revisions_status_check",
+  "portfolio_target_revisions_terminal_state_check",
+  "portfolio_target_revisions_universe_hash_check",
+  "portfolio_target_revisions_vector_hash_check",
+  "portfolio_target_rows_account_owner_fk",
+  "portfolio_target_rows_asset_account_fk",
+  "portfolio_target_rows_asset_name_check",
+  "portfolio_target_rows_asset_owner_fk",
+  "portfolio_target_rows_buyability_check",
+  "portfolio_target_rows_currency_check",
+  "portfolio_target_rows_market_check",
+  "portfolio_target_rows_positive_buyability_check",
+  "portfolio_target_rows_revision_owner_fk",
+  "portfolio_target_rows_ticker_check",
+  "portfolio_target_rows_weight_check",
+  "portfolio_target_policy_rows_pk",
+]);
 
 type Query = (query: string) => Promise<Record<string, unknown>[]>;
 
@@ -332,6 +429,10 @@ export type PreviewDatabaseState = {
     holdingOnboardingOwnerIndexExact: boolean;
     holdingOnboardingAccountIndexExact: boolean;
     assetOwnerAccountInstrumentIndexExact: boolean;
+    portfolioTargetPolicyTables: string[];
+    portfolioTargetPolicyConstraints: string[];
+    portfolioTargetPolicyIndexes: string[];
+    portfolioTargetPolicyRows: PortfolioTargetPolicyRowCounts | null;
     duplicateAssetIdentityGroups: number;
   };
 };
@@ -346,6 +447,12 @@ export type PortfolioScopeRowCounts = {
   groups: number;
   accountMemberships: number;
   assetMemberships: number;
+};
+
+export type PortfolioTargetPolicyRowCounts = {
+  revisions: number;
+  rows: number;
+  lifecycleEvents: number;
 };
 
 export async function readPreviewDatabaseState(input: {
@@ -474,6 +581,8 @@ export async function readPreviewDatabaseState(input: {
           'portfolio_group_account_memberships',
           'portfolio_group_asset_memberships',
           'portfolio_groups',
+          'portfolio_target_policy_lifecycle_events',
+          'portfolio_target_policy_revisions',
           'target_policy_approval_revisions',
           'target_policy_approval_lifecycle_events'
         )
@@ -495,6 +604,14 @@ export async function readPreviewDatabaseState(input: {
           'portfolio_group_asset_memberships_start_unique',
           'portfolio_group_asset_memberships_active_unique',
           'portfolio_groups_id_canonical_owner_unique',
+          'portfolio_target_events_revision_sequence_unique',
+          'portfolio_target_revisions_id_owner_unique',
+          'portfolio_target_revisions_all_revision_unique',
+          'portfolio_target_revisions_account_revision_unique',
+          'portfolio_target_revisions_group_revision_unique',
+          'portfolio_target_current_all_unique',
+          'portfolio_target_current_account_unique',
+          'portfolio_target_current_group_unique',
           'target_policy_revisions_identity_revision_unique',
           'target_policy_revisions_current_unique',
           'target_policy_events_revision_sequence_unique'
@@ -522,6 +639,9 @@ export async function readPreviewDatabaseState(input: {
            'portfolio_group_account_memberships',
            'portfolio_group_asset_memberships',
            'portfolio_groups',
+           'portfolio_target_policy_lifecycle_events',
+           'portfolio_target_policy_revisions',
+           'portfolio_target_policy_rows',
            'target_policy_approval_lifecycle_events',
            'target_policy_approval_revisions',
            'target_policy_approval_vector_rows'
@@ -548,7 +668,10 @@ export async function readPreviewDatabaseState(input: {
            'holding_onboarding_evidence',
            'portfolio_group_account_memberships',
            'portfolio_group_asset_memberships',
-           'portfolio_groups'
+           'portfolio_groups',
+           'portfolio_target_policy_lifecycle_events',
+           'portfolio_target_policy_revisions',
+           'portfolio_target_policy_rows'
          )
        order by constraint_definition.conname
     `),
@@ -589,6 +712,10 @@ export async function readPreviewDatabaseState(input: {
         ({ table_name }) => table_name === tableName,
       ),
   );
+  const presentPortfolioTargetPolicyTables =
+    PORTFOLIO_TARGET_POLICY_TABLES.filter((tableName) =>
+      reviewedTableRows.some(({ table_name }) => table_name === tableName),
+    );
   const presentHoldingOnboardingColumns = HOLDING_ONBOARDING_COLUMNS.filter(
     (columnName) =>
       columnRows.some(
@@ -618,6 +745,17 @@ export async function readPreviewDatabaseState(input: {
           constraint_name === constraintName && is_validated === true,
       ),
     );
+  const presentPortfolioTargetPolicyConstraints =
+    PORTFOLIO_TARGET_POLICY_CONSTRAINTS.filter((constraintName) =>
+      constraintRows.some(
+        ({ constraint_name, is_validated }) =>
+          constraint_name === constraintName && is_validated === true,
+      ),
+    );
+  const presentPortfolioTargetPolicyIndexes =
+    PORTFOLIO_TARGET_POLICY_INDEXES.filter((expected) =>
+      hasExactUniqueIndex(indexRows, expected),
+    ).map(({ name }) => name);
   const presentSnapshotOwnershipConstraints =
     SNAPSHOT_OWNERSHIP_CONSTRAINTS.filter((expected) =>
       constraintRows.some(
@@ -645,6 +783,11 @@ export async function readPreviewDatabaseState(input: {
   const holdingOnboardingEvidenceRows =
     presentHoldingOnboardingTables.length === HOLDING_ONBOARDING_TABLES.length
       ? await readHoldingOnboardingEvidenceRowCount(input.query)
+      : null;
+  const portfolioTargetPolicyRows =
+    presentPortfolioTargetPolicyTables.length ===
+    PORTFOLIO_TARGET_POLICY_TABLES.length
+      ? await readPortfolioTargetPolicyRowCounts(input.query)
       : null;
 
   const appliedMigrations = migrationRows.map((row) => ({
@@ -781,6 +924,11 @@ export async function readPreviewDatabaseState(input: {
       ),
       assetOwnerAccountInstrumentIndexExact:
         hasExactAssetOwnerAccountInstrumentIndex(indexRows),
+      portfolioTargetPolicyTables: presentPortfolioTargetPolicyTables,
+      portfolioTargetPolicyConstraints:
+        presentPortfolioTargetPolicyConstraints,
+      portfolioTargetPolicyIndexes: presentPortfolioTargetPolicyIndexes,
+      portfolioTargetPolicyRows,
       duplicateAssetIdentityGroups: integerValue(
         counts.duplicate_asset_identity_groups,
         "duplicate asset identity groups",
@@ -794,7 +942,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0025 ledger.",
+      "Preview database migration ledger does not match the reviewed 0026 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -808,7 +956,33 @@ export function assertReviewedPreviewDatabaseState(
 export function assertReviewedPreviewDatabaseCatalog(
   state: PreviewDatabaseState,
 ) {
+  assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog(state);
   if (!hasReviewedCatalog(state)) {
+    const publicEvidence = publicPreviewDatabaseEvidence(state);
+    const catalog = state.reviewedCatalog;
+    throw new Error(
+      `Preview database reviewed 0026 catalog is incomplete. ${JSON.stringify(
+        {
+          portfolioTargetPolicyCatalogStatus:
+            publicEvidence.portfolioTargetPolicyCatalogStatus,
+          portfolioTargetPolicyTableCount:
+            catalog.portfolioTargetPolicyTables.length,
+          portfolioTargetPolicyConstraintCount:
+            catalog.portfolioTargetPolicyConstraints.length,
+          portfolioTargetPolicyIndexCount:
+            catalog.portfolioTargetPolicyIndexes.length,
+          portfolioTargetPolicyRowsAvailable:
+            catalog.portfolioTargetPolicyRows !== null,
+        },
+      )}`,
+    );
+  }
+}
+
+export function assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog(
+  state: PreviewDatabaseState,
+) {
+  if (!hasReviewedPrePortfolioTargetPolicyCatalog(state)) {
     const publicEvidence = publicPreviewDatabaseEvidence(state);
     const catalog = state.reviewedCatalog;
     throw new Error(
@@ -980,6 +1154,34 @@ export function assertPreviewHoldingOnboardingRowsPreserved(
   }
 }
 
+export function assertPreviewPortfolioTargetPolicyRowsPreserved(
+  before: PortfolioTargetPolicyRowCounts | null,
+  after: PortfolioTargetPolicyRowCounts | null,
+) {
+  if (after === null) {
+    throw new Error(
+      "Preview postflight portfolio target-policy row evidence is unavailable.",
+    );
+  }
+
+  const expected = before ?? {
+    revisions: 0,
+    rows: 0,
+    lifecycleEvents: 0,
+  };
+  if (
+    after.revisions !== expected.revisions ||
+    after.rows !== expected.rows ||
+    after.lifecycleEvents !== expected.lifecycleEvents
+  ) {
+    throw new Error(
+      before === null
+        ? "Preview migration unexpectedly seeded portfolio target-policy rows."
+        : "Preview migration changed inherited portfolio target-policy row counts.",
+    );
+  }
+}
+
 export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedMigrationLedgerPresent =
     hasReviewedMigrationLedger(state);
@@ -994,8 +1196,10 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     hasReviewedPortfolioScopeCatalog(state);
   const reviewedHoldingOnboardingCatalogPresent =
     hasReviewedHoldingOnboardingCatalog(state);
+  const reviewedPortfolioTargetPolicyCatalogPresent =
+    hasReviewedPortfolioTargetPolicyCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v8",
+    evidenceVersion: "preview_database_evidence_v9",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -1004,8 +1208,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0025_present"
-      : "reviewed_0025_not_present",
+      ? "reviewed_0026_present"
+      : "reviewed_0026_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",
@@ -1021,6 +1225,10 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
     holdingOnboardingCatalogStatus: reviewedHoldingOnboardingCatalogPresent
       ? "reviewed_0025_present"
       : "reviewed_0025_not_present",
+    portfolioTargetPolicyCatalogStatus:
+      reviewedPortfolioTargetPolicyCatalogPresent
+        ? "reviewed_0026_present"
+        : "reviewed_0026_not_present",
   };
 }
 
@@ -1049,6 +1257,15 @@ function hasReviewedLatestMigration(state: PreviewDatabaseState) {
 }
 
 function hasReviewedCatalog(state: PreviewDatabaseState) {
+  return (
+    hasReviewedPrePortfolioTargetPolicyCatalog(state) &&
+    hasReviewedPortfolioTargetPolicyCatalog(state)
+  );
+}
+
+function hasReviewedPrePortfolioTargetPolicyCatalog(
+  state: PreviewDatabaseState,
+) {
   return (
     hasReviewedPreHoldingOnboardingCatalog(state) &&
     hasReviewedHoldingOnboardingCatalog(state)
@@ -1135,6 +1352,20 @@ function hasReviewedHoldingOnboardingCatalog(state: PreviewDatabaseState) {
     state.reviewedCatalog.holdingOnboardingAccountIndexExact &&
     state.reviewedCatalog.assetOwnerAccountInstrumentIndexExact &&
     state.reviewedCatalog.duplicateAssetIdentityGroups === 0
+  );
+}
+
+function hasReviewedPortfolioTargetPolicyCatalog(
+  state: PreviewDatabaseState,
+) {
+  return (
+    state.reviewedCatalog.portfolioTargetPolicyTables.length ===
+      PORTFOLIO_TARGET_POLICY_TABLES.length &&
+    state.reviewedCatalog.portfolioTargetPolicyConstraints.length ===
+      PORTFOLIO_TARGET_POLICY_CONSTRAINTS.length &&
+    state.reviewedCatalog.portfolioTargetPolicyIndexes.length ===
+      PORTFOLIO_TARGET_POLICY_INDEXES.length &&
+    state.reviewedCatalog.portfolioTargetPolicyRows !== null
   );
 }
 
@@ -1281,6 +1512,40 @@ async function readHoldingOnboardingEvidenceRowCount(query: Query) {
     rows[0].evidence_rows,
     "holding onboarding evidence rows",
   );
+}
+
+async function readPortfolioTargetPolicyRowCounts(query: Query) {
+  const rows = await query(`
+    select
+      (
+        select count(*)::integer
+          from portfolio_target_policy_revisions
+      ) as revisions,
+      (
+        select count(*)::integer
+          from portfolio_target_policy_rows
+      ) as policy_rows,
+      (
+        select count(*)::integer
+          from portfolio_target_policy_lifecycle_events
+      ) as lifecycle_events
+  `);
+  if (rows.length !== 1) {
+    throw new Error(
+      "Preview database portfolio target-policy row evidence is unavailable.",
+    );
+  }
+  return {
+    revisions: integerValue(
+      rows[0].revisions,
+      "portfolio target-policy revisions",
+    ),
+    rows: integerValue(rows[0].policy_rows, "portfolio target-policy rows"),
+    lifecycleEvents: integerValue(
+      rows[0].lifecycle_events,
+      "portfolio target-policy lifecycle events",
+    ),
+  };
 }
 
 function integerValue(value: unknown, label: string) {

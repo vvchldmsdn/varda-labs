@@ -423,6 +423,26 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "separate",
   },
   {
+    id: "portfolio_target_policy_session_write",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["/portfolio/targets"],
+    implementationPaths: ["src/lib/portfolio-target-policy-write.ts"],
+    targets: [
+      userTarget("portfolio_target_policy_revisions", "insert", "update"),
+      userTarget("portfolio_target_policy_rows", "insert"),
+      userTarget("portfolio_target_policy_lifecycle_events", "insert"),
+    ],
+    transition: {
+      prepare: "shadow_trusted_context",
+      activate: "atomic_target_policy_approval",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "operator_investment_lab_stress_history_completion",
     classification: "mixed",
     authorization: "migration_cli",
