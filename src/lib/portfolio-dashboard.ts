@@ -8,11 +8,7 @@ import {
   eventLedgerEntries,
   livePriceQuotes,
 } from "@/db/schema";
-import {
-  NAMED_PORTFOLIO_ACCOUNTS,
-  type NamedPortfolioAccount,
-  type PortfolioAccountScope,
-} from "@/lib/portfolio-account-scope";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -51,10 +47,7 @@ const NON_INVESTMENT_ASSET_TYPES = new Set([
   "fixed_deposit",
   "housing_subscription",
 ]);
-const ASSET_ACCOUNT_CODES = NAMED_PORTFOLIO_ACCOUNTS;
 const DEFAULT_TRIM_DRIFT_THRESHOLD = 12;
-export type AssetAccount = NamedPortfolioAccount;
-export type DashboardAccount = PortfolioAccountScope;
 
 type AssetRow = typeof assets.$inferSelect;
 type AssetGroupRow = typeof assetGroups.$inferSelect;
@@ -101,7 +94,7 @@ export type DashboardHolding = {
 };
 
 export type AccountSummary = {
-  code: AssetAccount;
+  code: string;
   label: string;
   totalValueKrw: number;
   costBasisKrw: number;
@@ -150,7 +143,8 @@ export type DashboardEventActivity = {
 };
 
 export type DashboardData = {
-  selectedAccount: DashboardAccount;
+  selectedScope: PortfolioAnalysisScope;
+  analysisScopes: readonly PortfolioAnalysisScope[];
   generatedAt: string;
   usdKrwRate: number;
   latestSnapshotDate: string | null;
@@ -228,25 +222,14 @@ export type DashboardTodayMovement = {
   coverage: PortfolioMovementCoverage;
 };
 
-export function normalizeDashboardAccount(value: string | string[] | undefined) {
-  const rawValue = Array.isArray(value) ? value[0] : value;
-  if (
-    rawValue === "all" ||
-    rawValue === "brokerage" ||
-    rawValue === "isa" ||
-    rawValue === "irp"
-  ) {
-    return rawValue;
-  }
-  return "brokerage";
-}
-
 export async function getPortfolioDashboard(
   {
-    selectedAccount,
+    analysisScopes,
+    scope,
     tenantContext,
   }: {
-    selectedAccount: DashboardAccount;
+    analysisScopes: readonly PortfolioAnalysisScope[];
+    scope: PortfolioAnalysisScope;
     tenantContext: TenantContext;
   },
 ): Promise<DashboardData> {
@@ -265,8 +248,8 @@ export async function getPortfolioDashboard(
     liveQuoteRows,
     recentPriceRows,
   } = await getReadOnlyTenantPortfolioDashboardSources({
+    scope,
     tenantContext,
-    selectedAccount,
     snapshotDate: movementCycle.snapshotDate,
   });
 
@@ -280,9 +263,7 @@ export async function getPortfolioDashboard(
   const valuationAssetRows = investmentAssetRows.map((asset) =>
     applyLiveQuote(asset, liveQuotesByAssetKey.get(assetLiveQuoteKey(asset))),
   );
-  const selectedInvestmentAssetRows = valuationAssetRows.filter(
-    (asset) => selectedAccount === "all" || asset.account === selectedAccount,
-  );
+  const selectedInvestmentAssetRows = valuationAssetRows;
   const setting = settingsRows[0] ?? null;
   const latestFxRow = latestFxRows[0] ?? null;
   const usdKrwRate =
@@ -316,37 +297,15 @@ export async function getPortfolioDashboard(
       returnMetrics: getAssetReturnMetrics(returnSummary, asset, usdKrwRate),
     }),
   );
-  const accountTotals = new Map<DashboardAccount, number>();
-
-  for (const code of ASSET_ACCOUNT_CODES) {
-    accountTotals.set(
-      code,
-      allHoldingsWithoutWeights
-        .filter((holding) => holding.account === code)
-        .reduce((sum, holding) => sum + holding.valueKrw, 0),
-    );
-  }
-  accountTotals.set(
-    "all",
-    allHoldingsWithoutWeights.reduce((sum, holding) => sum + holding.valueKrw, 0),
-  );
-
-  const allHoldings = valuationAssetRows.map((asset) =>
-    buildHolding({
-      asset,
-      accountTotalValueKrw: accountTotals.get(asset.account as AssetAccount) ?? 0,
-      groupName: asset.groupId ? assetGroupNames.get(asset.groupId) : null,
-      usdKrwRate,
-      trimDriftThreshold,
-      useTrendFilter,
-      returnMetrics: getAssetReturnMetrics(returnSummary, asset, usdKrwRate),
-    }),
+  const selectedTotalValueKrw = sumBy(
+    allHoldingsWithoutWeights,
+    (holding) => holding.valueKrw,
   );
 
   const holdingsBase = selectedInvestmentAssetRows.map((asset) =>
     buildHolding({
       asset,
-      accountTotalValueKrw: accountTotals.get(selectedAccount) ?? 0,
+      accountTotalValueKrw: selectedTotalValueKrw,
       groupName: asset.groupId ? assetGroupNames.get(asset.groupId) : null,
       usdKrwRate,
       trimDriftThreshold,
@@ -359,14 +318,14 @@ export async function getPortfolioDashboard(
   );
   const realizedRows = getSelectedRealizedRows(
     returnSummary,
-    selectedAccount,
+    "all",
     selectedAssetKeys,
   );
   const dailyPositionMovement = buildDailyPositionMovement({
     holdings: holdingsBase,
     positionRows: latestPositionRows,
     eventRows,
-    selectedAccount,
+    selectedAccount: "all",
     baselineDate: latestSnapshotDate,
     usdKrwRate,
     movementCycle,
@@ -417,19 +376,14 @@ export async function getPortfolioDashboard(
     totalPnlKrw,
     costBasisKrw + realizedCostBasisKrw,
   );
-  const recentSnapshots = buildPortfolioDashboardSnapshotTrend(
-    recentPortfolioRows,
-    selectedAccount,
-  );
+  const recentSnapshots = buildPortfolioDashboardSnapshotTrend(recentPortfolioRows);
   const latestPortfolioSnapshot = recentSnapshots.at(-1) ?? null;
   const latestPortfolioSnapshotValue =
     latestPortfolioSnapshot?.totalMarketValue ?? null;
   const latestPortfolioSnapshotPnl = latestPortfolioSnapshot?.totalPnl ?? null;
   const latestPortfolioSnapshotReturnPct =
     latestPortfolioSnapshot?.totalReturnPct ?? null;
-  const latestAccountPositions = latestPositionRows.filter(
-    (position) => selectedAccount === "all" || position.account === selectedAccount,
-  );
+  const latestAccountPositions = latestPositionRows;
   const latestSnapshotReferenceDate =
     latestDate(
       latestAccountPositions
@@ -441,12 +395,12 @@ export async function getPortfolioDashboard(
   ).length;
   const nonInvestmentAssets = buildNonInvestmentAssets(
     assetRows,
-    selectedAccount,
     usdKrwRate,
   );
 
   return {
-    selectedAccount,
+    selectedScope: scope,
+    analysisScopes,
     generatedAt: new Date().toISOString(),
     usdKrwRate,
     latestSnapshotDate,
@@ -466,8 +420,8 @@ export async function getPortfolioDashboard(
     trimDriftThreshold,
     useTrendFilter,
     accountSummaries: buildAccountSummaries(
-      ASSET_ACCOUNT_CODES,
-      allHoldings,
+      accountRows.map((account) => account.code),
+      holdings,
       accountLabels,
     ),
     holdings,
@@ -480,7 +434,6 @@ export async function getPortfolioDashboard(
     eventActivity: buildEventActivity({
       eventRows,
       assetRows: investmentAssetRows,
-      selectedAccount,
       accountLabels,
       returnSummary,
     }),
@@ -509,11 +462,7 @@ export async function getPortfolioDashboard(
       nonInvestmentAssetCount: nonInvestmentAssets.length,
       assetCount: holdings.length,
       eventLedgerCount: eventRows.length,
-      selectedEventLedgerCount: filterEventRowsForAccount(
-        eventRows,
-        investmentAssetRows,
-        selectedAccount,
-      ).length,
+      selectedEventLedgerCount: eventRows.length,
       selectedRealizedSellEventCount: realizedRows.length,
       selectedUnmatchedSellEventCount: realizedRows.filter((row) => !row.assetKey)
         .length,
@@ -731,7 +680,7 @@ function buildAssetGroupNames(groupRows: AssetGroupRow[]) {
 }
 
 function buildAccountSummaries(
-  accountCodes: readonly AssetAccount[],
+  accountCodes: readonly string[],
   holdings: DashboardHolding[],
   accountLabels: Map<string, string>,
 ): AccountSummary[] {
@@ -772,12 +721,10 @@ function buildAccountSummaries(
 
 function buildNonInvestmentAssets(
   assetRows: AssetRow[],
-  selectedAccount: DashboardAccount,
   usdKrwRate: number,
 ): NonInvestmentAsset[] {
   return assetRows
     .filter((asset) => NON_INVESTMENT_ASSET_TYPES.has(asset.assetType ?? ""))
-    .filter((asset) => selectedAccount === "all" || asset.account === selectedAccount)
     .map((asset) => ({
       id: asset.id,
       name: asset.name,
@@ -799,13 +746,11 @@ function latestDate(values: string[]) {
 function buildEventActivity({
   eventRows,
   assetRows,
-  selectedAccount,
   accountLabels,
   returnSummary,
 }: {
   eventRows: EventLedgerRow[];
   assetRows: AssetRow[];
-  selectedAccount: DashboardAccount;
   accountLabels: Map<string, string>;
   returnSummary: ReturnMetricsSummary;
 }): DashboardEventActivity[] {
@@ -815,7 +760,7 @@ function buildEventActivity({
       .map((row) => [row.eventId as string, row]),
   );
 
-  return filterEventRowsForAccount(eventRows, assetRows, selectedAccount)
+  return eventRows
     .sort(compareEventsDescending)
     .slice(0, 8)
     .map((event) => {
@@ -843,23 +788,6 @@ function buildEventActivity({
     });
 }
 
-function filterEventRowsForAccount(
-  eventRows: EventLedgerRow[],
-  assetRows: AssetRow[],
-  selectedAccount: DashboardAccount,
-) {
-  if (selectedAccount === "all") return eventRows;
-
-  return eventRows.filter((event) => {
-    const resolvedAsset = resolveEventActivityAsset(event, assetRows);
-    return eventMatchesSelectedAccount(
-      event,
-      selectedAccount,
-      resolvedAsset?.account ?? null,
-    );
-  });
-}
-
 function resolveEventActivityAsset(event: EventLedgerRow, assetRows: AssetRow[]) {
   if (event.assetId) {
     const byId = assetRows.find((asset) => asset.id === event.assetId);
@@ -874,24 +802,20 @@ function resolveEventActivityAsset(event: EventLedgerRow, assetRows: AssetRow[])
   }
 
   const eventAccount = portfolioEventAccount(event);
-  const accountsToTry = eventAccount ? [eventAccount] : ASSET_ACCOUNT_CODES;
+  const candidates = eventAccount
+    ? assetRows.filter((asset) => asset.account === eventAccount)
+    : assetRows;
   const eventTicker = normalizeTicker(event.ticker);
 
-  for (const account of accountsToTry) {
-    if (eventTicker) {
-      const byTicker = assetRows.find(
-        (asset) =>
-          asset.account === account &&
-          normalizeTicker(asset.ticker) === eventTicker,
-      );
-      if (byTicker) return byTicker;
-    }
-
-    const byName = assetRows.find(
-      (asset) => asset.account === account && asset.name === event.assetName,
+  if (eventTicker) {
+    const byTicker = candidates.find(
+      (asset) => normalizeTicker(asset.ticker) === eventTicker,
     );
-    if (byName) return byName;
+    if (byTicker) return byTicker;
   }
+
+  const byName = candidates.find((asset) => asset.name === event.assetName);
+  if (byName) return byName;
 
   return null;
 }
@@ -914,18 +838,6 @@ function compareEventsDescending(a: EventLedgerRow, b: EventLedgerRow) {
 function eventTimestampMs(event: EventLedgerRow) {
   const timestamp = event.recordedAt ?? event.createdAt;
   return new Date(timestamp).getTime();
-}
-
-function eventMatchesSelectedAccount(
-  event: EventLedgerRow,
-  selectedAccount: DashboardAccount,
-  fallbackAccount: string | null,
-) {
-  if (selectedAccount === "all") return true;
-  const eventAccount = portfolioEventAccount(event);
-  if (eventAccount) return eventAccount === selectedAccount;
-  if (fallbackAccount) return fallbackAccount === selectedAccount;
-  return selectedAccount === "brokerage";
 }
 
 function deltaOrNull(left: number | null, right: number | null) {

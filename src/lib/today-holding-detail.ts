@@ -1,10 +1,13 @@
 import { normalizeTicker } from "./portfolio-math.ts";
-
-export type TodayDetailSelectedAccount = "all" | "brokerage" | "isa" | "irp";
+import {
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScopeKey,
+} from "./portfolio-analysis-scope.ts";
 
 export type TodayHoldingDetailQuery = {
   ticker: string | null;
   market: string | null;
+  holdingAccount: string | null;
 };
 
 export type TodayHoldingDetailHolding = {
@@ -84,7 +87,6 @@ type DetailExclusionInput = TodayHoldingDetailExclusion & {
 };
 
 type DetailDashboardInput = {
-  selectedAccount: TodayDetailSelectedAccount;
   holdings: DetailHoldingInput[];
   todayMovement: {
     contributionRows: DetailContributionInput[];
@@ -93,12 +95,14 @@ type DetailDashboardInput = {
 };
 
 export function normalizeTodayHoldingDetailQuery(params: {
+  holdingAccount?: string | string[];
   ticker?: string | string[];
   market?: string | string[];
 }): TodayHoldingDetailQuery {
   return {
     ticker: normalizeTicker(firstParam(params.ticker)),
     market: normalizeMarket(firstParam(params.market)),
+    holdingAccount: normalizeAccount(firstParam(params.holdingAccount)),
   };
 }
 
@@ -111,7 +115,7 @@ export function selectTodayHoldingDetail(
   }
 
   const candidates = data.holdings.filter((holding) =>
-    matchesHoldingSelector(holding, data.selectedAccount, query),
+    matchesHoldingSelector(holding, query),
   );
 
   if (candidates.length === 0) {
@@ -145,23 +149,21 @@ export function selectTodayHoldingDetail(
 }
 
 export function todayHoldingDetailHref(
-  selectedAccount: TodayDetailSelectedAccount,
-  holding: Pick<TodayHoldingDetailHolding, "ticker" | "market">,
+  selectedScopeKey: PortfolioAnalysisScopeKey,
+  holding: Pick<TodayHoldingDetailHolding, "account" | "ticker" | "market">,
 ) {
-  const params = new URLSearchParams();
-  if (selectedAccount !== "brokerage") params.set("account", selectedAccount);
-  if (holding.ticker) params.set("ticker", normalizeTicker(holding.ticker) ?? "");
-  if (holding.market) params.set("market", holding.market);
-  const query = params.toString();
-  return query ? `/today?${query}` : "/today";
+  return buildPortfolioAnalysisScopeHref("/today", selectedScopeKey, {
+    holdingAccount: normalizeAccount(holding.account),
+    market: normalizeMarket(holding.market),
+    ticker: normalizeTicker(holding.ticker),
+  });
 }
 
 function matchesHoldingSelector(
   holding: DetailHoldingInput,
-  selectedAccount: TodayDetailSelectedAccount,
   query: TodayHoldingDetailQuery,
 ) {
-  if (selectedAccount !== "all" && holding.account !== selectedAccount) {
+  if (query.holdingAccount && holding.account !== query.holdingAccount) {
     return false;
   }
   if (normalizeTicker(holding.ticker) !== query.ticker) return false;
@@ -241,5 +243,10 @@ function firstParam(value: string | string[] | undefined) {
 
 function normalizeMarket(value: string | null | undefined) {
   const normalized = value?.trim().toLowerCase();
+  return normalized || null;
+}
+
+function normalizeAccount(value: string | null | undefined) {
+  const normalized = value?.trim();
   return normalized || null;
 }

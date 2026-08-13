@@ -1,12 +1,11 @@
 import { Suspense } from "react";
 
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioDashboardAccessBoundary } from "@/components/portfolio-dashboard-access-boundary";
 import { TodayMovement } from "@/components/today-movement";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import {
-  getPortfolioDashboard,
-  normalizeDashboardAccount,
-} from "@/lib/portfolio-dashboard";
+import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 import { normalizeTodayHoldingDetailQuery } from "@/lib/today-holding-detail";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +13,8 @@ export const dynamic = "force-dynamic";
 type TodayPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    holdingAccount?: string | string[];
+    scope?: string | string[];
     ticker?: string | string[];
     market?: string | string[];
   }>;
@@ -24,7 +25,6 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const selectedAccount = normalizeDashboardAccount(params.account);
   const detailQuery = normalizeTodayHoldingDetailQuery(params);
 
   if (!resolution.ok) {
@@ -36,8 +36,27 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     );
   }
 
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
+    account: params.account,
+    scope: params.scope,
+    tenantContext: resolution.tenantContext,
+  });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/today"
+        context={scopeContext}
+        title="오늘 변동"
+      />
+    );
+  }
+
   const dashboardPromise = getPortfolioDashboard({
-    selectedAccount,
+    analysisScopes: scopeContext.catalog.scopes,
+    scope: scopeContext.resolution.scope,
     tenantContext: resolution.tenantContext,
   });
 

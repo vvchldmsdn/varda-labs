@@ -1,20 +1,14 @@
 import Link from "next/link";
 
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import type {
-  DashboardAccount,
   DashboardData,
   DashboardEventActivity,
   DashboardHolding,
   NonInvestmentAsset,
   RecentPortfolioPoint,
 } from "@/lib/portfolio-dashboard";
-
-const accountTabs: { code: DashboardAccount; label: string }[] = [
-  { code: "brokerage", label: "증권" },
-  { code: "isa", label: "ISA" },
-  { code: "irp", label: "IRP" },
-  { code: "all", label: "전체" },
-];
+import { buildPortfolioAnalysisScopeHref } from "@/lib/portfolio-analysis-scope";
 
 const navItems: { label: string; href?: string }[] = [
   { label: "홈", href: "/" },
@@ -49,6 +43,7 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
           </div>
           <nav className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
             {navItems.map((item, index) => {
+              const href = scopedDashboardNavHref(item.href, data.selectedScope.key);
               const className = cn(
                 "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium",
                 index === 0
@@ -56,8 +51,8 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                   : "text-[#697064] hover:bg-[#eef1e8]",
               );
 
-              return item.href ? (
-                <Link key={item.label} href={item.href} className={className}>
+              return href ? (
+                <Link key={item.label} href={href} className={className}>
                   {item.label}
                 </Link>
               ) : (
@@ -92,22 +87,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
                   포트폴리오 요약
                 </h1>
               </div>
-              <div className="grid grid-cols-2 gap-2 rounded-md border border-[#dce2d2] bg-white p-1 sm:grid-cols-4">
-                {accountTabs.map((tab) => (
-                  <Link
-                    key={tab.code}
-                    href={tab.code === "brokerage" ? "/" : `/?account=${tab.code}`}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-center text-sm font-semibold transition",
-                      data.selectedAccount === tab.code
-                        ? "bg-[#1e3a34] text-white"
-                        : "text-[#5d665b] hover:bg-[#edf1e8]",
-                    )}
-                  >
-                    {tab.label}
-                  </Link>
-                ))}
-              </div>
+              <PortfolioAnalysisScopeTabs
+                basePath="/"
+                scopes={data.analysisScopes}
+                selectedScopeKey={data.selectedScope.key}
+              />
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -387,6 +371,16 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
       </div>
     </main>
   );
+}
+
+function scopedDashboardNavHref(
+  href: string | undefined,
+  selectedScopeKey: DashboardData["selectedScope"]["key"],
+) {
+  if (href === "/" || href === "/today") {
+    return buildPortfolioAnalysisScopeHref(href, selectedScopeKey);
+  }
+  return href;
 }
 
 function EventActivityPanel({

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import type {
-  DashboardAccount,
   DashboardData,
   DashboardHolding,
 } from "@/lib/portfolio-dashboard";
+import {
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScopeKey,
+} from "@/lib/portfolio-analysis-scope";
 import {
   selectTodayHoldingDetail,
   todayHoldingDetailHref,
@@ -13,16 +17,9 @@ import {
   type TodayHoldingDetailResult,
 } from "@/lib/today-holding-detail";
 
-const accountTabs: { code: DashboardAccount; label: string }[] = [
-  { code: "brokerage", label: "Brokerage" },
-  { code: "isa", label: "ISA" },
-  { code: "irp", label: "IRP" },
-  { code: "all", label: "All" },
-];
-
 export function TodayMovement({
   data,
-  detailQuery = { ticker: null, market: null },
+  detailQuery = { holdingAccount: null, ticker: null, market: null },
 }: {
   data: DashboardData;
   detailQuery?: TodayHoldingDetailQuery;
@@ -51,27 +48,19 @@ export function TodayMovement({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                href="/"
+                href={buildPortfolioAnalysisScopeHref(
+                  "/",
+                  data.selectedScope.key,
+                )}
                 className="rounded-md border border-[#dce2d2] bg-white px-3 py-2 text-sm font-semibold text-[#334038]"
               >
                 Dashboard
               </Link>
-              <div className="grid grid-cols-2 gap-2 rounded-md border border-[#dce2d2] bg-white p-1 sm:grid-cols-4">
-                {accountTabs.map((tab) => (
-                  <Link
-                    key={tab.code}
-                    href={tab.code === "brokerage" ? "/today" : `/today?account=${tab.code}`}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-center text-sm font-semibold transition",
-                      data.selectedAccount === tab.code
-                        ? "bg-[#1e3a34] text-white"
-                        : "text-[#5d665b] hover:bg-[#edf1e8]",
-                    )}
-                  >
-                    {tab.label}
-                  </Link>
-                ))}
-              </div>
+              <PortfolioAnalysisScopeTabs
+                basePath="/today"
+                scopes={data.analysisScopes}
+                selectedScopeKey={data.selectedScope.key}
+              />
             </div>
           </div>
         </header>
@@ -118,6 +107,7 @@ export function TodayMovement({
         <HoldingDetailPanel
           detail={detail}
           baselineReferenceDate={data.latestSnapshotReferenceDate}
+          selectedScopeKey={data.selectedScope.key}
           snapshotDate={data.latestSnapshotDate}
           usdKrwRate={data.usdKrwRate}
         />
@@ -155,7 +145,7 @@ export function TodayMovement({
                         <Td>
                           <HoldingLabel
                             holding={holding}
-                            selectedAccount={data.selectedAccount}
+                            selectedScopeKey={data.selectedScope.key}
                           />
                         </Td>
                         <Td>{holding?.account ?? "-"}</Td>
@@ -245,11 +235,13 @@ export function TodayMovement({
 function HoldingDetailPanel({
   detail,
   baselineReferenceDate,
+  selectedScopeKey,
   snapshotDate,
   usdKrwRate,
 }: {
   detail: TodayHoldingDetailResult;
   baselineReferenceDate: string | null;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
   snapshotDate: string | null;
   usdKrwRate: number | null;
 }) {
@@ -279,7 +271,7 @@ function HoldingDetailPanel({
           {detail.candidates.map((candidate) => (
             <Link
               key={`${candidate.account}-${candidate.market}-${candidate.ticker}`}
-              href={todayHoldingDetailHref(candidate.account as DashboardAccount, candidate)}
+              href={todayHoldingDetailHref(selectedScopeKey, candidate)}
               className="rounded-md border border-[#d8c68f] bg-white px-3 py-2 text-xs font-semibold text-[#5d4b1b]"
             >
               {candidate.ticker ?? "-"} / {candidate.account} / {candidate.market}
@@ -306,7 +298,7 @@ function HoldingDetailPanel({
           </p>
         </div>
         <Link
-          href={holding.account === "brokerage" ? "/today" : `/today?account=${holding.account}`}
+          href={buildPortfolioAnalysisScopeHref("/today", selectedScopeKey)}
           className="w-fit rounded-md border border-[#dce2d2] bg-white px-3 py-2 text-sm font-semibold text-[#334038]"
         >
           선택 해제
@@ -451,15 +443,15 @@ function MetricCard({
 
 function HoldingLabel({
   holding,
-  selectedAccount,
+  selectedScopeKey,
 }: {
   holding: DashboardHolding | null;
-  selectedAccount: DashboardAccount;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   if (holding?.ticker) {
     return (
       <Link
-        href={todayHoldingDetailHref(selectedAccount, holding)}
+        href={todayHoldingDetailHref(selectedScopeKey, holding)}
         className="block rounded-sm outline-offset-2 hover:text-[#1e3a34] hover:underline focus:outline focus:outline-2 focus:outline-[#1e3a34]"
       >
         <div className="font-semibold text-[#1f2722]">{holding.ticker}</div>
