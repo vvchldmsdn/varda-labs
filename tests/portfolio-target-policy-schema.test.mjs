@@ -52,6 +52,11 @@ describe("portfolio target policy persistence boundary", () => {
     assert.match(migration, /portfolio_target_current_all_unique/);
     assert.match(migration, /portfolio_target_current_account_unique/);
     assert.match(migration, /portfolio_target_current_group_unique/);
+    assert.ok(
+      migration.indexOf("portfolio_target_revisions_id_owner_unique") <
+        migration.indexOf("portfolio_target_events_revision_owner_fk"),
+      "the referenced revision-owner unique index must exist before its foreign keys",
+    );
     assert.doesNotMatch(migration, /^\s*(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP)\b/gim);
   });
 });

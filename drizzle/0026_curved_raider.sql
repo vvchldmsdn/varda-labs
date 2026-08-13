@@ -61,6 +61,7 @@ CREATE TABLE "portfolio_target_policy_rows" (
 	CONSTRAINT "portfolio_target_rows_positive_buyability_check" CHECK ("portfolio_target_policy_rows"."target_weight_bps" = 0 or "portfolio_target_policy_rows"."buyability" = 'buyable')
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX "portfolio_target_revisions_id_owner_unique" ON "portfolio_target_policy_revisions" USING btree ("id","canonical_owner_user_id");--> statement-breakpoint
 ALTER TABLE "portfolio_target_policy_lifecycle_events" ADD CONSTRAINT "portfolio_target_events_revision_owner_fk" FOREIGN KEY ("approval_revision_id","canonical_owner_user_id") REFERENCES "public"."portfolio_target_policy_revisions"("id","canonical_owner_user_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "portfolio_target_policy_lifecycle_events" ADD CONSTRAINT "portfolio_target_events_replacement_owner_fk" FOREIGN KEY ("replacement_revision_id","canonical_owner_user_id") REFERENCES "public"."portfolio_target_policy_revisions"("id","canonical_owner_user_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "portfolio_target_policy_revisions" ADD CONSTRAINT "portfolio_target_revisions_owner_user_fk" FOREIGN KEY ("canonical_owner_user_id") REFERENCES "public"."app_users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -73,7 +74,6 @@ ALTER TABLE "portfolio_target_policy_rows" ADD CONSTRAINT "portfolio_target_rows
 CREATE UNIQUE INDEX "portfolio_target_events_revision_sequence_unique" ON "portfolio_target_policy_lifecycle_events" USING btree ("approval_revision_id","event_sequence");--> statement-breakpoint
 CREATE INDEX "portfolio_target_events_owner_idx" ON "portfolio_target_policy_lifecycle_events" USING btree ("canonical_owner_user_id");--> statement-breakpoint
 CREATE INDEX "portfolio_target_events_replacement_idx" ON "portfolio_target_policy_lifecycle_events" USING btree ("replacement_revision_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "portfolio_target_revisions_id_owner_unique" ON "portfolio_target_policy_revisions" USING btree ("id","canonical_owner_user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "portfolio_target_revisions_all_revision_unique" ON "portfolio_target_policy_revisions" USING btree ("canonical_owner_user_id","approval_revision") WHERE "portfolio_target_policy_revisions"."scope_kind" = 'all';--> statement-breakpoint
 CREATE UNIQUE INDEX "portfolio_target_revisions_account_revision_unique" ON "portfolio_target_policy_revisions" USING btree ("canonical_owner_user_id","scope_account_id","approval_revision") WHERE "portfolio_target_policy_revisions"."scope_kind" = 'account';--> statement-breakpoint
 CREATE UNIQUE INDEX "portfolio_target_revisions_group_revision_unique" ON "portfolio_target_policy_revisions" USING btree ("canonical_owner_user_id","scope_portfolio_group_id","approval_revision") WHERE "portfolio_target_policy_revisions"."scope_kind" = 'portfolio_group';--> statement-breakpoint

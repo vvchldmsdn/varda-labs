@@ -20,19 +20,19 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
     tag: "0026_curved_raider",
     createdAt: 1786588427095,
     sha256:
-      "7bdc6d663acf866dfba791691230a7370441a9e051f6f0cbde870674504bc27a",
+      "cdfb124a33cea8e54cc75147ee850fb5f69594b0cb1fd9fe45835bd45bf4cba9",
   }),
   reviewedMigrationLedger: Object.freeze({
     entryCount: 27,
     sha256:
-      "sha256:2dc9af8f95b9b81808c5e70715695657ade33bcd0f32b48ce138488a0f09f42f",
+      "sha256:964965a30697a028b547a8487655c34d03eb73c2dca9c5d2b4213bcac77d53b0",
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
       tag: "0026_curved_raider",
       createdAt: 1786588427095,
       sha256:
-        "7bdc6d663acf866dfba791691230a7370441a9e051f6f0cbde870674504bc27a",
+        "cdfb124a33cea8e54cc75147ee850fb5f69594b0cb1fd9fe45835bd45bf4cba9",
     }),
   ]),
 });
