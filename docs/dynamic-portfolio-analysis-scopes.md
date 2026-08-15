@@ -1,6 +1,6 @@
 # Dynamic Portfolio Analysis Scopes
 
-Status: Production schema and user group management applied; feature conversion in progress
+Status: Production schema and user group management applied; History portfolio lane converted
 
 ## Product Decision
 
@@ -115,6 +115,15 @@ are effective-dated so changing a group today does not rewrite past charts.
   consume the same resolved current-holdings universe for a scope.
 - History and Investment Lab need separate effective-dated membership
   semantics because their results span past service dates.
+- The History portfolio-performance lane resolves group membership separately
+  for every stored position-snapshot date. Whole-account and direct-asset
+  membership are unioned without double counting; `valid_from` is inclusive
+  and `valid_to` is exclusive. A missing valuation field keeps a partial row
+  visible instead of dropping the date or inventing an interpolated value.
+- History balance rows remain legacy fixed-column evidence, and event-ledger
+  group inclusion still lacks an approved semantic. Neither is presented as a
+  portfolio-group aggregate. Group position drilldown/comparison also remains
+  closed until its cross-account reconciliation model is explicit.
 - Additional contribution requires an approved target policy for the selected
   portfolio group. Existing account-bound target policies need an explicit
   migration; they must not be inferred from a matching display name.
@@ -143,10 +152,12 @@ are effective-dated so changing a group today does not rewrite past charts.
    - Keep `account=` only as a redirect/compatibility input.
 5. **Feature conversion (in progress)**
    - Dashboard, today movement, additional contribution, portfolio
-     structure/risk, and simulation use the shared holdings resolver.
-   - History and Investment Lab still require an explicit historical
-     membership policy before conversion. Their current legacy `account=`
-     filters must not be described as dynamic portfolio-group support.
+     structure/risk, simulation, and the History portfolio-performance lane
+     use the dynamic scope model.
+   - History uses effective-dated memberships for each snapshot date and keeps
+     legacy `account=` only as a compatibility input. History balance/events,
+     group position drilldown/comparison, and Investment Lab remain explicit
+     follow-up work rather than implied dynamic-group support.
 6. **User management (complete)**
    - Add create, rename, archive, and membership editing with Server Actions or
      narrow mutation handlers protected by the current tenant context.
@@ -161,10 +172,12 @@ are effective-dated so changing a group today does not rewrite past charts.
    - Remove fixed account constants and fixed snapshot checks only after old
      rows, jobs, routes, and target policies have migrated and been audited.
 
-## Explicit Non-Goals Of This Change
+## Explicit Non-Goals Of The Current History Slice
 
 - No database migration application or data seeding
 - No Production or Preview database write
-- No route, UI, snapshot, target-policy, or calculation behavior change
+- No balance-history reinterpretation, group event aggregation, or group
+  position drilldown/comparison
+- No snapshot writer, target-policy, provider, or calculation-authority change
 - No reinterpretation of legacy `asset_groups`
 - No hard deletion of historical group evidence

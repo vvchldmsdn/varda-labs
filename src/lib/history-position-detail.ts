@@ -1,12 +1,11 @@
 import type {
-  HistoryAccount,
   HistoryLane,
   PortfolioHistoryDisplayRow,
 } from "./history-balance.ts";
 
 export const HISTORY_POSITION_DETAIL_POLICY = Object.freeze({
-  version: "stored_named_account_position_drilldown_v1",
-  supportedAccounts: "brokerage_isa_irp_only",
+  version: "stored_owned_account_position_drilldown_v2",
+  supportedAccounts: "resolved_owned_account_scope",
   sourceMatch: "exact_snapshot_date_account_source",
   currentAssetFallback: "none",
   livePriceFallback: "none",
@@ -17,7 +16,7 @@ export const HISTORY_POSITION_DETAIL_POLICY = Object.freeze({
 export const HISTORY_POSITION_DETAIL_QUERY_LIMIT =
   HISTORY_POSITION_DETAIL_POLICY.rowLimit + 1;
 
-export type HistoryPositionAccount = Exclude<HistoryAccount, "all">;
+export type HistoryPositionAccount = string;
 
 export type HistoryPositionSelection =
   | Readonly<{
@@ -85,7 +84,7 @@ export type HistoryPositionDisplayRow = Readonly<{
 
 export type HistoryPositionDetailModel = Readonly<{
   policy: typeof HISTORY_POSITION_DETAIL_POLICY;
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   selection: HistoryPositionSelection;
   status: "idle" | "blocked" | "unavailable" | "partial" | "ready";
@@ -120,7 +119,7 @@ export function normalizeHistoryPositionSelection({
   positionDate,
   positionSource,
 }: {
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   positionDate: string | string[] | undefined;
   positionSource: string | string[] | undefined;
@@ -170,7 +169,7 @@ export function buildHistoryPositionDetail({
   portfolioRows,
   positionRows,
 }: {
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   selection: HistoryPositionSelection;
   portfolioRows: readonly PortfolioHistoryDisplayRow[];
@@ -351,7 +350,7 @@ function emptyModel({
   inputPositionRowCount = 0,
   incompatibleRowCount = 0,
 }: {
-  account: HistoryAccount;
+  account: string;
   lane: HistoryLane;
   selection: HistoryPositionSelection;
   status: HistoryPositionDetailModel["status"];

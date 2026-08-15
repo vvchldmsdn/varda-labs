@@ -1,15 +1,19 @@
 import Link from "next/link";
 
 import { HistoryView } from "@/components/history/history-view";
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { getReadOnlyTenantEvents } from "@/db/queries/tenant-events";
 import { getReadOnlyTenantHistoryBalance } from "@/db/queries/history-balance";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import {
-  normalizeHistoryAccount,
-  normalizeHistoryLane,
-} from "@/lib/history-balance";
+import { normalizeHistoryLane } from "@/lib/history-balance";
 import { normalizeHistoryPositionSelection } from "@/lib/history-position-detail";
 import { normalizeHistoryPositionComparisonSelection } from "@/lib/history-position-comparison";
+import {
+  isNamedPortfolioAccount,
+  type PortfolioAccountScope,
+} from "@/lib/portfolio-account-scope";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
@@ -18,6 +22,7 @@ export const dynamic = "force-dynamic";
 type HistoryPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    scope?: string | string[];
     lane?: string | string[];
     positionDate?: string | string[];
     positionSource?: string | string[];
@@ -31,43 +36,85 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const account = normalizeHistoryAccount(params.account);
   const lane = normalizeHistoryLane(params.lane);
 
   if (!resolution.ok) {
     return <HistoryAccessBoundary resolution={resolution} />;
   }
 
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
+    account: params.account,
+    scope: params.scope,
+    tenantContext: resolution.tenantContext,
+  });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/history"
+        context={scopeContext}
+        title="히스토리"
+      />
+    );
+  }
+
+  const selectedScope = scopeContext.resolution.scope;
+  const positionAccount =
+    selectedScope.kind === "account" ? selectedScope.accountCode : "all";
+  const eventScope = legacyEventScope(selectedScope);
+
   const positionSelection = normalizeHistoryPositionSelection({
-    account,
+    account: positionAccount,
     lane,
     positionDate: params.positionDate,
     positionSource: params.positionSource,
   });
   const positionComparisonSelection =
     normalizeHistoryPositionComparisonSelection({
-      account,
+      account: positionAccount,
       lane,
       comparisonFrom: params.comparisonFrom,
       comparisonTo: params.comparisonTo,
     });
   const [history, events] = await Promise.all([
     getReadOnlyTenantHistoryBalance({
+      analysisScopes: scopeContext.catalog.scopes,
       tenantContext: resolution.tenantContext,
-      account,
+      scope: selectedScope,
       lane,
       positionSelection,
       positionComparisonSelection,
     }),
-    lane === "all" || lane === "events"
+    eventScope !== null && (lane === "all" || lane === "events")
       ? getReadOnlyTenantEvents({
           tenantContext: resolution.tenantContext,
-          scope: account,
+          scope: eventScope,
         })
       : Promise.resolve(null),
   ]);
 
-  return <HistoryView history={history} events={events} />;
+  return (
+    <HistoryView
+      events={events}
+      eventsSupported={eventScope !== null}
+      history={history}
+    />
+  );
+}
+
+function legacyEventScope(
+  scope: PortfolioAnalysisScope,
+): PortfolioAccountScope | null {
+  if (scope.kind === "all") return "all";
+  if (
+    scope.kind === "account" &&
+    isNamedPortfolioAccount(scope.accountCode)
+  ) {
+    return scope.accountCode;
+  }
+  return null;
 }
 
 function HistoryAccessBoundary({
