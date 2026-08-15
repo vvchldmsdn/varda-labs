@@ -5,10 +5,10 @@ import type {
   InvestmentLabObservedHistorySegment,
 } from "@/lib/investment-lab-observed-history-segments";
 import {
-  buildPortfolioAccountScopeHref,
-  type PortfolioAccountScope,
-  type PortfolioAccountScopeQuery,
-} from "@/lib/portfolio-account-scope";
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScopeKey,
+  type PortfolioAnalysisScopeQuery,
+} from "@/lib/portfolio-analysis-scope";
 
 const WIDTH = 1000;
 const HEIGHT = 300;
@@ -16,13 +16,13 @@ const PADDING_X = 48;
 const PADDING_Y = 28;
 
 export function InvestmentLabObservedHistoryView({
-  account,
   model,
   query,
+  scopeKey,
 }: {
-  account: PortfolioAccountScope;
   model: InvestmentLabObservedHistory;
-  query: PortfolioAccountScopeQuery;
+  query: PortfolioAnalysisScopeQuery;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   if (model.status === "unavailable" || model.segments.length === 0) {
     return null;
@@ -33,7 +33,7 @@ export function InvestmentLabObservedHistoryView({
     .at(-1);
   const latestCalculationHref =
     currentWriterSegment && currentWriterSegment.observationCount >= 2
-      ? buildPortfolioAccountScopeHref("/investment-lab", account, {
+      ? buildPortfolioAnalysisScopeHref("/investment-lab", scopeKey, {
           start: currentWriterSegment.startServiceDate,
           end: currentWriterSegment.endServiceDate,
           kodexWeight: query.kodexWeight,

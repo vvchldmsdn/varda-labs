@@ -40,6 +40,7 @@ import "./investment-lab-return-evidence.test.mjs";
 import "./investment-lab-voo-readiness.test.mjs";
 import "./investment-lab-voo-path.test.mjs";
 import "./investment-lab-counterfactual-read-model.test.mjs";
+import "./investment-lab-analysis-scope.test.mjs";
 import "./investment-lab-account-scope.test.mjs";
 import "./investment-lab-account-composition.test.mjs";
 import "./investment-lab-account-composition-return.test.mjs";

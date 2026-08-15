@@ -5,19 +5,19 @@ import type {
   InvestmentLabPeriodSelectionReason,
 } from "@/lib/investment-lab-period-selection";
 import {
-  buildPortfolioAccountScopeHref,
-  type PortfolioAccountScope,
-  type PortfolioAccountScopeQuery,
-} from "@/lib/portfolio-account-scope";
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScopeKey,
+  type PortfolioAnalysisScopeQuery,
+} from "@/lib/portfolio-analysis-scope";
 
 export function InvestmentLabPeriodSelector({
-  account,
   period,
   query,
+  scopeKey,
 }: {
-  account: PortfolioAccountScope;
   period: InvestmentLabPeriodSelection;
-  query: PortfolioAccountScopeQuery;
+  query: PortfolioAnalysisScopeQuery;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
     <section
@@ -45,7 +45,7 @@ export function InvestmentLabPeriodSelector({
           className="flex flex-col gap-3 sm:flex-row sm:items-end"
           method="get"
         >
-          <input name="account" type="hidden" value={account} />
+          <input name="scope" type="hidden" value={scopeKey} />
           <PreservedHiddenInputs query={query} />
           <DateField
             defaultValue={period.requestedStartServiceDate}
@@ -70,9 +70,9 @@ export function InvestmentLabPeriodSelector({
             </button>
             <Link
               className="flex h-10 items-center rounded-md border border-[#d4dbce] bg-white px-4 text-sm font-semibold text-[#394138] hover:bg-[#edf1e8]"
-              href={buildPortfolioAccountScopeHref(
+              href={buildPortfolioAnalysisScopeHref(
                 "/investment-lab",
-                account,
+                scopeKey,
                 {
                   kodexWeight: query.kodexWeight,
                   basketAnchor: query.basketAnchor,
@@ -107,10 +107,15 @@ export function InvestmentLabPeriodSelector({
   );
 }
 
-function PreservedHiddenInputs({ query }: { query: PortfolioAccountScopeQuery }) {
+function PreservedHiddenInputs({
+  query,
+}: {
+  query: PortfolioAnalysisScopeQuery;
+}) {
   return Object.entries(query).flatMap(([name, value]) => {
     if (
       name === "account" ||
+      name === "scope" ||
       name === "start" ||
       name === "end" ||
       value === null ||

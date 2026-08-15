@@ -4,8 +4,10 @@ import type {
 } from "@/lib/investment-lab-small-adjustment";
 
 export function InvestmentLabSmallAdjustmentResult({
+  accountLabel,
   result,
 }: {
+  accountLabel: string;
   result: InvestmentLabSmallAdjustmentCalculation;
 }) {
   if (result.status === "blocked") {
@@ -34,7 +36,7 @@ export function InvestmentLabSmallAdjustmentResult({
         <div>
           <h3 className="text-lg font-semibold">조정 전후 비교</h3>
           <p className="mt-1 text-sm text-[#687064]">
-            {accountLabel(result.account)} · {formatKrw(result.transferAmountKrw)}
+            {accountLabel} · {formatKrw(result.transferAmountKrw)}
           </p>
         </div>
         <p className="text-xs text-[#777e73]">
@@ -144,11 +146,6 @@ function calculationBlockerLabel(
     case "invalid_calculation_result":
       return "총 평가액 보존을 검증하지 못해 결과를 표시하지 않습니다.";
   }
-}
-
-function accountLabel(account: string) {
-  if (account === "brokerage") return "증권";
-  return account.toUpperCase();
 }
 
 function holdingLabel(holding: { name: string; ticker: string | null }) {

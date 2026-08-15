@@ -18,19 +18,22 @@ import {
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabFixedMixComparison as FixedMixComparisonModel } from "@/lib/investment-lab-fixed-mix-comparison";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
-import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import {
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScopeKey,
+} from "@/lib/portfolio-analysis-scope";
 
 export function InvestmentLabFixedMix({
-  account,
   comparison,
   model,
   period,
+  scopeKey,
   selection,
 }: {
-  account: PortfolioAccountScope;
   comparison: FixedMixComparisonModel | null;
   model: InvestmentLabFixedMixScenario | null;
   period: InvestmentLabPeriodSelection;
+  scopeKey: PortfolioAnalysisScopeKey;
   selection: InvestmentLabFixedMixSelection;
 }) {
   const periodReady =
@@ -90,14 +93,14 @@ export function InvestmentLabFixedMix({
             </p>
           </div>
           <MixForm
-            account={account}
             kodexWeightPct={kodexWeightPct}
             period={period}
+            scopeKey={scopeKey}
             vooWeightPct={vooWeightPct}
           />
         </div>
 
-        <PresetLinks account={account} period={period} />
+        <PresetLinks period={period} scopeKey={scopeKey} />
 
         {!periodReady ? (
           <UnavailableMessage>
@@ -146,14 +149,14 @@ export function InvestmentLabFixedMix({
 }
 
 function MixForm({
-  account,
   kodexWeightPct,
   period,
+  scopeKey,
   vooWeightPct,
 }: {
-  account: PortfolioAccountScope;
   kodexWeightPct: number;
   period: InvestmentLabPeriodSelection;
+  scopeKey: PortfolioAnalysisScopeKey;
   vooWeightPct: number;
 }) {
   return (
@@ -162,7 +165,7 @@ function MixForm({
       className="flex flex-wrap items-end gap-2"
       method="get"
     >
-      <input name="account" type="hidden" value={account} />
+      <input name="scope" type="hidden" value={scopeKey} />
       <PeriodHiddenInputs period={period} />
       <label className="grid gap-1 text-xs font-semibold text-[#586358]">
         KODEX 200 배분
@@ -194,18 +197,18 @@ function MixForm({
 }
 
 function PresetLinks({
-  account,
   period,
+  scopeKey,
 }: {
-  account: PortfolioAccountScope;
   period: InvestmentLabPeriodSelection;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
     <nav aria-label="고정 배분 예시" className="flex flex-wrap gap-2">
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
           className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
-          href={mixHref(account, period, kodexWeightPct)}
+          href={mixHref(scopeKey, period, kodexWeightPct)}
           key={kodexWeightPct}
         >
           {kodexWeightPct}:{100 - kodexWeightPct}
@@ -323,23 +326,26 @@ function PeriodHiddenInputs({ period }: { period: InvestmentLabPeriodSelection }
 }
 
 function mixHref(
-  account: PortfolioAccountScope,
+  scopeKey: PortfolioAnalysisScopeKey,
   period: InvestmentLabPeriodSelection,
   kodexWeightPct: number,
 ) {
-  const params = new URLSearchParams({
-    account,
+  const query: Record<string, string> = {
     kodexWeight: String(kodexWeightPct),
-  });
+  };
   if (
     period.status === "selected" &&
     period.selectedStartServiceDate &&
     period.selectedEndServiceDate
   ) {
-    params.set("start", period.selectedStartServiceDate);
-    params.set("end", period.selectedEndServiceDate);
+    query.start = period.selectedStartServiceDate;
+    query.end = period.selectedEndServiceDate;
   }
-  return `/investment-lab?${params}`;
+  return buildPortfolioAnalysisScopeHref(
+    "/investment-lab",
+    scopeKey,
+    query,
+  );
 }
 
 function formatSignedPercentagePoints(value: number) {

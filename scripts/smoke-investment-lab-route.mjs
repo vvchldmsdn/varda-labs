@@ -8,9 +8,12 @@ config({ path: ".env.local", quiet: true });
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3107";
 const START_SERVICE_DATE = readArgument("--start");
 const END_SERVICE_DATE = readArgument("--end");
-const ACCOUNT = readArgument("--account") ?? "all";
+const SCOPE = readArgument("--scope") ?? "all";
 const KODEX_WEIGHT = readArgument("--kodex-weight");
 const BASKET_ANCHOR = readArgument("--basket-anchor");
+const EXPECTED_FOUNT_SCOPE_ADJUSTMENT = readArgument(
+  "--expect-fount-scope-adjustment",
+);
 const EXPECTED_PERIOD_STATUS =
   readArgument("--expect-period-status") ??
   (START_SERVICE_DATE || END_SERVICE_DATE ? "selected" : "current_writer");
@@ -51,11 +54,34 @@ const SESSION_COOKIE =
   readArgument("--session-cookie") ??
   process.env.VARDA_SESSION_COOKIE?.trim() ??
   null;
+const UUID_FRAGMENT =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const CANONICAL_SCOPE_PATTERN = new RegExp(
+  `^(?:all|(?:account|portfolio):${UUID_FRAGMENT})$`,
+);
+const RAW_DYNAMIC_SCOPE_PATTERN = new RegExp(
+  `(?:account|portfolio):${UUID_FRAGMENT}`,
+  "g",
+);
+const ENCODED_DYNAMIC_SCOPE_PATTERN = new RegExp(
+  `(?:account|portfolio)%3A${UUID_FRAGMENT}`,
+  "gi",
+);
 const LEAK_PATTERN =
   /legacyBase44Id|holdingId|assetId|ownerUserId|api[_-]?key|authorization|password|secret|token|[0-9a-f]{8}-[0-9a-f-]{27}|\b[0-9a-f]{24}\b/i;
 
-if (!["all", "brokerage", "isa", "irp"].includes(ACCOUNT)) {
-  throw new Error(`Unsupported account scope: ${ACCOUNT}`);
+if (!CANONICAL_SCOPE_PATTERN.test(SCOPE)) {
+  throw new Error(`Unsupported analysis scope: ${SCOPE}`);
+}
+if (
+  EXPECTED_FOUNT_SCOPE_ADJUSTMENT !== null &&
+  !["not_applicable", "applied", "blocked"].includes(
+    EXPECTED_FOUNT_SCOPE_ADJUSTMENT,
+  )
+) {
+  throw new Error(
+    "--expect-fount-scope-adjustment must be not_applicable, applied, or blocked",
+  );
 }
 
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
@@ -72,14 +98,14 @@ async function main() {
   assert.match(boundary.body, /Product database read/);
   assert.match(boundary.body, /Not attempted/);
   assert.doesNotMatch(boundary.body, /data-page="investment-lab"/);
-  assert.doesNotMatch(boundary.body, LEAK_PATTERN);
+  assertNoSensitiveLeaks(boundary.body);
 
   if (!SESSION_COOKIE) {
     console.log(
       JSON.stringify(
         {
           status: "session_boundary_verified",
-          account: ACCOUNT,
+          scope: SCOPE,
           databaseReadAttempted: false,
           leakPatternMatches: 0,
         },
@@ -95,20 +121,17 @@ async function main() {
   const dashboard = await request("/", true);
   assert.equal(dashboard.status, 200, "authenticated dashboard must return 200");
   assert.match(dashboard.body, /href="\/investment-lab"/);
-  assert.doesNotMatch(dashboard.body, LEAK_PATTERN);
+  assertNoSensitiveLeaks(dashboard.body);
 
   const route = await request(routePath, true);
   assert.equal(route.status, 200, "authenticated route must return 200");
   assert.match(route.body, /data-page="investment-lab"/);
-  assert.equal(
-    readStringAttribute(route.body, "data-account-scope"),
-    ACCOUNT,
-  );
+  assert.equal(readStringAttribute(route.body, "data-analysis-scope"), SCOPE);
   const accountCompositionStatus = readStringAttribute(
     route.body,
     "data-account-composition-status",
   );
-  if (ACCOUNT === "all") {
+  if (SCOPE === "all") {
     assert.ok(
       accountCompositionStatus === "ready" ||
         accountCompositionStatus === "partial",
@@ -148,7 +171,7 @@ async function main() {
   assert.ok(
     ["ready", "partial", "unavailable"].includes(fundingPreflightStatus),
   );
-  assert.equal(fundingAccountRows, ACCOUNT === "all" ? 3 : 1);
+  assert.ok(fundingAccountRows >= 0);
   assert.equal(fundingRequestedCells, fundingReadyCells + fundingUnavailableCells);
   assert.equal(
     fundingRequestedCells + fundingNotRequestedCells,
@@ -159,8 +182,7 @@ async function main() {
     "forbidden",
   );
   assert.equal(
-    (route.body.match(/data-funding-account="(?:brokerage|isa|irp)"/g) ?? [])
-      .length,
+    (route.body.match(/data-funding-account="[^"]+"/g) ?? []).length,
     fundingAccountRows,
   );
   for (const marker of ["투자 랩", "과거 비교 구간", "구간 적용"]) {
@@ -182,10 +204,12 @@ async function main() {
     route.body,
     "data-fount-scope-adjustment",
   );
-  assert.equal(
-    fountScopeAdjustment,
-    ACCOUNT === "all" || ACCOUNT === "irp" ? "applied" : "not_applicable",
+  assert.ok(
+    ["not_applicable", "applied", "blocked"].includes(fountScopeAdjustment),
   );
+  if (EXPECTED_FOUNT_SCOPE_ADJUSTMENT !== null) {
+    assert.equal(fountScopeAdjustment, EXPECTED_FOUNT_SCOPE_ADJUSTMENT);
+  }
   assert.equal(
     readStringAttribute(route.body, "data-output-authority"),
     "research_counterfactual_not_executable",
@@ -548,10 +572,11 @@ async function main() {
     approvedTargetWeightStatus === "ready" ||
       approvedTargetWeightStatus === "unavailable",
   );
-  assert.equal(
-    approvedTargetWeightPolicyBindings,
-    approvedTargetWeightStatus === "ready" ? (ACCOUNT === "all" ? 3 : 1) : 0,
-  );
+  if (approvedTargetWeightStatus === "ready") {
+    assert.ok(approvedTargetWeightPolicyBindings > 0);
+  } else {
+    assert.equal(approvedTargetWeightPolicyBindings, 0);
+  }
   assert.ok(
     preperiodMinVolatilityStatus === "ready" ||
       preperiodMinVolatilityStatus === "path_unavailable" ||
@@ -1034,7 +1059,7 @@ async function main() {
   ]) {
     assert.ok(route.body.includes(marker), `route is missing marker: ${marker}`);
   }
-  assert.doesNotMatch(route.body, LEAK_PATTERN);
+  assertNoSensitiveLeaks(route.body);
   assert.doesNotMatch(
     route.body,
     /event_ledger_entries|daily_portfolio_snapshots|asset_price_snapshots/i,
@@ -1059,11 +1084,10 @@ async function main() {
     route.body,
     "data-persistence",
   );
-  const expectedAdjustmentAccountCount = ACCOUNT === "all" ? 3 : 1;
-  assert.equal(adjustmentAccountCount, expectedAdjustmentAccountCount);
+  assert.ok(adjustmentAccountCount >= 0);
   assert.ok(
     adjustmentReadyAccounts >= 0 &&
-      adjustmentReadyAccounts <= expectedAdjustmentAccountCount,
+      adjustmentReadyAccounts <= adjustmentAccountCount,
   );
   assert.equal(
     adjustmentPolicy,
@@ -1585,7 +1609,7 @@ async function request(path, authenticated = false) {
 
 function investmentLabRoutePath() {
   const params = new URLSearchParams();
-  if (ACCOUNT !== "all") params.set("account", ACCOUNT);
+  params.set("scope", SCOPE);
   if (START_SERVICE_DATE) params.set("start", START_SERVICE_DATE);
   if (END_SERVICE_DATE) params.set("end", END_SERVICE_DATE);
   if (KODEX_WEIGHT !== null) params.set("kodexWeight", KODEX_WEIGHT);
@@ -1634,9 +1658,16 @@ function readOptionalIntegerAttribute(html, name) {
 }
 
 function readStringAttribute(html, name) {
-  const match = html.match(new RegExp(`${name}="([a-z0-9_/-]+)"`));
+  const match = html.match(new RegExp(`${name}="([a-z0-9_:/-]+)"`));
   assert.ok(match, `route is missing string attribute: ${name}`);
   return match[1];
+}
+
+function assertNoSensitiveLeaks(body) {
+  const inspectedBody = body
+    .replace(RAW_DYNAMIC_SCOPE_PATTERN, "authorized_scope")
+    .replace(ENCODED_DYNAMIC_SCOPE_PATTERN, "authorized_scope");
+  assert.doesNotMatch(inspectedBody, LEAK_PATTERN);
 }
 
 function readOptionalStringAttribute(html, name) {

@@ -4,18 +4,18 @@ import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anc
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabAnchorSpecialHoldingEvidence } from "@/lib/investment-lab-special-holding-authority";
-import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 
 export function InvestmentLabAnchorBasket({
-  account,
   model,
   period,
   fixedMixSelection,
+  scopeKey,
 }: {
-  account: PortfolioAccountScope;
   model: InvestmentLabAnchorBasketScenario;
   period: InvestmentLabPeriodSelection;
   fixedMixSelection: InvestmentLabFixedMixSelection;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   const ready = model.status === "ready" && model.summary !== null;
   const anchor = model.anchor;
@@ -66,10 +66,10 @@ export function InvestmentLabAnchorBasket({
             </p>
           </div>
           <AnchorForm
-            account={account}
             anchorDates={anchor.candidateAnchorDates}
             fixedMixSelection={fixedMixSelection}
             period={period}
+            scopeKey={scopeKey}
             selectedAnchorDate={anchor.selectedAnchorDate}
           />
         </div>
@@ -307,22 +307,22 @@ function UnavailableResult({ model }: { model: InvestmentLabAnchorBasketScenario
 }
 
 function AnchorForm({
-  account,
   anchorDates,
   selectedAnchorDate,
   period,
   fixedMixSelection,
+  scopeKey,
 }: {
-  account: PortfolioAccountScope;
   anchorDates: readonly string[];
   selectedAnchorDate: string | null;
   period: InvestmentLabPeriodSelection;
   fixedMixSelection: InvestmentLabFixedMixSelection;
+  scopeKey: PortfolioAnalysisScopeKey;
 }) {
   if (anchorDates.length === 0) return null;
   return (
     <form action="/investment-lab" className="flex items-end gap-2" method="get">
-      <input name="account" type="hidden" value={account} />
+      <input name="scope" type="hidden" value={scopeKey} />
       <PeriodHiddenInputs period={period} />
       {fixedMixSelection.kodexWeightPct !== null ? (
         <input

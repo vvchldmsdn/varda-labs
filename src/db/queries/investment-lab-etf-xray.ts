@@ -14,6 +14,7 @@ import {
 import type { EtfHoldingRawRow } from "@/lib/etf-holdings";
 import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
 import type { PortfolioAccountScope } from "@/lib/portfolio-account-scope";
+import type { PortfolioStructureResult } from "@/lib/portfolio-structure";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export async function getReadOnlyTenantInvestmentLabEtfXray({
@@ -23,8 +24,16 @@ export async function getReadOnlyTenantInvestmentLabEtfXray({
   account?: PortfolioAccountScope;
   tenantContext: TenantContext;
 }): Promise<InvestmentLabEtfXrayModel> {
-  const [portfolio, masters] = await Promise.all([
+  return getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
     getReadOnlyTenantPortfolioStructure({ account, tenantContext }),
+  );
+}
+
+export async function getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
+  portfolioPromise: Promise<PortfolioStructureResult>,
+): Promise<InvestmentLabEtfXrayModel> {
+  const [portfolio, masters] = await Promise.all([
+    portfolioPromise,
     loadEtfMasters(),
   ]);
   const scopedPortfolio =
