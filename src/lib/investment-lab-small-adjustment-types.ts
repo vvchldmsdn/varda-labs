@@ -8,10 +8,7 @@ export const INVESTMENT_LAB_SMALL_ADJUSTMENT_POLICY = Object.freeze({
   targetRecommendationOrOrderAuthority: "excluded",
 } as const);
 
-export type InvestmentLabSmallAdjustmentAccount =
-  | "brokerage"
-  | "isa"
-  | "irp";
+export type InvestmentLabSmallAdjustmentAccount = string;
 
 export type InvestmentLabSmallAdjustmentHolding = Readonly<{
   key: string;
@@ -32,6 +29,7 @@ export type InvestmentLabSmallAdjustmentAccountBlocker =
 
 export type InvestmentLabSmallAdjustmentAccountModel = Readonly<{
   account: InvestmentLabSmallAdjustmentAccount;
+  label: string;
   status: "ready" | "unavailable";
   totalValueKrw: number;
   holdings: readonly InvestmentLabSmallAdjustmentHolding[];

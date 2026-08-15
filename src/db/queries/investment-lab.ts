@@ -19,6 +19,8 @@ import {
 import type { InvestmentLabPeriodRequest } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabFountRuntimeEvidence } from "@/lib/investment-lab-fount-runtime-scope";
+import { INVESTMENT_LAB_FOUNT_RUNTIME_SCOPE_POLICY } from "@/lib/investment-lab-fount-runtime-scope";
+import type { InvestmentLabAnalysisScopeEvidence } from "@/lib/investment-lab-analysis-scope";
 import {
   DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
   attachBase44ImportedTickerEvidence,
@@ -38,6 +40,7 @@ import {
   selectPreferredPrivateHistoricalPriceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
 import { getReadOnlyTenantApprovedTargetPolicy } from "./target-policy";
 import { getReadOnlyTenantTargetPolicyHoldingUniverse } from "./target-policy-holding-universe";
@@ -210,16 +213,7 @@ function createTenantInvestmentLabRepository(
   },
 
   async loadFxRows() {
-    return db
-      .select({
-        rateDate: fxRates.rateDate,
-        usdKrw: fxRates.usdKrw,
-        source: fxRates.source,
-        status: fxRates.status,
-      })
-      .from(fxRates)
-      .where(eq(fxRates.isSample, false))
-      .orderBy(asc(fxRates.rateDate));
+    return loadInvestmentLabFxRows();
   },
 
   async loadFountRuntimeEvidence(serviceDates) {
@@ -444,65 +438,173 @@ function createTenantInvestmentLabRepository(
     startServiceDate,
     endServiceDate,
   }) {
-    const tickers = [
-      ...new Set(
-        instruments.flatMap((row) => (row.ticker ? [row.ticker] : [])),
-      ),
-    ];
-    if (tickers.length === 0) return [];
-    const rows = await db
-      .select({
-        ticker: assetPriceSnapshots.ticker,
-        market: assetPriceSnapshots.market,
-        currency: assetPriceSnapshots.currency,
-        priceDate: assetPriceSnapshots.priceDate,
-        closePrice: assetPriceSnapshots.closePrice,
-        adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
-        adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
-        adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
-        adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
-        adjustedCloseFetchedAt: assetPriceSnapshots.adjustedCloseFetchedAt,
-        providerSymbol: assetPriceSnapshots.providerSymbol,
-        providerExchange: assetPriceSnapshots.providerExchange,
-        fetchedAt: assetPriceSnapshots.fetchedAt,
-        source: assetPriceSnapshots.source,
-      })
-      .from(assetPriceSnapshots)
-      .where(
-        and(
-          eq(assetPriceSnapshots.isSample, false),
-          inArray(
-            sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
-            tickers,
-          ),
-          gte(
-            assetPriceSnapshots.priceDate,
-            shiftIsoDate(startServiceDate, -10),
-          ),
-          lte(assetPriceSnapshots.priceDate, endServiceDate),
-        ),
-      )
-      .orderBy(
-        asc(assetPriceSnapshots.priceDate),
-        asc(assetPriceSnapshots.ticker),
-      );
-
-    const admission = admitPrivateSingleTenantRawHistoricalPriceRows({
-      rows,
-      requestedOwnerUserId: tenantContext.ownerUserId,
+    return loadInvestmentLabAnchorPriceRows({
       activeOwnerUserIds: await activeOwnerUserIdsPromise,
+      endServiceDate,
+      instruments,
+      startServiceDate,
+      tenantContext,
     });
-
-    return admission.rows.map((row) => ({
-      ticker: row.ticker,
-      market: row.market,
-      currency: row.currency,
-      priceDate: row.priceDate,
-      closePrice: row.closePrice,
-      source: row.source,
-    }));
   },
   };
+}
+
+function createTenantInvestmentLabScopeRepository(
+  tenantContext: TenantContext,
+  evidence: InvestmentLabAnalysisScopeEvidence,
+  activeOwnerUserIdsPromise: Promise<readonly string[]>,
+): InvestmentLabCounterfactualReadRepository {
+  const targetPolicyRepository = evidence.supportsLegacyTargetPolicy
+    ? {
+        async loadApprovedTargetPolicyContext(account: (typeof NAMED_PORTFOLIO_ACCOUNTS)[number]) {
+          const [approvedPolicyRead, currentUniverse] = await Promise.all([
+            getReadOnlyTenantApprovedTargetPolicy({ account, tenantContext }),
+            getReadOnlyTenantTargetPolicyHoldingUniverse({
+              account,
+              tenantContext,
+            }),
+          ]);
+          return Object.freeze({ approvedPolicyRead, currentUniverse });
+        },
+      }
+    : {};
+
+  return {
+    ...targetPolicyRepository,
+    async loadEvents() {
+      return evidence.eventRows;
+    },
+    async loadSnapshots() {
+      return evidence.snapshotRows;
+    },
+    async loadScenarioCloses() {
+      return loadPreferredScenarioCloseRows({
+        ticker: "069500",
+        market: "korea",
+        currency: "KRW",
+        tenantContext,
+        activeOwnerUserIds: await activeOwnerUserIdsPromise,
+      });
+    },
+    async loadVooCloses() {
+      return loadPrivateRawScenarioCloseRows({
+        ticker: "VOO",
+        market: "us",
+        currency: "USD",
+        tenantContext,
+        activeOwnerUserIds: await activeOwnerUserIdsPromise,
+      });
+    },
+    async loadFxRows() {
+      return loadInvestmentLabFxRows();
+    },
+    async loadFountRuntimeEvidence() {
+      return { status: "not_applicable" } as const;
+    },
+    async loadAnchorPositionRows(serviceDates) {
+      const serviceDateSet = new Set(serviceDates);
+      return evidence.anchorPositionRows.filter((row) =>
+        serviceDateSet.has(row.snapshotDate),
+      );
+    },
+    async loadAnchorPriceRows({
+      instruments,
+      startServiceDate,
+      endServiceDate,
+    }) {
+      return loadInvestmentLabAnchorPriceRows({
+        activeOwnerUserIds: await activeOwnerUserIdsPromise,
+        endServiceDate,
+        instruments,
+        startServiceDate,
+        tenantContext,
+      });
+    },
+  };
+}
+
+async function loadInvestmentLabFxRows() {
+  return db
+    .select({
+      rateDate: fxRates.rateDate,
+      usdKrw: fxRates.usdKrw,
+      source: fxRates.source,
+      status: fxRates.status,
+    })
+    .from(fxRates)
+    .where(eq(fxRates.isSample, false))
+    .orderBy(asc(fxRates.rateDate));
+}
+
+async function loadInvestmentLabAnchorPriceRows({
+  activeOwnerUserIds,
+  endServiceDate,
+  instruments,
+  startServiceDate,
+  tenantContext,
+}: {
+  activeOwnerUserIds: readonly string[];
+  endServiceDate: string;
+  instruments: Parameters<
+    InvestmentLabCounterfactualReadRepository["loadAnchorPriceRows"]
+  >[0]["instruments"];
+  startServiceDate: string;
+  tenantContext: TenantContext;
+}) {
+  const tickers = [
+    ...new Set(
+      instruments.flatMap((row) => (row.ticker ? [row.ticker] : [])),
+    ),
+  ];
+  if (tickers.length === 0) return [];
+  const rows = await db
+    .select({
+      ticker: assetPriceSnapshots.ticker,
+      market: assetPriceSnapshots.market,
+      currency: assetPriceSnapshots.currency,
+      priceDate: assetPriceSnapshots.priceDate,
+      closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
+      adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
+      adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
+      adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
+      adjustedCloseFetchedAt: assetPriceSnapshots.adjustedCloseFetchedAt,
+      providerSymbol: assetPriceSnapshots.providerSymbol,
+      providerExchange: assetPriceSnapshots.providerExchange,
+      fetchedAt: assetPriceSnapshots.fetchedAt,
+      source: assetPriceSnapshots.source,
+    })
+    .from(assetPriceSnapshots)
+    .where(
+      and(
+        eq(assetPriceSnapshots.isSample, false),
+        inArray(
+          sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+          tickers,
+        ),
+        gte(assetPriceSnapshots.priceDate, shiftIsoDate(startServiceDate, -10)),
+        lte(assetPriceSnapshots.priceDate, endServiceDate),
+      ),
+    )
+    .orderBy(
+      asc(assetPriceSnapshots.priceDate),
+      asc(assetPriceSnapshots.ticker),
+    );
+
+  const admission = admitPrivateSingleTenantRawHistoricalPriceRows({
+    rows,
+    requestedOwnerUserId: tenantContext.ownerUserId,
+    activeOwnerUserIds,
+  });
+
+  return admission.rows.map((row) => ({
+    ticker: row.ticker,
+    market: row.market,
+    currency: row.currency,
+    priceDate: row.priceDate,
+    closePrice: row.closePrice,
+    source: row.source,
+  }));
 }
 
 async function loadScenarioCloseCandidates(
@@ -643,6 +745,51 @@ export async function getReadOnlyTenantInvestmentLabCounterfactual({
     requestedAnchorDate,
     account,
   );
+}
+
+export async function getReadOnlyTenantInvestmentLabCounterfactualForScope({
+  evidencePromise,
+  fixedMixSelection,
+  request,
+  requestedAnchorDate,
+  scope,
+  tenantContext,
+}: {
+  evidencePromise: Promise<InvestmentLabAnalysisScopeEvidence>;
+  fixedMixSelection?: InvestmentLabFixedMixSelection;
+  request?: InvestmentLabPeriodRequest;
+  requestedAnchorDate?: string | null;
+  scope: PortfolioAnalysisScope;
+  tenantContext: TenantContext;
+}) {
+  const evidence = await evidencePromise;
+  const activeOwnerUserIdsPromise = getActivePortfolioOwnerUserIds();
+  const result = await loadInvestmentLabCounterfactualReadModel(
+    createTenantInvestmentLabScopeRepository(
+      tenantContext,
+      evidence,
+      activeOwnerUserIdsPromise,
+    ),
+    request,
+    fixedMixSelection,
+    requestedAnchorDate,
+    evidence.engineAccount,
+  );
+  const fountScopeAdjustment =
+    evidence.fountAdjustment.status === "applied"
+      ? Object.freeze({
+          status: "applied" as const,
+          policy: INVESTMENT_LAB_FOUNT_RUNTIME_SCOPE_POLICY,
+          adjustedDateCount: evidence.fountAdjustment.adjustedDateCount,
+          excludedAccount: "irp" as const,
+        })
+      : result.fountScopeAdjustment;
+
+  return Object.freeze({
+    ...result,
+    analysisScope: scope,
+    fountScopeAdjustment,
+  });
 }
 
 function activeOwnedAccountPredicates(tenantContext: TenantContext) {

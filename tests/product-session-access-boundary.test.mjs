@@ -24,10 +24,12 @@ const PRODUCT_PAGES = Object.freeze([
   [
     "src/app/investment-lab/page.tsx",
     [
-      "getReadOnlyTenantPortfolioStructure({",
-      "getReadOnlyTenantInvestmentLabDataAvailability({",
-      "getReadOnlyTenantInvestmentLabEtfXray({",
-      "getReadOnlyTenantInvestmentLabCounterfactual({",
+      "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({",
+      "getReadOnlyTenantPortfolioStructureForScope({",
+      "getReadOnlyTenantInvestmentLabDataAvailabilityForScope({",
+      "getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(",
+      "getReadOnlyTenantInvestmentLabCounterfactualForScope({",
+      "getReadOnlyTenantInvestmentLabStressReplay({",
     ],
   ],
   [

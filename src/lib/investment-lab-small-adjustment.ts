@@ -40,15 +40,19 @@ export function buildInvestmentLabSmallAdjustmentModel(
     holdingRows: readonly PortfolioStructureHoldingRow[];
     exclusions: readonly PortfolioStructureExclusion[];
   }>,
-  selectedAccount: PortfolioAccountScope = "all",
+  selectedAccount: PortfolioAccountScope | readonly string[] = "all",
+  accountLabels: ReadonlyMap<string, string> = new Map(),
 ): InvestmentLabSmallAdjustmentModel {
-  const accounts = accountsForPortfolioScope(selectedAccount);
+  const accounts = Array.isArray(selectedAccount)
+    ? [...new Set(selectedAccount)].sort()
+    : accountsForPortfolioScope(selectedAccount as PortfolioAccountScope);
   return Object.freeze({
     policy: INVESTMENT_LAB_SMALL_ADJUSTMENT_POLICY,
     accounts: Object.freeze(
       accounts.map((account) =>
         buildAccountModel(
           account,
+          resolveAccountLabel(account, accountLabels.get(account)),
           portfolio.holdingRows.filter((row) => row.account === account),
           portfolio.exclusions.filter((row) => row.account === account),
         ),
@@ -163,6 +167,7 @@ export function calculateInvestmentLabSmallAdjustment(input: {
 
 function buildAccountModel(
   account: InvestmentLabSmallAdjustmentAccount,
+  label: string,
   holdings: readonly PortfolioStructureHoldingRow[],
   exclusions: readonly PortfolioStructureExclusion[],
 ): InvestmentLabSmallAdjustmentAccountModel {
@@ -196,6 +201,7 @@ function buildAccountModel(
 
   return Object.freeze({
     account,
+    label,
     status: blockers.length === 0 ? "ready" : "unavailable",
     totalValueKrw,
     holdings: Object.freeze(weightedHoldings),
@@ -211,6 +217,21 @@ function buildAccountModel(
     }),
     blockers: Object.freeze(blockers),
   });
+}
+
+function resolveAccountLabel(account: string, label: string | undefined) {
+  const normalizedLabel = label?.trim();
+  if (normalizedLabel) return normalizedLabel;
+  switch (account.toLowerCase()) {
+    case "brokerage":
+      return "증권";
+    case "isa":
+      return "ISA";
+    case "irp":
+      return "IRP";
+    default:
+      return account;
+  }
 }
 
 type AdjustmentSnapshot = Readonly<{

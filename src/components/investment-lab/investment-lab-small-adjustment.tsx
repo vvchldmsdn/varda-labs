@@ -11,12 +11,6 @@ import {
   type InvestmentLabSmallAdjustmentModel,
 } from "@/lib/investment-lab-small-adjustment";
 
-const ACCOUNT_LABELS: Record<InvestmentLabSmallAdjustmentAccount, string> = {
-  brokerage: "증권",
-  isa: "ISA",
-  irp: "IRP",
-};
-
 export function InvestmentLabSmallAdjustment({
   model,
 }: {
@@ -24,7 +18,7 @@ export function InvestmentLabSmallAdjustment({
 }) {
   const [accountCode, setAccountCode] =
     useState<InvestmentLabSmallAdjustmentAccount>(
-      model.accounts[0]?.account ?? "brokerage",
+      model.accounts[0]?.account ?? "",
     );
   const [sourceKey, setSourceKey] = useState("");
   const [destinationKey, setDestinationKey] = useState("");
@@ -93,14 +87,12 @@ export function InvestmentLabSmallAdjustment({
       <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
         <div
           aria-label="조정 계정"
-          className={`grid gap-1 rounded-md border border-[#d9ded3] bg-white p-1 sm:w-[360px] ${
-            model.accounts.length === 1 ? "grid-cols-1" : "grid-cols-3"
-          }`}
+          className="flex max-w-full gap-1 overflow-x-auto rounded-md border border-[#d9ded3] bg-white p-1"
           role="group"
         >
           {model.accounts.map((account) => (
             <button
-              className={`min-h-10 rounded px-3 text-sm font-semibold ${
+              className={`min-h-10 min-w-24 shrink-0 rounded px-3 text-sm font-semibold ${
                 account.account === accountCode
                   ? "bg-[#173f39] text-white"
                   : "text-[#4e584d] hover:bg-[#eef2e8]"
@@ -112,7 +104,7 @@ export function InvestmentLabSmallAdjustment({
               }}
               type="button"
             >
-              {ACCOUNT_LABELS[account.account]}
+              {account.label}
             </button>
           ))}
         </div>
@@ -202,7 +194,15 @@ export function InvestmentLabSmallAdjustment({
         )}
       </div>
 
-      {result ? <InvestmentLabSmallAdjustmentResult result={result} /> : null}
+      {result ? (
+        <InvestmentLabSmallAdjustmentResult
+          accountLabel={
+            model.accounts.find((row) => row.account === result.account)
+              ?.label ?? result.account
+          }
+          result={result}
+        />
+      ) : null}
     </section>
   );
 }

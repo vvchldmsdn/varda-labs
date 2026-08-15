@@ -1,10 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import {
-  AccountScopeTabs,
-  portfolioAccountScopeLabel,
-} from "@/components/account-scope-tabs";
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
@@ -24,13 +21,12 @@ import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-s
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
 import type { InvestmentLabObservedHistory } from "@/lib/investment-lab-observed-history-segments";
 import {
-  buildPortfolioAccountScopeHref,
-  type PortfolioAccountScope,
-  type PortfolioAccountScopeQuery,
-} from "@/lib/portfolio-account-scope";
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScope,
+  type PortfolioAnalysisScopeQuery,
+} from "@/lib/portfolio-analysis-scope";
 
 export function InvestmentLabView({
-  accountQuery,
   accountComposition,
   anchorBasketScenario,
   anchorValueWeightScenario,
@@ -43,9 +39,10 @@ export function InvestmentLabView({
   model,
   observedHistory,
   period,
-  selectedAccount,
+  scopeCatalog,
+  scopeQuery,
+  selectedScope,
 }: {
-  accountQuery: PortfolioAccountScopeQuery;
   accountComposition: InvestmentLabAccountComposition;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
@@ -58,7 +55,9 @@ export function InvestmentLabView({
   model: InvestmentLabCounterfactualReadModel;
   observedHistory: InvestmentLabObservedHistory;
   period: InvestmentLabPeriodSelection;
-  selectedAccount: PortfolioAccountScope;
+  scopeCatalog: readonly PortfolioAnalysisScope[];
+  scopeQuery: PortfolioAnalysisScopeQuery;
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const periodReady =
     period.status === "full" ||
@@ -74,7 +73,7 @@ export function InvestmentLabView({
       className="min-h-screen bg-[#f3f4ef] text-[#171916]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-account-composition-status={accountComposition.status}
-      data-account-scope={selectedAccount}
+      data-analysis-scope={selectedScope.key}
       data-anchor-value-weight-comparison-dates={
         periodReady && anchorValueWeightScenario.status === "ready"
           ? (anchorValueWeightScenario.summary?.comparisonDateCount ?? 0)
@@ -175,30 +174,30 @@ export function InvestmentLabView({
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
               <NavLink
-                href={buildPortfolioAccountScopeHref("/", selectedAccount)}
+                href={buildPortfolioAnalysisScopeHref("/", selectedScope.key)}
               >
                 홈
               </NavLink>
               <NavLink
-                href={buildPortfolioAccountScopeHref(
+                href={buildPortfolioAnalysisScopeHref(
                   "/today",
-                  selectedAccount,
+                  selectedScope.key,
                 )}
               >
                 오늘 변동
               </NavLink>
               <NavLink
-                href={buildPortfolioAccountScopeHref(
+                href={buildPortfolioAnalysisScopeHref(
                   "/portfolio/structure",
-                  selectedAccount,
+                  selectedScope.key,
                 )}
               >
                 포트 구조
               </NavLink>
               <NavLink
-                href={buildPortfolioAccountScopeHref(
+                href={buildPortfolioAnalysisScopeHref(
                   "/history",
-                  selectedAccount,
+                  selectedScope.key,
                 )}
               >
                 히스토리
@@ -206,16 +205,17 @@ export function InvestmentLabView({
             </nav>
           </div>
           <div className="mt-4">
-            <AccountScopeTabs
+            <PortfolioAnalysisScopeTabs
               basePath="/investment-lab"
-              query={accountQuery}
-              selectedAccount={selectedAccount}
+              query={scopeQuery}
+              scopes={scopeCatalog}
+              selectedScopeKey={selectedScope.key}
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-2 text-sm">
             <StatusPill
-              label="계정"
-              value={portfolioAccountScopeLabel(selectedAccount)}
+              label="분석 범위"
+              value={selectedScope.label}
             />
             <StatusPill label="시나리오" value="전액 KODEX 200" />
             <StatusPill
@@ -238,16 +238,16 @@ export function InvestmentLabView({
         {dataAvailability}
 
         <InvestmentLabPeriodSelector
-          account={selectedAccount}
           period={period}
-          query={accountQuery}
+          query={scopeQuery}
+          scopeKey={selectedScope.key}
         />
 
         {showSegmentedHistory ? (
           <InvestmentLabObservedHistoryView
-            account={selectedAccount}
             model={observedHistory}
-            query={accountQuery}
+            query={scopeQuery}
+            scopeKey={selectedScope.key}
           />
         ) : null}
 
@@ -265,7 +265,7 @@ export function InvestmentLabView({
             fountScopeAdjustment={fountScopeAdjustment}
             model={model}
             period={period}
-            selectedAccount={selectedAccount}
+            selectedScope={selectedScope}
           />
         ) : (
           <BlockedView model={model} />
@@ -284,7 +284,7 @@ function ReadyView({
   fountScopeAdjustment,
   model,
   period,
-  selectedAccount,
+  selectedScope,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
@@ -294,7 +294,7 @@ function ReadyView({
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
-  selectedAccount: PortfolioAccountScope;
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const observedSummary = model.observedPath.summary!;
   const kodexSummary = model.summary;
@@ -306,7 +306,7 @@ function ReadyView({
         fountScopeAdjustment={fountScopeAdjustment}
         model={model}
         period={period}
-        selectedAccount={selectedAccount}
+        selectedScope={selectedScope}
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -458,12 +458,12 @@ function CurrentWriterSegmentNotice({
   fountScopeAdjustment,
   model,
   period,
-  selectedAccount,
+  selectedScope,
 }: {
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   model: InvestmentLabCounterfactualReadModel;
   period: InvestmentLabPeriodSelection;
-  selectedAccount: PortfolioAccountScope;
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const summary = model.observedPath.summary!;
   return (
@@ -483,7 +483,7 @@ function CurrentWriterSegmentNotice({
         </span>
       </div>
       <p className="mt-3 text-xs leading-5 text-[#73786c]">
-        {portfolioAccountScopeLabel(selectedAccount)} 범위의 연구용 반사실 비교이며, 계정별 매수 가능 상품·환전·세금·주문 가능성을 검증한 투자 권고가 아닙니다. 금현물은 저장된 수동 평가 이력을 사용합니다.
+        {selectedScope.label} 범위의 연구용 반사실 비교이며, 계정별 매수 가능 상품·환전·세금·주문 가능성을 검증한 투자 권고가 아닙니다. 금현물은 저장된 수동 평가 이력을 사용합니다.
         {fountScopeAdjustment.status === "applied"
           ? ` Fount는 ${fountScopeAdjustment.adjustedDateCount}개 평가일에서 제외했습니다.`
           : ""}

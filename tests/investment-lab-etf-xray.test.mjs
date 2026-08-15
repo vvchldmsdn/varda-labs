@@ -162,7 +162,7 @@ describe("investment lab ETF X-ray", () => {
     assert.doesNotMatch(querySource, /\bfetch\s*\(/);
     assert.match(
       pageSource,
-      /getReadOnlyTenantInvestmentLabEtfXray\(\{[\s\S]*account: selectedAccount,[\s\S]*tenantContext/,
+      /getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio\(\s*portfolioStructurePromise/,
     );
     assert.match(pageSource, /InvestmentLabEtfXraySkeleton/);
     assert.match(pageSource, /InvestmentLabEtfXrayUnavailable/);

@@ -58,6 +58,24 @@ describe("investment lab small adjustment", () => {
     );
   });
 
+  it("preserves a dynamic account display name", () => {
+    const portfolio = {
+      holdingRows: [
+        holding("ETF 1", "ONE", "KRW", 300_000, "broker-main"),
+        holding("ETF 2", "TWO", "KRW", 200_000, "broker-main"),
+      ],
+      exclusions: [],
+    };
+    const model = buildInvestmentLabSmallAdjustmentModel(
+      portfolio,
+      ["broker-main"],
+      new Map([["broker-main", "장기 투자 계좌"]]),
+    );
+
+    assert.equal(model.accounts[0]?.account, "broker-main");
+    assert.equal(model.accounts[0]?.label, "장기 투자 계좌");
+  });
+
   it("moves a user-specified KRW value and reconciles concentration and FX exposure", () => {
     const model = buildInvestmentLabSmallAdjustmentModel({
       holdingRows: [
@@ -228,6 +246,7 @@ describe("investment lab small adjustment", () => {
     );
 
     assert.match(componentSource, /^"use client";/);
+    assert.doesNotMatch(componentSource, /ACCOUNT_LABELS|grid-cols-3/);
     assert.doesNotMatch(componentSource, /\bfetch\s*\(/);
     assert.doesNotMatch(componentSource, /\.insert\s*\(|\.update\s*\(|\.delete\s*\(/);
     assert.match(querySource, /^import "server-only";/);
@@ -237,7 +256,10 @@ describe("investment lab small adjustment", () => {
     );
     assert.match(querySource, /cache\(\s*loadTenantPortfolioStructure,\s*\)/);
     assert.match(querySource, /tenantContext,\s*selectedAccount/);
-    assert.match(pageSource, /getReadOnlyTenantPortfolioStructure\s*\(\s*\{/);
+    assert.match(
+      pageSource,
+      /getReadOnlyTenantPortfolioStructureForScope\s*\(\s*\{/,
+    );
     assert.match(pageSource, /InvestmentLabSmallAdjustmentSkeleton/);
     assert.match(pageSource, /InvestmentLabSmallAdjustmentUnavailable/);
   });

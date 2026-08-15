@@ -37,6 +37,7 @@ export type InvestmentLabAnchorPositionRow = Readonly<{
   assetId?: string | null;
   legacyAssetId?: string | null;
   account: string;
+  identityAccount?: string | null;
   source: string | null;
   ticker: string | null;
   assetName: string | null;
@@ -186,13 +187,19 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
   let excludedPositionRows = 0;
 
   for (const row of anchorRows) {
-    const identity = resolveInvestmentLabSpecialHoldingIdentity(row);
+    const identityAccount = row.identityAccount ?? row.account;
+    const identity = resolveInvestmentLabSpecialHoldingIdentity({
+      ...row,
+      account: identityAccount,
+    });
     const ticker = identity.ticker;
     const market = normalizeText(row.market)?.toLowerCase() ?? null;
     const currency = normalizeText(row.currency)?.toUpperCase() ?? null;
     const axis = supportedAxis(market, currency);
     const assetType = normalizeText(row.assetType)?.toLowerCase() ?? null;
     const account = normalizeText(row.account)?.toLowerCase() ?? null;
+    const economicAccount =
+      normalizeText(identityAccount)?.toLowerCase() ?? account;
     const source = normalizeText(row.source);
     const quantity = positiveNumber(row.quantity);
     const marketValueKrw = nonNegativeNumber(row.marketValueKrw);
@@ -223,6 +230,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
       if (
         !axis ||
         !account ||
+        !economicAccount ||
         !selectedAccounts.includes(
           account as (typeof selectedAccounts)[number],
         ) ||
@@ -253,11 +261,11 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
         blockers.add("ambiguous_anchor_identity_metadata");
         continue;
       }
-      if (existing.accounts.has(account)) {
+      if (existing.accounts.has(economicAccount)) {
         blockers.add("duplicate_anchor_identity");
       }
       existing.labels.add(label);
-      existing.accounts.add(account);
+      existing.accounts.add(economicAccount);
       existing.sourceRows += 1;
       existing.storedMarketValueKrw += marketValueKrw;
       grouped.set(key, existing);
@@ -283,6 +291,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
     }
     if (
       !account ||
+      !economicAccount ||
       !selectedAccounts.includes(
         account as (typeof selectedAccounts)[number],
       ) ||
@@ -297,6 +306,7 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
       !ticker ||
       !axis ||
       !account ||
+      !economicAccount ||
       !source ||
       !label ||
       quantity === null ||
@@ -317,11 +327,11 @@ export function resolveInvestmentLabAnchorSelection(input: Readonly<{
       sourceRows: 0,
       storedMarketValueKrw: 0,
     };
-    if (existing.accounts.has(account)) {
+    if (existing.accounts.has(economicAccount)) {
       blockers.add("duplicate_anchor_identity");
     }
     existing.labels.add(label);
-    existing.accounts.add(account);
+    existing.accounts.add(economicAccount);
     existing.sourceRows += 1;
     existing.storedMarketValueKrw += marketValueKrw;
     grouped.set(key, existing);

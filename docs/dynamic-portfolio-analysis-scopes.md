@@ -1,6 +1,6 @@
 # Dynamic Portfolio Analysis Scopes
 
-Status: Production schema and user group management applied; Portfolio Risk and History portfolio lane converted
+Status: Production schema and user group management applied; current read surfaces and Investment Lab converted
 
 ## Product Decision
 
@@ -152,16 +152,19 @@ are effective-dated so changing a group today does not rewrite past charts.
    - Keep `account=` only as a redirect/compatibility input.
 5. **Feature conversion (in progress)**
    - Dashboard, today movement, additional contribution, portfolio
-     structure/risk, simulation, and the History portfolio-performance lane
-     use the dynamic scope model.
+     structure/risk, simulation, the History portfolio-performance lane, and
+     Investment Lab use the dynamic scope model.
    - Portfolio Risk resolves the current effective-dated scope membership on
      the server before loading price and FX evidence. Its covariance, Sharpe,
      correlation, risk-contribution, and ENB formulas are unchanged; only the
      owner-scoped holding universe is dynamic.
-   - History uses effective-dated memberships for each snapshot date and keeps
-     legacy `account=` only as a compatibility input. History balance/events,
-     group position drilldown/comparison, and Investment Lab remain explicit
-     follow-up work rather than implied dynamic-group support.
+   - History and Investment Lab use effective-dated memberships for each
+     historical row date and keep legacy `account=` only as a compatibility
+     input. Investment Lab excludes Fount, preserves stored manual gold
+     valuation evidence, and leaves its established scenario formulas
+     unchanged; only the owner-scoped input universe is dynamic.
+   - History balance/events and group position drilldown/comparison remain
+     explicit follow-up work rather than implied dynamic-group support.
 6. **User management (complete)**
    - Add create, rename, archive, and membership editing with Server Actions or
      narrow mutation handlers protected by the current tenant context.

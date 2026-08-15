@@ -439,6 +439,12 @@ describe("current tenant read scope runtime boundary", () => {
 
   it("authorizes every Investment Lab portfolio input through owned accounts", () => {
     const counterfactualSource = read("src/db/queries/investment-lab.ts");
+    const scopeEvidenceSource = read(
+      "src/db/queries/investment-lab-scope-evidence.ts",
+    );
+    const analysisScopesSource = read(
+      "src/db/queries/portfolio-analysis-scopes.ts",
+    );
     const availabilitySource = read(
       "src/db/queries/investment-lab-data-availability.ts",
     );
@@ -505,6 +511,39 @@ describe("current tenant read scope runtime boundary", () => {
     );
     assert.match(xraySource, /getReadOnlyTenantPortfolioStructure/);
     assert.doesNotMatch(xraySource, /getReadOnlyPortfolioStructure\(/);
+    assert.match(scopeEvidenceSource, /^import "server-only";/);
+    assert.match(
+      scopeEvidenceSource,
+      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+    );
+    assert.match(
+      analysisScopesSource,
+      /eq\(\s*portfolioGroups\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId/,
+    );
+    assert.match(
+      scopeEvidenceSource,
+      /portfolioGroupAccountMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
+    );
+    assert.match(
+      scopeEvidenceSource,
+      /portfolioGroupAssetMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
+    );
+    assert.match(
+      scopeEvidenceSource,
+      /innerJoin\(accounts, eq\(eventLedgerEntries\.accountId, accounts\.id\)\)/,
+    );
+    assert.match(
+      scopeEvidenceSource,
+      /dailyPositionSnapshots\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
+    );
+    assert.match(
+      scopeEvidenceSource,
+      /eq\(dailyPositionSnapshots\.isSample, false\)/,
+    );
+    assert.doesNotMatch(
+      scopeEvidenceSource,
+      /ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)|\bfetch\s*\(/,
+    );
   });
 
   it("keeps Investment Lab behind one resolved server tenant", () => {
@@ -515,10 +554,11 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /if \(!resolution\.ok\)/);
     assert.match(source, /PortfolioReadAccessBoundary/);
     for (const reader of [
-      "getReadOnlyTenantInvestmentLabCounterfactual",
-      "getReadOnlyTenantInvestmentLabDataAvailability",
-      "getReadOnlyTenantInvestmentLabEtfXray",
-      "getReadOnlyTenantPortfolioStructure",
+      "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence",
+      "getReadOnlyTenantInvestmentLabCounterfactualForScope",
+      "getReadOnlyTenantInvestmentLabDataAvailabilityForScope",
+      "getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio",
+      "getReadOnlyTenantPortfolioStructureForScope",
     ]) {
       assert.match(source, new RegExp(reader));
     }
@@ -538,6 +578,9 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /databaseReadAttempted: false/);
     assert.match(source, /assert\.doesNotMatch\(boundary\.body, \/data-page=/);
     assert.match(source, /if \(!sql\) throw new Error/);
+    assert.match(source, /readArgument\("--scope"\)/);
+    assert.match(source, /data-analysis-scope/);
+    assert.doesNotMatch(source, /readArgument\("--account"\)/);
   });
 
   it("keeps Simulation shared research reads behind the resolved server session", () => {
