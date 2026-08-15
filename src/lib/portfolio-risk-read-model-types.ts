@@ -1,5 +1,8 @@
 export type PortfolioRiskAccount = "brokerage" | "isa" | "irp" | "all";
 export type PortfolioRiskWindow = 30 | 90 | 252;
+export type PortfolioRiskAssetSelection =
+  | "legacy_account_filter"
+  | "preselected";
 
 type NumericSourceValue = number | string | null;
 

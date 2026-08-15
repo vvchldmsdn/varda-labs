@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
 import { PortfolioRiskControls } from "./portfolio-risk-controls";
@@ -14,8 +15,12 @@ import {
 
 export function PortfolioRiskView({
   model,
+  scopes,
+  selectedScope,
 }: {
   model: PortfolioRiskReadModel;
+  scopes: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const portfolio = model.calculation.portfolio;
 
@@ -43,10 +48,14 @@ export function PortfolioRiskView({
               <NavLink href="/portfolio/structure">자산 배분</NavLink>
             </nav>
           </div>
-          <PortfolioRiskControls selection={model.selection} />
+          <PortfolioRiskControls
+            scopes={scopes}
+            selectedScope={selectedScope}
+            selection={model.selection}
+          />
         </header>
 
-        <RiskAnalysisBasis model={model} />
+        <RiskAnalysisBasis model={model} scopeLabel={selectedScope.label} />
         <RiskPortfolioSummary model={model} />
         <RiskStandaloneSummary model={model} />
         <RiskInstrumentTable model={model} />

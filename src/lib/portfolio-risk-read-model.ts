@@ -2,6 +2,7 @@ import { buildPortfolioRiskInput } from "./portfolio-risk-input.ts";
 import { calculatePortfolioRisk } from "./portfolio-risk.ts";
 import type {
   PortfolioRiskAssetSourceRow,
+  PortfolioRiskAssetSelection,
   PortfolioRiskFxSourceRow,
   PortfolioRiskPriceSourceRow,
   PortfolioRiskQueryRange,
@@ -21,18 +22,23 @@ export function composePortfolioRiskReadModel({
   assetRows,
   priceRows,
   fxRows,
+  assetSelection = "legacy_account_filter",
 }: {
   selection: PortfolioRiskSelection;
   queryRange: PortfolioRiskQueryRange;
   assetRows: readonly PortfolioRiskAssetSourceRow[];
   priceRows: readonly PortfolioRiskPriceSourceRow[];
   fxRows: readonly PortfolioRiskFxSourceRow[];
+  assetSelection?: PortfolioRiskAssetSelection;
 }) {
-  const selectedAssets = assetRows.filter((row) =>
-    selection.account === "all"
-      ? isTrackedAccount(row.account)
-      : row.account === selection.account,
-  );
+  const selectedAssets =
+    assetSelection === "preselected"
+      ? [...assetRows]
+      : assetRows.filter((row) =>
+          selection.account === "all"
+            ? isTrackedAccount(row.account)
+            : row.account === selection.account,
+        );
   const canonicalPriceRows = priceRows.filter((row) => !row.isSample);
   const nonSampleFxRows = fxRows.filter((row) => !row.isSample);
   const canonicalFxRows = nonSampleFxRows.filter(

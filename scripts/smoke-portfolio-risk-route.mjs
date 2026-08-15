@@ -6,10 +6,6 @@ import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3100";
-const PASSWORD =
-  process.env.VARDA_APP_PASSWORD?.trim() ||
-  process.env.APP_ACCESS_PASSWORD?.trim();
-const USERNAME = process.env.VARDA_APP_USER?.trim() || "varda";
 const SESSION_COOKIE =
   readArgument("--session-cookie") ??
   process.env.VARDA_SESSION_COOKIE?.trim() ??
@@ -98,27 +94,24 @@ const scenarios = EXPECT_HISTORY_UNAVAILABLE
     }))
   : baseScenarios;
 
-if (!PASSWORD) throw new Error("Dashboard access password is not configured");
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
-const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
 
 async function main() {
-  const unauthorizedRisk = await request("/portfolio/risk");
+  const boundary = await request("/portfolio/risk");
   assert.equal(
-    unauthorizedRisk.status,
-    401,
-    "no-auth risk request must return 401",
+    boundary.status,
+    200,
+    "signed-out risk shell must return 200",
   );
+  assert.match(boundary.body, /Portfolio risk/);
+  assert.match(boundary.body, /Portfolio user link/);
+  assert.match(boundary.body, /Product database read/);
+  assert.match(boundary.body, /Not attempted/);
+  assert.match(boundary.body, /href="\/auth\/sign-in"/);
+  assert.doesNotMatch(boundary.body, /data-page="portfolio-risk"/);
+  assert.doesNotMatch(boundary.body, LEAK_PATTERN);
 
   if (!SESSION_COOKIE) {
-    const boundary = await request("/portfolio/risk", true);
-    assert.equal(boundary.status, 200, "Basic-auth boundary must return 200");
-    assert.match(boundary.body, /Portfolio risk/);
-    assert.match(boundary.body, /Portfolio user link/);
-    assert.match(boundary.body, /Product database read/);
-    assert.match(boundary.body, /Not attempted/);
-    assert.doesNotMatch(boundary.body, /data-page="portfolio-risk"/);
-    assert.doesNotMatch(boundary.body, LEAK_PATTERN);
     console.log(
       JSON.stringify(
         {
@@ -135,14 +128,18 @@ async function main() {
 
   if (!sql) throw new Error("DATABASE_URL is required for session-bound smoke");
   const countsBefore = await readCounts();
-  const unauthorizedDashboard = await request("/");
+  const signedOutDashboard = await request("/");
   assert.equal(
-    unauthorizedDashboard.status,
-    401,
-    "no-auth dashboard request must return 401",
+    signedOutDashboard.status,
+    200,
+    "signed-out dashboard shell must return 200",
   );
+  assert.match(signedOutDashboard.body, /Portfolio user link/);
+  assert.match(signedOutDashboard.body, /Product database read/);
+  assert.match(signedOutDashboard.body, /Not attempted/);
+  assert.doesNotMatch(signedOutDashboard.body, LEAK_PATTERN);
 
-  const dashboard = await request("/", true);
+  const dashboard = await request("/", SESSION_COOKIE);
   assert.equal(dashboard.status, 200, "authenticated dashboard must return 200");
   assert.match(dashboard.body, /href="\/portfolio\/structure"/);
   assert.match(dashboard.body, /href="\/portfolio\/risk"/);
@@ -157,7 +154,7 @@ async function main() {
 
   const routeResults = [];
   for (const scenario of scenarios) {
-    const response = await request(scenario.path, true);
+    const response = await request(scenario.path, SESSION_COOKIE);
     assert.equal(response.status, 200, `${scenario.label} must return 200`);
     if (EXPECT_HISTORY_UNAVAILABLE) {
       assert.match(
@@ -224,9 +221,9 @@ async function main() {
       {
         smoke: "portfolio_risk_route",
         baseUrl: BASE_URL,
-        noAuthStatus: {
-          dashboard: unauthorizedDashboard.status,
-          portfolioRisk: unauthorizedRisk.status,
+        signedOutStatus: {
+          dashboard: signedOutDashboard.status,
+          portfolioRisk: boundary.status,
         },
         dashboard: {
           status: dashboard.status,
@@ -244,15 +241,9 @@ async function main() {
   );
 }
 
-async function request(path, authenticated = false) {
-  const headers = authenticated
-    ? {
-        authorization,
-        ...(SESSION_COOKIE ? { cookie: SESSION_COOKIE } : {}),
-      }
-    : undefined;
+async function request(path, cookie = null) {
   const response = await fetch(new URL(path, BASE_URL), {
-    headers,
+    headers: cookie ? { cookie } : undefined,
     redirect: "manual",
     signal: AbortSignal.timeout(30_000),
   });

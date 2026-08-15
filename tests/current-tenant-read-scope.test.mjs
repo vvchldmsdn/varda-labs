@@ -382,9 +382,11 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(pageSource, /Promise\.all/);
     assert.match(pageSource, /if \(!resolution\.ok\)/);
     assert.match(pageSource, /PortfolioReadAccessBoundary/);
+    assert.match(pageSource, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
+    assert.match(pageSource, /PortfolioAnalysisScopeBoundary/);
     assert.match(
       pageSource,
-      /getReadOnlyTenantPortfolioRisk\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
+      /getReadOnlyTenantPortfolioRiskForScope\(\{[\s\S]*scope: selectedScope,[\s\S]*tenantContext: resolution\.tenantContext/,
     );
     assert.doesNotMatch(
       pageSource,
@@ -392,7 +394,8 @@ describe("current tenant read scope runtime boundary", () => {
     );
 
     assert.match(querySource, /^import "server-only";/);
-    assert.match(querySource, /getReadOnlyTenantPortfolioRisk/);
+    assert.match(querySource, /getReadOnlyTenantPortfolioRiskForScope/);
+    assert.match(querySource, /getPortfolioAnalysisScopeTargets/);
     assert.match(
       querySource,
       /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
@@ -403,7 +406,16 @@ describe("current tenant read scope runtime boundary", () => {
     );
     assert.match(querySource, /eq\(accounts\.isActive, true\)/);
     assert.match(querySource, /inArray\(accounts\.code, TRACKED_ACCOUNTS\)/);
+    assert.match(
+      querySource,
+      /eq\(assets\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
+    );
     assert.match(querySource, /eq\(assets\.account, accounts\.code\)/);
+    const scopedRepositorySource = querySource.match(
+      /export function createTenantPortfolioRiskScopeRepository[\s\S]*?(?=export async function getReadOnlyTenantPortfolioRiskForScope)/,
+    )?.[0];
+    assert.ok(scopedRepositorySource);
+    assert.doesNotMatch(scopedRepositorySource, /TRACKED_ACCOUNTS/);
     assert.doesNotMatch(
       querySource,
       /export async function getReadOnlyPortfolioRisk|accountCondition\(/,
@@ -416,6 +428,8 @@ describe("current tenant read scope runtime boundary", () => {
       /status: "portfolio_risk_session_boundary_verified"/,
     );
     assert.match(smokeSource, /databaseReadAttempted: false/);
+    assert.match(smokeSource, /signed-out risk shell must return 200/);
+    assert.doesNotMatch(smokeSource, /no-auth risk request must return 401/);
     assert.match(
       smokeSource,
       /assert\.doesNotMatch\(boundary\.body, \/data-page=/,

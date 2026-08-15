@@ -1,7 +1,6 @@
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
 import {
-  accountLabel,
   calculationReasonLabel,
   calculationStatusLabel,
   formatRiskMetric,
@@ -18,8 +17,10 @@ import {
 
 export function RiskAnalysisBasis({
   model,
+  scopeLabel,
 }: {
   model: PortfolioRiskReadModel;
+  scopeLabel: string;
 }) {
   const { provenance, calculation, inputHealth, selection } = model;
   const dateRange =
@@ -35,8 +36,8 @@ export function RiskAnalysisBasis({
     >
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <RiskSummaryCard
-          label="계좌 / 기간"
-          value={`${accountLabel(selection.account)} / ${selection.window}일`}
+          label="분석 범위 / 기간"
+          value={`${scopeLabel} / ${selection.window}일`}
           detail={`${provenance.usableReturnObservations}/${provenance.requestedReturnObservations} observations`}
         />
         <RiskSummaryCard

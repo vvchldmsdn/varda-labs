@@ -20,6 +20,11 @@ export type PortfolioRiskReadOptions = {
   now?: Date;
 };
 
+export type PreselectedPortfolioRiskReadOptions = Omit<
+  PortfolioRiskReadOptions,
+  "account"
+>;
+
 export async function loadPortfolioRiskReadModel(
   repository: PortfolioRiskReadRepository,
   options: PortfolioRiskReadOptions = {},
@@ -28,8 +33,44 @@ export async function loadPortfolioRiskReadModel(
     account: normalizePortfolioRiskAccount(options.account),
     window: normalizePortfolioRiskWindow(options.window),
   };
-  const serviceCycleDate = resolveSnapshotCycle(options.now ?? new Date())
-    .snapshotDate;
+  return loadPortfolioRiskReadModelWithSelection({
+    assetSelection: "legacy_account_filter",
+    repository,
+    selection,
+    now: options.now,
+  });
+}
+
+export async function loadPreselectedPortfolioRiskReadModel(
+  repository: PortfolioRiskReadRepository,
+  options: PreselectedPortfolioRiskReadOptions = {},
+) {
+  return loadPortfolioRiskReadModelWithSelection({
+    assetSelection: "preselected",
+    repository,
+    selection: {
+      account: "all",
+      window: normalizePortfolioRiskWindow(options.window),
+    },
+    now: options.now,
+  });
+}
+
+async function loadPortfolioRiskReadModelWithSelection({
+  assetSelection,
+  repository,
+  selection,
+  now,
+}: {
+  assetSelection: "legacy_account_filter" | "preselected";
+  repository: PortfolioRiskReadRepository;
+  selection: {
+    account: PortfolioRiskAccount;
+    window: PortfolioRiskWindow;
+  };
+  now?: Date;
+}) {
+  const serviceCycleDate = resolveSnapshotCycle(now ?? new Date()).snapshotDate;
   const sourceDateTo = shiftRiskDate(serviceCycleDate, -1);
   const priceSourceDateFrom = shiftRiskDate(
     sourceDateTo,
@@ -69,6 +110,7 @@ export async function loadPortfolioRiskReadModel(
   ]);
 
   return composePortfolioRiskReadModel({
+    assetSelection,
     selection,
     queryRange: {
       serviceCycleDate,

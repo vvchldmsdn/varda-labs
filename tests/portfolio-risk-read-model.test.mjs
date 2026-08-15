@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  loadPreselectedPortfolioRiskReadModel,
   loadPortfolioRiskReadModel,
   normalizePortfolioRiskAccount,
   normalizePortfolioRiskWindow,
@@ -79,6 +80,36 @@ describe("portfolio risk read model", () => {
       filtered.calculation.instruments.map((instrument) => instrument.weight),
       baseline.calculation.instruments.map((instrument) => instrument.weight),
     );
+  });
+
+  it("keeps a preselected dynamic-scope universe without fixed account filtering", async () => {
+    const fixture = portfolioRiskReadModelFixture();
+    fixture.assetRows.push({
+      ...fixture.assetRows[0],
+      account: "custom-broker",
+      quantity: "5",
+    });
+    const repository = {
+      async loadAssets(account) {
+        assert.equal(account, "all");
+        return fixture.assetRows;
+      },
+      async loadPrices() {
+        return fixture.priceRows;
+      },
+      async loadFxRates() {
+        return fixture.fxRows;
+      },
+    };
+
+    const result = await loadPreselectedPortfolioRiskReadModel(repository, {
+      window: 30,
+      now: new Date("2026-07-10T00:00:00Z"),
+    });
+
+    assert.equal(result.provenance.selectedHoldingCount, 3);
+    assert.equal(result.inputHealth.status, "ready");
+    assert.deepEqual(result.selection, { account: "all", window: 30 });
   });
 
   it("removes sample and failed-source rows before duplicate checks", () => {
