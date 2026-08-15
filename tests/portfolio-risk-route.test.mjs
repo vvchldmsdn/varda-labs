@@ -10,15 +10,24 @@ import {
 import { buildPortfolioRiskHref } from "../src/lib/portfolio-risk-route.ts";
 
 describe("portfolio risk route presentation", () => {
-  it("uses a canonical path for the brokerage 90-day default", () => {
-    assert.equal(buildPortfolioRiskHref("brokerage", 90), "/portfolio/risk");
+  it("uses canonical dynamic scopes and preserves the risk window", () => {
     assert.equal(
-      buildPortfolioRiskHref("isa", 90),
-      "/portfolio/risk?account=isa",
+      buildPortfolioRiskHref("all", 90),
+      "/portfolio/risk?scope=all",
     );
     assert.equal(
-      buildPortfolioRiskHref("all", 252),
-      "/portfolio/risk?account=all&window=252",
+      buildPortfolioRiskHref(
+        "account:11111111-1111-4111-8111-111111111111",
+        90,
+      ),
+      "/portfolio/risk?scope=account%3A11111111-1111-4111-8111-111111111111",
+    );
+    assert.equal(
+      buildPortfolioRiskHref(
+        "portfolio:22222222-2222-4222-8222-222222222222",
+        252,
+      ),
+      "/portfolio/risk?window=252&scope=portfolio%3A22222222-2222-4222-8222-222222222222",
     );
   });
 

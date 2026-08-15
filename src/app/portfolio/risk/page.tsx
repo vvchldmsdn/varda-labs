@@ -1,6 +1,8 @@
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { PortfolioRiskView } from "@/components/portfolio-risk/portfolio-risk-view";
-import { getReadOnlyTenantPortfolioRisk } from "@/db/queries/portfolio-risk";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { getReadOnlyTenantPortfolioRiskForScope } from "@/db/queries/portfolio-risk";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +10,7 @@ export const dynamic = "force-dynamic";
 type PortfolioRiskPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    scope?: string | string[];
     window?: string | string[];
   }>;
 };
@@ -29,11 +32,36 @@ export default async function PortfolioRiskPage({
     );
   }
 
-  const model = await getReadOnlyTenantPortfolioRisk({
+  const scopeContext = await getReadOnlyTenantPortfolioAnalysisScopeContext({
     account: params.account,
+    scope: params.scope,
+    tenantContext: resolution.tenantContext,
+  });
+  if (
+    scopeContext.state !== "ready" ||
+    scopeContext.resolution.state !== "resolved"
+  ) {
+    return (
+      <PortfolioAnalysisScopeBoundary
+        basePath="/portfolio/risk"
+        context={scopeContext}
+        title="Portfolio risk"
+      />
+    );
+  }
+
+  const selectedScope = scopeContext.resolution.scope;
+  const model = await getReadOnlyTenantPortfolioRiskForScope({
+    scope: selectedScope,
     window: params.window,
     tenantContext: resolution.tenantContext,
   });
 
-  return <PortfolioRiskView model={model} />;
+  return (
+    <PortfolioRiskView
+      model={model}
+      scopes={scopeContext.catalog.scopes}
+      selectedScope={selectedScope}
+    />
+  );
 }

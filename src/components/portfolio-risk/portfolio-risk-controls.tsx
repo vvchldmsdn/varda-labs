@@ -1,45 +1,43 @@
 import Link from "next/link";
 
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type {
-  PortfolioRiskAccount,
   PortfolioRiskSelection,
   PortfolioRiskWindow,
 } from "@/lib/portfolio-risk-read-model-types";
 import { buildPortfolioRiskHref } from "@/lib/portfolio-risk-route";
 
-import { accountLabel } from "./portfolio-risk-format";
-
-const ACCOUNTS: PortfolioRiskAccount[] = [
-  "brokerage",
-  "isa",
-  "irp",
-  "all",
-];
 const WINDOWS: PortfolioRiskWindow[] = [30, 90, 252];
 
 export function PortfolioRiskControls({
+  scopes,
+  selectedScope,
   selection,
 }: {
+  scopes: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
   selection: PortfolioRiskSelection;
 }) {
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-2">
-      <RiskOptionGroup label="계좌">
-        {ACCOUNTS.map((account) => (
-          <RiskOptionLink
-            key={account}
-            href={buildPortfolioRiskHref(account, selection.window)}
-            active={selection.account === account}
-          >
-            {accountLabel(account)}
-          </RiskOptionLink>
-        ))}
-      </RiskOptionGroup>
+      <div>
+        <p className="mb-1 text-xs font-semibold text-[#687064]">분석 범위</p>
+        <PortfolioAnalysisScopeTabs
+          basePath="/portfolio/risk"
+          query={{
+            window:
+              selection.window === 90 ? null : String(selection.window),
+          }}
+          scopes={scopes}
+          selectedScopeKey={selectedScope.key}
+        />
+      </div>
       <RiskOptionGroup label="기간">
         {WINDOWS.map((window) => (
           <RiskOptionLink
             key={window}
-            href={buildPortfolioRiskHref(selection.account, window)}
+            href={buildPortfolioRiskHref(selectedScope.key, window)}
             active={selection.window === window}
           >
             {window}일

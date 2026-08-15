@@ -1,6 +1,6 @@
 # Dynamic Portfolio Analysis Scopes
 
-Status: Production schema and user group management applied; History portfolio lane converted
+Status: Production schema and user group management applied; Portfolio Risk and History portfolio lane converted
 
 ## Product Decision
 
@@ -154,6 +154,10 @@ are effective-dated so changing a group today does not rewrite past charts.
    - Dashboard, today movement, additional contribution, portfolio
      structure/risk, simulation, and the History portfolio-performance lane
      use the dynamic scope model.
+   - Portfolio Risk resolves the current effective-dated scope membership on
+     the server before loading price and FX evidence. Its covariance, Sharpe,
+     correlation, risk-contribution, and ENB formulas are unchanged; only the
+     owner-scoped holding universe is dynamic.
    - History uses effective-dated memberships for each snapshot date and keeps
      legacy `account=` only as a compatibility input. History balance/events,
      group position drilldown/comparison, and Investment Lab remain explicit

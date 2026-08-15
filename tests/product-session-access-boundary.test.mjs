@@ -15,7 +15,7 @@ const PRODUCT_PAGES = Object.freeze([
   ],
   [
     "src/app/portfolio/risk/page.tsx",
-    ["getReadOnlyTenantPortfolioRisk({"],
+    ["getReadOnlyTenantPortfolioRiskForScope({"],
   ],
   [
     "src/app/history/page.tsx",
