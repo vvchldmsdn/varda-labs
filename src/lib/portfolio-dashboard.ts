@@ -3,7 +3,6 @@ import "server-only";
 import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
 import {
   accounts,
-  assetGroups,
   assets,
   eventLedgerEntries,
   livePriceQuotes,
@@ -50,7 +49,7 @@ const NON_INVESTMENT_ASSET_TYPES = new Set([
 const DEFAULT_TRIM_DRIFT_THRESHOLD = 12;
 
 type AssetRow = typeof assets.$inferSelect;
-type AssetGroupRow = typeof assetGroups.$inferSelect;
+type AssetGroupRow = Readonly<{ id: string; name: string }>;
 type LivePriceQuoteRow = typeof livePriceQuotes.$inferSelect;
 type EventLedgerRow = typeof eventLedgerEntries.$inferSelect;
 
@@ -671,7 +670,7 @@ function buildAccountLabels(accountRows: (typeof accounts.$inferSelect)[]) {
   return labels;
 }
 
-function buildAssetGroupNames(groupRows: AssetGroupRow[]) {
+function buildAssetGroupNames(groupRows: readonly AssetGroupRow[]) {
   const names = new Map<string, string>();
   for (const group of groupRows) {
     names.set(group.id, group.name);

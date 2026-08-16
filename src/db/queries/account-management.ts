@@ -1,13 +1,10 @@
 import "server-only";
 
-import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import {
-  assets,
-  portfolioGroupAccountMemberships,
-  portfolioGroupAssetMemberships,
-} from "@/db/schema";
+import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
+import { assets } from "@/db/schema";
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -38,81 +35,54 @@ export async function getReadOnlyTenantAccountManagementModel({
   tenantContext: TenantContext;
 }): Promise<AccountManagementModelResult> {
   const ownerUserId = tenantContext.ownerUserId;
-  const openPeriod = or(
-    isNull(portfolioGroupAccountMemberships.validTo),
-    gt(portfolioGroupAccountMemberships.validTo, serviceDate),
-  );
-  const openAssetPeriod = or(
-    isNull(portfolioGroupAssetMemberships.validTo),
-    gt(portfolioGroupAssetMemberships.validTo, serviceDate),
-  );
 
   try {
-    const [
-      accountResultSets,
-      holdingRows,
-      accountMembershipRows,
-      assetMembershipRows,
-    ] = await Promise.all([
+    const [accountResultSets, assetRows, memberships] = await Promise.all([
       runTenantReadTransaction(ownerUserId, (transaction) => [
         transaction.query(ACCOUNT_MANAGEMENT_ACCOUNT_ROWS_SQL),
       ]),
       db
-        .select({ accountId: assets.accountId })
+        .select({
+          assetId: assets.id,
+          accountId: assets.accountId,
+          isActiveHolding: sql<boolean>`${assets.quantity} > 0`,
+        })
         .from(assets)
         .where(
           and(
             eq(assets.canonicalOwnerUserId, ownerUserId),
             sql`${assets.accountId} is not null`,
-            sql`${assets.quantity} > 0`,
           ),
         ),
-      db
-        .select({
-          accountId: portfolioGroupAccountMemberships.accountId,
-          groupId: portfolioGroupAccountMemberships.portfolioGroupId,
-        })
-        .from(portfolioGroupAccountMemberships)
-        .where(
-          and(
-            eq(
-              portfolioGroupAccountMemberships.canonicalOwnerUserId,
-              ownerUserId,
-            ),
-            openPeriod,
-          ),
-        ),
-      db
-        .select({
-          accountId: assets.accountId,
-          groupId: portfolioGroupAssetMemberships.portfolioGroupId,
-        })
-        .from(portfolioGroupAssetMemberships)
-        .innerJoin(
-          assets,
-          eq(portfolioGroupAssetMemberships.assetId, assets.id),
-        )
-        .where(
-          and(
-            eq(
-              portfolioGroupAssetMemberships.canonicalOwnerUserId,
-              ownerUserId,
-            ),
-            eq(assets.canonicalOwnerUserId, ownerUserId),
-            sql`${assets.accountId} is not null`,
-            openAssetPeriod,
-          ),
-        ),
+      loadTenantPortfolioGroupMemberships({
+        mode: "open",
+        serviceDate,
+        tenantContext,
+      }),
     ]);
     const accountRows = accountResultSets[0].map(projectTenantAccountRow);
 
-    const activeHoldingCount = countByAccount(holdingRows);
+    const activeHoldingCount = countByAccount(
+      assetRows.filter((row) => row.isActiveHolding),
+    );
+    const accountIdByAssetId = new Map(
+      assetRows.flatMap((row) =>
+        row.accountId === null ? [] : [[row.assetId, row.accountId] as const],
+      ),
+    );
     const groupReferences = new Map<string, Set<string>>();
-    for (const row of [...accountMembershipRows, ...assetMembershipRows]) {
-      if (row.accountId === null) continue;
-      const groups = groupReferences.get(row.accountId) ?? new Set<string>();
-      groups.add(row.groupId);
-      groupReferences.set(row.accountId, groups);
+    for (const membership of memberships.accountMemberships) {
+      addGroupReference(
+        groupReferences,
+        membership.targetId,
+        membership.groupId,
+      );
+    }
+    for (const membership of memberships.assetMemberships) {
+      const accountId = accountIdByAssetId.get(membership.targetId);
+      if (accountId) {
+        addGroupReference(groupReferences, accountId, membership.groupId);
+      }
     }
 
     return Object.freeze({
@@ -193,4 +163,14 @@ function countByAccount(rows: readonly { accountId: string | null }[]) {
     counts.set(row.accountId, (counts.get(row.accountId) ?? 0) + 1);
   }
   return counts;
+}
+
+function addGroupReference(
+  references: Map<string, Set<string>>,
+  accountId: string,
+  groupId: string,
+) {
+  const groups = references.get(accountId) ?? new Set<string>();
+  groups.add(groupId);
+  references.set(accountId, groups);
 }

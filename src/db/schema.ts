@@ -773,8 +773,14 @@ export const portfolioGroups = pgTable(
       "portfolio_groups_archived_at_check",
       sql`${table.archivedAt} is null or ${table.archivedAt} >= ${table.createdAt}`,
     ),
+    tenantSelectPolicy: pgPolicy("portfolio_groups_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const portfolioGroupAccountMemberships = pgTable(
   "portfolio_group_account_memberships",
@@ -823,8 +829,17 @@ export const portfolioGroupAccountMemberships = pgTable(
       "portfolio_group_account_memberships_valid_period_check",
       sql`${table.validTo} is null or ${table.validTo} > ${table.validFrom}`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_group_account_memberships_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const portfolioGroupAssetMemberships = pgTable(
   "portfolio_group_asset_memberships",
@@ -873,8 +888,17 @@ export const portfolioGroupAssetMemberships = pgTable(
       "portfolio_group_asset_memberships_valid_period_check",
       sql`${table.validTo} is null or ${table.validTo} > ${table.validFrom}`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_group_asset_memberships_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export type PortfolioGroup = typeof portfolioGroups.$inferSelect;
 export type NewPortfolioGroup = typeof portfolioGroups.$inferInsert;
@@ -1342,8 +1366,14 @@ export const assetGroups = pgTable(
     canonicalOwnerUserIdIdx: index(
       "asset_groups_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy("asset_groups_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const assetGroupMembers = pgTable(
   "asset_group_members",
@@ -1371,8 +1401,14 @@ export const assetGroupMembers = pgTable(
     canonicalOwnerUserIdIdx: index(
       "asset_group_members_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy("asset_group_members_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const fxRates = pgTable(
   "fx_rates",

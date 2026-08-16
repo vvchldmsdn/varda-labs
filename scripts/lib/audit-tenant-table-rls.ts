@@ -12,16 +12,22 @@ import {
 loadEnvironment({ path: ".env.local", quiet: true });
 
 type TenantTableRlsAuditConfig = Readonly<{
+  allowEmptyTable?: boolean;
   operation: string;
   policyName: string;
   successStatus: string;
   tableName:
     | "account_balance_snapshots"
     | "accounts"
+    | "asset_group_members"
+    | "asset_groups"
     | "assets"
     | "daily_portfolio_snapshots"
     | "daily_position_snapshots"
-    | "event_ledger_entries";
+    | "event_ledger_entries"
+    | "portfolio_group_account_memberships"
+    | "portfolio_group_asset_memberships"
+    | "portfolio_groups";
 }>;
 
 export async function runTenantTableRlsAudit(
@@ -64,17 +70,6 @@ export async function runTenantTableRlsAudit(
       totalRows,
       code(tableName, "total_catalog_invalid"),
     );
-    if (owners.length === 0) fail(code(tableName, "owner_catalog_empty"));
-
-    const selectedOwner = owners[0];
-    const ownerUserId = requiredString(
-      selectedOwner.owner_user_id,
-      code(tableName, "owner_catalog_invalid"),
-    );
-    const expectedOwnerRows = integerValue(
-      selectedOwner.row_count,
-      code(tableName, "owner_catalog_invalid"),
-    );
     const ownedRows = owners.reduce(
       (sum, owner) =>
         sum +
@@ -92,6 +87,26 @@ export async function runTenantTableRlsAudit(
       totals.unowned_count,
       code(tableName, "total_catalog_invalid"),
     );
+    const emptyTable = catalogRows === 0;
+    if (
+      owners.length === 0 &&
+      !(auditConfig.allowEmptyTable === true && emptyTable)
+    ) {
+      fail(code(tableName, "owner_catalog_empty"));
+    }
+    const selectedOwner = owners[0] ?? null;
+    const ownerUserId = selectedOwner
+      ? requiredString(
+          selectedOwner.owner_user_id,
+          code(tableName, "owner_catalog_invalid"),
+        )
+      : randomUUID();
+    const expectedOwnerRows = selectedOwner
+      ? integerValue(
+          selectedOwner.row_count,
+          code(tableName, "owner_catalog_invalid"),
+        )
+      : 0;
 
     if (unownedRows !== 0 || ownedRows !== catalogRows) {
       fail(code(tableName, "unowned_rows_present"));
@@ -179,6 +194,9 @@ export async function runTenantTableRlsAudit(
           policyCount: 1,
           tenantPrivileges: ["SELECT"],
           ownerGroups: owners.length,
+          ownerCanaryStatus: selectedOwner
+            ? "matching_owner_verified"
+            : "empty_table_no_matching_owner_row",
           ownerScopedRows: ownedRows,
           unownedRows,
           selectedOwnerRows: matchingCount,

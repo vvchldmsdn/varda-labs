@@ -10,6 +10,10 @@ const tabsSource = readFileSync(
   new URL("../src/components/portfolio-analysis-scope-tabs.tsx", import.meta.url),
   "utf8",
 );
+const groupReadSource = readFileSync(
+  new URL("../src/db/queries/tenant-group-reads.ts", import.meta.url),
+  "utf8",
+);
 
 describe("tenant portfolio analysis scope query", () => {
   it("builds the catalog only from active owner-scoped rows", () => {
@@ -20,11 +24,9 @@ describe("tenant portfolio analysis scope query", () => {
       /eq\(accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
     );
     assert.match(querySource, /eq\(accounts\.isActive, true\)/);
-    assert.match(
-      querySource,
-      /portfolioGroups\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
-    );
-    assert.match(querySource, /isNull\(portfolioGroups\.archivedAt\)/);
+    assert.match(querySource, /loadActiveTenantPortfolioGroups\(tenantContext\)/);
+    assert.match(groupReadSource, /runTenantReadTransaction/);
+    assert.match(groupReadSource, /where archived_at is null/);
     assert.match(querySource, /buildPortfolioAnalysisScopeCatalog/);
     assert.match(querySource, /resolvePortfolioAnalysisScope/);
     assert.doesNotMatch(

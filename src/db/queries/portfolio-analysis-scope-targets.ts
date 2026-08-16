@@ -1,12 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
-
-import { db } from "@/db/client";
-import {
-  portfolioGroupAccountMemberships,
-  portfolioGroupAssetMemberships,
-} from "@/db/schema";
+import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -41,52 +35,20 @@ export async function getPortfolioAnalysisScopeTargets({
     });
   }
 
-  const [accountRows, assetRows] = await Promise.all([
-    db
-      .selectDistinct({ accountId: portfolioGroupAccountMemberships.accountId })
-      .from(portfolioGroupAccountMemberships)
-      .where(
-        and(
-          eq(
-            portfolioGroupAccountMemberships.canonicalOwnerUserId,
-            tenantContext.ownerUserId,
-          ),
-          eq(
-            portfolioGroupAccountMemberships.portfolioGroupId,
-            scope.portfolioGroupId,
-          ),
-          lte(portfolioGroupAccountMemberships.validFrom, serviceDate),
-          or(
-            isNull(portfolioGroupAccountMemberships.validTo),
-            gt(portfolioGroupAccountMemberships.validTo, serviceDate),
-          ),
-        ),
-      ),
-    db
-      .selectDistinct({ assetId: portfolioGroupAssetMemberships.assetId })
-      .from(portfolioGroupAssetMemberships)
-      .where(
-        and(
-          eq(
-            portfolioGroupAssetMemberships.canonicalOwnerUserId,
-            tenantContext.ownerUserId,
-          ),
-          eq(
-            portfolioGroupAssetMemberships.portfolioGroupId,
-            scope.portfolioGroupId,
-          ),
-          lte(portfolioGroupAssetMemberships.validFrom, serviceDate),
-          or(
-            isNull(portfolioGroupAssetMemberships.validTo),
-            gt(portfolioGroupAssetMemberships.validTo, serviceDate),
-          ),
-        ),
-      ),
-  ]);
+  const memberships = await loadTenantPortfolioGroupMemberships({
+    mode: "effective",
+    portfolioGroupId: scope.portfolioGroupId,
+    serviceDate,
+    tenantContext,
+  });
 
   return Object.freeze({
     includesAllOwnedAccounts: false,
-    wholeAccountIds: Object.freeze(accountRows.map((row) => row.accountId)),
-    directAssetIds: Object.freeze(assetRows.map((row) => row.assetId)),
+    wholeAccountIds: Object.freeze(
+      [...new Set(memberships.accountMemberships.map((row) => row.targetId))],
+    ),
+    directAssetIds: Object.freeze(
+      [...new Set(memberships.assetMemberships.map((row) => row.targetId))],
+    ),
   });
 }

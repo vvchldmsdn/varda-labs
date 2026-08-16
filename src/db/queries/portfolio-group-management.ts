@@ -1,15 +1,13 @@
 import "server-only";
 
-import { and, asc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
-  accounts,
-  assets,
-  portfolioGroupAccountMemberships,
-  portfolioGroupAssetMemberships,
-  portfolioGroups,
-} from "@/db/schema";
+  loadActiveTenantPortfolioGroups,
+  loadTenantPortfolioGroupMemberships,
+} from "@/db/queries/tenant-group-reads";
+import { accounts, assets } from "@/db/schema";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type PortfolioGroupManagementModel = Readonly<{
@@ -49,41 +47,11 @@ export async function getReadOnlyTenantPortfolioGroupManagementModel({
   tenantContext: TenantContext;
 }): Promise<PortfolioGroupManagementModelResult> {
   const ownerUserId = tenantContext.ownerUserId;
-  const currentAccountMembership = and(
-    eq(portfolioGroupAccountMemberships.canonicalOwnerUserId, ownerUserId),
-    lte(portfolioGroupAccountMemberships.validFrom, serviceDate),
-    or(
-      isNull(portfolioGroupAccountMemberships.validTo),
-      gt(portfolioGroupAccountMemberships.validTo, serviceDate),
-    ),
-  );
-  const currentAssetMembership = and(
-    eq(portfolioGroupAssetMemberships.canonicalOwnerUserId, ownerUserId),
-    lte(portfolioGroupAssetMemberships.validFrom, serviceDate),
-    or(
-      isNull(portfolioGroupAssetMemberships.validTo),
-      gt(portfolioGroupAssetMemberships.validTo, serviceDate),
-    ),
-  );
 
   try {
-    const [groupRows, accountRows, assetRows, groupAccountRows, groupAssetRows] =
+    const [groupRows, accountRows, assetRows, memberships] =
       await Promise.all([
-        db
-          .select({
-            id: portfolioGroups.id,
-            name: portfolioGroups.name,
-            description: portfolioGroups.description,
-            updatedAt: portfolioGroups.updatedAt,
-          })
-          .from(portfolioGroups)
-          .where(
-            and(
-              eq(portfolioGroups.canonicalOwnerUserId, ownerUserId),
-              isNull(portfolioGroups.archivedAt),
-            ),
-          )
-          .orderBy(asc(portfolioGroups.sortOrder), asc(portfolioGroups.name)),
+        loadActiveTenantPortfolioGroups(tenantContext),
         db
           .select({
             id: accounts.id,
@@ -123,29 +91,20 @@ export async function getReadOnlyTenantPortfolioGroupManagementModel({
             asc(assets.name),
             asc(assets.ticker),
           ),
-        db
-          .select({
-            groupId: portfolioGroupAccountMemberships.portfolioGroupId,
-            accountId: portfolioGroupAccountMemberships.accountId,
-          })
-          .from(portfolioGroupAccountMemberships)
-          .where(currentAccountMembership),
-        db
-          .select({
-            groupId: portfolioGroupAssetMemberships.portfolioGroupId,
-            assetId: portfolioGroupAssetMemberships.assetId,
-          })
-          .from(portfolioGroupAssetMemberships)
-          .where(currentAssetMembership),
+        loadTenantPortfolioGroupMemberships({
+          mode: "effective",
+          serviceDate,
+          tenantContext,
+        }),
       ]);
 
     const accountIdsByGroup = collectMemberships(
-      groupAccountRows,
-      (row) => row.accountId,
+      memberships.accountMemberships,
+      (row) => row.targetId,
     );
     const assetIdsByGroup = collectMemberships(
-      groupAssetRows,
-      (row) => row.assetId,
+      memberships.assetMemberships,
+      (row) => row.targetId,
     );
 
     return Object.freeze({

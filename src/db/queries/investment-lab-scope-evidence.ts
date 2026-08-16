@@ -3,14 +3,13 @@ import "server-only";
 import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
 import {
   accounts,
   assets,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
   eventLedgerEntries,
-  portfolioGroupAccountMemberships,
-  portfolioGroupAssetMemberships,
 } from "@/db/schema";
 import {
   buildInvestmentLabAnalysisScopeEvidence,
@@ -33,8 +32,7 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
 }): Promise<InvestmentLabAnalysisScopeEvidence> {
   const [
     ownedAccounts,
-    accountMemberships,
-    assetMemberships,
+    memberships,
     positionRows,
     eventRows,
     provenanceRows,
@@ -48,47 +46,17 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
       .from(accounts)
       .where(eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId)),
     scope.kind === "portfolio_group"
-      ? db
-          .select({
-            targetId: portfolioGroupAccountMemberships.accountId,
-            validFrom: portfolioGroupAccountMemberships.validFrom,
-            validTo: portfolioGroupAccountMemberships.validTo,
-          })
-          .from(portfolioGroupAccountMemberships)
-          .where(
-            and(
-              eq(
-                portfolioGroupAccountMemberships.canonicalOwnerUserId,
-                tenantContext.ownerUserId,
-              ),
-              eq(
-                portfolioGroupAccountMemberships.portfolioGroupId,
-                scope.portfolioGroupId,
-              ),
-            ),
-          )
-      : Promise.resolve([]),
-    scope.kind === "portfolio_group"
-      ? db
-          .select({
-            targetId: portfolioGroupAssetMemberships.assetId,
-            validFrom: portfolioGroupAssetMemberships.validFrom,
-            validTo: portfolioGroupAssetMemberships.validTo,
-          })
-          .from(portfolioGroupAssetMemberships)
-          .where(
-            and(
-              eq(
-                portfolioGroupAssetMemberships.canonicalOwnerUserId,
-                tenantContext.ownerUserId,
-              ),
-              eq(
-                portfolioGroupAssetMemberships.portfolioGroupId,
-                scope.portfolioGroupId,
-              ),
-            ),
-          )
-      : Promise.resolve([]),
+      ? loadTenantPortfolioGroupMemberships({
+          mode: "all",
+          portfolioGroupId: scope.portfolioGroupId,
+          tenantContext,
+        })
+      : Promise.resolve(
+          Object.freeze({
+            accountMemberships: Object.freeze([]),
+            assetMemberships: Object.freeze([]),
+          }),
+        ),
     db
       .select({
         snapshotDate: dailyPositionSnapshots.snapshotDate,
@@ -209,8 +177,8 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
   return buildInvestmentLabAnalysisScopeEvidence({
     scope,
     accounts: ownedAccounts,
-    accountMemberships,
-    assetMemberships,
+    accountMemberships: memberships.accountMemberships,
+    assetMemberships: memberships.assetMemberships,
     positions: importedPositionRows.map((row) => {
       const { identityKey, ...position } = row;
       void identityKey;

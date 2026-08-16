@@ -1,9 +1,10 @@
 import "server-only";
 
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { accounts, portfolioGroups } from "@/db/schema";
+import { loadActiveTenantPortfolioGroups } from "@/db/queries/tenant-group-reads";
+import { accounts } from "@/db/schema";
 import {
   buildPortfolioAnalysisScopeCatalog,
   resolvePortfolioAnalysisScope,
@@ -54,23 +55,7 @@ export async function getReadOnlyTenantPortfolioAnalysisScopeContext({
           ),
         )
         .orderBy(asc(accounts.sortOrder), asc(accounts.name), asc(accounts.code)),
-      db
-        .select({
-          id: portfolioGroups.id,
-          name: portfolioGroups.name,
-          sortOrder: portfolioGroups.sortOrder,
-        })
-        .from(portfolioGroups)
-        .where(
-          and(
-            eq(
-              portfolioGroups.canonicalOwnerUserId,
-              tenantContext.ownerUserId,
-            ),
-            isNull(portfolioGroups.archivedAt),
-          ),
-        )
-        .orderBy(asc(portfolioGroups.sortOrder), asc(portfolioGroups.name)),
+      loadActiveTenantPortfolioGroups(tenantContext),
     ]);
 
     const catalog = buildPortfolioAnalysisScopeCatalog({
