@@ -1,6 +1,8 @@
+import { TENANT_CONTEXT_SETTING_NAME } from "./tenant-security-constants.ts";
+
 export const TENANT_TRANSACTION_CONTEXT_POLICY = Object.freeze({
   policyId: "tenant_transaction_context_v1",
-  settingName: "app.current_user_id",
+  settingName: TENANT_CONTEXT_SETTING_NAME,
   isolationLevel: "ReadCommitted",
   readOnly: true,
 });

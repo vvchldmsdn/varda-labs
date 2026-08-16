@@ -72,6 +72,7 @@
     "audit:tenant-ownership": "node --no-warnings scripts/audit-tenant-ownership-preflight.mjs",
     "audit:tenant-db-role": "node --no-warnings scripts/audit-tenant-database-role-boundary.mjs",
     "audit:tenant-db-context": "node --conditions=react-server --import tsx scripts/audit-tenant-transaction-context.ts",
+    "audit:accounts-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-accounts-tenant-rls.ts",
     "tenant-db-role:provision": "node --no-warnings scripts/provision-tenant-database-role.mjs",
     "audit:tenant-snapshot-readiness": "node --no-warnings scripts/audit-tenant-snapshot-readiness.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",
