@@ -190,6 +190,13 @@
       "when": 1786588427095,
       "tag": "0026_curved_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786850659293,
+      "tag": "0027_easy_kulan_gath",
+      "breakpoints": true
     }
   ]
 }

@@ -606,6 +606,110 @@ export type HoldingOnboardingEvidence =
 export type NewHoldingOnboardingEvidence =
   typeof holdingOnboardingEvidence.$inferInsert;
 
+export const holdingStateCorrections = pgTable(
+  "holding_state_corrections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    previousQuantity: decimal("previous_quantity", {
+      precision: 20,
+      scale: 6,
+    }).notNull(),
+    correctedQuantity: decimal("corrected_quantity", {
+      precision: 20,
+      scale: 6,
+    }).notNull(),
+    previousAverageCost: decimal("previous_average_cost", {
+      precision: 20,
+      scale: 4,
+    }),
+    correctedAverageCost: decimal("corrected_average_cost", {
+      precision: 20,
+      scale: 4,
+    }).notNull(),
+    previousAssetUpdatedAt: timestamp("previous_asset_updated_at", {
+      withTimezone: true,
+    }).notNull(),
+    correctedAssetUpdatedAt: timestamp("corrected_asset_updated_at", {
+      withTimezone: true,
+    }).notNull(),
+    reason: text("reason"),
+    policyVersion: varchar("policy_version", { length: 100 })
+      .default("holding_state_correction_v1")
+      .notNull(),
+    correctedAt: timestamp("corrected_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "holding_state_corrections_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "holding_state_corrections_asset_owner_fk",
+      columns: [table.assetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "holding_state_corrections_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "holding_state_corrections_asset_account_fk",
+      columns: [table.assetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    ownerUserIdIdx: index(
+      "holding_state_corrections_owner_user_id_idx",
+    ).on(table.canonicalOwnerUserId),
+    assetCorrectedAtIdx: index(
+      "holding_state_corrections_asset_corrected_at_idx",
+    ).on(table.assetId, table.correctedAt),
+    accountCorrectedAtIdx: index(
+      "holding_state_corrections_account_corrected_at_idx",
+    ).on(table.accountId, table.correctedAt),
+    previousQuantityCheck: check(
+      "holding_state_corrections_previous_quantity_check",
+      sql`${table.previousQuantity} >= 0`,
+    ),
+    correctedQuantityCheck: check(
+      "holding_state_corrections_corrected_quantity_check",
+      sql`${table.correctedQuantity} > 0`,
+    ),
+    previousAverageCostCheck: check(
+      "holding_state_corrections_previous_average_cost_check",
+      sql`${table.previousAverageCost} is null or ${table.previousAverageCost} >= 0`,
+    ),
+    correctedAverageCostCheck: check(
+      "holding_state_corrections_corrected_average_cost_check",
+      sql`${table.correctedAverageCost} > 0`,
+    ),
+    timestampOrderCheck: check(
+      "holding_state_corrections_timestamp_order_check",
+      sql`${table.correctedAssetUpdatedAt} >= ${table.previousAssetUpdatedAt} and ${table.correctedAt} = ${table.correctedAssetUpdatedAt}`,
+    ),
+    reasonCheck: check(
+      "holding_state_corrections_reason_check",
+      sql`${table.reason} is null or (${table.reason} = btrim(${table.reason}) and char_length(${table.reason}) between 1 and 500)`,
+    ),
+    policyVersionCheck: check(
+      "holding_state_corrections_policy_version_check",
+      sql`${table.policyVersion} = 'holding_state_correction_v1'`,
+    ),
+  }),
+);
+
+export type HoldingStateCorrection =
+  typeof holdingStateCorrections.$inferSelect;
+export type NewHoldingStateCorrection =
+  typeof holdingStateCorrections.$inferInsert;
+
 export const portfolioGroups = pgTable(
   "portfolio_groups",
   {

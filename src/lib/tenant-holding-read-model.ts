@@ -14,13 +14,16 @@ export type TenantHoldingReadRow = Readonly<{
   market: string;
   currency: string;
   quantity: string;
+  averageCost: string | null;
   currentPrice: string;
   priceSource: string | null;
   priceAsOf: Date | null;
   priceStatus: string | null;
+  updatedAt: Date;
 }>;
 
 export type TenantHoldingDto = Readonly<{
+  holdingId: string;
   accountCode: string;
   accountName: string;
   name: string;
@@ -29,10 +32,12 @@ export type TenantHoldingDto = Readonly<{
   market: string;
   currency: string;
   quantity: string;
+  averageCost: string | null;
   currentPrice: string;
   priceSource: string | null;
   priceAsOf: string | null;
   priceStatus: string | null;
+  updatedAt: string;
 }>;
 
 export type TenantHoldingReadResult =
@@ -86,7 +91,9 @@ export function projectTenantHoldingRows(
       !isCanonicalLowercaseText(row.market) ||
       !isCanonicalUppercaseText(row.currency) ||
       !isOptionalCanonicalText(row.priceSource) ||
-      !isOptionalCanonicalText(row.priceStatus)
+      !isOptionalCanonicalText(row.priceStatus) ||
+      (row.averageCost !== null &&
+        !isCanonicalNonnegativeDecimal(row.averageCost))
     ) {
       excludedHoldingCount += 1;
       continue;
@@ -99,9 +106,11 @@ export function projectTenantHoldingRows(
       continue;
     }
     if (
-      row.priceAsOf !== null &&
-      (!(row.priceAsOf instanceof Date) ||
-        !Number.isFinite(row.priceAsOf.getTime()))
+      (row.priceAsOf !== null &&
+        (!(row.priceAsOf instanceof Date) ||
+          !Number.isFinite(row.priceAsOf.getTime()))) ||
+      !(row.updatedAt instanceof Date) ||
+      !Number.isFinite(row.updatedAt.getTime())
     ) {
       excludedHoldingCount += 1;
       continue;
@@ -110,6 +119,7 @@ export function projectTenantHoldingRows(
     seenAssetIds.add(row.assetId);
     holdings.push(
       Object.freeze({
+        holdingId: row.assetId,
         accountCode: row.accountCode,
         accountName: row.accountName,
         accountSortOrder: row.accountSortOrder,
@@ -119,10 +129,12 @@ export function projectTenantHoldingRows(
         market: row.market,
         currency: row.currency,
         quantity: row.quantity,
+        averageCost: row.averageCost,
         currentPrice: row.currentPrice,
         priceSource: row.priceSource,
         priceAsOf: row.priceAsOf?.toISOString() ?? null,
         priceStatus: row.priceStatus,
+        updatedAt: row.updatedAt.toISOString(),
       }),
     );
   }
@@ -146,6 +158,7 @@ function toPublicHolding(
   holding: TenantHoldingDto & Readonly<{ accountSortOrder: number }>,
 ): TenantHoldingDto {
   return Object.freeze({
+    holdingId: holding.holdingId,
     accountCode: holding.accountCode,
     accountName: holding.accountName,
     name: holding.name,
@@ -154,10 +167,12 @@ function toPublicHolding(
     market: holding.market,
     currency: holding.currency,
     quantity: holding.quantity,
+    averageCost: holding.averageCost,
     currentPrice: holding.currentPrice,
     priceSource: holding.priceSource,
     priceAsOf: holding.priceAsOf,
     priceStatus: holding.priceStatus,
+    updatedAt: holding.updatedAt,
   });
 }
 

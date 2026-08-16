@@ -15,7 +15,6 @@ import {
   assertPreviewPortfolioScopeRowsPreserved,
   assertPreviewTargetPolicyRowsPreserved,
   assertReviewedPreHoldingOnboardingPreviewDatabaseCatalog,
-  assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog,
   assertReviewedPrePortfolioScopePreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
@@ -129,10 +128,10 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0026_curved_raider",
-        createdAt: 1786588427095,
+        tag: "0027_easy_kulan_gath",
+        createdAt: 1786850659293,
         sha256:
-          "cdfb124a33cea8e54cc75147ee850fb5f69594b0cb1fd9fe45835bd45bf4cba9",
+          "b65c0e226c6ef201b2d2abf213222a58a7bc9e1b39d44ff913a05f101c9ea591",
       },
     );
     assert.deepEqual(
@@ -142,9 +141,9 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 27,
+        entryCount: 28,
         sha256:
-          "sha256:964965a30697a028b547a8487655c34d03eb73c2dca9c5d2b4213bcac77d53b0",
+          "sha256:30db1378dc40419a271dbb18ef7fa19ab9f6fbd01ecd2b21f17c4ac124d4b124",
       },
     );
   });
@@ -186,7 +185,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v9",
+        evidenceVersion: "preview_database_evidence_v10",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
@@ -194,7 +193,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0026_present",
+      "reviewed_0027_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -228,20 +227,9 @@ describe("Preview database target operational guard", () => {
       ...reviewed,
       latestMigration: appliedMigrations.at(-1) ?? null,
       appliedMigrations,
-      reviewedCatalog: {
-        ...reviewed.reviewedCatalog,
-        portfolioTargetPolicyTables: [],
-        portfolioTargetPolicyConstraints: [],
-        portfolioTargetPolicyIndexes: [],
-        portfolioTargetPolicyRows: null,
-      },
     };
     assert.doesNotThrow(() =>
-      assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog(pending),
-    );
-    assert.throws(
-      () => assertReviewedPreviewDatabaseCatalog(pending),
-      /0026 catalog is incomplete/,
+      assertReviewedPreviewDatabaseCatalog(pending),
     );
     assert.throws(
       () => assertReviewedPreviewDatabaseState(pending),
@@ -270,13 +258,13 @@ describe("Preview database target operational guard", () => {
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0026_not_present",
+        migrationLedgerStatus: "reviewed_0027_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
         portfolioScopeCatalogStatus: "reviewed_0024_present",
         holdingOnboardingCatalogStatus: "reviewed_0025_present",
-        portfolioTargetPolicyCatalogStatus: "reviewed_0026_not_present",
+        portfolioTargetPolicyCatalogStatus: "reviewed_0026_present",
       },
     );
   });
@@ -328,12 +316,12 @@ describe("Preview database target operational guard", () => {
       "scripts/preview-database-evidence.mjs",
       "utf8",
     );
-    assert.match(buildScript, /preview_database_build_preflight_v10/);
+    assert.match(buildScript, /preview_database_build_preflight_v11/);
     assert.match(buildScript, /targetPolicyRows/);
     assert.match(buildScript, /assertPreviewTargetPolicyRowsPreserved/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0026 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0027 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -358,8 +346,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0026_curved_raider",
-        migrationLedgerStatus: "reviewed_0026_not_present",
+        latestReviewedMigration: "0027_easy_kulan_gath",
+        migrationLedgerStatus: "reviewed_0027_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );

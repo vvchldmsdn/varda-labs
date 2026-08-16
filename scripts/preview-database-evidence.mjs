@@ -11,7 +11,7 @@ import {
   assertPreviewPortfolioTargetPolicyRowsPreserved,
   assertPreviewTargetPolicyRowsPreserved,
   assertPreviewPortfolioScopeRowsPreserved,
-  assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog,
+  assertReviewedPreviewDatabaseCatalog,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
   readPreviewDatabaseState,
@@ -22,7 +22,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v10.json",
+  "varda-preview-database-preflight-v11.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -60,7 +60,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v10",
+      evidenceVersion: "preview_database_build_preflight_v11",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
@@ -88,7 +88,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v10",
+    "preview_database_build_preflight_v11",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -130,13 +130,13 @@ function assertPreflightCatalog(plan, state, localMigrations) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0026_curved_raider"],
-    "Only reviewed migration 0026 may be pending",
+    ["0027_easy_kulan_gath"],
+    "Only reviewed migration 0027 may be pending",
   );
   assert.equal(
     plan.latestAppliedTag,
-    "0025_nebulous_the_phantom",
-    "Pending 0026 target must start from reviewed migration 0025",
+    "0026_curved_raider",
+    "Pending 0027 target must start from reviewed migration 0026",
   );
   const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
@@ -145,9 +145,9 @@ function assertPreflightCatalog(plan, state, localMigrations) {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0026",
+    "Preview state and migration ledger disagree before migration 0027",
   );
-  assertReviewedPrePortfolioTargetPolicyPreviewDatabaseCatalog(state);
+  assertReviewedPreviewDatabaseCatalog(state);
 }
 
 function readLocalMigrations() {

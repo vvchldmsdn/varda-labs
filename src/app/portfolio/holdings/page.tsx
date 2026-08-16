@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HoldingStateCorrectionForm } from "@/components/holding-state-correction-form";
 import { ManualKrxGoldPriceForm } from "@/components/manual-krx-gold-price-form";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import {
@@ -136,7 +137,7 @@ export default async function TenantHoldingsPage({
                 the count, and this result must not be used for valuation totals.
               </p>
             ) : null}
-            <table className="min-w-[760px] w-full border-collapse text-left text-sm">
+            <table className="min-w-[1120px] w-full border-collapse text-left text-sm">
               <thead className="bg-[#eef2e8] text-xs text-[#5e685e]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Holding</th>
@@ -146,23 +147,25 @@ export default async function TenantHoldingsPage({
                     Quantity
                   </th>
                   <th className="px-4 py-3 text-right font-semibold">
+                    Average cost
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">
                     Stored price
                   </th>
                   <th className="px-4 py-3 font-semibold">Price evidence</th>
+                  <th className="px-4 py-3 font-semibold">Correction</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e5e8df]">
                 {result.holdings.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-5 text-[#687064]" colSpan={6}>
+                    <td className="px-4 py-5 text-[#687064]" colSpan={8}>
                       No owned holdings are linked to this account scope.
                     </td>
                   </tr>
                 ) : (
-                  result.holdings.map((holding, index) => (
-                    <tr
-                      key={`${holding.accountCode}:${holding.market}:${holding.ticker ?? holding.name}:${index}`}
-                    >
+                  result.holdings.map((holding) => (
+                    <tr key={holding.holdingId}>
                       <td className="px-4 py-3">
                         <p className="font-semibold">{holding.name}</p>
                         <p className="text-xs text-[#687064]">
@@ -183,6 +186,11 @@ export default async function TenantHoldingsPage({
                         {holding.quantity}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
+                        {holding.averageCost === null
+                          ? "Not recorded"
+                          : `${holding.averageCost} ${holding.currency}`}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
                         {holding.currentPrice} {holding.currency}
                       </td>
                       <td className="px-4 py-3 text-xs text-[#687064]">
@@ -195,6 +203,15 @@ export default async function TenantHoldingsPage({
                             currentPrice={holding.currentPrice}
                           />
                         ) : null}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <HoldingStateCorrectionForm
+                          averageCost={holding.averageCost}
+                          currency={holding.currency}
+                          holdingId={holding.holdingId}
+                          quantity={holding.quantity}
+                          updatedAt={holding.updatedAt}
+                        />
                       </td>
                     </tr>
                   ))
