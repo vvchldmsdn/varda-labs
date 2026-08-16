@@ -106,4 +106,16 @@ describe("snapshot tenant RLS", () => {
       assert.doesNotMatch(source, /from "@\/db\/client"/);
     }
   });
+
+  it("reads the physical portfolio snapshot USD/KRW column", () => {
+    const schema = readFileSync("src/db/schema.ts", "utf8");
+    const source = readFileSync(
+      "src/db/queries/tenant-portfolio-snapshots.ts",
+      "utf8",
+    );
+
+    assert.match(schema, /usdKrw:\s*decimal\("usdkrw"/);
+    assert.match(source, /snapshot\.usdkrw::text as usd_krw/);
+    assert.doesNotMatch(source, /snapshot\.usd_krw/);
+  });
 });
