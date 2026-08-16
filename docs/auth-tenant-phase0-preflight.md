@@ -236,6 +236,24 @@ Future role model:
 - admin job role: separate from user sessions and explicitly authorized;
 - public browser: never connects to Postgres directly.
 
+The runtime connection boundary is now explicit:
+
+- `DATABASE_URL` remains the privileged migration/operator connection during
+  the transition;
+- `TENANT_DATABASE_URL` is reserved for the non-owner, non-`BYPASSRLS`
+  application role;
+- the tenant URL must point at the same Neon endpoint and database while using
+  a distinct role and credential secret;
+- tenant runtime code must fail closed when `TENANT_DATABASE_URL` is absent and
+  must never fall back to `DATABASE_URL`;
+- `npm run audit:tenant-db-role` performs the SELECT-only role posture check.
+
+As of the 2026-08-16 Production audit, the existing `DATABASE_URL` role owns
+public tables and has `BYPASSRLS`. Enabling policies while that connection is
+still used for product reads would not establish database-layer tenant
+isolation. Role provisioning, least-privilege grants, transaction-scoped
+identity proof, and RLS policy activation remain separate subsequent gates.
+
 Future request identity direction:
 
 1. Server session resolves provider identity to `app_users.id`.

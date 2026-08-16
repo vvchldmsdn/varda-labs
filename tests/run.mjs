@@ -1,5 +1,6 @@
 import "./market-calendar.test.mjs";
 import "./tenant-ownership-audit.test.mjs";
+import "./tenant-database-role-boundary.test.mjs";
 import "./snapshot-gap-backfill.test.mjs";
 import "./frankfurter-history.test.mjs";
 import "./portfolio-math.test.mjs";
