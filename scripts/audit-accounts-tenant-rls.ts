@@ -57,11 +57,12 @@ async function main() {
 
   auditStage = "runtime_import";
   const {
-    tenantSqlClient,
+    getTenantSqlClient,
   } = await import("../src/db/tenant-client.ts");
   const {
     runTenantReadTransaction,
   } = await import("../src/db/tenant-transaction-context.ts");
+  const tenantSqlClient = getTenantSqlClient();
 
   auditStage = "no_context_before";
   const beforeRows = await tenantSqlClient.query(VISIBLE_COUNT_SQL);

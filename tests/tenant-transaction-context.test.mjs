@@ -73,6 +73,7 @@ describe("tenant transaction context", () => {
     );
 
     assert.match(source, /^import "server-only";/);
+    assert.match(source, /getTenantSqlClient\(\)/);
     assert.match(source, /normalizeTenantContextOwnerUserId\(ownerUserId\)/);
     assert.match(
       source,

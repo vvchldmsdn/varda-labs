@@ -79,4 +79,20 @@ describe("accounts tenant RLS canary", () => {
     assert.doesNotMatch(audit, /console\.log\(process\.env/);
     assert.doesNotMatch(audit, /\bownerUserId\s*:/);
   });
+
+  it("routes the account-management account read through the RLS transaction", () => {
+    const query = readFileSync(
+      "src/db/queries/account-management.ts",
+      "utf8",
+    );
+    const accountSql = query.match(
+      /const ACCOUNT_MANAGEMENT_ACCOUNT_ROWS_SQL = `([\s\S]*?)`;/,
+    )?.[1];
+
+    assert.match(query, /runTenantReadTransaction\(ownerUserId/);
+    assert.ok(accountSql);
+    assert.match(accountSql, /from public\.accounts/);
+    assert.doesNotMatch(accountSql, /canonical_owner_user_id|owner_user_id/);
+    assert.match(query, /eq\(assets\.canonicalOwnerUserId, ownerUserId\)/);
+  });
 });

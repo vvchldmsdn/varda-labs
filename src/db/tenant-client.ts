@@ -1,20 +1,34 @@
 import "server-only";
 
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import {
+  neon,
+  type NeonQueryFunction,
+} from "@neondatabase/serverless";
 
 import { guardTenantDatabaseRoleBoundary } from "@/lib/deployment/tenant-database-role-boundary";
 
-import * as schema from "./schema";
+type TenantSqlClient = NeonQueryFunction<false, false>;
 
-export const tenantDatabaseRoleBoundary = guardTenantDatabaseRoleBoundary(
-  process.env,
-);
+let cachedTenantClient:
+  | Readonly<{
+      databaseUrl: string;
+      sql: TenantSqlClient;
+    }>
+  | undefined;
 
-const tenantDatabaseUrl = process.env.TENANT_DATABASE_URL;
-if (!tenantDatabaseUrl) {
-  throw new Error("TENANT_DATABASE_URL is not set");
+export function getTenantSqlClient(): TenantSqlClient {
+  guardTenantDatabaseRoleBoundary(process.env);
+
+  const tenantDatabaseUrl = process.env.TENANT_DATABASE_URL?.trim();
+  if (!tenantDatabaseUrl) {
+    throw new Error("TENANT_DATABASE_URL is not set");
+  }
+
+  if (cachedTenantClient?.databaseUrl === tenantDatabaseUrl) {
+    return cachedTenantClient.sql;
+  }
+
+  const sql = neon(tenantDatabaseUrl);
+  cachedTenantClient = Object.freeze({ databaseUrl: tenantDatabaseUrl, sql });
+  return sql;
 }
-
-export const tenantSqlClient = neon(tenantDatabaseUrl);
-export const tenantDb = drizzle(tenantSqlClient, { schema });

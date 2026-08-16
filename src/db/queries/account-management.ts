@@ -1,14 +1,14 @@
 import "server-only";
 
-import { and, asc, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
-  accounts,
   assets,
   portfolioGroupAccountMemberships,
   portfolioGroupAssetMemberships,
 } from "@/db/schema";
+import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type AccountManagementModel = Readonly<{
@@ -48,73 +48,63 @@ export async function getReadOnlyTenantAccountManagementModel({
   );
 
   try {
-    const [accountRows, holdingRows, accountMembershipRows, assetMembershipRows] =
-      await Promise.all([
-        db
-          .select({
-            id: accounts.id,
-            code: accounts.code,
-            name: accounts.name,
-            accountType: accounts.accountType,
-            currency: accounts.currency,
-            isActive: accounts.isActive,
-            sortOrder: accounts.sortOrder,
-            updatedAt: accounts.updatedAt,
-          })
-          .from(accounts)
-          .where(eq(accounts.canonicalOwnerUserId, ownerUserId))
-          .orderBy(
-            desc(accounts.isActive),
-            asc(accounts.sortOrder),
-            asc(accounts.name),
+    const [
+      accountResultSets,
+      holdingRows,
+      accountMembershipRows,
+      assetMembershipRows,
+    ] = await Promise.all([
+      runTenantReadTransaction(ownerUserId, (transaction) => [
+        transaction.query(ACCOUNT_MANAGEMENT_ACCOUNT_ROWS_SQL),
+      ]),
+      db
+        .select({ accountId: assets.accountId })
+        .from(assets)
+        .where(
+          and(
+            eq(assets.canonicalOwnerUserId, ownerUserId),
+            sql`${assets.accountId} is not null`,
+            sql`${assets.quantity} > 0`,
           ),
-        db
-          .select({ accountId: assets.accountId })
-          .from(assets)
-          .where(
-            and(
-              eq(assets.canonicalOwnerUserId, ownerUserId),
-              sql`${assets.accountId} is not null`,
-              sql`${assets.quantity} > 0`,
+        ),
+      db
+        .select({
+          accountId: portfolioGroupAccountMemberships.accountId,
+          groupId: portfolioGroupAccountMemberships.portfolioGroupId,
+        })
+        .from(portfolioGroupAccountMemberships)
+        .where(
+          and(
+            eq(
+              portfolioGroupAccountMemberships.canonicalOwnerUserId,
+              ownerUserId,
             ),
+            openPeriod,
           ),
-        db
-          .select({
-            accountId: portfolioGroupAccountMemberships.accountId,
-            groupId: portfolioGroupAccountMemberships.portfolioGroupId,
-          })
-          .from(portfolioGroupAccountMemberships)
-          .where(
-            and(
-              eq(
-                portfolioGroupAccountMemberships.canonicalOwnerUserId,
-                ownerUserId,
-              ),
-              openPeriod,
+        ),
+      db
+        .select({
+          accountId: assets.accountId,
+          groupId: portfolioGroupAssetMemberships.portfolioGroupId,
+        })
+        .from(portfolioGroupAssetMemberships)
+        .innerJoin(
+          assets,
+          eq(portfolioGroupAssetMemberships.assetId, assets.id),
+        )
+        .where(
+          and(
+            eq(
+              portfolioGroupAssetMemberships.canonicalOwnerUserId,
+              ownerUserId,
             ),
+            eq(assets.canonicalOwnerUserId, ownerUserId),
+            sql`${assets.accountId} is not null`,
+            openAssetPeriod,
           ),
-        db
-          .select({
-            accountId: assets.accountId,
-            groupId: portfolioGroupAssetMemberships.portfolioGroupId,
-          })
-          .from(portfolioGroupAssetMemberships)
-          .innerJoin(
-            assets,
-            eq(portfolioGroupAssetMemberships.assetId, assets.id),
-          )
-          .where(
-            and(
-              eq(
-                portfolioGroupAssetMemberships.canonicalOwnerUserId,
-                ownerUserId,
-              ),
-              eq(assets.canonicalOwnerUserId, ownerUserId),
-              sql`${assets.accountId} is not null`,
-              openAssetPeriod,
-            ),
-          ),
-      ]);
+        ),
+    ]);
+    const accountRows = accountResultSets[0].map(projectTenantAccountRow);
 
     const activeHoldingCount = countByAccount(holdingRows);
     const groupReferences = new Map<string, Set<string>>();
@@ -136,7 +126,7 @@ export async function getReadOnlyTenantAccountManagementModel({
             accountType: row.accountType,
             currency: row.currency,
             isActive: row.isActive,
-            updatedAt: row.updatedAt.toISOString(),
+            updatedAt: row.updatedAt,
             activeHoldingCount: activeHoldingCount.get(row.id) ?? 0,
             openGroupReferenceCount: groupReferences.get(row.id)?.size ?? 0,
           }),
@@ -146,6 +136,54 @@ export async function getReadOnlyTenantAccountManagementModel({
   } catch {
     return Object.freeze({ state: "unavailable" });
   }
+}
+
+const ACCOUNT_MANAGEMENT_ACCOUNT_ROWS_SQL = `
+  select
+    id::text as id,
+    code,
+    name,
+    account_type,
+    currency,
+    is_active,
+    updated_at::text as updated_at
+  from public.accounts
+  order by is_active desc, sort_order asc, name asc
+`;
+
+function projectTenantAccountRow(row: Record<string, unknown>) {
+  return Object.freeze({
+    id: requiredString(row.id),
+    code: requiredString(row.code),
+    name: requiredString(row.name),
+    accountType: requiredString(row.account_type),
+    currency: requiredString(row.currency),
+    isActive: requiredBoolean(row.is_active),
+    updatedAt: requiredTimestamp(row.updated_at),
+  });
+}
+
+function requiredString(value: unknown) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Tenant account row is invalid");
+  }
+  return value;
+}
+
+function requiredBoolean(value: unknown) {
+  if (typeof value !== "boolean") {
+    throw new Error("Tenant account row is invalid");
+  }
+  return value;
+}
+
+function requiredTimestamp(value: unknown) {
+  const timestamp = requiredString(value);
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Tenant account row is invalid");
+  }
+  return parsed.toISOString();
 }
 
 function countByAccount(rows: readonly { accountId: string | null }[]) {

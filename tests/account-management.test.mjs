@@ -81,11 +81,18 @@ describe("owner-scoped account management", () => {
 
   it("reads all owner accounts and computes blockers without legacy fixed codes", () => {
     assert.match(querySource, /await Promise\.all\(\[/);
-    assert.match(querySource, /eq\(accounts\.canonicalOwnerUserId, ownerUserId\)/);
+    assert.match(querySource, /runTenantReadTransaction\(ownerUserId/);
     assert.match(querySource, /eq\(assets\.canonicalOwnerUserId, ownerUserId\)/);
     assert.match(querySource, /openGroupReferenceCount/);
     assert.doesNotMatch(querySource, /NAMED_PORTFOLIO_ACCOUNTS/);
     assert.doesNotMatch(querySource, /\bfetch\s*\(/);
+
+    const accountSql = querySource.match(
+      /const ACCOUNT_MANAGEMENT_ACCOUNT_ROWS_SQL = `([\s\S]*?)`;/,
+    )?.[1];
+    assert.ok(accountSql);
+    assert.match(accountSql, /from public\.accounts/);
+    assert.doesNotMatch(accountSql, /canonical_owner_user_id|owner_user_id/);
   });
 
   it("serializes owner writes and archives only after reference checks", () => {
