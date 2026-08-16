@@ -218,6 +218,10 @@ describe("stored named-account history position comparison", () => {
       new URL("../src/db/queries/history-balance.ts", import.meta.url),
       "utf8",
     );
+    const tenantSnapshotSource = readFileSync(
+      new URL("../src/db/queries/tenant-history-snapshots.ts", import.meta.url),
+      "utf8",
+    );
     const pageSource = readFileSync(
       new URL("../src/app/history/page.tsx", import.meta.url),
       "utf8",
@@ -239,9 +243,18 @@ describe("stored named-account history position comparison", () => {
 
     assert.match(querySource, /loadPositionComparisonRows/);
     assert.match(querySource, /HISTORY_POSITION_COMPARISON_QUERY_LIMIT/);
-    assert.match(querySource, /dailyPositionSnapshots\.legacyAssetId/);
-    assert.doesNotMatch(querySource, /\.leftJoin\(assets|\.innerJoin\(assets/);
-    assert.doesNotMatch(querySource, /livePriceQuotes|assetPriceSnapshots|fxRates/);
+    assert.match(querySource, /loadTenantHistoryPositionComparisonRows/);
+    assert.match(tenantSnapshotSource, /snapshot\.legacy_asset_id/);
+    assert.match(tenantSnapshotSource, /snapshot\.ticker/);
+    assert.match(tenantSnapshotSource, /snapshot\.asset_name/);
+    assert.doesNotMatch(
+      `${querySource}\n${tenantSnapshotSource}`,
+      /\.leftJoin\(assets|\.innerJoin\(assets/,
+    );
+    assert.doesNotMatch(
+      `${querySource}\n${tenantSnapshotSource}`,
+      /livePriceQuotes|assetPriceSnapshots|fxRates/,
+    );
     assert.doesNotMatch(pageSource, /fetch\(|\/api\//);
     assert.doesNotMatch(viewSource, /use client|fetch\(|\/api\//);
     assert.doesNotMatch(resultSource, /use client|fetch\(|\/api\//);

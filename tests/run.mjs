@@ -7,6 +7,7 @@ import "./accounts-tenant-rls.test.mjs";
 import "./assets-tenant-rls.test.mjs";
 import "./snapshot-tenant-rls.test.mjs";
 import "./history-financial-tenant-rls.test.mjs";
+import "./history-snapshot-tenant-reads.test.mjs";
 import "./snapshot-gap-backfill.test.mjs";
 import "./frankfurter-history.test.mjs";
 import "./portfolio-math.test.mjs";
