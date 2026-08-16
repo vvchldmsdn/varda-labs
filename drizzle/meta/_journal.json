@@ -218,6 +218,13 @@
       "when": 1786885846061,
       "tag": "0030_spooky_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786890896787,
+      "tag": "0031_third_penance",
+      "breakpoints": true
     }
   ]
 }

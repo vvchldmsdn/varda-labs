@@ -122,30 +122,44 @@ describe("current tenant read scope runtime boundary", () => {
   it("authorizes position snapshots only through active owned accounts", () => {
     const source = read("src/db/queries/tenant-position-snapshots.ts");
     const accountSource = read("src/db/queries/tenant-snapshot-accounts.ts");
+    const snapshotSql = source.match(
+      /const TENANT_POSITION_SNAPSHOT_ROWS_SQL = `([\s\S]*?)`;/,
+    )?.[1];
+    const accountSql = accountSource.match(
+      /const TENANT_SNAPSHOT_ACCOUNTS_SQL = `([\s\S]*?)`;/,
+    )?.[1];
 
     assert.match(source, /^import "server-only";/);
     assert.match(source, /loadOwnedActiveSnapshotAccounts/);
+    assert.match(source, /runTenantReadTransaction/);
+    assert.match(source, /tenantContext\.ownerUserId/);
+    assert.ok(snapshotSql);
+    assert.match(snapshotSql, /from public\.daily_position_snapshots as snapshot/);
     assert.match(
-      source,
-      /innerJoin\(\s*accounts,\s*eq\(dailyPositionSnapshots\.accountId,\s*accounts\.id\)/,
+      snapshotSql,
+      /inner join public\.accounts as account on snapshot\.account_id = account\.id/,
     );
+    assert.match(snapshotSql, /account\.id = any\(\$2::uuid\[\]\)/);
+    assert.match(snapshotSql, /snapshot\.account = account\.code/);
+    assert.match(snapshotSql, /snapshot\.is_sample = false/);
+    assert.doesNotMatch(
+      snapshotSql,
+      /canonical_owner_user_id|owner_user_id|app\.current_user_id/,
+    );
+    assert.match(accountSource, /runTenantReadTransaction/);
+    assert.ok(accountSql);
+    assert.match(accountSql, /from public\.accounts as account/);
     assert.match(
-      accountSource,
-      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+      accountSql,
+      /inner join public\.assets as asset on asset\.account_id = account\.id/,
     );
-    assert.match(accountSource, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(accountSource, /ne\(accounts\.accountType,\s*"cash"\)/);
-    assert.match(accountSource, /eq\(assets\.accountId,\s*accounts\.id\)/);
-    assert.match(accountSource, /gt\(assets\.quantity,\s*"0"\)/);
+    assert.match(accountSql, /account\.is_active = true/);
+    assert.match(accountSql, /account\.account_type <> 'cash'/);
+    assert.match(accountSql, /asset\.quantity > 0/);
     assert.doesNotMatch(accountSource, /NAMED_PORTFOLIO_ACCOUNTS/);
-    assert.match(
-      source,
-      /eq\(dailyPositionSnapshots\.account,\s*accounts\.code\)/,
-    );
-    assert.match(source, /eq\(dailyPositionSnapshots\.isSample,\s*false\)/);
     assert.doesNotMatch(
       source,
-      /eq\(dailyPositionSnapshots\.(?:canonicalOwnerUserId|legacyAssetId|ticker)|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+      /from "@\/db\/client"|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
     );
   });
 
@@ -171,29 +185,43 @@ describe("current tenant read scope runtime boundary", () => {
   it("authorizes portfolio snapshots only through eligible active owned accounts", () => {
     const source = read("src/db/queries/tenant-portfolio-snapshots.ts");
     const accountSource = read("src/db/queries/tenant-snapshot-accounts.ts");
+    const snapshotSql = source.match(
+      /const TENANT_PORTFOLIO_SNAPSHOT_ROWS_SQL = `([\s\S]*?)`;/,
+    )?.[1];
+    const accountSql = accountSource.match(
+      /const TENANT_SNAPSHOT_ACCOUNTS_SQL = `([\s\S]*?)`;/,
+    )?.[1];
 
     assert.match(source, /^import "server-only";/);
     assert.match(source, /loadOwnedActiveSnapshotAccounts/);
+    assert.match(source, /runTenantReadTransaction/);
+    assert.match(source, /tenantContext\.ownerUserId/);
+    assert.ok(snapshotSql);
+    assert.match(snapshotSql, /from public\.daily_portfolio_snapshots as snapshot/);
     assert.match(
-      source,
-      /innerJoin\(\s*accounts,\s*eq\(dailyPortfolioSnapshots\.accountId,\s*accounts\.id\)/,
+      snapshotSql,
+      /inner join public\.accounts as account on snapshot\.account_id = account\.id/,
     );
+    assert.match(snapshotSql, /account\.id = any\(\$2::uuid\[\]\)/);
+    assert.match(snapshotSql, /snapshot\.account = account\.code/);
+    assert.match(snapshotSql, /snapshot\.is_sample = false/);
+    assert.doesNotMatch(
+      snapshotSql,
+      /canonical_owner_user_id|owner_user_id|app\.current_user_id/,
+    );
+    assert.match(accountSource, /runTenantReadTransaction/);
+    assert.ok(accountSql);
+    assert.match(accountSql, /from public\.accounts as account/);
     assert.match(
-      accountSource,
-      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+      accountSql,
+      /inner join public\.assets as asset on asset\.account_id = account\.id/,
     );
-    assert.match(accountSource, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(accountSource, /ne\(accounts\.accountType,\s*"cash"\)/);
-    assert.match(accountSource, /eq\(assets\.accountId,\s*accounts\.id\)/);
+    assert.match(accountSql, /account\.is_active = true/);
+    assert.match(accountSql, /account\.account_type <> 'cash'/);
     assert.doesNotMatch(accountSource, /NAMED_PORTFOLIO_ACCOUNTS/);
-    assert.match(
-      source,
-      /eq\(dailyPortfolioSnapshots\.account,\s*accounts\.code\)/,
-    );
-    assert.match(source, /eq\(dailyPortfolioSnapshots\.isSample,\s*false\)/);
     assert.doesNotMatch(
       source,
-      /eq\(dailyPortfolioSnapshots\.canonicalOwnerUserId|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
+      /from "@\/db\/client"|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
     );
   });
 

@@ -15,7 +15,11 @@ type TenantTableRlsAuditConfig = Readonly<{
   operation: string;
   policyName: string;
   successStatus: string;
-  tableName: "accounts" | "assets";
+  tableName:
+    | "accounts"
+    | "assets"
+    | "daily_portfolio_snapshots"
+    | "daily_position_snapshots";
 }>;
 
 export async function runTenantTableRlsAudit(

@@ -2191,8 +2191,17 @@ export const dailyPortfolioSnapshots = pgTable(
       "daily_portfolio_snapshots_generated_owner_check",
       sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ((${table.account} = 'all' and ${table.accountId} is null) or (${table.account} <> 'all' and ${table.accountId} is not null)))`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "daily_portfolio_snapshots_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const dailyPositionSnapshots = pgTable(
   "daily_position_snapshots",
@@ -2359,8 +2368,17 @@ export const dailyPositionSnapshots = pgTable(
       "daily_position_snapshots_asset_identity_check",
       sql`${table.assetId} is not null or ${table.legacyAssetId} is not null`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "daily_position_snapshots_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const settings = pgTable(
   "settings",
