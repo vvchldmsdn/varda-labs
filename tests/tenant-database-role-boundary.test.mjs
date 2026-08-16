@@ -133,8 +133,14 @@ describe("Tenant database role boundary", () => {
       "utf8",
     );
 
+    assert.match(source, /export function getTenantSqlClient/);
     assert.match(source, /guardTenantDatabaseRoleBoundary\(\s*process\.env/);
     assert.match(source, /process\.env\.TENANT_DATABASE_URL/);
+    assert.doesNotMatch(source, /export const tenantSqlClient\s*=\s*neon/);
+    assert.doesNotMatch(
+      source,
+      /export const tenantDatabaseRoleBoundary\s*=\s*guardTenantDatabaseRoleBoundary/,
+    );
     assert.doesNotMatch(
       source,
       /TENANT_DATABASE_URL\s*\?\?\s*process\.env\.DATABASE_URL/,

@@ -13,7 +13,7 @@ import {
   type TenantTransactionContextAssessment,
 } from "@/lib/deployment/tenant-transaction-context";
 
-import { tenantSqlClient } from "./tenant-client";
+import { getTenantSqlClient } from "./tenant-client";
 
 type TransactionSql = NeonQueryFunctionInTransaction<false, false>;
 type TenantReadQueryFactory = (
@@ -54,6 +54,7 @@ export async function auditTenantTransactionContextIsolation(): Promise<
   const insideTransaction = readSingleContextValue(
     execution.queryResults[0],
   );
+  const tenantSqlClient = getTenantSqlClient();
   const [nextTransactionRows] = await tenantSqlClient.transaction(
     (transaction) => [
       transaction.query(READ_CONTEXT_SQL, [settingName()]),
@@ -78,6 +79,7 @@ async function executeTenantReadTransaction(
   buildQueries: TenantReadQueryFactory,
 ) {
   const canonicalOwnerUserId = normalizeTenantContextOwnerUserId(ownerUserId);
+  const tenantSqlClient = getTenantSqlClient();
   let requestedQueryCount = 0;
   const results = await tenantSqlClient.transaction(
     (transaction) => {
@@ -120,6 +122,7 @@ async function executeTenantReadTransaction(
 }
 
 async function readStandaloneContext() {
+  const tenantSqlClient = getTenantSqlClient();
   const rows = await tenantSqlClient.query(READ_CONTEXT_SQL, [settingName()]);
   return readSingleContextValue(rows);
 }
