@@ -424,10 +424,15 @@ Core rules:
 - v1 still performs preflight duplicate/unmanaged-row checks before using Neon
   HTTP batch writes, because imported unmatched position rows can have nullable
   `asset_id`.
-- Migration `0030_spooky_ikaris` is generated and locally reviewed but is not
-  yet applied to Production. It broadens generated-row ownership constraints
-  from fixed account codes to any eligible account with a non-null `account_id`,
-  while preserving the special `all` aggregate with a null `account_id`.
+- Migration `0030_spooky_ikaris` was applied to Production on 2026-08-16 and
+  passed its constraint and ownership postflight. It broadens generated-row
+  ownership constraints from fixed account codes to any eligible account with
+  a non-null `account_id`, while preserving the special `all` aggregate with a
+  null `account_id`.
+- Migration `0031_third_penance` is locally reviewed and remains unapplied to
+  Production. It enables SELECT-only tenant RLS on both daily snapshot tables;
+  the owner-scoped snapshot canaries now read those tables through the
+  transaction-local tenant role instead of the privileged application client.
 
 Valuation basis:
 

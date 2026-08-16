@@ -128,10 +128,10 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0029_swift_wilson_fisk",
-        createdAt: 1786879415128,
+        tag: "0031_third_penance",
+        createdAt: 1786890896787,
         sha256:
-          "ebd95bcb5755c9b5f5a295cfc1b859b33c098c8dfc3f6f367f4831cb6ad473dd",
+          "390a42d2ba38db90f083393a2834f199b332dc7cc56084f385d8dfb8493c9f0d",
       },
     );
     assert.deepEqual(
@@ -141,9 +141,9 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 30,
+        entryCount: 32,
         sha256:
-          "sha256:0b07077e3dd7535dcb3e4d3d1539722538c4be2d868360a28b34315f2086f005",
+          "sha256:759f6a7bc0cc52c414e81d73da7c20cd3c23826067ef05e44baad3b95d81b71e",
       },
     );
   });
@@ -185,7 +185,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v12",
+        evidenceVersion: "preview_database_evidence_v13",
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",
@@ -193,7 +193,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0029_present",
+      "reviewed_0031_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -258,7 +258,7 @@ describe("Preview database target operational guard", () => {
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0029_not_present",
+        migrationLedgerStatus: "reviewed_0031_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
@@ -316,12 +316,12 @@ describe("Preview database target operational guard", () => {
       "scripts/preview-database-evidence.mjs",
       "utf8",
     );
-    assert.match(buildScript, /preview_database_build_preflight_v13/);
+    assert.match(buildScript, /preview_database_build_preflight_v14/);
     assert.match(buildScript, /targetPolicyRows/);
     assert.match(buildScript, /assertPreviewTargetPolicyRowsPreserved/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0029 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0031 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -346,8 +346,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0029_swift_wilson_fisk",
-        migrationLedgerStatus: "reviewed_0029_not_present",
+        latestReviewedMigration: "0031_third_penance",
+        migrationLedgerStatus: "reviewed_0031_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );
