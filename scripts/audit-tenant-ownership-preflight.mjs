@@ -9,6 +9,10 @@ import {
   resolveTenantTablePolicies,
   summarizeTenantClassifications,
 } from "./lib/tenant-ownership-policy.mjs";
+import {
+  buildTenantOwnershipAudit,
+  collectAuditedOwnerColumns,
+} from "./lib/tenant-ownership-audit.mjs";
 
 config({ path: ".env.local", quiet: true });
 
@@ -47,7 +51,11 @@ const ownerColumns = await sql.query(`
   select table_name, column_name, data_type, is_nullable
   from information_schema.columns
   where table_schema = 'public'
-    and column_name in ('owner_user_id', 'created_by_id')
+    and column_name in (
+      'owner_user_id',
+      'canonical_owner_user_id',
+      'created_by_id'
+    )
   order by table_name, column_name
 `);
 
@@ -66,89 +74,31 @@ const rowCounts = await sql.query(
   ).join(" union all "),
 );
 
-const legacyOwnerPolicies = activePolicies.filter(
-  (policy) => policy.currentOwnerColumn,
+const auditedOwnerColumns = collectAuditedOwnerColumns(
+  activePolicies,
+  ownerColumns,
 );
 const ownerStats = await sql.query(
-  legacyOwnerPolicies
+  auditedOwnerColumns
     .map(
-      ({ table, currentOwnerColumn }) => `
+      ({ table, columnName }) => `
         select
           '${table}'::text as table_name,
-          '${currentOwnerColumn}'::text as column_name,
-          count(*) filter (where "${currentOwnerColumn}" is null)::int as null_rows,
-          count(*) filter (where "${currentOwnerColumn}" is not null)::int as non_null_rows,
-          count(distinct "${currentOwnerColumn}")::int as distinct_values
+          '${columnName}'::text as column_name,
+          count(*) filter (where "${columnName}" is null)::int as null_rows,
+          count(*) filter (where "${columnName}" is not null)::int as non_null_rows,
+          count(distinct "${columnName}")::int as distinct_values
         from "${table}"
       `,
     )
     .join(" union all "),
 );
-
-const rowCountByTable = new Map(
-  rowCounts.map((row) => [row.table_name, Number(row.row_count)]),
-);
-const columnByKey = new Map(
-  ownerColumns.map((column) => [
-    `${column.table_name}:${column.column_name}`,
-    column,
-  ]),
-);
-const ownerStatsByKey = new Map(
-  ownerStats.map((stats) => [
-    `${stats.table_name}:${stats.column_name}`,
-    stats,
-  ]),
-);
-
-const tables = activePolicies.map((policy) => {
-  const currentColumn = policy.currentOwnerColumn
-    ? columnByKey.get(`${policy.table}:${policy.currentOwnerColumn}`)
-    : null;
-  const currentStats = policy.currentOwnerColumn
-    ? ownerStatsByKey.get(`${policy.table}:${policy.currentOwnerColumn}`)
-    : null;
-
-  if (policy.currentOwnerColumn) {
-    assert.ok(currentColumn, `${policy.table} owner column is missing`);
-    assert.ok(currentStats, `${policy.table} owner stats are missing`);
-  }
-
-  return {
-    table: policy.table,
-    classification: policy.classification,
-    rows: rowCountByTable.get(policy.table) ?? 0,
-    canonicalOwnerRequired: policy.canonicalOwnerRequired,
-    currentOwner: currentColumn
-      ? {
-          column: currentColumn.column_name,
-          type: currentColumn.data_type,
-          nullable: currentColumn.is_nullable === "YES",
-          nullRows: Number(currentStats.null_rows),
-          nonNullRows: Number(currentStats.non_null_rows),
-          distinctValues: Number(currentStats.distinct_values),
-        }
-      : null,
-    canonicalOwnerReady:
-      policy.ownershipPath === "parent_fk" ||
-      (currentColumn?.column_name ===
-        CANONICAL_OWNER_CONTRACT.ownerColumn &&
-        currentColumn?.data_type ===
-          CANONICAL_OWNER_CONTRACT.ownerColumnType &&
-        currentColumn?.is_nullable === "NO"),
-  };
+const ownershipAudit = buildTenantOwnershipAudit({
+  policies: activePolicies,
+  ownerColumns,
+  ownerStats,
+  rowCounts,
 });
-
-const userOwnedTables = tables.filter(
-  (table) => table.classification === "user_owned",
-);
-const canonicalOwnerReadyRows = userOwnedTables
-  .filter((table) => table.canonicalOwnerReady)
-  .reduce((sum, table) => sum + table.rows, 0);
-const userOwnedRows = userOwnedTables.reduce(
-  (sum, table) => sum + table.rows,
-  0,
-);
 
 console.log(
   JSON.stringify(
@@ -160,10 +110,8 @@ console.log(
       canonicalOwnerContract: CANONICAL_OWNER_CONTRACT,
       classificationCounts: summarizeTenantClassifications(activePolicies),
       foreignKeyCount: foreignKeys.length,
-      userOwnedRows,
-      canonicalOwnerReadyRows,
-      userOwnedRowsWithoutCanonicalOwner: userOwnedRows - canonicalOwnerReadyRows,
-      tables,
+      ...ownershipAudit.ownershipSummary,
+      tables: ownershipAudit.tables,
     },
     null,
     2,
