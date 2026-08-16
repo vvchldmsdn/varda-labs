@@ -64,25 +64,35 @@ describe("current tenant read scope runtime boundary", () => {
     );
 
     assert.match(source, /^import "server-only";/);
+    assert.match(source, /runTenantReadTransaction/);
+    assert.match(source, /tenantContext\.ownerUserId/);
+    assert.match(source, /from public\.assets as asset/);
     assert.match(
       source,
-      /innerJoin\(accounts,\s*eq\(assets\.accountId,\s*accounts\.id\)\)/,
+      /inner join public\.accounts as account on asset\.account_id = account\.id/,
     );
-    assert.match(
-      source,
-      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
+    assert.match(source, /where account\.is_active = true/);
+    assert.match(source, /asset\.account = account\.code/);
+    assert.doesNotMatch(
+      source.match(/const TENANT_HOLDING_ROWS_SQL = `([\s\S]*?)`;/)?.[1] ?? "",
+      /canonical_owner_user_id|owner_user_id/,
     );
-    assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(
-      source,
-      /eq\(assets\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
-    );
-    assert.match(source, /eq\(assets\.account,\s*accounts\.code\)/);
+    assert.match(source, /Promise\.all/);
+    assert.match(source, /wholeAccountIds\.has/);
+    assert.match(source, /directAssetIds\.has/);
     assert.match(source, /getPortfolioAnalysisScopeTargets/);
     assert.match(targetSource, /^import "server-only";/);
     assert.match(targetSource, /portfolioGroupAccountMemberships/);
     assert.match(targetSource, /portfolioGroupAssetMemberships/);
     assert.match(targetSource, /selectDistinct/);
+    assert.match(
+      targetSource,
+      /portfolioGroupAccountMemberships\.canonicalOwnerUserId/,
+    );
+    assert.match(
+      targetSource,
+      /portfolioGroupAssetMemberships\.canonicalOwnerUserId/,
+    );
     assert.match(targetSource, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
     assert.match(targetSource, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
     assert.doesNotMatch(

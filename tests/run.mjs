@@ -4,6 +4,7 @@ import "./tenant-database-role-boundary.test.mjs";
 import "./tenant-database-role-provisioning.test.mjs";
 import "./tenant-transaction-context.test.mjs";
 import "./accounts-tenant-rls.test.mjs";
+import "./assets-tenant-rls.test.mjs";
 import "./snapshot-gap-backfill.test.mjs";
 import "./frankfurter-history.test.mjs";
 import "./portfolio-math.test.mjs";

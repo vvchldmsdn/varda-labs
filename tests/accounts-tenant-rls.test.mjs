@@ -63,11 +63,18 @@ describe("accounts tenant RLS canary", () => {
   });
 
   it("keeps the executable audit SELECT-only and sanitized", () => {
-    const audit = readFileSync(
+    const wrapper = readFileSync(
       "scripts/audit-accounts-tenant-rls.ts",
       "utf8",
     );
+    const audit = readFileSync(
+      "scripts/lib/audit-tenant-table-rls.ts",
+      "utf8",
+    );
 
+    assert.match(wrapper, /runTenantTableRlsAudit/);
+    assert.match(wrapper, /policyName: "accounts_tenant_select_v1"/);
+    assert.match(wrapper, /tableName: "accounts"/);
     assert.match(audit, /privilegedSql\.query/);
     assert.doesNotMatch(audit, /privilegedSql\.transaction/);
     assert.match(audit, /databaseSideEffects: false/);
