@@ -47,7 +47,6 @@ export async function GET(request: Request) {
       runDailySnapshotJob({
         dryRun: true,
         snapshotDate: query.snapshotDate,
-        account: query.account,
       }),
       getKisPriceSyncCooldownStatus("close"),
     ]);

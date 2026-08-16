@@ -1,9 +1,4 @@
 import {
-  isNamedPortfolioAccount,
-  type NamedPortfolioAccount,
-  type PortfolioAccountScope,
-} from "./portfolio-account-scope.ts";
-import {
   fixedPercent,
   isNonnegativeFixedDecimal,
   isSignedFixedDecimal,
@@ -17,6 +12,10 @@ import type {
   TenantPortfolioSnapshotReadResult,
   TenantPortfolioSnapshotReadRow,
 } from "./tenant-portfolio-snapshot-contract.ts";
+import {
+  tenantSnapshotScopeMatchesAccount,
+  type TenantSnapshotScope,
+} from "./tenant-snapshot-scope.ts";
 
 export type {
   TenantPortfolioSnapshotAccountRow,
@@ -34,28 +33,22 @@ export function projectTenantPortfolioSnapshotRows({
 }: {
   accountRows: readonly TenantPortfolioSnapshotAccountRow[];
   rows: readonly TenantPortfolioSnapshotReadRow[];
-  scope: PortfolioAccountScope;
+  scope: TenantSnapshotScope;
   snapshotDate: string | null;
 }): TenantPortfolioSnapshotReadResult {
-  const accountsById = new Map<
-    string,
-    TenantPortfolioSnapshotAccountRow & {
-      accountCode: NamedPortfolioAccount;
-    }
-  >();
-  const accountIdsByCode = new Map<NamedPortfolioAccount, string>();
+  const accountsById = new Map<string, TenantPortfolioSnapshotAccountRow>();
+  const accountIdsByCode = new Map<string, string>();
 
   for (const account of accountRows) {
     if (
       !isCanonicalText(account.accountId) ||
-      !isNamedPortfolioAccount(account.accountCode) ||
-      account.accountCode.trim().toLowerCase() !== account.accountCode ||
+      !isCanonicalAccountCode(account.accountCode) ||
       !isCanonicalText(account.accountName) ||
       !Number.isSafeInteger(account.accountSortOrder)
     ) {
       return integrityError("invalid_account_metadata");
     }
-    if (scope !== "all" && account.accountCode !== scope) {
+    if (!tenantSnapshotScopeMatchesAccount(scope, account)) {
       return integrityError("account_scope_mismatch");
     }
     if (
@@ -65,10 +58,7 @@ export function projectTenantPortfolioSnapshotRows({
       return integrityError("duplicate_account_relation");
     }
 
-    accountsById.set(account.accountId, {
-      ...account,
-      accountCode: account.accountCode,
-    });
+    accountsById.set(account.accountId, account);
     accountIdsByCode.set(account.accountCode, account.accountId);
   }
 
@@ -79,7 +69,7 @@ export function projectTenantPortfolioSnapshotRows({
           left.accountSortOrder - right.accountSortOrder ||
           left.accountCode.localeCompare(right.accountCode),
       )
-      .map((account) => account.accountCode as NamedPortfolioAccount),
+      .map((account) => account.accountCode),
   );
 
   if (rows.length === 0) {
@@ -92,8 +82,8 @@ export function projectTenantPortfolioSnapshotRows({
   }
   if (snapshotDate === null) return integrityError("snapshot_date_mismatch");
 
-  const seenAccounts = new Set<NamedPortfolioAccount>();
-  const coveredAccountSet = new Set<NamedPortfolioAccount>();
+  const seenAccounts = new Set<string>();
+  const coveredAccountSet = new Set<string>();
   const sources = new Set<string>();
   const ruleVersionKeys = new Set<string>();
   const snapshots: Array<
@@ -115,7 +105,7 @@ export function projectTenantPortfolioSnapshotRows({
     ) {
       return integrityError("invalid_account_relation");
     }
-    if (scope !== "all" && row.accountCode !== scope) {
+    if (!tenantSnapshotScopeMatchesAccount(scope, ownedAccount)) {
       return integrityError("account_scope_mismatch");
     }
     if (row.snapshotDate !== snapshotDate) {
@@ -306,6 +296,16 @@ function toPublicSnapshot(
 
 function isCanonicalText(value: string) {
   return value.length > 0 && value.trim() === value;
+}
+
+function isCanonicalAccountCode(value: string) {
+  return (
+    isCanonicalText(value) &&
+    value.length <= 50 &&
+    value.toLowerCase() === value &&
+    value !== "all" &&
+    !value.includes(":")
+  );
 }
 
 function isOptionalCanonicalText(value: string | null) {

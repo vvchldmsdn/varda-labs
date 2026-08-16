@@ -7,11 +7,12 @@ import {
   getReadOnlyTenantPortfolioSnapshots,
   type TenantPortfolioSnapshotQueryResult,
 } from "@/db/queries/tenant-portfolio-snapshots";
+import { getReadOnlyTenantSnapshotScopeContext } from "@/db/queries/tenant-snapshot-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { parseTenantSnapshotDateQuery } from "@/lib/tenant-snapshot-date-query";
+import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -19,23 +20,40 @@ type TenantPortfolioSnapshotsPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     date?: string | string[];
+    scope?: string | string[];
   }>;
 };
 
 export default async function TenantPortfolioSnapshotsPage({
   searchParams,
 }: TenantPortfolioSnapshotsPageProps) {
-  const [params, resolution] = await Promise.all([
+  const [params, sessionResolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const scope = normalizePortfolioAccountScope(params.account);
   const requestedSnapshotDate = parseTenantSnapshotDateQuery(params.date);
+  const scopeContext = sessionResolution.ok
+    ? await getReadOnlyTenantSnapshotScopeContext({
+        account: params.account,
+        scope: params.scope,
+        tenantContext: sessionResolution.tenantContext,
+      })
+    : null;
+  const selectedScope =
+    scopeContext?.state === "ready" &&
+    scopeContext.resolution.state === "resolved" &&
+    isTenantSnapshotScope(scopeContext.resolution.scope)
+      ? scopeContext.resolution.scope
+      : null;
+  const scopes =
+    scopeContext?.state === "ready"
+      ? scopeContext.catalog.scopes.filter(isTenantSnapshotScope)
+      : [];
   const result =
-    requestedSnapshotDate !== null && resolution.ok
+    requestedSnapshotDate !== null && sessionResolution.ok && selectedScope
       ? await getReadOnlyTenantPortfolioSnapshots({
-          tenantContext: resolution.tenantContext,
-          scope,
+          tenantContext: sessionResolution.tenantContext,
+          scope: selectedScope,
           requestedSnapshotDate,
         })
       : null;
@@ -64,17 +82,22 @@ export default async function TenantPortfolioSnapshotsPage({
           </nav>
         </div>
 
-        <PortfolioSnapshotControls
-          requestedSnapshotDate={requestedSnapshotDate ?? undefined}
-          resolvedSnapshotDate={evidence?.snapshotDate}
-          scope={scope}
-        />
+        {selectedScope ? (
+          <PortfolioSnapshotControls
+            basePath="/portfolio/portfolio-snapshots"
+            requestedSnapshotDate={requestedSnapshotDate ?? undefined}
+            resolvedSnapshotDate={evidence?.snapshotDate}
+            scope={selectedScope}
+            scopes={scopes}
+          />
+        ) : null}
 
         <p className="mt-5 text-sm font-semibold">
           {portfolioSnapshotReadEvidence({
             result,
-            resolution,
+            resolution: sessionResolution,
             invalidDate: requestedSnapshotDate === null,
+            scopeReady: selectedScope !== null,
           })}
         </p>
 
@@ -109,12 +132,17 @@ function portfolioSnapshotReadEvidence({
   result,
   resolution,
   invalidDate,
+  scopeReady,
 }: {
   result: TenantPortfolioSnapshotQueryResult | null;
   resolution: SessionResolverResult;
   invalidDate: boolean;
+  scopeReady: boolean;
 }) {
   if (invalidDate) return "Invalid date; product data was not read.";
+  if (resolution.ok && !scopeReady) {
+    return "Snapshot account scope is unavailable; product data was not read.";
+  }
   if (result === null) {
     return `${sessionResolutionEvidence(resolution)}; product data was not read.`;
   }

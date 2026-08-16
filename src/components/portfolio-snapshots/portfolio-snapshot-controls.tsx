@@ -1,28 +1,32 @@
 import Link from "next/link";
 
-import { AccountScopeTabs } from "@/components/account-scope-tabs";
+import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import {
-  buildPortfolioAccountScopeHref,
-  type PortfolioAccountScope,
-} from "@/lib/portfolio-account-scope";
+  buildPortfolioAnalysisScopeHref,
+} from "@/lib/portfolio-analysis-scope";
+import type { TenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export function PortfolioSnapshotControls({
+  basePath,
   scope,
+  scopes,
   requestedSnapshotDate,
   resolvedSnapshotDate,
 }: {
-  scope: PortfolioAccountScope;
+  basePath: string;
+  scope: TenantSnapshotScope;
+  scopes: readonly TenantSnapshotScope[];
   requestedSnapshotDate?: string;
   resolvedSnapshotDate?: string;
 }) {
   return (
     <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-[#dfe3d5] pt-6">
       <form
-        action="/portfolio/portfolio-snapshots"
+        action={basePath}
         className="flex flex-wrap items-end gap-2"
         method="get"
       >
-        <input name="account" type="hidden" value={scope} />
+        <input name="scope" type="hidden" value={scope.key} />
         <label className="grid gap-1 text-xs font-semibold text-[#5e685e]">
           Snapshot date
           <input
@@ -40,20 +44,18 @@ export function PortfolioSnapshotControls({
         </button>
         <Link
           className="flex h-10 items-center rounded-md border border-[#cfd6c8] bg-white px-4 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-          href={buildPortfolioAccountScopeHref(
-            "/portfolio/portfolio-snapshots",
-            scope,
-          )}
+          href={buildPortfolioAnalysisScopeHref(basePath, scope.key)}
         >
           Latest
         </Link>
       </form>
-      <AccountScopeTabs
-        basePath="/portfolio/portfolio-snapshots"
+      <PortfolioAnalysisScopeTabs
+        basePath={basePath}
         query={
           requestedSnapshotDate ? { date: requestedSnapshotDate } : undefined
         }
-        selectedAccount={scope}
+        scopes={scopes}
+        selectedScopeKey={scope.key}
       />
     </div>
   );

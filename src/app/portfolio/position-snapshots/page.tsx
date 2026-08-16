@@ -1,18 +1,16 @@
 import Link from "next/link";
 
-import { AccountScopeTabs } from "@/components/account-scope-tabs";
+import { PortfolioSnapshotControls } from "@/components/portfolio-snapshots/portfolio-snapshot-controls";
 import {
   getReadOnlyTenantPositionSnapshots,
   type TenantPositionSnapshotQueryResult,
 } from "@/db/queries/tenant-position-snapshots";
+import { getReadOnlyTenantSnapshotScopeContext } from "@/db/queries/tenant-snapshot-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import {
-  buildPortfolioAccountScopeHref,
-  normalizePortfolioAccountScope,
-} from "@/lib/portfolio-account-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { parseTenantPositionSnapshotDateQuery } from "@/lib/tenant-position-snapshot-read-model";
+import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -20,25 +18,42 @@ type TenantPositionSnapshotsPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     date?: string | string[];
+    scope?: string | string[];
   }>;
 };
 
 export default async function TenantPositionSnapshotsPage({
   searchParams,
 }: TenantPositionSnapshotsPageProps) {
-  const [params, resolution] = await Promise.all([
+  const [params, sessionResolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-  const scope = normalizePortfolioAccountScope(params.account);
   const requestedSnapshotDate = parseTenantPositionSnapshotDateQuery(
     params.date,
   );
+  const scopeContext = sessionResolution.ok
+    ? await getReadOnlyTenantSnapshotScopeContext({
+        account: params.account,
+        scope: params.scope,
+        tenantContext: sessionResolution.tenantContext,
+      })
+    : null;
+  const selectedScope =
+    scopeContext?.state === "ready" &&
+    scopeContext.resolution.state === "resolved" &&
+    isTenantSnapshotScope(scopeContext.resolution.scope)
+      ? scopeContext.resolution.scope
+      : null;
+  const scopes =
+    scopeContext?.state === "ready"
+      ? scopeContext.catalog.scopes.filter(isTenantSnapshotScope)
+      : [];
   const result =
-    requestedSnapshotDate !== null && resolution.ok
+    requestedSnapshotDate !== null && sessionResolution.ok && selectedScope
       ? await getReadOnlyTenantPositionSnapshots({
-          tenantContext: resolution.tenantContext,
-          scope,
+          tenantContext: sessionResolution.tenantContext,
+          scope: selectedScope,
           requestedSnapshotDate,
         })
       : null;
@@ -70,57 +85,24 @@ export default async function TenantPositionSnapshotsPage({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-[#dfe3d5] pt-6">
-          <form
-            action="/portfolio/position-snapshots"
-            className="flex flex-wrap items-end gap-2"
-            method="get"
-          >
-            <input name="account" type="hidden" value={scope} />
-            <label className="grid gap-1 text-xs font-semibold text-[#5e685e]">
-              Snapshot date
-              <input
-                className="h-10 rounded-md border border-[#cfd6c8] bg-white px-3 text-sm text-[#171916]"
-                defaultValue={
-                  requestedSnapshotDate ??
-                  (isEvidenceResult(result) ? result.snapshotDate : "")
-                }
-                name="date"
-                type="date"
-              />
-            </label>
-            <button
-              className="h-10 rounded-md bg-[#173f38] px-4 text-sm font-semibold text-white hover:bg-[#235249]"
-              type="submit"
-            >
-              View date
-            </button>
-            <Link
-              className="flex h-10 items-center rounded-md border border-[#cfd6c8] bg-white px-4 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-              href={buildPortfolioAccountScopeHref(
-                "/portfolio/position-snapshots",
-                scope,
-              )}
-            >
-              Latest
-            </Link>
-          </form>
-          <AccountScopeTabs
+        {selectedScope ? (
+          <PortfolioSnapshotControls
             basePath="/portfolio/position-snapshots"
-            query={
-              requestedSnapshotDate
-                ? { date: requestedSnapshotDate }
-                : undefined
+            requestedSnapshotDate={requestedSnapshotDate ?? undefined}
+            resolvedSnapshotDate={
+              isEvidenceResult(result) ? result.snapshotDate : undefined
             }
-            selectedAccount={scope}
+            scope={selectedScope}
+            scopes={scopes}
           />
-        </div>
+        ) : null}
 
         <p className="mt-5 text-sm font-semibold">
           {positionSnapshotReadEvidence({
             result,
-            resolution,
+            resolution: sessionResolution,
             invalidDate: requestedSnapshotDate === null,
+            scopeReady: selectedScope !== null,
           })}
         </p>
 
@@ -264,12 +246,17 @@ function positionSnapshotReadEvidence({
   result,
   resolution,
   invalidDate,
+  scopeReady,
 }: {
   result: TenantPositionSnapshotQueryResult | null;
   resolution: SessionResolverResult;
   invalidDate: boolean;
+  scopeReady: boolean;
 }) {
   if (invalidDate) return "Invalid date; product data was not read.";
+  if (resolution.ok && !scopeReady) {
+    return "Snapshot account scope is unavailable; product data was not read.";
+  }
   if (result === null) {
     return `${sessionResolutionEvidence(resolution)}; product data was not read.`;
   }

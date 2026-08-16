@@ -1,7 +1,4 @@
-import type {
-  NamedPortfolioAccount,
-  PortfolioAccountScope,
-} from "./portfolio-account-scope.ts";
+import type { TenantSnapshotScope } from "./tenant-snapshot-scope.ts";
 
 export type TenantPortfolioSnapshotAccountRow = Readonly<{
   accountId: string;
@@ -40,7 +37,7 @@ export type TenantPortfolioSnapshotReadRow = Readonly<{
 }>;
 
 export type TenantPortfolioSnapshotDto = Readonly<{
-  accountCode: NamedPortfolioAccount;
+  accountCode: string;
   accountName: string;
   ruleVersion: string | null;
   cashValue: string | null;
@@ -76,13 +73,13 @@ export type TenantPortfolioSnapshotAggregate = Readonly<{
 export type TenantPortfolioSnapshotReadResult =
   | Readonly<{
       state: "ready" | "partial";
-      scope: PortfolioAccountScope;
+      scope: TenantSnapshotScope;
       snapshotDate: string;
       source: string;
       ruleVersions: readonly (string | null)[];
-      expectedAccounts: readonly NamedPortfolioAccount[];
-      coveredAccounts: readonly NamedPortfolioAccount[];
-      missingAccounts: readonly NamedPortfolioAccount[];
+      expectedAccounts: readonly string[];
+      coveredAccounts: readonly string[];
+      missingAccounts: readonly string[];
       snapshots: readonly TenantPortfolioSnapshotDto[];
       aggregate: TenantPortfolioSnapshotAggregate | null;
       excludedSnapshotCount: number;
@@ -91,9 +88,9 @@ export type TenantPortfolioSnapshotReadResult =
     }>
   | Readonly<{
       state: "no_data";
-      scope: PortfolioAccountScope;
+      scope: TenantSnapshotScope;
       snapshotDate: string | null;
-      expectedAccounts: readonly NamedPortfolioAccount[];
+      expectedAccounts: readonly string[];
     }>
   | Readonly<{
       state: "integrity_error";

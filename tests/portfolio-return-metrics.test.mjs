@@ -307,4 +307,156 @@ describe("portfolio return metrics", () => {
     assert.equal(irp.realizedPnlKrw, 1000);
     assert.equal(irp.realizedCostBasisKrw, 10000);
   });
+
+  it("matches an accountless event to one uniquely identified generated-account asset", () => {
+    const generatedAsset = {
+      ...asset,
+      id: "generated-account-asset",
+      legacyBase44Id: null,
+      account: "acct_11111111111141118111111111111111",
+      ticker: "DYNAMIC",
+      name: "Dynamic holding",
+      currency: "KRW",
+      averageCost: "1000",
+    };
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          eventType: "sell",
+          account: null,
+          assetId: null,
+          legacyAssetId: "missing-legacy-id",
+          ticker: "DYNAMIC",
+          assetName: "Dynamic holding",
+          amountKrw: "1100",
+          quantityDelta: "-1",
+        }),
+      ],
+      [generatedAsset],
+      1300,
+    );
+
+    assert.equal(summary.realizedRows[0].assetKey, generatedAsset.id);
+    assert.equal(summary.realizedRows[0].account, generatedAsset.account);
+    assert.equal(
+      getSelectedRealizedRows(
+        summary,
+        generatedAsset.account,
+        new Set([generatedAsset.id]),
+      ).length,
+      1,
+    );
+  });
+
+  it("keeps an accountless duplicate ticker unmatched instead of assigning it", () => {
+    const first = {
+      ...asset,
+      id: "duplicate-one",
+      legacyBase44Id: null,
+      account: "brokerage",
+      ticker: "DUP",
+      name: "Duplicate holding",
+    };
+    const second = {
+      ...first,
+      id: "duplicate-two",
+      account: "acct_22222222222242228222222222222222",
+    };
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          eventType: "sell",
+          account: null,
+          assetId: null,
+          legacyAssetId: "missing-legacy-id",
+          ticker: "DUP",
+          assetName: "Duplicate holding",
+          amountKrw: "1100",
+          quantityDelta: "-1",
+          memo: "realized_pnl_krw=100",
+        }),
+      ],
+      [first, second],
+      1300,
+    );
+
+    assert.equal(summary.realizedRows[0].assetKey, null);
+    assert.equal(summary.realizedRows[0].account, null);
+    assert.equal(getSelectedRealizedRows(summary, "brokerage", new Set()).length, 0);
+    assert.equal(getSelectedRealizedRows(summary, second.account, new Set()).length, 0);
+    assert.equal(getSelectedRealizedRows(summary, "all", new Set()).length, 1);
+  });
+
+  it("uses ticker and name together to disambiguate an accountless event", () => {
+    const first = {
+      ...asset,
+      id: "same-ticker-first",
+      legacyBase44Id: null,
+      account: "brokerage",
+      ticker: "SHARED",
+      name: "First holding",
+    };
+    const second = {
+      ...first,
+      id: "same-ticker-second",
+      account: "acct_22222222222242228222222222222222",
+      name: "Second holding",
+    };
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          eventType: "sell",
+          account: null,
+          assetId: null,
+          legacyAssetId: "missing-legacy-id",
+          ticker: "SHARED",
+          assetName: "Second holding",
+          amountKrw: "1100",
+          quantityDelta: "-1",
+        }),
+      ],
+      [first, second],
+      1300,
+    );
+
+    assert.equal(summary.realizedRows[0].assetKey, second.id);
+    assert.equal(summary.realizedRows[0].account, second.account);
+  });
+
+  it("keeps conflicting accountless ticker and name evidence unmatched", () => {
+    const first = {
+      ...asset,
+      id: "conflicting-ticker",
+      legacyBase44Id: null,
+      ticker: "TICKER-A",
+      name: "First holding",
+    };
+    const second = {
+      ...first,
+      id: "conflicting-name",
+      account: "acct_22222222222242228222222222222222",
+      ticker: "TICKER-B",
+      name: "Second holding",
+    };
+    const summary = buildReturnMetricsSummary(
+      [
+        tradeEvent({
+          eventType: "sell",
+          account: null,
+          assetId: null,
+          legacyAssetId: "missing-legacy-id",
+          ticker: "TICKER-A",
+          assetName: "Second holding",
+          amountKrw: "1100",
+          quantityDelta: "-1",
+          memo: "realized_pnl_krw=100",
+        }),
+      ],
+      [first, second],
+      1300,
+    );
+
+    assert.equal(summary.realizedRows[0].assetKey, null);
+    assert.equal(summary.realizedRows[0].account, null);
+  });
 });

@@ -13,14 +13,12 @@ describe("cron preflight helpers", () => {
       parseCronPreflightQuery(
         new URLSearchParams({
           date: "2026-07-08",
-          account: "brokerage",
           mode: "preflight",
         }),
       ),
       {
         ok: true,
         snapshotDate: "2026-07-08",
-        account: "brokerage",
         mode: "preflight",
       },
     );
@@ -43,6 +41,10 @@ describe("cron preflight helpers", () => {
     assert.doesNotMatch(sensitiveResult.message, /token/i);
     assert.equal(
       parseCronPreflightQuery(new URLSearchParams({ provider: "kis" })).ok,
+      false,
+    );
+    assert.equal(
+      parseCronPreflightQuery(new URLSearchParams({ account: "brokerage" })).ok,
       false,
     );
   });

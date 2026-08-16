@@ -1,8 +1,7 @@
 import {
-  isNamedPortfolioAccount,
-  type NamedPortfolioAccount,
-  type PortfolioAccountScope,
-} from "./portfolio-account-scope.ts";
+  tenantSnapshotScopeMatchesAccount,
+  type TenantSnapshotScope,
+} from "./tenant-snapshot-scope.ts";
 export {
   parseTenantSnapshotDateQuery as parseTenantPositionSnapshotDateQuery,
 } from "./tenant-snapshot-date-query.ts";
@@ -43,7 +42,7 @@ export type TenantPositionSnapshotReadRow = Readonly<{
 }>;
 
 export type TenantPositionSnapshotDto = Readonly<{
-  accountCode: NamedPortfolioAccount;
+  accountCode: string;
   accountName: string;
   assetName: string;
   ticker: string | null;
@@ -65,12 +64,12 @@ export type TenantPositionSnapshotDto = Readonly<{
 export type TenantPositionSnapshotReadResult =
   | Readonly<{
       state: "ready" | "partial";
-      scope: PortfolioAccountScope;
+      scope: TenantSnapshotScope;
       snapshotDate: string;
       source: string;
-      expectedAccounts: readonly NamedPortfolioAccount[];
-      coveredAccounts: readonly NamedPortfolioAccount[];
-      missingAccounts: readonly NamedPortfolioAccount[];
+      expectedAccounts: readonly string[];
+      coveredAccounts: readonly string[];
+      missingAccounts: readonly string[];
       positions: readonly TenantPositionSnapshotDto[];
       excludedPositionCount: number;
       linkedPositionCount: number;
@@ -78,9 +77,9 @@ export type TenantPositionSnapshotReadResult =
     }>
   | Readonly<{
       state: "no_data";
-      scope: PortfolioAccountScope;
+      scope: TenantSnapshotScope;
       snapshotDate: string | null;
-      expectedAccounts: readonly NamedPortfolioAccount[];
+      expectedAccounts: readonly string[];
     }>
   | Readonly<{
       state: "integrity_error";
@@ -103,28 +102,22 @@ export function projectTenantPositionSnapshotRows({
 }: {
   accountRows: readonly TenantPositionSnapshotAccountRow[];
   rows: readonly TenantPositionSnapshotReadRow[];
-  scope: PortfolioAccountScope;
+  scope: TenantSnapshotScope;
   snapshotDate: string | null;
 }): TenantPositionSnapshotReadResult {
-  const accountsById = new Map<
-    string,
-    TenantPositionSnapshotAccountRow & {
-      accountCode: NamedPortfolioAccount;
-    }
-  >();
-  const accountIdsByCode = new Map<NamedPortfolioAccount, string>();
+  const accountsById = new Map<string, TenantPositionSnapshotAccountRow>();
+  const accountIdsByCode = new Map<string, string>();
 
   for (const account of accountRows) {
     if (
       !isCanonicalText(account.accountId) ||
-      !isNamedPortfolioAccount(account.accountCode) ||
-      account.accountCode.trim().toLowerCase() !== account.accountCode ||
+      !isCanonicalAccountCode(account.accountCode) ||
       !isCanonicalText(account.accountName) ||
       !Number.isSafeInteger(account.accountSortOrder)
     ) {
       return integrityError("invalid_account_metadata");
     }
-    if (scope !== "all" && account.accountCode !== scope) {
+    if (!tenantSnapshotScopeMatchesAccount(scope, account)) {
       return integrityError("account_scope_mismatch");
     }
     if (
@@ -134,10 +127,7 @@ export function projectTenantPositionSnapshotRows({
       return integrityError("duplicate_account_relation");
     }
 
-    accountsById.set(account.accountId, {
-      ...account,
-      accountCode: account.accountCode,
-    });
+    accountsById.set(account.accountId, account);
     accountIdsByCode.set(account.accountCode, account.accountId);
   }
 
@@ -148,7 +138,7 @@ export function projectTenantPositionSnapshotRows({
           left.accountSortOrder - right.accountSortOrder ||
           left.accountCode.localeCompare(right.accountCode),
       )
-      .map((account) => account.accountCode as NamedPortfolioAccount),
+      .map((account) => account.accountCode),
   );
 
   if (rows.length === 0) {
@@ -164,7 +154,7 @@ export function projectTenantPositionSnapshotRows({
   }
 
   const seenPositionKeys = new Set<string>();
-  const coveredAccountSet = new Set<NamedPortfolioAccount>();
+  const coveredAccountSet = new Set<string>();
   const sources = new Set<string>();
   const positions: Array<
     TenantPositionSnapshotDto & Readonly<{ accountSortOrder: number }>
@@ -186,7 +176,7 @@ export function projectTenantPositionSnapshotRows({
     ) {
       return integrityError("invalid_account_relation");
     }
-    if (scope !== "all" && row.accountCode !== scope) {
+    if (!tenantSnapshotScopeMatchesAccount(scope, ownedAccount)) {
       return integrityError("account_scope_mismatch");
     }
     if (row.snapshotDate !== snapshotDate) {
@@ -335,6 +325,16 @@ function toPublicPosition(
 
 function isCanonicalText(value: string) {
   return value.length > 0 && value.trim() === value;
+}
+
+function isCanonicalAccountCode(value: string) {
+  return (
+    isCanonicalText(value) &&
+    value.length <= 50 &&
+    value.toLowerCase() === value &&
+    value !== "all" &&
+    !value.includes(":")
+  );
 }
 
 function isOptionalCanonicalText(value: string | null) {

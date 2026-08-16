@@ -164,6 +164,7 @@ import "./history-coverage-manifest-validator.test.mjs";
 import "./cron-preflight.test.mjs";
 import "./cron-market-cycle.test.mjs";
 import "./cron-runtime-config.test.mjs";
+import "./snapshot-account-target.test.mjs";
 import "./daily-snapshot-tenant-job.test.mjs";
 import "./live-price-write.test.mjs";
 import "./fx-refresh.test.mjs";

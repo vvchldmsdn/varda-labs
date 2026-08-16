@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, getTableColumns, inArray, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, lt, lte, ne } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
@@ -61,10 +61,14 @@ import {
   validateSnapshotGapBackfillAuthorization,
   type SnapshotGapBackfillAuthorization,
 } from "@/lib/snapshots/gap-backfill";
+import {
+  ALL_SNAPSHOT_ACCOUNTS,
+  resolveSnapshotAccountTargets,
+  type SnapshotAccount,
+} from "@/lib/snapshots/account-target";
+import { isSnapshotInvestmentAssetType } from "@/lib/snapshots/investment-eligibility";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
-const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
-const ACCOUNT_CODES = ["brokerage", "isa", "irp"] as const;
 const SNAPSHOT_SOURCE = "varda_manual_daily_snapshot";
 const SNAPSHOT_RULE_VERSION = "varda-manual-daily-snapshot-v1";
 const FRESH_CLOSE_MAX_AGE_DAYS = 7;
@@ -78,9 +82,9 @@ const KOREA_UNHEDGED_GLOBAL_CATEGORIES = new Set([
   "\uae08/\uadc0\uae08\uc18d",
 ]);
 
-export type SnapshotAccount = (typeof ACCOUNT_CODES)[number] | "all";
+export type { SnapshotAccount } from "@/lib/snapshots/account-target";
 
-type TrackedAccount = (typeof ACCOUNT_CODES)[number];
+type TrackedAccount = string;
 type SnapshotWriteAction = "insert" | "update" | "skip" | "blocked";
 type AssetRow = Asset;
 type AssetGroupRow = AssetGroup;
@@ -331,6 +335,7 @@ type AllAccountSnapshotBuild = AllAccountSnapshotPlan & {
 
 type AccountContext = {
   ownerUserId: string;
+  activeAccountCodes: readonly string[];
   accountRowsByCode: Map<string, string>;
   groupsById: Map<string, AssetGroupRow>;
   latestRegime: MarketRegimeDaily | null;
@@ -398,7 +403,7 @@ export async function runDailySnapshot(
   const dryRun = options.dryRun ?? true;
   const resolvedCycle = resolveSnapshotCycle(options.now);
   const snapshotDate = options.snapshotDate ?? resolvedCycle.snapshotDate;
-  const requestedAccount = options.account ?? "all";
+  const requestedAccount = options.account ?? ALL_SNAPSHOT_ACCOUNTS;
 
   if (!DATE_KEY_PATTERN.test(snapshotDate)) {
     throw new DailySnapshotRequestError(
@@ -450,7 +455,6 @@ export async function runDailySnapshot(
   });
 
   const cycle = buildCycleForSnapshotDate(snapshotDate, options.now ?? new Date());
-  const targetAccounts = requestedAccount === "all" ? [...ACCOUNT_CODES] : [requestedAccount];
   const ownerUserId = options.tenantContext.ownerUserId;
   const context = await loadAccountContext(snapshotDate, ownerUserId);
   const allAssetRows = await db
@@ -467,17 +471,34 @@ export async function runDailySnapshot(
       and(
         eq(accounts.canonicalOwnerUserId, ownerUserId),
         eq(accounts.isActive, true),
+        ne(accounts.accountType, "cash"),
       ),
     )
     .orderBy(assets.account, assets.name);
   const investmentAssetRows = allAssetRows.filter((asset) =>
-    INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
+    isSnapshotInvestmentAssetType(asset.assetType),
   );
   const openInvestmentAssets = investmentAssetRows.filter((asset) =>
-    isOpenInvestmentAsset(asset, context.groupsById),
+    isOpenInvestmentAsset(asset),
   );
+  const targetResolution = resolveSnapshotAccountTargets({
+    activeAccountCodes: context.activeAccountCodes,
+    openInvestmentAccountCodes: new Set(
+      openInvestmentAssets.map((asset) => asset.account),
+    ),
+    requestedAccount,
+  });
+  if (!targetResolution.ok) {
+    throw new DailySnapshotRequestError(
+      targetResolution.reason,
+      "No owned active investment account matches the snapshot request",
+      { snapshotDate, requestedAccount },
+      409,
+    );
+  }
+  const targetAccounts = [...targetResolution.targetAccounts];
   const selectedAssets = openInvestmentAssets.filter((asset) =>
-    targetAccounts.includes(asset.account as TrackedAccount),
+    targetAccounts.includes(asset.account),
   );
   const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate);
   const unsupportedCurrencyAssets = selectedAssets.filter(
@@ -561,7 +582,7 @@ export async function runDailySnapshot(
     );
   let allBuild: AllAccountSnapshotBuild | null = null;
 
-  if (requestedAccount === "all") {
+  if (requestedAccount === ALL_SNAPSHOT_ACCOUNTS) {
     const existingAllRows = await loadExistingAllPortfolioRows(
       snapshotDate,
       ownerUserId,
@@ -1394,8 +1415,10 @@ async function loadAccountContext(
         and(
           eq(accounts.canonicalOwnerUserId, ownerUserId),
           eq(accounts.isActive, true),
+          ne(accounts.accountType, "cash"),
         ),
-      ),
+      )
+      .orderBy(asc(accounts.sortOrder), asc(accounts.code)),
     db
       .selectDistinct(getTableColumns(assetGroups))
       .from(assetGroups)
@@ -1451,6 +1474,7 @@ async function loadAccountContext(
 
   return {
     ownerUserId,
+    activeAccountCodes: Object.freeze(accountRows.map((account) => account.code)),
     accountRowsByCode: new Map(accountRows.map((account) => [account.code, account.id])),
     groupsById: new Map(groupRows.map((group) => [group.id, group])),
     latestRegime: regimeRows[0] ?? null,
@@ -1489,13 +1513,13 @@ function buildRealizedReturnRunSummary(
   selectedAssets: AssetRow[],
   snapshotDate: string,
 ): RealizedReturnRunSummary {
-  const assetsByAccount = new Map<TrackedAccount, Set<string>>();
+  const assetsByAccount = new Map<string, Set<string>>();
   for (const account of targetAccounts) {
     assetsByAccount.set(account, new Set<string>());
   }
   for (const asset of selectedAssets) {
-    if (targetAccounts.includes(asset.account as TrackedAccount)) {
-      assetsByAccount.get(asset.account as TrackedAccount)?.add(assetMetricKey(asset));
+    if (targetAccounts.includes(asset.account)) {
+      assetsByAccount.get(asset.account)?.add(assetMetricKey(asset));
     }
   }
 
@@ -2380,16 +2404,10 @@ function publicAllAccountPlan(build: AllAccountSnapshotBuild): AllAccountSnapsho
   };
 }
 
-function isOpenInvestmentAsset(asset: AssetRow, groupsById: Map<string, AssetGroupRow>) {
+function isOpenInvestmentAsset(asset: AssetRow) {
   const quantity = toNumber(asset.quantity) ?? 0;
   const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
-  const groupTargetWeight = asset.groupId
-    ? toNumber(groupsById.get(asset.groupId)?.targetWeight) ?? 0
-    : 0;
-  return (
-    (quantity > 0 || fractionalKrwValue > 0) &&
-    (INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf") || groupTargetWeight > 0)
-  );
+  return quantity > 0 || fractionalKrwValue > 0;
 }
 
 function selectPriceForAsset(asset: AssetRow, closeContext: CloseContext) {
