@@ -156,29 +156,26 @@ describe("tenant event ledger read model", () => {
     });
   });
 
-  it("keeps the query and page server-only, owner-scoped, and identity-minimal", () => {
+  it("keeps the query and page server-only, tenant-scoped, and identity-minimal", () => {
     const querySource = read("src/db/queries/tenant-events.ts");
     const pageSource = read("src/app/portfolio/events/page.tsx");
     const accountsPageSource = read("src/app/portfolio/accounts/page.tsx");
     const tableSource = read("src/components/events/tenant-event-table.tsx");
 
     assert.match(querySource, /^import "server-only";/);
+    assert.match(querySource, /runTenantReadTransaction/);
+    assert.match(querySource, /tenantContext\.ownerUserId/);
     assert.match(
       querySource,
-      /innerJoin\(accounts,\s*eq\(eventLedgerEntries\.accountId,\s*accounts\.id\)\)/,
+      /inner join public\.accounts as account on event\.account_id = account\.id/,
     );
-    assert.match(
-      querySource,
-      /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
-    );
-    assert.match(querySource, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(querySource, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
-    assert.match(
-      querySource,
-      /eq\(eventLedgerEntries\.account,\s*accounts\.code\)/,
-    );
-    assert.match(querySource, /eq\(eventLedgerEntries\.isSample,\s*false\)/);
-    assert.match(querySource, /\.limit\(HISTORY_EVENT_QUERY_LIMIT\)/);
+    assert.match(querySource, /account\.is_active = true/);
+    assert.match(querySource, /account\.code = any\(\$2::text\[\]\)/);
+    assert.match(querySource, /event\.account = account\.code/);
+    assert.match(querySource, /event\.is_sample = false/);
+    assert.match(querySource, /limit \$3::integer/);
+    assert.doesNotMatch(querySource, /from "@\/db\/client"/);
+    assert.doesNotMatch(querySource, /canonical_owner_user_id\s*=/);
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.match(pageSource, /normalizePortfolioAccountScope/);
     assert.match(pageSource, /AccountScopeTabs/);

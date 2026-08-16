@@ -1758,8 +1758,14 @@ export const eventLedgerEntries = pgTable(
     canonicalOwnerUserIdIdx: index(
       "event_ledger_entries_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy("event_ledger_entries_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const marketRegimeDaily = pgTable(
   "market_regime_daily",
@@ -2090,8 +2096,17 @@ export const accountBalanceSnapshots = pgTable(
     canonicalOwnerUserIdIdx: index(
       "account_balance_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy(
+      "account_balance_snapshots_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const dailyPortfolioSnapshots = pgTable(
   "daily_portfolio_snapshots",

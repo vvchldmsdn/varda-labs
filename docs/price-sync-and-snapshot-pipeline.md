@@ -429,9 +429,10 @@ Core rules:
   ownership constraints from fixed account codes to any eligible account with
   a non-null `account_id`, while preserving the special `all` aggregate with a
   null `account_id`.
-- Migration `0031_third_penance` is locally reviewed and remains unapplied to
-  Production. It enables SELECT-only tenant RLS on both daily snapshot tables;
-  the owner-scoped snapshot canaries now read those tables through the
+- Migration `0031_third_penance` was applied to Production on 2026-08-16 and
+  passed the two-table RLS audit and authenticated snapshot read smoke. It
+  enables SELECT-only tenant RLS on both daily snapshot tables; the
+  owner-scoped snapshot canaries read those tables through the
   transaction-local tenant role instead of the privileged application client.
 
 Valuation basis:

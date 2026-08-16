@@ -225,6 +225,13 @@
       "when": 1786890896787,
       "tag": "0031_third_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786894705603,
+      "tag": "0032_boring_jimmy_woo",
+      "breakpoints": true
     }
   ]
 }

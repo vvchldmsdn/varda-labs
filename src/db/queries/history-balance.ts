@@ -4,13 +4,13 @@ import { and, asc, desc, eq, gte, inArray, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
-  accountBalanceSnapshots,
   accounts,
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
   portfolioGroupAccountMemberships,
   portfolioGroupAssetMemberships,
 } from "@/db/schema";
+import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import {
   buildPortfolioHistoryDisplayRows,
   type HistoryAccount,
@@ -346,25 +346,46 @@ async function loadPositionRows(
 async function loadBalanceRows(
   tenantContext: TenantContext,
 ): Promise<ReadOnlyBalanceHistoryRow[]> {
-  return db
-    .select({
-      balanceDate: accountBalanceSnapshots.balanceDate,
-      cash: accountBalanceSnapshots.cash,
-      brokerage: accountBalanceSnapshots.brokerage,
-      isa: accountBalanceSnapshots.isa,
-      irp: accountBalanceSnapshots.irp,
-    })
-    .from(accountBalanceSnapshots)
-    .where(
-      and(
-        eq(
-          accountBalanceSnapshots.canonicalOwnerUserId,
-          tenantContext.ownerUserId,
-        ),
-        eq(accountBalanceSnapshots.isSample, false),
-      ),
-    )
-    .orderBy(asc(accountBalanceSnapshots.balanceDate));
+  const [rows] = await runTenantReadTransaction(
+    tenantContext.ownerUserId,
+    (transaction) => [transaction.query(TENANT_BALANCE_ROWS_SQL)],
+  );
+  return rows.map(projectTenantBalanceSqlRow);
+}
+
+const TENANT_BALANCE_ROWS_SQL = `
+  select
+    snapshot.date::text as "balanceDate",
+    snapshot.cash::text as cash,
+    snapshot.brokerage::text as brokerage,
+    snapshot.isa::text as isa,
+    snapshot.irp::text as irp
+  from public.account_balance_snapshots as snapshot
+  where snapshot.is_sample = false
+  order by snapshot.date
+`;
+
+function projectTenantBalanceSqlRow(
+  row: Readonly<Record<string, unknown>>,
+): ReadOnlyBalanceHistoryRow {
+  return Object.freeze({
+    balanceDate: requiredBalanceString(row.balanceDate),
+    cash: nullableBalanceString(row.cash),
+    brokerage: nullableBalanceString(row.brokerage),
+    isa: nullableBalanceString(row.isa),
+    irp: nullableBalanceString(row.irp),
+  });
+}
+
+function requiredBalanceString(value: unknown) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Tenant balance snapshot row is invalid");
+  }
+  return value;
+}
+
+function nullableBalanceString(value: unknown) {
+  return value === null ? null : requiredBalanceString(value);
 }
 
 async function loadPortfolioRows(
