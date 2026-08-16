@@ -33,10 +33,12 @@ const BROKERAGE = Object.freeze({
   market: "korea",
   currency: "KRW",
   quantity: "47.000000",
+  averageCost: "90000.0000",
   currentPrice: "117700.0000",
   priceSource: "kis_domestic_inquire_price",
   priceAsOf: new Date("2026-07-09T04:20:00.000Z"),
   priceStatus: "ok",
+  updatedAt: new Date("2026-08-16T01:02:03.000Z"),
 });
 
 const ISA = Object.freeze({
@@ -55,13 +57,14 @@ const ISA = Object.freeze({
 });
 
 describe("tenant holding read model", () => {
-  it("projects sorted minimal DTOs without database or owner identities", () => {
+  it("projects correction-capable DTOs without owner identities", () => {
     const result = projectTenantHoldingRows([ISA, BROKERAGE], ALL_SCOPE);
 
     assert.deepEqual(result, {
       state: "ready",
       holdings: [
         {
+          holdingId: "asset-brokerage-1",
           accountCode: "brokerage",
           accountName: "Brokerage",
           name: "KODEX 200",
@@ -70,12 +73,15 @@ describe("tenant holding read model", () => {
           market: "korea",
           currency: "KRW",
           quantity: "47.000000",
+          averageCost: "90000.0000",
           currentPrice: "117700.0000",
           priceSource: "kis_domestic_inquire_price",
           priceAsOf: "2026-07-09T04:20:00.000Z",
           priceStatus: "ok",
+          updatedAt: "2026-08-16T01:02:03.000Z",
         },
         {
+          holdingId: "asset-isa-1",
           accountCode: "isa",
           accountName: "ISA",
           name: "ACE US S&P 500",
@@ -84,10 +90,12 @@ describe("tenant holding read model", () => {
           market: "korea",
           currency: "KRW",
           quantity: "12.000000",
+          averageCost: "90000.0000",
           currentPrice: "25000.0000",
           priceSource: "kis_domestic_inquire_price",
           priceAsOf: "2026-07-09T04:20:00.000Z",
           priceStatus: "ok",
+          updatedAt: "2026-08-16T01:02:03.000Z",
         },
       ],
       excludedHoldingCount: 0,

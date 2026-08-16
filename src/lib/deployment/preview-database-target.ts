@@ -17,22 +17,22 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0026_curved_raider",
-    createdAt: 1786588427095,
+    tag: "0027_easy_kulan_gath",
+    createdAt: 1786850659293,
     sha256:
-      "cdfb124a33cea8e54cc75147ee850fb5f69594b0cb1fd9fe45835bd45bf4cba9",
+      "b65c0e226c6ef201b2d2abf213222a58a7bc9e1b39d44ff913a05f101c9ea591",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 27,
+    entryCount: 28,
     sha256:
-      "sha256:964965a30697a028b547a8487655c34d03eb73c2dca9c5d2b4213bcac77d53b0",
+      "sha256:30db1378dc40419a271dbb18ef7fa19ab9f6fbd01ecd2b21f17c4ac124d4b124",
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
-      tag: "0026_curved_raider",
-      createdAt: 1786588427095,
+      tag: "0027_easy_kulan_gath",
+      createdAt: 1786850659293,
       sha256:
-        "cdfb124a33cea8e54cc75147ee850fb5f69594b0cb1fd9fe45835bd45bf4cba9",
+        "b65c0e226c6ef201b2d2abf213222a58a7bc9e1b39d44ff913a05f101c9ea591",
     }),
   ]),
 });

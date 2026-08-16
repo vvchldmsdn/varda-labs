@@ -74,10 +74,12 @@ export async function getReadOnlyTenantHoldings({
         market: assets.market,
         currency: assets.currency,
         quantity: assets.quantity,
+        averageCost: assets.averageCost,
         currentPrice: assets.currentPrice,
         priceSource: assets.priceSource,
         priceAsOf: assets.priceAsOf,
         priceStatus: assets.priceStatus,
+        updatedAt: assets.updatedAt,
       })
       .from(assets)
       .innerJoin(accounts, eq(assets.accountId, accounts.id))

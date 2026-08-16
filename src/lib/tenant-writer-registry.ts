@@ -388,6 +388,21 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "not_applicable",
   },
   {
+    id: "session_holding_state_correction",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["/portfolio/holdings#correctHoldingState"],
+    implementationPaths: ["src/lib/holding-state-correction-write.ts"],
+    targets: [
+      userTarget("assets", "update"),
+      userTarget("holding_state_corrections", "insert"),
+    ],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "session_portfolio_group_management",
     classification: "user_owned",
     authorization: "server_verified_session",
