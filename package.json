@@ -30,6 +30,7 @@
     "preflight:legacy-account-ownership": "node --no-warnings scripts/preflight-legacy-account-ownership.mjs",
     "identity:assign-legacy-account-owners": "node --no-warnings scripts/assign-legacy-account-owners.mjs",
     "identity:assign-legacy-core-owners": "node --no-warnings scripts/assign-legacy-core-owners.mjs",
+    "identity:assign-legacy-active-evidence-owners": "node --no-warnings scripts/assign-legacy-active-evidence-owners.mjs",
     "snapshots:backfill-owners": "node --no-warnings scripts/backfill-generated-snapshot-owners.mjs",
     "snapshots:backfill-gap": "node --conditions=react-server --import tsx scripts/backfill-daily-snapshot-gap.ts",
     "simulation:complete-kis-history": "node --conditions=react-server --import tsx scripts/complete-simulation-kis-history.ts",
