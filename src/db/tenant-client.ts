@@ -1,10 +1,13 @@
 import "server-only";
 
-import { neon } from "@neondatabase/serverless";
+import {
+  neon,
+  type NeonQueryFunction,
+} from "@neondatabase/serverless";
 
 import { guardTenantDatabaseRoleBoundary } from "@/lib/deployment/tenant-database-role-boundary";
 
-type TenantSqlClient = ReturnType<typeof neon>;
+type TenantSqlClient = NeonQueryFunction<false, false>;
 
 let cachedTenantClient:
   | Readonly<{
