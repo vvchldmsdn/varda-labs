@@ -105,7 +105,7 @@ const TENANT_PORTFOLIO_SNAPSHOT_ROWS_SQL = `
       snapshot.total_pnl::text as total_pnl,
       snapshot.total_return_pct::text as total_return_pct,
       snapshot.fx_rate::text as fx_rate,
-      snapshot.usd_krw::text as usd_krw,
+      snapshot.usdkrw::text as usd_krw,
       snapshot.kr_weight::text as kr_weight,
       snapshot.us_weight::text as us_weight,
       snapshot.usd_exposure_pct::text as usd_exposure_pct,
