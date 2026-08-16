@@ -4,8 +4,9 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { parse } from "dotenv";
 
 import { sha256Fingerprint } from "../../src/lib/deployment/preview-database-target.ts";
+import { TENANT_DATABASE_ROLE_NAME } from "../../src/lib/deployment/tenant-security-constants.ts";
 
-export const TENANT_DATABASE_ROLE_NAME = "varda_tenant_app";
+export { TENANT_DATABASE_ROLE_NAME };
 export const TENANT_DATABASE_ROLE_WRITE_CONFIRMATION =
   "CREATE_RESTRICTED_TENANT_ROLE";
 export const TENANT_DATABASE_ROLE_ADVISORY_LOCK =

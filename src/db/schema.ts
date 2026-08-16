@@ -7,6 +7,7 @@ import {
   index,
   integer,
   jsonb,
+  pgPolicy,
   pgTable,
   primaryKey,
   text,
@@ -16,6 +17,11 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+import {
+  currentTenantOwns,
+  tenantDatabaseRole,
+} from "./tenant-rls-policy.ts";
 
 export const appUsers = pgTable(
   "app_users",
@@ -509,8 +515,14 @@ export const accounts = pgTable(
     canonicalOwnerUserIdIdx: index(
       "accounts_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy("accounts_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const holdingOnboardingEvidence = pgTable(
   "holding_onboarding_evidence",
