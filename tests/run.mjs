@@ -181,6 +181,7 @@ import "./current-tenant-read-scope.test.mjs";
 import "./legacy-account-ownership-preflight.test.mjs";
 import "./legacy-account-owner-assignment-writer.test.mjs";
 import "./legacy-account-owner-assignment-cli.test.mjs";
+import "./legacy-core-owner-assignment.test.mjs";
 import "./legacy-account-owner-assignment-rehearsal.test.mjs";
 import "./legacy-account-owner-assignment-rehearsal-result-evidence.test.mjs";
 import "./legacy-account-owner-assignment-rehearsal-host.test.mjs";
