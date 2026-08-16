@@ -1,15 +1,18 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, inArray, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
-  accounts,
-  dailyPortfolioSnapshots,
-  dailyPositionSnapshots,
   portfolioGroupAccountMemberships,
   portfolioGroupAssetMemberships,
 } from "@/db/schema";
+import {
+  loadTenantHistoryGroupPositionRows,
+  loadTenantHistoryPortfolioRows,
+  loadTenantHistoryPositionComparisonRows,
+  loadTenantHistoryPositionDetailRows,
+} from "@/db/queries/tenant-history-snapshots";
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import {
   buildPortfolioHistoryDisplayRows,
@@ -255,39 +258,14 @@ async function loadPositionComparisonEndpointRows({
   snapshotDate: string;
   source: string;
 }): Promise<HistoryPositionComparisonRawRow[]> {
-  return db
-    .select({
-      snapshotDate: dailyPositionSnapshots.snapshotDate,
-      account: dailyPositionSnapshots.account,
-      source: dailyPositionSnapshots.source,
-      assetId: dailyPositionSnapshots.assetId,
-      legacyAssetId: dailyPositionSnapshots.legacyAssetId,
-      ticker: dailyPositionSnapshots.ticker,
-      assetName: dailyPositionSnapshots.assetName,
-      market: dailyPositionSnapshots.market,
-      currency: dailyPositionSnapshots.currency,
-      quantity: dailyPositionSnapshots.quantity,
-      marketValueKrw: dailyPositionSnapshots.marketValueKrw,
-    })
-    .from(dailyPositionSnapshots)
-    .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
-    .where(
-      and(
-        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
-        eq(accounts.isActive, true),
-        eq(accounts.id, accountId),
-        eq(accounts.code, account),
-        eq(dailyPositionSnapshots.account, accounts.code),
-        eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
-        eq(dailyPositionSnapshots.source, source),
-        eq(dailyPositionSnapshots.isSample, false),
-      ),
-    )
-    .orderBy(
-      asc(dailyPositionSnapshots.assetName),
-      asc(dailyPositionSnapshots.legacyAssetId),
-    )
-    .limit(HISTORY_POSITION_COMPARISON_QUERY_LIMIT);
+  return loadTenantHistoryPositionComparisonRows({
+    account,
+    accountId,
+    limit: HISTORY_POSITION_COMPARISON_QUERY_LIMIT,
+    snapshotDate,
+    source,
+    tenantContext,
+  });
 }
 
 async function loadPositionRows(
@@ -298,49 +276,14 @@ async function loadPositionRows(
   if (scope.kind !== "account" || scope.accountCode !== selection.account) {
     throw new Error("History position detail scope mismatch");
   }
-  return db
-    .select({
-      snapshotDate: dailyPositionSnapshots.snapshotDate,
-      account: dailyPositionSnapshots.account,
-      source: dailyPositionSnapshots.source,
-      assetId: dailyPositionSnapshots.assetId,
-      legacyAssetId: dailyPositionSnapshots.legacyAssetId,
-      ticker: dailyPositionSnapshots.ticker,
-      assetName: dailyPositionSnapshots.assetName,
-      market: dailyPositionSnapshots.market,
-      currency: dailyPositionSnapshots.currency,
-      quantity: dailyPositionSnapshots.quantity,
-      currentPrice: dailyPositionSnapshots.currentPrice,
-      marketValueLocal: dailyPositionSnapshots.marketValueLocal,
-      marketValueKrw: dailyPositionSnapshots.marketValueKrw,
-      costKrw: dailyPositionSnapshots.costKrw,
-      pnlKrw: dailyPositionSnapshots.pnlKrw,
-      pnlPct: dailyPositionSnapshots.pnlPct,
-      currentWeight: dailyPositionSnapshots.currentWeight,
-      fxRate: dailyPositionSnapshots.fxRate,
-      priceSource: dailyPositionSnapshots.priceSource,
-      priceBasis: dailyPositionSnapshots.priceBasis,
-    })
-    .from(dailyPositionSnapshots)
-    .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
-    .where(
-      and(
-        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
-        eq(accounts.isActive, true),
-        eq(accounts.id, scope.accountId),
-        eq(accounts.code, selection.account),
-        eq(dailyPositionSnapshots.account, accounts.code),
-        eq(dailyPositionSnapshots.snapshotDate, selection.snapshotDate),
-        eq(dailyPositionSnapshots.source, selection.source),
-        eq(dailyPositionSnapshots.isSample, false),
-      ),
-    )
-    .orderBy(
-      desc(dailyPositionSnapshots.marketValueKrw),
-      asc(dailyPositionSnapshots.assetName),
-      asc(dailyPositionSnapshots.legacyAssetId),
-    )
-    .limit(HISTORY_POSITION_DETAIL_QUERY_LIMIT);
+  return loadTenantHistoryPositionDetailRows({
+    account: selection.account,
+    accountId: scope.accountId,
+    limit: HISTORY_POSITION_DETAIL_QUERY_LIMIT,
+    snapshotDate: selection.snapshotDate,
+    source: selection.source,
+    tenantContext,
+  });
 }
 
 async function loadBalanceRows(
@@ -396,37 +339,10 @@ async function loadPortfolioRows(
     return loadPortfolioGroupRows(tenantContext, scope);
   }
 
-  const predicates = [
-    eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
-    eq(accounts.isActive, true),
-    eq(dailyPortfolioSnapshots.account, accounts.code),
-    eq(dailyPortfolioSnapshots.isSample, false),
-  ];
-  if (scope.kind === "account") {
-    predicates.push(eq(accounts.id, scope.accountId));
-  }
-
-  return db
-    .select({
-      snapshotDate: dailyPortfolioSnapshots.snapshotDate,
-      account: dailyPortfolioSnapshots.account,
-      source: dailyPortfolioSnapshots.source,
-      cashValue: dailyPortfolioSnapshots.cashValue,
-      investedAmount: dailyPortfolioSnapshots.investedAmount,
-      totalCost: dailyPortfolioSnapshots.totalCost,
-      totalMarketValue: dailyPortfolioSnapshots.totalMarketValue,
-      totalPnl: dailyPortfolioSnapshots.totalPnl,
-      totalReturnPct: dailyPortfolioSnapshots.totalReturnPct,
-    })
-    .from(dailyPortfolioSnapshots)
-    .innerJoin(accounts, eq(dailyPortfolioSnapshots.accountId, accounts.id))
-    .where(and(...predicates))
-    .orderBy(
-      asc(dailyPortfolioSnapshots.snapshotDate),
-      asc(accounts.sortOrder),
-      asc(accounts.code),
-      asc(dailyPortfolioSnapshots.source),
-    );
+  return loadTenantHistoryPortfolioRows({
+    accountIds: scope.kind === "account" ? [scope.accountId] : undefined,
+    tenantContext,
+  });
 }
 
 async function loadPortfolioGroupRows(
@@ -478,50 +394,15 @@ async function loadPortfolioGroupRows(
   const assetIds = uniqueTargets(assetMemberships);
   if (accountIds.length === 0 && assetIds.length === 0) return [];
 
-  const candidatePredicates = [];
-  if (accountIds.length > 0) {
-    candidatePredicates.push(inArray(dailyPositionSnapshots.accountId, accountIds));
-  }
-  if (assetIds.length > 0) {
-    candidatePredicates.push(inArray(dailyPositionSnapshots.assetId, assetIds));
-  }
-  const membershipPredicate =
-    candidatePredicates.length === 1
-      ? candidatePredicates[0]
-      : or(...candidatePredicates);
   const earliestMembershipDate = [...accountMemberships, ...assetMemberships]
     .map((membership) => membership.validFrom)
     .sort()[0]!;
-
-  const rows = await db
-    .select({
-      snapshotDate: dailyPositionSnapshots.snapshotDate,
-      source: dailyPositionSnapshots.source,
-      account: dailyPositionSnapshots.account,
-      accountId: dailyPositionSnapshots.accountId,
-      assetId: dailyPositionSnapshots.assetId,
-      marketValueKrw: dailyPositionSnapshots.marketValueKrw,
-      costKrw: dailyPositionSnapshots.costKrw,
-      pnlKrw: dailyPositionSnapshots.pnlKrw,
-    })
-    .from(dailyPositionSnapshots)
-    .where(
-      and(
-        eq(
-          dailyPositionSnapshots.canonicalOwnerUserId,
-          tenantContext.ownerUserId,
-        ),
-        eq(dailyPositionSnapshots.isSample, false),
-        gte(dailyPositionSnapshots.snapshotDate, earliestMembershipDate),
-        membershipPredicate,
-      ),
-    )
-    .orderBy(
-      asc(dailyPositionSnapshots.snapshotDate),
-      asc(dailyPositionSnapshots.source),
-      asc(dailyPositionSnapshots.account),
-      asc(dailyPositionSnapshots.assetName),
-    );
+  const rows = await loadTenantHistoryGroupPositionRows({
+    accountIds,
+    assetIds,
+    earliestMembershipDate,
+    tenantContext,
+  });
 
   return buildPortfolioGroupHistoryRows({
     accountMemberships,

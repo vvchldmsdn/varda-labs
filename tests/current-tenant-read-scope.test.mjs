@@ -252,6 +252,9 @@ describe("current tenant read scope runtime boundary", () => {
   it("keeps history server-rendered and scoped through the resolved tenant", () => {
     const pageSource = read("src/app/history/page.tsx");
     const querySource = read("src/db/queries/history-balance.ts");
+    const tenantSnapshotSource = read(
+      "src/db/queries/tenant-history-snapshots.ts",
+    );
     const controlsSource = read("src/components/history/history-controls.tsx");
 
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
@@ -269,16 +272,29 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(querySource, /^import "server-only";/);
     assert.match(
       querySource,
-      /accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId/,
+      /portfolioGroupAccountMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
+    );
+    assert.match(
+      querySource,
+      /portfolioGroupAssetMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
     );
     assert.match(querySource, /runTenantReadTransaction/);
     assert.match(querySource, /transaction\.query\(TENANT_BALANCE_ROWS_SQL\)/);
     assert.match(querySource, /from public\.account_balance_snapshots as snapshot/);
     assert.match(querySource, /where snapshot\.is_sample = false/);
     assert.doesNotMatch(querySource, /accountBalanceSnapshots/);
-    assert.match(querySource, /innerJoin\(accounts/);
-    assert.match(querySource, /dailyPortfolioSnapshots\.account, accounts\.code/);
-    assert.match(querySource, /dailyPositionSnapshots\.account, accounts\.code/);
+    assert.match(querySource, /tenant-history-snapshots/);
+    assert.doesNotMatch(querySource, /dailyPortfolioSnapshots|dailyPositionSnapshots/);
+    assert.match(tenantSnapshotSource, /runTenantReadTransaction/);
+    assert.match(
+      tenantSnapshotSource,
+      /from public\.daily_portfolio_snapshots as snapshot/,
+    );
+    assert.match(
+      tenantSnapshotSource,
+      /from public\.daily_position_snapshots as snapshot/,
+    );
+    assert.doesNotMatch(tenantSnapshotSource, /from "@\/db\/client"/);
     assert.match(querySource, /buildPortfolioGroupHistoryRows/);
     assert.match(querySource, /portfolioGroupAccountMemberships\.validFrom/);
     assert.match(querySource, /portfolioGroupAssetMemberships\.validFrom/);

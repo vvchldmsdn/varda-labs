@@ -215,6 +215,10 @@ describe("stored named-account history position drilldown", () => {
       new URL("../src/db/queries/history-balance.ts", import.meta.url),
       "utf8",
     );
+    const tenantSnapshotSource = readFileSync(
+      new URL("../src/db/queries/tenant-history-snapshots.ts", import.meta.url),
+      "utf8",
+    );
     const pageSource = readFileSync(
       new URL("../src/app/history/page.tsx", import.meta.url),
       "utf8",
@@ -229,10 +233,14 @@ describe("stored named-account history position drilldown", () => {
 
     assert.match(querySource, /Promise\.all/);
     assert.match(querySource, /HISTORY_POSITION_DETAIL_QUERY_LIMIT/);
-    assert.match(querySource, /dailyPositionSnapshots\.snapshotDate/);
-    assert.match(querySource, /dailyPositionSnapshots\.account/);
-    assert.match(querySource, /dailyPositionSnapshots\.source/);
-    assert.doesNotMatch(querySource, /\.leftJoin\(assets|\.innerJoin\(assets/);
+    assert.match(querySource, /loadTenantHistoryPositionDetailRows/);
+    assert.match(tenantSnapshotSource, /snapshot\.snapshot_date = \$3::date/);
+    assert.match(tenantSnapshotSource, /snapshot\.account = account\.code/);
+    assert.match(tenantSnapshotSource, /snapshot\.source = \$4::text/);
+    assert.doesNotMatch(
+      `${querySource}\n${tenantSnapshotSource}`,
+      /\.leftJoin\(assets|\.innerJoin\(assets/,
+    );
     assert.doesNotMatch(pageSource, /fetch\(|\/api\//);
     assert.doesNotMatch(detailSource, /use client|fetch\(|\/api\//);
   });
