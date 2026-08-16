@@ -121,18 +121,23 @@ describe("current tenant read scope runtime boundary", () => {
 
   it("authorizes position snapshots only through active owned accounts", () => {
     const source = read("src/db/queries/tenant-position-snapshots.ts");
+    const accountSource = read("src/db/queries/tenant-snapshot-accounts.ts");
 
     assert.match(source, /^import "server-only";/);
+    assert.match(source, /loadOwnedActiveSnapshotAccounts/);
     assert.match(
       source,
       /innerJoin\(\s*accounts,\s*eq\(dailyPositionSnapshots\.accountId,\s*accounts\.id\)/,
     );
     assert.match(
-      source,
+      accountSource,
       /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
     );
-    assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(source, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(accountSource, /eq\(accounts\.isActive,\s*true\)/);
+    assert.match(accountSource, /ne\(accounts\.accountType,\s*"cash"\)/);
+    assert.match(accountSource, /eq\(assets\.accountId,\s*accounts\.id\)/);
+    assert.match(accountSource, /gt\(assets\.quantity,\s*"0"\)/);
+    assert.doesNotMatch(accountSource, /NAMED_PORTFOLIO_ACCOUNTS/);
     assert.match(
       source,
       /eq\(dailyPositionSnapshots\.account,\s*accounts\.code\)/,
@@ -149,8 +154,9 @@ describe("current tenant read scope runtime boundary", () => {
 
     assert.match(source, /resolveCurrentTenantContext\(\)/);
     assert.match(source, /getReadOnlyTenantPositionSnapshots/);
+    assert.match(source, /getReadOnlyTenantSnapshotScopeContext/);
     assert.match(source, /parseTenantPositionSnapshotDateQuery/);
-    assert.match(source, /AccountScopeTabs/);
+    assert.match(source, /PortfolioSnapshotControls/);
     assert.match(source, /Partial evidence only/);
     assert.match(
       source,
@@ -162,20 +168,24 @@ describe("current tenant read scope runtime boundary", () => {
     );
   });
 
-  it("authorizes portfolio snapshots only through named active owned accounts", () => {
+  it("authorizes portfolio snapshots only through eligible active owned accounts", () => {
     const source = read("src/db/queries/tenant-portfolio-snapshots.ts");
+    const accountSource = read("src/db/queries/tenant-snapshot-accounts.ts");
 
     assert.match(source, /^import "server-only";/);
+    assert.match(source, /loadOwnedActiveSnapshotAccounts/);
     assert.match(
       source,
       /innerJoin\(\s*accounts,\s*eq\(dailyPortfolioSnapshots\.accountId,\s*accounts\.id\)/,
     );
     assert.match(
-      source,
+      accountSource,
       /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
     );
-    assert.match(source, /eq\(accounts\.isActive,\s*true\)/);
-    assert.match(source, /inArray\(accounts\.code,\s*NAMED_PORTFOLIO_ACCOUNTS\)/);
+    assert.match(accountSource, /eq\(accounts\.isActive,\s*true\)/);
+    assert.match(accountSource, /ne\(accounts\.accountType,\s*"cash"\)/);
+    assert.match(accountSource, /eq\(assets\.accountId,\s*accounts\.id\)/);
+    assert.doesNotMatch(accountSource, /NAMED_PORTFOLIO_ACCOUNTS/);
     assert.match(
       source,
       /eq\(dailyPortfolioSnapshots\.account,\s*accounts\.code\)/,
@@ -195,6 +205,7 @@ describe("current tenant read scope runtime boundary", () => {
 
     assert.match(source, /resolveCurrentTenantContext\(\)/);
     assert.match(source, /getReadOnlyTenantPortfolioSnapshots/);
+    assert.match(source, /getReadOnlyTenantSnapshotScopeContext/);
     assert.match(source, /parseTenantSnapshotDateQuery/);
     assert.match(source, /PortfolioSnapshotControls/);
     assert.match(source, /PortfolioSnapshotSummary/);

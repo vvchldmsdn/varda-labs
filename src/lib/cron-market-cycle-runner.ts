@@ -188,7 +188,6 @@ export async function runCronMarketCycle({
     const snapshotWrite = await runDailySnapshotJob({
       dryRun: false,
       snapshotDate,
-      account: "all",
       now,
     });
     const snapshotSummary = {
@@ -246,7 +245,7 @@ export async function runCronMarketCycle({
 
 async function loadPlan(now: Date) {
   const [snapshotJob, kisCooldown] = await Promise.all([
-    runDailySnapshotJob({ dryRun: true, account: "all", now }),
+    runDailySnapshotJob({ dryRun: true, now }),
     getKisPriceSyncCooldownStatus("close", now),
   ]);
   return {

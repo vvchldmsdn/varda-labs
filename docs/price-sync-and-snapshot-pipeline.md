@@ -379,13 +379,21 @@ Inputs:
 - `dryRun=false` requires `confirmWrite=true`.
 - optional `date=YYYY-MM-DD`; dry-run can inspect other dates, but actual writes
   are limited to the current resolved cycle date.
-- optional `account=brokerage|isa|irp|all`; `all` writes the three account
-  snapshots plus the aggregate portfolio snapshot.
+- account selection is server-derived. The route rejects an `account` query
+  parameter and always evaluates every eligible account owned by each active
+  user.
 
 Core rules:
 
 - Resolve the cycle in KST. Before 07:00 KST, the snapshot date is yesterday.
   At or after 07:00 KST, the snapshot date is today.
+- An eligible snapshot account is active, non-cash, canonically owned by the
+  user, and has at least one open `etf`, `stock`, `pension`, or `commodity`
+  position. Account codes are user-defined; `brokerage`, `isa`, and `irp` have
+  no special runtime authority.
+- Empty accounts and cash accounts are excluded. For an all-account run, the
+  writer creates one account portfolio row per eligible account and one
+  additional `account = 'all'` aggregate row.
 - Before writing snapshots, require fresh close rows for every active investment
   asset with a ticker.
 - `snapshotDate` is the portfolio cycle date. It is not assumed to be the same
@@ -416,6 +424,10 @@ Core rules:
 - v1 still performs preflight duplicate/unmanaged-row checks before using Neon
   HTTP batch writes, because imported unmatched position rows can have nullable
   `asset_id`.
+- Migration `0030_spooky_ikaris` is generated and locally reviewed but is not
+  yet applied to Production. It broadens generated-row ownership constraints
+  from fixed account codes to any eligible account with a non-null `account_id`,
+  while preserving the special `all` aggregate with a null `account_id`.
 
 Valuation basis:
 

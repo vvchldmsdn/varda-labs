@@ -8,7 +8,7 @@ import {
 
 type ParsedObject = Record<string, unknown>;
 
-export type PortfolioReturnAccount = "brokerage" | "isa" | "irp";
+export type PortfolioReturnAccount = string;
 export type PortfolioReturnSelectedAccount = PortfolioReturnAccount | "all";
 
 export type PortfolioReturnAssetRow = {
@@ -49,6 +49,8 @@ type AssetMaps = {
   byLegacyId: Map<string, PortfolioReturnAssetRow>;
   byTickerAccount: Map<string, PortfolioReturnAssetRow>;
   byNameAccount: Map<string, PortfolioReturnAssetRow>;
+  byTicker: Map<string, PortfolioReturnAssetRow[]>;
+  byName: Map<string, PortfolioReturnAssetRow[]>;
 };
 
 export type AssetReturnMetrics = {
@@ -97,8 +99,6 @@ export type AccountRealizedReturnSummary = {
   unmatchedSellEventCount: number;
   missingCostSellEventCount: number;
 };
-
-const ASSET_ACCOUNT_CODES = ["brokerage", "isa", "irp"] as const;
 
 export function buildReturnMetricsSummary(
   events: PortfolioReturnEventRow[],
@@ -242,7 +242,7 @@ export function getSelectedRealizedRows(
   return summary.realizedRows.filter((row) => {
     if (row.account) return row.account === selectedAccount;
     if (row.assetKey) return selectedAssetKeys.has(row.assetKey);
-    return selectedAccount === "brokerage";
+    return false;
   });
 }
 
@@ -401,14 +401,20 @@ function buildAssetMaps(assetRows: PortfolioReturnAssetRow[]): AssetMaps {
     byLegacyId: new Map(),
     byTickerAccount: new Map(),
     byNameAccount: new Map(),
+    byTicker: new Map(),
+    byName: new Map(),
   };
 
   for (const asset of assetRows) {
     maps.byId.set(asset.id, asset);
     if (asset.legacyBase44Id) maps.byLegacyId.set(asset.legacyBase44Id, asset);
     const ticker = normalizeTicker(asset.ticker);
-    if (ticker) maps.byTickerAccount.set(accountKey(asset.account, ticker), asset);
+    if (ticker) {
+      maps.byTickerAccount.set(accountKey(asset.account, ticker), asset);
+      appendAssetMatch(maps.byTicker, ticker, asset);
+    }
     maps.byNameAccount.set(accountKey(asset.account, asset.name), asset);
+    appendAssetMatch(maps.byName, asset.name, asset);
   }
 
   return maps;
@@ -423,20 +429,62 @@ function resolveEventAsset(event: PortfolioReturnEventRow, maps: AssetMaps) {
   }
 
   const eventAccount = portfolioEventAccount(event);
-  const accountsToTry = eventAccount ? [eventAccount] : ASSET_ACCOUNT_CODES;
   const ticker = normalizeTicker(event.ticker);
-  for (const account of accountsToTry) {
+  if (eventAccount) {
     if (ticker) {
-      const asset = maps.byTickerAccount.get(accountKey(account, ticker));
+      const asset = maps.byTickerAccount.get(accountKey(eventAccount, ticker));
       if (asset) return asset;
     }
     if (event.assetName) {
-      const asset = maps.byNameAccount.get(accountKey(account, event.assetName));
+      const asset = maps.byNameAccount.get(
+        accountKey(eventAccount, event.assetName),
+      );
       if (asset) return asset;
     }
+    return null;
   }
 
-  return null;
+  return resolveAccountlessAssetMatch({
+    tickerMatches: ticker ? maps.byTicker.get(ticker) : undefined,
+    nameMatches: event.assetName
+      ? maps.byName.get(event.assetName)
+      : undefined,
+  });
+}
+
+function appendAssetMatch(
+  map: Map<string, PortfolioReturnAssetRow[]>,
+  key: string,
+  asset: PortfolioReturnAssetRow,
+) {
+  const matches = map.get(key);
+  if (matches) {
+    matches.push(asset);
+    return;
+  }
+  map.set(key, [asset]);
+}
+
+function resolveAccountlessAssetMatch({
+  tickerMatches = [],
+  nameMatches = [],
+}: {
+  tickerMatches?: readonly PortfolioReturnAssetRow[];
+  nameMatches?: readonly PortfolioReturnAssetRow[];
+}) {
+  if (tickerMatches.length > 0 && nameMatches.length > 0) {
+    const nameMatchIds = new Set(nameMatches.map((asset) => asset.id));
+    return uniqueAssetMatch(
+      tickerMatches.filter((asset) => nameMatchIds.has(asset.id)),
+    );
+  }
+  return uniqueAssetMatch(
+    tickerMatches.length > 0 ? tickerMatches : nameMatches,
+  );
+}
+
+function uniqueAssetMatch(matches: readonly PortfolioReturnAssetRow[]) {
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function accountKey(account: string, value: string) {

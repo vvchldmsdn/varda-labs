@@ -11,6 +11,19 @@ const BROKERAGE_ACCOUNT = Object.freeze({
   accountSortOrder: 10,
 });
 
+const ALL_SCOPE = Object.freeze({
+  kind: "all",
+  key: "all",
+  label: "All",
+});
+const BROKERAGE_SCOPE = Object.freeze({
+  kind: "account",
+  key: "account:11111111-1111-4111-8111-111111111111",
+  label: "Brokerage",
+  accountId: BROKERAGE_ACCOUNT.accountId,
+  accountCode: BROKERAGE_ACCOUNT.accountCode,
+});
+
 const ISA_ACCOUNT = Object.freeze({
   accountId: "account-isa",
   accountCode: "isa",
@@ -81,7 +94,7 @@ describe("tenant portfolio snapshot read model", () => {
     const result = projectTenantPortfolioSnapshotRows({
       accountRows: [ISA_ACCOUNT, BROKERAGE_ACCOUNT],
       rows: [ISA_SNAPSHOT, BROKERAGE_SNAPSHOT],
-      scope: "all",
+      scope: ALL_SCOPE,
       snapshotDate: "2026-07-09",
     });
 
@@ -113,7 +126,7 @@ describe("tenant portfolio snapshot read model", () => {
             legacyAccountCode: "all",
           },
         ],
-        scope: "all",
+        scope: ALL_SCOPE,
         snapshotDate: "2026-07-09",
       }),
       { state: "integrity_error", reason: "invalid_account_relation" },
@@ -124,7 +137,7 @@ describe("tenant portfolio snapshot read model", () => {
     const result = projectTenantPortfolioSnapshotRows({
       accountRows: [BROKERAGE_ACCOUNT, ISA_ACCOUNT],
       rows: [BROKERAGE_SNAPSHOT],
-      scope: "all",
+      scope: ALL_SCOPE,
       snapshotDate: "2026-07-09",
     });
 
@@ -138,7 +151,7 @@ describe("tenant portfolio snapshot read model", () => {
     const result = projectTenantPortfolioSnapshotRows({
       accountRows: [BROKERAGE_ACCOUNT, ISA_ACCOUNT],
       rows: [BROKERAGE_SNAPSHOT, { ...ISA_SNAPSHOT, totalPnl: "NaN" }],
-      scope: "all",
+      scope: ALL_SCOPE,
       snapshotDate: "2026-07-09",
     });
 
@@ -160,7 +173,7 @@ describe("tenant portfolio snapshot read model", () => {
           totalCost: null,
         },
       ],
-      scope: "all",
+      scope: ALL_SCOPE,
       snapshotDate: "2026-07-09",
     });
 
@@ -173,7 +186,7 @@ describe("tenant portfolio snapshot read model", () => {
   it("fails closed for invalid relations, mixed sources, samples, and duplicates", () => {
     const input = {
       accountRows: [BROKERAGE_ACCOUNT],
-      scope: "brokerage",
+      scope: BROKERAGE_SCOPE,
       snapshotDate: "2026-07-09",
     };
 
@@ -217,12 +230,12 @@ describe("tenant portfolio snapshot read model", () => {
       projectTenantPortfolioSnapshotRows({
         accountRows: [BROKERAGE_ACCOUNT],
         rows: [],
-        scope: "brokerage",
+        scope: BROKERAGE_SCOPE,
         snapshotDate: "2026-07-10",
       }),
       {
         state: "no_data",
-        scope: "brokerage",
+        scope: BROKERAGE_SCOPE,
         snapshotDate: "2026-07-10",
         expectedAccounts: ["brokerage"],
       },

@@ -4,16 +4,17 @@ import { and, asc, eq, inArray, max } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { accounts, dailyPortfolioSnapshots } from "@/db/schema";
-import {
-  NAMED_PORTFOLIO_ACCOUNTS,
-  type PortfolioAccountScope,
-} from "@/lib/portfolio-account-scope";
+import { loadOwnedActiveSnapshotAccounts } from "@/db/queries/tenant-snapshot-accounts";
 import {
   projectTenantPortfolioSnapshotRows,
   type TenantPortfolioSnapshotReadResult,
 } from "@/lib/tenant-portfolio-snapshot-read-model";
 import { parseTenantSnapshotDateQuery } from "@/lib/tenant-snapshot-date-query";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import {
+  tenantSnapshotScopeMatchesAccount,
+  type TenantSnapshotScope,
+} from "@/lib/tenant-snapshot-scope";
 
 export type TenantPortfolioSnapshotQueryResult =
   | TenantPortfolioSnapshotReadResult
@@ -26,7 +27,7 @@ export async function getReadOnlyTenantPortfolioSnapshots({
   requestedSnapshotDate,
 }: {
   tenantContext: TenantContext;
-  scope: PortfolioAccountScope;
+  scope: TenantSnapshotScope;
   requestedSnapshotDate?: string;
 }): Promise<TenantPortfolioSnapshotQueryResult> {
   if (
@@ -38,38 +39,30 @@ export async function getReadOnlyTenantPortfolioSnapshots({
   }
 
   try {
-    const accountPredicates = [
-      eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
-      eq(accounts.isActive, true),
-      inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
-    ];
+    const accountRows = (await loadOwnedActiveSnapshotAccounts(tenantContext)).filter(
+      (account) => tenantSnapshotScopeMatchesAccount(scope, account),
+    );
+    if (accountRows.length === 0) {
+      return projectTenantPortfolioSnapshotRows({
+        accountRows,
+        rows: [],
+        scope,
+        snapshotDate: requestedSnapshotDate ?? null,
+      });
+    }
+    const accountIds = accountRows.map((account) => account.accountId);
     const snapshotPredicates = [
       eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
       eq(accounts.isActive, true),
-      inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
+      inArray(accounts.id, accountIds),
       eq(dailyPortfolioSnapshots.account, accounts.code),
       eq(dailyPortfolioSnapshots.isSample, false),
     ];
-    if (scope !== "all") {
-      accountPredicates.push(eq(accounts.code, scope));
-      snapshotPredicates.push(eq(accounts.code, scope));
-    }
 
-    const [accountRows, snapshotDate] = await Promise.all([
-      db
-        .select({
-          accountId: accounts.id,
-          accountCode: accounts.code,
-          accountName: accounts.name,
-          accountSortOrder: accounts.sortOrder,
-        })
-        .from(accounts)
-        .where(and(...accountPredicates))
-        .orderBy(asc(accounts.sortOrder), asc(accounts.code)),
+    const snapshotDate =
       requestedSnapshotDate === undefined
-        ? findLatestOwnedSnapshotDate(snapshotPredicates)
-        : Promise.resolve(requestedSnapshotDate),
-    ]);
+        ? await findLatestOwnedSnapshotDate(snapshotPredicates)
+        : requestedSnapshotDate;
 
     if (snapshotDate === null) {
       return projectTenantPortfolioSnapshotRows({

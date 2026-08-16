@@ -1,28 +1,26 @@
 import "server-only";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, ne, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { accounts, appUsers } from "@/db/schema";
+import { accounts, appUsers, assets } from "@/db/schema";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import {
   DailySnapshotRequestError,
   runDailySnapshot,
-  type SnapshotAccount,
 } from "@/lib/snapshots/daily";
+import { ALL_SNAPSHOT_ACCOUNTS } from "@/lib/snapshots/account-target";
 import {
   buildDailySnapshotJobResult,
   type DailySnapshotJobResult,
   type DailySnapshotTenantResult,
 } from "@/lib/snapshots/daily-job-result";
+import { SNAPSHOT_INVESTMENT_ASSET_TYPES } from "@/lib/snapshots/investment-eligibility";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
-
-const SNAPSHOT_ACCOUNT_CODES = ["brokerage", "isa", "irp"] as const;
 
 type DailySnapshotJobOptions = {
   dryRun?: boolean;
   snapshotDate?: string;
-  account?: SnapshotAccount;
   now?: Date;
 };
 
@@ -30,7 +28,7 @@ export async function runDailySnapshotJob(
   options: DailySnapshotJobOptions = {},
 ): Promise<DailySnapshotJobResult> {
   const dryRun = options.dryRun ?? true;
-  const requestedAccount = options.account ?? "all";
+  const requestedAccount = ALL_SNAPSHOT_ACCOUNTS;
   const snapshotDate =
     options.snapshotDate ?? resolveSnapshotCycle(options.now).snapshotDate;
   const targets = await loadActiveSnapshotTenantContexts();
@@ -93,7 +91,16 @@ async function loadActiveSnapshotTenantContexts(): Promise<TenantContext[]> {
       and(
         eq(accounts.canonicalOwnerUserId, appUsers.id),
         eq(accounts.isActive, true),
-        inArray(accounts.code, SNAPSHOT_ACCOUNT_CODES),
+        ne(accounts.accountType, "cash"),
+      ),
+    )
+    .innerJoin(
+      assets,
+      and(
+        eq(assets.accountId, accounts.id),
+        eq(assets.canonicalOwnerUserId, appUsers.id),
+        inArray(assets.assetType, SNAPSHOT_INVESTMENT_ASSET_TYPES),
+        or(gt(assets.quantity, "0"), gt(assets.fractionalKrwValue, "0")),
       ),
     )
     .where(

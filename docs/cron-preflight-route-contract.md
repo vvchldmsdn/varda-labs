@@ -16,8 +16,9 @@ Implementation status:
 - read-only KIS close cooldown visibility from `market_data_sync_runs`
 - no DB mutation beyond `runDailySnapshotJob({ dryRun: true })` and the
   cooldown status select
-- active owners are enumerated from canonical `app_users -> accounts`
-  relationships; no owner query, body, or header selector is accepted
+- active owners are enumerated from canonical `app_users -> accounts -> assets`
+  relationships. Only active non-cash accounts with open investment positions
+  qualify; no owner or account query, body, or header selector is accepted
 - output is a per-owner target list with an aggregate readiness summary
 
 The preflight route remains read-only and `vercel.json` still has no Cron
@@ -107,7 +108,6 @@ Allowed candidate inputs:
 | Query | Required | Values | Purpose |
 | --- | --- | --- | --- |
 | `date` | no | `YYYY-MM-DD` | inspect a specific cycle date in dry-run/debug mode |
-| `account` | no | `all`, `brokerage`, `isa`, `irp` | inspect one account scope or the aggregate scope |
 | `mode` | no | `preflight` | reserved explicit mode; any future value requires review |
 
 Rejected inputs:
@@ -118,11 +118,15 @@ Rejected inputs:
 - `force`
 - `backfill`
 - `delete`
+- `account`
 - provider tokens or provider credentials
 
 The route should default to the current resolved KST cycle when `date` is not
 provided. Cron schedule definitions stay UTC, but cycle logic remains KST-based
 because the daily snapshot writer already resolves portfolio cycles in KST.
+Each owner preflight evaluates all eligible user-defined accounts and the
+derived `all` aggregate together, so one request cannot silently omit an
+account by selecting a fixed legacy code.
 
 ## Output Contract
 

@@ -4,20 +4,16 @@ import { isAuthorizedAdminJob } from "@/lib/admin-auth";
 import {
   parseBooleanQuery,
   parseDateKeyQuery,
-  parseEnumQuery,
 } from "@/lib/http-query";
 import {
   DailySnapshotRequestError,
-  type SnapshotAccount,
 } from "@/lib/snapshots/daily";
 import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
 
-const SNAPSHOT_ACCOUNTS = ["brokerage", "isa", "irp", "all"] as const;
 const ALLOWED_QUERY_KEYS = new Set([
   "dryrun",
   "confirmwrite",
   "date",
-  "account",
 ]);
 
 export const dynamic = "force-dynamic";
@@ -44,8 +40,6 @@ export async function POST(request: Request) {
   const snapshotDate = parseDateKeyQuery(url.searchParams.get("date"), {
     emptyAsUndefined: true,
   });
-  const account = parseAccount(url.searchParams.get("account"));
-
   if (dryRun === null) {
     return NextResponse.json(
       { error: "dryRun must be true or false when provided" },
@@ -67,13 +61,6 @@ export async function POST(request: Request) {
     );
   }
 
-  if (account === null) {
-    return NextResponse.json(
-      { error: "account must be one of: brokerage, isa, irp, all" },
-      { status: 400 },
-    );
-  }
-
   if (!dryRun && !confirmWrite) {
     return NextResponse.json(
       {
@@ -88,7 +75,6 @@ export async function POST(request: Request) {
     const result = await runDailySnapshotJob({
       dryRun,
       snapshotDate,
-      account,
     });
     const status =
       dryRun || result.ok ? 200 : result.writtenCount > 0 ? 207 : 409;
@@ -110,10 +96,6 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-}
-
-function parseAccount(value: string | null): SnapshotAccount | null {
-  return parseEnumQuery(value, SNAPSHOT_ACCOUNTS, "all");
 }
 
 function hasUnsupportedQuery(searchParams: URLSearchParams) {

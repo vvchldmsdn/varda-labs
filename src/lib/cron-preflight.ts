@@ -1,7 +1,6 @@
-const ACCOUNTS = ["brokerage", "isa", "irp", "all"] as const;
 const MODES = ["preflight"] as const;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const ALLOWED_QUERY_KEYS = new Set(["date", "account", "mode"]);
+const ALLOWED_QUERY_KEYS = new Set(["date", "mode"]);
 const REJECTED_QUERY_KEYS = new Set([
   "dryrun",
   "confirmwrite",
@@ -14,13 +13,12 @@ const SECRET_SHAPED_QUERY_KEY_PATTERN =
   /(secret|token|credential|password|api[_-]?key|authorization|header|env)/i;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
-export type CronPreflightAccount = (typeof ACCOUNTS)[number];
+export type CronPreflightAccount = string;
 
 export type CronPreflightQuery =
   | {
       ok: true;
       snapshotDate: string | undefined;
-      account: CronPreflightAccount;
       mode: "preflight";
     }
   | {
@@ -292,16 +290,6 @@ export function parseCronPreflightQuery(
     };
   }
 
-  const account = parseEnumQuery(searchParams.get("account"), ACCOUNTS, "all");
-  if (account === null) {
-    return {
-      ok: false,
-      statusCode: 400,
-      error: "invalid_account",
-      message: "account must be one of: brokerage, isa, irp, all",
-    };
-  }
-
   const mode = parseEnumQuery(searchParams.get("mode"), MODES, "preflight");
   if (mode === null) {
     return {
@@ -315,7 +303,6 @@ export function parseCronPreflightQuery(
   return {
     ok: true,
     snapshotDate,
-    account,
     mode,
   };
 }

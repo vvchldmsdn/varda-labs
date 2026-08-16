@@ -2189,7 +2189,7 @@ export const dailyPortfolioSnapshots = pgTable(
     }).onDelete("restrict"),
     generatedOwnerCheck: check(
       "daily_portfolio_snapshots_generated_owner_check",
-      sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ((${table.account} = 'all' and ${table.accountId} is null) or (${table.account} in ('brokerage', 'isa', 'irp') and ${table.accountId} is not null)))`,
+      sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ((${table.account} = 'all' and ${table.accountId} is null) or (${table.account} <> 'all' and ${table.accountId} is not null)))`,
     ),
   }),
 );
@@ -2353,7 +2353,7 @@ export const dailyPositionSnapshots = pgTable(
     }).onDelete("restrict"),
     generatedOwnerCheck: check(
       "daily_position_snapshots_generated_owner_check",
-      sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.assetId} is not null and ${table.account} in ('brokerage', 'isa', 'irp'))`,
+      sql`${table.source} <> 'varda_manual_daily_snapshot' or (${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.assetId} is not null and ${table.account} <> 'all')`,
     ),
     assetIdentityCheck: check(
       "daily_position_snapshots_asset_identity_check",

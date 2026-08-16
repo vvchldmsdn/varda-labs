@@ -57,9 +57,14 @@ describe("tenant daily snapshot job", () => {
     const writer = readFileSync("src/lib/snapshots/daily.ts", "utf8");
 
     assert.match(job, /eq\(accounts\.canonicalOwnerUserId, appUsers\.id\)/);
+    assert.match(job, /ne\(accounts\.accountType, "cash"\)/);
+    assert.match(job, /eq\(assets\.accountId, accounts\.id\)/);
+    assert.match(job, /gt\(assets\.quantity, "0"\)/);
     assert.match(job, /eq\(appUsers\.status, "active"\)/);
+    assert.doesNotMatch(job, /SNAPSHOT_ACCOUNT_CODES/);
     assert.doesNotMatch(job, /\.limit\(1\)/);
     assert.match(route, /hasUnsupportedQuery/);
+    assert.doesNotMatch(route, /SNAPSHOT_ACCOUNTS|parseAccount/);
     assert.doesNotMatch(route, /searchParams\.get\(["'](?:owner|ownerUserId|canonicalOwnerUserId)/);
     assert.match(writer, /select\(getTableColumns\(assets\)\)/);
     assert.match(writer, /eq\(accounts\.canonicalOwnerUserId, ownerUserId\)/);
@@ -122,6 +127,31 @@ describe("tenant daily snapshot job", () => {
     assert.match(
       migration,
       /ALTER COLUMN "legacy_asset_id" DROP NOT NULL/,
+    );
+  });
+
+  it("widens generated snapshot checks for dynamic accounts without DML", () => {
+    const migration = readFileSync(
+      "drizzle/0030_spooky_ikaris.sql",
+      "utf8",
+    );
+
+    assert.match(
+      migration,
+      /daily_portfolio_snapshots_generated_owner_check/,
+    );
+    assert.match(
+      migration,
+      /"account" <> 'all' and "daily_portfolio_snapshots"\."account_id" is not null/,
+    );
+    assert.match(
+      migration,
+      /"daily_position_snapshots"\."account" <> 'all'/,
+    );
+    assert.doesNotMatch(migration, /'brokerage', 'isa', 'irp'/);
+    assert.doesNotMatch(
+      migration,
+      /\b(?:insert\s+into|update|delete\s+from|truncate)\b/i,
     );
   });
 });
