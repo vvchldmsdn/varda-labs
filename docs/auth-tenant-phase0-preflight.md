@@ -247,6 +247,11 @@ The runtime connection boundary is now explicit:
 - tenant runtime code must fail closed when `TENANT_DATABASE_URL` is absent and
   must never fall back to `DATABASE_URL`;
 - `npm run audit:tenant-db-role` performs the SELECT-only role posture check.
+- `npm run tenant-db-role:provision` is dry-run by default. The reviewed write
+  path requires `--write --confirm CREATE_RESTRICTED_TENANT_ROLE`, creates only
+  the fixed SQL role `varda_tenant_app`, and does not grant table privileges or
+  change RLS policies. A generated credential is stored in ignored
+  `.env.local` as `TENANT_DATABASE_URL` and is never printed.
 
 As of the 2026-08-16 Production audit, the existing `DATABASE_URL` role owns
 public tables and has `BYPASSRLS`. Enabling policies while that connection is
