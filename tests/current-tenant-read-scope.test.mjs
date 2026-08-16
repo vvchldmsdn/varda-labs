@@ -44,13 +44,13 @@ describe("current tenant read scope runtime boundary", () => {
     );
   });
 
-  it("projects only public evidence on the account-scope page", () => {
+  it("projects only owner-scoped management DTOs on the account page", () => {
     const source = read("src/app/portfolio/accounts/page.tsx");
 
     assert.match(source, /resolveCurrentTenantContext\(\)/);
-    assert.match(source, /getReadOnlyTenantAccounts/);
-    assert.match(source, /normalizePortfolioAccountScope/);
-    assert.match(source, /sessionResolutionEvidence\(resolution\)/);
+    assert.match(source, /getReadOnlyTenantAccountManagementModel/);
+    assert.match(source, /AccountCreateForm/);
+    assert.match(source, /AccountEditor/);
     assert.doesNotMatch(
       source,
       /providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,

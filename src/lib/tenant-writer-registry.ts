@@ -414,6 +414,18 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "not_applicable",
   },
   {
+    id: "session_account_management",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["/portfolio/accounts"],
+    implementationPaths: ["src/lib/account-management-write.ts"],
+    targets: [userTarget("accounts", "insert", "update")],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "entity_asset_groups_api",
     classification: "user_owned",
     authorization: "machine_admin",

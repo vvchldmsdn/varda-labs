@@ -1,165 +1,159 @@
 import Link from "next/link";
 
 import {
-  AccountScopeTabs,
-  portfolioAccountScopeLabel,
-} from "@/components/account-scope-tabs";
-import {
-  getReadOnlyTenantAccounts,
-  type TenantAccountQueryResult,
-} from "@/db/queries/tenant-accounts";
+  AccountCreateForm,
+  AccountEditor,
+  ArchivedAccountRow,
+} from "@/components/account-management";
+import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
+import { getReadOnlyTenantAccountManagementModel } from "@/db/queries/account-management";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
-import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
-type AccountScopePageProps = {
-  searchParams: Promise<{
-    account?: string | string[];
-  }>;
-};
-
-export default async function AccountScopePage({
-  searchParams,
-}: AccountScopePageProps) {
-  const params = await searchParams;
-  const scope = normalizePortfolioAccountScope(params.account);
+export default async function AccountManagementPage() {
   const resolution = await resolveCurrentTenantContext();
-  const accounts = resolution.ok
-    ? await getReadOnlyTenantAccounts({
-        tenantContext: resolution.tenantContext,
-        scope,
-      })
-    : null;
+  if (!resolution.ok) {
+    return (
+      <PortfolioReadAccessBoundary
+        closedMessage="Accounts remain closed until the signed-in portfolio owner is resolved."
+        description="Create and manage custody accounts without mixing them with analysis groups."
+        resolution={resolution}
+        title="Account management"
+      />
+    );
+  }
+
+  const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
+  const model = await getReadOnlyTenantAccountManagementModel({
+    serviceDate,
+    tenantContext: resolution.tenantContext,
+  });
+  const activeAccounts =
+    model.state === "ready"
+      ? model.accounts.filter((account) => account.isActive)
+      : [];
+  const archivedAccounts =
+    model.state === "ready"
+      ? model.accounts.filter((account) => !account.isActive)
+      : [];
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-[#687064]">
-              Varda Labs
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-              Owner-scoped accounts
-            </h1>
-            <p className="mt-2 text-sm text-[#687064]">
-              Server session and canonical ownership only
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/portfolio/holdings?account=all"
-              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-            >
-              Holdings
-            </Link>
-            <Link
-              href="/portfolio/position-snapshots?account=all"
-              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-            >
-              Position snapshots
-            </Link>
-            <Link
-              href="/portfolio/portfolio-snapshots?account=all"
-              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-            >
-              Portfolio snapshots
-            </Link>
-            <Link
-              href="/portfolio/events?account=all"
-              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-            >
-              Events
-            </Link>
-            <Link
-              href="/auth/session"
-              className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-            >
-              Session evidence
-            </Link>
-          </div>
-        </div>
-
-        <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-          <EvidenceCell
-            label="Portfolio user link"
-            value={sessionResolutionEvidence(resolution)}
-          />
-          <EvidenceCell
-            label="Product database read"
-            value={productReadEvidence(accounts)}
-          />
-        </dl>
-
-        {accounts?.state === "ready" ? (
-          <section className="mt-6 border-t border-[#dfe3d5] pt-6">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold text-[#687064]">
-                  Account scope
-                </p>
-                <h2 className="mt-1 text-lg font-semibold">
-                  {portfolioAccountScopeLabel(scope)}
-                </h2>
-              </div>
-              <AccountScopeTabs
-                basePath="/portfolio/accounts"
-                selectedAccount={scope}
-              />
+    <main className="min-h-screen bg-[#f3f4ef] px-4 py-6 text-[#171916]">
+      <div className="mx-auto w-full max-w-4xl space-y-5">
+        <header className="border-b border-[#dfe3d5] pb-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
+                Account management
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687064]">
+                Accounts represent custody locations such as a broker or pension
+                account. Use asset groups separately when several accounts should
+                be analyzed together.
+              </p>
             </div>
+            <nav className="flex flex-wrap gap-2 text-sm font-semibold">
+              <NavLink href="/">Dashboard</NavLink>
+              <NavLink href="/portfolio/holdings">Holdings</NavLink>
+              <NavLink href="/portfolio/holdings/new">Add holding</NavLink>
+              <NavLink href="/portfolio/groups">Asset groups</NavLink>
+              <NavLink href="/portfolio/events?account=all">Events</NavLink>
+            </nav>
+          </div>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <SummaryCell label="Service date" value={serviceDate} />
+            <SummaryCell
+              label="Active accounts"
+              value={model.state === "ready" ? String(activeAccounts.length) : "-"}
+            />
+            <SummaryCell
+              label="Archived accounts"
+              value={
+                model.state === "ready" ? String(archivedAccounts.length) : "-"
+              }
+            />
+          </dl>
+        </header>
 
-            <ul className="mt-4 divide-y divide-[#e5e8df] rounded-md border border-[#dfe3d5] bg-white">
-              {accounts.accounts.length === 0 ? (
-                <li className="p-4 text-sm text-[#687064]">
-                  No owned account is assigned to this scope.
-                </li>
-              ) : (
-                accounts.accounts.map((account) => (
-                  <li
-                    key={account.code}
-                    className="flex items-center justify-between gap-4 p-4"
-                  >
-                    <div>
-                      <p className="font-semibold">{account.name}</p>
-                      <p className="text-xs text-[#687064]">
-                        {account.code} / {account.accountType}
-                      </p>
-                    </div>
-                    <span className="text-sm font-semibold">
-                      {account.currency}
-                    </span>
-                  </li>
-                ))
-              )}
-            </ul>
+        {model.state !== "ready" ? (
+          <section className="rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
+            Account data is temporarily unavailable. No write was attempted.
           </section>
         ) : (
-          <p className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
-            Account data remains closed until the reviewed identity and owner
-            bootstrap is complete.
-          </p>
+          <>
+            <section className="rounded-md border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+              <h2 className="text-lg font-semibold">Create an account</h2>
+              <p className="mt-1 text-sm text-[#687064]">
+                The immutable internal account code is generated on the server.
+              </p>
+              <div className="mt-4">
+                <AccountCreateForm />
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold">Active accounts</h2>
+                <p className="mt-1 text-sm text-[#687064]">
+                  Renaming does not rewrite holdings, snapshots, or event history.
+                </p>
+              </div>
+              {activeAccounts.length === 0 ? (
+                <div className="rounded-md border border-[#dfe3d5] bg-[#fbfcf7] p-5 text-sm text-[#687064]">
+                  Create the first account before adding a holding.
+                </div>
+              ) : (
+                activeAccounts.map((account) => (
+                  <AccountEditor
+                    account={account}
+                    key={`${account.id}:${account.updatedAt}`}
+                  />
+                ))
+              )}
+            </section>
+
+            {archivedAccounts.length > 0 ? (
+              <section className="space-y-3 border-t border-[#dfe3d5] pt-5">
+                <div>
+                  <h2 className="text-lg font-semibold">Archived accounts</h2>
+                  <p className="mt-1 text-sm text-[#687064]">
+                    Historical evidence remains stored and accounts can be restored.
+                  </p>
+                </div>
+                {archivedAccounts.map((account) => (
+                  <ArchivedAccountRow
+                    account={account}
+                    key={`${account.id}:${account.updatedAt}`}
+                  />
+                ))}
+              </section>
+            ) : null}
+          </>
         )}
-      </section>
+      </div>
     </main>
   );
 }
 
-function productReadEvidence(result: TenantAccountQueryResult | null) {
-  if (result === null) return "Not attempted";
-  if (result.state === "unavailable") return "Unavailable";
-  if (result.state === "integrity_error") return "Blocked";
-  return `${result.accounts.length} account${
-    result.accounts.length === 1 ? "" : "s"
-  }`;
-}
-
-function EvidenceCell({ label, value }: { label: string; value: string }) {
+function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
       <dt className="text-xs font-semibold text-[#687064]">{label}</dt>
-      <dd className="mt-2 font-semibold">{value}</dd>
+      <dd className="mt-2 text-lg font-semibold">{value}</dd>
     </div>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: string }) {
+  return (
+    <Link
+      className="rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-[#35423a] hover:bg-[#eef2e8]"
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }

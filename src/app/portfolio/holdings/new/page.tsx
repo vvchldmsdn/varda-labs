@@ -53,9 +53,15 @@ export default async function NewHoldingPage() {
             계좌와 자산 그룹 정보를 불러오지 못했습니다.
           </p>
         ) : options.accounts.length === 0 ? (
-          <p className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
-            먼저 보유 계좌를 만들어야 합니다.
-          </p>
+          <div className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
+            <p>먼저 보유 계좌를 만들어야 합니다.</p>
+            <Link
+              className="mt-3 inline-block font-semibold underline"
+              href="/portfolio/accounts"
+            >
+              계좌 관리 열기
+            </Link>
+          </div>
         ) : (
           <HoldingOnboardingForm options={options} />
         )}
