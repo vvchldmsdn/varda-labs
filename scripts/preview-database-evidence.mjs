@@ -22,7 +22,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v12.json",
+  "varda-preview-database-preflight-v13.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -60,7 +60,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v14",
+      evidenceVersion: "preview_database_build_preflight_v15",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
@@ -88,7 +88,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v14",
+    "preview_database_build_preflight_v15",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -130,13 +130,13 @@ function assertPreflightCatalog(plan, state, localMigrations) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0031_third_penance"],
-    "Only reviewed migration 0031 may be pending",
+    ["0032_boring_jimmy_woo"],
+    "Only reviewed migration 0032 may be pending",
   );
   assert.equal(
     plan.latestAppliedTag,
-    "0030_spooky_ikaris",
-    "Pending 0031 target must start from reviewed migration 0030",
+    "0031_third_penance",
+    "Pending 0032 target must start from reviewed migration 0031",
   );
   const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
@@ -145,7 +145,7 @@ function assertPreflightCatalog(plan, state, localMigrations) {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0031",
+    "Preview state and migration ledger disagree before migration 0032",
   );
   assertReviewedPreviewDatabaseCatalog(state);
 }

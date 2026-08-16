@@ -271,10 +271,11 @@ describe("current tenant read scope runtime boundary", () => {
       querySource,
       /accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId/,
     );
-    assert.match(
-      querySource,
-      /accountBalanceSnapshots\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
-    );
+    assert.match(querySource, /runTenantReadTransaction/);
+    assert.match(querySource, /transaction\.query\(TENANT_BALANCE_ROWS_SQL\)/);
+    assert.match(querySource, /from public\.account_balance_snapshots as snapshot/);
+    assert.match(querySource, /where snapshot\.is_sample = false/);
+    assert.doesNotMatch(querySource, /accountBalanceSnapshots/);
     assert.match(querySource, /innerJoin\(accounts/);
     assert.match(querySource, /dailyPortfolioSnapshots\.account, accounts\.code/);
     assert.match(querySource, /dailyPositionSnapshots\.account, accounts\.code/);

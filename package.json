@@ -76,6 +76,8 @@
     "audit:assets-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-assets-tenant-rls.ts",
     "audit:daily-portfolio-snapshots-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-daily-portfolio-snapshots-tenant-rls.ts",
     "audit:daily-position-snapshots-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-daily-position-snapshots-tenant-rls.ts",
+    "audit:event-ledger-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-event-ledger-tenant-rls.ts",
+    "audit:account-balance-snapshots-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-account-balance-snapshots-tenant-rls.ts",
     "tenant-db-role:provision": "node --no-warnings scripts/provision-tenant-database-role.mjs",
     "audit:tenant-snapshot-readiness": "node --no-warnings scripts/audit-tenant-snapshot-readiness.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",
