@@ -144,7 +144,7 @@ describe("Tenant database role boundary", () => {
     assert.doesNotMatch(audit, /console\.log\(process\.env/);
     assert.ok(
       audit.indexOf("guardProductionDatabaseTarget(process.env)") <
-        audit.indexOf("readDatabaseRoleEvidence(privilegedUrl)"),
+        audit.indexOf("readCurrentDatabaseRoleEvidence(neon(privilegedUrl))"),
     );
     assert.doesNotMatch(audit, /\b(?:insert|update|delete|alter|drop)\s+(?:into|table|from)\b/i);
   });
