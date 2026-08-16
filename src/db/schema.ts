@@ -475,8 +475,14 @@ export const assets = pgTable(
       .where(
         sql`${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.ticker} is not null`,
       ),
+    tenantSelectPolicy: pgPolicy("assets_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export type Asset = typeof assets.$inferSelect;
 export type NewAsset = typeof assets.$inferInsert;

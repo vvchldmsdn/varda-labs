@@ -942,7 +942,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0028 ledger.",
+      "Preview database migration ledger does not match the reviewed 0029 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -1199,7 +1199,7 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedPortfolioTargetPolicyCatalogPresent =
     hasReviewedPortfolioTargetPolicyCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v11",
+    evidenceVersion: "preview_database_evidence_v12",
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -1208,8 +1208,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0028_present"
-      : "reviewed_0028_not_present",
+      ? "reviewed_0029_present"
+      : "reviewed_0029_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",
