@@ -1857,8 +1857,14 @@ export const marketRegimeDaily = pgTable(
     canonicalOwnerUserIdIdx: index(
       "market_regime_daily_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy("market_regime_daily_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const globalMarketFactors = pgTable(
   "global_market_factors",
@@ -2501,8 +2507,14 @@ export const settings = pgTable(
     canonicalOwnerUserIdIdx: index(
       "settings_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    tenantSelectPolicy: pgPolicy("settings_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;

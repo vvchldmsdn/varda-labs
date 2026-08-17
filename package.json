@@ -79,6 +79,7 @@
     "audit:event-ledger-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-event-ledger-tenant-rls.ts",
     "audit:account-balance-snapshots-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-account-balance-snapshots-tenant-rls.ts",
     "audit:group-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-group-tenant-rls.ts",
+    "audit:settings-regime-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-settings-regime-tenant-rls.ts",
     "tenant-db-role:provision": "node --no-warnings scripts/provision-tenant-database-role.mjs",
     "audit:tenant-snapshot-readiness": "node --no-warnings scripts/audit-tenant-snapshot-readiness.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",

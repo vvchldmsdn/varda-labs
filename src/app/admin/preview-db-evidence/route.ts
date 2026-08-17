@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 import {
+  PREVIEW_DATABASE_EVIDENCE_VERSION,
   assertReviewedPreviewDatabaseState,
   publicPreviewDatabaseEvidence,
   readPreviewDatabaseState,
@@ -13,7 +14,7 @@ export async function GET() {
   if (process.env.VERCEL_ENV !== "preview") {
     return Response.json(
       {
-        evidenceVersion: "preview_database_evidence_v9",
+        evidenceVersion: PREVIEW_DATABASE_EVIDENCE_VERSION,
         status: "not_found",
       },
       { status: 404, headers: { "Cache-Control": "no-store" } },
@@ -37,7 +38,7 @@ export async function GET() {
   } catch {
     return Response.json(
       {
-        evidenceVersion: "preview_database_evidence_v9",
+        evidenceVersion: PREVIEW_DATABASE_EVIDENCE_VERSION,
         status: "blocked",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },

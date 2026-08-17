@@ -6,6 +6,9 @@ import {
 } from "./preview-database-target.ts";
 import type { AppliedMigrationEvidence } from "./preview-migration-plan.ts";
 
+export const PREVIEW_DATABASE_EVIDENCE_VERSION =
+  "preview_database_evidence_v15";
+
 const REVIEWED_COLUMNS = Object.freeze([
   "adjusted_close_basis",
   "adjusted_close_provider",
@@ -942,7 +945,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0033 ledger.",
+      "Preview database migration ledger does not match the reviewed 0034 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -1199,7 +1202,7 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedPortfolioTargetPolicyCatalogPresent =
     hasReviewedPortfolioTargetPolicyCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v15",
+    evidenceVersion: PREVIEW_DATABASE_EVIDENCE_VERSION,
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
@@ -1208,8 +1211,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0033_present"
-      : "reviewed_0033_not_present",
+      ? "reviewed_0034_present"
+      : "reviewed_0034_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",

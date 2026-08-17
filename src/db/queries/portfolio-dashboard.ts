@@ -17,6 +17,7 @@ import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
 import { loadActiveTenantLegacyAssetGroups } from "@/db/queries/tenant-group-reads";
+import { loadLatestTenantPortfolioSettingsRows } from "@/db/queries/tenant-settings";
 import {
   accounts,
   assetPriceSnapshots,
@@ -26,7 +27,6 @@ import {
   eventLedgerEntries,
   fxRates,
   livePriceQuotes,
-  settings,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { normalizeTicker, uniqueStrings } from "@/lib/portfolio-math";
@@ -78,17 +78,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
                 assetScopePredicate,
               ),
             ),
-      db
-        .select()
-        .from(settings)
-        .where(
-          and(
-            eq(settings.canonicalOwnerUserId, tenantContext.ownerUserId),
-            eq(settings.isSample, false),
-          ),
-        )
-        .orderBy(desc(settings.createdAt))
-        .limit(1),
+      loadLatestTenantPortfolioSettingsRows(tenantContext),
       db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
     ]);
 

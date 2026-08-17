@@ -130,13 +130,13 @@ function assertPreflightCatalog(plan, state, localMigrations) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0033_lucky_ben_grimm"],
-    "Only reviewed migration 0033 may be pending",
+    ["0034_fine_ink"],
+    "Only reviewed migration 0034 may be pending",
   );
   assert.equal(
     plan.latestAppliedTag,
-    "0032_boring_jimmy_woo",
-    "Pending 0033 target must start from reviewed migration 0032",
+    "0033_lucky_ben_grimm",
+    "Pending 0034 target must start from reviewed migration 0033",
   );
   const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
@@ -145,7 +145,7 @@ function assertPreflightCatalog(plan, state, localMigrations) {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0033",
+    "Preview state and migration ledger disagree before migration 0034",
   );
   assertReviewedPreviewDatabaseCatalog(state);
 }

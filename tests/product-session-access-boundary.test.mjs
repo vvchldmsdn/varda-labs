@@ -135,25 +135,24 @@ describe("product session access boundary", () => {
 
   it("scopes account regime rows through active accounts owned by the tenant", () => {
     const query = read("src/db/queries/market-context.ts");
+    const tenantQuery = read("src/db/queries/tenant-market-regimes.ts");
 
     assert.match(query, /^import "server-only";/);
     assert.match(query, /tenantContext: TenantContext/);
-    assert.match(
-      query,
-      /innerJoin\(accounts, eq\(marketRegimeDaily\.accountId, accounts\.id\)\)/,
-    );
-    assert.match(
-      query,
-      /eq\(accounts\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
-    );
-    assert.match(query, /eq\(accounts\.isActive, true\)/);
-    assert.match(query, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
-    assert.match(query, /eq\(marketRegimeDaily\.account, accounts\.code\)/);
+    assert.match(query, /loadTenantMarketRegimeRows\(tenantContext\)/);
+    assert.match(tenantQuery, /runTenantReadTransaction/);
+    assert.match(tenantQuery, /inner join public\.accounts as account/);
+    assert.match(tenantQuery, /account\.is_active = true/);
+    assert.match(tenantQuery, /regime\.account = account\.code/);
     assert.doesNotMatch(
-      query,
+      tenantQuery,
+      /canonical_owner_user_id|owner_user_id|NAMED_PORTFOLIO_ACCOUNTS/,
+    );
+    assert.doesNotMatch(
+      `${query}\n${tenantQuery}`,
       /\b(?:insert|update|delete|upsert)\s*\(/i,
     );
-    assert.doesNotMatch(query, /\bfetch\s*\(|\/api\//);
+    assert.doesNotMatch(`${query}\n${tenantQuery}`, /\bfetch\s*\(|\/api\//);
   });
 });
 

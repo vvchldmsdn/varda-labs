@@ -19,11 +19,14 @@ import {
   type TenantLegacyAssetGroupRow,
 } from "@/db/queries/tenant-group-reads";
 import {
+  loadLatestTenantPortfolioSettingsRows,
+  type TenantPortfolioSettingsRow,
+} from "@/db/queries/tenant-settings";
+import {
   accounts,
   assets,
   fxRates,
   livePriceQuotes,
-  settings,
 } from "@/db/schema";
 import {
   buildPortfolioStructure,
@@ -147,17 +150,7 @@ async function loadTenantPortfolioStructureRows({
             ),
       loadActiveTenantLegacyAssetGroupBundle(tenantContext),
       db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
-      db
-        .select()
-        .from(settings)
-        .where(
-          and(
-            eq(settings.canonicalOwnerUserId, tenantContext.ownerUserId),
-            eq(settings.isSample, false),
-          ),
-        )
-        .orderBy(desc(settings.createdAt))
-        .limit(1),
+      loadLatestTenantPortfolioSettingsRows(tenantContext),
     ]);
 
   const selectedGroupIdByAssetId = new Map(
@@ -202,7 +195,7 @@ async function buildStructureFromRows({
   groupRows: readonly TenantLegacyAssetGroupRow[];
   memberRows: readonly TenantLegacyAssetGroupMemberRow[];
   latestFxRows: (typeof fxRates.$inferSelect)[];
-  settingsRows: (typeof settings.$inferSelect)[];
+  settingsRows: readonly TenantPortfolioSettingsRow[];
   selectedAccount: PortfolioStructureAccount;
   assetSelection?: "legacy_account_filter" | "preselected";
   identityScope?: PortfolioStructureIdentityScope;
