@@ -423,7 +423,7 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /PortfolioAnalysisScopeTabs/);
     assert.match(
       source,
-      /getReadOnlyTenantPortfolioStructureForScope\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
+      /getReadOnlyTenantPortfolioTargetPolicyModel\(\{[\s\S]*tenantContext: resolution\.tenantContext/,
     );
     assert.doesNotMatch(
       source,

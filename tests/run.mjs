@@ -22,6 +22,7 @@ import "./price-instrument-identity.test.mjs";
 import "./asset-price-consumer-admission.test.mjs";
 import "./historical-evidence-completeness.test.mjs";
 import "./portfolio-structure.test.mjs";
+import "./portfolio-structure-target-policy.test.mjs";
 import "./portfolio-risk-input.test.mjs";
 import "./portfolio-risk.test.mjs";
 import "./portfolio-risk-read-model.test.mjs";

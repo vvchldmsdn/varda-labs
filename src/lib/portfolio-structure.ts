@@ -60,6 +60,7 @@ export type PortfolioStructureLiveQuoteInput = {
 };
 
 export type PortfolioStructureTargetPolicyStatus =
+  | "approved_policy"
   | "asset_target_raw"
   | "group_target_raw"
   | "target_policy_unresolved"
@@ -89,8 +90,8 @@ export type PortfolioStructureHoldingRow = {
   rawAssetTargetPct: number | null;
   groupTargetPct: number | null;
   memberAllocationRatioPct: number | null;
-  effectiveTargetPct: null;
-  driftPct: null;
+  effectiveTargetPct: number | null;
+  driftPct: number | null;
   targetPolicyStatus: PortfolioStructureTargetPolicyStatus;
   priceEvidenceSource: PortfolioStructurePriceEvidenceSource;
   priceSource: string | null;
@@ -103,8 +104,8 @@ export type PortfolioStructureGroupRow = {
   currentValueKrw: number;
   currentWeightPct: number;
   groupTargetPct: number | null;
-  effectiveTargetPct: null;
-  driftPct: null;
+  effectiveTargetPct: number | null;
+  driftPct: number | null;
   holdingCount: number;
   excludedCount: number;
 };

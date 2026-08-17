@@ -8,7 +8,7 @@ import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-b
 import { PortfolioFxShock } from "@/components/portfolio/portfolio-fx-shock";
 import { SpecialHoldingsCoverage } from "@/components/portfolio/special-holdings-coverage";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
-import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfolio-structure";
+import { getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfolio-target-policy";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
 import { buildPortfolioSpecialHoldingsModel } from "@/lib/portfolio-special-holdings";
@@ -17,8 +17,8 @@ import type {
   PortfolioStructureExclusion,
   PortfolioStructureGroupRow,
   PortfolioStructureHoldingRow,
-  PortfolioStructureResult,
 } from "@/lib/portfolio-structure";
+import type { PortfolioStructureTargetProjection } from "@/lib/portfolio-structure-target-policy";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
@@ -66,11 +66,13 @@ export default async function PortfolioStructurePage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  const structure = await getReadOnlyTenantPortfolioStructureForScope({
+  const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
+  const model = await getReadOnlyTenantPortfolioTargetPolicyModel({
     scope: selectedScope,
-    serviceDate: resolveSnapshotCycle(new Date()).snapshotDate,
+    serviceDate,
     tenantContext: resolution.tenantContext,
   });
+  const structure = model.structure;
   const directHoldingsBaseline =
     buildPortfolioDirectHoldingsBaseline(structure);
   const specialHoldingsCoverage =
@@ -136,8 +138,12 @@ export default async function PortfolioStructurePage({
             />
             <SummaryCell
               label="Policy status"
-              value={policyStatusSummary(structure)}
-              detail="effective target n/a"
+              value={policyStatusLabel(model.structureTargetProjection.status)}
+              detail={policyStatusDetail({
+                effectiveServiceDate:
+                  model.approvedPolicy.policy?.effectiveServiceDate ?? null,
+                projection: model.structureTargetProjection,
+              })}
             />
           </div>
         </section>
@@ -217,6 +223,7 @@ function GroupTable({ rows }: { rows: PortfolioStructureGroupRow[] }) {
             <TableHeader align="right">Weight</TableHeader>
             <TableHeader align="right">Group target</TableHeader>
             <TableHeader align="right">Effective target</TableHeader>
+            <TableHeader align="right">Drift</TableHeader>
             <TableHeader align="right">Holdings</TableHeader>
             <TableHeader align="right">Excluded</TableHeader>
           </tr>
@@ -230,7 +237,10 @@ function GroupTable({ rows }: { rows: PortfolioStructureGroupRow[] }) {
                 {formatPercent(row.currentWeightPct)}
               </TableCell>
               <TableCell align="right">{formatPercent(row.groupTargetPct)}</TableCell>
-              <TableCell align="right">n/a</TableCell>
+              <TableCell align="right">
+                {formatPercent(row.effectiveTargetPct)}
+              </TableCell>
+              <TableCell align="right">{formatSignedPercent(row.driftPct)}</TableCell>
               <TableCell align="right">{row.holdingCount}</TableCell>
               <TableCell align="right">{row.excludedCount}</TableCell>
             </tr>
@@ -248,7 +258,7 @@ function HoldingTable({ rows }: { rows: PortfolioStructureHoldingRow[] }) {
 
   return (
     <div className="mt-3 overflow-x-auto">
-      <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
+      <table className="w-full min-w-[1450px] border-separate border-spacing-0 text-left text-sm">
         <thead className="text-xs uppercase text-[#687064]">
           <tr>
             <TableHeader>Holding</TableHeader>
@@ -262,6 +272,8 @@ function HoldingTable({ rows }: { rows: PortfolioStructureHoldingRow[] }) {
             <TableHeader align="right">Weight</TableHeader>
             <TableHeader align="right">Asset target</TableHeader>
             <TableHeader align="right">Group target</TableHeader>
+            <TableHeader align="right">Effective target</TableHeader>
+            <TableHeader align="right">Drift</TableHeader>
             <TableHeader>Policy</TableHeader>
             <TableHeader>Price evidence</TableHeader>
           </tr>
@@ -290,6 +302,10 @@ function HoldingTable({ rows }: { rows: PortfolioStructureHoldingRow[] }) {
                 {formatPercent(row.rawAssetTargetPct)}
               </TableCell>
               <TableCell align="right">{formatPercent(row.groupTargetPct)}</TableCell>
+              <TableCell align="right">
+                {formatPercent(row.effectiveTargetPct)}
+              </TableCell>
+              <TableCell align="right">{formatSignedPercent(row.driftPct)}</TableCell>
               <TableCell>{row.targetPolicyStatus}</TableCell>
               <TableCell>
                 <div>{row.priceEvidenceSource}</div>
@@ -439,11 +455,34 @@ function EmptyTableMessage({ children }: { children: ReactNode }) {
   );
 }
 
-function policyStatusSummary(structure: PortfolioStructureResult) {
-  const statuses = new Set(
-    structure.holdingRows.map((row) => row.targetPolicyStatus),
-  );
-  return statuses.size > 0 ? String(statuses.size) : "0";
+function policyStatusLabel(
+  status: PortfolioStructureTargetProjection["status"],
+) {
+  if (status === "applied") return "승인 정책 적용";
+  if (status === "partial") return "일부 연결";
+  if (status === "invalid") return "검증 필요";
+  return "정책 없음";
+}
+
+function policyStatusDetail({
+  effectiveServiceDate,
+  projection,
+}: {
+  effectiveServiceDate: string | null;
+  projection: Omit<PortfolioStructureTargetProjection, "structure">;
+}) {
+  if (projection.status === "applied") {
+    return `${effectiveServiceDate ?? "-"} · ${projection.coverage.matchedHoldingCount}/${projection.coverage.policyTargetCount} 종목`;
+  }
+  if (projection.status === "partial") {
+    return `${projection.coverage.matchedHoldingCount}/${projection.coverage.policyTargetCount} 종목 연결`;
+  }
+  if (projection.status === "invalid") return "목표비중 매핑을 확인하세요";
+  if (projection.reason === "not_effective") {
+    return `유효 시작일 ${effectiveServiceDate ?? "-"}`;
+  }
+  if (projection.reason === "missing") return "저장된 목표비중 없음";
+  return "현재 구성과 정책을 확인하세요";
 }
 
 function scopeKindLabel(kind: "all" | "account" | "portfolio_group") {
@@ -469,4 +508,12 @@ function formatPercent(value: number | null) {
   return `${value.toLocaleString("en-US", {
     maximumFractionDigits: 2,
   })}%`;
+}
+
+function formatSignedPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "n/a";
+  const formatted = Math.abs(value).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  });
+  return `${value > 0 ? "+" : value < 0 ? "-" : ""}${formatted}%`;
 }
