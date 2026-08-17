@@ -14,8 +14,11 @@ import { cache } from "react";
 import { db } from "@/db/client";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
 import {
-  assetGroupMembers,
-  assetGroups,
+  loadActiveTenantLegacyAssetGroupBundle,
+  type TenantLegacyAssetGroupMemberRow,
+  type TenantLegacyAssetGroupRow,
+} from "@/db/queries/tenant-group-reads";
+import {
   accounts,
   assets,
   fxRates,
@@ -126,7 +129,7 @@ async function loadTenantPortfolioStructureRows({
     tenantContext,
     namedAccountsOnly,
   );
-  const [assetRows, groupRows, memberRows, latestFxRows, settingsRows] =
+  const [assetRows, legacyGroupRows, latestFxRows, settingsRows] =
     await Promise.all([
       assetScopePredicate === null
         ? Promise.resolve([])
@@ -142,39 +145,7 @@ async function loadTenantPortfolioStructureRows({
                 assetScopePredicate,
               ),
             ),
-      db
-        .select()
-        .from(assetGroups)
-        .where(
-          and(
-            eq(assetGroups.canonicalOwnerUserId, tenantContext.ownerUserId),
-            eq(assetGroups.isActive, true),
-          ),
-        ),
-      assetScopePredicate === null
-        ? Promise.resolve([])
-        : db
-            .select(getTableColumns(assetGroupMembers))
-            .from(assetGroupMembers)
-            .innerJoin(assetGroups, eq(assetGroupMembers.groupId, assetGroups.id))
-            .innerJoin(assets, eq(assetGroupMembers.assetId, assets.id))
-            .innerJoin(accounts, eq(assets.accountId, accounts.id))
-            .where(
-              and(
-                ...ownedAccountPredicates,
-                eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
-                eq(assets.account, accounts.code),
-                assetScopePredicate,
-                eq(assetGroupMembers.groupId, assets.groupId),
-                eq(
-                  assetGroupMembers.canonicalOwnerUserId,
-                  tenantContext.ownerUserId,
-                ),
-                eq(assetGroupMembers.isActive, true),
-                eq(assetGroups.canonicalOwnerUserId, tenantContext.ownerUserId),
-                eq(assetGroups.isActive, true),
-              ),
-            ),
+      loadActiveTenantLegacyAssetGroupBundle(tenantContext),
       db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
       db
         .select()
@@ -189,9 +160,18 @@ async function loadTenantPortfolioStructureRows({
         .limit(1),
     ]);
 
+  const selectedGroupIdByAssetId = new Map(
+    assetRows.flatMap((asset) =>
+      asset.groupId === null ? [] : [[asset.id, asset.groupId] as const],
+    ),
+  );
+  const memberRows = legacyGroupRows.members.filter(
+    (member) => selectedGroupIdByAssetId.get(member.assetId) === member.groupId,
+  );
+
   return buildStructureFromRows({
     assetRows,
-    groupRows,
+    groupRows: legacyGroupRows.groups,
     memberRows,
     latestFxRows,
     settingsRows,
@@ -219,8 +199,8 @@ async function buildStructureFromRows({
   identityScope,
 }: {
   assetRows: (typeof assets.$inferSelect)[];
-  groupRows: (typeof assetGroups.$inferSelect)[];
-  memberRows: (typeof assetGroupMembers.$inferSelect)[];
+  groupRows: readonly TenantLegacyAssetGroupRow[];
+  memberRows: readonly TenantLegacyAssetGroupMemberRow[];
   latestFxRows: (typeof fxRates.$inferSelect)[];
   settingsRows: (typeof settings.$inferSelect)[];
   selectedAccount: PortfolioStructureAccount;
@@ -238,8 +218,8 @@ async function buildStructureFromRows({
 
   return buildPortfolioStructure({
     assets: structureAssetRows,
-    groups: groupRows,
-    groupMembers: memberRows,
+    groups: [...groupRows],
+    groupMembers: [...memberRows],
     liveQuotes: quoteRows,
     usdKrwRate,
     selectedAccount,

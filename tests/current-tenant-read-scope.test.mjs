@@ -62,6 +62,7 @@ describe("current tenant read scope runtime boundary", () => {
     const targetSource = read(
       "src/db/queries/portfolio-analysis-scope-targets.ts",
     );
+    const groupReadSource = read("src/db/queries/tenant-group-reads.ts");
 
     assert.match(source, /^import "server-only";/);
     assert.match(source, /runTenantReadTransaction/);
@@ -82,19 +83,13 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /directAssetIds\.has/);
     assert.match(source, /getPortfolioAnalysisScopeTargets/);
     assert.match(targetSource, /^import "server-only";/);
-    assert.match(targetSource, /portfolioGroupAccountMemberships/);
-    assert.match(targetSource, /portfolioGroupAssetMemberships/);
-    assert.match(targetSource, /selectDistinct/);
-    assert.match(
-      targetSource,
-      /portfolioGroupAccountMemberships\.canonicalOwnerUserId/,
-    );
-    assert.match(
-      targetSource,
-      /portfolioGroupAssetMemberships\.canonicalOwnerUserId/,
-    );
-    assert.match(targetSource, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
-    assert.match(targetSource, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
+    assert.match(targetSource, /loadTenantPortfolioGroupMemberships/);
+    assert.match(targetSource, /mode: "effective"/);
+    assert.match(groupReadSource, /runTenantReadTransaction/);
+    assert.match(groupReadSource, /public\.portfolio_group_account_memberships/);
+    assert.match(groupReadSource, /public\.portfolio_group_asset_memberships/);
+    assert.match(groupReadSource, /valid_from <= \$3::date/);
+    assert.match(groupReadSource, /valid_to > \$3::date/);
     assert.doesNotMatch(
       source,
       /NAMED_PORTFOLIO_ACCOUNTS|ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
@@ -256,6 +251,7 @@ describe("current tenant read scope runtime boundary", () => {
       "src/db/queries/tenant-history-snapshots.ts",
     );
     const controlsSource = read("src/components/history/history-controls.tsx");
+    const groupReadSource = read("src/db/queries/tenant-group-reads.ts");
 
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.match(pageSource, /getReadOnlyTenantHistoryBalance/);
@@ -270,14 +266,8 @@ describe("current tenant read scope runtime boundary", () => {
     assert.doesNotMatch(pageSource, /fetch\(|\/api\//);
 
     assert.match(querySource, /^import "server-only";/);
-    assert.match(
-      querySource,
-      /portfolioGroupAccountMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
-    );
-    assert.match(
-      querySource,
-      /portfolioGroupAssetMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
-    );
+    assert.match(querySource, /loadTenantPortfolioGroupMemberships/);
+    assert.match(querySource, /mode: "all"/);
     assert.match(querySource, /runTenantReadTransaction/);
     assert.match(querySource, /transaction\.query\(TENANT_BALANCE_ROWS_SQL\)/);
     assert.match(querySource, /from public\.account_balance_snapshots as snapshot/);
@@ -296,8 +286,8 @@ describe("current tenant read scope runtime boundary", () => {
     );
     assert.doesNotMatch(tenantSnapshotSource, /from "@\/db\/client"/);
     assert.match(querySource, /buildPortfolioGroupHistoryRows/);
-    assert.match(querySource, /portfolioGroupAccountMemberships\.validFrom/);
-    assert.match(querySource, /portfolioGroupAssetMemberships\.validFrom/);
+    assert.match(groupReadSource, /valid_from::text as valid_from/);
+    assert.match(groupReadSource, /runTenantReadTransaction/);
     assert.doesNotMatch(querySource, /NAMED_PORTFOLIO_ACCOUNTS/);
     assert.doesNotMatch(querySource, /ownerUserId\s*:\s*string|headers\(\)|cookies\(\)/);
     assert.match(controlsSource, /PortfolioAnalysisScopeTabs/);
@@ -310,6 +300,7 @@ describe("current tenant read scope runtime boundary", () => {
     const targetSource = read(
       "src/db/queries/portfolio-analysis-scope-targets.ts",
     );
+    const groupReadSource = read("src/db/queries/tenant-group-reads.ts");
 
     assert.match(source, /^import "server-only";/);
     assert.match(
@@ -325,8 +316,9 @@ describe("current tenant read scope runtime boundary", () => {
       /eq\(assets\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
     );
     assert.doesNotMatch(source, /NAMED_PORTFOLIO_ACCOUNTS/);
-    assert.match(targetSource, /lte\(portfolioGroupAccountMemberships\.validFrom, serviceDate\)/);
-    assert.match(targetSource, /gt\(portfolioGroupAssetMemberships\.validTo, serviceDate\)/);
+    assert.match(targetSource, /mode: "effective"/);
+    assert.match(groupReadSource, /valid_from <= \$3::date/);
+    assert.match(groupReadSource, /valid_to > \$3::date/);
     for (const relation of [
       /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
       /eq\(assets\.account, accounts\.code\)/,
@@ -381,6 +373,7 @@ describe("current tenant read scope runtime boundary", () => {
 
   it("authorizes portfolio structure through owned accounts and owner-scoped groups", () => {
     const source = read("src/db/queries/portfolio-structure.ts");
+    const groupReadSource = read("src/db/queries/tenant-group-reads.ts");
 
     assert.match(source, /^import "server-only";/);
     assert.match(source, /getReadOnlyTenantPortfolioStructure/);
@@ -401,15 +394,12 @@ describe("current tenant read scope runtime boundary", () => {
       source,
       /eq\(assets\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
     );
-    assert.match(
-      source,
-      /eq\(assetGroups\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
-    );
-    assert.match(
-      source,
-      /eq\(\s*assetGroupMembers\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId/,
-    );
-    assert.match(source, /eq\(assetGroupMembers\.groupId, assets\.groupId\)/);
+    assert.match(source, /loadActiveTenantLegacyAssetGroupBundle/);
+    assert.match(source, /selectedGroupIdByAssetId/);
+    assert.match(groupReadSource, /public\.asset_groups/);
+    assert.match(groupReadSource, /public\.asset_group_members/);
+    assert.match(groupReadSource, /inner join public\.asset_groups/);
+    assert.match(groupReadSource, /runTenantReadTransaction/);
     assert.match(
       source,
       /eq\(settings\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
@@ -516,6 +506,7 @@ describe("current tenant read scope runtime boundary", () => {
     );
     const riskSource = read("src/db/queries/portfolio-risk.ts");
     const xraySource = read("src/db/queries/investment-lab-etf-xray.ts");
+    const groupReadSource = read("src/db/queries/tenant-group-reads.ts");
 
     for (const source of [counterfactualSource, availabilitySource, riskSource]) {
       assert.match(source, /^import "server-only";/);
@@ -582,18 +573,9 @@ describe("current tenant read scope runtime boundary", () => {
       scopeEvidenceSource,
       /eq\(accounts\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId\)/,
     );
-    assert.match(
-      analysisScopesSource,
-      /eq\(\s*portfolioGroups\.canonicalOwnerUserId,\s*tenantContext\.ownerUserId/,
-    );
-    assert.match(
-      scopeEvidenceSource,
-      /portfolioGroupAccountMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
-    );
-    assert.match(
-      scopeEvidenceSource,
-      /portfolioGroupAssetMemberships\.canonicalOwnerUserId,[\s\S]*tenantContext\.ownerUserId/,
-    );
+    assert.match(analysisScopesSource, /loadActiveTenantPortfolioGroups/);
+    assert.match(scopeEvidenceSource, /loadTenantPortfolioGroupMemberships/);
+    assert.match(groupReadSource, /runTenantReadTransaction/);
     assert.match(
       scopeEvidenceSource,
       /innerJoin\(accounts, eq\(eventLedgerEntries\.accountId, accounts\.id\)\)/,

@@ -1,12 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
-
-import { db } from "@/db/client";
-import {
-  portfolioGroupAccountMemberships,
-  portfolioGroupAssetMemberships,
-} from "@/db/schema";
+import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
 import {
   loadTenantHistoryGroupPositionRows,
   loadTenantHistoryPortfolioRows,
@@ -349,46 +343,13 @@ async function loadPortfolioGroupRows(
   tenantContext: TenantContext,
   scope: Extract<PortfolioAnalysisScope, { kind: "portfolio_group" }>,
 ): Promise<PortfolioHistoryRawRow[]> {
-  const [accountMemberships, assetMemberships] = await Promise.all([
-    db
-      .select({
-        targetId: portfolioGroupAccountMemberships.accountId,
-        validFrom: portfolioGroupAccountMemberships.validFrom,
-        validTo: portfolioGroupAccountMemberships.validTo,
-      })
-      .from(portfolioGroupAccountMemberships)
-      .where(
-        and(
-          eq(
-            portfolioGroupAccountMemberships.canonicalOwnerUserId,
-            tenantContext.ownerUserId,
-          ),
-          eq(
-            portfolioGroupAccountMemberships.portfolioGroupId,
-            scope.portfolioGroupId,
-          ),
-        ),
-      ),
-    db
-      .select({
-        targetId: portfolioGroupAssetMemberships.assetId,
-        validFrom: portfolioGroupAssetMemberships.validFrom,
-        validTo: portfolioGroupAssetMemberships.validTo,
-      })
-      .from(portfolioGroupAssetMemberships)
-      .where(
-        and(
-          eq(
-            portfolioGroupAssetMemberships.canonicalOwnerUserId,
-            tenantContext.ownerUserId,
-          ),
-          eq(
-            portfolioGroupAssetMemberships.portfolioGroupId,
-            scope.portfolioGroupId,
-          ),
-        ),
-      ),
-  ]);
+  const memberships = await loadTenantPortfolioGroupMemberships({
+    mode: "all",
+    portfolioGroupId: scope.portfolioGroupId,
+    tenantContext,
+  });
+  const accountMemberships = memberships.accountMemberships;
+  const assetMemberships = memberships.assetMemberships;
 
   const accountIds = uniqueTargets(accountMemberships);
   const assetIds = uniqueTargets(assetMemberships);

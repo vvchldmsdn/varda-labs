@@ -15,6 +15,7 @@ const ASSET_A = "44444444-4444-4444-8444-444444444444";
 const UPDATED_AT = "2026-08-13T01:02:03.000Z";
 
 const querySource = source("../src/db/queries/portfolio-group-management.ts");
+const groupReadSource = source("../src/db/queries/tenant-group-reads.ts");
 const writerSource = source("../src/lib/portfolio-group-management-write.ts");
 const actionSource = source("../src/app/portfolio/groups/actions.ts");
 const pageSource = source("../src/app/portfolio/groups/page.tsx");
@@ -89,16 +90,16 @@ describe("portfolio group management", () => {
     });
   });
 
-  it("keeps the read model owner-qualified and parallel", () => {
+  it("keeps the read model tenant-scoped and parallel", () => {
     assert.match(querySource, /await Promise\.all\(\[/);
-    assert.match(
-      querySource,
-      /eq\(portfolioGroups\.canonicalOwnerUserId, ownerUserId\)/,
-    );
+    assert.match(querySource, /loadActiveTenantPortfolioGroups/);
+    assert.match(querySource, /loadTenantPortfolioGroupMemberships/);
+    assert.match(querySource, /mode: "effective"/);
     assert.match(querySource, /eq\(accounts\.canonicalOwnerUserId, ownerUserId\)/);
     assert.match(querySource, /eq\(assets\.canonicalOwnerUserId, ownerUserId\)/);
-    assert.match(querySource, /lte\([^,]+\.validFrom, serviceDate\)/);
-    assert.match(querySource, /gt\([^,]+\.validTo, serviceDate\)/);
+    assert.match(groupReadSource, /runTenantReadTransaction/);
+    assert.match(groupReadSource, /valid_from <= \$3::date/);
+    assert.match(groupReadSource, /valid_to > \$3::date/);
     assert.doesNotMatch(querySource, /\bfetch\s*\(/);
   });
 
