@@ -25,9 +25,11 @@ type TenantTableRlsAuditConfig = Readonly<{
     | "daily_portfolio_snapshots"
     | "daily_position_snapshots"
     | "event_ledger_entries"
+    | "market_regime_daily"
     | "portfolio_group_account_memberships"
     | "portfolio_group_asset_memberships"
-    | "portfolio_groups";
+    | "portfolio_groups"
+    | "settings";
 }>;
 
 export async function runTenantTableRlsAudit(

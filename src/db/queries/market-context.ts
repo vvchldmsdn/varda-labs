@@ -1,15 +1,13 @@
 import "server-only";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { asc, inArray } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { loadTenantMarketRegimeRows } from "@/db/queries/tenant-market-regimes";
 import {
-  accounts,
   benchmarkSnapshots,
   globalMarketFactors,
-  marketRegimeDaily,
 } from "@/db/schema";
-import { NAMED_PORTFOLIO_ACCOUNTS } from "@/lib/portfolio-account-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import {
   groupGlobalMarketFactorsByFamily,
@@ -226,41 +224,6 @@ function loadBenchmarkRows(tickers: string[]) {
       asc(benchmarkSnapshots.benchmarkTicker),
       asc(benchmarkSnapshots.benchmarkDate),
     );
-}
-
-function loadTenantMarketRegimeRows(tenantContext: TenantContext) {
-  return db
-    .select({
-      legacyBase44Id: marketRegimeDaily.legacyBase44Id,
-      regimeDate: marketRegimeDaily.regimeDate,
-      account: marketRegimeDaily.account,
-      label: marketRegimeDaily.label,
-      description: marketRegimeDaily.description,
-      driversJson: marketRegimeDaily.driversJson,
-      macroStressScore: marketRegimeDaily.macroStressScore,
-      regimeScore: marketRegimeDaily.regimeScore,
-      newsSentimentScore: marketRegimeDaily.newsSentimentScore,
-      avgCorrelation: marketRegimeDaily.avgCorrelation,
-      enb: marketRegimeDaily.enb,
-      portfolioVolatility: marketRegimeDaily.portfolioVolatility,
-      yieldCurve: marketRegimeDaily.yieldCurve,
-      rateLevel: marketRegimeDaily.rateLevel,
-      stressBadgeCount: marketRegimeDaily.stressBadgeCount,
-      base44UpdatedAt: marketRegimeDaily.base44UpdatedAt,
-      createdAt: marketRegimeDaily.createdAt,
-      updatedAt: marketRegimeDaily.updatedAt,
-    })
-    .from(marketRegimeDaily)
-    .innerJoin(accounts, eq(marketRegimeDaily.accountId, accounts.id))
-    .where(
-      and(
-        eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
-        eq(accounts.isActive, true),
-        inArray(accounts.code, NAMED_PORTFOLIO_ACCOUNTS),
-        eq(marketRegimeDaily.account, accounts.code),
-      ),
-    )
-    .orderBy(asc(marketRegimeDaily.account), asc(marketRegimeDaily.regimeDate));
 }
 
 function loadGlobalMarketFactorRows() {

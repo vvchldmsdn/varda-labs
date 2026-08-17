@@ -297,6 +297,7 @@ describe("current tenant read scope runtime boundary", () => {
 
   it("authorizes dashboard rows through dynamic accounts and effective group targets", () => {
     const source = read("src/db/queries/portfolio-dashboard.ts");
+    const settingsSource = read("src/db/queries/tenant-settings.ts");
     const targetSource = read(
       "src/db/queries/portfolio-analysis-scope-targets.ts",
     );
@@ -319,6 +320,8 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(targetSource, /mode: "effective"/);
     assert.match(groupReadSource, /valid_from <= \$3::date/);
     assert.match(groupReadSource, /valid_to > \$3::date/);
+    assert.match(source, /loadLatestTenantPortfolioSettingsRows/);
+    assert.match(settingsSource, /runTenantReadTransaction/);
     for (const relation of [
       /innerJoin\(accounts, eq\(assets\.accountId, accounts\.id\)\)/,
       /eq\(assets\.account, accounts\.code\)/,
@@ -374,6 +377,7 @@ describe("current tenant read scope runtime boundary", () => {
   it("authorizes portfolio structure through owned accounts and owner-scoped groups", () => {
     const source = read("src/db/queries/portfolio-structure.ts");
     const groupReadSource = read("src/db/queries/tenant-group-reads.ts");
+    const settingsSource = read("src/db/queries/tenant-settings.ts");
 
     assert.match(source, /^import "server-only";/);
     assert.match(source, /getReadOnlyTenantPortfolioStructure/);
@@ -400,10 +404,8 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(groupReadSource, /public\.asset_group_members/);
     assert.match(groupReadSource, /inner join public\.asset_groups/);
     assert.match(groupReadSource, /runTenantReadTransaction/);
-    assert.match(
-      source,
-      /eq\(settings\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
-    );
+    assert.match(source, /loadLatestTenantPortfolioSettingsRows/);
+    assert.match(settingsSource, /runTenantReadTransaction/);
     assert.doesNotMatch(
       source,
       /ownerUserId\s*:\s*string|searchParams|headers\(\)|cookies\(\)/,
