@@ -7,7 +7,7 @@ import {
 import type { AppliedMigrationEvidence } from "./preview-migration-plan.ts";
 
 export const PREVIEW_DATABASE_EVIDENCE_VERSION =
-  "preview_database_evidence_v15";
+  "preview_database_evidence_v16";
 
 const REVIEWED_COLUMNS = Object.freeze([
   "adjusted_close_basis",
@@ -945,7 +945,7 @@ export function assertReviewedPreviewDatabaseState(
 ) {
   if (!hasReviewedMigrationLedger(state)) {
     throw new Error(
-      "Preview database migration ledger does not match the reviewed 0034 ledger.",
+      "Preview database migration ledger does not match the reviewed 0035 ledger.",
     );
   }
   if (!hasReviewedLatestMigration(state)) {
@@ -1211,8 +1211,8 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
       ? PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag
       : null,
     migrationLedgerStatus: reviewedMigrationLedgerPresent
-      ? "reviewed_0034_present"
-      : "reviewed_0034_not_present",
+      ? "reviewed_0035_present"
+      : "reviewed_0035_not_present",
     assetPriceCatalogStatus: reviewedAssetPriceCatalogPresent
       ? "reviewed_0020_present"
       : "reviewed_0020_not_present",

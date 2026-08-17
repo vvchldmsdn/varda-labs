@@ -165,8 +165,8 @@ describe("additional contribution tenant preview", () => {
     }
     assert.match(universeQuery, /accounts\.canonicalOwnerUserId/);
     assert.match(universeQuery, /assets\.accountId/);
-    assert.match(policyQuery, /tenantContext\.ownerUserId/);
-    assert.match(policyQuery, /targetPolicyApprovalRevisions\.ownerUserId/);
+    assert.match(policyQuery, /loadCurrentTenantLegacyTargetPolicy/);
+    assert.doesNotMatch(policyQuery, /from "@\/db\/client"/);
     assert.match(previewQuery, /Promise\.all/);
     assert.match(ma120Query, /Promise\.all/);
     assert.match(ma120Query, /getActivePortfolioOwnerUserIds/);

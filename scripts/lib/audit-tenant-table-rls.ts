@@ -14,6 +14,10 @@ loadEnvironment({ path: ".env.local", quiet: true });
 type TenantTableRlsAuditConfig = Readonly<{
   allowEmptyTable?: boolean;
   operation: string;
+  ownerScope?:
+    | "canonical_owner_user_id"
+    | "owner_user_id"
+    | "target_policy_approval_revision";
   policyName: string;
   successStatus: string;
   tableName:
@@ -26,10 +30,16 @@ type TenantTableRlsAuditConfig = Readonly<{
     | "daily_position_snapshots"
     | "event_ledger_entries"
     | "market_regime_daily"
+    | "portfolio_target_policy_lifecycle_events"
+    | "portfolio_target_policy_revisions"
+    | "portfolio_target_policy_rows"
     | "portfolio_group_account_memberships"
     | "portfolio_group_asset_memberships"
     | "portfolio_groups"
-    | "settings";
+    | "settings"
+    | "target_policy_approval_lifecycle_events"
+    | "target_policy_approval_revisions"
+    | "target_policy_approval_vector_rows";
 }>;
 
 export async function runTenantTableRlsAudit(
@@ -38,6 +48,7 @@ export async function runTenantTableRlsAudit(
   let auditStage = "startup";
   const tableName = safeIdentifier(auditConfig.tableName);
   const policyName = safeIdentifier(auditConfig.policyName);
+  const ownerScope = normalizeOwnerScope(auditConfig.ownerScope);
 
   try {
     const boundary = guardTenantDatabaseRoleBoundary(process.env);
@@ -53,8 +64,12 @@ export async function runTenantTableRlsAudit(
       `public.${tableName}`,
     ]);
     auditStage = "owner_catalog";
-    const ownerRows = await privilegedSql.query(ownerCountsSql(tableName));
-    const totalRows = await privilegedSql.query(totalCountsSql(tableName));
+    const ownerRows = await privilegedSql.query(
+      ownerCountsSql(tableName, ownerScope),
+    );
+    const totalRows = await privilegedSql.query(
+      totalCountsSql(tableName, ownerScope),
+    );
 
     const table = singleRow(tableRows, code(tableName, "table_catalog_invalid"));
     const policy = singleRow(
@@ -130,7 +145,7 @@ export async function runTenantTableRlsAudit(
     );
     const tenantSqlClient = getTenantSqlClient();
     const visibleCountSql = visibleCountSqlFor(tableName);
-    const contextCountSql = contextCountSqlFor(tableName);
+    const contextCountSql = contextCountSqlFor(tableName, ownerScope);
 
     auditStage = "no_context_before";
     const beforeRows = await tenantSqlClient.query(visibleCountSql);
@@ -318,6 +333,12 @@ function safeIdentifier(value: string) {
   return value;
 }
 
+function normalizeOwnerScope(
+  value: TenantTableRlsAuditConfig["ownerScope"],
+) {
+  return value ?? "canonical_owner_user_id";
+}
+
 function code(tableName: string, suffix: string) {
   return `${tableName}_${suffix}`;
 }
@@ -365,24 +386,32 @@ function safeDiagnosticToken(value: unknown) {
     : "";
 }
 
-function ownerCountsSql(tableName: string) {
+function ownerCountsSql(
+  tableName: string,
+  ownerScope: NonNullable<TenantTableRlsAuditConfig["ownerScope"]>,
+) {
+  const owner = ownerSqlParts(tableName, ownerScope);
   return `
     select
-      canonical_owner_user_id::text as owner_user_id,
+      ${owner.expression}::text as owner_user_id,
       count(*)::int as row_count
-    from public.${tableName}
-    where canonical_owner_user_id is not null
-    group by canonical_owner_user_id
-    order by canonical_owner_user_id
+    from ${owner.fromClause}
+    where ${owner.expression} is not null
+    group by ${owner.expression}
+    order by ${owner.expression}
   `;
 }
 
-function totalCountsSql(tableName: string) {
+function totalCountsSql(
+  tableName: string,
+  ownerScope: NonNullable<TenantTableRlsAuditConfig["ownerScope"]>,
+) {
+  const owner = ownerSqlParts(tableName, ownerScope);
   return `
     select
       count(*)::int as total_count,
-      count(*) filter (where canonical_owner_user_id is null)::int as unowned_count
-    from public.${tableName}
+      count(*) filter (where ${owner.expression} is null)::int as unowned_count
+    from ${owner.fromClause}
   `;
 }
 
@@ -390,16 +419,39 @@ function visibleCountSqlFor(tableName: string) {
   return `select count(*)::int as visible_count from public.${tableName}`;
 }
 
-function contextCountSqlFor(tableName: string) {
+function contextCountSqlFor(
+  tableName: string,
+  ownerScope: NonNullable<TenantTableRlsAuditConfig["ownerScope"]>,
+) {
+  const owner = ownerSqlParts(tableName, ownerScope);
   return `
     select
       count(*)::int as visible_count,
       count(*) filter (
-        where canonical_owner_user_id is distinct from
+        where ${owner.expression} is distinct from
           nullif(current_setting('${TENANT_CONTEXT_SETTING_NAME}', true), '')::uuid
       )::int as mismatch_count
-    from public.${tableName}
+    from ${owner.fromClause}
   `;
+}
+
+function ownerSqlParts(
+  tableName: string,
+  ownerScope: NonNullable<TenantTableRlsAuditConfig["ownerScope"]>,
+) {
+  if (ownerScope === "target_policy_approval_revision") {
+    return Object.freeze({
+      expression: "revision.owner_user_id",
+      fromClause: `public.${tableName} as audited
+        left join public.target_policy_approval_revisions as revision
+          on revision.id = audited.approval_revision_id`,
+    });
+  }
+
+  return Object.freeze({
+    expression: `audited.${safeIdentifier(ownerScope)}`,
+    fromClause: `public.${tableName} as audited`,
+  });
 }
 
 const TABLE_RLS_SQL = `
