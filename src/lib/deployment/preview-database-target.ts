@@ -29,10 +29,10 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
-      tag: "0033_lucky_ben_grimm",
-      createdAt: 1786923380082,
+      tag: "0034_fine_ink",
+      createdAt: 1786931281235,
       sha256:
-        "e9d0f31b7a367322118b0d9aa666f3902ac6f46ed2b655270e4323e1559a2a6b",
+        "380f739104dddac730b5917d82ca71f30e6e872d0ab5a7ba6e5d564451bc0625",
     }),
   ]),
 });

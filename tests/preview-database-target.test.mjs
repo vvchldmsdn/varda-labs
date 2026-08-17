@@ -136,7 +136,14 @@ describe("Preview database target operational guard", () => {
     );
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
-      [PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration],
+      [
+        {
+          tag: "0034_fine_ink",
+          createdAt: 1786931281235,
+          sha256:
+            "380f739104dddac730b5917d82ca71f30e6e872d0ab5a7ba6e5d564451bc0625",
+        },
+      ],
     );
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
