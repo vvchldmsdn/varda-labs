@@ -10,6 +10,7 @@ import {
   sha256Fingerprint,
 } from "../src/lib/deployment/preview-database-target.ts";
 import {
+  PREVIEW_DATABASE_EVIDENCE_VERSION,
   assertPreviewHoldingOnboardingRowsPreserved,
   assertPreviewPortfolioTargetPolicyRowsPreserved,
   assertPreviewPortfolioScopeRowsPreserved,
@@ -167,6 +168,8 @@ describe("Preview database target operational guard", () => {
     );
 
     assert.match(route, /process\.env\.VERCEL_ENV !== "preview"/);
+    assert.match(route, /PREVIEW_DATABASE_EVIDENCE_VERSION/);
+    assert.doesNotMatch(route, /preview_database_evidence_v9/);
     assert.match(route, /assertReviewedPreviewDatabaseState/);
     assert.match(route, /Cache-Control": "no-store"/);
     assert.doesNotMatch(
@@ -176,6 +179,12 @@ describe("Preview database target operational guard", () => {
     assert.match(proxy, /"\/admin\/:path\*"/);
     assert.match(smoke, /--remote-db-evidence/);
     assert.match(smoke, /\/admin\/preview-db-evidence/);
+    assert.match(smoke, /PREVIEW_DATABASE_EVIDENCE_VERSION/);
+    assert.match(smoke, /PREVIEW_DATABASE_TARGET_GUARD_POLICY/);
+    assert.doesNotMatch(
+      smoke,
+      /preview_database_evidence_v9|migrationLedgerStatus,\s*"reviewed_0026_present"|latestReviewedMigration,\s*"0026_curved_raider"/,
+    );
   });
 
   it("does not label pending schema evidence as reviewed", () => {
@@ -192,7 +201,7 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(reviewed).endpointProjectBinding,
       },
       {
-        evidenceVersion: "preview_database_evidence_v15",
+        evidenceVersion: PREVIEW_DATABASE_EVIDENCE_VERSION,
         status: "operational_guard_passed",
         endpointProjectBinding:
           "external_vercel_neon_integration_control",

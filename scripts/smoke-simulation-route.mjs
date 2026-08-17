@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { neon } from "@neondatabase/serverless";
 import { config } from "dotenv";
 
+import { PREVIEW_DATABASE_EVIDENCE_VERSION } from "../src/lib/deployment/preview-database-evidence.ts";
+import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
+
 config({ path: ".env.local", quiet: true });
 
 const BASE_URL = readArgument("--base-url") ?? "http://127.0.0.1:3100";
@@ -102,6 +105,8 @@ const sql = USE_REMOTE_DATABASE_EVIDENCE
     ? neon(process.env.DATABASE_URL)
     : null;
 const authorization = `Basic ${Buffer.from(`${USERNAME}:${PASSWORD}`).toString("base64")}`;
+const REVIEWED_MIGRATION_STATUS =
+  `reviewed_${PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag.slice(0, 4)}_present`;
 const simulationPath =
   RAW_QUERY !== null
     ? `/simulation?${RAW_QUERY}`
@@ -943,7 +948,10 @@ async function readCounts() {
       "authenticated Preview database evidence must return 200",
     );
     const evidence = JSON.parse(response.body);
-    assert.equal(evidence.evidenceVersion, "preview_database_evidence_v9");
+    assert.equal(
+      evidence.evidenceVersion,
+      PREVIEW_DATABASE_EVIDENCE_VERSION,
+    );
     assert.equal(evidence.status, "operational_guard_passed");
     assert.equal(
       evidence.endpointProjectBinding,
@@ -951,7 +959,7 @@ async function readCounts() {
     );
     assert.equal(
       evidence.migrationLedgerStatus,
-      "reviewed_0026_present",
+      REVIEWED_MIGRATION_STATUS,
     );
     assert.equal(
       evidence.assetPriceCatalogStatus,
@@ -979,7 +987,7 @@ async function readCounts() {
     );
     assert.equal(
       evidence.latestReviewedMigration,
-      "0026_curved_raider",
+      PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration.tag,
     );
     assert.match(evidence.targetFingerprint, /^sha256:[0-9a-f]{64}$/);
     return {

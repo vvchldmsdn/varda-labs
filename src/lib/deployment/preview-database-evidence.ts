@@ -6,6 +6,9 @@ import {
 } from "./preview-database-target.ts";
 import type { AppliedMigrationEvidence } from "./preview-migration-plan.ts";
 
+export const PREVIEW_DATABASE_EVIDENCE_VERSION =
+  "preview_database_evidence_v15";
+
 const REVIEWED_COLUMNS = Object.freeze([
   "adjusted_close_basis",
   "adjusted_close_provider",
@@ -1199,7 +1202,7 @@ export function publicPreviewDatabaseEvidence(state: PreviewDatabaseState) {
   const reviewedPortfolioTargetPolicyCatalogPresent =
     hasReviewedPortfolioTargetPolicyCatalog(state);
   return {
-    evidenceVersion: "preview_database_evidence_v15",
+    evidenceVersion: PREVIEW_DATABASE_EVIDENCE_VERSION,
     status: "operational_guard_passed",
     targetFingerprint: state.target.targetFingerprint,
     endpointProjectBinding: state.target.endpointProjectBinding,
