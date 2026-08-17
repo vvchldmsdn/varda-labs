@@ -36,6 +36,10 @@ const audits = [
   },
 ] as const;
 
-for (const audit of audits) {
-  await runTenantTableRlsAudit(audit);
+async function runGroupTenantRlsAudits() {
+  for (const audit of audits) {
+    await runTenantTableRlsAudit(audit);
+  }
 }
+
+void runGroupTenantRlsAudits();
