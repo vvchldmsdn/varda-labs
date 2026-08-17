@@ -5,12 +5,8 @@ import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
 import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfolio-structure";
-import {
-  accounts,
-  assets,
-  portfolioTargetPolicyRevisions,
-  portfolioTargetPolicyRows,
-} from "@/db/schema";
+import { loadCurrentTenantPortfolioTargetPolicy } from "@/db/queries/tenant-target-policies";
+import { accounts, assets } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import {
   buildPortfolioTargetPolicyRecord,
@@ -218,70 +214,11 @@ async function readCurrentApprovedPolicy({
   tenantContext: TenantContext;
 }) {
   const columns = portfolioTargetScopeColumns(scope);
-  const revisions = await db
-    .select({
-      id: portfolioTargetPolicyRevisions.id,
-      approvalRevision: portfolioTargetPolicyRevisions.approvalRevision,
-      policyVersion: portfolioTargetPolicyRevisions.policyVersion,
-      effectiveServiceDate:
-        portfolioTargetPolicyRevisions.effectiveServiceDate,
-      universeHash: portfolioTargetPolicyRevisions.universeHash,
-      vectorHash: portfolioTargetPolicyRevisions.vectorHash,
-      approvedAt: portfolioTargetPolicyRevisions.approvedAt,
-    })
-    .from(portfolioTargetPolicyRevisions)
-    .where(
-      and(
-        eq(
-          portfolioTargetPolicyRevisions.canonicalOwnerUserId,
-          tenantContext.ownerUserId,
-        ),
-        eq(portfolioTargetPolicyRevisions.scopeKind, columns.scopeKind),
-        nullableEquals(
-          portfolioTargetPolicyRevisions.scopeAccountId,
-          columns.scopeAccountId,
-        ),
-        nullableEquals(
-          portfolioTargetPolicyRevisions.scopePortfolioGroupId,
-          columns.scopePortfolioGroupId,
-        ),
-        eq(portfolioTargetPolicyRevisions.lifecycleStatus, "approved"),
-      ),
-    )
-    .limit(2);
-  if (revisions.length === 0) {
-    return Object.freeze({ status: "missing" as const, policy: null });
-  }
-  if (revisions.length !== 1) {
-    return Object.freeze({ status: "conflict" as const, policy: null });
-  }
-
-  const [revision] = revisions;
-  const rows = await db
-    .select({
-      accountId: portfolioTargetPolicyRows.accountId,
-      assetId: portfolioTargetPolicyRows.assetId,
-      assetName: portfolioTargetPolicyRows.assetName,
-      market: portfolioTargetPolicyRows.market,
-      currency: portfolioTargetPolicyRows.currency,
-      ticker: portfolioTargetPolicyRows.ticker,
-      buyability: portfolioTargetPolicyRows.buyability,
-      targetWeightBps: portfolioTargetPolicyRows.targetWeightBps,
-    })
-    .from(portfolioTargetPolicyRows)
-    .where(eq(portfolioTargetPolicyRows.approvalRevisionId, revision.id))
-    .orderBy(
-      asc(portfolioTargetPolicyRows.accountId),
-      asc(portfolioTargetPolicyRows.assetId),
-    )
-    .limit(65);
-  if (rows.length > 64) {
-    return Object.freeze({ status: "conflict" as const, policy: null });
-  }
-
-  return Object.freeze({
-    status: "available" as const,
-    policy: Object.freeze({ ...revision, rows: Object.freeze(rows) }),
+  return loadCurrentTenantPortfolioTargetPolicy({
+    scopeAccountId: columns.scopeAccountId,
+    scopeKind: columns.scopeKind,
+    scopePortfolioGroupId: columns.scopePortfolioGroupId,
+    tenantContext,
   });
 }
 
@@ -336,13 +273,4 @@ function combineScopePredicates(predicates: readonly (SQL | null)[]) {
   if (available.length === 0) return null;
   if (available.length === 1) return available[0];
   return or(...available) ?? null;
-}
-
-function nullableEquals(
-  column:
-    | typeof portfolioTargetPolicyRevisions.scopeAccountId
-    | typeof portfolioTargetPolicyRevisions.scopePortfolioGroupId,
-  value: string | null,
-) {
-  return value === null ? sql`${column} is null` : eq(column, value);
 }

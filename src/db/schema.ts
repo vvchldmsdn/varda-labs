@@ -987,8 +987,14 @@ export const targetPolicyApprovalRevisions = pgTable(
     )
       .on(table.ownerUserId, table.accountId, table.policyId)
       .where(sql`${table.lifecycleStatus} = 'approved'`),
+    tenantSelectPolicy: pgPolicy("target_policy_revisions_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.ownerUserId),
+    }),
   }),
-);
+).enableRLS();
 
 export const targetPolicyApprovalVectorRows = pgTable(
   "target_policy_approval_vector_rows",
@@ -1030,8 +1036,22 @@ export const targetPolicyApprovalVectorRows = pgTable(
       "target_policy_vector_rows_weight_check",
       sql`${table.targetWeightBps} between 0 and 10000`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "target_policy_vector_rows_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: sql`exists (
+          select 1
+          from ${targetPolicyApprovalRevisions}
+          where ${targetPolicyApprovalRevisions.id} = ${table.approvalRevisionId}
+            and ${currentTenantOwns(targetPolicyApprovalRevisions.ownerUserId)}
+        )`,
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const targetPolicyApprovalLifecycleEvents = pgTable(
   "target_policy_approval_lifecycle_events",
@@ -1077,8 +1097,22 @@ export const targetPolicyApprovalLifecycleEvents = pgTable(
       "target_policy_events_transition_shape_check",
       sql`(${table.eventSequence} = 1 and ${table.transitionKind} = 'explicit_approval' and ${table.previousStatus} is null and ${table.resultingStatus} = 'approved' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'revocation' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'revoked' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'supersession' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'superseded' and ${table.replacementRevisionId} is not null and ${table.replacementRevisionId} <> ${table.approvalRevisionId})`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "target_policy_events_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: sql`exists (
+          select 1
+          from ${targetPolicyApprovalRevisions}
+          where ${targetPolicyApprovalRevisions.id} = ${table.approvalRevisionId}
+            and ${currentTenantOwns(targetPolicyApprovalRevisions.ownerUserId)}
+        )`,
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const portfolioTargetPolicyRevisions = pgTable(
   "portfolio_target_policy_revisions",
@@ -1193,8 +1227,17 @@ export const portfolioTargetPolicyRevisions = pgTable(
       .where(
         sql`${table.scopeKind} = 'portfolio_group' and ${table.lifecycleStatus} = 'approved'`,
       ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_target_policy_revisions_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const portfolioTargetPolicyRows = pgTable(
   "portfolio_target_policy_rows",
@@ -1271,8 +1314,17 @@ export const portfolioTargetPolicyRows = pgTable(
       "portfolio_target_rows_positive_buyability_check",
       sql`${table.targetWeightBps} = 0 or ${table.buyability} = 'buyable'`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_target_policy_rows_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const portfolioTargetPolicyLifecycleEvents = pgTable(
   "portfolio_target_policy_lifecycle_events",
@@ -1326,8 +1378,17 @@ export const portfolioTargetPolicyLifecycleEvents = pgTable(
       "portfolio_target_events_transition_shape_check",
       sql`(${table.eventSequence} = 1 and ${table.transitionKind} = 'explicit_approval' and ${table.previousStatus} is null and ${table.resultingStatus} = 'approved' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'revocation' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'revoked' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'supersession' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'superseded' and ${table.replacementRevisionId} is not null and ${table.replacementRevisionId} <> ${table.approvalRevisionId})`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_target_policy_events_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const assetGroups = pgTable(
   "asset_groups",
