@@ -17,22 +17,22 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0032_boring_jimmy_woo",
-    createdAt: 1786894705603,
+    tag: "0033_lucky_ben_grimm",
+    createdAt: 1786923380082,
     sha256:
-      "c178a5f6f5015fa611f9b275bcf15e2d244fe1507567af3f293c5b32a45fe12f",
+      "e9d0f31b7a367322118b0d9aa666f3902ac6f46ed2b655270e4323e1559a2a6b",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 33,
+    entryCount: 34,
     sha256:
-      "sha256:1b6d5624bdb679a57423013527b9fde888a3cd38c107eed33d285f32c8e7adcf",
+      "sha256:76f285c4a962a61430ca8abfe40da430e2bb8f6f2b58fd846d770849f720e12b",
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
-      tag: "0032_boring_jimmy_woo",
-      createdAt: 1786894705603,
+      tag: "0033_lucky_ben_grimm",
+      createdAt: 1786923380082,
       sha256:
-        "c178a5f6f5015fa611f9b275bcf15e2d244fe1507567af3f293c5b32a45fe12f",
+        "e9d0f31b7a367322118b0d9aa666f3902ac6f46ed2b655270e4323e1559a2a6b",
     }),
   ]),
 });
