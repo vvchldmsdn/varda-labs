@@ -34,6 +34,11 @@ describe("portfolio target policy persistence boundary", () => {
     assert.match(writer, /set local lock_timeout = '2s'/);
     assert.match(writer, /set local statement_timeout = '8s'/);
     assert.match(writer, /portfolio_target_policy_audit_v1/);
+    assert.match(
+      writer,
+      /serializePortfolioTargetPolicyRows\(record\.rows\)/,
+    );
+    assert.doesNotMatch(writer, /accountId:\s*row\.accountId/);
     assert.doesNotMatch(writer, /retry/i);
   });
 

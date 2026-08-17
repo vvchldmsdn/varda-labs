@@ -11,6 +11,7 @@ import {
   buildPortfolioTargetPolicyRecord,
   parseTargetWeightPercent,
   portfolioTargetScopeColumns,
+  serializePortfolioTargetPolicyRows,
 } from "@/lib/portfolio-target-policy";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import {
@@ -147,18 +148,7 @@ async function recordPortfolioTargetPolicy({
     ownerUserId,
     scope.key,
   ].join(":");
-  const rowsJson = JSON.stringify(
-    record.rows.map((row) => ({
-      accountId: row.accountId,
-      assetId: row.assetId,
-      assetName: row.assetName,
-      market: row.market,
-      currency: row.currency,
-      ticker: row.ticker,
-      buyability: row.buyability,
-      targetWeightBps: row.targetWeightBps,
-    })),
-  );
+  const rowsJson = serializePortfolioTargetPolicyRows(record.rows);
 
   const results = await sqlClient.transaction((transaction) => [
     transaction.query("set local lock_timeout = '2s'"),
