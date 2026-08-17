@@ -61,6 +61,17 @@ export type PortfolioTargetPolicyDecision = Readonly<{
   targetWeightBps: number;
 }>;
 
+type PortfolioTargetPolicyPersistenceRow = Readonly<{
+  accountId: string;
+  assetId: string;
+  assetName: string;
+  market: string;
+  currency: string;
+  ticker: string | null;
+  buyability: PortfolioTargetBuyability;
+  targetWeightBps: number;
+}>;
+
 export function normalizePortfolioTargetUniverse(
   input: readonly PortfolioTargetUniverseInput[],
 ) {
@@ -276,6 +287,23 @@ export function portfolioTargetScopeColumns(scope: PortfolioAnalysisScope) {
     scopePortfolioGroupId:
       scope.kind === "portfolio_group" ? scope.portfolioGroupId : null,
   });
+}
+
+export function serializePortfolioTargetPolicyRows(
+  rows: readonly PortfolioTargetPolicyPersistenceRow[],
+) {
+  return JSON.stringify(
+    rows.map((row) => ({
+      account_id: row.accountId,
+      asset_id: row.assetId,
+      asset_name: row.assetName,
+      market: row.market,
+      currency: row.currency,
+      ticker: row.ticker,
+      buyability: row.buyability,
+      target_weight_bps: row.targetWeightBps,
+    })),
+  );
 }
 
 export function classifyPortfolioTargetBuyability({

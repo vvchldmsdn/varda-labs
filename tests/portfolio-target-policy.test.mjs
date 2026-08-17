@@ -7,6 +7,7 @@ import {
   createPortfolioTargetUniverseHash,
   normalizePortfolioTargetUniverse,
   parseTargetWeightPercent,
+  serializePortfolioTargetPolicyRows,
 } from "../src/lib/portfolio-target-policy.ts";
 
 const ACCOUNT_A = "11111111-1111-4111-8111-111111111111";
@@ -106,6 +107,38 @@ describe("portfolio target policy", () => {
     assert.equal(parseTargetWeightPercent("12.34"), 1_234);
     assert.equal(parseTargetWeightPercent("100.01"), null);
     assert.equal(parseTargetWeightPercent("1.234"), null);
+  });
+
+  it("serializes persistence rows with the exact PostgreSQL record keys", () => {
+    const rows = JSON.parse(
+      serializePortfolioTargetPolicyRows([
+        {
+          accountId: ACCOUNT_A,
+          assetId: ASSET_A,
+          assetName: "KODEX 200",
+          market: "korea",
+          currency: "KRW",
+          ticker: "069500",
+          buyability: "buyable",
+          targetWeightBps: 10_000,
+        },
+      ]),
+    );
+
+    assert.deepEqual(rows, [
+      {
+        account_id: ACCOUNT_A,
+        asset_id: ASSET_A,
+        asset_name: "KODEX 200",
+        market: "korea",
+        currency: "KRW",
+        ticker: "069500",
+        buyability: "buyable",
+        target_weight_bps: 10_000,
+      },
+    ]);
+    assert.equal("accountId" in rows[0], false);
+    assert.equal("targetWeightBps" in rows[0], false);
   });
 });
 
