@@ -22,7 +22,7 @@ import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-p
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v15.json",
+  "varda-preview-database-preflight-v16.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -60,7 +60,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v18",
+      evidenceVersion: "preview_database_build_preflight_v19",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
@@ -88,7 +88,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v18",
+    "preview_database_build_preflight_v19",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -130,13 +130,13 @@ function assertPreflightCatalog(plan, state, localMigrations) {
 
   assert.deepEqual(
     plan.pendingTags,
-    ["0036_curvy_iron_monger"],
-    "Only reviewed migration 0036 may be pending",
+    ["0037_holding_lifecycle_tenant_grant"],
+    "Only reviewed migration 0037 may be pending",
   );
   assert.equal(
     plan.latestAppliedTag,
-    "0035_worthless_thor",
-    "Pending 0036 target must start from reviewed migration 0035",
+    "0036_curvy_iron_monger",
+    "Pending 0037 target must start from reviewed migration 0036",
   );
   const latestApplied = localMigrations[plan.appliedCount - 1];
   assert.deepEqual(
@@ -145,7 +145,7 @@ function assertPreflightCatalog(plan, state, localMigrations) {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0036",
+    "Preview state and migration ledger disagree before migration 0037",
   );
   assertReviewedPreviewDatabaseCatalog(state);
 }

@@ -260,6 +260,13 @@
       "when": 1787007650343,
       "tag": "0036_curvy_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1787009718615,
+      "tag": "0037_holding_lifecycle_tenant_grant",
+      "breakpoints": true
     }
   ]
 }

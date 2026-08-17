@@ -129,29 +129,29 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0036_curvy_iron_monger",
-        createdAt: 1787007650343,
+        tag: "0037_holding_lifecycle_tenant_grant",
+        createdAt: 1787009718615,
         sha256:
-          "d3daa5bd7cad2fdc66c9c685fb8683fcb2c3815cc5bed223f8b0af316b2c282e",
+          "4d9de71af43938f91fe8193cfeaab7ae33f299cbe9d36f6365407ee2d459bddf",
       },
     );
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
       [
         {
-          tag: "0036_curvy_iron_monger",
-          createdAt: 1787007650343,
+          tag: "0037_holding_lifecycle_tenant_grant",
+          createdAt: 1787009718615,
           sha256:
-            "d3daa5bd7cad2fdc66c9c685fb8683fcb2c3815cc5bed223f8b0af316b2c282e",
+            "4d9de71af43938f91fe8193cfeaab7ae33f299cbe9d36f6365407ee2d459bddf",
         },
       ],
     );
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 37,
+        entryCount: 38,
         sha256:
-          "sha256:a3292cad78ea015db6c8a9123ca2dfa0f46a59ca737f5cae206c0accf74003c6",
+          "sha256:ed125c593b507aca737384710bc0ea6aa1e4ad9d540f38cfdf493efeaa1ff48a",
       },
     );
   });
@@ -209,7 +209,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0036_present",
+      "reviewed_0037_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -274,7 +274,7 @@ describe("Preview database target operational guard", () => {
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0036_not_present",
+        migrationLedgerStatus: "reviewed_0037_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
@@ -332,12 +332,12 @@ describe("Preview database target operational guard", () => {
       "scripts/preview-database-evidence.mjs",
       "utf8",
     );
-    assert.match(buildScript, /preview_database_build_preflight_v18/);
+    assert.match(buildScript, /preview_database_build_preflight_v19/);
     assert.match(buildScript, /targetPolicyRows/);
     assert.match(buildScript, /assertPreviewTargetPolicyRowsPreserved/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0036 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0037 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -362,8 +362,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0036_curvy_iron_monger",
-        migrationLedgerStatus: "reviewed_0036_not_present",
+        latestReviewedMigration: "0037_holding_lifecycle_tenant_grant",
+        migrationLedgerStatus: "reviewed_0037_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );

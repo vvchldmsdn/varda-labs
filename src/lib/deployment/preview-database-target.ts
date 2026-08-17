@@ -17,22 +17,22 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0036_curvy_iron_monger",
-    createdAt: 1787007650343,
+    tag: "0037_holding_lifecycle_tenant_grant",
+    createdAt: 1787009718615,
     sha256:
-      "d3daa5bd7cad2fdc66c9c685fb8683fcb2c3815cc5bed223f8b0af316b2c282e",
+      "4d9de71af43938f91fe8193cfeaab7ae33f299cbe9d36f6365407ee2d459bddf",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 37,
+    entryCount: 38,
     sha256:
-      "sha256:a3292cad78ea015db6c8a9123ca2dfa0f46a59ca737f5cae206c0accf74003c6",
+      "sha256:ed125c593b507aca737384710bc0ea6aa1e4ad9d540f38cfdf493efeaa1ff48a",
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
-      tag: "0036_curvy_iron_monger",
-      createdAt: 1787007650343,
+      tag: "0037_holding_lifecycle_tenant_grant",
+      createdAt: 1787009718615,
       sha256:
-        "d3daa5bd7cad2fdc66c9c685fb8683fcb2c3815cc5bed223f8b0af316b2c282e",
+        "4d9de71af43938f91fe8193cfeaab7ae33f299cbe9d36f6365407ee2d459bddf",
     }),
   ]),
 });

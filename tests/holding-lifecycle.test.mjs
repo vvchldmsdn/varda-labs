@@ -17,6 +17,9 @@ const pageSource = source("../src/app/portfolio/holdings/page.tsx");
 const schemaSource = source("../src/db/schema.ts");
 const registrySource = source("../src/lib/tenant-writer-registry.ts");
 const migrationSource = source("../drizzle/0036_curvy_iron_monger.sql");
+const tenantGrantMigrationSource = source(
+  "../drizzle/0037_holding_lifecycle_tenant_grant.sql",
+);
 const dailySnapshotSource = source("../src/lib/snapshots/daily.ts");
 const dailySnapshotJobSource = source("../src/lib/snapshots/daily-job.ts");
 
@@ -148,6 +151,14 @@ describe("owner-scoped holding lifecycle", () => {
     ]) {
       assert.doesNotMatch(migrationSource, forbidden);
     }
+    assert.match(
+      tenantGrantMigrationSource,
+      /GRANT SELECT ON TABLE "holding_lifecycle_events" TO "varda_tenant_app"/,
+    );
+    assert.doesNotMatch(
+      tenantGrantMigrationSource,
+      /\b(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)\b/i,
+    );
   });
 });
 
