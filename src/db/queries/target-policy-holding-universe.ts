@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { accounts, assets } from "@/db/schema";
@@ -40,6 +40,7 @@ export async function getReadOnlyTenantTargetPolicyHoldingUniverse({
         eq(accounts.isActive, true),
         eq(accounts.code, account),
         eq(assets.account, accounts.code),
+        isNull(assets.archivedAt),
         sql<boolean>`(${assets.quantity} > 0 or coalesce(${assets.fractionalKrwValue}, 0) > 0)`,
       ),
     )

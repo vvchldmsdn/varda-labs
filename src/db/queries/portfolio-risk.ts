@@ -6,6 +6,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   lte,
   or,
   sql,
@@ -112,6 +113,7 @@ export function createTenantPortfolioRiskRepository(
         eq(accounts.isActive, true),
         inArray(accounts.code, TRACKED_ACCOUNTS),
         eq(assets.account, accounts.code),
+        isNull(assets.archivedAt),
       ];
       if (account !== "all") predicates.push(eq(accounts.code, account));
 
@@ -179,6 +181,7 @@ export function createTenantPortfolioRiskScopeRepository({
             eq(accounts.isActive, true),
             eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
             eq(assets.account, accounts.code),
+            isNull(assets.archivedAt),
             scopePredicate,
           ),
         )

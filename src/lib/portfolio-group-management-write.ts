@@ -266,6 +266,7 @@ with lock_acquired as materialized (
     and account.canonical_owner_user_id = $2::uuid
     and account.is_active = true
     and asset.account = account.code
+    and asset.archived_at is null
 ), effective_requested_assets as materialized (
   select owned.id
   from owned_assets owned

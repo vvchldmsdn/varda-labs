@@ -6,6 +6,7 @@ import {
   eq,
   getTableColumns,
   inArray,
+  isNull,
   or,
   type SQL,
 } from "drizzle-orm";
@@ -145,6 +146,7 @@ async function loadTenantPortfolioStructureRows({
                 ...ownedAccountPredicates,
                 eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
                 eq(assets.account, accounts.code),
+                isNull(assets.archivedAt),
                 assetScopePredicate,
               ),
             ),

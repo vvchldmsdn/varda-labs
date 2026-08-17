@@ -1,6 +1,15 @@
 import "server-only";
 
-import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
@@ -98,6 +107,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
           ...activeOwnedAccountPredicates(tenantContext),
           inArray(accounts.code, selectedAccounts),
           eq(assets.account, accounts.code),
+          isNull(assets.archivedAt),
           eq(assets.name, goldDecision.assetName),
           eq(accounts.code, goldDecision.account),
           eq(sql<string>`lower(trim(${assets.market}))`, goldDecision.market),
@@ -252,6 +262,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
               eq(accounts.isActive, true),
               eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
               eq(assets.account, accounts.code),
+              isNull(assets.archivedAt),
               eq(assets.name, goldDecision.assetName),
               eq(sql<string>`lower(trim(${assets.market}))`, goldDecision.market),
               eq(sql<string>`upper(trim(${assets.currency}))`, goldDecision.currency),

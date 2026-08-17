@@ -45,7 +45,7 @@ export async function getReadOnlyTenantAccountManagementModel({
         .select({
           assetId: assets.id,
           accountId: assets.accountId,
-          isActiveHolding: sql<boolean>`${assets.quantity} > 0`,
+          isActiveHolding: sql<boolean>`${assets.archivedAt} is null`,
         })
         .from(assets)
         .where(

@@ -37,6 +37,7 @@ const TENANT_SNAPSHOT_ACCOUNTS_SQL = `
   where account.is_active = true
     and account.account_type <> 'cash'
     and asset.account = account.code
+    and asset.archived_at is null
     and asset.asset_type = any($1::text[])
     and (asset.quantity > 0 or asset.fractional_krw_value > 0)
   order by account.sort_order, account.name, account.code

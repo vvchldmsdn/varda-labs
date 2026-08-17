@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, gt, inArray, ne, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { accounts, appUsers, assets } from "@/db/schema";
@@ -99,6 +99,7 @@ async function loadActiveSnapshotTenantContexts(): Promise<TenantContext[]> {
       and(
         eq(assets.accountId, accounts.id),
         eq(assets.canonicalOwnerUserId, appUsers.id),
+        isNull(assets.archivedAt),
         inArray(assets.assetType, SNAPSHOT_INVESTMENT_ASSET_TYPES),
         or(gt(assets.quantity, "0"), gt(assets.fractionalKrwValue, "0")),
       ),

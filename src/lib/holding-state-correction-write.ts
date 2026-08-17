@@ -160,6 +160,7 @@ with lock_acquired as materialized (
   where asset.id = $3::uuid
     and asset.canonical_owner_user_id = $2::uuid
     and asset.account = account_row.code
+    and asset.archived_at is null
   for update of asset
 ), facts as materialized (
   select

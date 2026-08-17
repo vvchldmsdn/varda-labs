@@ -13,6 +13,8 @@ import {
   IDENTITY_SYSTEM_TABLE_POLICIES,
   HOLDING_ONBOARDING_EXPANDED_TENANT_TABLE_POLICIES,
   HOLDING_ONBOARDING_TABLE_POLICIES,
+  HOLDING_LIFECYCLE_TABLE_POLICIES,
+  HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES,
   HOLDING_STATE_CORRECTION_TABLE_POLICIES,
   LEGACY_EXCLUDED_USER_TABLE_NAMES,
   PORTFOLIO_ANALYSIS_SCOPE_TABLE_POLICIES,
@@ -75,6 +77,10 @@ describe("tenant ownership policy", () => {
       PORTFOLIO_TARGET_POLICY_EXPANDED_TENANT_TABLE_POLICIES.map(
         (policy) => policy.table,
       );
+    const holdingStateCorrectionExpandedNames =
+      HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES.map(
+        (policy) => policy.table,
+      );
 
     assert.deepEqual(
       IDENTITY_CORE_TABLE_POLICIES.map((policy) => policy.table),
@@ -92,7 +98,8 @@ describe("tenant ownership policy", () => {
     assert.equal(portfolioScopeExpandedNames.length, 35);
     assert.equal(holdingOnboardingExpandedNames.length, 36);
     assert.equal(portfolioTargetPolicyExpandedNames.length, 39);
-    assert.equal(expandedNames.length, 40);
+    assert.equal(holdingStateCorrectionExpandedNames.length, 40);
+    assert.equal(expandedNames.length, 41);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
     assert.deepEqual(
       resolveTenantTablePolicies(coreExpandedNames),
@@ -121,6 +128,10 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       resolveTenantTablePolicies(portfolioTargetPolicyExpandedNames),
       PORTFOLIO_TARGET_POLICY_EXPANDED_TENANT_TABLE_POLICIES,
+    );
+    assert.deepEqual(
+      resolveTenantTablePolicies(holdingStateCorrectionExpandedNames),
+      HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES,
     );
     assert.deepEqual(
       resolveTenantTablePolicies(expandedNames),
@@ -165,7 +176,7 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 28,
+        user_owned: 29,
         shared_reference: 7,
         admin_system: 1,
         identity_system: 4,
@@ -208,6 +219,10 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       HOLDING_STATE_CORRECTION_TABLE_POLICIES.map(({ table }) => table),
       ["holding_state_corrections"],
+    );
+    assert.deepEqual(
+      HOLDING_LIFECYCLE_TABLE_POLICIES.map(({ table }) => table),
+      ["holding_lifecycle_events"],
     );
     assert.deepEqual(
       PORTFOLIO_TARGET_POLICY_TABLE_POLICIES.map(({ table }) => table),

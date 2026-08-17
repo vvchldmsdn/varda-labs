@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+import {
+  HoldingArchiveForm,
+  HoldingRestoreForm,
+} from "@/components/holding-lifecycle-forms";
 import { HoldingStateCorrectionForm } from "@/components/holding-state-correction-form";
 import { ManualKrxGoldPriceForm } from "@/components/manual-krx-gold-price-form";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -52,6 +56,16 @@ export default async function TenantHoldingsPage({
         tenantContext: tenantResolution.tenantContext,
       })
     : null;
+  const visibleHoldings =
+    result?.state === "ready" || result?.state === "partial"
+      ? result.holdings
+      : [];
+  const activeHoldings = visibleHoldings.filter(
+    (holding) => holding.archivedAt === null,
+  );
+  const archivedHoldings = visibleHoldings.filter(
+    (holding) => holding.archivedAt !== null,
+  );
 
   return (
     <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
@@ -157,14 +171,14 @@ export default async function TenantHoldingsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e5e8df]">
-                {result.holdings.length === 0 ? (
+                {activeHoldings.length === 0 ? (
                   <tr>
                     <td className="px-4 py-5 text-[#687064]" colSpan={8}>
-                      No owned holdings are linked to this account scope.
+                      이 범위에 현재 보유 중인 종목이 없습니다.
                     </td>
                   </tr>
                 ) : (
-                  result.holdings.map((holding) => (
+                  activeHoldings.map((holding) => (
                     <tr key={holding.holdingId}>
                       <td className="px-4 py-3">
                         <p className="font-semibold">{holding.name}</p>
@@ -212,6 +226,10 @@ export default async function TenantHoldingsPage({
                           quantity={holding.quantity}
                           updatedAt={holding.updatedAt}
                         />
+                        <HoldingArchiveForm
+                          holdingId={holding.holdingId}
+                          updatedAt={holding.updatedAt}
+                        />
                       </td>
                     </tr>
                   ))
@@ -225,6 +243,61 @@ export default async function TenantHoldingsPage({
             row integrity checks all pass.
           </p>
         )}
+
+        {(result?.state === "ready" || result?.state === "partial") &&
+        archivedHoldings.length > 0 ? (
+          <section className="mt-8 border-t border-[#dfe3d5] pt-6">
+            <div>
+              <h2 className="text-lg font-semibold">종료된 보유종목</h2>
+              <p className="mt-1 text-sm text-[#687064]">
+                평가와 분석에서는 제외되며 수량·매입원가·과거 기록은 보존됩니다.
+              </p>
+            </div>
+            <div className="mt-4 overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
+              <table className="min-w-[820px] w-full border-collapse text-left text-sm">
+                <thead className="bg-[#eef2e8] text-xs text-[#5e685e]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Holding</th>
+                    <th className="px-4 py-3 font-semibold">Account</th>
+                    <th className="px-4 py-3 font-semibold">종료 시각</th>
+                    <th className="px-4 py-3 text-right font-semibold">수량</th>
+                    <th className="px-4 py-3 font-semibold">복원</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e5e8df]">
+                  {archivedHoldings.map((holding) => (
+                    <tr key={holding.holdingId}>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">{holding.name}</p>
+                        <p className="text-xs text-[#687064]">
+                          {holding.ticker ?? "No ticker"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">{holding.accountName}</p>
+                        <p className="text-xs text-[#687064]">
+                          {holding.accountCode}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[#687064]">
+                        {formatPriceAsOf(holding.archivedAt)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {holding.quantity}
+                      </td>
+                      <td className="px-4 py-3">
+                        <HoldingRestoreForm
+                          holdingId={holding.holdingId}
+                          updatedAt={holding.updatedAt}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
       </section>
     </main>
   );
@@ -250,9 +323,13 @@ function holdingReadEvidence(
   if (result === null) return "Holdings were not read.";
   if (result.state === "unavailable") return "Holdings read unavailable.";
   if (result.state === "integrity_error") return "Holdings read blocked.";
-  const included = `${result.holdings.length} owned holding${
-    result.holdings.length === 1 ? "" : "s"
-  }`;
+  const activeCount = result.holdings.filter(
+    (holding) => holding.archivedAt === null,
+  ).length;
+  const archivedCount = result.holdings.length - activeCount;
+  const included = `${activeCount} active holding${
+    activeCount === 1 ? "" : "s"
+  }; ${archivedCount} archived`;
   return result.state === "ready"
     ? included
     : `${included}; partial evidence, ${result.excludedHoldingCount} invalid row${
