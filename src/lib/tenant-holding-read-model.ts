@@ -19,6 +19,7 @@ export type TenantHoldingReadRow = Readonly<{
   priceSource: string | null;
   priceAsOf: Date | null;
   priceStatus: string | null;
+  archivedAt: Date | null;
   updatedAt: Date;
 }>;
 
@@ -37,6 +38,7 @@ export type TenantHoldingDto = Readonly<{
   priceSource: string | null;
   priceAsOf: string | null;
   priceStatus: string | null;
+  archivedAt: string | null;
   updatedAt: string;
 }>;
 
@@ -109,6 +111,9 @@ export function projectTenantHoldingRows(
       (row.priceAsOf !== null &&
         (!(row.priceAsOf instanceof Date) ||
           !Number.isFinite(row.priceAsOf.getTime()))) ||
+      (row.archivedAt !== null &&
+        (!(row.archivedAt instanceof Date) ||
+          !Number.isFinite(row.archivedAt.getTime()))) ||
       !(row.updatedAt instanceof Date) ||
       !Number.isFinite(row.updatedAt.getTime())
     ) {
@@ -134,6 +139,7 @@ export function projectTenantHoldingRows(
         priceSource: row.priceSource,
         priceAsOf: row.priceAsOf?.toISOString() ?? null,
         priceStatus: row.priceStatus,
+        archivedAt: row.archivedAt?.toISOString() ?? null,
         updatedAt: row.updatedAt.toISOString(),
       }),
     );
@@ -172,6 +178,7 @@ function toPublicHolding(
     priceSource: holding.priceSource,
     priceAsOf: holding.priceAsOf,
     priceStatus: holding.priceStatus,
+    archivedAt: holding.archivedAt,
     updatedAt: holding.updatedAt,
   });
 }

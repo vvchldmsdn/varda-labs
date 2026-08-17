@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 29);
-    assert.equal(registeredPaths.length, 35);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 30);
+    assert.equal(registeredPaths.length, 36);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -130,7 +130,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 19,
+      in_scope: 20,
       intentionally_skipped_legacy: 1,
       not_applicable: 9,
     });
@@ -260,6 +260,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
       "session_manual_krx_gold_price",
       "session_holding_onboarding",
       "session_holding_state_correction",
+      "session_holding_lifecycle",
       "session_portfolio_group_management",
       "session_account_management",
       "portfolio_target_policy_session_write",
@@ -281,6 +282,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
           [
             "post_consume_account_owner_assignment",
             "session_holding_state_correction",
+            "session_holding_lifecycle",
             "session_portfolio_group_management",
             "session_account_management",
             "portfolio_target_policy_session_write",
@@ -306,6 +308,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(canonicalOwnerWriters, [
       "post_consume_account_owner_assignment",
       "session_holding_state_correction",
+      "session_holding_lifecycle",
       "session_portfolio_group_management",
       "session_account_management",
       "portfolio_target_policy_session_write",

@@ -353,7 +353,7 @@ with lock_acquired as materialized (
       select count(*)
       from assets asset
       where asset.account_id = $3::uuid
-        and asset.quantity > 0
+        and asset.archived_at is null
     ) as active_holding_count,
     (
       select count(*)

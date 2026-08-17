@@ -425,6 +425,7 @@ export const assets = pgTable(
     groupId: uuid("group_id"),
     memo: text("memo"),
     description: text("description"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
 
     maAssetClass: varchar("ma_asset_class", { length: 50 }),
     maRuleEnabled: boolean("ma_rule_enabled").default(true),
@@ -727,6 +728,98 @@ export type HoldingStateCorrection =
   typeof holdingStateCorrections.$inferSelect;
 export type NewHoldingStateCorrection =
   typeof holdingStateCorrections.$inferInsert;
+
+export const holdingLifecycleEvents = pgTable(
+  "holding_lifecycle_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    eventType: varchar("event_type", { length: 20 }).notNull(),
+    previousArchivedAt: timestamp("previous_archived_at", {
+      withTimezone: true,
+    }),
+    resultingArchivedAt: timestamp("resulting_archived_at", {
+      withTimezone: true,
+    }),
+    previousAssetUpdatedAt: timestamp("previous_asset_updated_at", {
+      withTimezone: true,
+    }).notNull(),
+    resultingAssetUpdatedAt: timestamp("resulting_asset_updated_at", {
+      withTimezone: true,
+    }).notNull(),
+    reason: text("reason"),
+    policyVersion: varchar("policy_version", { length: 100 })
+      .default("holding_lifecycle_v1")
+      .notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ownerUserFk: foreignKey({
+      name: "holding_lifecycle_events_owner_user_fk",
+      columns: [table.canonicalOwnerUserId],
+      foreignColumns: [appUsers.id],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "holding_lifecycle_events_asset_owner_fk",
+      columns: [table.assetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "holding_lifecycle_events_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "holding_lifecycle_events_asset_account_fk",
+      columns: [table.assetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    ownerUserIdIdx: index("holding_lifecycle_events_owner_user_id_idx").on(
+      table.canonicalOwnerUserId,
+    ),
+    assetOccurredAtIdx: index(
+      "holding_lifecycle_events_asset_occurred_at_idx",
+    ).on(table.assetId, table.occurredAt),
+    accountOccurredAtIdx: index(
+      "holding_lifecycle_events_account_occurred_at_idx",
+    ).on(table.accountId, table.occurredAt),
+    eventTypeCheck: check(
+      "holding_lifecycle_events_event_type_check",
+      sql`${table.eventType} in ('archived', 'restored')`,
+    ),
+    transitionShapeCheck: check(
+      "holding_lifecycle_events_transition_shape_check",
+      sql`(${table.eventType} = 'archived' and ${table.previousArchivedAt} is null and ${table.resultingArchivedAt} is not null) or (${table.eventType} = 'restored' and ${table.previousArchivedAt} is not null and ${table.resultingArchivedAt} is null)`,
+    ),
+    timestampOrderCheck: check(
+      "holding_lifecycle_events_timestamp_order_check",
+      sql`${table.resultingAssetUpdatedAt} >= ${table.previousAssetUpdatedAt} and ${table.occurredAt} = ${table.resultingAssetUpdatedAt}`,
+    ),
+    reasonCheck: check(
+      "holding_lifecycle_events_reason_check",
+      sql`${table.reason} is null or (${table.reason} = btrim(${table.reason}) and char_length(${table.reason}) between 1 and 500)`,
+    ),
+    policyVersionCheck: check(
+      "holding_lifecycle_events_policy_version_check",
+      sql`${table.policyVersion} = 'holding_lifecycle_v1'`,
+    ),
+    tenantSelectPolicy: pgPolicy("holding_lifecycle_events_tenant_select_v1", {
+      as: "permissive",
+      for: "select",
+      to: tenantDatabaseRole,
+      using: currentTenantOwns(table.canonicalOwnerUserId),
+    }),
+  }),
+).enableRLS();
+
+export type HoldingLifecycleEvent = typeof holdingLifecycleEvents.$inferSelect;
+export type NewHoldingLifecycleEvent =
+  typeof holdingLifecycleEvents.$inferInsert;
 
 export const portfolioGroups = pgTable(
   "portfolio_groups",

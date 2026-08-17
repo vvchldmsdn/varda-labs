@@ -55,6 +55,7 @@ export async function writeSessionManualKrxGoldPrice(
           eq(accounts.isActive, true),
           eq(accounts.code, KRX_GOLD_MANUAL_ASSET_BINDING.account),
           eq(assets.account, accounts.code),
+          isNull(assets.archivedAt),
           eq(assets.name, KRX_GOLD_MANUAL_ASSET_BINDING.name),
           isNull(assets.ticker),
           eq(assets.assetType, KRX_GOLD_MANUAL_ASSET_BINDING.assetType),

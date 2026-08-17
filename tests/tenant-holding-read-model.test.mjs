@@ -38,6 +38,7 @@ const BROKERAGE = Object.freeze({
   priceSource: "kis_domestic_inquire_price",
   priceAsOf: new Date("2026-07-09T04:20:00.000Z"),
   priceStatus: "ok",
+  archivedAt: null,
   updatedAt: new Date("2026-08-16T01:02:03.000Z"),
 });
 
@@ -78,6 +79,7 @@ describe("tenant holding read model", () => {
           priceSource: "kis_domestic_inquire_price",
           priceAsOf: "2026-07-09T04:20:00.000Z",
           priceStatus: "ok",
+          archivedAt: null,
           updatedAt: "2026-08-16T01:02:03.000Z",
         },
         {
@@ -95,6 +97,7 @@ describe("tenant holding read model", () => {
           priceSource: "kis_domestic_inquire_price",
           priceAsOf: "2026-07-09T04:20:00.000Z",
           priceStatus: "ok",
+          archivedAt: null,
           updatedAt: "2026-08-16T01:02:03.000Z",
         },
       ],
@@ -175,5 +178,21 @@ describe("tenant holding read model", () => {
 
     assert.equal(result.state, "ready");
     assert.equal(result.holdings[0]?.accountCode, "future-broker-2");
+  });
+
+  it("preserves archived status for management views without exposing owners", () => {
+    const result = projectTenantHoldingRows(
+      [
+        {
+          ...BROKERAGE,
+          archivedAt: new Date("2026-08-18T01:02:03.000Z"),
+        },
+      ],
+      ALL_SCOPE,
+    );
+
+    assert.equal(result.state, "ready");
+    assert.equal(result.holdings[0]?.archivedAt, "2026-08-18T01:02:03.000Z");
+    assert.doesNotMatch(JSON.stringify(result), /canonicalOwner|ownerUserId/i);
   });
 });

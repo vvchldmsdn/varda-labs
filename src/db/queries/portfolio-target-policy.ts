@@ -1,6 +1,15 @@
 import "server-only";
 
-import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
@@ -72,6 +81,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
               eq(accounts.isActive, true),
               eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
               eq(assets.account, accounts.code),
+              isNull(assets.archivedAt),
               inArray(assets.assetType, INVESTMENT_ASSET_TYPES),
               sql<boolean>`(${assets.quantity} > 0 or coalesce(${assets.fractionalKrwValue}, 0) > 0)`,
               scopePredicate,

@@ -75,7 +75,7 @@ export async function writeSessionHoldingOnboarding(
     if (!group.ok) return state("conflict", group.message);
 
     const duplicate = await db
-      .select({ id: assets.id })
+      .select({ id: assets.id, archivedAt: assets.archivedAt })
       .from(assets)
       .where(
         and(
@@ -90,7 +90,9 @@ export async function writeSessionHoldingOnboarding(
     if (duplicate.length > 0) {
       return state(
         "conflict",
-        "같은 계좌에 이미 등록된 종목입니다. 기존 보유종목을 수정해 주세요.",
+        duplicate[0]?.archivedAt === null
+          ? "같은 계좌에 이미 등록된 종목입니다. 기존 보유종목을 수정해 주세요."
+          : "같은 계좌에 종료된 보유종목이 있습니다. 보유종목 화면에서 복원해 주세요.",
       );
     }
 

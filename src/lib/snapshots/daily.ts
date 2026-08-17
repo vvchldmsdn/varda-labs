@@ -1,6 +1,17 @@
 import "server-only";
 
-import { and, asc, desc, eq, getTableColumns, inArray, lt, lte, ne } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+} from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
@@ -472,6 +483,7 @@ export async function runDailySnapshot(
         eq(accounts.canonicalOwnerUserId, ownerUserId),
         eq(accounts.isActive, true),
         ne(accounts.accountType, "cash"),
+        isNull(assets.archivedAt),
       ),
     )
     .orderBy(assets.account, assets.name);
@@ -1434,6 +1446,7 @@ async function loadAccountContext(
         and(
           eq(accounts.canonicalOwnerUserId, ownerUserId),
           eq(accounts.isActive, true),
+          isNull(assets.archivedAt),
         ),
       ),
     db

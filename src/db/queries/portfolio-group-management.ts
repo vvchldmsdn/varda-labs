@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
@@ -82,6 +82,7 @@ export async function getReadOnlyTenantPortfolioGroupManagementModel({
               eq(accounts.canonicalOwnerUserId, ownerUserId),
               eq(accounts.isActive, true),
               eq(assets.account, accounts.code),
+              isNull(assets.archivedAt),
               sql`${assets.quantity} > 0`,
             ),
           )

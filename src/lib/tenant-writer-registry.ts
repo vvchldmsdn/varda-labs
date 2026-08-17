@@ -403,6 +403,29 @@ export const TENANT_WRITER_REGISTRY = [
     legacyOwnerEvidence: "not_applicable",
   },
   {
+    id: "session_holding_lifecycle",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: [
+      "/portfolio/holdings#archiveHolding",
+      "/portfolio/holdings#restoreHolding",
+    ],
+    implementationPaths: ["src/lib/holding-lifecycle-write.ts"],
+    targets: [
+      userTarget("assets", "update"),
+      userTarget("holding_lifecycle_events", "insert"),
+      userTarget(
+        "portfolio_group_asset_memberships",
+        "update",
+        "delete",
+      ),
+    ],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "session_portfolio_group_management",
     classification: "user_owned",
     authorization: "server_verified_session",
