@@ -91,6 +91,8 @@ describe("group tenant RLS", () => {
 
     for (const table of tables) assert.match(wrapper, new RegExp(table));
     assert.match(wrapper, /allowEmptyTable: true/);
+    assert.doesNotMatch(wrapper, /^for \(const audit of audits\)/m);
+    assert.match(wrapper, /void runGroupTenantRlsAudits\(\);/);
     assert.match(audit, /empty_table_no_matching_owner_row/);
     assert.match(audit, /context_leaked_outside_transaction/);
     assert.match(audit, /foreign_scope_visible/);
