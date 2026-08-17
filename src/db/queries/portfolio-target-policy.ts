@@ -9,6 +9,10 @@ import { loadCurrentTenantPortfolioTargetPolicy } from "@/db/queries/tenant-targ
 import { accounts, assets } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import {
+  portfolioStructureHoldingIdentityKey,
+  projectPortfolioStructureEffectiveTargets,
+} from "@/lib/portfolio-structure-target-policy";
+import {
   buildPortfolioTargetPolicyRecord,
   buildCurrentAllocationStartingWeights,
   createPortfolioTargetUniverseHash,
@@ -90,7 +94,10 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
   ]);
 
   const currentValues = new Map(
-    structure.holdingRows.map((row) => [holdingIdentityKey(row), row.currentValueKrw]),
+    structure.holdingRows.map((row) => [
+      portfolioStructureHoldingIdentityKey(row),
+      row.currentValueKrw,
+    ]),
   );
   const universeInput: PortfolioTargetUniverseInput[] = assetRows.map((row) => ({
     accountCode: row.accountCode,
@@ -104,7 +111,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
     currentValueKrw:
       (row.ticker === null
         ? undefined
-        : currentValues.get(holdingIdentityKey(row))) ??
+        : currentValues.get(portfolioStructureHoldingIdentityKey(row))) ??
       fallbackCurrentValueKrw(row, structure.usdKrwRate),
   }));
   const universe = normalizePortfolioTargetUniverse(universeInput);
@@ -136,6 +143,22 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
   const startingWeights = policyValidation.status === "available"
     ? new Map(currentPolicyRows.map((row) => [row.assetId, row.targetWeightBps]))
     : buildCurrentAllocationStartingWeights(universe.rows);
+  const targetProjection = projectPortfolioStructureEffectiveTargets({
+    policyStatus: policyValidation.status,
+    structure,
+    targets:
+      policyValidation.status === "available"
+        ? universe.rows.map((row) => ({
+            account: row.accountCode,
+            market: row.market,
+            currency: row.currency,
+            ticker: row.ticker,
+            targetWeightBps: startingWeights.get(row.assetId) ?? -1,
+          }))
+        : [],
+  });
+  const { structure: effectiveStructure, ...structureTargetProjection } =
+    targetProjection;
 
   return Object.freeze({
     status: universe.status,
@@ -147,6 +170,8 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
     policyValidation,
     exactPolicyUniverse,
     currentUniverseHash,
+    structure: effectiveStructure,
+    structureTargetProjection: Object.freeze(structureTargetProjection),
     ma120HoldingRows: Object.freeze(structure.holdingRows),
     startingWeightSource: policyValidation.status === "available"
       ? ("approved_policy" as const)
@@ -220,21 +245,6 @@ async function readCurrentApprovedPolicy({
     scopePortfolioGroupId: columns.scopePortfolioGroupId,
     tenantContext,
   });
-}
-
-function holdingIdentityKey(row: {
-  account?: string;
-  accountCode?: string;
-  market: string;
-  currency: string;
-  ticker: string | null;
-}) {
-  return [
-    row.account ?? row.accountCode,
-    row.market.trim().toLowerCase(),
-    row.currency.trim().toUpperCase(),
-    row.ticker?.trim().toUpperCase() ?? "",
-  ].join(":");
 }
 
 function fallbackCurrentValueKrw(
