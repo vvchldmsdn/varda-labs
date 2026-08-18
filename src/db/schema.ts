@@ -301,8 +301,17 @@ export const simulationScenarioApprovalRevisions = pgTable(
         table.scenarioVersion,
       )
       .where(sql`${table.lifecycleStatus} = 'approved'`),
+    tenantSelectPolicy: pgPolicy(
+      "simulation_scenario_revisions_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.ownerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const simulationScenarioApprovalVectorRows = pgTable(
   "simulation_scenario_approval_vector_rows",
@@ -344,8 +353,22 @@ export const simulationScenarioApprovalVectorRows = pgTable(
       "sim_scenario_approval_vector_rows_weight_check",
       sql`${table.weightBps} between 0 and 10000`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "simulation_scenario_vector_rows_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: sql`exists (
+          select 1
+          from ${simulationScenarioApprovalRevisions}
+          where ${simulationScenarioApprovalRevisions.id} = ${table.approvalRevisionId}
+            and ${currentTenantOwns(simulationScenarioApprovalRevisions.ownerUserId)}
+        )`,
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const simulationScenarioApprovalLifecycleEvents = pgTable(
   "simulation_scenario_approval_lifecycle_events",
@@ -391,8 +414,22 @@ export const simulationScenarioApprovalLifecycleEvents = pgTable(
       "sim_scenario_approval_events_transition_shape_check",
       sql`(${table.eventSequence} = 1 and ${table.transitionKind} = 'explicit_approval' and ${table.previousStatus} is null and ${table.resultingStatus} = 'approved' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'revocation' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'revoked' and ${table.replacementRevisionId} is null) or (${table.eventSequence} = 2 and ${table.transitionKind} = 'supersession' and ${table.previousStatus} = 'approved' and ${table.resultingStatus} = 'superseded' and ${table.replacementRevisionId} is not null and ${table.replacementRevisionId} <> ${table.approvalRevisionId})`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "simulation_scenario_events_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: sql`exists (
+          select 1
+          from ${simulationScenarioApprovalRevisions}
+          where ${simulationScenarioApprovalRevisions.id} = ${table.approvalRevisionId}
+            and ${currentTenantOwns(simulationScenarioApprovalRevisions.ownerUserId)}
+        )`,
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export const assets = pgTable(
   "assets",
@@ -617,8 +654,17 @@ export const holdingOnboardingEvidence = pgTable(
       "holding_onboarding_evidence_policy_version_check",
       sql`${table.policyVersion} = 'holding_onboarding_v1'`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "holding_onboarding_evidence_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export type HoldingOnboardingEvidence =
   typeof holdingOnboardingEvidence.$inferSelect;
@@ -721,8 +767,17 @@ export const holdingStateCorrections = pgTable(
       "holding_state_corrections_policy_version_check",
       sql`${table.policyVersion} = 'holding_state_correction_v1'`,
     ),
+    tenantSelectPolicy: pgPolicy(
+      "holding_state_corrections_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
   }),
-);
+).enableRLS();
 
 export type HoldingStateCorrection =
   typeof holdingStateCorrections.$inferSelect;

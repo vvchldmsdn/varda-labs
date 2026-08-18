@@ -17,6 +17,7 @@ type TenantTableRlsAuditConfig = Readonly<{
   ownerScope?:
     | "canonical_owner_user_id"
     | "owner_user_id"
+    | "simulation_scenario_approval_revision"
     | "target_policy_approval_revision";
   policyName: string;
   successStatus: string;
@@ -29,6 +30,9 @@ type TenantTableRlsAuditConfig = Readonly<{
     | "daily_portfolio_snapshots"
     | "daily_position_snapshots"
     | "event_ledger_entries"
+    | "holding_lifecycle_events"
+    | "holding_onboarding_evidence"
+    | "holding_state_corrections"
     | "market_regime_daily"
     | "portfolio_target_policy_lifecycle_events"
     | "portfolio_target_policy_revisions"
@@ -37,6 +41,9 @@ type TenantTableRlsAuditConfig = Readonly<{
     | "portfolio_group_asset_memberships"
     | "portfolio_groups"
     | "settings"
+    | "simulation_scenario_approval_lifecycle_events"
+    | "simulation_scenario_approval_revisions"
+    | "simulation_scenario_approval_vector_rows"
     | "target_policy_approval_lifecycle_events"
     | "target_policy_approval_revisions"
     | "target_policy_approval_vector_rows";
@@ -444,6 +451,15 @@ function ownerSqlParts(
       expression: "revision.owner_user_id",
       fromClause: `public.${tableName} as audited
         left join public.target_policy_approval_revisions as revision
+          on revision.id = audited.approval_revision_id`,
+    });
+  }
+
+  if (ownerScope === "simulation_scenario_approval_revision") {
+    return Object.freeze({
+      expression: "revision.owner_user_id",
+      fromClause: `public.${tableName} as audited
+        left join public.simulation_scenario_approval_revisions as revision
           on revision.id = audited.approval_revision_id`,
     });
   }
