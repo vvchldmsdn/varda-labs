@@ -81,6 +81,7 @@
     "audit:group-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-group-tenant-rls.ts",
     "audit:settings-regime-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-settings-regime-tenant-rls.ts",
     "audit:target-policy-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-target-policy-tenant-rls.ts",
+    "audit:evidence-simulation-tenant-rls": "node --conditions=react-server --import tsx scripts/audit-evidence-simulation-tenant-rls.ts",
     "tenant-db-role:provision": "node --no-warnings scripts/provision-tenant-database-role.mjs",
     "audit:tenant-snapshot-readiness": "node --no-warnings scripts/audit-tenant-snapshot-readiness.mjs",
     "audit:tenant-expand": "node --no-warnings scripts/audit-tenant-expand.mjs",
