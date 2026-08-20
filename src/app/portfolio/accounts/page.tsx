@@ -7,8 +7,10 @@ import {
   ArchivedAccountRow,
 } from "@/components/account-management";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
+import { PortfolioSetupProgressPanel } from "@/components/portfolio-setup-progress";
 import { getReadOnlyTenantAccountManagementModel } from "@/db/queries/account-management";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { derivePortfolioSetupProgress } from "@/lib/portfolio-setup-progress";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,16 @@ export default async function AccountManagementPage() {
     model.state === "ready"
       ? model.accounts.filter((account) => !account.isActive)
       : [];
+  const setupProgress =
+    model.state === "ready"
+      ? derivePortfolioSetupProgress({
+          activeAccountCount: activeAccounts.length,
+          activeHoldingCount: activeAccounts.reduce(
+            (count, account) => count + account.activeHoldingCount,
+            0,
+          ),
+        })
+      : null;
 
   return (
     <main className="min-h-screen bg-[#f3f4ef] px-4 py-6 text-[#171916]">
@@ -88,7 +100,14 @@ export default async function AccountManagementPage() {
           </section>
         ) : (
           <>
-            <section className="rounded-md border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+            {setupProgress ? (
+              <PortfolioSetupProgressPanel progress={setupProgress} />
+            ) : null}
+
+            <section
+              className="rounded-md border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+              id="create-account"
+            >
               <h2 className="text-lg font-semibold">Create an account</h2>
               <p className="mt-1 text-sm text-[#687064]">
                 The immutable internal account code is generated on the server.
