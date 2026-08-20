@@ -41,6 +41,7 @@ export type WriterTransitionPolicy = Readonly<{
     | "single_identity_insert"
     | "single_claim_intent_insert"
     | "atomic_identity_pairing_consume"
+    | "atomic_self_service_tenant_onboarding"
     | "post_consume_owner_assignment"
     | "atomic_target_policy_approval";
   freeze:
@@ -146,6 +147,27 @@ export const TENANT_WRITER_REGISTRY = [
     transition: {
       prepare: "dry_run_only",
       activate: "atomic_identity_pairing_consume",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "self_service_tenant_onboarding",
+    classification: "identity_system",
+    authorization: "server_verified_session",
+    entrypoints: ["src/app/portfolio/onboarding/actions.ts"],
+    implementationPaths: [
+      "src/lib/auth/self-service-tenant-onboarding-write.ts",
+    ],
+    targets: [
+      identityTarget("app_users", "insert"),
+      identityTarget("auth_identities", "insert"),
+    ],
+    transition: {
+      prepare: "owner_not_applicable",
+      activate: "atomic_self_service_tenant_onboarding",
       freeze: "not_required",
     },
     canonicalOwnerRolloutScope: "not_applicable",

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   AccountCreateForm,
@@ -15,6 +16,9 @@ export const dynamic = "force-dynamic";
 export default async function AccountManagementPage() {
   const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok) {
+    if (resolution.failure.code === "identity_unlinked") {
+      redirect("/portfolio/onboarding");
+    }
     return (
       <PortfolioReadAccessBoundary
         closedMessage="Accounts remain closed until the signed-in portfolio owner is resolved."

@@ -228,6 +228,7 @@ import "./identity-pairing-rehearsal-target.test.mjs";
 import "./preview-auth-readiness.test.mjs";
 import "./auth-transport-runtime.test.mjs";
 import "./product-session-access-boundary.test.mjs";
+import "./self-service-tenant-onboarding.test.mjs";
 import "./production-database-target.test.mjs";
 import "./preview-database-target.test.mjs";
 import "./preview-migration-plan.test.mjs";
