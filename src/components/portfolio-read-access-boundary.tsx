@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
+import { sessionResolutionNextAction } from "@/lib/session-resolution-next-action";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export function PortfolioReadAccessBoundary({
@@ -16,6 +17,8 @@ export function PortfolioReadAccessBoundary({
   resolution: SessionResolverResult;
   title: string;
 }) {
+  const nextAction = sessionResolutionNextAction(resolution);
+
   return (
     <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
@@ -33,10 +36,10 @@ export function PortfolioReadAccessBoundary({
           {closedMessage}
         </p>
         <Link
-          href="/auth/sign-in"
+          href={nextAction.href}
           className="mt-5 inline-flex rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
         >
-          Sign in
+          {nextAction.label}
         </Link>
       </section>
     </main>

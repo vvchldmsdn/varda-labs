@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { sessionResolutionNextAction } from "../src/lib/session-resolution-next-action.ts";
+
 const PRODUCT_PAGES = Object.freeze([
   ["src/app/page.tsx", ["getPortfolioDashboard({"]],
   ["src/app/today/page.tsx", ["getPortfolioDashboard({"]],
@@ -154,6 +156,26 @@ describe("product session access boundary", () => {
     );
     assert.doesNotMatch(`${query}\n${tenantQuery}`, /\bfetch\s*\(|\/api\//);
   });
+
+  it("routes each unresolved session to the correct recovery action", () => {
+    assert.deepEqual(
+      sessionResolutionNextAction(failure("unauthenticated", 401)),
+      { href: "/auth/sign-in", label: "Sign in" },
+    );
+    assert.deepEqual(
+      sessionResolutionNextAction(failure("identity_unlinked", 403)),
+      { href: "/portfolio/onboarding", label: "Start portfolio" },
+    );
+    assert.deepEqual(
+      sessionResolutionNextAction(failure("auth_provider_unavailable", 503)),
+      { href: "/auth/session", label: "Session evidence" },
+    );
+
+    const boundary = read("src/components/portfolio-read-access-boundary.tsx");
+    assert.match(boundary, /sessionResolutionNextAction\(resolution\)/);
+    assert.match(boundary, /href=\{nextAction\.href\}/);
+    assert.doesNotMatch(boundary, /href="\/auth\/sign-in"/);
+  });
 });
 
 function read(path) {
@@ -162,4 +184,8 @@ function read(path) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function failure(code, httpStatus) {
+  return { ok: false, failure: { code, httpStatus } };
 }
