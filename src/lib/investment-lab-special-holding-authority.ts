@@ -1,34 +1,12 @@
+import { KRX_GOLD_ACTIVE_VALUATION_POLICY } from "./instrument-identity.ts";
 import {
-  KRX_GOLD_ACTIVE_VALUATION_POLICY,
-  KRX_GOLD_CLOSE_ONLY_CONTRACT,
-} from "./instrument-identity.ts";
+  DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
+  matchesDecisionSupportSpecialHolding,
+} from "./portfolio-analysis-special-holding-authority.ts";
+
+export { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./portfolio-analysis-special-holding-authority.ts";
 
 const IMPORTED_SNAPSHOT_SOURCE = "base44_import";
-
-export const DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS = Object.freeze({
-  version: "legacy_imported_special_holding_decisions_v1",
-  authority: "product_owner_review_2026_07_16",
-  scope: Object.freeze(["investment_lab", "simulation"]),
-  decisions: Object.freeze({
-    krxGold: Object.freeze({
-      assetName: "금현물",
-      account: "brokerage",
-      market: "korea",
-      currency: "KRW",
-      assetType: "commodity",
-      productKey: KRX_GOLD_CLOSE_ONLY_CONTRACT.identityBinding.productKey,
-      outcome: "manual_valuation_history_required",
-    }),
-    fount: Object.freeze({
-      assetName: "Fount 일임서비스",
-      account: "irp",
-      market: "korea",
-      currency: "KRW",
-      assetType: "etf",
-      outcome: "intentionally_excluded",
-    }),
-  }),
-} as const);
 
 const PERMANENTLY_UNSUPPORTED_ASSET_TYPES = new Set([
   "fixed_deposit",
@@ -330,16 +308,7 @@ function matchesApprovedDecision(
   row: InvestmentLabSpecialHoldingIdentityInput,
   decisionKey: keyof typeof DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions,
 ) {
-  const decision =
-    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions[decisionKey];
-  return (
-    normalizeText(row.assetName)?.toLowerCase() ===
-      decision.assetName.toLowerCase() &&
-    normalizeText(row.account)?.toLowerCase() === decision.account &&
-    normalizeText(row.market)?.toLowerCase() === decision.market &&
-    normalizeText(row.currency)?.toUpperCase() === decision.currency &&
-    normalizeText(row.assetType)?.toLowerCase() === decision.assetType
-  );
+  return matchesDecisionSupportSpecialHolding(row, decisionKey);
 }
 
 function resolveImportedTickerEvidence(

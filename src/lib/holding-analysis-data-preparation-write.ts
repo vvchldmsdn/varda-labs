@@ -76,6 +76,8 @@ export async function prepareSessionHoldingAnalysisData(
         "invalid",
         current.reason === "manual_history_required"
           ? "금현물은 자동 조회 대신 저장된 수동 평가 기록을 사용합니다."
+          : current.reason === "managed_sleeve_excluded"
+            ? "일임·관리형 상품은 투자 랩·시뮬레이션 계산 대상에서 제외합니다."
           : "이 보유종목은 자동 과거 가격 준비 대상이 아닙니다.",
       );
     }

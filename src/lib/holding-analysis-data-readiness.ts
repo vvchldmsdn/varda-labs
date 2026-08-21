@@ -6,6 +6,7 @@ import {
   mapRiskEvidenceDateToServiceDate,
   riskCalendarDayDistance,
 } from "./portfolio-risk-calendar.ts";
+import { resolveDecisionSupportSpecialHolding } from "./portfolio-analysis-special-holding-authority.ts";
 import type { PortfolioHoldingClassification } from "./portfolio-special-holdings.ts";
 import { buildPrivateOwnerRawHistory } from "./simulation-private-owner-raw-history.ts";
 import type { SimulationReturnMatrixFxInput } from "./simulation-return-matrix.ts";
@@ -239,6 +240,15 @@ function classifyHolding(
 ): PortfolioHoldingClassification {
   const assetType = holding.assetType?.trim().toLowerCase() ?? "";
   if (MANAGED_ASSET_TYPES.has(assetType)) return "managed_sleeve";
+  const specialHolding = resolveDecisionSupportSpecialHolding({
+    assetName: holding.name,
+    account: holding.accountCode,
+    market: holding.market,
+    currency: holding.currency,
+    assetType: holding.assetType,
+  });
+  if (specialHolding === "fount") return "managed_sleeve";
+  if (specialHolding === "krxGold") return "physical_commodity_position";
   if (assetType === "commodity") return "physical_commodity_position";
   if (
     holding.accountCode.trim() &&
