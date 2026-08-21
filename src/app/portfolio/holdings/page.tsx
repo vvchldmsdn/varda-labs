@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HoldingAnalysisDataForm } from "@/components/holding-analysis-data-form";
 import {
   HoldingArchiveForm,
   HoldingRestoreForm,
@@ -11,6 +12,9 @@ import {
   getReadOnlyTenantPortfolioAnalysisScopeContext,
   type TenantPortfolioAnalysisScopeContextResult,
 } from "@/db/queries/portfolio-analysis-scopes";
+import {
+  getReadOnlyTenantHoldingAnalysisDataReadiness,
+} from "@/db/queries/holding-analysis-data-readiness";
 import {
   getReadOnlyTenantHoldings,
   type TenantHoldingQueryResult,
@@ -37,6 +41,7 @@ export default async function TenantHoldingsPage({
     searchParams,
     resolveCurrentTenantContext(),
   ]);
+  const serviceDate = resolveSnapshotCycle().snapshotDate;
   const scopeContext = tenantResolution.ok
     ? await getReadOnlyTenantPortfolioAnalysisScopeContext({
         account: params.account,
@@ -51,7 +56,7 @@ export default async function TenantHoldingsPage({
       : null;
   const result = tenantResolution.ok && selectedScope
     ? await getReadOnlyTenantHoldings({
-        serviceDate: resolveSnapshotCycle().snapshotDate,
+        serviceDate,
         scope: selectedScope,
         tenantContext: tenantResolution.tenantContext,
       })
@@ -65,6 +70,27 @@ export default async function TenantHoldingsPage({
   );
   const archivedHoldings = visibleHoldings.filter(
     (holding) => holding.archivedAt !== null,
+  );
+  const analysisDataResult =
+    tenantResolution.ok && activeHoldings.length > 0
+      ? await getReadOnlyTenantHoldingAnalysisDataReadiness({
+          tenantContext: tenantResolution.tenantContext,
+          serviceDate,
+          holdings: activeHoldings.map((holding) => ({
+            holdingId: holding.holdingId,
+            accountCode: holding.accountCode,
+            name: holding.name,
+            ticker: holding.ticker,
+            assetType: holding.assetType,
+            market: holding.market,
+            currency: holding.currency,
+          })),
+        })
+      : null;
+  const analysisDataByHolding = new Map(
+    analysisDataResult?.state === "ready"
+      ? analysisDataResult.entries.map((entry) => [entry.holdingId, entry])
+      : [],
   );
 
   return (
@@ -151,7 +177,7 @@ export default async function TenantHoldingsPage({
                 the count, and this result must not be used for valuation totals.
               </p>
             ) : null}
-            <table className="min-w-[1120px] w-full border-collapse text-left text-sm">
+            <table className="min-w-[1320px] w-full border-collapse text-left text-sm">
               <thead className="bg-[#eef2e8] text-xs text-[#5e685e]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Holding</th>
@@ -167,13 +193,14 @@ export default async function TenantHoldingsPage({
                     Stored price
                   </th>
                   <th className="px-4 py-3 font-semibold">Price evidence</th>
+                  <th className="px-4 py-3 font-semibold">분석 데이터</th>
                   <th className="px-4 py-3 font-semibold">Correction</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e5e8df]">
                 {activeHoldings.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-5 text-[#687064]" colSpan={8}>
+                    <td className="px-4 py-5 text-[#687064]" colSpan={9}>
                       이 범위에 현재 보유 중인 종목이 없습니다.
                     </td>
                   </tr>
@@ -217,6 +244,14 @@ export default async function TenantHoldingsPage({
                             currentPrice={holding.currentPrice}
                           />
                         ) : null}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <HoldingAnalysisDataForm
+                          holdingId={holding.holdingId}
+                          readiness={
+                            analysisDataByHolding.get(holding.holdingId) ?? null
+                          }
+                        />
                       </td>
                       <td className="px-4 py-3 align-top">
                         <HoldingStateCorrectionForm

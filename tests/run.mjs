@@ -150,6 +150,7 @@ import "./instrument-identity.test.mjs";
 import "./manual-asset-price.test.mjs";
 import "./holding-onboarding.test.mjs";
 import "./holding-onboarding-schema.test.mjs";
+import "./holding-analysis-data-readiness.test.mjs";
 import "./holding-state-correction.test.mjs";
 import "./holding-lifecycle.test.mjs";
 import "./portfolio-group-management.test.mjs";
