@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
+import type {
+  HoldingAnalysisDataPreparationActionState,
+} from "@/lib/holding-analysis-data-readiness";
+import { prepareSessionHoldingAnalysisData } from "@/lib/holding-analysis-data-preparation-write";
 import type { HoldingStateCorrectionActionState } from "@/lib/holding-state-correction";
 import { writeSessionHoldingStateCorrection } from "@/lib/holding-state-correction-write";
 import type { HoldingLifecycleActionState } from "@/lib/holding-lifecycle";
@@ -82,5 +86,24 @@ export async function updateManualKrxGoldPrice(
     }
   }
 
+  return state;
+}
+
+export async function prepareHoldingAnalysisData(
+  _previousState: HoldingAnalysisDataPreparationActionState,
+  formData: FormData,
+): Promise<HoldingAnalysisDataPreparationActionState> {
+  const state = await prepareSessionHoldingAnalysisData(formData);
+  if (state.status === "success") {
+    for (const path of [
+      "/additional-contribution",
+      "/portfolio/holdings",
+      "/portfolio/risk",
+      "/investment-lab",
+      "/simulation",
+    ]) {
+      revalidatePath(path);
+    }
+  }
   return state;
 }
