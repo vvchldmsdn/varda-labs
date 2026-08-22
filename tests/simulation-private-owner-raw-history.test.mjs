@@ -9,8 +9,6 @@ import {
   resolvePrivateOwnerRawAvailableServiceDates,
 } from "../src/lib/simulation-private-owner-raw-history.ts";
 
-const OWNER_ID = "11111111-1111-4111-8111-111111111111";
-
 describe("private owner KIS raw history", () => {
   it("builds a complete 90-return owner matrix without claiming adjustments", () => {
     const fixture = readyFixture();
@@ -42,21 +40,15 @@ describe("private owner KIS raw history", () => {
     assert.equal(PRIVATE_OWNER_RAW_HISTORY_POLICY.returnStepCount, 90);
   });
 
-  it("fails closed as soon as a second active portfolio owner exists", () => {
-    const result = buildPrivateOwnerRawHistory({
-      ...readyFixture(),
-      activeOwnerUserIds: [
-        OWNER_ID,
-        "22222222-2222-4222-8222-222222222222",
-      ],
-    });
+  it("uses shared KIS evidence after the caller scopes the instrument universe", () => {
+    const result = buildPrivateOwnerRawHistory(readyFixture());
 
-    assert.equal(result.status, "blocked");
-    assert.equal(result.matrix, null);
-    assert.deepEqual(result.scopeAdmission.issues, [
-      "private_single_tenant_scope_not_established",
-    ]);
-    assert.equal(result.instruments[0].admissionStatus, "blocked_invalid_input");
+    assert.equal(result.status, "ready");
+    assert.equal(
+      result.policy.ownerBoundary,
+      "user_owned_instrument_universe",
+    );
+    assert.equal(result.policy.marketDataBoundary, "shared_instrument_date_cache");
   });
 
   it("keeps partial diagnostics instead of filling missing raw history", () => {
@@ -110,7 +102,7 @@ describe("private owner KIS raw history", () => {
     );
   });
 
-  it("resolves the latest common date only inside the singleton boundary", () => {
+  it("resolves the latest common date from admitted shared evidence", () => {
     const fixture = readyFixture();
     const latestSourceRows = fixture.instruments.map((row) => ({
       market: row.market,
@@ -125,8 +117,6 @@ describe("private owner KIS raw history", () => {
 
     assert.equal(
       resolveLatestCommonPrivateOwnerRawServiceDate({
-        requestedOwnerUserId: OWNER_ID,
-        activeOwnerUserIds: [OWNER_ID],
         instruments: fixture.instruments,
         latestSourceRows,
         latestFxSourceDate: shiftRiskDate(
@@ -135,19 +125,6 @@ describe("private owner KIS raw history", () => {
         ),
       }),
       fixture.requestedEndServiceDate,
-    );
-    assert.equal(
-      resolveLatestCommonPrivateOwnerRawServiceDate({
-        requestedOwnerUserId: OWNER_ID,
-        activeOwnerUserIds: [OWNER_ID, "another-owner"],
-        instruments: fixture.instruments,
-        latestSourceRows,
-        latestFxSourceDate: shiftRiskDate(
-          fixture.requestedEndServiceDate,
-          -1,
-        ),
-      }),
-      null,
     );
   });
 
@@ -206,8 +183,6 @@ function readyFixture(returnStepCount = 90) {
   ];
 
   return {
-    requestedOwnerUserId: OWNER_ID,
-    activeOwnerUserIds: [OWNER_ID],
     requestedEndServiceDate,
     instruments,
     priceRows: instruments.flatMap((row, instrumentIndex) =>

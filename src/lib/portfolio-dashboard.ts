@@ -292,7 +292,6 @@ export async function getPortfolioDashboard(
       groupName: asset.groupId ? assetGroupNames.get(asset.groupId) : null,
       usdKrwRate,
       trimDriftThreshold,
-      useTrendFilter,
       returnMetrics: getAssetReturnMetrics(returnSummary, asset, usdKrwRate),
     }),
   );
@@ -308,7 +307,6 @@ export async function getPortfolioDashboard(
       groupName: asset.groupId ? assetGroupNames.get(asset.groupId) : null,
       usdKrwRate,
       trimDriftThreshold,
-      useTrendFilter,
       returnMetrics: getAssetReturnMetrics(returnSummary, asset, usdKrwRate),
     }),
   );
@@ -563,7 +561,6 @@ function buildHolding({
   groupName,
   usdKrwRate,
   trimDriftThreshold,
-  useTrendFilter,
   returnMetrics,
 }: {
   asset: AssetRow;
@@ -571,13 +568,11 @@ function buildHolding({
   groupName: string | null | undefined;
   usdKrwRate: number;
   trimDriftThreshold: number;
-  useTrendFilter: boolean;
   returnMetrics: AssetReturnMetrics;
 }): DashboardHolding {
   const quantity = toNumber(asset.quantity) ?? 0;
   const currentPrice = toNumber(asset.currentPrice) ?? 0;
   const targetWeight = toNumber(asset.targetWeight) ?? 0;
-  const ma120 = toNumber(asset.ma120);
   const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
   const localValue = quantity * currentPrice;
   const valueKrw =
@@ -590,9 +585,8 @@ function buildHolding({
   const totalPnlKrw = unrealizedPnlKrw + realizedPnlKrw;
   const currentWeight =
     accountTotalValueKrw > 0 ? (valueKrw / accountTotalValueKrw) * 100 : 0;
-  const belowMa =
-    useTrendFilter && ma120 !== null && ma120 > 0 && currentPrice <= ma120;
-  const effectiveTargetWeight = belowMa ? targetWeight / 2 : targetWeight;
+  // Strategic targets remain authoritative outside the additional-contribution preview.
+  const effectiveTargetWeight = targetWeight;
   const driftPct =
     effectiveTargetWeight > 0
       ? (currentWeight / effectiveTargetWeight - 1) * 100

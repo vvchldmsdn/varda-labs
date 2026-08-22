@@ -1,6 +1,5 @@
 import "server-only";
 
-import { getActivePortfolioOwnerUserIds } from "@/db/queries/active-portfolio-owners";
 import { loadPortfolioRiskPriceCandidates } from "@/db/queries/portfolio-risk";
 import {
   evaluateAdditionalContributionMa120OperationalEvidence,
@@ -9,10 +8,9 @@ import {
 } from "@/lib/additional-contribution-ma120-operational-evidence";
 import {
   admitAdjustedHistoricalPriceRows,
-  admitPrivateSingleTenantRawTrendEvidenceRows,
+  admitSharedKisRawTrendEvidenceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import type { PortfolioStructureHoldingRow } from "@/lib/portfolio-structure";
-import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const HISTORY_LOOKBACK_CALENDAR_DAYS = 420;
 
@@ -44,11 +42,9 @@ export type AdditionalContributionMa120ReadRow = Readonly<{
 export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
   holdings,
   serviceDate,
-  tenantContext,
 }: {
   holdings: readonly Ma120HoldingInput[];
   serviceDate: string;
-  tenantContext: TenantContext;
 }) {
   const normalizedHoldings = holdings
     .map(normalizeHolding)
@@ -59,21 +55,13 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
     -HISTORY_LOOKBACK_CALENDAR_DAYS,
   );
 
-  const [candidateRows, activeOwnerUserIds] = await Promise.all([
-    loadPortfolioRiskPriceCandidates({
-      tickers,
-      sourceDateFrom,
-      sourceDateTo: serviceDate,
-    }),
-    getActivePortfolioOwnerUserIds(),
-  ]);
+  const candidateRows = await loadPortfolioRiskPriceCandidates({
+    tickers,
+    sourceDateFrom,
+    sourceDateTo: serviceDate,
+  });
   const adjustedAdmission = admitAdjustedHistoricalPriceRows(candidateRows);
-  const privateRawAdmission =
-    admitPrivateSingleTenantRawTrendEvidenceRows({
-      rows: candidateRows,
-      requestedOwnerUserId: tenantContext.ownerUserId,
-      activeOwnerUserIds,
-    });
+  const privateRawAdmission = admitSharedKisRawTrendEvidenceRows(candidateRows);
   const adjustedRowsByInstrument = groupRowsByInstrument(
     adjustedAdmission.rows,
   );
@@ -136,7 +124,7 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
   return Object.freeze({
     policyVersion:
       "additional_contribution_ma120_operational_evidence_v1" as const,
-    allocationEffect: "none" as const,
+    allocationEffect: "bounded_overlay" as const,
     status:
       usableCount === rows.length && rows.length > 0
         ? ("ready" as const)

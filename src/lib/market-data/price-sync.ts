@@ -1,9 +1,10 @@
 import "server-only";
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
+  accounts,
   assets,
   livePriceQuotes,
   marketDataSyncRuns,
@@ -103,7 +104,7 @@ export type PriceSyncCooldownStatus = {
 };
 
 export type PriceSyncTargetMarket = "korea" | "us";
-export type PriceSyncTargetAccount = "brokerage" | "isa" | "irp";
+export type PriceSyncTargetAccount = string;
 
 export type PriceSyncTargetFilter = {
   tickers?: string[];
@@ -522,6 +523,16 @@ async function getAssetRowsForPriceSync(): Promise<PriceSyncAssetRow[]> {
       account: assets.account,
     })
     .from(assets)
+    .innerJoin(accounts, eq(assets.accountId, accounts.id))
+    .where(
+      and(
+        eq(accounts.isActive, true),
+        ne(accounts.accountType, "cash"),
+        eq(assets.account, accounts.code),
+        eq(assets.canonicalOwnerUserId, accounts.canonicalOwnerUserId),
+        isNull(assets.archivedAt),
+      ),
+    )
     .orderBy(assets.market, assets.ticker, assets.name);
 
   return rows;
@@ -578,7 +589,7 @@ function normalizeTargetFilter(
   return {
     tickers: tickers && tickers.length > 0 ? [...new Set(tickers)] : undefined,
     market: filter?.market,
-    account: filter?.account,
+    account: normalizeText(filter?.account) ?? undefined,
   };
 }
 

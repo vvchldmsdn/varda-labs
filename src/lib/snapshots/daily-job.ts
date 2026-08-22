@@ -4,6 +4,7 @@ import { and, asc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { accounts, appUsers, assets } from "@/db/schema";
+import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import {
   DailySnapshotRequestError,
@@ -42,34 +43,41 @@ export async function runDailySnapshotJob(
     );
   }
 
-  const results: DailySnapshotTenantResult[] = [];
-  for (const tenantContext of targets) {
-    try {
-      const result = await runDailySnapshot({
-        tenantContext,
-        dryRun,
-        snapshotDate,
-        account: requestedAccount,
-        now: options.now,
-      });
-      results.push({
-        ownerUserId: tenantContext.ownerUserId,
-        status: result.writeReady ? (dryRun ? "ready" : "written") : "blocked",
-        result,
-      });
-    } catch (error) {
-      if (!(error instanceof DailySnapshotRequestError)) throw error;
-      results.push({
-        ownerUserId: tenantContext.ownerUserId,
-        status: "failed",
-        error: {
-          code: error.code,
-          message: error.message,
-          statusCode: error.statusCode,
-        },
-      });
-    }
-  }
+  const results = await mapWithConcurrency(
+    targets,
+    2,
+    async (tenantContext): Promise<DailySnapshotTenantResult> => {
+      try {
+        const result = await runDailySnapshot({
+          tenantContext,
+          dryRun,
+          snapshotDate,
+          account: requestedAccount,
+          now: options.now,
+        });
+        return {
+          ownerUserId: tenantContext.ownerUserId,
+          status: result.writeReady
+            ? dryRun
+              ? "ready"
+              : "written"
+            : "blocked",
+          result,
+        };
+      } catch (error) {
+        if (!(error instanceof DailySnapshotRequestError)) throw error;
+        return {
+          ownerUserId: tenantContext.ownerUserId,
+          status: "failed",
+          error: {
+            code: error.code,
+            message: error.message,
+            statusCode: error.statusCode,
+          },
+        };
+      }
+    },
+  );
 
   return buildDailySnapshotJobResult({
     dryRun,

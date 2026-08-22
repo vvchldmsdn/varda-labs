@@ -24,7 +24,7 @@ type PriceProviderName = "stub" | "kis";
 const KIS_WRITE_TARGET_LIMIT_MAX = 5;
 const PRICE_PROVIDER_NAMES = ["stub", "kis"] as const;
 const TARGET_MARKETS = ["korea", "us"] as const;
-const TARGET_ACCOUNTS = ["brokerage", "isa", "irp"] as const;
+const ACCOUNT_CODE_PATTERN = /^[a-z0-9][a-z0-9._-]{0,49}$/;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -268,7 +268,8 @@ function parseTargetFilter(searchParams: URLSearchParams): {
   if (accountResult === null) {
     return {
       value: {},
-      error: "account must be one of: brokerage, isa, irp, all",
+      error:
+        "account must be all or a valid account code using lowercase letters, numbers, dot, dash, or underscore",
     };
   }
 
@@ -313,5 +314,5 @@ function parseAccountFilter(value: string | null) {
 
   const normalized = value.trim().toLowerCase();
   if (normalized === "all") return undefined;
-  return parseEnumQuery(normalized, TARGET_ACCOUNTS, undefined);
+  return ACCOUNT_CODE_PATTERN.test(normalized) ? normalized : null;
 }

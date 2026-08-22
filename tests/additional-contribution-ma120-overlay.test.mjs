@@ -7,8 +7,8 @@ import {
   compareAdditionalContributionMa120Overlay,
 } from "../src/lib/additional-contribution-ma120-overlay.ts";
 
-describe("additional contribution MA120 bounded overlay candidate", () => {
-  it("keeps the strategic baseline exact when the candidate is off", () => {
+describe("additional contribution MA120 bounded overlay", () => {
+  it("keeps the strategic baseline exact when the overlay is off", () => {
     const baseline = strategicBaseline();
     const result = compareAdditionalContributionMa120Overlay({
       mode: "off",
@@ -26,7 +26,7 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
   it("applies a linear buffer and a bounded 50 percent floor", () => {
     const result = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: strategicBaseline(),
       evidence: [
@@ -61,7 +61,7 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
   it("does not redistribute a reduced amount to another holding", () => {
     const result = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: strategicBaseline(),
       evidence: [
@@ -95,7 +95,7 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
     for (const fixture of cases) {
       const result = compareAdditionalContributionMa120Overlay({
-        mode: "candidate",
+        mode: "enabled",
         serviceDate: "2026-08-12",
         baseline: singleHoldingBaseline(),
         evidence: fixture.evidence,
@@ -109,13 +109,13 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
   it("treats the seven-calendar-day freshness boundary as inclusive", () => {
     const fresh = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: singleHoldingBaseline(),
       evidence: [evidence("AAA", "below_ma", -3, "2026-08-05")],
     });
     const stale = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: singleHoldingBaseline(),
       evidence: [evidence("AAA", "below_ma", -3, "2026-08-04")],
@@ -127,7 +127,7 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
   it("accepts the source evaluator's at-MA floating-point tolerance", () => {
     const result = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: singleHoldingBaseline(),
       evidence: [evidence("AAA", "at_ma", Number.EPSILON * 100)],
@@ -140,7 +140,7 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
   it("rounds reductions toward the strategic allocation for tiny KRW amounts", () => {
     const result = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: {
         cashAmountKrw: 1,
@@ -163,13 +163,13 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
       evidence("CCC", "at_ma", 0),
     ];
     const forward = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline,
       evidence: evidenceRows,
     });
     const reversed = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: { ...baseline, allocations: [...baseline.allocations].reverse() },
       evidence: [...evidenceRows].reverse(),
@@ -181,13 +181,13 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
 
   it("blocks malformed baseline or duplicate evidence instead of producing a plan", () => {
     const malformed = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: { ...singleHoldingBaseline(), totalAllocatedKrw: 99 },
       evidence: [],
     });
     const duplicate = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: singleHoldingBaseline(),
       evidence: [
@@ -196,7 +196,7 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
       ],
     });
     const malformedEvidence = compareAdditionalContributionMa120Overlay({
-      mode: "candidate",
+      mode: "enabled",
       serviceDate: "2026-08-12",
       baseline: singleHoldingBaseline(),
       evidence: [
@@ -221,10 +221,17 @@ describe("additional contribution MA120 bounded overlay candidate", () => {
       "utf8",
     );
 
-    assert.equal(ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY.runtimeBinding, "not_enabled");
+    assert.equal(
+      ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY.runtimeBinding,
+      "additional_contribution_preview",
+    );
+    assert.equal(
+      ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY.orderAuthority,
+      "forbidden",
+    );
     assert.equal(ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY.redistribution, "forbidden");
     assert.doesNotMatch(source, /server-only|drizzle|neon|@\/db|fetch\s*\(|\/api\//i);
-    assert.doesNotMatch(source, /insert|update|delete|recommendation.*enabled|order/i);
+    assert.doesNotMatch(source, /\.insert\s*\(|\.update\s*\(|\.delete\s*\(/i);
   });
 
   it("keeps the reproducible Production audit guarded and SELECT-only", () => {

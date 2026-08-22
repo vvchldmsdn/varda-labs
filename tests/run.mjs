@@ -1,4 +1,7 @@
 import "./market-calendar.test.mjs";
+import "./map-with-concurrency.test.mjs";
+import "./p1-p2-hardening.test.mjs";
+import "./audit-tenant-selector.test.mjs";
 import "./tenant-ownership-audit.test.mjs";
 import "./tenant-database-role-boundary.test.mjs";
 import "./tenant-database-role-provisioning.test.mjs";

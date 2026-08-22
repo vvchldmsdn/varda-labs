@@ -7,6 +7,13 @@ import type {
   AdditionalContributionMa120OperationalPriceBasis,
 } from "./additional-contribution-ma120-operational-evidence.ts";
 import {
+  ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY,
+  compareAdditionalContributionMa120Overlay,
+  type AdditionalContributionMa120OverlayBlocker,
+  type AdditionalContributionMa120OverlayDecision,
+  type AdditionalContributionMa120OverlayMode,
+} from "./additional-contribution-ma120-overlay.ts";
+import {
   normalizeTargetPolicyUniverseAccount,
   type TargetPolicyUniverseSourceRow,
 } from "./target-policy-holding-universe.ts";
@@ -33,7 +40,7 @@ export type AdditionalContributionApprovedPolicyPort = Readonly<{
 
 export type AdditionalContributionMa120ReadPort = Readonly<{
   policyVersion: string;
-  allocationEffect: "none";
+  allocationEffect: "bounded_overlay";
   status: "ready" | "partial" | "unavailable" | "read_failed";
   suppliedHoldingCount: number;
   evaluatedHoldingCount: number;
@@ -195,23 +202,148 @@ export function buildAdditionalContributionPreview({
   } as const);
 }
 
-export function attachAdditionalContributionMa120Evidence({
+export function attachAdditionalContributionMa120Evidence<
+  TPreview extends AdditionalContributionMa120AttachablePreview,
+>({
   preview,
   ma120Read,
+  mode = "off",
 }: {
-  preview: ReturnType<typeof buildAdditionalContributionPreview>;
+  preview: TPreview;
   ma120Read: AdditionalContributionMa120ReadPort;
+  mode?: AdditionalContributionMa120OverlayMode;
 }) {
-  if (preview.status !== "ready") return preview;
+  return applyAdditionalContributionMa120Overlay({ preview, ma120Read, mode });
+}
+
+type AdditionalContributionMa120AttachableRow = Readonly<{
+  allocationKey?: string | null;
+  market: string | null;
+  currency: string | null;
+  ticker: string | null;
+  currentValueKrw: number;
+  allocationKrw: number;
+  postTopupValueKrw: number;
+  postTopupWeightPct: number;
+}>;
+
+type AdditionalContributionMa120AttachablePreview = Readonly<{
+  status: "ready";
+  serviceDate: string;
+  cashAmountKrw: number;
+  postTopupTotalKrw: number;
+  totalAllocatedKrw: number;
+  residualCashKrw: number;
+  rows: readonly AdditionalContributionMa120AttachableRow[];
+}>;
+
+type AdditionalContributionMa120AppliedRow<
+  TRow extends AdditionalContributionMa120AttachableRow,
+> = Readonly<
+  Omit<
+    TRow,
+    "allocationKrw" | "postTopupValueKrw" | "postTopupWeightPct"
+  > & {
+    allocationKrw: number;
+    strategicAllocationKrw: number;
+    ma120Multiplier: number;
+    ma120ReductionKrw: number;
+    ma120Decision: AdditionalContributionMa120OverlayDecision | "overlay_blocked";
+    postTopupValueKrw: number;
+    postTopupWeightPct: number;
+    ma120Evidence: ReturnType<typeof compactMa120Evidence>;
+  }
+>;
+
+export type AdditionalContributionMa120AppliedPreview<
+  TPreview extends AdditionalContributionMa120AttachablePreview,
+> = Readonly<
+  Omit<TPreview, "totalAllocatedKrw" | "residualCashKrw" | "rows"> & {
+    totalAllocatedKrw: number;
+    residualCashKrw: number;
+    ma120Evidence: Readonly<{
+      policyVersion: string;
+      overlayPolicyVersion: typeof ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY.version;
+      allocationEffect: "bounded_overlay" | "disabled";
+      mode: AdditionalContributionMa120OverlayMode;
+      overlayStatus: "blocked" | "ready" | "partial" | "disabled";
+      totalReductionKrw: number;
+      blockers: readonly AdditionalContributionMa120OverlayBlocker[];
+      status: AdditionalContributionMa120ReadPort["status"];
+      suppliedHoldingCount: number;
+      evaluatedHoldingCount: number;
+      usableCount: number;
+      unavailableCount: number;
+    }>;
+    rows: readonly AdditionalContributionMa120AppliedRow<
+      TPreview["rows"][number]
+    >[];
+  }
+>;
+
+export function applyAdditionalContributionMa120Overlay<
+  TPreview extends AdditionalContributionMa120AttachablePreview,
+>({
+  preview,
+  ma120Read,
+  mode,
+}: {
+  preview: TPreview;
+  ma120Read: AdditionalContributionMa120ReadPort;
+  mode: AdditionalContributionMa120OverlayMode;
+}): AdditionalContributionMa120AppliedPreview<TPreview> {
+  const overlay = compareAdditionalContributionMa120Overlay({
+    mode,
+    serviceDate: preview.serviceDate,
+    baseline: {
+      cashAmountKrw: preview.cashAmountKrw,
+      totalAllocatedKrw: preview.totalAllocatedKrw,
+      residualCashKrw: preview.residualCashKrw,
+      allocations: preview.rows.map((row, index) => ({
+        allocationKey: allocationKey(row, index),
+        market: row.market,
+        currency: row.currency,
+        ticker: row.ticker,
+        allocationKrw: row.allocationKrw,
+      })),
+    },
+    evidence: ma120Read.rows.map((row) => ({
+      instrumentKey: row.instrumentKey,
+      status: row.status,
+      latestWindowPriceDate:
+        row.evidence?.latestWindowPriceDate ?? null,
+      distanceFromMaPct: row.evidence?.distanceFromMaPct ?? null,
+    })),
+  });
 
   const evidenceByInstrument = new Map(
     ma120Read.rows.map((row) => [row.instrumentKey, row] as const),
   );
+  const overlayByAllocationKey = new Map(
+    overlay.rows.map((row) => [row.allocationKey, row] as const),
+  );
+  const overlayApplied = overlay.status !== "blocked";
+  const totalAllocatedKrw = overlayApplied
+    ? overlay.overlayAllocatedKrw
+    : preview.totalAllocatedKrw;
+  const residualCashKrw = overlayApplied
+    ? overlay.overlayResidualCashKrw
+    : preview.residualCashKrw;
+
   return Object.freeze({
     ...preview,
+    totalAllocatedKrw,
+    residualCashKrw,
     ma120Evidence: Object.freeze({
       policyVersion: ma120Read.policyVersion,
-      allocationEffect: ma120Read.allocationEffect,
+      overlayPolicyVersion:
+        ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY.version,
+      allocationEffect:
+        mode === "enabled" ? ma120Read.allocationEffect : "disabled",
+      mode,
+      overlayStatus: overlay.status,
+      totalReductionKrw: overlayApplied ? overlay.totalReductionKrw : 0,
+      blockers: overlay.blockers,
       status: ma120Read.status,
       suppliedHoldingCount: ma120Read.suppliedHoldingCount,
       evaluatedHoldingCount: ma120Read.evaluatedHoldingCount,
@@ -219,10 +351,24 @@ export function attachAdditionalContributionMa120Evidence({
       unavailableCount: ma120Read.unavailableCount,
     }),
     rows: Object.freeze(
-      preview.rows.map((row) => {
+      preview.rows.map((row, index) => {
         const evidence = evidenceByInstrument.get(instrumentKey(row) ?? "");
+        const overlayRow = overlayByAllocationKey.get(allocationKey(row, index));
+        const allocationKrw = overlayRow?.overlayAllocationKrw ?? row.allocationKrw;
         return Object.freeze({
           ...row,
+          allocationKrw,
+          strategicAllocationKrw: row.allocationKrw,
+          ma120Multiplier: overlayRow?.multiplier ?? 1,
+          ma120ReductionKrw: overlayRow?.reductionKrw ?? 0,
+          ma120Decision: overlayRow?.decision ?? "overlay_blocked",
+          postTopupValueKrw: row.currentValueKrw + allocationKrw,
+          postTopupWeightPct:
+            preview.postTopupTotalKrw > 0
+              ? ((row.currentValueKrw + allocationKrw) /
+                  preview.postTopupTotalKrw) *
+                100
+              : 0,
           ma120Evidence: evidence
             ? compactMa120Evidence(evidence)
             : Object.freeze({
@@ -237,7 +383,7 @@ export function attachAdditionalContributionMa120Evidence({
         });
       }),
     ),
-  });
+  }) as AdditionalContributionMa120AppliedPreview<TPreview>;
 }
 
 export function additionalContributionMa120ReadFailure(
@@ -245,7 +391,7 @@ export function additionalContributionMa120ReadFailure(
 ): AdditionalContributionMa120ReadPort {
   return Object.freeze({
     policyVersion: "additional_contribution_ma120_operational_evidence_v1",
-    allocationEffect: "none",
+    allocationEffect: "bounded_overlay",
     status: "read_failed",
     suppliedHoldingCount,
     evaluatedHoldingCount: 0,
@@ -253,6 +399,14 @@ export function additionalContributionMa120ReadFailure(
     unavailableCount: suppliedHoldingCount,
     rows: Object.freeze([]),
   });
+}
+
+function allocationKey(
+  row: AdditionalContributionMa120AttachableRow,
+  index: number,
+) {
+  const explicit = normalize(row.allocationKey ?? null, "lower");
+  return explicit ?? instrumentKey(row) ?? `invalid:${index}`;
 }
 
 function blocked(

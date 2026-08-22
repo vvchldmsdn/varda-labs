@@ -262,7 +262,7 @@ describe("additional contribution MA120 evidence Phase 2A", () => {
       result.policy.allocationEffect,
       ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.allocationEffect,
     );
-    assert.equal(result.policy.recommendation, "forbidden");
+    assert.equal(result.policy.recommendation, "allocation_preview_only");
   });
 
   it("rejects unsupported operational price bases", () => {
@@ -298,7 +298,7 @@ describe("additional contribution MA120 evidence Phase 2A", () => {
     );
     assert.equal(
       ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.allocationEffect,
-      "none",
+      "bounded_overlay",
     );
     for (const source of [contractSource, operationalSource]) {
       assert.doesNotMatch(

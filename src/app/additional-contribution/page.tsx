@@ -200,7 +200,7 @@ function ReadyPreview({
         <SummaryCell
           label="MA120 근거"
           value={`${preview.ma120Evidence.usableCount}/${preview.rows.length} 종목`}
-          detail={ma120SummaryDetail(preview.ma120Evidence.status)}
+          detail={ma120SummaryDetail(preview.ma120Evidence)}
         />
       </dl>
 
@@ -215,7 +215,7 @@ function ReadyPreview({
               <th className="px-3 py-3 text-right">현재 비중</th>
               <th className="px-3 py-3 text-right">목표 비중</th>
               <th className="px-3 py-3 text-right">MA120 참고</th>
-              <th className="px-3 py-3 text-right">투입 금액</th>
+              <th className="px-3 py-3 text-right">최종 투입</th>
               <th className="px-3 py-3 text-right">투입 후 비중</th>
             </tr>
           </thead>
@@ -252,6 +252,11 @@ function ReadyPreview({
                 </td>
                 <td className="px-3 py-3 text-right font-semibold text-[#1e5d49]">
                   {formatKrw(row.allocationKrw)}
+                  {row.ma120ReductionKrw > 0 ? (
+                    <p className="mt-0.5 text-xs font-normal text-[#b83c3c]">
+                      기본안 대비 -{formatKrw(row.ma120ReductionKrw)}
+                    </p>
+                  ) : null}
                 </td>
                 <td className="px-3 py-3 text-right">
                   {formatPercent(row.postTopupWeightPct)}
@@ -448,11 +453,20 @@ function formatPrice(value: number, currency: string | null) {
   }).format(value);
 }
 
-function ma120SummaryDetail(
-  status: "ready" | "partial" | "unavailable" | "read_failed",
-) {
-  if (status === "read_failed") return "근거 조회 실패 · 분배액은 정상 표시";
-  if (status === "unavailable") return "사용 가능한 가격 이력 없음 · 분배 미반영";
-  if (status === "partial") return "일부 종목만 계산 · 분배 미반영";
-  return "최근 120개 관측치 · 분배 미반영";
+function ma120SummaryDetail(evidence: {
+  mode: "off" | "enabled";
+  status: "ready" | "partial" | "unavailable" | "read_failed";
+  totalReductionKrw: number;
+}) {
+  if (evidence.mode === "off") return "추세 필터 꺼짐 · 기본 배분 사용";
+  if (evidence.status === "read_failed") {
+    return "근거 조회 실패 · 해당 종목은 기본 배분 사용";
+  }
+  if (evidence.status === "unavailable") {
+    return "사용 가능한 가격 이력 없음 · 기본 배분 사용";
+  }
+  if (evidence.status === "partial") {
+    return `일부 종목만 적용 · 현금 보류 ${formatKrw(evidence.totalReductionKrw)}`;
+  }
+  return `최근 120개 관측치 적용 · 현금 보류 ${formatKrw(evidence.totalReductionKrw)}`;
 }

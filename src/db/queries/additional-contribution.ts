@@ -5,12 +5,14 @@ import { getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfo
 import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { getReadOnlyTenantApprovedTargetPolicy } from "@/db/queries/target-policy";
 import { getReadOnlyTenantTargetPolicyHoldingUniverse } from "@/db/queries/target-policy-holding-universe";
+import { loadLatestTenantPortfolioSettingsRows } from "@/db/queries/tenant-settings";
 import {
   additionalContributionMa120ReadFailure,
+  applyAdditionalContributionMa120Overlay,
   attachAdditionalContributionMa120Evidence,
   buildAdditionalContributionPreview,
-  type AdditionalContributionMa120ReadPort,
 } from "@/lib/additional-contribution-preview";
+import type { AdditionalContributionMa120OverlayMode } from "@/lib/additional-contribution-ma120-overlay";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -22,18 +24,25 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
   account,
   cashAmountKrw,
   tenantContext,
+  ma120Mode,
   now = new Date(),
 }: {
   account: string;
   cashAmountKrw: number;
   tenantContext: TenantContext;
+  ma120Mode?: AdditionalContributionMa120OverlayMode;
   now?: Date;
 }) {
-  const [approvedPolicyRead, currentUniverse, structure] = await Promise.all([
+  const [approvedPolicyRead, currentUniverse, structure, settingsRows] = await Promise.all([
     getReadOnlyTenantApprovedTargetPolicy({ account, tenantContext }),
     getReadOnlyTenantTargetPolicyHoldingUniverse({ account, tenantContext }),
     getReadOnlyTenantPortfolioStructure({ account, tenantContext }),
+    ma120Mode
+      ? Promise.resolve(null)
+      : loadLatestTenantPortfolioSettingsRows(tenantContext),
   ]);
+  const resolvedMa120Mode =
+    ma120Mode ?? resolveMa120Mode(settingsRows?.[0]?.useTrendFilter ?? false);
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
   const preview = buildAdditionalContributionPreview({
     account,
@@ -50,7 +59,6 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
     ma120Read = await getReadOnlyTenantAdditionalContributionMa120Evidence({
       holdings: structure.holdingRows,
       serviceDate,
-      tenantContext,
     });
   } catch {
     ma120Read = additionalContributionMa120ReadFailure(
@@ -58,7 +66,11 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
     );
   }
 
-  return attachAdditionalContributionMa120Evidence({ preview, ma120Read });
+  return attachAdditionalContributionMa120Evidence({
+    preview,
+    ma120Read,
+    mode: resolvedMa120Mode,
+  });
 }
 
 export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
@@ -73,11 +85,17 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
   now?: Date;
 }) {
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
-  const model = await getReadOnlyTenantPortfolioTargetPolicyModel({
-    scope,
-    serviceDate,
-    tenantContext,
-  });
+  const [model, settingsRows] = await Promise.all([
+    getReadOnlyTenantPortfolioTargetPolicyModel({
+      scope,
+      serviceDate,
+      tenantContext,
+    }),
+    loadLatestTenantPortfolioSettingsRows(tenantContext),
+  ]);
+  const ma120Mode = resolveMa120Mode(
+    settingsRows[0]?.useTrendFilter ?? false,
+  );
 
   if (
     model.policyValidation.status === "missing" &&
@@ -88,6 +106,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
       account: scope.accountCode,
       cashAmountKrw,
       tenantContext,
+      ma120Mode,
       now,
     });
     return adaptLegacyPreview({ preview: legacyPreview, scope });
@@ -131,16 +150,11 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     ma120Read = await getReadOnlyTenantAdditionalContributionMa120Evidence({
       holdings: model.ma120HoldingRows,
       serviceDate,
-      tenantContext,
     });
   } catch {
     ma120Read = additionalContributionMa120ReadFailure(model.rows.length);
   }
-  const ma120ByInstrument = new Map(
-    ma120Read.rows.map((row) => [row.instrumentKey, row] as const),
-  );
-
-  return Object.freeze({
+  const preview = Object.freeze({
     status: "ready" as const,
     source: "portfolio_target_policy" as const,
     scopeKey: scope.key,
@@ -154,21 +168,10 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     postTopupTotalKrw: allocation.postTopupTotalKrw,
     totalAllocatedKrw: allocation.totalAllocatedKrw,
     residualCashKrw: allocation.residualCashKrw,
-    ma120Evidence: Object.freeze({
-      policyVersion: ma120Read.policyVersion,
-      allocationEffect: ma120Read.allocationEffect,
-      status: ma120Read.status,
-      suppliedHoldingCount: ma120Read.suppliedHoldingCount,
-      evaluatedHoldingCount: ma120Read.evaluatedHoldingCount,
-      usableCount: ma120Read.usableCount,
-      unavailableCount: ma120Read.unavailableCount,
-    }),
     rows: Object.freeze(
-      allocation.rows.map((row) => {
-        const evidence = ma120ByInstrument.get(
-          instrumentKey(row.metadata) ?? "",
-        );
-        return Object.freeze({
+      allocation.rows.map((row, index) =>
+        Object.freeze({
+          allocationKey: `${row.metadata.accountCode}:${instrumentKey(row.metadata) ?? "invalid"}:${index}`,
           accountCode: row.metadata.accountCode,
           accountName: row.metadata.accountName,
           name: row.metadata.assetName,
@@ -192,11 +195,16 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
                 100
               : 0,
           allocationStatus: row.allocationStatus,
-          ma120Evidence: compactMa120Evidence(evidence),
-        });
-      }),
+        }),
+      ),
     ),
     blockers: Object.freeze([] as string[]),
+  });
+
+  return applyAdditionalContributionMa120Overlay({
+    preview,
+    ma120Read,
+    mode: ma120Mode,
   });
 }
 
@@ -227,6 +235,11 @@ function adaptLegacyPreview({
           ...row,
           accountCode: scope.accountCode,
           accountName: scope.label,
+          strategicAllocationKrw: row.strategicAllocationKrw,
+          ma120Multiplier: row.ma120Multiplier,
+          ma120ReductionKrw: row.ma120ReductionKrw,
+          ma120Decision: row.ma120Decision,
+          ma120Evidence: row.ma120Evidence,
         }),
       ),
     ),
@@ -268,20 +281,6 @@ function scopedPolicyBlocker(status: string) {
   return "portfolio_target_policy_integrity_error";
 }
 
-function compactMa120Evidence(
-  row: AdditionalContributionMa120ReadPort["rows"][number] | undefined,
-) {
-  return Object.freeze({
-    status: row?.status ?? ("unavailable" as const),
-    priceBasis: row?.priceBasis ?? null,
-    availableObservationCount: row?.evidence?.availableObservationCount ?? 0,
-    latestWindowPriceDate: row?.evidence?.latestWindowPriceDate ?? null,
-    ma120: row?.evidence?.ma120 ?? null,
-    distanceFromMaPct: row?.evidence?.distanceFromMaPct ?? null,
-    unavailableReason: row?.unavailableReason ?? "evidence_row_missing",
-  });
-}
-
 function instrumentKey(row: {
   market: string | null;
   currency: string | null;
@@ -293,4 +292,10 @@ function instrumentKey(row: {
   return market && currency && ticker
     ? `${market}:${currency}:${ticker}`
     : null;
+}
+
+function resolveMa120Mode(
+  useTrendFilter: boolean,
+): AdditionalContributionMa120OverlayMode {
+  return useTrendFilter ? "enabled" : "off";
 }

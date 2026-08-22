@@ -1,5 +1,9 @@
 import { Suspense } from "react";
 
+import {
+  HoldingAnalysisDataPanel,
+  HoldingAnalysisDataPanelSkeleton,
+} from "@/components/holding-analysis-data-panel";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import {
@@ -29,6 +33,7 @@ import {
 } from "@/components/investment-lab/investment-lab-small-adjustment";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
 import { getReadOnlyTenantInvestmentLabDataAvailabilityForScope } from "@/db/queries/investment-lab-data-availability";
+import { getReadOnlyTenantHoldingAnalysisDataReadinessForScope } from "@/db/queries/holding-analysis-data-readiness";
 import { getReadOnlyTenantInvestmentLabCounterfactualForScope } from "@/db/queries/investment-lab";
 import { getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio } from "@/db/queries/investment-lab-etf-xray";
 import { getReadOnlyTenantInvestmentLabAnalysisScopeEvidence } from "@/db/queries/investment-lab-scope-evidence";
@@ -123,6 +128,12 @@ export default async function InvestmentLabPage({
       scope: selectedScope,
       tenantContext,
     });
+  const analysisDataReadinessPromise =
+    getReadOnlyTenantHoldingAnalysisDataReadinessForScope({
+      scope: selectedScope,
+      serviceDate,
+      tenantContext,
+    });
   const etfXrayPromise =
     getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
       portfolioStructurePromise,
@@ -144,7 +155,6 @@ export default async function InvestmentLabPage({
   const stressReplayPromise = getReadOnlyTenantInvestmentLabStressReplay({
     account: selectedScope.key,
     portfolioStructurePromise,
-    tenantContext,
   });
 
   return (
@@ -162,6 +172,13 @@ export default async function InvestmentLabPage({
           selectedScope={selectedScope}
         />
       </Suspense>
+      <div className="mx-auto w-full max-w-[1500px] px-4 pb-4">
+        <Suspense fallback={<HoldingAnalysisDataPanelSkeleton />}>
+          <HoldingAnalysisDataPanel
+            resultPromise={analysisDataReadinessPromise}
+          />
+        </Suspense>
+      </div>
       <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
         <div className="scroll-mt-4" id="investment-lab-etf-xray">
           <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />

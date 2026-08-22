@@ -34,9 +34,6 @@ describe("Simulation input readiness route boundary", () => {
     const ownerPrivateHistoryQuery = read(
       "src/db/queries/simulation-owner-private-history.ts",
     );
-    const activePortfolioOwnersQuery = read(
-      "src/db/queries/active-portfolio-owners.ts",
-    );
     const fixedMixView = read(
       "src/components/simulation/fixed-mix-research-execution-section.tsx",
     );
@@ -82,7 +79,12 @@ describe("Simulation input readiness route boundary", () => {
     );
     assert.match(page, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
     assert.match(page, /scope: selectedScope/);
-    assert.match(page, /serviceDate: resolveSnapshotCycle/);
+    assert.match(page, /const serviceDate = resolveSnapshotCycle/);
+    assert.match(
+      page,
+      /getReadOnlyTenantHoldingAnalysisDataReadinessForScope\([\s\S]*scope: selectedScope,[\s\S]*serviceDate,[\s\S]*tenantContext: resolution\.tenantContext/,
+    );
+    assert.match(page, /HoldingAnalysisDataPanel/);
     assert.match(page, /tenantContext: resolution\.tenantContext/);
     assert.match(page, /getReadOnlyTenantSimulationOwnerResearch/);
     assert.match(
@@ -280,10 +282,7 @@ describe("Simulation input readiness route boundary", () => {
       /getReadOnlyPrivateOwnerRawHistoryValidationBatch/,
     );
     assert.match(ownerInputQuery, /getLatestCommonPrivateOwnerRawServiceDate/);
-    assert.match(ownerInputQuery, /getActivePortfolioOwnerUserIds/);
-    assert.match(activePortfolioOwnersQuery, /^import "server-only";/);
-    assert.match(activePortfolioOwnersQuery, /eq\(accounts\.isActive, true\)/);
-    assert.match(activePortfolioOwnersQuery, /eq\(appUsers\.status, "active"\)/);
+    assert.doesNotMatch(ownerInputQuery, /getActivePortfolioOwnerUserIds/);
     assert.match(ownerPrivateHistoryQuery, /buildPrivateOwnerRawHistory/);
     assert.doesNotMatch(
       ownerPrivateHistoryQuery,

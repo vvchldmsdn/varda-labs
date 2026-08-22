@@ -5,7 +5,6 @@ import {
   getReadOnlyTenantPortfolioStructureForScope,
 } from "@/db/queries/portfolio-structure";
 import {
-  getActivePortfolioOwnerUserIds,
   getLatestCommonPrivateOwnerRawServiceDate,
   getReadOnlyPrivateOwnerRawHistoryValidationBatch,
 } from "@/db/queries/simulation-owner-private-history";
@@ -58,10 +57,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
         tenantContext: options.tenantContext,
         account: options.account,
       });
-  const [portfolio, activeOwnerUserIds] = await Promise.all([
-    portfolioPromise,
-    getActivePortfolioOwnerUserIds(),
-  ]);
+  const portfolio = await portfolioPromise;
   const candidate = options.scope
     ? buildSimulationOwnerInputCandidate({
         scopeKey: options.scope.key,
@@ -75,7 +71,6 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     options.endServiceDate === undefined && candidate.selection
       ? await getLatestCommonPrivateOwnerRawServiceDate({
           tenantContext: options.tenantContext,
-          activeOwnerUserIds,
           selection: candidate.selection,
         })
       : null;
@@ -87,7 +82,6 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     candidate.selection && endSelection.status === "valid"
       ? await getReadOnlyPrivateOwnerRawHistoryValidationBatch({
           tenantContext: options.tenantContext,
-          activeOwnerUserIds,
           selection: candidate.selection,
           endServiceDate: endSelection.endServiceDate,
           currentReturnStepCount: 90,

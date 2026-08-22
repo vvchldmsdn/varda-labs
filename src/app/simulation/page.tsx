@@ -1,5 +1,9 @@
 import { Suspense } from "react";
 
+import {
+  HoldingAnalysisDataPanel,
+  HoldingAnalysisDataPanelSkeleton,
+} from "@/components/holding-analysis-data-panel";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
@@ -19,6 +23,7 @@ import { ResearchUniversePreflightSection } from "@/components/simulation/resear
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { getReadOnlyTenantHoldingAnalysisDataReadinessForScope } from "@/db/queries/holding-analysis-data-readiness";
 import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
 import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
 import { getReadOnlyTenantSimulationOwnerParametricFactorResearch } from "@/db/queries/simulation-owner-parametric-factor";
@@ -94,6 +99,13 @@ export default async function SimulationPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
+  const analysisDataReadinessPromise =
+    getReadOnlyTenantHoldingAnalysisDataReadinessForScope({
+      scope: selectedScope,
+      serviceDate,
+      tenantContext: resolution.tenantContext,
+    });
   const modelPromise = getReadOnlySimulationInputReadiness({
     endServiceDate: params.end,
     horizon: params.horizon,
@@ -104,7 +116,7 @@ export default async function SimulationPage({
       endServiceDate: params.end,
       horizon: params.horizon,
       scope: selectedScope,
-      serviceDate: resolveSnapshotCycle(new Date()).snapshotDate,
+      serviceDate,
       tenantContext: resolution.tenantContext,
     });
   const ownerParametricFactorPromise =
@@ -152,6 +164,7 @@ export default async function SimulationPage({
         historicalOutcomeValidationPromise={
           historicalOutcomeValidationPromise
         }
+        analysisDataReadinessPromise={analysisDataReadinessPromise}
         modelPromise={modelPromise}
         ownerResearchPromise={ownerResearchPromise}
         ownerParametricFactorPromise={ownerParametricFactorPromise}
@@ -173,6 +186,7 @@ export default async function SimulationPage({
 }
 
 async function SimulationContent({
+  analysisDataReadinessPromise,
   historicalOutcomeValidationPromise,
   modelPromise,
   ownerResearchPromise,
@@ -186,6 +200,9 @@ async function SimulationContent({
   scopeCatalog,
   selectedScope,
 }: {
+  analysisDataReadinessPromise: ReturnType<
+    typeof getReadOnlyTenantHoldingAnalysisDataReadinessForScope
+  >;
   historicalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationHistoricalOutcomeValidation
   >;
@@ -236,14 +253,21 @@ async function SimulationContent({
           section="owner-input-preflight"
           title="내 포트폴리오 입력 점검"
         >
-          <Suspense fallback={<OwnerInputPreflightSkeleton />}>
-            <OwnerInputPreflightContent
-              preservedQuery={preservedQuery}
-              resultPromise={ownerResearchPromise}
-              scopeCatalog={scopeCatalog}
-              selectedScope={selectedScope}
-            />
-          </Suspense>
+          <div className="space-y-4">
+            <Suspense fallback={<OwnerInputPreflightSkeleton />}>
+              <OwnerInputPreflightContent
+                preservedQuery={preservedQuery}
+                resultPromise={ownerResearchPromise}
+                scopeCatalog={scopeCatalog}
+                selectedScope={selectedScope}
+              />
+            </Suspense>
+            <Suspense fallback={<HoldingAnalysisDataPanelSkeleton />}>
+              <HoldingAnalysisDataPanel
+                resultPromise={analysisDataReadinessPromise}
+              />
+            </Suspense>
+          </div>
         </SimulationSectionErrorBoundary>
       }
       ownerResearchExecution={

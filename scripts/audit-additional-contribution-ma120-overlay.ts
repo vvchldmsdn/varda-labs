@@ -1,7 +1,10 @@
 import { config } from "dotenv";
 
-import { compareAdditionalContributionMa120Overlay } from "../src/lib/additional-contribution-ma120-overlay.ts";
 import { guardProductionDatabaseTarget } from "../src/lib/deployment/production-database-target.ts";
+import {
+  buildAuditTenantContext,
+  parseAuditOwnerUserId,
+} from "./lib/audit-tenant-selector.ts";
 
 config({ path: ".env.local", quiet: true });
 
@@ -17,32 +20,21 @@ main().catch(() => {
 });
 
 async function main() {
+  const ownerUserId = parseAuditOwnerUserId(process.argv.slice(2));
   const databaseTarget = guardProductionDatabaseTarget(process.env);
-  const [{ eq }, client, schema, ownerModule, queryModule] = await Promise.all([
+  const [{ eq }, client, schema, queryModule] = await Promise.all([
     import("drizzle-orm"),
     import("../src/db/client.ts"),
     import("../src/db/schema.ts"),
-    import("../src/db/queries/active-portfolio-owners.ts"),
     import("../src/db/queries/additional-contribution.ts"),
   ]);
-  const ownerUserIds = await ownerModule.getActivePortfolioOwnerUserIds();
-  if (ownerUserIds.length !== 1) {
-    throw new Error("Expected exactly one active portfolio owner.");
-  }
 
   const userRows = await client.db
-    .select({ role: schema.appUsers.role })
+    .select({ role: schema.appUsers.role, status: schema.appUsers.status })
     .from(schema.appUsers)
-    .where(eq(schema.appUsers.id, ownerUserIds[0]))
+    .where(eq(schema.appUsers.id, ownerUserId))
     .limit(2);
-  const role = userRows[0]?.role;
-  if (userRows.length !== 1 || (role !== "user" && role !== "admin")) {
-    throw new Error("Active portfolio owner role is unavailable.");
-  }
-  const tenantContext = Object.freeze({
-    ownerUserId: ownerUserIds[0],
-    role,
-  });
+  const tenantContext = buildAuditTenantContext(ownerUserId, userRows);
 
   const cashAmountKrw = 3_000_000;
   const summaries = await Promise.all(
@@ -53,64 +45,37 @@ async function main() {
           cashAmountKrw,
           tenantContext,
         });
-      if (preview.status !== "ready" || !("ma120Evidence" in preview)) {
+      if (!isMa120AuditPreview(preview)) {
         return Object.freeze({
           account,
           baselineStatus: preview.status,
           blockers: preview.blockers,
         });
       }
-
-      const comparison = compareAdditionalContributionMa120Overlay({
-        mode: "candidate",
-        serviceDate: preview.serviceDate,
-        baseline: Object.freeze({
-          cashAmountKrw: preview.cashAmountKrw,
-          totalAllocatedKrw: preview.totalAllocatedKrw,
-          residualCashKrw: preview.residualCashKrw,
-          allocations: Object.freeze(
-            preview.rows.map((row) =>
-              Object.freeze({
-                market: row.market,
-                currency: row.currency,
-                ticker: row.ticker,
-                allocationKrw: row.allocationKrw,
-              }),
-            ),
-          ),
-        }),
-        evidence: Object.freeze(
-          preview.rows.map((row) =>
-            Object.freeze({
-              instrumentKey: instrumentKey(row),
-              status: row.ma120Evidence.status,
-              latestWindowPriceDate:
-                row.ma120Evidence.latestWindowPriceDate,
-              distanceFromMaPct: row.ma120Evidence.distanceFromMaPct,
-            }),
-          ),
-        ),
-      });
+      const auditPreview: Ma120AuditPreview = preview;
 
       return Object.freeze({
         account,
-        baselineStatus: preview.status,
-        evidenceStatus: preview.ma120Evidence.status,
-        serviceDate: preview.serviceDate,
-        usableEvidence: `${preview.ma120Evidence.usableCount}/${preview.rows.length}`,
-        comparisonStatus: comparison.status,
-        strategicAllocatedKrw: comparison.strategicAllocatedKrw,
-        overlayAllocatedKrw: comparison.overlayAllocatedKrw,
-        overlayResidualCashKrw: comparison.overlayResidualCashKrw,
-        totalReductionKrw: comparison.totalReductionKrw,
-        rows: comparison.rows.map((row) =>
+        baselineStatus: auditPreview.status,
+        evidenceStatus: auditPreview.ma120Evidence.status,
+        serviceDate: auditPreview.serviceDate,
+        usableEvidence: `${auditPreview.ma120Evidence.usableCount}/${auditPreview.rows.length}`,
+        comparisonStatus: auditPreview.ma120Evidence.overlayStatus,
+        strategicAllocatedKrw: auditPreview.rows.reduce(
+          (sum, row) => sum + row.strategicAllocationKrw,
+          0,
+        ),
+        overlayAllocatedKrw: auditPreview.totalAllocatedKrw,
+        overlayResidualCashKrw: auditPreview.residualCashKrw,
+        totalReductionKrw: auditPreview.ma120Evidence.totalReductionKrw,
+        rows: auditPreview.rows.map((row) =>
           Object.freeze({
             ticker: row.ticker,
-            decision: row.decision,
-            multiplier: row.multiplier,
+            decision: row.ma120Decision,
+            multiplier: row.ma120Multiplier,
             strategicAllocationKrw: row.strategicAllocationKrw,
-            overlayAllocationKrw: row.overlayAllocationKrw,
-            reductionKrw: row.reductionKrw,
+            overlayAllocationKrw: row.allocationKrw,
+            reductionKrw: row.ma120ReductionKrw,
           }),
         ),
       });
@@ -131,10 +96,56 @@ async function main() {
   );
 }
 
-function instrumentKey(row: {
-  market: string | null;
-  currency: string | null;
-  ticker: string | null;
-}) {
-  return `${String(row.market).toLowerCase()}:${String(row.currency).toUpperCase()}:${String(row.ticker).toUpperCase()}`;
+type Ma120AuditPreview = Readonly<{
+  status: "ready";
+  serviceDate: string;
+  totalAllocatedKrw: number;
+  residualCashKrw: number;
+  blockers: readonly string[];
+  ma120Evidence: Readonly<{
+    status: string;
+    overlayStatus: string;
+    usableCount: number;
+    totalReductionKrw: number;
+  }>;
+  rows: readonly Readonly<{
+    ticker: string | null;
+    allocationKrw: number;
+    strategicAllocationKrw: number;
+    ma120Decision: string;
+    ma120Multiplier: number;
+    ma120ReductionKrw: number;
+  }>[];
+}>;
+
+function isMa120AuditPreview(value: unknown): value is Ma120AuditPreview {
+  if (!isRecord(value) || value.status !== "ready") return false;
+  if (!isRecord(value.ma120Evidence) || !Array.isArray(value.rows)) return false;
+  return (
+    typeof value.serviceDate === "string" &&
+    isFiniteNumber(value.totalAllocatedKrw) &&
+    isFiniteNumber(value.residualCashKrw) &&
+    typeof value.ma120Evidence.status === "string" &&
+    typeof value.ma120Evidence.overlayStatus === "string" &&
+    isFiniteNumber(value.ma120Evidence.usableCount) &&
+    isFiniteNumber(value.ma120Evidence.totalReductionKrw) &&
+    value.rows.every(
+      (row) =>
+        isRecord(row) &&
+        (row.ticker === null || typeof row.ticker === "string") &&
+        isFiniteNumber(row.allocationKrw) &&
+        isFiniteNumber(row.strategicAllocationKrw) &&
+        typeof row.ma120Decision === "string" &&
+        isFiniteNumber(row.ma120Multiplier) &&
+        isFiniteNumber(row.ma120ReductionKrw),
+    )
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }

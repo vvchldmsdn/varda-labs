@@ -1,0 +1,6 @@
+CREATE INDEX "asset_price_snapshots_normalized_instrument_date_idx" ON "asset_price_snapshots" USING btree (lower(trim("market")),upper(trim("currency")),upper(trim("ticker")),"date");--> statement-breakpoint
+CREATE INDEX "assets_active_account_instrument_idx" ON "assets" USING btree ("account_id","market","currency","ticker") WHERE "assets"."archived_at" is null;--> statement-breakpoint
+CREATE INDEX "daily_portfolio_snapshots_owner_account_date_idx" ON "daily_portfolio_snapshots" USING btree ("canonical_owner_user_id","account_id","snapshot_date");--> statement-breakpoint
+CREATE INDEX "daily_position_snapshots_owner_account_date_idx" ON "daily_position_snapshots" USING btree ("canonical_owner_user_id","account_id","snapshot_date");--> statement-breakpoint
+CREATE INDEX "daily_position_snapshots_owner_asset_date_idx" ON "daily_position_snapshots" USING btree ("canonical_owner_user_id","asset_id","snapshot_date");--> statement-breakpoint
+CREATE INDEX "event_ledger_entries_owner_account_date_idx" ON "event_ledger_entries" USING btree ("canonical_owner_user_id","account_id","event_date");

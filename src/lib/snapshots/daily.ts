@@ -15,6 +15,7 @@ import {
 
 import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
+import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import {
   accounts,
   assetGroups,
@@ -555,37 +556,44 @@ export async function runDailySnapshot(
     );
   }
 
-  const accountBuilds: AccountSnapshotBuild[] = [];
+  const accountBuilds = await mapWithConcurrency(
+    targetAccounts,
+    2,
+    async (account): Promise<AccountSnapshotBuild> => {
+      const accountAssets = selectedAssets.filter(
+        (asset) => asset.account === account,
+      );
+      const existingRows = await loadExistingRows({
+        ownerUserId,
+        account,
+        snapshotDate,
+        assetCount: accountAssets.length,
+      });
+      const computed = computeAccountSnapshot({
+        account,
+        assets: accountAssets,
+        context,
+        fx,
+        closeContext,
+        cycle,
+        snapshotDate,
+        returnMetrics,
+        priorPositions: existingRows.priorPositions,
+        provenance,
+      });
+      const build = buildAccountPlan({
+        computed,
+        existingRows,
+        context,
+        fx,
+      });
 
-  for (const account of targetAccounts) {
-    const accountAssets = selectedAssets.filter((asset) => asset.account === account);
-    const existingRows = await loadExistingRows({
-      ownerUserId,
-      account,
-      snapshotDate,
-      assetCount: accountAssets.length,
-    });
-    const computed = computeAccountSnapshot({
-      account,
-      assets: accountAssets,
-      context,
-      fx,
-      closeContext,
-      cycle,
-      snapshotDate,
-      returnMetrics,
-      priorPositions: existingRows.priorPositions,
-      provenance,
-    });
-    const build = buildAccountPlan({
-      computed,
-      existingRows,
-      context,
-      fx,
-    });
+      return build;
+    },
+  );
 
+  for (const build of accountBuilds) {
     accumulatePlannedWrites(plannedWrites, build);
-    accountBuilds.push(build);
   }
 
   const resultMap: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan> =
@@ -1099,8 +1107,6 @@ function computeAccountSnapshot({
         : 0;
     const costKrw = costBasisKrw(asset, fx.usdKrw);
     const pnlKrw = marketValueKrw - costKrw;
-    const belowMa =
-      (toNumber(asset.ma120) ?? 0) > 0 && closePrice <= (toNumber(asset.ma120) ?? 0);
     const exposureType = getFxExposureType(asset);
 
     if (asset.market === "korea") krValue += marketValueKrw;
@@ -1142,7 +1148,7 @@ function computeAccountSnapshot({
         "cost_basis_source=asset_average_cost_fallback",
         ...provenance.descriptionTags,
       ].join("; "),
-      belowMa,
+      belowMa: false,
       isSample: false,
       quantity: decimal(quantity, 8),
       totalQuantity: decimal(totalQuantity, 8),
@@ -1182,7 +1188,7 @@ function computeAccountSnapshot({
       marketValueChangePct: decimal(marketValueChangePct),
       unitValueChangeKrw: decimal(unitValueChangeKrw),
       unitValueChangePct: decimal(unitValueChangePct),
-      ma120: decimal(toNumber(asset.ma120)),
+      ma120: null,
       fractionalKrwValue: decimal(fractionalKrwValue),
       fractionalAvgCost: decimal(fractionalAvgCost),
       priceDate: selectedPrice.referenceDate,
