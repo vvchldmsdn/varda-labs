@@ -1,5 +1,5 @@
 import {
-  admitPrivateSingleTenantRawHistoricalPriceRows,
+  admitSharedKisRawHistoricalPriceRows,
   type RawHistoricalPriceConsumerEvidenceRow,
 } from "./market-data/asset-price-consumer-admission.ts";
 import {
@@ -15,9 +15,10 @@ import {
 import type { SimulationHistoricalEvidenceStatus } from "./simulation-historical-evidence-admission-types.ts";
 
 export const PRIVATE_OWNER_RAW_HISTORY_POLICY = Object.freeze({
-  version: "simulation_private_owner_raw_history_v1",
-  purpose: "owner_only_simulation_research",
-  ownerBoundary: "exactly_one_active_portfolio_owner_matching_session",
+  version: "simulation_private_owner_raw_history_v2",
+  purpose: "tenant_scoped_simulation_research",
+  ownerBoundary: "user_owned_instrument_universe",
+  marketDataBoundary: "shared_instrument_date_cache",
   providerBoundary: "stored_complete_kis_raw_close_only",
   returnStepCount: 90,
   priceBasis: "raw_price_return",
@@ -45,8 +46,6 @@ export type PrivateOwnerRawHistoryResult = ReturnType<
 >;
 
 export function buildPrivateOwnerRawHistory(input: {
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
   requestedEndServiceDate: string;
   returnStepCount?: number;
   instruments: readonly PrivateOwnerRawHistoryInstrumentInput[];
@@ -58,11 +57,7 @@ export function buildPrivateOwnerRawHistory(input: {
     (row) =>
       row.weightBps > 0 && row.classification === "listed_instrument",
   );
-  const scopeAdmission = admitPrivateSingleTenantRawHistoricalPriceRows({
-    rows: input.priceRows,
-    requestedOwnerUserId: input.requestedOwnerUserId,
-    activeOwnerUserIds: input.activeOwnerUserIds,
-  });
+  const scopeAdmission = admitSharedKisRawHistoricalPriceRows(input.priceRows);
   const admittedRows = scopeAdmission.rows;
   const requestedServiceDates = resolvePrivateOwnerRawServiceDates({
     endServiceDate: input.requestedEndServiceDate,
@@ -97,8 +92,6 @@ export function buildPrivateOwnerRawHistory(input: {
   const instruments = input.instruments.map((instrument) =>
     buildInstrumentEvidence({
       instrument,
-      requestedOwnerUserId: input.requestedOwnerUserId,
-      activeOwnerUserIds: input.activeOwnerUserIds,
       priceRows: input.priceRows.filter((row) =>
         matchesInstrument(row, instrument),
       ),
@@ -140,8 +133,6 @@ export function buildPrivateOwnerRawHistory(input: {
 }
 
 export function resolveLatestCommonPrivateOwnerRawServiceDate(input: {
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
   instruments: readonly PrivateOwnerRawHistoryInstrumentInput[];
   latestSourceRows: readonly Readonly<{
     market: string;
@@ -157,15 +148,6 @@ export function resolveLatestCommonPrivateOwnerRawServiceDate(input: {
       row.weightBps > 0 && row.classification === "listed_instrument",
   );
   if (modeledInstruments.length === 0) return null;
-
-  if (
-    !hasPrivateOwnerScope(
-      input.requestedOwnerUserId,
-      input.activeOwnerUserIds,
-    )
-  ) {
-    return null;
-  }
 
   const serviceDates: string[] = [];
   for (const instrument of modeledInstruments) {
@@ -244,8 +226,6 @@ export function resolvePrivateOwnerRawAvailableServiceDates(input: {
 
 function buildInstrumentEvidence(input: {
   instrument: PrivateOwnerRawHistoryInstrumentInput;
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
   priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
   returnStepCount: number;
   requestedServiceDates: readonly string[];
@@ -273,11 +253,7 @@ function buildInstrumentEvidence(input: {
     return terminalInstrument(instrument, "identity_unresolved", null);
   }
 
-  const admission = admitPrivateSingleTenantRawHistoricalPriceRows({
-    rows: input.priceRows,
-    requestedOwnerUserId: input.requestedOwnerUserId,
-    activeOwnerUserIds: input.activeOwnerUserIds,
-  });
+  const admission = admitSharedKisRawHistoricalPriceRows(input.priceRows);
   const cells = input.matrix?.matrix.flatMap((row) =>
     row.cells.filter(
       (cell) => cell.instrumentKey === instrument.instrumentKey,
@@ -381,21 +357,6 @@ function matchesInstrument(
     row.currency.trim().toUpperCase() === instrument.currency &&
     row.ticker.trim().toUpperCase() === instrument.ticker
   );
-}
-
-function hasPrivateOwnerScope(
-  requestedOwnerUserId: string,
-  activeOwnerUserIds: readonly string[],
-) {
-  const requested = normalizeText(requestedOwnerUserId)?.toLowerCase();
-  const active = [
-    ...new Set(
-      activeOwnerUserIds
-        .map((value) => normalizeText(value)?.toLowerCase())
-        .filter((value): value is string => value !== null),
-    ),
-  ];
-  return Boolean(requested && active.length === 1 && active[0] === requested);
 }
 
 function positiveNumber(value: number | string | null | undefined) {

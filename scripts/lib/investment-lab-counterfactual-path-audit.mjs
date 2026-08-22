@@ -9,7 +9,7 @@ import {
 } from "../../src/lib/investment-lab-execution-schedule.ts";
 import {
   admitAdjustedHistoricalPriceRows,
-  admitPrivateSingleTenantRawHistoricalPriceRows,
+  admitSharedKisRawHistoricalPriceRows,
   selectPreferredPrivateHistoricalPriceRows,
 } from "../../src/lib/market-data/asset-price-consumer-admission.ts";
 
@@ -33,7 +33,7 @@ export function auditInvestmentLabCounterfactualPathEvidence({
   const eligible = classified.filter(
     ({ classification }) => classification.includedInV1,
   );
-  const closeEvidence = resolvePreferredCloseEvidence(closeRows, ownerRows);
+  const closeEvidence = resolvePreferredCloseEvidence(closeRows);
   const closes = closeEvidence.rows;
   const actualPath = actualPathRows.map((row) => ({
     serviceDate: row.service_date,
@@ -130,7 +130,7 @@ export function auditInvestmentLabCounterfactualPathEvidence({
   };
 }
 
-function resolvePreferredCloseEvidence(closeRows, ownerRows) {
+function resolvePreferredCloseEvidence(closeRows) {
   const candidates = closeRows.map((row) => ({
     ticker: row.ticker,
     market: row.market,
@@ -148,15 +148,7 @@ function resolvePreferredCloseEvidence(closeRows, ownerRows) {
     source: row.source,
   }));
   const adjusted = admitAdjustedHistoricalPriceRows(candidates);
-  const activeOwnerUserIds = ownerRows
-    .map((row) => String(row.owner_user_id ?? "").trim())
-    .filter(Boolean);
-  const raw = admitPrivateSingleTenantRawHistoricalPriceRows({
-    rows: candidates,
-    requestedOwnerUserId:
-      activeOwnerUserIds.length === 1 ? activeOwnerUserIds[0] : "",
-    activeOwnerUserIds,
-  });
+  const raw = admitSharedKisRawHistoricalPriceRows(candidates);
   const preferred = selectPreferredPrivateHistoricalPriceRows({
     adjustedRows: adjusted.rows,
     privateRawRows: raw.rows,

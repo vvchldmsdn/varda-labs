@@ -380,7 +380,7 @@ describe("investment lab counterfactual read model", () => {
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
     assert.match(query, /^import "server-only";/);
-    assert.match(query, /admitPrivateSingleTenantRawHistoricalPriceRows/);
+    assert.match(query, /admitSharedKisRawHistoricalPriceRows/);
     assert.doesNotMatch(query, /admitRawHistoricalPriceRows/);
     assert.doesNotMatch(query, /\.select\(\s*\)/);
     assert.doesNotMatch(query, /\bfetch\s*\(|\/api\//);

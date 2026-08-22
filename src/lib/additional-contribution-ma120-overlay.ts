@@ -1,6 +1,6 @@
 export const ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY = Object.freeze({
-  version: "additional_contribution_ma120_bounded_overlay_candidate_v1",
-  authority: "comparison_only",
+  version: "additional_contribution_ma120_bounded_overlay_v1",
+  authority: "additional_contribution_preview_only",
   priceDistanceBufferPct: 3,
   minimumMultiplier: 0.5,
   maxEvidenceAgeCalendarDays: 7,
@@ -9,13 +9,14 @@ export const ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY = Object.freeze({
   redistribution: "forbidden",
   targetRewrite: "forbidden",
   sellAction: "forbidden",
-  recommendation: "forbidden",
-  runtimeBinding: "not_enabled",
+  recommendation: "allocation_preview_only",
+  orderAuthority: "forbidden",
+  runtimeBinding: "additional_contribution_preview",
 } as const);
 
 const MA_STATUS_DISTANCE_TOLERANCE_PCT = 1e-9;
 
-export type AdditionalContributionMa120OverlayMode = "off" | "candidate";
+export type AdditionalContributionMa120OverlayMode = "off" | "enabled";
 
 export type AdditionalContributionMa120OverlayEvidenceStatus =
   | "above_ma"
@@ -42,7 +43,7 @@ export type AdditionalContributionMa120OverlayBlocker =
   | "invalid_baseline_totals"
   | "invalid_baseline_allocation"
   | "invalid_instrument_identity"
-  | "duplicate_baseline_instrument"
+  | "duplicate_baseline_allocation_key"
   | "duplicate_evidence_instrument";
 
 export type AdditionalContributionMa120OverlayBaseline = Readonly<{
@@ -50,6 +51,7 @@ export type AdditionalContributionMa120OverlayBaseline = Readonly<{
   totalAllocatedKrw: number;
   residualCashKrw: number;
   allocations: readonly Readonly<{
+    allocationKey?: string;
     market: string | null;
     currency: string | null;
     ticker: string | null;
@@ -65,6 +67,7 @@ export type AdditionalContributionMa120OverlayEvidenceInput = Readonly<{
 }>;
 
 type NormalizedBaselineRow = Readonly<{
+  allocationKey: string;
   instrumentKey: string;
   market: string;
   currency: string;
@@ -80,7 +83,7 @@ export function compareAdditionalContributionMa120Overlay(input: {
 }) {
   const blockers = new Set<AdditionalContributionMa120OverlayBlocker>();
   const serviceDate = normalizeDate(input.serviceDate);
-  const mode = input.mode === "off" || input.mode === "candidate"
+  const mode = input.mode === "off" || input.mode === "enabled"
     ? input.mode
     : null;
   if (!mode) blockers.add("invalid_mode");
@@ -193,16 +196,23 @@ function normalizeBaseline(
       blockers.add("invalid_instrument_identity");
       continue;
     }
+    const allocationKey = normalizeText(row.allocationKey) ?? identity.instrumentKey;
     if (!Number.isSafeInteger(row.allocationKrw) || row.allocationKrw < 0) {
       blockers.add("invalid_baseline_allocation");
       continue;
     }
-    if (seen.has(identity.instrumentKey)) {
-      blockers.add("duplicate_baseline_instrument");
+    if (seen.has(allocationKey)) {
+      blockers.add("duplicate_baseline_allocation_key");
       continue;
     }
-    seen.add(identity.instrumentKey);
-    normalizedRows.push(Object.freeze({ ...identity, allocationKrw: row.allocationKrw }));
+    seen.add(allocationKey);
+    normalizedRows.push(
+      Object.freeze({
+        ...identity,
+        allocationKey,
+        allocationKrw: row.allocationKrw,
+      }),
+    );
   }
   const allocated = normalizedRows.reduce(
     (sum, row) => sum + row.allocationKrw,
@@ -212,7 +222,7 @@ function normalizeBaseline(
     blockers.add("invalid_baseline_totals");
   }
   return normalizedRows.sort((left, right) =>
-    left.instrumentKey.localeCompare(right.instrumentKey),
+    left.allocationKey.localeCompare(right.allocationKey),
   );
 }
 

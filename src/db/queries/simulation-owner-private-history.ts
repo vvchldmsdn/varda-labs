@@ -30,11 +30,8 @@ import {
 import type { SimulationResearchUniverseSelection } from "@/lib/simulation-research-universe-preflight";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
-export { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
-
 export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
 }) {
   if (options.selection.status !== "valid") return null;
@@ -90,8 +87,6 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
   ]);
 
   return resolveLatestCommonPrivateOwnerRawServiceDate({
-    requestedOwnerUserId: options.tenantContext.ownerUserId,
-    activeOwnerUserIds: options.activeOwnerUserIds,
     instruments,
     latestSourceRows,
     latestFxSourceDate: latestFxRows[0]?.latestSourceDate ?? null,
@@ -100,14 +95,12 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
 
 export async function getReadOnlyPrivateOwnerRawHistoryBundle(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   endServiceDate: string;
   returnStepCount?: number;
 }) {
   const [result] = await getReadOnlyPrivateOwnerRawHistoryBatch({
     tenantContext: options.tenantContext,
-    activeOwnerUserIds: options.activeOwnerUserIds,
     selection: options.selection,
     requests: [
       {
@@ -121,7 +114,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryBundle(options: {
 
 export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   requests: readonly Readonly<{
     endServiceDate: string;
@@ -136,8 +128,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
       const hasQueryablePlan =
         plan?.status === "queryable" && plan.queryRange !== null;
       return buildPrivateOwnerRawHistory({
-        requestedOwnerUserId: options.tenantContext.ownerUserId,
-        activeOwnerUserIds: options.activeOwnerUserIds,
         requestedEndServiceDate: request.endServiceDate,
         returnStepCount: request.returnStepCount,
         instruments: source.instruments,
@@ -151,7 +141,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
 export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   options: {
     tenantContext: TenantContext;
-    activeOwnerUserIds: readonly string[];
     selection: SimulationResearchUniverseSelection;
     endServiceDate: string;
     currentReturnStepCount?: number;
@@ -163,7 +152,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
     policy.outcomeReturnStepCount * (policy.maximumEndpointCount - 1);
   const source = await loadPrivateOwnerRawHistorySource({
     tenantContext: options.tenantContext,
-    activeOwnerUserIds: options.activeOwnerUserIds,
     selection: options.selection,
     requests: [
       {
@@ -175,13 +163,10 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   const plan = source.plans[0];
   const hasQueryablePlan =
     plan?.status === "queryable" && plan.queryRange !== null;
-  const ownerScopeReady =
-    options.activeOwnerUserIds.length === 1 &&
-    options.activeOwnerUserIds[0] === options.tenantContext.ownerUserId;
   const priceRows = hasQueryablePlan ? source.priceRows : [];
   const fxRows = hasQueryablePlan ? source.fxRows : [];
   const availableServiceDates =
-    ownerScopeReady && hasQueryablePlan
+    hasQueryablePlan
       ? resolvePrivateOwnerRawAvailableServiceDates({
           endServiceDate: options.endServiceDate,
           priceRows,
@@ -195,8 +180,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   );
   const buildResult = (endServiceDate: string, returnStepCount: number) =>
     buildPrivateOwnerRawHistory({
-      requestedOwnerUserId: options.tenantContext.ownerUserId,
-      activeOwnerUserIds: options.activeOwnerUserIds,
       requestedEndServiceDate: endServiceDate,
       returnStepCount,
       instruments: source.instruments,
@@ -227,7 +210,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
 
 async function loadPrivateOwnerRawHistorySource(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   requests: readonly Readonly<{
     endServiceDate: string;

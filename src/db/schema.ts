@@ -513,6 +513,11 @@ export const assets = pgTable(
       .where(
         sql`${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.ticker} is not null`,
       ),
+    activeAccountInstrumentIdx: index(
+      "assets_active_account_instrument_idx",
+    )
+      .on(table.accountId, table.market, table.currency, table.ticker)
+      .where(sql`${table.archivedAt} is null`),
     tenantSelectPolicy: pgPolicy("assets_tenant_select_v1", {
       as: "permissive",
       for: "select",
@@ -1692,6 +1697,14 @@ export const assetPriceSnapshots = pgTable(
       table.assetId,
       table.priceDate,
     ),
+    normalizedInstrumentDateIdx: index(
+      "asset_price_snapshots_normalized_instrument_date_idx",
+    ).on(
+      sql`lower(trim(${table.market}))`,
+      sql`upper(trim(${table.currency}))`,
+      sql`upper(trim(${table.ticker}))`,
+      table.priceDate,
+    ),
   }),
 );
 
@@ -2003,6 +2016,9 @@ export const eventLedgerEntries = pgTable(
     canonicalOwnerUserIdIdx: index(
       "event_ledger_entries_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerAccountDateIdx: index(
+      "event_ledger_entries_owner_account_date_idx",
+    ).on(table.canonicalOwnerUserId, table.accountId, table.eventDate),
     tenantSelectPolicy: pgPolicy("event_ledger_entries_tenant_select_v1", {
       as: "permissive",
       for: "select",
@@ -2443,6 +2459,9 @@ export const dailyPortfolioSnapshots = pgTable(
     canonicalOwnerUserIdIdx: index(
       "daily_portfolio_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerAccountDateIdx: index(
+      "daily_portfolio_snapshots_owner_account_date_idx",
+    ).on(table.canonicalOwnerUserId, table.accountId, table.snapshotDate),
     ownerUserFk: foreignKey({
       name: "daily_portfolio_snapshots_owner_user_fk",
       columns: [table.canonicalOwnerUserId],
@@ -2611,6 +2630,12 @@ export const dailyPositionSnapshots = pgTable(
     canonicalOwnerUserIdIdx: index(
       "daily_position_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerAccountDateIdx: index(
+      "daily_position_snapshots_owner_account_date_idx",
+    ).on(table.canonicalOwnerUserId, table.accountId, table.snapshotDate),
+    ownerAssetDateIdx: index(
+      "daily_position_snapshots_owner_asset_date_idx",
+    ).on(table.canonicalOwnerUserId, table.assetId, table.snapshotDate),
     ownerUserFk: foreignKey({
       name: "daily_position_snapshots_owner_user_fk",
       columns: [table.canonicalOwnerUserId],

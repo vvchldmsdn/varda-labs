@@ -8,7 +8,7 @@ import {
 export const ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY =
   Object.freeze({
     version: "additional_contribution_ma120_operational_evidence_v1",
-    mode: "evidence_only",
+    mode: "additional_contribution_preview_input",
     windowObservationCount: 120,
     allowedPriceBases: Object.freeze([
       "provider_adjusted_close",
@@ -16,8 +16,8 @@ export const ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY =
     ] as const),
     historyBoundary: "price_date_lte_as_of_price_date",
     observationBasis: "distinct_observed_price_dates_without_calendar_carry",
-    allocationEffect: "none",
-    recommendation: "forbidden",
+    allocationEffect: "bounded_overlay",
+    recommendation: "allocation_preview_only",
   } as const);
 
 export type AdditionalContributionMa120OperationalPriceBasis =

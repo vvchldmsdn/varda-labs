@@ -61,6 +61,7 @@ describe("tenant daily snapshot job", () => {
     assert.match(job, /eq\(assets\.accountId, accounts\.id\)/);
     assert.match(job, /gt\(assets\.quantity, "0"\)/);
     assert.match(job, /eq\(appUsers\.status, "active"\)/);
+    assert.match(job, /mapWithConcurrency\(\s*targets,\s*2,/);
     assert.doesNotMatch(job, /SNAPSHOT_ACCOUNT_CODES/);
     assert.doesNotMatch(job, /\.limit\(1\)/);
     assert.match(route, /hasUnsupportedQuery/);
@@ -69,6 +70,7 @@ describe("tenant daily snapshot job", () => {
     assert.match(writer, /select\(getTableColumns\(assets\)\)/);
     assert.match(writer, /eq\(accounts\.canonicalOwnerUserId, ownerUserId\)/);
     assert.match(writer, /canonicalOwnerUserId: context\.ownerUserId/);
+    assert.match(writer, /mapWithConcurrency\(\s*targetAccounts,\s*2,/);
   });
 
   it("pins owner-aware keys and a dry-run-default generated-row backfill", () => {

@@ -10,7 +10,6 @@ import {
 } from "../src/lib/holding-analysis-data-readiness.ts";
 import { shiftRiskDate } from "../src/lib/portfolio-risk-calendar.ts";
 
-const OWNER_ID = "11111111-1111-4111-8111-111111111111";
 const HOLDING_ID = "22222222-2222-4222-8222-222222222222";
 const SERVICE_DATE = "2026-08-21";
 const writerSource = readFileSync(
@@ -86,19 +85,12 @@ describe("holding analysis data readiness", () => {
     assert.equal(result.canPrepare, true);
   });
 
-  it("distinguishes missing cache data from a blocked owner boundary", () => {
+  it("distinguishes missing cache data without depending on other users", () => {
     const missing = readiness({ priceRows: [] });
-    const blocked = readiness({
-      priceRows: priceRows(130),
-      activeOwnerUserIds: [OWNER_ID, "33333333-3333-4333-8333-333333333333"],
-    });
 
     assert.equal(missing.state, "missing");
     assert.equal(missing.reason, "stored_history_missing");
     assert.equal(missing.canPrepare, true);
-    assert.equal(blocked.state, "blocked");
-    assert.equal(blocked.reason, "private_owner_scope_not_established");
-    assert.equal(blocked.canPrepare, false);
   });
 
   it("keeps physical gold manual and managed sleeves outside provider preparation", () => {
@@ -198,14 +190,11 @@ describe("holding analysis data readiness", () => {
 function readiness({
   holding: candidate = holding(),
   priceRows,
-  activeOwnerUserIds = [OWNER_ID],
   fxRows = [],
 }) {
   return buildHoldingAnalysisDataReadiness({
     holding: candidate,
     serviceDate: SERVICE_DATE,
-    requestedOwnerUserId: OWNER_ID,
-    activeOwnerUserIds,
     priceRows,
     fxRows,
   });

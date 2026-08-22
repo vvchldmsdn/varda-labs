@@ -2,8 +2,8 @@ import "server-only";
 
 import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
-import { getActivePortfolioOwnerUserIds } from "@/db/queries/active-portfolio-owners";
 import { db } from "@/db/client";
+import { getReadOnlyTenantHoldings } from "@/db/queries/tenant-holdings";
 import { assetPriceSnapshots, fxRates } from "@/db/schema";
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import {
@@ -12,6 +12,7 @@ import {
   type HoldingAnalysisDataReadiness,
 } from "@/lib/holding-analysis-data-readiness";
 import { shiftRiskDate } from "@/lib/portfolio-risk-calendar";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type HoldingAnalysisDataReadinessQueryResult =
@@ -20,6 +21,82 @@ export type HoldingAnalysisDataReadinessQueryResult =
       entries: readonly HoldingAnalysisDataReadiness[];
     }>
   | Readonly<{ state: "unavailable" }>;
+
+export type ScopedHoldingAnalysisDataReadinessQueryResult =
+  | Readonly<{
+      state: "ready";
+      entries: readonly Readonly<{
+        holdingId: string;
+        accountCode: string;
+        name: string;
+        ticker: string | null;
+        readiness: HoldingAnalysisDataReadiness;
+      }>[];
+    }>
+  | Readonly<{ state: "unavailable" }>;
+
+export async function getReadOnlyTenantHoldingAnalysisDataReadinessForScope(
+  options: {
+    tenantContext: TenantContext;
+    serviceDate: string;
+    scope: PortfolioAnalysisScope;
+  },
+): Promise<ScopedHoldingAnalysisDataReadinessQueryResult> {
+  const holdingsResult = await getReadOnlyTenantHoldings(options);
+  if (
+    holdingsResult.state !== "ready" &&
+    holdingsResult.state !== "partial"
+  ) {
+    return Object.freeze({ state: "unavailable" as const });
+  }
+
+  const holdings = holdingsResult.holdings.filter(
+    (holding) => holding.archivedAt === null,
+  );
+  if (holdings.length === 0) {
+    return Object.freeze({ state: "ready" as const, entries: Object.freeze([]) });
+  }
+
+  const readinessResult = await getReadOnlyTenantHoldingAnalysisDataReadiness({
+    tenantContext: options.tenantContext,
+    serviceDate: options.serviceDate,
+    holdings: holdings.map((holding) => ({
+      holdingId: holding.holdingId,
+      accountCode: holding.accountCode,
+      name: holding.name,
+      ticker: holding.ticker,
+      assetType: holding.assetType,
+      market: holding.market,
+      currency: holding.currency,
+    })),
+  });
+  if (readinessResult.state !== "ready") {
+    return Object.freeze({ state: "unavailable" as const });
+  }
+
+  const readinessByHoldingId = new Map(
+    readinessResult.entries.map((entry) => [entry.holdingId, entry]),
+  );
+  return Object.freeze({
+    state: "ready" as const,
+    entries: Object.freeze(
+      holdings.flatMap((holding) => {
+        const readiness = readinessByHoldingId.get(holding.holdingId);
+        return readiness
+          ? [
+              Object.freeze({
+                holdingId: holding.holdingId,
+                accountCode: holding.accountCode,
+                name: holding.name,
+                ticker: holding.ticker,
+                readiness,
+              }),
+            ]
+          : [];
+      }),
+    ),
+  });
+}
 
 export async function getReadOnlyTenantHoldingAnalysisDataReadiness(options: {
   tenantContext: TenantContext;
@@ -39,8 +116,7 @@ export async function getReadOnlyTenantHoldingAnalysisDataReadiness(options: {
     const requiresFx = options.holdings.some(
       (holding) => holding.currency.trim().toUpperCase() === "USD",
     );
-    const [activeOwnerUserIds, priceRows, fxRows] = await Promise.all([
-      getActivePortfolioOwnerUserIds(),
+    const [priceRows, fxRows] = await Promise.all([
       tickers.length > 0
         ? loadRawPriceRows({ tickers, sourceDateFrom, sourceDateTo })
         : Promise.resolve([]),
@@ -56,8 +132,6 @@ export async function getReadOnlyTenantHoldingAnalysisDataReadiness(options: {
           buildHoldingAnalysisDataReadiness({
             holding,
             serviceDate: options.serviceDate,
-            requestedOwnerUserId: options.tenantContext.ownerUserId,
-            activeOwnerUserIds,
             priceRows,
             fxRows,
           }),

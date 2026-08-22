@@ -79,7 +79,7 @@ describe("additional contribution tenant preview", () => {
     );
   });
 
-  it("attaches MA120 evidence without changing the baseline allocation", () => {
+  it("applies the bounded MA120 overlay and leaves reductions as cash", () => {
     const baseline = buildAdditionalContributionPreview(validInput());
     assert.equal(baseline.status, "ready");
     const before = baseline.rows.map((row) => [row.ticker, row.allocationKrw]);
@@ -87,25 +87,33 @@ describe("additional contribution tenant preview", () => {
       preview: baseline,
       ma120Read: {
         policyVersion: "ma120-fixture-v1",
-        allocationEffect: "none",
+        allocationEffect: "bounded_overlay",
         status: "partial",
         suppliedHoldingCount: 3,
         evaluatedHoldingCount: 3,
         usableCount: 1,
         unavailableCount: 2,
-        rows: [ma120ReadRow("AAA")],
+        rows: [ma120ReadRow("AAA", "below_ma", -3)],
       },
+      mode: "enabled",
     });
 
     assert.equal(attached.status, "ready");
-    assert.equal(attached.ma120Evidence.allocationEffect, "none");
-    assert.deepEqual(
+    assert.equal(attached.ma120Evidence.allocationEffect, "bounded_overlay");
+    assert.equal(attached.ma120Evidence.mode, "enabled");
+    assert.deepEqual(attached.rows.map((row) => [row.ticker, row.allocationKrw]), [
+      ["AAA", 888],
+      ["BBB", 1_225],
+      ["CCC", 0],
+    ]);
+    assert.notDeepEqual(
       attached.rows.map((row) => [row.ticker, row.allocationKrw]),
       before,
     );
-    assert.equal(attached.totalAllocatedKrw, baseline.totalAllocatedKrw);
-    assert.equal(attached.residualCashKrw, baseline.residualCashKrw);
-    assert.equal(attached.rows[0].ma120Evidence.status, "above_ma");
+    assert.equal(attached.totalAllocatedKrw, 2_113);
+    assert.equal(attached.residualCashKrw, 887);
+    assert.equal(attached.rows[0].ma120Evidence.status, "below_ma");
+    assert.equal(attached.rows[0].ma120Multiplier, 0.5);
     assert.equal(attached.rows[1].ma120Evidence.status, "unavailable");
   });
 
@@ -115,6 +123,7 @@ describe("additional contribution tenant preview", () => {
     const attached = attachAdditionalContributionMa120Evidence({
       preview: baseline,
       ma120Read: additionalContributionMa120ReadFailure(3),
+      mode: "enabled",
     });
 
     assert.equal(attached.status, "ready");
@@ -168,13 +177,14 @@ describe("additional contribution tenant preview", () => {
     assert.match(policyQuery, /loadCurrentTenantLegacyTargetPolicy/);
     assert.doesNotMatch(policyQuery, /from "@\/db\/client"/);
     assert.match(previewQuery, /Promise\.all/);
-    assert.match(ma120Query, /Promise\.all/);
-    assert.match(ma120Query, /getActivePortfolioOwnerUserIds/);
+    assert.doesNotMatch(ma120Query, /getActivePortfolioOwnerUserIds/);
     assert.match(
       ma120Query,
-      /admitPrivateSingleTenantRawTrendEvidenceRows/,
+      /admitSharedKisRawTrendEvidenceRows/,
     );
-    assert.match(ma120Query, /allocationEffect: "none"/);
+    assert.match(ma120Query, /allocationEffect: "bounded_overlay"/);
+    assert.match(previewQuery, /loadLatestTenantPortfolioSettingsRows/);
+    assert.match(previewQuery, /useTrendFilter/);
     assert.doesNotMatch(ma120Query, /assets\.ma_?120|daysAboveMa/i);
     assert.doesNotMatch(route, /^"use client";/);
     assert.doesNotMatch(route, /fetch\s*\(|\/api\//);
@@ -243,16 +253,20 @@ function validInput() {
   };
 }
 
-function ma120ReadRow(ticker) {
+function ma120ReadRow(
+  ticker,
+  status = "above_ma",
+  distanceFromMaPct = 20,
+) {
   return {
     instrumentKey: `korea:KRW:${ticker}`,
-    status: "above_ma",
+    status,
     priceBasis: "private_kis_raw_close",
     evidence: {
-      status: "above_ma",
+      status,
       policy: {
         version: "fixture",
-        mode: "evidence_only",
+        mode: "additional_contribution_preview_input",
         windowObservationCount: 120,
         allowedPriceBases: [
           "provider_adjusted_close",
@@ -261,8 +275,8 @@ function ma120ReadRow(ticker) {
         historyBoundary: "price_date_lte_as_of_price_date",
         observationBasis:
           "distinct_observed_price_dates_without_calendar_carry",
-        allocationEffect: "none",
-        recommendation: "forbidden",
+        allocationEffect: "bounded_overlay",
+        recommendation: "allocation_preview_only",
       },
       instrumentKey: `korea:KRW:${ticker}`,
       asOfPriceDate: "2026-07-12",
@@ -274,7 +288,7 @@ function ma120ReadRow(ticker) {
       oldestWindowPriceDate: "2026-01-01",
       latestWindowPriceDate: "2026-07-11",
       ma120: 100,
-      distanceFromMaPct: 20,
+      distanceFromMaPct,
       blockers: [],
     },
     unavailableReason: null,

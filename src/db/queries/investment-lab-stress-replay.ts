@@ -4,7 +4,6 @@ import {
   loadPortfolioRiskFxRates,
   loadPortfolioRiskPriceCandidates,
 } from "@/db/queries/portfolio-risk";
-import { getActivePortfolioOwnerUserIds } from "@/db/queries/active-portfolio-owners";
 import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
 import {
   buildInvestmentLabStressReplay,
@@ -14,23 +13,20 @@ import {
 } from "@/lib/investment-lab-stress-replay";
 import {
   admitAdjustedHistoricalPriceRows,
-  admitPrivateSingleTenantRawHistoricalPriceRows,
+  admitSharedKisRawHistoricalPriceRows,
   selectPreferredPrivateHistoricalPriceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import { shiftRiskDate } from "@/lib/portfolio-risk-calendar";
 import type { PortfolioStructureResult } from "@/lib/portfolio-structure";
-import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const BENCHMARK_TICKERS = Object.freeze(["069500", "VOO"]);
 
 export async function getReadOnlyTenantInvestmentLabStressReplay({
   account,
   portfolioStructurePromise,
-  tenantContext,
 }: {
   account: string;
   portfolioStructurePromise: Promise<PortfolioStructureResult>;
-  tenantContext: TenantContext;
 }) {
   const portfolioStructure = await portfolioStructurePromise;
   const scopedPortfolio = applyInvestmentLabCurrentHoldingScope(
@@ -49,14 +45,13 @@ export async function getReadOnlyTenantInvestmentLabStressReplay({
     -INVESTMENT_LAB_STRESS_REPLAY_POLICY.priceCarryCalendarDays,
   );
   const sourceDateTo = INVESTMENT_LAB_STRESS_WINDOWS.at(-1)!.endDate;
-  const [candidateRows, fxRows, activeOwnerUserIds] = await Promise.all([
+  const [candidateRows, fxRows] = await Promise.all([
     loadPortfolioRiskPriceCandidates({
       tickers,
       sourceDateFrom,
       sourceDateTo,
     }),
     loadPortfolioRiskFxRates({ sourceDateFrom, sourceDateTo }),
-    getActivePortfolioOwnerUserIds(),
   ]);
 
   return buildInvestmentLabStressReplay({
@@ -64,21 +59,15 @@ export async function getReadOnlyTenantInvestmentLabStressReplay({
     holdings: scopedPortfolio.holdingRows,
     priceRows: selectWindowPriceRows({
       candidateRows,
-      activeOwnerUserIds,
-      requestedOwnerUserId: tenantContext.ownerUserId,
     }),
     fxRows,
   });
 }
 
 function selectWindowPriceRows({
-  activeOwnerUserIds,
   candidateRows,
-  requestedOwnerUserId,
 }: {
-  activeOwnerUserIds: readonly string[];
   candidateRows: Awaited<ReturnType<typeof loadPortfolioRiskPriceCandidates>>;
-  requestedOwnerUserId: string;
 }) {
   const selectedRows: InvestmentLabStressPriceInput[] = [];
 
@@ -91,11 +80,7 @@ function selectWindowPriceRows({
       (row) => row.priceDate >= scanStart && row.priceDate <= window.endDate,
     );
     const adjustedRows = admitAdjustedHistoricalPriceRows(rows).rows;
-    const privateRawRows = admitPrivateSingleTenantRawHistoricalPriceRows({
-      rows,
-      requestedOwnerUserId,
-      activeOwnerUserIds,
-    }).rows;
+    const privateRawRows = admitSharedKisRawHistoricalPriceRows(rows).rows;
     const preferred = selectPreferredPrivateHistoricalPriceRows({
       adjustedRows,
       privateRawRows,

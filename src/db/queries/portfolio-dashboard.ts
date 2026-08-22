@@ -7,6 +7,7 @@ import {
   getTableColumns,
   inArray,
   isNull,
+  lte,
   or,
   sql,
   type AnyColumn,
@@ -174,6 +175,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               eventScopePredicate,
               eq(eventLedgerEntries.account, accounts.code),
               eq(eventLedgerEntries.isSample, false),
+              lte(eventLedgerEntries.eventDate, snapshotDate),
             ),
           ),
     positionScopePredicate === null

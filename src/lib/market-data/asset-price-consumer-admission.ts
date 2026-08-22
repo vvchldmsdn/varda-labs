@@ -1,7 +1,7 @@
 import { ADJUSTED_CLOSE_BASIS } from "./providers/types.ts";
 
 export const ASSET_PRICE_CONSUMER_ADMISSION_POLICY = Object.freeze({
-  version: "asset_price_snapshot_consumer_admission_v2",
+  version: "asset_price_snapshot_consumer_admission_v3",
   operationalClose: Object.freeze({
     priceField: "close_price",
     adjustedCloseFallback: "forbidden",
@@ -27,22 +27,22 @@ export const ASSET_PRICE_CONSUMER_ADMISSION_POLICY = Object.freeze({
     incompleteProvenance: "exclude_row",
     rightsNotAdmitted: "exclude_all_rows",
   }),
-  privateSingleTenantRawHistoricalReturn: Object.freeze({
+  sharedKisRawHistoricalReturn: Object.freeze({
     priceField: "close_price",
     priceBasis: "raw_price_return",
-    consumerPurpose: "owner_only_simulation_research",
-    tenantBoundary: "exactly_one_active_owner_matching_session",
+    consumerPurpose: "tenant_scoped_instrument_analysis",
+    tenantBoundary: "shared_market_data_cache_owner_independent",
     providerBoundary: "kis_only_with_complete_provenance",
     corporateActionAdjustment: "not_claimed",
     distributionAdjustment: "not_claimed",
     persistence: "forbidden",
     recommendation: "forbidden",
   }),
-  privateSingleTenantRawTrendEvidence: Object.freeze({
+  sharedKisRawTrendEvidence: Object.freeze({
     priceField: "close_price",
     priceBasis: "raw_price_level",
-    consumerPurpose: "owner_only_descriptive_trend_evidence",
-    tenantBoundary: "exactly_one_active_owner_matching_session",
+    consumerPurpose: "tenant_scoped_descriptive_trend_evidence",
+    tenantBoundary: "shared_market_data_cache_owner_independent",
     providerBoundary: "kis_only_with_complete_provenance",
     corporateActionAdjustment: "not_claimed",
     distributionAdjustment: "not_claimed",
@@ -111,8 +111,7 @@ export type RawHistoricalAdmissionIssue =
   | "invalid_instrument_identity"
   | "raw_history_consumer_rights_not_admitted";
 
-export type PrivateSingleTenantRawHistoricalAdmissionIssue =
-  | "private_single_tenant_scope_not_established"
+export type SharedKisRawHistoricalAdmissionIssue =
   | "invalid_instrument_identity"
   | "raw_close_missing"
   | "raw_source_not_kis"
@@ -134,8 +133,8 @@ export type RawHistoricalPriceAdmission<T> = Readonly<{
   issues: readonly RawHistoricalAdmissionIssue[];
 }>;
 
-export type PrivateSingleTenantRawHistoricalPriceAdmission<T> = Readonly<{
-  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn;
+export type SharedKisRawHistoricalPriceAdmission<T> = Readonly<{
+  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.sharedKisRawHistoricalReturn;
   status: "ready" | "blocked";
   rows: readonly T[];
   summary: Readonly<{
@@ -145,11 +144,11 @@ export type PrivateSingleTenantRawHistoricalPriceAdmission<T> = Readonly<{
     admittedInstrumentCount: number;
     excludedInstrumentCount: number;
   }>;
-  issues: readonly PrivateSingleTenantRawHistoricalAdmissionIssue[];
+  issues: readonly SharedKisRawHistoricalAdmissionIssue[];
 }>;
 
-export type PrivateSingleTenantRawTrendEvidenceAdmission<T> = Readonly<{
-  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawTrendEvidence;
+export type SharedKisRawTrendEvidenceAdmission<T> = Readonly<{
+  policy: typeof ASSET_PRICE_CONSUMER_ADMISSION_POLICY.sharedKisRawTrendEvidence;
   status: "ready" | "blocked";
   rows: readonly T[];
   summary: Readonly<{
@@ -159,7 +158,7 @@ export type PrivateSingleTenantRawTrendEvidenceAdmission<T> = Readonly<{
     admittedInstrumentCount: number;
     excludedInstrumentCount: number;
   }>;
-  issues: readonly PrivateSingleTenantRawHistoricalAdmissionIssue[];
+  issues: readonly SharedKisRawHistoricalAdmissionIssue[];
 }>;
 
 export type PreferredPrivateHistoricalPriceBasis =
@@ -273,79 +272,32 @@ export function admitRawHistoricalPriceRows<
   });
 }
 
-export function admitPrivateSingleTenantRawHistoricalPriceRows<
+export function admitSharedKisRawHistoricalPriceRows<
   T extends RawHistoricalPriceConsumerEvidenceRow,
->(input: {
-  rows: readonly T[];
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
-}): PrivateSingleTenantRawHistoricalPriceAdmission<T> {
-  const result = admitPrivateSingleTenantKisRawRows(input);
+>(rows: readonly T[]): SharedKisRawHistoricalPriceAdmission<T> {
+  const result = admitSharedKisRawRows(rows);
   return Object.freeze({
-    policy:
-      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawHistoricalReturn,
+    policy: ASSET_PRICE_CONSUMER_ADMISSION_POLICY.sharedKisRawHistoricalReturn,
     ...result,
   });
 }
 
-export function admitPrivateSingleTenantRawTrendEvidenceRows<
+export function admitSharedKisRawTrendEvidenceRows<
   T extends RawHistoricalPriceConsumerEvidenceRow,
->(input: {
-  rows: readonly T[];
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
-}): PrivateSingleTenantRawTrendEvidenceAdmission<T> {
-  const result = admitPrivateSingleTenantKisRawRows(input);
+>(rows: readonly T[]): SharedKisRawTrendEvidenceAdmission<T> {
+  const result = admitSharedKisRawRows(rows);
   return Object.freeze({
-    policy:
-      ASSET_PRICE_CONSUMER_ADMISSION_POLICY.privateSingleTenantRawTrendEvidence,
+    policy: ASSET_PRICE_CONSUMER_ADMISSION_POLICY.sharedKisRawTrendEvidence,
     ...result,
   });
 }
 
-function admitPrivateSingleTenantKisRawRows<
-  T extends RawHistoricalPriceConsumerEvidenceRow,
->(input: {
-  rows: readonly T[];
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
-}) {
-  const suppliedRows = Array.isArray(input.rows) ? input.rows : [];
-  const activeOwnerUserIds = [
-    ...new Set(
-      (Array.isArray(input.activeOwnerUserIds)
-        ? input.activeOwnerUserIds
-        : []
-      )
-        .map((value) => normalizeText(value)?.toLowerCase())
-        .filter((value): value is string => value !== null),
-    ),
-  ];
-  const requestedOwnerUserId = normalizeText(
-    input.requestedOwnerUserId,
-  )?.toLowerCase();
-  if (
-    !requestedOwnerUserId ||
-    activeOwnerUserIds.length !== 1 ||
-    activeOwnerUserIds[0] !== requestedOwnerUserId
-  ) {
-    return Object.freeze({
-      status: "blocked" as const,
-      rows: Object.freeze([]),
-      summary: Object.freeze({
-        suppliedRowCount: suppliedRows.length,
-        admittedRowCount: 0,
-        excludedRowCount: suppliedRows.length,
-        admittedInstrumentCount: 0,
-        excludedInstrumentCount: uniqueInstrumentCount(suppliedRows),
-      }),
-      issues: Object.freeze([
-        "private_single_tenant_scope_not_established" as const,
-      ]),
-    });
-  }
+function admitSharedKisRawRows<T extends RawHistoricalPriceConsumerEvidenceRow>(
+  rows: readonly T[],
+) {
+  const suppliedRows = Array.isArray(rows) ? rows : [];
 
-  const issues = new Set<PrivateSingleTenantRawHistoricalAdmissionIssue>();
+  const issues = new Set<SharedKisRawHistoricalAdmissionIssue>();
   const groups = new Map<string, T[]>();
   for (const row of suppliedRows) {
     const instrumentKey = normalizeInstrumentKey(row);
@@ -365,7 +317,7 @@ function admitPrivateSingleTenantKisRawRows<
     const eligibleRows: T[] = [];
     const bindingKeys = new Set<string>();
     for (const row of groupRows) {
-      const rowIssues = validatePrivateSingleTenantRawRow(row);
+      const rowIssues = validateSharedKisRawRow(row);
       for (const issue of rowIssues) issues.add(issue);
       if (rowIssues.length > 0) continue;
       eligibleRows.push(row);
@@ -495,12 +447,13 @@ function validateAdjustedHistoricalRow(
   return issues;
 }
 
-function validatePrivateSingleTenantRawRow(
+function validateSharedKisRawRow(
   row: RawHistoricalPriceConsumerEvidenceRow,
-): PrivateSingleTenantRawHistoricalAdmissionIssue[] {
-  const issues: PrivateSingleTenantRawHistoricalAdmissionIssue[] = [];
+): SharedKisRawHistoricalAdmissionIssue[] {
+  const issues: SharedKisRawHistoricalAdmissionIssue[] = [];
   if (positiveNumber(row.closePrice) === null) issues.push("raw_close_missing");
-  if (!normalizeText(row.source)?.toLowerCase().startsWith("kis")) {
+  const source = normalizeText(row.source)?.toLowerCase() ?? "";
+  if (!/^kis(?:$|[_:])/.test(source)) {
     issues.push("raw_source_not_kis");
   }
   if (!normalizeText(row.providerSymbol)) issues.push("provider_symbol_missing");
@@ -555,12 +508,6 @@ function rawProviderBindingKey(row: RawHistoricalPriceConsumerEvidenceRow) {
     normalizeText(row.providerSymbol)?.toUpperCase(),
     normalizeText(row.providerExchange)?.toUpperCase(),
   ].join("|");
-}
-
-function uniqueInstrumentCount(
-  rows: readonly AssetPriceInstrumentEvidenceRow[],
-) {
-  return new Set(rows.map(normalizeInstrumentKey).filter(Boolean)).size;
 }
 
 function normalizeText(value: string | null | undefined) {
