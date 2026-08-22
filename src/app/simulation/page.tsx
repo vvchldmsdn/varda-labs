@@ -246,6 +246,82 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
+      ownerResearchExecution={
+        <SimulationSectionErrorBoundary
+          section="owner-research-execution"
+          title="내 포트폴리오 확률 경로"
+        >
+          <Suspense
+            fallback={
+              <OwnerResultSkeleton
+                label="내 포트폴리오 확률 경로 로딩"
+                marker="execution"
+              />
+            }
+          >
+            <OwnerResearchExecutionContent
+              resultPromise={ownerResearchPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
+      ownerCandidateComparison={
+        <SimulationSectionErrorBoundary
+          section="owner-candidate-comparison"
+          title="변동성 완화 후보 비교"
+        >
+          <Suspense
+            fallback={
+              <OwnerResultSkeleton
+                label="변동성 완화 후보 비교 로딩"
+                marker="candidate-comparison"
+              />
+            }
+          >
+            <OwnerCandidateComparisonContent
+              resultPromise={ownerResearchPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
+      ownerWalkForwardValidation={
+        <SimulationSectionErrorBoundary
+          section="owner-walk-forward-validation"
+          title="과거 구간 밖 검증"
+        >
+          <Suspense
+            fallback={
+              <OwnerResultSkeleton
+                label="과거 구간 밖 검증 로딩"
+                marker="walk-forward-validation"
+              />
+            }
+          >
+            <OwnerWalkForwardValidationContent
+              resultPromise={ownerResearchPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
+      ownerHistoricalValidation={
+        <SimulationSectionErrorBoundary
+          section="owner-historical-validation"
+          title="내 포트폴리오 예측 범위와 실제 결과"
+        >
+          <Suspense
+            fallback={
+              <OwnerResultSkeleton
+                label="내 포트폴리오 과거 결과 검증 로딩"
+                marker="historical-validation"
+              />
+            }
+          >
+            <OwnerHistoricalValidationContent
+              resultPromise={ownerResearchPromise}
+            />
+          </Suspense>
+        </SimulationSectionErrorBoundary>
+      }
       ownerParametricFactor={
         <SimulationSectionErrorBoundary
           section="owner-parametric-factor"
@@ -344,24 +420,64 @@ async function OwnerInputPreflightContent({
 }) {
   const result = await resultPromise;
   return (
-    <>
-      <OwnerInputPreflightSection
-        model={result.inputPreflight}
-        preservedQuery={preservedQuery}
-        scopes={scopeCatalog}
-        selectedScope={selectedScope}
-      />
-      <OwnerResearchExecutionSection execution={result.execution} />
-      <OwnerCandidateComparisonSection
-        comparison={result.candidateComparison}
-      />
-      <OwnerWalkForwardValidationSection
-        result={result.walkForwardValidation}
-      />
-      <OwnerHistoricalOutcomeValidationSection
-        result={result.historicalValidation}
-      />
-    </>
+    <OwnerInputPreflightSection
+      model={result.inputPreflight}
+      preservedQuery={preservedQuery}
+      scopes={scopeCatalog}
+      selectedScope={selectedScope}
+    />
+  );
+}
+
+async function OwnerResearchExecutionContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerResearch
+  >;
+}) {
+  const result = await resultPromise;
+  return <OwnerResearchExecutionSection execution={result.execution} />;
+}
+
+async function OwnerCandidateComparisonContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerResearch
+  >;
+}) {
+  const result = await resultPromise;
+  return (
+    <OwnerCandidateComparisonSection comparison={result.candidateComparison} />
+  );
+}
+
+async function OwnerWalkForwardValidationContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerResearch
+  >;
+}) {
+  const result = await resultPromise;
+  return (
+    <OwnerWalkForwardValidationSection result={result.walkForwardValidation} />
+  );
+}
+
+async function OwnerHistoricalValidationContent({
+  resultPromise,
+}: {
+  resultPromise: ReturnType<
+    typeof getReadOnlyTenantSimulationOwnerResearch
+  >;
+}) {
+  const result = await resultPromise;
+  return (
+    <OwnerHistoricalOutcomeValidationSection
+      result={result.historicalValidation}
+    />
   );
 }
 
@@ -532,6 +648,25 @@ function OwnerInputPreflightSkeleton() {
     >
       <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
       <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    </section>
+  );
+}
+
+function OwnerResultSkeleton({
+  label,
+  marker,
+}: {
+  label: string;
+  marker: string;
+}) {
+  return (
+    <section
+      aria-label={label}
+      className="border-b border-[#d7ddcf] py-5"
+      data-owner-result-loading={marker}
+    >
+      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
+      <div className="mt-4 h-64 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
     </section>
   );
 }

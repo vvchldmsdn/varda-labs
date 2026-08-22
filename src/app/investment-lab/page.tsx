@@ -163,18 +163,24 @@ export default async function InvestmentLabPage({
         />
       </Suspense>
       <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
-        <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
+        <div className="scroll-mt-4" id="investment-lab-etf-xray">
+          <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
+        </div>
       </Suspense>
-      <Suspense fallback={<InvestmentLabStressReplaySkeleton />}>
-        <InvestmentLabStressReplayContent modelPromise={stressReplayPromise} />
-      </Suspense>
-      <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
-        <InvestmentLabSmallAdjustmentContent
-          modelPromise={portfolioStructurePromise}
-          scopeCatalog={scopeContext.catalog.scopes}
-          selectedScope={selectedScope}
-        />
-      </Suspense>
+      <div className="scroll-mt-4" id="investment-lab-stress">
+        <Suspense fallback={<InvestmentLabStressReplaySkeleton />}>
+          <InvestmentLabStressReplayContent modelPromise={stressReplayPromise} />
+        </Suspense>
+      </div>
+      <div className="scroll-mt-4" id="investment-lab-small-adjustment">
+        <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
+          <InvestmentLabSmallAdjustmentContent
+            modelPromise={portfolioStructurePromise}
+            scopeCatalog={scopeContext.catalog.scopes}
+            selectedScope={selectedScope}
+          />
+        </Suspense>
+      </div>
     </div>
   );
 }
@@ -250,6 +256,7 @@ async function InvestmentLabContent({
         fundingPreflight={fundingPreflight}
         model={model}
         observedHistory={observedHistory}
+        optimizerStatus={preperiodOptimizer.status}
         period={period}
         scopeCatalog={scopeCatalog}
         scopeQuery={scopeQuery}
@@ -265,7 +272,9 @@ async function InvestmentLabContent({
       <InvestmentLabPreperiodMinVolatilityView
         model={model.preperiodMinVolatility}
       />
-      <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
+      <div className="scroll-mt-4" id="investment-lab-optimizer">
+        <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
+      </div>
       <InvestmentLabAnchorBasket
         fixedMixSelection={fixedMixSelection}
         model={anchorBasketScenario}

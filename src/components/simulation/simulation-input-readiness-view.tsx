@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AnalysisJourneyNav } from "@/components/analysis-journey-nav";
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 import { buildSimulationHref } from "@/lib/simulation-navigation";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
@@ -25,10 +26,14 @@ type HistoryRow = SimulationInputReadinessPageModel["history"][number];
 export function SimulationInputReadinessView({
   model,
   historicalOutcomeValidation,
+  ownerCandidateComparison,
+  ownerHistoricalValidation,
   ownerInputPreflight,
   ownerModelCalibration,
   ownerModelComparison,
   ownerParametricFactor,
+  ownerResearchExecution,
+  ownerWalkForwardValidation,
   researchUniverse,
   researchUniversePreflight,
   regimeHistoricalOutcomeValidation,
@@ -37,10 +42,14 @@ export function SimulationInputReadinessView({
 }: {
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
+  ownerCandidateComparison?: ReactNode;
+  ownerHistoricalValidation?: ReactNode;
   ownerInputPreflight?: ReactNode;
   ownerModelCalibration?: ReactNode;
   ownerModelComparison?: ReactNode;
   ownerParametricFactor?: ReactNode;
+  ownerResearchExecution?: ReactNode;
+  ownerWalkForwardValidation?: ReactNode;
   researchUniverse: string | null;
   researchUniversePreflight?: ReactNode;
   regimeHistoricalOutcomeValidation?: ReactNode;
@@ -109,6 +118,35 @@ export function SimulationInputReadinessView({
           </div>
         </header>
 
+        <AnalysisJourneyNav
+          items={[
+            {
+              description: "현재 보유 비중으로 만든 500개 확률 경로와 손실 가능성을 봅니다.",
+              href: "#simulation-current-result",
+              label: "현재 비중 결과",
+              status: "조회 시 계산",
+            },
+            {
+              description: "현재안과 변동성을 낮춘 후보를 같은 무작위 경로로 비교합니다.",
+              href: "#simulation-weight-experiment",
+              label: "비중 후보 비교",
+              status: "추천 아님",
+            },
+            {
+              description: "계산에 쓰지 않은 과거 구간에서 예측 범위와 실제 결과를 대조합니다.",
+              href: "#simulation-validation",
+              label: "과거 검증",
+              status: "독립 검증",
+            },
+            {
+              description: "부트스트랩과 환율·금리 요인 모형의 차이와 입력 근거를 확인합니다.",
+              href: "#simulation-model-diagnostics",
+              label: "모형과 데이터 근거",
+              status: "상세 진단",
+            },
+          ]}
+        />
+
         {model.endServiceDateSelection.status === "invalid" ? (
           <section
             data-invalid-end-query
@@ -130,9 +168,21 @@ export function SimulationInputReadinessView({
         ) : null}
 
         {ownerInputPreflight}
-        {ownerParametricFactor}
-        {ownerModelComparison}
-        {ownerModelCalibration}
+        <div className="scroll-mt-4" id="simulation-current-result">
+          {ownerResearchExecution}
+        </div>
+        <div className="scroll-mt-4" id="simulation-weight-experiment">
+          {ownerCandidateComparison}
+        </div>
+        <div className="scroll-mt-4" id="simulation-validation">
+          {ownerWalkForwardValidation}
+          {ownerHistoricalValidation}
+        </div>
+        <div className="scroll-mt-4" id="simulation-model-diagnostics">
+          {ownerParametricFactor}
+          {ownerModelComparison}
+          {ownerModelCalibration}
+        </div>
         <ResearchHorizonSelector
           scopeKey={selectedScopeKey}
           endServiceDate={explicitEndServiceDate}
