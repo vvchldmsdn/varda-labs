@@ -201,6 +201,22 @@ Run `npm run audit:investment-lab-anchor-basket` to inspect the exact stored
 portfolio/position anchor intersection and whole-basket instrument evidence
 without provider calls or writes.
 
+### 2026-08-22 Price-Authority Refresh
+
+The earlier adjusted-close row counts above remain dated baseline evidence,
+not current runtime price authority. The refreshed SELECT-only path audit now
+uses the same adjusted-history and private single-tenant KIS raw-history
+admission policy as the product read model, and selects one basis for the
+entire KODEX 200 series instead of replacing missing adjusted closes with zero.
+
+The refresh supplied 1,165 stored KODEX 200 rows. Consumer admission selected
+622 private KIS raw-close rows from 2020-02-12 through 2026-08-21. The path
+completed 69 service dates, scheduled all 46 eligible flows, applied 38
+post-anchor flows, preserved 5 bounded pending comparisons, and ended with no
+pending flow or blocker. The audit also fails closed unless exactly one active
+portfolio owner exists, preventing a future aggregate run from mixing tenant
+paths.
+
 ## Anchor Special-Holding Identity Authority
 
 `base44_imported_snapshot_ticker_consensus_v1` is a narrow read-time identity

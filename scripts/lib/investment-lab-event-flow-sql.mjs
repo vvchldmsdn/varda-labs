@@ -66,14 +66,38 @@ export const INVESTMENT_LAB_DERIVED_ALL_PATH_SQL = `
 
 export const INVESTMENT_LAB_KODEX_CLOSE_SQL = `
   select
+    ticker,
+    market,
+    currency,
     date::text as price_date,
-    adjusted_close_price
+    close_price,
+    adjusted_close_price,
+    adjusted_close_basis,
+    adjusted_close_provider,
+    adjusted_close_source,
+    adjusted_close_fetched_at,
+    provider_symbol,
+    provider_exchange,
+    fetched_at,
+    source
   from asset_price_snapshots
   where is_sample = false
     and upper(btrim(ticker)) = '069500'
     and lower(btrim(market)) = 'korea'
     and upper(btrim(currency)) = 'KRW'
   order by date
+`;
+
+export const INVESTMENT_LAB_ACTIVE_OWNER_SQL = `
+  select distinct
+    a.canonical_owner_user_id as owner_user_id
+  from accounts a
+  inner join app_users u on u.id = a.canonical_owner_user_id
+  where a.is_active = true
+    and u.status = 'active'
+    and u.role in ('user', 'admin')
+    and a.canonical_owner_user_id is not null
+  order by a.canonical_owner_user_id
 `;
 
 export const INVESTMENT_LAB_SNAPSHOT_BOUNDARY_SQL = `

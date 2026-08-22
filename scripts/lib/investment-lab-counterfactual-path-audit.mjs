@@ -7,11 +7,17 @@ import {
   INVESTMENT_LAB_EXECUTION_POLICY,
   scheduleInvestmentLabBoundaryFlows,
 } from "../../src/lib/investment-lab-execution-schedule.ts";
+import {
+  admitAdjustedHistoricalPriceRows,
+  admitPrivateSingleTenantRawHistoricalPriceRows,
+  selectPreferredPrivateHistoricalPriceRows,
+} from "../../src/lib/market-data/asset-price-consumer-admission.ts";
 
 export function auditInvestmentLabCounterfactualPathEvidence({
   eventRows,
   closeRows,
   actualPathRows,
+  ownerRows = [],
 }) {
   const classified = eventRows.map((row) => ({
     row,
@@ -27,10 +33,8 @@ export function auditInvestmentLabCounterfactualPathEvidence({
   const eligible = classified.filter(
     ({ classification }) => classification.includedInV1,
   );
-  const closes = closeRows.map((row) => ({
-    priceDate: row.price_date,
-    adjustedClose: number(row.adjusted_close_price),
-  }));
+  const closeEvidence = resolvePreferredCloseEvidence(closeRows, ownerRows);
+  const closes = closeEvidence.rows;
   const actualPath = actualPathRows.map((row) => ({
     serviceDate: row.service_date,
     totalMarketValueKrw: number(row.total_market_value_krw),
@@ -48,6 +52,7 @@ export function auditInvestmentLabCounterfactualPathEvidence({
   });
 
   const preEngineBlockers = [
+    ...(ownerRows.length === 1 ? [] : ["active_owner_scope_not_established"]),
     ...unsupported.map(() => "unsupported_event_evidence"),
     ...schedule.blockers.map((row) => row.reason),
   ];
@@ -79,6 +84,11 @@ export function auditInvestmentLabCounterfactualPathEvidence({
       closeRows: closes.length,
       closeStartDate: closes[0]?.priceDate ?? null,
       closeEndDate: closes.at(-1)?.priceDate ?? null,
+      priceBasis: closeEvidence.priceBasis,
+      activeOwnerCount: ownerRows.length,
+      suppliedCloseRows: closeRows.length,
+      adjustedAdmittedRows: closeEvidence.adjustedAdmittedRows,
+      privateRawAdmittedRows: closeEvidence.privateRawAdmittedRows,
       amountProvenanceDistribution: distribution(
         eligible.map(({ row }) => row.amount_provenance ?? "unresolved"),
       ),
@@ -117,6 +127,61 @@ export function auditInvestmentLabCounterfactualPathEvidence({
       routesEnabled: 0,
       userFacingMetricsEnabled: 0,
     },
+  };
+}
+
+function resolvePreferredCloseEvidence(closeRows, ownerRows) {
+  const candidates = closeRows.map((row) => ({
+    ticker: row.ticker,
+    market: row.market,
+    currency: row.currency,
+    priceDate: row.price_date,
+    closePrice: row.close_price,
+    adjustedClosePrice: row.adjusted_close_price,
+    adjustedCloseBasis: row.adjusted_close_basis,
+    adjustedCloseProvider: row.adjusted_close_provider,
+    adjustedCloseSource: row.adjusted_close_source,
+    adjustedCloseFetchedAt: row.adjusted_close_fetched_at,
+    providerSymbol: row.provider_symbol,
+    providerExchange: row.provider_exchange,
+    fetchedAt: row.fetched_at,
+    source: row.source,
+  }));
+  const adjusted = admitAdjustedHistoricalPriceRows(candidates);
+  const activeOwnerUserIds = ownerRows
+    .map((row) => String(row.owner_user_id ?? "").trim())
+    .filter(Boolean);
+  const raw = admitPrivateSingleTenantRawHistoricalPriceRows({
+    rows: candidates,
+    requestedOwnerUserId:
+      activeOwnerUserIds.length === 1 ? activeOwnerUserIds[0] : "",
+    activeOwnerUserIds,
+  });
+  const preferred = selectPreferredPrivateHistoricalPriceRows({
+    adjustedRows: adjusted.rows,
+    privateRawRows: raw.rows,
+  });
+  const bases = new Set(preferred.rows.map((row) => row.priceBasis));
+  const selectedBasis = bases.size === 1 ? [...bases][0] : null;
+  const priceBasis =
+    selectedBasis === "provider_adjusted_close"
+      ? "provider_adjusted_close"
+      : selectedBasis === "private_kis_raw_close"
+        ? "kis_raw_close"
+        : "unavailable";
+  const rows = preferred.rows.map(({ row }) => ({
+    priceDate: row.priceDate,
+    adjustedClose:
+      priceBasis === "kis_raw_close"
+        ? number(row.closePrice)
+        : number(row.adjustedClosePrice),
+  }));
+
+  return {
+    rows,
+    priceBasis,
+    adjustedAdmittedRows: adjusted.rows.length,
+    privateRawAdmittedRows: raw.rows.length,
   };
 }
 

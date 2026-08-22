@@ -190,6 +190,7 @@ describe("investment lab deterministic counterfactual path", () => {
     assert.equal(result.path.rowCount, 4);
     assert.equal(result.path.appliedFlowRows, 3);
     assert.equal(result.path.pendingComparisonRows, 2);
+    assert.equal(result.input.priceBasis, "provider_adjusted_close");
     assert.deepEqual(result.input.amountProvenanceDistribution, {
       derived_quantity_price_fx: 1,
       derived_quantity_price_krw: 1,
@@ -199,6 +200,42 @@ describe("investment lab deterministic counterfactual path", () => {
     const serialized = JSON.stringify(result);
     assert.doesNotMatch(serialized, /actualMarketValueKrw|amountKrw|unitsAfter/);
     assert.doesNotMatch(serialized, /authorization|api[_-]?key|password|secret|token|subject/i);
+  });
+
+  it("uses the longer admitted private KIS raw series as one price basis", () => {
+    const fixture = auditFixture();
+    fixture.closeRows[0] = {
+      ...fixture.closeRows[0],
+      adjusted_close_price: null,
+      adjusted_close_basis: null,
+      adjusted_close_provider: null,
+      adjusted_close_source: null,
+      adjusted_close_fetched_at: null,
+    };
+
+    const result = auditInvestmentLabCounterfactualPathEvidence(fixture);
+
+    assert.equal(result.status, "passed");
+    assert.equal(result.input.priceBasis, "kis_raw_close");
+    assert.equal(result.input.suppliedCloseRows, 3);
+    assert.equal(result.input.adjustedAdmittedRows, 2);
+    assert.equal(result.input.privateRawAdmittedRows, 3);
+  });
+
+  it("blocks the aggregate audit before paths can mix multiple owners", () => {
+    const fixture = auditFixture();
+    fixture.ownerRows.push({
+      owner_user_id: "00000000-0000-4000-8000-000000000002",
+    });
+
+    const result = auditInvestmentLabCounterfactualPathEvidence(fixture);
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.input.activeOwnerCount, 2);
+    assert.equal(result.path.status, "not_run");
+    assert.deepEqual(result.path.blockerCounts, {
+      active_owner_scope_not_established: 1,
+    });
   });
 
   it("keeps the path audit free of providers, writes, and product routes", () => {
@@ -279,14 +316,31 @@ function auditFixture() {
       amount_resolved: true,
       is_correction: false,
     })),
-    closeRows: fixture.closes.map((row) => ({
-      price_date: row.priceDate,
-      adjusted_close_price: row.adjustedClose,
-    })),
+    closeRows: fixture.closes.map((row) => auditCloseRow(row)),
     actualPathRows: fixture.actualPath.map((row) => ({
       service_date: row.serviceDate,
       total_market_value_krw: row.totalMarketValueKrw,
     })),
+    ownerRows: [{ owner_user_id: "00000000-0000-4000-8000-000000000001" }],
+  };
+}
+
+function auditCloseRow(row) {
+  return {
+    ticker: "069500",
+    market: "korea",
+    currency: "KRW",
+    price_date: row.priceDate,
+    close_price: row.adjustedClose,
+    adjusted_close_price: row.adjustedClose,
+    adjusted_close_basis: "provider_adjusted_close_v1",
+    adjusted_close_provider: "fixture-provider",
+    adjusted_close_source: "fixture-source",
+    adjusted_close_fetched_at: "2026-01-08T00:00:00.000Z",
+    provider_symbol: "069500",
+    provider_exchange: "KRX",
+    fetched_at: "2026-01-08T00:00:00.000Z",
+    source: "kis_fixture",
   };
 }
 
