@@ -19,6 +19,11 @@ import {
 } from "@/lib/portfolio-return-metrics";
 import { buildPortfolioDashboardSnapshotTrend } from "@/lib/portfolio-dashboard-snapshots";
 import {
+  buildPortfolioDashboardHoldingHistory,
+  buildPortfolioDashboardPositionTrend,
+  type PortfolioDashboardHoldingHistory,
+} from "@/lib/portfolio-dashboard-history";
+import {
   convertToKrw,
   diffDays,
   normalizeTicker,
@@ -167,6 +172,7 @@ export type DashboardData = {
   nonInvestmentAssets: NonInvestmentAsset[];
   nonInvestmentTotalKrw: number;
   recentSnapshots: RecentPortfolioPoint[];
+  holdingHistory: PortfolioDashboardHoldingHistory;
   eventActivity: DashboardEventActivity[];
   topMovers: DashboardHolding[];
   todayMovement: DashboardTodayMovement;
@@ -241,6 +247,7 @@ export async function getPortfolioDashboard(
     settingsRows,
     latestFxRows,
     latestPositionRows,
+    recentPositionRows,
     recentPortfolioRows,
     eventRows,
     unmatchedSnapshotCountRows,
@@ -373,7 +380,17 @@ export async function getPortfolioDashboard(
     totalPnlKrw,
     costBasisKrw + realizedCostBasisKrw,
   );
-  const recentSnapshots = buildPortfolioDashboardSnapshotTrend(recentPortfolioRows);
+  const holdingHistory = buildPortfolioDashboardHoldingHistory({
+    holdings,
+    rows: recentPositionRows,
+  });
+  const recentSnapshots =
+    scope.kind === "portfolio_group"
+      ? buildPortfolioDashboardPositionTrend({
+          holdings,
+          rows: recentPositionRows,
+        })
+      : buildPortfolioDashboardSnapshotTrend(recentPortfolioRows);
   const latestPortfolioSnapshot = recentSnapshots.at(-1) ?? null;
   const latestPortfolioSnapshotValue =
     latestPortfolioSnapshot?.totalMarketValue ?? null;
@@ -428,6 +445,7 @@ export async function getPortfolioDashboard(
       (asset) => asset.valueKrw,
     ),
     recentSnapshots,
+    holdingHistory,
     eventActivity: buildEventActivity({
       eventRows,
       assetRows: investmentAssetRows,

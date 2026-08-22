@@ -31,3 +31,44 @@ select,
 textarea {
   font: inherit;
 }
+
+.portfolio-history-range {
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.portfolio-history-range::-webkit-slider-runnable-track {
+  height: 1px;
+  background: #cbd0c9;
+}
+
+.portfolio-history-range::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -6px;
+  appearance: none;
+  border: 1px solid #8f968d;
+  border-radius: 2px;
+  background: #f7f8f5;
+}
+
+.portfolio-history-range::-moz-range-track {
+  height: 1px;
+  background: #cbd0c9;
+}
+
+.portfolio-history-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 1px solid #8f968d;
+  border-radius: 2px;
+  background: #f7f8f5;
+}
+
+.portfolio-history-range:focus-visible {
+  outline: 2px solid #347e62;
+  outline-offset: 4px;
+}

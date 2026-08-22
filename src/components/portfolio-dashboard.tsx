@@ -1,963 +1,316 @@
 import Link from "next/link";
 
+import { HoldingMovementHeatmap } from "@/components/home/holding-movement-heatmap";
+import { PortfolioHistoryChart } from "@/components/home/portfolio-history-chart";
+import {
+  formatDate,
+  formatKrw,
+  formatKstTime,
+  formatPercent,
+  formatSignedKrw,
+  toneClass,
+} from "@/components/home/portfolio-format";
+import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
-import type {
-  DashboardData,
-  DashboardEventActivity,
-  DashboardHolding,
-  NonInvestmentAsset,
-  RecentPortfolioPoint,
-} from "@/lib/portfolio-dashboard";
-import { buildPortfolioAnalysisScopeHref } from "@/lib/portfolio-analysis-scope";
+import type { DashboardData, DashboardHolding } from "@/lib/portfolio-dashboard";
+import {
+  buildPortfolioAnalysisScopeHref,
+  type PortfolioAnalysisScope,
+  type PortfolioAnalysisScopeKey,
+} from "@/lib/portfolio-analysis-scope";
 
-const navItems: { label: string; href?: string }[] = [
+const HOME_NAV_ITEMS = [
   { label: "홈", href: "/" },
-  { label: "오늘 변동", href: "/today" },
+  { label: "포트폴리오", href: "/portfolio/structure" },
   { label: "추가 투입", href: "/additional-contribution" },
-  { label: "자산 그룹", href: "/portfolio/groups" },
-  { label: "자산 배분", href: "/portfolio/structure" },
-  { label: "위험·분산", href: "/portfolio/risk" },
   { label: "히스토리", href: "/history" },
-  { label: "투자랩", href: "/investment-lab" },
-  { label: "시뮬레이션 검증", href: "/simulation" },
-  { label: "설정" },
-];
+  { label: "분석", href: "/investment-lab" },
+  { label: "시뮬레이션", href: "/simulation" },
+] as const;
+
+const LIVE_QUOTE_TYPES = new Set(["live", "delayed", "realtime"]);
 
 export function PortfolioDashboard({ data }: { data: DashboardData }) {
-  const topHoldings = data.holdings.slice(0, 7);
-  const heatmapHoldings = data.holdings.slice(0, 16);
-  const maxHeatmapValue =
-    Math.max(...heatmapHoldings.map((holding) => holding.valueKrw), 0) || 1;
+  const topContributor = largestPositiveContributor(data.holdings);
+  const priceImpactKrw =
+    data.todayChangeKrw === null
+      ? null
+      : data.todayChangeKrw - (data.todayFxChangeKrw ?? 0) - data.tradeFlowKrw;
+  const priceImpactPct = percentageOfPrevious(priceImpactKrw, data.todayMovement.previousTotalKrw);
+  const fxImpactPct = percentageOfPrevious(
+    data.todayFxChangeKrw,
+    data.todayMovement.previousTotalKrw,
+  );
+  const liveEvidenceCount = data.holdings.filter(hasLivePriceEvidence).length;
+  const storedPriceCount = Math.max(0, data.holdings.length - liveEvidenceCount);
+  const structureHref = scopedHref("/portfolio/structure", data.selectedScope.key);
+  const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key);
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[220px_minmax(0,1fr)_360px]">
-        <aside className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-3 lg:min-h-[calc(100vh-2rem)]">
-          <div className="mb-5 flex items-center gap-3 px-2">
-            <div className="grid h-8 w-8 place-items-center rounded-md bg-[#1e3a34] text-sm font-semibold text-white">
-              V
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-normal">Varda Labs</p>
-              <p className="text-xs text-[#73786c]">Portfolio</p>
-            </div>
-          </div>
-          <nav className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {navItems.map((item, index) => {
-              const href = scopedDashboardNavHref(item.href, data.selectedScope.key);
-              const className = cn(
-                "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium",
-                index === 0
-                  ? "bg-[#e5ece3] text-[#16211c]"
-                  : "text-[#697064] hover:bg-[#eef1e8]",
-              );
+    <main className="min-h-screen overflow-x-hidden bg-[#f7f8f5] text-[#20231f]">
+      <HomeNavigation
+        generatedAt={data.generatedAt}
+        selectedScopeKey={data.selectedScope.key}
+      />
 
-              return href ? (
-                <Link key={item.label} href={href} className={className}>
-                  {item.label}
-                </Link>
-              ) : (
-                <span key={item.label} className={className}>
-                  {item.label}
-                </span>
-              );
-            })}
-          </nav>
-          <div className="mt-5 rounded-md border border-[#e2e6da] bg-white p-3 text-xs text-[#687064]">
-            <p className="font-medium text-[#2a2f29]">기준일</p>
-            <p className="mt-1">{formatDate(data.latestSnapshotDate)}</p>
-            <p className="mt-3 font-medium text-[#2a2f29]">USD/KRW</p>
-            <p className="mt-1">{formatNumber(data.usdKrwRate)}</p>
-            <p className="mt-1">
-              환율 기준 {formatDate(data.dataHealth.latestFxRateDate)}
-            </p>
-            <p className="mt-1 text-[#8a917f]">
-              {formatFxFreshness(data)} · {formatFxSource(data.dataHealth.latestFxSource)}
-            </p>
-          </div>
-        </aside>
-
-        <section className="min-w-0 space-y-4">
-          <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div className="mx-auto w-full max-w-[1540px] px-5 pb-10 pt-8 sm:px-8 lg:px-10 lg:pb-14 lg:pt-10">
+        <section aria-labelledby="portfolio-overview-title">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
-                <p className="text-sm font-medium text-[#626b5f]">
-                  {formatDate(data.generatedAt)}
-                </p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-normal text-[#151815] sm:text-3xl">
-                  포트폴리오 요약
-                </h1>
+                <p className="text-[11px] font-medium text-[#7b8079]">PORTFOLIO / OVERVIEW</p>
+                <h1 id="portfolio-overview-title" className="sr-only">포트폴리오 홈</h1>
               </div>
-              <PortfolioAnalysisScopeTabs
-                basePath="/"
-                scopes={data.analysisScopes}
-                selectedScopeKey={data.selectedScope.key}
-              />
-            </div>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-4">
-              <MetricBlock
-                label="총 평가액"
-                value={formatKrwCompact(data.totalValueKrw)}
-                emphasis
-              />
-              <MetricBlock
-                label="오늘 변동"
-                value={formatSignedKrwCompact(data.todayChangeKrw)}
-                tone={moneyToneFor(data.todayChangeKrw)}
-                subValue={formatPct(data.todayReturnPct, true)}
-              />
-              <MetricBlock
-                label="총 손익"
-                value={formatSignedKrwCompact(data.totalPnlKrw)}
-                tone={moneyToneFor(data.totalPnlKrw)}
-                subValue={`${formatPct(data.totalReturnPct, true)} · 실현 ${formatSignedKrwCompact(data.realizedPnlKrw)}`}
-              />
-              <MetricBlock
-                label="보유 원금"
-                value={formatKrw(data.costBasisKrw)}
-                subValue={principalSubValue(data)}
-              />
-            </div>
-          </header>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-base font-semibold tracking-normal">
-                  계정 자산 분포
-                </h2>
-                <div className="grid w-full grid-cols-3 rounded-md border border-[#dce2d2] bg-white p-1 text-sm sm:w-[260px]">
-                  <span className="whitespace-nowrap rounded-md bg-[#1e3a34] px-2 py-1.5 text-center font-semibold text-white">
-                    오늘
-                  </span>
-                  <span className="whitespace-nowrap px-2 py-1.5 text-center font-semibold text-[#6c7469]">
-                    위험
-                  </span>
-                  <span className="whitespace-nowrap px-2 py-1.5 text-center font-semibold text-[#6c7469]">
-                    기여도
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-4">
-                {heatmapHoldings.map((holding, index) => (
-                  <HeatmapCell
-                    key={holdingPresentationKey(holding, index)}
-                    holding={holding}
-                    maxValue={maxHeatmapValue}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="grid gap-3">
-              {data.accountSummaries.map((summary) => (
-                <div
-                  key={summary.code}
-                  className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{summary.label}</p>
-                    <p className="text-xs text-[#687064]">
-                      {summary.holdingCount}개
-                    </p>
-                  </div>
-                  <p className="mt-3 text-xl font-semibold">
-                    {formatKrw(summary.totalValueKrw)}
-                  </p>
-                  <p
-                    className={cn(
-                      "mt-1 text-sm font-medium",
-                      moneyToneClass(summary.totalPnlKrw),
-                    )}
-                  >
-                    {formatSignedKrw(summary.totalPnlKrw)} ·{" "}
-                    {formatPct(summary.totalReturnPct, true)}
-                  </p>
-                </div>
-              ))}
-            </section>
-          </div>
-
-          <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
-            <div className="flex flex-col gap-2 border-b border-[#e3e7da] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-base font-semibold tracking-normal">보유 자산</h2>
-              <p className="text-sm text-[#687064]">
-                미매칭 스냅샷 {data.dataHealth.unmatchedSnapshotRowsAllTime}건
+              <p className="text-xs text-[#7b8079]">
+                기준일 {formatDate(data.latestSnapshotReferenceDate ?? data.latestSnapshotDate)}
               </p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[920px] border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[#eef2e8] text-left text-xs font-semibold uppercase text-[#616a5e]">
-                    <th className="px-4 py-3">종목</th>
-                    <th className="px-3 py-3">계정</th>
-                    <th className="px-3 py-3 text-right">수량</th>
-                    <th className="px-3 py-3 text-right">현재가</th>
-                    <th className="px-3 py-3 text-right">평가액</th>
-                    <th className="px-3 py-3 text-right">비중</th>
-                    <th className="px-3 py-3 text-right">목표</th>
-                    <th className="px-3 py-3 text-right">드리프트</th>
-                    <th className="px-3 py-3 text-right">오늘</th>
-                    <th className="px-4 py-3 text-right">누적</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.holdings.map((holding, index) => (
-                    <HoldingRow
-                      key={holdingPresentationKey(holding, index)}
-                      holding={holding}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+
+            <PortfolioAnalysisScopeTabs
+              basePath="/"
+              scopes={[...data.analysisScopes].toSorted(compareHomeScope)}
+              selectedScopeKey={data.selectedScope.key}
+              variant="underline"
+            />
+          </div>
+
+          <div className="pb-10 pt-12 text-center sm:pb-12 sm:pt-14 lg:pb-14 lg:pt-16">
+            <p className="text-xs font-medium text-[#737970]">
+              {homeScopeLabel(data.selectedScope)}
+            </p>
+            <p className="mt-3 text-5xl font-normal tabular-nums text-[#151714] sm:text-6xl lg:text-[80px]">
+              {formatKrw(data.totalValueKrw)}
+            </p>
+            <dl className="mx-auto mt-7 flex max-w-2xl flex-wrap items-center justify-center gap-y-3 text-sm">
+              <HeroMetric label="오늘" value={formatSignedKrw(data.todayChangeKrw)} tone={data.todayChangeKrw} />
+              <HeroMetric label="누적" value={formatPercent(data.totalReturnPct, true)} tone={data.totalReturnPct} divided />
+              <HeroMetric label="환율" value={formatSignedKrw(data.todayFxChangeKrw)} tone={data.todayFxChangeKrw} divided />
+            </dl>
+          </div>
         </section>
 
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-            <h2 className="text-base font-semibold tracking-normal">오늘 브리핑</h2>
-            <div className="mt-4 space-y-3">
-              <BriefingRow
-                label="평가액 변동"
-                value={formatSignedKrw(data.todayChangeKrw)}
-                tone={moneyToneFor(data.todayChangeKrw)}
-              />
-              <BriefingRow
-                label="수익률"
-                value={formatPct(data.todayReturnPct, true)}
-                tone={toneFor(data.todayReturnPct)}
-              />
-              <BriefingRow
-                label="환율 영향"
-                value={formatSignedKrw(data.todayFxChangeKrw)}
-                tone={moneyToneFor(data.todayFxChangeKrw)}
-              />
-              <BriefingRow
-                label="실현손익"
-                value={formatSignedKrw(data.realizedPnlKrw)}
-                tone={moneyToneFor(data.realizedPnlKrw)}
-              />
-            </div>
-            <p
-              className={cn(
-                "mt-4 rounded-md border px-3 py-2 text-xs font-medium",
-                data.dataHealth.movementReady
-                  ? "border-[#d7e3d2] bg-[#f3f8ef] text-[#2c643f]"
-                  : "border-[#eadfc7] bg-[#fff8e7] text-[#7a5b16]",
-              )}
-            >
-              {movementHealthText(data)}
-            </p>
-          </section>
-
-          {data.nonInvestmentAssets.length > 0 ? (
-            <NonInvestmentCard
-              assets={data.nonInvestmentAssets}
-              totalValue={data.nonInvestmentTotalKrw}
+        <div className="grid gap-12 border-t border-[#d9ddd7] pt-9 lg:grid-cols-[minmax(0,1.5fr)_minmax(420px,0.9fr)] lg:gap-0">
+          <div className="min-w-0 lg:pr-10">
+            <PortfolioHistoryChart
+              events={data.eventActivity.map((event) => ({
+                eventDate: event.eventDate,
+                eventType: event.eventType,
+              }))}
+              points={data.recentSnapshots}
             />
-          ) : null}
+          </div>
+          <HoldingMovementHeatmap
+            history={data.holdingHistory}
+            riskHref={riskHref}
+            structureHref={structureHref}
+          />
+        </div>
 
-          <EventActivityPanel activities={data.eventActivity} data={data} />
+        <div className="mt-8 flex justify-end">
+          <Link
+            className="inline-flex items-center gap-3 text-sm font-medium text-[#343833] hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+            href={scopedHref("/today", data.selectedScope.key)}
+          >
+            오늘의 흐름 전체 보기 <span aria-hidden="true">→</span>
+          </Link>
+        </div>
 
-          <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-            <h2 className="text-base font-semibold tracking-normal">주요 변동 종목</h2>
-            <div className="mt-3 space-y-2">
-              {data.topMovers.length > 0 ? (
-                data.topMovers.map((holding, index) => (
-                  <CompactHolding
-                    key={holdingPresentationKey(holding, index)}
-                    holding={holding}
-                  />
-                ))
-              ) : (
-                <p className="rounded-md bg-[#eef2e8] px-3 py-2 text-sm text-[#687064]">
-                  변동 데이터 없음
-                </p>
-              )}
-            </div>
-          </section>
+        <section aria-label="오늘의 핵심 근거" className="mt-5 border-y border-[#d9ddd7]">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5">
+            <EvidenceMetric
+              label="평가액 변동"
+              value={formatSignedKrw(data.todayChangeKrw)}
+              subValue={formatPercent(data.todayReturnPct, true)}
+              tone={data.todayChangeKrw}
+            />
+            <EvidenceMetric
+              label="최대 기여"
+              value={topContributor?.name ?? "-"}
+              subValue={formatSignedKrw(topContributor?.dailyChangeKrw ?? null)}
+              tone={topContributor?.dailyChangeKrw ?? null}
+            />
+            <EvidenceMetric
+              label="가격 영향"
+              value={formatSignedKrw(priceImpactKrw)}
+              subValue={formatPercent(priceImpactPct, true)}
+              tone={priceImpactKrw}
+            />
+            <EvidenceMetric
+              label="환율 영향"
+              value={formatSignedKrw(data.todayFxChangeKrw)}
+              subValue={formatPercent(fxImpactPct, true)}
+              tone={data.todayFxChangeKrw}
+            />
+            <EvidenceMetric
+              label="데이터 상태"
+              value={`현재가 ${liveEvidenceCount}/${data.holdings.length}`}
+              subValue={dataStatusText(data, storedPriceCount)}
+            />
+          </div>
+        </section>
 
-          <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold tracking-normal">30일 추세</h2>
-              <p className="text-xs text-[#687064]">
-                {data.recentSnapshots.length}일
-              </p>
-            </div>
-            <TrendBars points={data.recentSnapshots} />
-          </section>
+        <section aria-label="빠른 작업" className="grid gap-6 border-b border-[#d9ddd7] py-7 sm:grid-cols-3 sm:gap-0">
+          <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
+            <PortfolioRefreshButton />
+          </div>
+          <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
+            <Link
+              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+              href="/portfolio/holdings/new"
+            >
+              <span aria-hidden="true" className="text-xl">＋</span>
+              보유 종목 추가
+            </Link>
+          </div>
+          <div className="flex justify-center">
+            <Link
+              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+              href={scopedHref("/additional-contribution", data.selectedScope.key)}
+            >
+              <span aria-hidden="true" className="text-xl">Σ</span>
+              투입 금액 계산
+            </Link>
+          </div>
+        </section>
 
-          <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-            <h2 className="text-base font-semibold tracking-normal">보유 자산 상위</h2>
-            <div className="mt-3 space-y-2">
-              {topHoldings.map((holding, index) => (
-                <div
-                  key={holdingPresentationKey(holding, index)}
-                  className="space-y-1"
-                >
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="truncate font-medium">{holding.name}</span>
-                    <span className="shrink-0 font-semibold">
-                      {formatPct(holding.currentWeight)}
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-sm bg-[#e4e8dc]">
-                    <div
-                      className="h-2 rounded-sm bg-[#1e3a34]"
-                      style={{
-                        width: `${Math.min(Math.max(holding.currentWeight, 0), 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-            <h2 className="text-base font-semibold tracking-normal">데이터</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-center text-sm">
-              <DataPill
-                label="전체자산"
-                value={String(data.dataHealth.importedAssetCount)}
-              />
-              <DataPill
-                label="투자자산"
-                value={String(data.dataHealth.investmentAssetCount)}
-              />
-              <DataPill
-                label="포지션"
-                value={String(data.dataHealth.latestSnapshotPositions)}
-              />
-              <DataPill
-                label="미매칭"
-                value={String(data.dataHealth.unmatchedSnapshotRowsAllTime)}
-              />
-              <DataPill
-                label="이벤트"
-                value={String(data.dataHealth.selectedEventLedgerCount)}
-              />
-              <DataPill
-                label="실현매도"
-                value={String(data.dataHealth.selectedRealizedSellEventCount)}
-              />
-              <DataPill
-                label="헤드라인"
-                value={headlineBasisLabel(data.dataHealth.headlineBasis)}
-              />
-              <DataPill
-                label="손익차이"
-                value={formatSignedKrwCompact(
-                  data.dataHealth.portfolioSnapshotPnlDeltaKrw,
-                )}
-              />
-              <DataPill
-                label="미지원통화"
-                value={
-                  data.dataHealth.unsupportedCurrencyCount > 0
-                    ? `${data.dataHealth.unsupportedCurrencyCount} (${data.dataHealth.unsupportedCurrencies.join(", ")})`
-                    : "0"
-                }
-              />
-              <DataPill
-                label="환율기준"
-                value={formatDate(data.dataHealth.latestFxRateDate)}
-              />
-            </div>
-          </section>
-        </aside>
+        <footer className="flex flex-col gap-2 pt-5 text-[11px] text-[#858a83] sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}
+            {data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)} 기준` : ""}
+          </p>
+          <p>{movementBasisText(data)}</p>
+        </footer>
       </div>
     </main>
   );
 }
 
-function scopedDashboardNavHref(
-  href: string | undefined,
-  selectedScopeKey: DashboardData["selectedScope"]["key"],
-) {
-  if (href === "/" || href === "/today") {
-    return buildPortfolioAnalysisScopeHref(href, selectedScopeKey);
-  }
-  return href;
-}
-
-function EventActivityPanel({
-  activities,
-  data,
+function HomeNavigation({
+  generatedAt,
+  selectedScopeKey,
 }: {
-  activities: DashboardEventActivity[];
-  data: DashboardData;
+  generatedAt: string;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
-    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold tracking-normal">이벤트 활동</h2>
-          <p className="mt-1 text-xs text-[#687064]">
-            최근 {activities.length}건 · 전체 {data.dataHealth.selectedEventLedgerCount}건
-          </p>
+    <header className="border-b border-[#e1e4df] bg-[#fafbf8]">
+      <div className="mx-auto flex min-h-16 w-full max-w-[1540px] items-center justify-between gap-5 px-5 sm:px-8 lg:px-10">
+        <Link className="shrink-0 text-sm font-semibold text-[#171a16] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]" href={scopedHref("/", selectedScopeKey)}>
+          VARDA
+        </Link>
+        <nav aria-label="주요 메뉴" className="min-w-0 overflow-x-auto">
+          <div className="flex min-w-max items-center gap-7 text-sm lg:gap-12">
+            {HOME_NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                aria-current={item.href === "/" ? "page" : undefined}
+                className={`border-b py-5 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] ${
+                  item.href === "/"
+                    ? "border-[#20231f] text-[#20231f]"
+                    : "border-transparent text-[#61675f] hover:text-[#20231f]"
+                }`}
+                href={scopedHref(item.href, selectedScopeKey)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="hidden text-xs text-[#6f756d] md:inline">{formatKstTime(generatedAt)} 기준</span>
+          <PortfolioRefreshButton compact />
+          <Link
+            aria-label="세션 정보"
+            className="grid h-8 w-8 place-items-center rounded-full border border-[#d8dcd6] bg-[#f2f4f0] text-xs font-semibold hover:border-[#aeb4ac] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#347e62]"
+            href="/auth/session"
+          >
+            V
+          </Link>
         </div>
-        {data.dataHealth.selectedUnmatchedSellEventCount > 0 ? (
-          <span className="rounded-md border border-[#eadfc7] bg-[#fff8e7] px-2 py-1 text-xs font-semibold text-[#7a5b16]">
-            보존 {data.dataHealth.selectedUnmatchedSellEventCount}
-          </span>
-        ) : null}
       </div>
-      <div className="mt-3 space-y-2">
-        {activities.length > 0 ? (
-          activities.map((activity, index) => (
-            <EventActivityRow
-              key={eventActivityPresentationKey(activity, index)}
-              activity={activity}
-            />
-          ))
-        ) : (
-          <p className="rounded-md bg-[#eef2e8] px-3 py-2 text-sm text-[#687064]">
-            이벤트 없음
-          </p>
-        )}
-      </div>
-    </section>
+    </header>
   );
 }
 
-function EventActivityRow({ activity }: { activity: DashboardEventActivity }) {
+function HeroMetric({
+  divided = false,
+  label,
+  tone,
+  value,
+}: {
+  divided?: boolean;
+  label: string;
+  tone: number | null;
+  value: string;
+}) {
   return (
-    <div className="rounded-md bg-white px-3 py-2 text-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-medium text-[#687064]">
-              {formatDate(activity.eventDate)}
-            </span>
-            <span className="rounded-sm bg-[#edf1e8] px-1.5 py-0.5 text-[11px] font-semibold text-[#3d463b]">
-              {eventTypeLabel(activity.eventType)}
-            </span>
-            <span
-              className={cn(
-                "rounded-sm px-1.5 py-0.5 text-[11px] font-semibold",
-                mappingStatusClass(activity.mappingStatus),
-              )}
-            >
-              {mappingStatusLabel(activity.mappingStatus)}
-            </span>
-          </div>
-          <p className="mt-1 truncate font-semibold text-[#171916]">
-            {activity.ticker ? `${activity.ticker} · ` : ""}
-            {activity.assetName}
-          </p>
-          <p className="mt-1 truncate text-xs text-[#687064]">
-            {activity.accountLabel}
-            {activity.source ? ` · ${activity.source}` : ""}
-            {activity.ruleVersion ? ` · ${activity.ruleVersion}` : ""}
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p
-            className={cn(
-              "text-sm font-semibold tabular-nums",
-              moneyToneClass(activity.realizedPnlKrw ?? activity.amountKrw),
-            )}
-          >
-            {activity.realizedPnlKrw !== null
-              ? formatSignedKrw(activity.realizedPnlKrw)
-              : formatSignedKrw(activity.amountKrw)}
-          </p>
-          <p className="mt-1 text-[11px] font-medium text-[#737b70]">
-            {activity.realizedPnlKrw !== null
-              ? activity.missingCost
-                ? "실현·원가추정"
-                : "실현손익"
-              : activity.quantityDelta !== null
-                ? `수량 ${formatQuantity(activity.quantityDelta)}`
-                : "금액"}
-          </p>
-        </div>
-      </div>
+    <div className={`flex items-center gap-3 px-4 ${divided ? "border-l border-[#d3d7d1]" : ""}`}>
+      <dt className="text-[#666c64]">{label}</dt>
+      <dd className={`font-medium tabular-nums ${toneClass(tone)}`}>{value}</dd>
     </div>
   );
 }
 
-function MetricBlock({
+function EvidenceMetric({
   label,
-  value,
   subValue,
-  tone = "neutral",
-  emphasis = false,
+  tone = null,
+  value,
 }: {
   label: string;
+  subValue: string;
+  tone?: number | null;
   value: string;
-  subValue?: string;
-  tone?: "positive" | "negative" | "neutral";
-  emphasis?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-[#e1e5d9] bg-white px-4 py-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p
-        className={cn(
-          "mt-2 min-w-0 whitespace-nowrap font-semibold tracking-normal",
-          emphasis ? "text-xl sm:text-2xl" : "text-lg sm:text-xl",
-          toneClassValue(tone),
-        )}
-      >
+    <div className="min-w-0 border-b border-[#e2e5df] px-5 py-6 last:border-b-0 sm:odd:border-r sm:odd:border-[#e2e5df] lg:border-b-0 lg:border-r lg:border-[#e2e5df] lg:last:border-r-0">
+      <p className="text-xs font-medium text-[#6d736b]">{label}</p>
+      <p className={`mt-3 truncate text-xl font-medium tabular-nums ${toneClass(tone)}`} title={value}>
         {value}
       </p>
-      {subValue ? <p className="mt-1 text-xs text-[#687064]">{subValue}</p> : null}
+      <p className="mt-2 truncate text-xs text-[#747a72]" title={subValue}>{subValue}</p>
     </div>
   );
 }
 
-function HeatmapCell({
-  holding,
-  maxValue,
-}: {
-  holding: DashboardHolding;
-  maxValue: number;
-}) {
-  const signal = holding.dailyReturnPct;
-  const hasSignal = signal !== null;
-  const intensity = hasSignal ? Math.min(Math.abs(signal) / 4, 1) : 0;
-  const valueRatio = Math.max(holding.valueKrw / maxValue, 0.18);
-  const color = hasSignal
-    ? signal >= 0
-      ? `rgba(34, 128, 92, ${0.18 + intensity * 0.62})`
-      : `rgba(189, 68, 73, ${0.18 + intensity * 0.62})`
-    : "#eef2e8";
-
-  return (
-    <div
-      className="aspect-square rounded-md border border-white/80 p-3 text-[#111511]"
-      style={{ backgroundColor: color }}
-    >
-      <div className="flex h-full flex-col justify-between">
-        <div>
-          <p className="truncate text-sm font-semibold">{holding.ticker ?? "-"}</p>
-          <p className="mt-1 truncate text-xs text-[#25302a]">{holding.name}</p>
-        </div>
-        <div>
-          <div className="mb-2 h-1.5 rounded-sm bg-white/45">
-            <div
-              className="h-1.5 rounded-sm bg-[#111511]/75"
-              style={{ width: `${Math.min(valueRatio * 100, 100)}%` }}
-            />
-          </div>
-          <p className="text-xs font-semibold">
-            {hasSignal ? formatPct(signal, true) : "-"}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+function largestPositiveContributor(holdings: readonly DashboardHolding[]) {
+  return holdings
+    .filter((holding) => holding.dailyChangeKrw !== null)
+    .toSorted((left, right) => (right.dailyChangeKrw ?? 0) - (left.dailyChangeKrw ?? 0))[0] ?? null;
 }
 
-function HoldingRow({ holding }: { holding: DashboardHolding }) {
-  return (
-    <tr className="border-t border-[#e3e7da] bg-white/60">
-      <td className="px-4 py-3">
-        <div className="max-w-[260px]">
-          <p className="truncate font-semibold text-[#171916]">{holding.name}</p>
-          <p className="truncate text-xs text-[#687064]">
-            {holding.ticker ?? "-"} · {holding.market} · {holding.currency}
-          </p>
-        </div>
-      </td>
-      <td className="px-3 py-3 text-[#4e574c]">{accountLabel(holding.account)}</td>
-      <td className="px-3 py-3 text-right tabular-nums">
-        {formatQuantity(holding.quantity)}
-      </td>
-      <td className="px-3 py-3 text-right tabular-nums">
-        {formatPrice(holding.currentPrice, holding.currency)}
-      </td>
-      <td className="px-3 py-3 text-right font-semibold tabular-nums">
-        {formatKrw(holding.valueKrw)}
-      </td>
-      <td className="px-3 py-3 text-right tabular-nums">
-        {formatPct(holding.currentWeight)}
-      </td>
-      <td className="px-3 py-3 text-right tabular-nums">
-        {formatPct(holding.effectiveTargetWeight)}
-      </td>
-      <td className={cn("px-3 py-3 text-right tabular-nums", toneClass(holding.driftPct))}>
-        {formatPct(holding.driftPct, true)}
-      </td>
-      <td
-        className={cn(
-          "px-3 py-3 text-right tabular-nums",
-          moneyToneClass(holding.dailyChangeKrw),
-        )}
-      >
-        <p>{formatSignedKrw(holding.dailyChangeKrw)}</p>
-        <p className="text-[11px] font-medium text-[#737b70]">
-          {movementSourceLabel(holding.dailySource)}
-        </p>
-      </td>
-      <td
-        className={cn(
-          "px-4 py-3 text-right font-semibold tabular-nums",
-          toneClass(holding.totalReturnPct),
-        )}
-      >
-        {formatPct(holding.totalReturnPct, true)}
-      </td>
-    </tr>
-  );
+function hasLivePriceEvidence(holding: DashboardHolding) {
+  return holding.priceStatus === "ok" && LIVE_QUOTE_TYPES.has(holding.priceQuoteType ?? "");
 }
 
-function NonInvestmentCard({
-  assets,
-  totalValue,
-}: {
-  assets: NonInvestmentAsset[];
-  totalValue: number;
-}) {
-  return (
-    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold tracking-normal">
-            비투자/현금성 자산
-          </h2>
-          <p className="mt-1 text-xs text-[#687064]">투자 비중·드리프트 제외</p>
-        </div>
-        <p className="shrink-0 text-sm font-semibold">{formatKrw(totalValue)}</p>
-      </div>
-      <div className="mt-3 space-y-2">
-        {assets.map((asset, index) => (
-          <div
-            key={nonInvestmentPresentationKey(asset, index)}
-            className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-sm"
-          >
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{asset.name}</p>
-              <p className="text-xs text-[#687064]">
-                {accountLabel(asset.account)} · {assetTypeLabel(asset.assetType)}
-              </p>
-            </div>
-            <p className="shrink-0 font-semibold">{formatKrw(asset.valueKrw)}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+function dataStatusText(data: DashboardData, storedPriceCount: number) {
+  const historyCoverage = data.holdingHistory.coveragePct;
+  if (storedPriceCount > 0) return `${storedPriceCount}종목 저장 가격 사용`;
+  if (historyCoverage !== null) return `변동 이력 ${formatPercent(historyCoverage)} 커버리지`;
+  return "종목별 이력 수집 대기";
 }
 
-function BriefingRow({
-  label,
-  value,
-  subValue,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  subValue?: string;
-  tone?: "positive" | "negative" | "neutral";
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
-      <span className="text-sm text-[#687064]">{label}</span>
-      <span className={cn("text-right text-sm font-semibold", toneClassValue(tone))}>
-        {value}
-        {subValue ? (
-          <span className="ml-2 text-xs font-medium text-[#777f73]">{subValue}</span>
-        ) : null}
-      </span>
-    </div>
-  );
+function movementBasisText(data: DashboardData) {
+  if (!data.dataHealth.movementReady) return "오늘 변동 근거 일부 부족";
+  if (data.dataHealth.movementSource === "daily_position_snapshot") return "오늘 변동: 기준 스냅샷 대비";
+  if (data.dataHealth.movementSource === "asset_price_snapshot") return "오늘 변동: 최근 종가 대비";
+  return "오늘 변동 근거 확인 중";
 }
 
-function CompactHolding({ holding }: { holding: DashboardHolding }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{holding.name}</p>
-        <p className="text-xs text-[#687064]">
-          {holding.ticker ?? "-"} · {movementSourceLabel(holding.dailySource)}
-        </p>
-      </div>
-      <div className="text-right">
-        <p
-          className={cn(
-            "text-sm font-semibold",
-            moneyToneClass(holding.dailyChangeKrw),
-          )}
-        >
-          {formatSignedKrw(holding.dailyChangeKrw)}
-        </p>
-        <p className={cn("text-xs", toneClass(holding.dailyReturnPct))}>
-          {formatPct(holding.dailyReturnPct, true)}
-        </p>
-      </div>
-    </div>
-  );
+function percentageOfPrevious(value: number | null, previousValue: number) {
+  if (value === null || previousValue <= 0) return null;
+  return (value / previousValue) * 100;
 }
 
-function TrendBars({ points }: { points: RecentPortfolioPoint[] }) {
-  if (points.length === 0) {
-    return (
-      <p className="mt-3 rounded-md bg-[#eef2e8] px-3 py-2 text-sm text-[#687064]">
-        히스토리 없음
-      </p>
-    );
-  }
-
-  const values = points.map((point) => point.totalMarketValue);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(max - min, 1);
-
-  return (
-    <div className="mt-4 flex h-24 items-end gap-1 rounded-md bg-white px-3 py-3">
-      {points.map((point) => {
-        const height = 18 + ((point.totalMarketValue - min) / range) * 70;
-        return (
-          <div
-            key={point.date}
-            className="min-w-0 flex-1 rounded-sm bg-[#3d6b5e]"
-            title={`${formatDate(point.date)} ${formatKrw(point.totalMarketValue)}`}
-            style={{ height: `${height}%` }}
-          />
-        );
-      })}
-    </div>
-  );
+function scopedHref(path: string, selectedScopeKey: PortfolioAnalysisScopeKey) {
+  return buildPortfolioAnalysisScopeHref(path, selectedScopeKey);
 }
 
-function DataPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-white px-2 py-2">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 font-semibold tabular-nums">{value}</p>
-    </div>
-  );
+function homeScopeLabel(scope: PortfolioAnalysisScope) {
+  return scope.kind === "all" ? "전체 자산" : scope.label;
 }
 
-function holdingPresentationKey(holding: DashboardHolding, index: number) {
-  return [
-    holding.account,
-    holding.market,
-    holding.ticker ?? holding.name,
-    index,
-  ].join(":");
-}
-
-function eventActivityPresentationKey(
-  activity: DashboardEventActivity,
-  index: number,
-) {
-  return [
-    activity.eventDate,
-    activity.eventType,
-    activity.account ?? "unknown",
-    activity.ticker ?? activity.assetName,
-    index,
-  ].join(":");
-}
-
-function nonInvestmentPresentationKey(
-  asset: NonInvestmentAsset,
-  index: number,
-) {
-  return [asset.account, asset.assetType, asset.ticker ?? asset.name, index].join(
-    ":",
-  );
-}
-
-function movementHealthText(data: DashboardData) {
-  if (data.dataHealth.movementReady) {
-    const source =
-      data.dataHealth.movementSource === "asset_price_snapshot"
-        ? "전일종가 fallback"
-        : "포지션 스냅샷";
-    const coverage =
-      data.dataHealth.movementSource === "asset_price_snapshot"
-        ? data.dataHealth.previousCloseCoveragePct
-        : data.dataHealth.movementCurrentCoveragePct;
-    return `${source} 기준 · 커버리지 ${formatPct(coverage)}`;
-  }
-
-  if (data.dataHealth.movementReason === "missing_fresh_live_prices") {
-    return "현재 주기 가격 근거가 부족해 오늘 변동을 숨김";
-  }
-
-  return data.dataHealth.movementReason === "incomplete_baseline_snapshot"
-    ? "기준 스냅샷 커버리지가 낮아 오늘 변동을 보수적으로 숨김"
-    : "오늘 변동 기준 데이터 없음";
-}
-
-function movementSourceLabel(source: DashboardHolding["dailySource"]) {
-  if (source === "daily_position_snapshot") return "스냅샷";
-  if (source === "asset_price_snapshot") return "전일종가";
-  return "-";
-}
-
-function eventTypeLabel(value: string) {
-  if (value === "buy") return "매수";
-  if (value === "sell") return "매도";
-  if (value === "dividend") return "배당";
-  if (value === "deposit") return "입금";
-  if (value === "withdrawal") return "출금";
-  if (value === "rebalance") return "리밸런싱";
-  return value;
-}
-
-function mappingStatusLabel(value: DashboardEventActivity["mappingStatus"]) {
-  if (value === "mapped") return "mapped";
-  if (value === "legacy_only") return "legacy only";
-  return "unmatched";
-}
-
-function mappingStatusClass(value: DashboardEventActivity["mappingStatus"]) {
-  if (value === "mapped") return "bg-[#edf6ec] text-[#25633f]";
-  if (value === "legacy_only") return "bg-[#fff8e7] text-[#7a5b16]";
-  return "bg-[#f8ecec] text-[#9a3439]";
-}
-
-function principalSubValue(data: DashboardData) {
-  const parts = [`${data.holdings.length}개 보유`];
-  if (Math.abs(data.realizedCostBasisKrw) >= 0.5) {
-    parts.push(`실현원가 ${formatKrwCompact(data.realizedCostBasisKrw)}`);
-  }
-  return parts.join(" · ");
-}
-
-function headlineBasisLabel(value: DashboardData["dataHealth"]["headlineBasis"]) {
-  if (value === "current_assets_plus_event_ledger") return "현재+실현";
-  return value;
-}
-
-function formatFxFreshness(data: DashboardData) {
-  const state = data.dataHealth.fxFreshnessState;
-  if (state === "missing") return "저장 환율 없음";
-  if (data.dataHealth.latestFxAgeDays === null) return "저장 환율";
-  if (state === "fresh") return "저장 환율 최신";
-  return `저장 환율 ${data.dataHealth.latestFxAgeDays}일 전`;
-}
-
-function formatFxSource(value: string | null) {
-  if (!value) return "source 없음";
-  return value.length > 18 ? `${value.slice(0, 18)}...` : value;
-}
-
-function formatKrw(value: number | null) {
-  if (value === null) return "-";
-  return new Intl.NumberFormat("ko-KR", {
-    style: "currency",
-    currency: "KRW",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatSignedKrw(value: number | null) {
-  if (value === null) return "-";
-  const cleanValue = Math.abs(value) < 0.5 ? 0 : value;
-  const formatted = formatKrw(Math.abs(cleanValue));
-  if (cleanValue > 0) return `+${formatted}`;
-  if (cleanValue < 0) return `-${formatted}`;
-  return formatted;
-}
-
-function formatKrwCompact(value: number | null) {
-  if (value === null) return "-";
-  return compactKrw(value, false);
-}
-
-function formatSignedKrwCompact(value: number | null) {
-  if (value === null) return "-";
-  return compactKrw(value, true);
-}
-
-function compactKrw(value: number, signed: boolean) {
-  const cleanValue = Math.abs(value) < 0.5 ? 0 : value;
-  const absValue = Math.abs(cleanValue);
-  const prefix = signed && cleanValue > 0 ? "+" : cleanValue < 0 ? "-" : "";
-
-  if (absValue >= 100_000_000) {
-    return `${prefix}${(absValue / 100_000_000).toFixed(1)}억`;
-  }
-  if (absValue >= 10_000) {
-    return `${prefix}${Math.round(absValue / 10_000).toLocaleString("ko-KR")}만`;
-  }
-  return `${prefix}${formatKrw(absValue)}`;
-}
-
-function formatPct(value: number | null, signed = false) {
-  if (value === null) return "-";
-  const cleanValue = Math.abs(value) < 0.005 ? 0 : value;
-  const sign = signed && cleanValue > 0 ? "+" : "";
-  return `${sign}${cleanValue.toFixed(2)}%`;
-}
-
-function formatNumber(value: number | null) {
-  if (value === null) return "-";
-  return new Intl.NumberFormat("ko-KR", {
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatQuantity(value: number) {
-  return new Intl.NumberFormat("ko-KR", {
-    maximumFractionDigits: 6,
-  }).format(value);
-}
-
-function formatPrice(value: number, currency: string) {
-  if (currency === "USD") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-  return formatKrw(value);
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "-";
-  return value.slice(0, 10).replaceAll("-", ".");
-}
-
-function accountLabel(value: string) {
-  if (value === "brokerage") return "증권";
-  if (value === "isa") return "ISA";
-  if (value === "irp") return "IRP";
-  return value;
-}
-
-function assetTypeLabel(value: string) {
-  if (value === "housing_subscription") return "청약";
-  if (value === "savings") return "저축";
-  if (value === "fixed_deposit") return "예금";
-  return value;
-}
-
-function toneFor(value: number | null): "positive" | "negative" | "neutral" {
-  if (value === null || Math.abs(value) < 0.005) return "neutral";
-  return value > 0 ? "positive" : "negative";
-}
-
-function moneyToneFor(value: number | null): "positive" | "negative" | "neutral" {
-  if (value === null || Math.abs(value) < 0.5) return "neutral";
-  return value > 0 ? "positive" : "negative";
-}
-
-function toneClass(value: number | null) {
-  return toneClassValue(toneFor(value));
-}
-
-function moneyToneClass(value: number | null) {
-  return toneClassValue(moneyToneFor(value));
-}
-
-function toneClassValue(tone: "positive" | "negative" | "neutral") {
-  if (tone === "positive") return "text-[#1d7a4a]";
-  if (tone === "negative") return "text-[#b43d43]";
-  return "text-[#2e352f]";
-}
-
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+function compareHomeScope(left: PortfolioAnalysisScope, right: PortfolioAnalysisScope) {
+  const rank = { all: 0, account: 1, portfolio_group: 2 } as const;
+  return rank[left.kind] - rank[right.kind];
 }

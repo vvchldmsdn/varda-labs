@@ -72,14 +72,17 @@ async function DashboardContent({
 
 function DashboardSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f3f4ef] p-4 text-[#171916]">
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 lg:grid-cols-[220px_minmax(0,1fr)_360px]">
-        <div className="h-80 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-        <div className="space-y-4">
-          <div className="h-48 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-96 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    <main className="min-h-screen bg-[#f7f8f5] text-[#20231f]">
+      <div className="h-16 border-b border-[#e1e4df] bg-[#fafbf8]" />
+      <div className="mx-auto w-full max-w-[1540px] animate-pulse px-5 py-10 sm:px-8 lg:px-10">
+        <div className="h-4 w-40 bg-[#e4e7e2]" />
+        <div className="mt-8 h-5 w-full max-w-xl bg-[#e4e7e2]" />
+        <div className="mx-auto mt-16 h-20 w-full max-w-2xl bg-[#e1e4df]" />
+        <div className="mt-16 grid gap-12 border-t border-[#d9ddd7] pt-9 lg:grid-cols-[minmax(0,1.5fr)_minmax(420px,0.9fr)]">
+          <div className="h-[340px] bg-[#eceeeb]" />
+          <div className="h-[340px] bg-[#eceeeb]" />
         </div>
-        <div className="h-96 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+        <div className="mt-10 h-28 border-y border-[#d9ddd7] bg-[#f1f3ef]" />
       </div>
     </main>
   );
