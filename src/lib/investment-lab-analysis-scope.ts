@@ -3,7 +3,7 @@ import type {
   InvestmentLabSourceSnapshotRow,
 } from "./investment-lab-counterfactual-read-model.ts";
 import type { InvestmentLabAnchorPositionRow } from "./investment-lab-anchor-basket-anchor.ts";
-import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./investment-lab-special-holding-authority.ts";
+import { matchesDecisionSupportSpecialHolding } from "./portfolio-analysis-special-holding-authority.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
   isNamedPortfolioAccount,
@@ -379,15 +379,7 @@ function matchesFountMetadata(row: Readonly<{
   currency?: string | null;
   assetType?: string | null;
 }>) {
-  const decision =
-    DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount;
-  return (
-    normalize(row.assetName) === normalize(decision.assetName) &&
-    normalize(row.account) === decision.account &&
-    normalize(row.market) === decision.market &&
-    normalizeUpper(row.currency) === decision.currency &&
-    normalize(row.assetType) === decision.assetType
-  );
+  return matchesDecisionSupportSpecialHolding(row, "fount");
 }
 
 function provenanceKey(date: string, accountId: string, source: string) {
@@ -398,12 +390,4 @@ function finiteNonNegative(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
-}
-
-function normalize(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
-function normalizeUpper(value: unknown) {
-  return typeof value === "string" ? value.trim().toUpperCase() : "";
 }

@@ -117,6 +117,35 @@ describe("holding analysis data readiness", () => {
     assert.equal(managed.reason, "managed_sleeve_excluded");
   });
 
+  it("uses the exact reviewed Fount metadata without inferring from its name alone", () => {
+    const fount = readiness({
+      holding: holding({
+        accountCode: "irp",
+        name: "Fount 일임서비스",
+        ticker: null,
+        assetType: "etf",
+      }),
+      priceRows: [],
+    });
+    const sameNameDifferentAccount = readiness({
+      holding: holding({
+        accountCode: "brokerage",
+        name: "Fount 일임서비스",
+        ticker: null,
+        assetType: "etf",
+      }),
+      priceRows: [],
+    });
+
+    assert.equal(fount.state, "unsupported");
+    assert.equal(fount.reason, "managed_sleeve_excluded");
+    assert.equal(sameNameDifferentAccount.state, "unsupported");
+    assert.equal(
+      sameNameDifferentAccount.reason,
+      "instrument_identity_unresolved",
+    );
+  });
+
   it("returns cooldown evidence immediately without waiting", () => {
     const now = new Date("2026-08-21T00:00:00.000Z");
     const blocked = evaluateHoldingAnalysisDataCooldown({
@@ -155,6 +184,7 @@ describe("holding analysis data readiness", () => {
     assert.match(writerSource, /ticker = target\.ticker/);
     assert.match(writerSource, /accounts: \[\]/);
     assert.match(writerSource, /assetIds: \[\]/);
+    assert.match(writerSource, /managed_sleeve_excluded/);
     assert.doesNotMatch(writerSource, /setTimeout|Start-Sleep|\bretry\b/i);
     assert.doesNotMatch(onboardingWriterSource, /\bfetch\s*\(/);
     assert.doesNotMatch(pageSource, /createKisMarketDataProvider/);
