@@ -117,8 +117,21 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
     assert.equal(
       page.match(/<SimulationSectionErrorBoundary/g)?.length,
-      8,
+      12,
       "each independent simulation query section must have its own error boundary",
+    );
+    assert.match(page, /ownerResearchExecution=\{/);
+    assert.match(page, /ownerCandidateComparison=\{/);
+    assert.match(page, /ownerWalkForwardValidation=\{/);
+    assert.match(page, /ownerHistoricalValidation=\{/);
+    assert.match(page, /OwnerResearchExecutionContent/);
+    assert.match(page, /OwnerCandidateComparisonContent/);
+    assert.match(page, /OwnerWalkForwardValidationContent/);
+    assert.match(page, /OwnerHistoricalValidationContent/);
+    assert.equal(
+      page.match(/resultPromise=\{ownerResearchPromise\}/g)?.length,
+      5,
+      "owner input and result sections must reuse the started owner research promise",
     );
     assert.match(sectionErrorBoundary, /^"use client";/);
     assert.match(sectionErrorBoundary, /unstable_catchError/);

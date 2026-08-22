@@ -112,6 +112,7 @@ import "./simulation-private-owner-raw-history.test.mjs";
 import "./simulation-history-completion.test.mjs";
 import "./simulation-history-command.test.mjs";
 import "./simulation-navigation.test.mjs";
+import "./analysis-journey-navigation.test.mjs";
 import "./simulation-research-universe-preflight.test.mjs";
 import "./simulation-return-matrix-universe-evidence.test.mjs";
 import "./simulation-period-request-resolver.test.mjs";

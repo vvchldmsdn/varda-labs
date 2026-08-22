@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AnalysisJourneyNav } from "@/components/analysis-journey-nav";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart";
@@ -20,6 +21,7 @@ import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
 import type { InvestmentLabObservedHistory } from "@/lib/investment-lab-observed-history-segments";
+import type { InvestmentLabPreperiodOptimizer } from "@/lib/investment-lab-preperiod-optimizer";
 import {
   buildPortfolioAnalysisScopeHref,
   type PortfolioAnalysisScope,
@@ -38,6 +40,7 @@ export function InvestmentLabView({
   fundingPreflight,
   model,
   observedHistory,
+  optimizerStatus,
   period,
   scopeCatalog,
   scopeQuery,
@@ -54,6 +57,7 @@ export function InvestmentLabView({
   fundingPreflight: InvestmentLabAccountFundingPreflight;
   model: InvestmentLabCounterfactualReadModel;
   observedHistory: InvestmentLabObservedHistory;
+  optimizerStatus: InvestmentLabPreperiodOptimizer["status"];
   period: InvestmentLabPeriodSelection;
   scopeCatalog: readonly PortfolioAnalysisScope[];
   scopeQuery: PortfolioAnalysisScopeQuery;
@@ -235,44 +239,103 @@ export function InvestmentLabView({
           </div>
         </header>
 
-        {dataAvailability}
-
-        <InvestmentLabPeriodSelector
-          period={period}
-          query={scopeQuery}
-          scopeKey={selectedScope.key}
+        <AnalysisJourneyNav
+          items={[
+            {
+              description: "실제 평가액과 여러 가상 포트폴리오를 같은 기간으로 비교합니다.",
+              href: "#investment-lab-results",
+              label: "성과 비교",
+              status: investmentLabResultStatus({
+                model,
+                periodReady,
+                showSegmentedHistory,
+              }),
+            },
+            {
+              description: "최고 수익, 최소 변동성, 최소 낙폭, 최대 샤프 비중을 비교합니다.",
+              href: "#investment-lab-optimizer",
+              label: "비중 실험",
+              status: optimizerStatusLabel(optimizerStatus),
+            },
+            {
+              description: "과거 충격 구간과 ETF 내부 노출을 별도 데이터 경계에서 확인합니다.",
+              href: "#investment-lab-etf-xray",
+              label: "스트레스와 구성",
+              status: "독립 계산",
+            },
+            {
+              description: "현재 비중을 조금 바꿨을 때 구조와 위험 지표가 어떻게 달라지는지 봅니다.",
+              href: "#investment-lab-small-adjustment",
+              label: "작은 조정",
+              status: "독립 계산",
+            },
+          ]}
         />
 
-        {showSegmentedHistory ? (
-          <InvestmentLabObservedHistoryView
-            model={observedHistory}
+        <div className="scroll-mt-4 space-y-4" id="investment-lab-results">
+          {dataAvailability}
+
+          <InvestmentLabPeriodSelector
+            period={period}
             query={scopeQuery}
             scopeKey={selectedScope.key}
           />
-        ) : null}
 
-        <InvestmentLabFundingPreflightView model={fundingPreflight} />
+          {showSegmentedHistory ? (
+            <InvestmentLabObservedHistoryView
+              model={observedHistory}
+              query={scopeQuery}
+              scopeKey={selectedScope.key}
+            />
+          ) : null}
 
-        {!periodReady ? null : model.observedPath.status === "ready" ? (
-          <ReadyView
-            anchorBasketScenario={anchorBasketScenario}
-            anchorValueWeightScenario={anchorValueWeightScenario}
-            anchorCurrentWeightMonthlyScenario={
-              anchorCurrentWeightMonthlyScenario
-            }
-            anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
-            approvedTargetWeightScenario={approvedTargetWeightScenario}
-            fountScopeAdjustment={fountScopeAdjustment}
-            model={model}
-            period={period}
-            selectedScope={selectedScope}
-          />
-        ) : (
-          <BlockedView model={model} />
-        )}
+          <InvestmentLabFundingPreflightView model={fundingPreflight} />
+
+          {!periodReady ? null : model.observedPath.status === "ready" ? (
+            <ReadyView
+              anchorBasketScenario={anchorBasketScenario}
+              anchorValueWeightScenario={anchorValueWeightScenario}
+              anchorCurrentWeightMonthlyScenario={
+                anchorCurrentWeightMonthlyScenario
+              }
+              anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
+              approvedTargetWeightScenario={approvedTargetWeightScenario}
+              fountScopeAdjustment={fountScopeAdjustment}
+              model={model}
+              period={period}
+              selectedScope={selectedScope}
+            />
+          ) : (
+            <BlockedView model={model} />
+          )}
+        </div>
       </div>
     </main>
   );
+}
+
+function investmentLabResultStatus({
+  model,
+  periodReady,
+  showSegmentedHistory,
+}: {
+  model: InvestmentLabCounterfactualReadModel;
+  periodReady: boolean;
+  showSegmentedHistory: boolean;
+}) {
+  if (!periodReady) {
+    return showSegmentedHistory ? "부분 이력 표시" : "기간 확인 필요";
+  }
+  if (model.observedPath.status !== "ready") return "입력 확인 필요";
+  return model.status === "ready" ? "계산 가능" : "일부 계산 가능";
+}
+
+function optimizerStatusLabel(
+  status: InvestmentLabPreperiodOptimizer["status"],
+) {
+  if (status === "ready") return "4개 목적 계산 가능";
+  if (status === "training_unavailable") return "학습 이력 확인 필요";
+  return "비교 경로 확인 필요";
 }
 
 function ReadyView({
