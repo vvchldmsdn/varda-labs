@@ -111,7 +111,12 @@ export type PortfolioMovementContribution = {
   changeKrw: number;
   returnPct: number | null;
   tradeFlowKrw: number;
+  priceChangeKrw: number;
   fxChangeKrw: number;
+  previousPrice: number;
+  currentPrice: number;
+  previousFxRate: number;
+  currentFxRate: number;
   source: Exclude<PortfolioMovementSource, null>;
 };
 
@@ -153,6 +158,7 @@ export type PortfolioMovementResult = {
   changeKrw: number | null;
   returnPct: number | null;
   tradeFlowKrw: number;
+  priceChangeKrw: number | null;
   fxChangeKrw: number | null;
   contributions: Map<string, PortfolioMovementContribution>;
   contributionRows: PortfolioMovementContribution[];
@@ -240,6 +246,7 @@ export function buildDailyPositionMovement({
   let matchedSnapshotValue = 0;
   let matchedCount = 0;
   let tradeFlowKrw = 0;
+  let priceChangeKrw = 0;
   let fxChangeKrw = 0;
   let fxEvidenceChangeKrw = 0;
   let fxEvidenceRequiredValueKrw = 0;
@@ -336,11 +343,12 @@ export function buildDailyPositionMovement({
       );
       continue;
     }
+    const previousPrice = snapshotPositionPrice(snapshot, holding.currentPrice);
     const movement = calculateFxAwareSnapshotMovementKrw({
       quantity: holding.quantity,
       currentPrice: holding.currentPrice,
       currentValueKrw: holding.valueKrw,
-      previousPrice: snapshotPositionPrice(snapshot, holding.currentPrice),
+      previousPrice,
       previousValueKrw,
       currentFxRate: currentFx.rate,
       previousFxRate: effectivePreviousFxRate,
@@ -355,7 +363,12 @@ export function buildDailyPositionMovement({
       changeKrw: movement.changeKrw,
       returnPct: percentOrNull(movement.changeKrw, previousValueKrw),
       tradeFlowKrw: holdingTradeFlowKrw,
+      priceChangeKrw: movement.priceChangeKrw,
       fxChangeKrw: holdingFxChangeKrw,
+      previousPrice,
+      currentPrice: holding.currentPrice,
+      previousFxRate: effectivePreviousFxRate,
+      currentFxRate: currentFx.rate,
       source: "daily_position_snapshot",
     });
     matchedSnapshotIds.add(snapshot.id);
@@ -363,6 +376,7 @@ export function buildDailyPositionMovement({
     matchedSnapshotValue += previousValueKrw;
     matchedCount += 1;
     tradeFlowKrw += holdingTradeFlowKrw;
+    priceChangeKrw += movement.priceChangeKrw;
     fxChangeKrw += holdingFxChangeKrw;
   }
 
@@ -428,6 +442,7 @@ export function buildDailyPositionMovement({
     changeKrw,
     returnPct: percentOrNull(changeKrw, snapshotTotalValue),
     tradeFlowKrw,
+    priceChangeKrw,
     fxChangeKrw: independentFxChangeKrw ?? fxChangeKrw,
     contributions,
     contributionRows: [...contributions.values()],
@@ -460,6 +475,7 @@ export function buildPreviousCloseMovement({
   let matchedCount = 0;
   let previousTotalKrw = 0;
   let changeKrw = 0;
+  let priceChangeKrw = 0;
   let fxChangeKrw = 0;
 
   for (const holding of movementHoldings) {
@@ -509,6 +525,7 @@ export function buildPreviousCloseMovement({
     matchedCount += 1;
     previousTotalKrw += previous.previousValueKrw;
     changeKrw += previous.changeKrw;
+    priceChangeKrw += previous.priceChangeKrw;
     fxChangeKrw += previous.fxChangeKrw;
   }
 
@@ -536,6 +553,7 @@ export function buildPreviousCloseMovement({
       changeKrw: null,
       returnPct: null,
       tradeFlowKrw: 0,
+      priceChangeKrw: null,
       fxChangeKrw: null,
       contributions,
       contributionRows: [...contributions.values()],
@@ -555,6 +573,7 @@ export function buildPreviousCloseMovement({
     changeKrw,
     returnPct: percentOrNull(changeKrw, previousTotalKrw),
     tradeFlowKrw: 0,
+    priceChangeKrw,
     fxChangeKrw,
     contributions,
     contributionRows: [...contributions.values()],
@@ -643,7 +662,12 @@ function calculatePreviousCloseContribution(
     changeKrw: movement.changeKrw,
     returnPct: percentOrNull(movement.changeKrw, movement.previousValueKrw),
     tradeFlowKrw: 0,
+    priceChangeKrw: movement.priceChangeKrw,
     fxChangeKrw: currentFx.requiresFx ? movement.fxChangeKrw : 0,
+    previousPrice: closePrice,
+    currentPrice: holding.currentPrice,
+    previousFxRate,
+    currentFxRate: currentFx.rate,
     source: "asset_price_snapshot" as const,
   };
 }
@@ -669,6 +693,7 @@ function emptyMovement(
   details: {
     contributionRows?: PortfolioMovementContribution[];
     exclusions?: PortfolioMovementExclusion[];
+    priceChangeKrw?: number | null;
     fxChangeKrw?: number | null;
     previousTotalKrw?: number;
   } = {},
@@ -681,6 +706,7 @@ function emptyMovement(
     changeKrw: null,
     returnPct: null,
     tradeFlowKrw: 0,
+    priceChangeKrw: details.priceChangeKrw ?? null,
     fxChangeKrw: details.fxChangeKrw ?? null,
     contributions: new Map(),
     contributionRows: details.contributionRows ?? [],

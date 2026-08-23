@@ -99,10 +99,12 @@ describe("portfolio movement builder", () => {
     assert.equal(result.source, "daily_position_snapshot");
     assert.equal(result.previousTotalKrw, 1000);
     assert.equal(result.changeKrw, -50);
+    assert.equal(result.priceChangeKrw, -50);
     assert.equal(result.fxChangeKrw, 0);
     assert.equal(result.coverage.currentCoveragePct, 100);
     assert.equal(result.coverage.snapshotCoveragePct, 100);
     assert.equal(contribution?.changeKrw, -50);
+    assert.equal(contribution?.priceChangeKrw, -50);
     assert.equal(contribution?.fxChangeKrw, 0);
     assert.deepEqual(result.contributionRows, [contribution]);
     assert.equal("legacyBase44Id" in result.contributionRows[0], false);
@@ -140,8 +142,10 @@ describe("portfolio movement builder", () => {
 
     assert.equal(result.ready, true);
     assertClose(result.changeKrw, -14_823.039);
+    assertClose(result.priceChangeKrw, 0);
     assertClose(result.fxChangeKrw, -14_823.039);
     assertClose(contribution?.changeKrw, -14_823.039);
+    assertClose(contribution?.priceChangeKrw, 0);
     assertClose(contribution?.fxChangeKrw, -14_823.039);
   });
 
@@ -176,8 +180,10 @@ describe("portfolio movement builder", () => {
 
     assert.equal(result.ready, true);
     assertClose(result.changeKrw, 61_021.958);
+    assertClose(result.priceChangeKrw, 76_586.14895);
     assertClose(result.fxChangeKrw, -15_564.19095);
     assertClose(contribution?.changeKrw, 61_021.958);
+    assertClose(contribution?.priceChangeKrw, 76_586.14895);
     assertClose(contribution?.fxChangeKrw, -15_564.19095);
   });
 
@@ -240,6 +246,7 @@ describe("portfolio movement builder", () => {
 
     assert.equal(result.ready, true);
     assertClose(result.changeKrw, -9_931.611738611567, 0.001);
+    assertClose(result.priceChangeKrw, -9_931.611738611567, 0.001);
     assertClose(result.fxChangeKrw, 0);
     assertClose(
       result.changeKrw - result.fxChangeKrw,
@@ -250,6 +257,19 @@ describe("portfolio movement builder", () => {
       result.contributions.get("asset-voo")?.changeKrw,
       -5_875.54538464,
       0.001,
+    );
+    assertClose(
+      result.contributions.get("asset-voo")?.priceChangeKrw,
+      -5_875.54538464,
+      0.001,
+    );
+    assert.equal(
+      result.contributions.get("asset-voo")?.previousPrice,
+      704.77,
+    );
+    assert.equal(
+      result.contributions.get("asset-voo")?.currentPrice,
+      703.71,
     );
   });
 
@@ -776,8 +796,10 @@ describe("portfolio movement builder", () => {
     assert.equal(result.ready, true);
     assert.equal(result.source, "asset_price_snapshot");
     assertClose(result.changeKrw, 61_021.958);
+    assertClose(result.priceChangeKrw, 76_586.14895);
     assertClose(result.fxChangeKrw, -15_564.19095);
     assertClose(contribution?.changeKrw, 61_021.958);
+    assertClose(contribution?.priceChangeKrw, 76_586.14895);
     assertClose(contribution?.fxChangeKrw, -15_564.19095);
     assert.deepEqual(result.contributionRows, [contribution]);
   });

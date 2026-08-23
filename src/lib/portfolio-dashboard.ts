@@ -100,6 +100,7 @@ export type DashboardHolding = {
   dailyReturnPct: number | null;
   dailySource: MovementSource;
   previousCloseValueKrw: number | null;
+  priceDailyChangeKrw: number | null;
   fxDailyChangeKrw: number | null;
   groupName: string | null;
 };
@@ -231,7 +232,11 @@ export type DashboardTodayMovement = {
   changeKrw: number | null;
   returnPct: number | null;
   tradeFlowKrw: number;
+  priceChangeKrw: number | null;
   fxChangeKrw: number | null;
+  scopePreviousTotalKrw: number | null;
+  scopeCurrentTotalKrw: number | null;
+  movementExcludedCurrentValueKrw: number;
   contributionRows: PortfolioMovementContribution[];
   exclusions: PortfolioMovementExclusion[];
   coverage: PortfolioMovementCoverage;
@@ -377,6 +382,18 @@ export async function getPortfolioDashboard(
   ).length;
 
   const totalValueKrw = sumBy(holdings, (holding) => holding.valueKrw);
+  const movementExcludedCurrentValueKrw = sumBy(
+    holdings.filter((holding) => !holding.movementEligible),
+    (holding) => holding.valueKrw,
+  );
+  const scopePreviousTotalKrw =
+    movement.ready && movement.changeKrw !== null
+      ? totalValueKrw - movement.changeKrw - movement.tradeFlowKrw
+      : null;
+  const scopeTodayReturnPct = percentOrNull(
+    movement.changeKrw,
+    scopePreviousTotalKrw,
+  );
   const costBasisKrw = sumBy(holdings, (holding) => holding.costBasisKrw);
   const realizedCostBasisKrw =
     sumBy(holdings, (holding) => holding.realizedCostBasisKrw) +
@@ -446,7 +463,7 @@ export async function getPortfolioDashboard(
     holdingReturnPct,
     totalReturnPct,
     todayChangeKrw: movement.changeKrw,
-    todayReturnPct: movement.returnPct,
+    todayReturnPct: scopeTodayReturnPct,
     todayFxChangeKrw: movement.fxChangeKrw,
     tradeFlowKrw: movement.tradeFlowKrw,
     trimDriftThreshold,
@@ -482,9 +499,13 @@ export async function getPortfolioDashboard(
       reason: movement.reason,
       previousTotalKrw: movement.previousTotalKrw,
       changeKrw: movement.changeKrw,
-      returnPct: movement.returnPct,
+      returnPct: scopeTodayReturnPct,
       tradeFlowKrw: movement.tradeFlowKrw,
+      priceChangeKrw: movement.priceChangeKrw,
       fxChangeKrw: movement.fxChangeKrw,
+      scopePreviousTotalKrw,
+      scopeCurrentTotalKrw: movement.ready ? totalValueKrw : null,
+      movementExcludedCurrentValueKrw,
       contributionRows: movement.contributionRows,
       exclusions: movement.exclusions,
       coverage: movement.coverage,
@@ -667,6 +688,7 @@ function buildHolding({
     dailyReturnPct: null,
     dailySource: null,
     previousCloseValueKrw: null,
+    priceDailyChangeKrw: null,
     fxDailyChangeKrw: null,
     groupName: groupName ?? null,
   };
@@ -684,6 +706,7 @@ function attachDailyContribution(
     dailyReturnPct: contribution.returnPct,
     dailySource: contribution.source,
     previousCloseValueKrw: contribution.previousValueKrw,
+    priceDailyChangeKrw: contribution.priceChangeKrw,
     fxDailyChangeKrw: contribution.fxChangeKrw,
   };
 }

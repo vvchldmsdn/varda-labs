@@ -60,7 +60,7 @@ export function TodayMovement({
         href: todayHoldingDetailHref(data.selectedScope.key, holding),
         key: [holding.account, holding.market, holding.ticker ?? holding.name].join("|"),
         name: holding.name,
-        priceImpactKrw: row.changeKrw - row.fxChangeKrw,
+        priceImpactKrw: row.priceChangeKrw,
         returnPct: row.returnPct,
         selected: isSelectedHolding(detail, holding),
         ticker: holding.ticker,
@@ -140,8 +140,11 @@ export function TodayMovement({
 
         <MovementBridge
           currentEvidenceKrw={attribution.currentEvidenceKrw}
+          movementExcludedCurrentValueKrw={
+            attribution.movementExcludedCurrentValueKrw
+          }
           fxImpactKrw={attribution.fxImpactKrw}
-          previousTotalKrw={movement.ready ? movement.previousTotalKrw : null}
+          previousTotalKrw={attribution.previousEvidenceKrw}
           priceImpactKrw={attribution.priceImpactKrw}
           tradeFlowKrw={attribution.tradeFlowKrw}
         />
@@ -228,12 +231,14 @@ export function TodayMovement({
 
 function MovementBridge({
   currentEvidenceKrw,
+  movementExcludedCurrentValueKrw,
   fxImpactKrw,
   previousTotalKrw,
   priceImpactKrw,
   tradeFlowKrw,
 }: {
   currentEvidenceKrw: number | null;
+  movementExcludedCurrentValueKrw: number;
   fxImpactKrw: number | null;
   previousTotalKrw: number | null;
   priceImpactKrw: number | null;
@@ -256,7 +261,14 @@ function MovementBridge({
             오늘 변동 구성
           </h2>
         </div>
-        <p className="hidden text-xs text-[#777d75] sm:block">저장된 기준과 현재 근거 비교</p>
+        <div className="hidden text-right text-xs text-[#777d75] sm:block">
+          <p>저장된 기준과 현재 근거 비교</p>
+          {movementExcludedCurrentValueKrw > 0 ? (
+            <p className="mt-1">
+              변동 제외 보유액 {formatKrw(movementExcludedCurrentValueKrw)} 정적 포함
+            </p>
+          ) : null}
+        </div>
       </div>
       <div className="overflow-x-auto border-y border-[#d9ddd7]">
         <div className="grid min-w-[800px] grid-cols-5">
@@ -321,7 +333,8 @@ function HoldingDetailPanel({
   const contribution = detail.contribution;
   const changeKrw = contribution?.changeKrw ?? holding.dailyChangeKrw;
   const fxImpactKrw = contribution?.fxChangeKrw ?? holding.fxDailyChangeKrw;
-  const priceImpactKrw = changeKrw === null ? null : changeKrw - (fxImpactKrw ?? 0);
+  const priceImpactKrw =
+    contribution?.priceChangeKrw ?? holding.priceDailyChangeKrw;
   const tradeFlowKrw = contribution?.tradeFlowKrw ?? 0;
   const previousValueKrw = contribution?.previousValueKrw ?? holding.previousCloseValueKrw;
   const currentEvidenceKrw =
@@ -370,6 +383,14 @@ function HoldingDetailPanel({
           <DetailRow label="현재 비교 평가액" value={formatNullableKrw(currentEvidenceKrw)} />
           <DetailRow label="수량" value={formatNumber(holding.quantity)} />
           <DetailRow label="현재가" value={formatNumber(holding.currentPrice)} />
+          <DetailRow
+            label="현재 USD/KRW"
+            value={
+              holding.currency === "USD"
+                ? formatNumber(contribution?.currentFxRate ?? data.usdKrwRate)
+                : "해당 없음"
+            }
+          />
           <DetailRow label="가격 출처" value={holding.priceSource ?? "-"} />
           <DetailRow label="가격 시각" value={formatDateTime(holding.priceAsOf)} />
         </DetailColumn>
@@ -377,8 +398,19 @@ function HoldingDetailPanel({
         <DetailColumn divided title="기준 근거">
           <DetailRow label="기준일" value={formatDate(data.latestSnapshotReferenceDate)} />
           <DetailRow label="기준 평가액" value={formatNullableKrw(previousValueKrw)} />
+          <DetailRow
+            label="기준가"
+            value={formatNumber(contribution?.previousPrice ?? null)}
+          />
           <DetailRow label="근거 유형" value={sourceLabel(contribution?.source ?? holding.dailySource)} />
-          <DetailRow label="USD/KRW" value={holding.currency === "USD" ? formatNumber(data.usdKrwRate) : "해당 없음"} />
+          <DetailRow
+            label="기준 USD/KRW"
+            value={
+              holding.currency === "USD"
+                ? formatNumber(contribution?.previousFxRate ?? null)
+                : "해당 없음"
+            }
+          />
         </DetailColumn>
 
         <DetailColumn divided title="변동 분해">
