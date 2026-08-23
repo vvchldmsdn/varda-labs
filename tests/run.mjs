@@ -185,6 +185,8 @@ import "./cron-runtime-config.test.mjs";
 import "./snapshot-account-target.test.mjs";
 import "./daily-snapshot-tenant-job.test.mjs";
 import "./live-price-write.test.mjs";
+import "./tenant-live-price-sync-policy.test.mjs";
+import "./tenant-live-price-sync-route.test.mjs";
 import "./fx-refresh.test.mjs";
 import "./admin-market-sync-status.test.mjs";
 import "./base44-asset-policy.test.mjs";

@@ -21,7 +21,12 @@ export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
 
   if (process.env.NODE_ENV === "development") {
-    return <PortfolioDashboard data={buildHomeDesignPreview(params.scope)} />;
+    return (
+      <PortfolioDashboard
+        data={buildHomeDesignPreview(params.scope)}
+        liveSyncEnabled={false}
+      />
+    );
   }
 
   const resolution = await resolveCurrentTenantContext();
@@ -71,7 +76,7 @@ async function DashboardContent({
   dashboardPromise: ReturnType<typeof getPortfolioDashboard>;
 }) {
   const dashboard = await dashboardPromise;
-  return <PortfolioDashboard data={dashboard} />;
+  return <PortfolioDashboard data={dashboard} liveSyncEnabled />;
 }
 
 function DashboardSkeleton() {
