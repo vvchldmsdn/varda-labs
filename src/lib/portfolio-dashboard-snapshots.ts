@@ -57,5 +57,5 @@ export function buildPortfolioDashboardSnapshotTrend(
             : null),
       };
     })
-    .slice(-14);
+    .slice(-130);
 }

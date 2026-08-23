@@ -34,8 +34,12 @@ import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { normalizeTicker, uniqueStrings } from "@/lib/portfolio-math";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
-const RECENT_PORTFOLIO_DATE_COUNT = 30;
+const RECENT_PORTFOLIO_DATE_COUNT = 190;
 const MAX_RECENT_SNAPSHOT_SOURCES_PER_ACCOUNT = 4;
+const RECENT_POSITION_DATE_COUNT = 24;
+const PORTFOLIO_GROUP_POSITION_DATE_COUNT = 130;
+const MAX_RECENT_POSITION_SOURCES_PER_ASSET = 3;
+const RECENT_FX_OBSERVATION_LIMIT = 260;
 
 export async function getReadOnlyTenantPortfolioDashboardSources({
   scope,
@@ -58,7 +62,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
         inArrayWhenPresent(assets.id, targets.directAssetIds),
       ]);
 
-  const [allAccountRows, assetGroupRows, assetRows, settingsRows, latestFxRows] =
+  const [allAccountRows, assetGroupRows, assetRows, settingsRows, recentFxRows] =
     await Promise.all([
       db
         .select()
@@ -82,7 +86,22 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               ),
             ),
       loadLatestTenantPortfolioSettingsRows(tenantContext),
-      db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
+      db
+        .select()
+        .from(fxRates)
+        .where(
+          and(
+            eq(fxRates.isSample, false),
+            eq(sql<string>`lower(trim(${fxRates.status}))`, "ok"),
+            sql`${fxRates.usdKrw} > 0`,
+          ),
+        )
+        .orderBy(
+          desc(fxRates.rateDate),
+          sql`${fxRates.fetchedAt} desc nulls last`,
+          desc(fxRates.createdAt),
+        )
+        .limit(RECENT_FX_OBSERVATION_LIMIT),
     ]);
 
   const activeAccountIds = new Set(allAccountRows.map((account) => account.id));
@@ -121,9 +140,18 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     RECENT_PORTFOLIO_DATE_COUNT *
     Math.max(wholeAccountIds.length, 1) *
     MAX_RECENT_SNAPSHOT_SOURCES_PER_ACCOUNT;
+  const selectedPositionDateCount =
+    scope.kind === "portfolio_group"
+      ? PORTFOLIO_GROUP_POSITION_DATE_COUNT
+      : RECENT_POSITION_DATE_COUNT;
+  const selectedPositionRowLimit =
+    selectedPositionDateCount *
+    Math.max(assetRows.length, 1) *
+    MAX_RECENT_POSITION_SOURCES_PER_ASSET;
 
   const [
     latestPositionRows,
+    recentPositionRows,
     recentPortfolioRows,
     eventRows,
     unmatchedSnapshotCountRows,
@@ -143,6 +171,44 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
             ),
           ),
+    positionScopePredicate === null
+      ? Promise.resolve([])
+      : db
+          .select({
+            snapshotDate: dailyPositionSnapshots.snapshotDate,
+            assetId: dailyPositionSnapshots.assetId,
+            ticker: dailyPositionSnapshots.ticker,
+            assetName: dailyPositionSnapshots.assetName,
+            account: dailyPositionSnapshots.account,
+            unitValueChangePct: dailyPositionSnapshots.unitValueChangePct,
+            marketValueChangePct: dailyPositionSnapshots.marketValueChangePct,
+            marketValueChangeKrw: dailyPositionSnapshots.marketValueChangeKrw,
+            priceChangeKrw: dailyPositionSnapshots.priceChangeKrw,
+            fxChangeKrw: dailyPositionSnapshots.fxChangeKrw,
+            marketValueKrw: dailyPositionSnapshots.marketValueKrw,
+            costKrw: dailyPositionSnapshots.costKrw,
+            pnlKrw: dailyPositionSnapshots.pnlKrw,
+            source: dailyPositionSnapshots.source,
+            capturedAt: dailyPositionSnapshots.capturedAt,
+            createdAt: dailyPositionSnapshots.createdAt,
+          })
+          .from(dailyPositionSnapshots)
+          .innerJoin(accounts, eq(dailyPositionSnapshots.accountId, accounts.id))
+          .where(
+            and(
+              ...activeOwnedAccountPredicates(tenantContext),
+              positionScopePredicate,
+              eq(dailyPositionSnapshots.account, accounts.code),
+              eq(dailyPositionSnapshots.isSample, false),
+              lte(dailyPositionSnapshots.snapshotDate, snapshotDate),
+            ),
+          )
+          .orderBy(
+            desc(dailyPositionSnapshots.snapshotDate),
+            sql`${dailyPositionSnapshots.capturedAt} desc nulls last`,
+            desc(dailyPositionSnapshots.createdAt),
+          )
+          .limit(selectedPositionRowLimit),
     wholeAccountIds.length === 0
       ? Promise.resolve([])
       : db
@@ -229,8 +295,10 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     assetGroupRows,
     assetRows,
     settingsRows,
-    latestFxRows,
+    latestFxRows: recentFxRows.slice(0, 1),
+    recentFxRows,
     latestPositionRows,
+    recentPositionRows,
     recentPortfolioRows,
     eventRows,
     unmatchedSnapshotCountRows,
