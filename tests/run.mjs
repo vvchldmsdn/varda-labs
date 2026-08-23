@@ -1,6 +1,7 @@
 import "./market-calendar.test.mjs";
 import "./live-valuation-admission.test.mjs";
 import "./home-metrics.test.mjs";
+import "./portfolio-format.test.mjs";
 import "./map-with-concurrency.test.mjs";
 import "./p1-p2-hardening.test.mjs";
 import "./audit-tenant-selector.test.mjs";
