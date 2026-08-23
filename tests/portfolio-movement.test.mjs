@@ -5,6 +5,7 @@ import {
   buildDailyPositionMovement,
   buildPreviousCloseMovement,
   hasFreshMovementPrice,
+  isPortfolioMovementEligibleHolding,
 } from "../src/lib/portfolio-movement.ts";
 
 const movementCycle = {
@@ -26,6 +27,7 @@ function holding(overrides = {}) {
     legacyBase44Id: "legacy-kr",
     name: "KODEX 200",
     ticker: "069500",
+    assetType: "etf",
     account: "brokerage",
     market: "korea",
     currency: "KRW",
@@ -322,6 +324,50 @@ describe("portfolio movement builder", () => {
       result.exclusions.map((exclusion) => exclusion.reason),
       ["manual_valuation_not_updated_in_cycle", "coverage_below_threshold"],
     );
+  });
+
+  it("keeps tickerless physical commodities out of movement coverage", () => {
+    const gold = holding({
+      id: "asset-gold",
+      legacyBase44Id: "legacy-gold",
+      name: "Gold bullion",
+      ticker: null,
+      assetType: "commodity",
+      quantity: 8,
+      currentPrice: 225_750,
+      valueKrw: 1_806_000,
+      priceFetchedAt: null,
+      priceQuoteType: null,
+      priceStatus: null,
+    });
+    const result = buildDaily({
+      holdings: [holding(), gold],
+      positionRows: [
+        position(),
+        position({
+          id: "snap-gold",
+          assetId: "asset-gold",
+          legacyAssetId: "legacy-gold",
+          ticker: null,
+          assetName: "Gold bullion",
+          assetType: "commodity",
+          marketValueKrw: 1_806_000,
+        }),
+      ],
+    });
+
+    assert.equal(isPortfolioMovementEligibleHolding(gold), false);
+    assert.equal(
+      isPortfolioMovementEligibleHolding({ assetType: "commodity", ticker: "GLD" }),
+      true,
+    );
+    assert.equal(result.ready, true);
+    assert.equal(result.contributions.size, 1);
+    assert.equal(result.contributions.has("asset-gold"), false);
+    assert.equal(result.coverage.currentCoveragePct, 100);
+    assert.equal(result.coverage.snapshotCoveragePct, 100);
+    assert.equal(result.coverage.countCoveragePct, 100);
+    assert.deepEqual(result.exclusions, []);
   });
 
   it("uses a manual valuation entered inside the current movement cycle", () => {

@@ -90,21 +90,35 @@ function isUsTradingDay(date: string) {
 
 function koreaMarketHolidays(year: number) {
   const holidays = new Set([
-    observedFixedHoliday(year, 1, 1),
-    observedFixedHoliday(year, 3, 1),
+    ...koreaFixedHolidayDates(year, 1, 1),
+    ...koreaFixedHolidayDates(year, 3, 1, true),
     `${year}-05-01`,
-    observedFixedHoliday(year, 5, 5),
+    ...koreaFixedHolidayDates(year, 5, 5, true),
     `${year}-06-06`,
-    ...(year >= 2026 ? [observedFixedHoliday(year, 7, 17)] : []),
-    observedFixedHoliday(year, 8, 15),
-    observedFixedHoliday(year, 10, 3),
-    `${year}-10-09`,
-    observedFixedHoliday(year, 12, 25),
+    ...(year >= 2026 ? koreaFixedHolidayDates(year, 7, 17, true) : []),
+    ...koreaFixedHolidayDates(year, 8, 15, true),
+    ...koreaFixedHolidayDates(year, 10, 3, true),
+    ...koreaFixedHolidayDates(year, 10, 9, true),
+    ...koreaFixedHolidayDates(year, 12, 25, true),
     koreaYearEndMarketHoliday(year),
     ...(KOREA_LUNAR_AND_ELECTION_MARKET_HOLIDAYS_BY_YEAR[year] ?? []),
   ]);
 
   return holidays;
+}
+
+function koreaFixedHolidayDates(
+  year: number,
+  month: number,
+  day: number,
+  hasWeekendSubstitute = false,
+) {
+  const actual = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  if (!hasWeekendSubstitute || !isWeekend(actual)) return [actual];
+
+  let substitute = shiftDate(actual, 1);
+  while (isWeekend(substitute)) substitute = shiftDate(substitute, 1);
+  return [actual, substitute];
 }
 
 // Lunar and election holidays cannot be derived from Gregorian fixed-date rules.

@@ -43,8 +43,14 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
     data.todayFxChangeKrw,
     data.todayMovement.previousTotalKrw,
   );
-  const liveEvidenceCount = data.holdings.filter(hasLivePriceEvidence).length;
-  const storedPriceCount = Math.max(0, data.holdings.length - liveEvidenceCount);
+  const movementHoldings = data.holdings.filter(
+    (holding) => holding.movementEligible,
+  );
+  const liveEvidenceCount = movementHoldings.filter(hasLivePriceEvidence).length;
+  const storedPriceCount = Math.max(
+    0,
+    data.dataHealth.movementEligibleAssetCount - liveEvidenceCount,
+  );
   const structureHref = scopedHref("/portfolio/structure", data.selectedScope.key);
   const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key);
 
@@ -157,8 +163,16 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
             />
             <EvidenceMetric
               label="데이터 상태"
-              value={`현재가 ${liveEvidenceCount}/${data.holdings.length}`}
-              subValue={dataStatusText(data, storedPriceCount)}
+              value={
+                data.dataHealth.movementEligibleAssetCount > 0
+                  ? `현재가 ${liveEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
+                  : "변동 계산 제외"
+              }
+              subValue={dataStatusText(
+                data,
+                storedPriceCount,
+                data.dataHealth.movementExcludedAssetCount,
+              )}
             />
           </div>
         </section>
@@ -297,11 +311,22 @@ function hasLivePriceEvidence(holding: DashboardHolding) {
   return holding.priceStatus === "ok" && LIVE_QUOTE_TYPES.has(holding.priceQuoteType ?? "");
 }
 
-function dataStatusText(data: DashboardData, storedPriceCount: number) {
+function dataStatusText(
+  data: DashboardData,
+  storedPriceCount: number,
+  movementExcludedAssetCount: number,
+) {
   const historyCoverage = data.holdingHistory.coveragePct;
-  if (storedPriceCount > 0) return `${storedPriceCount}종목 저장 가격 사용`;
-  if (historyCoverage !== null) return `변동 이력 ${formatPercent(historyCoverage)} 커버리지`;
-  return "종목별 이력 수집 대기";
+  const evidenceText = storedPriceCount > 0
+    ? `${storedPriceCount}종목 저장 가격 사용`
+    : historyCoverage !== null
+      ? `변동 이력 ${formatPercent(historyCoverage)} 커버리지`
+      : "종목별 이력 수집 대기";
+  const exclusionText = movementExcludedAssetCount > 0
+    ? `수동 평가 ${movementExcludedAssetCount}종 제외`
+    : null;
+
+  return [evidenceText, exclusionText].filter(Boolean).join(" · ");
 }
 
 function movementBasisText(data: DashboardData) {

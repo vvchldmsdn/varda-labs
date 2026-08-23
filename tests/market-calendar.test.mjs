@@ -86,6 +86,23 @@ describe("market calendar", () => {
     );
   });
 
+  it("uses the Friday close before the 2026 Liberation Day substitute holiday", () => {
+    assert.equal(
+      closeCalendarReferenceDateForAsset(
+        { market: "korea", currency: "KRW" },
+        "2026-08-15",
+      ),
+      "2026-08-14",
+    );
+    assert.equal(
+      closeCalendarReferenceDateForAsset(
+        { market: "korea", currency: "KRW" },
+        "2026-08-18",
+      ),
+      "2026-08-14",
+    );
+  });
+
   it("treats USD-denominated assets as US-listed for close coverage", () => {
     const asset = { market: "korea", currency: "USD" };
 
