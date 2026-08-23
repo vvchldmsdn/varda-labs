@@ -5,6 +5,8 @@ export type TodayMovementAttribution = Readonly<{
   changeKrw: number | null;
   currentEvidenceKrw: number | null;
   fxImpactKrw: number | null;
+  movementExcludedCurrentValueKrw: number;
+  previousEvidenceKrw: number | null;
   priceImpactKrw: number | null;
   tradeFlowKrw: number | null;
 }>;
@@ -22,8 +24,11 @@ export function buildTodayMovementAttribution(
     DashboardTodayMovement,
     | "changeKrw"
     | "fxChangeKrw"
-    | "previousTotalKrw"
+    | "movementExcludedCurrentValueKrw"
+    | "priceChangeKrw"
     | "ready"
+    | "scopeCurrentTotalKrw"
+    | "scopePreviousTotalKrw"
     | "tradeFlowKrw"
   >,
 ): TodayMovementAttribution {
@@ -32,19 +37,22 @@ export function buildTodayMovementAttribution(
       changeKrw: null,
       currentEvidenceKrw: null,
       fxImpactKrw: null,
+      movementExcludedCurrentValueKrw:
+        movement.movementExcludedCurrentValueKrw,
+      previousEvidenceKrw: null,
       priceImpactKrw: null,
       tradeFlowKrw: null,
     };
   }
 
-  const fxImpactKrw = movement.fxChangeKrw ?? 0;
-
   return {
     changeKrw: movement.changeKrw,
-    currentEvidenceKrw:
-      movement.previousTotalKrw + movement.changeKrw + movement.tradeFlowKrw,
-    fxImpactKrw,
-    priceImpactKrw: movement.changeKrw - fxImpactKrw,
+    currentEvidenceKrw: movement.scopeCurrentTotalKrw,
+    fxImpactKrw: movement.fxChangeKrw,
+    movementExcludedCurrentValueKrw:
+      movement.movementExcludedCurrentValueKrw,
+    previousEvidenceKrw: movement.scopePreviousTotalKrw,
+    priceImpactKrw: movement.priceChangeKrw,
     tradeFlowKrw: movement.tradeFlowKrw,
   };
 }

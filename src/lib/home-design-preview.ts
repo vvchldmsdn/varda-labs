@@ -81,17 +81,36 @@ export function buildHomeDesignPreview(scopeInput: string | readonly string[] | 
   const todayFxChangeKrw = holdings
     .filter((holding) => holding.currency === "USD")
     .reduce((sum, holding) => sum - Math.round(holding.valueKrw * 0.0018), 0);
-  const contributionRows = holdings.map((holding) => ({
-    holdingId: holding.id,
-    previousValueKrw:
-      holding.previousCloseValueKrw ??
-      holding.valueKrw - (holding.dailyChangeKrw ?? 0),
-    changeKrw: holding.dailyChangeKrw ?? 0,
-    returnPct: holding.dailyReturnPct,
-    tradeFlowKrw: 0,
-    fxChangeKrw: holding.fxDailyChangeKrw ?? 0,
-    source: "daily_position_snapshot" as const,
-  }));
+  const contributionRows = holdings.map((holding) => {
+    const changeKrw = holding.dailyChangeKrw ?? 0;
+    const fxChangeKrw = holding.fxDailyChangeKrw ?? 0;
+    const priceChangeKrw = changeKrw - fxChangeKrw;
+    const currentFxRate = holding.currency === "USD" ? 1_493.62 : 1;
+    const previousFxRate =
+      holding.currency === "USD" && holding.quantity * holding.currentPrice > 0
+        ? currentFxRate - fxChangeKrw / (holding.quantity * holding.currentPrice)
+        : 1;
+    const previousPrice =
+      holding.quantity * previousFxRate > 0
+        ? holding.currentPrice - priceChangeKrw / (holding.quantity * previousFxRate)
+        : holding.currentPrice;
+
+    return {
+      holdingId: holding.id,
+      previousValueKrw:
+        holding.previousCloseValueKrw ?? holding.valueKrw - changeKrw,
+      changeKrw,
+      returnPct: holding.dailyReturnPct,
+      tradeFlowKrw: 0,
+      priceChangeKrw,
+      fxChangeKrw,
+      previousPrice,
+      currentPrice: holding.currentPrice,
+      previousFxRate,
+      currentFxRate,
+      source: "daily_position_snapshot" as const,
+    };
+  });
 
   return {
     selectedScope,
@@ -166,7 +185,11 @@ export function buildHomeDesignPreview(scopeInput: string | readonly string[] | 
       changeKrw: todayChangeKrw,
       returnPct: percentage(todayChangeKrw, selectedTotal - todayChangeKrw),
       tradeFlowKrw: 0,
+      priceChangeKrw: todayChangeKrw - todayFxChangeKrw,
       fxChangeKrw: todayFxChangeKrw,
+      scopePreviousTotalKrw: selectedTotal - todayChangeKrw,
+      scopeCurrentTotalKrw: selectedTotal,
+      movementExcludedCurrentValueKrw: 0,
       contributionRows,
       exclusions: [],
       coverage: {
@@ -263,6 +286,8 @@ function buildHolding(seed: HoldingSeed, selectedTotal: number): DashboardHoldin
     dailyReturnPct,
     dailySource: "daily_position_snapshot",
     previousCloseValueKrw: valueKrw - dailyChangeKrw,
+    priceDailyChangeKrw:
+      dailyChangeKrw - (currency === "USD" ? -Math.round(valueKrw * 0.0018) : 0),
     fxDailyChangeKrw: currency === "USD" ? -Math.round(valueKrw * 0.0018) : 0,
     groupName,
   };

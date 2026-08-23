@@ -28,6 +28,7 @@ export type TodayHoldingDetailHolding = {
   dailyReturnPct: number | null;
   dailySource: string | null;
   previousCloseValueKrw: number | null;
+  priceDailyChangeKrw: number | null;
   fxDailyChangeKrw: number | null;
 };
 
@@ -36,7 +37,12 @@ export type TodayHoldingDetailContribution = {
   changeKrw: number;
   returnPct: number | null;
   tradeFlowKrw: number;
+  priceChangeKrw: number;
   fxChangeKrw: number;
+  previousPrice: number;
+  currentPrice: number;
+  previousFxRate: number;
+  currentFxRate: number;
   source: string;
 };
 
@@ -207,6 +213,7 @@ function sanitizeHolding(holding: DetailHoldingInput): TodayHoldingDetailHolding
     dailyReturnPct: holding.dailyReturnPct,
     dailySource: holding.dailySource,
     previousCloseValueKrw: holding.previousCloseValueKrw,
+    priceDailyChangeKrw: holding.priceDailyChangeKrw,
     fxDailyChangeKrw: holding.fxDailyChangeKrw,
   };
 }
@@ -219,7 +226,12 @@ function sanitizeContribution(
     changeKrw: row.changeKrw,
     returnPct: row.returnPct,
     tradeFlowKrw: row.tradeFlowKrw,
+    priceChangeKrw: row.priceChangeKrw,
     fxChangeKrw: row.fxChangeKrw,
+    previousPrice: row.previousPrice,
+    currentPrice: row.currentPrice,
+    previousFxRate: row.previousFxRate,
+    currentFxRate: row.currentFxRate,
     source: row.source,
   };
 }

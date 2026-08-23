@@ -11,15 +11,20 @@ describe("today movement view attribution", () => {
     assert.deepEqual(
       buildTodayMovementAttribution({
         ready: true,
-        previousTotalKrw: 10_000,
         changeKrw: 700,
+        priceChangeKrw: 500,
         fxChangeKrw: 200,
+        scopePreviousTotalKrw: 10_000,
+        scopeCurrentTotalKrw: 11_700,
+        movementExcludedCurrentValueKrw: 0,
         tradeFlowKrw: 1_000,
       }),
       {
         changeKrw: 700,
         currentEvidenceKrw: 11_700,
         fxImpactKrw: 200,
+        movementExcludedCurrentValueKrw: 0,
+        previousEvidenceKrw: 10_000,
         priceImpactKrw: 500,
         tradeFlowKrw: 1_000,
       },
@@ -30,17 +35,46 @@ describe("today movement view attribution", () => {
     assert.deepEqual(
       buildTodayMovementAttribution({
         ready: false,
-        previousTotalKrw: 10_000,
         changeKrw: null,
+        priceChangeKrw: null,
         fxChangeKrw: 200,
+        scopePreviousTotalKrw: null,
+        scopeCurrentTotalKrw: null,
+        movementExcludedCurrentValueKrw: 1_806_000,
         tradeFlowKrw: 1_000,
       }),
       {
         changeKrw: null,
         currentEvidenceKrw: null,
         fxImpactKrw: null,
+        movementExcludedCurrentValueKrw: 1_806_000,
+        previousEvidenceKrw: null,
         priceImpactKrw: null,
         tradeFlowKrw: null,
+      },
+    );
+  });
+
+  it("keeps non-movement holdings in both scope totals without attributing movement", () => {
+    assert.deepEqual(
+      buildTodayMovementAttribution({
+        ready: true,
+        changeKrw: -9_932,
+        priceChangeKrw: -9_932,
+        fxChangeKrw: 0,
+        scopePreviousTotalKrw: 25_748_395,
+        scopeCurrentTotalKrw: 25_738_463,
+        movementExcludedCurrentValueKrw: 1_806_000,
+        tradeFlowKrw: 0,
+      }),
+      {
+        changeKrw: -9_932,
+        currentEvidenceKrw: 25_738_463,
+        fxImpactKrw: 0,
+        movementExcludedCurrentValueKrw: 1_806_000,
+        previousEvidenceKrw: 25_748_395,
+        priceImpactKrw: -9_932,
+        tradeFlowKrw: 0,
       },
     );
   });
