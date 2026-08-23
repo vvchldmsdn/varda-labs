@@ -33,6 +33,7 @@
     "identity:assign-legacy-active-evidence-owners": "node --no-warnings scripts/assign-legacy-active-evidence-owners.mjs",
     "snapshots:backfill-owners": "node --no-warnings scripts/backfill-generated-snapshot-owners.mjs",
     "snapshots:backfill-gap": "node --conditions=react-server --import tsx scripts/backfill-daily-snapshot-gap.ts",
+    "snapshots:repair-fractional-movement": "node --no-warnings scripts/repair-snapshot-fractional-movement.mjs",
     "simulation:complete-kis-history": "node --conditions=react-server --import tsx scripts/complete-simulation-kis-history.ts",
     "investment-lab:complete-stress-history": "node --conditions=react-server --import tsx scripts/complete-investment-lab-stress-history.ts",
     "identity:issue-bootstrap-claim": "node --no-warnings scripts/issue-identity-bootstrap-claim.mjs",

@@ -27,7 +27,7 @@ export function PortfolioRefreshButton({ compact = false }: { compact?: boolean 
       <span aria-hidden="true" className={pending ? "animate-spin" : undefined}>
         ↻
       </span>
-      {compact ? null : <span>{pending ? "불러오는 중" : "데이터 새로고침"}</span>}
+      {compact ? null : <span>{pending ? "불러오는 중" : "화면 새로고침"}</span>}
     </button>
   );
 }

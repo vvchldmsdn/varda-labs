@@ -30,6 +30,7 @@ export type PortfolioDashboardHistoryHolding = Readonly<{
 export type PortfolioDashboardHeatmapCell = Readonly<{
   date: string;
   changePct: number | null;
+  marketValueKrw: number | null;
   changeKrw: number | null;
   priceChangeKrw: number | null;
   fxChangeKrw: number | null;
@@ -97,6 +98,7 @@ export function buildPortfolioDashboardHoldingHistory({
       return Object.freeze({
         date,
         changePct,
+        marketValueKrw: toNumber(row?.marketValueKrw),
         changeKrw: toNumber(row?.marketValueChangeKrw),
         priceChangeKrw: toNumber(row?.priceChangeKrw),
         fxChangeKrw: toNumber(row?.fxChangeKrw),

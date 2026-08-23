@@ -319,6 +319,7 @@ function buildHoldingHistory(holdings: readonly DashboardHolding[], endDate: str
         return {
           date,
           changePct: null,
+          marketValueKrw: null,
           changeKrw: null,
           priceChangeKrw: null,
           fxChangeKrw: null,
@@ -334,6 +335,7 @@ function buildHoldingHistory(holdings: readonly DashboardHolding[], endDate: str
       return {
         date,
         changePct,
+        marketValueKrw: Math.round(holding.valueKrw * (1 + changePct / 100)),
         changeKrw,
         priceChangeKrw: changeKrw - fxChangeKrw,
         fxChangeKrw,

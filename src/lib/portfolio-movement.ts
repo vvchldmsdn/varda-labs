@@ -625,12 +625,12 @@ function calculatePreviousCloseContribution(
     holding.quantity * holding.currentPrice * currentFx.rate;
   const fractionalKrwValue = Math.max(holding.valueKrw - currentBaseValueKrw, 0);
   const movement = calculateFxAwarePositionMovementKrw({
-    quantity: holding.quantity,
+    marketExposedQuantity: holding.quantity,
     currentPrice: holding.currentPrice,
     previousPrice: closePrice,
     currentFxRate: currentFx.rate,
     previousFxRate,
-    fractionalKrwValue,
+    fixedKrwValue: fractionalKrwValue,
   });
 
   return {

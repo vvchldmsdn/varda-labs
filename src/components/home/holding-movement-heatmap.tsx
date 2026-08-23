@@ -100,15 +100,16 @@ export function HoldingMovementHeatmap({
               {selectedCell.basis === "market_value" ? " · 평가액 변동 근거" : ""}
             </p>
           </div>
-          <dl className="grid grid-cols-2 gap-x-5 text-xs sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-5">
             <HeatmapDetail
               label="등락"
               value={selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true)}
               tone={selectedCell.changePct}
             />
-            <HeatmapDetail label="평가액" value={formatKrw(selectedCell.changeKrw)} tone={selectedCell.changeKrw} />
-            <HeatmapDetail label="가격" value={formatKrw(selectedCell.priceChangeKrw)} tone={selectedCell.priceChangeKrw} />
-            <HeatmapDetail label="환율" value={formatKrw(selectedCell.fxChangeKrw)} tone={selectedCell.fxChangeKrw} />
+            <HeatmapDetail label="평가액" value={formatKrw(selectedCell.marketValueKrw)} tone={null} />
+            <HeatmapDetail label="평가액 변동" value={formatKrw(selectedCell.changeKrw)} tone={selectedCell.changeKrw} />
+            <HeatmapDetail label="가격 영향" value={formatKrw(selectedCell.priceChangeKrw)} tone={selectedCell.priceChangeKrw} />
+            <HeatmapDetail label="환율 영향" value={formatKrw(selectedCell.fxChangeKrw)} tone={selectedCell.fxChangeKrw} />
           </dl>
         </div>
       ) : null}

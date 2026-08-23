@@ -29,8 +29,6 @@ const HOME_NAV_ITEMS = [
   { label: "시뮬레이션", href: "/simulation" },
 ] as const;
 
-const LIVE_QUOTE_TYPES = new Set(["live", "delayed", "realtime"]);
-
 export function PortfolioDashboard({ data }: { data: DashboardData }) {
   const movementReady = data.dataHealth.movementReady;
   const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
@@ -43,14 +41,16 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
     data.todayFxChangeKrw,
     data.todayMovement.previousTotalKrw,
   );
-  const movementHoldings = data.holdings.filter(
-    (holding) => holding.movementEligible,
-  );
-  const liveEvidenceCount = movementHoldings.filter(hasLivePriceEvidence).length;
-  const storedPriceCount = Math.max(
-    0,
-    data.dataHealth.movementEligibleAssetCount - liveEvidenceCount,
-  );
+  const contributionEvidenceCount = new Set(
+    data.todayMovement.contributionRows.map((row) => row.holdingId),
+  ).size;
+  const movementEvidenceCount = contributionEvidenceCount > 0
+    ? contributionEvidenceCount
+    : movementReady
+      ? data.holdings.filter(
+          (holding) => holding.movementEligible && holding.dailyChangeKrw !== null,
+        ).length
+      : 0;
   const structureHref = scopedHref("/portfolio/structure", data.selectedScope.key);
   const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key);
 
@@ -165,12 +165,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               label="데이터 상태"
               value={
                 data.dataHealth.movementEligibleAssetCount > 0
-                  ? `현재가 ${liveEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
+                  ? `변동 근거 ${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
                   : "변동 계산 제외"
               }
               subValue={dataStatusText(
                 data,
-                storedPriceCount,
                 data.dataHealth.movementExcludedAssetCount,
               )}
             />
@@ -307,18 +306,13 @@ function largestPositiveContributor(holdings: readonly DashboardHolding[]) {
     .toSorted((left, right) => (right.dailyChangeKrw ?? 0) - (left.dailyChangeKrw ?? 0))[0] ?? null;
 }
 
-function hasLivePriceEvidence(holding: DashboardHolding) {
-  return holding.priceStatus === "ok" && LIVE_QUOTE_TYPES.has(holding.priceQuoteType ?? "");
-}
-
 function dataStatusText(
   data: DashboardData,
-  storedPriceCount: number,
   movementExcludedAssetCount: number,
 ) {
   const historyCoverage = data.holdingHistory.coveragePct;
-  const evidenceText = storedPriceCount > 0
-    ? `${storedPriceCount}종목 저장 가격 사용`
+  const evidenceText = data.dataHealth.movementReason === "missing_fresh_live_prices"
+    ? "실시간 시세 갱신 필요"
     : historyCoverage !== null
       ? `변동 이력 ${formatPercent(historyCoverage)} 커버리지`
       : "종목별 이력 수집 대기";
@@ -339,6 +333,7 @@ function movementBasisText(data: DashboardData) {
 function movementPendingReason(data: DashboardData) {
   if (data.dataHealth.movementReason === "missing_current_price") return "현재가 근거 부족";
   if (data.dataHealth.movementReason === "missing_baseline_snapshot") return "기준 스냅샷 부족";
+  if (data.dataHealth.movementReason === "missing_fresh_live_prices") return "실시간 시세 갱신 필요";
   return "변동 근거 확인 중";
 }
 
