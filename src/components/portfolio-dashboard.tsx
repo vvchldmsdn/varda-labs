@@ -139,6 +139,7 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               tone={priceImpactKrw}
             />
             <FxImpactPopover
+              basisDate={data.latestSnapshotDate}
               impactKrw={data.todayFxChangeKrw}
               impactPct={fxImpactPct}
               points={data.fxTrend}

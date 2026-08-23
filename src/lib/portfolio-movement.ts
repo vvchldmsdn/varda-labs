@@ -220,12 +220,22 @@ export function buildDailyPositionMovement({
   let matchedCount = 0;
   let tradeFlowKrw = 0;
   let fxChangeKrw = 0;
+  let fxEvidenceChangeKrw = 0;
+  let fxEvidenceRequiredValueKrw = 0;
+  let fxEvidenceMatchedValueKrw = 0;
+  let fxEvidenceRequiredCount = 0;
+  let fxEvidenceMatchedCount = 0;
 
   for (const holding of holdings) {
     const snapshot = findPositionSnapshotForHolding(holding, accountRows);
     if (snapshot) currentHoldingSnapshotIds.add(snapshot.id);
 
     const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
+    const requiresFxEvidence = holding.currency.trim().toUpperCase() !== "KRW";
+    if (requiresFxEvidence) {
+      fxEvidenceRequiredValueKrw += Math.max(holding.valueKrw, 0);
+      fxEvidenceRequiredCount += 1;
+    }
     if (!currentFx.ok) {
       exclusions.push(
         holdingExclusion(
@@ -233,16 +243,6 @@ export function buildDailyPositionMovement({
           currentFx.reason === "unsupported_currency"
             ? "unsupported_currency"
             : "missing_current_fx",
-          "daily_position_snapshot",
-        ),
-      );
-      continue;
-    }
-    if (!hasFreshMovementPrice(holding, movementCycle)) {
-      exclusions.push(
-        holdingExclusion(
-          holding,
-          movementPriceExclusionReason(holding),
           "daily_position_snapshot",
         ),
       );
@@ -293,6 +293,28 @@ export function buildDailyPositionMovement({
       previousFxRate !== null && previousFxRate > 0
         ? previousFxRate
         : currentFx.rate;
+    if (
+      currentFx.requiresFx &&
+      Number.isFinite(holding.currentPrice) &&
+      holding.currentPrice > 0
+    ) {
+      fxEvidenceChangeKrw +=
+        holding.quantity *
+        holding.currentPrice *
+        (currentFx.rate - effectivePreviousFxRate);
+      fxEvidenceMatchedValueKrw += Math.max(holding.valueKrw, 0);
+      fxEvidenceMatchedCount += 1;
+    }
+    if (!hasFreshMovementPrice(holding, movementCycle)) {
+      exclusions.push(
+        holdingExclusion(
+          holding,
+          movementPriceExclusionReason(holding),
+          "daily_position_snapshot",
+        ),
+      );
+      continue;
+    }
     const movement = calculateFxAwareSnapshotMovementKrw({
       quantity: holding.quantity,
       currentPrice: holding.currentPrice,
@@ -340,10 +362,19 @@ export function buildDailyPositionMovement({
     snapshotCoverage >= DAILY_MOVEMENT_MIN_VALUE_COVERAGE &&
     countCoverage >= DAILY_MOVEMENT_MIN_COUNT_COVERAGE &&
     matchedSnapshotCountCoverage >= DAILY_MOVEMENT_MIN_COUNT_COVERAGE;
+  const independentFxChangeKrw = resolveIndependentFxEvidence({
+    matchedCount: fxEvidenceMatchedCount,
+    matchedValueKrw: fxEvidenceMatchedValueKrw,
+    requiredCount: fxEvidenceRequiredCount,
+    requiredValueKrw: fxEvidenceRequiredValueKrw,
+    valueKrw: fxEvidenceChangeKrw,
+  });
 
   if (!hasEnoughCoverage) {
     return emptyMovement("missing_fresh_live_prices", coverage, {
       contributionRows: [...contributions.values()],
+      fxChangeKrw: independentFxChangeKrw,
+      previousTotalKrw: snapshotTotalValue,
       exclusions: [
         ...exclusions,
         aggregateExclusion("coverage_below_threshold", "daily_position_snapshot"),
@@ -375,7 +406,7 @@ export function buildDailyPositionMovement({
     changeKrw,
     returnPct: percentOrNull(changeKrw, snapshotTotalValue),
     tradeFlowKrw,
-    fxChangeKrw,
+    fxChangeKrw: independentFxChangeKrw ?? fxChangeKrw,
     contributions,
     contributionRows: [...contributions.values()],
     exclusions,
@@ -611,22 +642,47 @@ function emptyMovement(
   details: {
     contributionRows?: PortfolioMovementContribution[];
     exclusions?: PortfolioMovementExclusion[];
+    fxChangeKrw?: number | null;
+    previousTotalKrw?: number;
   } = {},
 ): PortfolioMovementResult {
   return {
     ready: false,
     source: null,
     reason,
-    previousTotalKrw: 0,
+    previousTotalKrw: details.previousTotalKrw ?? 0,
     changeKrw: null,
     returnPct: null,
     tradeFlowKrw: 0,
-    fxChangeKrw: null,
+    fxChangeKrw: details.fxChangeKrw ?? null,
     contributions: new Map(),
     contributionRows: details.contributionRows ?? [],
     exclusions: details.exclusions ?? [],
     coverage,
   };
+}
+
+function resolveIndependentFxEvidence({
+  matchedCount,
+  matchedValueKrw,
+  requiredCount,
+  requiredValueKrw,
+  valueKrw,
+}: {
+  matchedCount: number;
+  matchedValueKrw: number;
+  requiredCount: number;
+  requiredValueKrw: number;
+  valueKrw: number;
+}) {
+  if (requiredCount === 0) return 0;
+  const countCoverage = matchedCount / requiredCount;
+  const valueCoverage =
+    requiredValueKrw > 0 ? matchedValueKrw / requiredValueKrw : 0;
+  return countCoverage >= DAILY_MOVEMENT_MIN_COUNT_COVERAGE &&
+    valueCoverage >= DAILY_MOVEMENT_MIN_VALUE_COVERAGE
+    ? valueKrw
+    : null;
 }
 
 function holdingExclusion(

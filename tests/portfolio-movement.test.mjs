@@ -269,6 +269,42 @@ describe("portfolio movement builder", () => {
     assert.equal(result.coverage.currentCoveragePct, 0);
   });
 
+  it("keeps complete FX evidence when stale prices block total movement", () => {
+    const result = buildDaily({
+      holdings: [
+        holding({
+          id: "asset-us",
+          legacyBase44Id: "legacy-us",
+          name: "VOO",
+          ticker: "VOO",
+          currency: "USD",
+          quantity: 10,
+          currentPrice: 100,
+          valueKrw: 1_516_899.94,
+          priceFetchedAt: "2026-07-07T21:59:59.000Z",
+        }),
+      ],
+      positionRows: [
+        position({
+          id: "snap-us",
+          assetId: "asset-us",
+          legacyAssetId: "legacy-us",
+          ticker: "VOO",
+          assetName: "VOO",
+          marketValueKrw: 1_531_722.979,
+          unitPrice: 100,
+          fxRate: 1531.722979,
+        }),
+      ],
+    });
+
+    assert.equal(result.ready, false);
+    assert.equal(result.changeKrw, null);
+    assert.equal(result.previousTotalKrw, 1_531_722.979);
+    assertClose(result.fxChangeKrw, -14_823.039);
+    assert.equal(result.contributions.size, 0);
+  });
+
   it("keeps a stale manual valuation out of the current movement cycle", () => {
     const manualHolding = holding({
       priceFetchedAt: null,

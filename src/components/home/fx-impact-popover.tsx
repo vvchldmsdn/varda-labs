@@ -26,10 +26,12 @@ type PanelPosition = {
 };
 
 export function FxImpactPopover({
+  basisDate,
   impactKrw,
   impactPct,
   points,
 }: {
+  basisDate: string | null;
   impactKrw: number | null;
   impactPct: number | null;
   points: readonly DashboardFxTrendPoint[];
@@ -190,6 +192,10 @@ export function FxImpactPopover({
                   <Legend color="#6f9b87" label="60일선" />
                   <Legend color="#a68d72" label="120일선" />
                 </div>
+                <p className="mt-4 border-t border-[#e3e6e1] pt-3 text-[10px] leading-4 text-[#7b8179]">
+                  오늘 영향은 {basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근"} 기준 스냅샷 이후의 환율 차이입니다.
+                  직전 주기의 환율 변동은 이미 평가액과 이력에 반영됩니다.
+                </p>
               </div>
             </>
           ) : (
