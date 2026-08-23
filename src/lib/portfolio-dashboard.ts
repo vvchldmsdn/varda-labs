@@ -40,6 +40,7 @@ import {
 import {
   buildDailyPositionMovement,
   buildPreviousCloseMovement,
+  isPortfolioMovementEligibleHolding,
   type PortfolioMovementContribution,
   type PortfolioMovementCycle,
   type PortfolioMovementCoverage,
@@ -70,6 +71,8 @@ export type DashboardHolding = {
   legacyBase44Id: string | null;
   name: string;
   ticker: string | null;
+  assetType: string | null;
+  movementEligible: boolean;
   account: string;
   market: string;
   currency: string;
@@ -200,6 +203,8 @@ export type DashboardData = {
     movementSnapshotCoveragePct: number | null;
     movementCountCoveragePct: number | null;
     previousCloseCoveragePct: number | null;
+    movementEligibleAssetCount: number;
+    movementExcludedAssetCount: number;
     headlineBasis: "current_assets_plus_event_ledger";
     trendBasis: "daily_portfolio_snapshots";
     latestPortfolioSnapshotDate: string | null;
@@ -364,6 +369,9 @@ export async function getPortfolioDashboard(
       ),
     )
     .sort((a, b) => b.valueKrw - a.valueKrw);
+  const movementEligibleAssetCount = holdings.filter(
+    (holding) => holding.movementEligible,
+  ).length;
 
   const totalValueKrw = sumBy(holdings, (holding) => holding.valueKrw);
   const costBasisKrw = sumBy(holdings, (holding) => holding.costBasisKrw);
@@ -498,6 +506,8 @@ export async function getPortfolioDashboard(
       movementSnapshotCoveragePct: movement.coverage.snapshotCoveragePct,
       movementCountCoveragePct: movement.coverage.countCoveragePct,
       previousCloseCoveragePct: previousCloseFallback.coverage.previousCloseCoveragePct,
+      movementEligibleAssetCount,
+      movementExcludedAssetCount: holdings.length - movementEligibleAssetCount,
       headlineBasis: "current_assets_plus_event_ledger",
       trendBasis: "daily_portfolio_snapshots",
       latestPortfolioSnapshotDate: latestPortfolioSnapshot?.date ?? null,
@@ -622,6 +632,8 @@ function buildHolding({
     legacyBase44Id: asset.legacyBase44Id,
     name: asset.name,
     ticker: asset.ticker,
+    assetType: asset.assetType,
+    movementEligible: isPortfolioMovementEligibleHolding(asset),
     account: asset.account,
     market: asset.market,
     currency: asset.currency,

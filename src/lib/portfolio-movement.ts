@@ -36,6 +36,7 @@ export type PortfolioMovementHoldingInput = {
   legacyBase44Id: string | null;
   name: string;
   ticker: string | null;
+  assetType: string | null;
   account: string;
   market: string;
   currency: string;
@@ -155,6 +156,16 @@ export type PortfolioMovementResult = {
   coverage: PortfolioMovementCoverage;
 };
 
+export function isPortfolioMovementEligibleHolding(
+  holding: Pick<PortfolioMovementHoldingInput, "assetType" | "ticker">,
+) {
+  const assetType = holding.assetType?.trim().toLowerCase() ?? "";
+  const isTickerlessPhysicalCommodity =
+    assetType === "commodity" && normalizeTicker(holding.ticker) === null;
+
+  return !isTickerlessPhysicalCommodity;
+}
+
 export function buildDailyPositionMovement({
   holdings,
   positionRows,
@@ -172,6 +183,7 @@ export function buildDailyPositionMovement({
   usdKrwRate: number;
   movementCycle: PortfolioMovementCycle;
 }): PortfolioMovementResult {
+  const movementHoldings = holdings.filter(isPortfolioMovementEligibleHolding);
   const emptyCoverage = {
     currentCoveragePct: null,
     snapshotCoveragePct: null,
@@ -181,7 +193,7 @@ export function buildDailyPositionMovement({
 
   if (!baselineDate) {
     return emptyMovement("missing_baseline_snapshot", emptyCoverage, {
-      exclusions: holdings.map((holding) =>
+      exclusions: movementHoldings.map((holding) =>
         holdingExclusion(
           holding,
           "missing_baseline_snapshot",
@@ -191,17 +203,22 @@ export function buildDailyPositionMovement({
     });
   }
 
-  const accountRows = positionRows.filter(
-    (row) =>
-      (selectedAccount === "all" || row.account === selectedAccount) &&
-      isInvestmentSnapshot(row),
-  );
+  const accountRows = positionRows
+    .filter(
+      (row) =>
+        (selectedAccount === "all" || row.account === selectedAccount) &&
+        isInvestmentSnapshot(row),
+    )
+    .filter((row) => isPortfolioMovementEligibleSnapshot(row, holdings));
   const snapshotTotalValue = sumBy(accountRows, snapshotMarketValue);
-  const currentTotalValue = sumBy(holdings, (holding) => holding.valueKrw);
+  const currentTotalValue = sumBy(
+    movementHoldings,
+    (holding) => holding.valueKrw,
+  );
 
   if (accountRows.length === 0 || snapshotTotalValue <= 0 || currentTotalValue <= 0) {
     return emptyMovement("missing_baseline_snapshot", emptyCoverage, {
-      exclusions: holdings.map((holding) =>
+      exclusions: movementHoldings.map((holding) =>
         holdingExclusion(
           holding,
           "missing_baseline_snapshot",
@@ -226,7 +243,7 @@ export function buildDailyPositionMovement({
   let fxEvidenceRequiredCount = 0;
   let fxEvidenceMatchedCount = 0;
 
-  for (const holding of holdings) {
+  for (const holding of movementHoldings) {
     const snapshot = findPositionSnapshotForHolding(holding, accountRows);
     if (snapshot) currentHoldingSnapshotIds.add(snapshot.id);
 
@@ -348,7 +365,8 @@ export function buildDailyPositionMovement({
   const currentCoverage = currentTotalValue > 0 ? matchedCurrentValue / currentTotalValue : 0;
   const snapshotCoverage =
     snapshotTotalValue > 0 ? matchedSnapshotValue / snapshotTotalValue : 0;
-  const countCoverage = holdings.length > 0 ? matchedCount / holdings.length : 0;
+  const countCoverage =
+    movementHoldings.length > 0 ? matchedCount / movementHoldings.length : 0;
   const matchedSnapshotCountCoverage =
     accountRows.length > 0 ? matchedSnapshotIds.size / accountRows.length : 0;
   const coverage = {
@@ -427,16 +445,20 @@ export function buildPreviousCloseMovement({
   usdKrwRate: number;
   movementCycle: PortfolioMovementCycle;
 }): PortfolioMovementResult {
+  const movementHoldings = holdings.filter(isPortfolioMovementEligibleHolding);
   const contributions = new Map<string, PortfolioMovementContribution>();
   const exclusions: PortfolioMovementExclusion[] = [];
-  const currentTotalValue = sumBy(holdings, (holding) => holding.valueKrw);
+  const currentTotalValue = sumBy(
+    movementHoldings,
+    (holding) => holding.valueKrw,
+  );
   let matchedCurrentValue = 0;
   let matchedCount = 0;
   let previousTotalKrw = 0;
   let changeKrw = 0;
   let fxChangeKrw = 0;
 
-  for (const holding of holdings) {
+  for (const holding of movementHoldings) {
     const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
     if (!currentFx.ok) {
       exclusions.push(
@@ -488,7 +510,8 @@ export function buildPreviousCloseMovement({
 
   const valueCoverage =
     currentTotalValue > 0 ? matchedCurrentValue / currentTotalValue : 0;
-  const countCoverage = holdings.length > 0 ? matchedCount / holdings.length : 0;
+  const countCoverage =
+    movementHoldings.length > 0 ? matchedCount / movementHoldings.length : 0;
   const coverage = {
     currentCoveragePct: null,
     snapshotCoveragePct: null,
@@ -745,17 +768,32 @@ function findPositionSnapshotForHolding(
   holding: PortfolioMovementHoldingInput,
   rows: PortfolioMovementPositionSnapshotInput[],
 ) {
-  const holdingTicker = normalizeTicker(holding.ticker);
+  return rows.find((row) => positionSnapshotMatchesHolding(row, holding));
+}
 
-  return rows.find((row) => {
-    if (row.account !== holding.account) return false;
-    if (row.assetId && row.assetId === holding.id) return true;
-    if (row.legacyAssetId && row.legacyAssetId === holding.legacyBase44Id) {
-      return true;
-    }
-    if (holdingTicker && normalizeTicker(row.ticker) === holdingTicker) return true;
-    return row.assetName === holding.name;
-  });
+function isPortfolioMovementEligibleSnapshot(
+  row: PortfolioMovementPositionSnapshotInput,
+  holdings: PortfolioMovementHoldingInput[],
+) {
+  const currentHolding = holdings.find((holding) =>
+    positionSnapshotMatchesHolding(row, holding),
+  );
+
+  return isPortfolioMovementEligibleHolding(currentHolding ?? row);
+}
+
+function positionSnapshotMatchesHolding(
+  row: PortfolioMovementPositionSnapshotInput,
+  holding: PortfolioMovementHoldingInput,
+) {
+  if (row.account !== holding.account) return false;
+  if (row.assetId && row.assetId === holding.id) return true;
+  if (row.legacyAssetId && row.legacyAssetId === holding.legacyBase44Id) {
+    return true;
+  }
+  const holdingTicker = normalizeTicker(holding.ticker);
+  if (holdingTicker && normalizeTicker(row.ticker) === holdingTicker) return true;
+  return row.assetName === holding.name;
 }
 
 function calculateTradeFlowForHolding(

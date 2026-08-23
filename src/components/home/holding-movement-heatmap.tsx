@@ -369,7 +369,7 @@ function HeatmapRow({
             style={heatmapStyle(cell)}
             title={`${row.name}\n${formatDate(cell.date)}\n${evidenceLabel}`}
           >
-            {cell.changePct === 0 ? "0" : cell.changePct === null ? "·" : null}
+            {cell.changePct === null ? "·" : null}
           </button>
         );
       })}
