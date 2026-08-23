@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import {
+  formatPercent as formatPortfolioPercent,
+  formatSignedKrw,
+} from "@/components/home/portfolio-format";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import type {
   DashboardData,
@@ -569,17 +573,9 @@ function formatKrw(value: number | null) {
   return `₩${Math.round(value).toLocaleString("en-US")}`;
 }
 
-function formatSignedKrw(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  const rounded = Math.round(value);
-  const prefix = rounded > 0 ? "+" : "";
-  return `${prefix}₩${rounded.toLocaleString("en-US")}`;
-}
-
 function formatPct(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${value.toFixed(2)}%`;
+  if (value !== null && !Number.isFinite(value)) return "-";
+  return formatPortfolioPercent(value, true);
 }
 
 function formatCoveragePct(value: number | null) {
