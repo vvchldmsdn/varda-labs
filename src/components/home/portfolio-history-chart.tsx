@@ -55,7 +55,10 @@ export function PortfolioHistoryChart({
   const activePoint = hoveredIndex === null ? null : visiblePoints[hoveredIndex] ?? null;
   const activeGeometry = hoveredIndex === null ? null : geometry.points[hoveredIndex] ?? null;
   const mobilePoint = visiblePoints[mobileActiveIndex] ?? null;
-  const visibleEvents = recentVisibleEvents(events, visiblePoints);
+  const visibleEvents = layoutVisibleEvents(
+    recentVisibleEvents(events, visiblePoints),
+    geometry.points,
+  );
 
   return (
     <section aria-labelledby="portfolio-history-title" className="min-w-0">
@@ -139,11 +142,10 @@ export function PortfolioHistoryChart({
                 vectorEffect="non-scaling-stroke"
               />
               {visibleEvents.map((event) => {
-                const index = closestPointIndex(visiblePoints, event.eventDate);
-                const point = geometry.points[index];
+                const point = geometry.points[event.pointIndex];
                 if (!point) return null;
                 return (
-                  <g key={`${event.eventDate}:${event.eventType}`}>
+                  <g key={event.key}>
                     <line
                       x1={point.x}
                       x2={point.x}
@@ -155,12 +157,12 @@ export function PortfolioHistoryChart({
                     <circle cx={point.x} cy={point.y} r="4" fill="#20231f" />
                     <text
                       x={point.x}
-                      y={PLOT_BOTTOM + 26}
+                      y={PLOT_BOTTOM + 24 + event.labelRow * 13}
                       textAnchor="middle"
                       fill="#656b63"
-                      fontSize="10"
+                      fontSize="9"
                     >
-                      {eventTypeLabel(event.eventType)}
+                      {event.label}
                     </text>
                   </g>
                 );
@@ -207,8 +209,11 @@ export function PortfolioHistoryChart({
                     width={Math.max(1, hitEnd - hitStart)}
                     height={PLOT_BOTTOM - PLOT_TOP}
                     fill="transparent"
+                    className="outline-none"
+                    style={{ outline: "none" }}
                     onBlur={() => setHoveredIndex(null)}
                     onFocus={() => setHoveredIndex(index)}
+                    onPointerDown={(event) => event.preventDefault()}
                     onPointerEnter={() => setHoveredIndex(index)}
                   />
                 );
@@ -332,10 +337,58 @@ function recentVisibleEvents(events: readonly HistoryEvent[], points: readonly H
   const start = points[0]?.date;
   const end = points.at(-1)?.date;
   if (!start || !end) return [];
-  return events
+  const grouped = new Map<
+    number,
+    { eventDate: string; eventTypes: string[]; pointIndex: number }
+  >();
+
+  for (const event of events
     .filter((event) => event.eventDate >= start && event.eventDate <= end)
-    .toSorted((left, right) => left.eventDate.localeCompare(right.eventDate))
-    .slice(-3);
+    .toSorted((left, right) => left.eventDate.localeCompare(right.eventDate))) {
+    const pointIndex = closestPointIndex(points, event.eventDate);
+    const current = grouped.get(pointIndex);
+    if (current) {
+      if (!current.eventTypes.includes(event.eventType)) {
+        current.eventTypes.push(event.eventType);
+      }
+      current.eventDate = event.eventDate;
+      continue;
+    }
+    grouped.set(pointIndex, {
+      eventDate: event.eventDate,
+      eventTypes: [event.eventType],
+      pointIndex,
+    });
+  }
+
+  return [...grouped.values()]
+    .toSorted((left, right) => left.pointIndex - right.pointIndex)
+    .slice(-3)
+    .map((event) => ({
+      ...event,
+      key: `${event.pointIndex}:${event.eventTypes.join(":")}`,
+      label:
+        event.eventTypes.length > 1
+          ? `${eventTypeLabel(event.eventTypes[0] ?? "")} 외 ${event.eventTypes.length - 1}`
+          : eventTypeLabel(event.eventTypes[0] ?? ""),
+    }));
+}
+
+function layoutVisibleEvents(
+  events: ReturnType<typeof recentVisibleEvents>,
+  points: readonly { x: number; y: number }[],
+) {
+  let previousX: number | null = null;
+  let previousRow = 0;
+
+  return events.map((event) => {
+    const x = points[event.pointIndex]?.x ?? 0;
+    const isClose = previousX !== null && x - previousX < 130;
+    const labelRow = isClose ? (previousRow === 0 ? 1 : 0) : 0;
+    previousX = x;
+    previousRow = labelRow;
+    return { ...event, labelRow };
+  });
 }
 
 function closestPointIndex(points: readonly HistoryPoint[], date: string) {
@@ -359,5 +412,9 @@ function eventTypeLabel(value: string) {
   if (value === "dividend") return "배당";
   if (value === "deposit") return "입금";
   if (value === "withdrawal") return "출금";
-  return value;
+  if (value === "asset_added") return "종목 추가";
+  if (value === "asset_removed") return "종목 정리";
+  if (value === "quantity_adjusted") return "수량 조정";
+  if (value === "manual_price_update") return "가격 수정";
+  return "기타 기록";
 }

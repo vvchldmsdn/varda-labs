@@ -89,6 +89,7 @@ import "./portfolio-fx-shock.test.mjs";
 import "./portfolio-special-holdings.test.mjs";
 import "./portfolio-dashboard-snapshots.test.mjs";
 import "./portfolio-dashboard-history.test.mjs";
+import "./holding-connection-graph.test.mjs";
 import "./fx-trend.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
 import "./target-deficit-allocation.test.mjs";

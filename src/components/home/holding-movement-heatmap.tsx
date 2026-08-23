@@ -14,6 +14,7 @@ import type {
   PortfolioDashboardHeatmapCell,
   PortfolioDashboardHoldingHistory,
 } from "@/lib/portfolio-dashboard-history";
+import { buildHoldingConnectionGraph } from "@/lib/holding-connection-graph";
 
 type HeatmapMode = "movement" | "allocation" | "connections";
 
@@ -86,22 +87,7 @@ export function HoldingMovementHeatmap({
       ) : null}
 
       {mode === "connections" ? (
-        <div className="grid min-h-[310px] place-items-center border-y border-[#e2e5df] px-6 text-center">
-          <div className="max-w-sm">
-            <p className="text-sm font-semibold text-[#2d312c]">연결 분석은 근거별로 나누어 제공합니다.</p>
-            <p className="mt-2 text-xs leading-5 text-[#747a72]">
-              가격 상관관계와 ETF 구성 겹침을 하나의 점수로 섞지 않고 각각 확인할 수 있습니다.
-            </p>
-            <div className="mt-5 flex justify-center gap-5 text-xs font-medium">
-              <Link className="border-b border-[#9da39b] pb-1 hover:text-[#347e62]" href={riskHref}>
-                상관·위험 보기
-              </Link>
-              <Link className="border-b border-[#9da39b] pb-1 hover:text-[#347e62]" href="/etfs">
-                ETF 겹침 보기
-              </Link>
-            </div>
-          </div>
-        </div>
+        <ConnectionMap history={history} riskHref={riskHref} />
       ) : null}
 
       {mode === "movement" && selectedRow && selectedCell ? (
@@ -124,6 +110,150 @@ export function HoldingMovementHeatmap({
       ) : null}
     </section>
   );
+}
+
+function ConnectionMap({
+  history,
+  riskHref,
+}: {
+  history: PortfolioDashboardHoldingHistory;
+  riskHref: string;
+}) {
+  const graph = useMemo(() => buildHoldingConnectionGraph(history), [history]);
+
+  if (graph.nodes.length < 2 || graph.edges.length === 0) {
+    return (
+      <div className="grid min-h-[310px] place-items-center border-y border-[#e2e5df] px-6 text-center">
+        <div className="max-w-sm">
+          <p className="text-sm font-semibold text-[#2d312c]">연결을 계산할 공통 이력이 아직 부족합니다.</p>
+          <p className="mt-2 text-xs leading-5 text-[#747a72]">
+            가격 상관관계와 ETF 구성 겹침은 서로 다른 근거이므로 상세 화면에서 나누어 확인합니다.
+          </p>
+          <ConnectionLinks riskHref={riskHref} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-y border-[#e2e5df] py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-[10px] text-[#7a8078]">
+        <p>최근 저장 일별 등락 · 상위 {graph.nodes.length}종목</p>
+        <div className="flex items-center gap-4" aria-label="연결선 범례">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-px w-5 bg-[#6f9e88]" /> 함께 움직임
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-px w-5 bg-[#c48680]" /> 반대 움직임
+          </span>
+        </div>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <svg
+          aria-label="종목별 최근 등락 상관 연결도"
+          className="h-[300px] min-w-[720px] w-full"
+          role="img"
+          viewBox="0 0 900 300"
+        >
+          <ellipse
+            cx="450"
+            cy="145"
+            fill="none"
+            rx="332"
+            ry="104"
+            stroke="#e3e7e1"
+            strokeDasharray="2 7"
+          />
+          {graph.edges.map((edge) => {
+            const left = graph.nodes[edge.leftIndex];
+            const right = graph.nodes[edge.rightIndex];
+            if (!left || !right) return null;
+            const strength = Math.abs(edge.correlation);
+            return (
+              <line
+                key={edge.key}
+                x1={left.x}
+                x2={right.x}
+                y1={left.y}
+                y2={right.y}
+                stroke={edge.correlation >= 0 ? "#6f9e88" : "#c48680"}
+                strokeDasharray={edge.correlation < 0 ? "4 4" : undefined}
+                strokeLinecap="round"
+                strokeOpacity={0.24 + strength * 0.42}
+                strokeWidth={0.8 + strength * 3.2}
+              >
+                <title>
+                  {left.name} · {right.name}: 상관 {edge.correlation.toFixed(2)} ({edge.observations}일)
+                </title>
+              </line>
+            );
+          })}
+          {graph.nodes.map((node) => (
+            <g key={node.holdingId}>
+              <circle
+                cx={node.x}
+                cy={node.y}
+                fill="#f7f8f5"
+                r={node.radius + 4}
+                stroke="#dfe4de"
+              />
+              <circle
+                cx={node.x}
+                cy={node.y}
+                fill="#2f6652"
+                fillOpacity="0.88"
+                r={node.radius}
+              >
+                <title>{node.name} · 현재 비중 {formatPercent(node.currentWeight)}</title>
+              </circle>
+              <text
+                x={node.x}
+                y={node.y + node.radius + 18}
+                fill="#30342f"
+                fontSize="11"
+                fontWeight="600"
+                textAnchor="middle"
+              >
+                {compactName(node.name)}
+              </text>
+              <text
+                x={node.x}
+                y={node.y + node.radius + 32}
+                fill="#858a83"
+                fontSize="9"
+                textAnchor="middle"
+              >
+                {formatPercent(node.currentWeight)}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 px-1 pt-1">
+        <p className="max-w-xl text-[10px] leading-4 text-[#858a83]">
+          선은 같은 날짜에 관측된 일별 등락의 방향만 요약합니다. ETF 내부 종목 겹침이나 투자 권고를 뜻하지 않습니다.
+        </p>
+        <ConnectionLinks riskHref={riskHref} />
+      </div>
+    </div>
+  );
+}
+
+function ConnectionLinks({ riskHref }: { riskHref: string }) {
+  return (
+    <div className="mt-5 flex justify-center gap-5 text-xs font-medium">
+      <Link className="border-b border-[#9da39b] pb-1 hover:text-[#347e62]" href={riskHref}>
+        상관·위험 상세
+      </Link>
+      <Link className="border-b border-[#9da39b] pb-1 hover:text-[#347e62]" href="/etfs">
+        ETF 겹침 상세
+      </Link>
+    </div>
+  );
+}
+
+function compactName(value: string) {
+  return value.length > 18 ? `${value.slice(0, 16)}…` : value;
 }
 
 function MovementMatrix({
