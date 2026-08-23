@@ -160,10 +160,10 @@ export function isPortfolioMovementEligibleHolding(
   holding: Pick<PortfolioMovementHoldingInput, "assetType" | "ticker">,
 ) {
   const assetType = holding.assetType?.trim().toLowerCase() ?? "";
-  const isTickerlessPhysicalCommodity =
-    assetType === "commodity" && normalizeTicker(holding.ticker) === null;
+  const ticker = normalizeTicker(holding.ticker);
+  const hasQuotedInstrument = ticker !== null && ticker !== "-";
 
-  return !isTickerlessPhysicalCommodity;
+  return MOVEMENT_INVESTMENT_ASSET_TYPES.has(assetType) && hasQuotedInstrument;
 }
 
 export function buildDailyPositionMovement({
