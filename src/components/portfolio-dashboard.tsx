@@ -71,7 +71,7 @@ export function PortfolioDashboard({
                 <h1 id="portfolio-overview-title" className="sr-only">포트폴리오 홈</h1>
               </div>
               <p className="text-xs text-[#7b8079]">
-                기준일 {formatDate(data.latestSnapshotReferenceDate ?? data.latestSnapshotDate)}
+                기준일 {formatDate(data.movementBaselineDate)}
               </p>
             </div>
 
@@ -157,7 +157,7 @@ export function PortfolioDashboard({
               tone={priceImpactKrw}
             />
             <FxImpactPopover
-              basisDate={data.latestSnapshotDate}
+              basisDate={data.movementBaselineDate}
               impactKrw={data.todayFxChangeKrw}
               impactPct={fxImpactPct}
               points={data.fxTrend}

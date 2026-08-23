@@ -20,12 +20,12 @@ describe("P1/P2 hardening boundaries", () => {
     assert.doesNotMatch(route, /TARGET_ACCOUNTS/);
   });
 
-  it("bounds dashboard events to the selected snapshot date", () => {
+  it("bounds dashboard events to the current service date", () => {
     const source = read("src/db/queries/portfolio-dashboard.ts");
 
     assert.match(
       source,
-      /lte\(eventLedgerEntries\.eventDate, snapshotDate\)/,
+      /lte\(eventLedgerEntries\.eventDate, serviceDate\)/,
     );
   });
 
