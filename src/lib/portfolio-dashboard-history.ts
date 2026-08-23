@@ -62,8 +62,8 @@ export type PortfolioDashboardPositionTrendPoint = Readonly<{
 
 export function buildPortfolioDashboardHoldingHistory({
   holdings,
-  maxDates = 18,
-  maxRows = 7,
+  maxDates = 31,
+  maxRows,
   rows,
 }: {
   holdings: readonly PortfolioDashboardHistoryHolding[];
@@ -71,12 +71,14 @@ export function buildPortfolioDashboardHoldingHistory({
   maxRows?: number;
   rows: readonly PortfolioDashboardPositionHistoryRow[];
 }): PortfolioDashboardHoldingHistory {
-  const selectedHoldings = holdings.slice(0, Math.max(0, maxRows));
+  const selectedHoldings = maxRows === undefined
+    ? [...holdings]
+    : holdings.slice(0, Math.max(0, maxRows));
   const selectedHoldingIds = new Set(selectedHoldings.map((holding) => holding.id));
   const preferred = preferredPositionRows(rows, selectedHoldingIds);
-  const dates = [...new Set([...preferred.values()].map((row) => row.snapshotDate))]
-    .sort((left, right) => left.localeCompare(right))
-    .slice(-Math.max(0, maxDates));
+  const observedDates = [...new Set([...preferred.values()].map((row) => row.snapshotDate))]
+    .sort((left, right) => left.localeCompare(right));
+  const dates = continuousDateWindow(observedDates, maxDates);
 
   let observedCellCount = 0;
   const heatmapRows = selectedHoldings.map((holding) => ({
@@ -121,6 +123,26 @@ export function buildPortfolioDashboardHoldingHistory({
     expectedCellCount,
     coveragePct: percentOrNull(observedCellCount, expectedCellCount),
   });
+}
+
+function continuousDateWindow(observedDates: readonly string[], maxDates: number) {
+  const latest = observedDates.at(-1);
+  const earliest = observedDates[0];
+  const boundedCount = Math.max(0, Math.floor(maxDates));
+  if (!latest || !earliest || boundedCount === 0) return [];
+
+  const candidateStart = shiftIsoDate(latest, -(boundedCount - 1));
+  const start = candidateStart.localeCompare(earliest) > 0 ? candidateStart : earliest;
+  const dates: string[] = [];
+  for (let date = start; date.localeCompare(latest) <= 0; date = shiftIsoDate(date, 1)) {
+    dates.push(date);
+  }
+  return dates;
+}
+
+function shiftIsoDate(value: string, dayDelta: number) {
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  return new Date(timestamp + dayDelta * 86_400_000).toISOString().slice(0, 10);
 }
 
 export function buildPortfolioDashboardPositionTrend({

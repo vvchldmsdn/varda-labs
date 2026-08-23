@@ -8,6 +8,7 @@ import {
   formatPercent,
   formatShortDate,
 } from "@/components/home/portfolio-format";
+import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 
 type HistoryPoint = Readonly<{
   date: string;
@@ -17,8 +18,14 @@ type HistoryPoint = Readonly<{
 }>;
 
 type HistoryEvent = Readonly<{
+  id: string;
   eventDate: string;
   eventType: string;
+  accountLabel: string;
+  assetName: string;
+  ticker: string | null;
+  amountKrw: number | null;
+  quantityDelta: number | null;
 }>;
 
 type RangeKey = "1M" | "3M" | "6M" | "ALL";
@@ -46,6 +53,7 @@ export function PortfolioHistoryChart({
   const [range, setRange] = useState<RangeKey>("ALL");
   const visiblePoints = useMemo(() => pointsForRange(points, range), [points, range]);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [activeEventKey, setActiveEventKey] = useState<string | null>(null);
   const [mobileIndex, setMobileIndex] = useState(Math.max(points.length - 1, 0));
   const geometry = useMemo(() => buildGeometry(visiblePoints), [visiblePoints]);
   const mobileActiveIndex = Math.min(
@@ -55,10 +63,11 @@ export function PortfolioHistoryChart({
   const activePoint = hoveredIndex === null ? null : visiblePoints[hoveredIndex] ?? null;
   const activeGeometry = hoveredIndex === null ? null : geometry.points[hoveredIndex] ?? null;
   const mobilePoint = visiblePoints[mobileActiveIndex] ?? null;
-  const visibleEvents = layoutVisibleEvents(
-    recentVisibleEvents(events, visiblePoints),
-    geometry.points,
-  );
+  const visibleEvents = groupedVisibleEvents(events, visiblePoints);
+  const activeEvent = visibleEvents.find((event) => event.key === activeEventKey) ?? null;
+  const activeEventGeometry = activeEvent
+    ? geometry.points[activeEvent.pointIndex] ?? null
+    : null;
 
   return (
     <section aria-labelledby="portfolio-history-title" className="min-w-0">
@@ -83,6 +92,7 @@ export function PortfolioHistoryChart({
               onClick={() => {
                 setRange(item);
                 setHoveredIndex(null);
+                setActiveEventKey(null);
                 setMobileIndex(Math.max(pointsForRange(points, item).length - 1, 0));
               }}
             >
@@ -96,7 +106,10 @@ export function PortfolioHistoryChart({
         <>
           <div
             className="relative aspect-[2.65/1] min-h-[250px] w-full"
-            onPointerLeave={() => setHoveredIndex(null)}
+            onPointerLeave={() => {
+              setHoveredIndex(null);
+              setActiveEventKey(null);
+            }}
           >
             <svg
               role="img"
@@ -141,32 +154,6 @@ export function PortfolioHistoryChart({
                 strokeWidth="1.75"
                 vectorEffect="non-scaling-stroke"
               />
-              {visibleEvents.map((event) => {
-                const point = geometry.points[event.pointIndex];
-                if (!point) return null;
-                return (
-                  <g key={event.key}>
-                    <line
-                      x1={point.x}
-                      x2={point.x}
-                      y1={point.y + 9}
-                      y2={PLOT_BOTTOM + 5}
-                      stroke="#b8bdb6"
-                      strokeDasharray="2 4"
-                    />
-                    <circle cx={point.x} cy={point.y} r="4" fill="#20231f" />
-                    <text
-                      x={point.x}
-                      y={PLOT_BOTTOM + 24 + event.labelRow * 13}
-                      textAnchor="middle"
-                      fill="#656b63"
-                      fontSize="9"
-                    >
-                      {event.label}
-                    </text>
-                  </g>
-                );
-              })}
               {activePoint && activeGeometry ? (
                 <g>
                   <line
@@ -218,6 +205,54 @@ export function PortfolioHistoryChart({
                   />
                 );
               })}
+              {visibleEvents.map((event) => {
+                const point = geometry.points[event.pointIndex];
+                if (!point) return null;
+                const active = event.key === activeEventKey;
+                return (
+                  <g
+                    key={event.key}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={eventAriaLabel(event)}
+                    className="cursor-help outline-none"
+                    onBlur={() => setActiveEventKey(null)}
+                    onFocus={() => {
+                      setHoveredIndex(null);
+                      setActiveEventKey(event.key);
+                    }}
+                    onPointerEnter={() => {
+                      setHoveredIndex(null);
+                      setActiveEventKey(event.key);
+                    }}
+                    onPointerLeave={() => setActiveEventKey(null)}
+                  >
+                    <circle
+                      cx={point.x}
+                      cy={PLOT_BOTTOM - 2}
+                      fill="transparent"
+                      r="11"
+                    />
+                    <line
+                      x1={point.x}
+                      x2={point.x}
+                      y1={Math.min(point.y + 12, PLOT_BOTTOM - 12)}
+                      y2={PLOT_BOTTOM - 7}
+                      stroke="#a9aea7"
+                      strokeDasharray="2 5"
+                    />
+                    <circle
+                      cx={point.x}
+                      cy={PLOT_BOTTOM - 2}
+                      fill={active ? "#347e62" : "#7f8a82"}
+                      r={active ? 5 : 3.5}
+                      stroke="#f7f8f5"
+                      strokeWidth="2"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </g>
+                );
+              })}
               {geometry.labelIndexes.map((index) => {
                 const point = geometry.points[index];
                 const value = visiblePoints[index];
@@ -262,6 +297,38 @@ export function PortfolioHistoryChart({
                     {formatPercent(activePoint.totalReturnPct, true)}
                   </dd>
                 </dl>
+              </div>
+            ) : null}
+
+            {activeEvent && activeEventGeometry ? (
+              <div
+                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[#d7ddd7] bg-[rgba(250,252,249,0.98)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
+                style={{
+                  bottom: "9%",
+                  left: `${Math.min(74, Math.max(3, (activeEventGeometry.x / WIDTH) * 100 + 1.5))}%`,
+                }}
+              >
+                <p className="border-b border-[#e4e8e3] pb-2 font-semibold text-[#20231f]">
+                  {formatDate(activeEvent.eventDate)} · {activeEvent.events.length}건
+                </p>
+                <div className="mt-2.5 space-y-2.5">
+                  {activeEvent.events.slice(0, 3).map((event) => (
+                    <div key={event.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-[#252824]">{eventTypeLabel(event.eventType)}</p>
+                        <p className="text-right font-medium tabular-nums text-[#252824]">
+                          {eventAmountLabel(event)}
+                        </p>
+                      </div>
+                      <p className="mt-0.5 truncate text-[#747a72]">
+                        {event.assetName} · {event.accountLabel}
+                      </p>
+                    </div>
+                  ))}
+                  {activeEvent.events.length > 3 ? (
+                    <p className="text-[#747a72]">그 외 {activeEvent.events.length - 3}건</p>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -326,20 +393,20 @@ function buildGeometry(points: readonly HistoryPoint[]) {
     .filter((index) => index === 0 || index === points.length - 1 || index % labelStep === 0);
 
   return {
-    path: chartPoints.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
+    path: buildMonotoneCurvePath(chartPoints),
     points: chartPoints,
     labelIndexes,
     barWidth: Math.max(1.2, Math.min(4, xStep * 0.32)),
   };
 }
 
-function recentVisibleEvents(events: readonly HistoryEvent[], points: readonly HistoryPoint[]) {
+function groupedVisibleEvents(events: readonly HistoryEvent[], points: readonly HistoryPoint[]) {
   const start = points[0]?.date;
   const end = points.at(-1)?.date;
   if (!start || !end) return [];
   const grouped = new Map<
     number,
-    { eventDate: string; eventTypes: string[]; pointIndex: number }
+    { eventDate: string; events: HistoryEvent[]; pointIndex: number }
   >();
 
   for (const event of events
@@ -348,47 +415,23 @@ function recentVisibleEvents(events: readonly HistoryEvent[], points: readonly H
     const pointIndex = closestPointIndex(points, event.eventDate);
     const current = grouped.get(pointIndex);
     if (current) {
-      if (!current.eventTypes.includes(event.eventType)) {
-        current.eventTypes.push(event.eventType);
-      }
+      current.events.push(event);
       current.eventDate = event.eventDate;
       continue;
     }
     grouped.set(pointIndex, {
       eventDate: event.eventDate,
-      eventTypes: [event.eventType],
+      events: [event],
       pointIndex,
     });
   }
 
   return [...grouped.values()]
     .toSorted((left, right) => left.pointIndex - right.pointIndex)
-    .slice(-3)
     .map((event) => ({
       ...event,
-      key: `${event.pointIndex}:${event.eventTypes.join(":")}`,
-      label:
-        event.eventTypes.length > 1
-          ? `${eventTypeLabel(event.eventTypes[0] ?? "")} 외 ${event.eventTypes.length - 1}`
-          : eventTypeLabel(event.eventTypes[0] ?? ""),
+      key: `${event.pointIndex}:${event.events.map((row) => row.id).join(":")}`,
     }));
-}
-
-function layoutVisibleEvents(
-  events: ReturnType<typeof recentVisibleEvents>,
-  points: readonly { x: number; y: number }[],
-) {
-  let previousX: number | null = null;
-  let previousRow = 0;
-
-  return events.map((event) => {
-    const x = points[event.pointIndex]?.x ?? 0;
-    const isClose = previousX !== null && x - previousX < 130;
-    const labelRow = isClose ? (previousRow === 0 ? 1 : 0) : 0;
-    previousX = x;
-    previousRow = labelRow;
-    return { ...event, labelRow };
-  });
 }
 
 function closestPointIndex(points: readonly HistoryPoint[], date: string) {
@@ -417,4 +460,18 @@ function eventTypeLabel(value: string) {
   if (value === "quantity_adjusted") return "수량 조정";
   if (value === "manual_price_update") return "가격 수정";
   return "기타 기록";
+}
+
+function eventAmountLabel(event: HistoryEvent) {
+  if (event.amountKrw !== null) return formatKrw(event.amountKrw);
+  if (event.quantityDelta !== null) {
+    const prefix = event.quantityDelta > 0 ? "+" : "";
+    return `${prefix}${new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 4 }).format(event.quantityDelta)}좌`;
+  }
+  return "상세 금액 없음";
+}
+
+function eventAriaLabel(event: ReturnType<typeof groupedVisibleEvents>[number]) {
+  const kinds = [...new Set(event.events.map((row) => eventTypeLabel(row.eventType)))].join(", ");
+  return `${formatDate(event.eventDate)} ${kinds} ${event.events.length}건`;
 }
