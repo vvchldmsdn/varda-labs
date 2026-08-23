@@ -54,6 +54,12 @@ export function isUsdListedAsset(asset: MarketAsset) {
   return asset.market === "us" || asset.currency === "USD";
 }
 
+export function isTradingDayForAsset(asset: MarketAsset, date: string) {
+  if (isUsdListedAsset(asset)) return isUsTradingDay(date);
+  if (asset.market === "korea") return isKoreaTradingDay(date);
+  return Boolean(date) && !isWeekend(date);
+}
+
 function previousWeekdayOnOrBefore(date: string) {
   let current = date;
   while (isWeekend(current)) current = shiftDate(current, -1);
