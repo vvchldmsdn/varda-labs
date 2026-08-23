@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import {
   formatDate,
@@ -101,7 +101,11 @@ export function HoldingMovementHeatmap({
             </p>
           </div>
           <dl className="grid grid-cols-2 gap-x-5 text-xs sm:grid-cols-4">
-            <HeatmapDetail label="등락" value={formatPercent(selectedCell.changePct, true)} tone={selectedCell.changePct} />
+            <HeatmapDetail
+              label="등락"
+              value={selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true)}
+              tone={selectedCell.changePct}
+            />
             <HeatmapDetail label="평가액" value={formatKrw(selectedCell.changeKrw)} tone={selectedCell.changeKrw} />
             <HeatmapDetail label="가격" value={formatKrw(selectedCell.priceChangeKrw)} tone={selectedCell.priceChangeKrw} />
             <HeatmapDetail label="환율" value={formatKrw(selectedCell.fxChangeKrw)} tone={selectedCell.fxChangeKrw} />
@@ -276,18 +280,18 @@ function MovementMatrix({
     );
   }
 
-  const cellWidth = history.dates.length <= 20 ? 38 : 30;
-  const gridTemplateColumns = `minmax(156px, 200px) repeat(${history.dates.length}, ${cellWidth}px)`;
+  const cellWidth = history.dates.length <= 20 ? 34 : 27;
+  const gridTemplateColumns = `minmax(174px, 214px) repeat(${history.dates.length}, ${cellWidth}px)`;
 
   return (
     <div className="overflow-x-auto pb-1">
       <div
         className="min-w-max"
         style={{
-          columnGap: "2px",
+          columnGap: "1px",
           display: "grid",
           gridTemplateColumns,
-          rowGap: "3px",
+          rowGap: "2px",
         }}
       >
         <div />
@@ -313,16 +317,19 @@ function MovementMatrix({
           />
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-between text-[9px] text-[#858a83]">
+      <div className="mt-3 flex items-center gap-3 text-[9px] text-[#858a83]">
         <span>하락</span>
-        <div className="mx-2.5 flex flex-1 items-center gap-0.5" aria-hidden="true">
-          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(217, 101, 93, 0.46)" }} />
-          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(217, 101, 93, 0.18)" }} />
-          <span className="h-1.5 flex-1 rounded-[3px] bg-[#eceeeb]" />
-          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(76, 155, 118, 0.18)" }} />
-          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(76, 155, 118, 0.46)" }} />
+        <div className="flex flex-1 items-center gap-px" aria-hidden="true">
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(213, 70, 66, 0.78)" }} />
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(213, 70, 66, 0.30)" }} />
+          <span className="h-1.5 flex-1 rounded-[3px] bg-[#e3e6e2]" />
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(39, 142, 95, 0.30)" }} />
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(39, 142, 95, 0.78)" }} />
         </div>
         <span>상승</span>
+        <span className="ml-2 inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-4 rounded-[4px]" style={missingCellStyle} /> 미수집
+        </span>
       </div>
     </div>
   );
@@ -346,19 +353,24 @@ function HeatmapRow({
       </div>
       {row.cells.map((cell, cellIndex) => {
         const selected = selection?.rowIndex === rowIndex && selection.cellIndex === cellIndex;
+        const evidenceLabel = cell.changePct === null
+          ? "미수집"
+          : formatPercent(cell.changePct, true);
         return (
           <button
             key={`${row.holdingId}:${cell.date}`}
             type="button"
-            aria-label={`${row.name} ${formatDate(cell.date)} ${formatPercent(cell.changePct, true)}`}
+            aria-label={`${row.name} ${formatDate(cell.date)} ${evidenceLabel}`}
             aria-pressed={selected}
-            className={`h-[18px] min-w-[22px] w-full rounded-[5px] border border-white/25 transition-[transform,box-shadow] hover:relative hover:z-10 hover:scale-[1.08] hover:shadow-[0_3px_8px_rgba(28,35,30,0.14)] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#20231f] ${
-              selected ? "ring-1 ring-[#2b3731] ring-offset-1 ring-offset-[#f7f8f5]" : ""
+            className={`flex h-[18px] min-w-[22px] w-full items-center justify-center rounded-[6px] border border-white/30 text-[8px] font-semibold tabular-nums text-[#667068] transition-[transform,box-shadow] hover:relative hover:z-10 hover:scale-[1.08] hover:shadow-[0_3px_8px_rgba(28,35,30,0.14)] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#347e62] ${
+              selected ? "ring-1 ring-[#347e62] ring-offset-1 ring-offset-[#f7f8f5]" : ""
             }`}
             onClick={() => onSelect(rowIndex, cellIndex)}
-            style={{ backgroundColor: heatmapColor(cell) }}
-            title={`${row.name}\n${formatDate(cell.date)}\n${formatPercent(cell.changePct, true)}`}
-          />
+            style={heatmapStyle(cell)}
+            title={`${row.name}\n${formatDate(cell.date)}\n${evidenceLabel}`}
+          >
+            {cell.changePct === 0 ? "0" : cell.changePct === null ? "·" : null}
+          </button>
         );
       })}
     </>
@@ -408,9 +420,19 @@ function HeatmapDetail({
 }
 
 function heatmapColor(cell: PortfolioDashboardHeatmapCell) {
-  if (cell.changePct === null) return "#eceeeb";
-  const alpha = Math.min(0.62, 0.13 + (Math.abs(cell.changePct) / 4) * 0.49);
-  if (cell.changePct > 0) return `rgba(76, 155, 118, ${alpha.toFixed(3)})`;
-  if (cell.changePct < 0) return `rgba(217, 101, 93, ${alpha.toFixed(3)})`;
-  return "#e7e9e6";
+  if (cell.changePct === null) return "#e9ece8";
+  const alpha = Math.min(0.82, 0.22 + (Math.abs(cell.changePct) / 4) * 0.6);
+  if (cell.changePct > 0) return `rgba(39, 142, 95, ${alpha.toFixed(3)})`;
+  if (cell.changePct < 0) return `rgba(213, 70, 66, ${alpha.toFixed(3)})`;
+  return "#e3e6e2";
+}
+
+const missingCellStyle: CSSProperties = {
+  backgroundColor: "#edf0ec",
+  backgroundImage: "repeating-linear-gradient(135deg, transparent 0 4px, rgba(112, 121, 113, 0.12) 4px 5px)",
+};
+
+function heatmapStyle(cell: PortfolioDashboardHeatmapCell): CSSProperties {
+  if (cell.changePct === null) return missingCellStyle;
+  return { backgroundColor: heatmapColor(cell) };
 }

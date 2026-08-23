@@ -32,11 +32,12 @@ const HOME_NAV_ITEMS = [
 const LIVE_QUOTE_TYPES = new Set(["live", "delayed", "realtime"]);
 
 export function PortfolioDashboard({ data }: { data: DashboardData }) {
-  const topContributor = largestPositiveContributor(data.holdings);
-  const priceImpactKrw =
-    data.todayChangeKrw === null
-      ? null
-      : data.todayChangeKrw - (data.todayFxChangeKrw ?? 0) - data.tradeFlowKrw;
+  const movementReady = data.dataHealth.movementReady;
+  const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
+  const topContributor = movementReady ? largestPositiveContributor(data.holdings) : null;
+  const priceImpactKrw = movementReady
+    ? (data.todayChangeKrw ?? 0) - (data.todayFxChangeKrw ?? 0) - data.tradeFlowKrw
+    : null;
   const priceImpactPct = percentageOfPrevious(priceImpactKrw, data.todayMovement.previousTotalKrw);
   const fxImpactPct = percentageOfPrevious(
     data.todayFxChangeKrw,
@@ -83,7 +84,11 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               {formatKrw(data.totalValueKrw)}
             </p>
             <dl className="mx-auto mt-7 flex max-w-2xl flex-wrap items-center justify-center gap-y-3 text-sm">
-              <HeroMetric label="오늘" value={formatSignedKrw(data.todayChangeKrw)} tone={data.todayChangeKrw} />
+              <HeroMetric
+                label="오늘"
+                value={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"}
+                tone={todayChangeKrw}
+              />
               <HeroMetric label="누적" value={formatPercent(data.totalReturnPct, true)} tone={data.totalReturnPct} divided />
               <HeroMetric label="환율" value={formatSignedKrw(data.todayFxChangeKrw)} tone={data.todayFxChangeKrw} divided />
             </dl>
@@ -94,8 +99,14 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
           <div className="min-w-0">
             <PortfolioHistoryChart
               events={data.eventActivity.map((event) => ({
+                id: event.id,
                 eventDate: event.eventDate,
                 eventType: event.eventType,
+                accountLabel: event.accountLabel,
+                assetName: event.assetName,
+                ticker: event.ticker,
+                amountKrw: event.amountKrw,
+                quantityDelta: event.quantityDelta,
               }))}
               points={data.recentSnapshots}
             />
@@ -122,20 +133,20 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
           <div className="grid sm:grid-cols-2 lg:grid-cols-5">
             <EvidenceMetric
               label="평가액 변동"
-              value={formatSignedKrw(data.todayChangeKrw)}
-              subValue={formatPercent(data.todayReturnPct, true)}
-              tone={data.todayChangeKrw}
+              value={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"}
+              subValue={movementReady ? formatPercent(data.todayReturnPct ?? 0, true) : movementPendingReason(data)}
+              tone={todayChangeKrw}
             />
             <EvidenceMetric
               label="최대 기여"
-              value={topContributor?.name ?? "-"}
-              subValue={formatSignedKrw(topContributor?.dailyChangeKrw ?? null)}
+              value={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"}
+              subValue={movementReady ? formatSignedKrw(topContributor?.dailyChangeKrw ?? 0) : movementPendingReason(data)}
               tone={topContributor?.dailyChangeKrw ?? null}
             />
             <EvidenceMetric
               label="가격 영향"
-              value={formatSignedKrw(priceImpactKrw)}
-              subValue={formatPercent(priceImpactPct, true)}
+              value={movementReady ? formatSignedKrw(priceImpactKrw ?? 0) : "계산 대기"}
+              subValue={movementReady ? formatPercent(priceImpactPct ?? 0, true) : movementPendingReason(data)}
               tone={priceImpactKrw}
             />
             <FxImpactPopover
@@ -298,6 +309,12 @@ function movementBasisText(data: DashboardData) {
   if (data.dataHealth.movementSource === "daily_position_snapshot") return "오늘 변동: 기준 스냅샷 대비";
   if (data.dataHealth.movementSource === "asset_price_snapshot") return "오늘 변동: 최근 종가 대비";
   return "오늘 변동 근거 확인 중";
+}
+
+function movementPendingReason(data: DashboardData) {
+  if (data.dataHealth.movementReason === "missing_current_price") return "현재가 근거 부족";
+  if (data.dataHealth.movementReason === "missing_baseline_snapshot") return "기준 스냅샷 부족";
+  return "변동 근거 확인 중";
 }
 
 function percentageOfPrevious(value: number | null, previousValue: number) {

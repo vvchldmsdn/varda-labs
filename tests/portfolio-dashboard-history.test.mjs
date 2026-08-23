@@ -122,6 +122,35 @@ describe("portfolio dashboard holding history", () => {
       totalReturnPct: null,
     });
   });
+
+  it("keeps every holding and exposes missing calendar dates without inventing zero", () => {
+    const extendedHoldings = [
+      ...holdings,
+      {
+        id: "asset-schd",
+        name: "Schwab US Dividend Equity ETF",
+        ticker: "SCHD",
+        account: "brokerage",
+        currentWeight: 10,
+      },
+    ];
+    const result = buildPortfolioDashboardHoldingHistory({
+      holdings: extendedHoldings,
+      maxDates: 3,
+      rows: [
+        row({ snapshotDate: "2026-08-20", assetId: "asset-kodex", unitValueChangePct: 0 }),
+        row({ snapshotDate: "2026-08-22", assetId: "asset-kodex", unitValueChangePct: 1 }),
+        row({ snapshotDate: "2026-08-22", assetId: "asset-voo", unitValueChangePct: -1 }),
+      ],
+    });
+
+    assert.deepEqual(result.dates, ["2026-08-20", "2026-08-21", "2026-08-22"]);
+    assert.equal(result.rows.length, 3);
+    assert.equal(result.rows[0]?.cells[0]?.changePct, 0);
+    assert.equal(result.rows[0]?.cells[1]?.changePct, null);
+    assert.equal(result.rows[0]?.cells[1]?.basis, "missing");
+    assert.equal(result.rows[2]?.cells.every((cell) => cell.basis === "missing"), true);
+  });
 });
 
 function row(overrides) {

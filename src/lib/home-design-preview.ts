@@ -299,11 +299,11 @@ function buildPortfolioHistory(totalValueKrw: number, count: number, endDate: st
 
 function buildHoldingHistory(holdings: readonly DashboardHolding[], endDate: string): PortfolioDashboardHoldingHistory {
   const end = Date.parse(`${endDate}T00:00:00Z`);
-  const dates = Array.from({ length: 18 }, (_, index) =>
-    new Date(end - (17 - index) * 86_400_000).toISOString().slice(0, 10),
+  const dates = Array.from({ length: 31 }, (_, index) =>
+    new Date(end - (30 - index) * 86_400_000).toISOString().slice(0, 10),
   );
   let observedCellCount = 0;
-  const rows: PortfolioDashboardHeatmapRow[] = holdings.slice(0, 7).map((holding, rowIndex) => ({
+  const rows: PortfolioDashboardHeatmapRow[] = holdings.map((holding, rowIndex) => ({
     holdingId: holding.id,
     name: holding.name,
     ticker: holding.ticker,
