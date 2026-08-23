@@ -25,4 +25,14 @@ describe("home metrics", () => {
       null,
     );
   });
+
+  it("ignores sub-won calculation residue that is displayed as zero", () => {
+    assert.equal(
+      selectLargestMovementContributor([
+        { name: "KODEX 200", dailyChangeKrw: 0.000_001 },
+        { name: "VOO", dailyChangeKrw: -0.49 },
+      ]),
+      null,
+    );
+  });
 });

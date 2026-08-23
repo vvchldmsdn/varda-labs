@@ -9,7 +9,8 @@ export function selectLargestMovementContributor<T extends MovementHolding>(
     holdings
       .filter(
         (holding) =>
-          holding.dailyChangeKrw !== null && holding.dailyChangeKrw !== 0,
+          holding.dailyChangeKrw !== null &&
+          Math.round(holding.dailyChangeKrw) !== 0,
       )
       .toSorted(
         (left, right) =>
