@@ -275,8 +275,7 @@ export async function getPortfolioDashboard(
     snapshotDate: movementCycle.snapshotDate,
   });
 
-  const latestSnapshotDate =
-    latestPositionRows.length > 0 ? movementCycle.snapshotDate : null;
+  const latestSnapshotDate = latestPositionRows[0]?.snapshotDate ?? null;
 
   const investmentAssetRows = assetRows.filter((asset) =>
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),

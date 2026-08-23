@@ -91,6 +91,7 @@ import "./portfolio-fx-shock.test.mjs";
 import "./portfolio-special-holdings.test.mjs";
 import "./portfolio-dashboard-snapshots.test.mjs";
 import "./portfolio-dashboard-history.test.mjs";
+import "./portfolio-dashboard-baseline.test.mjs";
 import "./svg-monotone-curve.test.mjs";
 import "./holding-connection-graph.test.mjs";
 import "./fx-trend.test.mjs";
