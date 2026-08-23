@@ -170,6 +170,7 @@ import "./investment-lab-manual-valuation-path.test.mjs";
 import "./krx-gold-close-cycle.test.mjs";
 import "./fsc-krx-gold-source.test.mjs";
 import "./today-holding-detail.test.mjs";
+import "./today-movement-view.test.mjs";
 import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";
 import "./market-context.test.mjs";

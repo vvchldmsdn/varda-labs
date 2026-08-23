@@ -5,6 +5,7 @@ import { PortfolioDashboardAccessBoundary } from "@/components/portfolio-dashboa
 import { TodayMovement } from "@/components/today-movement";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { buildHomeDesignPreview } from "@/lib/home-design-preview";
 import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 import { normalizeTodayHoldingDetailQuery } from "@/lib/today-holding-detail";
 
@@ -21,11 +22,19 @@ type TodayPageProps = {
 };
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const params = await searchParams;
   const detailQuery = normalizeTodayHoldingDetailQuery(params);
+
+  if (process.env.NODE_ENV === "development") {
+    return (
+      <TodayMovement
+        data={buildHomeDesignPreview(params.scope ?? params.account)}
+        detailQuery={detailQuery}
+      />
+    );
+  }
+
+  const resolution = await resolveCurrentTenantContext();
 
   if (!resolution.ok) {
     return (
@@ -83,17 +92,14 @@ async function TodayContent({
 
 function TodaySkeleton() {
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-4 text-[#171916]">
-      <div className="mx-auto w-full max-w-[1500px] space-y-4">
-        <div className="h-32 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <div className="h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-        </div>
-        <div className="h-80 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    <main className="min-h-screen bg-[#f7f8f5] text-[#20231f]">
+      <div className="h-16 border-b border-[#e1e4df] bg-[#fafbf8]" />
+      <div className="mx-auto w-full max-w-[1540px] animate-pulse px-5 pb-12 pt-10 sm:px-8 lg:px-10">
+        <div className="h-4 w-36 bg-[#e5e8e2]" />
+        <div className="mt-8 h-10 w-full border-b border-[#e1e4df]" />
+        <div className="mx-auto mt-16 h-20 w-96 max-w-full bg-[#e8ebe5]" />
+        <div className="mt-20 h-32 border-y border-[#d9ddd7] bg-[#f1f3ef]" />
+        <div className="mt-16 h-[520px] border-y border-[#d9ddd7] bg-[#f1f3ef]" />
       </div>
     </main>
   );

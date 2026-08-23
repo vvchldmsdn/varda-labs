@@ -81,6 +81,17 @@ export function buildHomeDesignPreview(scopeInput: string | readonly string[] | 
   const todayFxChangeKrw = holdings
     .filter((holding) => holding.currency === "USD")
     .reduce((sum, holding) => sum - Math.round(holding.valueKrw * 0.0018), 0);
+  const contributionRows = holdings.map((holding) => ({
+    holdingId: holding.id,
+    previousValueKrw:
+      holding.previousCloseValueKrw ??
+      holding.valueKrw - (holding.dailyChangeKrw ?? 0),
+    changeKrw: holding.dailyChangeKrw ?? 0,
+    returnPct: holding.dailyReturnPct,
+    tradeFlowKrw: 0,
+    fxChangeKrw: holding.fxDailyChangeKrw ?? 0,
+    source: "daily_position_snapshot" as const,
+  }));
 
   return {
     selectedScope,
@@ -156,7 +167,7 @@ export function buildHomeDesignPreview(scopeInput: string | readonly string[] | 
       returnPct: percentage(todayChangeKrw, selectedTotal - todayChangeKrw),
       tradeFlowKrw: 0,
       fxChangeKrw: todayFxChangeKrw,
-      contributionRows: [],
+      contributionRows,
       exclusions: [],
       coverage: {
         currentCoveragePct: 100,
