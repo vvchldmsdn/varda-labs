@@ -181,6 +181,78 @@ describe("portfolio movement builder", () => {
     assertClose(contribution?.fxChangeKrw, -15_564.19095);
   });
 
+  it("derives closed-market movement from current and baseline evidence without calendar overrides", () => {
+    const usdKrwRate = 1385.741836;
+    const usHoldings = [
+      {
+        id: "asset-qqq",
+        ticker: "QQQ",
+        name: "Invesco QQQ Trust",
+        quantity: 2,
+        currentPrice: 713.44,
+        previousPrice: 713.71,
+      },
+      {
+        id: "asset-schd",
+        ticker: "SCHD",
+        name: "Schwab US Dividend Equity ETF",
+        quantity: 62,
+        currentPrice: 35.11,
+        previousPrice: 35.1485,
+      },
+      {
+        id: "asset-voo",
+        ticker: "VOO",
+        name: "Vanguard S&P 500 ETF",
+        quantity: 4,
+        currentPrice: 703.71,
+        previousPrice: 704.77,
+      },
+    ];
+    const result = buildDaily({
+      usdKrwRate,
+      holdings: usHoldings.map((row) =>
+        holding({
+          id: row.id,
+          legacyBase44Id: `legacy-${row.ticker.toLowerCase()}`,
+          name: row.name,
+          ticker: row.ticker,
+          market: "us",
+          currency: "USD",
+          quantity: row.quantity,
+          currentPrice: row.currentPrice,
+          valueKrw: row.quantity * row.currentPrice * usdKrwRate,
+        }),
+      ),
+      positionRows: usHoldings.map((row) =>
+        position({
+          id: `snapshot-${row.ticker.toLowerCase()}`,
+          assetId: row.id,
+          legacyAssetId: `legacy-${row.ticker.toLowerCase()}`,
+          ticker: row.ticker,
+          assetName: row.name,
+          marketValueKrw: row.quantity * row.previousPrice * usdKrwRate,
+          unitPrice: row.previousPrice,
+          fxRate: usdKrwRate,
+        }),
+      ),
+    });
+
+    assert.equal(result.ready, true);
+    assertClose(result.changeKrw, -9_931.611738611567, 0.001);
+    assertClose(result.fxChangeKrw, 0);
+    assertClose(
+      result.changeKrw - result.fxChangeKrw,
+      -9_931.611738611567,
+      0.001,
+    );
+    assertClose(
+      result.contributions.get("asset-voo")?.changeKrw,
+      -5_875.54538464,
+      0.001,
+    );
+  });
+
   it("subtracts post-baseline trade flow from holding movement", () => {
     const result = buildDaily({
       holdings: [holding({ currentPrice: 120, valueKrw: 1200 })],
