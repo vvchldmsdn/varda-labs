@@ -64,8 +64,13 @@ export function PortfolioRefreshButton({
     const key = `varda:live-price-sync:${bucket}`;
     if (window.sessionStorage.getItem(key)) return;
 
-    window.sessionStorage.setItem(key, "attempted");
-    void sync("page_view");
+    const timeout = window.setTimeout(() => {
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, "attempted");
+      void sync("page_view");
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [autoSync, sync]);
 
   return (

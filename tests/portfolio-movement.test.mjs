@@ -326,7 +326,7 @@ describe("portfolio movement builder", () => {
     );
   });
 
-  it("keeps tickerless physical commodities out of movement coverage", () => {
+  it("keeps holdings without a quoted instrument out of movement coverage", () => {
     const gold = holding({
       id: "asset-gold",
       legacyBase44Id: "legacy-gold",
@@ -360,6 +360,18 @@ describe("portfolio movement builder", () => {
     assert.equal(
       isPortfolioMovementEligibleHolding({ assetType: "commodity", ticker: "GLD" }),
       true,
+    );
+    assert.equal(
+      isPortfolioMovementEligibleHolding({ assetType: "etf", ticker: "-" }),
+      false,
+    );
+    assert.equal(
+      isPortfolioMovementEligibleHolding({ assetType: "etf", ticker: null }),
+      false,
+    );
+    assert.equal(
+      isPortfolioMovementEligibleHolding({ assetType: "cash", ticker: "CASH" }),
+      false,
     );
     assert.equal(result.ready, true);
     assert.equal(result.contributions.size, 1);
