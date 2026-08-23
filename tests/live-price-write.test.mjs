@@ -67,6 +67,40 @@ describe("live price write planning", () => {
     assert.equal(planned.write?.priceQuoteType, "live");
   });
 
+  it("accepts an owner-authorized explicit instrument without exposing asset ids", () => {
+    const planned = planLiveAssetPriceWrite({
+      row: quote(),
+      target: target({
+        authority: "explicit_instrument",
+        accounts: [],
+        assetIds: [],
+        assetNames: [],
+      }),
+      provider: "kis",
+      dryRun: true,
+      allowWrite: false,
+      writePolicy: "kis",
+    });
+
+    assert.equal(planned.result.action, "planned_upsert");
+    assert.deepEqual(planned.result.assetIds, []);
+    assert.equal(planned.write?.ticker, "069500");
+  });
+
+  it("rejects an empty asset authority that was not explicitly authorized", () => {
+    const planned = planLiveAssetPriceWrite({
+      row: quote(),
+      target: target({ accounts: [], assetIds: [], assetNames: [] }),
+      provider: "kis",
+      dryRun: true,
+      allowWrite: false,
+      writePolicy: "kis",
+    });
+
+    assert.equal(planned.result.action, "skipped");
+    assert.equal(planned.result.reason, "target_has_no_assets");
+  });
+
   it("rejects live writes from unsupported sources", () => {
     const planned = planLiveAssetPriceWrite({
       row: quote({ source: "manual" }),

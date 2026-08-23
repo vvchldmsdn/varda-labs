@@ -112,6 +112,12 @@ export type PriceSyncTargetFilter = {
   account?: PriceSyncTargetAccount;
 };
 
+export type ExplicitPriceSyncTarget = Readonly<{
+  ticker: string;
+  market: string;
+  currency: string;
+}>;
+
 export type PriceSyncTargetFilterResult = {
   ticker: string;
   action: "included" | "skipped";
@@ -247,6 +253,7 @@ export async function runMarketPriceSync(options: {
   provider?: MarketDataProvider;
   targetLimit?: number;
   targetFilter?: PriceSyncTargetFilter;
+  explicitTargets?: readonly ExplicitPriceSyncTarget[];
 }): Promise<PriceSyncRunResult> {
   const provider = options.provider ?? createStubMarketDataProvider();
   const dryRun = options.dryRun ?? true;
@@ -260,31 +267,54 @@ export async function runMarketPriceSync(options: {
   const liveWritePolicy = getLivePriceWritePolicy(provider.name);
   const closeWriteEnabled = !dryRun && closeWritePolicy !== "none";
   const liveWriteEnabled = !dryRun && liveWritePolicy !== "none";
+  if (options.explicitTargets && options.targetFilter) {
+    throw new PriceSyncRequestError(
+      "ambiguous_target_authority",
+      "Explicit targets cannot be combined with asset target filters",
+      {},
+    );
+  }
+
   const targetFilter = normalizeTargetFilter(options.targetFilter);
-  const assetRows = await getAssetRowsForPriceSync();
+  const explicitPriceTargets = options.explicitTargets
+    ? buildExplicitPriceLookupTargets(options.explicitTargets)
+    : null;
+  const assetRows = explicitPriceTargets ? [] : await getAssetRowsForPriceSync();
   const syncableAssetRows = assetRows.filter(isSyncableAssetRow);
-  const totalPriceTargets = buildPriceLookupTargets(syncableAssetRows);
-  const filteredAssetRows = applyTargetFilter(syncableAssetRows, targetFilter);
-  const filteredPriceTargets = orderPriceTargetsByFilter(
-    buildPriceLookupTargets(filteredAssetRows),
-    targetFilter,
-  );
+  const totalPriceTargets =
+    explicitPriceTargets ?? buildPriceLookupTargets(syncableAssetRows);
+  const filteredAssetRows = explicitPriceTargets
+    ? []
+    : applyTargetFilter(syncableAssetRows, targetFilter);
+  const filteredPriceTargets = explicitPriceTargets
+    ? explicitPriceTargets
+    : orderPriceTargetsByFilter(
+        buildPriceLookupTargets(filteredAssetRows),
+        targetFilter,
+      );
   const priceTargets =
     options.targetLimit === undefined
       ? filteredPriceTargets
       : filteredPriceTargets.slice(0, options.targetLimit);
-  const targetFilterResults = buildTargetFilterResults({
-    targetFilter,
-    allAssetRows: assetRows,
-    syncableAssetRows,
-    filteredPriceTargets,
-    priceTargets,
-  });
+  const targetFilterResults = explicitPriceTargets
+    ? []
+    : buildTargetFilterResults({
+        targetFilter,
+        allAssetRows: assetRows,
+        syncableAssetRows,
+        filteredPriceTargets,
+        priceTargets,
+      });
+  const selectedAssetCount = explicitPriceTargets
+    ? explicitPriceTargets.length
+    : syncableAssetRows.length;
   const targetFilterSummary = summarizeTargetFilter({
     targetFilter,
-    totalSyncableAssetCount: syncableAssetRows.length,
+    totalSyncableAssetCount: selectedAssetCount,
     totalPriceTargetCount: totalPriceTargets.length,
-    filteredAssetCount: filteredAssetRows.length,
+    filteredAssetCount: explicitPriceTargets
+      ? explicitPriceTargets.length
+      : filteredAssetRows.length,
     filteredPriceTargetCount: filteredPriceTargets.length,
     limitedPriceTargetCount: priceTargets.length,
   });
@@ -418,7 +448,7 @@ export async function runMarketPriceSync(options: {
       fixture,
       priceDate,
       requestedCount: priceTargets.length,
-      assetCount: syncableAssetRows.length,
+      assetCount: selectedAssetCount,
       successCount: counts.successCount,
       failedCount:
         counts.failedCount +
@@ -455,7 +485,7 @@ export async function runMarketPriceSync(options: {
           priceDate,
           provider: provider.name,
           mode: options.mode,
-          assetCount: syncableAssetRows.length,
+          assetCount: selectedAssetCount,
           priceTargetCount: priceTargets.length,
           totalPriceTargetCount: totalPriceTargets.length,
           filteredPriceTargetCount: filteredPriceTargets.length,
@@ -568,9 +598,48 @@ function buildPriceLookupTargets(rows: PriceSyncAssetRow[]): PriceLookupTarget[]
       ticker,
       market,
       currency,
+      authority: "asset_rows",
       accounts: [normalizeText(row.account) ?? "unknown"],
       assetIds: [row.id],
       assetNames: [row.name],
+    });
+  }
+
+  return Array.from(targetsByKey.values()).sort((left, right) =>
+    left.key.localeCompare(right.key),
+  );
+}
+
+function buildExplicitPriceLookupTargets(
+  rows: readonly ExplicitPriceSyncTarget[],
+): PriceLookupTarget[] {
+  const targetsByKey = new Map<string, PriceLookupTarget>();
+
+  for (const row of rows) {
+    const ticker = normalizeTicker(row.ticker);
+    const market = normalizeText(row.market);
+    const currency = normalizeText(row.currency);
+
+    if (!ticker || !market || !currency) {
+      throw new PriceSyncRequestError(
+        "invalid_explicit_target",
+        "Explicit price targets require market, ticker, and currency",
+        {},
+      );
+    }
+
+    const key = `${market}:${ticker}:${currency}`;
+    if (targetsByKey.has(key)) continue;
+
+    targetsByKey.set(key, {
+      key,
+      ticker,
+      market,
+      currency,
+      authority: "explicit_instrument",
+      accounts: [],
+      assetIds: [],
+      assetNames: [],
     });
   }
 

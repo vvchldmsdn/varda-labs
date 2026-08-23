@@ -29,7 +29,13 @@ const HOME_NAV_ITEMS = [
   { label: "시뮬레이션", href: "/simulation" },
 ] as const;
 
-export function PortfolioDashboard({ data }: { data: DashboardData }) {
+export function PortfolioDashboard({
+  data,
+  liveSyncEnabled = false,
+}: {
+  data: DashboardData;
+  liveSyncEnabled?: boolean;
+}) {
   const movementReady = data.dataHealth.movementReady;
   const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
   const topContributor = movementReady ? largestPositiveContributor(data.holdings) : null;
@@ -165,7 +171,7 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               label="데이터 상태"
               value={
                 data.dataHealth.movementEligibleAssetCount > 0
-                  ? `변동 근거 ${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
+                  ? `실시간 시세 ${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
                   : "변동 계산 제외"
               }
               subValue={dataStatusText(
@@ -178,7 +184,7 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
 
         <section aria-label="빠른 작업" className="grid gap-6 border-b border-[#d9ddd7] py-7 sm:grid-cols-3 sm:gap-0">
           <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
-            <PortfolioRefreshButton />
+            <PortfolioRefreshButton autoSync={liveSyncEnabled} />
           </div>
           <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
             <Link
