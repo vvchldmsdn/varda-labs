@@ -45,14 +45,16 @@ export function PortfolioHistoryChart({
 }) {
   const [range, setRange] = useState<RangeKey>("ALL");
   const visiblePoints = useMemo(() => pointsForRange(points, range), [points, range]);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [mobileIndex, setMobileIndex] = useState(Math.max(points.length - 1, 0));
   const geometry = useMemo(() => buildGeometry(visiblePoints), [visiblePoints]);
-  const activeIndex = Math.min(
-    selectedIndex ?? Math.max(visiblePoints.length - 1, 0),
+  const mobileActiveIndex = Math.min(
+    mobileIndex,
     Math.max(visiblePoints.length - 1, 0),
   );
-  const activePoint = visiblePoints[activeIndex] ?? null;
-  const activeGeometry = geometry.points[activeIndex] ?? null;
+  const activePoint = hoveredIndex === null ? null : visiblePoints[hoveredIndex] ?? null;
+  const activeGeometry = hoveredIndex === null ? null : geometry.points[hoveredIndex] ?? null;
+  const mobilePoint = visiblePoints[mobileActiveIndex] ?? null;
   const visibleEvents = recentVisibleEvents(events, visiblePoints);
 
   return (
@@ -77,7 +79,8 @@ export function PortfolioHistoryChart({
               }`}
               onClick={() => {
                 setRange(item);
-                setSelectedIndex(null);
+                setHoveredIndex(null);
+                setMobileIndex(Math.max(pointsForRange(points, item).length - 1, 0));
               }}
             >
               {item}
@@ -88,7 +91,10 @@ export function PortfolioHistoryChart({
 
       {visiblePoints.length > 1 ? (
         <>
-          <div className="relative aspect-[2.65/1] min-h-[250px] w-full">
+          <div
+            className="relative aspect-[2.65/1] min-h-[250px] w-full"
+            onPointerLeave={() => setHoveredIndex(null)}
+          >
             <svg
               role="img"
               aria-label="기간별 포트폴리오 평가액 추이"
@@ -103,6 +109,17 @@ export function PortfolioHistoryChart({
                 y2={PLOT_BOTTOM}
                 stroke="#d9ddd7"
               />
+              {[0.25, 0.5, 0.75].map((fraction) => (
+                <line
+                  key={fraction}
+                  x1={PLOT_LEFT}
+                  x2={PLOT_RIGHT}
+                  y1={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
+                  y2={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
+                  stroke="#e7eae5"
+                  strokeDasharray="2 7"
+                />
+              ))}
               {geometry.points.map((point, index) => (
                 <rect
                   key={`bar:${visiblePoints[index]?.date}`}
@@ -111,14 +128,14 @@ export function PortfolioHistoryChart({
                   width={geometry.barWidth}
                   height={Math.max(0, PLOT_BOTTOM - point.y - 8)}
                   fill="#e8ebe7"
-                  opacity="0.72"
+                  opacity="0.58"
                 />
               ))}
               <path
                 d={geometry.path}
                 fill="none"
-                stroke="#20231f"
-                strokeWidth="2"
+                stroke="#29332e"
+                strokeWidth="1.75"
                 vectorEffect="non-scaling-stroke"
               />
               {visibleEvents.map((event) => {
@@ -155,35 +172,47 @@ export function PortfolioHistoryChart({
                     x2={activeGeometry.x}
                     y1={PLOT_TOP}
                     y2={PLOT_BOTTOM}
-                    stroke="#aeb4ac"
-                    strokeDasharray="3 4"
+                    stroke="#4f7969"
+                    strokeDasharray="2 5"
                   />
                   <circle
                     cx={activeGeometry.x}
                     cy={activeGeometry.y}
                     r="5"
-                    fill="#f7f8f5"
-                    stroke="#20231f"
+                    fill="#f8faf7"
+                    stroke="#315f4e"
                     strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
                   />
                 </g>
               ) : null}
-              {geometry.points.map((point, index) => (
-                <circle
-                  key={`hit:${visiblePoints[index]?.date}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${formatDate(visiblePoints[index]?.date ?? null)} ${formatKrw(visiblePoints[index]?.totalMarketValue ?? null)}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r={Math.max(8, Math.min(14, geometry.barWidth * 1.6))}
-                  fill="transparent"
-                  onClick={() => setSelectedIndex(index)}
-                  onFocus={() => setSelectedIndex(index)}
-                  onPointerEnter={() => setSelectedIndex(index)}
-                />
-              ))}
+              {geometry.points.map((point, index) => {
+                const previousPoint = geometry.points[index - 1];
+                const nextPoint = geometry.points[index + 1];
+                const hitStart = previousPoint
+                  ? (previousPoint.x + point.x) / 2
+                  : PLOT_LEFT;
+                const hitEnd = nextPoint
+                  ? (point.x + nextPoint.x) / 2
+                  : PLOT_RIGHT;
+
+                return (
+                  <rect
+                    key={`hit:${visiblePoints[index]?.date}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${formatDate(visiblePoints[index]?.date ?? null)} ${formatKrw(visiblePoints[index]?.totalMarketValue ?? null)}`}
+                    x={hitStart}
+                    y={PLOT_TOP}
+                    width={Math.max(1, hitEnd - hitStart)}
+                    height={PLOT_BOTTOM - PLOT_TOP}
+                    fill="transparent"
+                    onBlur={() => setHoveredIndex(null)}
+                    onFocus={() => setHoveredIndex(index)}
+                    onPointerEnter={() => setHoveredIndex(index)}
+                  />
+                );
+              })}
               {geometry.labelIndexes.map((index) => {
                 const point = geometry.points[index];
                 const value = visiblePoints[index];
@@ -205,14 +234,16 @@ export function PortfolioHistoryChart({
 
             {activePoint && activeGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-48 border border-[#d7dbd5] bg-[#fbfcf9] p-3 text-xs shadow-[0_8px_24px_rgba(24,28,23,0.08)] md:block"
+                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[#d7ddd7] bg-[rgba(250,252,249,0.96)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
                 style={{
-                  left: `${Math.min(79, Math.max(8, (activeGeometry.x / WIDTH) * 100))}%`,
-                  top: `${Math.min(58, Math.max(5, (activeGeometry.y / HEIGHT) * 100))}%`,
+                  left: `${Math.min(76, Math.max(5, (activeGeometry.x / WIDTH) * 100 + 2))}%`,
+                  top: `${Math.min(55, Math.max(3, (activeGeometry.y / HEIGHT) * 100 - 4))}%`,
                 }}
               >
-                <p className="font-semibold text-[#20231f]">{formatDate(activePoint.date)}</p>
-                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[#656b63]">
+                <p className="border-b border-[#e4e8e3] pb-2 font-semibold text-[#20231f]">
+                  {formatDate(activePoint.date)}
+                </p>
+                <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[#656b63]">
                   <dt>평가액</dt>
                   <dd className="text-right font-medium text-[#20231f]">
                     {formatKrw(activePoint.totalMarketValue)}
@@ -232,19 +263,19 @@ export function PortfolioHistoryChart({
 
           <input
             aria-label="포트폴리오 이력 날짜 선택"
-            className="portfolio-history-range mt-2 w-full"
+            className="portfolio-history-range mt-2 w-full md:hidden"
             max={Math.max(visiblePoints.length - 1, 0)}
             min="0"
-            onChange={(event) => setSelectedIndex(Number(event.target.value))}
+            onChange={(event) => setMobileIndex(Number(event.target.value))}
             type="range"
-            value={activeIndex}
+            value={mobileActiveIndex}
           />
 
-          {activePoint ? (
+          {mobilePoint ? (
             <div className="mt-3 flex items-center justify-between gap-4 text-xs text-[#6e746c] md:hidden">
-              <span>{formatDate(activePoint.date)}</span>
+              <span>{formatDate(mobilePoint.date)}</span>
               <span className="font-medium text-[#20231f]">
-                {formatKrw(activePoint.totalMarketValue)}
+                {formatKrw(mobilePoint.totalMarketValue)}
               </span>
             </div>
           ) : null}

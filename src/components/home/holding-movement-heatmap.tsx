@@ -38,7 +38,7 @@ export function HoldingMovementHeatmap({
   );
 
   return (
-    <section aria-labelledby="holding-heatmap-title" className="min-w-0 lg:border-l lg:border-[#d9ddd7] lg:pl-10">
+    <section aria-labelledby="holding-heatmap-title" className="min-w-0">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-medium text-[#7b8079]">HOLDING PULSE</p>
@@ -146,16 +146,25 @@ function MovementMatrix({
     );
   }
 
-  const gridTemplateColumns = `minmax(124px, 1.3fr) repeat(${history.dates.length}, minmax(24px, 1fr))`;
+  const cellWidth = history.dates.length <= 20 ? 38 : 30;
+  const gridTemplateColumns = `minmax(156px, 200px) repeat(${history.dates.length}, ${cellWidth}px)`;
 
   return (
     <div className="overflow-x-auto pb-1">
-      <div className="min-w-[690px]" style={{ display: "grid", gridTemplateColumns, gap: "7px" }}>
+      <div
+        className="min-w-max"
+        style={{
+          columnGap: "2px",
+          display: "grid",
+          gridTemplateColumns,
+          rowGap: "3px",
+        }}
+      >
         <div />
         {history.dates.map((date, index) => (
           <div
             key={date}
-            className="h-5 text-center text-[9px] text-[#858a83]"
+            className="h-4 text-center text-[8px] tabular-nums text-[#858a83]"
             title={formatDate(date)}
           >
             {index === 0 || index === history.dates.length - 1 || index % 5 === 0
@@ -174,14 +183,14 @@ function MovementMatrix({
           />
         ))}
       </div>
-      <div className="mt-4 flex items-center justify-between text-[10px] text-[#858a83]">
+      <div className="mt-3 flex items-center justify-between text-[9px] text-[#858a83]">
         <span>하락</span>
-        <div className="mx-3 flex flex-1 items-center gap-1" aria-hidden="true">
-          <span className="h-2 flex-1" style={{ backgroundColor: "rgba(217, 101, 93, 0.46)" }} />
-          <span className="h-2 flex-1" style={{ backgroundColor: "rgba(217, 101, 93, 0.18)" }} />
-          <span className="h-2 flex-1 bg-[#eceeeb]" />
-          <span className="h-2 flex-1" style={{ backgroundColor: "rgba(76, 155, 118, 0.18)" }} />
-          <span className="h-2 flex-1" style={{ backgroundColor: "rgba(76, 155, 118, 0.46)" }} />
+        <div className="mx-2.5 flex flex-1 items-center gap-0.5" aria-hidden="true">
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(217, 101, 93, 0.46)" }} />
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(217, 101, 93, 0.18)" }} />
+          <span className="h-1.5 flex-1 rounded-[3px] bg-[#eceeeb]" />
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(76, 155, 118, 0.18)" }} />
+          <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "rgba(76, 155, 118, 0.46)" }} />
         </div>
         <span>상승</span>
       </div>
@@ -202,7 +211,7 @@ function HeatmapRow({
 }) {
   return (
     <>
-      <div className="flex min-w-0 items-center pr-2 text-xs font-medium text-[#2e322d]" title={row.name}>
+      <div className="flex min-w-0 items-center pr-2 text-[11px] font-medium text-[#2e322d]" title={row.name}>
         <span className="truncate">{row.name}</span>
       </div>
       {row.cells.map((cell, cellIndex) => {
@@ -213,8 +222,8 @@ function HeatmapRow({
             type="button"
             aria-label={`${row.name} ${formatDate(cell.date)} ${formatPercent(cell.changePct, true)}`}
             aria-pressed={selected}
-            className={`aspect-square min-h-6 w-full border transition-transform hover:scale-110 focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20231f] ${
-              selected ? "border-[#20231f]" : "border-transparent"
+            className={`h-[18px] min-w-[22px] w-full rounded-[5px] border border-white/25 transition-[transform,box-shadow] hover:relative hover:z-10 hover:scale-[1.08] hover:shadow-[0_3px_8px_rgba(28,35,30,0.14)] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#20231f] ${
+              selected ? "ring-1 ring-[#2b3731] ring-offset-1 ring-offset-[#f7f8f5]" : ""
             }`}
             onClick={() => onSelect(rowIndex, cellIndex)}
             style={{ backgroundColor: heatmapColor(cell) }}

@@ -5,6 +5,7 @@ import { PortfolioDashboard } from "@/components/portfolio-dashboard";
 import { PortfolioDashboardAccessBoundary } from "@/components/portfolio-dashboard-access-boundary";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { buildHomeDesignPreview } from "@/lib/home-design-preview";
 import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +18,13 @@ type HomeProps = {
 };
 
 export default async function Home({ searchParams }: HomeProps) {
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const params = await searchParams;
+
+  if (process.env.NODE_ENV === "development") {
+    return <PortfolioDashboard data={buildHomeDesignPreview(params.scope)} />;
+  }
+
+  const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok) {
     return (
       <PortfolioDashboardAccessBoundary

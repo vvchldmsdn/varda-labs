@@ -24,6 +24,10 @@ import {
   type PortfolioDashboardHoldingHistory,
 } from "@/lib/portfolio-dashboard-history";
 import {
+  buildDashboardFxTrend,
+  type DashboardFxTrendPoint,
+} from "@/lib/fx-trend";
+import {
   convertToKrw,
   diffDays,
   normalizeTicker,
@@ -151,6 +155,7 @@ export type DashboardData = {
   analysisScopes: readonly PortfolioAnalysisScope[];
   generatedAt: string;
   usdKrwRate: number;
+  fxTrend: readonly DashboardFxTrendPoint[];
   latestSnapshotDate: string | null;
   latestSnapshotReferenceDate: string | null;
   totalValueKrw: number;
@@ -246,6 +251,7 @@ export async function getPortfolioDashboard(
     assetRows,
     settingsRows,
     latestFxRows,
+    recentFxRows,
     latestPositionRows,
     recentPositionRows,
     recentPortfolioRows,
@@ -417,6 +423,7 @@ export async function getPortfolioDashboard(
     analysisScopes,
     generatedAt: new Date().toISOString(),
     usdKrwRate,
+    fxTrend: buildDashboardFxTrend(recentFxRows),
     latestSnapshotDate,
     latestSnapshotReferenceDate,
     totalValueKrw,

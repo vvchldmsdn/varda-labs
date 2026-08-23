@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { FxImpactPopover } from "@/components/home/fx-impact-popover";
 import { HoldingMovementHeatmap } from "@/components/home/holding-movement-heatmap";
 import { PortfolioHistoryChart } from "@/components/home/portfolio-history-chart";
 import {
@@ -89,8 +90,8 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
           </div>
         </section>
 
-        <div className="grid gap-12 border-t border-[#d9ddd7] pt-9 lg:grid-cols-[minmax(0,1.5fr)_minmax(420px,0.9fr)] lg:gap-0">
-          <div className="min-w-0 lg:pr-10">
+        <div className="grid gap-12 border-t border-[#d9ddd7] pt-9 lg:gap-14">
+          <div className="min-w-0">
             <PortfolioHistoryChart
               events={data.eventActivity.map((event) => ({
                 eventDate: event.eventDate,
@@ -99,11 +100,13 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               points={data.recentSnapshots}
             />
           </div>
-          <HoldingMovementHeatmap
-            history={data.holdingHistory}
-            riskHref={riskHref}
-            structureHref={structureHref}
-          />
+          <div className="min-w-0 border-t border-[#d9ddd7] pt-9">
+            <HoldingMovementHeatmap
+              history={data.holdingHistory}
+              riskHref={riskHref}
+              structureHref={structureHref}
+            />
+          </div>
         </div>
 
         <div className="mt-8 flex justify-end">
@@ -135,11 +138,10 @@ export function PortfolioDashboard({ data }: { data: DashboardData }) {
               subValue={formatPercent(priceImpactPct, true)}
               tone={priceImpactKrw}
             />
-            <EvidenceMetric
-              label="환율 영향"
-              value={formatSignedKrw(data.todayFxChangeKrw)}
-              subValue={formatPercent(fxImpactPct, true)}
-              tone={data.todayFxChangeKrw}
+            <FxImpactPopover
+              impactKrw={data.todayFxChangeKrw}
+              impactPct={fxImpactPct}
+              points={data.fxTrend}
             />
             <EvidenceMetric
               label="데이터 상태"
