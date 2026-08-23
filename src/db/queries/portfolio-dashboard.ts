@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   getTableColumns,
+  gte,
   inArray,
   isNull,
   lte,
@@ -31,6 +32,10 @@ import {
   livePriceQuotes,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import {
+  portfolioDashboardBaselineWindowStart,
+  selectLatestPortfolioDashboardBaselineRows,
+} from "@/lib/portfolio-dashboard-baseline";
 import { normalizeTicker, uniqueStrings } from "@/lib/portfolio-math";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -148,9 +153,11 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     selectedPositionDateCount *
     Math.max(assetRows.length, 1) *
     MAX_RECENT_POSITION_SOURCES_PER_ASSET;
+  const baselineWindowStart =
+    portfolioDashboardBaselineWindowStart(snapshotDate);
 
   const [
-    latestPositionRows,
+    baselinePositionCandidateRows,
     recentPositionRows,
     recentPortfolioRows,
     eventRows,
@@ -168,8 +175,14 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               positionScopePredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
-              eq(dailyPositionSnapshots.snapshotDate, snapshotDate),
+              gte(dailyPositionSnapshots.snapshotDate, baselineWindowStart),
+              lte(dailyPositionSnapshots.snapshotDate, snapshotDate),
             ),
+          )
+          .orderBy(
+            desc(dailyPositionSnapshots.snapshotDate),
+            sql`${dailyPositionSnapshots.capturedAt} desc nulls last`,
+            desc(dailyPositionSnapshots.createdAt),
           ),
     positionScopePredicate === null
       ? Promise.resolve([])
@@ -261,6 +274,11 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
             ),
           ),
   ]);
+
+  const latestPositionRows = selectLatestPortfolioDashboardBaselineRows(
+    baselinePositionCandidateRows,
+    snapshotDate,
+  ).rows;
 
   const quoteTickers = uniqueStrings(
     assetRows
