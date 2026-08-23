@@ -87,7 +87,7 @@ export function TodayMovement({
                 <h1 id="today-movement-title" className="sr-only">오늘 변동</h1>
               </div>
               <p className="text-xs text-[#7b8079]">
-                기준일 {formatDate(data.latestSnapshotReferenceDate ?? data.latestSnapshotDate)}
+                기준일 {formatDate(data.movementBaselineDate)}
               </p>
             </div>
 
@@ -175,7 +175,7 @@ export function TodayMovement({
             <EvidenceMetric
               label="기준 근거"
               value={sourceLabel(movement.source)}
-              note={formatDate(data.latestSnapshotReferenceDate)}
+              note={formatDate(data.movementBaselineDate)}
             />
             <EvidenceMetric
               label="현재 가격 커버리지"
@@ -396,7 +396,11 @@ function HoldingDetailPanel({
         </DetailColumn>
 
         <DetailColumn divided title="기준 근거">
-          <DetailRow label="기준일" value={formatDate(data.latestSnapshotReferenceDate)} />
+          <DetailRow label="기준일" value={formatDate(data.movementBaselineDate)} />
+          <DetailRow
+            label="가격 근거일"
+            value={formatDate(data.marketPriceReferenceDate)}
+          />
           <DetailRow label="기준 평가액" value={formatNullableKrw(previousValueKrw)} />
           <DetailRow
             label="기준가"

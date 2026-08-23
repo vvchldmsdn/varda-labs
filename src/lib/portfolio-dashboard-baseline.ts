@@ -1,37 +1,71 @@
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export const PORTFOLIO_DASHBOARD_BASELINE_MAX_AGE_DAYS = 1;
+export const PORTFOLIO_DASHBOARD_BASELINE_FALLBACK_DAYS = 1;
+
+export type PortfolioDashboardBaselineWindow = {
+  serviceDate: string;
+  expectedReferenceDate: string;
+  fallbackReferenceDate: string;
+  storageWindowStart: string;
+  storageWindowEnd: string;
+};
+
+export function resolvePortfolioDashboardBaselineWindow(
+  serviceDate: string,
+): PortfolioDashboardBaselineWindow {
+  const expectedReferenceDate = shiftIsoDate(serviceDate, -1);
+
+  return {
+    serviceDate,
+    expectedReferenceDate,
+    fallbackReferenceDate: shiftIsoDate(
+      expectedReferenceDate,
+      -PORTFOLIO_DASHBOARD_BASELINE_FALLBACK_DAYS,
+    ),
+    // Snapshot rows are currently keyed by the 07:00 cycle end date. A row
+    // stored on the service date therefore represents the prior calendar day.
+    storageWindowStart: shiftIsoDate(
+      serviceDate,
+      -PORTFOLIO_DASHBOARD_BASELINE_FALLBACK_DAYS,
+    ),
+    storageWindowEnd: serviceDate,
+  };
+}
 
 export function portfolioDashboardBaselineWindowStart(
-  expectedSnapshotDate: string,
+  serviceDate: string,
 ) {
-  return shiftIsoDate(
-    expectedSnapshotDate,
-    -PORTFOLIO_DASHBOARD_BASELINE_MAX_AGE_DAYS,
-  );
+  return resolvePortfolioDashboardBaselineWindow(serviceDate).storageWindowStart;
 }
 
 export function selectLatestPortfolioDashboardBaselineRows<
   TRow extends Readonly<{ snapshotDate: string }>,
->(rows: readonly TRow[], expectedSnapshotDate: string) {
-  const windowStart = portfolioDashboardBaselineWindowStart(expectedSnapshotDate);
+>(rows: readonly TRow[], serviceDate: string) {
+  const window = resolvePortfolioDashboardBaselineWindow(serviceDate);
   const eligibleRows = rows.filter(
     (row) =>
-      row.snapshotDate >= windowStart &&
-      row.snapshotDate <= expectedSnapshotDate,
+      row.snapshotDate >= window.storageWindowStart &&
+      row.snapshotDate <= window.storageWindowEnd,
   );
-  const snapshotDate = eligibleRows.reduce<string | null>(
+  const storageSnapshotDate = eligibleRows.reduce<string | null>(
     (latest, row) =>
       latest === null || row.snapshotDate > latest ? row.snapshotDate : latest,
     null,
   );
+  const baselineReferenceDate =
+    storageSnapshotDate === null
+      ? null
+      : shiftIsoDate(storageSnapshotDate, -1);
 
   return {
-    snapshotDate,
+    storageSnapshotDate,
+    baselineReferenceDate,
     rows:
-      snapshotDate === null
+      storageSnapshotDate === null
         ? []
-        : eligibleRows.filter((row) => row.snapshotDate === snapshotDate),
+        : eligibleRows.filter(
+            (row) => row.snapshotDate === storageSnapshotDate,
+          ),
   } as const;
 }
 

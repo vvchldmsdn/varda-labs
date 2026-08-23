@@ -160,8 +160,8 @@ export type DashboardData = {
   generatedAt: string;
   usdKrwRate: number;
   fxTrend: readonly DashboardFxTrendPoint[];
-  latestSnapshotDate: string | null;
-  latestSnapshotReferenceDate: string | null;
+  movementBaselineDate: string | null;
+  marketPriceReferenceDate: string | null;
   totalValueKrw: number;
   costBasisKrw: number;
   realizedCostBasisKrw: number;
@@ -263,6 +263,7 @@ export async function getPortfolioDashboard(
     latestFxRows,
     recentFxRows,
     latestPositionRows,
+    baselineReferenceDate,
     recentPositionRows,
     recentPortfolioRows,
     eventRows,
@@ -272,10 +273,10 @@ export async function getPortfolioDashboard(
   } = await getReadOnlyTenantPortfolioDashboardSources({
     scope,
     tenantContext,
-    snapshotDate: movementCycle.snapshotDate,
+    serviceDate: movementCycle.snapshotDate,
   });
 
-  const latestSnapshotDate = latestPositionRows[0]?.snapshotDate ?? null;
+  const movementBaselineDate = baselineReferenceDate;
 
   const investmentAssetRows = assetRows.filter((asset) =>
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
@@ -348,14 +349,14 @@ export async function getPortfolioDashboard(
     positionRows: latestPositionRows,
     eventRows,
     selectedAccount: "all",
-    baselineDate: latestSnapshotDate,
+    baselineDate: movementBaselineDate,
     usdKrwRate,
     movementCycle,
   });
   const previousCloseFallback = buildPreviousCloseMovement({
     holdings: holdingsBase,
     priceRows: recentPriceRows,
-    referenceDate: latestSnapshotDate,
+    referenceDate: movementBaselineDate,
     usdKrwRate,
     movementCycle,
   });
@@ -431,12 +432,12 @@ export async function getPortfolioDashboard(
   const latestPortfolioSnapshotReturnPct =
     latestPortfolioSnapshot?.totalReturnPct ?? null;
   const latestAccountPositions = latestPositionRows;
-  const latestSnapshotReferenceDate =
+  const marketPriceReferenceDate =
     latestDate(
       latestAccountPositions
         .map((position) => position.referenceDate ?? position.priceDate)
         .filter((date): date is string => Boolean(date)),
-    ) ?? latestSnapshotDate;
+    ) ?? movementBaselineDate;
   const unmatchedSnapshotRows = latestAccountPositions.filter(
     (position) => position.assetId === null,
   ).length;
@@ -451,8 +452,8 @@ export async function getPortfolioDashboard(
     generatedAt: new Date().toISOString(),
     usdKrwRate,
     fxTrend: buildDashboardFxTrend(recentFxRows),
-    latestSnapshotDate,
-    latestSnapshotReferenceDate,
+    movementBaselineDate,
+    marketPriceReferenceDate,
     totalValueKrw,
     costBasisKrw,
     realizedCostBasisKrw,

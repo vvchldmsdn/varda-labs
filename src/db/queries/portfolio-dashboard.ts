@@ -48,16 +48,16 @@ const RECENT_FX_OBSERVATION_LIMIT = 260;
 
 export async function getReadOnlyTenantPortfolioDashboardSources({
   scope,
-  snapshotDate,
+  serviceDate,
   tenantContext,
 }: {
   scope: PortfolioAnalysisScope;
-  snapshotDate: string;
+  serviceDate: string;
   tenantContext: TenantContext;
 }) {
   const targets = await getPortfolioAnalysisScopeTargets({
     scope,
-    serviceDate: snapshotDate,
+    serviceDate,
     tenantContext,
   });
   const assetScopePredicate = targets.includesAllOwnedAccounts
@@ -154,7 +154,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     Math.max(assetRows.length, 1) *
     MAX_RECENT_POSITION_SOURCES_PER_ASSET;
   const baselineWindowStart =
-    portfolioDashboardBaselineWindowStart(snapshotDate);
+    portfolioDashboardBaselineWindowStart(serviceDate);
 
   const [
     baselinePositionCandidateRows,
@@ -176,7 +176,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
               gte(dailyPositionSnapshots.snapshotDate, baselineWindowStart),
-              lte(dailyPositionSnapshots.snapshotDate, snapshotDate),
+              lte(dailyPositionSnapshots.snapshotDate, serviceDate),
             ),
           )
           .orderBy(
@@ -213,7 +213,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               positionScopePredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
-              lte(dailyPositionSnapshots.snapshotDate, snapshotDate),
+              lte(dailyPositionSnapshots.snapshotDate, serviceDate),
             ),
           )
           .orderBy(
@@ -254,7 +254,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               eventScopePredicate,
               eq(eventLedgerEntries.account, accounts.code),
               eq(eventLedgerEntries.isSample, false),
-              lte(eventLedgerEntries.eventDate, snapshotDate),
+              lte(eventLedgerEntries.eventDate, serviceDate),
             ),
           ),
     positionScopePredicate === null
@@ -275,10 +275,10 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
           ),
   ]);
 
-  const latestPositionRows = selectLatestPortfolioDashboardBaselineRows(
+  const baselineSelection = selectLatestPortfolioDashboardBaselineRows(
     baselinePositionCandidateRows,
-    snapshotDate,
-  ).rows;
+    serviceDate,
+  );
 
   const quoteTickers = uniqueStrings(
     assetRows
@@ -315,7 +315,8 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     settingsRows,
     latestFxRows: recentFxRows.slice(0, 1),
     recentFxRows,
-    latestPositionRows,
+    latestPositionRows: baselineSelection.rows,
+    baselineReferenceDate: baselineSelection.baselineReferenceDate,
     recentPositionRows,
     recentPortfolioRows,
     eventRows,
