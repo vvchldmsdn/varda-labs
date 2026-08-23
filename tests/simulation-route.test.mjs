@@ -334,6 +334,9 @@ describe("Simulation input readiness route boundary", () => {
     const view = readSimulationView();
     const proxy = read("src/proxy.ts");
     const dashboard = read("src/components/portfolio-dashboard.tsx");
+    const primaryNavigation = read(
+      "src/components/portfolio-primary-navigation.tsx",
+    );
     const smoke = read("scripts/smoke-simulation-route.mjs");
 
     assert.match(view, /data-page="simulation-input-readiness"/);
@@ -569,7 +572,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /resolveCurrentTenantContext/);
     assert.match(page, /if \(!resolution\.ok\)/);
     assert.doesNotMatch(proxy, /"\/simulation(?:\/:path\*)?"/);
-    assert.match(dashboard, /href: "\/simulation"/);
+    assert.match(dashboard, /PortfolioPrimaryNavigation/);
+    assert.match(primaryNavigation, /href: "\/simulation"/);
     assert.match(
       smoke,
       /data-regime-historical-outcome-point-in-time="not_established"/,

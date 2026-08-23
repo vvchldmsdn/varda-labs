@@ -6,13 +6,13 @@ import { PortfolioHistoryChart } from "@/components/home/portfolio-history-chart
 import {
   formatDate,
   formatKrw,
-  formatKstTime,
   formatPercent,
   formatSignedKrw,
   toneClass,
 } from "@/components/home/portfolio-format";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
+import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { selectLargestMovementContributor } from "@/lib/home-metrics";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
 import {
@@ -20,15 +20,6 @@ import {
   type PortfolioAnalysisScope,
   type PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
-
-const HOME_NAV_ITEMS = [
-  { label: "홈", href: "/" },
-  { label: "포트폴리오", href: "/portfolio/structure" },
-  { label: "추가 투입", href: "/additional-contribution" },
-  { label: "히스토리", href: "/history" },
-  { label: "분석", href: "/investment-lab" },
-  { label: "시뮬레이션", href: "/simulation" },
-] as const;
 
 export function PortfolioDashboard({
   data,
@@ -43,7 +34,7 @@ export function PortfolioDashboard({
     ? selectLargestMovementContributor(data.holdings)
     : null;
   const priceImpactKrw = movementReady
-    ? (data.todayChangeKrw ?? 0) - (data.todayFxChangeKrw ?? 0) - data.tradeFlowKrw
+    ? (data.todayChangeKrw ?? 0) - (data.todayFxChangeKrw ?? 0)
     : null;
   const priceImpactPct = percentageOfPrevious(priceImpactKrw, data.todayMovement.previousTotalKrw);
   const fxImpactPct = percentageOfPrevious(
@@ -65,7 +56,8 @@ export function PortfolioDashboard({
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f7f8f5] text-[#20231f]">
-      <HomeNavigation
+      <PortfolioPrimaryNavigation
+        activePath="/"
         generatedAt={data.generatedAt}
         selectedScopeKey={data.selectedScope.key}
       />
@@ -218,53 +210,6 @@ export function PortfolioDashboard({
         </footer>
       </div>
     </main>
-  );
-}
-
-function HomeNavigation({
-  generatedAt,
-  selectedScopeKey,
-}: {
-  generatedAt: string;
-  selectedScopeKey: PortfolioAnalysisScopeKey;
-}) {
-  return (
-    <header className="border-b border-[#e1e4df] bg-[#fafbf8]">
-      <div className="mx-auto flex min-h-16 w-full max-w-[1540px] items-center justify-between gap-5 px-5 sm:px-8 lg:px-10">
-        <Link className="shrink-0 text-sm font-semibold text-[#171a16] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]" href={scopedHref("/", selectedScopeKey)}>
-          VARDA
-        </Link>
-        <nav aria-label="주요 메뉴" className="min-w-0 overflow-x-auto">
-          <div className="flex min-w-max items-center gap-7 text-sm lg:gap-12">
-            {HOME_NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                aria-current={item.href === "/" ? "page" : undefined}
-                className={`border-b py-5 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] ${
-                  item.href === "/"
-                    ? "border-[#20231f] text-[#20231f]"
-                    : "border-transparent text-[#61675f] hover:text-[#20231f]"
-                }`}
-                href={scopedHref(item.href, selectedScopeKey)}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="hidden text-xs text-[#6f756d] md:inline">{formatKstTime(generatedAt)} 기준</span>
-          <PortfolioRefreshButton compact />
-          <Link
-            aria-label="세션 정보"
-            className="grid h-8 w-8 place-items-center rounded-full border border-[#d8dcd6] bg-[#f2f4f0] text-xs font-semibold hover:border-[#aeb4ac] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#347e62]"
-            href="/auth/session"
-          >
-            V
-          </Link>
-        </div>
-      </div>
-    </header>
   );
 }
 
