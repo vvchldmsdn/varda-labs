@@ -13,7 +13,8 @@ import {
 } from "@/components/home/portfolio-format";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
-import type { DashboardData, DashboardHolding } from "@/lib/portfolio-dashboard";
+import { selectLargestMovementContributor } from "@/lib/home-metrics";
+import type { DashboardData } from "@/lib/portfolio-dashboard";
 import {
   buildPortfolioAnalysisScopeHref,
   type PortfolioAnalysisScope,
@@ -38,7 +39,9 @@ export function PortfolioDashboard({
 }) {
   const movementReady = data.dataHealth.movementReady;
   const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
-  const topContributor = movementReady ? largestPositiveContributor(data.holdings) : null;
+  const topContributor = movementReady
+    ? selectLargestMovementContributor(data.holdings)
+    : null;
   const priceImpactKrw = movementReady
     ? (data.todayChangeKrw ?? 0) - (data.todayFxChangeKrw ?? 0) - data.tradeFlowKrw
     : null;
@@ -171,7 +174,7 @@ export function PortfolioDashboard({
               label="데이터 상태"
               value={
                 data.dataHealth.movementEligibleAssetCount > 0
-                  ? `실시간 시세 ${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
+                  ? `시세 근거 ${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`
                   : "변동 계산 제외"
               }
               subValue={dataStatusText(
@@ -304,12 +307,6 @@ function EvidenceMetric({
       <p className="mt-2 truncate text-xs text-[#747a72]" title={subValue}>{subValue}</p>
     </div>
   );
-}
-
-function largestPositiveContributor(holdings: readonly DashboardHolding[]) {
-  return holdings
-    .filter((holding) => holding.dailyChangeKrw !== null)
-    .toSorted((left, right) => (right.dailyChangeKrw ?? 0) - (left.dailyChangeKrw ?? 0))[0] ?? null;
 }
 
 function dataStatusText(

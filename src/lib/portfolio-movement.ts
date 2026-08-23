@@ -22,7 +22,12 @@ const MOVEMENT_INVESTMENT_ASSET_TYPES = new Set([
 const DAILY_MOVEMENT_MIN_VALUE_COVERAGE = 0.8;
 const DAILY_MOVEMENT_MIN_COUNT_COVERAGE = 0.6;
 const PREVIOUS_CLOSE_MAX_AGE_DAYS = 10;
-const MOVEMENT_FRESH_PRICE_QUOTE_TYPES = new Set(["live", "delayed", "realtime"]);
+const MOVEMENT_FRESH_PRICE_QUOTE_TYPES = new Set([
+  "live",
+  "delayed",
+  "realtime",
+  "market_closed_snapshot",
+]);
 
 export type PortfolioMovementAccount = "brokerage" | "isa" | "irp";
 export type PortfolioMovementSelectedAccount = PortfolioMovementAccount | "all";
