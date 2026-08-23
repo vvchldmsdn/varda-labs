@@ -4,11 +4,9 @@ import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfol
 import {
   accounts,
   assets,
-  dailyPositionSnapshots,
   eventLedgerEntries,
   livePriceQuotes,
 } from "@/db/schema";
-import { resolveSessionAwareValuationPrice } from "@/lib/market-data/live-valuation-admission";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import {
   assetMetricKey,
@@ -279,18 +277,12 @@ export async function getPortfolioDashboard(
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
   );
   const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
-  const valuationAssetRows = investmentAssetRows.map((asset) => {
-    const quotedAsset = applyLiveQuote(
+  const valuationAssetRows = investmentAssetRows.map((asset) =>
+    applyLiveQuote(
       asset,
       liveQuotesByAssetKey.get(assetLiveQuoteKey(asset)),
-    );
-    return applySessionAwareValuationPrice({
-      asset: quotedAsset,
-      baselinePositions: latestPositionRows,
-      evaluatedAt: now,
-      liveWindowStartAt: movementCycle.liveWindowStartAt,
-    });
-  });
+    ),
+  );
   const selectedInvestmentAssetRows = valuationAssetRows;
   const setting = settingsRows[0] ?? null;
   const latestFxRow = latestFxRows[0] ?? null;
@@ -590,43 +582,6 @@ function applyLiveQuote(asset: AssetRow, quote: LivePriceQuoteRow | undefined) {
     priceQuoteType: quote.quoteType,
     priceStatus: quote.status,
     priceError: quote.error,
-  };
-}
-
-function applySessionAwareValuationPrice({
-  asset,
-  baselinePositions,
-  evaluatedAt,
-  liveWindowStartAt,
-}: {
-  asset: AssetRow;
-  baselinePositions: readonly (typeof dailyPositionSnapshots.$inferSelect)[];
-  evaluatedAt: Date;
-  liveWindowStartAt: Date;
-}) {
-  const admitted = resolveSessionAwareValuationPrice({
-    asset,
-    baselinePositions,
-    evaluatedAt,
-    liveWindowStartAt,
-  });
-  if (admitted.basis === "current") return asset;
-
-  const basisAsOf = admitted.basisAsOf
-    ? admitted.basisAsOf instanceof Date
-      ? admitted.basisAsOf
-      : new Date(admitted.basisAsOf)
-    : asset.priceAsOf;
-
-  return {
-    ...asset,
-    currentPrice: String(admitted.price),
-    priceSource: "daily_position_snapshot_market_closed",
-    priceFetchedAt: basisAsOf,
-    priceAsOf: basisAsOf,
-    priceQuoteType: "market_closed_snapshot",
-    priceStatus: "ok",
-    priceError: null,
   };
 }
 

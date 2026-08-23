@@ -1,5 +1,4 @@
 import "./market-calendar.test.mjs";
-import "./live-valuation-admission.test.mjs";
 import "./home-metrics.test.mjs";
 import "./portfolio-format.test.mjs";
 import "./map-with-concurrency.test.mjs";

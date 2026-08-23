@@ -26,7 +26,6 @@ const MOVEMENT_FRESH_PRICE_QUOTE_TYPES = new Set([
   "live",
   "delayed",
   "realtime",
-  "market_closed_snapshot",
 ]);
 
 export type PortfolioMovementAccount = "brokerage" | "isa" | "irp";
