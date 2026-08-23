@@ -1079,15 +1079,17 @@ function computeAccountSnapshot({
       unitValueChangeKrw !== null && previousUnitValueKrw && previousUnitValueKrw > 0
         ? (unitValueChangeKrw / previousUnitValueKrw) * 100
         : null;
+    const movementQuantity = provenance.insertOnly ? totalQuantity : quantity;
+    const movementFixedKrwValue = provenance.insertOnly ? 0 : fractionalKrwValue;
     const movement =
       previousUnitPrice && previousUnitPrice > 0 && previousFxRate && previousFxRate > 0
         ? calculateFxAwarePositionMovementKrw({
-            quantity: totalQuantity,
+            marketExposedQuantity: movementQuantity,
             currentPrice: closePrice,
             previousPrice: previousUnitPrice,
             currentFxRate: fxRate,
             previousFxRate,
-            fractionalKrwValue,
+            fixedKrwValue: movementFixedKrwValue,
             previousMarketValueKrw,
           })
         : null;

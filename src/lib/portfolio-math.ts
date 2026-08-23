@@ -23,12 +23,12 @@ export type KrwFxRateResolution =
     };
 
 export type FxAwarePositionMovementInput = {
-  quantity: number;
+  marketExposedQuantity: number;
   currentPrice: number;
   previousPrice: number;
   currentFxRate: number;
   previousFxRate: number;
-  fractionalKrwValue?: number;
+  fixedKrwValue?: number;
   previousMarketValueKrw?: number | null;
 };
 
@@ -84,21 +84,23 @@ export function convertToKrw(value: number, currency: string, usdKrwRate: number
 }
 
 export function calculateFxAwarePositionMovementKrw({
-  quantity,
+  marketExposedQuantity,
   currentPrice,
   previousPrice,
   currentFxRate,
   previousFxRate,
-  fractionalKrwValue = 0,
+  fixedKrwValue = 0,
   previousMarketValueKrw = null,
 }: FxAwarePositionMovementInput) {
-  const currentBaseValueKrw = quantity * currentPrice * currentFxRate;
-  const currentValueKrw = currentBaseValueKrw + fractionalKrwValue;
+  const currentBaseValueKrw = marketExposedQuantity * currentPrice * currentFxRate;
+  const currentValueKrw = currentBaseValueKrw + fixedKrwValue;
   const inferredPreviousValueKrw =
-    quantity * previousPrice * previousFxRate + fractionalKrwValue;
+    marketExposedQuantity * previousPrice * previousFxRate + fixedKrwValue;
   const previousValueKrw = previousMarketValueKrw ?? inferredPreviousValueKrw;
-  const priceChangeKrw = quantity * (currentPrice - previousPrice) * previousFxRate;
-  const fxChangeKrw = quantity * currentPrice * (currentFxRate - previousFxRate);
+  const priceChangeKrw =
+    marketExposedQuantity * (currentPrice - previousPrice) * previousFxRate;
+  const fxChangeKrw =
+    marketExposedQuantity * currentPrice * (currentFxRate - previousFxRate);
 
   return {
     currentValueKrw,

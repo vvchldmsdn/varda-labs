@@ -40,6 +40,8 @@ describe("portfolio dashboard holding history", () => {
           assetId: "asset-kodex",
           unitValueChangePct: 2.5,
           marketValueChangePct: 9,
+          marketValueKrw: 1_250_000,
+          marketValueChangeKrw: 25_000,
           capturedAt: "2026-08-02T08:00:00.000Z",
           source: "varda_manual_daily_snapshot",
         }),
@@ -67,6 +69,8 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[0]?.name, "KODEX 200");
     assert.equal(result.rows[0]?.ticker, "069500");
     assert.equal(result.rows[0]?.cells[0]?.changePct, 2.5);
+    assert.equal(result.rows[0]?.cells[0]?.marketValueKrw, 1_250_000);
+    assert.equal(result.rows[0]?.cells[0]?.changeKrw, 25_000);
     assert.equal(result.rows[0]?.cells[0]?.basis, "unit_value");
     assert.equal(result.rows[0]?.cells[1]?.basis, "missing");
     assert.equal(result.rows[1]?.cells[0]?.basis, "market_value");

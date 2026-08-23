@@ -53,7 +53,7 @@ describe("portfolio math helpers", () => {
 
   it("includes USD/KRW movement in KRW daily value changes", () => {
     const movement = calculateFxAwarePositionMovementKrw({
-      quantity: 10,
+      marketExposedQuantity: 10,
       previousPrice: 100,
       currentPrice: 110,
       previousFxRate: 1200,
@@ -66,6 +66,42 @@ describe("portfolio math helpers", () => {
     assert.equal(movement.changeKrw, 230_000);
     assert.equal(movement.priceChangeKrw, 120_000);
     assert.equal(movement.fxChangeKrw, 110_000);
+  });
+
+  it("does not expose a fixed KRW fractional balance to price or FX movement", () => {
+    const movement = calculateFxAwarePositionMovementKrw({
+      marketExposedQuantity: 4,
+      previousPrice: 704.77,
+      currentPrice: 704.77,
+      previousFxRate: 1394.706577,
+      currentFxRate: 1385.741836,
+      fixedKrwValue: 433_748,
+      previousMarketValueKrw: 4_365_537.417089,
+    });
+
+    assertClose(movement.currentValueKrw, 4_340_265.095031);
+    assertClose(movement.changeKrw, -25_272.322058);
+    assertClose(movement.priceChangeKrw, 0);
+    assertClose(movement.fxChangeKrw, -25_272.322058);
+  });
+
+  it("keeps a carried fractional quantity exposed during historical backfill", () => {
+    const movement = calculateFxAwarePositionMovementKrw({
+      marketExposedQuantity: 4.434_011_49,
+      previousPrice: 707.82,
+      currentPrice: 701.01,
+      previousFxRate: 1411.930856,
+      currentFxRate: 1395.12,
+      previousMarketValueKrw: 4_431_319.593976,
+    });
+
+    assertClose(movement.currentValueKrw, 4_336_432.514841, 0.01);
+    assertClose(movement.changeKrw, -94_887.079135, 0.01);
+    assertClose(
+      movement.changeKrw,
+      movement.priceChangeKrw + movement.fxChangeKrw,
+      0.01,
+    );
   });
 
   it("separates a dashboard snapshot FX loss from unchanged USD price", () => {
