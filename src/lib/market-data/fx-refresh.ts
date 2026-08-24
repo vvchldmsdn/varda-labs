@@ -25,7 +25,7 @@ export const FX_REFRESH_PROVIDER_NAMES = ["er-api-open"] as const;
 export type FxRefreshProviderName =
   (typeof FX_REFRESH_PROVIDER_NAMES)[number];
 
-export type FxProviderName = FxRefreshProviderName | "frankfurter";
+export type FxProviderName = FxRefreshProviderName | "frankfurter" | "kis";
 
 export type FxRateCandidate = {
   provider: FxProviderName;

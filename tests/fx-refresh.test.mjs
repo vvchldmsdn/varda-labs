@@ -9,6 +9,10 @@ import {
   planFxRateWrite,
   prepareFxRateActualWrite,
 } from "../src/lib/market-data/fx-refresh.ts";
+import {
+  parseKisUsdKrwPriceDetailResponse,
+  selectKisUsdKrwQuoteTarget,
+} from "../src/lib/market-data/providers/kis-fx.ts";
 
 const fetchedAt = new Date("2026-07-08T10:00:00.000Z");
 
@@ -39,6 +43,97 @@ function existingRow(overrides = {}) {
 }
 
 describe("FX refresh provider parsing", () => {
+  it("parses KIS overseas price-detail USD/KRW evidence", () => {
+    const parsed = parseKisUsdKrwPriceDetailResponse(
+      {
+        rt_cd: "0",
+        output: {
+          curr: "USD",
+          t_rate: "1382.40",
+        },
+      },
+      {
+        exchange: "AMS",
+        fetchedAt,
+        rateDate: "2026-08-24",
+      },
+    );
+
+    assert.equal(parsed.ok, true);
+    assert.deepEqual(parsed.candidate, {
+      provider: "kis",
+      pair: "USD/KRW",
+      rateDate: "2026-08-24",
+      usdKrw: "1382.4",
+      source: "kis_overseas_price_detail:AMS",
+      status: "ok",
+      fetchedAt: fetchedAt.toISOString(),
+    });
+  });
+
+  it("rejects unusable KIS price-detail FX evidence", () => {
+    const providerFailure = parseKisUsdKrwPriceDetailResponse(
+      { rt_cd: "1", output: { curr: "USD", t_rate: "1382.40" } },
+      { exchange: "NAS", fetchedAt, rateDate: "2026-08-24" },
+    );
+    const wrongCurrency = parseKisUsdKrwPriceDetailResponse(
+      { rt_cd: "0", output: { curr: "JPY", t_rate: "1382.40" } },
+      { exchange: "NAS", fetchedAt, rateDate: "2026-08-24" },
+    );
+    const missingRate = parseKisUsdKrwPriceDetailResponse(
+      { rt_cd: "0", output: { curr: "USD", t_rate: "0" } },
+      { exchange: "NAS", fetchedAt, rateDate: "2026-08-24" },
+    );
+
+    assert.deepEqual(providerFailure, {
+      ok: false,
+      error: "provider_status_not_success",
+    });
+    assert.deepEqual(wrongCurrency, {
+      ok: false,
+      error: "unexpected_provider_currency",
+    });
+    assert.deepEqual(missingRate, {
+      ok: false,
+      error: "missing_or_invalid_usdkrw",
+    });
+  });
+
+  it("selects a USD holding and preserves its known KIS exchange", () => {
+    const target = selectKisUsdKrwQuoteTarget({
+      targets: [
+        { ticker: "069500", market: "korea", currency: "KRW" },
+        { ticker: "VOO", market: "us", currency: "USD" },
+      ],
+      quotes: [
+        {
+          ticker: "VOO",
+          market: "us",
+          currency: "USD",
+          source: "kis_overseas_price:AMS",
+        },
+      ],
+    });
+
+    assert.deepEqual(target, { ticker: "VOO", exchange: "AMS" });
+  });
+
+  it("falls back to exchange probing when no quote source is available", () => {
+    const target = selectKisUsdKrwQuoteTarget({
+      targets: [{ ticker: "QQQ", market: "us", currency: "USD" }],
+      quotes: [],
+    });
+
+    assert.deepEqual(target, { ticker: "QQQ", exchange: null });
+    assert.equal(
+      selectKisUsdKrwQuoteTarget({
+        targets: [{ ticker: "069500", market: "korea", currency: "KRW" }],
+        quotes: [],
+      }),
+      null,
+    );
+  });
+
   it("parses an ExchangeRate-API Open Access USD/KRW response", () => {
     const parsed = parseExchangeRateOpenAccessUsdKrwResponse(
       {

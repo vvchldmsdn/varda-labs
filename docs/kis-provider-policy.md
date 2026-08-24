@@ -88,13 +88,17 @@ Supported first-pass policies:
 
 Default:
 
-- `per_request`
+- `memory_cache`
 
 Reasoning:
 
-- `per_request` is simplest and keeps the no-DB-token-storage rule strict.
-- `memory_cache` can reduce token calls later, but serverless cold starts must
-  still tolerate token refetches.
+- `memory_cache` reuses an unexpired token in a warm server instance without
+  persisting credentials in Postgres.
+- One live refresh also shares a request-scoped token session between price and
+  USD/KRW requests, including concurrent issuance coalescing.
+- `per_request` remains available for troubleshooting and still reuses one
+  token inside a single request-scoped session.
+- Serverless cold starts must still tolerate token refetches.
 - Vercel serverless memory is not a global cache. Consecutive admin requests can
   land on different instances and still trigger multiple token requests.
 - Vercel KV or a dedicated secret store can be considered later.
