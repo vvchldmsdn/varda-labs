@@ -18,6 +18,7 @@ import "./target-policy-tenant-rls.test.mjs";
 import "./evidence-simulation-tenant-rls.test.mjs";
 import "./history-snapshot-tenant-reads.test.mjs";
 import "./snapshot-gap-backfill.test.mjs";
+import "./snapshot-cutoff-valuation.test.mjs";
 import "./frankfurter-history.test.mjs";
 import "./portfolio-math.test.mjs";
 import "./portfolio-analysis-scope.test.mjs";

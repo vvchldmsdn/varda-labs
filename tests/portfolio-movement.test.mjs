@@ -273,6 +273,46 @@ describe("portfolio movement builder", () => {
     );
   });
 
+  it("returns zero when the cutoff baseline and current evidence are unchanged", () => {
+    const usdKrwRate = 1385.741836;
+    const quantity = 4;
+    const price = 703.71;
+    const result = buildDaily({
+      usdKrwRate,
+      holdings: [
+        holding({
+          id: "asset-voo",
+          legacyBase44Id: "legacy-voo",
+          name: "Vanguard S&P 500 ETF",
+          ticker: "VOO",
+          market: "us",
+          currency: "USD",
+          quantity,
+          currentPrice: price,
+          valueKrw: quantity * price * usdKrwRate,
+        }),
+      ],
+      positionRows: [
+        position({
+          id: "snapshot-voo",
+          assetId: "asset-voo",
+          legacyAssetId: "legacy-voo",
+          ticker: "VOO",
+          assetName: "Vanguard S&P 500 ETF",
+          marketValueKrw: quantity * price * usdKrwRate,
+          unitPrice: price,
+          fxRate: usdKrwRate,
+        }),
+      ],
+    });
+
+    assert.equal(result.ready, true);
+    assertClose(result.changeKrw, 0);
+    assertClose(result.priceChangeKrw, 0);
+    assertClose(result.fxChangeKrw, 0);
+    assertClose(result.contributions.get("asset-voo")?.changeKrw, 0);
+  });
+
   it("subtracts post-baseline trade flow from holding movement", () => {
     const result = buildDaily({
       holdings: [holding({ currentPrice: 120, valueKrw: 1200 })],

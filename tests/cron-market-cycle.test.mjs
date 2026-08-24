@@ -143,7 +143,9 @@ describe("Cron market-cycle controller", () => {
     assert.doesNotMatch(route, /confirmWrite|account=|snapshotDate=/);
     assert.match(runner, /acceptExistingVardaRow: true/);
     assert.match(runner, /mode: "close"/);
-    assert.doesNotMatch(runner, /mode: "live"/);
+    assert.match(runner, /mode: "live"/);
+    assert.match(runner, /live_quote_sync_incomplete/);
+    assert.match(runner, /runDailySnapshotJob\(\{[\s\S]*now: new Date\(\)/);
     assert.match(repository, /pg_try_advisory_xact_lock/);
     assert.match(repository, /metadata_json ->> 'snapshotDate'/);
     assert.match(fxJob, /plannedWrite\.reason === "same_varda_row_value"/);

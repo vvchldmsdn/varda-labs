@@ -4,6 +4,7 @@ const TICKER_PATTERN = /^[A-Z0-9._-]+$/;
 export const CRON_MARKET_CYCLE_LIMITS = {
   maxCloseTargetsPerGroup: 25,
   maxCloseTargetsPerCycle: 50,
+  maxLiveTargetsPerCycle: 50,
   activeRunLeaseMinutes: 30,
 } as const;
 

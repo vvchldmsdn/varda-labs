@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   buildCronMarketCyclePlan,
+  CRON_MARKET_CYCLE_LIMITS,
   type CronCloseSyncGroup,
   type CronMarketCyclePlan,
 } from "@/lib/cron-market-cycle";
@@ -18,6 +19,7 @@ import {
   createKisMarketDataProvider,
   getKisProviderPolicy,
 } from "@/lib/market-data/providers/kis";
+import type { MarketDataProvider } from "@/lib/market-data/providers/types";
 import { safeErrorMessage } from "@/lib/redaction";
 import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
@@ -37,6 +39,18 @@ type CloseSyncSummary = {
     tickerCount: number;
     status: "completed" | "partial";
   }>;
+};
+
+type LiveSyncSummary = {
+  status: "not_attempted" | "completed" | "partial";
+  expectedTargetCount: number;
+  requestedCount: number;
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+  insertedCount: number;
+  updatedCount: number;
+  conflictCount: number;
 };
 
 export type CronMarketCycleRunResult = {
@@ -60,6 +74,7 @@ export type CronMarketCycleRunResult = {
     source: string | null;
   };
   closeSync: CloseSyncSummary;
+  liveSync: LiveSyncSummary;
   snapshot: {
     targetCount: number;
     writtenCount: number;
@@ -103,6 +118,8 @@ export async function runCronMarketCycle({
     source: null,
   };
   let closeSync = emptyCloseSyncSummary();
+  let liveSync = emptyLiveSyncSummary();
+  let kisProvider: MarketDataProvider | null = null;
 
   try {
     const fxResult = await runUsdKrwFxRefreshJob({
@@ -125,6 +142,7 @@ export async function runCronMarketCycle({
         snapshotDate,
         fxSummary,
         closeSync,
+        liveSync,
         plan,
         snapshotJob,
       });
@@ -138,6 +156,7 @@ export async function runCronMarketCycle({
           snapshotDate,
           fxSummary,
           closeSync,
+          liveSync,
           plan: {
             ...plan,
             ok: false,
@@ -148,7 +167,8 @@ export async function runCronMarketCycle({
         });
       }
 
-      closeSync = await syncCloseGroups(plan.closeGroups);
+      kisProvider = createKisMarketDataProvider();
+      closeSync = await syncCloseGroups(plan.closeGroups, kisProvider);
       ({ snapshotJob, plan } = await loadPlan(now));
       if (!plan.ok || plan.action === "sync_closes_then_snapshot") {
         return finishBlocked({
@@ -156,6 +176,7 @@ export async function runCronMarketCycle({
           snapshotDate,
           fxSummary,
           closeSync,
+          liveSync,
           plan: {
             ...plan,
             ok: false,
@@ -180,15 +201,53 @@ export async function runCronMarketCycle({
         snapshotDate,
         fx: fxSummary,
         closeSync,
+        liveSync,
       });
       await finishRun(result, "completed");
       return result;
     }
 
+    const policy = getKisProviderPolicy();
+    if (!policy.configured) {
+      return finishBlocked({
+        runId,
+        snapshotDate,
+        fxSummary,
+        closeSync,
+        liveSync,
+        plan: {
+          ...plan,
+          ok: false,
+          action: "blocked",
+          blockers: [...plan.blockers, "kis_provider_not_configured"],
+        },
+        snapshotJob,
+      });
+    }
+
+    kisProvider ??= createKisMarketDataProvider();
+    liveSync = await syncLiveQuotes(kisProvider);
+    if (liveSync.status !== "completed") {
+      return finishBlocked({
+        runId,
+        snapshotDate,
+        fxSummary,
+        closeSync,
+        liveSync,
+        plan: {
+          ...plan,
+          ok: false,
+          action: "blocked",
+          blockers: [...plan.blockers, "live_quote_sync_incomplete"],
+        },
+        snapshotJob,
+      });
+    }
+
     const snapshotWrite = await runDailySnapshotJob({
       dryRun: false,
       snapshotDate,
-      now,
+      now: new Date(),
     });
     const snapshotSummary = {
       targetCount: snapshotWrite.targetCount,
@@ -205,6 +264,7 @@ export async function runCronMarketCycle({
         snapshotDate,
         fx: fxSummary,
         closeSync,
+        liveSync,
         snapshot: snapshotSummary,
         blockers: ["snapshot_write_incomplete"],
       });
@@ -219,6 +279,7 @@ export async function runCronMarketCycle({
       snapshotDate,
       fx: fxSummary,
       closeSync,
+      liveSync,
       snapshot: snapshotSummary,
     });
     await finishRun(result, "completed");
@@ -232,6 +293,7 @@ export async function runCronMarketCycle({
       snapshotDate,
       fx: fxSummary,
       closeSync,
+      liveSync,
       blockers: ["unexpected_market_cycle_error"],
     });
     try {
@@ -257,8 +319,10 @@ async function loadPlan(now: Date) {
   };
 }
 
-async function syncCloseGroups(groups: CronCloseSyncGroup[]) {
-  const provider = createKisMarketDataProvider();
+async function syncCloseGroups(
+  groups: CronCloseSyncGroup[],
+  provider: MarketDataProvider,
+) {
   const summary = emptyCloseSyncSummary();
 
   for (const group of groups) {
@@ -298,11 +362,43 @@ async function syncCloseGroups(groups: CronCloseSyncGroup[]) {
   return summary;
 }
 
+async function syncLiveQuotes(provider: MarketDataProvider): Promise<LiveSyncSummary> {
+  const result = await runMarketPriceSync({
+    mode: "live",
+    dryRun: false,
+    fixture: false,
+    provider,
+    targetLimit: CRON_MARKET_CYCLE_LIMITS.maxLiveTargetsPerCycle,
+  });
+  const expectedTargetCount = result.targetFilterSummary.filteredPriceTargetCount;
+  const complete =
+    expectedTargetCount <= CRON_MARKET_CYCLE_LIMITS.maxLiveTargetsPerCycle &&
+    result.requestedCount === expectedTargetCount &&
+    result.successCount === result.requestedCount &&
+    result.failedCount === 0 &&
+    result.skippedCount === 0 &&
+    result.conflictCount === 0 &&
+    result.insertedCount + result.updatedCount === result.requestedCount;
+
+  return {
+    status: complete ? "completed" : "partial",
+    expectedTargetCount,
+    requestedCount: result.requestedCount,
+    successCount: result.successCount,
+    failedCount: result.failedCount,
+    skippedCount: result.skippedCount,
+    insertedCount: result.insertedCount,
+    updatedCount: result.updatedCount,
+    conflictCount: result.conflictCount,
+  };
+}
+
 async function finishBlocked({
   runId,
   snapshotDate,
   fxSummary,
   closeSync,
+  liveSync,
   plan,
   snapshotJob,
 }: {
@@ -310,6 +406,7 @@ async function finishBlocked({
   snapshotDate: string;
   fxSummary: CronMarketCycleRunResult["fx"];
   closeSync: CloseSyncSummary;
+  liveSync: LiveSyncSummary;
   plan: CronMarketCyclePlan;
   snapshotJob: Awaited<ReturnType<typeof runDailySnapshotJob>>;
 }) {
@@ -320,6 +417,7 @@ async function finishBlocked({
     snapshotDate,
     fx: fxSummary,
     closeSync,
+    liveSync,
     snapshot: {
       targetCount: snapshotJob.targetCount,
       writtenCount: 0,
@@ -342,16 +440,21 @@ async function finishRun(
     runId: result.runId,
     status,
     finishedAt: new Date(),
-    requestedCount: result.closeSync.requestedCount,
-    successCount: result.closeSync.successCount,
-    failedCount: result.closeSync.failedCount + result.snapshot.failedCount,
-    skippedCount: result.closeSync.skippedCount,
+    requestedCount:
+      result.closeSync.requestedCount + result.liveSync.requestedCount,
+    successCount: result.closeSync.successCount + result.liveSync.successCount,
+    failedCount:
+      result.closeSync.failedCount +
+      result.liveSync.failedCount +
+      result.snapshot.failedCount,
+    skippedCount: result.closeSync.skippedCount + result.liveSync.skippedCount,
     metadata: {
       snapshotDate: result.snapshotDate,
       phase: status,
       outcome: result.status,
       fx: result.fx,
       closeSync: result.closeSync,
+      liveSync: result.liveSync,
       snapshot: result.snapshot,
       blockers: result.blockers,
     },
@@ -377,6 +480,7 @@ function emptyResult(
       source: null,
     },
     closeSync: overrides.closeSync ?? emptyCloseSyncSummary(),
+    liveSync: overrides.liveSync ?? emptyLiveSyncSummary(),
     snapshot: overrides.snapshot ?? {
       targetCount: 0,
       writtenCount: 0,
@@ -398,5 +502,19 @@ function emptyCloseSyncSummary(): CloseSyncSummary {
     updatedCount: 0,
     conflictCount: 0,
     groups: [],
+  };
+}
+
+function emptyLiveSyncSummary(): LiveSyncSummary {
+  return {
+    status: "not_attempted",
+    expectedTargetCount: 0,
+    requestedCount: 0,
+    successCount: 0,
+    failedCount: 0,
+    skippedCount: 0,
+    insertedCount: 0,
+    updatedCount: 0,
+    conflictCount: 0,
   };
 }
