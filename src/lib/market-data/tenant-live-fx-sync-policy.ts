@@ -1,7 +1,7 @@
 export const TENANT_LIVE_FX_SYNC_POLICY = Object.freeze({
-  version: "tenant_live_fx_sync_v1",
+  version: "tenant_live_fx_sync_v2",
   pair: "USD/KRW",
-  provider: "er-api-open",
+  provider: "kis",
   freshnessMilliseconds: 5 * 60 * 1000,
 } as const);
 

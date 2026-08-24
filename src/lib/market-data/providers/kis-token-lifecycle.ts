@@ -8,6 +8,10 @@ export type KisReusableToken = Readonly<{
 
 export type KisTokenSession = {
   tokenCache: KisReusableToken | null;
+  tokenRequest?: Readonly<{
+    cacheKey: string;
+    promise: Promise<KisReusableToken>;
+  }> | null;
 };
 
 type IssuedKisToken = Readonly<{
@@ -36,6 +40,13 @@ export async function getReusableKisAccessToken({
   const sessionToken = session.tokenCache;
   if (isUsableToken(sessionToken, cacheKey, currentTime)) {
     return sessionToken.accessToken;
+  }
+
+  const sessionRequest = session.tokenRequest;
+  if (sessionRequest?.cacheKey === cacheKey) {
+    const token = await sessionRequest.promise;
+    session.tokenCache = token;
+    return token.accessToken;
   }
 
   if (policy === "memory_cache") {
@@ -68,6 +79,7 @@ export async function getReusableKisAccessToken({
     return token;
   });
 
+  session.tokenRequest = Object.freeze({ cacheKey, promise: request });
   if (policy === "memory_cache") inFlightTokenRequests.set(cacheKey, request);
 
   try {
@@ -75,6 +87,9 @@ export async function getReusableKisAccessToken({
     session.tokenCache = token;
     return token.accessToken;
   } finally {
+    if (session.tokenRequest?.promise === request) {
+      session.tokenRequest = null;
+    }
     if (inFlightTokenRequests.get(cacheKey) === request) {
       inFlightTokenRequests.delete(cacheKey);
     }

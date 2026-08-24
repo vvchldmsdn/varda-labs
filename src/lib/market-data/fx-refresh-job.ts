@@ -14,6 +14,7 @@ import {
 } from "@/lib/market-data/fx-refresh";
 import type {
   ExistingFxRateRow,
+  FxRateCandidate,
   FxRateActualWrite,
   FxRefreshProviderName,
 } from "@/lib/market-data/fx-refresh";
@@ -28,10 +29,26 @@ export async function runUsdKrwFxRefreshJob({
   acceptExistingVardaRow?: boolean;
 } = {}) {
   const candidate = await fetchUsdKrwFxCandidate({ provider });
+  return runUsdKrwFxCandidateJob({
+    candidate,
+    dryRun,
+    acceptExistingVardaRow,
+  });
+}
+
+export async function runUsdKrwFxCandidateJob({
+  candidate,
+  dryRun = true,
+  acceptExistingVardaRow = false,
+}: {
+  candidate: FxRateCandidate;
+  dryRun?: boolean;
+  acceptExistingVardaRow?: boolean;
+}) {
   const existingRows = await getExistingFxRows(candidate.rateDate);
   const plannedWrite = planFxRateWrite(candidate, existingRows);
   const baseResult = {
-    provider,
+    provider: candidate.provider,
     pair: candidate.pair,
     candidate: {
       rateDate: candidate.rateDate,

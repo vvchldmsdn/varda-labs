@@ -15,9 +15,16 @@ import {
 } from "@/lib/market-data/price-sync";
 import {
   createKisMarketDataProvider,
+  createKisProviderRequestSession,
+  fetchKisUsdKrwFxCandidate,
   getKisProviderPolicy,
+  type KisProviderRequestSession,
 } from "@/lib/market-data/providers/kis";
-import { runUsdKrwFxRefreshJob } from "@/lib/market-data/fx-refresh-job";
+import {
+  selectKisUsdKrwQuoteTarget,
+  type KisUsdKrwQuoteTarget,
+} from "@/lib/market-data/providers/kis-fx";
+import { runUsdKrwFxCandidateJob } from "@/lib/market-data/fx-refresh-job";
 import {
   planTenantLiveFxSync,
   type TenantLiveFxSyncPlan,
@@ -27,6 +34,7 @@ import {
   TENANT_LIVE_PRICE_SYNC_POLICY,
   type TenantLivePriceTarget,
 } from "@/lib/market-data/tenant-live-price-sync-policy";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -93,10 +101,12 @@ export async function POST(request: Request) {
       evidence: fxEvidence,
       reason,
     });
+    const kisSession = createKisProviderRequestSession();
+    const fxTarget = selectKisUsdKrwQuoteTarget({ targets, quotes });
 
     const [priceOutcome, fxOutcome] = await Promise.all([
-      refreshKisPrices(requestedTargets),
-      refreshUsdKrw(fxPlan),
+      refreshKisPrices(requestedTargets, kisSession),
+      refreshUsdKrw(fxPlan, fxTarget, kisSession),
     ]);
 
     return combinedRefreshResponse({
@@ -118,6 +128,7 @@ export async function POST(request: Request) {
 
 async function refreshKisPrices(
   requestedTargets: readonly TenantLivePriceTarget[],
+  session: KisProviderRequestSession,
 ): Promise<PriceRefreshOutcome> {
   if (requestedTargets.length === 0) {
     return priceOutcome("fresh");
@@ -141,7 +152,7 @@ async function refreshKisPrices(
       mode: "live",
       dryRun: false,
       fixture: false,
-      provider: createKisMarketDataProvider(),
+      provider: createKisMarketDataProvider(session),
       explicitTargets: [...requestedTargets],
     });
     const refreshedTargetCount = result.insertedCount + result.updatedCount;
@@ -170,16 +181,26 @@ async function refreshKisPrices(
 
 async function refreshUsdKrw(
   plan: TenantLiveFxSyncPlan,
+  target: KisUsdKrwQuoteTarget | null,
+  session: KisProviderRequestSession,
 ): Promise<FxRefreshOutcome> {
   if (plan.state === "not_required") {
     return Object.freeze({ state: "not_required" });
   }
   if (!plan.shouldRefresh) return Object.freeze({ state: "fresh" });
+  if (!target) return Object.freeze({ state: "provider_failed" });
 
   try {
-    const result = await runUsdKrwFxRefreshJob({
+    const fetchedAt = new Date();
+    const candidate = await fetchKisUsdKrwFxCandidate({
+      fetchedAt,
+      rateDate: resolveSnapshotCycle(fetchedAt).snapshotDate,
+      session,
+      target,
+    });
+    const result = await runUsdKrwFxCandidateJob({
+      candidate,
       dryRun: false,
-      provider: "er-api-open",
       acceptExistingVardaRow: true,
     });
     if (!result.ok) return Object.freeze({ state: "provider_failed" });
@@ -274,6 +295,7 @@ async function getCurrentKisQuoteEvidence(
       market: livePriceQuotes.market,
       currency: livePriceQuotes.currency,
       provider: livePriceQuotes.provider,
+      source: livePriceQuotes.source,
       status: livePriceQuotes.status,
       price: livePriceQuotes.price,
       fetchedAt: livePriceQuotes.fetchedAt,

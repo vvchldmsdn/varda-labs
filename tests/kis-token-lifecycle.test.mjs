@@ -4,6 +4,37 @@ import { describe, it } from "node:test";
 import { getReusableKisAccessToken } from "../src/lib/market-data/providers/kis-token-lifecycle.ts";
 
 describe("KIS token lifecycle", () => {
+  it("coalesces concurrent token issuance inside one request session", async () => {
+    let issueCount = 0;
+    let release;
+    const issued = new Promise((resolve) => {
+      release = resolve;
+    });
+    const session = { tokenCache: null, tokenRequest: null };
+    const options = {
+      cacheKey: "same-request-concurrent",
+      policy: "per_request",
+      session,
+      now: () => 1_000,
+      issueToken: async () => {
+        issueCount += 1;
+        await issued;
+        return { accessToken: "shared-request-token", expiresInSeconds: 3600 };
+      },
+    };
+
+    const first = getReusableKisAccessToken(options);
+    const second = getReusableKisAccessToken(options);
+    release();
+
+    assert.deepEqual(await Promise.all([first, second]), [
+      "shared-request-token",
+      "shared-request-token",
+    ]);
+    assert.equal(issueCount, 1);
+    assert.equal(session.tokenRequest, null);
+  });
+
   it("reuses one token in the same provider session", async () => {
     let issueCount = 0;
     const session = { tokenCache: null };

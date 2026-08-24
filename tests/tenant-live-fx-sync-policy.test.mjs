@@ -9,6 +9,11 @@ import {
 describe("tenant live FX sync policy", () => {
   const now = new Date("2026-08-24T11:32:00.000Z");
 
+  it("identifies KIS as the intraday USD/KRW provider", () => {
+    assert.equal(TENANT_LIVE_FX_SYNC_POLICY.version, "tenant_live_fx_sync_v2");
+    assert.equal(TENANT_LIVE_FX_SYNC_POLICY.provider, "kis");
+  });
+
   it("does not call an FX provider when the selected scope has no USD exposure", () => {
     assert.deepEqual(
       planTenantLiveFxSync({

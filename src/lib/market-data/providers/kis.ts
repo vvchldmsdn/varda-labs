@@ -24,6 +24,11 @@ import {
   getReusableKisAccessToken,
   type KisTokenSession,
 } from "./kis-token-lifecycle";
+import {
+  KIS_US_EXCHANGES,
+  parseKisUsdKrwPriceDetailResponse,
+  type KisUsdKrwQuoteTarget,
+} from "./kis-fx";
 import { redactSensitiveText } from "@/lib/redaction";
 
 export const KIS_REQUIRED_ENV_KEYS = ["KIS_APP_KEY", "KIS_APP_SECRET"] as const;
@@ -71,7 +76,7 @@ export type KisProviderPolicy = {
 type EnvReader = Record<string, string | undefined>;
 const DEFAULT_KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 const MOCK_KIS_BASE_URL = "https://openapivts.koreainvestment.com:29443";
-const US_EXCHANGES = ["NAS", "NYS", "AMS"] as const;
+const US_EXCHANGES = KIS_US_EXCHANGES;
 
 export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderPolicy {
   const missingEnvKeys = KIS_REQUIRED_ENV_KEYS.filter(
@@ -97,8 +102,19 @@ export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderP
   };
 }
 
-export function createKisMarketDataProvider(): MarketDataProvider {
-  const session: KisProviderSession = { tokenCache: null };
+export type KisProviderRequestSession = KisTokenSession;
+
+type KisProviderSession = KisProviderRequestSession;
+
+export function createKisProviderRequestSession(): KisProviderRequestSession {
+  return { tokenCache: null, tokenRequest: null };
+}
+
+export function createKisMarketDataProvider(
+  requestSession?: KisProviderRequestSession,
+): MarketDataProvider {
+  const session: KisProviderSession =
+    requestSession ?? createKisProviderRequestSession();
 
   return {
     name: "kis",
@@ -115,7 +131,66 @@ export function createKisMarketDataProvider(): MarketDataProvider {
   };
 }
 
-type KisProviderSession = KisTokenSession;
+export async function fetchKisUsdKrwFxCandidate({
+  fetchedAt = new Date(),
+  rateDate,
+  session = createKisProviderRequestSession(),
+  target,
+}: {
+  fetchedAt?: Date;
+  rateDate: string;
+  session?: KisProviderRequestSession;
+  target: KisUsdKrwQuoteTarget;
+}) {
+  const config = getKisConfig();
+  if (!config) throw new Error("KIS provider is not configured");
+
+  const ticker = target.ticker.trim().toUpperCase();
+  if (!ticker) throw new Error("KIS USD/KRW quote target is missing");
+
+  const token = await getKisAccessToken(config, session);
+  const exchanges = target.exchange ? [target.exchange] : [...US_EXCHANGES];
+  const errors: string[] = [];
+
+  for (const [index, exchange] of exchanges.entries()) {
+    try {
+      const params = new URLSearchParams({
+        AUTH: "",
+        EXCD: exchange,
+        SYMB: ticker,
+      });
+      const response = await fetch(
+        `${config.baseUrl}/uapi/overseas-price/v1/quotations/price-detail?${params}`,
+        {
+          headers: kisHeaders(config, token, "HHDFS76200200"),
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      const data = await readKisJson(
+        response,
+        `overseas-price-detail:${ticker}:${exchange}`,
+      );
+      const parsed = response.ok
+        ? parseKisUsdKrwPriceDetailResponse(data, {
+            exchange,
+            fetchedAt,
+            rateDate,
+          })
+        : { ok: false as const, error: `provider_http_${response.status}` };
+
+      if (parsed.ok) return parsed.candidate;
+      errors.push(`${exchange}:${parsed.error}`);
+    } catch (error) {
+      errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
+    }
+
+    if (index < exchanges.length - 1) await sleep(180);
+  }
+
+  throw new Error(
+    `KIS USD/KRW quote returned no usable rate (${ticker}): ${errors.join(" / ")}`,
+  );
+}
 
 async function fetchKisLiveQuotes(
   targets: PriceLookupTarget[],

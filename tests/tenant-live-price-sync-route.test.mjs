@@ -17,7 +17,12 @@ describe("tenant live price sync route boundary", () => {
     assert.match(route, /runMarketPriceSync/);
     assert.match(route, /explicitTargets: \[\.\.\.requestedTargets\]/);
     assert.match(route, /planTenantLiveFxSync/);
-    assert.match(route, /runUsdKrwFxRefreshJob/);
+    assert.match(route, /createKisProviderRequestSession/);
+    assert.match(route, /createKisMarketDataProvider\(session\)/);
+    assert.match(route, /fetchKisUsdKrwFxCandidate/);
+    assert.match(route, /runUsdKrwFxCandidateJob/);
+    assert.match(route, /selectKisUsdKrwQuoteTarget/);
+    assert.doesNotMatch(route, /runUsdKrwFxRefreshJob|er-api-open/);
     assert.match(route, /Promise\.all/);
     assert.match(route, /request\.headers\.get\("origin"\) !== url\.origin/);
     assert.match(route, /"Cache-Control": "no-store"/);
