@@ -415,6 +415,7 @@ export async function getPortfolioDashboard(
     costBasisKrw + realizedCostBasisKrw,
   );
   const holdingHistory = buildPortfolioDashboardHoldingHistory({
+    currentDate: movementCycle.snapshotDate,
     holdings,
     rows: recentPositionRows,
   });

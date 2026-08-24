@@ -25,6 +25,11 @@ export type PortfolioDashboardHistoryHolding = Readonly<{
   ticker: string | null;
   account: string;
   currentWeight: number;
+  valueKrw?: number;
+  dailyChangeKrw?: number | null;
+  dailyReturnPct?: number | null;
+  priceDailyChangeKrw?: number | null;
+  fxDailyChangeKrw?: number | null;
 }>;
 
 export type PortfolioDashboardHeatmapCell = Readonly<{
@@ -34,7 +39,7 @@ export type PortfolioDashboardHeatmapCell = Readonly<{
   changeKrw: number | null;
   priceChangeKrw: number | null;
   fxChangeKrw: number | null;
-  basis: "unit_value" | "market_value" | "missing";
+  basis: "live_movement" | "unit_value" | "market_value" | "missing";
 }>;
 
 export type PortfolioDashboardHeatmapRow = Readonly<{
@@ -62,11 +67,13 @@ export type PortfolioDashboardPositionTrendPoint = Readonly<{
 }>;
 
 export function buildPortfolioDashboardHoldingHistory({
+  currentDate,
   holdings,
   maxDates = 31,
   maxRows,
   rows,
 }: {
+  currentDate?: string;
   holdings: readonly PortfolioDashboardHistoryHolding[];
   maxDates?: number;
   maxRows?: number;
@@ -77,7 +84,10 @@ export function buildPortfolioDashboardHoldingHistory({
     : holdings.slice(0, Math.max(0, maxRows));
   const selectedHoldingIds = new Set(selectedHoldings.map((holding) => holding.id));
   const preferred = preferredPositionRows(rows, selectedHoldingIds);
-  const observedDates = [...new Set([...preferred.values()].map((row) => row.snapshotDate))]
+  const observedDates = [...new Set([
+    ...[...preferred.values()].map((row) => row.snapshotDate),
+    ...(isIsoDate(currentDate) ? [currentDate] : []),
+  ])]
     .sort((left, right) => left.localeCompare(right));
   const dates = continuousDateWindow(observedDates, maxDates);
 
@@ -89,6 +99,14 @@ export function buildPortfolioDashboardHoldingHistory({
     account: holding.account,
     currentWeight: holding.currentWeight,
     cells: dates.map((date) => {
+      const liveCell = date === currentDate
+        ? currentMovementCell(date, holding)
+        : null;
+      if (liveCell) {
+        observedCellCount += 1;
+        return liveCell;
+      }
+
       const row = preferred.get(positionRowKey(date, holding.id));
       const unitValueChangePct = toNumber(row?.unitValueChangePct);
       const marketValueChangePct = toNumber(row?.marketValueChangePct);
@@ -127,6 +145,29 @@ export function buildPortfolioDashboardHoldingHistory({
   });
 }
 
+function currentMovementCell(
+  date: string,
+  holding: PortfolioDashboardHistoryHolding,
+): PortfolioDashboardHeatmapCell | null {
+  const changePct = toNumber(holding.dailyReturnPct);
+  const changeKrw = toNumber(holding.dailyChangeKrw);
+  const marketValueKrw = toNumber(holding.valueKrw);
+
+  if (changePct === null || changeKrw === null || marketValueKrw === null) {
+    return null;
+  }
+
+  return Object.freeze({
+    date,
+    changePct,
+    marketValueKrw,
+    changeKrw,
+    priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
+    fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
+    basis: "live_movement" as const,
+  });
+}
+
 function continuousDateWindow(observedDates: readonly string[], maxDates: number) {
   const latest = observedDates.at(-1);
   const earliest = observedDates[0];
@@ -145,6 +186,10 @@ function continuousDateWindow(observedDates: readonly string[], maxDates: number
 function shiftIsoDate(value: string, dayDelta: number) {
   const timestamp = Date.parse(`${value}T00:00:00Z`);
   return new Date(timestamp + dayDelta * 86_400_000).toISOString().slice(0, 10);
+}
+
+function isIsoDate(value: string | undefined): value is string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value ?? "");
 }
 
 export function buildPortfolioDashboardPositionTrend({

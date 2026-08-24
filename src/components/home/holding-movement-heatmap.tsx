@@ -98,6 +98,7 @@ export function HoldingMovementHeatmap({
               {formatDate(selectedCell.date)}
               {selectedRow.ticker ? ` · ${selectedRow.ticker}` : ""}
               {selectedCell.basis === "market_value" ? " · 평가액 변동 근거" : ""}
+              {selectedCell.basis === "live_movement" ? " · 실시간 변동 근거" : ""}
             </p>
           </div>
           <dl className="grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-5">

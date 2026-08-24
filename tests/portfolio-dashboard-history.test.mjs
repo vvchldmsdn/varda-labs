@@ -155,6 +155,58 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[0]?.cells[1]?.basis, "missing");
     assert.equal(result.rows[2]?.cells.every((cell) => cell.basis === "missing"), true);
   });
+
+  it("uses live movement for the current service date without rewriting history", () => {
+    const currentHoldings = [
+      {
+        ...holdings[0],
+        valueKrw: 1_300_000,
+        dailyChangeKrw: 30_000,
+        dailyReturnPct: 2.3622,
+        priceDailyChangeKrw: 24_000,
+        fxDailyChangeKrw: 6_000,
+      },
+      {
+        ...holdings[1],
+        valueKrw: 900_000,
+        dailyChangeKrw: 0,
+        dailyReturnPct: 0,
+        priceDailyChangeKrw: 0,
+        fxDailyChangeKrw: 0,
+      },
+    ];
+    const result = buildPortfolioDashboardHoldingHistory({
+      currentDate: "2026-08-24",
+      holdings: currentHoldings,
+      maxDates: 2,
+      rows: [
+        row({
+          snapshotDate: "2026-08-23",
+          assetId: "asset-kodex",
+          unitValueChangePct: -1,
+        }),
+        row({
+          snapshotDate: "2026-08-24",
+          assetId: "asset-kodex",
+          unitValueChangePct: -9,
+        }),
+      ],
+    });
+
+    assert.deepEqual(result.dates, ["2026-08-23", "2026-08-24"]);
+    assert.equal(result.rows[0]?.cells[0]?.changePct, -1);
+    assert.deepEqual(result.rows[0]?.cells[1], {
+      date: "2026-08-24",
+      changePct: 2.3622,
+      marketValueKrw: 1_300_000,
+      changeKrw: 30_000,
+      priceChangeKrw: 24_000,
+      fxChangeKrw: 6_000,
+      basis: "live_movement",
+    });
+    assert.equal(result.rows[1]?.cells[1]?.changePct, 0);
+    assert.equal(result.rows[1]?.cells[1]?.basis, "live_movement");
+  });
 });
 
 function row(overrides) {
