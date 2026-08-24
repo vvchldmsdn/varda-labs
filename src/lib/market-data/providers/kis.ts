@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import type {
   ClosePrice,
   HistoricalPriceFailure,
@@ -18,6 +20,10 @@ import {
   planKisRawHistoryRequests,
   type KisHistoryWindow,
 } from "./kis-history";
+import {
+  getReusableKisAccessToken,
+  type KisTokenSession,
+} from "./kis-token-lifecycle";
 import { redactSensitiveText } from "@/lib/redaction";
 
 export const KIS_REQUIRED_ENV_KEYS = ["KIS_APP_KEY", "KIS_APP_SECRET"] as const;
@@ -36,11 +42,6 @@ type KisConfig = {
   appSecret: string;
   baseUrl: string;
   tokenPolicy: KisTokenPolicy;
-};
-
-type KisTokenCache = {
-  accessToken: string;
-  expiresAt: number;
 };
 
 type KisHistoryRow = {
@@ -71,7 +72,6 @@ type EnvReader = Record<string, string | undefined>;
 const DEFAULT_KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 const MOCK_KIS_BASE_URL = "https://openapivts.koreainvestment.com:29443";
 const US_EXCHANGES = ["NAS", "NYS", "AMS"] as const;
-let memoryTokenCache: KisTokenCache | null = null;
 
 export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderPolicy {
   const missingEnvKeys = KIS_REQUIRED_ENV_KEYS.filter(
@@ -89,8 +89,9 @@ export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderP
     storesSecretsInDatabase: false,
     notes: [
       "KIS app key, app secret, and access tokens must not be stored in Postgres settings or market_data_sync_runs metadata.",
-      "per_request token policy is the safest first implementation because it persists no token.",
-      "memory_cache token policy may reuse tokens only inside a warm server instance and must tolerate cold-start refetches.",
+      "memory_cache reuses an unexpired token inside a warm server instance and coalesces concurrent token requests.",
+      "per_request remains available as an explicit troubleshooting policy.",
+      "serverless cold starts and separate instances may still obtain separate tokens.",
       "Vercel KV or another external secret store can be considered later, but is not required for the first KIS adapter.",
     ],
   };
@@ -114,9 +115,7 @@ export function createKisMarketDataProvider(): MarketDataProvider {
   };
 }
 
-type KisProviderSession = {
-  tokenCache: KisTokenCache | null;
-};
+type KisProviderSession = KisTokenSession;
 
 async function fetchKisLiveQuotes(
   targets: PriceLookupTarget[],
@@ -445,20 +444,19 @@ async function getKisAccessToken(
   config: KisConfig,
   session: KisProviderSession,
 ) {
-  const now = Date.now();
-  if (session.tokenCache && session.tokenCache.expiresAt > now + 60_000) {
-    return session.tokenCache.accessToken;
-  }
+  const cacheKey = createHash("sha256")
+    .update(`${config.baseUrl}\u0000${config.appKey}`)
+    .digest("hex");
 
-  if (
-    config.tokenPolicy === "memory_cache" &&
-    memoryTokenCache &&
-    memoryTokenCache.expiresAt > now + 60_000
-  ) {
-    session.tokenCache = memoryTokenCache;
-    return memoryTokenCache.accessToken;
-  }
+  return getReusableKisAccessToken({
+    cacheKey,
+    policy: config.tokenPolicy,
+    session,
+    issueToken: () => issueKisAccessToken(config),
+  });
+}
 
+async function issueKisAccessToken(config: KisConfig) {
   const response = await fetch(`${config.baseUrl}/oauth2/tokenP`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -478,16 +476,10 @@ async function getKisAccessToken(
     );
   }
 
-  const expiresInSeconds = toNumber(data.expires_in) ?? 23 * 60 * 60;
-  session.tokenCache = {
+  return {
     accessToken: token,
-    expiresAt: now + expiresInSeconds * 1000,
+    expiresInSeconds: toNumber(data.expires_in) ?? 23 * 60 * 60,
   };
-  if (config.tokenPolicy === "memory_cache") {
-    memoryTokenCache = session.tokenCache;
-  }
-
-  return token;
 }
 
 async function fetchKoreanHistoryWindow(options: {
@@ -1061,8 +1053,8 @@ function sleep(ms: number) {
 
 function parseTokenPolicy(value: string | undefined): KisTokenPolicy {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === "memory_cache") return "memory_cache";
-  return "per_request";
+  if (normalized === "per_request") return "per_request";
+  return "memory_cache";
 }
 
 function hasEnvValue(value: string | undefined) {

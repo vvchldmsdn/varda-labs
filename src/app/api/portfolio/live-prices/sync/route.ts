@@ -1,11 +1,11 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/db/client";
 import { getTenantLivePriceTargets } from "@/db/queries/tenant-live-price-targets";
-import { livePriceQuotes } from "@/db/schema";
+import { fxRates, livePriceQuotes } from "@/db/schema";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
   getKisPriceSyncCooldownStatus,
@@ -17,6 +17,11 @@ import {
   createKisMarketDataProvider,
   getKisProviderPolicy,
 } from "@/lib/market-data/providers/kis";
+import { runUsdKrwFxRefreshJob } from "@/lib/market-data/fx-refresh-job";
+import {
+  planTenantLiveFxSync,
+  type TenantLiveFxSyncPlan,
+} from "@/lib/market-data/tenant-live-fx-sync-policy";
 import {
   planTenantLivePriceSync,
   TENANT_LIVE_PRICE_SYNC_POLICY,
@@ -28,6 +33,24 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type RefreshReason = "page_view" | "manual";
+type PriceRefreshState =
+  | "fresh"
+  | "synced"
+  | "partial"
+  | "cooldown"
+  | "provider_unavailable"
+  | "provider_failed";
+type FxRefreshState = "not_required" | "fresh" | "synced" | "provider_failed";
+
+type PriceRefreshOutcome = Readonly<{
+  state: PriceRefreshState;
+  requestedTargetCount: number;
+  refreshedTargetCount: number;
+  failedTargetCount: number;
+  retryAfterSeconds: number | null;
+}>;
+
+type FxRefreshOutcome = Readonly<{ state: FxRefreshState }>;
 
 export async function POST(request: Request) {
   const reason = await readRefreshReason(request);
@@ -58,63 +81,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const quotes = await getCurrentKisQuoteEvidence(targets);
+    const [quotes, fxEvidence] = await Promise.all([
+      getCurrentKisQuoteEvidence(targets),
+      getCurrentUsdKrwEvidence(),
+    ]);
     const plan = planTenantLivePriceSync({ targets, quotes });
     const requestedTargets =
       reason === "manual" ? plan.targets : plan.staleTargets;
-
-    if (requestedTargets.length === 0) {
-      return response({
-        state: "fresh",
-        targetCount: plan.targets.length,
-        freshTargetCount: plan.freshTargetCount,
-        refreshedTargetCount: 0,
-      });
-    }
-
-    const providerPolicy = getKisProviderPolicy();
-    if (!providerPolicy.configured) {
-      return response({ state: "provider_unavailable" }, 503);
-    }
-
-    const cooldown = await getKisPriceSyncCooldownStatus("live");
-    if (cooldown.active) {
-      return response(
-        {
-          state: "cooldown",
-          retryAfterSeconds: cooldown.retryAfterSeconds,
-        },
-        429,
-        { "Retry-After": String(cooldown.retryAfterSeconds) },
-      );
-    }
-
-    const result = await runMarketPriceSync({
-      mode: "live",
-      dryRun: false,
-      fixture: false,
-      provider: createKisMarketDataProvider(),
-      explicitTargets: requestedTargets,
+    const fxPlan = planTenantLiveFxSync({
+      currencies: targets.map((target) => target.currency),
+      evidence: fxEvidence,
+      reason,
     });
-    const refreshedTargetCount = result.insertedCount + result.updatedCount;
 
-    if (refreshedTargetCount === 0) {
-      return response(
-        {
-          state: "provider_failed",
-          requestedTargetCount: result.requestedCount,
-          failedTargetCount: result.failedCount,
-        },
-        502,
-      );
-    }
+    const [priceOutcome, fxOutcome] = await Promise.all([
+      refreshKisPrices(requestedTargets),
+      refreshUsdKrw(fxPlan),
+    ]);
 
-    return response({
-      state: result.failedCount > 0 ? "partial" : "synced",
+    return combinedRefreshResponse({
+      freshTargetCount: plan.freshTargetCount,
+      fxOutcome,
+      priceOutcome,
       targetCount: plan.targets.length,
-      requestedTargetCount: result.requestedCount,
-      refreshedTargetCount,
-      failedTargetCount: result.failedCount,
     });
   } catch (error) {
     if (error instanceof PriceSyncRequestError) {
@@ -125,6 +114,153 @@ export async function POST(request: Request) {
     }
     return response({ state: "service_unavailable" }, 503);
   }
+}
+
+async function refreshKisPrices(
+  requestedTargets: readonly TenantLivePriceTarget[],
+): Promise<PriceRefreshOutcome> {
+  if (requestedTargets.length === 0) {
+    return priceOutcome("fresh");
+  }
+
+  const providerPolicy = getKisProviderPolicy();
+  if (!providerPolicy.configured) {
+    return priceOutcome("provider_unavailable", requestedTargets.length);
+  }
+
+  const cooldown = await getKisPriceSyncCooldownStatus("live");
+  if (cooldown.active) {
+    return Object.freeze({
+      ...priceOutcome("cooldown", requestedTargets.length),
+      retryAfterSeconds: cooldown.retryAfterSeconds,
+    });
+  }
+
+  try {
+    const result = await runMarketPriceSync({
+      mode: "live",
+      dryRun: false,
+      fixture: false,
+      provider: createKisMarketDataProvider(),
+      explicitTargets: [...requestedTargets],
+    });
+    const refreshedTargetCount = result.insertedCount + result.updatedCount;
+
+    if (refreshedTargetCount === 0) {
+      return Object.freeze({
+        ...priceOutcome("provider_failed", result.requestedCount),
+        failedTargetCount: result.failedCount,
+      });
+    }
+
+    return Object.freeze({
+      state: result.failedCount > 0 ? "partial" : "synced",
+      requestedTargetCount: result.requestedCount,
+      refreshedTargetCount,
+      failedTargetCount: result.failedCount,
+      retryAfterSeconds: null,
+    });
+  } catch (error) {
+    if (error instanceof PriceSyncRequestError || error instanceof PriceSyncError) {
+      return priceOutcome("provider_failed", requestedTargets.length);
+    }
+    throw error;
+  }
+}
+
+async function refreshUsdKrw(
+  plan: TenantLiveFxSyncPlan,
+): Promise<FxRefreshOutcome> {
+  if (plan.state === "not_required") {
+    return Object.freeze({ state: "not_required" });
+  }
+  if (!plan.shouldRefresh) return Object.freeze({ state: "fresh" });
+
+  try {
+    const result = await runUsdKrwFxRefreshJob({
+      dryRun: false,
+      provider: "er-api-open",
+      acceptExistingVardaRow: true,
+    });
+    if (!result.ok) return Object.freeze({ state: "provider_failed" });
+    return Object.freeze({
+      state: result.status === "written" ? "synced" : "fresh",
+    });
+  } catch {
+    return Object.freeze({ state: "provider_failed" });
+  }
+}
+
+function priceOutcome(
+  state: PriceRefreshState,
+  requestedTargetCount = 0,
+): PriceRefreshOutcome {
+  return Object.freeze({
+    state,
+    requestedTargetCount,
+    refreshedTargetCount: 0,
+    failedTargetCount: 0,
+    retryAfterSeconds: null,
+  });
+}
+
+function combinedRefreshResponse({
+  freshTargetCount,
+  fxOutcome,
+  priceOutcome: prices,
+  targetCount,
+}: {
+  freshTargetCount: number;
+  fxOutcome: FxRefreshOutcome;
+  priceOutcome: PriceRefreshOutcome;
+  targetCount: number;
+}) {
+  const details = {
+    targetCount,
+    freshTargetCount,
+    requestedTargetCount: prices.requestedTargetCount,
+    refreshedTargetCount: prices.refreshedTargetCount,
+    failedTargetCount: prices.failedTargetCount,
+    priceState: prices.state,
+    fxState: fxOutcome.state,
+  };
+  const priceChanged = prices.state === "synced" || prices.state === "partial";
+  const fxChanged = fxOutcome.state === "synced";
+  const hasFailure =
+    prices.state === "provider_unavailable" ||
+    prices.state === "provider_failed" ||
+    fxOutcome.state === "provider_failed";
+
+  if (prices.state === "cooldown" && !fxChanged) {
+    const retryAfterSeconds = prices.retryAfterSeconds ?? 1;
+    return response(
+      { state: "cooldown", retryAfterSeconds, ...details },
+      429,
+      { "Retry-After": String(retryAfterSeconds) },
+    );
+  }
+
+  if (hasFailure && !priceChanged && !fxChanged) {
+    return response(
+      {
+        state:
+          prices.state === "provider_unavailable"
+            ? "provider_unavailable"
+            : "provider_failed",
+        ...details,
+      },
+      prices.state === "provider_unavailable" ? 503 : 502,
+    );
+  }
+
+  if (hasFailure || prices.state === "partial" || prices.state === "cooldown") {
+    return response({ state: "partial", ...details });
+  }
+
+  return response({
+    state: priceChanged || fxChanged ? "synced" : "fresh",
+    ...details,
+  });
 }
 
 async function getCurrentKisQuoteEvidence(
@@ -149,6 +285,31 @@ async function getCurrentKisQuoteEvidence(
         inArray(livePriceQuotes.ticker, tickers),
       ),
     );
+}
+
+async function getCurrentUsdKrwEvidence() {
+  const [row] = await db
+    .select({
+      usdKrw: fxRates.usdKrw,
+      status: fxRates.status,
+      fetchedAt: fxRates.fetchedAt,
+    })
+    .from(fxRates)
+    .where(
+      and(
+        eq(fxRates.isSample, false),
+        eq(sql<string>`lower(trim(${fxRates.status}))`, "ok"),
+        sql`${fxRates.usdKrw} > 0`,
+      ),
+    )
+    .orderBy(
+      sql`${fxRates.fetchedAt} desc nulls last`,
+      desc(fxRates.rateDate),
+      desc(fxRates.createdAt),
+    )
+    .limit(1);
+
+  return row ?? null;
 }
 
 async function readRefreshReason(request: Request): Promise<RefreshReason | null> {

@@ -15,7 +15,10 @@ describe("tenant live price sync route boundary", () => {
     assert.match(route, /planTenantLivePriceSync/);
     assert.match(route, /getKisPriceSyncCooldownStatus\("live"\)/);
     assert.match(route, /runMarketPriceSync/);
-    assert.match(route, /explicitTargets: requestedTargets/);
+    assert.match(route, /explicitTargets: \[\.\.\.requestedTargets\]/);
+    assert.match(route, /planTenantLiveFxSync/);
+    assert.match(route, /runUsdKrwFxRefreshJob/);
+    assert.match(route, /Promise\.all/);
     assert.match(route, /request\.headers\.get\("origin"\) !== url\.origin/);
     assert.match(route, /"Cache-Control": "no-store"/);
     assert.doesNotMatch(route, /KIS_APP_KEY|KIS_APP_SECRET|ownerUserId\s*:/);
