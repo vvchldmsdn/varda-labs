@@ -26,6 +26,7 @@ import {
   dailyPositionSnapshots,
   eventLedgerEntries,
   fxRates,
+  livePriceQuotes,
   marketRegimeDaily,
   type Asset,
   type AssetGroup,
@@ -79,6 +80,10 @@ import {
   type SnapshotAccount,
 } from "@/lib/snapshots/account-target";
 import { isSnapshotInvestmentAssetType } from "@/lib/snapshots/investment-eligibility";
+import {
+  SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS,
+  selectSnapshotCutoffQuote,
+} from "@/lib/snapshots/cutoff-valuation";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const SNAPSHOT_SOURCE = "varda_manual_daily_snapshot";
@@ -101,6 +106,7 @@ type SnapshotWriteAction = "insert" | "update" | "skip" | "blocked";
 type AssetRow = Asset;
 type AssetGroupRow = AssetGroup;
 type PriceRow = AssetPriceSnapshot;
+type LivePriceRow = typeof livePriceQuotes.$inferSelect;
 type PositionRow = DailyPositionSnapshot;
 type PortfolioRow = DailyPortfolioSnapshot;
 
@@ -116,6 +122,7 @@ export type DailySnapshotRunResult = {
   closeReferences: CloseReferenceSummary[];
   freshClose: FreshCloseSummary;
   closeSyncPlan: CloseSyncPlan;
+  cutoffValuation: CutoffValuationSummary;
   realizedReturn: RealizedReturnRunSummary;
   plannedWrites: PlannedSnapshotWrites;
   results: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan>;
@@ -168,6 +175,22 @@ type FreshCloseSummary = {
   closeReferences: CloseReferenceSummary[];
   coverage: CloseCoverageAsset[];
   missing: MissingCloseAsset[];
+};
+
+type CutoffValuationSummary = {
+  policy: "fresh_kis_live_quote_else_official_close";
+  maxQuoteAgeMinutes: number;
+  requiredCount: number;
+  observedCount: number;
+  fallbackCount: number;
+  missing: ReadonlyArray<{
+    assetId: string;
+    ticker: string;
+    name: string;
+    account: string;
+    market: string;
+    currency: string;
+  }>;
 };
 
 type CloseReferenceSummary = {
@@ -361,7 +384,7 @@ type PriceSelection = {
   referenceDate: string | null;
   calendarReferenceDate: string | null;
   expectedCloseDate: string | null;
-  basis: "close" | "manual_current";
+  basis: "cutoff_live" | "close" | "manual_current";
   fromCloseSnapshot: boolean;
 };
 
@@ -532,8 +555,15 @@ export async function runDailySnapshot(
     assets: selectedAssets,
     ownerUserId,
     manualValuation: provenance.manualValuation,
+    capturedAt: cycle.capturedAt,
+    useCutoffValuation: !provenance.insertOnly,
   });
   const freshClose = summarizeFreshClose(selectedAssets, closeContext, snapshotDate);
+  const cutoffValuation = summarizeCutoffValuation({
+    selectedAssets,
+    closeContext,
+    required: !provenance.insertOnly,
+  });
   const closeSyncPlan = buildCloseSyncPlan({
     snapshotDate,
     selectedAssets,
@@ -552,6 +582,15 @@ export async function runDailySnapshot(
       "missing_fresh_closes",
       "Fresh close prices are required before writing a daily snapshot",
       { snapshotDate, missingCloseAssets: freshClose.missing },
+      409,
+    );
+  }
+
+  if (!dryRun && cutoffValuation.missing.length > 0) {
+    throw new DailySnapshotRequestError(
+      "missing_fresh_cutoff_quotes",
+      "Fresh KIS cutoff quotes are required before writing the current daily snapshot",
+      { snapshotDate, missingCutoffAssets: cutoffValuation.missing },
       409,
     );
   }
@@ -683,6 +722,7 @@ export async function runDailySnapshot(
     closeReferences: closeContext.closeReferences,
     freshClose,
     closeSyncPlan,
+    cutoffValuation,
     realizedReturn,
     plannedWrites,
     results: resultMap,
@@ -904,7 +944,7 @@ function buildAllAccountPlan({
             `source=${provenance.source}`,
             "source_basis=account_position_sums",
             `accounts=${completed.length}`,
-            "valuation_basis=close_price",
+            `valuation_basis=${portfolioValuationBasis(provenance)}`,
             `fx_source=${fx.source}`,
             "return_basis=unrealized_plus_event_ledger_realized_v1",
             `open_cost_krw=${Math.round(openCostKrw)}`,
@@ -1032,7 +1072,10 @@ function computeAccountSnapshot({
 
   const positions = assets.map((asset) => {
     const selectedPrice = selectPriceForAsset(asset, closeContext);
-    const closePrice = selectedPrice.price;
+    const selectedClose = selectOfficialCloseForAsset(asset, closeContext);
+    const valuationPrice = selectedPrice.price;
+    const officialClosePrice =
+      selectedClose.price > 0 ? selectedClose.price : valuationPrice;
     const fxResolution = resolveKrwFxRate(asset.currency, fx.usdKrw);
     const fxRate = fxResolution.ok ? fxResolution.rate : 0;
     const prior = priorByAssetId.get(asset.id) ?? null;
@@ -1043,11 +1086,11 @@ function computeAccountSnapshot({
     const estimatedFractionalQuantity =
       provenance.insertOnly && priorFractionalQuantity !== null
         ? priorFractionalQuantity
-        : fractionalKrwValue > 0 && closePrice > 0 && fxRate > 0
-        ? fractionalKrwValue / (closePrice * fxRate)
+        : fractionalKrwValue > 0 && valuationPrice > 0 && fxRate > 0
+        ? fractionalKrwValue / (valuationPrice * fxRate)
         : 0;
     const totalQuantity = quantity + estimatedFractionalQuantity;
-    const marketValueLocal = totalQuantity * closePrice;
+    const marketValueLocal = totalQuantity * valuationPrice;
     const marketValueKrw = marketValueLocal * fxRate;
     const currentWeight = percentOrZero(marketValueKrw, totalMarketValue);
     const group = asset.groupId ? context.groupsById.get(asset.groupId) : null;
@@ -1070,7 +1113,7 @@ function computeAccountSnapshot({
         ? previousUnitPrice * previousFxRate
         : null);
     const previousMarketValueKrw = toNumber(prior?.marketValueKrw);
-    const unitValueKrw = closePrice * fxRate;
+    const unitValueKrw = valuationPrice * fxRate;
     const unitValueChangeKrw =
       previousUnitValueKrw && previousUnitValueKrw > 0
         ? unitValueKrw - previousUnitValueKrw
@@ -1085,7 +1128,7 @@ function computeAccountSnapshot({
       previousUnitPrice && previousUnitPrice > 0 && previousFxRate && previousFxRate > 0
         ? calculateFxAwarePositionMovementKrw({
             marketExposedQuantity: movementQuantity,
-            currentPrice: closePrice,
+            currentPrice: valuationPrice,
             previousPrice: previousUnitPrice,
             currentFxRate: fxRate,
             previousFxRate,
@@ -1146,6 +1189,7 @@ function computeAccountSnapshot({
         `source=${provenance.source}`,
         `price_basis=${selectedPrice.basis}`,
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
+        `close_source=${selectedClose.source}${selectedClose.referenceDate ? `@${selectedClose.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
         "cost_basis_source=asset_average_cost_fallback",
         ...provenance.descriptionTags,
@@ -1156,9 +1200,9 @@ function computeAccountSnapshot({
       totalQuantity: decimal(totalQuantity, 8),
       estimatedFractionalQuantity: decimal(estimatedFractionalQuantity, 8),
       avgCost: decimal(toNumber(asset.averageCost)),
-      currentPrice: decimal(closePrice),
-      closePrice: decimal(closePrice),
-      unitPrice: decimal(closePrice),
+      currentPrice: decimal(valuationPrice),
+      closePrice: decimal(officialClosePrice),
+      unitPrice: decimal(valuationPrice),
       unitValueKrw: decimal(unitValueKrw),
       marketValueLocal: decimal(marketValueLocal),
       marketValueKrw: decimal(marketValueKrw),
@@ -1267,7 +1311,7 @@ function buildPortfolioSnapshot(
       "snapshot_status=complete",
       `source=${computed.provenance.source}`,
       `expected_positions=${computed.positions.length}`,
-      "valuation_basis=close_price",
+      `valuation_basis=${portfolioValuationBasis(computed.provenance)}`,
       `fx_source=${fx.source}`,
       "return_basis=unrealized_plus_event_ledger_realized_v1",
       `open_cost_krw=${Math.round(computed.openCostKrw)}`,
@@ -1602,6 +1646,7 @@ async function resolveSnapshotFx(
 type CloseContext = {
   rowsByInstrument: Map<string, PriceRow[]>;
   selectedByAssetId: Map<string, PriceSelection>;
+  valuationByAssetId: Map<string, PriceSelection>;
   referencesByMarket: Map<string, CloseReferenceSummary>;
   closeReferences: CloseReferenceSummary[];
   manualCarryMissing: ReadonlyArray<{
@@ -1616,11 +1661,15 @@ async function buildCloseContext({
   assets: targetAssets,
   ownerUserId,
   manualValuation,
+  capturedAt,
+  useCutoffValuation,
 }: {
   snapshotDate: string;
   assets: AssetRow[];
   ownerUserId: string;
   manualValuation: SnapshotWritePolicySummary["manualValuation"];
+  capturedAt: Date;
+  useCutoffValuation: boolean;
 }): Promise<CloseContext> {
   const instruments = targetAssets.map(({ market, currency, ticker }) => ({
     market,
@@ -1637,6 +1686,27 @@ async function buildCloseContext({
           .limit(Math.max(400, instruments.length * 40))
       : [];
   const rowsByInstrument = groupPriceRowsByInstrument(priceRows);
+  const liveTickers = uniqueStrings(
+    targetAssets
+      .map((asset) => normalizeTicker(asset.ticker))
+      .filter((ticker): ticker is string => Boolean(ticker)),
+  );
+  const liveRows: LivePriceRow[] =
+    useCutoffValuation && liveTickers.length > 0
+      ? await db
+          .select()
+          .from(livePriceQuotes)
+          .where(
+            and(
+              eq(livePriceQuotes.provider, "kis"),
+              eq(livePriceQuotes.status, "ok"),
+              inArray(livePriceQuotes.ticker, liveTickers),
+              lte(livePriceQuotes.fetchedAt, capturedAt),
+            ),
+          )
+          .orderBy(desc(livePriceQuotes.fetchedAt))
+          .limit(Math.max(100, liveTickers.length * 4))
+      : [];
 
   const closeReferences = buildCloseReferences(
     targetAssets,
@@ -1666,25 +1736,87 @@ async function buildCloseContext({
           }))
       : [];
   const selectedByAssetId = new Map<string, PriceSelection>();
+  const valuationByAssetId = new Map<string, PriceSelection>();
   for (const asset of targetAssets) {
-    selectedByAssetId.set(
-      asset.id,
+    const closeSelection =
       manualCarryByAssetId.get(asset.id) ??
         selectClosePriceForAsset(
           asset,
           snapshotDate,
           rowsByInstrument,
           referencesByMarket,
-        ),
+        );
+    selectedByAssetId.set(asset.id, closeSelection);
+
+    const cutoffQuote = useCutoffValuation
+      ? selectSnapshotCutoffQuote({
+          instrument: asset,
+          rows: liveRows,
+          capturedAt,
+        })
+      : null;
+    valuationByAssetId.set(
+      asset.id,
+      cutoffQuote
+        ? {
+            row: null,
+            price: cutoffQuote.price,
+            source: cutoffQuote.row.source,
+            referenceDate: dateFromTimestamp(cutoffQuote.referenceAt),
+            calendarReferenceDate: closeSelection.calendarReferenceDate,
+            expectedCloseDate: closeSelection.expectedCloseDate,
+            basis: "cutoff_live",
+            fromCloseSnapshot: false,
+          }
+        : closeSelection,
     );
   }
 
   return {
     rowsByInstrument,
     selectedByAssetId,
+    valuationByAssetId,
     referencesByMarket,
     closeReferences,
     manualCarryMissing,
+  };
+}
+
+function summarizeCutoffValuation({
+  selectedAssets,
+  closeContext,
+  required,
+}: {
+  selectedAssets: AssetRow[];
+  closeContext: CloseContext;
+  required: boolean;
+}): CutoffValuationSummary {
+  const requiredAssets = required
+    ? selectedAssets.filter((asset) => normalizeTicker(asset.ticker))
+    : [];
+  const observedCount = selectedAssets.filter(
+    (asset) => closeContext.valuationByAssetId.get(asset.id)?.basis === "cutoff_live",
+  ).length;
+  const missing = requiredAssets
+    .filter(
+      (asset) => closeContext.valuationByAssetId.get(asset.id)?.basis !== "cutoff_live",
+    )
+    .map((asset) => ({
+      assetId: asset.id,
+      ticker: normalizeTicker(asset.ticker) ?? "",
+      name: asset.name,
+      account: asset.account,
+      market: asset.market,
+      currency: asset.currency,
+    }));
+
+  return {
+    policy: "fresh_kis_live_quote_else_official_close",
+    maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60_000,
+    requiredCount: requiredAssets.length,
+    observedCount,
+    fallbackCount: selectedAssets.length - observedCount,
+    missing,
   };
 }
 
@@ -2433,7 +2565,7 @@ function isOpenInvestmentAsset(asset: AssetRow) {
 
 function selectPriceForAsset(asset: AssetRow, closeContext: CloseContext) {
   return (
-    closeContext.selectedByAssetId.get(asset.id) ?? {
+    closeContext.valuationByAssetId.get(asset.id) ?? {
       row: null,
       price: toNumber(asset.currentPrice) ?? 0,
       source: asset.priceSource ?? "asset_current_price",
@@ -2444,6 +2576,19 @@ function selectPriceForAsset(asset: AssetRow, closeContext: CloseContext) {
       fromCloseSnapshot: false,
     }
   );
+}
+
+function selectOfficialCloseForAsset(
+  asset: AssetRow,
+  closeContext: CloseContext,
+) {
+  return closeContext.selectedByAssetId.get(asset.id) ?? selectPriceForAsset(asset, closeContext);
+}
+
+function portfolioValuationBasis(provenance: SnapshotProvenance) {
+  return provenance.insertOnly
+    ? "historical_close_or_manual_carry"
+    : "cutoff_observed_price";
 }
 
 function assetValueKrw(asset: AssetRow, price: number, fxRate: number) {

@@ -71,6 +71,10 @@ describe("tenant daily snapshot job", () => {
     assert.match(writer, /eq\(accounts\.canonicalOwnerUserId, ownerUserId\)/);
     assert.match(writer, /canonicalOwnerUserId: context\.ownerUserId/);
     assert.match(writer, /mapWithConcurrency\(\s*targetAccounts,\s*2,/);
+    assert.match(writer, /missing_fresh_cutoff_quotes/);
+    assert.match(writer, /currentPrice: decimal\(valuationPrice\)/);
+    assert.match(writer, /closePrice: decimal\(officialClosePrice\)/);
+    assert.match(writer, /unitPrice: decimal\(valuationPrice\)/);
   });
 
   it("pins owner-aware keys and a dry-run-default generated-row backfill", () => {
