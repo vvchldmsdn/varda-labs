@@ -157,6 +157,10 @@ describe("additional contribution tenant preview", () => {
       "src/app/additional-contribution/page.tsx",
       "utf8",
     );
+    const pageView = readFileSync(
+      "src/components/additional-contribution/additional-contribution-page-view.tsx",
+      "utf8",
+    );
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
     for (const source of [
@@ -188,18 +192,21 @@ describe("additional contribution tenant preview", () => {
     assert.doesNotMatch(ma120Query, /assets\.ma_?120|daysAboveMa/i);
     assert.doesNotMatch(route, /^"use client";/);
     assert.doesNotMatch(route, /fetch\s*\(|\/api\//);
+    assert.doesNotMatch(pageView, /^"use client";/);
+    assert.doesNotMatch(pageView, /fetch\s*\(|\/api\//);
     assert.match(route, /searchParams: Promise/);
-    assert.match(route, /method="get"/);
+    assert.match(pageView, /method="get"/);
     assert.match(route, /resolveCurrentTenantContext/);
     assert.match(route, /if \(!resolution\.ok\)/);
     assert.match(route, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
-    assert.match(route, /PortfolioAnalysisScopeTabs/);
+    assert.match(route, /AdditionalContributionPageView/);
+    assert.match(pageView, /PortfolioAnalysisScopeTabs/);
     assert.match(
       route,
       /getReadOnlyTenantAdditionalContributionPreviewForScope/,
     );
     assert.doesNotMatch(route, /resolveAdditionalContributionScope/);
-    assert.match(route, /name="scope"/);
+    assert.match(pageView, /name="scope"/);
     assert.doesNotMatch(
       proxy,
       /"\/additional-contribution(?:\/:path\*)?"/,

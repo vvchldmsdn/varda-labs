@@ -102,6 +102,7 @@ import "./portfolio-target-policy.test.mjs";
 import "./portfolio-target-policy-schema.test.mjs";
 import "./additional-contribution-scope.test.mjs";
 import "./additional-contribution-preview.test.mjs";
+import "./additional-contribution-view.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./additional-contribution-ma120-overlay.test.mjs";
 import "./simulation-return-matrix.test.mjs";
