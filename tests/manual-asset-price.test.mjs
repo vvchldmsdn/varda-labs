@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import {
   isKrxGoldManualAssetCandidate,
+  isKrxGoldManualInstrumentCandidate,
   KRX_GOLD_MANUAL_ASSET_BINDING,
   MANUAL_ASSET_PRICE_POLICY,
   buildManualAssetPriceUpdate,
@@ -91,6 +92,22 @@ describe("manual asset price", () => {
     );
     assert.equal(
       isKrxGoldManualAssetCandidate({ ...candidate, ticker: "411060" }),
+      false,
+    );
+    assert.equal(isKrxGoldManualInstrumentCandidate(candidate), true);
+    assert.equal(
+      isKrxGoldManualInstrumentCandidate({
+        ...candidate,
+        accountCode: "isa",
+      }),
+      true,
+    );
+    assert.equal(
+      isKrxGoldManualInstrumentCandidate({
+        ...candidate,
+        name: "Fount",
+        assetType: "managed_portfolio",
+      }),
       false,
     );
   });

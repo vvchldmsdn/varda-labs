@@ -54,6 +54,8 @@ describe("portfolio target policy", () => {
       holding({
         accountId: ACCOUNT_A,
         assetId: ASSET_C,
+        assetName: "Fount",
+        assetType: "managed_portfolio",
         value: 200,
         ticker: null,
       }),
@@ -81,6 +83,40 @@ describe("portfolio target policy", () => {
     assert.equal(accepted.rows.find((row) => row.assetId === ASSET_C)?.targetWeightBps, 0);
     assert.equal(rejected.status, "blocked");
     assert.ok(rejected.blockers.includes("positive_target_not_buyable"));
+  });
+
+  it("allows the reviewed manual KRX gold holding to have a positive target", () => {
+    const universe = normalizePortfolioTargetUniverse([
+      holding({ accountId: ACCOUNT_A, assetId: ASSET_A, value: 900 }),
+      holding({
+        accountId: ACCOUNT_A,
+        assetId: ASSET_C,
+        assetName: "금현물",
+        assetType: "commodity",
+        value: 100,
+        ticker: null,
+      }),
+    ]);
+    const record = buildPortfolioTargetPolicyRecord({
+      decisions: [
+        { assetId: ASSET_A, targetWeightBps: 9_000 },
+        { assetId: ASSET_C, targetWeightBps: 1_000 },
+      ],
+      effectiveServiceDate: "2026-08-13",
+      scope: allScope,
+      universe: universe.rows,
+    });
+
+    assert.equal(universe.status, "ready");
+    assert.equal(
+      universe.rows.find((row) => row.assetId === ASSET_C)?.buyability,
+      "buyable",
+    );
+    assert.equal(record.status, "ready");
+    assert.equal(
+      record.rows.find((row) => row.assetId === ASSET_C)?.targetWeightBps,
+      1_000,
+    );
   });
 
   it("builds deterministic hashes and exact current-allocation starting weights", () => {
@@ -145,6 +181,8 @@ describe("portfolio target policy", () => {
 function holding({
   accountId,
   assetId,
+  assetName,
+  assetType = "etf",
   value,
   ticker = "069500",
 }) {
@@ -153,7 +191,8 @@ function holding({
     accountId,
     accountName: accountId === ACCOUNT_A ? "증권" : "두 번째 계좌",
     assetId,
-    assetName: ticker ?? "금현물",
+    assetName: assetName ?? ticker ?? "관리형 자산",
+    assetType,
     market: "korea",
     currency: "KRW",
     ticker,
