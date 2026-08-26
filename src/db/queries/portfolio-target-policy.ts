@@ -65,10 +65,14 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
             accountId: accounts.id,
             accountName: accounts.name,
             assetId: assets.id,
-            assetName: assets.name,
             assetType: assets.assetType,
+            assetName: assets.name,
+            averageCost: assets.averageCost,
+            fractionalAvgCost: assets.fractionalAvgCost,
             market: assets.market,
             currency: assets.currency,
+            maAssetClass: assets.maAssetClass,
+            maRuleEnabled: assets.maRuleEnabled,
             ticker: assets.ticker,
             quantity: assets.quantity,
             currentPrice: assets.currentPrice,
@@ -124,6 +128,17 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       currentValues.get(portfolioStructureHoldingIdentityKey(row)) ??
       fallbackCurrentValueKrw(row, structure.usdKrwRate),
   }));
+  const allocationMetadata = new Map(
+    assetRows.map((row) => [
+      row.assetId,
+      Object.freeze({
+        assetType: row.assetType,
+        costBasisKrw: fallbackCostBasisKrw(row, structure.usdKrwRate),
+        maAssetClass: row.maAssetClass,
+        maRuleEnabled: row.maRuleEnabled ?? true,
+      }),
+    ]),
+  );
   const universe = normalizePortfolioTargetUniverse(universeInput);
   const currentPolicyRows = approvedPolicy.policy?.rows ?? [];
   const exactPolicyUniverse =
@@ -192,11 +207,36 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       universe.rows.map((row) =>
         Object.freeze({
           ...row,
+          ...allocationMetadata.get(row.assetId),
           targetWeightBps: startingWeights.get(row.assetId) ?? 0,
         }),
       ),
     ),
   });
+}
+
+function fallbackCostBasisKrw(
+  row: {
+    averageCost: string | null;
+    currency: string;
+    fractionalAvgCost: string | null;
+    quantity: string;
+  },
+  usdKrwRate: number | null,
+) {
+  const quantity = toNumber(row.quantity);
+  const averageCost = toNumber(row.averageCost);
+  const fractionalAverageCost = toNumber(row.fractionalAvgCost) ?? 0;
+  const currency = row.currency.trim().toUpperCase();
+  const fx = currency === "KRW" ? 1 : currency === "USD" ? usdKrwRate : null;
+  return quantity !== null &&
+    averageCost !== null &&
+    quantity >= 0 &&
+    averageCost > 0 &&
+    fx !== null &&
+    fx > 0
+    ? quantity * averageCost * fx + fractionalAverageCost
+    : null;
 }
 
 function validateApprovedPolicy({
