@@ -1,4 +1,5 @@
 import { AdditionalContributionFlowMap } from "@/components/additional-contribution/additional-contribution-flow-map";
+import { AdditionalContributionLogicDialog } from "@/components/additional-contribution/additional-contribution-logic-dialog";
 import {
   buildAdditionalContributionView,
   type AdditionalContributionResultPreview,
@@ -20,9 +21,6 @@ export function AdditionalContributionResult({
         right.allocationKrw - left.allocationKrw ||
         left.name.localeCompare(right.name, "ko"),
     );
-  const zeroRows = preview.rows
-    .filter((row) => row.allocationKrw === 0)
-    .toSorted((left, right) => left.name.localeCompare(right.name, "ko"));
   const weightScaleMax = Math.max(
     1,
     ...preview.rows.flatMap((row) => [
@@ -92,57 +90,24 @@ export function AdditionalContributionResult({
         </div>
       </section>
 
-      <section aria-labelledby="allocation-detail-title" className="mt-14">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section aria-labelledby="allocation-detail-title" className="mt-14 border-y border-[#d9ddd7] py-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-medium text-[#7b8079]">CALCULATION EVIDENCE</p>
             <h2 id="allocation-detail-title" className="mt-1 text-xl font-medium">
               계산 근거
             </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6d736b]">
+              초과 종목의 계산상 매도, 매도금 재사용, MA120 조정과 종목별 최종 금액을 단계별로 확인합니다.
+            </p>
           </div>
-          <p className="text-xs text-[#777d75]">
-            {preview.policyLabel} · {formatDate(preview.effectiveServiceDate)} 적용 · 기준일 {formatDate(preview.serviceDate)}
-          </p>
+          <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+            <AdditionalContributionLogicDialog preview={preview} />
+            <p className="text-xs text-[#777d75]">
+              {preview.policyLabel} · {formatDate(preview.effectiveServiceDate)} 적용 · 기준일 {formatDate(preview.serviceDate)}
+            </p>
+          </div>
         </div>
-
-        <div className="mt-6 overflow-x-auto border-y border-[#d9ddd7]">
-          <table className="w-full min-w-[1120px] border-collapse text-sm">
-            <thead className="text-left text-[11px] font-medium text-[#737970]">
-              <tr>
-                <th className="px-3 py-4">종목</th>
-                <th className="px-3 py-4">계좌</th>
-                <th className="px-3 py-4 text-right">현재 평가액</th>
-                <th className="px-3 py-4 text-right">현재</th>
-                <th className="px-3 py-4 text-right">목표</th>
-                <th className="px-3 py-4 text-right">MA120 근거</th>
-                <th className="px-3 py-4 text-right">최종 투입</th>
-                <th className="px-3 py-4 text-right">투입 후</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allocationRows.map((row) => (
-                <DetailRow key={rowKey(row)} row={row} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {zeroRows.length > 0 ? (
-          <details className="border-b border-[#d9ddd7]">
-            <summary className="cursor-pointer list-none py-5 text-sm font-medium text-[#535a52] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#347e62]">
-              배분하지 않는 목표 종목 {zeroRows.length}개 보기
-            </summary>
-            <div className="overflow-x-auto pb-5">
-              <table className="w-full min-w-[1120px] border-collapse text-sm">
-                <tbody>
-                  {zeroRows.map((row) => (
-                    <DetailRow key={rowKey(row)} row={row} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        ) : null}
       </section>
 
       <footer className="mt-12 flex flex-col gap-2 border-t border-[#d9ddd7] pt-5 text-[11px] text-[#858a83] sm:flex-row sm:items-center sm:justify-between">
@@ -216,54 +181,6 @@ function WeightRow({ row, scaleMax }: { row: AdditionalContributionResultRow; sc
   );
 }
 
-function DetailRow({ row }: { row: AdditionalContributionResultRow }) {
-  return (
-    <tr className="border-t border-[#e2e5df] first:border-t-0">
-      <td className="px-3 py-4">
-        <p className="font-medium">{row.name}</p>
-        <p className="mt-1 text-xs text-[#777d75]">
-          {row.ticker ?? "티커 없음"} · {row.market ?? "시장 없음"} · {row.currency ?? "통화 없음"}
-        </p>
-      </td>
-      <td className="px-3 py-4 text-[#596057]">{row.accountName}</td>
-      <td className="px-3 py-4 text-right tabular-nums">{formatKrw(row.currentValueKrw)}</td>
-      <td className="px-3 py-4 text-right tabular-nums">{formatPercent(row.currentWeightPct)}</td>
-      <td className="px-3 py-4 text-right tabular-nums">{formatPercent(row.targetWeightPct)}</td>
-      <td className="px-3 py-4 text-right"><Ma120EvidenceCell currency={row.currency} evidence={row.ma120Evidence} /></td>
-      <td className="px-3 py-4 text-right font-medium tabular-nums text-[#347e62]">
-        {formatKrw(row.allocationKrw)}
-        {row.ma120ReductionKrw > 0 ? (
-          <p className="mt-1 text-xs font-normal text-[#9a6745]">기본안 대비 -{formatKrw(row.ma120ReductionKrw)}</p>
-        ) : null}
-      </td>
-      <td className="px-3 py-4 text-right tabular-nums">{formatPercent(row.postTopupWeightPct)}</td>
-    </tr>
-  );
-}
-
-function Ma120EvidenceCell({ currency, evidence }: { currency: string | null; evidence: AdditionalContributionResultRow["ma120Evidence"] }) {
-  if (evidence.status === "insufficient_history") {
-    return <span className="text-[#8b6a35]">이력 {evidence.availableObservationCount}/120</span>;
-  }
-  if (
-    evidence.status === "unavailable" ||
-    evidence.status === "invalid_history" ||
-    evidence.ma120 === null ||
-    evidence.distanceFromMaPct === null
-  ) {
-    return <span className="text-[#81867f]">근거 없음</span>;
-  }
-
-  const label = evidence.status === "above_ma" ? "위" : evidence.status === "below_ma" ? "아래" : "근접";
-  const tone = evidence.status === "below_ma" ? "text-[#c8544f]" : evidence.status === "above_ma" ? "text-[#347e62]" : "text-[#535a52]";
-  return (
-    <div>
-      <p className={`font-medium ${tone}`}>{label} {formatSignedPercent(evidence.distanceFromMaPct)}</p>
-      <p className="mt-1 text-xs text-[#777d75]">MA120 {formatPrice(evidence.ma120, currency)}</p>
-    </div>
-  );
-}
-
 function LegendDot({ className, label }: { className: string; label: string }) {
   return <span className="inline-flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${className}`} />{label}</span>;
 }
@@ -294,16 +211,6 @@ function formatPercent(value: number) {
   return `${value.toFixed(2)}%`;
 }
 
-function formatSignedPercent(value: number) {
-  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
-}
-
 function formatDate(value: string | null) {
   return value ? value.slice(0, 10).replaceAll("-", ".") : "-";
-}
-
-function formatPrice(value: number, currency: string | null) {
-  return new Intl.NumberFormat(currency === "KRW" ? "ko-KR" : "en-US", {
-    maximumFractionDigits: currency === "KRW" ? 0 : 4,
-  }).format(value);
 }

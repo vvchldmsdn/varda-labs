@@ -41,7 +41,31 @@ export type AdditionalContributionMa120EvidenceView = Readonly<{
 
 export type AdditionalContributionResultRow = AdditionalContributionViewInputRow &
   Readonly<{
+    action: "buy" | "hold" | "trim";
+    baseNeedKrw: number;
+    costBasisKrw: number | null;
+    driftRatioPct: number | null;
+    effectiveTargetWeightPct: number;
+    maAdjustmentReason:
+      | "above_or_at_ma120"
+      | "below_ma120_buffer"
+      | "below_ma120_full_adjustment"
+      | "asset_class_exempt"
+      | "asset_rule_disabled"
+      | "evidence_unavailable";
+    maEffectiveMultiplier: number;
     ma120Evidence: AdditionalContributionMa120EvidenceView;
+    postTrimValueKrw: number;
+    trimAmountKrw: number;
+    trimReason:
+      | "eligible_overweight"
+      | "eligible_zero_target_exit"
+      | "not_overweight"
+      | "loss_position"
+      | "cost_basis_unavailable"
+      | "target_zero_but_loss"
+      | "target_zero_cost_basis_unavailable";
+    unrealizedReturnPct: number | null;
   }>;
 
 export type AdditionalContributionResultPreview = Omit<
@@ -53,6 +77,20 @@ export type AdditionalContributionResultPreview = Omit<
     effectiveServiceDate: string | null;
     policyLabel: string;
     serviceDate: string;
+    totalAvailableFundsKrw: number;
+    totalBaseNeedKrw: number;
+    totalTrimProceedsKrw: number;
+    minimumExecutionTargetKrw: number;
+    minimumExecutionSatisfied: boolean;
+    calculationParameters: Readonly<{
+      minimumExecutionRatioPct: number;
+      trimDriftThresholdPct: number;
+    }>;
+    calculationPolicy: Readonly<{
+      version: string;
+      trimLandingTargetMultiplier: number;
+      unsupportedDynamicModifiers: readonly string[];
+    }>;
     ma120Evidence: Readonly<{
       mode: "off" | "enabled";
       status: "ready" | "partial" | "unavailable" | "read_failed";
