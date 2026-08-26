@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { PortfolioAnalysisScope } from "./portfolio-analysis-scope.ts";
+import { isKrxGoldManualInstrumentCandidate } from "./market-data/manual-asset-price.ts";
 
 export const PORTFOLIO_TARGET_POLICY = Object.freeze({
   version: "portfolio_target_policy_v1",
@@ -26,6 +27,7 @@ export type PortfolioTargetUniverseInput = Readonly<{
   accountName: string;
   assetId: string;
   assetName: string;
+  assetType: string | null;
   market: string;
   currency: string;
   ticker: string | null;
@@ -38,6 +40,7 @@ export type PortfolioTargetUniverseRow = Readonly<{
   accountName: string;
   assetId: string;
   assetName: string;
+  assetType: string | null;
   market: string;
   currency: string;
   ticker: string | null;
@@ -307,14 +310,29 @@ export function serializePortfolioTargetPolicyRows(
 }
 
 export function classifyPortfolioTargetBuyability({
+  assetName,
+  assetType,
   currency,
   market,
   ticker,
 }: {
+  assetName: string | null;
+  assetType: string | null;
   currency: string | null;
   market: string | null;
   ticker: string | null;
 }): PortfolioTargetBuyability {
+  if (
+    isKrxGoldManualInstrumentCandidate({
+      name: assetName,
+      ticker,
+      assetType,
+      market,
+      currency,
+    })
+  ) {
+    return "buyable";
+  }
   if (!ticker) return "tickerless";
   if (!market || !SUPPORTED_MARKETS.has(market)) return "unsupported_market";
   if (!currency || !SUPPORTED_CURRENCIES.has(currency)) {
@@ -331,6 +349,7 @@ function normalizeUniverseRow(
   const accountCode = canonicalText(source.accountCode);
   const accountName = canonicalText(source.accountName);
   const assetName = canonicalText(source.assetName);
+  const assetType = canonicalText(source.assetType)?.toLowerCase() ?? null;
   const market = canonicalText(source.market)?.toLowerCase() ?? null;
   const currency = canonicalText(source.currency)?.toUpperCase() ?? null;
   const ticker = canonicalText(source.ticker)?.toUpperCase() ?? null;
@@ -355,10 +374,13 @@ function normalizeUniverseRow(
     accountName,
     assetId: source.assetId.toLowerCase(),
     assetName,
+    assetType,
     market,
     currency,
     ticker,
     buyability: classifyPortfolioTargetBuyability({
+      assetName,
+      assetType,
       currency,
       market,
       ticker,

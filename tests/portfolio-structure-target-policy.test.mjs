@@ -95,6 +95,68 @@ describe("portfolio structure effective target projection", () => {
     assert.equal(projection.reason, "duplicate_target_identity");
     assert.equal(projection.structure, structure);
   });
+
+  it("matches the exact tickerless gold holding without confusing another tickerless asset", () => {
+    const structure = buildPortfolioStructure({
+      assets: [
+        asset({
+          assetType: "commodity",
+          id: "gold",
+          name: "금현물",
+          quantity: 8,
+          targetWeight: 10,
+          ticker: null,
+        }),
+        asset({
+          assetType: "managed_portfolio",
+          id: "fount",
+          name: "Fount",
+          quantity: 1,
+          targetWeight: 0,
+          ticker: null,
+        }),
+        asset({
+          id: "asset-a",
+          name: "KODEX 200",
+          quantity: 1,
+          targetWeight: 90,
+          ticker: "069500",
+        }),
+      ],
+      groups: [],
+      liveQuotes: [quote("069500")],
+      selectedAccount: "all",
+      usdKrwRate: 1_500,
+    });
+    const projection = projectPortfolioStructureEffectiveTargets({
+      policyStatus: "available",
+      structure,
+      targets: [
+        target("069500", 9_000, { assetName: "KODEX 200" }),
+        target(null, 1_000, {
+          assetName: "금현물",
+          assetType: "commodity",
+        }),
+        target(null, 0, {
+          assetName: "Fount",
+          assetType: "managed_portfolio",
+        }),
+      ],
+    });
+
+    assert.equal(projection.status, "applied");
+    assert.equal(
+      projection.structure.holdingRows.find((row) => row.name === "금현물")
+        ?.effectiveTargetPct,
+      10,
+    );
+    assert.equal(
+      projection.structure.holdingRows.find((row) => row.name === "Fount")
+        ?.effectiveTargetPct,
+      0,
+    );
+    assertNoInternalIds(projection);
+  });
 });
 
 function fixtureStructure() {
@@ -120,12 +182,12 @@ function fixtureStructure() {
 function asset(overrides) {
   return {
     id: overrides.id,
-    name: overrides.ticker,
+    name: overrides.name ?? overrides.ticker,
     ticker: overrides.ticker,
     account: "isa",
     market: "korea",
     currency: "KRW",
-    assetType: "etf",
+    assetType: overrides.assetType ?? "etf",
     quantity: overrides.quantity,
     currentPrice: 100,
     targetWeight: overrides.targetWeight,
@@ -144,9 +206,11 @@ function quote(ticker) {
   };
 }
 
-function target(ticker, targetWeightBps) {
+function target(ticker, targetWeightBps, overrides = {}) {
   return {
     account: "isa",
+    assetName: overrides.assetName ?? ticker,
+    assetType: overrides.assetType ?? "etf",
     market: "korea",
     currency: "KRW",
     ticker,

@@ -69,9 +69,9 @@ export type AdditionalContributionMa120OverlayEvidenceInput = Readonly<{
 type NormalizedBaselineRow = Readonly<{
   allocationKey: string;
   instrumentKey: string;
-  market: string;
-  currency: string;
-  ticker: string;
+  market: string | null;
+  currency: string | null;
+  ticker: string | null;
   allocationKrw: number;
 }>;
 
@@ -192,24 +192,29 @@ function normalizeBaseline(
     ? baseline.allocations
     : []) {
     const identity = normalizeIdentity(row);
-    if (!identity) {
+    const allocationKey = normalizeText(row.allocationKey);
+    if (!identity && !allocationKey) {
       blockers.add("invalid_instrument_identity");
       continue;
     }
-    const allocationKey = normalizeText(row.allocationKey) ?? identity.instrumentKey;
+    const resolvedAllocationKey = allocationKey ?? identity!.instrumentKey;
     if (!Number.isSafeInteger(row.allocationKrw) || row.allocationKrw < 0) {
       blockers.add("invalid_baseline_allocation");
       continue;
     }
-    if (seen.has(allocationKey)) {
+    if (seen.has(resolvedAllocationKey)) {
       blockers.add("duplicate_baseline_allocation_key");
       continue;
     }
-    seen.add(allocationKey);
+    seen.add(resolvedAllocationKey);
     normalizedRows.push(
       Object.freeze({
-        ...identity,
-        allocationKey,
+        instrumentKey:
+          identity?.instrumentKey ?? `allocation-only:${resolvedAllocationKey}`,
+        market: identity?.market ?? null,
+        currency: identity?.currency ?? null,
+        ticker: identity?.ticker ?? null,
+        allocationKey: resolvedAllocationKey,
         allocationKrw: row.allocationKrw,
       }),
     );

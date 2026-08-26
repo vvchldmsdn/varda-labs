@@ -107,6 +107,35 @@ describe("additional contribution MA120 bounded overlay", () => {
     }
   });
 
+  it("keeps a tickerless allocation neutral when it has an explicit allocation identity", () => {
+    const result = compareAdditionalContributionMa120Overlay({
+      mode: "enabled",
+      serviceDate: "2026-08-12",
+      baseline: {
+        cashAmountKrw: 100,
+        totalAllocatedKrw: 100,
+        residualCashKrw: 0,
+        allocations: [
+          {
+            allocationKey: "account-id:gold-asset-id",
+            market: "korea",
+            currency: "KRW",
+            ticker: null,
+            allocationKrw: 100,
+          },
+        ],
+      },
+      evidence: [],
+    });
+
+    assert.equal(result.status, "partial");
+    assert.equal(result.rows[0].allocationKey, "account-id:gold-asset-id");
+    assert.equal(result.rows[0].ticker, null);
+    assert.equal(result.rows[0].multiplier, 1);
+    assert.equal(result.rows[0].overlayAllocationKrw, 100);
+    assert.equal(result.rows[0].decision, "missing_evidence");
+  });
+
   it("treats the seven-calendar-day freshness boundary as inclusive", () => {
     const fresh = compareAdditionalContributionMa120Overlay({
       mode: "enabled",

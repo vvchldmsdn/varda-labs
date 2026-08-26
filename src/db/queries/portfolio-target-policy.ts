@@ -66,6 +66,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
             accountName: accounts.name,
             assetId: assets.id,
             assetName: assets.name,
+            assetType: assets.assetType,
             market: assets.market,
             currency: assets.currency,
             ticker: assets.ticker,
@@ -115,13 +116,12 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
     accountName: row.accountName,
     assetId: row.assetId,
     assetName: row.assetName,
+    assetType: row.assetType,
     market: row.market,
     currency: row.currency,
     ticker: row.ticker,
     currentValueKrw:
-      (row.ticker === null
-        ? undefined
-        : currentValues.get(portfolioStructureHoldingIdentityKey(row))) ??
+      currentValues.get(portfolioStructureHoldingIdentityKey(row)) ??
       fallbackCurrentValueKrw(row, structure.usdKrwRate),
   }));
   const universe = normalizePortfolioTargetUniverse(universeInput);
@@ -160,6 +160,8 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       policyValidation.status === "available"
         ? universe.rows.map((row) => ({
             account: row.accountCode,
+            assetName: row.assetName,
+            assetType: row.assetType,
             market: row.market,
             currency: row.currency,
             ticker: row.ticker,

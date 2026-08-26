@@ -169,9 +169,9 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     totalAllocatedKrw: allocation.totalAllocatedKrw,
     residualCashKrw: allocation.residualCashKrw,
     rows: Object.freeze(
-      allocation.rows.map((row, index) =>
+      allocation.rows.map((row) =>
         Object.freeze({
-          allocationKey: `${row.metadata.accountCode}:${instrumentKey(row.metadata) ?? "invalid"}:${index}`,
+          allocationKey: row.allocationKey,
           accountCode: row.metadata.accountCode,
           accountName: row.metadata.accountName,
           name: row.metadata.assetName,
@@ -279,19 +279,6 @@ function scopedPolicyBlocker(status: string) {
     return "portfolio_target_policy_not_effective";
   }
   return "portfolio_target_policy_integrity_error";
-}
-
-function instrumentKey(row: {
-  market: string | null;
-  currency: string | null;
-  ticker: string | null;
-}) {
-  const market = row.market?.trim().toLowerCase();
-  const currency = row.currency?.trim().toUpperCase();
-  const ticker = row.ticker?.trim().toUpperCase();
-  return market && currency && ticker
-    ? `${market}:${currency}:${ticker}`
-    : null;
 }
 
 function resolveMa120Mode(

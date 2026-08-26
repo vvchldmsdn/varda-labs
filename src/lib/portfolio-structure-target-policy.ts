@@ -5,6 +5,8 @@ import type {
 
 export type PortfolioStructureEffectiveTargetInput = Readonly<{
   account: string;
+  assetName: string;
+  assetType: string | null;
   market: string;
   currency: string;
   ticker: string | null;
@@ -143,15 +145,23 @@ export function projectPortfolioStructureEffectiveTargets({
 export function portfolioStructureHoldingIdentityKey(row: {
   account?: string;
   accountCode?: string;
+  assetName?: string;
+  assetType?: string | null;
+  name?: string;
   market: string;
   currency: string;
   ticker: string | null;
 }) {
+  const ticker = row.ticker?.trim().toUpperCase() ?? null;
+  const tickerlessIdentity = [
+    row.assetType?.trim().toLowerCase() ?? "unknown",
+    (row.assetName ?? row.name ?? "").trim().toLowerCase(),
+  ].join(":");
   return [
     (row.account ?? row.accountCode ?? "").trim().toLowerCase(),
     row.market.trim().toLowerCase(),
     row.currency.trim().toUpperCase(),
-    row.ticker?.trim().toUpperCase() ?? "",
+    ticker ?? `tickerless:${tickerlessIdentity}`,
   ].join(":");
 }
 

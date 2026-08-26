@@ -149,7 +149,7 @@ is no new comparison period; it is not evidence of a zero return.
 | today movement | tickerless gold uses stored current valuation evidence | compare only against an explicit prior stored observation |
 | admin sync status | price and close coverage are ticker based | add separate close-only health evidence later |
 | Gate B1 | `(market,currency,ticker)` makes brokerage fail closed | keep blocked until explicit instrument identity and policy treatment are reviewed |
-| Additional Contribution | allocation identity is ticker based | do not include gold in a positive vector before a separate allocator decision |
+| Portfolio targets and Additional Contribution | durable target and allocation identity use the held asset UUID; MA120 has no ticker-keyed gold history | allow the exact reviewed manual KRX gold holding in a positive target, while treating unavailable MA120 evidence as a neutral overlay |
 | portfolio risk | tickerless holdings are excluded and price history is ticker keyed | add an explicit manual-observation history path before risk inclusion |
 | Investment Lab | the reviewed gold product is identified, but a single current manual value is not historical authority | admit only explicit forward manual observations; do not wait for the deferred provider |
 | event and movement matching | asset UUID and legacy asset id are primary fallbacks | no fake ticker is needed for historical event matching |
