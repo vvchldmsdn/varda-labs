@@ -198,8 +198,9 @@ function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel }) {
     return (
       <RiskNotice tone="warning">
         <span data-historical-price-admission="unavailable">
-          승인된 분석용 조정종가 이력이 없습니다. 현재가와 운영 종가는 계속
-          사용할 수 있지만, 수익률·상관관계·Sharpe 계산에는 사용하지 않습니다.
+          검증된 분석용 가격 이력이 없습니다. 현재가와 운영 종가는 계속 사용할
+          수 있지만, 수익률·상관관계·Sharpe 계산에는 사용하지 않습니다. 분석은
+          조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다.
         </span>
       </RiskNotice>
     );

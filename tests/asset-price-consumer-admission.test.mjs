@@ -371,6 +371,14 @@ describe("asset price consumer admission", () => {
       investmentLabAvailabilityAdapter,
       /selectPreferredPrivateHistoricalPriceRows/,
     );
+    assert.match(
+      adjustedHistoricalAdapters[1],
+      /admitSharedKisRawHistoricalPriceRows/,
+    );
+    assert.match(
+      adjustedHistoricalAdapters[1],
+      /selectPreferredPrivateHistoricalPriceRows/,
+    );
     assert.doesNotMatch(
       investmentLabAvailabilityAdapter,
       /getReadOnlyTenantPortfolioRisk/,
