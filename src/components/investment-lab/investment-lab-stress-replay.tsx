@@ -20,22 +20,22 @@ export function InvestmentLabStressReplayView({
   return (
     <section
       aria-labelledby="investment-lab-stress-replay-title"
-      className="mx-auto w-full max-w-[1500px] space-y-4 px-4 pb-4"
+      className="mx-auto w-full max-w-[1540px] space-y-10 border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10"
       data-account-scope={model.account}
       data-section="investment-lab-stress-replay"
       data-window-count={model.windows.length}
     >
-      <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-        <p className="text-xs font-semibold text-[#687064]">
-          과거 시장 재생 · 읽기 전용
+      <header className="border-b border-[#dde1db] pb-8">
+        <p className="text-[10px] font-medium uppercase text-[#777d75]">
+          STRESS REPLAY
         </p>
         <h2
-          className="mt-1 text-xl font-semibold sm:text-2xl"
+          className="mt-3 text-2xl font-semibold sm:text-3xl"
           id="investment-lab-stress-replay-title"
         >
           지금 구성으로 과거를 다시 지나갔다면
         </h2>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-[#626b5f]">
+        <p className="mt-3 max-w-4xl text-sm leading-7 text-[#626b5f]">
           현재 보유 비중을 각 과거 구간의 첫날에 적용한 뒤 리밸런싱 없이
           보유했다고 가정합니다. 당시 상장 전이거나 가격 근거가 부족한 종목은
           임의로 채우지 않고 제외하며, 포함된 현재 평가액 비율을 함께 표시합니다.
@@ -57,9 +57,9 @@ export function InvestmentLabStressReplayView({
 
 export function InvestmentLabStressReplaySkeleton() {
   return (
-    <section className="mx-auto w-full max-w-[1500px] space-y-4 px-4 pb-4">
-      <div className="h-32 animate-pulse rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-      <div className="h-72 animate-pulse rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    <section className="mx-auto w-full max-w-[1540px] space-y-4 border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10">
+      <div className="h-32 animate-pulse border-y border-[#dde1db] bg-[#f2f4ef]" />
+      <div className="h-72 animate-pulse border-y border-[#dde1db] bg-[#f2f4ef]" />
     </section>
   );
 }
@@ -67,11 +67,11 @@ export function InvestmentLabStressReplaySkeleton() {
 export function InvestmentLabStressReplayUnavailable() {
   return (
     <section
-      className="mx-auto w-full max-w-[1500px] px-4 pb-4"
+      className="mx-auto w-full max-w-[1540px] border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10"
       data-section="investment-lab-stress-replay"
       data-stress-replay-status="unavailable"
     >
-      <div className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-4 text-sm text-[#725f2d]">
+      <div className="border-y border-[#d8c69d] py-4 text-sm text-[#725f2d]">
         과거 구간 비교 근거를 읽지 못했습니다. 기존 투자 랩 결과를 추정값으로
         대체하지 않았습니다.
       </div>
@@ -89,7 +89,7 @@ function StressWindowCard({ window }: { window: InvestmentLabStressReplayWindow 
 
   return (
     <article
-      className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      className="overflow-hidden rounded-[4px] border border-[#dfe3d5] bg-[#fbfcf7]"
       data-current-value-coverage={window.currentValueCoveragePct.toFixed(2)}
       data-eligible-instruments={window.eligibleInstrumentCount}
       data-stress-window={window.id}
@@ -134,7 +134,7 @@ function StressWindowCard({ window }: { window: InvestmentLabStressReplayWindow 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] border-collapse text-sm">
               <thead>
-                <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+                <tr className="border-y border-[#e1e6dc] text-left text-xs font-semibold text-[#616a5e]">
                   <th className="px-4 py-3">비교 구성</th>
                   <th className="px-3 py-3 text-right">구간 수익률</th>
                   <th className="px-3 py-3 text-right">최대 낙폭</th>

@@ -10,7 +10,7 @@ export function InvestmentLabCashComparisonView({
   if (!comparison || comparison.status === "unavailable") {
     return (
       <section
-        className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-4"
+        className="border-y border-[#e6dcc2] py-5"
         data-cash-comparison-status="unavailable"
         data-section="investment-lab-cash-comparison"
       >
@@ -28,7 +28,7 @@ export function InvestmentLabCashComparisonView({
 
   return (
     <section
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-y border-[#dde1db] py-6"
       data-cash-applied-flows={comparison.coverage.appliedFlowRows}
       data-cash-comparison-dates={summary.comparisonDateCount}
       data-cash-comparison-status="ready"

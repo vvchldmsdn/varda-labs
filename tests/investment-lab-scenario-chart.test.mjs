@@ -132,7 +132,7 @@ describe("investment lab multi-scenario chart", () => {
     assert.doesNotMatch(componentSource, /^["']use client["'];/);
     assert.doesNotMatch(componentSource, /\bfetch\s*\(|\/api\//);
     assert.match(interactiveSource, /^["']use client["'];/);
-    assert.match(interactiveSource, /PORTFOLIO TIME MACHINE/);
+    assert.match(interactiveSource, /COUNTERFACTUAL LAB/);
     assert.doesNotMatch(interactiveSource, /@\/db|process\.env|\bfetch\s*\(|\/api\//);
     assert.doesNotMatch(
       `${pureSource}\n${componentSource}\n${interactiveSource}`,

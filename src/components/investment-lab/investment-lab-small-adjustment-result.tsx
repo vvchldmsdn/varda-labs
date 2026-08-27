@@ -12,7 +12,7 @@ export function InvestmentLabSmallAdjustmentResult({
 }) {
   if (result.status === "blocked") {
     return (
-      <div className="rounded-lg border border-[#d8c7a1] bg-[#fff8e6] p-4 text-sm text-[#725f2d]">
+      <div className="border-y border-[#d8c7a1] py-4 text-sm text-[#725f2d]">
         {result.blockers.map((blocker) => (
           <p key={blocker}>{calculationBlockerLabel(blocker)}</p>
         ))}
@@ -29,7 +29,7 @@ export function InvestmentLabSmallAdjustmentResult({
 
   return (
     <div
-      className="space-y-4 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="space-y-5 border-y border-[#dde1db] py-5"
       data-adjustment-result="ready"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -67,8 +67,8 @@ export function InvestmentLabSmallAdjustmentResult({
         />
       </div>
 
-      <section className="overflow-hidden rounded-md border border-[#e1e6dc]">
-        <div className="border-b border-[#e1e6dc] bg-white px-4 py-3">
+      <section className="overflow-hidden border-y border-[#e1e6dc]">
+        <div className="border-b border-[#e1e6dc] py-3">
           <h4 className="font-semibold">통화 노출 변화</h4>
           <p className="mt-1 text-xs text-[#687064]">
             직접 보유 평가액 기준이며 ETF 구성종목 통화는 펼치지 않습니다.
@@ -77,7 +77,7 @@ export function InvestmentLabSmallAdjustmentResult({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] border-collapse text-sm">
             <thead>
-              <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+              <tr className="text-left text-xs font-semibold text-[#616a5e]">
                 <th className="px-4 py-3">통화</th>
                 <th className="px-3 py-3 text-right">조정 전</th>
                 <th className="px-3 py-3 text-right">조정 후</th>
@@ -117,7 +117,7 @@ function ResultCell({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-[#e1e6dc] bg-white p-3">
+    <div className="border-l-2 border-[#cfd7c7] pl-3">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
       <p className="mt-2 break-words text-base font-semibold tabular-nums">
         {value}

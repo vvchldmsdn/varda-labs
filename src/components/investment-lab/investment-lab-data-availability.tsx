@@ -16,7 +16,7 @@ export function InvestmentLabDataAvailabilityView({
 
   return (
     <section
-      className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      className="overflow-hidden border-y border-[#dde1db]"
       data-availability-status={model.status}
       data-current-writer-dates={actual.latestCurrentWriterDateCount}
       data-market-fx-gaps={market.fxGapCount}
@@ -30,7 +30,7 @@ export function InvestmentLabDataAvailabilityView({
       data-scenario-count={model.scenarioRows.length}
       data-section="investment-lab-data-availability"
     >
-      <div className="border-b border-[#e1e6dc] px-4 py-4">
+      <div className="border-b border-[#e1e6dc] py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">계산 데이터 준비 상태</h2>
@@ -38,7 +38,7 @@ export function InvestmentLabDataAvailabilityView({
               보여줄 수 있는 근거와 아직 보완해야 하는 근거를 분리합니다.
             </p>
           </div>
-          <span className="w-fit rounded-md border border-[#d4dbce] bg-white px-3 py-1.5 text-xs font-semibold text-[#4e594d]">
+          <span className="w-fit border-b border-[#718075] pb-1 text-xs font-semibold text-[#4e594d]">
             자동 보완·DB 쓰기 없음
           </span>
         </div>
@@ -84,7 +84,7 @@ export function InvestmentLabDataAvailabilityView({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead>
-              <tr className="border-y border-[#e1e6dc] bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+              <tr className="border-y border-[#e1e6dc] text-left text-xs font-semibold text-[#616a5e]">
                 <th className="px-3 py-3">시나리오 묶음</th>
                 <th className="px-3 py-3">상태</th>
                 <th className="px-3 py-3">판단 근거</th>
@@ -155,14 +155,14 @@ export function InvestmentLabDataAvailabilityView({
 
 export function InvestmentLabDataAvailabilitySkeleton() {
   return (
-    <section className="h-72 animate-pulse rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    <section className="h-72 animate-pulse border-y border-[#dde1db] bg-[#f2f4ef]" />
   );
 }
 
 export function InvestmentLabDataAvailabilityUnavailable() {
   return (
     <section
-      className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] px-4 py-4 text-sm text-[#725f2d]"
+      className="border-y border-[#d8c69d] py-4 text-sm text-[#725f2d]"
       data-availability-status="unavailable"
       data-section="investment-lab-data-availability"
     >

@@ -160,7 +160,7 @@ export default async function InvestmentLabPage({
 
   return (
     <div
-      className="min-h-screen bg-[#f3f4ef] text-[#171916]"
+      className="min-h-screen bg-[#f8f9f6] text-[#171a16]"
       data-page="investment-lab"
     >
       <Suspense fallback={<InvestmentLabSkeleton />}>
@@ -174,7 +174,7 @@ export default async function InvestmentLabPage({
           selectedScope={selectedScope}
         />
       </Suspense>
-      <div className="mx-auto w-full max-w-[1500px] px-4 pb-4">
+      <div className="mx-auto w-full max-w-[1540px] px-5 pb-4 sm:px-8 lg:px-10">
         <Suspense fallback={<HoldingAnalysisDataPanelSkeleton />}>
           <HoldingAnalysisDataPanel
             resultPromise={analysisDataReadinessPromise}
@@ -391,18 +391,19 @@ async function InvestmentLabSmallAdjustmentContent({
 
 function InvestmentLabSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f3f4ef] p-4 text-[#171916]">
-      <div className="mx-auto w-full max-w-[1500px] space-y-4">
-        <div className="h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <main className="min-h-screen bg-[#f8f9f6] text-[#171a16]">
+      <div className="mx-auto w-full max-w-[1540px] px-5 py-8 sm:px-8 lg:px-10">
+        <div className="h-12 border-y border-[#dde1db]" />
+        <div className="mt-12 h-28 border-b border-[#dde1db]" />
+        <div className="grid border-b border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
-              className="h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+              className="h-24 border-r border-[#dde1db] last:border-r-0"
             />
           ))}
         </div>
-        <div className="h-[420px] rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+        <div className="mt-8 h-[420px] border-b border-[#dde1db]" />
       </div>
     </main>
   );

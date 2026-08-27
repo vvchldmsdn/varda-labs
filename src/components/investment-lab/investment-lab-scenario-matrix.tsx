@@ -43,7 +43,7 @@ export function InvestmentLabScenarioMatrix({
 
   return (
     <section
-      className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      className="overflow-hidden border-y border-[#dde1db]"
       data-scenario-matrix-ready-rows={matrix.coverage.readyRowCount}
       data-scenario-matrix-rows={matrix.coverage.rowCount}
       data-scenario-matrix-status={matrix.status}
@@ -72,7 +72,7 @@ export function InvestmentLabScenarioMatrix({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1380px] border-collapse text-sm">
           <thead>
-            <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+            <tr className="border-b border-[#dde1db] text-left text-xs font-semibold text-[#616a5e]">
               <th className="px-4 py-3">시나리오</th>
               <th className="px-3 py-3">상태</th>
               <th className="px-3 py-3 text-right">종료 평가액</th>

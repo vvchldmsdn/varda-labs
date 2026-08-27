@@ -58,7 +58,7 @@ export function InvestmentLabEtfShock({
 
   return (
     <section
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-y border-[#dde1db] py-6"
       data-shock-covered-exposure={readyResult?.coveredExposurePct.toFixed(6) ?? ""}
       data-shock-direct-exposure={readyResult?.directExposurePct.toFixed(6) ?? ""}
       data-shock-estimated-change-krw={readyResult?.estimatedChangeKrw.toFixed(6) ?? ""}
@@ -75,7 +75,7 @@ export function InvestmentLabEtfShock({
       data-shock-value-scope={exposureScope}
       data-section="investment-lab-etf-shock"
     >
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-1 border-b border-[#dde1db] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold">단일 구성종목 충격 실험</h3>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
@@ -95,7 +95,7 @@ export function InvestmentLabEtfShock({
             <label className="min-w-0 text-xs font-semibold text-[#596255]">
               구성종목
               <select
-                className="mt-2 h-10 w-full rounded-md border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
                 onChange={(event) => {
                   setSelectedKey(event.target.value);
                   setResult(null);
@@ -116,7 +116,7 @@ export function InvestmentLabEtfShock({
             <label className="min-w-0 text-xs font-semibold text-[#596255]">
               가격 충격 (%)
               <input
-                className="mt-2 h-10 w-full rounded-md border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
                 inputMode="decimal"
                 max={INVESTMENT_LAB_ETF_SHOCK_POLICY.maximumShockPct}
                 min={INVESTMENT_LAB_ETF_SHOCK_POLICY.minimumShockPct}
@@ -131,7 +131,7 @@ export function InvestmentLabEtfShock({
             </label>
 
             <button
-              className="h-10 rounded-md bg-[#173f38] px-5 text-sm font-semibold text-white hover:bg-[#0f302a]"
+              className="h-10 rounded-[4px] bg-[#173f38] px-5 text-sm font-semibold text-white hover:bg-[#0f302a]"
               type="submit"
             >
               계산

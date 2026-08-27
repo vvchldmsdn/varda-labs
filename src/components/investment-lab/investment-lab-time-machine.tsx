@@ -4,7 +4,6 @@ import {
   useId,
   useMemo,
   useState,
-  type CSSProperties,
   type PointerEvent,
 } from "react";
 
@@ -13,6 +12,7 @@ import type {
   InvestmentLabScenarioChartLine,
 } from "@/lib/investment-lab-scenario-chart";
 import type { InvestmentLabScenarioMatrixId } from "@/lib/investment-lab-scenario-matrix";
+import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 
 const CHART_WIDTH = 1120;
 const CHART_HEIGHT = 520;
@@ -108,117 +108,139 @@ export function InvestmentLabTimeMachine({
   }
 
   return (
-    <div className="border-y border-[#dce1da] bg-[#f8f9f6]">
-      <div className="border-b border-[#dce1da] px-5 py-7 sm:px-7 lg:px-9">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
+    <section
+      aria-labelledby="investment-lab-time-machine-title"
+      className="border-b border-[#dde1db]"
+    >
+      <div className="grid gap-8 border-b border-[#dde1db] py-9 lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.25fr)] lg:items-end">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="text-[11px] font-medium text-[#777d75]">
-              PORTFOLIO TIME MACHINE
+              COUNTERFACTUAL LAB
             </p>
-            <h2 className="mt-2 max-w-2xl text-3xl font-semibold leading-tight sm:text-4xl">
-              다른 선택을 했다면,
-              <br />
-              지금은 어디에 있었을까
-            </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#666d65]">
-              같은 시작 자산과 같은 관측일을 고정한 뒤 실제 포트폴리오와
-              선택한 대안 세계선을 나란히 봅니다. 결과는 과거 해석이며 미래
-              수익을 보장하거나 매매를 권하지 않습니다.
-            </p>
+            <span className="border border-[#dce0da] bg-[#f1f3ef] px-2 py-1 text-[10px] font-medium text-[#626961]">
+              과거 재구성
+            </span>
           </div>
+          <h1
+            className="mt-3 text-3xl font-semibold tracking-normal"
+            id="investment-lab-time-machine-title"
+          >
+            포트폴리오 타임머신
+          </h1>
+          <p className="mt-1 text-sm text-[#697069]">
+            {selectedLine.label} · {formatDate(actualPoint.serviceDate)}
+          </p>
+          <p
+            className={`mt-6 text-[clamp(2.8rem,5.2vw,5.8rem)] font-normal leading-none tracking-normal tabular-nums ${moneyTone(differenceKrw)}`}
+          >
+            {formatSignedKrw(differenceKrw)}
+          </p>
+          <p className="mt-4 max-w-xl text-xs leading-6 text-[#7a8078]">
+            {differenceLabel(differenceKrw)} · 실제와 같은 시작 자산, 관측일,
+            현금흐름을 사용한 과거 비교입니다.
+          </p>
+        </div>
 
-          <div className="min-w-[250px] border-l border-[#dce1da] pl-5 xl:text-right">
-            <p className="text-[11px] text-[#777d75]">선택일 차이</p>
-            <p
-              className={`mt-1 text-3xl font-medium tabular-nums ${moneyTone(differenceKrw)}`}
+        <dl className="grid grid-cols-2 border-y border-[#dde1db] xl:grid-cols-4">
+          <HeroMetric
+            detail="저장된 실제 경로"
+            label="실제 평가액"
+            value={formatKrw(actualPoint.valueKrw)}
+          />
+          <HeroMetric
+            detail={selectedLine.label}
+            label="가상 평가액"
+            value={formatKrw(selectedPoint.valueKrw)}
+          />
+          <HeroMetric
+            detail={formatSignedPercent(differencePct)}
+            label="실제 대비"
+            value={formatSignedKrw(differenceKrw)}
+            valueClass={moneyTone(differenceKrw)}
+          />
+          <HeroMetric
+            detail={
+              selectedSummary?.annualizedVolatility === null ||
+              selectedSummary?.annualizedVolatility === undefined
+                ? "변동성 근거 부족"
+                : `변동성 ${formatPercent(selectedSummary.annualizedVolatility)}`
+            }
+            label="최대 낙폭"
+            value={formatPercent(selectedSummary?.maximumDrawdown ?? null, true)}
+          />
+        </dl>
+      </div>
+
+      <div className="border-b border-[#dde1db] py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-[#777d75]">세계선 선택</p>
+            <div
+              aria-label="대안 세계선"
+              className="mt-2 flex gap-6 overflow-x-auto pb-1"
+              role="group"
             >
-              {formatSignedKrw(differenceKrw)}
-            </p>
-            <p className={`mt-1 text-sm tabular-nums ${moneyTone(differenceKrw)}`}>
-              {formatSignedPercent(differencePct)} · {formatDate(actualPoint.serviceDate)}
-            </p>
+              {selectableLines.map((line) => {
+                const active = line.id === selectedLine.id;
+                const summary = summaryById.get(line.id);
+                return (
+                  <button
+                    key={line.id}
+                    aria-pressed={active}
+                    className={`min-w-max border-b-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] ${
+                      active
+                        ? "border-[#20231f] text-[#20231f]"
+                        : "border-transparent text-[#777d75] hover:text-[#20231f]"
+                    }`}
+                    onClick={() => setRequestedScenarioId(line.id)}
+                    type="button"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <span
+                        aria-hidden="true"
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: line.color }}
+                      />
+                      {line.label}
+                    </span>
+                    <span
+                      className={`mt-1 block text-[11px] tabular-nums ${moneyTone(summary?.endDifferenceKrw ?? null)}`}
+                    >
+                      종료 시점 {formatSignedKrw(summary?.endDifferenceKrw ?? null)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-x-5 gap-y-2 text-xs text-[#5f665e]">
+            <Legend color={actualLine.color} label="실제 포트폴리오" />
+            <Legend color={selectedLine.color} label={selectedLine.label} />
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3 w-5 bg-[#e9eee9]" />
+              두 경로의 간격
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="border-b border-[#dce1da] p-5 sm:p-7 lg:border-b-0 lg:border-r">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-medium text-[#777d75]">
-                ALTERNATE WORLDS
-              </p>
-              <h3 className="mt-1 text-lg font-semibold">대안 세계선</h3>
-            </div>
-            <p className="text-xs text-[#777d75]">{selectableLines.length}개</p>
+      <div className="min-w-0 py-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-medium text-[#777d75]">
+              VALUE PATHS
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">
+              실제와 {selectedLine.label}
+            </h2>
           </div>
+          <p className="text-xs text-[#777d75]">
+            동일 축 · 누락값 보간 없음 · 마우스로 날짜 탐색
+          </p>
+        </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:max-h-[506px] lg:grid-cols-1 lg:overflow-y-auto lg:pr-1">
-            {selectableLines.map((line) => {
-              const active = line.id === selectedLine.id;
-              const summary = summaryById.get(line.id);
-              return (
-                <button
-                  key={line.id}
-                  aria-pressed={active}
-                  className={`min-h-[74px] border px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] ${
-                    active
-                      ? "border-[#6c746b] bg-white"
-                      : "border-[#e0e4de] bg-[#f4f6f2] hover:border-[#aeb5ad] hover:bg-white"
-                  }`}
-                  onClick={() => setRequestedScenarioId(line.id)}
-                  style={
-                    active
-                      ? ({ borderLeftColor: line.color, borderLeftWidth: 3 } satisfies CSSProperties)
-                      : undefined
-                  }
-                  type="button"
-                >
-                  <span className="flex items-center gap-2">
-                    <span
-                      aria-hidden="true"
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: line.color }}
-                    />
-                    <span className="min-w-0 truncate text-xs font-semibold text-[#272b27]">
-                      {line.label}
-                    </span>
-                  </span>
-                  <span
-                    className={`mt-2 block text-sm font-medium tabular-nums ${moneyTone(summary?.endDifferenceKrw ?? null)}`}
-                  >
-                    {formatSignedKrw(summary?.endDifferenceKrw ?? null)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        <section className="min-w-0 px-4 py-5 sm:px-7 sm:py-7 lg:px-9">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-[11px] font-medium text-[#777d75]">
-                시나리오 평가액 경로
-              </p>
-              <h3 className="mt-1 text-xl font-semibold">{selectedLine.label}</h3>
-              <p className="mt-1 text-xs text-[#777d75]">
-                실제 포트폴리오와 동일한 축 · 값 누락 시 보간 없음
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#5f665e]">
-              <Legend color={actualLine.color} label="실제 포트폴리오" />
-              {selectedLine.id === actualLine.id ? null : (
-                <Legend color={selectedLine.color} label={selectedLine.label} />
-              )}
-              <span className="inline-flex items-center gap-2">
-                <span className="h-3 w-5 bg-[#e9eee9]" />
-                두 경로의 간격
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
+        <div className="mt-5 overflow-x-auto">
             <svg
               aria-label="실제 포트폴리오와 선택한 대안 세계선 평가액 비교"
               className="block h-auto min-w-[820px] w-full touch-none"
@@ -361,60 +383,49 @@ export function InvestmentLabTimeMachine({
                 </text>
               ))}
             </svg>
-          </div>
+        </div>
 
-          <label className="mt-1 block text-[11px] font-medium text-[#777d75]">
-            날짜 탐색
-            <input
-              aria-label="비교 날짜 탐색"
-              className="portfolio-history-range mt-2 w-full"
-              max={Math.max(actualLine.points.length - 1, 0)}
-              min={0}
-              onChange={(event) =>
-                setRequestedFocusIndex(Number(event.currentTarget.value))
-              }
-              step={1}
-              type="range"
-              value={focusIndex}
-            />
-          </label>
-        </section>
+        <label className="mt-1 block text-[11px] font-medium text-[#777d75]">
+          날짜 탐색
+          <input
+            aria-label="비교 날짜 탐색"
+            className="portfolio-history-range mt-2 w-full"
+            max={Math.max(actualLine.points.length - 1, 0)}
+            min={0}
+            onChange={(event) =>
+              setRequestedFocusIndex(Number(event.currentTarget.value))
+            }
+            step={1}
+            type="range"
+            value={focusIndex}
+          />
+        </label>
       </div>
 
-      <dl className="grid border-t border-[#dce1da] sm:grid-cols-2 xl:grid-cols-5">
+      <dl className="grid border-t border-[#dce1da] sm:grid-cols-2 xl:grid-cols-4">
+        <Metric
+          detail={`${formatDate(chart.period!.startServiceDate)} ~ ${formatDate(chart.period!.endServiceDate)}`}
+          label="비교 구간"
+          value={`${chart.period!.comparisonDateCount}개 관측일`}
+        />
         <Metric
           detail={formatDate(actualPoint.serviceDate)}
           label="선택 관측일"
           value={shortDate(actualPoint.serviceDate)}
         />
         <Metric
-          detail="저장된 실제 평가액"
-          label="실제 포트폴리오"
-          value={formatKrw(actualPoint.valueKrw)}
-        />
-        <Metric
-          detail={selectedLine.label}
-          label="대안 세계선"
-          value={formatKrw(selectedPoint.valueKrw)}
-        />
-        <Metric
-          detail={formatSignedPercent(selectedSummary?.returnEstimate ?? null)}
+          detail="현금흐름 조정 추정"
           label="구간 수익률"
-          value={formatSignedKrw(selectedSummary?.endDifferenceKrw ?? null)}
-          valueClass={moneyTone(selectedSummary?.endDifferenceKrw ?? null)}
+          value={formatSignedPercent(selectedSummary?.returnEstimate ?? null)}
+          valueClass={moneyTone(selectedSummary?.returnEstimate ?? null)}
         />
         <Metric
-          detail={
-            selectedSummary?.annualizedVolatility === null ||
-            selectedSummary?.annualizedVolatility === undefined
-              ? "변동성 계산 근거 부족"
-              : `연환산 변동성 ${formatPercent(selectedSummary.annualizedVolatility)}`
-          }
-          label="최대 낙폭"
-          value={formatPercent(selectedSummary?.maximumDrawdown ?? null, true)}
+          detail="같은 관측일 수익률의 연환산"
+          label="연환산 변동성"
+          value={formatPercent(selectedSummary?.annualizedVolatility ?? null)}
         />
       </dl>
-    </div>
+    </section>
   );
 }
 
@@ -487,11 +498,12 @@ function linePath(
   x: (index: number) => number,
   y: (value: number) => number,
 ) {
-  return line.points
-    .map((point, index) =>
-      `${index === 0 ? "M" : "L"}${x(index).toFixed(2)},${y(point.valueKrw).toFixed(2)}`,
-    )
-    .join(" ");
+  return buildMonotoneCurvePath(
+    line.points.map((point, index) => ({
+      x: x(index),
+      y: y(point.valueKrw),
+    })),
+  );
 }
 
 function Tooltip({
@@ -602,6 +614,28 @@ function Metric({
   );
 }
 
+function HeroMetric({
+  detail,
+  label,
+  value,
+  valueClass = "text-[#20231f]",
+}: {
+  detail: string;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="min-w-0 border-b border-r border-[#dde1db] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
+      <dt className="text-[11px] text-[#747a72]">{label}</dt>
+      <dd className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}>
+        {value}
+      </dd>
+      <dd className="mt-2 truncate text-[11px] text-[#858a83]">{detail}</dd>
+    </div>
+  );
+}
+
 function defaultScenarioId(chart: InvestmentLabScenarioChart) {
   for (const id of DEFAULT_SCENARIO_ORDER) {
     if (chart.lines.some((line) => line.id === id)) return id;
@@ -650,6 +684,13 @@ function shortDate(value: string) {
 function moneyTone(value: number | null) {
   if (value === null || Math.abs(value) < 0.5) return "text-[#4f5650]";
   return value > 0 ? "text-[#27735c]" : "text-[#c8524b]";
+}
+
+function differenceLabel(value: number) {
+  if (Math.abs(value) < 0.5) return "실제 포트폴리오와 같은 위치";
+  return value > 0
+    ? "실제 포트폴리오보다 높은 위치"
+    : "실제 포트폴리오보다 낮은 위치";
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
