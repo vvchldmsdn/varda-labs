@@ -72,6 +72,7 @@ export function PortfolioStructureRiskAnalytics({
           {formatDate(model.provenance.firstServiceDate)} ~ {formatDate(model.provenance.lastServiceDate)}
         </span>
         <span>KRW 환산 수익률</span>
+        <span>조정종가 우선 · 검증된 KIS 원종가 보완</span>
         {excludedHoldingCount > 0 ? (
           <span className="text-[#8a6230]">
             시계열 없는 특수자산 {excludedHoldingCount}개 제외
@@ -409,7 +410,7 @@ function RiskUnavailable({ model }: { model: PortfolioRiskReadModel }) {
     <div className="mt-8 border-y border-[#d9ddd7] py-10">
       <p className="text-lg font-medium">위험 분석 근거가 아직 충분하지 않습니다.</p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[#747a72]">
-        현재 {model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}일의 수익률을 사용할 수 있습니다. 가격 이력을 지우거나 임의 평균으로 채우지 않고, 승인된 조정종가가 쌓이면 같은 화면에서 자동 계산합니다.
+        현재 {model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}일의 수익률을 사용할 수 있습니다. 가격 이력을 지우거나 임의 평균으로 채우지 않으며, 조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다.
       </p>
     </div>
   );

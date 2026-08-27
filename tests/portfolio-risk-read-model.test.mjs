@@ -9,6 +9,11 @@ import {
 } from "../src/lib/portfolio-risk-read-loader.ts";
 import { composePortfolioRiskReadModel } from "../src/lib/portfolio-risk-read-model.ts";
 import {
+  admitAdjustedHistoricalPriceRows,
+  admitSharedKisRawHistoricalPriceRows,
+  selectPreferredPrivateHistoricalPriceRows,
+} from "../src/lib/market-data/asset-price-consumer-admission.ts";
+import {
   fxRow,
   portfolioRiskReadModelFixture,
 } from "./fixtures/portfolio-risk-read-model.mjs";
@@ -61,6 +66,52 @@ describe("portfolio risk read model", () => {
       serialized,
       /api[_-]?key|authorization|password|secret|token/i,
     );
+  });
+
+  it("calculates ENB and Sharpe from verified KIS raw history when adjusted history is unavailable", () => {
+    const fixture = portfolioRiskReadModelFixture();
+    const candidates = fixture.priceRows.map((row) => ({
+      ...row,
+      adjustedCloseBasis: null,
+      adjustedCloseProvider: null,
+      adjustedCloseSource: null,
+      adjustedCloseFetchedAt: null,
+      providerSymbol: row.ticker,
+      providerExchange: row.market === "korea" ? "KRX" : "AMS",
+      fetchedAt: `${row.priceDate}T22:00:00.000Z`,
+      source:
+        row.market === "korea"
+          ? "kis_domestic_dailyitemchartprice"
+          : "kis_overseas_dailyprice:AMS",
+    }));
+    const preferred = selectPreferredPrivateHistoricalPriceRows({
+      adjustedRows: admitAdjustedHistoricalPriceRows(candidates).rows,
+      privateRawRows: admitSharedKisRawHistoricalPriceRows(candidates).rows,
+    });
+    fixture.priceRows = preferred.rows.map(({ row, priceBasis }) => ({
+      ticker: row.ticker,
+      market: row.market,
+      currency: row.currency,
+      priceDate: row.priceDate,
+      closePrice: row.closePrice,
+      adjustedClosePrice:
+        priceBasis === "provider_adjusted_close"
+          ? row.adjustedClosePrice
+          : null,
+      source:
+        priceBasis === "provider_adjusted_close"
+          ? row.adjustedCloseSource
+          : row.source,
+      isSample: row.isSample,
+    }));
+
+    const result = composePortfolioRiskReadModel(fixture);
+
+    assert.equal(preferred.summary.privateRawInstrumentCount, 2);
+    assert.equal(result.provenance.usableReturnObservations, 30);
+    assert.equal(result.calculation.calculationStatus, "complete");
+    assert.notEqual(result.calculation.portfolio?.riskContributionEnb.value, null);
+    assert.notEqual(result.calculation.portfolio?.sharpe.value, null);
   });
 
   it("filters holdings by account before instrument aggregation and weights", () => {
