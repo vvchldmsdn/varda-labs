@@ -141,6 +141,8 @@ describe("stored history amount trajectory", () => {
     assert.doesNotMatch(chartSource, /fetch\s*\(|\/api\//i);
     assert.match(chartSource, /<polyline/);
     assert.match(chartSource, /<circle/);
+    assert.match(chartSource, /<title>\{chartTitle\}<\/title>/);
+    assert.doesNotMatch(chartSource, /<title>\s*\n\s*\{historyAccountLabel/);
     assert.match(viewSource, /<HistoryTrajectoryChart/);
   });
 });
