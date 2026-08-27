@@ -22,7 +22,7 @@ export function DirectHoldingsBaseline({
   return (
     <section
       aria-labelledby="direct-holdings-baseline-title"
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-t border-[#d9ddd7] pt-8 lg:pt-10"
       data-direct-holding-count={model.directHoldingCount}
       data-excluded-holding-count={model.excludedHoldingCount}
       data-policy={model.policy.version}
@@ -32,26 +32,29 @@ export function DirectHoldingsBaseline({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
+          <p className="text-[11px] font-medium text-[#7b8079]">
+            CONCENTRATION / CURRENCY
+          </p>
           <h2
-            className="text-lg font-semibold tracking-normal"
+            className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="direct-holdings-baseline-title"
           >
             직접 보유 집중도·통화 노출
           </h2>
-          <p className="mt-1 text-sm leading-6 text-[#687064]">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#687064]">
             {scopeLabel ?? ACCOUNT_LABELS[model.selectedAccount]}의 현재 평가액을 직접 보유
             종목 기준으로 계산했습니다. ETF 내부 구성, 목표비중, 추천, 주문은
             포함하지 않습니다.
           </p>
         </div>
-        <p className="text-sm font-semibold text-[#3f4b40]">
+        <p className="text-sm font-medium text-[#3f4b40]">
           평가 완전성 {statusLabel(model.status)}
         </p>
       </div>
 
       {metrics ? (
         <>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-7 grid border-y border-[#d9ddd7] sm:grid-cols-2 xl:grid-cols-5">
             <MetricCell
               detail={`식별 가능한 직접 보유 ${model.directHoldingCount}개`}
               label="평가액"
@@ -79,12 +82,12 @@ export function DirectHoldingsBaseline({
             />
           </div>
 
-          <div className="mt-4">
-            <h3 className="text-sm font-semibold text-[#30382f]">통화별 노출</h3>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-8">
+            <h3 className="text-sm font-medium text-[#30382f]">통화별 노출</h3>
+            <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
               {metrics.currencyExposures.map((row) => (
                 <div
-                  className="rounded-md border border-[#e2e6da] bg-white p-3"
+                  className="border-l border-[#cfd4cd] pl-4"
                   key={row.currency}
                 >
                   <div className="flex items-baseline justify-between gap-3">
@@ -93,7 +96,7 @@ export function DirectHoldingsBaseline({
                       {formatPercent(row.currentWeightPct)}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs tabular-nums text-[#687064]">
+                  <p className="mt-2 text-xs tabular-nums text-[#687064]">
                     {formatKrw(row.currentValueKrw)} · {row.holdingCount}개
                   </p>
                 </div>
@@ -102,14 +105,14 @@ export function DirectHoldingsBaseline({
           </div>
         </>
       ) : (
-        <p className="mt-4 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-sm text-[#725f2d]">
+        <p className="mt-7 border-y border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-sm text-[#725f2d]">
           식별 가능하고 평가액이 있는 직접 보유 종목이 없어 집중도와 통화
           노출을 계산하지 않았습니다.
         </p>
       )}
 
       {model.status === "partial" ? (
-        <p className="mt-4 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-xs leading-5 text-[#725f2d]">
+        <p className="mt-6 border-y border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-xs leading-5 text-[#725f2d]">
           표시된 값은 확인 가능한 종목만의 부분 계산입니다. 평가 제외 {" "}
           {model.excludedHoldingCount}개 · 식별 불가 {" "}
           {model.unresolvedIdentityCount}개 · 평가액 오류 {" "}
@@ -135,9 +138,9 @@ function MetricCell({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-[#e2e6da] bg-white p-3">
+    <div className="min-w-0 border-b border-[#e2e5df] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-2 text-xl font-semibold tracking-normal tabular-nums text-[#111411]">
+      <p className="mt-3 text-xl font-medium tracking-normal tabular-nums text-[#111411]">
         {value}
       </p>
       <p className="mt-1 truncate text-xs text-[#73786c]" title={detail}>

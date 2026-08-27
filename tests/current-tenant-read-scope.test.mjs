@@ -413,7 +413,11 @@ describe("current tenant read scope runtime boundary", () => {
   });
 
   it("keeps portfolio structure behind the resolved server session", () => {
-    const source = read("src/app/portfolio/structure/page.tsx");
+    const pageSource = read("src/app/portfolio/structure/page.tsx");
+    const viewSource = read(
+      "src/components/portfolio/portfolio-structure-view.tsx",
+    );
+    const source = `${pageSource}\n${viewSource}`;
 
     assert.match(source, /resolveCurrentTenantContext\(\)/);
     assert.match(source, /Promise\.all/);

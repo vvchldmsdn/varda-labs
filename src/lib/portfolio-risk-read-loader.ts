@@ -4,6 +4,7 @@ import {
   composePortfolioRiskReadModel,
   PORTFOLIO_RISK_READ_POLICY,
 } from "./portfolio-risk-read-model.ts";
+import { PORTFOLIO_RISK_BENCHMARKS } from "./portfolio-risk-path-analytics.ts";
 import type {
   PortfolioRiskAccount,
   PortfolioRiskReadRepository,
@@ -81,14 +82,23 @@ async function loadPortfolioRiskReadModelWithSelection({
     -PORTFOLIO_RISK_READ_POLICY.maxFxCarryDays,
   );
   const assetRows = await repository.loadAssets(selection.account);
-  const tickers = uniqueStrings(
-    assetRows
+  const hasAssets = assetRows.length > 0;
+  const tickers = uniqueStrings([
+    ...assetRows
       .map((row) => normalizeTicker(row.ticker))
       .filter((ticker): ticker is string => Boolean(ticker)),
-  );
-  const requiresFx = assetRows.some(
-    (row) => normalizeCurrencyCode(row.currency) === "USD",
-  );
+    ...(hasAssets
+      ? PORTFOLIO_RISK_BENCHMARKS.map((benchmark) => benchmark.ticker)
+      : []),
+  ]);
+  const requiresFx =
+    hasAssets &&
+    (assetRows.some(
+      (row) => normalizeCurrencyCode(row.currency) === "USD",
+    ) ||
+      PORTFOLIO_RISK_BENCHMARKS.some(
+        (benchmark) => benchmark.currency === "USD",
+      ));
 
   const priceRowsPromise =
     tickers.length > 0

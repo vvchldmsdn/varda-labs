@@ -125,13 +125,21 @@ describe("portfolio direct USD FX shock", () => {
       new URL("../src/app/portfolio/structure/page.tsx", import.meta.url),
       "utf8",
     );
+    const viewSource = readFileSync(
+      new URL(
+        "../src/components/portfolio/portfolio-structure-view.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
 
     assert.doesNotMatch(calculatorSource, /@\/db|\bfetch\s*\(|DATABASE_URL/);
     assert.match(componentSource, /^"use client";/);
     assert.doesNotMatch(componentSource, /\bfetch\s*\(|\/api\//);
     assert.match(componentSource, /data-section="portfolio-fx-shock"/);
-    assert.match(pageSource, /<PortfolioFxShock/);
-    assert.match(pageSource, /currentUsdKrwRate=\{structure\.usdKrwRate\}/);
+    assert.match(pageSource, /const structure = model\.structure/);
+    assert.match(viewSource, /<PortfolioFxShock/);
+    assert.match(viewSource, /currentUsdKrwRate=\{data\.structure\.usdKrwRate\}/);
   });
 });
 

@@ -1,24 +1,13 @@
-import Link from "next/link";
-import type { ReactNode } from "react";
-
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
-import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
-import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-baseline";
-import { PortfolioFxShock } from "@/components/portfolio/portfolio-fx-shock";
-import { SpecialHoldingsCoverage } from "@/components/portfolio/special-holdings-coverage";
+import { PortfolioStructureView } from "@/components/portfolio/portfolio-structure-view";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { getReadOnlyTenantPortfolioRiskForScope } from "@/db/queries/portfolio-risk";
 import { getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfolio-target-policy";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { buildPortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
+import { buildPortfolioStructureDesignPreview } from "@/lib/portfolio-structure-design-preview";
 import { buildPortfolioSpecialHoldingsModel } from "@/lib/portfolio-special-holdings";
-import { buildPortfolioAnalysisScopeHref } from "@/lib/portfolio-analysis-scope";
-import type {
-  PortfolioStructureExclusion,
-  PortfolioStructureGroupRow,
-  PortfolioStructureHoldingRow,
-} from "@/lib/portfolio-structure";
-import type { PortfolioStructureTargetProjection } from "@/lib/portfolio-structure-target-policy";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
@@ -27,17 +16,26 @@ type PortfolioStructurePageProps = {
   searchParams: Promise<{
     account?: string | string[];
     scope?: string | string[];
+    window?: string | string[];
   }>;
 };
 
 export default async function PortfolioStructurePage({
   searchParams,
 }: PortfolioStructurePageProps) {
+  if (process.env.NODE_ENV === "development") {
+    const params = await searchParams;
+    return (
+      <PortfolioStructureView
+        data={buildPortfolioStructureDesignPreview(params.scope)}
+      />
+    );
+  }
+
   const [params, resolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
   ]);
-
   if (!resolution.ok) {
     return (
       <PortfolioReadAccessBoundary
@@ -66,454 +64,40 @@ export default async function PortfolioStructurePage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
-  const model = await getReadOnlyTenantPortfolioTargetPolicyModel({
-    scope: selectedScope,
-    serviceDate,
-    tenantContext: resolution.tenantContext,
-  });
+  const now = new Date();
+  const serviceDate = resolveSnapshotCycle(now).snapshotDate;
+  const [model, riskModel] = await Promise.all([
+    getReadOnlyTenantPortfolioTargetPolicyModel({
+      scope: selectedScope,
+      serviceDate,
+      tenantContext: resolution.tenantContext,
+    }),
+    getReadOnlyTenantPortfolioRiskForScope({
+      scope: selectedScope,
+      tenantContext: resolution.tenantContext,
+      window: params.window,
+      now,
+    }),
+  ]);
   const structure = model.structure;
-  const directHoldingsBaseline =
-    buildPortfolioDirectHoldingsBaseline(structure);
-  const specialHoldingsCoverage =
-    buildPortfolioSpecialHoldingsModel(structure);
 
   return (
-    <main
-      className="min-h-screen bg-[#f3f4ef] text-[#171916]"
-      data-page="portfolio-structure"
-    >
-      <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[#687064]">
-                Varda Labs
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                자산 배분
-              </h1>
-            </div>
-            <nav className="flex flex-wrap gap-2 text-sm font-semibold">
-              <NavLink href="/">Dashboard</NavLink>
-              <NavLink href="/today">Today Movement</NavLink>
-              <NavLink href="/history">History</NavLink>
-              <NavLink href="/portfolio/groups">자산 그룹</NavLink>
-              <NavLink
-                href={buildPortfolioAnalysisScopeHref(
-                  "/portfolio/targets",
-                  selectedScope.key,
-                )}
-              >
-                목표비중
-              </NavLink>
-              <NavLink href="/etfs">ETF Reference</NavLink>
-              <NavLink href="/market">Market Context</NavLink>
-            </nav>
-          </div>
-
-          <div className="mt-4">
-            <PortfolioAnalysisScopeTabs
-              basePath="/portfolio/structure"
-              scopes={scopeContext.catalog.scopes}
-              selectedScopeKey={selectedScope.key}
-            />
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <SummaryCell
-              label="Current value"
-              value={formatMoney(structure.totalValueKrw)}
-              detail={`USD/KRW ${formatNumber(structure.usdKrwRate)}`}
-            />
-            <SummaryCell
-              label="Included holdings"
-              value={String(structure.includedHoldingCount)}
-              detail={`${structure.excludedHoldingCount} excluded`}
-            />
-            <SummaryCell
-              label="Groups"
-              value={String(structure.groupRows.length)}
-              detail={`${selectedScope.label} · ${scopeKindLabel(selectedScope.kind)}`}
-            />
-            <SummaryCell
-              label="Policy status"
-              value={policyStatusLabel(model.structureTargetProjection.status)}
-              detail={policyStatusDetail({
-                effectiveServiceDate:
-                  model.approvedPolicy.policy?.effectiveServiceDate ?? null,
-                projection: model.structureTargetProjection,
-              })}
-            />
-          </div>
-        </section>
-
-        <DirectHoldingsBaseline
-          model={directHoldingsBaseline}
-          scopeLabel={selectedScope.label}
-        />
-
-        <PortfolioFxShock
-          baseline={directHoldingsBaseline}
-          currentUsdKrwRate={structure.usdKrwRate}
-        />
-
-        <SpecialHoldingsCoverage model={specialHoldingsCoverage} />
-
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <SectionHeader title="그룹 비중" detail="current read model" />
-          <GroupTable rows={structure.groupRows} />
-        </section>
-
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <SectionHeader title="보유 종목 비중" detail="current holdings" />
-          <HoldingTable rows={structure.holdingRows} />
-        </section>
-
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <SectionHeader
-            title="Exclusions"
-            detail={`${structure.exclusions.length} rows`}
-          />
-          <ExclusionTable rows={structure.exclusions} />
-        </section>
-
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <SectionHeader title="Data Health" detail="read-only counts" />
-          <div className="mt-3 grid gap-3 md:grid-cols-4">
-            <SummaryCell
-              label="Selected assets"
-              value={String(structure.dataHealth.selectedAssetCount)}
-              detail={`input ${structure.dataHealth.inputAssetCount}`}
-            />
-            <SummaryCell
-              label="Missing price"
-              value={String(structure.dataHealth.missingPriceCount)}
-              detail="current valuation"
-            />
-            <SummaryCell
-              label="Missing FX"
-              value={String(structure.dataHealth.missingFxCount)}
-              detail="USD conversion"
-            />
-            <SummaryCell
-              label="Policy unresolved"
-              value={String(structure.dataHealth.unresolvedTargetPolicyCount)}
-              detail="target_policy_unresolved"
-            />
-          </div>
-        </section>
-      </div>
-    </main>
+    <PortfolioStructureView
+      data={{
+        analysisScopes: scopeContext.catalog.scopes,
+        selectedScope,
+        generatedAt: now.toISOString(),
+        serviceDate,
+        structure,
+        targetProjection: model.structureTargetProjection,
+        targetEffectiveServiceDate:
+          model.approvedPolicy.policy?.effectiveServiceDate ?? null,
+        directHoldingsBaseline:
+          buildPortfolioDirectHoldingsBaseline(structure),
+        specialHoldingsCoverage:
+          buildPortfolioSpecialHoldingsModel(structure),
+        riskModel,
+      }}
+    />
   );
-}
-
-function GroupTable({ rows }: { rows: PortfolioStructureGroupRow[] }) {
-  if (rows.length === 0) {
-    return <EmptyTableMessage>No group rows found.</EmptyTableMessage>;
-  }
-
-  return (
-    <div className="mt-3 overflow-x-auto">
-      <table className="w-full min-w-[820px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs uppercase text-[#687064]">
-          <tr>
-            <TableHeader>Group</TableHeader>
-            <TableHeader align="right">Value</TableHeader>
-            <TableHeader align="right">Weight</TableHeader>
-            <TableHeader align="right">Group target</TableHeader>
-            <TableHeader align="right">Effective target</TableHeader>
-            <TableHeader align="right">Drift</TableHeader>
-            <TableHeader align="right">Holdings</TableHeader>
-            <TableHeader align="right">Excluded</TableHeader>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.name} className="border-t border-[#e1e6dc]">
-              <TableCell strong>{row.name}</TableCell>
-              <TableCell align="right">{formatMoney(row.currentValueKrw)}</TableCell>
-              <TableCell align="right">
-                {formatPercent(row.currentWeightPct)}
-              </TableCell>
-              <TableCell align="right">{formatPercent(row.groupTargetPct)}</TableCell>
-              <TableCell align="right">
-                {formatPercent(row.effectiveTargetPct)}
-              </TableCell>
-              <TableCell align="right">{formatSignedPercent(row.driftPct)}</TableCell>
-              <TableCell align="right">{row.holdingCount}</TableCell>
-              <TableCell align="right">{row.excludedCount}</TableCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function HoldingTable({ rows }: { rows: PortfolioStructureHoldingRow[] }) {
-  if (rows.length === 0) {
-    return <EmptyTableMessage>No holding rows found.</EmptyTableMessage>;
-  }
-
-  return (
-    <div className="mt-3 overflow-x-auto">
-      <table className="w-full min-w-[1450px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs uppercase text-[#687064]">
-          <tr>
-            <TableHeader>Holding</TableHeader>
-            <TableHeader>Account</TableHeader>
-            <TableHeader>Market</TableHeader>
-            <TableHeader>Currency</TableHeader>
-            <TableHeader>Group</TableHeader>
-            <TableHeader align="right">Quantity</TableHeader>
-            <TableHeader align="right">Price</TableHeader>
-            <TableHeader align="right">Value</TableHeader>
-            <TableHeader align="right">Weight</TableHeader>
-            <TableHeader align="right">Asset target</TableHeader>
-            <TableHeader align="right">Group target</TableHeader>
-            <TableHeader align="right">Effective target</TableHeader>
-            <TableHeader align="right">Drift</TableHeader>
-            <TableHeader>Policy</TableHeader>
-            <TableHeader>Price evidence</TableHeader>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={`${row.account}-${row.market}-${row.ticker ?? row.name}`}
-              className="border-t border-[#e1e6dc]"
-            >
-              <TableCell strong>
-                <div>{row.ticker ?? "-"}</div>
-                <div className="text-xs font-normal text-[#687064]">
-                  {row.name}
-                </div>
-              </TableCell>
-              <TableCell>{row.account}</TableCell>
-              <TableCell>{row.market}</TableCell>
-              <TableCell>{row.currency}</TableCell>
-              <TableCell>{row.groupName}</TableCell>
-              <TableCell align="right">{formatNumber(row.quantity)}</TableCell>
-              <TableCell align="right">{formatNumber(row.currentPrice)}</TableCell>
-              <TableCell align="right">{formatMoney(row.currentValueKrw)}</TableCell>
-              <TableCell align="right">{formatPercent(row.currentWeightPct)}</TableCell>
-              <TableCell align="right">
-                {formatPercent(row.rawAssetTargetPct)}
-              </TableCell>
-              <TableCell align="right">{formatPercent(row.groupTargetPct)}</TableCell>
-              <TableCell align="right">
-                {formatPercent(row.effectiveTargetPct)}
-              </TableCell>
-              <TableCell align="right">{formatSignedPercent(row.driftPct)}</TableCell>
-              <TableCell>{row.targetPolicyStatus}</TableCell>
-              <TableCell>
-                <div>{row.priceEvidenceSource}</div>
-                <div className="text-xs text-[#687064]">
-                  {row.priceSource ?? "-"}
-                </div>
-              </TableCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ExclusionTable({ rows }: { rows: PortfolioStructureExclusion[] }) {
-  if (rows.length === 0) {
-    return <EmptyTableMessage>No excluded rows.</EmptyTableMessage>;
-  }
-
-  return (
-    <div className="mt-3 overflow-x-auto">
-      <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs uppercase text-[#687064]">
-          <tr>
-            <TableHeader>Reason</TableHeader>
-            <TableHeader>Holding</TableHeader>
-            <TableHeader>Account</TableHeader>
-            <TableHeader>Market</TableHeader>
-            <TableHeader>Currency</TableHeader>
-            <TableHeader>Group</TableHeader>
-            <TableHeader align="right">Quantity</TableHeader>
-            <TableHeader align="right">Price</TableHeader>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={`${row.reason}-${row.account}-${row.market}-${row.ticker ?? row.name}`}
-              className="border-t border-[#e1e6dc]"
-            >
-              <TableCell strong>{row.reason}</TableCell>
-              <TableCell>
-                <div>{row.ticker ?? "-"}</div>
-                <div className="text-xs text-[#687064]">{row.name}</div>
-              </TableCell>
-              <TableCell>{row.account}</TableCell>
-              <TableCell>{row.market}</TableCell>
-              <TableCell>{row.currency}</TableCell>
-              <TableCell>{row.groupName}</TableCell>
-              <TableCell align="right">{formatNumber(row.quantity)}</TableCell>
-              <TableCell align="right">{formatNumber(row.currentPrice)}</TableCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SummaryCell({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-md border border-[#e2e6da] bg-white p-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-2 text-xl font-semibold tracking-normal text-[#111411]">
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-[#73786c]">{detail}</p>
-    </div>
-  );
-}
-
-function SectionHeader({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
-      <p className="text-xs text-[#687064]">{detail}</p>
-    </div>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-[#253029] hover:bg-[#eef1e8]"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function TableHeader({
-  children,
-  align = "left",
-}: {
-  children: ReactNode;
-  align?: "left" | "right";
-}) {
-  return (
-    <th
-      className={[
-        "border-b border-[#dfe3d5] px-3 py-2 font-semibold",
-        align === "right" ? "text-right" : "text-left",
-      ].join(" ")}
-    >
-      {children}
-    </th>
-  );
-}
-
-function TableCell({
-  children,
-  align = "left",
-  strong = false,
-}: {
-  children: ReactNode;
-  align?: "left" | "right";
-  strong?: boolean;
-}) {
-  return (
-    <td
-      className={[
-        "border-b border-[#edf0e7] px-3 py-2 align-top",
-        align === "right" ? "text-right" : "text-left",
-        strong ? "font-semibold" : "",
-      ].join(" ")}
-    >
-      {children}
-    </td>
-  );
-}
-
-function EmptyTableMessage({ children }: { children: ReactNode }) {
-  return (
-    <div className="mt-3 rounded-md border border-[#e2e6da] bg-white p-3 text-sm text-[#687064]">
-      {children}
-    </div>
-  );
-}
-
-function policyStatusLabel(
-  status: PortfolioStructureTargetProjection["status"],
-) {
-  if (status === "applied") return "승인 정책 적용";
-  if (status === "partial") return "일부 연결";
-  if (status === "invalid") return "검증 필요";
-  return "정책 없음";
-}
-
-function policyStatusDetail({
-  effectiveServiceDate,
-  projection,
-}: {
-  effectiveServiceDate: string | null;
-  projection: Omit<PortfolioStructureTargetProjection, "structure">;
-}) {
-  if (projection.status === "applied") {
-    return `${effectiveServiceDate ?? "-"} · ${projection.coverage.matchedHoldingCount}/${projection.coverage.policyTargetCount} 종목`;
-  }
-  if (projection.status === "partial") {
-    return `${projection.coverage.matchedHoldingCount}/${projection.coverage.policyTargetCount} 종목 연결`;
-  }
-  if (projection.status === "invalid") return "목표비중 매핑을 확인하세요";
-  if (projection.reason === "not_effective") {
-    return `유효 시작일 ${effectiveServiceDate ?? "-"}`;
-  }
-  if (projection.reason === "missing") return "저장된 목표비중 없음";
-  return "현재 구성과 정책을 확인하세요";
-}
-
-function scopeKindLabel(kind: "all" | "account" | "portfolio_group") {
-  if (kind === "account") return "계좌";
-  if (kind === "portfolio_group") return "자산그룹";
-  return "전체 자산";
-}
-
-function formatMoney(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  return `₩${Math.round(value).toLocaleString("en-US")}`;
-}
-
-function formatNumber(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  return value.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "n/a";
-  return `${value.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  })}%`;
-}
-
-function formatSignedPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "n/a";
-  const formatted = Math.abs(value).toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  });
-  return `${value > 0 ? "+" : value < 0 ? "-" : ""}${formatted}%`;
 }
