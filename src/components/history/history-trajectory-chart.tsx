@@ -93,6 +93,9 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
   );
   const uniqueDates = [...new Set(allPoints.map((point) => point.date))].sort();
   const xLabels = uniqueDateLabels(uniqueDates);
+  const chartTitle = `${historyAccountLabel(model.account)} ${
+    model.lane === "balance" ? "저장 잔액" : "포트폴리오 평가액"
+  } 궤적`;
   const toX = (date: string) =>
     minTimestamp === maxTimestamp
       ? LEFT + plotWidth / 2
@@ -133,15 +136,12 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
 
       <div className="mt-3 overflow-x-auto border-y border-[#e1e6dc] bg-white py-2">
         <svg
-          aria-label={`${historyAccountLabel(model.account)} ${model.lane === "balance" ? "저장 잔액" : "포트폴리오 평가액"} 궤적 차트`}
+          aria-label={`${chartTitle} 차트`}
           className="h-auto w-full min-w-[760px]"
           role="img"
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         >
-          <title>
-            {historyAccountLabel(model.account)} {" "}
-            {model.lane === "balance" ? "저장 잔액" : "포트폴리오 평가액"} 궤적
-          </title>
+          <title>{chartTitle}</title>
           {yTicks.map((tick, index) => {
             const y = TOP + (index / 4) * plotHeight;
             return (
