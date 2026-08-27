@@ -99,6 +99,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     <HistoryView
       events={events}
       eventsSupported={eventScope !== null}
+      generatedAt={new Date().toISOString()}
       history={history}
     />
   );

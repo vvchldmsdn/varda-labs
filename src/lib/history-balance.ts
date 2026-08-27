@@ -30,6 +30,11 @@ export type PortfolioHistoryRawRow = {
   totalMarketValue: string | null;
   totalPnl: string | null;
   totalReturnPct: string | null;
+  avgCorrelation?: string | null;
+  enb?: string | null;
+  portfolioVolatility?: string | null;
+  regimeLabel?: string | null;
+  regimeScore?: string | null;
 };
 
 export type PortfolioHistoryDisplayRow = {
@@ -44,6 +49,11 @@ export type PortfolioHistoryDisplayRow = {
   totalMarketValue: number | null;
   totalPnl: number | null;
   totalReturnPct: number | null;
+  avgCorrelation?: number | null;
+  enb?: number | null;
+  portfolioVolatility?: number | null;
+  regimeLabel?: string | null;
+  regimeScore?: number | null;
 };
 
 export function normalizeHistoryAccount(
@@ -132,6 +142,42 @@ function storedPortfolioRow(
     totalMarketValue: numberOrNull(row.totalMarketValue),
     totalPnl: numberOrNull(row.totalPnl),
     totalReturnPct: numberOrNull(row.totalReturnPct),
+    ...storedRiskEvidence(row),
+  };
+}
+
+function storedRiskEvidence(
+  row: PortfolioHistoryRawRow,
+): Pick<
+  PortfolioHistoryDisplayRow,
+  | "avgCorrelation"
+  | "enb"
+  | "portfolioVolatility"
+  | "regimeLabel"
+  | "regimeScore"
+> | Record<string, never> {
+  const avgCorrelation = numberOrNull(row.avgCorrelation ?? null);
+  const enb = numberOrNull(row.enb ?? null);
+  const portfolioVolatility = numberOrNull(row.portfolioVolatility ?? null);
+  const regimeLabel = row.regimeLabel?.trim() || null;
+  const regimeScore = numberOrNull(row.regimeScore ?? null);
+
+  if (
+    avgCorrelation === null &&
+    enb === null &&
+    portfolioVolatility === null &&
+    regimeLabel === null &&
+    regimeScore === null
+  ) {
+    return {};
+  }
+
+  return {
+    avgCorrelation,
+    enb,
+    portfolioVolatility,
+    regimeLabel,
+    regimeScore,
   };
 }
 
