@@ -49,7 +49,7 @@ export function InvestmentLabFixedMixStandardComparison({
           const selected = selectedKodexWeightPct === entry.kodexWeightPct;
           return (
             <div
-              className={`rounded-lg border p-4 ${
+              className={`rounded-[4px] border p-4 ${
                 selected
                   ? "border-[#1e3a34] bg-[#f6f9f4]"
                   : "border-[#dfe3d5] bg-[#fbfcf7]"
@@ -109,7 +109,7 @@ export function InvestmentLabFixedMixStandardComparison({
           );
         })}
       </div>
-      <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="border-y border-[#dde1db] py-6">
         <InvestmentLabFixedMixComparisonChart scenarios={model.scenarios} />
       </div>
       {model.status === "partial" ? (
@@ -155,7 +155,7 @@ function MetricRow({
 
 function UnavailableMessage({ children }: { children: string }) {
   return (
-    <p className="rounded-md border border-[#ead9b2] bg-[#fff9ea] px-4 py-3 text-sm text-[#73551b]">
+    <p className="border-y border-[#d8c69d] py-4 text-sm text-[#73551b]">
       {children}
     </p>
   );

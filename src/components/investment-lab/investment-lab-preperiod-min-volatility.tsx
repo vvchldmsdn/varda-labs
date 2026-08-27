@@ -8,7 +8,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
   const training = model.training;
   return (
     <section
-      className="border-t border-[#dfe3d5] bg-[#f3f4ef] px-4 py-6"
+      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-12 sm:px-8 lg:px-10"
       data-preperiod-min-volatility-candidate-common-price-dates={
         model.coverage.commonPriceDateCount
       }
@@ -27,14 +27,15 @@ export function InvestmentLabPreperiodMinVolatilityView({
       }
       data-section="investment-lab-preperiod-min-volatility"
     >
-      <div className="mx-auto w-full max-w-[1500px] overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
-        <div className="border-b border-[#e1e6dc] px-4 py-4">
+      <div className="mx-auto w-full max-w-[1540px] overflow-hidden">
+        <div className="border-b border-[#dde1db] pb-6">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">
+              <p className="text-[11px] font-medium text-[#777d75]">PRE-PERIOD MODEL</p>
+              <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">
                 기간 시작 전 최소변동성 비교
               </h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
+              <p className="mt-3 max-w-4xl text-sm leading-6 text-[#687064]">
                 선택한 비교 기간보다 앞선 KODEX 200·VOO 공동 관측 60개만으로
                 비중을 한 번 산정하고, 이후 실제와 같은 외부 입출금을 적용한
                 연구 경로입니다.
@@ -47,7 +48,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
         </div>
 
         {training && model.weights ? (
-          <div className="grid gap-px bg-[#e1e6dc] sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid border-b border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4">
             <EvidenceCell
               label="학습 구간"
               value={`${formatDate(training.startPriceDate)} ~ ${formatDate(training.endPriceDate)}`}
@@ -81,7 +82,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
           </p>
         ) : null}
 
-        <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
+        <div className="grid gap-8 border-b border-[#dde1db] py-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
           <div>
             {model.status === "ready" ? (
               <>
@@ -131,7 +132,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
           </dl>
         </div>
 
-        <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
+        <p className="py-4 text-xs leading-5 text-[#73786c]">
           미래 데이터, 보간, provider backfill, 현재 보유비중, 목표비중을
           사용하지 않습니다. 거래비용·세금·주문 가능성을 반영한 추천이
           아니며, 산정 뒤 정기 리밸런싱도 하지 않습니다.
@@ -151,7 +152,7 @@ function EvidenceCell({
   value: string;
 }) {
   return (
-    <div className="bg-[#fbfcf7] px-4 py-4">
+    <div className="border-b border-[#dde1db] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
       <p className="mt-2 text-lg font-semibold tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-[#73786c]">{detail}</p>

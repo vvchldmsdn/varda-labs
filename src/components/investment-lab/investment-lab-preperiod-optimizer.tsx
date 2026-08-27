@@ -36,17 +36,18 @@ export function InvestmentLabPreperiodOptimizerView({
 
   return (
     <section
-      className="border-t border-[#dfe3d5] bg-[#f3f4ef] px-4 py-6"
+      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-12 sm:px-8 lg:px-10"
       data-optimizer-candidate-count={model.candidates.length}
       data-optimizer-status={model.status}
       data-section="investment-lab-preperiod-optimizer"
     >
-      <div className="mx-auto w-full max-w-[1500px] overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
-        <header className="border-b border-[#e1e6dc] px-4 py-4">
+      <div className="mx-auto w-full max-w-[1540px] overflow-hidden">
+        <header className="border-b border-[#dde1db] pb-6">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">과거 학습 비중 실험</h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
+              <p className="text-[11px] font-medium text-[#777d75]">OBJECTIVE LAB</p>
+              <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">과거 학습 비중 실험</h2>
+              <p className="mt-3 max-w-4xl text-sm leading-6 text-[#687064]">
                 비교 시작일 이전의 공통 가격 60개 수익률만으로 비중 후보를
                 만들고, 이후 실제 기간에는 같은 입출금과 리밸런싱하지 않는
                 조건으로 비교합니다. 수동 평가 종목은 시작 비중을 유지합니다.
@@ -60,19 +61,19 @@ export function InvestmentLabPreperiodOptimizerView({
 
         {candidate && model.training ? (
           <>
-            <div className="border-b border-[#e1e6dc] px-4 py-3">
+            <div className="border-b border-[#dde1db] py-3">
               <div
                 aria-label="비중 후보 선택"
-                className="grid grid-cols-2 gap-1 rounded-md border border-[#d6ddd1] bg-white p-1 lg:inline-grid lg:grid-cols-4"
+                className="grid grid-cols-2 gap-x-6 lg:inline-grid lg:grid-cols-4"
                 role="group"
               >
                 {OBJECTIVES.map((objective) => (
                   <button
                     aria-pressed={candidate.objective === objective.id}
-                    className={`min-h-10 px-3 py-2 text-sm font-semibold ${
+                    className={`min-h-10 border-b-2 px-1 py-2 text-sm font-semibold ${
                       candidate.objective === objective.id
-                        ? "rounded bg-[#173f38] text-white"
-                        : "text-[#4f584f] hover:bg-[#edf1e9]"
+                        ? "border-[#20231f] text-[#20231f]"
+                        : "border-transparent text-[#777d75] hover:text-[#20231f]"
                     }`}
                     key={objective.id}
                     onClick={() => setSelectedObjective(objective.id)}
@@ -84,7 +85,7 @@ export function InvestmentLabPreperiodOptimizerView({
               </div>
             </div>
 
-            <div className="grid gap-px border-b border-[#e1e6dc] bg-[#e1e6dc] sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid border-b border-[#dde1db] sm:grid-cols-2 xl:grid-cols-5">
               <Metric
                 detail={`${model.training.returnObservationCount}개 수익률 · 상장 ${model.training.instrumentCount}개`}
                 label="학습 구간"
@@ -137,7 +138,7 @@ export function InvestmentLabPreperiodOptimizerView({
           <Unavailable model={model} />
         )}
 
-        <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
+        <p className="border-t border-[#dde1db] py-4 text-xs leading-5 text-[#73786c]">
           학습 지표는 수동 평가 종목을 제외한 상장 종목 부분 기준입니다. 이
           결과는 과거 학습 구간을 뒤늦게 보고 만든 연구 후보이며 미래 성과,
           주문 가능성, 세금·거래비용을 보장하지 않습니다. 현재 보유비중이나
@@ -163,7 +164,7 @@ function ReadyCandidate({
   const estimate = candidate.scenario.returnEstimate;
   const summary = candidate.scenario.summary;
   return (
-    <div className="grid gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-8 py-7 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0">
         <InvestmentLabComparisonChart
           chartId={`investment-lab-optimizer-${candidate.objective}`}
@@ -247,7 +248,7 @@ function WeightTable({
 
 function Unavailable({ model }: { model: InvestmentLabPreperiodOptimizer }) {
   return (
-    <div className="px-4 py-5">
+    <div className="py-6">
       <p className="font-semibold text-[#8a641f]">
         현재 계정 범위에서는 학습 비중 후보를 만들 수 없습니다.
       </p>
@@ -288,7 +289,7 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="bg-[#fbfcf7] px-4 py-4">
+    <div className="border-b border-[#dde1db] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
       <p className="mt-2 text-base font-semibold tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-[#73786c]">{detail}</p>

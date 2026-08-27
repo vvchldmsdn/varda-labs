@@ -47,7 +47,7 @@ export function InvestmentLabFixedMix({
 
   return (
     <section
-      className="border-t border-[#dfe3d5] bg-[#f3f4ef] px-4 py-6"
+      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-12 sm:px-8 lg:px-10"
       data-fixed-mix-comparison-dates={
         ready ? model.summary.comparisonDateCount : 0
       }
@@ -77,16 +77,16 @@ export function InvestmentLabFixedMix({
       data-fixed-mix-voo-weight-bps={selection.vooWeightBps ?? 0}
       data-section="investment-lab-fixed-mix"
     >
-      <div className="mx-auto w-full max-w-[1500px] space-y-4">
+      <div className="mx-auto w-full max-w-[1540px] space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase text-[#657065]">
-              Historical research
+            <p className="text-[11px] font-medium text-[#777d75]">
+              ALLOCATION SANDBOX
             </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-normal">
+            <h2 className="mt-2 text-2xl font-semibold tracking-normal sm:text-3xl">
               KODEX 200·VOO 고정 배분 실험
             </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[#687064]">
               초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두
               종목에 적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로
               두며 중간 재리밸런싱은 하지 않습니다.
@@ -204,10 +204,10 @@ function PresetLinks({
   scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
-    <nav aria-label="고정 배분 예시" className="flex flex-wrap gap-2">
+    <nav aria-label="고정 배분 예시" className="flex flex-wrap gap-5 border-y border-[#dde1db] py-3">
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
-          className="rounded-md border border-[#d5dacd] bg-[#fbfcf7] px-3 py-2 text-sm font-semibold text-[#33423a]"
+          className="border-b border-transparent py-1 text-sm font-semibold text-[#586158] transition-colors hover:border-[#20231f] hover:text-[#20231f]"
           href={mixHref(scopeKey, period, kodexWeightPct)}
           key={kodexWeightPct}
         >
@@ -254,7 +254,7 @@ function FixedMixResult({ model }: { model: Extract<InvestmentLabFixedMixScenari
         />
       </div>
 
-      <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="border-y border-[#dde1db] py-6">
         <InvestmentLabComparisonChart
           chartId="investment-lab-fixed-mix-chart"
           description={`실제 포트폴리오와 KODEX 200 ${kodexWeightPct}%, VOO ${vooWeightPct}% 고정 배분 same-flow 경로를 비교합니다.`}
@@ -284,7 +284,7 @@ function SummaryCell({
   tone?: "neutral" | "positive" | "negative";
 }) {
   return (
-    <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+    <div className="border-b border-[#dde1db] px-4 py-5 first:border-l-0 xl:border-r">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
       <p
         className={`mt-2 text-xl font-semibold tabular-nums ${
@@ -303,7 +303,7 @@ function SummaryCell({
 
 function UnavailableMessage({ children }: { children: string }) {
   return (
-    <p className="rounded-md border border-[#ead9b2] bg-[#fff9ea] px-4 py-3 text-sm text-[#73551b]">
+    <p className="border-y border-[#ead9b2] bg-[#fffaf0] px-4 py-3 text-sm text-[#73551b]">
       {children}
     </p>
   );

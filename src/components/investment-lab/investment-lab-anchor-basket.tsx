@@ -22,7 +22,7 @@ export function InvestmentLabAnchorBasket({
 
   return (
     <section
-      className="border-t border-[#dfe3d5] bg-[#f3f4ef] px-4 py-6"
+      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-16 sm:px-8 lg:px-10"
       data-anchor-basket-candidate-dates={anchor.candidateAnchorDates.length}
       data-anchor-basket-comparison-dates={
         ready ? model.summary!.comparisonDateCount : 0
@@ -50,16 +50,16 @@ export function InvestmentLabAnchorBasket({
       }
       data-section="investment-lab-anchor-basket"
     >
-      <div className="mx-auto w-full max-w-[1500px] space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto w-full max-w-[1540px] space-y-10">
+        <div className="flex flex-col gap-8 border-b border-[#dde1db] pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase text-[#657065]">
-              Historical research
+            <p className="text-[10px] font-medium uppercase text-[#777d75]">
+              ANCHOR RECONSTRUCTION
             </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-normal">
+            <h2 className="mt-3 text-2xl font-semibold tracking-normal sm:text-3xl">
               기준일 바스켓: 초기 동일비중·흐름 균등배분
             </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#687064]">
               선택한 과거 기준일에 실제로 저장된 종목만 사용합니다. 기준일에만
               동일비중으로 시작하고 이후 실제 매수·매도 금액은 종목마다 같은
               비율로 나눠 적용하며 자동 리밸런싱은 하지 않습니다.
@@ -74,7 +74,7 @@ export function InvestmentLabAnchorBasket({
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid border-y border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCell
             label="선택 기준일"
             value={formatDate(anchor.selectedAnchorDate)}
@@ -149,7 +149,7 @@ function SpecialHoldingEvidence({
   ).length;
   return (
     <div
-      className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      className="overflow-hidden border-y border-[#dde1db]"
       data-anchor-special-holding-eligible={eligibleCount}
       data-anchor-special-holding-intentionally-excluded={
         intentionallyExcludedCount
@@ -162,7 +162,7 @@ function SpecialHoldingEvidence({
       data-anchor-special-holding-unsupported={unsupportedCount}
       data-section="investment-lab-anchor-special-holding-evidence"
     >
-      <div className="border-b border-[#e1e6dc] px-4 py-3">
+      <div className="border-b border-[#e1e6dc] py-4">
         <h3 className="font-semibold">ticker 없는 저장 포지션 근거</h3>
         <p className="mt-1 text-xs leading-5 text-[#687064]">
           이름이나 현재 자산값으로 종목을 추론하지 않습니다. 같은 legacy 자산의
@@ -172,7 +172,7 @@ function SpecialHoldingEvidence({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
-            <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+            <tr className="border-y border-[#e1e6dc] text-left text-xs font-semibold text-[#616a5e]">
               <th className="px-4 py-3">저장 포지션</th>
               <th className="px-3 py-3">계좌·축</th>
               <th className="px-3 py-3">identity 상태</th>
@@ -258,7 +258,7 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
           }
         />
       </div>
-      <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="border-y border-[#dde1db] py-6">
         <InvestmentLabComparisonChart
           chartId="investment-lab-anchor-basket-chart"
           description="실제 포트폴리오와 기준일 저장 보유 종목을 동일비중으로 시작한 same-flow 경로를 비교합니다."
@@ -292,7 +292,7 @@ function UnavailableResult({ model }: { model: InvestmentLabAnchorBasketScenario
     ),
   ];
   return (
-    <div className="rounded-md border border-[#ead9b2] bg-[#fff9ea] px-4 py-3 text-sm leading-6 text-[#73551b]">
+    <div className="border-y border-[#d8c69d] py-4 text-sm leading-6 text-[#73551b]">
       <p className="font-semibold">전체 바스켓 비교를 만들 수 없습니다.</p>
       <p>
         {reasons.length > 0
@@ -381,7 +381,7 @@ function SummaryCell({
   tone?: "neutral" | "positive" | "negative";
 }) {
   return (
-    <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+    <div className="min-w-0 border-b border-[#dde1db] px-4 py-5 first:pl-0 last:pr-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
       <p
         className={`mt-2 text-xl font-semibold tabular-nums ${

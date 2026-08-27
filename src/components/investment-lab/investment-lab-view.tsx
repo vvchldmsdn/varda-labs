@@ -75,7 +75,7 @@ export function InvestmentLabView({
 
   return (
     <main
-      className="min-h-screen bg-[#f3f4ef] text-[#171916]"
+      className="min-h-screen overflow-x-hidden bg-[#f8f9f6] text-[#171a16]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-account-composition-status={accountComposition.status}
       data-analysis-scope={selectedScope.key}
@@ -291,8 +291,7 @@ function InvestmentLabJourneyNav({
     <AnalysisJourneyNav
       items={[
         {
-          description:
-            "실제 평가액과 여러 가상 포트폴리오를 같은 기간으로 비교합니다.",
+          description: "실제와 대안 세계선",
           href: "#investment-lab-results",
           label: "성과 비교",
           status: investmentLabResultStatus({
@@ -302,27 +301,26 @@ function InvestmentLabJourneyNav({
           }),
         },
         {
-          description:
-            "수익, 변동성, 낙폭, 샤프 목적별 비중 실험을 분리해 비교합니다.",
+          description: "수익·위험 목적별 비중",
           href: "#investment-lab-optimizer",
           label: "비중 실험",
           status: optimizerStatusLabel(optimizerStatus),
         },
         {
-          description:
-            "과거 충격 구간과 ETF 내부 노출을 별도 데이터 경계에서 확인합니다.",
+          description: "충격 구간과 ETF 내부",
           href: "#investment-lab-etf-xray",
           label: "스트레스와 구성",
           status: "독립 계산",
         },
         {
-          description:
-            "현재 비중을 조금 바꿨을 때 구조와 위험 지표가 어떻게 달라지는지 봅니다.",
+          description: "비중 변경 전후 구조",
           href: "#investment-lab-small-adjustment",
           label: "작은 조정",
           status: "독립 계산",
         },
       ]}
+      title="투자랩 분석 흐름"
+      variant="editorial"
     />
   );
 }
@@ -434,7 +432,7 @@ function ReadyView({
       </div>
 
       {model.status === "ready" ? (
-        <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
+        <section className="overflow-hidden border-y border-[#dde1db]">
         <div className="flex flex-col gap-1 border-b border-[#e1e6dc] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">비교 데이터</h2>
@@ -449,7 +447,7 @@ function ReadyView({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead>
-              <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+              <tr className="border-b border-[#dde1db] text-left text-xs font-semibold text-[#616a5e]">
                 <th className="px-4 py-3">평가일</th>
                 <th className="px-3 py-3 text-right">실제 평가액</th>
                 <th className="px-3 py-3 text-right">KODEX 200</th>
@@ -484,7 +482,7 @@ function ReadyView({
         </section>
       ) : null}
 
-      <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <section className="border-y border-[#dde1db] py-5">
         <h2 className="text-lg font-semibold">데이터 상태</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <EvidenceCell label="완전한 비교일" value={`${model.coverage.completeComparisonDates}일`} />
@@ -524,7 +522,7 @@ function CurrentWriterSegmentNotice({
   const summary = model.observedPath.summary!;
   return (
     <section
-      className="rounded-lg border border-[#d9dfcf] bg-[#f8faf5] p-4"
+      className="border-y border-[#dde1db] py-5"
       data-section="investment-lab-current-writer-segment"
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
@@ -534,7 +532,7 @@ function CurrentWriterSegmentNotice({
             {formatDate(summary.startServiceDate)} ~ {formatDate(summary.endServiceDate)} · {summary.comparisonDateCount}개 평가일만 사용합니다. 레거시 구간과 이어 붙이지 않았고, 짧은 구간이므로 연환산·순위·스트레스 결론을 만들지 않습니다.
           </p>
         </div>
-        <span className="w-fit rounded-md border border-[#d4dbce] bg-white px-3 py-1.5 text-xs font-semibold text-[#4e594d]">
+        <span className="w-fit border border-[#d4dbce] px-3 py-1.5 text-xs font-semibold text-[#4e594d]">
           {period.status === "current_writer" ? "최신 구간 자동 적용" : "명시 구간 적용"}
         </span>
       </div>
@@ -556,7 +554,7 @@ function ReturnEstimateSection({
   const estimate = model.returnEstimate;
   if (!estimate || estimate.status === "blocked") {
     return (
-      <section className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-4">
+      <section className="border-y border-[#e6dcc2] py-5">
         <h2 className="text-lg font-semibold text-[#5f5027]">
           현금흐름 조정 추정수익률
         </h2>
@@ -576,7 +574,7 @@ function ReturnEstimateSection({
 
   return (
     <section
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-y border-[#dde1db] py-6"
       data-return-method={estimate.method.version}
     >
       <div className="flex flex-col gap-1 lg:flex-row lg:items-start lg:justify-between">
@@ -637,7 +635,7 @@ function VooComparisonSection({
     const estimate = comparison.returnEstimate;
     return (
       <section
-        className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+        className="border-y border-[#dde1db] py-6"
         data-voo-applied-flows={comparison.coverage.appliedFlowRows}
         data-voo-comparison-dates={summary.comparisonDateCount}
         data-voo-delayed-executions={
@@ -712,7 +710,7 @@ function VooComparisonSection({
             />
           </div>
         ) : (
-          <p className="mt-4 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-3 py-2 text-sm text-[#725f2d]">
+          <p className="mt-4 border-y border-[#e6dcc2] py-3 text-sm text-[#725f2d]">
             경로는 계산됐지만 현금·이벤트 근거가 불충분해 추정수익률은 표시하지 않습니다.
           </p>
         )}
@@ -735,7 +733,7 @@ function VooComparisonSection({
 
   return (
     <section
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-y border-[#dde1db] py-6"
       data-voo-execution-fx-ready={readiness.executionFxReadyCount}
       data-voo-relevant-flows={readiness.relevantFlowCount}
       data-voo-service-dates={readiness.serviceDateCount}
@@ -795,7 +793,7 @@ function VooComparisonSection({
 
 function BlockedView({ model }: { model: InvestmentLabCounterfactualReadModel }) {
   return (
-    <section className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-5">
+    <section className="border-y border-[#e6dcc2] py-6">
       <h2 className="text-lg font-semibold text-[#5f5027]">현재 계산할 수 없습니다</h2>
       <p className="mt-2 text-sm text-[#725f2d]">
         일부 결과를 추정해서 표시하지 않고 입력 증거를 차단했습니다.

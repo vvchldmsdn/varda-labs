@@ -99,7 +99,7 @@ export function InvestmentLabContributionExperiment({
 
   return (
     <section
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-y border-[#dde1db] py-6"
       data-contribution-experiment="ephemeral_client_only"
       data-contribution-policy={
         INVESTMENT_LAB_CONTRIBUTION_EXPERIMENT_POLICY.version
@@ -121,7 +121,7 @@ export function InvestmentLabContributionExperiment({
       }
       id="investment-lab-contribution-experiment"
     >
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-1 border-b border-[#dde1db] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">과거 추가 투입 효과 실험</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
@@ -144,13 +144,13 @@ export function InvestmentLabContributionExperiment({
               <legend className="mb-2 text-xs font-semibold text-[#596255]">
                 고정 시나리오
               </legend>
-              <div className="flex min-h-10 rounded-md border border-[#d7dccf] bg-white p-1">
+              <div className="flex min-h-10 max-w-full gap-5 overflow-x-auto border-b border-[#d7dccf]">
                 {fixedMixWeights ? (
                   <button
                     className={
                       scenarioId === "fixed_mix"
-                        ? "min-w-0 flex-1 rounded bg-[#173f38] px-3 py-2 text-sm font-semibold text-white"
-                        : "min-w-0 flex-1 rounded px-3 py-2 text-sm font-semibold text-[#4f594d] hover:bg-[#eef1e9] disabled:cursor-not-allowed disabled:text-[#9ca397]"
+                        ? "min-w-max border-b-2 border-[#173f38] px-1 py-2 text-sm font-semibold text-[#173f38]"
+                        : "min-w-max border-b-2 border-transparent px-1 py-2 text-sm font-semibold text-[#6f766e] hover:text-[#173f38] disabled:cursor-not-allowed disabled:text-[#9ca397]"
                     }
                     disabled={!fixedMixEvidence}
                     onClick={selectFixedMix}
@@ -165,8 +165,8 @@ export function InvestmentLabContributionExperiment({
                   <button
                     className={
                       candidate.scenarioId === scenarioId
-                        ? "min-w-0 flex-1 rounded px-3 py-2 text-sm font-semibold text-white bg-[#173f38]"
-                        : "min-w-0 flex-1 rounded px-3 py-2 text-sm font-semibold text-[#4f594d] hover:bg-[#eef1e9]"
+                        ? "min-w-max border-b-2 border-[#173f38] px-1 py-2 text-sm font-semibold text-[#173f38]"
+                        : "min-w-max border-b-2 border-transparent px-1 py-2 text-sm font-semibold text-[#6f766e] hover:text-[#173f38]"
                     }
                     key={candidate.scenarioId}
                     onClick={() => selectScenario(candidate)}
@@ -181,7 +181,7 @@ export function InvestmentLabContributionExperiment({
             <label className="min-w-0 text-xs font-semibold text-[#596255]">
               관측 기준일
               <select
-                className="mt-2 h-10 w-full rounded-md border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
                 onChange={(event) => {
                   setServiceDate(event.target.value);
                   setResult(null);
@@ -199,7 +199,7 @@ export function InvestmentLabContributionExperiment({
             <label className="min-w-0 text-xs font-semibold text-[#596255]">
               추가 원금 (KRW)
               <input
-                className="mt-2 h-10 w-full rounded-md border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
                 inputMode="numeric"
                 min="1"
                 onChange={(event) => {
@@ -214,7 +214,7 @@ export function InvestmentLabContributionExperiment({
             </label>
 
             <button
-              className="h-10 rounded-md bg-[#173f38] px-5 text-sm font-semibold text-white hover:bg-[#0f302a]"
+              className="h-10 rounded-[4px] bg-[#173f38] px-5 text-sm font-semibold text-white hover:bg-[#0f302a]"
               type="submit"
             >
               계산

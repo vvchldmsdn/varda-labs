@@ -56,24 +56,24 @@ export function InvestmentLabSmallAdjustment({
   return (
     <section
       aria-labelledby="investment-lab-small-adjustment-title"
-      className="mx-auto w-full max-w-[1500px] space-y-4 px-4 pb-4"
+      className="mx-auto w-full max-w-[1540px] space-y-10 border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10"
       data-adjustment-account-count={model.accounts.length}
       data-adjustment-policy={model.policy.version}
       data-adjustment-ready-accounts={readyAccountCount}
       data-persistence={model.policy.persistence}
       data-section="investment-lab-small-adjustment"
     >
-      <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <header className="border-b border-[#dde1db] pb-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold text-[#687064]">What-if</p>
+            <p className="text-[10px] font-medium uppercase text-[#777d75]">WHAT-IF WORKBENCH</p>
             <h2
               id="investment-lab-small-adjustment-title"
-              className="mt-1 text-xl font-semibold sm:text-2xl"
+              className="mt-3 text-2xl font-semibold sm:text-3xl"
             >
               작은 조정 영향 실험
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#626b5f]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#626b5f]">
               같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다.
               외부 현금, 목표비중, 추천, 주문은 반영하지 않습니다.
             </p>
@@ -84,18 +84,18 @@ export function InvestmentLabSmallAdjustment({
         </div>
       </header>
 
-      <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="rounded-[4px] border border-[#dfe3d5] bg-[#fbfcf7] p-5 sm:p-6">
         <div
           aria-label="조정 계정"
-          className="flex max-w-full gap-1 overflow-x-auto rounded-md border border-[#d9ded3] bg-white p-1"
+          className="flex max-w-full gap-7 overflow-x-auto border-b border-[#d9ded3]"
           role="group"
         >
           {model.accounts.map((account) => (
             <button
-              className={`min-h-10 min-w-24 shrink-0 rounded px-3 text-sm font-semibold ${
+              className={`min-h-10 min-w-20 shrink-0 border-b-2 px-1 text-sm font-semibold ${
                 account.account === accountCode
-                  ? "bg-[#173f39] text-white"
-                  : "text-[#4e584d] hover:bg-[#eef2e8]"
+                  ? "border-[#173f39] text-[#173f39]"
+                  : "border-transparent text-[#6a7269] hover:text-[#173f39]"
               }`}
               key={account.account}
               onClick={() => {
@@ -239,16 +239,16 @@ function AccountUnavailable({
 
 export function InvestmentLabSmallAdjustmentSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1500px] px-4 pb-4">
-      <div className="h-64 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    <div className="mx-auto w-full max-w-[1540px] border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10">
+      <div className="h-64 border-y border-[#dde1db] bg-[#f2f4ef]" />
     </div>
   );
 }
 
 export function InvestmentLabSmallAdjustmentUnavailable() {
   return (
-    <section className="mx-auto w-full max-w-[1500px] px-4 pb-4">
-      <div className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-4 text-sm text-[#725f2d]">
+    <section className="mx-auto w-full max-w-[1540px] border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10">
+      <div className="border-y border-[#d8c69d] py-4 text-sm text-[#725f2d]">
         <h2 className="text-lg font-semibold">작은 조정 영향 실험</h2>
         <p className="mt-2">현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다.</p>
       </div>

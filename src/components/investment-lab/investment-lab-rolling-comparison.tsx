@@ -11,7 +11,7 @@ export function InvestmentLabRollingComparisonView({
   return (
     <section
       aria-labelledby="investment-lab-rolling-title"
-      className="mx-auto w-full max-w-[1500px] space-y-4 px-4 pb-4"
+      className="mx-auto w-full max-w-[1540px] space-y-6 border-t border-[#dde1db] px-5 py-12 sm:px-8 lg:px-10"
       data-rolling-candidate-windows={model.candidateWindowCount}
       data-rolling-complete-windows={model.completeWindowCount}
       data-rolling-excluded-windows={model.excludedWindowCount}
@@ -19,17 +19,17 @@ export function InvestmentLabRollingComparisonView({
       data-rolling-status={model.status}
       data-section="investment-lab-rolling-comparison"
     >
-      <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-        <p className="text-xs font-semibold text-[#687064]">
-          Historical hindsight · read-only
+      <header className="border-b border-[#dde1db] pb-6">
+        <p className="text-[11px] font-medium text-[#777d75]">
+          ROLLING HINDSIGHT
         </p>
         <h2
           id="investment-lab-rolling-title"
-          className="mt-1 text-xl font-semibold sm:text-2xl"
+          className="mt-2 text-2xl font-semibold sm:text-3xl"
         >
           과거 최고·최저 rolling 구간
         </h2>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-[#626b5f]">
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-[#626b5f]">
           저장된 완전 관측 구간 중 실제 포트폴리오의 현금흐름 조정
           추정수익률이 가장 높고 낮았던 {model.policy.observationCount}개 관측일을
           찾고, 같은 시작 평가액과 같은 매수·매도 흐름을 KODEX 200 및 VOO에
@@ -48,7 +48,7 @@ export function InvestmentLabRollingComparisonView({
           <RollingWindowCard label="최고 구간" tone="positive" window={model.bestWindow} />
         </div>
       ) : (
-        <div className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] p-4 text-sm text-[#725f2d]">
+        <div className="border-y border-[#eadfbe] bg-[#fffaf0] px-4 py-4 text-sm text-[#725f2d]">
           비교 가능한 완전 관측 rolling 구간이 2개 미만입니다. 일부 가격·환율·
           거래 일정으로 결과를 보충하지 않고 이 섹션 전체를 표시하지 않습니다.
         </div>
@@ -67,7 +67,7 @@ function RollingWindowCard({
   window: InvestmentLabRollingWindow;
 }) {
   return (
-    <article className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
+    <article className="overflow-hidden rounded-[4px] border border-[#dfe3d5] bg-[#fbfcf7]">
       <header className="border-b border-[#e1e6dc] px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3

@@ -16,7 +16,7 @@ export async function HoldingAnalysisDataPanel({
   if (result.state !== "ready") {
     return (
       <section
-        className="rounded-lg border border-[#eadfbe] bg-[#fff9e8] px-4 py-4 text-sm text-[#725f2d]"
+        className="border-y border-[#eadfbe] py-4 text-sm text-[#725f2d]"
         data-section="holding-analysis-data-repair"
         data-status="unavailable"
       >
@@ -30,7 +30,7 @@ export async function HoldingAnalysisDataPanel({
 
   return (
     <section
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] px-4 py-4"
+      className="border-y border-[#dde1db] py-5"
       data-actionable-count={actionable.length}
       data-section="holding-analysis-data-repair"
       data-status="actionable"
@@ -43,7 +43,7 @@ export async function HoldingAnalysisDataPanel({
       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {actionable.map((entry) => (
           <div
-            className="rounded-md border border-[#dfe3d5] bg-white px-3 py-3"
+            className="rounded-[4px] border border-[#dfe3d5] bg-white px-3 py-3"
             key={entry.holdingId}
           >
             <p className="text-sm font-semibold">{entry.name}</p>
@@ -65,6 +65,6 @@ export async function HoldingAnalysisDataPanel({
 
 export function HoldingAnalysisDataPanelSkeleton() {
   return (
-    <section className="h-28 animate-pulse rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+    <section className="h-28 animate-pulse border-y border-[#dfe3d5] bg-[#f2f4ef]" />
   );
 }
