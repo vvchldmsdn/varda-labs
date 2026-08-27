@@ -31,7 +31,7 @@ export function PortfolioFxShock({
   return (
     <section
       aria-labelledby="portfolio-fx-shock-title"
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-t border-[#d9ddd7] pt-8 lg:pt-10"
       data-applied-asset-count={result.appliedAssetCount}
       data-coverage-status={result.coverageStatus}
       data-estimated-change-krw={result.estimatedChangeKrw ?? ""}
@@ -56,13 +56,16 @@ export function PortfolioFxShock({
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
+          <p className="text-[11px] font-medium text-[#7b8079]">
+            WHAT IF / FX
+          </p>
           <h2
-            className="text-lg font-semibold tracking-normal"
+            className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="portfolio-fx-shock-title"
           >
             직접 보유 USD 환율 충격 실험
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#687064]">
             USD 직접 보유 종목의 현지 가격은 고정하고 USD/KRW만 바뀐다고
             가정합니다. 원화 상장 ETF의 해외 구성 종목은 추정하지 않습니다.
           </p>
@@ -71,7 +74,7 @@ export function PortfolioFxShock({
           USD/KRW 변동률
           <span className="flex items-center gap-2">
             <input
-              className="min-w-0 flex-1 rounded-md border border-[#cfd6c7] bg-white px-3 py-2 text-right text-sm tabular-nums outline-none focus:border-[#1e3a34]"
+              className="min-w-0 flex-1 border-b border-[#9fa69d] bg-transparent px-2 py-2 text-right text-sm tabular-nums outline-none focus:border-[#1e3a34]"
               inputMode="decimal"
               max={PORTFOLIO_FX_SHOCK_POLICY.maxShockPct}
               min={PORTFOLIO_FX_SHOCK_POLICY.minShockPct}
@@ -86,7 +89,7 @@ export function PortfolioFxShock({
       </div>
 
       {result.status === "ready" ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="mt-7 grid border-y border-[#d9ddd7] sm:grid-cols-2 xl:grid-cols-6">
           <Metric
             detail={`${result.appliedAssetCount}개 직접 보유 종목`}
             label="USD 직접 노출"
@@ -119,7 +122,7 @@ export function PortfolioFxShock({
           />
         </div>
       ) : (
-        <p className="mt-4 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-sm text-[#725f2d]">
+        <p className="mt-7 border-y border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-sm text-[#725f2d]">
           {reasonLabel(result.reason)}
         </p>
       )}
@@ -143,9 +146,9 @@ function Metric({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-[#e2e6da] bg-white p-3">
+    <div className="min-w-0 border-b border-[#e2e5df] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-2 text-lg font-semibold tracking-normal tabular-nums text-[#111411]">
+      <p className="mt-3 text-lg font-medium tracking-normal tabular-nums text-[#111411]">
         {value}
       </p>
       <p className="mt-1 text-xs leading-5 text-[#73786c]">{detail}</p>

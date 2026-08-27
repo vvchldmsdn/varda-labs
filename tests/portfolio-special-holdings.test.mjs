@@ -96,12 +96,19 @@ describe("portfolio special holdings coverage", () => {
       new URL("../src/app/portfolio/structure/page.tsx", import.meta.url),
       "utf8",
     );
+    const viewSource = readFileSync(
+      new URL(
+        "../src/components/portfolio/portfolio-structure-view.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
 
     assert.doesNotMatch(componentSource, /^"use client";/);
     assert.doesNotMatch(componentSource, /\bfetch\s*\(/);
     assert.match(componentSource, /data-section="special-holdings-coverage"/);
     assert.match(pageSource, /buildPortfolioSpecialHoldingsModel\(structure\)/);
-    assert.match(pageSource, /<SpecialHoldingsCoverage/);
+    assert.match(viewSource, /<SpecialHoldingsCoverage/);
     assert.doesNotMatch(componentSource, /legacyBase44Id|assetId|ownerUserId/);
   });
 });
