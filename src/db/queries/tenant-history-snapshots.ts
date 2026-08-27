@@ -123,7 +123,12 @@ const TENANT_HISTORY_PORTFOLIO_ROWS_SQL = `
     snapshot.total_cost::text as total_cost,
     snapshot.total_market_value::text as total_market_value,
     snapshot.total_pnl::text as total_pnl,
-    snapshot.total_return_pct::text as total_return_pct
+    snapshot.total_return_pct::text as total_return_pct,
+    snapshot.avg_correlation::text as avg_correlation,
+    snapshot.enb::text as enb,
+    snapshot.portfolio_volatility::text as portfolio_volatility,
+    snapshot.regime_label,
+    snapshot.regime_score::text as regime_score
   from public.daily_portfolio_snapshots as snapshot
   inner join public.accounts as account on snapshot.account_id = account.id
   where account.is_active = true
@@ -228,6 +233,11 @@ function projectPortfolioRow(
     totalMarketValue: nullableString(row.total_market_value),
     totalPnl: nullableString(row.total_pnl),
     totalReturnPct: nullableString(row.total_return_pct),
+    avgCorrelation: nullableString(row.avg_correlation),
+    enb: nullableString(row.enb),
+    portfolioVolatility: nullableString(row.portfolio_volatility),
+    regimeLabel: nullableString(row.regime_label),
+    regimeScore: nullableString(row.regime_score),
   });
 }
 
