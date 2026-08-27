@@ -8,52 +8,69 @@ import {
   formatHistoryPercent,
   historySourceLabel,
 } from "@/components/history/history-format";
+import { HistoryPerformanceChart } from "@/components/history/history-performance-chart";
+import { HistorySnapshotRail } from "@/components/history/history-snapshot-rail";
+import {
+  historyPointMetric,
+  historyPointsWithMetric,
+  selectHistoryRange,
+  summarizeHistoryRange,
+  type HistoryExplorerMode,
+  type HistoryExplorerRange,
+} from "@/lib/history-explorer";
 import type {
   HistoryOverviewEvent,
   HistoryOverviewModel,
   HistoryOverviewPoint,
 } from "@/lib/history-overview";
-import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 
-type RangeKey = "1M" | "3M" | "6M" | "ALL";
-
-const CHART_WIDTH = 960;
-const CHART_HEIGHT = 330;
-const PLOT_TOP = 24;
-const PLOT_BOTTOM = 278;
-const PLOT_LEFT = 8;
-const PLOT_RIGHT = 952;
+const RANGE_OPTIONS: readonly Readonly<{
+  key: HistoryExplorerRange;
+  label: string;
+}>[] = Object.freeze([
+  { key: "30D", label: "30일" },
+  { key: "90D", label: "90일" },
+  { key: "1Y", label: "1년" },
+  { key: "ALL", label: "전체" },
+]);
 
 export function HistoryTimeExplorer({
   model,
+  scopeLabel,
 }: {
   model: HistoryOverviewModel;
+  scopeLabel: string;
 }) {
-  const [range, setRange] = useState<RangeKey>("ALL");
+  const returnAvailable = model.points.some(
+    (point) => point.totalReturnPct !== null,
+  );
+  const [mode, setMode] = useState<HistoryExplorerMode>(
+    returnAvailable ? "return" : "value",
+  );
+  const [range, setRange] = useState<HistoryExplorerRange>("90D");
   const visiblePoints = useMemo(
-    () => pointsForRange(model.points, range),
+    () => selectHistoryRange(model.points, range),
     [model.points, range],
+  );
+  const rangeSummary = useMemo(
+    () => summarizeHistoryRange(visiblePoints),
+    [visiblePoints],
   );
   const [selectedDate, setSelectedDate] = useState(
     model.points.at(-1)?.date ?? null,
   );
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const geometry = useMemo(() => buildGeometry(visiblePoints), [visiblePoints]);
   const selectedPoint =
     visiblePoints.find((point) => point.date === selectedDate) ??
     visiblePoints.at(-1) ??
     null;
-  const hoveredPoint =
-    visiblePoints.find((point) => point.date === hoveredDate) ?? null;
-  const hoveredGeometry = hoveredPoint
-    ? geometry.points[visiblePoints.indexOf(hoveredPoint)] ?? null
-    : null;
 
   if (model.status === "no_data") {
     return (
       <section className="border-y border-[#dde1db] py-16 text-center">
-        <p className="text-xs font-medium text-[#777d75]">TIME EXPLORER</p>
-        <h2 className="mt-3 text-2xl font-semibold">아직 탐색할 기록이 없습니다.</h2>
+        <p className="text-xs font-medium text-[#777d75]">HISTORY</p>
+        <h1 className="mt-3 text-2xl font-semibold">
+          아직 탐색할 기록이 없습니다.
+        </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#6d736b]">
           평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이
           저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다.
@@ -62,166 +79,142 @@ export function HistoryTimeExplorer({
     );
   }
 
+  function changeRange(nextRange: HistoryExplorerRange) {
+    const nextPoints = selectHistoryRange(model.points, nextRange);
+    const nextMetricPoints = historyPointsWithMetric(nextPoints, mode);
+    setRange(nextRange);
+    setSelectedDate(
+      nextMetricPoints.at(-1)?.date ?? nextPoints.at(-1)?.date ?? null,
+    );
+  }
+
+  function changeMode(nextMode: HistoryExplorerMode) {
+    if (nextMode === "return" && !returnAvailable) return;
+    const nextMetricPoints = historyPointsWithMetric(visiblePoints, nextMode);
+    setMode(nextMode);
+    setSelectedDate(
+      nextMetricPoints.at(-1)?.date ?? visiblePoints.at(-1)?.date ?? null,
+    );
+  }
+
   return (
     <section aria-labelledby="history-time-explorer-title">
-      <div className="flex flex-col gap-4 border-t border-[#dde1db] pt-7 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[11px] font-medium text-[#777d75]">TIME EXPLORER</p>
-          <h2
+      <div className="grid gap-8 border-b border-[#dde1db] py-9 lg:grid-cols-[minmax(0,1fr)_minmax(540px,1.35fr)] lg:items-end">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-[11px] font-medium text-[#777d75]">HISTORY</p>
+            <span className="border border-[#dce0da] bg-[#f1f3ef] px-2 py-1 text-[10px] font-medium text-[#626961]">
+              실제 저장 기록
+            </span>
+          </div>
+          <h1
             id="history-time-explorer-title"
-            className="mt-1 text-xl font-semibold tracking-normal"
+            className="mt-3 text-3xl font-semibold tracking-normal"
           >
-            자산의 시간
-          </h2>
-          <p className="mt-2 text-sm text-[#697069]">
-            날짜를 선택하면 그날의 저장 평가액과 이벤트 근거가 함께 바뀝니다.
+            성과 그래프
+          </h1>
+          <p className="mt-1 text-sm text-[#697069]">
+            {scopeLabel} · {formatDate(selectedPoint?.date ?? null)}
+          </p>
+          <p
+            className={`mt-6 text-[clamp(2.8rem,5.2vw,5.8rem)] font-normal leading-none tracking-normal tabular-nums ${
+              mode === "return"
+                ? tone(selectedPoint?.totalReturnPct ?? null)
+                : "text-[#171a16]"
+            }`}
+          >
+            {formatPrimaryMetric(selectedPoint, mode)}
+          </p>
+          <p className="mt-4 text-xs leading-5 text-[#7a8078]">
+            {selectedPoint
+              ? `${historySourceLabel(selectedPoint.source)} · ${modeDescription(mode)}`
+              : "선택한 날짜의 저장 근거가 없습니다."}
           </p>
         </div>
+
+        <dl className="grid grid-cols-2 border-y border-[#dde1db] xl:grid-cols-4">
+          <SummaryMetric
+            detail={formatDate(rangeSummary.peakDate)}
+            label="표시 범위 최고 평가액"
+            value={formatHistoryKrw(rangeSummary.peakValueKrw)}
+          />
+          <SummaryMetric
+            detail={formatDate(rangeSummary.maxDrawdownDate)}
+            label="최대 낙폭"
+            value={formatSignedPercent(rangeSummary.maxDrawdownPct)}
+            valueClass={tone(rangeSummary.maxDrawdownPct)}
+          />
+          <SummaryMetric
+            detail={formatSignedPercent(rangeSummary.changePct)}
+            label="표시 범위 변화"
+            value={formatSignedKrw(rangeSummary.changeKrw)}
+            valueClass={tone(rangeSummary.changeKrw)}
+          />
+          <SummaryMetric
+            detail={`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`}
+            label="기록점"
+            value={`${rangeSummary.pointCount}개`}
+          />
+        </dl>
+      </div>
+
+      <div className="flex flex-col gap-5 border-b border-[#dde1db] py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="inline-flex w-fit border border-[#d9ddd7] bg-[#f1f3ef] p-1"
+          aria-label="그래프 지표"
+        >
+          <ModeButton
+            active={mode === "value"}
+            label="평가액"
+            onClick={() => changeMode("value")}
+          />
+          <ModeButton
+            active={mode === "return"}
+            disabled={!returnAvailable}
+            label="수익률"
+            onClick={() => changeMode("return")}
+          />
+        </div>
         <div className="flex items-center gap-5" aria-label="조회 기간">
-          {(["1M", "3M", "6M", "ALL"] as const).map((item) => (
+          {RANGE_OPTIONS.map((option) => (
             <button
-              key={item}
+              key={option.key}
               type="button"
-              aria-pressed={range === item}
+              aria-pressed={range === option.key}
               className={`border-b py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] ${
-                range === item
+                range === option.key
                   ? "border-[#20231f] text-[#20231f]"
                   : "border-transparent text-[#777d75] hover:text-[#20231f]"
               }`}
-              onClick={() => {
-                const nextPoints = pointsForRange(model.points, item);
-                setRange(item);
-                setSelectedDate(nextPoints.at(-1)?.date ?? null);
-                setHoveredDate(null);
-              }}
+              onClick={() => changeRange(option.key)}
             >
-              {item}
+              {option.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="mt-7 grid border-y border-[#dde1db] xl:grid-cols-[minmax(0,2.15fr)_minmax(310px,0.85fr)]">
-        <div className="min-w-0 py-6 xl:pr-8">
-          <div
-            className="relative aspect-[2.85/1] min-h-[270px] w-full"
-            onPointerLeave={() => setHoveredDate(null)}
-          >
-            <svg
-              role="img"
-              aria-label="저장된 날짜별 포트폴리오 평가액 흐름"
-              className="h-full w-full overflow-visible"
-              viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-              preserveAspectRatio="none"
-            >
-              {[0.25, 0.5, 0.75].map((fraction) => (
-                <line
-                  key={fraction}
-                  x1={PLOT_LEFT}
-                  x2={PLOT_RIGHT}
-                  y1={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
-                  y2={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
-                  stroke="#e7eae5"
-                  strokeDasharray="2 8"
-                />
-              ))}
-              <line
-                x1={PLOT_LEFT}
-                x2={PLOT_RIGHT}
-                y1={PLOT_BOTTOM}
-                y2={PLOT_BOTTOM}
-                stroke="#d9ddd7"
-              />
-              {geometry.points.map((point, index) => (
-                <rect
-                  key={`bar:${visiblePoints[index]?.date}`}
-                  x={point.x - Math.max(1, geometry.barWidth / 2)}
-                  y={point.y + 8}
-                  width={geometry.barWidth}
-                  height={Math.max(0, PLOT_BOTTOM - point.y - 8)}
-                  fill="#e9ece8"
-                  opacity="0.62"
-                />
-              ))}
-              <path
-                d={geometry.path}
-                fill="none"
-                stroke="#25302a"
-                strokeWidth="1.75"
-                vectorEffect="non-scaling-stroke"
-              />
-              {geometry.points.map((point, index) => {
-                const value = visiblePoints[index];
-                const previous = geometry.points[index - 1];
-                const next = geometry.points[index + 1];
-                if (!value) return null;
-                const hitStart = previous
-                  ? (previous.x + point.x) / 2
-                  : PLOT_LEFT;
-                const hitEnd = next ? (point.x + next.x) / 2 : PLOT_RIGHT;
-                const active = value.date === selectedPoint?.date;
-
-                return (
-                  <g key={`point:${value.date}`}>
-                    {active ? (
-                      <>
-                        <line
-                          x1={point.x}
-                          x2={point.x}
-                          y1={PLOT_TOP}
-                          y2={PLOT_BOTTOM}
-                          stroke="#6d8f82"
-                          strokeDasharray="2 6"
-                        />
-                        <circle
-                          cx={point.x}
-                          cy={point.y}
-                          r="5"
-                          fill="#f8faf7"
-                          stroke="#347e62"
-                          strokeWidth="2"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      </>
-                    ) : null}
-                    <rect
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${formatDate(value.date)} 평가액 ${formatHistoryKrw(value.valueKrw)}`}
-                      x={hitStart}
-                      y={PLOT_TOP}
-                      width={Math.max(1, hitEnd - hitStart)}
-                      height={PLOT_BOTTOM - PLOT_TOP}
-                      fill="transparent"
-                      className="cursor-crosshair outline-none"
-                      onClick={() => setSelectedDate(value.date)}
-                      onFocus={() => setHoveredDate(value.date)}
-                      onBlur={() => setHoveredDate(null)}
-                      onPointerDown={(event) => event.preventDefault()}
-                      onPointerEnter={() => setHoveredDate(value.date)}
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-
-            {hoveredPoint && hoveredGeometry ? (
-              <ChartTooltip point={hoveredPoint} geometry={hoveredGeometry} />
-            ) : null}
-          </div>
-
-          <ChartDateLabels points={visiblePoints} />
-        </div>
-
-        <SelectedDayPanel point={selectedPoint} />
+      <div className="grid gap-8 border-b border-[#dde1db] py-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <HistoryPerformanceChart
+          mode={mode}
+          onSelect={setSelectedDate}
+          points={visiblePoints}
+          selectedDate={selectedPoint?.date ?? null}
+        />
+        <HistorySnapshotRail
+          onSelect={setSelectedDate}
+          points={visiblePoints}
+          selectedDate={selectedPoint?.date ?? null}
+        />
       </div>
 
+      <RangeSummary summary={rangeSummary} />
+      <SelectedDayEvidence point={selectedPoint} />
       <HistoryCalendar
+        onSelect={setSelectedDate}
         points={visiblePoints}
         selectedDate={selectedPoint?.date ?? null}
-        onSelect={setSelectedDate}
       />
-
       {model.riskPointCount > 0 ? (
         <StoredRiskHistory points={visiblePoints} />
       ) : null}
@@ -229,49 +222,163 @@ export function HistoryTimeExplorer({
   );
 }
 
-function SelectedDayPanel({ point }: { point: HistoryOverviewPoint | null }) {
-  if (!point) return null;
+function ModeButton({
+  active,
+  disabled = false,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <aside className="border-t border-[#dde1db] py-6 xl:border-t-0 xl:border-l xl:pl-8">
-      <p className="text-[11px] font-medium text-[#777d75]">SELECTED DATE</p>
-      <p className="mt-2 text-sm text-[#6d736b]">{formatDate(point.date)}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-normal tabular-nums">
-        {formatHistoryKrw(point.valueKrw)}
-      </p>
-      <dl className="mt-7 divide-y divide-[#e1e4df] text-sm">
-        <MetricRow
-          label="이전 저장점 대비"
-          value={formatSignedKrw(point.movementKrw)}
-          tone={tone(point.movementKrw)}
+    <button
+      type="button"
+      aria-pressed={active}
+      className={`min-w-20 px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] disabled:cursor-not-allowed disabled:opacity-40 ${
+        active
+          ? "bg-[#202a25] text-white"
+          : "text-[#697069] hover:text-[#20231f]"
+      }`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SummaryMetric({
+  detail,
+  label,
+  value,
+  valueClass = "text-[#20231f]",
+}: {
+  detail: string;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="min-w-0 border-b border-r border-[#dde1db] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
+      <dt className="text-[11px] text-[#747a72]">{label}</dt>
+      <dd className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}>
+        {value}
+      </dd>
+      <dd className="mt-2 truncate text-[11px] text-[#858a83]">{detail}</dd>
+    </div>
+  );
+}
+
+function RangeSummary({
+  summary,
+}: {
+  summary: ReturnType<typeof summarizeHistoryRange>;
+}) {
+  return (
+    <dl className="grid border-b border-[#dde1db] py-5 sm:grid-cols-[1fr_auto_1fr_1.2fr] sm:items-center">
+      <RangeValue
+        detail={formatDate(summary.startDate)}
+        label="시작 평가액"
+        value={formatHistoryKrw(summary.startValueKrw)}
+      />
+      <div className="hidden px-7 text-xl text-[#858a83] sm:block">→</div>
+      <RangeValue
+        detail={formatDate(summary.endDate)}
+        label="종료 평가액"
+        value={formatHistoryKrw(summary.endValueKrw)}
+      />
+      <div className="mt-4 grid grid-cols-2 gap-5 border-t border-[#e1e4df] pt-4 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-7 sm:pt-0">
+        <RangeValue
+          detail="평가액 변화"
+          label="변화 금액"
+          value={formatSignedKrw(summary.changeKrw)}
+          valueClass={tone(summary.changeKrw)}
+        />
+        <RangeValue
+          detail="현금흐름 미보정"
+          label="변화율"
+          value={formatSignedPercent(summary.changePct)}
+          valueClass={tone(summary.changePct)}
+        />
+      </div>
+    </dl>
+  );
+}
+
+function RangeValue({
+  detail,
+  label,
+  value,
+  valueClass = "text-[#20231f]",
+}: {
+  detail: string;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="py-2">
+      <dt className="text-[11px] text-[#747a72]">{label}</dt>
+      <dd className={`mt-2 text-lg font-semibold tabular-nums ${valueClass}`}>
+        {value}
+      </dd>
+      <dd className="mt-1 text-[11px] text-[#858a83]">{detail}</dd>
+    </div>
+  );
+}
+
+function SelectedDayEvidence({ point }: { point: HistoryOverviewPoint | null }) {
+  if (!point) return null;
+
+  return (
+    <section className="border-b border-[#dde1db] py-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-medium text-[#777d75]">SELECTED DATE</p>
+          <h2 className="mt-1 text-xl font-semibold">{formatDate(point.date)}</h2>
+        </div>
+        <p className="text-xs text-[#777d75]">
+          {historySourceLabel(point.source)}
+        </p>
+      </div>
+
+      <dl className="mt-5 grid border-y border-[#e1e4df] sm:grid-cols-2 lg:grid-cols-4">
+        <EvidenceMetric
           detail={
             point.gapDays === null
               ? "첫 저장점"
               : `${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`
           }
+          label="이전 저장점 대비"
+          value={formatSignedKrw(point.movementKrw)}
+          valueClass={tone(point.movementKrw)}
         />
-        <MetricRow
+        <EvidenceMetric
+          detail={formatSignedPercent(point.totalReturnPct)}
           label="저장 손익"
           value={formatSignedKrw(point.totalPnlKrw)}
-          tone={tone(point.totalPnlKrw)}
-          detail={formatSignedPercent(point.totalReturnPct)}
+          valueClass={tone(point.totalPnlKrw)}
         />
-        <MetricRow
+        <EvidenceMetric
+          detail={formatSignedPercent(point.drawdownPct)}
           label="고점 대비"
           value={formatSignedKrw(point.drawdownKrw)}
-          tone={tone(point.drawdownKrw)}
-          detail={formatSignedPercent(point.drawdownPct)}
+          valueClass={tone(point.drawdownKrw)}
         />
-        <MetricRow
+        <EvidenceMetric
+          detail="저장된 현금성 평가액"
           label="현금"
           value={formatHistoryKrw(point.cashValueKrw)}
-          detail={historySourceLabel(point.source)}
         />
       </dl>
 
-      <div className="mt-7 border-t border-[#dde1db] pt-5">
+      <div className="mt-5">
         <p className="text-xs font-semibold">같은 날짜의 활동</p>
         {point.events.length > 0 ? (
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {point.events.slice(0, 4).map((event, index) => (
               <li
                 key={`${event.eventDate}:${event.eventType}:${event.assetName}:${index}`}
@@ -279,10 +386,10 @@ function SelectedDayPanel({ point }: { point: HistoryOverviewPoint | null }) {
               >
                 <span className="mt-1 h-2 w-2 rounded-full bg-[#5b917c]" />
                 <div className="min-w-0">
-                  <p className="font-medium">
+                  <p className="truncate font-medium">
                     {eventTypeLabel(event)} · {event.assetName}
                   </p>
-                  <p className="mt-1 text-xs text-[#72786f]">
+                  <p className="mt-1 truncate text-xs text-[#72786f]">
                     {[event.accountName, formatOptionalKrw(event.amountKrw)]
                       .filter(Boolean)
                       .join(" · ")}
@@ -292,7 +399,7 @@ function SelectedDayPanel({ point }: { point: HistoryOverviewPoint | null }) {
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm leading-6 text-[#777d75]">
+          <p className="mt-3 text-sm text-[#777d75]">
             이 날짜에 연결된 저장 이벤트가 없습니다.
           </p>
         )}
@@ -300,28 +407,50 @@ function SelectedDayPanel({ point }: { point: HistoryOverviewPoint | null }) {
           같은 날짜에 저장된 활동이며 평가액 변화의 원인으로 단정하지 않습니다.
         </p>
       </div>
-    </aside>
+    </section>
+  );
+}
+
+function EvidenceMetric({
+  detail,
+  label,
+  value,
+  valueClass = "text-[#20231f]",
+}: {
+  detail: string;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="border-b border-[#e1e4df] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
+      <dt className="text-xs text-[#747a72]">{label}</dt>
+      <dd className={`mt-2 text-lg font-semibold tabular-nums ${valueClass}`}>
+        {value}
+      </dd>
+      <dd className="mt-2 text-xs leading-5 text-[#858a83]">{detail}</dd>
+    </div>
   );
 }
 
 function HistoryCalendar({
+  onSelect,
   points,
   selectedDate,
-  onSelect,
 }: {
+  onSelect: (date: string) => void;
   points: readonly HistoryOverviewPoint[];
   selectedDate: string | null;
-  onSelect: (date: string) => void;
 }) {
   const layout = useMemo(() => calendarLayout(points), [points]);
   if (layout.cells.length === 0) return null;
 
   return (
-    <div className="border-b border-[#dde1db] py-7">
+    <section className="border-b border-[#dde1db] py-7">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-medium text-[#777d75]">VALUE RHYTHM</p>
-          <h3 className="mt-1 text-base font-semibold">기록 리듬</h3>
+          <h2 className="mt-1 text-base font-semibold">기록 리듬</h2>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-[#7a8078]">
           <span>하락</span>
@@ -367,11 +496,15 @@ function HistoryCalendar({
         <span>빈 날짜는 보간하지 않음</span>
         <span>{formatDate(points.at(-1)?.date ?? null)}</span>
       </div>
-    </div>
+    </section>
   );
 }
 
-function StoredRiskHistory({ points }: { points: readonly HistoryOverviewPoint[] }) {
+function StoredRiskHistory({
+  points,
+}: {
+  points: readonly HistoryOverviewPoint[];
+}) {
   const riskPoints = points.filter((point) => point.risk !== null);
   const latest = riskPoints.at(-1)?.risk ?? null;
   if (!latest) return null;
@@ -381,145 +514,57 @@ function StoredRiskHistory({ points }: { points: readonly HistoryOverviewPoint[]
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-medium text-[#777d75]">STORED RISK</p>
-          <h3 className="mt-1 text-base font-semibold">저장된 위험 기록</h3>
+          <h2 className="mt-1 text-base font-semibold">저장된 위험 기록</h2>
         </div>
-        <p className="text-xs text-[#777d75]">저장값이 있는 {riskPoints.length}개 날짜</p>
+        <p className="text-xs text-[#777d75]">
+          저장값이 있는 {riskPoints.length}개 날짜
+        </p>
       </div>
       <dl className="mt-5 grid border-t border-[#e1e4df] sm:grid-cols-2 lg:grid-cols-4">
         <RiskMetric
+          detail="실제로 분산 효과를 내는 종목 수"
           label="유효 분산 수"
           value={formatHistoryNumber(latest.enb)}
-          detail="실제로 분산 효과를 내는 종목 수"
         />
         <RiskMetric
+          detail="종목들이 함께 움직인 정도"
           label="평균 상관계수"
           value={formatHistoryNumber(latest.avgCorrelation)}
-          detail="종목들이 함께 움직인 정도"
         />
         <RiskMetric
+          detail="저장된 위험 계산 결과"
           label="포트 변동성"
           value={formatHistoryPercent(latest.portfolioVolatility)}
-          detail="저장된 위험 계산 결과"
         />
         <RiskMetric
-          label="시장 국면"
-          value={latest.regimeLabel ?? "기록 없음"}
           detail={
             latest.regimeScore === null
               ? "점수 기록 없음"
               : `저장 점수 ${formatHistoryNumber(latest.regimeScore)}`
           }
+          label="시장 국면"
+          value={latest.regimeLabel ?? "기록 없음"}
         />
       </dl>
     </section>
   );
 }
 
-function ChartTooltip({
-  point,
-  geometry,
-}: {
-  point: HistoryOverviewPoint;
-  geometry: { x: number; y: number };
-}) {
-  const left = Math.min(78, Math.max(2, (geometry.x / CHART_WIDTH) * 100));
-  const top = Math.min(68, Math.max(3, (geometry.y / CHART_HEIGHT) * 100));
-  return (
-    <div
-      className="pointer-events-none absolute z-10 min-w-48 border border-[#d8ddd7] bg-[#fbfcf9]/95 px-4 py-3 text-xs shadow-[0_12px_34px_rgba(36,43,38,0.12)] backdrop-blur-sm"
-      style={{ left: `${left}%`, top: `${top}%` }}
-    >
-      <p className="font-semibold">{formatDate(point.date)}</p>
-      <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1 text-[#686f67]">
-        <span>평가액</span>
-        <span className="text-right font-medium text-[#20231f]">
-          {formatHistoryKrw(point.valueKrw)}
-        </span>
-        <span>이전 대비</span>
-        <span className={`text-right font-medium ${tone(point.movementKrw)}`}>
-          {formatSignedKrw(point.movementKrw)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ChartDateLabels({ points }: { points: readonly HistoryOverviewPoint[] }) {
-  if (points.length === 0) return null;
-  const indexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
-  return (
-    <div className="mt-1 flex justify-between text-[11px] text-[#858a83]">
-      {indexes.map((index) => (
-        <span key={points[index]!.date}>{shortDate(points[index]!.date)}</span>
-      ))}
-    </div>
-  );
-}
-
-function MetricRow({
+function RiskMetric({
+  detail,
   label,
   value,
-  detail,
-  tone: toneClass = "text-[#20231f]",
 }: {
+  detail: string;
   label: string;
   value: string;
-  detail: string;
-  tone?: string;
 }) {
-  return (
-    <div className="grid grid-cols-[1fr_auto] gap-x-4 py-3">
-      <dt className="text-[#70766e]">{label}</dt>
-      <dd className={`text-right font-semibold tabular-nums ${toneClass}`}>{value}</dd>
-      <dd className="col-span-2 mt-1 text-xs text-[#858a83]">{detail}</dd>
-    </div>
-  );
-}
-
-function RiskMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="border-b border-[#e1e4df] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
       <dt className="text-xs text-[#747a72]">{label}</dt>
       <dd className="mt-2 text-xl font-semibold tabular-nums">{value}</dd>
       <dd className="mt-2 text-xs leading-5 text-[#858a83]">{detail}</dd>
     </div>
-  );
-}
-
-function buildGeometry(points: readonly HistoryOverviewPoint[]) {
-  if (points.length === 0) return { points: [], path: "", barWidth: 1 };
-  const values = points.map((point) => point.valueKrw);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const padding = Math.max((max - min) * 0.16, Math.abs(max) * 0.015, 1);
-  const yMin = min - padding;
-  const yMax = max + padding;
-  const xStep =
-    points.length > 1 ? (PLOT_RIGHT - PLOT_LEFT) / (points.length - 1) : 0;
-  const chartPoints = points.map((point, index) => ({
-    x: points.length === 1 ? (PLOT_LEFT + PLOT_RIGHT) / 2 : PLOT_LEFT + xStep * index,
-    y:
-      PLOT_BOTTOM -
-      ((point.valueKrw - yMin) / Math.max(yMax - yMin, 1)) *
-        (PLOT_BOTTOM - PLOT_TOP),
-  }));
-  return {
-    points: chartPoints,
-    path: buildMonotoneCurvePath(chartPoints),
-    barWidth: Math.max(2, Math.min(8, xStep * 0.42 || 5)),
-  };
-}
-
-function pointsForRange(
-  points: readonly HistoryOverviewPoint[],
-  range: RangeKey,
-) {
-  if (range === "ALL" || points.length === 0) return points;
-  const days = range === "1M" ? 31 : range === "3M" ? 92 : 183;
-  const latest = Date.parse(`${points.at(-1)!.date}T00:00:00Z`);
-  const cutoff = latest - days * 86_400_000;
-  return points.filter(
-    (point) => Date.parse(`${point.date}T00:00:00Z`) >= cutoff,
   );
 }
 
@@ -561,6 +606,19 @@ function movementColor(point: HistoryOverviewPoint, maxMovement: number) {
   return "#f0cbc8";
 }
 
+function formatPrimaryMetric(
+  point: HistoryOverviewPoint | null,
+  mode: HistoryExplorerMode,
+) {
+  if (!point) return "기록 없음";
+  if (mode === "value") return formatHistoryKrw(point.valueKrw);
+  return formatSignedPercent(historyPointMetric(point, mode));
+}
+
+function modeDescription(mode: HistoryExplorerMode) {
+  return mode === "value" ? "저장 평가액 기준" : "저장된 총 수익률 기준";
+}
+
 function eventTypeLabel(event: HistoryOverviewEvent) {
   if (event.eventType === "buy") return "매수";
   if (event.eventType === "sell") return "매도";
@@ -570,13 +628,13 @@ function eventTypeLabel(event: HistoryOverviewEvent) {
 }
 
 function tone(value: number | null) {
-  if (value === null || value === 0) return "text-[#20231f]";
+  if (value === null || Math.abs(value) < 0.005) return "text-[#20231f]";
   return value > 0 ? "text-[#347e62]" : "text-[#cb5551]";
 }
 
 function formatSignedKrw(value: number | null) {
   if (value === null) return "기록 없음";
-  if (value === 0) return "₩0";
+  if (Math.abs(value) < 0.5) return "₩0";
   return `${value > 0 ? "+" : "-"}${formatHistoryKrw(Math.abs(value))}`;
 }
 
@@ -586,16 +644,10 @@ function formatOptionalKrw(value: number | null) {
 
 function formatSignedPercent(value: number | null) {
   if (value === null) return "기록 없음";
-  const formatted = formatHistoryPercent(Math.abs(value));
-  if (value === 0) return formatted;
-  return `${value > 0 ? "+" : "-"}${formatted}`;
+  if (Math.abs(value) < 0.005) return "0%";
+  return `${value > 0 ? "+" : "-"}${formatHistoryPercent(Math.abs(value))}`;
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "날짜 없음";
-  return value.replaceAll("-", ".");
-}
-
-function shortDate(value: string) {
-  return value.slice(5).replace("-", ".");
+  return value ? value.replaceAll("-", ".") : "기록 없음";
 }

@@ -89,64 +89,32 @@ export function HistoryView({
           </p>
         ) : null}
 
-        <section
-          className="flex min-h-[300px] flex-col items-center justify-center border-b border-[#dde1db] py-14 text-center"
-          aria-labelledby="history-title"
-        >
-          <p className="text-xs text-[#747a72]">{history.selectedScope.label}</p>
-          <h1 id="history-title" className="mt-3 text-2xl font-semibold">
-            자산의 시간을 다시 봅니다
-          </h1>
-          {overview.status === "ready" ? (
-            <>
-              <p className="mt-5 text-[clamp(3.2rem,7vw,6.6rem)] font-normal leading-none tracking-normal tabular-nums">
-                {formatHistoryKrw(overview.latestValueKrw)}
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm">
-                <span className="text-[#737970]">첫 기록 대비</span>
-                <span className={`font-semibold tabular-nums ${tone(overview.valuationChangeKrw)}`}>
-                  {formatSignedKrw(overview.valuationChangeKrw)}
-                </span>
-                <span className="h-3 w-px bg-[#d8dcd6]" />
-                <span className={`font-semibold tabular-nums ${tone(overview.valuationChangePct)}`}>
-                  {formatSignedPercent(overview.valuationChangePct)}
-                </span>
-              </div>
-              <p className="mt-4 text-xs text-[#858a83]">
-                {formatDisplayDate(overview.startDate)}부터 {overview.pointCount}개 저장점 · 현금흐름을 보정하지 않은 평가액 변화
-              </p>
-            </>
-          ) : (
-            <div className="mt-7 max-w-xl">
-              <p className="text-3xl font-semibold">표시할 평가액 기록이 없습니다.</p>
-              <p className="mt-3 text-sm leading-6 text-[#72786f]">
-                누락값을 임의로 만들지 않습니다. 저장된 포트폴리오 스냅샷이 생기면 같은 화면에서 시간축이 열립니다.
-              </p>
-            </div>
-          )}
-        </section>
+        <HistoryTimeExplorer
+          model={overview}
+          scopeLabel={history.selectedScope.label}
+        />
 
         {overview.status === "ready" ? (
-          <>
+          <section className="border-b border-[#dde1db] py-8">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[11px] font-medium text-[#777d75]">
+                  MOVEMENT INSIGHTS
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">움직임 인사이트</h2>
+              </div>
+              <p className="text-xs text-[#777d75]">
+                저장점 간 변화 · 현금흐름 미보정
+              </p>
+            </div>
             <dl
-              className="grid border-b border-[#dde1db] sm:grid-cols-2 xl:grid-cols-6"
-              aria-label="히스토리 핵심 지표"
+              className="mt-5 grid border-y border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4"
+              aria-label="히스토리 움직임 지표"
             >
-              <InsightMetric
-                label="저장 고점"
-                value={formatHistoryKrw(overview.peakValueKrw)}
-                detail={formatDisplayDate(overview.peakDate)}
-              />
               <InsightMetric
                 label="저장 저점"
                 value={formatHistoryKrw(overview.lowestValueKrw)}
                 detail={formatDisplayDate(overview.lowestDate)}
-              />
-              <InsightMetric
-                label="고점 대비 최대 하락"
-                value={formatSignedPercent(overview.maxDrawdownPct)}
-                detail={formatDisplayDate(overview.maxDrawdownDate)}
-                valueClass={tone(overview.maxDrawdownPct)}
               />
               <InsightMetric
                 label="가장 크게 오른 저장점"
@@ -166,9 +134,7 @@ export function HistoryView({
                 detail="저장점 간 방향 기준"
               />
             </dl>
-
-            <HistoryTimeExplorer model={overview} />
-          </>
+          </section>
         ) : null}
 
         <HistoryActivityStream result={events} supported={eventsSupported} />
