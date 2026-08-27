@@ -1,8 +1,8 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AnalysisJourneyNav } from "@/components/analysis-journey-nav";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
+import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
@@ -22,10 +22,9 @@ import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-s
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
 import type { InvestmentLabObservedHistory } from "@/lib/investment-lab-observed-history-segments";
 import type { InvestmentLabPreperiodOptimizer } from "@/lib/investment-lab-preperiod-optimizer";
-import {
-  buildPortfolioAnalysisScopeHref,
-  type PortfolioAnalysisScope,
-  type PortfolioAnalysisScopeQuery,
+import type {
+  PortfolioAnalysisScope,
+  PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
 
 export function InvestmentLabView({
@@ -38,6 +37,7 @@ export function InvestmentLabView({
   dataAvailability,
   fountScopeAdjustment,
   fundingPreflight,
+  generatedAt,
   model,
   observedHistory,
   optimizerStatus,
@@ -55,6 +55,7 @@ export function InvestmentLabView({
   dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
   fundingPreflight: InvestmentLabAccountFundingPreflight;
+  generatedAt: string;
   model: InvestmentLabCounterfactualReadModel;
   observedHistory: InvestmentLabObservedHistory;
   optimizerStatus: InvestmentLabPreperiodOptimizer["status"];
@@ -164,117 +165,30 @@ export function InvestmentLabView({
         model.sourceAuthority.coverage.sourceTransitionCount
       }
     >
-      <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
-        <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal sm:text-3xl">
-                투자 랩
-              </h1>
-              <p className="mt-2 text-sm text-[#626b5f]">
-                실제 평가액과 동일한 거래금액을 전액 KODEX 200에 적용한 경로 비교
-              </p>
-            </div>
-            <nav className="flex flex-wrap gap-2 text-sm font-semibold">
-              <NavLink
-                href={buildPortfolioAnalysisScopeHref("/", selectedScope.key)}
-              >
-                홈
-              </NavLink>
-              <NavLink
-                href={buildPortfolioAnalysisScopeHref(
-                  "/today",
-                  selectedScope.key,
-                )}
-              >
-                오늘 변동
-              </NavLink>
-              <NavLink
-                href={buildPortfolioAnalysisScopeHref(
-                  "/portfolio/structure",
-                  selectedScope.key,
-                )}
-              >
-                포트 구조
-              </NavLink>
-              <NavLink
-                href={buildPortfolioAnalysisScopeHref(
-                  "/history",
-                  selectedScope.key,
-                )}
-              >
-                히스토리
-              </NavLink>
-            </nav>
+      <PortfolioPrimaryNavigation
+        activePath="/investment-lab"
+        generatedAt={generatedAt}
+        selectedScopeKey={selectedScope.key}
+      />
+
+      <div className="mx-auto w-full max-w-[1540px] px-5 pb-16 pt-7 sm:px-8 lg:px-10">
+        <header>
+          <div className="flex items-center justify-between gap-5 text-[11px] text-[#777d75]">
+            <p>PORTFOLIO / INVESTMENT LAB</p>
+            <p className="tabular-nums">분석 범위 {selectedScope.label}</p>
           </div>
-          <div className="mt-4">
+          <div className="mt-3">
             <PortfolioAnalysisScopeTabs
               basePath="/investment-lab"
               query={scopeQuery}
               scopes={scopeCatalog}
               selectedScopeKey={selectedScope.key}
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <StatusPill
-              label="분석 범위"
-              value={selectedScope.label}
-            />
-            <StatusPill label="시나리오" value="전액 KODEX 200" />
-            <StatusPill
-              label="상태"
-              value={
-                !periodReady
-                  ? showSegmentedHistory
-                    ? "부분 관측 표시"
-                    : "구간 확인 필요"
-                  : model.observedPath.status !== "ready"
-                    ? "관측 경로 차단"
-                    : model.status === "ready"
-                      ? "비교 계산 가능"
-                      : "일부 시나리오만 가능"
-              }
+              variant="underline"
             />
           </div>
         </header>
 
-        <AnalysisJourneyNav
-          items={[
-            {
-              description: "실제 평가액과 여러 가상 포트폴리오를 같은 기간으로 비교합니다.",
-              href: "#investment-lab-results",
-              label: "성과 비교",
-              status: investmentLabResultStatus({
-                model,
-                periodReady,
-                showSegmentedHistory,
-              }),
-            },
-            {
-              description: "최고 수익, 최소 변동성, 최소 낙폭, 최대 샤프 비중을 비교합니다.",
-              href: "#investment-lab-optimizer",
-              label: "비중 실험",
-              status: optimizerStatusLabel(optimizerStatus),
-            },
-            {
-              description: "과거 충격 구간과 ETF 내부 노출을 별도 데이터 경계에서 확인합니다.",
-              href: "#investment-lab-etf-xray",
-              label: "스트레스와 구성",
-              status: "독립 계산",
-            },
-            {
-              description: "현재 비중을 조금 바꿨을 때 구조와 위험 지표가 어떻게 달라지는지 봅니다.",
-              href: "#investment-lab-small-adjustment",
-              label: "작은 조정",
-              status: "독립 계산",
-            },
-          ]}
-        />
-
-        <div className="scroll-mt-4 space-y-4" id="investment-lab-results">
-          {dataAvailability}
-
+        <div className="mt-8 scroll-mt-4" id="investment-lab-results">
           <InvestmentLabPeriodSelector
             period={period}
             query={scopeQuery}
@@ -282,16 +196,27 @@ export function InvestmentLabView({
           />
 
           {showSegmentedHistory ? (
-            <InvestmentLabObservedHistoryView
-              model={observedHistory}
-              query={scopeQuery}
-              scopeKey={selectedScope.key}
-            />
+            <div className="mt-6">
+              <InvestmentLabObservedHistoryView
+                model={observedHistory}
+                query={scopeQuery}
+                scopeKey={selectedScope.key}
+              />
+            </div>
           ) : null}
 
-          <InvestmentLabFundingPreflightView model={fundingPreflight} />
-
-          {!periodReady ? null : model.observedPath.status === "ready" ? (
+          {!periodReady ? (
+            <div className="mt-6 space-y-4">
+              <InvestmentLabJourneyNav
+                model={model}
+                optimizerStatus={optimizerStatus}
+                periodReady={false}
+                showSegmentedHistory={showSegmentedHistory}
+              />
+              {dataAvailability}
+              <InvestmentLabFundingPreflightView model={fundingPreflight} />
+            </div>
+          ) : model.observedPath.status === "ready" ? (
             <ReadyView
               anchorBasketScenario={anchorBasketScenario}
               anchorValueWeightScenario={anchorValueWeightScenario}
@@ -300,13 +225,26 @@ export function InvestmentLabView({
               }
               anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
               approvedTargetWeightScenario={approvedTargetWeightScenario}
+              dataAvailability={dataAvailability}
               fountScopeAdjustment={fountScopeAdjustment}
+              fundingPreflight={fundingPreflight}
               model={model}
+              optimizerStatus={optimizerStatus}
               period={period}
               selectedScope={selectedScope}
             />
           ) : (
-            <BlockedView model={model} />
+            <div className="mt-6 space-y-4">
+              <InvestmentLabJourneyNav
+                model={model}
+                optimizerStatus={optimizerStatus}
+                periodReady
+                showSegmentedHistory={false}
+              />
+              {dataAvailability}
+              <InvestmentLabFundingPreflightView model={fundingPreflight} />
+              <BlockedView model={model} />
+            </div>
           )}
         </div>
       </div>
@@ -338,14 +276,68 @@ function optimizerStatusLabel(
   return "비교 경로 확인 필요";
 }
 
+function InvestmentLabJourneyNav({
+  model,
+  optimizerStatus,
+  periodReady,
+  showSegmentedHistory,
+}: {
+  model: InvestmentLabCounterfactualReadModel;
+  optimizerStatus: InvestmentLabPreperiodOptimizer["status"];
+  periodReady: boolean;
+  showSegmentedHistory: boolean;
+}) {
+  return (
+    <AnalysisJourneyNav
+      items={[
+        {
+          description:
+            "실제 평가액과 여러 가상 포트폴리오를 같은 기간으로 비교합니다.",
+          href: "#investment-lab-results",
+          label: "성과 비교",
+          status: investmentLabResultStatus({
+            model,
+            periodReady,
+            showSegmentedHistory,
+          }),
+        },
+        {
+          description:
+            "수익, 변동성, 낙폭, 샤프 목적별 비중 실험을 분리해 비교합니다.",
+          href: "#investment-lab-optimizer",
+          label: "비중 실험",
+          status: optimizerStatusLabel(optimizerStatus),
+        },
+        {
+          description:
+            "과거 충격 구간과 ETF 내부 노출을 별도 데이터 경계에서 확인합니다.",
+          href: "#investment-lab-etf-xray",
+          label: "스트레스와 구성",
+          status: "독립 계산",
+        },
+        {
+          description:
+            "현재 비중을 조금 바꿨을 때 구조와 위험 지표가 어떻게 달라지는지 봅니다.",
+          href: "#investment-lab-small-adjustment",
+          label: "작은 조정",
+          status: "독립 계산",
+        },
+      ]}
+    />
+  );
+}
+
 function ReadyView({
   anchorBasketScenario,
   anchorValueWeightScenario,
   anchorCurrentWeightMonthlyScenario,
   anchorEqualWeightMonthlyScenario,
   approvedTargetWeightScenario,
+  dataAvailability,
   fountScopeAdjustment,
+  fundingPreflight,
   model,
+  optimizerStatus,
   period,
   selectedScope,
 }: {
@@ -354,62 +346,19 @@ function ReadyView({
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
+  dataAvailability: ReactNode;
   fountScopeAdjustment: InvestmentLabFountRuntimeScope;
+  fundingPreflight: InvestmentLabAccountFundingPreflight;
   model: InvestmentLabCounterfactualReadModel;
+  optimizerStatus: InvestmentLabPreperiodOptimizer["status"];
   period: InvestmentLabPeriodSelection;
   selectedScope: PortfolioAnalysisScope;
 }) {
   const observedSummary = model.observedPath.summary!;
-  const kodexSummary = model.summary;
   const fixedMixWeights = model.fixedMixScenario?.weights ?? null;
 
   return (
     <>
-      <CurrentWriterSegmentNotice
-        fountScopeAdjustment={fountScopeAdjustment}
-        model={model}
-        period={period}
-        selectedScope={selectedScope}
-      />
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCell
-          label="실제 최종 평가액"
-          value={formatKrw(observedSummary.endValueKrw)}
-          detail={formatDate(observedSummary.endServiceDate)}
-        />
-        <SummaryCell
-          label="KODEX 200 최종 평가액"
-          value={
-            kodexSummary
-              ? formatKrw(kodexSummary.scenarioEndValueKrw)
-              : "-"
-          }
-          detail={kodexSummary ? "동일 거래금액 반영" : "가격 근거 부족"}
-        />
-        <SummaryCell
-          label="최종 차이"
-          value={
-            kodexSummary
-              ? formatSignedKrw(kodexSummary.endDifferenceKrw)
-              : "-"
-          }
-          detail={kodexSummary ? "가상 경로 - 실제 경로" : "KODEX 경로 미계산"}
-          tone={
-            !kodexSummary
-              ? undefined
-              : kodexSummary.endDifferenceKrw >= 0
-                ? "positive"
-                : "negative"
-          }
-        />
-        <SummaryCell
-          label="비교 구간"
-          value={`${observedSummary.comparisonDateCount}개 평가일`}
-          detail={`${formatDate(observedSummary.startServiceDate)} ~ ${formatDate(observedSummary.endServiceDate)}`}
-        />
-      </section>
-
       <InvestmentLabScenarioChartView
         anchorBasketScenario={anchorBasketScenario}
         anchorValueWeightScenario={anchorValueWeightScenario}
@@ -419,26 +368,70 @@ function ReadyView({
         model={model}
       />
 
-      <InvestmentLabScenarioMatrix
-        anchorBasketScenario={anchorBasketScenario}
-        anchorValueWeightScenario={anchorValueWeightScenario}
-        anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
-        anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
-        approvedTargetWeightScenario={approvedTargetWeightScenario}
-        model={model}
-      />
+      <div className="mt-6">
+        <InvestmentLabJourneyNav
+          model={model}
+          optimizerStatus={optimizerStatus}
+          periodReady
+          showSegmentedHistory={false}
+        />
+      </div>
 
-      <InvestmentLabCashComparisonView comparison={model.cashComparison} />
+      <details className="group mt-6 border-y border-[#dce1da] bg-[#f8f9f6] px-5 py-4 sm:px-7 lg:px-9">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold marker:content-none">
+          <span>계산 근거와 준비 상태</span>
+          <span className="text-xs font-normal text-[#777d75] group-open:hidden">
+            펼쳐서 확인
+          </span>
+          <span className="hidden text-xs font-normal text-[#777d75] group-open:inline">
+            접기
+          </span>
+        </summary>
+        <div className="mt-5 space-y-4 border-t border-[#dce1da] pt-5">
+          {dataAvailability}
+          <InvestmentLabFundingPreflightView model={fundingPreflight} />
+        </div>
+      </details>
 
-      <ReturnEstimateSection model={model} />
+      <div className="mt-6">
+        <CurrentWriterSegmentNotice
+          fountScopeAdjustment={fountScopeAdjustment}
+          model={model}
+          period={period}
+          selectedScope={selectedScope}
+        />
+      </div>
 
-      <VooComparisonSection model={model} />
+      <div className="mt-6">
+        <InvestmentLabScenarioMatrix
+          anchorBasketScenario={anchorBasketScenario}
+          anchorValueWeightScenario={anchorValueWeightScenario}
+          anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
+          anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
+          approvedTargetWeightScenario={approvedTargetWeightScenario}
+          model={model}
+        />
+      </div>
 
-      <InvestmentLabContributionExperiment
-        fixedMixWeights={fixedMixWeights}
-        key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
-        scenarios={model.contributionExperimentScenarios}
-      />
+      <div className="mt-6">
+        <InvestmentLabCashComparisonView comparison={model.cashComparison} />
+      </div>
+
+      <div className="mt-6">
+        <ReturnEstimateSection model={model} />
+      </div>
+
+      <div className="mt-6">
+        <VooComparisonSection model={model} />
+      </div>
+
+      <div className="mt-6">
+        <InvestmentLabContributionExperiment
+          fixedMixWeights={fixedMixWeights}
+          key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
+          scenarios={model.contributionExperimentScenarios}
+        />
+      </div>
 
       {model.status === "ready" ? (
         <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
@@ -813,55 +806,6 @@ function BlockedView({ model }: { model: InvestmentLabCounterfactualReadModel })
         ))}
       </ul>
     </section>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-md border border-[#dce2d2] bg-white px-3 py-2 text-[#394138] hover:bg-[#edf1e8]"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function StatusPill({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="rounded-md border border-[#dce2d2] bg-white px-3 py-2 text-[#5d665b]">
-      {label} <strong className="ml-1 text-[#1e2821]">{value}</strong>
-    </span>
-  );
-}
-
-function SummaryCell({
-  label,
-  value,
-  detail,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: "default" | "positive" | "negative";
-}) {
-  return (
-    <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
-      <p className="text-sm text-[#687064]">{label}</p>
-      <p
-        className={`mt-2 text-xl font-semibold tabular-nums ${
-          tone === "positive"
-            ? "text-[#087f4f]"
-            : tone === "negative"
-              ? "text-[#c43d39]"
-              : "text-[#171916]"
-        }`}
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-[#777e73]">{detail}</p>
-    </div>
   );
 }
 

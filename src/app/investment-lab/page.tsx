@@ -111,7 +111,8 @@ export default async function InvestmentLabPage({
     params.kodexWeight,
   );
   const tenantContext = resolution.tenantContext;
-  const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
+  const generatedAt = new Date();
+  const serviceDate = resolveSnapshotCycle(generatedAt).snapshotDate;
   const scopeEvidencePromise =
     getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
       scope: selectedScope,
@@ -166,6 +167,7 @@ export default async function InvestmentLabPage({
         <InvestmentLabContent
           dataAvailabilityPromise={dataAvailabilityPromise}
           fixedMixSelection={fixedMixSelection}
+          generatedAt={generatedAt.toISOString()}
           modelPromise={modelPromise}
           scopeCatalog={scopeContext.catalog.scopes}
           scopeQuery={scopeQuery}
@@ -219,6 +221,7 @@ async function InvestmentLabStressReplayContent({
 async function InvestmentLabContent({
   dataAvailabilityPromise,
   fixedMixSelection,
+  generatedAt,
   modelPromise,
   scopeCatalog,
   scopeQuery,
@@ -230,6 +233,7 @@ async function InvestmentLabContent({
     typeof getReadOnlyTenantInvestmentLabDataAvailabilityForScope
   >;
   fixedMixSelection: InvestmentLabFixedMixSelection;
+  generatedAt: string;
   modelPromise: ReturnType<
     typeof getReadOnlyTenantInvestmentLabCounterfactualForScope
   >;
@@ -271,6 +275,7 @@ async function InvestmentLabContent({
         }
         fountScopeAdjustment={fountScopeAdjustment}
         fundingPreflight={fundingPreflight}
+        generatedAt={generatedAt}
         model={model}
         observedHistory={observedHistory}
         optimizerStatus={preperiodOptimizer.status}

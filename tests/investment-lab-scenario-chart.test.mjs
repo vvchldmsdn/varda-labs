@@ -123,12 +123,19 @@ describe("investment lab multi-scenario chart", () => {
       "src/components/investment-lab/investment-lab-scenario-chart.tsx",
       "utf8",
     );
+    const interactiveSource = readFileSync(
+      "src/components/investment-lab/investment-lab-time-machine.tsx",
+      "utf8",
+    );
 
     assert.doesNotMatch(pureSource, /server-only|@\/db|process\.env|\bfetch\s*\(/);
     assert.doesNotMatch(componentSource, /^["']use client["'];/);
     assert.doesNotMatch(componentSource, /\bfetch\s*\(|\/api\//);
+    assert.match(interactiveSource, /^["']use client["'];/);
+    assert.match(interactiveSource, /PORTFOLIO TIME MACHINE/);
+    assert.doesNotMatch(interactiveSource, /@\/db|process\.env|\bfetch\s*\(|\/api\//);
     assert.doesNotMatch(
-      `${pureSource}\n${componentSource}`,
+      `${pureSource}\n${componentSource}\n${interactiveSource}`,
       /data-rank|최고 시나리오|추천 시나리오/i,
     );
   });
