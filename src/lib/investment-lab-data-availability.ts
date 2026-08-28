@@ -176,6 +176,8 @@ export function buildInvestmentLabDataAvailability(input: {
   const hasUnresolvedSpecialHolding = specialHoldings.some(
     (row) => row.kind === "unresolved",
   );
+  const hasCoveredGoldHistory =
+    hasGold && manualValuationHistory.status === "current_segment_covered";
   const marketHistoryReady =
     input.marketHistory.blockerCount === 0 &&
     input.marketHistory.eligibleHoldingCount > 0 &&
@@ -194,9 +196,12 @@ export function buildInvestmentLabDataAvailability(input: {
   const actualSegmentReady =
     actualHistory.latestCurrentWriterDateCount >=
     INVESTMENT_LAB_DATA_AVAILABILITY_POLICY.minimumActualComparisonDates;
-  const specialHistoryBlocked = hasGold || hasUnresolvedSpecialHolding;
+  const specialHistoryBlocked =
+    (hasGold && !hasCoveredGoldHistory) || hasUnresolvedSpecialHolding;
   const specialHistoryReasons: InvestmentLabScenarioAvailabilityReason[] = [
-    ...(hasGold ? (["manual_valuation_history_required"] as const) : []),
+    ...(hasGold && !hasCoveredGoldHistory
+      ? (["manual_valuation_history_required"] as const)
+      : []),
     ...(hasUnresolvedSpecialHolding
       ? (["special_holding_price_authority_required"] as const)
       : []),
@@ -288,9 +293,12 @@ export function buildInvestmentLabDataAvailability(input: {
     repairItems.push(
       Object.freeze({
         id: "krx_gold" as const,
-        status: "manual_history_required" as const,
-        affectedCount: specialHoldings.filter((row) => row.kind === "krx_gold")
-          .length,
+        status: hasCoveredGoldHistory
+          ? ("not_needed" as const)
+          : ("manual_history_required" as const),
+        affectedCount: hasCoveredGoldHistory
+          ? 0
+          : specialHoldings.filter((row) => row.kind === "krx_gold").length,
       }),
     );
   }

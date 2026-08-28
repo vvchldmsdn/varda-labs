@@ -11,6 +11,7 @@ import {
   type InvestmentLabScenarioMatrixRow,
   type InvestmentLabScenarioPriceBasis,
 } from "@/lib/investment-lab-scenario-matrix";
+import { diagnoseInvestmentLabScenario } from "@/lib/investment-lab-scenario-diagnostics";
 
 const MINIMUM_VOLATILITY_PERIODS =
   INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods;
@@ -113,6 +114,8 @@ function ScenarioRow({
   row: InvestmentLabScenarioMatrixRow;
   model: InvestmentLabCounterfactualReadModel;
 }) {
+  const diagnosis = diagnoseInvestmentLabScenario(row.reasonCodes);
+
   return (
     <tr
       className="border-t border-[#e1e6dc] align-top"
@@ -139,12 +142,17 @@ function ScenarioRow({
         >
           {row.status === "ready" ? "경로 계산" : "계산 불가"}
         </span>
-        {row.status === "unavailable" ? (
-          <p className="mt-1 max-w-52 text-xs leading-5 text-[#7b6232]">
-            {reasonLabel(row.reasonCodes)}
-          </p>
-        ) : row.returnEstimate.status === "unavailable" ? (
-          <p className="mt-1 text-xs text-[#7b6232]">수익률 근거 부족</p>
+        {row.status === "unavailable" ||
+        row.returnEstimate.status === "unavailable" ? (
+          <div className="mt-1 max-w-72 space-y-1 text-xs leading-5">
+            <p className="text-[#7b6232]">
+              <span className="font-semibold">원인</span> {diagnosis.reason}
+            </p>
+            <p className="text-[#687064]">
+              <span className="font-semibold">해결</span>{" "}
+              {diagnosis.resolution}
+            </p>
+          </div>
         ) : null}
       </td>
       <td className="px-3 py-3 text-right font-semibold tabular-nums">
@@ -316,48 +324,6 @@ function fxBasisLabel(value: InvestmentLabScenarioFxBasis) {
     stored_usdkrw_for_usd_legs: "USD leg만 저장 USD/KRW",
   };
   return labels[value];
-}
-
-function reasonLabel(reasonCodes: readonly string[]) {
-  if (reasonCodes.includes("approved_target_policy_missing")) {
-    return "승인된 목표 비중 없음";
-  }
-  if (reasonCodes.includes("approved_target_policy_conflict")) {
-    return "승인 목표 비중이 둘 이상이라 확정 불가";
-  }
-  if (reasonCodes.includes("target_policy_not_effective")) {
-    return "선택 구간이 목표 정책 효력일보다 이름";
-  }
-  if (
-    reasonCodes.includes("target_policy_universe_mismatch") ||
-    reasonCodes.includes("target_policy_vector_mismatch") ||
-    reasonCodes.includes("target_weight_vector_mismatch")
-  ) {
-    return "현재 종목 집합과 승인 목표 비중 불일치";
-  }
-  if (reasonCodes.includes("named_account_target_policy_unavailable")) {
-    return "일부 계정의 승인 목표 비중 없음";
-  }
-  if (reasonCodes.includes("period_mismatch")) return "공통 비교 기간 불일치";
-  if (
-    reasonCodes.includes("tickerless_anchor_holding") ||
-    reasonCodes.includes("physical_anchor_holding")
-  ) {
-    return "기준일 미식별·특수 포지션 존재";
-  }
-  if (reasonCodes.some((reason) => reason.includes("price"))) {
-    return "가격 근거 부족 또는 중복";
-  }
-  if (reasonCodes.some((reason) => reason.includes("fx"))) {
-    return "환율 근거 부족 또는 중복";
-  }
-  if (reasonCodes.includes("base_period_unavailable")) {
-    return "기본 비교 구간 계산 불가";
-  }
-  if (reasonCodes.includes("insufficient_common_preperiod_rows")) {
-    return "기간 시작 전 공동 관측 60개 미만";
-  }
-  return "필요한 계산 근거가 완전하지 않음";
 }
 
 function formatDate(value: string) {

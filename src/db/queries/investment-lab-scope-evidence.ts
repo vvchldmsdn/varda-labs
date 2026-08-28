@@ -147,6 +147,9 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
         snapshotDate: dailyPortfolioSnapshots.snapshotDate,
         accountId: dailyPortfolioSnapshots.accountId,
         account: dailyPortfolioSnapshots.account,
+        cashValue: dailyPortfolioSnapshots.cashValue,
+        fxRate: dailyPortfolioSnapshots.fxRate,
+        usdKrw: dailyPortfolioSnapshots.usdKrw,
         source: dailyPortfolioSnapshots.source,
         ruleVersion: dailyPortfolioSnapshots.ruleVersion,
       })
@@ -191,6 +194,8 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
               snapshotDate: row.snapshotDate,
               accountId: row.accountId,
               account: row.account,
+              cashValue: row.cashValue,
+              usdKrw: row.usdKrw ?? row.fxRate,
               source: row.source,
               ruleVersion: row.ruleVersion,
             },

@@ -55,6 +55,8 @@ export type InvestmentLabScopeSnapshotProvenance = Readonly<{
   snapshotDate: string;
   accountId: string;
   account: string;
+  cashValue: string | number | null;
+  usdKrw: string | number | null;
   source: string;
   ruleVersion: string | null;
 }>;
@@ -123,10 +125,23 @@ export function buildInvestmentLabAnalysisScopeEvidence({
   const scopedEvents = selectedEvents.filter(
     (row) => !matchesFountEvent(row, fountIdentity),
   );
+  const selectedCashProvenance = provenanceRows.filter((row) =>
+    includesAccountCashAtDate({
+      accountId: row.accountId,
+      accountMemberships,
+      activeAccountIds,
+      date: row.snapshotDate,
+      scope,
+    }),
+  );
   const includedAccountCodes = Object.freeze(
     [
       ...new Set(
-        [...selectedPositions, ...selectedEvents].flatMap((row) => {
+        [
+          ...selectedPositions,
+          ...selectedEvents,
+          ...selectedCashProvenance,
+        ].flatMap((row) => {
           if (!row.accountId) return [];
           const account = accountById.get(row.accountId);
           return account ? [account.code] : [];
@@ -136,9 +151,12 @@ export function buildInvestmentLabAnalysisScopeEvidence({
   );
   const engine = resolveEngineAccount(scope, includedAccountCodes);
   const snapshotRows = buildSnapshotRows({
+    accountMemberships,
+    activeAccountIds,
     engineAccount: engine.account,
     positions: scopedPositions,
     provenanceRows,
+    scope,
   });
   const remapAccount = engine.account !== "all" && engine.rewritesAccounts;
   const anchorPositionRows = Object.freeze(
@@ -232,13 +250,19 @@ function resolveEngineAccount(
 }
 
 function buildSnapshotRows({
+  accountMemberships,
+  activeAccountIds,
   engineAccount,
   positions,
   provenanceRows,
+  scope,
 }: {
+  accountMemberships: readonly InvestmentLabScopeMembership[];
+  activeAccountIds: ReadonlySet<string>;
   engineAccount: PortfolioAccountScope;
   positions: readonly InvestmentLabScopePositionCandidate[];
   provenanceRows: readonly InvestmentLabScopeSnapshotProvenance[];
+  scope: PortfolioAnalysisScope;
 }) {
   const provenance = new Map(
     provenanceRows.map((row) => [
@@ -249,11 +273,38 @@ function buildSnapshotRows({
   const groups = new Map<string, InvestmentLabScopePositionCandidate[]>();
 
   for (const row of positions) {
-    const account = engineAccount === "all" ? row.account : engineAccount;
-    const key = `${row.snapshotDate}\u0000${account}\u0000${row.source ?? ""}`;
+    const key = snapshotGroupKey({
+      account: row.account,
+      engineAccount,
+      snapshotDate: row.snapshotDate,
+      source: row.source,
+    });
     const current = groups.get(key);
     if (current) current.push(row);
     else groups.set(key, [row]);
+  }
+
+  // A portfolio can legitimately contain cash without any position rows. Seed
+  // those dates from the portfolio snapshot instead of dropping the account.
+  for (const row of provenanceRows) {
+    if (
+      !includesAccountCashAtDate({
+        accountId: row.accountId,
+        accountMemberships,
+        activeAccountIds,
+        date: row.snapshotDate,
+        scope,
+      })
+    ) {
+      continue;
+    }
+    const key = snapshotGroupKey({
+      account: row.account,
+      engineAccount,
+      snapshotDate: row.snapshotDate,
+      source: row.source,
+    });
+    if (!groups.has(key)) groups.set(key, []);
   }
 
   return Object.freeze(
@@ -266,25 +317,69 @@ function buildSnapshotRows({
         )
           ? values.reduce((sum, value) => sum + value, 0)
           : null;
+        const positionAccountIds = [
+          ...new Set(
+            rows.flatMap((row) => (row.accountId ? [row.accountId] : [])),
+          ),
+        ];
+        const cashEvidenceRows = provenanceRows.filter(
+          (row) =>
+            row.snapshotDate === snapshotDate &&
+            row.source === source &&
+            (engineAccount !== "all" || row.account === account) &&
+            includesAccountCashAtDate({
+              accountId: row.accountId,
+              accountMemberships,
+              activeAccountIds,
+              date: snapshotDate,
+              scope,
+            }),
+        );
+        const accountIds = [
+          ...new Set([
+            ...positionAccountIds,
+            ...cashEvidenceRows.map((row) => row.accountId),
+          ]),
+        ];
+        const evidenceRows = accountIds.map((accountId) =>
+          provenance.get(provenanceKey(snapshotDate, accountId, source)),
+        );
         const ruleVersions = new Set(
-          rows.flatMap((row) => {
-            if (!row.accountId || !row.source) return [null];
-            return [
-              provenance.get(
-                provenanceKey(row.snapshotDate, row.accountId, row.source),
-              )?.ruleVersion ?? null,
-            ];
-          }),
+          evidenceRows.map((row) => row?.ruleVersion ?? null),
         );
         const ruleVersion =
           ruleVersions.size === 1 ? [...ruleVersions][0] : null;
+        const cashAccountIds = accountIds.filter((accountId) =>
+          includesAccountCashAtDate({
+            accountId,
+            accountMemberships,
+            activeAccountIds,
+            date: snapshotDate,
+            scope,
+          }),
+        );
+        const cashValues = cashAccountIds.map((accountId) =>
+          finiteNonNegative(
+            provenance.get(provenanceKey(snapshotDate, accountId, source))
+              ?.cashValue,
+          ),
+        );
+        const cashValue =
+          cashValues.length === 0
+            ? 0
+            : cashValues.every((value): value is number => value !== null)
+              ? cashValues.reduce((sum, value) => sum + value, 0)
+              : null;
+        const usdKrw = resolveConsistentPositiveValue(
+          evidenceRows.map((row) => row?.usdKrw),
+        );
 
         return Object.freeze({
           snapshotDate,
           account,
-          cashValue: null,
+          cashValue,
           totalMarketValue,
-          usdKrw: null,
+          usdKrw,
           source: source || null,
           ruleVersion,
         });
@@ -296,6 +391,58 @@ function buildSnapshotRows({
           String(left.source).localeCompare(String(right.source)),
       ),
   );
+}
+
+function snapshotGroupKey({
+  account,
+  engineAccount,
+  snapshotDate,
+  source,
+}: {
+  account: string;
+  engineAccount: PortfolioAccountScope;
+  snapshotDate: string;
+  source: string | null;
+}) {
+  const outputAccount = engineAccount === "all" ? account : engineAccount;
+  return `${snapshotDate}\u0000${outputAccount}\u0000${source ?? ""}`;
+}
+
+function includesAccountCashAtDate({
+  accountId,
+  accountMemberships,
+  activeAccountIds,
+  date,
+  scope,
+}: {
+  accountId: string;
+  accountMemberships: readonly InvestmentLabScopeMembership[];
+  activeAccountIds: ReadonlySet<string>;
+  date: string;
+  scope: PortfolioAnalysisScope;
+}) {
+  if (scope.kind === "all") return activeAccountIds.has(accountId);
+  if (scope.kind === "account") return scope.accountId === accountId;
+
+  return accountMemberships.some(
+    (membership) =>
+      membership.targetId === accountId && isActiveOn(membership, date),
+  );
+}
+
+function resolveConsistentPositiveValue(
+  values: readonly (string | number | null | undefined)[],
+) {
+  if (values.length === 0) return null;
+  const normalized = values.map(finitePositive);
+  if (!normalized.every((value): value is number => value !== null)) {
+    return null;
+  }
+
+  const reference = normalized[0];
+  return normalized.every((value) => Math.abs(value - reference) <= 1e-6)
+    ? reference
+    : null;
 }
 
 function isIncludedAtDate({
@@ -390,4 +537,9 @@ function finiteNonNegative(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+}
+
+function finitePositive(value: string | number | null | undefined) {
+  const numeric = finiteNonNegative(value);
+  return numeric !== null && numeric > 0 ? numeric : null;
 }

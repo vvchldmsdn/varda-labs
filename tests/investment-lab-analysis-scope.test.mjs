@@ -109,11 +109,13 @@ describe("investment lab dynamic analysis scope", () => {
       evidence.snapshotRows.map((row) => [
         row.snapshotDate,
         row.account,
+        row.cashValue,
         row.totalMarketValue,
+        row.usdKrw,
       ]),
       [
-        ["2026-01-02", "brokerage", 125],
-        ["2026-01-03", "brokerage", 200],
+        ["2026-01-02", "brokerage", 10, 125, 1300],
+        ["2026-01-03", "brokerage", 10, 200, 1300],
       ],
     );
   });
@@ -248,6 +250,99 @@ describe("investment lab dynamic analysis scope", () => {
     assert.equal(evidence.snapshotRows.length, 1);
     assert.equal(evidence.snapshotRows[0].totalMarketValue, null);
   });
+
+  it("does not add account cash to a direct-asset-only portfolio group", () => {
+    const positions = [
+      position({
+        account: "custom",
+        accountId: CUSTOM_ID,
+        assetId: "direct-asset",
+        marketValueKrw: 25,
+        ticker: "QQQ",
+      }),
+    ];
+    const evidence = buildInvestmentLabAnalysisScopeEvidence({
+      accounts: ACCOUNTS,
+      assetMemberships: [
+        { targetId: "direct-asset", validFrom: "2026-01-01", validTo: null },
+      ],
+      events: [],
+      positions,
+      provenanceRows: provenanceFor(positions),
+      scope: GROUP_SCOPE,
+    });
+
+    assert.equal(evidence.snapshotRows[0].cashValue, 0);
+    assert.equal(evidence.snapshotRows[0].usdKrw, 1300);
+  });
+
+  it("keeps a cash-only account date without inventing position value", () => {
+    const evidence = buildInvestmentLabAnalysisScopeEvidence({
+      accounts: ACCOUNTS,
+      events: [],
+      positions: [],
+      provenanceRows: [
+        {
+          snapshotDate: "2026-01-02",
+          accountId: BROKERAGE_ID,
+          account: "brokerage",
+          cashValue: 250,
+          usdKrw: 1300,
+          source: "daily_snapshot_writer",
+          ruleVersion: "daily_snapshot_v1",
+        },
+      ],
+      scope: {
+        kind: "account",
+        key: `account:${BROKERAGE_ID}`,
+        label: "증권",
+        accountId: BROKERAGE_ID,
+        accountCode: "brokerage",
+      },
+    });
+
+    assert.deepEqual(evidence.snapshotRows, [
+      {
+        snapshotDate: "2026-01-02",
+        account: "brokerage",
+        cashValue: 250,
+        totalMarketValue: 0,
+        usdKrw: 1300,
+        source: "daily_snapshot_writer",
+        ruleVersion: "daily_snapshot_v1",
+      },
+    ]);
+    assert.deepEqual(evidence.includedAccountCodes, ["brokerage"]);
+  });
+
+  it("fails closed when included accounts disagree on the stored FX rate", () => {
+    const positions = [
+      position({ accountId: BROKERAGE_ID, assetId: "asset-a" }),
+      position({
+        account: "isa",
+        accountId: ISA_ID,
+        assetId: "asset-b",
+        ticker: "360200",
+      }),
+    ];
+    const provenanceRows = provenanceFor(positions).map((row) => ({
+      ...row,
+      usdKrw: row.accountId === ISA_ID ? 1301 : 1300,
+    }));
+    const evidence = buildInvestmentLabAnalysisScopeEvidence({
+      accounts: ACCOUNTS,
+      accountMemberships: [
+        { targetId: BROKERAGE_ID, validFrom: "2026-01-01", validTo: null },
+        { targetId: ISA_ID, validFrom: "2026-01-01", validTo: null },
+      ],
+      events: [],
+      positions,
+      provenanceRows,
+      scope: GROUP_SCOPE,
+    });
+
+    assert.equal(evidence.snapshotRows[0].usdKrw, null);
+  });
 });
 
 function position(overrides = {}) {
@@ -303,6 +398,8 @@ function provenanceFor(positions) {
     snapshotDate: row.snapshotDate,
     accountId: row.accountId,
     account: row.account,
+    cashValue: 10,
+    usdKrw: 1300,
     source: row.source,
     ruleVersion: "daily_snapshot_v1",
   }));

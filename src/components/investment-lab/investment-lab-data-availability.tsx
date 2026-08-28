@@ -137,7 +137,10 @@ export function InvestmentLabDataAvailabilityView({
                 <li key={`${holding.account}:${holding.name}`}>
                   <strong className="text-[#2f3931]">{holding.name}</strong>
                   {" · "}
-                  {specialHoldingLabel(holding.kind)}
+                  {specialHoldingLabel(
+                    holding.kind,
+                    model.manualValuationHistory.status,
+                  )}
                   {holding.kind === "krx_gold" ? (
                     <p className="mt-1 text-xs text-[#777e73]">
                       {manualValuationSummary(model.manualValuationHistory)}
@@ -286,10 +289,15 @@ function formatTimestampDate(value: string | null) {
   return value ? value.slice(0, 10).replaceAll("-", ".") : "-";
 }
 
-function specialHoldingLabel(kind: "fount" | "krx_gold" | "unresolved") {
+function specialHoldingLabel(
+  kind: "fount" | "krx_gold" | "unresolved",
+  manualValuationStatus: InvestmentLabDataAvailability["manualValuationHistory"]["status"],
+) {
   if (kind === "fount") return "투자 랩·시뮬레이션에서 의도적으로 제외";
   if (kind === "krx_gold") {
-    return "저장된 1g당 수동 평가 사용 · 과거 계산은 수동 이력 필요";
+    return manualValuationStatus === "current_segment_covered"
+      ? "저장된 1g당 수동 평가로 최신 계산 구간 커버"
+      : "저장된 1g당 수동 평가 사용 · 누락 날짜는 수동 이력 필요";
   }
   return "정확한 상품 식별과 가격 권한 확인 필요";
 }
