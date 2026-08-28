@@ -107,6 +107,8 @@ describe("investment lab data availability", () => {
     ]);
     assert.equal(scenario(model, "same_flow_baselines").status, "limited_input_ready");
     assert.equal(scenario(model, "fixed_quantity").status, "blocked");
+    assert.equal(scenario(model, "scheduled_weights").status, "blocked");
+    assert.equal(scenario(model, "hindsight_research").status, "blocked");
     assert.ok(
       scenario(model, "fixed_quantity").reasons.includes(
         "manual_valuation_history_required",
@@ -176,12 +178,19 @@ describe("investment lab data availability", () => {
       availableEndServiceDate: "2026-07-09",
       latestManualReferenceDate: "2026-07-08",
     });
-    assert.equal(scenario(model, "fixed_quantity").status, "blocked");
+    assert.equal(scenario(model, "fixed_quantity").status, "market_only_ready");
+    assert.equal(scenario(model, "scheduled_weights").status, "market_only_ready");
+    assert.equal(scenario(model, "hindsight_research").status, "research_only");
     assert.ok(
-      scenario(model, "fixed_quantity").reasons.includes(
+      !scenario(model, "fixed_quantity").reasons.includes(
         "manual_valuation_history_required",
       ),
     );
+    assert.deepEqual(model.repairItems.at(-1), {
+      id: "krx_gold",
+      status: "not_needed",
+      affectedCount: 0,
+    });
   });
 
   it("treats Fount as a scope transform, not a price backfill", () => {

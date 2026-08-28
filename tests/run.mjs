@@ -56,6 +56,7 @@ import "./investment-lab-anchor-value-weight.test.mjs";
 import "./investment-lab-anchor-scheduled-rebalance.test.mjs";
 import "./investment-lab-approved-target-weight.test.mjs";
 import "./investment-lab-scenario-matrix.test.mjs";
+import "./investment-lab-scenario-diagnostics.test.mjs";
 import "./investment-lab-scenario-chart.test.mjs";
 import "./investment-lab-preperiod-min-volatility.test.mjs";
 import "./investment-lab-preperiod-optimizer.test.mjs";
