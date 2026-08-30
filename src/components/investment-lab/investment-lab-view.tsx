@@ -80,7 +80,7 @@ export function InvestmentLabView({
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden bg-[#f8f9f6] text-[#171a16]"
+      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-account-composition-status={accountComposition.status}
       data-analysis-scope={selectedScope.key}
@@ -177,14 +177,14 @@ export function InvestmentLabView({
         selectedScopeKey={selectedScope.key}
       />
 
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-16 pt-7 sm:px-8 lg:px-10">
+      <div className="varda-content">
         <header>
-          <div className="flex items-center justify-between gap-5 text-[11px] text-[#777d75]">
+          <div className="flex items-center justify-between gap-5 text-[11px] text-[var(--muted)]">
             <p>PORTFOLIO / LAB</p>
             <p className="tabular-nums">분석 범위 {selectedScope.label}</p>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-            <h1 className="text-2xl font-medium">투자 랩</h1>
+            <h1 className="varda-page-title">투자 랩</h1>
             <InvestmentLabScopeTabs
               scopes={scopeCatalog}
               selectedScopeKey={selectedScope.key}
@@ -359,16 +359,16 @@ function ReadyView({
         </div>
 
         {model.status === "ready" ? (
-          <section className="overflow-hidden border-y border-[#dde1db]">
-            <div className="flex flex-col gap-1 border-b border-[#e1e6dc] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <section className="overflow-hidden border-y border-[var(--line)]">
+            <div className="flex flex-col gap-1 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold">비교 데이터</h2>
-                <p className="mt-1 text-sm text-[#687064]">
+                <p className="mt-1 text-sm text-[var(--muted)]">
                   평가액과 해당 시점에 사용된 KODEX 200 가격 기준일을 함께
                   확인합니다.
                 </p>
               </div>
-              <p className="text-sm text-[#687064]">
+              <p className="text-sm text-[var(--muted)]">
                 기간 내 반영 거래 {model.coverage.appliedFlowRows}건 · 지연 체결{" "}
                 {model.coverage.delayedExecutionRows}건
               </p>
@@ -376,7 +376,7 @@ function ReadyView({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-[#dde1db] text-left text-xs font-semibold text-[#616a5e]">
+                  <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
                     <th className="px-4 py-3">평가일</th>
                     <th className="px-3 py-3 text-right">실제 평가액</th>
                     <th className="px-3 py-3 text-right">KODEX 200</th>
@@ -388,7 +388,7 @@ function ReadyView({
                   {model.rows.map((row) => (
                     <tr
                       key={row.serviceDate}
-                      className="border-t border-[#e1e6dc]"
+                      className="border-t border-[var(--wash)]"
                     >
                       <td className="px-4 py-3 font-medium">
                         {formatDate(row.serviceDate)}
@@ -404,7 +404,7 @@ function ReadyView({
                       >
                         {formatSignedKrw(row.differenceKrw)}
                       </td>
-                      <td className="px-4 py-3 text-[#687064]">
+                      <td className="px-4 py-3 text-[var(--muted)]">
                         {formatDate(row.valuationPriceDate)}
                         {row.hasPendingExecution ? " · 지연 체결" : ""}
                       </td>
@@ -416,7 +416,7 @@ function ReadyView({
           </section>
         ) : null}
 
-        <section className="border-y border-[#dde1db] py-5">
+        <section className="border-y border-[var(--line)] py-5">
           <h2 className="text-lg font-semibold">데이터 상태</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <EvidenceCell
@@ -466,26 +466,26 @@ function CurrentWriterSegmentNotice({
   const summary = model.observedPath.summary!;
   return (
     <section
-      className="border-y border-[#dde1db] py-5"
+      className="border-y border-[var(--line)] py-5"
       data-section="investment-lab-current-writer-segment"
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="font-semibold">최신 writer 관측 구간 연구 비교</h2>
-          <p className="mt-1 text-sm leading-6 text-[#5f685d]">
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
             {formatDate(summary.startServiceDate)} ~{" "}
             {formatDate(summary.endServiceDate)} · {summary.comparisonDateCount}
             개 평가일만 사용합니다. 레거시 구간과 이어 붙이지 않았고, 짧은
             구간이므로 연환산·순위·스트레스 결론을 만들지 않습니다.
           </p>
         </div>
-        <span className="w-fit border border-[#d4dbce] px-3 py-1.5 text-xs font-semibold text-[#4e594d]">
+        <span className="w-fit border border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">
           {period.status === "current_writer"
             ? "최신 구간 자동 적용"
             : "명시 구간 적용"}
         </span>
       </div>
-      <p className="mt-3 text-xs leading-5 text-[#73786c]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         {selectedScope.label} 범위의 연구용 반사실 비교이며, 계정별 매수 가능
         상품·환전·세금·주문 가능성을 검증한 투자 권고가 아닙니다. 금현물은
         저장된 수동 평가 이력을 사용합니다.
@@ -505,16 +505,16 @@ function ReturnEstimateSection({
   const estimate = model.returnEstimate;
   if (!estimate || estimate.status === "blocked") {
     return (
-      <section className="border-y border-[#e6dcc2] py-5">
-        <h2 className="text-lg font-semibold text-[#5f5027]">
+      <section className="border-y border-[var(--brand-soft)] py-5">
+        <h2 className="text-lg font-semibold text-[var(--warning)]">
           현금흐름 조정 추정수익률
         </h2>
-        <p className="mt-2 text-sm text-[#725f2d]">
+        <p className="mt-2 text-sm text-[var(--warning)]">
           평가액 비교는 유지하지만 가격 기준 또는 계산 입력이 불충분해 수익률
           추정치는 표시하지 않습니다.
         </p>
         {estimate ? (
-          <ul className="mt-3 space-y-1 text-sm text-[#725f2d]">
+          <ul className="mt-3 space-y-1 text-sm text-[var(--warning)]">
             {estimate.blockers.map((blocker) => (
               <li key={blocker}>{returnBlockerLabel(blocker)}</li>
             ))}
@@ -526,17 +526,17 @@ function ReturnEstimateSection({
 
   return (
     <section
-      className="border-y border-[#dde1db] py-6"
+      className="border-y border-[var(--line)] py-6"
       data-return-method={estimate.method.version}
     >
       <div className="flex flex-col gap-1 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold">현금흐름 조정 추정수익률</h2>
-          <p className="mt-1 text-sm text-[#687064]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             관측 평가일 사이의 일별 가중 현금흐름을 반영한 Modified Dietz 추정치
           </p>
         </div>
-        <p className="text-xs text-[#777e73]">
+        <p className="text-xs text-[var(--muted)]">
           가격수익 기준 · 배당·수수료·세금 별도 반영 안 함
         </p>
       </div>
@@ -564,7 +564,7 @@ function ReturnEstimateSection({
           }
         />
       </div>
-      <p className="mt-3 text-xs leading-5 text-[#777e73]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         현금흐름 직전 전체 평가액이 없는 구간을 날짜 가중 방식으로 추정한
         값이며, 정확한 일별 TWR 또는 총수익률을 의미하지 않습니다.
       </p>
@@ -586,7 +586,7 @@ function VooComparisonSection({
     const estimate = comparison.returnEstimate;
     return (
       <section
-        className="border-y border-[#dde1db] py-6"
+        className="border-y border-[var(--line)] py-6"
         data-voo-applied-flows={comparison.coverage.appliedFlowRows}
         data-voo-comparison-dates={summary.comparisonDateCount}
         data-voo-delayed-executions={comparison.coverage.delayedExecutionRows}
@@ -604,11 +604,11 @@ function VooComparisonSection({
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">전액 VOO 비교</h2>
-            <p className="mt-1 text-sm text-[#687064]">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               실제와 같은 원화 매수·매도 금액을 VOO에 적용한 가격수익 경로
             </p>
           </div>
-          <p className="text-sm font-semibold text-[#087f4f]">계산 완료</p>
+          <p className="text-sm font-semibold text-[var(--brand)]">계산 완료</p>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -630,7 +630,7 @@ function VooComparisonSection({
         </div>
 
         {estimate.status === "ready" ? (
-          <div className="mt-4 grid gap-3 border-t border-[#e1e6dc] pt-4 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 border-t border-[var(--wash)] pt-4 sm:grid-cols-3">
             <ReturnMetricCell
               label="실제 추정수익률"
               value={formatSignedPercent(estimate.actualReturn)}
@@ -657,13 +657,13 @@ function VooComparisonSection({
             />
           </div>
         ) : (
-          <p className="mt-4 border-y border-[#e6dcc2] py-3 text-sm text-[#725f2d]">
+          <p className="mt-4 border-y border-[var(--brand-soft)] py-3 text-sm text-[var(--warning)]">
             경로는 계산됐지만 현금·이벤트 근거가 불충분해 추정수익률은 표시하지
             않습니다.
           </p>
         )}
 
-        <div className="mt-5 border-t border-[#e1e6dc] pt-4">
+        <div className="mt-5 border-t border-[var(--wash)] pt-4">
           <InvestmentLabComparisonChart
             chartId="investment-lab-voo-chart"
             description="저장된 평가일마다 실제 평가액과 동일한 원화 거래금액을 VOO raw close와 당시 저장 환율에 적용한 가상 평가액을 비교합니다."
@@ -672,7 +672,7 @@ function VooComparisonSection({
             title="실제 포트폴리오와 VOO 시나리오 비교"
           />
         </div>
-        <p className="mt-3 text-xs leading-5 text-[#777e73]">
+        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
           소수점 수량을 허용해 잔여 현금을 만들지 않으며, 보유 수량을 넘는
           매도는 축소·차입 없이 전체 시나리오를 차단합니다. VOO raw close와 같은
           서비스 날짜에 저장된 환율을 사용하고 배당 재투자는 제외합니다.
@@ -683,7 +683,7 @@ function VooComparisonSection({
 
   return (
     <section
-      className="border-y border-[#dde1db] py-6"
+      className="border-y border-[var(--line)] py-6"
       data-voo-execution-fx-ready={readiness.executionFxReadyCount}
       data-voo-relevant-flows={readiness.relevantFlowCount}
       data-voo-service-dates={readiness.serviceDateCount}
@@ -696,7 +696,7 @@ function VooComparisonSection({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">전액 VOO 비교 준비도</h2>
-          <p className="mt-1 text-sm text-[#687064]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             미국 종가·환율·체결일 증거가 모두 맞을 때만 다음 단계에서 경로를
             계산합니다.
           </p>
@@ -704,8 +704,8 @@ function VooComparisonSection({
         <p
           className={
             readiness.status === "ready"
-              ? "text-sm font-semibold text-[#087f4f]"
-              : "text-sm font-semibold text-[#9a6b18]"
+              ? "text-sm font-semibold text-[var(--brand)]"
+              : "text-sm font-semibold text-[var(--warning)]"
           }
         >
           {readiness.status === "ready" ? "계산 입력 준비" : "증거 보완 필요"}
@@ -728,13 +728,13 @@ function VooComparisonSection({
           detail="체결 가격일 exact FX"
         />
       </div>
-      <p className="mt-3 text-xs leading-5 text-[#777e73]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         실제 포트폴리오와 같은 가격수익 기준을 위해 VOO raw close를 사용하고
         배당 재투자는 제외합니다. 준비 전에는 부분 경로나 추정값을 표시하지
         않습니다.
       </p>
       {readiness.blockers.length > 0 ? (
-        <ul className="mt-3 space-y-1 text-sm text-[#725f2d]">
+        <ul className="mt-3 space-y-1 text-sm text-[var(--warning)]">
           {readiness.blockers.map((blocker) => (
             <li key={blocker}>{vooReadinessBlockerLabel(blocker)}</li>
           ))}
@@ -750,14 +750,14 @@ function BlockedView({
   model: InvestmentLabCounterfactualReadModel;
 }) {
   return (
-    <section className="border-y border-[#e6dcc2] py-6">
-      <h2 className="text-lg font-semibold text-[#5f5027]">
+    <section className="border-y border-[var(--brand-soft)] py-6">
+      <h2 className="text-lg font-semibold text-[var(--warning)]">
         현재 계산할 수 없습니다
       </h2>
-      <p className="mt-2 text-sm text-[#725f2d]">
+      <p className="mt-2 text-sm text-[var(--warning)]">
         일부 결과를 추정해서 표시하지 않고 입력 증거를 차단했습니다.
       </p>
-      <ul className="mt-4 space-y-2 text-sm text-[#725f2d]">
+      <ul className="mt-4 space-y-2 text-sm text-[var(--warning)]">
         {model.blockers.map((blocker) => (
           <li key={blocker}>{blockerLabel(blocker)}</li>
         ))}
@@ -768,8 +768,8 @@ function BlockedView({
 
 function EvidenceCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-l-2 border-[#cfd7c7] pl-3">
-      <p className="text-xs text-[#687064]">{label}</p>
+    <div className="border-l-2 border-[var(--line)] pl-3">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 font-semibold tabular-nums">{value}</p>
     </div>
   );
@@ -787,16 +787,16 @@ function ReturnMetricCell({
   tone: "positive" | "negative";
 }) {
   return (
-    <div className="border-l-2 border-[#cfd7c7] pl-3">
-      <p className="text-sm text-[#687064]">{label}</p>
+    <div className="border-l-2 border-[var(--line)] pl-3">
+      <p className="text-sm text-[var(--muted)]">{label}</p>
       <p
         className={`mt-1 text-xl font-semibold tabular-nums ${
-          tone === "positive" ? "text-[#087f4f]" : "text-[#c43d39]"
+          tone === "positive" ? "text-[var(--brand)]" : "text-[var(--negative)]"
         }`}
       >
         {value}
       </p>
-      <p className="mt-1 text-xs text-[#777e73]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }
@@ -811,10 +811,10 @@ function ReadinessMetric({
   detail: string;
 }) {
   return (
-    <div className="border-l-2 border-[#cfd7c7] pl-3">
-      <p className="text-sm text-[#687064]">{label}</p>
+    <div className="border-l-2 border-[var(--line)] pl-3">
+      <p className="text-sm text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#777e73]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }
@@ -911,8 +911,8 @@ function formatSignedPercentagePoints(value: number) {
 
 function moneyTone(value: number) {
   return value > 0
-    ? "text-[#087f4f]"
+    ? "text-[var(--brand)]"
     : value < 0
-      ? "text-[#c43d39]"
-      : "text-[#5d665b]";
+      ? "text-[var(--negative)]"
+      : "text-[var(--muted)]";
 }

@@ -36,15 +36,15 @@ export function SelectedHoldingHistoryChart({
   const lastDate = points.at(-1)?.date;
 
   return (
-    <div className="border-t border-[#e0e3de] py-6">
+    <div className="border-t border-[var(--wash)] py-6">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
-          <p className="text-[11px] font-medium text-[#7b8079]">HOLDING HISTORY</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">HOLDING HISTORY</p>
           <h3 className="mt-1 text-base font-medium">
             {basis === "normalized_return" ? "종목 흐름" : "평가액 흐름"}
           </h3>
         </div>
-        <p className="text-xs text-[#777d75]">
+        <p className="text-xs text-[var(--muted)]">
           {basis === "normalized_return"
             ? "저장된 일별 등락률 복리 지수 · 시작=100"
             : "저장된 일일 포지션 평가액 · 최대 31일"}
@@ -68,7 +68,7 @@ export function SelectedHoldingHistoryChart({
               return (
                 <line
                   key={fraction}
-                  stroke="#e5e8e3"
+                  stroke="var(--wash)"
                   strokeDasharray={fraction === 1 ? undefined : "2 7"}
                   x1={PLOT_LEFT}
                   x2={PLOT_RIGHT}
@@ -80,13 +80,13 @@ export function SelectedHoldingHistoryChart({
 
             <path
               d={`${geometry.areaPath} Z`}
-              fill="#e7f0eb"
+              fill="var(--wash)"
               opacity="0.72"
             />
             <path
               d={geometry.path}
               fill="none"
-              stroke="#315f4e"
+              stroke="var(--brand)"
               strokeWidth="1.75"
               vectorEffect="non-scaling-stroke"
             />
@@ -94,7 +94,7 @@ export function SelectedHoldingHistoryChart({
             {activeGeometry ? (
               <g>
                 <line
-                  stroke="#5d8273"
+                  stroke="var(--brand)"
                   strokeDasharray="2 5"
                   x1={activeGeometry.x}
                   x2={activeGeometry.x}
@@ -104,9 +104,9 @@ export function SelectedHoldingHistoryChart({
                 <circle
                   cx={activeGeometry.x}
                   cy={activeGeometry.y}
-                  fill="#f7f8f5"
+                  fill="var(--paper)"
                   r="5"
-                  stroke="#315f4e"
+                  stroke="var(--brand)"
                   strokeWidth="2"
                   vectorEffect="non-scaling-stroke"
                 />
@@ -144,28 +144,28 @@ export function SelectedHoldingHistoryChart({
             })}
           </svg>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between text-[11px] text-[#7a8078]">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between text-[11px] text-[var(--muted)]">
             <span>{firstDate ? formatShortDate(firstDate) : "-"}</span>
             <span>{lastDate ? formatShortDate(lastDate) : "-"}</span>
           </div>
 
           {activePoint && activeGeometry ? (
             <div
-              className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 border border-[#d7dcd5] bg-[#fbfcf9] px-4 py-3 text-xs shadow-[0_12px_30px_rgba(35,43,37,0.10)]"
+              className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-xs shadow-[0_12px_30px_rgba(35,43,37,0.10)]"
               style={{ left: `${clamp((activeGeometry.x / WIDTH) * 100, 10, 90)}%` }}
             >
-              <p className="font-medium text-[#252925]">{formatDate(activePoint.date)}</p>
+              <p className="font-medium text-[var(--ink)]">{formatDate(activePoint.date)}</p>
               <div className="mt-2 flex items-baseline justify-between gap-3">
-                <span className="text-[#737971]">
+                <span className="text-[var(--muted)]">
                   {activePoint.basis === "market_value" ? "평가액" : "누적 지수"}
                 </span>
-                <span className="font-medium text-[#252925]">{formatChartValue(activePoint)}</span>
+                <span className="font-medium text-[var(--ink)]">{formatChartValue(activePoint)}</span>
               </div>
               <div className="mt-1 flex items-baseline justify-between gap-3">
-                <span className="text-[#737971]">일일 변동</span>
-                <span className="font-medium text-[#252925]">{formatPercent(activePoint.changePct, true)}</span>
+                <span className="text-[var(--muted)]">일일 변동</span>
+                <span className="font-medium text-[var(--ink)]">{formatPercent(activePoint.changePct, true)}</span>
               </div>
-              <p className="mt-2 text-[10px] text-[#8a8f88]">
+              <p className="mt-2 text-[10px] text-[var(--faint)]">
                 {activePoint.basis === "market_value"
                   ? `${currency} 보유 평가액의 KRW 환산 근거`
                   : "저장된 일별 변동률을 연결한 비교 지수"}
@@ -174,10 +174,10 @@ export function SelectedHoldingHistoryChart({
           ) : null}
         </div>
       ) : (
-        <div className="mt-5 grid min-h-40 place-items-center border-y border-[#e5e8e3] text-center">
+        <div className="mt-5 grid min-h-40 place-items-center border-y border-[var(--wash)] text-center">
           <div>
-            <p className="text-sm font-medium text-[#4b514b]">차트를 그릴 이력이 부족합니다.</p>
-            <p className="mt-1 text-xs text-[#7a8078]">일일 포지션 스냅샷이 2개 이상 쌓이면 표시됩니다.</p>
+            <p className="text-sm font-medium text-[var(--muted)]">차트를 그릴 이력이 부족합니다.</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">일일 포지션 스냅샷이 2개 이상 쌓이면 표시됩니다.</p>
           </div>
         </div>
       )}

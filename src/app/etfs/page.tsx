@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
@@ -68,13 +69,14 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
       : null;
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      <SecondaryPageHeader />
       <div className="mx-auto grid w-full max-w-[1500px] gap-4 px-4 py-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <aside className="min-w-0 space-y-4">
-          <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+          <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold text-[#687064]">
+                <p className="text-xs font-semibold text-[var(--muted)]">
                   Varda Labs
                 </p>
                 <h1 className="mt-1 text-xl font-semibold tracking-normal">
@@ -83,13 +85,13 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
               </div>
               <Link
                 href="/"
-                className="rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-sm font-semibold text-[#4d574b] hover:bg-[#eef2e8]"
+                className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--muted)] hover:bg-[var(--wash)]"
               >
                 Dashboard
               </Link>
             </div>
             <form action="/etfs" className="mt-4 space-y-2">
-              <label className="block text-xs font-semibold text-[#687064]" htmlFor="q">
+              <label className="block text-xs font-semibold text-[var(--muted)]" htmlFor="q">
                 Search ticker or name
               </label>
               <div className="flex gap-2">
@@ -98,12 +100,12 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
                   name="q"
                   type="search"
                   defaultValue={query ?? ticker ?? ""}
-                  className="min-w-0 flex-1 rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-sm outline-none focus:border-[#375e52]"
+                  className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
                   placeholder="SPY, TIGER, KODEX"
                 />
                 <button
                   type="submit"
-                  className="rounded-md bg-[#1e3a34] px-3 py-2 text-sm font-semibold text-white hover:bg-[#284a42]"
+                  className="rounded-md bg-[var(--ink)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)]"
                 >
                   Search
                 </button>
@@ -137,10 +139,10 @@ function EtfMasterList({
   query: string | null;
 }) {
   return (
-    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold tracking-normal">ETF Masters</h2>
-        <p className="text-xs text-[#687064]">{masters.length} shown</p>
+        <p className="text-xs text-[var(--muted)]">{masters.length} shown</p>
       </div>
       <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1 sm:max-h-[560px]">
         {masters.length > 0 ? (
@@ -151,29 +153,29 @@ function EtfMasterList({
               className={cn(
                 "block rounded-md border px-3 py-2 text-sm transition",
                 selectedMasterId === master.id
-                  ? "border-[#a9b9a5] bg-[#e8efe4]"
-                  : "border-[#e3e7da] bg-white hover:bg-[#eef2e8]",
+                  ? "border-[var(--faint)] bg-[var(--wash)]"
+                  : "border-[var(--wash)] bg-white hover:bg-[var(--wash)]",
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-[#171916]">
+                  <p className="truncate font-semibold text-[var(--ink)]">
                     {master.ticker}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-[#687064]">
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
                     {master.name}
                   </p>
                 </div>
-                <div className="shrink-0 text-right text-[11px] font-semibold text-[#687064]">
+                <div className="shrink-0 text-right text-[11px] font-semibold text-[var(--muted)]">
                   <p>{master.market}</p>
                   {master.isUniversePick ? (
-                    <p className="mt-1 rounded-sm bg-[#dfeade] px-1.5 py-0.5 text-[#27623f]">
+                    <p className="mt-1 rounded-sm bg-[var(--wash)] px-1.5 py-0.5 text-[var(--ink)]">
                       universe
                     </p>
                   ) : null}
                 </div>
               </div>
-              <p className="mt-2 truncate text-xs text-[#7b8378]">
+              <p className="mt-2 truncate text-xs text-[var(--faint)]">
                 {[master.issuer, master.assetClass, master.categoryLabel]
                   .filter(Boolean)
                   .join(" / ") || "No classification"}
@@ -181,13 +183,13 @@ function EtfMasterList({
             </Link>
           ))
         ) : (
-          <p className="rounded-md bg-white px-3 py-2 text-sm text-[#687064]">
+          <p className="rounded-md bg-white px-3 py-2 text-sm text-[var(--muted)]">
             No ETF masters found.
           </p>
         )}
       </div>
       {masters.length >= 24 ? (
-        <p className="mt-3 text-xs text-[#687064]">
+        <p className="mt-3 text-xs text-[var(--muted)]">
           Showing the first 24 matches. Refine search to narrow results.
         </p>
       ) : null}
@@ -204,12 +206,12 @@ function EtfHoldingSummary({
 }) {
   if (!holdings) {
     return (
-      <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-5">
-        <p className="text-sm font-semibold text-[#687064]">ETF Holdings</p>
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
+        <p className="text-sm font-semibold text-[var(--muted)]">ETF Holdings</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-normal">
           Select an ETF
         </h2>
-        <p className="mt-2 max-w-2xl text-sm text-[#687064]">
+        <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
           {searchQuery
             ? "No holdings are available for the current search."
             : "Search or select an ETF to inspect the latest grouped holdings."}
@@ -221,16 +223,16 @@ function EtfHoldingSummary({
   const master = holdings.etfMaster;
 
   return (
-    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-5">
+    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#687064]">
+          <p className="text-sm font-semibold text-[var(--muted)]">
             {holdings.asOfDate.replaceAll("-", ".")}
           </p>
           <h2 className="mt-1 truncate text-2xl font-semibold tracking-normal">
             {master?.name ?? holdings.etfTicker}
           </h2>
-          <p className="mt-2 text-sm text-[#687064]">
+          <p className="mt-2 text-sm text-[var(--muted)]">
             {[holdings.etfTicker, master?.market, master?.currency]
               .filter(Boolean)
               .join(" / ")}
@@ -248,7 +250,7 @@ function EtfHoldingSummary({
           />
         </div>
       </div>
-      <p className="mt-4 rounded-md border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-xs font-medium text-[#7a5b16]">
+      <p className="mt-4 rounded-md border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--warning)]">
         Read-only grouped view. These holdings are not connected to portfolio
         exposure, risk, recommendations, or snapshot writes.
       </p>
@@ -265,19 +267,19 @@ function GroupedHoldingsTable({
   const hiddenCount = Math.max(holdings.groupedHoldings.length - visibleRows.length, 0);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
-      <div className="flex flex-col gap-2 border-b border-[#e3e7da] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="flex flex-col gap-2 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-base font-semibold tracking-normal">
           Latest grouped holdings
         </h2>
-        <p className="text-sm text-[#687064]">
+        <p className="text-sm text-[var(--muted)]">
           {visibleRows.length} of {holdings.groupedRowCount} groups
         </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1100px] border-collapse text-sm">
           <thead>
-            <tr className="bg-[#eef2e8] text-left text-xs font-semibold uppercase text-[#616a5e]">
+            <tr className="bg-[var(--wash)] text-left text-xs font-semibold uppercase text-[var(--muted)]">
               <th className="px-4 py-3">Holding</th>
               <th className="px-3 py-3 text-right">Rank</th>
               <th className="px-3 py-3 text-right">Weight</th>
@@ -296,7 +298,7 @@ function GroupedHoldingsTable({
         </table>
       </div>
       {hiddenCount > 0 ? (
-        <p className="border-t border-[#e3e7da] px-4 py-3 text-sm text-[#687064]">
+        <p className="border-t border-[var(--wash)] px-4 py-3 text-sm text-[var(--muted)]">
           {hiddenCount} additional groups are not rendered in this first read-only
           view.
         </p>
@@ -307,23 +309,23 @@ function GroupedHoldingsTable({
 
 function GroupedHoldingRow({ holding }: { holding: GroupedEtfHoldingRow }) {
   return (
-    <tr className="border-t border-[#e3e7da] bg-white/70 align-top">
+    <tr className="border-t border-[var(--wash)] bg-white/70 align-top">
       <td className="px-4 py-3">
         <div className="max-w-[320px]">
           <div className="flex items-center gap-2">
-            <p className="truncate font-semibold text-[#171916]">
+            <p className="truncate font-semibold text-[var(--ink)]">
               {holding.holdingName}
             </p>
             {holding.hasDuplicates ? (
-              <span className="shrink-0 rounded-sm bg-[#fff0d5] px-1.5 py-0.5 text-[11px] font-semibold text-[#7b5412]">
+              <span className="shrink-0 rounded-sm bg-[var(--warning-soft)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--warning)]">
                 raw {holding.rawRowCount}
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-xs text-[#687064]">
+          <p className="mt-1 truncate text-xs text-[var(--muted)]">
             {holding.holdingSymbol ?? "-"} / {textValue(holding.holdingMarket)}
           </p>
-          <p className="mt-1 text-[11px] text-[#7b8378]">
+          <p className="mt-1 text-[11px] text-[var(--faint)]">
             source {textValue(holding.source)}
           </p>
         </div>
@@ -358,17 +360,17 @@ function GroupedHoldingRow({ holding }: { holding: GroupedEtfHoldingRow }) {
 
 function RawRowsDetails({ holding }: { holding: GroupedEtfHoldingRow }) {
   return (
-    <details className="max-w-[320px] text-xs text-[#687064]">
-      <summary className="cursor-pointer font-semibold text-[#445044]">
+    <details className="max-w-[320px] text-xs text-[var(--muted)]">
+      <summary className="cursor-pointer font-semibold text-[var(--muted)]">
         {holding.rawRowCount} row{holding.rawRowCount === 1 ? "" : "s"}
       </summary>
       <div className="mt-2 space-y-2">
         {holding.rawRows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-[#e3e7da] bg-[#fbfcf7] p-2"
+            className="rounded-md border border-[var(--wash)] bg-[var(--surface)] p-2"
           >
-            <p className="font-semibold text-[#171916]">
+            <p className="font-semibold text-[var(--ink)]">
               {row.source ?? "unknown source"}
             </p>
             <p className="mt-1">
@@ -388,7 +390,7 @@ function RawRowsDetails({ holding }: { holding: GroupedEtfHoldingRow }) {
 function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-white px-3 py-2">
-      <p className="text-xs text-[#687064]">{label}</p>
+      <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 font-semibold tabular-nums">{value}</p>
     </div>
   );
@@ -431,8 +433,8 @@ function StatusBadge({
       className={cn(
         "ml-1 inline-flex rounded-sm px-1.5 py-0.5 text-[11px] font-semibold",
         tone === "warn"
-          ? "bg-[#fff0d5] text-[#7b5412]"
-          : "bg-[#edf1e8] text-[#5b6658]",
+          ? "bg-[var(--warning-soft)] text-[var(--warning)]"
+          : "bg-[var(--wash)] text-[var(--muted)]",
       )}
     >
       {label}

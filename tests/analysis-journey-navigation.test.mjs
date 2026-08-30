@@ -40,7 +40,7 @@ describe("analysis result journey navigation", () => {
     }
   });
 
-  it("links every Simulation journey item to an always-rendered wrapper", () => {
+  it("preserves every Simulation section in accessible workspace tabs", () => {
     const view = read(
       "src/components/simulation/simulation-input-readiness-view.tsx",
     );
@@ -51,9 +51,12 @@ describe("analysis result journey navigation", () => {
       "simulation-model-diagnostics",
     ];
 
-    assert.match(view, /<AnalysisJourneyNav/);
+    const workspace = read("src/components/simulation/simulation-workspace.tsx");
+    assert.match(view, /<SimulationWorkspace/);
+    assert.match(workspace, /role="tablist"/);
+    assert.match(workspace, /role="tabpanel"/);
+    assert.match(workspace, /hidden=\{selected !== view\.id\}/);
     for (const target of targets) {
-      assert.match(view, new RegExp(`href: "#${target}"`));
       assert.match(view, new RegExp(`id="${target}"`));
     }
   });

@@ -49,10 +49,10 @@ export function IdentityBootstrapClaimForm() {
   }
 
   return (
-    <section className="mt-6 rounded-md border border-[#dfe3d5] bg-white p-4">
+    <section className="mt-6 rounded-md border border-[var(--line)] bg-white p-4">
       <h2 className="font-semibold">One-time account link</h2>
       <form className="mt-3 space-y-3" onSubmit={submitClaim}>
-        <label className="block text-sm font-semibold text-[#4f594e]">
+        <label className="block text-sm font-semibold text-[var(--muted)]">
           Bootstrap claim
           <input
             name="claim"
@@ -61,25 +61,25 @@ export function IdentityBootstrapClaimForm() {
             autoComplete="off"
             spellCheck={false}
             disabled={locked}
-            className="mt-2 block w-full rounded-md border border-[#cfd6c8] bg-white px-3 py-2 font-mono text-sm text-[#171916] disabled:bg-[#f3f4ef] disabled:text-[#7b8278]"
+            className="mt-2 block w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 font-mono text-sm text-[var(--ink)] disabled:bg-[var(--paper)] disabled:text-[var(--faint)]"
           />
         </label>
         <button
           type="submit"
           disabled={locked}
-          className="rounded-md bg-[#173f38] px-4 py-2 font-semibold text-white hover:bg-[#0f312b] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-[var(--ink)] px-4 py-2 font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {status === "submitting" ? "Submitting" : "Link once"}
         </button>
       </form>
 
       {status === "submitted" ? (
-        <p role="status" className="mt-3 text-sm text-[#386744]">
+        <p role="status" className="mt-3 text-sm text-[var(--brand)]">
           Submitted once. Server verification is pending.
         </p>
       ) : null}
       {status === "failed" ? (
-        <p role="alert" className="mt-3 text-sm text-[#a43e3e]">
+        <p role="alert" className="mt-3 text-sm text-[var(--negative)]">
           Submission was not confirmed. Stop here; do not submit again.
         </p>
       ) : null}

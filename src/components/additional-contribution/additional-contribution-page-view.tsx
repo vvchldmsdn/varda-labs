@@ -34,7 +34,7 @@ export function AdditionalContributionPageView({
 }) {
   return (
     <main
-      className="min-h-screen overflow-x-hidden bg-[#f7f8f5] text-[#20231f]"
+      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
       data-page="additional-contribution"
       data-preview-status={preview.status}
     >
@@ -44,19 +44,19 @@ export function AdditionalContributionPageView({
         selectedScopeKey={selectedScope.key}
       />
 
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-10 pt-8 sm:px-8 lg:px-10 lg:pb-14 lg:pt-10">
+      <div className="varda-content">
         <section aria-labelledby="additional-contribution-title">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
-                <p className="text-[11px] font-medium text-[#7b8079]">
+                <p className="text-[11px] font-medium text-[var(--muted)]">
                   PORTFOLIO / ADDITIONAL CONTRIBUTION
                 </p>
-                <h1 id="additional-contribution-title" className="sr-only">
+                <h1 id="additional-contribution-title" className="varda-page-title">
                   추가 투입
                 </h1>
               </div>
-              <p className="text-xs text-[#7b8079]">
+              <p className="text-xs text-[var(--muted)]">
                 실제 주문 전 읽기 전용 미리보기
               </p>
             </div>
@@ -70,8 +70,8 @@ export function AdditionalContributionPageView({
             />
           </div>
 
-          <div className="pb-10 pt-12 text-center sm:pb-12 sm:pt-14 lg:pb-14 lg:pt-16">
-            <p className="text-xs font-medium text-[#737970]">
+          <div className="varda-summary-stage varda-contribution-controls">
+            <p className="text-xs font-medium text-[var(--muted)]">
               {selectedScope.label}에 새로 투입할 금액
             </p>
             <form
@@ -86,7 +86,7 @@ export function AdditionalContributionPageView({
               <input
                 id="additional-contribution-amount"
                 aria-describedby="additional-contribution-amount-hint"
-                className="min-w-0 border-0 bg-transparent py-2 text-right !text-4xl font-normal tabular-nums outline-none placeholder:text-[#c8ccc6] focus-visible:ring-0 min-[420px]:!text-5xl sm:!text-6xl lg:!text-[80px]"
+                className="min-w-0 border-0 bg-transparent py-2 text-right !text-4xl font-normal tabular-nums outline-none placeholder:text-[var(--line)] focus-visible:ring-0 min-[420px]:!text-5xl sm:!text-6xl lg:!text-[80px]"
                 defaultValue={amountKrw ? formatInputKrw(amountKrw) : ""}
                 inputMode="numeric"
                 name="amount"
@@ -95,19 +95,19 @@ export function AdditionalContributionPageView({
                 required
                 type="text"
               />
-              <span className="shrink-0 text-2xl font-normal text-[#777d75] min-[420px]:text-3xl sm:ml-3 sm:text-4xl lg:text-5xl">
+              <span className="shrink-0 text-2xl font-normal text-[var(--muted)] min-[420px]:text-3xl sm:ml-3 sm:text-4xl lg:text-5xl">
                 원
               </span>
               <button
                 type="submit"
-                className="col-span-2 mx-auto mt-3 shrink-0 border-b border-[#20231f] px-1 py-2 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] sm:col-span-1 sm:ml-8 sm:mt-0"
+                className="col-span-2 mx-auto mt-3 shrink-0 border-b border-[var(--ink)] px-1 py-2 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] sm:col-span-1 sm:ml-8 sm:mt-0"
               >
                 계산
               </button>
             </form>
             <p
               id="additional-contribution-amount-hint"
-              className="mt-3 text-xs text-[#858a83]"
+              className="mt-3 text-xs text-[var(--faint)]"
             >
               {formatKrw(amountKrw)} · 만 원 단위 입력 권장
             </p>
@@ -118,10 +118,10 @@ export function AdditionalContributionPageView({
               {AMOUNT_PRESETS.map((preset) => (
                 <Link
                   key={preset}
-                  className={`border-b py-1 font-medium focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#347e62] ${
+                  className={`border-b py-1 font-medium focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
                     amountKrw === preset
-                      ? "border-[#20231f] text-[#20231f]"
-                      : "border-transparent text-[#71776f] hover:text-[#20231f]"
+                      ? "border-[var(--ink)] text-[var(--ink)]"
+                      : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
                   }`}
                   href={buildPortfolioAnalysisScopeHref(
                     "/additional-contribution",
@@ -144,21 +144,21 @@ export function AdditionalContributionPageView({
 
         <section
           aria-label="빠른 작업"
-          className="mt-12 grid gap-6 border-y border-[#d9ddd7] py-7 sm:grid-cols-3 sm:gap-0"
+          className="mt-12 grid gap-6 border-y border-[var(--line)] py-7 sm:grid-cols-3 sm:gap-0"
         >
-          <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
+          <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
             {enableLivePriceSync ? (
               <PortfolioRefreshButton autoSync />
             ) : (
-              <span className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[#727870]">
+              <span className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[var(--muted)]">
                 <span aria-hidden="true" className="text-xl">◎</span>
                 디자인 샘플 데이터
               </span>
             )}
           </div>
-          <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
+          <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
             <Link
-              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
               href={buildPortfolioAnalysisScopeHref(
                 "/portfolio/targets",
                 selectedScope.key,
@@ -170,7 +170,7 @@ export function AdditionalContributionPageView({
           </div>
           <div className="flex justify-center">
             <Link
-              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
               href={buildPortfolioAnalysisScopeHref(
                 "/portfolio/holdings",
                 selectedScope.key,
@@ -189,14 +189,14 @@ export function AdditionalContributionPageView({
 function BlockedPreview({ blockers }: { blockers: readonly string[] }) {
   return (
     <section
-      className="border-y border-[#d9ddd7] py-12"
+      className="border-y border-[var(--line)] py-12"
       aria-labelledby="blocked-title"
     >
-      <p className="text-[11px] font-medium text-[#7b8079]">CALCULATION STATUS</p>
+      <p className="text-[11px] font-medium text-[var(--muted)]">CALCULATION STATUS</p>
       <h2 id="blocked-title" className="mt-2 text-2xl font-medium">
         지금은 배분안을 계산할 수 없습니다
       </h2>
-      <ul className="mt-6 max-w-3xl divide-y divide-[#e1e4df] border-y border-[#d9ddd7] text-sm text-[#6b5a3e]">
+      <ul className="mt-6 max-w-3xl divide-y divide-[var(--wash)] border-y border-[var(--line)] text-sm text-[var(--warning)]">
         {blockers.map((blocker) => (
           <li key={blocker} className="py-4">
             {blockerLabel(blocker)}

@@ -1,4 +1,5 @@
 import "./market-calendar.test.mjs";
+import "./presentation-system.test.mjs";
 import "./home-metrics.test.mjs";
 import "./portfolio-format.test.mjs";
 import "./map-with-concurrency.test.mjs";
@@ -139,6 +140,7 @@ import "./simulation-input-readiness.test.mjs";
 import "./simulation-research-horizon.test.mjs";
 import "./simulation-observed-return-comparison.test.mjs";
 import "./simulation-route.test.mjs";
+import "./simulation-presentation.test.mjs";
 import "./simulation-stationary-bootstrap.test.mjs";
 import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";

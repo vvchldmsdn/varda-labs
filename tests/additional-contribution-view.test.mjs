@@ -4,6 +4,35 @@ import { describe, it } from "node:test";
 import { buildAdditionalContributionView } from "../src/lib/additional-contribution-view.ts";
 
 describe("additional contribution presentation view", () => {
+  it("reconciles both displayed flows to funds including trim proceeds", () => {
+    const view = buildAdditionalContributionView({
+      cashAmountKrw: 150,
+      currentPortfolioTotalKrw: 1_000,
+      postTopupTotalKrw: 1_100,
+      totalAllocatedKrw: 120,
+      residualCashKrw: 30,
+      rows: [
+        row({
+          allocationKrw: 120,
+          strategicAllocationKrw: 140,
+          ma120ReductionKrw: 20,
+        }),
+      ],
+    });
+    assert.equal(view.allocatedPct, 80);
+    assert.equal(
+      view.flowRows.reduce((sum, item) => sum + item.allocationKrw, 0),
+      150,
+    );
+    assert.equal(
+      view.flowRows.reduce((sum, item) => sum + item.strategicAllocationKrw, 0),
+      150,
+    );
+    assert.equal(
+      view.flowRows.find((item) => item.kind === "cash").strategicAllocationKrw,
+      10,
+    );
+  });
   it("measures target-distance improvement while treating residual cash as zero-target weight", () => {
     const view = buildAdditionalContributionView({
       cashAmountKrw: 20,
@@ -44,7 +73,9 @@ describe("additional contribution presentation view", () => {
     assert.equal(view.allocatedPct, 75);
     assert.equal(view.targetDistanceBeforePct, 10);
     assert.ok(Math.abs(view.targetDistanceAfterPct - 4.1666666667) < 1e-8);
-    assert.ok(Math.abs(view.targetDistanceImprovementPct - 5.8333333333) < 1e-8);
+    assert.ok(
+      Math.abs(view.targetDistanceImprovementPct - 5.8333333333) < 1e-8,
+    );
     assert.deepEqual(
       view.flowRows.map((flow) => [flow.id, flow.allocationKrw]),
       [

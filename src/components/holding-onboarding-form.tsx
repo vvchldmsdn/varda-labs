@@ -33,7 +33,7 @@ export function HoldingOnboardingForm({
   return (
     <form action={action} className="mt-6 space-y-6">
       <fieldset className="grid gap-4 md:grid-cols-2" disabled={pending}>
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           보유 계좌
           <select
             className={fieldClassName}
@@ -52,7 +52,7 @@ export function HoldingOnboardingForm({
           </select>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           기존 자산 그룹
           <select
             aria-describedby="portfolio-group-help"
@@ -69,7 +69,7 @@ export function HoldingOnboardingForm({
           </select>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a] md:col-span-2">
+        <label className="text-sm font-semibold text-[var(--ink)] md:col-span-2">
           새 자산 그룹 이름
           <input
             aria-describedby="portfolio-group-help"
@@ -80,14 +80,14 @@ export function HoldingOnboardingForm({
             type="text"
           />
           <span
-            className="mt-1 block text-xs font-normal text-[#687064]"
+            className="mt-1 block text-xs font-normal text-[var(--muted)]"
             id="portfolio-group-help"
           >
             기존 그룹 선택 또는 새 그룹 이름 중 하나만 사용합니다.
           </span>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           상장 시장
           <select
             className={fieldClassName}
@@ -103,7 +103,7 @@ export function HoldingOnboardingForm({
           </select>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           종목 유형
           <select className={fieldClassName} defaultValue="etf" name="assetType">
             {HOLDING_ONBOARDING_ASSET_TYPES.map((item) => (
@@ -114,7 +114,7 @@ export function HoldingOnboardingForm({
           </select>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           티커
           <input
             autoCapitalize="characters"
@@ -127,7 +127,7 @@ export function HoldingOnboardingForm({
           />
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           종목명 (선택)
           <input
             className={fieldClassName}
@@ -138,7 +138,7 @@ export function HoldingOnboardingForm({
           />
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           보유 수량
           <input
             className={fieldClassName}
@@ -151,7 +151,7 @@ export function HoldingOnboardingForm({
           />
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           1좌당 매입 원가 ({currency})
           <input
             aria-describedby="average-cost-help"
@@ -164,14 +164,14 @@ export function HoldingOnboardingForm({
             type="number"
           />
           <span
-            className="mt-1 block text-xs font-normal text-[#687064]"
+            className="mt-1 block text-xs font-normal text-[var(--muted)]"
             id="average-cost-help"
           >
             손익 계산의 기준 원가입니다.
           </span>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           현재 1좌 가격 ({currency}, 선택)
           <input
             aria-describedby="current-price-help"
@@ -183,14 +183,14 @@ export function HoldingOnboardingForm({
             type="number"
           />
           <span
-            className="mt-1 block text-xs font-normal text-[#687064]"
+            className="mt-1 block text-xs font-normal text-[var(--muted)]"
             id="current-price-help"
           >
             비우면 최신 저장 가격을 사용합니다.
           </span>
         </label>
 
-        <label className="text-sm font-semibold text-[#35423a]">
+        <label className="text-sm font-semibold text-[var(--ink)]">
           증권사 표시 수익률 (%, 선택)
           <input
             aria-describedby="reported-return-help"
@@ -202,7 +202,7 @@ export function HoldingOnboardingForm({
             type="number"
           />
           <span
-            className="mt-1 block text-xs font-normal text-[#687064]"
+            className="mt-1 block text-xs font-normal text-[var(--muted)]"
             id="reported-return-help"
           >
             검산용으로만 보존하며 손익 계산에는 사용하지 않습니다.
@@ -210,16 +210,16 @@ export function HoldingOnboardingForm({
         </label>
       </fieldset>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-[#dfe3d5] pt-5">
+      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-5">
         <button
-          className="rounded-md bg-[#1e3a34] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending || options.accounts.length === 0}
           type="submit"
         >
           {pending ? "저장 중" : "보유종목 저장"}
         </button>
         <Link
-          className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+          className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
           href="/portfolio/holdings?account=all"
         >
           취소
@@ -228,7 +228,7 @@ export function HoldingOnboardingForm({
           aria-live="polite"
           className={[
             "text-sm",
-            state.status === "success" ? "text-[#1e5d49]" : "text-[#8a5b16]",
+            state.status === "success" ? "text-[var(--brand)]" : "text-[var(--warning)]",
           ].join(" ")}
         >
           {state.message}
@@ -239,4 +239,4 @@ export function HoldingOnboardingForm({
 }
 
 const fieldClassName =
-  "mt-1.5 w-full rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-normal text-[#171916] outline-none focus:border-[#1e3a34] disabled:bg-[#eef0ea]";
+  "mt-1.5 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--ink)] disabled:bg-[var(--wash)]";

@@ -14,12 +14,12 @@ export function RiskSection({
   return (
     <section
       data-risk-section={marker}
-      className="border-t border-[#d8ddcf] py-5"
+      className="border-t border-[var(--line)] py-5"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
         {detail ? (
-          <p className="text-xs font-semibold text-[#687064]">{detail}</p>
+          <p className="text-xs font-semibold text-[var(--muted)]">{detail}</p>
         ) : null}
       </div>
       {children}
@@ -37,13 +37,13 @@ export function RiskSummaryCard({
   detail?: string | null;
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-[#dfe3d5] bg-white px-3 py-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-1 break-words text-lg font-semibold tracking-normal text-[#171916]">
+    <div className="min-w-0 rounded-md border border-[var(--line)] bg-white px-3 py-3">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="mt-1 break-words text-lg font-semibold tracking-normal text-[var(--ink)]">
         {value}
       </p>
       {detail ? (
-        <p className="mt-1 break-words text-xs text-[#687064]">{detail}</p>
+        <p className="mt-1 break-words text-xs text-[var(--muted)]">{detail}</p>
       ) : null}
     </div>
   );
@@ -57,9 +57,9 @@ export function RiskNotice({
   children: ReactNode;
 }) {
   const toneClass = {
-    neutral: "border-[#d8ddcf] bg-[#eef2e9] text-[#344038]",
-    warning: "border-[#e8d6ae] bg-[#fff8e9] text-[#73551e]",
-    danger: "border-[#e5bdbd] bg-[#fff0f0] text-[#7a2e2e]",
+    neutral: "border-[var(--line)] bg-[var(--wash)] text-[var(--ink)]",
+    warning: "border-[var(--warning-soft)] bg-[var(--surface)] text-[var(--warning)]",
+    danger: "border-[var(--negative-soft)] bg-[var(--surface)] text-[var(--negative)]",
   }[tone];
   return (
     <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${toneClass}`}>
@@ -77,7 +77,7 @@ export function RiskTableHeader({
 }) {
   return (
     <th
-      className={`whitespace-nowrap border-b border-[#d8ddcf] px-3 py-2 text-xs font-semibold uppercase text-[#687064] ${alignmentClass(align)}`}
+      className={`whitespace-nowrap border-b border-[var(--line)] px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)] ${alignmentClass(align)}`}
     >
       {children}
     </th>
@@ -95,7 +95,7 @@ export function RiskTableCell({
 }) {
   return (
     <td
-      className={`border-b border-[#e7eadf] px-3 py-2 align-top text-sm ${alignmentClass(align)} ${strong ? "font-semibold" : ""}`}
+      className={`border-b border-[var(--wash)] px-3 py-2 align-top text-sm ${alignmentClass(align)} ${strong ? "font-semibold" : ""}`}
     >
       {children}
     </td>
@@ -104,7 +104,7 @@ export function RiskTableCell({
 
 export function RiskEmptyMessage({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 border-l-2 border-[#b8c1b1] bg-white px-3 py-2 text-sm text-[#687064]">
+    <div className="mt-3 border-l-2 border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--muted)]">
       {children}
     </div>
   );

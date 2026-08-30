@@ -73,7 +73,7 @@ export function PortfolioHistoryChart({
     <section aria-labelledby="portfolio-history-title" className="min-w-0">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium text-[#7b8079]">VALUE HISTORY</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">VALUE HISTORY</p>
           <h2 id="portfolio-history-title" className="mt-1 text-base font-semibold">
             포트폴리오 흐름
           </h2>
@@ -84,10 +84,10 @@ export function PortfolioHistoryChart({
               key={item}
               type="button"
               aria-pressed={range === item}
-              className={`border-b py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] ${
+              className={`border-b py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
                 range === item
-                  ? "border-[#20231f] text-[#20231f]"
-                  : "border-transparent text-[#777c74] hover:text-[#20231f]"
+                  ? "border-[var(--ink)] text-[var(--ink)]"
+                  : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
               onClick={() => {
                 setRange(item);
@@ -105,7 +105,7 @@ export function PortfolioHistoryChart({
       {visiblePoints.length > 1 ? (
         <>
           <div
-            className="relative aspect-[2.65/1] min-h-[250px] w-full"
+            className="varda-home-chart relative w-full"
             onPointerLeave={() => {
               setHoveredIndex(null);
               setActiveEventKey(null);
@@ -123,35 +123,24 @@ export function PortfolioHistoryChart({
                 x2={PLOT_RIGHT}
                 y1={PLOT_BOTTOM}
                 y2={PLOT_BOTTOM}
-                stroke="#d9ddd7"
+                stroke="var(--line)"
               />
-              {[0.25, 0.5, 0.75].map((fraction) => (
+              {[0.33, 0.66].map((fraction) => (
                 <line
                   key={fraction}
                   x1={PLOT_LEFT}
                   x2={PLOT_RIGHT}
                   y1={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
                   y2={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
-                  stroke="#e7eae5"
+                  stroke="var(--wash)"
                   strokeDasharray="2 7"
-                />
-              ))}
-              {geometry.points.map((point, index) => (
-                <rect
-                  key={`bar:${visiblePoints[index]?.date}`}
-                  x={point.x - Math.max(1, geometry.barWidth / 2)}
-                  y={point.y + 8}
-                  width={geometry.barWidth}
-                  height={Math.max(0, PLOT_BOTTOM - point.y - 8)}
-                  fill="#e8ebe7"
-                  opacity="0.58"
                 />
               ))}
               <path
                 d={geometry.path}
                 fill="none"
-                stroke="#29332e"
-                strokeWidth="1.75"
+                stroke="var(--brand)"
+                strokeWidth="1.8"
                 vectorEffect="non-scaling-stroke"
               />
               {activePoint && activeGeometry ? (
@@ -161,15 +150,15 @@ export function PortfolioHistoryChart({
                     x2={activeGeometry.x}
                     y1={PLOT_TOP}
                     y2={PLOT_BOTTOM}
-                    stroke="#4f7969"
+                    stroke="var(--brand)"
                     strokeDasharray="2 5"
                   />
                   <circle
                     cx={activeGeometry.x}
                     cy={activeGeometry.y}
                     r="5"
-                    fill="#f8faf7"
-                    stroke="#315f4e"
+                    fill="var(--surface)"
+                    stroke="var(--brand)"
                     strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
                   />
@@ -238,15 +227,15 @@ export function PortfolioHistoryChart({
                       x2={point.x}
                       y1={Math.min(point.y + 12, PLOT_BOTTOM - 12)}
                       y2={PLOT_BOTTOM - 7}
-                      stroke="#a9aea7"
+                      stroke="var(--faint)"
                       strokeDasharray="2 5"
                     />
                     <circle
                       cx={point.x}
                       cy={PLOT_BOTTOM - 2}
-                      fill={active ? "#347e62" : "#7f8a82"}
+                      fill={active ? "var(--brand)" : "var(--faint)"}
                       r={active ? 5 : 3.5}
-                      stroke="#f7f8f5"
+                      stroke="var(--paper)"
                       strokeWidth="2"
                       vectorEffect="non-scaling-stroke"
                     />
@@ -263,7 +252,7 @@ export function PortfolioHistoryChart({
                     x={point.x}
                     y={HEIGHT - 4}
                     textAnchor={index === 0 ? "start" : index === visiblePoints.length - 1 ? "end" : "middle"}
-                    fill="#7b8079"
+                    fill="var(--muted)"
                     fontSize="10"
                   >
                     {formatShortDate(value.date)}
@@ -274,26 +263,26 @@ export function PortfolioHistoryChart({
 
             {activePoint && activeGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[#d7ddd7] bg-[rgba(250,252,249,0.96)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
+                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[var(--line)] bg-[rgba(250,252,249,0.96)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
                 style={{
                   left: `${Math.min(76, Math.max(5, (activeGeometry.x / WIDTH) * 100 + 2))}%`,
                   top: `${Math.min(55, Math.max(3, (activeGeometry.y / HEIGHT) * 100 - 4))}%`,
                 }}
               >
-                <p className="border-b border-[#e4e8e3] pb-2 font-semibold text-[#20231f]">
+                <p className="border-b border-[var(--wash)] pb-2 font-semibold text-[var(--ink)]">
                   {formatDate(activePoint.date)}
                 </p>
-                <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[#656b63]">
+                <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[var(--muted)]">
                   <dt>평가액</dt>
-                  <dd className="text-right font-medium text-[#20231f]">
+                  <dd className="text-right font-medium text-[var(--ink)]">
                     {formatKrw(activePoint.totalMarketValue)}
                   </dd>
                   <dt>누적 손익</dt>
-                  <dd className="text-right font-medium text-[#20231f]">
+                  <dd className="text-right font-medium text-[var(--ink)]">
                     {formatKrw(activePoint.totalPnl)}
                   </dd>
                   <dt>수익률</dt>
-                  <dd className="text-right font-medium text-[#20231f]">
+                  <dd className="text-right font-medium text-[var(--ink)]">
                     {formatPercent(activePoint.totalReturnPct, true)}
                   </dd>
                 </dl>
@@ -302,31 +291,31 @@ export function PortfolioHistoryChart({
 
             {activeEvent && activeEventGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[#d7ddd7] bg-[rgba(250,252,249,0.98)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
+                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[var(--line)] bg-[rgba(250,252,249,0.98)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
                 style={{
                   bottom: "9%",
                   left: `${Math.min(74, Math.max(3, (activeEventGeometry.x / WIDTH) * 100 + 1.5))}%`,
                 }}
               >
-                <p className="border-b border-[#e4e8e3] pb-2 font-semibold text-[#20231f]">
+                <p className="border-b border-[var(--wash)] pb-2 font-semibold text-[var(--ink)]">
                   {formatDate(activeEvent.eventDate)} · {activeEvent.events.length}건
                 </p>
                 <div className="mt-2.5 space-y-2.5">
                   {activeEvent.events.slice(0, 3).map((event) => (
                     <div key={event.id}>
                       <div className="flex items-start justify-between gap-3">
-                        <p className="font-medium text-[#252824]">{eventTypeLabel(event.eventType)}</p>
-                        <p className="text-right font-medium tabular-nums text-[#252824]">
+                        <p className="font-medium text-[var(--ink)]">{eventTypeLabel(event.eventType)}</p>
+                        <p className="text-right font-medium tabular-nums text-[var(--ink)]">
                           {eventAmountLabel(event)}
                         </p>
                       </div>
-                      <p className="mt-0.5 truncate text-[#747a72]">
+                      <p className="mt-0.5 truncate text-[var(--muted)]">
                         {event.assetName} · {event.accountLabel}
                       </p>
                     </div>
                   ))}
                   {activeEvent.events.length > 3 ? (
-                    <p className="text-[#747a72]">그 외 {activeEvent.events.length - 3}건</p>
+                    <p className="text-[var(--muted)]">그 외 {activeEvent.events.length - 3}건</p>
                   ) : null}
                 </div>
               </div>
@@ -344,19 +333,19 @@ export function PortfolioHistoryChart({
           />
 
           {mobilePoint ? (
-            <div className="mt-3 flex items-center justify-between gap-4 text-xs text-[#6e746c] md:hidden">
+            <div className="mt-3 flex items-center justify-between gap-4 text-xs text-[var(--muted)] md:hidden">
               <span>{formatDate(mobilePoint.date)}</span>
-              <span className="font-medium text-[#20231f]">
+              <span className="font-medium text-[var(--ink)]">
                 {formatKrw(mobilePoint.totalMarketValue)}
               </span>
             </div>
           ) : null}
         </>
       ) : (
-        <div className="grid min-h-[280px] place-items-center border-y border-[#e2e5df] text-center">
+        <div className="grid min-h-[280px] place-items-center border-y border-[var(--wash)] text-center">
           <div>
-            <p className="text-sm font-medium text-[#343833]">표시할 이력이 아직 충분하지 않습니다.</p>
-            <p className="mt-2 text-xs text-[#7b8079]">수집된 값은 숨기지 않고 다음 기준일과 함께 이어집니다.</p>
+            <p className="text-sm font-medium text-[var(--ink)]">표시할 이력이 아직 충분하지 않습니다.</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">수집된 값은 숨기지 않고 다음 기준일과 함께 이어집니다.</p>
           </div>
         </div>
       )}

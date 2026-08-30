@@ -58,7 +58,7 @@ export function InvestmentLabEtfShock({
 
   return (
     <section
-      className="border-y border-[#dde1db] py-6"
+      className="border-y border-[var(--line)] py-6"
       data-shock-covered-exposure={readyResult?.coveredExposurePct.toFixed(6) ?? ""}
       data-shock-direct-exposure={readyResult?.directExposurePct.toFixed(6) ?? ""}
       data-shock-estimated-change-krw={readyResult?.estimatedChangeKrw.toFixed(6) ?? ""}
@@ -75,15 +75,15 @@ export function InvestmentLabEtfShock({
       data-shock-value-scope={exposureScope}
       data-section="investment-lab-etf-shock"
     >
-      <div className="flex flex-col gap-1 border-b border-[#dde1db] pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-1 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold">단일 구성종목 충격 실험</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             선택한 종목 가격만 지정한 비율로 움직인다고 가정해 직접 보유와 ETF
             경유 노출의 정적 1차 영향을 합산합니다.
           </p>
         </div>
-        <p className="text-xs font-semibold text-[#687064]">입력값 저장 안 함</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">입력값 저장 안 함</p>
       </div>
 
       {defaultComponent ? (
@@ -92,10 +92,10 @@ export function InvestmentLabEtfShock({
             className="mt-5 grid items-end gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.6fr)_auto]"
             onSubmit={calculate}
           >
-            <label className="min-w-0 text-xs font-semibold text-[#596255]">
+            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]">
               구성종목
               <select
-                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 onChange={(event) => {
                   setSelectedKey(event.target.value);
                   setResult(null);
@@ -113,10 +113,10 @@ export function InvestmentLabEtfShock({
               </select>
             </label>
 
-            <label className="min-w-0 text-xs font-semibold text-[#596255]">
+            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]">
               가격 충격 (%)
               <input
-                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 inputMode="decimal"
                 max={INVESTMENT_LAB_ETF_SHOCK_POLICY.maximumShockPct}
                 min={INVESTMENT_LAB_ETF_SHOCK_POLICY.minimumShockPct}
@@ -131,7 +131,7 @@ export function InvestmentLabEtfShock({
             </label>
 
             <button
-              className="h-10 rounded-[4px] bg-[#173f38] px-5 text-sm font-semibold text-white hover:bg-[#0f302a]"
+              className="h-10 rounded-[4px] bg-[var(--ink)] px-5 text-sm font-semibold text-white hover:bg-[var(--ink)]"
               type="submit"
             >
               계산
@@ -141,12 +141,12 @@ export function InvestmentLabEtfShock({
           <ShockResult result={result} />
         </>
       ) : (
-        <p className="mt-4 text-sm text-[#725f2d]">
+        <p className="mt-4 text-sm text-[var(--warning)]">
           충격을 계산할 수 있는 구성종목 근거가 없습니다.
         </p>
       )}
 
-      <p className="mt-5 border-t border-[#e1e6dc] pt-3 text-xs leading-5 text-[#777e73]">
+      <p className="mt-5 border-t border-[var(--wash)] pt-3 text-xs leading-5 text-[var(--muted)]">
         {exposureScope === "whole_portfolio"
           ? "현재 평가된 전체 포트폴리오"
           : `가격·환율 근거가 있는 평가 하위집합(제외 ${excludedHoldingCount}개)`}
@@ -163,14 +163,14 @@ function ShockResult({ result }: { result: InvestmentLabEtfShockResult | null })
   if (!result) return null;
   if (result.status === "blocked") {
     return (
-      <p className="mt-4 border-t border-[#eadfbe] pt-4 text-sm text-[#725f2d]">
+      <p className="mt-4 border-t border-[var(--warning-soft)] pt-4 text-sm text-[var(--warning)]">
         {shockBlockerLabel(result.blockers[0])}
       </p>
     );
   }
 
   return (
-    <div className="mt-5 border-t border-[#e1e6dc] pt-4">
+    <div className="mt-5 border-t border-[var(--wash)] pt-4">
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
         <ResultMetric
           label="ETF 경유 노출"
@@ -197,7 +197,7 @@ function ShockResult({ result }: { result: InvestmentLabEtfShockResult | null })
           )}
         />
       </div>
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         {result.symbol} {formatSignedPercent(result.shockPct)} 가정 · 경유 ETF {" "}
         {result.throughEtfs.join(", ")} · 구성 근거 {" "}
         {result.asOfDates.map(formatDate).join(", ")}
@@ -217,15 +217,15 @@ function ResultMetric({
   value: string;
 }) {
   return (
-    <div className="border-l-2 border-[#cfd7c7] pl-3">
-      <p className="text-sm text-[#687064]">{label}</p>
+    <div className="border-l-2 border-[var(--line)] pl-3">
+      <p className="text-sm text-[var(--muted)]">{label}</p>
       <p
         className={`mt-1 text-xl font-semibold tabular-nums ${
           tone > 0
-            ? "text-[#087f4f]"
+            ? "text-[var(--brand)]"
             : tone < 0
-              ? "text-[#c43d39]"
-              : "text-[#171916]"
+              ? "text-[var(--negative)]"
+              : "text-[var(--ink)]"
         }`}
       >
         {value}

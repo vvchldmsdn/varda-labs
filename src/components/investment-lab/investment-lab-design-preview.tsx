@@ -22,7 +22,7 @@ export function InvestmentLabDesignPreview({
     buildInvestmentLabDesignPreview(query);
   return (
     <main
-      className="min-h-screen overflow-x-hidden bg-[#f8f9f6] text-[#171a16]"
+      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
       data-lab-design-preview
     >
       <PortfolioPrimaryNavigation
@@ -30,14 +30,14 @@ export function InvestmentLabDesignPreview({
         generatedAt={dashboard.generatedAt}
         selectedScopeKey={dashboard.selectedScope.key}
       />
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-16 pt-7 sm:px-8 lg:px-10">
+      <div className="varda-content">
         <header>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#777d75]">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--muted)]">
             <p>PORTFOLIO / LAB</p>
             <p>디자인 미리보기 · 예시 데이터</p>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-            <h1 className="text-2xl font-medium">투자 랩</h1>
+            <h1 className="varda-page-title">투자 랩</h1>
             <InvestmentLabScopeTabs
               scopes={dashboard.analysisScopes}
               selectedScopeKey={dashboard.selectedScope.key}
@@ -79,7 +79,7 @@ export function InvestmentLabDesignPreview({
                 >
                   <div className="overflow-x-auto pb-5">
                     <table className="w-full min-w-[570px] text-left text-sm">
-                      <thead className="text-xs text-[#788276]">
+                      <thead className="text-xs text-[var(--muted)]">
                         <tr>
                           <th className="py-4 font-normal">시나리오</th>
                           <th className="font-normal">종료 평가액</th>
@@ -90,7 +90,7 @@ export function InvestmentLabDesignPreview({
                       <tbody>
                         {summaries.map((row) => (
                           <tr
-                            className="border-t border-[#e0e5dd] tabular-nums"
+                            className="border-t border-[var(--wash)] tabular-nums"
                             key={row.id}
                           >
                             <th className="py-4 font-medium">

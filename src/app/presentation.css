@@ -1,0 +1,542 @@
+:root {
+  --paper: #f6f4ef;
+  --surface: #fdfcf9;
+  --ink: #191b20;
+  --muted: #696c72;
+  --faint: #6d7075;
+  --line: #dcdcd7;
+  --wash: #eeede8;
+  --brand: #315bb5;
+  --brand-mid: #6f8fc8;
+  --brand-soft: #d9e2f2;
+  --brand-wash: #eaeef6;
+  --negative: #a55248;
+  --negative-mid: #cf968c;
+  --negative-soft: #f1dfda;
+  --warning: #84652e;
+  --warning-soft: #eee5d1;
+  --warning-wash: #f7f1e4;
+  --secondary: #77668f;
+  --secondary-soft: #e9e3f0;
+  --chart-teal: #6b8b86;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --dialog-shadow: 0 24px 100px #191b201a;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    scrollbar-gutter: stable;
+  }
+  body {
+    letter-spacing: 0;
+  }
+  ::selection {
+    background: var(--brand-soft);
+    color: var(--ink);
+  }
+  :where(button, a, summary, input, select, textarea):focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 4px;
+  }
+  :where(button, summary, select) {
+    cursor: pointer;
+  }
+  :where(button:disabled) {
+    cursor: not-allowed;
+  }
+  :where(input, select, textarea) {
+    accent-color: var(--brand);
+  }
+  :where(
+    input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(
+        [type="hidden"]
+      ),
+    select,
+    textarea
+  ) {
+    border-radius: 4px;
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  :where(h1, h2, h3, p, dt, dd, label, th, td) {
+    overflow-wrap: anywhere;
+  }
+  :where(table) {
+    font-variant-numeric: tabular-nums;
+  }
+  :where(thead th) {
+    font-weight: 500;
+  }
+  :where(dialog, [role="dialog"]) {
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--dialog-shadow);
+  }
+  dialog::backdrop {
+    background: #191b202b;
+    backdrop-filter: blur(5px);
+  }
+  :where([role="tooltip"]) {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    box-shadow: 0 8px 32px #191b2010;
+  }
+  :where(svg[role="img"]) {
+    overflow: visible;
+  }
+  :where(svg[role="img"] text) {
+    letter-spacing: 0;
+  }
+}
+
+.varda-navigation {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.varda-navigation-inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 40px;
+  min-height: 88px;
+  max-width: 1540px;
+  padding: 0 48px;
+  margin: 0 auto;
+}
+.varda-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.varda-wordmark img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.varda-main-menu {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.varda-main-menu > div {
+  display: flex;
+  justify-content: center;
+  gap: 27px;
+  min-width: max-content;
+}
+.varda-main-menu a {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  min-height: 88px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 160ms;
+}
+.varda-main-menu a:hover,
+.varda-main-menu a[aria-current="page"] {
+  color: var(--ink);
+}
+.varda-main-menu a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand);
+}
+.varda-navigation-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.varda-content {
+  max-width: 1540px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 30px 48px 64px;
+}
+.varda-page-title {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.3;
+  margin-top: 8px;
+}
+.varda-kicker {
+  font-size: 10px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.varda-primary-number {
+  font-size: 76px;
+  line-height: 1.12;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.varda-summary-stage {
+  text-align: center;
+  padding: 50px 0 42px;
+}
+.varda-contribution-controls {
+  padding-top: 30px;
+  padding-bottom: 28px;
+}
+.varda-section {
+  padding-top: 40px;
+  padding-bottom: 40px;
+  border-top: 1px solid var(--line);
+}
+.varda-section-heading {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.varda-icon-button {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+}
+.varda-icon-button:hover {
+  color: var(--brand);
+  background: var(--brand-wash);
+}
+.varda-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 4px;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+}
+.varda-action:hover {
+  filter: brightness(0.94);
+}
+.varda-dialog {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--dialog-shadow);
+}
+.varda-dialog-header {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-dialog-content {
+  padding: 28px 32px;
+}
+.varda-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 5px;
+  background: var(--wash);
+}
+.varda-segmented button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.varda-segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: 0 1px 4px #191b2008;
+}
+.varda-palette-line {
+  height: 2px;
+  background: var(--brand);
+  width: 28px;
+}
+.varda-allocation-ring {
+  width: 100%;
+  max-width: 570px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+.varda-allocation-ring circle[role="button"] {
+  cursor: pointer;
+  transition:
+    opacity 150ms,
+    stroke-width 150ms;
+}
+.varda-allocation-ring circle[role="button"]:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 3px var(--brand));
+}
+.varda-allocation-ring text {
+  pointer-events: none;
+}
+.varda-home-chart {
+  height: 350px;
+  min-height: 270px;
+}
+.varda-history-chart {
+  height: 390px;
+}
+.varda-compact-summary {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 30px 0;
+}
+.varda-compact-summary .varda-primary-number {
+  font-size: 38px;
+}
+.varda-history-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(480px, 1.1fr);
+  align-items: end;
+  gap: 40px;
+  padding: 34px 0 28px;
+}
+.varda-history-heading .varda-primary-number {
+  font-size: 62px;
+}
+.varda-history-canvas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 270px;
+  gap: 40px;
+  padding: 24px 0 32px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-page :where(details) {
+  scroll-margin-top: 20px;
+}
+.varda-page nav[aria-label="자산 분석 범위"] {
+  scrollbar-width: none;
+}
+.varda-page :where(summary) {
+  min-height: 48px;
+  align-content: center;
+}
+.varda-page :where([role="tablist"]) {
+  gap: 12px;
+}
+.varda-page :where([role="tab"][aria-selected="true"]) {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+.varda-secondary-page {
+  padding: 0 28px 64px;
+}
+.varda-secondary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88px;
+  max-width: 1380px;
+  margin: 0 auto 28px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-secondary-page section {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  box-shadow: none;
+  padding-top: 24px;
+  padding-bottom: 28px;
+}
+.varda-secondary-page h1 {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.varda-secondary-page h2 {
+  font-weight: 500;
+}
+.varda-secondary-page dl > div {
+  border-radius: 0;
+  background: transparent;
+  border-color: var(--line);
+}
+.varda-secondary-page :where(table) {
+  background: transparent;
+}
+
+@media (max-width: 1100px) {
+  .varda-navigation-inner {
+    gap: 24px;
+    padding: 0 28px;
+  }
+  .varda-main-menu > div {
+    gap: 20px;
+  }
+  .varda-navigation-actions > span {
+    display: none;
+  }
+  .varda-content {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .varda-history-heading {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .varda-history-canvas {
+    grid-template-columns: minmax(0, 1fr) 235px;
+    gap: 24px;
+  }
+}
+@media (max-width: 760px) {
+  .varda-value-bridge {
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+  .varda-value-bridge > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 78px;
+    padding: 16px 0;
+    border-left: 0;
+  }
+  .varda-value-bridge > div + div {
+    border-top: 1px solid var(--line);
+  }
+  .varda-value-bridge > div > p + p {
+    margin-top: 0;
+    font-size: 18px;
+  }
+  .varda-value-bridge > div > span {
+    display: none;
+  }
+  .varda-navigation-inner {
+    grid-template-columns: 1fr auto;
+    gap: 0 20px;
+    padding: 0 20px;
+    min-height: 0;
+  }
+  .varda-wordmark {
+    min-height: 60px;
+  }
+  .varda-main-menu {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .varda-main-menu > div {
+    justify-content: flex-start;
+    gap: 24px;
+  }
+  .varda-main-menu a {
+    min-height: 45px;
+    font-size: 12px;
+  }
+  .varda-main-menu a[aria-current="page"]::after {
+    bottom: 0;
+  }
+  .varda-content {
+    padding: 24px 20px 44px;
+  }
+  .varda-secondary-page {
+    padding: 0 20px 40px;
+  }
+  .varda-secondary-header {
+    min-height: 64px;
+    margin-bottom: 16px;
+  }
+  .varda-page-title {
+    font-size: 22px;
+  }
+  .varda-summary-stage {
+    padding: 34px 0;
+  }
+  .varda-primary-number {
+    font-size: 42px;
+  }
+  .varda-section {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+  .varda-dialog-header {
+    padding: 18px 20px;
+  }
+  .varda-dialog-content {
+    padding: 22px 20px;
+  }
+  .varda-compact-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 26px 0;
+  }
+  .varda-compact-summary .varda-primary-number {
+    font-size: 32px;
+  }
+  .varda-history-heading {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 28px 0 20px;
+  }
+  .varda-history-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 0;
+  }
+  .varda-history-controls [aria-label="그래프 지표"] button {
+    min-width: 60px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .varda-history-controls [aria-label="조회 기간"] {
+    gap: 12px;
+  }
+  .varda-history-controls [aria-label="조회 기간"] button {
+    font-size: 12px;
+  }
+  .varda-history-heading .varda-primary-number {
+    font-size: 44px;
+  }
+  .varda-history-canvas {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .varda-home-chart {
+    height: 280px;
+  }
+  .varda-history-chart {
+    height: 310px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

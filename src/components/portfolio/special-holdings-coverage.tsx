@@ -14,7 +14,7 @@ export function SpecialHoldingsCoverage({
   return (
     <section
       aria-labelledby="special-holdings-coverage-title"
-      className="border-t border-[#d9ddd7] pt-8 lg:pt-10"
+      className="border-t border-[var(--line)] pt-8 lg:pt-10"
       data-adjustable-position-count={model.adjustablePositionCount}
       data-managed-sleeve-count={model.managedSleeveCount}
       data-physical-commodity-count={model.physicalCommodityPositionCount}
@@ -25,7 +25,7 @@ export function SpecialHoldingsCoverage({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#7b8079]">
+          <p className="text-[11px] font-medium text-[var(--muted)]">
             SPECIAL HOLDINGS
           </p>
           <h2
@@ -34,17 +34,17 @@ export function SpecialHoldingsCoverage({
           >
             특수 보유자산 커버리지·조정 가능성
           </h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-[#687064]">
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             저장된 상품 유형과 상장 식별 근거만 사용합니다. 이름으로 상품
             유형을 추론하지 않으며, 이 표시는 추천·주문 권한이 아닙니다.
           </p>
         </div>
-        <p className="text-sm font-medium text-[#3f4b40]">
+        <p className="text-sm font-medium text-[var(--muted)]">
           상태 {statusLabel(model.status)}
         </p>
       </div>
 
-      <div className="mt-7 grid border-y border-[#d9ddd7] sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-7 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCell
           detail={`평가액 비중 ${formatPercent(model.adjustableValuedWeightPct)}`}
           label="조정 가능"
@@ -73,14 +73,14 @@ export function SpecialHoldingsCoverage({
       </div>
 
       {model.attentionRows.length === 0 ? (
-        <p className="mt-6 border-y border-[#d8e4d2] bg-[#f3faef] px-4 py-3 text-sm text-[#36563a]">
+        <p className="mt-6 border-y border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--brand)]">
           현재 선택 범위의 모든 보유자산이 상장 종목 identity와 평가 근거를
           갖고 있습니다.
         </p>
       ) : (
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left text-sm">
-            <thead className="text-xs uppercase text-[#687064]">
+            <thead className="text-xs uppercase text-[var(--muted)]">
               <tr>
                 <TableHeader>보유자산</TableHeader>
                 <TableHeader>계정</TableHeader>
@@ -96,7 +96,7 @@ export function SpecialHoldingsCoverage({
                 <tr key={row.key}>
                   <TableCell strong>
                     <div>{row.name}</div>
-                    <div className="text-xs font-normal text-[#687064]">
+                    <div className="text-xs font-normal text-[var(--muted)]">
                       {row.ticker ?? "종목 코드 없음"}
                     </div>
                   </TableCell>
@@ -115,7 +115,7 @@ export function SpecialHoldingsCoverage({
         </div>
       )}
 
-      <p className="mt-3 text-xs text-[#73786c]">
+      <p className="mt-3 text-xs text-[var(--muted)]">
         평가 완료 {model.valuedPositionCount}개 · 평가 제외 {" "}
         {model.excludedPositionCount}개 · 조정 제외 {model.ineligiblePositionCount}개
       </p>
@@ -133,12 +133,12 @@ function SummaryCell({
   detail: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[#e2e5df] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-3 text-xl font-medium tabular-nums text-[#111411]">
+    <div className="min-w-0 border-b border-[var(--wash)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="mt-3 text-xl font-medium tabular-nums text-[var(--ink)]">
         {value}
       </p>
-      <p className="mt-1 text-xs text-[#73786c]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }
@@ -152,7 +152,7 @@ function TableHeader({
 }) {
   return (
     <th
-      className={`border-b border-[#dfe3d5] px-3 py-2 font-semibold ${
+      className={`border-b border-[var(--line)] px-3 py-2 font-semibold ${
         align === "right" ? "text-right" : "text-left"
       }`}
     >
@@ -172,7 +172,7 @@ function TableCell({
 }) {
   return (
     <td
-      className={`border-b border-[#edf0e7] px-3 py-2 align-top ${
+      className={`border-b border-[var(--wash)] px-3 py-2 align-top ${
         align === "right" ? "text-right" : "text-left"
       } ${strong ? "font-semibold" : ""}`}
     >

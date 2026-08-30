@@ -17,7 +17,7 @@ export function FanBandValidationSection({
   return (
     <section
       aria-labelledby="fan-band-validation-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-fan-band-validation
       data-fan-band-validation-horizon={result.horizon ?? "invalid"}
       data-fan-band-validation-status={result.status}
@@ -27,7 +27,7 @@ export function FanBandValidationSection({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             Stationary bootstrap · 과거 관측 검증
           </p>
           <h2
@@ -36,14 +36,14 @@ export function FanBandValidationSection({
           >
             종료수익률 P10~P90 확률밴드 검증
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             KODEX 200 50%와 VOO 50%를 처음 한 번 배분하고 리밸런싱하지
             않은 연구 포트폴리오입니다. 각 행은 앞선 90개 공동 KRW 수익률로
             500개 경로를 만들고, 이어진 실제 {result.horizon ?? "선택"}개
             관측값과 비교합니다.
           </p>
         </div>
-        <span className="text-xs text-[#687064]">
+        <span className="text-xs text-[var(--muted)]">
           예측·추천·계정 결과 아님
         </span>
       </div>
@@ -75,7 +75,7 @@ export function FanBandValidationSection({
       </div>
 
       {result.rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#62542c]">
+        <div className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
           {result.reason === "invalid_horizon_selection" ? (
             <>
               연구 기간은 <code>63</code> 또는 <code>126</code>만 선택할 수
@@ -89,9 +89,9 @@ export function FanBandValidationSection({
           )}
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="min-w-[900px] w-full text-left text-sm">
-            <thead className="border-b border-[#dfe3d5] text-xs text-[#687064]">
+            <thead className="border-b border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-2 font-semibold">실제 관측 종료일</th>
                 <th className="px-3 py-2 font-semibold">학습 종료일</th>
@@ -106,7 +106,7 @@ export function FanBandValidationSection({
             <tbody>
               {result.rows.map((row) => (
                 <tr
-                  className="border-b border-[#e7eadf] last:border-b-0"
+                  className="border-b border-[var(--wash)] last:border-b-0"
                   data-fan-band-validation-row={row.outcomeEndServiceDate}
                   data-fan-band-validation-row-status={row.status}
                   key={row.outcomeEndServiceDate}
@@ -153,7 +153,7 @@ export function FanBandValidationSection({
                       </td>
                     </>
                   ) : (
-                    <td className="px-3 py-2 text-[#7a5117]" colSpan={7}>
+                    <td className="px-3 py-2 text-[var(--warning)]" colSpan={7}>
                       계산 불가 · {historicalValidationReasonLabel(row.reason)}
                     </td>
                   )}
@@ -164,7 +164,7 @@ export function FanBandValidationSection({
         </div>
       )}
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         최근 7개 종료일의 구간은 서로 크게 겹치므로 독립된 7번의 실험이
         아닙니다. 포함률은 기술 진단값이며 합격 판정, 최적 날짜 선정,
         파라미터 조정에 사용하지 않습니다. 데이터가 부족한 행만 계산하지

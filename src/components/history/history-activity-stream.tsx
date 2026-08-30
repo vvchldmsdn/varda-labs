@@ -15,34 +15,34 @@ export function HistoryActivityStream({
       : [];
 
   return (
-    <section className="border-b border-[#dde1db] py-8" aria-labelledby="history-activity-title">
+    <section className="border-b border-[var(--line)] py-8" aria-labelledby="history-activity-title">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#777d75]">ACTIVITY TAPE</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">ACTIVITY TAPE</p>
           <h2 id="history-activity-title" className="mt-1 text-xl font-semibold">
             기록된 활동
           </h2>
         </div>
-        <p className="text-xs text-[#777d75]">
+        <p className="text-xs text-[var(--muted)]">
           {events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준"}
         </p>
       </div>
 
       {events.length > 0 ? (
-        <ol className="mt-6 divide-y divide-[#e1e4df] border-y border-[#e1e4df]">
+        <ol className="mt-6 divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
           {events.map((event, index) => (
             <li
               key={`${event.eventDate}:${event.eventType}:${event.assetName}:${index}`}
               className="grid gap-3 py-4 sm:grid-cols-[110px_1fr_auto] sm:items-center"
             >
-              <time className="text-xs tabular-nums text-[#72786f]">
+              <time className="text-xs tabular-nums text-[var(--muted)]">
                 {event.eventDate.replaceAll("-", ".")}
               </time>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">
                   {event.assetName}
                 </p>
-                <p className="mt-1 text-xs text-[#777d75]">
+                <p className="mt-1 text-xs text-[var(--muted)]">
                   {eventTypeLabel(event.eventType)} · {event.accountName}
                   {event.groupName ? ` · ${event.groupName}` : ""}
                 </p>
@@ -56,7 +56,7 @@ export function HistoryActivityStream({
           ))}
         </ol>
       ) : (
-        <p className="mt-6 border-y border-[#e1e4df] py-8 text-sm leading-6 text-[#747a72]">
+        <p className="mt-6 border-y border-[var(--wash)] py-8 text-sm leading-6 text-[var(--muted)]">
           {!supported
             ? "이 자산그룹의 이벤트 포함 규칙은 아직 정의되지 않아 계좌 이벤트를 임의로 합산하지 않습니다."
             : result?.state === "integrity_error"
@@ -66,7 +66,7 @@ export function HistoryActivityStream({
                 : "이 범위에 연결된 저장 이벤트가 없습니다."}
         </p>
       )}
-      <p className="mt-3 text-xs leading-5 text-[#858a83]">
+      <p className="mt-3 text-xs leading-5 text-[var(--faint)]">
         이벤트는 활동 맥락으로 표시하며 같은 날의 평가액 변화에 자동 귀속하지 않습니다.
       </p>
     </section>

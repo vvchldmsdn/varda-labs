@@ -41,18 +41,18 @@ export function HistoryPositionDetail({
       data-history-position-incompatible-count={model.incompatibleRowCount}
       data-history-position-reconciliation={model.reconciliationStatus}
       data-history-position-policy={model.policy.version}
-      className="mt-4 border-y border-[#dfe3d5] py-4"
+      className="mt-4 border-y border-[var(--line)] py-4"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             저장 포지션 근거
           </p>
           <h3 className="mt-1 text-base font-semibold tracking-normal">
             과거 보유 상세
           </h3>
           {model.snapshotDate && model.source ? (
-            <p className="mt-1 text-xs text-[#687064]">
+            <p className="mt-1 text-xs text-[var(--muted)]">
               {model.snapshotDate} · {historyAccountLabel(model.account)} · {" "}
               {historySourceLabel(model.source)}
             </p>
@@ -61,7 +61,7 @@ export function HistoryPositionDetail({
         {model.selection.status !== "idle" ? (
           <Link
             href={clearDetailHref(model, scopeKey)}
-            className="w-fit rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-xs font-semibold text-[#4d574b] hover:bg-[#eef2e8]"
+            className="w-fit rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--wash)]"
           >
             상세 닫기
           </Link>
@@ -71,7 +71,7 @@ export function HistoryPositionDetail({
       {model.status === "ready" || model.status === "partial" ? (
         <ReadyDetail model={model} />
       ) : (
-        <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[#687064]">
+        <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[var(--muted)]">
           {statusMessage(model)}
         </p>
       )}
@@ -83,13 +83,13 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
   return (
     <>
       {model.status === "partial" ? (
-        <p className="mt-3 border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-sm text-[#6f561c]">
+        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]">
           일부 저장 근거가 불완전합니다. 확인 가능한 행은 그대로 표시하며
           누락값을 보간하거나 현재 자산 정보로 대체하지 않습니다.
         </p>
       ) : null}
 
-      <div className="mt-3 grid border-t border-[#e1e6dc] sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid border-t border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCell
           label="포트폴리오 저장 평가액"
           value={formatHistoryKrw(model.portfolioTotalMarketValueKrw)}
@@ -112,7 +112,7 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
         />
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         저장 자산 참조 {model.positionCount - model.legacyOnlyCount}행 · 레거시
         전용 {model.legacyOnlyCount}행 · 중복 근거 {model.duplicateIdentityCount}행
         {model.rowLimitExceeded
@@ -122,7 +122,7 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[1380px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="text-xs text-[#687064]">
+          <thead className="text-xs text-[var(--muted)]">
             <tr>
               <TableHeader>종목</TableHeader>
               <TableHeader>근거 상태</TableHeader>
@@ -148,7 +148,7 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
         </table>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         이 상세는 선택한 날짜·계정·출처의 저장 포지션만 표시합니다. 실시간
         가격, 현재 자산 이름, ETF 내부 구성, 목표 비중, 추천 또는 주문 정보로
         보완하지 않습니다.
@@ -163,17 +163,17 @@ function PositionRow({ row }: { row: HistoryPositionDisplayRow }) {
       data-history-position-row
       data-history-position-mapping={row.mappingStatus}
       data-history-position-evidence={row.evidenceStatus}
-      className="border-t border-[#e1e6dc]"
+      className="border-t border-[var(--wash)]"
     >
       <TableCell strong>
         <span className="block">{row.ticker ?? "티커 없음"}</span>
-        <span className="mt-1 block text-xs font-normal text-[#687064]">
+        <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
           {row.assetName}
         </span>
       </TableCell>
       <TableCell>
         <span className="block">{mappingLabel(row.mappingStatus)}</span>
-        <span className="mt-1 block text-xs text-[#687064]">
+        <span className="mt-1 block text-xs text-[var(--muted)]">
           {evidenceLabel(row)}
         </span>
       </TableCell>
@@ -191,14 +191,14 @@ function PositionRow({ row }: { row: HistoryPositionDisplayRow }) {
       <TableCell align="right">{formatHistoryKrw(row.costKrw)}</TableCell>
       <TableCell align="right">
         <span className="block">{formatHistoryKrw(row.pnlKrw)}</span>
-        <span className="mt-1 block text-xs text-[#687064]">
+        <span className="mt-1 block text-xs text-[var(--muted)]">
           {formatPercent(row.pnlPct)}
         </span>
       </TableCell>
       <TableCell align="right">{formatPercent(row.currentWeight)}</TableCell>
       <TableCell>
         <span className="block">{row.priceSource ?? "n/a"}</span>
-        <span className="mt-1 block text-xs text-[#687064]">
+        <span className="mt-1 block text-xs text-[var(--muted)]">
           {row.priceBasis ?? "basis n/a"}
         </span>
       </TableCell>

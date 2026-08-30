@@ -48,7 +48,7 @@ export function SimulationPathComparisonChart({
 
   return (
     <figure data-simulation-path-comparison-chart>
-      <div className="flex flex-wrap gap-4 text-xs text-[#596158]">
+      <div className="flex flex-wrap gap-4 text-xs text-[var(--muted)]">
         {series.map((item) => (
           <span className="inline-flex items-center gap-2" key={item.id}>
             <span
@@ -70,7 +70,7 @@ export function SimulationPathComparisonChart({
         {yTicks.map((tick) => (
           <g key={tick.y}>
             <line
-              stroke="#dde2d7"
+              stroke="var(--line)"
               strokeWidth="1"
               x1={padding.left}
               x2={width - padding.right}
@@ -78,7 +78,7 @@ export function SimulationPathComparisonChart({
               y2={tick.y}
             />
             <text
-              fill="#687064"
+              fill="var(--muted)"
               fontSize="10"
               textAnchor="end"
               x={padding.left - 8}
@@ -107,7 +107,7 @@ export function SimulationPathComparisonChart({
           />
         ))}
         <text
-          fill="#687064"
+          fill="var(--muted)"
           fontSize="10"
           textAnchor="start"
           x={padding.left}
@@ -116,7 +116,7 @@ export function SimulationPathComparisonChart({
           검증 시작
         </text>
         <text
-          fill="#687064"
+          fill="var(--muted)"
           fontSize="10"
           textAnchor="end"
           x={width - padding.right}

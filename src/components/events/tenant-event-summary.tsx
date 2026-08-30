@@ -21,8 +21,8 @@ export function TenantEventSummary({ result }: { result: EventEvidence }) {
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-2 text-lg font-semibold tabular-nums">{value}</p>
     </div>
   );

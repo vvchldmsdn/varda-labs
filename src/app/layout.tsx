@@ -3,6 +3,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Noto_Sans_KR } from "next/font/google";
 
 import "./globals.css";
+import "./presentation.css";
 
 const geist = Geist({
   display: "swap",

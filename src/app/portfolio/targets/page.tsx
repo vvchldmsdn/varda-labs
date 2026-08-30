@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
@@ -63,16 +64,17 @@ export default async function PortfolioTargetsPage({
   });
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-4 text-[#171916]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-4 text-[var(--ink)]">
+      <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-[1300px] space-y-4">
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+              <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
                 목표비중
               </h1>
-              <p className="mt-2 text-sm text-[#687064]">
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 선택한 계좌 또는 자산그룹 안에서 새 투자금을 배분할 기준을 직접 정합니다.
               </p>
             </div>
@@ -119,15 +121,15 @@ export default async function PortfolioTargetsPage({
           </dl>
         </section>
 
-        <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">{selectedScope.label} 목표</h2>
-              <p className="mt-1 text-sm text-[#687064]">
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 저장하면 같은 범위의 이전 승인본은 수정되지 않고 종료 이력으로 남습니다.
               </p>
             </div>
-            <span className="rounded-md border border-[#d8dfd0] bg-white px-3 py-2 text-xs font-semibold text-[#445248]">
+            <span className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--muted)]">
               계좌·종목별 목적지 보존
             </span>
           </div>
@@ -140,7 +142,7 @@ export default async function PortfolioTargetsPage({
               universeHash={model.currentUniverseHash!}
             />
           ) : (
-            <div className="mt-5 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
+            <div className="mt-5 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
               현재 범위의 보유종목 구성을 목표비중으로 만들 수 없습니다. 보유종목과 계좌 연결을 먼저 확인해 주세요.
             </div>
           )}
@@ -160,10 +162,10 @@ function SummaryCell({
   value: string;
 }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <dt className="text-xs font-semibold text-[#687064]">{label}</dt>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 text-lg font-semibold">{value}</dd>
-      {detail ? <p className="mt-1 text-xs text-[#687064]">{detail}</p> : null}
+      {detail ? <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p> : null}
     </div>
   );
 }
@@ -171,7 +173,7 @@ function SummaryCell({
 function NavLink({ href, children }: { href: string; children: string }) {
   return (
     <Link
-      className="rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-[#35423a] hover:bg-[#eef2e8]"
+      className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
       href={href}
     >
       {children}

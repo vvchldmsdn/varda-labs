@@ -11,7 +11,7 @@ export function TenantHistoryEvents({
     return (
       <>
         {result.state === "partial" ? (
-          <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+          <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
             저장 근거가 일부 비어 있거나 표시 한도에 도달했습니다. 확인된
             이벤트는 계속 표시합니다.
           </p>
@@ -30,7 +30,7 @@ export function TenantHistoryEvents({
         : "이벤트 기록을 현재 읽을 수 없습니다.";
 
   return (
-    <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+    <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
       {message}
     </p>
   );

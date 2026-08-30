@@ -48,9 +48,9 @@ export function InvestmentLabComparisonChart({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-4 text-sm text-[#5f665d]">
-        <Legend color="#1e3a34" label="실제 포트폴리오" />
-        <Legend color="#e05b49" label={scenarioLabel} />
+      <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--muted)]">
+        <Legend color="var(--ink)" label="실제 포트폴리오" />
+        <Legend color="var(--negative)" label={scenarioLabel} />
         <span>원 표시는 지연 체결 비교일</span>
       </div>
       <svg
@@ -70,7 +70,7 @@ export function InvestmentLabComparisonChart({
               x2={WIDTH - PADDING_X}
               y1={lineY}
               y2={lineY}
-              stroke="#dfe3d8"
+              stroke="var(--line)"
               strokeDasharray="4 6"
               strokeWidth="1"
             />
@@ -79,7 +79,7 @@ export function InvestmentLabComparisonChart({
         <polyline
           fill="none"
           points={actualPoints}
-          stroke="#1e3a34"
+          stroke="var(--ink)"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
@@ -87,7 +87,7 @@ export function InvestmentLabComparisonChart({
         <polyline
           fill="none"
           points={scenarioPoints}
-          stroke="#e05b49"
+          stroke="var(--negative)"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
@@ -98,15 +98,15 @@ export function InvestmentLabComparisonChart({
               key={row.serviceDate}
               cx={x(index)}
               cy={y(row.scenarioMarketValueKrw)}
-              fill="#fbfcf7"
+              fill="var(--surface)"
               r="7"
-              stroke="#e05b49"
+              stroke="var(--negative)"
               strokeWidth="3"
             />
           ) : null,
         )}
       </svg>
-      <div className="mt-1 flex justify-between text-xs text-[#72786e]">
+      <div className="mt-1 flex justify-between text-xs text-[var(--muted)]">
         <span>{formatDate(rows[0]?.serviceDate)}</span>
         <span>{formatDate(rows.at(-1)?.serviceDate)}</span>
       </div>

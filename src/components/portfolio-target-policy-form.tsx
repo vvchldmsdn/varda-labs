@@ -54,9 +54,9 @@ export function PortfolioTargetPolicyForm({
       <input name="rowCount" type="hidden" value={rows.length} />
       <input name="universeHash" type="hidden" value={universeHash} />
 
-      <div className="overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
+      <div className="overflow-x-auto rounded-md border border-[var(--line)] bg-white">
         <table className="w-full min-w-[850px] border-collapse text-sm">
-          <thead className="bg-[#edf1e8] text-left text-xs text-[#596257]">
+          <thead className="bg-[var(--wash)] text-left text-xs text-[var(--muted)]">
             <tr>
               <th className="px-3 py-3">종목</th>
               <th className="px-3 py-3">계좌</th>
@@ -70,20 +70,20 @@ export function PortfolioTargetPolicyForm({
               const buyable = row.buyability === "buyable";
               return (
                 <tr
-                  className="border-t border-[#e4e8de]"
+                  className="border-t border-[var(--wash)]"
                   key={`${row.accountName}:${row.market}:${row.currency}:${row.ticker ?? row.assetName}`}
                 >
                   <td className="px-3 py-3">
                     <p className="font-semibold">{row.ticker ?? row.assetName}</p>
-                    <p className="mt-0.5 text-xs text-[#687064]">
+                    <p className="mt-0.5 text-xs text-[var(--muted)]">
                       {row.assetName}
                     </p>
                   </td>
                   <td className="px-3 py-3">{row.accountName}</td>
-                  <td className="px-3 py-3 text-[#596257]">
+                  <td className="px-3 py-3 text-[var(--muted)]">
                     {row.market} · {row.currency}
                     {!buyable ? (
-                      <span className="ml-2 text-[#8a5b16]">목표 0%만 가능</span>
+                      <span className="ml-2 text-[var(--warning)]">목표 0%만 가능</span>
                     ) : null}
                   </td>
                   <td className="px-3 py-3 text-right">
@@ -95,7 +95,7 @@ export function PortfolioTargetPolicyForm({
                         {row.ticker ?? row.assetName} 목표 비중
                       </span>
                       <input
-                        className="w-24 rounded-md border border-[#cfd6c8] bg-white px-2 py-1.5 text-right font-semibold outline-none focus:border-[#1e3a34] disabled:bg-[#eef0ea]"
+                        className="w-24 rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-right font-semibold outline-none focus:border-[var(--ink)] disabled:bg-[var(--wash)]"
                         disabled={!buyable || pending}
                         inputMode="decimal"
                         max="100"
@@ -114,7 +114,7 @@ export function PortfolioTargetPolicyForm({
                       {!buyable ? (
                         <input name={`targetWeight:${index}`} type="hidden" value="0" />
                       ) : null}
-                      <span className="text-[#687064]">%</span>
+                      <span className="text-[var(--muted)]">%</span>
                     </label>
                   </td>
                 </tr>
@@ -124,17 +124,17 @@ export function PortfolioTargetPolicyForm({
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-md border border-[#dfe3d5] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-md border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold">
             합계 {Number.isFinite(totalBps) ? formatPercent(totalBps) : "입력 확인"}
           </p>
-          <p className="mt-1 text-xs text-[#687064]">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             정확히 100%인 비중만 저장합니다. 이 값은 추천이나 주문이 아니라 사용자가 정한 기준입니다.
           </p>
         </div>
         <button
-          className="rounded-md bg-[#1e3a34] px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-[var(--ink)] px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           disabled={pending || !totalIsValid || rows.length === 0}
           type="submit"
         >
@@ -146,8 +146,8 @@ export function PortfolioTargetPolicyForm({
         aria-live="polite"
         className={
           state.status === "success"
-            ? "text-sm text-[#1e5d49]"
-            : "text-sm text-[#8a5b16]"
+            ? "text-sm text-[var(--brand)]"
+            : "text-sm text-[var(--warning)]"
         }
       >
         {state.message}

@@ -33,12 +33,12 @@ export function GoogleSignInButton() {
         type="button"
         onClick={signIn}
         disabled={status === "pending"}
-        className="w-full rounded-md bg-[#173f38] px-4 py-3 font-semibold text-white hover:bg-[#0f312b] disabled:cursor-wait disabled:opacity-60"
+        className="w-full rounded-md bg-[var(--ink)] px-4 py-3 font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-wait disabled:opacity-60"
       >
         {status === "pending" ? "Connecting to Google" : "Continue with Google"}
       </button>
       {status === "failed" ? (
-        <p role="alert" className="text-sm text-[#a43e3e]">
+        <p role="alert" className="text-sm text-[var(--negative)]">
           Sign-in could not be started. Try again.
         </p>
       ) : null}
@@ -72,12 +72,12 @@ export function SignOutButton() {
         type="button"
         onClick={signOut}
         disabled={status === "pending"}
-        className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 font-semibold text-[#35423a] hover:bg-[#eef2e8] disabled:cursor-wait disabled:opacity-60"
+        className="rounded-md border border-[var(--line)] bg-white px-4 py-2 font-semibold text-[var(--ink)] hover:bg-[var(--wash)] disabled:cursor-wait disabled:opacity-60"
       >
         {status === "pending" ? "Signing out" : "Sign out"}
       </button>
       {status === "failed" ? (
-        <p role="alert" className="text-sm text-[#a43e3e]">
+        <p role="alert" className="text-sm text-[var(--negative)]">
           Sign-out failed. Your session is still active.
         </p>
       ) : null}

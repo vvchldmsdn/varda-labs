@@ -83,13 +83,13 @@ export function InvestmentLabFixedMix({
       <div className="mx-auto w-full max-w-[1540px] space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-medium text-[#777d75]">
+            <p className="text-[11px] font-medium text-[var(--muted)]">
               ALLOCATION SANDBOX
             </p>
             <h2 className="mt-2 text-lg font-medium sm:text-xl">
               KODEX 200·VOO 고정 배분 실험
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-[#687064]">
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
               초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두 종목에
               적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로 두며 중간
               재리밸런싱은 하지 않습니다.
@@ -138,12 +138,12 @@ export function InvestmentLabFixedMix({
           </div>
         ) : null}
 
-        <p className="text-xs leading-5 text-[#73786c]">
+        <p className="text-xs leading-5 text-[var(--muted)]">
           두 leg 중 하나라도 가격·환율·체결·매도 가능성 검증에 실패하면 부분
           결과를 표시하지 않습니다. 소수점 수량을 사용해 자동 잔여 현금을 만들지
           않으며, 이 결과는 목표비중·추천·주문 근거가 아닌 과거 연구 비교입니다.
         </p>
-        <p className="text-xs leading-5 text-[#73786c]">
+        <p className="text-xs leading-5 text-[var(--muted)]">
           KODEX 200과 VOO는 화면에 표시된 저장 가격 근거를 사용하며, KIS 원종가
           구간은 배당·기업행사를 조정하지 않습니다. 서로 다른 가격 기준을 결합한
           현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을 의미하지
@@ -174,9 +174,9 @@ function MixForm({
       <input name="scope" type="hidden" value={scopeKey} />
       <InvestmentLabQueryFields />
       <PeriodHiddenInputs period={period} />
-      <label className="grid gap-1 text-xs font-semibold text-[#586358]">
+      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
         KODEX 200 배분
-        <span className="flex items-center overflow-hidden rounded-md border border-[#cfd5c9] bg-white">
+        <span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
           <input
             className="h-10 w-24 bg-transparent px-3 text-right text-sm tabular-nums outline-none"
             defaultValue={kodexWeightPct}
@@ -190,11 +190,11 @@ function MixForm({
           <span className="pr-3 text-sm">%</span>
         </span>
       </label>
-      <div className="h-10 rounded-md border border-[#dfe3d5] bg-[#fbfcf7] px-3 py-2 text-sm tabular-nums">
+      <div className="h-10 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm tabular-nums">
         VOO {vooWeightPct}%
       </div>
       <button
-        className="h-10 rounded-md bg-[#173c35] px-4 text-sm font-semibold text-white"
+        className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
       >
         계산
@@ -213,11 +213,11 @@ function PresetLinks({
   return (
     <nav
       aria-label="고정 배분 예시"
-      className="flex flex-wrap gap-5 border-y border-[#dde1db] py-3"
+      className="flex flex-wrap gap-5 border-y border-[var(--line)] py-3"
     >
       {[25, 50, 75].map((kodexWeightPct) => (
         <InvestmentLabQueryLink
-          className="border-b border-transparent py-1 text-sm font-semibold text-[#586158] transition-colors hover:border-[#20231f] hover:text-[#20231f]"
+          className="border-b border-transparent py-1 text-sm font-semibold text-[var(--muted)] transition-colors hover:border-[var(--ink)] hover:text-[var(--ink)]"
           href={mixHref(scopeKey, period, kodexWeightPct)}
           key={kodexWeightPct}
         >
@@ -266,7 +266,7 @@ function FixedMixResult({
         />
       </div>
 
-      <div className="border-y border-[#dde1db] py-6">
+      <div className="border-y border-[var(--line)] py-6">
         <InvestmentLabComparisonChart
           chartId="investment-lab-fixed-mix-chart"
           description={`실제 포트폴리오와 KODEX 200 ${kodexWeightPct}%, VOO ${vooWeightPct}% 고정 배분 same-flow 경로를 비교합니다.`}
@@ -276,7 +276,7 @@ function FixedMixResult({
         />
       </div>
 
-      <p className="text-sm text-[#687064]">
+      <p className="text-sm text-[var(--muted)]">
         관측일 {summary.comparisonDateCount}개 · 원본 현금흐름{" "}
         {model.coverage.componentFlowSourceCount}건 · 분할 체결{" "}
         {model.coverage.scenarioFlowLegCount}건 · 두 시장 체결일이 달랐던
@@ -296,15 +296,15 @@ function SummaryCell({
   tone?: "neutral" | "positive" | "negative";
 }) {
   return (
-    <div className="border-b border-[#dde1db] px-4 py-5 first:border-l-0 xl:border-r">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="border-b border-[var(--line)] px-4 py-5 first:border-l-0 xl:border-r">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p
         className={`mt-2 text-xl font-semibold tabular-nums ${
           tone === "positive"
-            ? "text-[#08784d]"
+            ? "text-[var(--brand)]"
             : tone === "negative"
-              ? "text-[#bd2929]"
-              : "text-[#111411]"
+              ? "text-[var(--negative)]"
+              : "text-[var(--ink)]"
         }`}
       >
         {value}
@@ -315,7 +315,7 @@ function SummaryCell({
 
 function UnavailableMessage({ children }: { children: string }) {
   return (
-    <p className="border-y border-[#ead9b2] bg-[#fffaf0] px-4 py-3 text-sm text-[#73551b]">
+    <p className="border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
       {children}
     </p>
   );

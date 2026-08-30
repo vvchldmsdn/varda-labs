@@ -11,7 +11,7 @@ export function OwnerModelCalibrationSection({
   return (
     <section
       aria-labelledby="owner-model-calibration-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-model-calibration
       data-owner-model-calibration-account={result.account}
       data-owner-model-calibration-effective-windows={
@@ -25,7 +25,7 @@ export function OwnerModelCalibrationSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             같은 과거 구간에서 실제 결과와 대조
           </p>
           <h2
@@ -34,14 +34,14 @@ export function OwnerModelCalibrationSection({
           >
             과거 결과로 두 모형 점검
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             부트스트랩과 요인·잔차 모형이 예측한 범위를 이후 21거래일의
             실제 결과와 같은 조건에서 비교합니다. 숫자가 낮을수록 과거
             오차가 작았다는 뜻일 뿐, 우승 모형이나 투자 추천을 정하지
             않습니다.
           </p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           읽기 전용 · 모형 선택 금지
         </span>
       </div>
@@ -98,7 +98,7 @@ export function OwnerModelCalibrationSection({
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <tr className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <th className="px-3 py-2 font-semibold">결과 기준일</th>
               <th className="px-3 py-2 text-right font-semibold">실제 수익률</th>
               <th className="px-3 py-2 text-right font-semibold">부트스트랩 중앙값</th>
@@ -118,7 +118,7 @@ export function OwnerModelCalibrationSection({
 
       {result.summary.unavailableEndpointCount > 0 ? (
         <p
-          className="mt-3 text-sm text-[#7a5117]"
+          className="mt-3 text-sm text-[var(--warning)]"
           data-owner-model-calibration-partial
         >
           비교할 수 없는 구간 {result.summary.unavailableEndpointCount}개도
@@ -129,7 +129,7 @@ export function OwnerModelCalibrationSection({
       {result.summary.endpointCount > 0 &&
       result.summary.endpointCount < result.policy.maximumEndpointCount ? (
         <p
-          className="mt-3 text-sm text-[#687064]"
+          className="mt-3 text-sm text-[var(--muted)]"
           data-owner-model-calibration-history-limited
         >
           현재 저장 이력으로는 서로 겹치지 않는 구간을 최대{" "}
@@ -139,7 +139,7 @@ export function OwnerModelCalibrationSection({
         </p>
       ) : null}
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         현재 계좌 구성과 비중을 과거 구간에 소급 적용한 진단입니다. 21거래일
         결과 구간은 저장된 서비스 날짜 축에서 수익률이 서로 겹치지 않게
         구성합니다. 그래도 표본 수가 적으므로 통계적 신뢰도나 모형 순위를
@@ -155,7 +155,7 @@ function CalibrationTableRow({ row }: { row: CalibrationRow }) {
   if (row.status !== "ready") {
     return (
       <tr
-        className="border-b border-[#e1e5da] text-[#7a6d4f]"
+        className="border-b border-[var(--line)] text-[var(--warning)]"
         data-owner-model-calibration-unavailable={row.reason}
       >
         <td className="px-3 py-3 tabular-nums">{row.outcomeEndServiceDate}</td>
@@ -168,7 +168,7 @@ function CalibrationTableRow({ row }: { row: CalibrationRow }) {
   }
 
   return (
-    <tr className="border-b border-[#e1e5da] tabular-nums">
+    <tr className="border-b border-[var(--line)] tabular-nums">
       <td className="px-3 py-3">{row.outcomeEndServiceDate}</td>
       <td className="px-3 py-3 text-right">{formatSignedPct(row.actual.returnPct)}</td>
       <td className="px-3 py-3 text-right">
@@ -202,10 +202,10 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
+    <div className="border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs leading-5 text-[#7a8175]">{detail}</dd>
+      <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</dd>
     </div>
   );
 }

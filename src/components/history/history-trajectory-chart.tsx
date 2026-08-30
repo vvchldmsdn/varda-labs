@@ -43,12 +43,12 @@ export function HistoryTrajectoryChart({
               ? "저장 잔액 궤적"
               : "포트폴리오 평가액 궤적"}
           </h3>
-          <p className="mt-1 text-xs leading-5 text-[#687064]">
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
             {historyAccountLabel(model.account)} · 금액 추세만 표시 · 수익률,
             TWR, MDD, 성과 순위 아님
           </p>
         </div>
-        <p className="text-xs text-[#687064]">
+        <p className="text-xs text-[var(--muted)]">
           {model.minDate && model.maxDate
             ? `${model.minDate} ~ ${model.maxDate}`
             : "표시할 저장점 없음"}
@@ -58,12 +58,12 @@ export function HistoryTrajectoryChart({
       {model.status === "ready" ? (
         <ReadyChart model={model} />
       ) : (
-        <p className="mt-3 border-y border-[#e1e6dc] py-4 text-sm text-[#687064]">
+        <p className="mt-3 border-y border-[var(--wash)] py-4 text-sm text-[var(--muted)]">
           유효한 저장 금액점이 없어 차트를 표시하지 않습니다.
         </p>
       )}
 
-      <figcaption className="mt-3 text-xs leading-5 text-[#687064]">
+      <figcaption className="mt-3 text-xs leading-5 text-[var(--muted)]">
         선은 같은 출처·같은 행 구분의 달력상 연속 날짜만 연결합니다. 저장 행이
         없는 날짜는 보간하거나 평평한 값으로 채우지 않습니다. 제외된 값 {" "}
         {model.excludedPointCount}건 · 분리된 날짜 간격 {model.disconnectedGapCount}건
@@ -108,7 +108,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
 
   return (
     <>
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[#596158]">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--muted)]">
         {model.evidenceGroups.map((group) => (
           <span
             className="inline-flex items-center gap-2"
@@ -134,7 +134,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
         ))}
       </div>
 
-      <div className="mt-3 overflow-x-auto border-y border-[#e1e6dc] bg-white py-2">
+      <div className="mt-3 overflow-x-auto border-y border-[var(--wash)] bg-white py-2">
         <svg
           aria-label={`${chartTitle} 차트`}
           className="h-auto w-full min-w-[760px]"
@@ -151,12 +151,12 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                   x2={WIDTH - RIGHT}
                   y1={y}
                   y2={y}
-                  stroke="#e1e6dc"
+                  stroke="var(--wash)"
                   strokeWidth="1"
                 />
                 <text
                   dominantBaseline="middle"
-                  fill="#687064"
+                  fill="var(--muted)"
                   fontSize="12"
                   textAnchor="end"
                   x={LEFT - 10}
@@ -201,7 +201,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                     cx={toX(point.date)}
                     cy={toY(point.valueKrw)}
                     fill={
-                      segment.rowKind === "stored" ? color : "#ffffff"
+                      segment.rowKind === "stored" ? color : "var(--surface)"
                     }
                     r="3.5"
                     stroke={color}
@@ -216,7 +216,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
 
           {xLabels.map((date) => (
             <text
-              fill="#687064"
+              fill="var(--muted)"
               fontSize="12"
               key={date}
               textAnchor={
@@ -265,9 +265,9 @@ function rowKindLabel(rowKind: HistoryTrajectoryRowKind) {
 }
 
 function strokeColor(rowKind: HistoryTrajectoryRowKind) {
-  if (rowKind === "derived") return "#b66b35";
-  if (rowKind === "partial") return "#9a6d23";
-  return "#1e3a34";
+  if (rowKind === "derived") return "var(--warning)";
+  if (rowKind === "partial") return "var(--warning)";
+  return "var(--ink)";
 }
 
 function formatCompactKrw(value: number) {

@@ -8,17 +8,21 @@ type FlowMode = "final" | "strategic";
 
 export function AdditionalContributionFlowMap({
   cashAmountKrw,
+  availableFundsKrw,
+  trimProceedsKrw,
   rows,
 }: {
   cashAmountKrw: number;
+  availableFundsKrw: number;
+  trimProceedsKrw: number;
   rows: readonly AdditionalContributionFlowRow[];
 }) {
   const hasOverlay = rows.some((row) => row.reductionKrw > 0);
   const [mode, setMode] = useState<FlowMode>("final");
   const [activeId, setActiveId] = useState<string | null>(null);
   const layout = useMemo(
-    () => buildFlowLayout(rows, cashAmountKrw, mode),
-    [cashAmountKrw, mode, rows],
+    () => buildFlowLayout(rows, availableFundsKrw, mode),
+    [availableFundsKrw, mode, rows],
   );
   const activeRow = rows.find((row) => row.id === activeId) ?? null;
 
@@ -26,12 +30,15 @@ export function AdditionalContributionFlowMap({
     <section aria-labelledby="allocation-flow-title" className="min-w-0">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#7b8079]">ALLOCATION FLOW</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">
+            ALLOCATION FLOW
+          </p>
           <h2 id="allocation-flow-title" className="mt-1 text-xl font-medium">
             투입금 흐름
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6d736b]">
-            목표비중까지의 부족분을 기준으로 계산한 읽기 전용 배분안입니다.
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            신규 {formatKrw(cashAmountKrw)} · 계산상 매도{" "}
+            {formatKrw(trimProceedsKrw)}
           </p>
         </div>
 
@@ -55,50 +62,30 @@ export function AdditionalContributionFlowMap({
         ) : null}
       </div>
 
-      <div className="relative mt-7 hidden min-h-[430px] overflow-hidden border-y border-[#d9ddd7] py-5 lg:block">
-        {activeRow ? (
-          <FlowTooltip
-            mode={mode}
-            row={activeRow}
-          />
-        ) : (
-          <p className="pointer-events-none absolute right-0 top-5 z-10 text-xs text-[#858a83]">
-            흐름에 마우스를 올리면 배분 근거를 확인합니다
-          </p>
-        )}
+      <div className="relative mt-4 hidden min-h-[400px] overflow-hidden py-5 lg:block">
+        {activeRow ? <FlowTooltip mode={mode} row={activeRow} /> : null}
 
         <svg
-          aria-label={`${formatKrw(cashAmountKrw)} 투입금 배분 흐름`}
+          aria-label={`${formatKrw(availableFundsKrw)} 재원 배분 흐름`}
           className="h-[390px] w-full overflow-visible"
           role="img"
           viewBox="0 0 1000 420"
         >
-          <defs>
-            <linearGradient id="holding-flow" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stopColor="#8db5a3" stopOpacity="0.45" />
-              <stop offset="1" stopColor="#4f8f76" stopOpacity="0.9" />
-            </linearGradient>
-            <linearGradient id="cash-flow" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stopColor="#d7b38e" stopOpacity="0.42" />
-              <stop offset="1" stopColor="#b68157" stopOpacity="0.82" />
-            </linearGradient>
-          </defs>
-
-          <text fill="#7b8079" fontSize="11" x="72" y="48">
-            새 투입금
+          <text fill="var(--muted)" fontSize="11" x="72" y="48">
+            배분 재원
           </text>
           <text
-            fill="#20231f"
+            fill="var(--ink)"
             fontSize="30"
             fontWeight="500"
             textAnchor="middle"
             x="145"
             y="220"
           >
-            {formatCompactKrw(cashAmountKrw)}
+            {formatCompactKrw(availableFundsKrw)}
           </text>
-          <circle cx="145" cy="210" fill="none" r="72" stroke="#ccd2cb" />
-          <circle cx="145" cy="210" fill="#f7f8f5" r="11" stroke="#347e62" strokeWidth="2" />
+          <circle cx="145" cy="210" fill="none" r="72" stroke="var(--line)" />
+          <circle cx="217" cy="210" fill="var(--brand)" r="4" />
 
           {layout.map((item) => {
             const active = item.row.id === activeId;
@@ -118,18 +105,22 @@ export function AdditionalContributionFlowMap({
                   d={item.path}
                   fill="none"
                   opacity={activeId && !active ? 0.25 : active ? 1 : 0.76}
-                  stroke={item.row.kind === "cash" ? "url(#cash-flow)" : "url(#holding-flow)"}
+                  stroke={
+                    item.row.kind === "cash" ? "var(--faint)" : "var(--brand)"
+                  }
                   strokeLinecap="round"
                   strokeWidth={active ? item.strokeWidth + 3 : item.strokeWidth}
                 />
                 <circle
                   cx="820"
                   cy={item.targetY}
-                  fill={item.row.kind === "cash" ? "#b68157" : "#4f8f76"}
+                  fill={
+                    item.row.kind === "cash" ? "var(--warning)" : "var(--brand)"
+                  }
                   r={active ? 6 : 4}
                 />
                 <text
-                  fill="#20231f"
+                  fill="var(--ink)"
                   fontSize="13"
                   fontWeight="500"
                   x="840"
@@ -137,7 +128,12 @@ export function AdditionalContributionFlowMap({
                 >
                   {truncateName(item.row.name)}
                 </text>
-                <text fill="#777d75" fontSize="11" x="840" y={item.targetY + 14}>
+                <text
+                  fill="var(--muted)"
+                  fontSize="11"
+                  x="840"
+                  y={item.targetY + 14}
+                >
                   {formatKrw(item.amountKrw)}
                 </text>
               </g>
@@ -146,26 +142,31 @@ export function AdditionalContributionFlowMap({
         </svg>
       </div>
 
-      <div className="mt-6 divide-y divide-[#e0e4de] border-y border-[#d9ddd7] lg:hidden">
+      <div className="mt-6 divide-y divide-[var(--wash)] border-y border-[var(--line)] lg:hidden">
         {layout.map(({ amountKrw, row }) => (
           <button
             key={row.id}
             type="button"
-            className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-1 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62]"
+            className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-1 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
             onClick={() => setActiveId(activeId === row.id ? null : row.id)}
           >
             <span className="min-w-0">
-              <span className="block truncate text-sm font-medium">{row.name}</span>
-              <span className="mt-1 block truncate text-xs text-[#777d75]">
-                {row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}
+              <span className="block truncate text-sm font-medium">
+                {row.name}
               </span>
-              <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-[#e5e8e3]">
+              <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                {row.accountName}
+                {row.ticker ? ` · ${row.ticker}` : ""}
+              </span>
+              <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-[var(--wash)]">
                 <span
                   className={`block h-full rounded-full ${
-                    row.kind === "cash" ? "bg-[#b68157]" : "bg-[#5f9a82]"
+                    row.kind === "cash"
+                      ? "bg-[var(--warning)]"
+                      : "bg-[var(--brand)]"
                   }`}
                   style={{
-                    width: `${Math.min(100, Math.max(1.5, cashAmountKrw > 0 ? (amountKrw / cashAmountKrw) * 100 : 0))}%`,
+                    width: `${Math.min(100, Math.max(1.5, availableFundsKrw > 0 ? (amountKrw / availableFundsKrw) * 100 : 0))}%`,
                   }}
                 />
               </span>
@@ -174,7 +175,7 @@ export function AdditionalContributionFlowMap({
               {formatKrw(amountKrw)}
             </span>
             {activeId === row.id ? (
-              <span className="col-span-2 mt-4 grid grid-cols-2 gap-3 text-xs text-[#666c64]">
+              <span className="col-span-2 mt-4 grid grid-cols-2 gap-3 text-xs text-[var(--muted)]">
                 <span>목표 {formatPercent(row.targetWeightPct)}</span>
                 <span>투입 후 {formatPercent(row.postTopupWeightPct)}</span>
               </span>
@@ -199,10 +200,10 @@ function ModeButton({
     <button
       type="button"
       aria-pressed={active}
-      className={`border-b py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#347e62] ${
+      className={`border-b py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
         active
-          ? "border-[#20231f] text-[#20231f]"
-          : "border-transparent text-[#71776f] hover:text-[#20231f]"
+          ? "border-[var(--ink)] text-[var(--ink)]"
+          : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
       }`}
       onClick={onClick}
     >
@@ -218,28 +219,34 @@ function FlowTooltip({
   mode: FlowMode;
   row: AdditionalContributionFlowRow;
 }) {
-  const amountKrw = mode === "final" ? row.allocationKrw : row.strategicAllocationKrw;
+  const amountKrw =
+    mode === "final" ? row.allocationKrw : row.strategicAllocationKrw;
   return (
-    <div className="pointer-events-none absolute right-0 top-4 z-10 w-64 border border-[#d3d8d1] bg-[#fbfcf9]/95 p-4 shadow-[0_12px_30px_rgba(37,40,36,0.08)] backdrop-blur-sm">
+    <div className="pointer-events-none absolute right-0 top-4 z-10 w-64 border border-[var(--line)] bg-[var(--surface)]/95 p-4 shadow-[0_12px_30px_rgba(37,40,36,0.08)] backdrop-blur-sm">
       <p className="truncate text-sm font-medium">{row.name}</p>
-      <p className="mt-1 text-xs text-[#777d75]">
-        {row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}
+      <p className="mt-1 text-xs text-[var(--muted)]">
+        {row.accountName}
+        {row.ticker ? ` · ${row.ticker}` : ""}
       </p>
       <p className="mt-4 text-2xl font-medium tabular-nums">
         {formatKrw(amountKrw)}
       </p>
-      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e0e4de] pt-3 text-xs">
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--wash)] pt-3 text-xs">
         <div>
-          <dt className="text-[#7b8079]">목표 비중</dt>
-          <dd className="mt-1 font-medium">{formatPercent(row.targetWeightPct)}</dd>
+          <dt className="text-[var(--muted)]">목표 비중</dt>
+          <dd className="mt-1 font-medium">
+            {formatPercent(row.targetWeightPct)}
+          </dd>
         </div>
         <div>
-          <dt className="text-[#7b8079]">투입 후</dt>
-          <dd className="mt-1 font-medium">{formatPercent(row.postTopupWeightPct)}</dd>
+          <dt className="text-[var(--muted)]">투입 후</dt>
+          <dd className="mt-1 font-medium">
+            {formatPercent(row.postTopupWeightPct)}
+          </dd>
         </div>
       </dl>
       {row.reductionKrw > 0 ? (
-        <p className="mt-3 text-xs text-[#9a6745]">
+        <p className="mt-3 text-xs text-[var(--warning)]">
           MA120 근거로 {formatKrw(row.reductionKrw)} 현금 보류
         </p>
       ) : null}
@@ -277,8 +284,8 @@ function buildFlowLayout(
       ...item,
       sourceY,
       targetY,
-      strokeWidth: Math.max(4, Math.min(34, Math.sqrt(share) * 58)),
-      path: `M 156 ${sourceY.toFixed(2)} C 370 ${sourceY.toFixed(2)}, 560 ${targetY.toFixed(2)}, 820 ${targetY.toFixed(2)}`,
+      strokeWidth: Math.max(1.5, Math.min(12, Math.sqrt(share) * 22)),
+      path: `M 217 210 C 390 ${sourceY.toFixed(2)}, 560 ${targetY.toFixed(2)}, 820 ${targetY.toFixed(2)}`,
     });
   });
 }

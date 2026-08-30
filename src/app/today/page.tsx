@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense } from "react";
 
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
@@ -92,14 +93,15 @@ async function TodayContent({
 
 function TodaySkeleton() {
   return (
-    <main className="min-h-screen bg-[#f7f8f5] text-[#20231f]">
-      <div className="h-16 border-b border-[#e1e4df] bg-[#fafbf8]" />
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <div className="h-16 border-b border-[var(--wash)] bg-[var(--paper)]" />
       <div className="mx-auto w-full max-w-[1540px] animate-pulse px-5 pb-12 pt-10 sm:px-8 lg:px-10">
-        <div className="h-4 w-36 bg-[#e5e8e2]" />
-        <div className="mt-8 h-10 w-full border-b border-[#e1e4df]" />
-        <div className="mx-auto mt-16 h-20 w-96 max-w-full bg-[#e8ebe5]" />
-        <div className="mt-20 h-32 border-y border-[#d9ddd7] bg-[#f1f3ef]" />
-        <div className="mt-16 h-[520px] border-y border-[#d9ddd7] bg-[#f1f3ef]" />
+        <div className="h-4 w-36 bg-[var(--wash)]" />
+        <div className="mt-8 h-10 w-full border-b border-[var(--wash)]" />
+        <div className="mx-auto mt-16 h-20 w-96 max-w-full bg-[var(--wash)]" />
+        <div className="mt-20 h-32 border-y border-[var(--line)] bg-[var(--wash)]" />
+        <div className="mt-16 h-[520px] border-y border-[var(--line)] bg-[var(--wash)]" />
       </div>
     </main>
   );

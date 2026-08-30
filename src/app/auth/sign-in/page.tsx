@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { notFound } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/auth-transport-controls";
@@ -10,13 +11,14 @@ export default function SignInPage() {
   if (runtime.state === "disabled") notFound();
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-md rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <section className="mx-auto w-full max-w-md rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
+        <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal">
           Sign in
         </h1>
-        <p className="mt-3 text-sm leading-6 text-[#566056]">
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
           Google sign-in verifies your session. Portfolio access remains
           unavailable until your account is explicitly linked.
         </p>
@@ -25,7 +27,7 @@ export default function SignInPage() {
           {runtime.state === "ready" ? (
             <GoogleSignInButton />
           ) : (
-            <p className="rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+            <p className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
               Authentication is unavailable.
             </p>
           )}

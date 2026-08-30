@@ -17,13 +17,13 @@ export function WalkForwardMinimumVolatilitySection({
   return (
     <section
       aria-labelledby="walk-forward-min-volatility-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-walk-forward-min-volatility
       data-walk-forward-min-volatility-status={result.status}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             사후 검증 연구 · 계좌 및 목표비중과 무관
           </p>
           <h2
@@ -32,13 +32,13 @@ export function WalkForwardMinimumVolatilitySection({
           >
             워크포워드 최소변동성 연구
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             KODEX 200과 VOO의 공동 원화 수익률만 사용합니다. 직전 60개
             관측으로 비중을 계산하고 다음 10개 관측에만 적용하는 과정을 3번
             반복합니다.
           </p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           미래 예측·추천 아님
         </span>
       </div>
@@ -47,11 +47,11 @@ export function WalkForwardMinimumVolatilitySection({
         <ReadyResearch result={result} />
       ) : (
         <div
-          className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+          className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-walk-forward-min-volatility-unavailable-reason={result.reason}
         >
           <p className="font-semibold">이 연구 경로만 계산할 수 없습니다.</p>
-          <p className="mt-2 text-sm leading-6 text-[#6b6044]">
+          <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
             {unavailableReasonLabel(result.reason)} 기존 단일 종목, 고정 비중,
             stationary bootstrap 및 시장 국면 결과는 그대로 유지합니다.
           </p>
@@ -91,20 +91,20 @@ function ReadyResearch({ result }: { result: ReadyResult }) {
         />
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-[#d7ddcf] bg-[#fbfcf7] p-4">
+      <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
         <SimulationPathComparisonChart
           ariaLabel="워크포워드 최소변동성과 같은 주기 50대50의 검증구간 누적지수 비교"
           series={[
             {
               id: minimum.id,
               label: minimum.label,
-              color: "#0f3d38",
+              color: "var(--ink)",
               points: minimum.points,
             },
             {
               id: equalWeight.id,
               label: equalWeight.label,
-              color: "#d95c48",
+              color: "var(--negative)",
               points: equalWeight.points,
             },
           ]}
@@ -113,7 +113,7 @@ function ReadyResearch({ result }: { result: ReadyResult }) {
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-          <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+          <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
             <tr>
               <th className="px-3 py-3 font-semibold">구간</th>
               <th className="px-3 py-3 font-semibold">학습기간</th>
@@ -130,7 +130,7 @@ function ReadyResearch({ result }: { result: ReadyResult }) {
           <tbody>
             {result.folds.map((fold) => (
               <tr
-                className="border-b border-[#e1e5da]"
+                className="border-b border-[var(--line)]"
                 data-walk-forward-fold={fold.foldIndex + 1}
                 key={fold.foldIndex}
               >
@@ -158,7 +158,7 @@ function ReadyResearch({ result }: { result: ReadyResult }) {
         </table>
       </div>
 
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         long-only·100% 투자, 10개 관측마다 비용 없이 재조정하고 구간 안에서는
         비중 변화를 그대로 둡니다. 표본 공분산은 10% 대각 축소를 적용합니다.
         거래비용·세금·환전비용은 0으로 가정하며 VOO의 원화 수익률에는 저장된
@@ -178,10 +178,10 @@ function Metric({
   value: string;
 }) {
   return (
-    <dl className="rounded-lg border border-[#d7ddcf] bg-[#fbfcf7] px-4 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
+    <dl className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[#687064]">{detail}</dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]">{detail}</dd>
     </dl>
   );
 }

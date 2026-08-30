@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense } from "react";
 
 import {
@@ -50,6 +51,9 @@ type SimulationPageProps = {
     horizon?: string | string[];
     kodexWeight?: string | string[];
     researchUniverse?: string | string[];
+    view?: string | string[];
+    preview?: string | string[];
+    previewState?: string | string[];
   }>;
 };
 
@@ -64,10 +68,12 @@ type SimulationPreservedQuery = Readonly<{
 export default async function SimulationPage({
   searchParams,
 }: SimulationPageProps) {
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const previewParams = process.env.NODE_ENV === "development" ? await searchParams : null;
+  if (process.env.NODE_ENV === "development" && previewParams?.preview === "design") {
+    const { SimulationDesignPreview } = await import("@/components/simulation/simulation-design-preview");
+    return <SimulationDesignPreview query={previewParams} />;
+  }
+  const [params, resolution] = await Promise.all([searchParams, resolveCurrentTenantContext()]);
 
   if (!resolution.ok) {
     return (
@@ -233,6 +239,7 @@ async function SimulationContent({
   const model = await modelPromise;
   return (
     <SimulationInputReadinessView
+      scopeCatalog={scopeCatalog}
       historicalOutcomeValidation={
         <SimulationSectionErrorBoundary
           section="historical-outcome-validation"
@@ -473,7 +480,7 @@ async function OwnerCandidateComparisonContent({
 }) {
   const result = await resultPromise;
   return (
-    <OwnerCandidateComparisonSection comparison={result.candidateComparison} />
+    <OwnerCandidateComparisonSection comparison={result.candidateComparison} instruments={result.execution.instruments} />
   );
 }
 
@@ -599,12 +606,13 @@ async function RegimeHistoricalOutcomeValidationContent({
 
 function SimulationSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f3f4ef] p-4 text-[#171916]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] p-4 text-[var(--ink)]">
+      <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-[1400px] space-y-4">
-        <div className="h-36 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+        <div className="h-36 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-96 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-96 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+          <div className="h-96 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
+          <div className="h-96 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
         </div>
       </div>
     </main>
@@ -615,11 +623,11 @@ function RegimeBootstrapSkeleton() {
   return (
     <section
       aria-label="시장 국면 조건부 연구 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-regime-bootstrap-loading
     >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-56 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-40 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -628,11 +636,11 @@ function HistoricalOutcomeValidationSkeleton() {
   return (
     <section
       aria-label="과거 시뮬레이션 결과 검증 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-historical-outcome-validation-loading
     >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-56 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-52 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -641,11 +649,11 @@ function RegimeHistoricalOutcomeValidationSkeleton() {
   return (
     <section
       aria-label="시장 국면 모델 과거 결과 대조 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-regime-historical-outcome-validation-loading
     >
-      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-64 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-52 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -654,11 +662,11 @@ function ResearchUniversePreflightSkeleton() {
   return (
     <section
       aria-label="연구 종목 데이터 점검 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-research-universe-preflight-loading
     >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-56 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-28 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -667,11 +675,11 @@ function OwnerInputPreflightSkeleton() {
   return (
     <section
       aria-label="내 포트폴리오 입력 점검 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-simulation-preflight-loading
     >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-56 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-40 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -686,11 +694,11 @@ function OwnerResultSkeleton({
   return (
     <section
       aria-label={label}
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-result-loading={marker}
     >
-      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-64 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-64 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-64 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -699,11 +707,11 @@ function OwnerParametricFactorSkeleton() {
   return (
     <section
       aria-label="환율·금리 요인 확률모형 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-parametric-factor-loading
     >
-      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-64 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-52 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -712,11 +720,11 @@ function OwnerModelComparisonSkeleton() {
   return (
     <section
       aria-label="두 확률모형 비교 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-model-comparison-loading
     >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-56 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-52 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }
@@ -725,11 +733,11 @@ function OwnerModelCalibrationSkeleton() {
   return (
     <section
       aria-label="과거 결과 모형 점검 로딩"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-model-calibration-loading
     >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
+      <div className="h-8 w-56 rounded bg-[var(--wash)]" />
+      <div className="mt-4 h-52 rounded-lg border border-[var(--line)] bg-[var(--surface)]" />
     </section>
   );
 }

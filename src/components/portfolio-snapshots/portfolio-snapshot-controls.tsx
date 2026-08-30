@@ -20,30 +20,30 @@ export function PortfolioSnapshotControls({
   resolvedSnapshotDate?: string;
 }) {
   return (
-    <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-[#dfe3d5] pt-6">
+    <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-[var(--line)] pt-6">
       <form
         action={basePath}
         className="flex flex-wrap items-end gap-2"
         method="get"
       >
         <input name="scope" type="hidden" value={scope.key} />
-        <label className="grid gap-1 text-xs font-semibold text-[#5e685e]">
+        <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
           Snapshot date
           <input
-            className="h-10 rounded-md border border-[#cfd6c8] bg-white px-3 text-sm text-[#171916]"
+            className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm text-[var(--ink)]"
             defaultValue={requestedSnapshotDate ?? resolvedSnapshotDate ?? ""}
             name="date"
             type="date"
           />
         </label>
         <button
-          className="h-10 rounded-md bg-[#173f38] px-4 text-sm font-semibold text-white hover:bg-[#235249]"
+          className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-[var(--ink)]"
           type="submit"
         >
           View date
         </button>
         <Link
-          className="flex h-10 items-center rounded-md border border-[#cfd6c8] bg-white px-4 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+          className="flex h-10 items-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
           href={buildPortfolioAnalysisScopeHref(basePath, scope.key)}
         >
           Latest

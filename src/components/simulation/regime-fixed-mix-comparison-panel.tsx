@@ -19,7 +19,7 @@ export function RegimeFixedMixComparisonPanel({
   return (
     <section
       aria-labelledby="regime-fixed-mix-comparison-title"
-      className="mt-5 border-t border-[#d7ddcf] pt-5"
+      className="mt-5 border-t border-[var(--line)] pt-5"
       data-regime-fixed-mix-comparison
       data-regime-fixed-mix-comparison-status={comparison.status}
     >
@@ -31,13 +31,13 @@ export function RegimeFixedMixComparisonPanel({
           >
             국면별 고정 비중 3안 공통 경로
           </h3>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             25:75, 50:50, 75:25를 같은 시장 상태·과거 후보·500개 추출
             계획으로 계산합니다. 최초 배분 뒤에는 리밸런싱하지 않아 종목별
             등락에 따른 비중 변화를 그대로 둡니다.
           </p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           비중 순서 · 성과 순위·추천 아님
         </span>
       </div>
@@ -46,11 +46,11 @@ export function RegimeFixedMixComparisonPanel({
         <ReadyComparisonGrid comparison={comparison} selection={selection} />
       ) : (
         <div
-          className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+          className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-regime-fixed-mix-unavailable-reason={comparison.reason}
         >
           <p className="font-semibold">세 고정 비중을 함께 비교하지 않았습니다.</p>
-          <p className="mt-2 text-sm leading-6 text-[#6b6044]">
+          <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
             공통 국면 실행 근거를 검증하지 못했습니다. 단일 종목이나 직접
             입력한 비중의 독립 결과는 준비된 경우 그대로 유지합니다.
           </p>
@@ -77,7 +77,7 @@ function ReadyComparisonGrid({
       data-regime-fixed-mix-path-count={comparison.pairing.pathCount}
       data-regime-fixed-mix-rebalancing="none"
     >
-      <p className="border-y border-[#e1e5da] py-3 text-xs leading-5 text-[#687064]">
+      <p className="border-y border-[var(--line)] py-3 text-xs leading-5 text-[var(--muted)]">
         세 그래프는 하나의 세로축을 사용합니다. 카드는 KODEX 200 비중이
         낮은 순서이며, 수익률이나 위험의 우열 순서가 아닙니다. stationary
         bootstrap 결과와 합산하거나 승패를 판정하지 않습니다.

@@ -28,7 +28,7 @@ export function RegimeScenarioCard({
 
   return (
     <article
-      className="overflow-hidden rounded-lg border border-[#d7ddcf] bg-[#fbfcf7]"
+      className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]"
       data-regime-scenario={scenario.id}
       data-regime-scenario-group={group}
       data-regime-scenario-selected={selected ? "true" : "false"}
@@ -42,17 +42,17 @@ export function RegimeScenarioCard({
         group === "fixed_mix_comparison" ? "ready" : undefined
       }
     >
-      <header className="flex items-start justify-between gap-3 border-b border-[#e1e5da] px-4 py-4">
+      <header className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-4">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">{eyebrow}</p>
+          <p className="text-xs font-semibold text-[var(--muted)]">{eyebrow}</p>
           <h3 className="mt-1 text-lg font-semibold">{scenario.name}</h3>
-          <p className="mt-1 text-xs text-[#687064]">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             069500 {formatBps(scenario.weightsBps[0])} · VOO{" "}
             {formatBps(scenario.weightsBps[1])} · 최초 배분 후 리밸런싱 없음
           </p>
         </div>
         {selected ? (
-          <span className="shrink-0 rounded-md bg-[#e5f1e6] px-2.5 py-1 text-xs font-semibold text-[#226039]">
+          <span className="shrink-0 rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
             현재 입력
           </span>
         ) : null}

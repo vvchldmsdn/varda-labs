@@ -58,7 +58,7 @@ export function InvestmentLabWorkspace({
 
   return (
     <div data-lab-workspace={selected}>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-[#dde1db]">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
         <div
           aria-label="투자랩 분석"
           className="flex min-w-0 gap-5 sm:gap-8"
@@ -69,7 +69,7 @@ export function InvestmentLabWorkspace({
               key={view}
               aria-controls={`${id}-${view}-panel`}
               aria-selected={selected === view}
-              className={`flex min-h-12 items-center gap-2 border-b-2 px-0.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#438574] sm:text-sm ${selected === view ? "border-[#253e35] text-[#203a31]" : "border-transparent text-[#777e77] hover:text-[#202a24]"}`}
+              className={`flex min-h-12 items-center gap-2 border-b-2 px-0.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] sm:text-sm ${selected === view ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"}`}
               id={`${id}-${view}-tab`}
               onClick={() => select(view)}
               onKeyDown={(event) => navigate(event, index)}
@@ -92,7 +92,7 @@ export function InvestmentLabWorkspace({
           id={`${id}-${view.id}-panel`}
           role="tabpanel"
           tabIndex={0}
-          className="min-w-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#438574]"
+          className="min-w-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
         >
           {panels[view.id]}
         </div>

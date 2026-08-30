@@ -20,7 +20,7 @@ export function ObservedReturnComparisonPanel({
         data-observed-return-comparison="unavailable"
         data-comparison-axis-status="unavailable"
         aria-labelledby="observed-return-comparison-title"
-        className="mt-5 rounded-lg border border-[#d7ddcf] bg-[#fbfcf7] p-4"
+        className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
       >
         <h2
           id="observed-return-comparison-title"
@@ -28,10 +28,10 @@ export function ObservedReturnComparisonPanel({
         >
           90개 관측구간 누적지수 비교
         </h2>
-        <p className="mt-2 text-sm text-[#6b5227]">
+        <p className="mt-2 text-sm text-[var(--warning)]">
           {formatUnavailableReason(comparison.reason)}
         </p>
-        <p className="mt-1 text-xs leading-5 text-[#687064]">
+        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
           두 입력이 같은 91개 날짜축으로 모두 준비될 때만 표시합니다. 날짜 자동
           대체나 부분 비교는 하지 않습니다.
         </p>
@@ -61,7 +61,7 @@ export function ObservedReturnComparisonPanel({
     (_, index) => axisMax - (axisSpan * index) / 4,
   );
   const pointCount = comparison.pointCount;
-  const seriesColors = ["#1f4a3d", "#c25c4b"] as const;
+  const seriesColors = ["var(--ink)", "var(--negative)"] as const;
   const anchorPoints = comparison.series[0]!.points;
   const middlePointIndex = Math.floor((pointCount - 1) / 2);
   const xLabels = [0, middlePointIndex, pointCount - 1].map((index) => ({
@@ -81,7 +81,7 @@ export function ObservedReturnComparisonPanel({
       data-comparison-point-count={comparison.pointCount}
       data-comparison-series-count={comparison.series.length}
       aria-labelledby="observed-return-comparison-title"
-      className="mt-5 rounded-lg border border-[#d7ddcf] bg-[#fbfcf7] p-4"
+      className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -91,19 +91,19 @@ export function ObservedReturnComparisonPanel({
           >
             90개 관측구간 누적지수 비교
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             두 독립 연구 입력의 과거 KRW 수익률을 각각 시작 100으로 누적했습니다.
             휴장일에는 아래 정렬 근거의 허용 범위 안에서 직전 저장값이 적용될 수
             있습니다. 포트폴리오 조합·예측·시뮬레이션 경로가 아닙니다.
           </p>
         </div>
-        <p className="text-xs text-[#687064]">
+        <p className="text-xs text-[var(--muted)]">
           공통 날짜축 {formatSimulationDate(comparison.baselineServiceDate)} ~ {" "}
           {formatSimulationDate(comparison.endServiceDate)}
         </p>
       </div>
 
-      <dl className="mt-4 grid gap-px overflow-hidden rounded-md border border-[#e1e5da] bg-[#e1e5da] sm:grid-cols-2">
+      <dl className="mt-4 grid gap-px overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)] sm:grid-cols-2">
         {comparison.series.map((series, index) => (
           <div key={series.id} className="bg-white px-4 py-3">
             <dt className="flex items-center gap-2 text-sm font-semibold">
@@ -118,7 +118,7 @@ export function ObservedReturnComparisonPanel({
               <span className="text-lg font-semibold">
                 {formatIndexValue(series.finalIndexValue)}
               </span>
-              <span className="text-sm text-[#596158]">
+              <span className="text-sm text-[var(--muted)]">
                 누적 {formatSignedReturn(series.totalReturn)}
               </span>
             </dd>
@@ -126,7 +126,7 @@ export function ObservedReturnComparisonPanel({
         ))}
       </dl>
 
-      <div className="mt-4 overflow-x-auto rounded-md border border-[#e1e5da] bg-white">
+      <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           role="img"
@@ -143,7 +143,7 @@ export function ObservedReturnComparisonPanel({
                   x2={chartWidth - rightPadding}
                   y1={y}
                   y2={y}
-                  stroke="#e1e5da"
+                  stroke="var(--line)"
                   strokeWidth="1"
                 />
                 <text
@@ -151,7 +151,7 @@ export function ObservedReturnComparisonPanel({
                   y={y}
                   textAnchor="end"
                   dominantBaseline="middle"
-                  fill="#687064"
+                  fill="var(--muted)"
                   fontSize="12"
                 >
                   {formatIndexValue(tick)}
@@ -164,7 +164,7 @@ export function ObservedReturnComparisonPanel({
             x2={chartWidth - rightPadding}
             y1={toY(100)}
             y2={toY(100)}
-            stroke="#9da99b"
+            stroke="var(--faint)"
             strokeDasharray="5 5"
             strokeWidth="1"
           />
@@ -196,7 +196,7 @@ export function ObservedReturnComparisonPanel({
                     ? "end"
                     : "middle"
               }
-              fill="#687064"
+              fill="var(--muted)"
               fontSize="12"
             >
               {formatSimulationDate(label.serviceDate)}
@@ -205,13 +205,13 @@ export function ObservedReturnComparisonPanel({
         </svg>
       </div>
 
-      <details className="mt-4 border-t border-[#e1e5da] pt-3">
-        <summary className="cursor-pointer text-sm font-semibold text-[#253029]">
+      <details className="mt-4 border-t border-[var(--line)] pt-3">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]">
           전체 {comparison.pointCount}개 누적지수 표 보기
         </summary>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[620px] border-collapse text-left text-sm">
-            <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-2 font-semibold">기준일</th>
                 {comparison.series.map((series) => (
@@ -226,7 +226,7 @@ export function ObservedReturnComparisonPanel({
             </thead>
             <tbody>
               {anchorPoints.map((point, pointIndex) => (
-                <tr key={point.serviceDate} className="border-b border-[#e8ebe3]">
+                <tr key={point.serviceDate} className="border-b border-[var(--wash)]">
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
                     {formatSimulationDate(point.serviceDate)}
                   </td>

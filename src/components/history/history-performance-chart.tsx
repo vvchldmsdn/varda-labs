@@ -50,12 +50,12 @@ export function HistoryPerformanceChart({
 
   if (displayPoints.length === 0) {
     return (
-      <div className="flex min-h-[360px] items-center justify-center border-y border-[#e1e4df] text-center">
+      <div className="flex min-h-[360px] items-center justify-center border-y border-[var(--wash)] text-center">
         <div className="max-w-md px-6">
           <p className="text-base font-semibold">
             저장된 수익률 근거가 없습니다.
           </p>
-          <p className="mt-2 text-sm leading-6 text-[#737970]">
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
             평가액 보기를 선택하면 저장 평가액 경로는 계속 확인할 수 있습니다.
             수익률을 임의 계산하거나 누락값을 보간하지 않습니다.
           </p>
@@ -67,7 +67,7 @@ export function HistoryPerformanceChart({
   return (
     <div className="min-w-0">
       <div
-        className="relative aspect-[2.4/1] min-h-[350px] w-full"
+        className="varda-history-chart relative w-full"
         onPointerLeave={() => setHoveredDate(null)}
       >
         <svg
@@ -81,14 +81,14 @@ export function HistoryPerformanceChart({
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           preserveAspectRatio="none"
         >
-          {[0.25, 0.5, 0.75].map((fraction) => (
+          {[0.33, 0.66].map((fraction) => (
             <line
               key={fraction}
               x1={PLOT_LEFT}
               x2={PLOT_RIGHT}
               y1={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
               y2={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
-              stroke="#e7eae5"
+              stroke="var(--wash)"
               strokeDasharray="2 8"
             />
           ))}
@@ -98,7 +98,7 @@ export function HistoryPerformanceChart({
               x2={PLOT_RIGHT}
               y1={geometry.zeroY}
               y2={geometry.zeroY}
-              stroke="#cfd4ce"
+              stroke="var(--line)"
               strokeDasharray="4 6"
             />
           ) : null}
@@ -107,24 +107,13 @@ export function HistoryPerformanceChart({
             x2={PLOT_RIGHT}
             y1={PLOT_BOTTOM}
             y2={PLOT_BOTTOM}
-            stroke="#d9ddd7"
+            stroke="var(--line)"
           />
-          {geometry.points.map((point, index) => (
-            <rect
-              key={`bar:${displayPoints[index]?.date}`}
-              x={point.x - Math.max(1, geometry.barWidth / 2)}
-              y={point.y + 8}
-              width={geometry.barWidth}
-              height={Math.max(0, PLOT_BOTTOM - point.y - 8)}
-              fill="#e9ece8"
-              opacity="0.58"
-            />
-          ))}
           <path
             d={geometry.path}
             fill="none"
-            stroke={mode === "return" ? "#d66758" : "#25302a"}
-            strokeWidth="2"
+            stroke="var(--brand)"
+            strokeWidth="1.8"
             vectorEffect="non-scaling-stroke"
           />
           {geometry.points.map((point, index) => {
@@ -145,15 +134,15 @@ export function HistoryPerformanceChart({
                       x2={point.x}
                       y1={PLOT_TOP}
                       y2={PLOT_BOTTOM}
-                      stroke="#74887e"
+                      stroke="var(--faint)"
                       strokeDasharray="2 6"
                     />
                     <circle
                       cx={point.x}
                       cy={point.y}
                       r="5"
-                      fill="#f8faf7"
-                      stroke={mode === "return" ? "#d66758" : "#347e62"}
+                      fill="var(--surface)"
+                      stroke="var(--brand)"
                       strokeWidth="2"
                       vectorEffect="non-scaling-stroke"
                     />
@@ -202,7 +191,7 @@ function ChartScale({
   mode: HistoryExplorerMode;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-12 text-[10px] tabular-nums text-[#858a83] sm:block">
+    <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-12 text-[10px] tabular-nums text-[var(--faint)] sm:block">
       <span className="absolute right-0 top-[7%]">
         {formatScaleValue(geometry.maxValue, mode)}
       </span>
@@ -230,17 +219,17 @@ function ChartTooltip({
 
   return (
     <div
-      className="pointer-events-none absolute z-10 min-w-48 border border-[#d8ddd7] bg-[#fbfcf9]/96 px-4 py-3 text-xs shadow-[0_12px_34px_rgba(36,43,38,0.12)] backdrop-blur-sm"
+      className="pointer-events-none absolute z-10 min-w-48 border border-[var(--line)] bg-[var(--surface)]/96 px-4 py-3 text-xs shadow-[0_12px_34px_rgba(36,43,38,0.12)] backdrop-blur-sm"
       style={{ left: `${left}%`, top: `${top}%` }}
     >
       <p className="font-semibold">{formatDate(point.date)}</p>
-      <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1 text-[#686f67]">
+      <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1 text-[var(--muted)]">
         <span>{metricLabel(mode)}</span>
-        <span className="text-right font-medium text-[#20231f]">
+        <span className="text-right font-medium text-[var(--ink)]">
           {formatMetric(point, mode)}
         </span>
         <span>평가액</span>
-        <span className="text-right font-medium text-[#20231f]">
+        <span className="text-right font-medium text-[var(--ink)]">
           {formatHistoryKrw(point.valueKrw)}
         </span>
         <span>이전 대비</span>
@@ -263,7 +252,7 @@ function ChartDateLabels({ points }: { points: readonly HistoryOverviewPoint[] }
     ]),
   ];
   return (
-    <div className="mt-1 flex justify-between text-[11px] text-[#858a83]">
+    <div className="mt-1 flex justify-between text-[11px] text-[var(--faint)]">
       {indexes.map((index) => (
         <span key={points[index]!.date}>{shortDate(points[index]!.date)}</span>
       ))}
@@ -343,8 +332,8 @@ function formatScaleValue(value: number, mode: HistoryExplorerMode) {
 }
 
 function tone(value: number | null) {
-  if (value === null || value === 0) return "text-[#20231f]";
-  return value > 0 ? "text-[#347e62]" : "text-[#cb5551]";
+  if (value === null || value === 0) return "text-[var(--ink)]";
+  return value > 0 ? "text-[var(--brand)]" : "text-[var(--negative)]";
 }
 
 function formatSignedKrw(value: number | null) {

@@ -94,7 +94,7 @@ export function RiskDataHealth({
           />
           <SourceCounts title="FX" sources={inputHealth.sourceRows.fx.sources} />
           {inputHealth.zeroVarianceInstruments.length > 0 ? (
-            <div className="mt-3 text-sm text-[#687064]">
+            <div className="mt-3 text-sm text-[var(--muted)]">
               변동성 0 종목:{" "}
               {inputHealth.zeroVarianceInstruments
                 .map(displayInstrumentKey)
@@ -116,7 +116,7 @@ function BlockerList({
     return <RiskEmptyMessage>차단 항목이 없습니다.</RiskEmptyMessage>;
   }
   return (
-    <ul className="mt-3 space-y-2 text-sm text-[#7a2e2e]">
+    <ul className="mt-3 space-y-2 text-sm text-[var(--negative)]">
       {blockers.map((blocker) => (
         <li key={`${blocker.reason}-${blocker.dates.join("-")}`}>
           {blockerDescription(blocker)}
@@ -171,9 +171,9 @@ function SourceCounts({
 }) {
   const rows = Object.entries(sources);
   return (
-    <div className="mt-3 border-l-2 border-[#c5ccbf] pl-3 text-sm">
+    <div className="mt-3 border-l-2 border-[var(--line)] pl-3 text-sm">
       <div className="font-semibold">{title}</div>
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[#687064]">
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[var(--muted)]">
         {rows.length > 0
           ? rows.map(([source, count]) => (
               <span key={source}>

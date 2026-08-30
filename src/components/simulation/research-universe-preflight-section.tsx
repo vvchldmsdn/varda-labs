@@ -1,4 +1,6 @@
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import Form from "next/form";
+import { SimulationContextFields } from "./simulation-query-controls";
 import type { SimulationResearchUniversePreflightModel } from "@/lib/simulation-research-universe-preflight";
 
 export function ResearchUniversePreflightSection({
@@ -16,7 +18,7 @@ export function ResearchUniversePreflightSection({
   return (
     <section
       aria-labelledby="research-universe-preflight-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-research-universe-preflight
       data-research-universe-selection={model.selectionStatus}
       data-research-universe-status={model.status}
@@ -30,21 +32,22 @@ export function ResearchUniversePreflightSection({
           >
             연구 종목 데이터 점검
           </h2>
-          <p className="mt-1 text-sm text-[#687064]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             계정과 연결하지 않은 연구 입력입니다. 저장된 가격·환율·출처만
             확인하며 시뮬레이션은 실행하지 않습니다.
           </p>
         </div>
-        <span className="text-xs font-semibold text-[#687064]">
+        <span className="text-xs font-semibold text-[var(--muted)]">
           실행 권한 미확립
         </span>
       </div>
 
-      <form
+      <Form
         action="/simulation"
         className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
-        method="get"
+        scroll={false}
       >
+        <SimulationContextFields />
         <input
           name="scope"
           type="hidden"
@@ -68,12 +71,12 @@ export function ResearchUniversePreflightSection({
           />
         ) : null}
         <label className="min-w-0">
-          <span className="mb-1 block text-xs font-semibold text-[#596158]">
+          <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
             market:currency:ticker:weight_bps
           </span>
           <input
             aria-label="연구 종목과 비중"
-            className="h-11 w-full rounded-md border border-[#cfd6c8] bg-white px-3 text-sm outline-none focus:border-[#47624d]"
+            className="h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--brand)]"
             defaultValue={model.rawValue ?? ""}
             name="researchUniverse"
             placeholder="korea:KRW:069500:5000,us:USD:QQQ:5000"
@@ -81,13 +84,13 @@ export function ResearchUniversePreflightSection({
           />
         </label>
         <button
-          className="h-11 self-end rounded-md bg-[#173c35] px-4 text-sm font-semibold text-white hover:bg-[#102f29]"
+          className="h-11 self-end rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-[var(--ink)]"
           type="submit"
         >
           데이터 점검
         </button>
-      </form>
-      <p className="mt-2 text-xs leading-5 text-[#687064]">
+      </Form>
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
         Fount는 managed:KRW:FOUNT:0, 금현물은
         krx-gold:KRW:GOLD_9999_1KG:0 형식으로 남길 수 있습니다. 0bps
         행도 삭제하지 않습니다.
@@ -95,7 +98,7 @@ export function ResearchUniversePreflightSection({
 
       {model.selectionStatus === "invalid" ? (
         <div
-          className="mt-4 rounded-md border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#6b5227]"
+          className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]"
           data-research-universe-invalid
         >
           {model.issues.map(issueLabel).join(" · ")}
@@ -127,7 +130,7 @@ export function ResearchUniversePreflightSection({
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-              <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+              <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
                 <tr>
                   <th className="px-3 py-3 font-semibold">종목</th>
                   <th className="px-3 py-3 text-right font-semibold">
@@ -142,14 +145,14 @@ export function ResearchUniversePreflightSection({
               <tbody>
                 {model.instruments.map((row) => (
                   <tr
-                    className="border-b border-[#e1e5da] align-top"
+                    className="border-b border-[var(--line)] align-top"
                     data-research-universe-instrument={row.instrumentKey}
                     data-research-universe-instrument-status={row.status}
                     key={row.instrumentKey}
                   >
                     <td className="px-3 py-3">
                       <p className="font-semibold">{row.ticker}</p>
-                      <p className="mt-1 text-xs text-[#687064]">
+                      <p className="mt-1 text-xs text-[var(--muted)]">
                         {row.market} · {row.currency}
                       </p>
                     </td>
@@ -166,7 +169,7 @@ export function ResearchUniversePreflightSection({
                       <p className="font-semibold">
                         {provenanceLabel(row.provenance.status)}
                       </p>
-                      <p className="mt-1 max-w-[260px] text-xs leading-5 text-[#687064]">
+                      <p className="mt-1 max-w-[260px] text-xs leading-5 text-[var(--muted)]">
                         {formatProvenance(row.provenance)}
                       </p>
                     </td>
@@ -175,18 +178,18 @@ export function ResearchUniversePreflightSection({
                         className={
                           row.status ===
                           "provenance_ready_for_separate_review"
-                            ? "font-semibold text-[#226039]"
+                            ? "font-semibold text-[var(--brand)]"
                             : row.status === "excluded_by_policy" ||
                                 row.status ===
                                   "zero_weight_not_evaluated"
-                              ? "font-semibold text-[#596158]"
-                              : "font-semibold text-[#7a5117]"
+                              ? "font-semibold text-[var(--muted)]"
+                              : "font-semibold text-[var(--warning)]"
                         }
                       >
                         {instrumentStatusLabel(row.status)}
                       </p>
                       {row.admissionIssues.length > 0 ? (
-                        <p className="mt-1 max-w-[260px] text-xs leading-5 text-[#7a6b4e]">
+                        <p className="mt-1 max-w-[260px] text-xs leading-5 text-[var(--warning)]">
                           {row.admissionIssues.join(", ")}
                         </p>
                       ) : null}
@@ -198,7 +201,7 @@ export function ResearchUniversePreflightSection({
           </div>
 
           <div
-            className="mt-4 rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-4 py-3 text-sm text-[#596158]"
+            className="mt-4 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
             data-research-universe-result-boundary
           >
             {resultBoundaryLabel(model.status)}
@@ -211,8 +214,8 @@ export function ResearchUniversePreflightSection({
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <p className="text-xs text-[#687064]">{label}</p>
+    <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
     </div>
   );

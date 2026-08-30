@@ -44,7 +44,7 @@ export function InvestmentLabScenarioMatrix({
 
   return (
     <section
-      className="overflow-hidden border-y border-[#dde1db]"
+      className="overflow-hidden border-y border-[var(--line)]"
       data-scenario-matrix-ready-rows={matrix.coverage.readyRowCount}
       data-scenario-matrix-rows={matrix.coverage.rowCount}
       data-scenario-matrix-status={matrix.status}
@@ -53,16 +53,16 @@ export function InvestmentLabScenarioMatrix({
       }
       data-section="investment-lab-scenario-matrix"
     >
-      <div className="border-b border-[#e1e6dc] px-4 py-4">
+      <div className="border-b border-[var(--wash)] px-4 py-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold">시나리오 한눈에 비교</h2>
-            <p className="mt-1 text-sm leading-6 text-[#687064]">
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
               이미 계산된 경로만 같은 기간으로 맞춰 표시합니다. 순위나 추천이
               아니라 계산 근거와 불가 사유를 확인하는 연구용 비교표입니다.
             </p>
           </div>
-          <p className="text-xs leading-5 text-[#73786c]">
+          <p className="text-xs leading-5 text-[var(--muted)]">
             {matrix.period
               ? `${formatDate(matrix.period.startServiceDate)} ~ ${formatDate(matrix.period.endServiceDate)} · ${matrix.period.comparisonDateCount}개 평가일`
               : "공통 비교 구간 없음"}
@@ -73,7 +73,7 @@ export function InvestmentLabScenarioMatrix({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1380px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-[#dde1db] text-left text-xs font-semibold text-[#616a5e]">
+            <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
               <th className="px-4 py-3">시나리오</th>
               <th className="px-3 py-3">상태</th>
               <th className="px-3 py-3 text-right">종료 평가액</th>
@@ -93,7 +93,7 @@ export function InvestmentLabScenarioMatrix({
         </table>
       </div>
 
-      <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
+      <p className="border-t border-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">
         MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을
         연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만
         표시합니다. 변동성은 최소 {MINIMUM_VOLATILITY_PERIODS}개의 연속 1일
@@ -118,17 +118,17 @@ function ScenarioRow({
 
   return (
     <tr
-      className="border-t border-[#e1e6dc] align-top"
+      className="border-t border-[var(--wash)] align-top"
       data-scenario-row={row.id}
       data-scenario-weight-constraint={scenarioWeightConstraint(row.id, model)}
       data-scenario-status={row.status}
       data-scenario-risk-status={row.riskMetrics.status}
     >
       <td className="px-4 py-3">
-        <p className="font-semibold text-[#171916]">
+        <p className="font-semibold text-[var(--ink)]">
           {scenarioLabel(row.id, model)}
         </p>
-        <p className="mt-1 text-xs text-[#73786c]">
+        <p className="mt-1 text-xs text-[var(--muted)]">
           {scenarioDetail(row.id, model)}
         </p>
       </td>
@@ -136,8 +136,8 @@ function ScenarioRow({
         <span
           className={
             row.status === "ready"
-              ? "font-semibold text-[#08784d]"
-              : "font-semibold text-[#9a6b18]"
+              ? "font-semibold text-[var(--brand)]"
+              : "font-semibold text-[var(--warning)]"
           }
         >
           {row.status === "ready" ? "경로 계산" : "계산 불가"}
@@ -145,10 +145,10 @@ function ScenarioRow({
         {row.status === "unavailable" ||
         row.returnEstimate.status === "unavailable" ? (
           <div className="mt-1 max-w-72 space-y-1 text-xs leading-5">
-            <p className="text-[#7b6232]">
+            <p className="text-[var(--warning)]">
               <span className="font-semibold">원인</span> {diagnosis.reason}
             </p>
-            <p className="text-[#687064]">
+            <p className="text-[var(--muted)]">
               <span className="font-semibold">해결</span>{" "}
               {diagnosis.resolution}
             </p>
@@ -172,28 +172,28 @@ function ScenarioRow({
       >
         {formatPercentOrDash(row.returnEstimate.value)}
       </td>
-      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#4f584f]">
+      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[var(--muted)]">
         {formatRiskPercentOrDash(row.riskMetrics.maximumDrawdown)}
       </td>
-      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#4f584f]">
+      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[var(--muted)]">
         <p>
           {formatRiskPercentOrDash(row.riskMetrics.annualizedVolatility)}
         </p>
-        <p className="mt-1 text-xs font-normal text-[#73786c]">
+        <p className="mt-1 text-xs font-normal text-[var(--muted)]">
           {riskEvidenceLabel(row.riskMetrics)}
         </p>
       </td>
-      <td className="px-3 py-3 text-right tabular-nums text-[#4f584f]">
+      <td className="px-3 py-3 text-right tabular-nums text-[var(--muted)]">
         <p>{row.flowCount === null ? "-" : `${row.flowCount}건`}</p>
-        <p className="mt-1 text-xs text-[#73786c]">
+        <p className="mt-1 text-xs text-[var(--muted)]">
           {row.pendingComparisonCount === null
             ? "대기 해당 없음"
             : `대기 ${row.pendingComparisonCount}일`}
         </p>
       </td>
-      <td className="px-4 py-3 text-xs leading-5 text-[#5f685d]">
+      <td className="px-4 py-3 text-xs leading-5 text-[var(--muted)]">
         <p>{priceBasisLabel(row.priceBasis)}</p>
-        <p className="text-[#73786c]">{fxBasisLabel(row.fxBasis)}</p>
+        <p className="text-[var(--muted)]">{fxBasisLabel(row.fxBasis)}</p>
       </td>
     </tr>
   );
@@ -355,8 +355,8 @@ function formatRiskPercentOrDash(value: number | null) {
 }
 
 function moneyTone(value: number | null) {
-  if (value === null || value === 0) return "text-[#4f584f]";
-  return value > 0 ? "text-[#08784d]" : "text-[#bd2929]";
+  if (value === null || value === 0) return "text-[var(--muted)]";
+  return value > 0 ? "text-[var(--brand)]" : "text-[var(--negative)]";
 }
 
 function percentTone(value: number | null) {

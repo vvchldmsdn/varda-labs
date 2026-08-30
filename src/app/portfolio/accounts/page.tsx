@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -56,16 +57,17 @@ export default async function AccountManagementPage() {
       : null;
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-6 text-[#171916]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-6 text-[var(--ink)]">
+      <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-4xl space-y-5">
-        <header className="border-b border-[#dfe3d5] pb-5">
+        <header className="border-b border-[var(--line)] pb-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+              <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
                 Account management
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687064]">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
                 Accounts represent custody locations such as a broker or pension
                 account. Use asset groups separately when several accounts should
                 be analyzed together.
@@ -95,7 +97,7 @@ export default async function AccountManagementPage() {
         </header>
 
         {model.state !== "ready" ? (
-          <section className="rounded-md border border-[#ead9b5] bg-[#fff9eb] p-4 text-sm text-[#76591f]">
+          <section className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
             Account data is temporarily unavailable. No write was attempted.
           </section>
         ) : (
@@ -105,11 +107,11 @@ export default async function AccountManagementPage() {
             ) : null}
 
             <section
-              className="rounded-md border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+              className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4"
               id="create-account"
             >
               <h2 className="text-lg font-semibold">Create an account</h2>
-              <p className="mt-1 text-sm text-[#687064]">
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 The immutable internal account code is generated on the server.
               </p>
               <div className="mt-4">
@@ -120,12 +122,12 @@ export default async function AccountManagementPage() {
             <section className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold">Active accounts</h2>
-                <p className="mt-1 text-sm text-[#687064]">
+                <p className="mt-1 text-sm text-[var(--muted)]">
                   Renaming does not rewrite holdings, snapshots, or event history.
                 </p>
               </div>
               {activeAccounts.length === 0 ? (
-                <div className="rounded-md border border-[#dfe3d5] bg-[#fbfcf7] p-5 text-sm text-[#687064]">
+                <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
                   Create the first account before adding a holding.
                 </div>
               ) : (
@@ -139,10 +141,10 @@ export default async function AccountManagementPage() {
             </section>
 
             {archivedAccounts.length > 0 ? (
-              <section className="space-y-3 border-t border-[#dfe3d5] pt-5">
+              <section className="space-y-3 border-t border-[var(--line)] pt-5">
                 <div>
                   <h2 className="text-lg font-semibold">Archived accounts</h2>
-                  <p className="mt-1 text-sm text-[#687064]">
+                  <p className="mt-1 text-sm text-[var(--muted)]">
                     Historical evidence remains stored and accounts can be restored.
                   </p>
                 </div>
@@ -163,8 +165,8 @@ export default async function AccountManagementPage() {
 
 function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <dt className="text-xs font-semibold text-[#687064]">{label}</dt>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 text-lg font-semibold">{value}</dd>
     </div>
   );
@@ -173,7 +175,7 @@ function SummaryCell({ label, value }: { label: string; value: string }) {
 function NavLink({ href, children }: { href: string; children: string }) {
   return (
     <Link
-      className="rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-[#35423a] hover:bg-[#eef2e8]"
+      className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
       href={href}
     >
       {children}
