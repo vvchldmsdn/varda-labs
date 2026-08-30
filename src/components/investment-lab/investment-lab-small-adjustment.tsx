@@ -63,10 +63,10 @@ export function InvestmentLabSmallAdjustment({
       data-persistence={model.policy.persistence}
       data-section="investment-lab-small-adjustment"
     >
-      <header className="border-b border-[#dde1db] pb-8">
+      <header className="border-b border-[var(--line)] pb-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[10px] font-medium uppercase text-[#777d75]">
+            <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
               WHAT-IF WORKBENCH
             </p>
             <h2
@@ -75,29 +75,29 @@ export function InvestmentLabSmallAdjustment({
             >
               작은 조정 영향 실험
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#626b5f]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
               같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다. 외부
               현금, 목표비중, 추천, 주문은 반영하지 않습니다.
             </p>
           </div>
-          <p className="text-sm font-semibold text-[#3f4b40]">
+          <p className="text-sm font-semibold text-[var(--muted)]">
             계산 가능 계정 {readyAccountCount}/{model.accounts.length}
           </p>
         </div>
       </header>
 
-      <div className="rounded-[4px] border border-[#dfe3d5] bg-[#fbfcf7] p-5 sm:p-6">
+      <div className="rounded-[4px] border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-6">
         <div
           aria-label="조정 계정"
-          className="flex max-w-full gap-7 overflow-x-auto border-b border-[#d9ded3]"
+          className="flex max-w-full gap-7 overflow-x-auto border-b border-[var(--line)]"
           role="group"
         >
           {model.accounts.map((account) => (
             <button
               className={`min-h-10 min-w-20 shrink-0 border-b-2 px-1 text-sm font-semibold ${
                 account.account === accountCode
-                  ? "border-[#173f39] text-[#173f39]"
-                  : "border-transparent text-[#6a7269] hover:text-[#173f39]"
+                  ? "border-[var(--ink)] text-[var(--ink)]"
+                  : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
               key={account.account}
               onClick={() => {
@@ -116,10 +116,10 @@ export function InvestmentLabSmallAdjustment({
         ) : (
           <form className="mt-4 space-y-4" onSubmit={submit}>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_220px_auto] lg:items-end">
-              <label className="grid gap-1.5 text-sm font-semibold text-[#3f493e]">
+              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]">
                 줄일 보유자산
                 <select
-                  className="min-h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3 font-normal text-[#171916]"
+                  className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
                     setSourceKey(event.target.value);
                     setResult(null);
@@ -136,10 +136,10 @@ export function InvestmentLabSmallAdjustment({
                 </select>
               </label>
 
-              <label className="grid gap-1.5 text-sm font-semibold text-[#3f493e]">
+              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]">
                 늘릴 보유자산
                 <select
-                  className="min-h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3 font-normal text-[#171916]"
+                  className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
                     setDestinationKey(event.target.value);
                     setResult(null);
@@ -160,10 +160,10 @@ export function InvestmentLabSmallAdjustment({
                 </select>
               </label>
 
-              <label className="grid gap-1.5 text-sm font-semibold text-[#3f493e]">
+              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]">
                 이동 금액
                 <input
-                  className="min-h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3 font-normal tabular-nums text-[#171916]"
+                  className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal tabular-nums text-[var(--ink)]"
                   inputMode="numeric"
                   max={source ? Math.floor(source.currentValueKrw) : undefined}
                   min="1"
@@ -179,7 +179,7 @@ export function InvestmentLabSmallAdjustment({
               </label>
 
               <button
-                className="min-h-11 rounded-md bg-[#173f39] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#9ca59a]"
+                className="min-h-11 rounded-md bg-[var(--ink)] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[var(--faint)]"
                 disabled={!sourceKey || !destinationKey || !amount}
                 type="submit"
               >
@@ -187,7 +187,7 @@ export function InvestmentLabSmallAdjustment({
               </button>
             </div>
 
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[#687064]">
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--muted)]">
               <span>
                 계정 평가액 {formatKrw(selectedAccount.totalValueKrw)}
               </span>
@@ -219,7 +219,7 @@ function AccountUnavailable({
   account: InvestmentLabSmallAdjustmentModel["accounts"][number] | undefined;
 }) {
   return (
-    <div className="mt-4 rounded-md border border-[#eadfbe] bg-[#fff9e8] px-4 py-3 text-sm text-[#725f2d]">
+    <div className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
       <p className="font-semibold">이 계정은 조정 계산을 차단했습니다.</p>
       <ul className="mt-2 space-y-1">
         {(account?.blockers ?? []).map((blocker) => (
@@ -246,7 +246,7 @@ function AccountUnavailable({
 export function InvestmentLabSmallAdjustmentSkeleton() {
   return (
     <div className="min-w-0 py-6">
-      <div className="h-64 border-y border-[#dde1db] bg-[#f2f4ef]" />
+      <div className="h-64 border-y border-[var(--line)] bg-[var(--wash)]" />
     </div>
   );
 }
@@ -254,7 +254,7 @@ export function InvestmentLabSmallAdjustmentSkeleton() {
 export function InvestmentLabSmallAdjustmentUnavailable() {
   return (
     <section className="min-w-0 py-6">
-      <div className="border-y border-[#d8c69d] py-4 text-sm text-[#725f2d]">
+      <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
         <h2 className="text-lg font-semibold">작은 조정 영향 실험</h2>
         <p className="mt-2">
           현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다.

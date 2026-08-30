@@ -21,7 +21,7 @@ export function OwnerInputPreflightSection({
   return (
     <section
       aria-labelledby="owner-simulation-input-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-simulation-preflight
       data-owner-simulation-scope={model.account}
       data-owner-simulation-status={model.status}
@@ -29,13 +29,13 @@ export function OwnerInputPreflightSection({
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             로그인 사용자 보유종목 기준
           </p>
           <h2 className="mt-1 text-lg font-semibold" id="owner-simulation-input-title">
             내 포트폴리오 입력 점검
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             현재 보유 구성과 저장된 과거 가격 이력을 계좌별로 점검합니다. 이 비중은
             아래의 일회성 연구 계산에만 사용하며 저장된 목표 비중, 최적화, 추천 또는
             주문 근거로 사용하지 않습니다.
@@ -70,7 +70,7 @@ export function OwnerInputPreflightSection({
 
       {model.historicalPriceBasis === "raw_price_return" ? (
         <p
-          className="mt-3 rounded-md border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm leading-6 text-[#6b5227]"
+          className="mt-3 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--warning)]"
           data-owner-simulation-raw-close-basis
         >
           현재 단일 사용자 연구 모드는 저장된 KIS 종가를 사용합니다. 배당과
@@ -81,7 +81,7 @@ export function OwnerInputPreflightSection({
 
       {model.summary.fountExcludedHoldingCount > 0 ? (
         <p
-          className="mt-3 rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-4 py-3 text-sm text-[#596158]"
+          className="mt-3 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
           data-owner-simulation-fount-excluded
         >
           Fount {model.summary.fountExcludedHoldingCount}건은 사용자 결정에 따라 투자 랩과
@@ -91,7 +91,7 @@ export function OwnerInputPreflightSection({
 
       {model.blockers.length > 0 ? (
         <div
-          className="mt-3 rounded-md border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#6b5227]"
+          className="mt-3 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]"
           data-owner-simulation-blockers={model.blockers.join(",")}
         >
           <p className="font-semibold">입력 후보를 확정하지 않았습니다.</p>
@@ -101,7 +101,7 @@ export function OwnerInputPreflightSection({
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[820px] border-collapse text-left text-sm">
-          <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+          <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
             <tr>
               <th className="px-3 py-3 font-semibold">종목</th>
               <th className="px-3 py-3 font-semibold">계좌</th>
@@ -113,14 +113,14 @@ export function OwnerInputPreflightSection({
           <tbody>
             {model.instruments.map((row) => (
               <tr
-                className="border-b border-[#e1e5da] align-top"
+                className="border-b border-[var(--line)] align-top"
                 data-owner-simulation-instrument={row.instrumentKey}
                 data-owner-simulation-history-status={row.historicalStatus}
                 key={row.instrumentKey}
               >
                 <td className="px-3 py-3">
                   <p className="font-semibold">{row.name}</p>
-                  <p className="mt-1 text-xs text-[#687064]">
+                  <p className="mt-1 text-xs text-[var(--muted)]">
                     {row.ticker} · {row.market} · {row.currency}
                   </p>
                 </td>
@@ -136,7 +136,7 @@ export function OwnerInputPreflightSection({
                     {historyStatusLabel(row.historicalStatus)}
                   </p>
                   {row.classification === "physical_commodity_position" ? (
-                    <p className="mt-1 text-xs leading-5 text-[#7a6b4e]">
+                    <p className="mt-1 text-xs leading-5 text-[var(--warning)]">
                       금현물은 사용자가 기록한 평가 이력만 사용합니다.
                     </p>
                   ) : null}
@@ -150,7 +150,7 @@ export function OwnerInputPreflightSection({
       {model.valuationGaps.length > 0 ? (
         <div className="mt-4" data-owner-simulation-valuation-gaps>
           <h3 className="text-sm font-semibold">평가액을 확인하지 못한 보유종목</h3>
-          <ul className="mt-2 space-y-1 text-sm text-[#6b5227]">
+          <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.valuationGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>
                 {gap.name} · {gap.account} · {valuationGapLabel(gap.reason)}
@@ -163,7 +163,7 @@ export function OwnerInputPreflightSection({
       {model.identityGaps.length > 0 ? (
         <div className="mt-4" data-owner-simulation-identity-gaps>
           <h3 className="text-sm font-semibold">종목 식별을 완료하지 못한 보유종목</h3>
-          <ul className="mt-2 space-y-1 text-sm text-[#6b5227]">
+          <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.identityGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>
                 {gap.name} · {gap.account} · {formatKrw(gap.currentValueKrw)}
@@ -173,7 +173,7 @@ export function OwnerInputPreflightSection({
         </div>
       ) : null}
 
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다. 부족한
         상장 종목은 임의의 평균값이나 현재 가격으로 과거를 만들지 않으며, 공급자 보강
         경로가 준비되기 전까지 부족한 범위를 명시한 진단을 제공합니다.
@@ -192,10 +192,10 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
+    <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-1 text-lg font-semibold">{value}</dd>
-      {detail ? <dd className="mt-1 text-xs text-[#7a8175]">{detail}</dd> : null}
+      {detail ? <dd className="mt-1 text-xs text-[var(--muted)]">{detail}</dd> : null}
     </div>
   );
 }
@@ -236,10 +236,10 @@ function historyStatusLabel(status: string) {
 
 function historyStatusClass(status: string) {
   return status === "provenance_ready_for_separate_review"
-    ? "font-semibold text-[#226039]"
+    ? "font-semibold text-[var(--brand)]"
     : status === "zero_weight_not_evaluated" || status === "excluded_by_policy"
-      ? "font-semibold text-[#596158]"
-      : "font-semibold text-[#7a5117]";
+      ? "font-semibold text-[var(--muted)]"
+      : "font-semibold text-[var(--warning)]";
 }
 
 function valuationGapLabel(reason: string) {

@@ -122,7 +122,7 @@ export function FxImpactPopover({
           aria-label="원 달러 환율 추세"
           data-placement={panelPosition?.placement}
           tabIndex={-1}
-          className="z-50 overflow-y-auto rounded-[6px] border border-[#cfd4cd] bg-[#fbfcf9] p-5 shadow-[0_18px_48px_rgba(26,32,27,0.16)] focus:outline-none"
+          className="z-50 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(26,32,27,0.16)] focus:outline-none"
           style={{
             left: panelPosition?.left ?? VIEWPORT_MARGIN,
             maxHeight: panelPosition?.maxHeight ?? `calc(100dvh - ${VIEWPORT_MARGIN * 2}px)`,
@@ -134,16 +134,16 @@ export function FxImpactPopover({
         >
           <div className="flex items-start justify-between gap-5">
             <div>
-              <p className="text-[11px] font-medium text-[#7b8079]">USD / KRW</p>
-              <h3 className="mt-1 text-base font-semibold text-[#242824]">원/달러 추세</h3>
-              <p className="mt-1 text-[11px] text-[#7d837b]">
+              <p className="text-[11px] font-medium text-[var(--muted)]">USD / KRW</p>
+              <h3 className="mt-1 text-base font-semibold text-[var(--ink)]">원/달러 추세</h3>
+              <p className="mt-1 text-[11px] text-[var(--faint)]">
                 {latest ? `${formatDate(latest.date)} · 최근 ${points.length}개 관측치` : "저장 이력 없음"}
               </p>
             </div>
             <button
               type="button"
               aria-label="환율 추세 닫기"
-              className="grid h-8 w-8 place-items-center rounded-full text-xl text-[#686e67] hover:bg-[#ecefe9] focus-visible:outline-2 focus-visible:outline-[#347e62]"
+              className="grid h-8 w-8 place-items-center rounded-full text-xl text-[var(--muted)] hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
               onClick={() => {
                 setOpen(false);
                 setPanelPosition(null);
@@ -156,7 +156,7 @@ export function FxImpactPopover({
 
           {latest && chart ? (
             <>
-              <dl className="mt-5 grid grid-cols-3 border-y border-[#e0e4de] py-3 text-xs">
+              <dl className="mt-5 grid grid-cols-3 border-y border-[var(--wash)] py-3 text-xs">
                 <FxValue label="현재" value={latest.rate} />
                 <FxValue label="60일선" value={latest.ma60} divided />
                 <FxValue label="120일선" value={latest.ma120} divided />
@@ -175,31 +175,31 @@ export function FxImpactPopover({
                       x2={CHART_WIDTH - CHART_PADDING}
                       y1={CHART_PADDING + (CHART_HEIGHT - CHART_PADDING * 2) * ratio}
                       y2={CHART_PADDING + (CHART_HEIGHT - CHART_PADDING * 2) * ratio}
-                      stroke="#e4e7e2"
+                      stroke="var(--wash)"
                       strokeWidth="1"
                     />
                   ))}
-                  <path d={chart.ma120Path} fill="none" stroke="#a68d72" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                  <path d={chart.ma60Path} fill="none" stroke="#6f9b87" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
-                  <path d={chart.ratePath} fill="none" stroke="#202520" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                  <path d={chart.ma120Path} fill="none" stroke="var(--warning)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                  <path d={chart.ma60Path} fill="none" stroke="var(--brand-mid)" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+                  <path d={chart.ratePath} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                 </svg>
-                <div className="mt-1 flex items-center justify-between text-[10px] tabular-nums text-[#858b83]">
+                <div className="mt-1 flex items-center justify-between text-[10px] tabular-nums text-[var(--faint)]">
                   <span>{formatDate(points[0].date)}</span>
                   <span>{formatDate(latest.date)}</span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[10px] text-[#6f756d]">
-                  <Legend color="#202520" label="원/달러" />
-                  <Legend color="#6f9b87" label="60일선" />
-                  <Legend color="#a68d72" label="120일선" />
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[10px] text-[var(--muted)]">
+                  <Legend color="var(--ink)" label="원/달러" />
+                  <Legend color="var(--brand-mid)" label="60일선" />
+                  <Legend color="var(--warning)" label="120일선" />
                 </div>
-                <p className="mt-4 border-t border-[#e3e6e1] pt-3 text-[10px] leading-4 text-[#7b8179]">
+                <p className="mt-4 border-t border-[var(--wash)] pt-3 text-[10px] leading-4 text-[var(--faint)]">
                   오늘 영향은 {basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근"} 기준 스냅샷 이후의 환율 차이입니다.
                   직전 주기의 환율 변동은 이미 평가액과 이력에 반영됩니다.
                 </p>
               </div>
             </>
           ) : (
-            <p className="mt-6 border-y border-[#e0e4de] py-8 text-center text-sm text-[#747a72]">
+            <p className="mt-6 border-y border-[var(--wash)] py-8 text-center text-sm text-[var(--muted)]">
               표시할 환율 이력이 아직 없습니다.
             </p>
           )}
@@ -212,27 +212,27 @@ export function FxImpactPopover({
     <>
       <div
         ref={rootRef}
-        className="relative min-w-0 border-b border-[#e2e5df] sm:even:border-r sm:even:border-[#e2e5df] lg:border-b-0 lg:border-r lg:border-[#e2e5df]"
+        className="relative min-w-0 border-b border-[var(--wash)] sm:even:border-r sm:even:border-[var(--wash)] lg:border-b-0 lg:border-r lg:border-[var(--wash)]"
       >
         <button
           ref={triggerRef}
           type="button"
           aria-expanded={open}
           aria-haspopup="dialog"
-          className="block min-h-full w-full px-5 py-6 text-left transition-colors hover:bg-[#f1f4ef] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#347e62]"
+          className="block min-h-full w-full px-5 py-6 text-left transition-colors hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand)]"
           onClick={() => {
             setPanelPosition(null);
             setOpen((value) => !value);
           }}
         >
-          <span className="flex items-center justify-between gap-3 text-xs font-medium text-[#6d736b]">
+          <span className="flex items-center justify-between gap-3 text-xs font-medium text-[var(--muted)]">
             환율 영향
-            <span aria-hidden="true" className="text-base text-[#8a9088]">↗</span>
+            <span aria-hidden="true" className="text-base text-[var(--faint)]">↗</span>
           </span>
           <span className={`mt-3 block truncate text-xl font-medium tabular-nums ${toneClass(impactKrw)}`}>
             {formatSignedKrw(impactKrw)}
           </span>
-          <span className="mt-2 block truncate text-xs text-[#747a72]">
+          <span className="mt-2 block truncate text-xs text-[var(--muted)]">
             {formatPercent(impactPct, true)}
           </span>
         </button>
@@ -244,9 +244,9 @@ export function FxImpactPopover({
 
 function FxValue({ divided = false, label, value }: { divided?: boolean; label: string; value: number | null }) {
   return (
-    <div className={`min-w-0 px-3 first:pl-0 last:pr-0 ${divided ? "border-l border-[#e0e4de]" : ""}`}>
-      <dt className="text-[#7b8179]">{label}</dt>
-      <dd className="mt-1 truncate font-medium tabular-nums text-[#252925]">
+    <div className={`min-w-0 px-3 first:pl-0 last:pr-0 ${divided ? "border-l border-[var(--wash)]" : ""}`}>
+      <dt className="text-[var(--faint)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium tabular-nums text-[var(--ink)]">
         {value === null ? "-" : value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </dd>
     </div>

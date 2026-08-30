@@ -53,7 +53,7 @@ export function ObservedReturnSeriesPanel({
       data-observed-return-series={input.id}
       data-return-row-count={rows.length}
       aria-labelledby={`observed-returns-${input.id}`}
-      className="border-t border-[#e1e5da] p-4"
+      className="border-t border-[var(--line)] p-4"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -63,11 +63,11 @@ export function ObservedReturnSeriesPanel({
           >
             {rows.length}개 관측 수익률
           </h3>
-          <p className="mt-1 text-xs leading-5 text-[#687064]">
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
             저장된 조정종가와 기준일별 환율로 계산한 과거 KRW 단순수익률입니다.
           </p>
         </div>
-        <div className="text-right text-xs leading-5 text-[#7a8175]">
+        <div className="text-right text-xs leading-5 text-[var(--muted)]">
           <p>예측·시뮬레이션 경로 아님</p>
           <p data-return-scale-mode={scaleMode}>
             {scaleMode === "shared" ? "두 입력 공통" : "개별"} 세로축 {" "}
@@ -76,7 +76,7 @@ export function ObservedReturnSeriesPanel({
         </div>
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-[#e1e5da] bg-[#e1e5da] text-sm sm:grid-cols-4">
+      <dl className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)] text-sm sm:grid-cols-4">
         <ReturnSummaryItem label="관측 행" value={`${rows.length}개`} />
         <ReturnSummaryItem
           label="최근 수익률"
@@ -86,7 +86,7 @@ export function ObservedReturnSeriesPanel({
         <ReturnSummaryItem label="최저" value={formatSignedReturn(minReturn)} />
       </dl>
 
-      <div className="mt-4 overflow-x-auto rounded-md border border-[#e1e5da] bg-white">
+      <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           role="img"
@@ -105,7 +105,7 @@ export function ObservedReturnSeriesPanel({
                   x2={chartWidth - rightPadding}
                   y1={y}
                   y2={y}
-                  stroke={tick === 0 ? "#aeb8aa" : "#e1e5da"}
+                  stroke={tick === 0 ? "var(--line)" : "var(--line)"}
                   strokeWidth="1"
                 />
                 <text
@@ -113,7 +113,7 @@ export function ObservedReturnSeriesPanel({
                   y={y}
                   textAnchor="end"
                   dominantBaseline="middle"
-                  fill="#687064"
+                  fill="var(--muted)"
                   fontSize="11"
                 >
                   {formatAxisReturn(tick)}
@@ -124,28 +124,28 @@ export function ObservedReturnSeriesPanel({
           <polyline
             points={points}
             fill="none"
-            stroke="#1f4a3d"
+            stroke="var(--ink)"
             strokeWidth="2"
             strokeLinejoin="round"
             strokeLinecap="round"
           />
         </svg>
       </div>
-      <div className="mt-2 flex justify-between text-xs text-[#7a8175]">
+      <div className="mt-2 flex justify-between text-xs text-[var(--muted)]">
         <span>{formatSimulationDate(rows[0]?.serviceDate ?? null)}</span>
         <span>{formatSimulationDate(rows.at(-1)?.serviceDate ?? null)}</span>
       </div>
 
       <details
         data-observed-return-table
-        className="mt-4 border-t border-[#e1e5da] pt-3"
+        className="mt-4 border-t border-[var(--line)] pt-3"
       >
-        <summary className="cursor-pointer text-sm font-semibold text-[#253029]">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]">
           전체 {rows.length}개 수익률 표 보기
         </summary>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-left text-sm">
-            <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-2 font-semibold">이전 기준일</th>
                 <th className="px-3 py-2 font-semibold">기준일</th>
@@ -154,7 +154,7 @@ export function ObservedReturnSeriesPanel({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.serviceDate} className="border-b border-[#e8ebe3]">
+                <tr key={row.serviceDate} className="border-b border-[var(--wash)]">
                   <td className="whitespace-nowrap px-3 py-2">
                     {formatSimulationDate(row.previousServiceDate)}
                   </td>
@@ -201,8 +201,8 @@ export function resolveSharedObservedReturnScale(
 
 function ReturnSummaryItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[#fbfcf7] px-3 py-2">
-      <dt className="text-xs text-[#687064]">{label}</dt>
+    <div className="bg-[var(--surface)] px-3 py-2">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
     </div>
   );

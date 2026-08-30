@@ -50,7 +50,7 @@ export function RiskInstrumentTable({
                 <tr key={instrument.instrumentKey}>
                   <RiskTableCell strong>
                     <div>{instrument.ticker}</div>
-                    <div className="max-w-56 truncate text-xs font-normal text-[#687064]">
+                    <div className="max-w-56 truncate text-xs font-normal text-[var(--muted)]">
                       {instrument.names.join(", ")}
                     </div>
                   </RiskTableCell>
@@ -110,7 +110,7 @@ function MetricTableValue({
   return (
     <div>
       <div>{value}</div>
-      {detail ? <div className="text-xs text-[#8a5b32]">{detail}</div> : null}
+      {detail ? <div className="text-xs text-[var(--warning)]">{detail}</div> : null}
     </div>
   );
 }

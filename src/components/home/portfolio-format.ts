@@ -49,7 +49,7 @@ export function valueTone(value: number | null) {
 
 export function toneClass(value: number | null) {
   const tone = valueTone(value);
-  if (tone === "positive") return "text-[#347e62]";
-  if (tone === "negative") return "text-[#c8544f]";
-  return "text-[#252824]";
+  if (tone === "positive") return "text-[var(--brand)]";
+  if (tone === "negative") return "text-[var(--negative)]";
+  return "text-[var(--ink)]";
 }

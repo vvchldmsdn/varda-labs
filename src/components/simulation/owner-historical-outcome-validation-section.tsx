@@ -18,7 +18,7 @@ export function OwnerHistoricalOutcomeValidationSection({
   return (
     <section
       aria-labelledby="owner-historical-validation-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-historical-validation
       data-owner-historical-validation-account={result.account}
       data-owner-historical-validation-status={result.status}
@@ -28,7 +28,7 @@ export function OwnerHistoricalOutcomeValidationSection({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             현재 구성 고정 · 과거 약 1개월 관측 점검
           </p>
           <h2
@@ -37,13 +37,13 @@ export function OwnerHistoricalOutcomeValidationSection({
           >
             내 포트폴리오 예측 범위와 실제 결과
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             현재 상장종목 비중을 과거에도 그대로 보유했다고 가정합니다. 각
             종료일 직전 90개 수익률로 500개 경로를 만든 뒤, 바로 이어진
             21개 수익률 구간의 실제 결과와 비교합니다.
           </p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           읽기 전용 · 추천 아님
         </span>
       </div>
@@ -80,14 +80,14 @@ export function OwnerHistoricalOutcomeValidationSection({
       </div>
 
       {result.rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm leading-6 text-[#62542c]">
+        <div className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--warning)]">
           현재 구성의 확률 경로가 먼저 계산되어야 과거 결과를 대조할 수
           있습니다. 입력 점검에 표시된 종목과 이력 상태는 그대로 유지합니다.
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="border-b border-[#dfe3d5] text-xs text-[#687064]">
+            <thead className="border-b border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-2 font-semibold">실제 종료일</th>
                 <th className="px-3 py-2 text-right font-semibold">P10</th>
@@ -103,7 +103,7 @@ export function OwnerHistoricalOutcomeValidationSection({
             <tbody>
               {result.rows.map((row) => (
                 <tr
-                  className="border-b border-[#e7eadf] last:border-b-0"
+                  className="border-b border-[var(--wash)] last:border-b-0"
                   data-owner-historical-validation-row={
                     row.outcomeEndServiceDate
                   }
@@ -151,7 +151,7 @@ export function OwnerHistoricalOutcomeValidationSection({
                       </td>
                     </>
                   ) : (
-                    <td className="px-3 py-2 text-[#7a5117]" colSpan={8}>
+                    <td className="px-3 py-2 text-[var(--warning)]" colSpan={8}>
                       계산 불가 · {historicalValidationReasonLabel(row.reason)}
                     </td>
                   )}
@@ -162,7 +162,7 @@ export function OwnerHistoricalOutcomeValidationSection({
         </div>
       )}
 
-      <div className="mt-3 space-y-1 text-xs leading-5 text-[#687064]">
+      <div className="mt-3 space-y-1 text-xs leading-5 text-[var(--muted)]">
         <p>
           이 결과는 현재 구성을 과거에 고정 적용한 사후 점검입니다. 당시 실제
           보유량·매매 내역을 재현한 성과가 아니며, 비중 최적화나 주문 근거로

@@ -31,17 +31,17 @@ export function HistoryPositionComparison({
       data-history-position-comparison-from={selectedDate(model, "from")}
       data-history-position-comparison-to={selectedDate(model, "to")}
       data-history-position-comparison-source={selectedSource(model)}
-      className="mt-4 border-y border-[#dfe3d5] py-4"
+      className="mt-4 border-y border-[var(--line)] py-4"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             저장 스냅샷 비교
           </p>
           <h3 className="mt-1 text-base font-semibold tracking-normal">
             두 시점 보유 변화
           </h3>
-          <p className="mt-1 text-xs leading-5 text-[#687064]">
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
             같은 계정·출처의 두 저장점을 비교합니다. 실시간 시세나 현재 자산
             정보로 과거 기록을 보완하지 않습니다.
           </p>
@@ -49,7 +49,7 @@ export function HistoryPositionComparison({
         {model.selection.status !== "idle" ? (
           <Link
             href={baseHistoryHref(model, scopeKey)}
-            className="w-fit rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-xs font-semibold text-[#4d574b] hover:bg-[#eef2e8]"
+            className="w-fit rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--wash)]"
           >
             비교 닫기
           </Link>
@@ -66,7 +66,7 @@ export function HistoryPositionComparison({
       {model.status === "ready" || model.status === "partial" ? (
         <HistoryPositionComparisonResult model={model} />
       ) : (
-        <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[#687064]">
+        <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[var(--muted)]">
           {statusMessage(model)}
         </p>
       )}
@@ -111,7 +111,7 @@ function ComparisonForm({
         <button
           type="submit"
           disabled={!canCompare}
-          className="rounded-md bg-[#1e3a34] px-4 py-2 text-sm font-semibold text-white hover:bg-[#284a42] disabled:cursor-not-allowed disabled:bg-[#aeb7aa]"
+          className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:bg-[var(--line)]"
         >
           비교
         </button>
@@ -134,13 +134,13 @@ function EndpointSelect({
   disabled: boolean;
 }) {
   return (
-    <label className="grid min-w-0 gap-1 text-xs font-semibold text-[#687064]">
+    <label className="grid min-w-0 gap-1 text-xs font-semibold text-[var(--muted)]">
       {label}
       <select
         name={name}
         defaultValue={defaultValue ?? ""}
         disabled={disabled}
-        className="min-w-0 rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-sm font-semibold text-[#171916] disabled:bg-[#eef1ea]"
+        className="min-w-0 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] disabled:bg-[var(--wash)]"
       >
         {options.length === 0 ? <option value="">저장점 없음</option> : null}
         {options.map((option) => (

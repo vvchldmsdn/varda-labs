@@ -13,7 +13,7 @@ export function ObservedReturnAlignmentEvidencePanel({
       data-cross-market-alignment={evidence.status}
       data-alignment-service-date-count={evidence.serviceDateCount}
       aria-labelledby="cross-market-alignment-title"
-      className="mt-5 border-y border-[#d7ddcf] py-4"
+      className="mt-5 border-y border-[var(--line)] py-4"
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -23,25 +23,25 @@ export function ObservedReturnAlignmentEvidencePanel({
           >
             교차시장 정렬 근거
           </h2>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-[#596158]">
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             공통 서비스 날짜에 정확한 관측값이 없으면 가격은 최대 7일, USD/KRW는
             최대 3일 범위에서 직전 저장값을 사용합니다. 휴장일을 실제 거래일로
             간주하거나 미래 값을 당겨 쓰지 않습니다.
           </p>
         </div>
-        <p className="text-xs leading-5 text-[#687064]">
+        <p className="text-xs leading-5 text-[var(--muted)]">
           원본 가격·환율·관측 날짜는 표시하지 않음
         </p>
       </div>
 
       {evidence.status === "unavailable" ? (
-        <p className="mt-3 text-sm text-[#6b5227]">
+        <p className="mt-3 text-sm text-[var(--warning)]">
           비교 입력이 완전히 준비되지 않아 정렬 집계를 표시하지 않습니다.
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse text-left text-sm">
-            <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-2 font-semibold">종목</th>
                 <th className="px-3 py-2 text-right font-semibold">
@@ -77,11 +77,11 @@ export function ObservedReturnAlignmentEvidencePanel({
                       ? instrument.fx.carriedObservationCount
                       : 0
                   }
-                  className="border-b border-[#e1e5da]"
+                  className="border-b border-[var(--line)]"
                 >
                   <th className="px-3 py-3 font-semibold">
                     {instrument.ticker}
-                    <span className="ml-2 font-normal text-[#687064]">
+                    <span className="ml-2 font-normal text-[var(--muted)]">
                       {instrument.name}
                     </span>
                   </th>
@@ -111,7 +111,7 @@ export function ObservedReturnAlignmentEvidencePanel({
                   ) : (
                     <td
                       colSpan={3}
-                      className="px-3 py-3 text-right text-[#687064]"
+                      className="px-3 py-3 text-right text-[var(--muted)]"
                     >
                       KRW 종목 · 환율 불필요
                     </td>
@@ -123,7 +123,7 @@ export function ObservedReturnAlignmentEvidencePanel({
         </div>
       )}
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         정확 관측은 해당 서비스 날짜에 대응하는 저장 근거를 뜻합니다. 직전값
         적용은 휴장일 등으로 정책 범위 안의 가장 최근 저장 근거를 사용한
         횟수입니다.
@@ -137,7 +137,7 @@ function MetricCell({ value, detail }: { value: string; detail?: string }) {
     <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
       <span className="font-semibold">{value}</span>
       {detail ? (
-        <span className="ml-1 text-xs text-[#687064]">({detail})</span>
+        <span className="ml-1 text-xs text-[var(--muted)]">({detail})</span>
       ) : null}
     </td>
   );

@@ -64,6 +64,24 @@ describe("simulation presentation", () => {
     assert.equal(simulationReturnLabel(100), "0.0%");
     assert.equal(bands[2].p50, 109);
   });
+  it("keeps the scrubber input independent from sparse chart observations", () => {
+    const source = readFileSync(
+      "src/components/simulation/simulation-fan-explorer.tsx",
+      "utf8",
+    );
+    assert.match(
+      source,
+      /value=\{Math\.round\(activeStep \?\? execution\.assumptions\.horizon\)\}/,
+    );
+    assert.match(
+      source,
+      /onInput=\{\(event\) => setActiveStep\(Number\(event\.currentTarget\.value\)\)\}/,
+    );
+    assert.match(
+      source,
+      /onFocus=\{\(event\) => setActiveStep\(Number\(event\.currentTarget\.value\)\)\}/,
+    );
+  });
   it("keeps preview data development-only and retains production tenant guards", () => {
     const source = readFileSync("src/app/simulation/page.tsx", "utf8");
     assert.match(
@@ -84,7 +102,14 @@ describe("simulation presentation", () => {
       "src/components/simulation/simulation-workspace.tsx",
       "utf8",
     );
-    for (const key of ["view", "end", "horizon", "kodexWeight", "researchUniverse", "preview"]) {
+    for (const key of [
+      "view",
+      "end",
+      "horizon",
+      "kodexWeight",
+      "researchUniverse",
+      "preview",
+    ]) {
       assert.ok(controls.includes(JSON.stringify(key)));
     }
     assert.match(controls, /scroll=\{false\}/);

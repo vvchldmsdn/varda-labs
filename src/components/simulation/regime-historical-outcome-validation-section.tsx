@@ -8,7 +8,7 @@ export function RegimeHistoricalOutcomeValidationSection({
   return (
     <section
       aria-labelledby="regime-historical-outcome-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-regime-historical-outcome-validation
       data-regime-historical-outcome-validation-status={result.status}
       data-regime-historical-outcome-ready-count={
@@ -27,27 +27,27 @@ export function RegimeHistoricalOutcomeValidationSection({
           >
             시장 국면 모델 과거 결과 대조
           </h2>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             과거 각 기준일에서 이전 120개 수익률과 당시까지 공개된
             시장 요인만 사용해 분포를 만든 뒤, 실제 다음 63개 서비스
             기준일 결과와 비교합니다.
           </p>
-          <p className="mt-1 text-sm font-medium text-[#3f473d]">
+          <p className="mt-1 text-sm font-medium text-[var(--ink)]">
             고정 연구 시나리오: KODEX 200 50% + VOO 50%, 최초 배분 후
             리밸런싱 없음
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
-          <span className="rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-[#52566f]">
+          <span className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[var(--brand)]">
             사후 연구
           </span>
-          <span className="rounded-md border border-[#e6d8ae] bg-[#fffdf6] px-3 py-1.5 text-[#6b6044]">
+          <span className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-3 py-1.5 text-[var(--warning)]">
             시점 증거 미확립
           </span>
         </div>
       </div>
 
-      <div className="mt-4 grid border-y border-[#e1e5da] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4">
         <SummaryItem
           detail={`전체 ${result.summary.endpointCount}개 기준일`}
           label="계산 가능한 기준일"
@@ -81,7 +81,7 @@ export function RegimeHistoricalOutcomeValidationSection({
       {result.rows.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-            <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-3 font-semibold">결과 기준일</th>
                 <th className="px-3 py-3 font-semibold">연구 기준일</th>
@@ -103,7 +103,7 @@ export function RegimeHistoricalOutcomeValidationSection({
             <tbody>
               {result.rows.map((row) => (
                 <tr
-                  className="border-b border-[#e1e5da]"
+                  className="border-b border-[var(--line)]"
                   data-regime-historical-outcome-row={
                     row.outcomeEndServiceDate
                   }
@@ -148,7 +148,7 @@ export function RegimeHistoricalOutcomeValidationSection({
                       <td className="px-3 py-3" colSpan={5}>
                         {reasonLabel(row.reason)}
                       </td>
-                      <td className="px-3 py-3 text-[#8a6a21]">
+                      <td className="px-3 py-3 text-[var(--warning)]">
                         계산 불가
                       </td>
                     </>
@@ -159,12 +159,12 @@ export function RegimeHistoricalOutcomeValidationSection({
           </table>
         </div>
       ) : (
-        <p className="mt-4 border-y border-[#e6d8ae] bg-[#fffdf6] px-4 py-4 text-sm text-[#6b6044]">
+        <p className="mt-4 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4 text-sm text-[var(--warning)]">
           검증할 명시적 기준일과 입력 행이 아직 준비되지 않았습니다.
         </p>
       )}
 
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         공개 시각과 과거 데이터 revision 이력이 현재 DB에 보존되지
         않아 이 결과는 엄격한 과거 시점 재현이 아닙니다. 서로 겹치는
         7개 구간은 독립 표본으로 세지 않으며, 합격 판정이나 모델
@@ -186,10 +186,10 @@ function SummaryItem({
   value: string;
 }) {
   return (
-    <div className="border-b border-r border-[#e1e5da] px-4 py-3 last:border-r-0 xl:border-b-0">
-      <p className="text-xs text-[#687064]">{label}</p>
+    <div className="border-b border-r border-[var(--line)] px-4 py-3 last:border-r-0 xl:border-b-0">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#7a8175]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }

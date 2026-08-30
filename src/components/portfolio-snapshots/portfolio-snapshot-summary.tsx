@@ -32,20 +32,20 @@ export function PortfolioSnapshotSummary({
       </div>
 
       {result.aggregate ? (
-        <section className="mt-4 rounded-md border border-[#dfe3d5] bg-[#eef2e8] p-4">
+        <section className="mt-4 rounded-md border border-[var(--line)] bg-[var(--wash)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-[#687064]">
+              <p className="text-xs font-semibold text-[var(--muted)]">
                 {result.aggregate.evidenceKind === "complete_total"
                   ? "Complete owned-account total"
                   : "Available-account subtotal"}
               </p>
-              <p className="mt-1 text-xs text-[#687064]">
+              <p className="mt-1 text-xs text-[var(--muted)]">
                 Derived only from the named owned-account rows shown below; the
                 stored account=all row is not an ownership authority.
               </p>
             </div>
-            <span className="text-xs font-semibold text-[#5e685e]">
+            <span className="text-xs font-semibold text-[var(--muted)]">
               {result.aggregate.accountCount} contributing account
               {result.aggregate.accountCount === 1 ? "" : "s"}
             </span>
@@ -72,7 +72,7 @@ export function PortfolioSnapshotSummary({
       ) : null}
 
       {result.state === "partial" ? (
-        <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+        <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
           Partial evidence only. Missing accounts: {formatPortfolioAccounts(result.missingAccounts)}.
           Excluded rows: {result.excludedSnapshotCount}. Incomplete core rows: {result.incompleteCoreSnapshotCount}.
           {result.hasMixedRuleVersions
@@ -87,8 +87,8 @@ export function PortfolioSnapshotSummary({
 
 function EvidenceCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-2 break-words text-lg font-semibold">{value}</p>
     </div>
   );
@@ -96,8 +96,8 @@ function EvidenceCard({ label, value }: { label: string; value: string }) {
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#d8ddd2] bg-white p-3">
-      <p className="text-xs text-[#687064]">{label}</p>
+    <div className="rounded-md border border-[var(--line)] bg-white p-3">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 font-semibold tabular-nums">{value}</p>
     </div>
   );

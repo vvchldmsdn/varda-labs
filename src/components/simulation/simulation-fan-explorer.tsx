@@ -113,7 +113,7 @@ export function SimulationFanExplorer({
     >
       <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs">
         <div
-          className="flex gap-1 rounded-md bg-[#edf0eb] p-1"
+          className="flex gap-1 rounded-md bg-[var(--wash)] p-1"
           role="group"
           aria-label="경로 표시"
         >
@@ -128,7 +128,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={mode === key}
               onClick={() => setMode(key)}
-              className={`flex min-h-8 items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[#438574] ${mode === key ? "bg-[#fafbf8] text-[#263e32] shadow-sm" : "text-[#737c72] hover:text-[#263e32]"}`}
+              className={`flex min-h-8 items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${mode === key ? "bg-[var(--paper)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon size={14} aria-hidden="true" />
               {label}
@@ -151,7 +151,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={unit === key}
               onClick={() => setUnit(key)}
-              className={`min-h-8 border-b focus-visible:outline-2 focus-visible:outline-[#438574] ${unit === key ? "border-[#294b3b] text-[#294b3b]" : "border-transparent text-[#7b8279]"}`}
+              className={`min-h-8 border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
             >
               {label}
             </button>
@@ -169,8 +169,12 @@ export function SimulationFanExplorer({
             <title>{`${execution.name} 확률 분포`}</title>
             <defs>
               <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#64a48c" stopOpacity="0.24" />
-                <stop offset="100%" stopColor="#64a48c" stopOpacity="0.04" />
+                <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.24" />
+                <stop
+                  offset="100%"
+                  stopColor="var(--brand)"
+                  stopOpacity="0.04"
+                />
               </linearGradient>
             </defs>
             {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
@@ -183,14 +187,14 @@ export function SimulationFanExplorer({
                     x2={right}
                     y1={geometry.y(value)}
                     y2={geometry.y(value)}
-                    stroke="#e0e5dd"
+                    stroke="var(--wash)"
                     strokeDasharray="2 6"
                   />
                   <text
                     x={left - 10}
                     y={geometry.y(value) + 4}
                     textAnchor="end"
-                    fill="#849082"
+                    fill="var(--faint)"
                     fontSize="10"
                   >
                     {format(value)}
@@ -203,7 +207,7 @@ export function SimulationFanExplorer({
               x2={right}
               y1={geometry.y(100)}
               y2={geometry.y(100)}
-              stroke="#9aa99d"
+              stroke="var(--faint)"
               strokeDasharray="4 5"
             />
             <path
@@ -217,7 +221,7 @@ export function SimulationFanExplorer({
                     key={path.id}
                     d={path.d}
                     fill="none"
-                    stroke={path.id % 3 === 0 ? "#929d86" : "#4b927f"}
+                    stroke={path.id % 3 === 0 ? "var(--faint)" : "var(--brand)"}
                     strokeWidth="1"
                     opacity="0.35"
                   />
@@ -226,21 +230,21 @@ export function SimulationFanExplorer({
             <path
               d={geometry.lower}
               fill="none"
-              stroke="#8ea48e"
+              stroke="var(--faint)"
               strokeDasharray="4 5"
               strokeWidth="1"
             />
             <path
               d={geometry.upper}
               fill="none"
-              stroke="#8ea48e"
+              stroke="var(--faint)"
               strokeDasharray="4 5"
               strokeWidth="1"
             />
             <path
               d={geometry.median}
               fill="none"
-              stroke="#2d7663"
+              stroke="var(--brand)"
               strokeWidth="2.5"
             />
             {axisSteps.map((ratio) => (
@@ -250,7 +254,7 @@ export function SimulationFanExplorer({
                   Math.round(execution.assumptions.horizon * ratio),
                 )}
                 y={height - 10}
-                fill="#849082"
+                fill="var(--faint)"
                 fontSize="10"
                 textAnchor={
                   ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"
@@ -268,7 +272,7 @@ export function SimulationFanExplorer({
                   x2={activeX}
                   y1={top}
                   y2={bottom}
-                  stroke="#7b9f8f"
+                  stroke="var(--brand-mid)"
                   strokeDasharray="3 4"
                 />
                 {(["p10", "p50", "p90"] as const).map((key) => (
@@ -277,8 +281,8 @@ export function SimulationFanExplorer({
                     cx={activeX}
                     cy={geometry.y(band[key])}
                     r={key === "p50" ? 4 : 3}
-                    fill="#fafbf8"
-                    stroke="#2d7663"
+                    fill="var(--paper)"
+                    stroke="var(--brand)"
                     strokeWidth="1.5"
                   />
                 ))}
@@ -311,17 +315,17 @@ export function SimulationFanExplorer({
             />
           </svg>
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-[#798475]">
+          <div className="flex h-full items-center justify-center text-sm text-[var(--muted)]">
             표시할 확률 경로가 없습니다.
           </div>
         )}
         {band ? (
           <div
             role="tooltip"
-            className="pointer-events-none absolute top-5 w-[184px] rounded-md border border-[#d6dfd4] bg-[#fafcf9]/95 p-3 text-xs shadow-lg"
+            className="pointer-events-none absolute top-5 w-[184px] rounded-md border border-[var(--line)] bg-[var(--surface)]/95 p-3 text-xs shadow-lg"
             style={{ left: tooltipLeft }}
           >
-            <p className="mb-2 border-b border-[#e0e6dc] pb-2 font-medium">
+            <p className="mb-2 border-b border-[var(--wash)] pb-2 font-medium">
               {band.stepIndex === 0 ? "현재" : `${band.stepIndex}단계`}
             </p>
             <dl className="space-y-2">
@@ -333,7 +337,7 @@ export function SimulationFanExplorer({
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">
-                  <dt className="text-[#798475]">{label}</dt>
+                  <dt className="text-[var(--muted)]">{label}</dt>
                   <dd className="font-medium tabular-nums">{format(value)}</dd>
                 </div>
               ))}
@@ -348,9 +352,10 @@ export function SimulationFanExplorer({
           aria-label={`${execution.name} 경로 시점`}
           min={0}
           max={execution.assumptions.horizon}
-          value={band?.stepIndex ?? execution.assumptions.horizon}
+          value={Math.round(activeStep ?? execution.assumptions.horizon)}
+          onInput={(event) => setActiveStep(Number(event.currentTarget.value))}
           onChange={(event) => setActiveStep(Number(event.target.value))}
-          onFocus={() => setActiveStep(execution.assumptions.horizon)}
+          onFocus={(event) => setActiveStep(Number(event.currentTarget.value))}
           onBlur={() => setActiveStep(null)}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
@@ -364,17 +369,17 @@ export function SimulationFanExplorer({
               : `${execution.assumptions.horizon}단계`
           }
         />
-        <span className="w-16 text-right text-[11px] tabular-nums text-[#798475]">
+        <span className="w-16 text-right text-[11px] tabular-nums text-[var(--muted)]">
           {band?.stepIndex ?? execution.assumptions.horizon}단계
         </span>
       </div>
-      <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[#798475]">
+      <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
         <span className="flex items-center gap-2">
-          <i className="h-0.5 w-5 bg-[#2d7663]" />
+          <i className="h-0.5 w-5 bg-[var(--brand)]" />
           중앙값 P50
         </span>
         <span className="flex items-center gap-2">
-          <i className="h-2.5 w-5 rounded-sm bg-[#cddfd2]" />
+          <i className="h-2.5 w-5 rounded-sm bg-[var(--line)]" />
           P10~P90 · 모형 내 80% 구간
         </span>
         <span>

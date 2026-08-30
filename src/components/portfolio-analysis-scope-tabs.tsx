@@ -28,7 +28,7 @@ export function PortfolioAnalysisScopeTabs({
       className={
         underline
           ? "flex max-w-full items-center gap-7 overflow-x-auto pb-1 text-sm sm:gap-10"
-          : "flex max-w-full gap-1 overflow-x-auto rounded-md border border-[#d8ddd2] bg-white p-1"
+          : "flex max-w-full gap-1 overflow-x-auto rounded-md border border-[var(--line)] bg-white p-1"
       }
     >
       {scopes.map((scope) => {
@@ -40,15 +40,15 @@ export function PortfolioAnalysisScopeTabs({
             aria-label={`${scope.label} ${scopeKindLabel(scope)}`}
             className={
               underline
-                ? `shrink-0 border-b py-2 font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#347e62] ${
+                ? `shrink-0 border-b py-2 font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
                     selected
-                      ? "border-[#20231f] text-[#20231f]"
-                      : "border-transparent text-[#666c64] hover:text-[#20231f]"
+                      ? "border-[var(--ink)] text-[var(--ink)]"
+                      : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
                   }`
                 : `min-w-16 rounded px-3 py-2 text-center text-sm font-semibold whitespace-nowrap ${
                     selected
-                      ? "bg-[#173f38] text-white"
-                      : "text-[#48524a] hover:bg-[#edf1eb]"
+                      ? "bg-[var(--ink)] text-white"
+                      : "text-[var(--muted)] hover:bg-[var(--wash)]"
                   }`
             }
             href={buildPortfolioAnalysisScopeHref(basePath, scope.key, query)}

@@ -12,7 +12,7 @@ export function InvestmentLabSmallAdjustmentResult({
 }) {
   if (result.status === "blocked") {
     return (
-      <div className="border-y border-[#d8c7a1] py-4 text-sm text-[#725f2d]">
+      <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
         {result.blockers.map((blocker) => (
           <p key={blocker}>{calculationBlockerLabel(blocker)}</p>
         ))}
@@ -29,17 +29,17 @@ export function InvestmentLabSmallAdjustmentResult({
 
   return (
     <div
-      className="space-y-5 border-y border-[#dde1db] py-5"
+      className="space-y-5 border-y border-[var(--line)] py-5"
       data-adjustment-result="ready"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold">조정 전후 비교</h3>
-          <p className="mt-1 text-sm text-[#687064]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             {accountLabel} · {formatKrw(result.transferAmountKrw)}
           </p>
         </div>
-        <p className="text-xs text-[#777e73]">
+        <p className="text-xs text-[var(--muted)]">
           현재 평가액 고정 · 거래비용 0원 · 저장 안 함
         </p>
       </div>
@@ -67,17 +67,17 @@ export function InvestmentLabSmallAdjustmentResult({
         />
       </div>
 
-      <section className="overflow-hidden border-y border-[#e1e6dc]">
-        <div className="border-b border-[#e1e6dc] py-3">
+      <section className="overflow-hidden border-y border-[var(--wash)]">
+        <div className="border-b border-[var(--wash)] py-3">
           <h4 className="font-semibold">통화 노출 변화</h4>
-          <p className="mt-1 text-xs text-[#687064]">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             직접 보유 평가액 기준이며 ETF 구성종목 통화는 펼치지 않습니다.
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] border-collapse text-sm">
             <thead>
-              <tr className="text-left text-xs font-semibold text-[#616a5e]">
+              <tr className="text-left text-xs font-semibold text-[var(--muted)]">
                 <th className="px-4 py-3">통화</th>
                 <th className="px-3 py-3 text-right">조정 전</th>
                 <th className="px-3 py-3 text-right">조정 후</th>
@@ -86,7 +86,7 @@ export function InvestmentLabSmallAdjustmentResult({
             </thead>
             <tbody>
               {result.currencyExposures.map((row) => (
-                <tr className="border-t border-[#e1e6dc]" key={row.currency}>
+                <tr className="border-t border-[var(--wash)]" key={row.currency}>
                   <td className="px-4 py-3 font-semibold">{row.currency}</td>
                   <td className="px-3 py-3 text-right tabular-nums">
                     {formatKrw(row.beforeValueKrw)} · {formatPercent(row.beforeWeightPct)}
@@ -117,12 +117,12 @@ function ResultCell({
   detail: string;
 }) {
   return (
-    <div className="border-l-2 border-[#cfd7c7] pl-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="border-l-2 border-[var(--line)] pl-3">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-2 break-words text-base font-semibold tabular-nums">
         {value}
       </p>
-      <p className="mt-1 text-xs tabular-nums text-[#687064]">{detail}</p>
+      <p className="mt-1 text-xs tabular-nums text-[var(--muted)]">{detail}</p>
     </div>
   );
 }

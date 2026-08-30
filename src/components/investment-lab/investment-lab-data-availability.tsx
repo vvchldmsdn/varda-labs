@@ -16,7 +16,7 @@ export function InvestmentLabDataAvailabilityView({
 
   return (
     <section
-      className="overflow-hidden border-y border-[#dde1db]"
+      className="overflow-hidden border-y border-[var(--line)]"
       data-availability-status={model.status}
       data-current-writer-dates={actual.latestCurrentWriterDateCount}
       data-market-fx-gaps={market.fxGapCount}
@@ -30,21 +30,21 @@ export function InvestmentLabDataAvailabilityView({
       data-scenario-count={model.scenarioRows.length}
       data-section="investment-lab-data-availability"
     >
-      <div className="border-b border-[#e1e6dc] py-4">
+      <div className="border-b border-[var(--wash)] py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">계산 데이터 준비 상태</h2>
-            <p className="mt-1 text-sm text-[#687064]">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               보여줄 수 있는 근거와 아직 보완해야 하는 근거를 분리합니다.
             </p>
           </div>
-          <span className="w-fit border-b border-[#718075] pb-1 text-xs font-semibold text-[#4e594d]">
+          <span className="w-fit border-b border-[var(--muted)] pb-1 text-xs font-semibold text-[var(--muted)]">
             자동 보완·DB 쓰기 없음
           </span>
         </div>
       </div>
 
-      <div className="grid border-b border-[#e1e6dc] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid border-b border-[var(--wash)] sm:grid-cols-2 xl:grid-cols-4">
         <AvailabilityMetric
           detail={formatRange(
             actual.latestCurrentWriterStartServiceDate,
@@ -77,14 +77,14 @@ export function InvestmentLabDataAvailabilityView({
       <div className="px-4 py-4">
         <div className="mb-3">
           <h3 className="font-semibold">시나리오별 현재 판단</h3>
-          <p className="mt-1 text-sm text-[#687064]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             시장가격이 있어도 실제 평가액 근거나 과거 시점 정책이 없으면 별도로 표시합니다.
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead>
-              <tr className="border-y border-[#e1e6dc] text-left text-xs font-semibold text-[#616a5e]">
+              <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
                 <th className="px-3 py-3">시나리오 묶음</th>
                 <th className="px-3 py-3">상태</th>
                 <th className="px-3 py-3">판단 근거</th>
@@ -93,7 +93,7 @@ export function InvestmentLabDataAvailabilityView({
             <tbody>
               {model.scenarioRows.map((row) => (
                 <tr
-                  className="border-b border-[#e1e6dc] align-top"
+                  className="border-b border-[var(--wash)] align-top"
                   data-scenario-availability={row.status}
                   data-scenario-family={row.id}
                   key={row.id}
@@ -104,7 +104,7 @@ export function InvestmentLabDataAvailabilityView({
                   <td className="px-3 py-3">
                     <StatusBadge status={row.status} />
                   </td>
-                  <td className="px-3 py-3 text-[#5f685d]">
+                  <td className="px-3 py-3 text-[var(--muted)]">
                     {row.reasons.map(scenarioReasonLabel).join(" · ")}
                   </td>
                 </tr>
@@ -114,10 +114,10 @@ export function InvestmentLabDataAvailabilityView({
         </div>
       </div>
 
-      <div className="grid border-t border-[#e1e6dc] lg:grid-cols-2">
-        <div className="px-4 py-4 lg:border-r lg:border-[#e1e6dc]">
+      <div className="grid border-t border-[var(--wash)] lg:grid-cols-2">
+        <div className="px-4 py-4 lg:border-r lg:border-[var(--wash)]">
           <h3 className="font-semibold">보완 경로</h3>
-          <ul className="mt-3 space-y-2 text-sm text-[#5f685d]">
+          <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
             {model.repairItems.map((item) => (
               <li key={item.id}>
                 {repairItemLabel(item, model.manualValuationHistory)}
@@ -125,24 +125,24 @@ export function InvestmentLabDataAvailabilityView({
             ))}
           </ul>
         </div>
-        <div className="border-t border-[#e1e6dc] px-4 py-4 lg:border-t-0">
+        <div className="border-t border-[var(--wash)] px-4 py-4 lg:border-t-0">
           <h3 className="font-semibold">특수 보유자산</h3>
           {model.specialHoldings.length === 0 ? (
-            <p className="mt-3 text-sm text-[#5f685d]">
+            <p className="mt-3 text-sm text-[var(--muted)]">
               이 계정 범위에는 별도 처리 대상이 없습니다.
             </p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm text-[#5f685d]">
+            <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
               {model.specialHoldings.map((holding) => (
                 <li key={`${holding.account}:${holding.name}`}>
-                  <strong className="text-[#2f3931]">{holding.name}</strong>
+                  <strong className="text-[var(--ink)]">{holding.name}</strong>
                   {" · "}
                   {specialHoldingLabel(
                     holding.kind,
                     model.manualValuationHistory.status,
                   )}
                   {holding.kind === "krx_gold" ? (
-                    <p className="mt-1 text-xs text-[#777e73]">
+                    <p className="mt-1 text-xs text-[var(--muted)]">
                       {manualValuationSummary(model.manualValuationHistory)}
                     </p>
                   ) : null}
@@ -158,14 +158,14 @@ export function InvestmentLabDataAvailabilityView({
 
 export function InvestmentLabDataAvailabilitySkeleton() {
   return (
-    <section className="h-72 animate-pulse border-y border-[#dde1db] bg-[#f2f4ef]" />
+    <section className="h-72 animate-pulse border-y border-[var(--line)] bg-[var(--wash)]" />
   );
 }
 
 export function InvestmentLabDataAvailabilityUnavailable() {
   return (
     <section
-      className="border-y border-[#d8c69d] py-4 text-sm text-[#725f2d]"
+      className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]"
       data-availability-status="unavailable"
       data-section="investment-lab-data-availability"
     >
@@ -184,10 +184,10 @@ function AvailabilityMetric({
   value: string;
 }) {
   return (
-    <div className="border-b border-[#e1e6dc] px-4 py-4 last:border-b-0 sm:border-r sm:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="border-b border-[var(--wash)] px-4 py-4 last:border-b-0 sm:border-r sm:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:last:border-r-0">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-2 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#777e73]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }
@@ -195,12 +195,12 @@ function AvailabilityMetric({
 function StatusBadge({ status }: { status: InvestmentLabScenarioAvailabilityStatus }) {
   const style =
     status === "limited_input_ready"
-      ? "border-[#c7dfd1] bg-[#edf7f0] text-[#356555]"
+      ? "border-[var(--line)] bg-[var(--wash)] text-[var(--brand)]"
       : status === "market_only_ready"
-        ? "border-[#d8dfbf] bg-[#f5f7e9] text-[#5e6b2d]"
+        ? "border-[var(--brand-soft)] bg-[var(--wash)] text-[var(--brand)]"
         : status === "research_only"
-          ? "border-[#d8d9e5] bg-[#f2f2f8] text-[#52566f]"
-          : "border-[#eadfbe] bg-[#fff9e8] text-[#725f2d]";
+          ? "border-[var(--line)] bg-[var(--surface)] text-[var(--brand)]"
+          : "border-[var(--warning-soft)] bg-[var(--surface)] text-[var(--warning)]";
   return (
     <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${style}`}>
       {statusLabel(status)}

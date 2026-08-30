@@ -99,7 +99,7 @@ export function InvestmentLabContributionExperiment({
 
   return (
     <section
-      className="border-y border-[#dde1db] py-6"
+      className="border-y border-[var(--line)] py-6"
       data-contribution-experiment="ephemeral_client_only"
       data-contribution-policy={
         INVESTMENT_LAB_CONTRIBUTION_EXPERIMENT_POLICY.version
@@ -121,15 +121,15 @@ export function InvestmentLabContributionExperiment({
       }
       id="investment-lab-contribution-experiment"
     >
-      <div className="flex flex-col gap-1 border-b border-[#dde1db] pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-1 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">과거 추가 투입 효과 실험</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             선택한 관측일에 추가 원금이 고정 시나리오에 함께 반영됐다면
             종료 평가액이 어떻게 달라졌는지 계산합니다.
           </p>
         </div>
-        <p className="text-xs font-semibold text-[#687064]">
+        <p className="text-xs font-semibold text-[var(--muted)]">
           입력값 저장 안 함
         </p>
       </div>
@@ -141,16 +141,16 @@ export function InvestmentLabContributionExperiment({
             onSubmit={calculate}
           >
             <fieldset className="min-w-0">
-              <legend className="mb-2 text-xs font-semibold text-[#596255]">
+              <legend className="mb-2 text-xs font-semibold text-[var(--muted)]">
                 고정 시나리오
               </legend>
-              <div className="flex min-h-10 max-w-full gap-5 overflow-x-auto border-b border-[#d7dccf]">
+              <div className="flex min-h-10 max-w-full gap-5 overflow-x-auto border-b border-[var(--line)]">
                 {fixedMixWeights ? (
                   <button
                     className={
                       scenarioId === "fixed_mix"
-                        ? "min-w-max border-b-2 border-[#173f38] px-1 py-2 text-sm font-semibold text-[#173f38]"
-                        : "min-w-max border-b-2 border-transparent px-1 py-2 text-sm font-semibold text-[#6f766e] hover:text-[#173f38] disabled:cursor-not-allowed disabled:text-[#9ca397]"
+                        ? "min-w-max border-b-2 border-[var(--ink)] px-1 py-2 text-sm font-semibold text-[var(--ink)]"
+                        : "min-w-max border-b-2 border-transparent px-1 py-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:text-[var(--faint)]"
                     }
                     disabled={!fixedMixEvidence}
                     onClick={selectFixedMix}
@@ -165,8 +165,8 @@ export function InvestmentLabContributionExperiment({
                   <button
                     className={
                       candidate.scenarioId === scenarioId
-                        ? "min-w-max border-b-2 border-[#173f38] px-1 py-2 text-sm font-semibold text-[#173f38]"
-                        : "min-w-max border-b-2 border-transparent px-1 py-2 text-sm font-semibold text-[#6f766e] hover:text-[#173f38]"
+                        ? "min-w-max border-b-2 border-[var(--ink)] px-1 py-2 text-sm font-semibold text-[var(--ink)]"
+                        : "min-w-max border-b-2 border-transparent px-1 py-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)]"
                     }
                     key={candidate.scenarioId}
                     onClick={() => selectScenario(candidate)}
@@ -178,10 +178,10 @@ export function InvestmentLabContributionExperiment({
               </div>
             </fieldset>
 
-            <label className="min-w-0 text-xs font-semibold text-[#596255]">
+            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]">
               관측 기준일
               <select
-                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 onChange={(event) => {
                   setServiceDate(event.target.value);
                   setResult(null);
@@ -196,10 +196,10 @@ export function InvestmentLabContributionExperiment({
               </select>
             </label>
 
-            <label className="min-w-0 text-xs font-semibold text-[#596255]">
+            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]">
               추가 원금 (KRW)
               <input
-                className="mt-2 h-10 w-full rounded-[4px] border border-[#d7dccf] bg-white px-3 text-sm font-normal text-[#171916]"
+                className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 inputMode="numeric"
                 min="1"
                 onChange={(event) => {
@@ -214,14 +214,14 @@ export function InvestmentLabContributionExperiment({
             </label>
 
             <button
-              className="h-10 rounded-[4px] bg-[#173f38] px-5 text-sm font-semibold text-white hover:bg-[#0f302a]"
+              className="h-10 rounded-[4px] bg-[var(--ink)] px-5 text-sm font-semibold text-white hover:bg-[var(--ink)]"
               type="submit"
             >
               계산
             </button>
           </form>
 
-          <p className="mt-3 text-xs leading-5 text-[#777e73]">
+          <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
             {scenarioId === "fixed_mix" && fixedMixEvidence
               ? fixedMixPriceBasisLabel(
                   fixedMixEvidence.weights,
@@ -235,12 +235,12 @@ export function InvestmentLabContributionExperiment({
           <ContributionResult result={result} />
         </>
       ) : (
-        <p className="mt-4 text-sm text-[#725f2d]">
+        <p className="mt-4 text-sm text-[var(--warning)]">
           현재 계산 가능한 고정 시나리오가 없습니다.
         </p>
       )}
 
-      <p className="mt-5 border-t border-[#e1e6dc] pt-3 text-xs leading-5 text-[#777e73]">
+      <p className="mt-5 border-t border-[var(--wash)] pt-3 text-xs leading-5 text-[var(--muted)]">
         실제 보유 자산, 현금, 거래 기록은 변경하지 않습니다. 이 결과는 목표
         비중이나 매수 추천이 아니며 브라우저를 벗어나 저장되지 않습니다.
         실제 추가 투입 분배 화면과도 연결되지 않는 과거 연구 실험입니다.
@@ -260,14 +260,14 @@ function ContributionResult({
   }
   if (result.status === "blocked") {
     return (
-      <p className="mt-4 border-t border-[#eadfbe] pt-4 text-sm text-[#725f2d]">
+      <p className="mt-4 border-t border-[var(--warning-soft)] pt-4 text-sm text-[var(--warning)]">
         {blockerLabel(result.blockers[0])}
       </p>
     );
   }
 
   return (
-    <div className="mt-5 border-t border-[#e1e6dc] pt-4">
+    <div className="mt-5 border-t border-[var(--wash)] pt-4">
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
         <ResultMetric
           label="추가 원금"
@@ -291,7 +291,7 @@ function ContributionResult({
           value={`${formatSignedKrw(result.additionalProfitKrw)} · ${formatSignedPercent(result.additionalReturn)}`}
         />
       </div>
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         관측일 {formatDate(result.contributionServiceDate)} · 가격 근거일{" "}
         {formatDate(result.contributionPriceDate)} · 종료일{" "}
         {formatDate(result.endServiceDate)} · 가정 수량{" "}
@@ -308,7 +308,7 @@ function FixedMixContributionResult({
 }) {
   if (result.status === "blocked") {
     return (
-      <p className="mt-4 border-t border-[#eadfbe] pt-4 text-sm text-[#725f2d]">
+      <p className="mt-4 border-t border-[var(--warning-soft)] pt-4 text-sm text-[var(--warning)]">
         {fixedMixBlockerLabel(result.blockers[0])}
       </p>
     );
@@ -318,7 +318,7 @@ function FixedMixContributionResult({
   const vooWeightPct = result.weights.vooWeightBps / 100;
   return (
     <div
-      className="mt-5 border-t border-[#e1e6dc] pt-4"
+      className="mt-5 border-t border-[var(--wash)] pt-4"
       data-fixed-mix-contribution-result="ready"
     >
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -344,14 +344,14 @@ function FixedMixContributionResult({
           value={`${formatSignedKrw(result.additionalProfitKrw)} · ${formatSignedPercent(result.additionalReturn)}`}
         />
       </div>
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         관측일 {formatDate(result.contributionServiceDate)} · KODEX 가격 근거일{" "}
         {formatDate(result.kodexContributionPriceDate)} · VOO 가격 근거일{" "}
         {formatDate(result.vooContributionPriceDate)} · USD/KRW 기준일{" "}
         {formatDate(result.contributionServiceDate)} · 종료일{" "}
         {formatDate(result.endServiceDate)}
       </p>
-      <p className="mt-2 text-xs leading-5 text-[#687064]">
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
         KODEX {kodexWeightPct}% {formatKrw(result.allocation.kodexAmountKrw)} ·{" "}
         {formatUnits(result.allocation.kodexUnits)}주 / VOO {vooWeightPct}%{" "}
         {formatKrw(result.allocation.vooAmountKrw)} ·{" "}
@@ -372,15 +372,15 @@ function ResultMetric({
   tone?: "default" | "positive" | "negative";
 }) {
   return (
-    <div className="min-w-0 border-l-2 border-[#dfe3d5] pl-3">
-      <p className="text-xs text-[#687064]">{label}</p>
+    <div className="min-w-0 border-l-2 border-[var(--line)] pl-3">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
       <p
         className={
           tone === "positive"
-            ? "mt-1 break-words text-base font-semibold text-[#087f4f]"
+            ? "mt-1 break-words text-base font-semibold text-[var(--brand)]"
             : tone === "negative"
-              ? "mt-1 break-words text-base font-semibold text-[#c43f43]"
-              : "mt-1 break-words text-base font-semibold text-[#171916]"
+              ? "mt-1 break-words text-base font-semibold text-[var(--negative)]"
+              : "mt-1 break-words text-base font-semibold text-[var(--ink)]"
         }
       >
         {value}

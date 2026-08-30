@@ -28,7 +28,7 @@ export function AccountCreateForm() {
 
   return (
     <form action={action} className="space-y-3" ref={formRef}>
-      <label className="block text-sm font-semibold text-[#35423a]">
+      <label className="block text-sm font-semibold text-[var(--ink)]">
         Account name
         <input
           className={fieldClassName}
@@ -39,7 +39,7 @@ export function AccountCreateForm() {
           type="text"
         />
       </label>
-      <p className="text-xs leading-5 text-[#687064]">
+      <p className="text-xs leading-5 text-[var(--muted)]">
         New accounts use KRW as the reporting base. Each holding keeps its own
         market currency, so USD holdings remain supported.
       </p>
@@ -70,24 +70,24 @@ export function AccountEditor({ account }: { account: AccountModel }) {
     account.activeHoldingCount > 0 || account.openGroupReferenceCount > 0;
 
   return (
-    <article className="rounded-md border border-[#dfe3d5] bg-white p-4">
+    <article className="rounded-md border border-[var(--line)] bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-semibold text-[#202721]">{account.name}</p>
-          <p className="mt-1 text-xs text-[#687064]">
+          <p className="font-semibold text-[var(--ink)]">{account.name}</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
             {account.accountType} / {account.currency}
           </p>
         </div>
-        <dl className="flex gap-4 text-right text-xs text-[#687064]">
+        <dl className="flex gap-4 text-right text-xs text-[var(--muted)]">
           <div>
             <dt>Active holdings</dt>
-            <dd className="mt-1 font-semibold text-[#202721]">
+            <dd className="mt-1 font-semibold text-[var(--ink)]">
               {account.activeHoldingCount}
             </dd>
           </div>
           <div>
             <dt>Group references</dt>
-            <dd className="mt-1 font-semibold text-[#202721]">
+            <dd className="mt-1 font-semibold text-[var(--ink)]">
               {account.openGroupReferenceCount}
             </dd>
           </div>
@@ -96,7 +96,7 @@ export function AccountEditor({ account }: { account: AccountModel }) {
 
       <form action={updateAction} className="mt-4 flex flex-wrap items-end gap-3">
         <IdentityFields account={account} />
-        <label className="min-w-56 flex-1 text-sm font-semibold text-[#35423a]">
+        <label className="min-w-56 flex-1 text-sm font-semibold text-[var(--ink)]">
           Display name
           <input
             className={fieldClassName}
@@ -119,13 +119,13 @@ export function AccountEditor({ account }: { account: AccountModel }) {
 
       <form
         action={archiveAction}
-        className="mt-4 flex flex-col gap-3 border-t border-[#e4e8de] pt-4 sm:flex-row sm:items-center sm:justify-between"
+        className="mt-4 flex flex-col gap-3 border-t border-[var(--wash)] pt-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <IdentityFields account={account} />
         <div className="min-w-0 flex-1">
-          <label className="flex items-start gap-2 text-sm text-[#687064]">
+          <label className="flex items-start gap-2 text-sm text-[var(--muted)]">
             <input
-              className="mt-0.5 h-4 w-4 accent-[#8a3d32]"
+              className="mt-0.5 h-4 w-4 accent-[var(--negative)]"
               disabled={archiveBlocked}
               name="archiveConfirmed"
               required
@@ -137,7 +137,7 @@ export function AccountEditor({ account }: { account: AccountModel }) {
             </span>
           </label>
           {archiveBlocked ? (
-            <p className="mt-2 text-xs text-[#8a5b16]">
+            <p className="mt-2 text-xs text-[var(--warning)]">
               Close or move holdings and remove group references first.
             </p>
           ) : null}
@@ -159,10 +159,10 @@ export function ArchivedAccountRow({ account }: { account: AccountModel }) {
   const [state, action, pending] = useActionState(restoreAccount, INITIAL_STATE);
 
   return (
-    <article className="flex flex-col gap-3 rounded-md border border-[#dfe3d5] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+    <article className="flex flex-col gap-3 rounded-md border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="font-semibold text-[#4d554f]">{account.name}</p>
-        <p className="mt-1 text-xs text-[#7a817b]">
+        <p className="font-semibold text-[var(--muted)]">{account.name}</p>
+        <p className="mt-1 text-xs text-[var(--faint)]">
           Archived / {account.accountType} / {account.currency}
         </p>
       </div>
@@ -200,8 +200,8 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
       aria-live="polite"
       className={
         state.status === "success"
-          ? "text-sm text-[#1e5d49]"
-          : "text-sm text-[#8a5b16]"
+          ? "text-sm text-[var(--brand)]"
+          : "text-sm text-[var(--warning)]"
       }
     >
       {state.message}
@@ -210,10 +210,10 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
 }
 
 const fieldClassName =
-  "mt-1.5 w-full rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-normal text-[#171916] outline-none focus:border-[#1e3a34]";
+  "mt-1.5 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--ink)]";
 const primaryButtonClassName =
-  "rounded-md bg-[#1e3a34] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButtonClassName =
-  "rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8] disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)] disabled:cursor-not-allowed disabled:opacity-50";
 const dangerButtonClassName =
-  "rounded-md border border-[#d9b8b0] bg-white px-4 py-2 text-sm font-semibold text-[#8a3d32] disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md border border-[var(--warning-soft)] bg-white px-4 py-2 text-sm font-semibold text-[var(--negative)] disabled:cursor-not-allowed disabled:opacity-50";

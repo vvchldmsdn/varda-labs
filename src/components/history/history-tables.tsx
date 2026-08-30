@@ -37,7 +37,7 @@ export function BalanceHistoryTable({
   return (
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs text-[#687064]">
+        <thead className="text-xs text-[var(--muted)]">
           <tr>
             <TableHeader>잔액 기준일</TableHeader>
             <TableHeader align="right">선택 계정</TableHeader>
@@ -51,7 +51,7 @@ export function BalanceHistoryTable({
           {rows.map((row, index) => (
             <tr
               key={`balance:${row.balanceDate}:${index}`}
-              className="border-t border-[#e1e6dc]"
+              className="border-t border-[var(--wash)]"
             >
               <TableCell strong>{row.balanceDate}</TableCell>
               <TableCell align="right">
@@ -91,7 +91,7 @@ export function PortfolioHistoryTable({
   return (
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs text-[#687064]">
+        <thead className="text-xs text-[var(--muted)]">
           <tr>
             <TableHeader>스냅샷 저장일</TableHeader>
             <TableHeader>계정</TableHeader>
@@ -122,8 +122,8 @@ export function PortfolioHistoryTable({
                 data-history-row-kind={row.rowKind}
                 data-history-position-selected={selected ? "true" : undefined}
                 className={cn(
-                  "border-t border-[#e1e6dc]",
-                  selected && "bg-[#eef2e8]",
+                  "border-t border-[var(--wash)]",
+                  selected && "bg-[var(--wash)]",
                 )}
               >
                 <TableCell strong>{row.snapshotDate}</TableCell>
@@ -151,7 +151,7 @@ export function PortfolioHistoryTable({
                 <TableCell>
                   {selectedScope.kind !== "account" ||
                   row.rowKind !== "stored" ? (
-                    <span className="text-xs text-[#687064]">
+                    <span className="text-xs text-[var(--muted)]">
                       범위 상세 준비 중
                     </span>
                   ) : (
@@ -162,7 +162,7 @@ export function PortfolioHistoryTable({
                         lane,
                         selectedScope.key,
                       )}
-                      className="inline-flex rounded-md border border-[#d7ddcf] bg-white px-2 py-1 text-xs font-semibold text-[#1e3a34] hover:bg-[#eef2e8]"
+                      className="inline-flex rounded-md border border-[var(--line)] bg-white px-2 py-1 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
                     >
                       {selected ? "선택됨" : "보유 상세"}
                     </Link>
@@ -210,7 +210,7 @@ function portfolioRowScopeLabel(scope: PortfolioAnalysisScope) {
 
 function EmptyTableMessage({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[#687064]">
+    <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[var(--muted)]">
       {children}
     </p>
   );

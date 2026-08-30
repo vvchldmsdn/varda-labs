@@ -61,7 +61,7 @@ export function SimulationWorkspace({
 
   return (
     <div data-simulation-workspace={selected}>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-[#dde1db]">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
         <div
           className="flex max-w-full gap-4 overflow-x-auto sm:gap-8"
           role="tablist"
@@ -78,7 +78,7 @@ export function SimulationWorkspace({
               tabIndex={selected === view ? 0 : -1}
               onClick={() => select(view)}
               onKeyDown={(event) => navigate(event, index)}
-              className={`flex min-h-12 shrink-0 items-center gap-2 border-b-2 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-[#438574] sm:text-sm ${selected === view ? "border-[#253e35] text-[#203a31]" : "border-transparent text-[#737b73] hover:text-[#202a24]"}`}
+              className={`flex min-h-12 shrink-0 items-center gap-2 border-b-2 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-[var(--brand)] sm:text-sm ${selected === view ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon
                 aria-hidden="true"
@@ -101,7 +101,7 @@ export function SimulationWorkspace({
           id={`${id}-${view.id}-panel`}
           aria-labelledby={`${id}-${view.id}-tab`}
           hidden={selected !== view.id}
-          className="min-w-0 focus-visible:outline-2 focus-visible:outline-[#438574]"
+          className="min-w-0 focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
           tabIndex={0}
         >
           {panels[view.id]}

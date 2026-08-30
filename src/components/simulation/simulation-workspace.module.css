@@ -1,6 +1,6 @@
 .details {
   min-width: 0;
-  --simulation-rule: #dde3d9;
+  --simulation-rule: var(--line);
 }
 
 .details section {
@@ -56,7 +56,7 @@
 }
 .scrubber::-webkit-slider-runnable-track {
   height: 2px;
-  background: #cfd9cd;
+  background: var(--line);
 }
 .scrubber::-webkit-slider-thumb {
   appearance: none;
@@ -64,21 +64,21 @@
   height: 10px;
   margin-top: -4px;
   border-radius: 50%;
-  background: #528873;
+  background: var(--brand);
 }
 .scrubber::-moz-range-track {
   height: 2px;
-  background: #cfd9cd;
+  background: var(--line);
 }
 .scrubber::-moz-range-thumb {
   width: 10px;
   height: 10px;
   border: 0;
   border-radius: 50%;
-  background: #528873;
+  background: var(--brand);
 }
 .scrubber:focus-visible {
-  outline: 2px solid #438574;
+  outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
 

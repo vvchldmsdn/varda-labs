@@ -25,11 +25,11 @@ export function ManualKrxGoldPriceForm({
 
   return (
     <form action={action} className="mt-3 min-w-[210px] space-y-2">
-      <label className="block text-xs font-semibold text-[#35423a]">
+      <label className="block text-xs font-semibold text-[var(--ink)]">
         1g 평가액 (KRW)
         <input
           aria-describedby="manual-gold-price-message"
-          className="mt-1 w-full rounded-md border border-[#cfd6c8] bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-[#1e3a34]"
+          className="mt-1 w-full rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-[var(--ink)]"
           defaultValue={Number(currentPrice)}
           inputMode="decimal"
           max={KRX_GOLD_MANUAL_ASSET_BINDING.maximumPriceKrwPerG}
@@ -41,7 +41,7 @@ export function ManualKrxGoldPriceForm({
         />
       </label>
       <button
-        className="w-full rounded-md bg-[#1e3a34] px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={pending}
         type="submit"
       >
@@ -51,7 +51,7 @@ export function ManualKrxGoldPriceForm({
         aria-live="polite"
         className={[
           "min-h-4 text-xs",
-          state.status === "success" ? "text-[#1e5d49]" : "text-[#8a5b16]",
+          state.status === "success" ? "text-[var(--brand)]" : "text-[var(--warning)]",
         ].join(" ")}
         id="manual-gold-price-message"
       >

@@ -55,22 +55,22 @@ export function PortfolioDashboard({
   const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f7f8f5] text-[#20231f]">
+    <main className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]" data-page="home">
       <PortfolioPrimaryNavigation
         activePath="/"
         generatedAt={data.generatedAt}
         selectedScopeKey={data.selectedScope.key}
       />
 
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-10 pt-8 sm:px-8 lg:px-10 lg:pb-14 lg:pt-10">
+      <div className="varda-content">
         <section aria-labelledby="portfolio-overview-title">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
-                <p className="text-[11px] font-medium text-[#7b8079]">PORTFOLIO / OVERVIEW</p>
-                <h1 id="portfolio-overview-title" className="sr-only">포트폴리오 홈</h1>
+                <p className="text-[11px] font-medium text-[var(--muted)]">PORTFOLIO / OVERVIEW</p>
+                <h1 id="portfolio-overview-title" className="varda-page-title">자산의 흐름</h1>
               </div>
-              <p className="text-xs text-[#7b8079]">
+              <p className="text-xs text-[var(--muted)]">
                 기준일 {formatDate(data.movementBaselineDate)}
               </p>
             </div>
@@ -83,11 +83,11 @@ export function PortfolioDashboard({
             />
           </div>
 
-          <div className="pb-10 pt-12 text-center sm:pb-12 sm:pt-14 lg:pb-14 lg:pt-16">
-            <p className="text-xs font-medium text-[#737970]">
+          <div className="varda-summary-stage">
+            <p className="text-xs font-medium text-[var(--muted)]">
               {homeScopeLabel(data.selectedScope)}
             </p>
-            <p className="mt-3 text-5xl font-normal tabular-nums text-[#151714] sm:text-6xl lg:text-[80px]">
+            <p className="varda-primary-number mt-3 text-[var(--ink)]">
               {formatKrw(data.totalValueKrw)}
             </p>
             <dl className="mx-auto mt-7 flex max-w-2xl flex-wrap items-center justify-center gap-y-3 text-sm">
@@ -102,7 +102,7 @@ export function PortfolioDashboard({
           </div>
         </section>
 
-        <div className="grid gap-12 border-t border-[#d9ddd7] pt-9 lg:gap-14">
+        <div className="grid gap-12 pt-3 lg:gap-16">
           <div className="min-w-0">
             <PortfolioHistoryChart
               events={data.eventActivity.map((event) => ({
@@ -118,7 +118,7 @@ export function PortfolioDashboard({
               points={data.recentSnapshots}
             />
           </div>
-          <div className="min-w-0 border-t border-[#d9ddd7] pt-9">
+          <div className="min-w-0 border-t border-[var(--line)] pt-9">
             <HoldingMovementHeatmap
               history={data.holdingHistory}
               riskHref={riskHref}
@@ -129,14 +129,14 @@ export function PortfolioDashboard({
 
         <div className="mt-8 flex justify-end">
           <Link
-            className="inline-flex items-center gap-3 text-sm font-medium text-[#343833] hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+            className="inline-flex items-center gap-3 text-sm font-medium text-[var(--ink)] hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
             href={scopedHref("/today", data.selectedScope.key)}
           >
             오늘의 흐름 전체 보기 <span aria-hidden="true">→</span>
           </Link>
         </div>
 
-        <section aria-label="오늘의 핵심 근거" className="mt-5 border-y border-[#d9ddd7]">
+        <section aria-label="오늘의 핵심 근거" className="mt-5 border-y border-[var(--line)]">
           <div className="grid sm:grid-cols-2 lg:grid-cols-5">
             <EvidenceMetric
               label="평가액 변동"
@@ -177,13 +177,13 @@ export function PortfolioDashboard({
           </div>
         </section>
 
-        <section aria-label="빠른 작업" className="grid gap-6 border-b border-[#d9ddd7] py-7 sm:grid-cols-3 sm:gap-0">
-          <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
+        <section aria-label="빠른 작업" className="grid gap-6 border-b border-[var(--line)] py-7 sm:grid-cols-3 sm:gap-0">
+          <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
             <PortfolioRefreshButton autoSync={liveSyncEnabled} />
           </div>
-          <div className="flex justify-center sm:border-r sm:border-[#d9ddd7]">
+          <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
             <Link
-              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
               href="/portfolio/holdings/new"
             >
               <span aria-hidden="true" className="text-xl">＋</span>
@@ -192,7 +192,7 @@ export function PortfolioDashboard({
           </div>
           <div className="flex justify-center">
             <Link
-              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
               href={scopedHref("/additional-contribution", data.selectedScope.key)}
             >
               <span aria-hidden="true" className="text-xl">Σ</span>
@@ -201,7 +201,7 @@ export function PortfolioDashboard({
           </div>
         </section>
 
-        <footer className="flex flex-col gap-2 pt-5 text-[11px] text-[#858a83] sm:flex-row sm:items-center sm:justify-between">
+        <footer className="flex flex-col gap-2 pt-5 text-[11px] text-[var(--faint)] sm:flex-row sm:items-center sm:justify-between">
           <p>
             USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}
             {data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)} 기준` : ""}
@@ -225,8 +225,8 @@ function HeroMetric({
   value: string;
 }) {
   return (
-    <div className={`flex items-center gap-3 px-4 ${divided ? "border-l border-[#d3d7d1]" : ""}`}>
-      <dt className="text-[#666c64]">{label}</dt>
+    <div className={`flex items-center gap-3 px-4 ${divided ? "border-l border-[var(--line)]" : ""}`}>
+      <dt className="text-[var(--muted)]">{label}</dt>
       <dd className={`font-medium tabular-nums ${toneClass(tone)}`}>{value}</dd>
     </div>
   );
@@ -244,12 +244,12 @@ function EvidenceMetric({
   value: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[#e2e5df] px-5 py-6 last:border-b-0 sm:odd:border-r sm:odd:border-[#e2e5df] lg:border-b-0 lg:border-r lg:border-[#e2e5df] lg:last:border-r-0">
-      <p className="text-xs font-medium text-[#6d736b]">{label}</p>
+    <div className="min-w-0 border-b border-[var(--wash)] px-5 py-6 last:border-b-0 sm:odd:border-r sm:odd:border-[var(--wash)] lg:border-b-0 lg:border-r lg:border-[var(--wash)] lg:last:border-r-0">
+      <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
       <p className={`mt-3 truncate text-xl font-medium tabular-nums ${toneClass(tone)}`} title={value}>
         {value}
       </p>
-      <p className="mt-2 truncate text-xs text-[#747a72]" title={subValue}>{subValue}</p>
+      <p className="mt-2 truncate text-xs text-[var(--muted)]" title={subValue}>{subValue}</p>
     </div>
   );
 }

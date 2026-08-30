@@ -4,7 +4,7 @@ const WIDTH = 1000;
 const HEIGHT = 360;
 const PADDING_X = 48;
 const PADDING_Y = 36;
-const SERIES_COLORS = ["#cb5948", "#527f72", "#b28a3e"] as const;
+const SERIES_COLORS = ["var(--negative)", "var(--brand)", "var(--warning)"] as const;
 
 export function InvestmentLabFixedMixComparisonChart({
   scenarios,
@@ -41,8 +41,8 @@ export function InvestmentLabFixedMixComparisonChart({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-4 text-sm text-[#5f665d]">
-        <Legend color="#1e3a34" label="실제 포트폴리오" />
+      <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--muted)]">
+        <Legend color="var(--ink)" label="실제 포트폴리오" />
         {ready.map((entry, index) => (
           <Legend
             color={SERIES_COLORS[index]}
@@ -69,7 +69,7 @@ export function InvestmentLabFixedMixComparisonChart({
           return (
             <line
               key={ratio}
-              stroke="#dfe3d8"
+              stroke="var(--line)"
               strokeDasharray="4 6"
               strokeWidth="1"
               x1={PADDING_X}
@@ -82,7 +82,7 @@ export function InvestmentLabFixedMixComparisonChart({
         <polyline
           fill="none"
           points={points(actualRows.map((row) => row.actualMarketValueKrw))}
-          stroke="#1e3a34"
+          stroke="var(--ink)"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
@@ -101,7 +101,7 @@ export function InvestmentLabFixedMixComparisonChart({
           />
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-xs text-[#72786e]">
+      <div className="mt-1 flex justify-between text-xs text-[var(--muted)]">
         <span>{formatDate(actualRows[0]?.serviceDate)}</span>
         <span>{formatDate(actualRows.at(-1)?.serviceDate)}</span>
       </div>

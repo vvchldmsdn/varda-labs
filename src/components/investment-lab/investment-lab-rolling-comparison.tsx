@@ -11,7 +11,7 @@ export function InvestmentLabRollingComparisonView({
   return (
     <section
       aria-labelledby="investment-lab-rolling-title"
-      className="min-w-0 space-y-6 border-t border-[#dde1db] py-6"
+      className="min-w-0 space-y-6 border-t border-[var(--line)] py-6"
       data-rolling-candidate-windows={model.candidateWindowCount}
       data-rolling-complete-windows={model.completeWindowCount}
       data-rolling-excluded-windows={model.excludedWindowCount}
@@ -19,8 +19,8 @@ export function InvestmentLabRollingComparisonView({
       data-rolling-status={model.status}
       data-section="investment-lab-rolling-comparison"
     >
-      <header className="border-b border-[#dde1db] pb-6">
-        <p className="text-[11px] font-medium text-[#777d75]">
+      <header className="border-b border-[var(--line)] pb-6">
+        <p className="text-[11px] font-medium text-[var(--muted)]">
           ROLLING HINDSIGHT
         </p>
         <h2
@@ -29,13 +29,13 @@ export function InvestmentLabRollingComparisonView({
         >
           과거 최고·최저 rolling 구간
         </h2>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-[#626b5f]">
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--muted)]">
           저장된 완전 관측 구간 중 실제 포트폴리오의 현금흐름 조정 추정수익률이
           가장 높고 낮았던 {model.policy.observationCount}개 관측일을 찾고, 같은
           시작 평가액과 같은 매수·매도 흐름을 KODEX 200 및 VOO에 적용한 결과를
           나란히 비교합니다. 사후 해석이며 예측·추천·최적화가 아닙니다.
         </p>
-        <p className="mt-2 text-xs text-[#777e73]">
+        <p className="mt-2 text-xs text-[var(--muted)]">
           후보 {model.candidateWindowCount}개 · 완전 관측{" "}
           {model.completeWindowCount}개 · 근거 불완전으로 제외{" "}
           {model.excludedWindowCount}개
@@ -56,7 +56,7 @@ export function InvestmentLabRollingComparisonView({
           />
         </div>
       ) : (
-        <div className="border-y border-[#eadfbe] bg-[#fffaf0] px-4 py-4 text-sm text-[#725f2d]">
+        <div className="border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4 text-sm text-[var(--warning)]">
           비교 가능한 완전 관측 rolling 구간이 2개 미만입니다. 일부 가격·환율·
           거래 일정으로 결과를 보충하지 않고 이 섹션 전체를 표시하지 않습니다.
         </div>
@@ -75,24 +75,24 @@ function RollingWindowCard({
   window: InvestmentLabRollingWindow;
 }) {
   return (
-    <article className="overflow-hidden rounded-[4px] border border-[#dfe3d5] bg-[#fbfcf7]">
-      <header className="border-b border-[#e1e6dc] px-4 py-3">
+    <article className="overflow-hidden rounded-[4px] border border-[var(--line)] bg-[var(--surface)]">
+      <header className="border-b border-[var(--wash)] px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3
             className={
               tone === "negative"
-                ? "text-lg font-semibold text-[#a43c3c]"
-                : "text-lg font-semibold text-[#16734a]"
+                ? "text-lg font-semibold text-[var(--negative)]"
+                : "text-lg font-semibold text-[var(--brand)]"
             }
           >
             {label}
           </h3>
-          <p className="text-sm tabular-nums text-[#626b5f]">
+          <p className="text-sm tabular-nums text-[var(--muted)]">
             {formatDate(window.startServiceDate)} ~{" "}
             {formatDate(window.endServiceDate)}
           </p>
         </div>
-        <p className="mt-1 text-xs text-[#777e73]">
+        <p className="mt-1 text-xs text-[var(--muted)]">
           {window.observationCount}개 관측일 · 실제 흐름{" "}
           {window.actualFlowCount}건
         </p>
@@ -101,7 +101,7 @@ function RollingWindowCard({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] border-collapse text-sm">
           <thead>
-            <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
+            <tr className="bg-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
               <th className="px-4 py-3">경로</th>
               <th className="px-3 py-3 text-right">추정수익률</th>
               <th className="px-3 py-3 text-right">실제 대비</th>
@@ -146,7 +146,7 @@ function MetricRow({
   returnValue: number;
 }) {
   return (
-    <tr className="border-t border-[#e1e6dc]">
+    <tr className="border-t border-[var(--wash)]">
       <td className="px-4 py-3 font-medium">{label}</td>
       <td className="px-3 py-3 text-right tabular-nums">
         {formatReturn(returnValue)}

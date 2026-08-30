@@ -82,7 +82,7 @@ export function SimulationDateControl() {
         router.push(`/simulation?${next}`, { scroll: false });
       }}
     >
-      <label className="min-w-0 text-xs text-[#677168]">
+      <label className="min-w-0 text-xs text-[var(--muted)]">
         <span className="mb-2 flex items-center gap-2">
           <CalendarDays size={14} aria-hidden="true" />
           기준일
@@ -92,19 +92,19 @@ export function SimulationDateControl() {
           type="date"
           name="end"
           defaultValue={params.get("end") ?? ""}
-          className="min-h-10 max-w-full rounded border border-[#d4dbd4] bg-transparent px-3 text-sm text-[#243a2e] focus-visible:outline-[#438574]"
+          className="min-h-10 max-w-full rounded border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--ink)] focus-visible:outline-[var(--brand)]"
         />
       </label>
       <button
         type="submit"
-        className="flex min-h-10 items-center gap-2 rounded border border-[#d4dbd4] px-3 text-sm hover:bg-[#edf2ed]"
+        className="flex min-h-10 items-center gap-2 rounded border border-[var(--line)] px-3 text-sm hover:bg-[var(--wash)]"
       >
         적용
         <ArrowRight size={14} aria-hidden="true" />
       </button>
       <button
         type="button"
-        className="min-h-10 text-xs text-[#63786c] underline underline-offset-4"
+        className="min-h-10 text-xs text-[var(--muted)] underline underline-offset-4"
         onClick={() => {
           const next = new URLSearchParams(params.toString());
           next.delete("end");

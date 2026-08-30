@@ -146,7 +146,7 @@ export function InvestmentLabChartCanvas({
           return (
             <g key={index}>
               <line
-                stroke="#e2e7df"
+                stroke="var(--wash)"
                 strokeDasharray="3 6"
                 x1={left}
                 x2={width - right}
@@ -154,7 +154,7 @@ export function InvestmentLabChartCanvas({
                 y2={lineY}
               />
               <text
-                fill="#858e83"
+                fill="var(--faint)"
                 fontSize="10"
                 textAnchor="end"
                 x={left - 10}
@@ -167,12 +167,12 @@ export function InvestmentLabChartCanvas({
         })}
         <g clipPath={`url(#${id}-plot)`}>
           {selected.id !== "actual" ? (
-            <polygon points={area} fill="#438f79" opacity="0.075" />
+            <polygon points={area} fill="var(--brand)" opacity="0.075" />
           ) : null}
           <path
             d={actualPath}
             fill="none"
-            stroke="#303b35"
+            stroke="var(--ink)"
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="1.8"
@@ -181,7 +181,7 @@ export function InvestmentLabChartCanvas({
             <path
               d={selectedPath}
               fill="none"
-              stroke="#438f79"
+              stroke="var(--brand)"
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth="2.3"
@@ -190,7 +190,7 @@ export function InvestmentLabChartCanvas({
         </g>
         {ticks.map((index) => (
           <text
-            fill="#858e83"
+            fill="var(--faint)"
             fontSize="10"
             key={index}
             textAnchor={
@@ -209,7 +209,7 @@ export function InvestmentLabChartCanvas({
         {actualPoint && selectedPoint ? (
           <g>
             <line
-              stroke="#a6b4a9"
+              stroke="var(--faint)"
               strokeDasharray="3 5"
               x1={focusX}
               x2={focusX}
@@ -220,43 +220,43 @@ export function InvestmentLabChartCanvas({
               cx={focusX}
               cy={y(actualPoint.valueKrw)}
               r="4"
-              stroke="#303b35"
+              stroke="var(--ink)"
               strokeWidth="1.5"
-              fill="#f8f9f6"
+              fill="var(--paper)"
             />
             <circle
               cx={focusX}
               cy={y(selectedPoint.valueKrw)}
               r="4"
-              stroke="#438f79"
+              stroke="var(--brand)"
               strokeWidth="1.5"
-              fill="#f8f9f6"
+              fill="var(--paper)"
             />
           </g>
         ) : null}
       </svg>
       {actualPoint && selectedPoint ? (
         <div
-          className="pointer-events-none absolute top-3 rounded-md border border-[#d8e1d7] bg-[#fcfdfb]/95 p-3 text-xs shadow-lg shadow-[#20332b]/5"
+          className="pointer-events-none absolute top-3 rounded-md border border-[var(--line)] bg-[var(--surface)]/95 p-3 text-xs shadow-lg shadow-[var(--ink)]/5"
           data-lab-tooltip
           style={{ left: tooltipLeft, width: tooltipWidth }}
         >
-          <p className="mb-2 border-b border-[#e2e8df] pb-2 font-medium tabular-nums">
+          <p className="mb-2 border-b border-[var(--wash)] pb-2 font-medium tabular-nums">
             {actualPoint.serviceDate.replaceAll("-", ".")}
           </p>
           <dl className="space-y-2">
             <div className="flex justify-between gap-3">
-              <dt className="text-[#788177]">실제 평가액</dt>
+              <dt className="text-[var(--muted)]">실제 평가액</dt>
               <dd className="tabular-nums">{labKrw(actualPoint.valueKrw)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-[#438f79]">비교 평가액</dt>
-              <dd className="tabular-nums text-[#438f79]">
+              <dt className="text-[var(--brand)]">비교 평가액</dt>
+              <dd className="tabular-nums text-[var(--brand)]">
                 {labKrw(selectedPoint.valueKrw)}
               </dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-[#788177]">차이</dt>
+              <dt className="text-[var(--muted)]">차이</dt>
               <dd
                 className={`font-medium tabular-nums ${labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}`}
               >
@@ -265,7 +265,7 @@ export function InvestmentLabChartCanvas({
             </div>
           </dl>
           {selectedPoint.hasPendingExecution ? (
-            <p className="mt-2 text-[11px] text-[#987d55]">
+            <p className="mt-2 text-[11px] text-[var(--warning)]">
               이 평가일에는 대기 거래가 포함됩니다.
             </p>
           ) : null}
@@ -274,7 +274,7 @@ export function InvestmentLabChartCanvas({
       <input
         aria-label="비교 그래프 날짜 탐색"
         aria-valuetext={`${dates[Math.min(keyboardIndex, dates.length - 1)]} 실제 ${labKrw(actual.points[Math.min(keyboardIndex, dates.length - 1)]?.valueKrw ?? null)} 비교 ${labKrw(selected.points[Math.min(keyboardIndex, dates.length - 1)]?.valueKrw ?? null)}`}
-        className="absolute inset-x-0 bottom-0 h-3 w-full opacity-0 accent-[#438f79] focus:opacity-100"
+        className="absolute inset-x-0 bottom-0 h-3 w-full opacity-0 accent-[var(--brand)] focus:opacity-100"
         max={dates.length - 1}
         min={0}
         onBlur={() => setKeyboardFocus(false)}

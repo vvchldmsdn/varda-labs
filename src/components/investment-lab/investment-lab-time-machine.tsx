@@ -65,13 +65,13 @@ export function InvestmentLabTimeMachine({
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] font-medium text-[#7b847c]">
+              <p className="text-[10px] font-medium text-[var(--faint)]">
                 COUNTERFACTUAL LAB
               </p>
               <h2 className="mt-2 text-lg font-medium sm:text-xl">
                 다른 선택을 했다면
               </h2>
-              <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-[#7b847c]">
+              <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-[var(--faint)]">
                 <span>{labScenarioLabel(selected.id)}</span>
                 <span aria-hidden="true">·</span>
                 <span>종료일 실제 대비</span>
@@ -88,18 +88,18 @@ export function InvestmentLabTimeMachine({
               label="비교 기준"
               title="무엇을 비교하나요?"
             >
-              <div className="max-w-2xl space-y-5 text-sm leading-7 text-[#657267]">
+              <div className="max-w-2xl space-y-5 text-sm leading-7 text-[var(--muted)]">
                 <p>
-                  <strong className="font-medium text-[#263c30]">
+                  <strong className="font-medium text-[var(--ink)]">
                     같은 기간, 같은 외부 입출금
                   </strong>
                   <br />
-                  검은 선은 저장된 실제 평가액, 초록 선은 같은 시작 평가액과
+                  검은 선은 저장된 실제 평가액, 파란 선은 같은 시작 평가액과
                   입출금으로 계산한 선택 시나리오입니다. 계좌 사이의 이동은
                   선택한 분석 범위에 맞춰 처리합니다.
                 </p>
                 <p>
-                  <strong className="font-medium text-[#263c30]">
+                  <strong className="font-medium text-[var(--ink)]">
                     평가액 차이와 수익률은 다릅니다
                   </strong>
                   <br />
@@ -108,7 +108,7 @@ export function InvestmentLabTimeMachine({
                   숫자를 만들지 않습니다.
                 </p>
                 <p>
-                  <strong className="font-medium text-[#263c30]">
+                  <strong className="font-medium text-[var(--ink)]">
                     과거 비교이지 미래 예측이 아닙니다
                   </strong>
                   <br />
@@ -127,15 +127,15 @@ export function InvestmentLabTimeMachine({
             selected={selected}
           />
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e3e7e1] pt-3">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-[#66716a]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--wash)] pt-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-[var(--muted)]">
               <span className="inline-flex items-center gap-2">
-                <i aria-hidden="true" className="h-0.5 w-5 bg-[#303b35]" />
+                <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--ink)]" />
                 실제 포트폴리오
               </span>
               {selected.id !== "actual" ? (
                 <span className="inline-flex items-center gap-2">
-                  <i aria-hidden="true" className="h-0.5 w-5 bg-[#438f79]" />
+                  <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--brand)]" />
                   {labScenarioLabel(selected.id)}
                 </span>
               ) : null}
@@ -148,7 +148,7 @@ export function InvestmentLabTimeMachine({
             >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] border-collapse text-sm">
-                  <thead className="text-left text-xs text-[#778077]">
+                  <thead className="text-left text-xs text-[var(--muted)]">
                     <tr>
                       <th className="py-3">평가일</th>
                       <th className="p-3 text-right">실제 평가액</th>
@@ -167,7 +167,7 @@ export function InvestmentLabTimeMachine({
                       const delta = alternative.valueKrw - point.valueKrw;
                       return (
                         <tr
-                          className="border-t border-[#e0e5dd] tabular-nums"
+                          className="border-t border-[var(--wash)] tabular-nums"
                           key={point.serviceDate}
                         >
                           <th className="py-3 text-left font-normal">
@@ -179,7 +179,7 @@ export function InvestmentLabTimeMachine({
                           <td className="p-3 text-right">
                             {labKrw(alternative.valueKrw)}
                             {alternative.hasPendingExecution ? (
-                              <span className="ml-1 text-xs text-[#916e3b]">
+                              <span className="ml-1 text-xs text-[var(--warning)]">
                                 대기 거래
                               </span>
                             ) : null}
@@ -200,20 +200,20 @@ export function InvestmentLabTimeMachine({
         </section>
 
         <aside
-          className="min-w-0 border-t border-[#dde1db] py-5 xl:border-t-0 xl:border-l xl:pl-6"
+          className="min-w-0 border-t border-[var(--line)] py-5 xl:border-t-0 xl:border-l xl:pl-6"
           aria-label="비교 시나리오"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-xs font-medium text-[#56675b]">
+            <h3 className="text-xs font-medium text-[var(--muted)]">
               비교 시나리오
             </h3>
-            <span className="text-[10px] tabular-nums text-[#7e887e]">
+            <span className="text-[10px] tabular-nums text-[var(--faint)]">
               {ready.length}개 경로
             </span>
           </div>
-          <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#e1e5df] pb-4 text-xs">
+          <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--wash)] pb-4 text-xs">
             <span className="inline-flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-[#303b35]" />
+              <span className="size-1.5 rounded-full bg-[var(--ink)]" />
               실제 포트폴리오
             </span>
             <span className="font-medium tabular-nums">
@@ -231,7 +231,7 @@ export function InvestmentLabTimeMachine({
               return (
                 <button
                   aria-pressed={active}
-                  className={`group grid min-h-[70px] grid-cols-[minmax(0,1fr)_58px] items-center gap-3 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#438574] ${active ? "border-[#ceded3] bg-[#eaf1eb]" : "border-transparent hover:bg-[#f0f3ed]"}`}
+                  className={`group grid min-h-[70px] grid-cols-[minmax(0,1fr)_58px] items-center gap-3 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand)] ${active ? "border-[var(--line)] bg-[var(--wash)]" : "border-transparent hover:bg-[var(--wash)]"}`}
                   key={line.id}
                   onClick={() => {
                     setRequested(line.id);
@@ -246,12 +246,12 @@ export function InvestmentLabTimeMachine({
                       {active ? (
                         <Check
                           aria-hidden="true"
-                          className="shrink-0 text-[#438574]"
+                          className="shrink-0 text-[var(--brand)]"
                           size={12}
                         />
                       ) : null}
                     </span>
-                    <span className="mt-1 block text-[11px] tabular-nums text-[#7a827b]">
+                    <span className="mt-1 block text-[11px] tabular-nums text-[var(--faint)]">
                       {labKrw(
                         summaries.get(line.id)?.endDifferenceKrw ?? null,
                         true,
@@ -264,10 +264,10 @@ export function InvestmentLabTimeMachine({
             })}
           </div>
           {unavailableScenarios.length > 0 ? (
-            <div className="mt-4 border-t border-[#e1e5df] pt-3">
+            <div className="mt-4 border-t border-[var(--wash)] pt-3">
               <button
                 aria-expanded={showUnavailable}
-                className="flex min-h-9 w-full items-center justify-between text-xs text-[#7c8177]"
+                className="flex min-h-9 w-full items-center justify-between text-xs text-[var(--muted)]"
                 onClick={() => setShowUnavailable(!showUnavailable)}
                 type="button"
               >
@@ -285,7 +285,7 @@ export function InvestmentLabTimeMachine({
                   {unavailableScenarios.map((item) => (
                     <button
                       aria-expanded={unavailable === item.id}
-                      className="flex w-full items-start gap-2 rounded py-2 text-left text-xs text-[#857557] hover:text-[#303b35]"
+                      className="flex w-full items-start gap-2 rounded py-2 text-left text-xs text-[var(--warning)] hover:text-[var(--ink)]"
                       key={item.id}
                       onClick={() =>
                         setUnavailable(item.id === unavailable ? null : item.id)
@@ -304,11 +304,11 @@ export function InvestmentLabTimeMachine({
               ) : null}
               {showUnavailable && unavailableDetail ? (
                 <div
-                  className="mt-2 border-l-2 border-[#d2bea0] pl-3 text-xs leading-6"
+                  className="mt-2 border-l-2 border-[var(--warning-soft)] pl-3 text-xs leading-6"
                   role="status"
                 >
-                  <p className="text-[#806a4e]">{unavailableDetail.reason}</p>
-                  <p className="mt-2 text-[#737d72]">
+                  <p className="text-[var(--warning)]">{unavailableDetail.reason}</p>
+                  <p className="mt-2 text-[var(--muted)]">
                     {unavailableDetail.resolution}
                   </p>
                 </div>
@@ -319,7 +319,7 @@ export function InvestmentLabTimeMachine({
       </div>
 
       <dl
-        className="grid grid-cols-2 border-y border-[#dde1db] lg:grid-cols-4"
+        className="grid grid-cols-2 border-y border-[var(--line)] lg:grid-cols-4"
         data-lab-metrics
       >
         <Metric
@@ -351,7 +351,7 @@ export function InvestmentLabTimeMachine({
           }
         />
       </dl>
-      <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-[11px] text-[#7c857b]">
+      <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-[11px] text-[var(--faint)]">
         <span>{labScenarioDetail(selected.id)}</span>
         <span>
           {chart.period.comparisonDateCount}개 평가일 · 같은 기간·입출금
@@ -371,12 +371,12 @@ function Metric({
   baseline: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[#e0e4dd] px-3 py-5 odd:border-r sm:px-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
-      <dt className="text-[11px] text-[#7b847b]">{label}</dt>
+    <div className="min-w-0 border-b border-[var(--wash)] px-3 py-5 odd:border-r sm:px-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
+      <dt className="text-[11px] text-[var(--faint)]">{label}</dt>
       <dd className="mt-2 break-words text-lg font-medium tabular-nums sm:text-xl">
         {value}
       </dd>
-      <dd className="mt-2 text-[11px] tabular-nums text-[#7b847b]">
+      <dd className="mt-2 text-[11px] tabular-nums text-[var(--faint)]">
         {baseline}
       </dd>
     </div>
@@ -404,7 +404,7 @@ function MiniPath({
       <path
         d={path}
         fill="none"
-        stroke={active ? "#438f79" : "#aab8ad"}
+        stroke={active ? "var(--brand)" : "var(--line)"}
         strokeWidth="1.5"
       />
     </svg>

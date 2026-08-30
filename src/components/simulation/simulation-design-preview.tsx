@@ -18,7 +18,7 @@ export function SimulationDesignPreview({
     preview;
   return (
     <>
-      <div className="border-b border-[#d7e1d5] bg-[#edf3ea] px-5 py-2 text-center text-xs text-[#57734f]">
+      <div className="border-b border-[var(--line)] bg-[var(--wash)] px-5 py-2 text-center text-xs text-[var(--brand)]">
         디자인 미리보기 · 예시 데이터 · 실제 계좌 및 시세와 무관
       </div>
       <SimulationInputReadinessView

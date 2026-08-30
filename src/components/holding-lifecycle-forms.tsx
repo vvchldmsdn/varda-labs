@@ -27,14 +27,14 @@ export function HoldingArchiveForm({
   const messageId = `holding-archive-${holdingId}`;
 
   return (
-    <details className="mt-3 min-w-[230px] border-t border-[#e5e8df] pt-3">
-      <summary className="cursor-pointer text-sm font-semibold text-[#8a3f36]">
+    <details className="mt-3 min-w-[230px] border-t border-[var(--wash)] pt-3">
+      <summary className="cursor-pointer text-sm font-semibold text-[var(--warning)]">
         보유 종료
       </summary>
       <form action={action} className="mt-3 space-y-3">
         <input name="assetId" type="hidden" value={holdingId} />
         <input name="expectedUpdatedAt" type="hidden" value={updatedAt} />
-        <label className="block text-xs font-semibold text-[#35423a]">
+        <label className="block text-xs font-semibold text-[var(--ink)]">
           종료 메모 (선택)
           <input
             aria-describedby={messageId}
@@ -45,7 +45,7 @@ export function HoldingArchiveForm({
             type="text"
           />
         </label>
-        <label className="flex items-start gap-2 text-xs leading-5 text-[#5e685e]">
+        <label className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]">
           <input
             className="mt-1"
             name="archiveConfirmed"
@@ -56,7 +56,7 @@ export function HoldingArchiveForm({
           현재 계산에서 제외하되 수량·매입원가·과거 기록은 보존합니다.
         </label>
         <button
-          className="w-full rounded-md border border-[#c97c70] bg-white px-3 py-2 text-xs font-semibold text-[#8a3f36] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-md border border-[var(--negative-mid)] bg-white px-3 py-2 text-xs font-semibold text-[var(--warning)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
           type="submit"
         >
@@ -91,7 +91,7 @@ export function HoldingRestoreForm({
         type="text"
       />
       <button
-        className="w-full rounded-md bg-[#1e3a34] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md bg-[var(--ink)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={pending}
         type="submit"
       >
@@ -114,7 +114,7 @@ function ActionMessage({
       aria-live="polite"
       className={[
         "min-h-4 text-xs leading-5",
-        state.status === "success" ? "text-[#1e5d49]" : "text-[#8a5b16]",
+        state.status === "success" ? "text-[var(--brand)]" : "text-[var(--warning)]",
       ].join(" ")}
       id={id}
     >
@@ -124,4 +124,4 @@ function ActionMessage({
 }
 
 const fieldClassName =
-  "mt-1 w-full rounded-md border border-[#cfd6c8] bg-white px-2 py-1.5 text-sm font-normal text-[#171916] outline-none focus:border-[#1e3a34]";
+  "mt-1 w-full rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--ink)]";

@@ -27,7 +27,7 @@ export function InvestmentLabFundingPreflightView({
 }) {
   return (
     <section
-      className="overflow-hidden border-y border-[#dde1db]"
+      className="overflow-hidden border-y border-[var(--line)]"
       data-cross-account-funding={model.policy.crossAccountFunding}
       data-funding-account-rows={model.coverage.accountCount}
       data-funding-not-requested-cells={model.coverage.notRequestedScenarioCells}
@@ -37,16 +37,16 @@ export function InvestmentLabFundingPreflightView({
       data-funding-unavailable-cells={model.coverage.unavailableScenarioCells}
       data-section="investment-lab-funding-preflight"
     >
-      <div className="border-b border-[#e1e6dc] py-4">
+      <div className="border-b border-[var(--wash)] py-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">계정별 자금 경계</h2>
-            <p className="mt-1 text-sm leading-6 text-[#687064]">
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
               각 계정의 시작 평가액과 매수·매도 흐름만 사용한 연구 경로인지
               확인합니다.
             </p>
           </div>
-          <p className="text-sm font-semibold text-[#34483f]">
+          <p className="text-sm font-semibold text-[var(--ink)]">
             {statusLabel(model.status)}
           </p>
         </div>
@@ -54,7 +54,7 @@ export function InvestmentLabFundingPreflightView({
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[820px] border-collapse text-left text-sm">
-          <thead className="text-xs font-semibold text-[#5d665b]">
+          <thead className="text-xs font-semibold text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">계정</th>
               {SCENARIOS.map(([, label]) => (
@@ -67,7 +67,7 @@ export function InvestmentLabFundingPreflightView({
           <tbody>
             {model.accountRows.map((row) => (
               <tr
-                className="border-t border-[#e4e7df]"
+                className="border-t border-[var(--wash)]"
                 data-funding-account={row.account}
                 key={row.account}
               >
@@ -83,7 +83,7 @@ export function InvestmentLabFundingPreflightView({
             ))}
           </tbody>
           {model.accountScope === "all" ? (
-            <tfoot className="border-t-2 border-[#cfd6ca]">
+            <tfoot className="border-t-2 border-[var(--line)]">
               <tr>
                 <th className="px-4 py-3 font-semibold">전체 합산</th>
                 {SCENARIOS.map(([id]) => (
@@ -97,7 +97,7 @@ export function InvestmentLabFundingPreflightView({
         </table>
       </div>
 
-      <p className="border-t border-[#e1e6dc] py-3 text-xs leading-5 text-[#687064]">
+      <p className="border-t border-[var(--wash)] py-3 text-xs leading-5 text-[var(--muted)]">
         전체는 통과한 증권·ISA·IRP 결과의 합이며 계정 간 자금을 합쳐 계산하지
         않습니다. 상품 매수 가능 여부, 비용, 세금, 환전 스프레드와 주문 체결은
         아직 검증하지 않은 연구 결과입니다. 따라서 ISA·IRP의 VOO 경로도 실제
@@ -110,10 +110,10 @@ export function InvestmentLabFundingPreflightView({
 function Resolution({ value }: { value: InvestmentLabFundingResolution }) {
   const classes =
     value.status === "ready"
-      ? "text-[#1f6a43]"
+      ? "text-[var(--brand)]"
       : value.status === "unavailable"
-        ? "text-[#a5413a]"
-        : "text-[#777c72]";
+        ? "text-[var(--negative)]"
+        : "text-[var(--muted)]";
   return (
     <span className={`font-semibold ${classes}`} data-resolution={value.status}>
       {value.status === "ready"

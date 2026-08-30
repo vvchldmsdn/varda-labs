@@ -8,7 +8,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
   const training = model.training;
   return (
     <section
-      className="min-w-0 border-t border-[#dde1db] py-6"
+      className="min-w-0 border-t border-[var(--line)] py-6"
       data-preperiod-min-volatility-candidate-common-price-dates={
         model.coverage.commonPriceDateCount
       }
@@ -28,29 +28,29 @@ export function InvestmentLabPreperiodMinVolatilityView({
       data-section="investment-lab-preperiod-min-volatility"
     >
       <div className="mx-auto w-full max-w-[1540px] overflow-hidden">
-        <div className="border-b border-[#dde1db] pb-6">
+        <div className="border-b border-[var(--line)] pb-6">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-[11px] font-medium text-[#777d75]">
+              <p className="text-[11px] font-medium text-[var(--muted)]">
                 PRE-PERIOD MODEL
               </p>
               <h2 className="mt-2 text-lg font-medium sm:text-xl">
                 기간 시작 전 최소변동성 비교
               </h2>
-              <p className="mt-3 max-w-4xl text-sm leading-6 text-[#687064]">
+              <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--muted)]">
                 선택한 비교 기간보다 앞선 KODEX 200·VOO 공동 관측 60개만으로
                 비중을 한 번 산정하고, 이후 실제와 같은 외부 입출금을 적용한
                 연구 경로입니다.
               </p>
             </div>
-            <p className="text-sm font-semibold text-[#4f584f]">
+            <p className="text-sm font-semibold text-[var(--muted)]">
               {statusLabel(model.status)}
             </p>
           </div>
         </div>
 
         {training && model.weights ? (
-          <div className="grid border-b border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid border-b border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4">
             <EvidenceCell
               label="학습 구간"
               value={`${formatDate(training.startPriceDate)} ~ ${formatDate(training.endPriceDate)}`}
@@ -76,7 +76,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
 
         {model.weightConstraint &&
         model.weightConstraint.status !== "interior" ? (
-          <p className="border-t border-[#ead8b5] bg-[#fff8e8] px-4 py-3 text-sm leading-6 text-[#76551c]">
+          <p className="border-t border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--warning)]">
             {boundaryConstraintLabel(model)} 비중은 모델의
             {` ${model.weightConstraint.minimumComponentWeightBps}bp`} 최소 하한
             제약이 작동한 경계값입니다. 무제약 최적 비중이나 투자 권고로
@@ -84,14 +84,14 @@ export function InvestmentLabPreperiodMinVolatilityView({
           </p>
         ) : null}
 
-        <div className="grid gap-8 border-b border-[#dde1db] py-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
+        <div className="grid gap-8 border-b border-[var(--line)] py-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
           <div>
             {model.status === "ready" ? (
               <>
-                <p className="text-sm font-semibold text-[#173f38]">
+                <p className="text-sm font-semibold text-[var(--ink)]">
                   비교 경로 계산 완료
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#626b5f]">
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                   종료 평가액{" "}
                   {formatKrw(model.scenario.summary.scenarioEndValueKrw)} · 기간
                   수익률{" "}
@@ -100,12 +100,12 @@ export function InvestmentLabPreperiodMinVolatilityView({
               </>
             ) : (
               <>
-                <p className="text-sm font-semibold text-[#8a641f]">
+                <p className="text-sm font-semibold text-[var(--warning)]">
                   {model.status === "training_unavailable"
                     ? "학습 근거가 아직 부족합니다."
                     : "비중은 산정됐지만 비교 경로 근거가 부족합니다."}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#6d6657]">
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                   이 항목만 계산 불가로 남기며, 실제·KODEX 200·VOO 등 다른
                   유효한 비교 결과는 계속 표시합니다.
                 </p>
@@ -132,7 +132,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
           </dl>
         </div>
 
-        <p className="py-4 text-xs leading-5 text-[#73786c]">
+        <p className="py-4 text-xs leading-5 text-[var(--muted)]">
           미래 데이터, 보간, provider backfill, 현재 보유비중, 목표비중을
           사용하지 않습니다. 거래비용·세금·주문 가능성을 반영한 추천이 아니며,
           산정 뒤 정기 리밸런싱도 하지 않습니다.
@@ -152,10 +152,10 @@ function EvidenceCell({
   value: string;
 }) {
   return (
-    <div className="border-b border-[#dde1db] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="border-b border-[var(--line)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-2 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#73786c]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }
@@ -163,7 +163,7 @@ function EvidenceCell({
 function EvidenceRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="contents">
-      <dt className="text-[#687064]">{label}</dt>
+      <dt className="text-[var(--muted)]">{label}</dt>
       <dd className="text-right font-semibold tabular-nums">{value}</dd>
     </div>
   );

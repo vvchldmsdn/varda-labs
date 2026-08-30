@@ -12,7 +12,7 @@ export function WalkForwardStabilityHistorySection({
   return (
     <section
       aria-labelledby="walk-forward-stability-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-walk-forward-stability-history
       data-walk-forward-stability-status={result.status}
       data-walk-forward-stability-ready-count={
@@ -21,7 +21,7 @@ export function WalkForwardStabilityHistorySection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             같은 정책 반복 점검 · 겹치는 기간
           </p>
           <h2
@@ -30,13 +30,13 @@ export function WalkForwardStabilityHistorySection({
           >
             워크포워드 기준일 안정성
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#596158]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             선택 기준일과 직전 6개 날짜에 같은 60/10/3 정책을 독립적으로
             적용합니다. 날짜에 따라 결과가 크게 달라지는지 확인하는 진단이며,
             가장 좋은 날짜나 설정을 고르는 기능이 아닙니다.
           </p>
         </div>
-        <div className="text-left text-xs text-[#687064] sm:text-right">
+        <div className="text-left text-xs text-[var(--muted)] sm:text-right">
           <p className="font-semibold">
             {result.summary.readyEndpointCount}/
             {result.summary.endpointCount || result.policy.endpointCount}개 계산 가능
@@ -46,9 +46,9 @@ export function WalkForwardStabilityHistorySection({
       </div>
 
       {result.rows.length === 0 ? (
-        <div className="mt-4 border-y border-[#e6d8ae] bg-[#fffdf6] px-4 py-4">
+        <div className="mt-4 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4">
           <p className="font-semibold">안정성 이력을 계산하지 않았습니다.</p>
-          <p className="mt-2 text-sm leading-6 text-[#6b6044]">
+          <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
             {reasonLabel(result.reason)} 기존 단일 기준일 연구 결과는 그대로
             유지합니다.
           </p>
@@ -57,7 +57,7 @@ export function WalkForwardStabilityHistorySection({
         <StabilityTable rows={result.rows} />
       )}
 
-      <p className="mt-4 text-xs leading-5 text-[#687064]">
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
         7개 검증창은 대부분의 학습·검증 수익률을 공유하므로 서로 독립된 7번의
         실험이 아닙니다. 이 표를 이용해 학습기간, 10% 대각 축소, 재조정 주기를
         다시 선택하거나 성과 순위를 만들지 않습니다.
@@ -70,7 +70,7 @@ function StabilityTable({ rows }: { rows: readonly StabilityRow[] }) {
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-        <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+        <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
           <tr>
             <th className="px-3 py-3 font-semibold">기준일</th>
             <th className="px-3 py-3 font-semibold">상태</th>
@@ -87,7 +87,7 @@ function StabilityTable({ rows }: { rows: readonly StabilityRow[] }) {
         <tbody>
           {rows.map((row) => (
             <tr
-              className="border-b border-[#e1e5da] align-top"
+              className="border-b border-[var(--line)] align-top"
               data-walk-forward-stability-row={row.serviceDate}
               data-walk-forward-stability-row-status={row.status}
               key={row.serviceDate}
@@ -99,14 +99,14 @@ function StabilityTable({ rows }: { rows: readonly StabilityRow[] }) {
                 <p
                   className={
                     row.status === "ready"
-                      ? "font-semibold text-[#226039]"
-                      : "font-semibold text-[#7a5117]"
+                      ? "font-semibold text-[var(--brand)]"
+                      : "font-semibold text-[var(--warning)]"
                   }
                 >
                   {row.status === "ready" ? "계산 가능" : "사용 불가"}
                 </p>
                 {row.reason ? (
-                  <p className="mt-1 max-w-[240px] text-xs leading-5 text-[#7a6b4e]">
+                  <p className="mt-1 max-w-[240px] text-xs leading-5 text-[var(--warning)]">
                     {reasonLabel(row.reason)}
                   </p>
                 ) : null}

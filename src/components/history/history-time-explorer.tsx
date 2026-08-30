@@ -66,14 +66,14 @@ export function HistoryTimeExplorer({
 
   if (model.status === "no_data") {
     return (
-      <section className="border-y border-[#dde1db] py-16 text-center">
-        <p className="text-xs font-medium text-[#777d75]">HISTORY</p>
+      <section className="border-y border-[var(--line)] py-16 text-center">
+        <p className="text-xs font-medium text-[var(--muted)]">HISTORY</p>
         <h1 className="mt-3 text-2xl font-semibold">
           아직 탐색할 기록이 없습니다.
         </h1>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#6d736b]">
-          평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이
-          저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다.
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
+          평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면
+          같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다.
         </p>
       </section>
     );
@@ -99,68 +99,44 @@ export function HistoryTimeExplorer({
 
   return (
     <section aria-labelledby="history-time-explorer-title">
-      <div className="grid gap-8 border-b border-[#dde1db] py-9 lg:grid-cols-[minmax(0,1fr)_minmax(540px,1.35fr)] lg:items-end">
+      <div className="varda-history-heading">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-[11px] font-medium text-[#777d75]">HISTORY</p>
-            <span className="border border-[#dce0da] bg-[#f1f3ef] px-2 py-1 text-[10px] font-medium text-[#626961]">
+            <p className="text-[11px] font-medium text-[var(--muted)]">
+              HISTORY
+            </p>
+            <span className="border border-[var(--line)] bg-[var(--wash)] px-2 py-1 text-[10px] font-medium text-[var(--muted)]">
               실제 저장 기록
             </span>
           </div>
-          <h1
-            id="history-time-explorer-title"
-            className="mt-3 text-3xl font-semibold tracking-normal"
-          >
-            성과 그래프
+          <h1 id="history-time-explorer-title" className="varda-page-title">
+            시간으로 보는 자산
           </h1>
-          <p className="mt-1 text-sm text-[#697069]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             {scopeLabel} · {formatDate(selectedPoint?.date ?? null)}
           </p>
           <p
-            className={`mt-6 text-[clamp(2.8rem,5.2vw,5.8rem)] font-normal leading-none tracking-normal tabular-nums ${
+            className={`varda-primary-number mt-5 ${
               mode === "return"
                 ? tone(selectedPoint?.totalReturnPct ?? null)
-                : "text-[#171a16]"
+                : "text-[var(--ink)]"
             }`}
           >
             {formatPrimaryMetric(selectedPoint, mode)}
           </p>
-          <p className="mt-4 text-xs leading-5 text-[#7a8078]">
+          <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
             {selectedPoint
               ? `${historySourceLabel(selectedPoint.source)} · ${modeDescription(mode)}`
               : "선택한 날짜의 저장 근거가 없습니다."}
           </p>
         </div>
 
-        <dl className="grid grid-cols-2 border-y border-[#dde1db] xl:grid-cols-4">
-          <SummaryMetric
-            detail={formatDate(rangeSummary.peakDate)}
-            label="표시 범위 최고 평가액"
-            value={formatHistoryKrw(rangeSummary.peakValueKrw)}
-          />
-          <SummaryMetric
-            detail={formatDate(rangeSummary.maxDrawdownDate)}
-            label="최대 낙폭"
-            value={formatSignedPercent(rangeSummary.maxDrawdownPct)}
-            valueClass={tone(rangeSummary.maxDrawdownPct)}
-          />
-          <SummaryMetric
-            detail={formatSignedPercent(rangeSummary.changePct)}
-            label="표시 범위 변화"
-            value={formatSignedKrw(rangeSummary.changeKrw)}
-            valueClass={tone(rangeSummary.changeKrw)}
-          />
-          <SummaryMetric
-            detail={`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`}
-            label="기록점"
-            value={`${rangeSummary.pointCount}개`}
-          />
-        </dl>
+        <RangeMetrics summary={rangeSummary} className="hidden md:grid" />
       </div>
 
-      <div className="flex flex-col gap-5 border-b border-[#dde1db] py-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="varda-history-controls flex flex-col gap-5 border-b border-[var(--line)] py-5 sm:flex-row sm:items-center sm:justify-between">
         <div
-          className="inline-flex w-fit border border-[#d9ddd7] bg-[#f1f3ef] p-1"
+          className="inline-flex w-fit border border-[var(--line)] bg-[var(--wash)] p-1"
           aria-label="그래프 지표"
         >
           <ModeButton
@@ -181,10 +157,10 @@ export function HistoryTimeExplorer({
               key={option.key}
               type="button"
               aria-pressed={range === option.key}
-              className={`border-b py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] ${
+              className={`border-b py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
                 range === option.key
-                  ? "border-[#20231f] text-[#20231f]"
-                  : "border-transparent text-[#777d75] hover:text-[#20231f]"
+                  ? "border-[var(--ink)] text-[var(--ink)]"
+                  : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
               onClick={() => changeRange(option.key)}
             >
@@ -194,7 +170,7 @@ export function HistoryTimeExplorer({
         </div>
       </div>
 
-      <div className="grid gap-8 border-b border-[#dde1db] py-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="varda-history-canvas">
         <HistoryPerformanceChart
           mode={mode}
           onSelect={setSelectedDate}
@@ -208,6 +184,7 @@ export function HistoryTimeExplorer({
         />
       </div>
 
+      <RangeMetrics summary={rangeSummary} className="grid md:hidden" />
       <RangeSummary summary={rangeSummary} />
       <SelectedDayEvidence point={selectedPoint} />
       <HistoryCalendar
@@ -219,6 +196,43 @@ export function HistoryTimeExplorer({
         <StoredRiskHistory points={visiblePoints} />
       ) : null}
     </section>
+  );
+}
+
+function RangeMetrics({
+  summary: rangeSummary,
+  className,
+}: {
+  summary: ReturnType<typeof summarizeHistoryRange>;
+  className: string;
+}) {
+  return (
+    <dl
+      className={`${className} grid-cols-2 border-y border-[var(--line)] xl:grid-cols-4`}
+    >
+      <SummaryMetric
+        detail={formatDate(rangeSummary.peakDate)}
+        label="표시 범위 최고 평가액"
+        value={formatHistoryKrw(rangeSummary.peakValueKrw)}
+      />
+      <SummaryMetric
+        detail={formatDate(rangeSummary.maxDrawdownDate)}
+        label="최대 낙폭"
+        value={formatSignedPercent(rangeSummary.maxDrawdownPct)}
+        valueClass={tone(rangeSummary.maxDrawdownPct)}
+      />
+      <SummaryMetric
+        detail={formatSignedPercent(rangeSummary.changePct)}
+        label="표시 범위 변화"
+        value={formatSignedKrw(rangeSummary.changeKrw)}
+        valueClass={tone(rangeSummary.changeKrw)}
+      />
+      <SummaryMetric
+        detail={`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`}
+        label="기록점"
+        value={`${rangeSummary.pointCount}개`}
+      />
+    </dl>
   );
 }
 
@@ -237,10 +251,10 @@ function ModeButton({
     <button
       type="button"
       aria-pressed={active}
-      className={`min-w-20 px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`min-w-20 px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40 ${
         active
-          ? "bg-[#202a25] text-white"
-          : "text-[#697069] hover:text-[#20231f]"
+          ? "bg-[var(--ink)] text-white"
+          : "text-[var(--muted)] hover:text-[var(--ink)]"
       }`}
       disabled={disabled}
       onClick={onClick}
@@ -254,7 +268,7 @@ function SummaryMetric({
   detail,
   label,
   value,
-  valueClass = "text-[#20231f]",
+  valueClass = "text-[var(--ink)]",
 }: {
   detail: string;
   label: string;
@@ -262,12 +276,16 @@ function SummaryMetric({
   valueClass?: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-r border-[#dde1db] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
-      <dt className="text-[11px] text-[#747a72]">{label}</dt>
-      <dd className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}>
+    <div className="min-w-0 border-b border-r border-[var(--line)] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
+      <dt className="text-[11px] text-[var(--muted)]">{label}</dt>
+      <dd
+        className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}
+      >
         {value}
       </dd>
-      <dd className="mt-2 truncate text-[11px] text-[#858a83]">{detail}</dd>
+      <dd className="mt-2 truncate text-[11px] text-[var(--faint)]">
+        {detail}
+      </dd>
     </div>
   );
 }
@@ -278,19 +296,19 @@ function RangeSummary({
   summary: ReturnType<typeof summarizeHistoryRange>;
 }) {
   return (
-    <dl className="grid border-b border-[#dde1db] py-5 sm:grid-cols-[1fr_auto_1fr_1.2fr] sm:items-center">
+    <dl className="grid border-b border-[var(--line)] py-5 sm:grid-cols-[1fr_auto_1fr_1.2fr] sm:items-center">
       <RangeValue
         detail={formatDate(summary.startDate)}
         label="시작 평가액"
         value={formatHistoryKrw(summary.startValueKrw)}
       />
-      <div className="hidden px-7 text-xl text-[#858a83] sm:block">→</div>
+      <div className="hidden px-7 text-xl text-[var(--faint)] sm:block">→</div>
       <RangeValue
         detail={formatDate(summary.endDate)}
         label="종료 평가액"
         value={formatHistoryKrw(summary.endValueKrw)}
       />
-      <div className="mt-4 grid grid-cols-2 gap-5 border-t border-[#e1e4df] pt-4 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-7 sm:pt-0">
+      <div className="mt-4 grid grid-cols-2 gap-5 border-t border-[var(--wash)] pt-4 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-7 sm:pt-0">
         <RangeValue
           detail="평가액 변화"
           label="변화 금액"
@@ -312,7 +330,7 @@ function RangeValue({
   detail,
   label,
   value,
-  valueClass = "text-[#20231f]",
+  valueClass = "text-[var(--ink)]",
 }: {
   detail: string;
   label: string;
@@ -321,31 +339,39 @@ function RangeValue({
 }) {
   return (
     <div className="py-2">
-      <dt className="text-[11px] text-[#747a72]">{label}</dt>
+      <dt className="text-[11px] text-[var(--muted)]">{label}</dt>
       <dd className={`mt-2 text-lg font-semibold tabular-nums ${valueClass}`}>
         {value}
       </dd>
-      <dd className="mt-1 text-[11px] text-[#858a83]">{detail}</dd>
+      <dd className="mt-1 text-[11px] text-[var(--faint)]">{detail}</dd>
     </div>
   );
 }
 
-function SelectedDayEvidence({ point }: { point: HistoryOverviewPoint | null }) {
+function SelectedDayEvidence({
+  point,
+}: {
+  point: HistoryOverviewPoint | null;
+}) {
   if (!point) return null;
 
   return (
-    <section className="border-b border-[#dde1db] py-8">
+    <section className="border-b border-[var(--line)] py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#777d75]">SELECTED DATE</p>
-          <h2 className="mt-1 text-xl font-semibold">{formatDate(point.date)}</h2>
+          <p className="text-[11px] font-medium text-[var(--muted)]">
+            SELECTED DATE
+          </p>
+          <h2 className="mt-1 text-xl font-semibold">
+            {formatDate(point.date)}
+          </h2>
         </div>
-        <p className="text-xs text-[#777d75]">
+        <p className="text-xs text-[var(--muted)]">
           {historySourceLabel(point.source)}
         </p>
       </div>
 
-      <dl className="mt-5 grid border-y border-[#e1e4df] sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-5 grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceMetric
           detail={
             point.gapDays === null
@@ -384,12 +410,12 @@ function SelectedDayEvidence({ point }: { point: HistoryOverviewPoint | null }) 
                 key={`${event.eventDate}:${event.eventType}:${event.assetName}:${index}`}
                 className="grid grid-cols-[auto_1fr] gap-3 text-sm"
               >
-                <span className="mt-1 h-2 w-2 rounded-full bg-[#5b917c]" />
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--brand)]" />
                 <div className="min-w-0">
                   <p className="truncate font-medium">
                     {eventTypeLabel(event)} · {event.assetName}
                   </p>
-                  <p className="mt-1 truncate text-xs text-[#72786f]">
+                  <p className="mt-1 truncate text-xs text-[var(--muted)]">
                     {[event.accountName, formatOptionalKrw(event.amountKrw)]
                       .filter(Boolean)
                       .join(" · ")}
@@ -399,11 +425,11 @@ function SelectedDayEvidence({ point }: { point: HistoryOverviewPoint | null }) 
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm text-[#777d75]">
+          <p className="mt-3 text-sm text-[var(--muted)]">
             이 날짜에 연결된 저장 이벤트가 없습니다.
           </p>
         )}
-        <p className="mt-4 text-xs leading-5 text-[#858a83]">
+        <p className="mt-4 text-xs leading-5 text-[var(--faint)]">
           같은 날짜에 저장된 활동이며 평가액 변화의 원인으로 단정하지 않습니다.
         </p>
       </div>
@@ -415,7 +441,7 @@ function EvidenceMetric({
   detail,
   label,
   value,
-  valueClass = "text-[#20231f]",
+  valueClass = "text-[var(--ink)]",
 }: {
   detail: string;
   label: string;
@@ -423,12 +449,12 @@ function EvidenceMetric({
   valueClass?: string;
 }) {
   return (
-    <div className="border-b border-[#e1e4df] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <dt className="text-xs text-[#747a72]">{label}</dt>
+    <div className="border-b border-[var(--wash)] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className={`mt-2 text-lg font-semibold tabular-nums ${valueClass}`}>
         {value}
       </dd>
-      <dd className="mt-2 text-xs leading-5 text-[#858a83]">{detail}</dd>
+      <dd className="mt-2 text-xs leading-5 text-[var(--faint)]">{detail}</dd>
     </div>
   );
 }
@@ -446,17 +472,19 @@ function HistoryCalendar({
   if (layout.cells.length === 0) return null;
 
   return (
-    <section className="border-b border-[#dde1db] py-7">
+    <section className="border-b border-[var(--line)] py-7">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#777d75]">VALUE RHYTHM</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">
+            VALUE RHYTHM
+          </p>
           <h2 className="mt-1 text-base font-semibold">기록 리듬</h2>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-[#7a8078]">
+        <div className="flex items-center gap-3 text-[11px] text-[var(--muted)]">
           <span>하락</span>
-          <span className="h-3 w-7 rounded-[3px] bg-[#d96864]" />
-          <span className="h-3 w-7 rounded-[3px] bg-[#e8ebe7]" />
-          <span className="h-3 w-7 rounded-[3px] bg-[#4d9a79]" />
+          <span className="h-3 w-7 rounded-[3px] bg-[var(--negative-mid)]" />
+          <span className="h-3 w-7 rounded-[3px] bg-[var(--wash)]" />
+          <span className="h-3 w-7 rounded-[3px] bg-[var(--brand)]" />
           <span>상승</span>
         </div>
       </div>
@@ -476,9 +504,9 @@ function HistoryCalendar({
               title={`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`}
               aria-label={`${formatDate(cell.point.date)} 이전 저장점 대비 ${formatSignedKrw(cell.point.movementKrw)}`}
               aria-pressed={cell.point.date === selectedDate}
-              className={`h-[17px] w-[17px] rounded-[4px] border transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] ${
+              className={`h-[17px] w-[17px] rounded-[4px] border transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] ${
                 cell.point.date === selectedDate
-                  ? "border-[#20231f]"
+                  ? "border-[var(--ink)]"
                   : "border-transparent"
               }`}
               style={{
@@ -491,7 +519,7 @@ function HistoryCalendar({
           ))}
         </div>
       </div>
-      <div className="mt-2 flex justify-between text-[11px] text-[#858a83]">
+      <div className="mt-2 flex justify-between text-[11px] text-[var(--faint)]">
         <span>{formatDate(points[0]?.date ?? null)}</span>
         <span>빈 날짜는 보간하지 않음</span>
         <span>{formatDate(points.at(-1)?.date ?? null)}</span>
@@ -510,17 +538,19 @@ function StoredRiskHistory({
   if (!latest) return null;
 
   return (
-    <section className="border-b border-[#dde1db] py-7">
+    <section className="border-b border-[var(--line)] py-7">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#777d75]">STORED RISK</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">
+            STORED RISK
+          </p>
           <h2 className="mt-1 text-base font-semibold">저장된 위험 기록</h2>
         </div>
-        <p className="text-xs text-[#777d75]">
+        <p className="text-xs text-[var(--muted)]">
           저장값이 있는 {riskPoints.length}개 날짜
         </p>
       </div>
-      <dl className="mt-5 grid border-t border-[#e1e4df] sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-5 grid border-t border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <RiskMetric
           detail="실제로 분산 효과를 내는 종목 수"
           label="유효 분산 수"
@@ -560,10 +590,10 @@ function RiskMetric({
   value: string;
 }) {
   return (
-    <div className="border-b border-[#e1e4df] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <dt className="text-xs text-[#747a72]">{label}</dt>
+    <div className="border-b border-[var(--wash)] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 text-xl font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-2 text-xs leading-5 text-[#858a83]">{detail}</dd>
+      <dd className="mt-2 text-xs leading-5 text-[var(--faint)]">{detail}</dd>
     </div>
   );
 }
@@ -594,16 +624,17 @@ function calendarLayout(points: readonly HistoryOverviewPoint[]) {
 }
 
 function movementColor(point: HistoryOverviewPoint, maxMovement: number) {
-  if (point.movementKrw === null || point.movementKrw === 0) return "#e8ebe7";
+  if (point.movementKrw === null || point.movementKrw === 0)
+    return "var(--wash)";
   const intensity = Math.min(1, Math.abs(point.movementPct ?? 0) / maxMovement);
   if (point.movementKrw > 0) {
-    if (intensity > 0.66) return "#4d9a79";
-    if (intensity > 0.33) return "#89bda8";
-    return "#c5ddd3";
+    if (intensity > 0.66) return "var(--brand)";
+    if (intensity > 0.33) return "var(--brand-mid)";
+    return "var(--line)";
   }
-  if (intensity > 0.66) return "#d96864";
-  if (intensity > 0.33) return "#eaa39e";
-  return "#f0cbc8";
+  if (intensity > 0.66) return "var(--negative-mid)";
+  if (intensity > 0.33) return "var(--warning-soft)";
+  return "var(--warning-soft)";
 }
 
 function formatPrimaryMetric(
@@ -628,8 +659,8 @@ function eventTypeLabel(event: HistoryOverviewEvent) {
 }
 
 function tone(value: number | null) {
-  if (value === null || Math.abs(value) < 0.005) return "text-[#20231f]";
-  return value > 0 ? "text-[#347e62]" : "text-[#cb5551]";
+  if (value === null || Math.abs(value) < 0.005) return "text-[var(--ink)]";
+  return value > 0 ? "text-[var(--brand)]" : "text-[var(--negative)]";
 }
 
 function formatSignedKrw(value: number | null) {

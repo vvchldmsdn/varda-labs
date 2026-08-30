@@ -16,7 +16,7 @@ export function OwnerParametricFactorSection({
   return (
     <section
       aria-labelledby="owner-parametric-factor-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-parametric-factor
       data-owner-parametric-factor-account={result.account}
       data-owner-parametric-factor-status={result.status}
@@ -27,7 +27,7 @@ export function OwnerParametricFactorSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             별도 모형 · 부트스트랩과 합산하지 않음
           </p>
           <h2
@@ -36,14 +36,14 @@ export function OwnerParametricFactorSection({
           >
             환율·금리 요인 확률모형
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             같은 날짜의 종목 수익률과 USD/KRW·미국 10년물 금리·장단기
             금리차 변화를 맞춰 통계 관계를 추정한 뒤 500개 경로를 계산합니다.
             기존 재표본 추출과 다른 가정의 결과이므로 두 모형의 차이 자체를
             불확실성으로 봐야 합니다.
           </p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           조회 시 계산 · 저장 안 함
         </span>
       </div>
@@ -71,7 +71,7 @@ export function OwnerParametricFactorSection({
         />
       </dl>
 
-      <p className="mt-3 rounded-md border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm leading-6 text-[#62542c]">
+      <p className="mt-3 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--warning)]">
         현재 저장 자료에는 각 지표의 정확한 공개 시각과 개정 이력이 없습니다.
         같은 날 발표값은 다음 서비스 날짜부터 사용했지만 완전한 시점별 예측
         검증은 아직 성립하지 않습니다. 이 결과는 회고적 연구이며 예측·추천·주문
@@ -82,11 +82,11 @@ export function OwnerParametricFactorSection({
         <ReadyFactorResult result={result} />
       ) : (
         <div
-          className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+          className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-owner-parametric-factor-unavailable-reason={result.reason}
         >
           <p className="font-semibold">이 모형만 아직 계산할 수 없습니다.</p>
-          <p className="mt-1 text-sm leading-6 text-[#6b6044]">
+          <p className="mt-1 text-sm leading-6 text-[var(--warning)]">
             {unavailableReasonLabel(result.reason)} 기존 보유 비중 부트스트랩과 다른
             검증 결과는 그대로 유지됩니다.
           </p>
@@ -99,20 +99,20 @@ export function OwnerParametricFactorSection({
 function ReadyFactorResult({ result }: { result: ReadyResult }) {
   return (
     <article
-      className="mt-4 overflow-hidden rounded-lg border border-[#d7ddcf] bg-[#fbfcf7]"
+      className="mt-4 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]"
       data-owner-parametric-factor-horizon={result.assumptions.horizon}
       data-owner-parametric-factor-path-count={result.assumptions.pathCount}
     >
-      <header className="flex flex-col gap-2 border-b border-[#e1e5da] px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-2 border-b border-[var(--line)] px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             현재 비중 · 최초 배분 후 리밸런싱 없음
           </p>
           <h3 className="mt-1 text-lg font-semibold">
             요인·잔차 모형 · {result.assumptions.horizon}단계
           </h3>
         </div>
-        <span className="w-fit rounded-md bg-[#e5f1e6] px-2.5 py-1 text-xs font-semibold text-[#226039]">
+        <span className="w-fit rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
           계산 완료
         </span>
       </header>
@@ -120,9 +120,9 @@ function ReadyFactorResult({ result }: { result: ReadyResult }) {
       <SimulationTerminalRiskMetrics terminal={result.terminal} />
       <ResearchFanChart execution={result} />
 
-      <div className="overflow-x-auto border-t border-[#e1e5da]">
+      <div className="overflow-x-auto border-t border-[var(--line)]">
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-          <thead className="text-xs text-[#687064]">
+          <thead className="text-xs text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3 font-semibold">종목</th>
               <th className="px-4 py-3 text-right font-semibold">USD/KRW</th>
@@ -133,10 +133,10 @@ function ReadyFactorResult({ result }: { result: ReadyResult }) {
           </thead>
           <tbody>
             {result.exposures.map((row) => (
-              <tr className="border-t border-[#e1e5da]" key={row.instrumentKey}>
+              <tr className="border-t border-[var(--line)]" key={row.instrumentKey}>
                 <td className="px-4 py-3">
                   <p className="font-semibold">{row.ticker}</p>
-                  <p className="mt-1 text-xs text-[#687064]">
+                  <p className="mt-1 text-xs text-[var(--muted)]">
                     {row.market} · {row.currency}
                   </p>
                 </td>
@@ -157,7 +157,7 @@ function ReadyFactorResult({ result }: { result: ReadyResult }) {
         </table>
       </div>
 
-      <p className="border-t border-[#e1e5da] px-4 py-3 text-xs leading-5 text-[#687064]">
+      <p className="border-t border-[var(--line)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">
         결합 구간 {formatDate(result.source.firstAlignedServiceDate)}~
         {formatDate(result.source.lastAlignedServiceDate)} · 제외된 요인 공백
         {" "}{result.source.factorGapRowCount}개 · 요인 공분산 축소 15% · 잔차
@@ -177,10 +177,10 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
+    <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-1 text-lg font-semibold">{value}</dd>
-      <dd className="mt-1 text-xs text-[#7a8175]">{detail}</dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]">{detail}</dd>
     </div>
   );
 }

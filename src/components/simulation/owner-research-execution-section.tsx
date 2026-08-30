@@ -25,7 +25,7 @@ export function OwnerResearchExecutionSection({
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="hidden text-[10px] text-[#7b867b] sm:block">PROBABILITY EXPLORER</p>
+          <p className="hidden text-[10px] text-[var(--faint)] sm:block">PROBABILITY EXPLORER</p>
           <h2
             className="mt-1 text-base font-medium sm:text-lg"
             id="owner-research-execution-title"
@@ -39,9 +39,9 @@ export function OwnerResearchExecutionSection({
           size="wide"
           compactLabel
         >
-          <div className="grid gap-6 text-sm leading-7 text-[#667263] sm:grid-cols-2">
+          <div className="grid gap-6 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
             <div>
-              <h3 className="mb-2 font-medium text-[#263f30]">
+              <h3 className="mb-2 font-medium text-[var(--ink)]">
                 P10 · P50 · P90
               </h3>
               <p>
@@ -51,7 +51,7 @@ export function OwnerResearchExecutionSection({
               </p>
             </div>
             <div>
-              <h3 className="mb-2 font-medium text-[#263f30]">
+              <h3 className="mb-2 font-medium text-[var(--ink)]">
                 손실 확률과 최대 낙폭
               </h3>
               <p>
@@ -61,7 +61,7 @@ export function OwnerResearchExecutionSection({
               </p>
             </div>
             <div>
-              <h3 className="mb-2 font-medium text-[#263f30]">
+              <h3 className="mb-2 font-medium text-[var(--ink)]">
                 500개 경로 · 12개 표본
               </h3>
               <p>
@@ -72,7 +72,7 @@ export function OwnerResearchExecutionSection({
               </p>
             </div>
             <div>
-              <h3 className="mb-2 font-medium text-[#263f30]">
+              <h3 className="mb-2 font-medium text-[var(--ink)]">
                 포함 범위와 가정
               </h3>
               <p>
@@ -84,10 +84,10 @@ export function OwnerResearchExecutionSection({
               </p>
             </div>
           </div>
-          <div className="mt-6 overflow-x-auto border-y border-[#dce2d8]">
+          <div className="mt-6 overflow-x-auto border-y border-[var(--line)]">
             <table className="w-full min-w-[540px] text-left text-sm">
               <thead>
-                <tr className="text-xs text-[#778272]">
+                <tr className="text-xs text-[var(--muted)]">
                   <th className="py-3 font-normal">종목</th>
                   <th className="py-3 text-right font-normal">현재 비중</th>
                   <th className="py-3 text-right font-normal">계산 비중</th>
@@ -105,11 +105,11 @@ export function OwnerResearchExecutionSection({
                   return (
                     <tr
                       key={row.instrumentKey}
-                      className="border-t border-[#e4e8e0]"
+                      className="border-t border-[var(--wash)]"
                     >
                       <td className="py-3">
                         {row.name}
-                        <span className="ml-2 text-xs text-[#85907f]">
+                        <span className="ml-2 text-xs text-[var(--faint)]">
                           {row.ticker}
                         </span>
                       </td>
@@ -121,7 +121,7 @@ export function OwnerResearchExecutionSection({
                       <td className="py-3 text-right tabular-nums">
                         {weight ? formatWeight(weight.weightBps) : "-"}
                       </td>
-                      <td className="py-3 text-right text-xs text-[#788471]">
+                      <td className="py-3 text-right text-xs text-[var(--muted)]">
                         {row.executionRole === "omitted_manual_history"
                           ? "수동 평가 제외"
                           : row.executionRole === "omitted_zero_weight"
@@ -138,7 +138,7 @@ export function OwnerResearchExecutionSection({
           </div>
         </SimulationDialog>
       </div>
-      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#7b867b]">
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--faint)]">
         <span>
           {execution.endSelection.endServiceDate
             ? formatDate(execution.endSelection.endServiceDate)
@@ -157,7 +157,7 @@ export function OwnerResearchExecutionSection({
       execution.coverage.omittedWeightBps > 0 ? (
         <p
           data-owner-research-partial-coverage
-          className="mt-3 border-l-2 border-[#beac80] pl-3 text-xs leading-5 text-[#8b7650]"
+          className="mt-3 border-l-2 border-[var(--warning)] pl-3 text-xs leading-5 text-[var(--warning)]"
         >
           {formatWeight(execution.coverage.omittedWeightBps)} 제외 · 포함 종목만 100%로 환산
           <span className="hidden sm:inline">한 부분 포트폴리오입니다.</span>
@@ -168,15 +168,15 @@ export function OwnerResearchExecutionSection({
       ) : (
         <div
           data-owner-research-unavailable-reason={execution.reason}
-          className="my-8 flex min-h-64 flex-col justify-center border-y border-[#dce2d8]"
+          className="my-8 flex min-h-64 flex-col justify-center border-y border-[var(--line)]"
         >
           <p className="text-xl font-medium">
             계산에 필요한 근거를 확인하고 있습니다.
           </p>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-[#788471]">
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
             {unavailableReasonLabel(execution.reason)}
           </p>
-          <p className="mt-2 text-xs leading-6 text-[#8b7650]">
+          <p className="mt-2 text-xs leading-6 text-[var(--warning)]">
             모형·데이터 탭에서 종목별 누락과 출처를 확인할 수 있습니다. 부족한
             값을 0이나 예시 경로로 대체하지 않습니다.
           </p>
@@ -194,44 +194,44 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
       data-owner-research-horizon={execution.assumptions.horizon}
       data-owner-research-path-count={execution.assumptions.pathCount}
     >
-      <div className="flex items-end justify-between gap-3 border-b border-[#e1e6dc] pb-4 sm:gap-5">
+      <div className="flex items-end justify-between gap-3 border-b border-[var(--wash)] pb-4 sm:gap-5">
         <div>
-          <p className="text-xs text-[#7b867b]">
+          <p className="text-xs text-[var(--faint)]">
             {execution.assumptions.horizon}단계 후 · 중앙값
           </p>
           <p
-            className={`mt-2 text-[32px] leading-none font-medium tabular-nums sm:text-[38px] ${execution.terminal.p50ReturnPct >= 0 ? "text-[#2d7663]" : "text-[#bd6263]"}`}
+            className={`mt-2 text-[32px] leading-none font-medium tabular-nums sm:text-[38px] ${execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}`}
           >
             {simulationReturnLabel(100 + execution.terminal.p50ReturnPct)}
           </p>
         </div>
         <dl className="grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-3 sm:gap-9 sm:text-xs">
           <div>
-            <dt className="text-[#7b867b]">하위 경계 P10</dt>
+            <dt className="text-[var(--faint)]">하위 경계 P10</dt>
             <dd className="mt-2 text-lg tabular-nums">
               {terminalBand ? simulationReturnLabel(terminalBand.p10) : "-"}
             </dd>
           </div>
           <div>
-            <dt className="text-[#7b867b]">상위 경계 P90</dt>
+            <dt className="text-[var(--faint)]">상위 경계 P90</dt>
             <dd className="mt-2 text-lg tabular-nums">
               {terminalBand ? simulationReturnLabel(terminalBand.p90) : "-"}
             </dd>
           </div>
           <div className="hidden sm:block">
-            <dt className="text-[#7b867b]">계산 경로</dt>
+            <dt className="text-[var(--faint)]">계산 경로</dt>
             <dd className="mt-2 text-lg tabular-nums">
               {execution.assumptions.pathCount}
-              <span className="ml-1 text-xs text-[#7b867b]">개</span>
+              <span className="ml-1 text-xs text-[var(--faint)]">개</span>
             </dd>
           </div>
         </dl>
       </div>
       <ResearchFanChart execution={execution} large />
-      <div className="border-y border-[#dde3d9]">
+      <div className="border-y border-[var(--line)]">
         <SimulationTerminalRiskMetrics terminal={execution.terminal} />
       </div>
-      <p className="mt-3 text-[11px] leading-6 text-[#7b867b]">
+      <p className="mt-3 text-[11px] leading-6 text-[var(--faint)]">
         기준일 {formatDate(execution.source.endServiceDate)} · 입력 수익률{" "}
         {execution.source.returnStepCount}개 · 평균 블록 5단계 · 최초 배분 후
         리밸런싱 없음
@@ -239,7 +239,7 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
       {execution.source.priceBasis === "raw_price_return" ? (
         <p
           data-owner-research-raw-close-disclosure
-          className="text-[11px] leading-6 text-[#8b7650]"
+          className="text-[11px] leading-6 text-[var(--warning)]"
         >
           저장된 KIS 미조정 종가·날짜별 환율 기준. 배당·액면분할 조정 총수익률이
           아닙니다.

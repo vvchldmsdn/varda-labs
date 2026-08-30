@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Workflow, X } from "lucide-react";
 
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
 
@@ -10,6 +11,13 @@ export function AdditionalContributionLogicDialog({
   preview: AdditionalContributionResultPreview;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; };
+  }, [open]);
   const rows = preview.rows.toSorted(
     (left, right) =>
       right.trimAmountKrw - left.trimAmountKrw ||
@@ -21,45 +29,46 @@ export function AdditionalContributionLogicDialog({
     <>
       <button
         type="button"
-        className="border-b border-[#1c2824] pb-0.5 text-sm font-medium text-[#1c2824] transition-colors hover:border-[#517064] hover:text-[#517064]"
-        onClick={() => dialogRef.current?.showModal()}
+        className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-[var(--brand)]"
+        onClick={() => { dialogRef.current?.showModal(); setOpen(true); }}
       >
-        계산 로직 보기
+        <Workflow size={16} aria-hidden="true" /> 계산 로직 보기
       </button>
 
       <dialog
         ref={dialogRef}
         aria-labelledby="contribution-logic-title"
-        className="fixed inset-0 m-auto max-h-[88vh] w-[min(1160px,calc(100vw-24px))] overflow-hidden rounded-lg border border-[#cfd5cd] bg-[#f7f8f5] p-0 text-[#171916] shadow-2xl backdrop:bg-black/35"
+        className="varda-dialog fixed inset-0 m-auto max-h-[88dvh] w-[min(1160px,calc(100vw-24px))] overflow-hidden p-0"
+        onClose={() => setOpen(false)}
         onClick={(event) => {
           if (event.target === event.currentTarget) dialogRef.current?.close();
         }}
       >
-        <div className="flex max-h-[88vh] flex-col">
-          <header className="flex items-start justify-between gap-5 border-b border-[#d9ded7] px-5 py-5 sm:px-7">
+        <div className="flex max-h-[88dvh] flex-col">
+          <header className="varda-dialog-header flex shrink-0 items-start justify-between gap-5">
             <div>
-              <p className="text-[11px] font-medium text-[#718077]">CALCULATION LOGIC</p>
+              <p className="text-[11px] font-medium text-[var(--muted)]">CALCULATION LOGIC</p>
               <h2 id="contribution-logic-title" className="mt-1 text-xl font-medium">
                 이번 추가 투입안이 만들어진 과정
               </h2>
-              <p className="mt-1 text-sm text-[#657068]">
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 실제 주문이 아닌 읽기 전용 계산입니다. 각 단계의 재원과 종목별 판단을 그대로 표시합니다.
               </p>
             </div>
             <button
               type="button"
               aria-label="계산 로직 닫기"
-              className="grid size-9 shrink-0 place-items-center rounded-full border border-[#cfd5cd] bg-white text-xl hover:bg-[#eef1eb]"
+              className="varda-icon-button"
               onClick={() => dialogRef.current?.close()}
             >
-              ×
+              <X size={18} aria-hidden="true" />
             </button>
           </header>
 
-          <div className="overflow-y-auto px-5 py-6 sm:px-7">
+          <div className="varda-dialog-content min-h-0 overflow-y-auto overscroll-contain">
             <section aria-labelledby="calculation-flow-title">
               <h3 id="calculation-flow-title" className="text-sm font-medium">금액 흐름</h3>
-              <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-[#d9ded7] bg-[#d9ded7] sm:grid-cols-5">
+              <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)] sm:grid-cols-5">
                 <FlowStep index="01" label="신규 투입금" value={formatKrw(preview.cashAmountKrw)} />
                 <FlowStep index="02" label="계산상 매도" value={`+${formatKrw(preview.totalTrimProceedsKrw)}`} />
                 <FlowStep index="03" label="매수 가능 재원" value={formatKrw(preview.totalAvailableFundsKrw)} />
@@ -68,7 +77,7 @@ export function AdditionalContributionLogicDialog({
               </div>
             </section>
 
-            <section className="mt-5 grid gap-4 border-y border-[#d9ded7] py-5 md:grid-cols-3">
+            <section className="mt-5 grid gap-4 border-y border-[var(--line)] py-5 md:grid-cols-3">
               <PolicyFact
                 label="1. 초과 종목 정리"
                 value={`목표 대비 +${formatNumber(preview.calculationParameters.trimDriftThresholdPct)}% 이상`}
@@ -90,16 +99,16 @@ export function AdditionalContributionLogicDialog({
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                   <h3 id="holding-calculation-title" className="text-sm font-medium">종목별 계산 근거</h3>
-                  <p className="mt-1 text-xs text-[#657068]">
+                  <p className="mt-1 text-xs text-[var(--muted)]">
                     원래 목표로 계산한 금액과 MA120 반영 후 최종 금액을 함께 비교합니다.
                   </p>
                 </div>
-                <span className="text-xs text-[#657068]">{rows.length}개 종목</span>
+                <span className="text-xs text-[var(--muted)]">{rows.length}개 종목</span>
               </div>
 
-              <div className="mt-3 overflow-x-auto border-y border-[#d9ded7]">
+              <div className="mt-3 overflow-x-auto border-y border-[var(--line)]">
                 <table className="w-full min-w-[1080px] border-collapse text-sm">
-                  <thead className="text-left text-[11px] font-medium text-[#657068]">
+                  <thead className="text-left text-[11px] font-medium text-[var(--muted)]">
                     <tr>
                       <th className="px-2 py-3">종목</th>
                       <th className="px-2 py-3 text-right">현재 → 목표</th>
@@ -113,10 +122,10 @@ export function AdditionalContributionLogicDialog({
                   </thead>
                   <tbody>
                     {rows.map((row) => (
-                      <tr key={`${row.accountCode}:${row.ticker ?? row.name}`} className="border-t border-[#e1e5df] align-top">
+                      <tr key={`${row.accountCode}:${row.ticker ?? row.name}`} className="border-t border-[var(--wash)] align-top">
                         <td className="px-2 py-3">
                           <p className="font-medium">{row.name}</p>
-                          <p className="mt-0.5 text-xs text-[#727b74]">{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</p>
+                          <p className="mt-0.5 text-xs text-[var(--muted)]">{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</p>
                         </td>
                         <td className="px-2 py-3 text-right tabular-nums">{formatPercent(row.currentWeightPct)} → {formatPercent(row.targetWeightPct)}</td>
                         <td className="px-2 py-3 text-right tabular-nums">{row.unrealizedReturnPct === null ? "근거 없음" : formatSignedPercent(row.unrealizedReturnPct)}</td>
@@ -124,10 +133,10 @@ export function AdditionalContributionLogicDialog({
                         <td className="px-2 py-3 text-right tabular-nums">{formatKrw(row.strategicAllocationKrw)}</td>
                         <td className="px-2 py-3 text-right tabular-nums">
                           <p>{formatPercent(row.effectiveTargetWeightPct)}</p>
-                          <p className="mt-0.5 text-xs text-[#727b74]">× {formatNumber(row.maEffectiveMultiplier)}</p>
+                          <p className="mt-0.5 text-xs text-[var(--muted)]">× {formatNumber(row.maEffectiveMultiplier)}</p>
                         </td>
                         <td className={`px-2 py-3 text-right font-medium tabular-nums ${actionTone(row.action)}`}>{actionLabel(row)}</td>
-                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[#5e6961]">{decisionReason(row)}</td>
+                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]">{decisionReason(row)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -135,9 +144,9 @@ export function AdditionalContributionLogicDialog({
               </div>
             </section>
 
-            <section className="mt-6 border-l-2 border-[#b8a46d] pl-4 text-sm">
+            <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
               <h3 className="font-medium">현재 계산 범위</h3>
-              <p className="mt-1 leading-6 text-[#657068]">
+              <p className="mt-1 leading-6 text-[var(--muted)]">
                 원 서비스 후반부에 있던 환율 진입시점, 위험기여, 시장 레짐, 뉴스, 성과감시 감액은 사용자별 정규화 근거가 아직 없어 이번 계산에 임의로 넣지 않았습니다. 근거가 연결되면 같은 단계에 추가할 수 있습니다.
               </p>
             </section>
@@ -149,11 +158,11 @@ export function AdditionalContributionLogicDialog({
 }
 
 function FlowStep({ index, label, value }: { index: string; label: string; value: string }) {
-  return <div className="bg-[#f7f8f5] px-4 py-4"><p className="text-[10px] text-[#7a827b]">{index}</p><p className="mt-2 text-xs text-[#657068]">{label}</p><p className="mt-1 font-medium tabular-nums">{value}</p></div>;
+  return <div className="bg-[var(--paper)] px-4 py-4"><p className="text-[10px] text-[var(--faint)]">{index}</p><p className="mt-2 text-xs text-[var(--muted)]">{label}</p><p className="mt-1 font-medium tabular-nums">{value}</p></div>;
 }
 
 function PolicyFact({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return <div><p className="text-[11px] font-medium text-[#718077]">{label}</p><p className="mt-2 font-medium">{value}</p><p className="mt-1 text-xs leading-5 text-[#657068]">{detail}</p></div>;
+  return <div><p className="text-[11px] font-medium text-[var(--muted)]">{label}</p><p className="mt-2 font-medium">{value}</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</p></div>;
 }
 
 function actionLabel(row: AdditionalContributionResultPreview["rows"][number]) {
@@ -163,7 +172,7 @@ function actionLabel(row: AdditionalContributionResultPreview["rows"][number]) {
 }
 
 function actionTone(action: "buy" | "hold" | "trim") {
-  return action === "buy" ? "text-[#347e62]" : action === "trim" ? "text-[#bb554f]" : "text-[#687068]";
+  return action === "buy" ? "text-[var(--brand)]" : action === "trim" ? "text-[var(--negative)]" : "text-[var(--muted)]";
 }
 
 function decisionReason(row: AdditionalContributionResultPreview["rows"][number]) {

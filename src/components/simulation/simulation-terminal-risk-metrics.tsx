@@ -30,14 +30,14 @@ export function SimulationTerminalRiskMetrics({
     <dl
       className={
         compact
-          ? "grid grid-cols-2 border-b border-[#e1e5da] text-sm"
-          : "grid grid-cols-2 border-b border-[#e1e5da] sm:grid-cols-3 xl:grid-cols-6"
+          ? "grid grid-cols-2 border-b border-[var(--line)] text-sm"
+          : "grid grid-cols-2 border-b border-[var(--line)] sm:grid-cols-3 xl:grid-cols-6"
       }
       data-simulation-terminal-risk-metrics
     >
       {metrics.map(([label, value]) => (
         <div className="min-w-0 px-3 py-3" key={label}>
-          <dt className="text-xs leading-5 text-[#687064]">{label}</dt>
+          <dt className="text-xs leading-5 text-[var(--muted)]">{label}</dt>
           <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
         </div>
       ))}

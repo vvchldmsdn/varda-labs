@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense, type ReactNode } from "react";
 
 import {
@@ -168,7 +169,7 @@ export default async function InvestmentLabPage({
 
   return (
     <div
-      className="min-h-screen bg-[#f8f9f6] text-[#171a16]"
+      className="min-h-screen bg-[var(--paper)] text-[var(--ink)]"
       data-page="investment-lab"
     >
       <Suspense fallback={<InvestmentLabSkeleton />}>
@@ -431,19 +432,20 @@ async function InvestmentLabSmallAdjustmentContent({
 
 function InvestmentLabSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f8f9f6] text-[#171a16]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-[1540px] px-5 py-8 sm:px-8 lg:px-10">
-        <div className="h-12 border-y border-[#dde1db]" />
-        <div className="mt-12 h-28 border-b border-[#dde1db]" />
-        <div className="grid border-b border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4">
+        <div className="h-12 border-y border-[var(--line)]" />
+        <div className="mt-12 h-28 border-b border-[var(--line)]" />
+        <div className="grid border-b border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
-              className="h-24 border-r border-[#dde1db] last:border-r-0"
+              className="h-24 border-r border-[var(--line)] last:border-r-0"
             />
           ))}
         </div>
-        <div className="mt-8 h-[420px] border-b border-[#dde1db]" />
+        <div className="mt-8 h-[420px] border-b border-[var(--line)]" />
       </div>
     </main>
   );

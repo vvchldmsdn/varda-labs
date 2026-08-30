@@ -145,8 +145,8 @@ export function labCompactKrw(value: number) {
 
 export function labMoneyTone(value: number | null) {
   return value === null || Math.abs(value) < 0.5
-    ? "text-[#27382e]"
+    ? "text-[var(--ink)]"
     : value > 0
-      ? "text-[#388773]"
-      : "text-[#c4615e]";
+      ? "text-[var(--brand)]"
+      : "text-[var(--negative)]";
 }

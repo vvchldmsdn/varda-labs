@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { HistoryView } from "@/components/history/history-view";
@@ -28,10 +29,18 @@ type HistoryPageProps = {
     positionSource?: string | string[];
     comparisonFrom?: string | string[];
     comparisonTo?: string | string[];
+    preview?: string | string[];
   }>;
 };
 
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
+  if (process.env.NODE_ENV === "development") {
+    const previewParams = await searchParams;
+    if (previewParams.preview === "design") {
+      const { HistoryDesignPreview } = await import("@/components/history/history-design-preview");
+      return <HistoryDesignPreview scope={previewParams.scope} />;
+    }
+  }
   const [params, resolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
@@ -124,13 +133,14 @@ function HistoryAccessBoundary({
   resolution: SessionResolverResult;
 }) {
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
+        <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal">
           히스토리
         </h1>
-        <p className="mt-2 text-sm text-[#687064]">
+        <p className="mt-2 text-sm text-[var(--muted)]">
           로그인 세션과 사용자 소유권이 확인된 기록만 조회합니다.
         </p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -140,13 +150,13 @@ function HistoryAccessBoundary({
           />
           <EvidenceCell label="상품 데이터 조회" value="시도하지 않음" />
         </dl>
-        <p className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+        <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
           로그인과 사용자 연결이 확인되기 전에는 히스토리 데이터를 읽지
           않습니다.
         </p>
         <Link
           href="/auth/sign-in"
-          className="mt-5 inline-flex rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+          className="mt-5 inline-flex rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
         >
           로그인
         </Link>
@@ -157,8 +167,8 @@ function HistoryAccessBoundary({
 
 function EvidenceCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <dt className="text-xs font-semibold text-[#687064]">{label}</dt>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 font-semibold">{value}</dd>
     </div>
   );

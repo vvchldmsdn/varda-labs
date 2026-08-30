@@ -27,12 +27,12 @@ export function HoldingAnalysisDataForm({
   const messageId = `holding-analysis-data-${holdingId}`;
 
   if (!readiness) {
-    return <p className="text-xs text-[#8a5b16]">상태 확인 불가</p>;
+    return <p className="text-xs text-[var(--warning)]">상태 확인 불가</p>;
   }
 
   return (
-    <div className="min-w-[190px] text-xs text-[#5e685e]">
-      <p className="font-semibold text-[#35423a]">
+    <div className="min-w-[190px] text-xs text-[var(--muted)]">
+      <p className="font-semibold text-[var(--ink)]">
         {readinessLabel(readiness)}
       </p>
       {readiness.state !== "unsupported" && readiness.state !== "blocked" ? (
@@ -54,7 +54,7 @@ export function HoldingAnalysisDataForm({
           <input name="holdingId" type="hidden" value={holdingId} />
           <button
             aria-describedby={messageId}
-            className="rounded-md border border-[#9caf9f] bg-white px-2.5 py-1.5 font-semibold text-[#1e3a34] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-md border border-[var(--faint)] bg-white px-2.5 py-1.5 font-semibold text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={pending}
             type="submit"
           >
@@ -67,8 +67,8 @@ export function HoldingAnalysisDataForm({
         className={[
           "mt-1 min-h-4 leading-5",
           state.status === "success" || state.status === "already_ready"
-            ? "text-[#1e5d49]"
-            : "text-[#8a5b16]",
+            ? "text-[var(--brand)]"
+            : "text-[var(--warning)]",
         ].join(" ")}
         id={messageId}
       >

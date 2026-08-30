@@ -25,7 +25,7 @@ export function HistoryPositionComparisonResult({
   return (
     <>
       {model.status === "partial" ? (
-        <p className="mt-3 border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-sm text-[#6f561c]">
+        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]">
           일부 저장 근거가 중복되었거나 비어 있습니다. 확인 가능한 변화만
           표시하고, 판단할 수 없는 행은 미확인으로 남깁니다.
         </p>
@@ -43,14 +43,14 @@ export function HistoryPositionComparisonResult({
       <ChangeSummary model={model} />
       <ComparisonTable rows={model.rows} />
 
-      <div className="mt-3 flex flex-col gap-2 text-xs leading-5 text-[#687064] sm:flex-row sm:items-start sm:justify-between">
+      <div className="mt-3 flex flex-col gap-2 text-xs leading-5 text-[var(--muted)] sm:flex-row sm:items-start sm:justify-between">
         <p>
           저장 평가액 변화는 수익률·손익 또는 이벤트 원인을 뜻하지 않습니다.
           실시간 가격, 현재 환율, 보간값을 섞지 않았습니다.
         </p>
         <Link
           href={eventHistoryHref(model)}
-          className="w-fit font-semibold text-[#1e3a34] underline underline-offset-2"
+          className="w-fit font-semibold text-[var(--ink)] underline underline-offset-2"
         >
           이벤트 기록은 별도 연대기로 보기
         </Link>
@@ -67,8 +67,8 @@ function EndpointEvidence({
   endpoint: HistoryPositionComparisonEndpointSummary;
 }) {
   return (
-    <div className="border border-[#e1e6dc] bg-white p-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="border border-[var(--wash)] bg-white p-3">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-sm font-semibold">
         {endpoint.snapshotDate} · {historySourceLabel(endpoint.source)}
       </p>
@@ -105,15 +105,15 @@ function EndpointEvidence({
 function EvidenceValue({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[#687064]">{label}</dt>
-      <dd className="mt-1 font-semibold text-[#171916]">{value}</dd>
+      <dt className="text-[var(--muted)]">{label}</dt>
+      <dd className="mt-1 font-semibold text-[var(--ink)]">{value}</dd>
     </div>
   );
 }
 
 function ChangeSummary({ model }: { model: HistoryPositionComparisonModel }) {
   return (
-    <div className="mt-3 grid border-t border-[#e1e6dc] sm:grid-cols-2 lg:grid-cols-5">
+    <div className="mt-3 grid border-t border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-5">
       <SummaryCell
         label="추가"
         value={String(model.addedCount)}
@@ -151,7 +151,7 @@ function ComparisonTable({
   return (
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs text-[#687064]">
+        <thead className="text-xs text-[var(--muted)]">
           <tr>
             <TableHeader>변화</TableHeader>
             <TableHeader>종목</TableHeader>
@@ -187,13 +187,13 @@ function ComparisonRow({ row }: { row: HistoryPositionComparisonRow }) {
     >
       <TableCell strong>
         <span className="block">{changeKindLabel(row.changeKind)}</span>
-        <span className="mt-1 block text-xs font-normal text-[#687064]">
+        <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
           {changeReasonLabel(row)}
         </span>
       </TableCell>
       <TableCell strong>
         <span className="block">{row.ticker ?? "티커 없음"}</span>
-        <span className="mt-1 block text-xs font-normal text-[#687064]">
+        <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
           {row.assetName}
         </span>
       </TableCell>

@@ -55,7 +55,7 @@ export function HistoryView({
   return (
     <main
       data-page="history"
-      className="min-h-screen overflow-x-hidden bg-[#f8f9f6] text-[#171a16]"
+      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
     >
       <PortfolioPrimaryNavigation
         activePath="/history"
@@ -63,9 +63,9 @@ export function HistoryView({
         selectedScopeKey={history.selectedScope.key}
       />
 
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-16 pt-7 sm:px-8 lg:px-10">
+      <div className="varda-content">
         <header>
-          <div className="flex items-center justify-between gap-5 text-[11px] text-[#777d75]">
+          <div className="flex items-center justify-between gap-5 text-[11px] text-[var(--muted)]">
             <p>PORTFOLIO / HISTORY</p>
             <p className="tabular-nums">
               기준일 {formatDisplayDate(overview.endDate)}
@@ -82,7 +82,7 @@ export function HistoryView({
         </header>
 
         {history.unavailableSources.length > 0 ? (
-          <p className="mt-7 border-y border-[#e4d6b9] bg-[#fffaf0] px-4 py-3 text-sm text-[#76591f]">
+          <p className="mt-7 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
             일부 기록을 읽지 못했습니다: {history.unavailableSources
               .map(historyReadSourceLabel)
               .join(", ")}. 읽을 수 있는 저장 기록만 계속 표시합니다.
@@ -95,20 +95,20 @@ export function HistoryView({
         />
 
         {overview.status === "ready" ? (
-          <section className="border-b border-[#dde1db] py-8">
+          <section className="border-b border-[var(--line)] py-8">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-[11px] font-medium text-[#777d75]">
+                <p className="text-[11px] font-medium text-[var(--muted)]">
                   MOVEMENT INSIGHTS
                 </p>
                 <h2 className="mt-1 text-xl font-semibold">움직임 인사이트</h2>
               </div>
-              <p className="text-xs text-[#777d75]">
+              <p className="text-xs text-[var(--muted)]">
                 저장점 간 변화 · 현금흐름 미보정
               </p>
             </div>
             <dl
-              className="mt-5 grid border-y border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4"
+              className="mt-5 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4"
               aria-label="히스토리 움직임 지표"
             >
               <InsightMetric
@@ -139,19 +139,19 @@ export function HistoryView({
 
         <HistoryActivityStream result={events} supported={eventsSupported} />
 
-        <details className="mt-8 border-y border-[#dde1db] py-5">
-          <summary className="cursor-pointer list-none text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]">
+        <details className="mt-8 border-y border-[var(--line)] py-5">
+          <summary className="cursor-pointer list-none text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]">
             원시 기록과 검증 근거 보기
           </summary>
           <div className="mt-6 space-y-10">
             <p
               data-history-semantic="stored-evidence-not-recomputed"
-              className="max-w-4xl text-sm leading-7 text-[#686f67]"
+              className="max-w-4xl text-sm leading-7 text-[var(--muted)]"
             >
               계좌 성과는 저장된 계좌 스냅샷을 읽고, 자산그룹 성과는 각 기준일에 유효했던 멤버십과 포지션 스냅샷으로 계산합니다. 누락값을 임의 보간하지 않으며 잔액 기록과 성과 시계열을 합치지 않습니다.
             </p>
 
-            <dl className="grid border-y border-[#e1e4df] sm:grid-cols-2 lg:grid-cols-4">
+            <dl className="grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
               <EvidenceMetric
                 label="잔액 기록"
                 value={String(history.summary.balanceRowCount)}
@@ -262,7 +262,7 @@ function InsightMetric({
   detail,
   label,
   value,
-  valueClass = "text-[#20231f]",
+  valueClass = "text-[var(--ink)]",
 }: {
   detail: string;
   label: string;
@@ -270,12 +270,12 @@ function InsightMetric({
   valueClass?: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[#dde1db] px-4 py-5 first:pl-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
-      <dt className="text-xs text-[#747a72]">{label}</dt>
+    <div className="min-w-0 border-b border-[var(--line)] px-4 py-5 first:pl-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className={`mt-2 truncate text-lg font-semibold tabular-nums ${valueClass}`}>
         {value}
       </dd>
-      <dd className="mt-2 text-xs text-[#858a83]">{detail}</dd>
+      <dd className="mt-2 text-xs text-[var(--faint)]">{detail}</dd>
     </div>
   );
 }
@@ -290,10 +290,10 @@ function EvidenceMetric({
   value: string;
 }) {
   return (
-    <div className="border-b border-[#e1e4df] px-4 py-4 first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <dt className="text-xs text-[#747a72]">{label}</dt>
+    <div className="border-b border-[var(--wash)] px-4 py-4 first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
+      <dt className="text-xs text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 text-xl font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[#858a83]">{detail}</dd>
+      <dd className="mt-1 text-xs text-[var(--faint)]">{detail}</dd>
     </div>
   );
 }
@@ -311,7 +311,7 @@ function RawSection({
     <section>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-xs text-[#747a72]">{detail}</p>
+        <p className="text-xs text-[var(--muted)]">{detail}</p>
       </div>
       {children}
     </section>
@@ -320,7 +320,7 @@ function RawSection({
 
 function UnsupportedScopeMessage({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-4 border-y border-[#ead9b5] bg-[#fff9eb] px-3 py-4 text-sm text-[#76591f]">
+    <p className="mt-4 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-3 py-4 text-sm text-[var(--warning)]">
       {children}
     </p>
   );
@@ -363,6 +363,6 @@ function formatDisplayDate(value: string | null) {
 }
 
 function tone(value: number | null) {
-  if (value === null || Math.abs(value) < 0.005) return "text-[#20231f]";
-  return value > 0 ? "text-[#347e62]" : "text-[#cb5551]";
+  if (value === null || Math.abs(value) < 0.005) return "text-[var(--ink)]";
+  return value > 0 ? "text-[var(--brand)]" : "text-[var(--negative)]";
 }

@@ -44,7 +44,7 @@ export function HistoryEventTimeline({
       data-history-event-policy={model.policy.version}
       className="mt-3"
     >
-      <p className="border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-sm leading-6 text-[#6f561c]">
+      <p className="border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm leading-6 text-[var(--warning)]">
         이벤트 일자는 저장된 이벤트 달력일이며 스냅샷 기준일·서비스
         사이클과 별개입니다. 같은 기간에 함께 보이더라도 평가액 변동의
         원인이나 성과 기여로 단정하지 않습니다.
@@ -53,7 +53,7 @@ export function HistoryEventTimeline({
       {model.status === "ready" || model.status === "partial" ? (
         <ReadyTimeline model={model} />
       ) : (
-        <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[#687064]">
+        <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[var(--muted)]">
           {statusMessage(model)}
         </p>
       )}
@@ -65,13 +65,13 @@ function ReadyTimeline({ model }: { model: HistoryEventTimelineModel }) {
   return (
     <>
       {model.status === "partial" ? (
-        <p className="mt-3 border border-[#eadfc7] bg-[#fff8e7] px-3 py-2 text-sm text-[#6f561c]">
+        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]">
           일부 이벤트 근거가 불완전합니다. 확인 가능한 저장 행은 유지하며
           금액을 복원하거나 정정 이벤트를 상계하지 않습니다.
         </p>
       ) : null}
 
-      <div className="mt-3 grid border-t border-[#e1e6dc] sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid border-t border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCell
           label="표시 이벤트"
           value={`${model.eventCount}건`}
@@ -100,7 +100,7 @@ function ReadyTimeline({ model }: { model: HistoryEventTimelineModel }) {
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[1320px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="text-xs text-[#687064]">
+          <thead className="text-xs text-[var(--muted)]">
             <tr>
               <TableHeader>이벤트 일자</TableHeader>
               <TableHeader>기록 시각</TableHeader>
@@ -125,7 +125,7 @@ function ReadyTimeline({ model }: { model: HistoryEventTimelineModel }) {
         </table>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
         계정 미귀속 이벤트와 다른 계정 이벤트는 포함하지 않습니다. 현재
         자산·현재 가격·fallback 환율로 과거 금액을 보완하지 않으며, 기간
         수익률·TWR·성과 기여를 계산하지 않습니다.
@@ -146,13 +146,13 @@ function EventRow({ row }: { row: HistoryEventDisplayRow }) {
       <TableCell>{formatRecordedAt(row.recordedAt)}</TableCell>
       <TableCell>
         <span className="block font-semibold">{eventTypeLabel(row)}</span>
-        <span className="mt-1 block text-xs text-[#687064]">
+        <span className="mt-1 block text-xs text-[var(--muted)]">
           {evidenceLabel(row)}
         </span>
       </TableCell>
       <TableCell>
         <span className="block font-semibold">{row.ticker ?? "티커 없음"}</span>
-        <span className="mt-1 block text-xs text-[#687064]">
+        <span className="mt-1 block text-xs text-[var(--muted)]">
           {row.assetName}
           {row.groupName ? ` · ${row.groupName}` : ""}
         </span>
@@ -160,7 +160,7 @@ function EventRow({ row }: { row: HistoryEventDisplayRow }) {
       <TableCell>
         <span className="block">{assetReferenceLabel(row)}</span>
         {row.correctionStatus !== "none" ? (
-          <span className="mt-1 block text-xs text-[#8a5a12]">
+          <span className="mt-1 block text-xs text-[var(--warning)]">
             정정 참조 별도 보존
           </span>
         ) : null}
@@ -173,7 +173,7 @@ function EventRow({ row }: { row: HistoryEventDisplayRow }) {
         <span className="block">
           {row.source ? historySourceLabel(row.source) : "출처 없음"}
         </span>
-        <span className="mt-1 block text-xs text-[#687064]">
+        <span className="mt-1 block text-xs text-[var(--muted)]">
           {row.ruleVersion ?? "규칙 버전 없음"}
         </span>
       </TableCell>

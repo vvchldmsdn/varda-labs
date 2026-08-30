@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { TENANT_LIVE_PRICE_SYNC_POLICY } from "@/lib/market-data/tenant-live-price-sync-policy";
@@ -79,15 +80,15 @@ export function PortfolioRefreshButton({
       aria-label="실시간 시세 갱신"
       className={
         compact
-          ? "grid h-9 w-9 place-items-center text-xl text-[#252824] transition-colors hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] disabled:opacity-40"
-          : "inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[#252824] transition-colors hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] disabled:opacity-40"
+          ? "grid h-9 w-9 place-items-center text-xl text-[var(--ink)] transition-colors hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] disabled:opacity-40"
+          : "inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[var(--ink)] transition-colors hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] disabled:opacity-40"
       }
       disabled={pending}
       onClick={() => void sync("manual")}
       title={syncTitle(syncState)}
     >
       <span aria-hidden="true" className={pending ? "animate-spin" : undefined}>
-        ↻
+        <RefreshCw size={15} strokeWidth={1.5} />
       </span>
       {compact ? null : <span aria-live="polite">{syncLabel(syncState)}</span>}
     </button>

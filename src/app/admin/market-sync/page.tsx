@@ -1,3 +1,4 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -17,18 +18,19 @@ export default async function AdminMarketSyncPage() {
   const status = await getAdminMarketSyncStatus();
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] text-[#171916]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-4">
-        <header className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+        <header className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold text-[#687064]">
+              <p className="text-xs font-semibold text-[var(--muted)]">
                 Varda Labs Admin
               </p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
                 Market Sync Status
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-[#4d574b]">
+              <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
                 Status-only console. This page reads stored database state and
                 does not call providers, dry-run routes, or write routes.
               </p>
@@ -121,7 +123,7 @@ export default async function AdminMarketSyncPage() {
               <Metric label="Source" value={status.fx.source ?? "-"} />
               <Metric label="Freshness" value={status.fx.freshness} />
             </MetricGrid>
-            <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[#4d574b]">
+            <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[var(--muted)]">
               FX dry-run is not called by this page. Use the stored row above to
               judge whether a separate reviewed FX refresh is needed.
             </p>
@@ -193,7 +195,7 @@ function NavLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="rounded-md border border-[#d7ddcf] bg-white px-3 py-2 text-[#4d574b] hover:bg-[#eef2e8]"
+      className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--muted)] hover:bg-[var(--wash)]"
     >
       {children}
     </Link>
@@ -210,10 +212,10 @@ function SummaryCell({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-[#e1e6dc] bg-white px-3 py-2">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="rounded-md border border-[var(--wash)] bg-white px-3 py-2">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-xl font-semibold tracking-normal">{value}</p>
-      <p className="mt-1 text-xs text-[#687064]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
     </div>
   );
 }
@@ -228,10 +230,10 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
-        <p className="text-xs font-semibold text-[#687064]">{detail}</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">{detail}</p>
       </div>
       <div className="mt-3">{children}</div>
     </section>
@@ -244,9 +246,9 @@ function MetricGrid({ children }: { children: ReactNode }) {
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-md border border-[#e1e6dc] bg-white px-3 py-2">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-[#171916]">{value}</p>
+    <div className="rounded-md border border-[var(--wash)] bg-white px-3 py-2">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{value}</p>
     </div>
   );
 }
@@ -261,16 +263,16 @@ function TargetList({
   const visibleTargets = targets.slice(0, 10);
 
   return (
-    <div className="mt-3 rounded-md border border-[#e1e6dc] bg-white p-3">
+    <div className="mt-3 rounded-md border border-[var(--wash)] bg-white p-3">
       <p className="text-sm font-semibold">{title}</p>
       {visibleTargets.length === 0 ? (
-        <p className="mt-2 text-sm text-[#687064]">No gaps.</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">No gaps.</p>
       ) : (
         <ul className="mt-2 space-y-2 text-sm">
           {visibleTargets.map((target) => (
             <li key={`${target.account}-${target.ticker}`}>
               <span className="font-semibold">{target.ticker}</span>
-              <span className="text-[#687064]">
+              <span className="text-[var(--muted)]">
                 {" "}
                 {target.name} - {target.account} - {target.market}
               </span>
@@ -279,7 +281,7 @@ function TargetList({
         </ul>
       )}
       {targets.length > visibleTargets.length ? (
-        <p className="mt-2 text-xs text-[#687064]">
+        <p className="mt-2 text-xs text-[var(--muted)]">
           +{targets.length - visibleTargets.length} more
         </p>
       ) : null}
@@ -291,12 +293,12 @@ function CloseGapList({ gaps }: { gaps: CloseCoverageTarget[] }) {
   const visibleGaps = gaps.slice(0, 10);
 
   return (
-    <div className="mt-3 overflow-x-auto rounded-md border border-[#e1e6dc] bg-white">
+    <div className="mt-3 overflow-x-auto rounded-md border border-[var(--wash)] bg-white">
       {visibleGaps.length === 0 ? (
-        <p className="px-3 py-2 text-sm text-[#687064]">No close gaps.</p>
+        <p className="px-3 py-2 text-sm text-[var(--muted)]">No close gaps.</p>
       ) : (
         <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="text-xs uppercase text-[#687064]">
+          <thead className="text-xs uppercase text-[var(--muted)]">
             <tr>
               <TableHeader>Ticker</TableHeader>
               <TableHeader>Account</TableHeader>
@@ -310,7 +312,7 @@ function CloseGapList({ gaps }: { gaps: CloseCoverageTarget[] }) {
             {visibleGaps.map((gap) => (
               <tr
                 key={`${gap.account}-${gap.ticker}`}
-                className="border-t border-[#e1e6dc]"
+                className="border-t border-[var(--wash)]"
               >
                 <TableCell strong>{gap.ticker}</TableCell>
                 <TableCell>{gap.account}</TableCell>
@@ -324,7 +326,7 @@ function CloseGapList({ gaps }: { gaps: CloseCoverageTarget[] }) {
         </table>
       )}
       {gaps.length > visibleGaps.length ? (
-        <p className="px-3 py-2 text-xs text-[#687064]">
+        <p className="px-3 py-2 text-xs text-[var(--muted)]">
           +{gaps.length - visibleGaps.length} more
         </p>
       ) : null}
@@ -342,16 +344,16 @@ function AccountCounts({
   const entries = Object.entries(counts);
 
   return (
-    <div className="mt-3 rounded-md border border-[#e1e6dc] bg-white p-3">
+    <div className="mt-3 rounded-md border border-[var(--wash)] bg-white p-3">
       <p className="text-sm font-semibold">{title}</p>
       {entries.length === 0 ? (
-        <p className="mt-2 text-sm text-[#687064]">No rows for current cycle.</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">No rows for current cycle.</p>
       ) : (
         <div className="mt-2 flex flex-wrap gap-2 text-sm">
           {entries.map(([account, count]) => (
             <span
               key={account}
-              className="rounded-md bg-[#eef2e8] px-2 py-1 font-semibold text-[#33423c]"
+              className="rounded-md bg-[var(--wash)] px-2 py-1 font-semibold text-[var(--ink)]"
             >
               {account}: {count}
             </span>
@@ -364,24 +366,24 @@ function AccountCounts({
 
 function CooldownBlock({ cooldown }: { cooldown: KisCooldownStatus }) {
   return (
-    <div className="mb-3 rounded-md border border-[#e1e6dc] bg-white p-3 last:mb-0">
+    <div className="mb-3 rounded-md border border-[var(--wash)] bg-white p-3 last:mb-0">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold uppercase">{cooldown.mode}</p>
         <StatusBadge active={cooldown.active}>
           {cooldown.active ? "cooldown" : "ready"}
         </StatusBadge>
       </div>
-      <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#687064]">
+      <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-[var(--muted)]">
         <dt>retry</dt>
-        <dd className="text-right font-semibold text-[#171916]">
+        <dd className="text-right font-semibold text-[var(--ink)]">
           {cooldown.retryAfterSeconds}s
         </dd>
         <dt>last status</dt>
-        <dd className="text-right font-semibold text-[#171916]">
+        <dd className="text-right font-semibold text-[var(--ink)]">
           {cooldown.lastRunStatus ?? "-"}
         </dd>
         <dt>last start</dt>
-        <dd className="text-right font-semibold text-[#171916]">
+        <dd className="text-right font-semibold text-[var(--ink)]">
           {formatDateTime(cooldown.lastRunStartedAt)}
         </dd>
       </dl>
@@ -401,8 +403,8 @@ function StatusBadge({
       className={[
         "rounded-md px-2 py-1 text-xs font-semibold",
         active
-          ? "bg-[#fff2ce] text-[#7a5200]"
-          : "bg-[#e8f3e8] text-[#176335]",
+          ? "bg-[var(--warning-soft)] text-[var(--warning)]"
+          : "bg-[var(--wash)] text-[var(--ink)]",
       ].join(" ")}
     >
       {children}
@@ -412,13 +414,13 @@ function StatusBadge({
 
 function RecentRunsTable({ runs }: { runs: AdminMarketSyncRun[] }) {
   if (runs.length === 0) {
-    return <p className="text-sm text-[#687064]">No sync runs found.</p>;
+    return <p className="text-sm text-[var(--muted)]">No sync runs found.</p>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-[#e1e6dc] bg-white">
+    <div className="overflow-x-auto rounded-md border border-[var(--wash)] bg-white">
       <table className="w-full min-w-[860px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs uppercase text-[#687064]">
+        <thead className="text-xs uppercase text-[var(--muted)]">
           <tr>
             <TableHeader>Started</TableHeader>
             <TableHeader>Job</TableHeader>
@@ -433,7 +435,7 @@ function RecentRunsTable({ runs }: { runs: AdminMarketSyncRun[] }) {
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-t border-[#e1e6dc]">
+            <tr key={run.id} className="border-t border-[var(--wash)]">
               <TableCell strong>{formatDateTime(run.startedAt)}</TableCell>
               <TableCell>{run.jobType}</TableCell>
               <TableCell>{run.mode ?? "-"}</TableCell>
@@ -453,12 +455,12 @@ function RecentRunsTable({ runs }: { runs: AdminMarketSyncRun[] }) {
 
 function RunbookCard({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-md border border-[#e1e6dc] bg-white p-3">
+    <div className="rounded-md border border-[var(--wash)] bg-white p-3">
       <p className="text-sm font-semibold">{title}</p>
-      <ul className="mt-2 space-y-1 text-sm text-[#4d574b]">
+      <ul className="mt-2 space-y-1 text-sm text-[var(--muted)]">
         {lines.map((line) => (
           <li key={line}>
-            <code className="rounded bg-[#eef2e8] px-1 py-0.5">{line}</code>
+            <code className="rounded bg-[var(--wash)] px-1 py-0.5">{line}</code>
           </li>
         ))}
       </ul>
@@ -476,7 +478,7 @@ function TableHeader({
   return (
     <th
       className={[
-        "border-b border-[#dfe3d5] px-3 py-2 font-semibold",
+        "border-b border-[var(--line)] px-3 py-2 font-semibold",
         align === "right" ? "text-right" : "text-left",
       ].join(" ")}
     >
@@ -497,7 +499,7 @@ function TableCell({
   return (
     <td
       className={[
-        "border-b border-[#edf0e8] px-3 py-2 align-top",
+        "border-b border-[var(--wash)] px-3 py-2 align-top",
         align === "right" ? "text-right" : "text-left",
         strong ? "font-semibold" : "",
       ].join(" ")}

@@ -52,15 +52,15 @@ export function InvestmentLabAnchorBasket({
       data-section="investment-lab-anchor-basket"
     >
       <div className="mx-auto w-full max-w-[1540px] space-y-10">
-        <div className="flex flex-col gap-8 border-b border-[#dde1db] pb-8 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-8 border-b border-[var(--line)] pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[10px] font-medium uppercase text-[#777d75]">
+            <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
               ANCHOR RECONSTRUCTION
             </p>
             <h2 className="mt-3 text-lg font-medium sm:text-xl">
               기준일 바스켓: 초기 동일비중·흐름 균등배분
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#687064]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
               선택한 과거 기준일에 실제로 저장된 종목만 사용합니다. 기준일에만
               동일비중으로 시작하고 이후 실제 매수·매도 금액은 종목마다 같은
               비율로 나눠 적용하며 자동 리밸런싱은 하지 않습니다.
@@ -75,7 +75,7 @@ export function InvestmentLabAnchorBasket({
           />
         </div>
 
-        <div className="grid border-y border-[#dde1db] sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCell
             label="선택 기준일"
             value={formatDate(anchor.selectedAnchorDate)}
@@ -107,7 +107,7 @@ export function InvestmentLabAnchorBasket({
 
         <SpecialHoldingEvidence rows={anchor.specialHoldingEvidence} />
 
-        <p className="text-xs leading-5 text-[#73786c]">
+        <p className="text-xs leading-5 text-[var(--muted)]">
           현재 보유 종목을 더 오래된 과거로 소급하지 않습니다. ticker·시장·통화,
           종가, USD/KRW 근거가 한 종목이라도 없으면 일부 종목만 제외한 그래프를
           만들지 않고 전체 비교를 중단합니다. 이 결과는 연구용 비교이며
@@ -150,7 +150,7 @@ function SpecialHoldingEvidence({
   ).length;
   return (
     <div
-      className="overflow-hidden border-y border-[#dde1db]"
+      className="overflow-hidden border-y border-[var(--line)]"
       data-anchor-special-holding-eligible={eligibleCount}
       data-anchor-special-holding-intentionally-excluded={
         intentionallyExcludedCount
@@ -163,9 +163,9 @@ function SpecialHoldingEvidence({
       data-anchor-special-holding-unsupported={unsupportedCount}
       data-section="investment-lab-anchor-special-holding-evidence"
     >
-      <div className="border-b border-[#e1e6dc] py-4">
+      <div className="border-b border-[var(--wash)] py-4">
         <h3 className="font-semibold">ticker 없는 저장 포지션 근거</h3>
-        <p className="mt-1 text-xs leading-5 text-[#687064]">
+        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
           이름이나 현재 자산값으로 종목을 추론하지 않습니다. 같은 legacy 자산의
           Base44 이관 스냅샷 메타데이터와 ticker가 합의될 때만 복구합니다.
         </p>
@@ -173,7 +173,7 @@ function SpecialHoldingEvidence({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
-            <tr className="border-y border-[#e1e6dc] text-left text-xs font-semibold text-[#616a5e]">
+            <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
               <th className="px-4 py-3">저장 포지션</th>
               <th className="px-3 py-3">계좌·축</th>
               <th className="px-3 py-3">identity 상태</th>
@@ -184,29 +184,29 @@ function SpecialHoldingEvidence({
           <tbody>
             {rows.map((row) => (
               <tr
-                className="border-t border-[#e1e6dc] align-top"
+                className="border-t border-[var(--wash)] align-top"
                 data-special-holding-status={row.identityStatus}
                 key={`${row.account}:${row.name}:${row.source ?? "unknown"}`}
               >
                 <td className="px-4 py-3 font-semibold">{row.name}</td>
-                <td className="px-3 py-3 text-[#5f685d]">
+                <td className="px-3 py-3 text-[var(--muted)]">
                   {row.account} · {row.market ?? "-"}/{row.currency ?? "-"}
                 </td>
                 <td className="px-3 py-3">
                   <span
                     className={
                       row.identityStatus === "resolved"
-                        ? "font-semibold text-[#08784d]"
-                        : "font-semibold text-[#9a6b18]"
+                        ? "font-semibold text-[var(--brand)]"
+                        : "font-semibold text-[var(--warning)]"
                     }
                   >
                     {specialHoldingIdentityLabel(row)}
                   </span>
                 </td>
-                <td className="px-3 py-3 font-semibold text-[#34443d]">
+                <td className="px-3 py-3 font-semibold text-[var(--ink)]">
                   {specialHoldingOutcomeLabel(row)}
                 </td>
-                <td className="px-4 py-3 text-[#5f685d]">
+                <td className="px-4 py-3 text-[var(--muted)]">
                   {specialHoldingReasonLabel(row.reason)}
                 </td>
               </tr>
@@ -260,7 +260,7 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
           }
         />
       </div>
-      <div className="border-y border-[#dde1db] py-6">
+      <div className="border-y border-[var(--line)] py-6">
         <InvestmentLabComparisonChart
           chartId="investment-lab-anchor-basket-chart"
           description="실제 포트폴리오와 기준일 저장 보유 종목을 동일비중으로 시작한 same-flow 경로를 비교합니다."
@@ -269,13 +269,13 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
           title="실제 포트폴리오와 기준일 보유 바스켓 비교"
         />
       </div>
-      <p className="text-sm text-[#687064]">
+      <p className="text-sm text-[var(--muted)]">
         종목 {summary.instrumentCount}개 · 비교일 {summary.comparisonDateCount}
         개 · 실제 흐름 {model.coverage.sourceFlowCount}건 · 종목별 체결 근거{" "}
         {model.coverage.scenarioFlowLegCount}건
       </p>
       {model.coverage.manualValuationComponentCount > 0 ? (
-        <p className="text-xs leading-5 text-[#687064]">
+        <p className="text-xs leading-5 text-[var(--muted)]">
           금현물은 저장된 수동 평가 {model.coverage.manualObservationRows}건과
           저장가 유지 {model.coverage.manualCarryRows}건만 사용했습니다.
         </p>
@@ -300,7 +300,7 @@ function UnavailableResult({
       ),
   ];
   return (
-    <div className="border-y border-[#d8c69d] py-4 text-sm leading-6 text-[#73551b]">
+    <div className="border-y border-[var(--warning-soft)] py-4 text-sm leading-6 text-[var(--warning)]">
       <p className="font-semibold">전체 바스켓 비교를 만들 수 없습니다.</p>
       <p>
         {reasons.length > 0
@@ -344,10 +344,10 @@ function AnchorForm({
           value={fixedMixSelection.kodexWeightPct}
         />
       ) : null}
-      <label className="grid gap-1 text-xs font-semibold text-[#586358]">
+      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
         기준일
         <select
-          className="h-10 rounded-md border border-[#cfd5c9] bg-white px-3 text-sm outline-none"
+          className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm outline-none"
           defaultValue={selectedAnchorDate ?? anchorDates[0]}
           name="basketAnchor"
         >
@@ -359,7 +359,7 @@ function AnchorForm({
         </select>
       </label>
       <button
-        className="h-10 rounded-md bg-[#173c35] px-4 text-sm font-semibold text-white"
+        className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
       >
         적용
@@ -402,15 +402,15 @@ function SummaryCell({
   tone?: "neutral" | "positive" | "negative";
 }) {
   return (
-    <div className="min-w-0 border-b border-[#dde1db] px-4 py-5 first:pl-0 last:pr-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="min-w-0 border-b border-[var(--line)] px-4 py-5 first:pl-0 last:pr-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
       <p
         className={`mt-2 text-xl font-semibold tabular-nums ${
           tone === "positive"
-            ? "text-[#08784d]"
+            ? "text-[var(--brand)]"
             : tone === "negative"
-              ? "text-[#bd2929]"
-              : "text-[#111411]"
+              ? "text-[var(--negative)]"
+              : "text-[var(--ink)]"
         }`}
       >
         {value}

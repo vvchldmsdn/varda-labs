@@ -23,32 +23,32 @@ export function PortfolioStructureRiskAnalytics({
   return (
     <section
       aria-labelledby="portfolio-risk-landscape-title"
-      className="border-t border-[#d9ddd7] pt-9 lg:pt-12"
+      className="border-t border-[var(--line)] pt-9 lg:pt-12"
       data-section="portfolio-risk-landscape"
     >
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[11px] font-medium text-[#7b8079]">RISK LANDSCAPE</p>
+          <p className="text-[11px] font-medium text-[var(--muted)]">RISK LANDSCAPE</p>
           <h2
-            className="mt-2 text-2xl font-medium tracking-normal text-[#171a16] sm:text-3xl"
+            className="mt-2 text-2xl font-medium tracking-normal text-[var(--ink)] sm:text-3xl"
             id="portfolio-risk-landscape-title"
           >
             위험 지형
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6d736b]">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
             각 종목이 따로 움직이는지, 하락할 때 함께 무너지는지, 위험이 몇
             종목에 집중되는지를 같은 KRW 투자자 수익률로 봅니다.
           </p>
         </div>
 
-        <div className="flex items-center gap-1 border-b border-[#d9ddd7] text-sm">
+        <div className="flex items-center gap-1 border-b border-[var(--line)] text-sm">
           {WINDOWS.map((window) => (
             <Link
               aria-current={model.selection.window === window ? "page" : undefined}
-              className={`px-3 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62] ${
+              className={`px-3 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] ${
                 model.selection.window === window
-                  ? "border-b border-[#20231f] text-[#20231f]"
-                  : "text-[#7b8079] hover:text-[#20231f]"
+                  ? "border-b border-[var(--ink)] text-[var(--ink)]"
+                  : "text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
               href={riskWindowHref(scopeKey, window)}
               key={window}
@@ -60,8 +60,8 @@ export function PortfolioStructureRiskAnalytics({
         </div>
       </div>
 
-      <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-[#e1e4df] py-3 text-xs text-[#6f756d]">
-        <span className="font-medium text-[#30352f]">
+      <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-[var(--wash)] py-3 text-xs text-[var(--muted)]">
+        <span className="font-medium text-[var(--ink)]">
           {riskStatusLabel(model)}
         </span>
         <span>관측 {observationLabel}</span>
@@ -74,12 +74,12 @@ export function PortfolioStructureRiskAnalytics({
         <span>KRW 환산 수익률</span>
         <span>조정종가 우선 · 검증된 KIS 원종가 보완</span>
         {excludedHoldingCount > 0 ? (
-          <span className="text-[#8a6230]">
+          <span className="text-[var(--warning)]">
             시계열 없는 특수자산 {excludedHoldingCount}개 제외
           </span>
         ) : null}
         {model.inputHealth.status === "partial" ? (
-          <span className="text-[#a36b22]">일부 관측치로 계산</span>
+          <span className="text-[var(--warning)]">일부 관측치로 계산</span>
         ) : null}
       </div>
 
@@ -92,13 +92,13 @@ export function PortfolioStructureRiskAnalytics({
               instruments={model.calculation.instruments}
               matrix={portfolio.correlationMatrix}
               title="평균 상관계수 행렬"
-              description="붉을수록 같이 움직이고, 초록일수록 서로 다른 방향으로 움직입니다. 대각선은 자기 자신입니다."
+              description="붉을수록 같이 움직이고, 파랄수록 서로 다른 방향으로 움직입니다. 대각선은 자기 자신입니다."
             />
 
             <RiskContributionList model={model} />
           </div>
 
-          <div className="mt-12 border-t border-[#e1e4df] pt-10">
+          <div className="mt-12 border-t border-[var(--wash)] pt-10">
             {portfolio.stress.correlationMatrix ? (
               <CorrelationMatrix
                 instruments={model.calculation.instruments}
@@ -109,7 +109,7 @@ export function PortfolioStructureRiskAnalytics({
             ) : (
               <div className="py-8">
                 <p className="text-lg font-medium">스트레스 상관계수</p>
-                <p className="mt-2 text-sm leading-6 text-[#737970]">
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                   하락일이 {portfolio.stress.downDayObservations}일이라 최소 {portfolio.stress.minimumObservations}일 기준을 충족하지 못했습니다.
                 </p>
               </div>
@@ -182,19 +182,19 @@ function RiskMetricStrip({ model }: { model: PortfolioRiskReadModel }) {
   ];
 
   return (
-    <dl className="mt-8 grid border-b border-[#d9ddd7] sm:grid-cols-2 lg:grid-cols-4">
+    <dl className="mt-8 grid border-b border-[var(--line)] sm:grid-cols-2 lg:grid-cols-4">
       {metrics.map((metric, index) => (
         <div
-          className={`min-w-0 border-t border-r border-[#e1e4df] px-4 py-5 last:border-r-0 ${
+          className={`min-w-0 border-t border-r border-[var(--wash)] px-4 py-5 last:border-r-0 ${
             index % 4 === 3 ? "lg:border-r-0" : ""
           }`}
           key={metric.label}
         >
-          <dt className="text-xs font-medium text-[#6c726a]">{metric.label}</dt>
-          <dd className="mt-3 text-2xl font-medium tabular-nums text-[#1d211c]">
+          <dt className="text-xs font-medium text-[var(--muted)]">{metric.label}</dt>
+          <dd className="mt-3 text-2xl font-medium tabular-nums text-[var(--ink)]">
             {metric.value}
           </dd>
-          <p className="mt-2 truncate text-xs text-[#7a8078]" title={metric.detail}>
+          <p className="mt-2 truncate text-xs text-[var(--muted)]" title={metric.detail}>
             {metric.detail}
           </p>
         </div>
@@ -221,16 +221,16 @@ function CorrelationMatrix({
     <section aria-label={title} className="min-w-0">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-lg font-medium text-[#20231f]">{title}</h3>
-          <p className="mt-2 max-w-2xl text-xs leading-5 text-[#757b73]">
+          <h3 className="text-lg font-medium text-[var(--ink)]">{title}</h3>
+          <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--muted)]">
             {description}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-[#7b8079]">
+        <div className="flex items-center gap-2 text-[10px] text-[var(--muted)]">
           <span>분산</span>
-          <span className="h-2 w-14 rounded-full bg-[#74b696]" />
-          <span className="h-2 w-14 rounded-full bg-[#eceeea]" />
-          <span className="h-2 w-14 rounded-full bg-[#dc7772]" />
+          <span className="h-2 w-14 rounded-full bg-[var(--brand-mid)]" />
+          <span className="h-2 w-14 rounded-full bg-[var(--wash)]" />
+          <span className="h-2 w-14 rounded-full bg-[var(--negative-mid)]" />
           <span>동조</span>
         </div>
       </div>
@@ -245,7 +245,7 @@ function CorrelationMatrix({
               <th className="w-[200px]" />
               {instruments.map((instrument) => (
                 <th
-                  className="h-28 align-bottom text-[10px] font-normal text-[#60665f]"
+                  className="h-28 align-bottom text-[10px] font-normal text-[var(--muted)]"
                   key={instrument.instrumentKey}
                   style={{ width: cellSize }}
                   title={instrumentName(instrument)}
@@ -267,7 +267,7 @@ function CorrelationMatrix({
             {instruments.map((instrument, rowIndex) => (
               <tr key={instrument.instrumentKey}>
                 <th
-                  className="max-w-[200px] truncate pr-3 text-left text-xs font-medium text-[#30352f]"
+                  className="max-w-[200px] truncate pr-3 text-left text-xs font-medium text-[var(--ink)]"
                   title={`${instrumentName(instrument)} · ${instrument.ticker}`}
                 >
                   {instrumentName(instrument)}
@@ -276,7 +276,7 @@ function CorrelationMatrix({
                   const value = matrix[rowIndex]?.[columnIndex] ?? null;
                   return (
                     <td
-                      className="rounded-[4px] text-center text-[9px] tabular-nums text-[#343a34]"
+                      className="rounded-[4px] text-center text-[9px] tabular-nums text-[var(--ink)]"
                       key={column.instrumentKey}
                       style={{
                         background: correlationCellBackground(value),
@@ -314,11 +314,11 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
       <h3 className="text-lg font-medium" id="risk-contribution-title">
         종목별 위험 기여
       </h3>
-      <p className="mt-2 text-xs leading-5 text-[#757b73]">
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
         투자금 비중이 아니라 전체 변동성에 실제로 더한 몫입니다. 값이 큰 종목부터 표시합니다.
       </p>
 
-      <div className="mt-5 divide-y divide-[#e4e7e2] border-y border-[#d9ddd7]">
+      <div className="mt-5 divide-y divide-[var(--wash)] border-y border-[var(--line)]">
         {rows.map((row) => {
           const share = row.absoluteRiskSharePct;
           return (
@@ -331,13 +331,13 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
                   <p className="truncate text-sm font-medium" title={instrumentName(row)}>
                     {instrumentName(row)}
                   </p>
-                  <p className="shrink-0 text-xs tabular-nums text-[#6f756d]">
+                  <p className="shrink-0 text-xs tabular-nums text-[var(--muted)]">
                     비중 {formatRatioPercent(row.weight)}
                   </p>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e7eae5]">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--wash)]">
                   <div
-                    className="h-full rounded-full bg-[#4e8d73]"
+                    className="h-full rounded-full bg-[var(--brand)]"
                     style={{ width: `${Math.max(0, ((share ?? 0) / maximumShare) * 100)}%` }}
                   />
                 </div>
@@ -346,7 +346,7 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
                 <p className="text-sm font-medium tabular-nums">
                   {formatPercentPoints(share)}
                 </p>
-                <p className="mt-1 text-[10px] text-[#7a8078]">
+                <p className="mt-1 text-[10px] text-[var(--muted)]">
                   Sharpe {formatMetric(row.sharpe.value, 1)}
                 </p>
               </div>
@@ -360,13 +360,13 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
 
 function RiskMetricGuide() {
   return (
-    <details className="group mt-10 border-y border-[#d9ddd7] py-1">
-      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#347e62]">
+    <details className="group mt-10 border-y border-[var(--line)] py-1">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]">
         <span>지표 읽는 법</span>
-        <span className="text-xs font-normal text-[#747a72] group-open:hidden">설명 보기 ＋</span>
-        <span className="hidden text-xs font-normal text-[#747a72] group-open:inline">접기 －</span>
+        <span className="text-xs font-normal text-[var(--muted)] group-open:hidden">설명 보기 ＋</span>
+        <span className="hidden text-xs font-normal text-[var(--muted)] group-open:inline">접기 －</span>
       </summary>
-      <div className="grid gap-x-10 gap-y-7 border-t border-[#e4e7e2] py-7 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-x-10 gap-y-7 border-t border-[var(--wash)] py-7 sm:grid-cols-2 lg:grid-cols-3">
         <GuideItem
           title="ENB"
           body="위험이 똑같이 나뉘었다고 볼 수 있는 종목 수입니다. 보유 종목은 많아도 ENB가 낮으면 실제 위험은 몇 종목에 몰려 있습니다."
@@ -399,17 +399,17 @@ function RiskMetricGuide() {
 function GuideItem({ body, title }: { body: string; title: string }) {
   return (
     <div>
-      <h4 className="text-sm font-medium text-[#282d27]">{title}</h4>
-      <p className="mt-2 text-xs leading-5 text-[#71776f]">{body}</p>
+      <h4 className="text-sm font-medium text-[var(--ink)]">{title}</h4>
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{body}</p>
     </div>
   );
 }
 
 function RiskUnavailable({ model }: { model: PortfolioRiskReadModel }) {
   return (
-    <div className="mt-8 border-y border-[#d9ddd7] py-10">
+    <div className="mt-8 border-y border-[var(--line)] py-10">
       <p className="text-lg font-medium">위험 분석 근거가 아직 충분하지 않습니다.</p>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#747a72]">
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
         현재 {model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}일의 수익률을 사용할 수 있습니다. 가격 이력을 지우거나 임의 평균으로 채우지 않으며, 조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다.
       </p>
     </div>
@@ -418,14 +418,14 @@ function RiskUnavailable({ model }: { model: PortfolioRiskReadModel }) {
 
 function correlationCellBackground(value: number | null) {
   if (value === null) {
-    return "repeating-linear-gradient(135deg, #eceeea 0, #eceeea 3px, #f7f8f5 3px, #f7f8f5 6px)";
+    return "repeating-linear-gradient(135deg, var(--wash) 0, var(--wash) 3px, var(--paper) 3px, var(--paper) 6px)";
   }
   if (value >= 0) {
     const alpha = 0.12 + Math.min(value, 1) * 0.72;
-    return `rgba(211, 84, 78, ${alpha})`;
+    return `color-mix(in srgb, var(--negative) ${alpha * 100}%, transparent)`;
   }
   const alpha = 0.12 + Math.min(Math.abs(value), 1) * 0.72;
-  return `rgba(54, 143, 102, ${alpha})`;
+  return `color-mix(in srgb, var(--brand) ${alpha * 100}%, transparent)`;
 }
 
 function riskWindowHref(scopeKey: string, window: number) {

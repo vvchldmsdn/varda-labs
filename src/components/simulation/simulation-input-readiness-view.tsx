@@ -104,21 +104,21 @@ export function SimulationInputReadinessView({
       data-page="simulation-input-readiness"
       data-runtime-trust-status={model.runtimeTrustStatus}
       data-end-query-status={model.endServiceDateSelection.status}
-      className="min-h-screen overflow-x-hidden bg-[#f8f9f6] text-[#171a16]"
+      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
     >
       <PortfolioPrimaryNavigation
         activePath="/simulation"
         selectedScopeKey={selectedScopeKey}
         generatedAt={model.generatedAt}
       />
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-10 pt-4 sm:px-8 sm:pt-6 lg:px-10">
+      <div className="varda-content">
         <header className="mb-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] text-[#7a8479]">
+              <p className="text-[10px] text-[var(--faint)]">
                 PORTFOLIO / SIMULATION
               </p>
-              <h1 className="mt-2 text-2xl font-medium">시뮬레이션 검증</h1>
+              <h1 className="varda-page-title">시뮬레이션 검증</h1>
             </div>
             <SimulationDialog
               label="계산 조건"
@@ -126,7 +126,7 @@ export function SimulationInputReadinessView({
               icon="calendar"
             >
               <SimulationDateControl />
-              <div className="mt-5 space-y-3 text-sm leading-7 text-[#687367]">
+              <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--muted)]">
                 <p>
                   내 포트폴리오는 저장 이력의 최신 공통 기준일을 사용합니다.
                   기준일을 지정하면 그 날짜를 정확히 적용하며, 누락된 이력을
@@ -155,7 +155,7 @@ export function SimulationInputReadinessView({
           <p
             data-invalid-end-query
             role="alert"
-            className="border-y border-[#e1d9c7] py-3 text-sm text-[#8b662a]"
+            className="border-y border-[var(--line)] py-3 text-sm text-[var(--warning)]"
           >
             기준일은 하나의 YYYY-MM-DD 값으로 입력해야 합니다. 계산 조건에서
             날짜를 확인해 주세요.
@@ -165,7 +165,7 @@ export function SimulationInputReadinessView({
           <p
             data-invalid-horizon-query
             role="alert"
-            className="border-y border-[#e1d9c7] py-3 text-sm text-[#8b662a]"
+            className="border-y border-[var(--line)] py-3 text-sm text-[var(--warning)]"
           >
             연구 기간은 63 또는 126단계만 가능합니다. 잘못된 값을 기본 기간으로
             대체하지 않았습니다.
@@ -242,7 +242,7 @@ export function SimulationInputReadinessView({
                 {researchUniversePreflight}
                 <section
                   aria-label="검사 요약"
-                  className="grid border-b border-[#d7ddcf] py-4 sm:grid-cols-2 xl:grid-cols-4"
+                  className="grid border-b border-[var(--line)] py-4 sm:grid-cols-2 xl:grid-cols-4"
                 >
                   <SummaryItem
                     label="검사 기준일"
@@ -337,7 +337,7 @@ export function SimulationInputReadinessView({
                   />
                 ) : null}
 
-                <footer className="border-t border-[#d7ddcf] pt-4 text-sm leading-6 text-[#687064]">
+                <footer className="border-t border-[var(--line)] pt-4 text-sm leading-6 text-[var(--muted)]">
                   두 종목은 서로 독립적으로 검사합니다. 현재 보유 종목, 기본
                   포트폴리오, 목표 비중 또는 승인된 실행 벡터로 해석하지
                   않습니다. 결손이 있으면 과거 날짜로 자동 대체하거나 범위를
@@ -348,7 +348,7 @@ export function SimulationInputReadinessView({
             </div>
           }
         />
-        <footer className="mt-7 border-t border-[#dce2d8] pt-4 text-[11px] leading-5 text-[#7c8779]">
+        <footer className="mt-7 border-t border-[var(--line)] pt-4 text-[11px] leading-5 text-[var(--faint)]">
           현재 구성 기준 연구 · 수수료·세금·현금수익률 미포함 · 결과는 수익
           보장, 추천 또는 주문 근거가 아닙니다.
         </footer>
@@ -385,8 +385,8 @@ function ResearchHorizonSelector({
       className="flex items-center gap-3"
       data-simulation-research-horizon={selectedHorizon}
     >
-      <span className="text-[11px] text-[#7c8779]">연구 기간</span>
-      <nav className="flex gap-1 rounded-md bg-[#edf0eb] p-1">
+      <span className="text-[11px] text-[var(--faint)]">연구 기간</span>
+      <nav className="flex gap-1 rounded-md bg-[var(--wash)] p-1">
         {SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons.map((horizon) => {
           const selected = horizon === selectedHorizon;
           return (
@@ -394,8 +394,8 @@ function ResearchHorizonSelector({
               aria-current={selected ? "page" : undefined}
               className={
                 selected
-                  ? "rounded bg-[#fafbf8] px-3 py-1.5 text-xs font-medium text-[#294b3b] shadow-sm"
-                  : "rounded px-3 py-1.5 text-xs text-[#7c8779] hover:text-[#294b3b]"
+                  ? "rounded bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] shadow-sm"
+                  : "rounded px-3 py-1.5 text-xs text-[var(--faint)] hover:text-[var(--ink)]"
               }
               href={buildSimulationHref({
                 scope: scopeKey,
@@ -435,7 +435,7 @@ function ReadinessHistory({
     <section
       data-simulation-readiness-history
       aria-labelledby="simulation-readiness-history-title"
-      className="border-t border-[#d7ddcf] py-5"
+      className="border-t border-[var(--line)] py-5"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -445,17 +445,17 @@ function ReadinessHistory({
           >
             최근 기준일 검사
           </h2>
-          <p className="mt-1 text-sm text-[#687064]">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             저장된 실행 기록이 아니라, 최근 7개 기준일을 현재 저장 증거로 다시
             검사한 결과입니다.
           </p>
         </div>
-        <p className="text-xs text-[#7a8175]">날짜 자동 대체 없음</p>
+        <p className="text-xs text-[var(--muted)]">날짜 자동 대체 없음</p>
       </div>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+          <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
             <tr>
               <th className="px-3 py-3 font-semibold">기준일</th>
               <th className="px-3 py-3 font-semibold">KODEX 200</th>
@@ -477,12 +477,12 @@ function ReadinessHistory({
                   data-readiness-history-row={row.serviceDate}
                   data-kodex200-status={kodex200?.status ?? "unavailable"}
                   data-voo-status={voo?.status ?? "unavailable"}
-                  className="border-b border-[#e1e5da] align-top"
+                  className="border-b border-[var(--line)] align-top"
                 >
                   <td className="whitespace-nowrap px-3 py-3 font-semibold">
                     {formatDate(row.serviceDate)}
                     {selected ? (
-                      <span className="ml-2 text-xs font-medium text-[#47624d]">
+                      <span className="ml-2 text-xs font-medium text-[var(--brand)]">
                         선택됨
                       </span>
                     ) : null}
@@ -491,7 +491,7 @@ function ReadinessHistory({
                   <HistoryStatusCell input={voo} />
                   <td className="whitespace-nowrap px-3 py-3 text-right">
                     {selected ? (
-                      <span className="text-xs font-semibold text-[#687064]">
+                      <span className="text-xs font-semibold text-[var(--muted)]">
                         현재 결과
                       </span>
                     ) : (
@@ -503,7 +503,7 @@ function ReadinessHistory({
                           researchUniverse,
                           selectedScopeKey,
                         )}
-                        className="inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-xs font-semibold text-[#253029] hover:bg-[#eef1e8]"
+                        className="inline-flex rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
                       >
                         이 날짜 검사
                       </Link>
@@ -530,17 +530,17 @@ function HistoryStatusCell({
       <p
         className={
           ready
-            ? "font-semibold text-[#226039]"
-            : "font-semibold text-[#7a5117]"
+            ? "font-semibold text-[var(--brand)]"
+            : "font-semibold text-[var(--warning)]"
         }
       >
         {ready ? "준비됨" : "사용 불가"}
       </p>
-      <p className="mt-1 text-xs text-[#687064]">
+      <p className="mt-1 text-xs text-[var(--muted)]">
         {formatHistoryCoverage(input)}
       </p>
       {!ready && input?.issueLabels[0] ? (
-        <p className="mt-1 max-w-[300px] text-xs leading-5 text-[#7a6b4e]">
+        <p className="mt-1 max-w-[300px] text-xs leading-5 text-[var(--warning)]">
           {input.issueLabels[0]}
         </p>
       ) : null}
@@ -582,11 +582,11 @@ function InputPanel({
       data-simulation-input={input.id}
       data-readiness-status={input.status}
       data-nearest-prior-date={input.nearestPriorObservedServiceDate ?? ""}
-      className="rounded-lg border border-[#d7ddcf] bg-[#fbfcf7]"
+      className="rounded-lg border border-[var(--line)] bg-[var(--surface)]"
     >
-      <header className="flex items-start justify-between gap-4 border-b border-[#e1e5da] p-4">
+      <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] p-4">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             {input.marketLabel} · {input.currency}
           </p>
           <h2 className="mt-1 text-xl font-semibold tracking-normal">
@@ -596,8 +596,8 @@ function InputPanel({
         <span
           className={
             ready
-              ? "rounded-md bg-[#e5f1e6] px-2.5 py-1 text-xs font-semibold text-[#226039]"
-              : "rounded-md bg-[#fff1dc] px-2.5 py-1 text-xs font-semibold text-[#7a5117]"
+              ? "rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]"
+              : "rounded-md bg-[var(--brand-wash)] px-2.5 py-1 text-xs font-semibold text-[var(--warning)]"
           }
         >
           {ready ? "준비됨" : "사용 불가"}
@@ -654,14 +654,14 @@ function InputPanel({
         />
       ) : null}
 
-      <div className="border-t border-[#e1e5da] p-4">
+      <div className="border-t border-[var(--line)] p-4">
         <h3 className="text-sm font-semibold">
           {ready ? "증거 결손" : "확인할 항목"}
         </h3>
         {input.issues.length === 0 ? (
-          <p className="mt-2 text-sm text-[#47624d]">확인된 결손이 없습니다.</p>
+          <p className="mt-2 text-sm text-[var(--brand)]">확인된 결손이 없습니다.</p>
         ) : (
-          <ul className="mt-2 space-y-2 text-sm text-[#6b5227]">
+          <ul className="mt-2 space-y-2 text-sm text-[var(--warning)]">
             {input.issues.map((issue) => (
               <li key={`${issue.code}-${issue.dates.join("-")}`}>
                 {issue.label}
@@ -682,7 +682,7 @@ function InputPanel({
               researchUniverse,
               selectedScopeKey,
             )}
-            className="mt-4 inline-flex rounded-md border border-[#cfd6c8] bg-white px-3 py-2 text-sm font-semibold text-[#253029] hover:bg-[#eef1e8]"
+            className="mt-4 inline-flex rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
           >
             최근 관측 기준일 {formatDate(input.nearestPriorObservedServiceDate)}
             로 다시 검사
@@ -703,18 +703,18 @@ function SummaryItem({
   detail?: string;
 }) {
   return (
-    <div className="border-[#d7ddcf] px-4 py-2 first:pl-0 sm:border-r sm:last:border-r-0">
-      <p className="text-xs font-medium text-[#687064]">{label}</p>
+    <div className="border-[var(--line)] px-4 py-2 first:pl-0 sm:border-r sm:last:border-r-0">
+      <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
-      {detail ? <p className="mt-1 text-xs text-[#7a8175]">{detail}</p> : null}
+      {detail ? <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p> : null}
     </div>
   );
 }
 
 function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-b border-[#e8ebe3] px-4 py-3 sm:odd:border-r">
-      <dt className="text-xs font-medium text-[#687064]">{label}</dt>
+    <div className="border-b border-[var(--wash)] px-4 py-3 sm:odd:border-r">
+      <dt className="text-xs font-medium text-[var(--muted)]">{label}</dt>
       <dd className="mt-1 text-sm font-semibold">{value}</dd>
     </div>
   );
