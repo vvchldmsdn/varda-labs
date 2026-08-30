@@ -9,6 +9,7 @@ import type { InvestmentLabApprovedTargetWeightScenario } from "@/lib/investment
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
 import { buildInvestmentLabScenarioChart } from "@/lib/investment-lab-scenario-chart";
 import { buildInvestmentLabScenarioMatrix } from "@/lib/investment-lab-scenario-matrix";
+import { diagnoseInvestmentLabScenario } from "@/lib/investment-lab-scenario-diagnostics";
 
 export function InvestmentLabScenarioChartView({
   anchorBasketScenario,
@@ -76,14 +77,13 @@ export function InvestmentLabScenarioChartView({
       <InvestmentLabTimeMachine
         chart={chart}
         scenarioSummaries={scenarioSummaries}
+        unavailableScenarios={chart.unavailableScenarioIds.map((id) => ({
+          id,
+          ...diagnoseInvestmentLabScenario(
+            matrixRows.get(id)?.reasonCodes ?? [],
+          ),
+        }))}
       />
-      {chart.unavailableScenarioIds.length > 0 ? (
-        <p className="border-b border-[#dce1da] bg-[#fffaf0] px-5 py-3 text-sm text-[#725f2d] sm:px-7 lg:px-9">
-          계산 근거가 부족한 {chart.unavailableScenarioIds.length}개 경로는
-          임의로 채우지 않았습니다. 아래 비교표에서 경로별 사유를 확인할 수
-          있습니다.
-        </p>
-      ) : null}
     </section>
   );
 }

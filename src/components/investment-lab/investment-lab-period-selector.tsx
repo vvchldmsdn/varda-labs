@@ -1,4 +1,8 @@
-import Link from "next/link";
+import { InvestmentLabDialog } from "./investment-lab-dialog";
+import {
+  InvestmentLabQueryFields,
+  InvestmentLabQueryLink,
+} from "./investment-lab-query-controls";
 
 import type {
   InvestmentLabPeriodSelection,
@@ -20,96 +24,109 @@ export function InvestmentLabPeriodSelector({
   scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
-    <section
-      className="border-y border-[#dde1db] py-4"
-      data-period-status={period.status}
+    <InvestmentLabDialog
+      icon="calendar"
+      label={
+        period.selectedStartServiceDate && period.selectedEndServiceDate
+          ? `${formatDate(period.selectedStartServiceDate)} ~ ${formatDate(period.selectedEndServiceDate)}`
+          : "기간 선택"
+      }
+      title="비교 기간"
     >
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium text-[#777d75]">
-            COMPARISON WINDOW
-          </p>
-          <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
-            <h2 className="text-lg font-semibold tracking-normal">
-              과거 비교 구간
-            </h2>
-            <p className="text-xs text-[#777d75]">
-              실제 포트폴리오와 대안 세계선에 같은 기간·현금흐름을 적용합니다.
+      <section data-period-status={period.status}>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium text-[#777d75]">
+              COMPARISON WINDOW
             </p>
+            <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
+              <h2 className="text-lg font-semibold tracking-normal">
+                과거 비교 구간
+              </h2>
+              <p className="text-xs text-[#777d75]">
+                실제 포트폴리오와 대안 세계선에 같은 기간·현금흐름을 적용합니다.
+              </p>
+            </div>
+            {period.availableStartServiceDate &&
+            period.availableEndServiceDate ? (
+              <p className="mt-2 text-[11px] tabular-nums text-[#858a83]">
+                선택 가능 {formatDate(period.availableStartServiceDate)} ~{" "}
+                {formatDate(period.availableEndServiceDate)}
+              </p>
+            ) : null}
           </div>
-          {period.availableStartServiceDate &&
-          period.availableEndServiceDate ? (
-            <p className="mt-2 text-[11px] tabular-nums text-[#858a83]">
-              선택 가능 {formatDate(period.availableStartServiceDate)} ~{" "}
-              {formatDate(period.availableEndServiceDate)}
-            </p>
-          ) : null}
+
+          <form
+            action="/investment-lab"
+            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            method="get"
+          >
+            <input name="scope" type="hidden" value={scopeKey} />
+            <PreservedHiddenInputs query={query} />
+            <InvestmentLabQueryFields />
+            <DateField
+              defaultValue={
+                period.requestedStartServiceDate ??
+                period.selectedStartServiceDate
+              }
+              label="시작 관측일"
+              max={period.availableEndServiceDate}
+              min={period.availableStartServiceDate}
+              name="start"
+            />
+            <DateField
+              defaultValue={
+                period.requestedEndServiceDate ?? period.selectedEndServiceDate
+              }
+              label="종료 관측일"
+              max={period.availableEndServiceDate}
+              min={period.availableStartServiceDate}
+              name="end"
+            />
+            <div className="flex h-10 items-end gap-5">
+              <button
+                className="h-9 border-b border-[#20231f] px-1 text-sm font-semibold text-[#20231f] transition-colors hover:border-[#347e62] hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+                type="submit"
+              >
+                구간 적용
+              </button>
+              <InvestmentLabQueryLink
+                className="flex h-9 items-center border-b border-transparent px-1 text-sm text-[#6f766e] transition-colors hover:border-[#20231f] hover:text-[#20231f] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
+                href={buildPortfolioAnalysisScopeHref(
+                  "/investment-lab",
+                  scopeKey,
+                  {
+                    kodexWeight: query.kodexWeight,
+                    basketAnchor: query.basketAnchor,
+                  },
+                )}
+              >
+                최신 구간
+              </InvestmentLabQueryLink>
+            </div>
+          </form>
         </div>
 
-        <form
-          action="/investment-lab"
-          className="flex flex-col gap-3 sm:flex-row sm:items-end"
-          method="get"
-        >
-          <input name="scope" type="hidden" value={scopeKey} />
-          <PreservedHiddenInputs query={query} />
-          <DateField
-            defaultValue={period.requestedStartServiceDate}
-            label="시작 관측일"
-            max={period.availableEndServiceDate}
-            min={period.availableStartServiceDate}
-            name="start"
-          />
-          <DateField
-            defaultValue={period.requestedEndServiceDate}
-            label="종료 관측일"
-            max={period.availableEndServiceDate}
-            min={period.availableStartServiceDate}
-            name="end"
-          />
-          <div className="flex h-10 items-end gap-5">
-            <button
-              className="h-9 border-b border-[#20231f] px-1 text-sm font-semibold text-[#20231f] transition-colors hover:border-[#347e62] hover:text-[#347e62] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
-              type="submit"
-            >
-              구간 적용
-            </button>
-            <Link
-              className="flex h-9 items-center border-b border-transparent px-1 text-sm text-[#6f766e] transition-colors hover:border-[#20231f] hover:text-[#20231f] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62]"
-              href={buildPortfolioAnalysisScopeHref(
-                "/investment-lab",
-                scopeKey,
-                {
-                  kodexWeight: query.kodexWeight,
-                  basketAnchor: query.basketAnchor,
-                },
-              )}
-            >
-              최신 구간
-            </Link>
-          </div>
-        </form>
-      </div>
-
-      {period.status === "invalid" || period.status === "unavailable" ? (
-        <p
-          className="mt-4 border-t border-[#e6dcc2] pt-3 text-sm text-[#725f2d]"
-          data-period-reason={period.reason}
-        >
-          {periodReasonLabel(period.reason)}
-        </p>
-      ) : period.status === "current_writer" ? (
-        <p className="mt-3 text-sm font-medium text-[#356555]">
-          최신 writer 구간 {formatDate(period.selectedStartServiceDate!)} ~{" "}
-          {formatDate(period.selectedEndServiceDate!)}를 자동 적용했습니다.
-        </p>
-      ) : period.status === "selected" ? (
-        <p className="mt-3 text-sm font-medium text-[#356555]">
-          선택 구간 {formatDate(period.selectedStartServiceDate!)} ~{" "}
-          {formatDate(period.selectedEndServiceDate!)}를 다시 계산했습니다.
-        </p>
-      ) : null}
-    </section>
+        {period.status === "invalid" || period.status === "unavailable" ? (
+          <p
+            className="mt-4 border-t border-[#e6dcc2] pt-3 text-sm text-[#725f2d]"
+            data-period-reason={period.reason}
+          >
+            {periodReasonLabel(period.reason)}
+          </p>
+        ) : period.status === "current_writer" ? (
+          <p className="mt-3 text-sm font-medium text-[#356555]">
+            최신 비교 가능 구간 {formatDate(period.selectedStartServiceDate!)} ~{" "}
+            {formatDate(period.selectedEndServiceDate!)}를 자동 적용했습니다.
+          </p>
+        ) : period.status === "selected" ? (
+          <p className="mt-3 text-sm font-medium text-[#356555]">
+            선택 구간 {formatDate(period.selectedStartServiceDate!)} ~{" "}
+            {formatDate(period.selectedEndServiceDate!)}를 다시 계산했습니다.
+          </p>
+        ) : null}
+      </section>
+    </InvestmentLabDialog>
   );
 }
 
@@ -124,6 +141,8 @@ function PreservedHiddenInputs({
       name === "scope" ||
       name === "start" ||
       name === "end" ||
+      name === "view" ||
+      name === "preview" ||
       value === null ||
       value === undefined
     ) {
@@ -131,12 +150,7 @@ function PreservedHiddenInputs({
     }
     const values = Array.isArray(value) ? value : [value];
     return values.map((item, index) => (
-      <input
-        key={`${name}:${index}`}
-        name={name}
-        type="hidden"
-        value={item}
-      />
+      <input key={`${name}:${index}`} name={name} type="hidden" value={item} />
     ));
   });
 }

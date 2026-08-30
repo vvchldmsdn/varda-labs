@@ -88,7 +88,11 @@ describe("product session access boundary", () => {
       assert.notEqual(resolverIndex, -1, `${path}: resolver missing`);
       assert.notEqual(guardIndex, -1, `${path}: fail-closed guard missing`);
       for (const queryMarker of queryMarkers) {
-        const queryIndex = source.indexOf(queryMarker);
+        const queryPattern = escapeRegExp(queryMarker).replace(
+          "\\(\\{",
+          "\\(\\s*\\{",
+        );
+        const queryIndex = source.search(new RegExp(queryPattern));
 
         assert.notEqual(
           queryIndex,

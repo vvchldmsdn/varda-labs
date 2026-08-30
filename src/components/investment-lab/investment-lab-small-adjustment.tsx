@@ -56,7 +56,7 @@ export function InvestmentLabSmallAdjustment({
   return (
     <section
       aria-labelledby="investment-lab-small-adjustment-title"
-      className="mx-auto w-full max-w-[1540px] space-y-10 border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10"
+      className="min-w-0 space-y-8 py-6"
       data-adjustment-account-count={model.accounts.length}
       data-adjustment-policy={model.policy.version}
       data-adjustment-ready-accounts={readyAccountCount}
@@ -66,16 +66,18 @@ export function InvestmentLabSmallAdjustment({
       <header className="border-b border-[#dde1db] pb-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[10px] font-medium uppercase text-[#777d75]">WHAT-IF WORKBENCH</p>
+            <p className="text-[10px] font-medium uppercase text-[#777d75]">
+              WHAT-IF WORKBENCH
+            </p>
             <h2
               id="investment-lab-small-adjustment-title"
-              className="mt-3 text-2xl font-semibold sm:text-3xl"
+              className="mt-3 text-lg font-medium sm:text-xl"
             >
               작은 조정 영향 실험
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#626b5f]">
-              같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다.
-              외부 현금, 목표비중, 추천, 주문은 반영하지 않습니다.
+              같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다. 외부
+              현금, 목표비중, 추천, 주문은 반영하지 않습니다.
             </p>
           </div>
           <p className="text-sm font-semibold text-[#3f4b40]">
@@ -127,7 +129,8 @@ export function InvestmentLabSmallAdjustment({
                   <option value="">선택 안 함</option>
                   {selectedAccount.holdings.map((holding) => (
                     <option key={holding.key} value={holding.key}>
-                      {holdingLabel(holding)} · {formatKrw(holding.currentValueKrw)}
+                      {holdingLabel(holding)} ·{" "}
+                      {formatKrw(holding.currentValueKrw)}
                     </option>
                   ))}
                 </select>
@@ -150,7 +153,8 @@ export function InvestmentLabSmallAdjustment({
                       key={holding.key}
                       value={holding.key}
                     >
-                      {holdingLabel(holding)} · {formatKrw(holding.currentValueKrw)}
+                      {holdingLabel(holding)} ·{" "}
+                      {formatKrw(holding.currentValueKrw)}
                     </option>
                   ))}
                 </select>
@@ -184,7 +188,9 @@ export function InvestmentLabSmallAdjustment({
             </div>
 
             <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[#687064]">
-              <span>계정 평가액 {formatKrw(selectedAccount.totalValueKrw)}</span>
+              <span>
+                계정 평가액 {formatKrw(selectedAccount.totalValueKrw)}
+              </span>
               <span>직접 보유 {selectedAccount.holdings.length}개</span>
               {source ? (
                 <span>이동 가능 상한 {formatKrw(source.currentValueKrw)}</span>
@@ -222,9 +228,9 @@ function AccountUnavailable({
       </ul>
       {account?.excludedHoldingCount ? (
         <p className="mt-2 text-xs">
-          평가 제외 {account.excludedHoldingCount}개 · 가격 {" "}
-          {account.exclusionReasonCounts.missingPrice} · 환율 {" "}
-          {account.exclusionReasonCounts.missingFx} · 미지원 통화 {" "}
+          평가 제외 {account.excludedHoldingCount}개 · 가격{" "}
+          {account.exclusionReasonCounts.missingPrice} · 환율{" "}
+          {account.exclusionReasonCounts.missingFx} · 미지원 통화{" "}
           {account.exclusionReasonCounts.unsupportedCurrency}
         </p>
       ) : null}
@@ -239,7 +245,7 @@ function AccountUnavailable({
 
 export function InvestmentLabSmallAdjustmentSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1540px] border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10">
+    <div className="min-w-0 py-6">
       <div className="h-64 border-y border-[#dde1db] bg-[#f2f4ef]" />
     </div>
   );
@@ -247,10 +253,12 @@ export function InvestmentLabSmallAdjustmentSkeleton() {
 
 export function InvestmentLabSmallAdjustmentUnavailable() {
   return (
-    <section className="mx-auto w-full max-w-[1540px] border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10">
+    <section className="min-w-0 py-6">
       <div className="border-y border-[#d8c69d] py-4 text-sm text-[#725f2d]">
         <h2 className="text-lg font-semibold">작은 조정 영향 실험</h2>
-        <p className="mt-2">현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다.</p>
+        <p className="mt-2">
+          현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다.
+        </p>
       </div>
     </section>
   );

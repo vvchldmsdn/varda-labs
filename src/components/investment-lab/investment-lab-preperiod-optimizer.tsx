@@ -27,7 +27,9 @@ export function InvestmentLabPreperiodOptimizerView({
   const initialObjective =
     model.candidates.find(
       (candidate) => candidate.objective === "minimum_volatility",
-    )?.objective ?? model.candidates[0]?.objective ?? "minimum_volatility";
+    )?.objective ??
+    model.candidates[0]?.objective ??
+    "minimum_volatility";
   const [selectedObjective, setSelectedObjective] =
     useState<InvestmentLabOptimizerObjective>(initialObjective);
   const candidate =
@@ -36,7 +38,7 @@ export function InvestmentLabPreperiodOptimizerView({
 
   return (
     <section
-      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-12 sm:px-8 lg:px-10"
+      className="min-w-0 py-6"
       data-optimizer-candidate-count={model.candidates.length}
       data-optimizer-status={model.status}
       data-section="investment-lab-preperiod-optimizer"
@@ -45,8 +47,12 @@ export function InvestmentLabPreperiodOptimizerView({
         <header className="border-b border-[#dde1db] pb-6">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <p className="text-[11px] font-medium text-[#777d75]">OBJECTIVE LAB</p>
-              <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">과거 학습 비중 실험</h2>
+              <p className="text-[11px] font-medium text-[#777d75]">
+                OBJECTIVE LAB
+              </p>
+              <h2 className="mt-2 text-lg font-medium sm:text-xl">
+                과거 학습 비중 실험
+              </h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-[#687064]">
                 비교 시작일 이전의 공통 가격 60개 수익률만으로 비중 후보를
                 만들고, 이후 실제 기간에는 같은 입출금과 리밸런싱하지 않는
@@ -113,9 +119,7 @@ export function InvestmentLabPreperiodOptimizerView({
               <Metric
                 detail="무위험 수익률 0% 가정"
                 label="샤프"
-                value={formatNumber(
-                  candidate.trainingMetrics.annualizedSharpe,
-                )}
+                value={formatNumber(candidate.trainingMetrics.annualizedSharpe)}
               />
             </div>
 
@@ -140,8 +144,8 @@ export function InvestmentLabPreperiodOptimizerView({
 
         <p className="border-t border-[#dde1db] py-4 text-xs leading-5 text-[#73786c]">
           학습 지표는 수동 평가 종목을 제외한 상장 종목 부분 기준입니다. 이
-          결과는 과거 학습 구간을 뒤늦게 보고 만든 연구 후보이며 미래 성과,
-          주문 가능성, 세금·거래비용을 보장하지 않습니다. 현재 보유비중이나
+          결과는 과거 학습 구간을 뒤늦게 보고 만든 연구 후보이며 미래 성과, 주문
+          가능성, 세금·거래비용을 보장하지 않습니다. 현재 보유비중이나
           목표비중도 자동으로 바꾸지 않습니다.
         </p>
       </div>
@@ -253,9 +257,9 @@ function Unavailable({ model }: { model: InvestmentLabPreperiodOptimizer }) {
         현재 계정 범위에서는 학습 비중 후보를 만들 수 없습니다.
       </p>
       <p className="mt-2 text-sm leading-6 text-[#6d6657]">
-        필요한 모든 종목의 비교 시작일 이전 공통 종가가 61개 이상 있어야
-        합니다. 수동 평가 종목은 과거 가격을 임의로 채우지 않고 시작일 저장
-        비중으로 고정합니다.
+        필요한 모든 종목의 비교 시작일 이전 공통 종가가 61개 이상 있어야 합니다.
+        수동 평가 종목은 과거 가격을 임의로 채우지 않고 시작일 저장 비중으로
+        고정합니다.
       </p>
       <dl className="mt-4 grid max-w-xl grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <EvidenceRow
