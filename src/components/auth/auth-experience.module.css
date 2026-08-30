@@ -298,6 +298,134 @@
   font-size: 13px;
   margin-bottom: 28px;
 }
+.panel[data-auth-entry] .heading {
+  margin-bottom: 28px;
+}
+.panel[data-auth-entry] .description {
+  margin-top: 14px;
+}
+.socialGroup {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.socialButton {
+  min-width: 0;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink);
+}
+.socialButton:hover:not(:disabled) {
+  border-color: var(--brand-mid);
+  background: var(--brand-wash);
+}
+.socialButton:disabled {
+  cursor: not-allowed;
+  color: var(--faint);
+}
+.socialButton small {
+  font-size: 10px;
+}
+.providerIcon,
+.providerIcon svg {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.naverMark {
+  color: #03a94d;
+  font-family: Arial, sans-serif;
+  font-size: 23px;
+  line-height: 1;
+  font-weight: 900;
+}
+.methodDivider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--faint);
+  font-size: 11px;
+  margin-block: 24px;
+}
+.methodDivider::before,
+.methodDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.emailForm .form {
+  min-width: 0;
+  gap: 16px;
+}
+.emailForm .input {
+  min-height: 48px;
+  padding: 12px 14px;
+  font-size: 16px;
+}
+.emailForm .field {
+  gap: 8px;
+  font-size: 12px;
+}
+.passwordField {
+  position: relative;
+  min-width: 0;
+}
+.passwordField .input {
+  padding-right: 52px;
+}
+.passwordToggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--muted);
+}
+.recoveryLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 10px;
+  color: var(--muted);
+}
+.recoveryLinks a {
+  font-size: 11px;
+  text-decoration: none;
+}
+.verificationState {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--brand);
+  font-size: 15px;
+}
+.emailAddress {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.entryNotice {
+  padding-block: 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
 @media (max-width: 600px) {
   .header,
   .footer {

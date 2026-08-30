@@ -104,14 +104,19 @@ describe("auth session transport smoke", () => {
     assert.equal(AUTH_TRANSPORT_SESSION_PATH, "/auth/session");
   });
 
-  it("allows only the two reviewed Google session transport requests", () => {
+  it("allows only the seven reviewed session and email transport requests", () => {
     assert.deepEqual(AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS, [
       {
         method: "POST",
         path: ["sign-in", "social"],
-        socialProvider: "google",
+        socialProviders: ["google", "github"],
       },
       { method: "POST", path: ["sign-out"] },
+      { method: "POST", path: ["sign-in", "email"] },
+      { method: "POST", path: ["sign-up", "email"] },
+      { method: "POST", path: ["send-verification-email"] },
+      { method: "POST", path: ["request-password-reset"] },
+      { method: "POST", path: ["reset-password"] },
     ]);
 
     assert.equal(
@@ -133,8 +138,8 @@ describe("auth session transport smoke", () => {
 
   it("rejects unreviewed auth methods, routes, and social providers", () => {
     const rejectedRequests = [
-      { method: "POST", path: ["sign-up", "email"] },
-      { method: "POST", path: ["sign-in", "email"] },
+      { method: "GET", path: ["sign-up", "email"] },
+      { method: "GET", path: ["sign-in", "email"] },
       { method: "GET", path: ["list-sessions"] },
       { method: "GET", path: ["get-session"] },
       { method: "POST", path: ["delete-user"] },
@@ -142,7 +147,7 @@ describe("auth session transport smoke", () => {
       {
         method: "POST",
         path: ["sign-in", "social"],
-        socialProvider: "github",
+        socialProvider: "naver",
       },
       { method: "GET", path: ["sign-out"] },
       { method: "PATCH", path: ["get-session"] },
@@ -327,17 +332,20 @@ describe("auth session transport smoke", () => {
     const { inspectedRuntimeGraphFiles, ...evidence } = result.evidence;
     assert.ok(inspectedRuntimeGraphFiles >= 15);
     assert.deepEqual(evidence, {
-      requiredFiles: 13,
-      presentFiles: 13,
+      requiredFiles: 25,
+      presentFiles: 25,
       productDatabaseBoundaryFiles: 0,
       publicAuthEnvironmentReferences: 0,
       authSdkPinned: true,
+      naverAuthSdkPinned: true,
       previewRuntimeDisabled: true,
       productionRuntimeEnabled: true,
       authTargetFingerprintGuardPresent: true,
-      allowedAuthApiEndpoints: 2,
-      googleSocialProviderRestricted: true,
-      strictGoogleSocialSignInBody: true,
+      allowedAuthApiEndpoints: 7,
+      socialProvidersRestricted: true,
+      strictAuthRequestBodies: true,
+      naverIdentityProtected: true,
+      verifiedEmailAndSessionIsolation: true,
       basicAuthBoundaryIntact: true,
       oauthCallbackExchangeProxyPresent: true,
       authEntryOutsideBasicAuthMatcher: true,
@@ -357,6 +365,7 @@ function createSocialSignInRequest(body, search = "") {
     {
       method: "POST",
       headers: {
+        origin: "https://app.example.invalid",
         "content-type": "application/json; charset=utf-8",
         "content-length": "999",
         "x-request-marker": "preserved",

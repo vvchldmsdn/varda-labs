@@ -296,14 +296,14 @@ describe("provider-neutral session resolver Phase 1G0", () => {
       productionImports: 1,
       unexpectedProductionImports: 0,
       runtimeBoundaryIntact: true,
-      authSdkDependencies: 1,
+      authSdkDependencies: 2,
       unexpectedAuthSdkDependencies: 0,
       basicAuthBoundaryIntact: true,
       databaseQueries: 1,
       databaseWrites: 0,
       providerCalls: 1,
       routeCalls: 0,
-      cacheImplementations: 1,
+      cacheImplementations: 2,
     });
 
     const auditCliSource = readFileSync(

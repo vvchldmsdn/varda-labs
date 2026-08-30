@@ -313,7 +313,7 @@ describe("reviewed initial identity-link planner Phase 1G1-A", () => {
       productRuntimeImports: 0,
       reviewedWriterRegistered: true,
       subjectCliEntrypoints: 0,
-      authSdkDependencies: 1,
+      authSdkDependencies: 2,
       unexpectedAuthSdkDependencies: 0,
       basicAuthBoundaryIntact: true,
       databaseQueries: 0,

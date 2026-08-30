@@ -241,7 +241,8 @@ describe("private session subject binding", () => {
     assert.match(adapter, /^import "server-only";/);
     assert.match(presentationAdapter, /^import "server-only";/);
     assert.match(adapter, /getAuthTransportRuntime/);
-    assert.match(adapter, /auth\.getSession\(\)/);
+    assert.match(adapter, /readCurrentSessionSubject\(\)/);
+    assert.match(adapter, /result.provider !== "neon_auth"/);
     assert.match(adapter, /runtime\.state === "disabled"/);
     assert.match(adapter, /IDENTITY_PAIRING_EVIDENCE_HMAC_KEY/);
     assert.doesNotMatch(

@@ -5,6 +5,7 @@ import { AuthHeading, AuthShell } from "@/components/auth/auth-shell";
 import { SignOutButton } from "@/components/auth/auth-transport-controls";
 import { IdentityBootstrapClaimForm } from "@/components/auth/identity-bootstrap-claim-form";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
+import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
 import {
   assessIdentityPairingClaimPresentationEnvironment,
   IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE_ENV,
@@ -16,7 +17,7 @@ export const metadata = {
   title: "내 계정 | VARDA-LABS",
   robots: { index: false, follow: false },
 };
-type SessionEvidence = "authenticated" | "unauthenticated" | "unavailable";
+type SessionEvidence = "authenticated" | "unauthenticated" | "unavailable" | "unverified" | "invalid";
 
 export default async function SessionPage({
   searchParams,
@@ -32,6 +33,8 @@ export default async function SessionPage({
     ? "authenticated"
     : await readSessionEvidence(runtime);
   if (evidence === "unauthenticated") redirect("/auth/sign-in");
+  if (evidence === "unverified") redirect("/auth/verify-email");
+  if (evidence === "invalid") redirect("/auth/sign-in");
   if (evidence === "authenticated" && params.view !== "account" && !preview)
     redirect("/portfolio/onboarding");
   const presentationRuntime = assessIdentityPairingClaimPresentationEnvironment(
@@ -58,7 +61,7 @@ export default async function SessionPage({
           <>
             <p className={styles.sessionState}>
               <Check size={16} aria-hidden="true" />
-              Google 계정으로 로그인됨
+              계정 로그인 확인됨
             </p>
             <div className={styles.stack}>
               <Link
@@ -123,9 +126,7 @@ async function readSessionEvidence(
 ): Promise<SessionEvidence> {
   if (runtime.state !== "ready") return "unavailable";
   try {
-    const result = await runtime.auth.getSession();
-    if (result.error) return "unavailable";
-    return result.data?.user.id ? "authenticated" : "unauthenticated";
+    return (await readCurrentSessionSubject()).state;
   } catch {
     return "unavailable";
   }
