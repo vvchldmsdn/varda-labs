@@ -1,5 +1,6 @@
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import { sessionResolutionNextAction } from "@/lib/session-resolution-next-action";
@@ -18,6 +19,8 @@ export function PortfolioReadAccessBoundary({
   resolution: SessionResolverResult;
   title: string;
 }) {
+  if (!resolution.ok && resolution.failure.code === "unauthenticated") redirect("/auth/sign-in");
+  if (!resolution.ok && resolution.failure.code === "identity_unlinked") redirect("/portfolio/onboarding");
   const nextAction = sessionResolutionNextAction(resolution);
 
   return (

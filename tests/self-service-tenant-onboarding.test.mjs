@@ -93,10 +93,10 @@ describe("self-service empty tenant onboarding", () => {
     assert.match(resolverSource, /getAuthTransportRuntime\(\)/);
     assert.match(actionSource, /"use server"/);
     assert.match(actionSource, /createCurrentSessionTenant\(formData\)/);
-    assert.match(actionSource, /redirect\("\/portfolio\/accounts\?account=all"\)/);
+    assert.match(actionSource, /redirect\("\/portfolio\/onboarding"\)/);
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.match(pageSource, /failure\.code === "identity_unlinked"/);
-    assert.match(pageSource, /SelfServiceTenantOnboardingForm/);
+    assert.match(pageSource, /OnboardingView/);
     assert.match(accountPageSource, /redirect\("\/portfolio\/onboarding"\)/);
     assert.match(componentSource, /"use client"/);
     assert.match(componentSource, /useActionState/);

@@ -11,6 +11,7 @@ const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
   "src/app/api/auth/[...path]/route.ts",
   "src/app/auth/callback/page.tsx",
   "src/app/auth/sign-in/page.tsx",
+  "src/app/auth/sign-up/page.tsx",
   "src/app/auth/session/page.tsx",
   "src/components/auth/auth-transport-controls.tsx",
   "src/proxy.ts",

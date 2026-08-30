@@ -1,7 +1,7 @@
-import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-
+import { notFound, redirect } from "next/navigation";
+import { ArrowRight, Check, RotateCcw } from "lucide-react";
+import { AuthHeading, AuthShell } from "@/components/auth/auth-shell";
 import { SignOutButton } from "@/components/auth/auth-transport-controls";
 import { IdentityBootstrapClaimForm } from "@/components/auth/identity-bootstrap-claim-form";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
@@ -9,78 +9,112 @@ import {
   assessIdentityPairingClaimPresentationEnvironment,
   IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE_ENV,
 } from "@/lib/auth/identity-pairing-claim-presentation-policy";
+import styles from "@/components/auth/auth-experience.module.css";
 
 export const dynamic = "force-dynamic";
+export const metadata = {
+  title: "내 계정 | VARDA-LABS",
+  robots: { index: false, follow: false },
+};
+type SessionEvidence = "authenticated" | "unauthenticated" | "unavailable";
 
-type SessionEvidence =
-  | "authenticated"
-  | "unauthenticated"
-  | "unavailable";
-
-export default async function SessionPage() {
+export default async function SessionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; preview?: string }>;
+}) {
+  const params = await searchParams;
+  const preview =
+    process.env.NODE_ENV === "development" && params.preview === "design";
   const runtime = getAuthTransportRuntime();
-  if (runtime.state === "disabled") notFound();
-
-  const evidence = await readSessionEvidence(runtime);
-  const presentationRuntime =
-    assessIdentityPairingClaimPresentationEnvironment({
+  if (runtime.state === "disabled" && !preview) notFound();
+  const evidence = preview
+    ? "authenticated"
+    : await readSessionEvidence(runtime);
+  if (evidence === "unauthenticated") redirect("/auth/sign-in");
+  if (evidence === "authenticated" && params.view !== "account" && !preview)
+    redirect("/portfolio/onboarding");
+  const presentationRuntime = assessIdentityPairingClaimPresentationEnvironment(
+    {
       VERCEL_ENV: process.env.VERCEL_ENV,
       IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE:
         process.env[IDENTITY_PAIRING_CLAIM_PRESENTATION_MODE_ENV],
-    });
+    },
+  );
 
   return (
-    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
-      <SecondaryPageHeader />
-      <section className="mx-auto w-full max-w-xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
-        <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-          Server session evidence
-        </h1>
-
-        <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-          <EvidenceCell
-            label="Authenticated session"
-            value={evidence === "authenticated" ? "Present" : "Not present"}
-          />
-          <EvidenceCell
-            label="Server user identifier"
-            value={evidence === "authenticated" ? "Present" : "Not exposed"}
-          />
-          <EvidenceCell label="Portfolio user link" value="Not attempted" />
-          <EvidenceCell label="Product database read" value="Not attempted" />
-        </dl>
-
-        {evidence === "unavailable" ? (
-          <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-            The server session is currently unavailable.
-          </p>
-        ) : null}
-
-        {evidence === "authenticated" &&
-        presentationRuntime.state === "enabled" ? (
-          <IdentityBootstrapClaimForm />
-        ) : null}
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          {evidence === "authenticated" ? <SignOutButton /> : null}
-          <Link
-            href="/auth/sign-in"
-            className="rounded-md border border-[var(--line)] bg-white px-4 py-2 font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-          >
-            Sign-in screen
-          </Link>
-          {evidence === "authenticated" ? (
+    <AuthShell preview={preview} alternate={{ href: "/", label: "포트폴리오" }}>
+      <section className={styles.panel}>
+        <AuthHeading
+          eyebrow="YOUR ACCOUNT"
+          title="내 계정"
+          description={
+            evidence === "authenticated"
+              ? "로그인이 확인되었습니다. 나의 포트폴리오로 이어가세요."
+              : "로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
+          }
+        />
+        {evidence === "authenticated" ? (
+          <>
+            <p className={styles.sessionState}>
+              <Check size={16} aria-hidden="true" />
+              Google 계정으로 로그인됨
+            </p>
+            <div className={styles.stack}>
+              <Link
+                className={styles.primaryButton}
+                href={
+                  preview
+                    ? "/portfolio/onboarding?preview=design"
+                    : "/portfolio/onboarding"
+                }
+              >
+                포트폴리오로 계속
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+              {!preview ? (
+                <SignOutButton />
+              ) : (
+                <Link
+                  className={styles.secondaryButton}
+                  href="/auth/sign-in?preview=design"
+                >
+                  로그인 화면 보기
+                </Link>
+              )}
+            </div>
+            <details className={styles.disclosure} id="existing-data">
+              <summary>기존 데이터 연결</summary>
+              <p>
+                이전 서비스의 자산 기록은 별도로 확인한 연결 코드로만
+                연결됩니다. 코드를 다른 사람에게 공유하지 마세요.
+              </p>
+              {presentationRuntime.state === "enabled" && !preview ? (
+                <IdentityBootstrapClaimForm />
+              ) : (
+                <p>
+                  현재 연결 코드 입력이 열려 있지 않습니다. 기존 기록이 있다면
+                  신규 포트폴리오 생성 전에 운영자에게 연결을 요청해 주세요.
+                </p>
+              )}
+            </details>
+          </>
+        ) : (
+          <div className={styles.stack}>
             <Link
-              href="/portfolio/accounts?account=all"
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
+              className={styles.primaryButton}
+              href="/auth/session?view=account"
             >
-              Owner-scoped accounts
+              <RotateCcw size={16} aria-hidden="true" />
+              로그인 상태 다시 확인
             </Link>
-          ) : null}
-        </div>
+            <Link className={styles.secondaryButton} href="/auth/sign-in">
+              로그인 화면으로
+            </Link>
+          </div>
+        )}
       </section>
-    </main>
+    </AuthShell>
   );
 }
 
@@ -88,7 +122,6 @@ async function readSessionEvidence(
   runtime: ReturnType<typeof getAuthTransportRuntime>,
 ): Promise<SessionEvidence> {
   if (runtime.state !== "ready") return "unavailable";
-
   try {
     const result = await runtime.auth.getSession();
     if (result.error) return "unavailable";
@@ -96,13 +129,4 @@ async function readSessionEvidence(
   } catch {
     return "unavailable";
   }
-}
-
-function EvidenceCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
-      <dd className="mt-2 font-semibold">{value}</dd>
-    </div>
-  );
 }
