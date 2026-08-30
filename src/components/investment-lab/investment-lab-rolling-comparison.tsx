@@ -11,7 +11,7 @@ export function InvestmentLabRollingComparisonView({
   return (
     <section
       aria-labelledby="investment-lab-rolling-title"
-      className="mx-auto w-full max-w-[1540px] space-y-6 border-t border-[#dde1db] px-5 py-12 sm:px-8 lg:px-10"
+      className="min-w-0 space-y-6 border-t border-[#dde1db] py-6"
       data-rolling-candidate-windows={model.candidateWindowCount}
       data-rolling-complete-windows={model.completeWindowCount}
       data-rolling-excluded-windows={model.excludedWindowCount}
@@ -25,27 +25,35 @@ export function InvestmentLabRollingComparisonView({
         </p>
         <h2
           id="investment-lab-rolling-title"
-          className="mt-2 text-2xl font-semibold sm:text-3xl"
+          className="mt-2 text-lg font-medium sm:text-xl"
         >
           과거 최고·최저 rolling 구간
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-[#626b5f]">
-          저장된 완전 관측 구간 중 실제 포트폴리오의 현금흐름 조정
-          추정수익률이 가장 높고 낮았던 {model.policy.observationCount}개 관측일을
-          찾고, 같은 시작 평가액과 같은 매수·매도 흐름을 KODEX 200 및 VOO에
-          적용한 결과를 나란히 비교합니다. 사후 해석이며 예측·추천·최적화가
-          아닙니다.
+          저장된 완전 관측 구간 중 실제 포트폴리오의 현금흐름 조정 추정수익률이
+          가장 높고 낮았던 {model.policy.observationCount}개 관측일을 찾고, 같은
+          시작 평가액과 같은 매수·매도 흐름을 KODEX 200 및 VOO에 적용한 결과를
+          나란히 비교합니다. 사후 해석이며 예측·추천·최적화가 아닙니다.
         </p>
         <p className="mt-2 text-xs text-[#777e73]">
-          후보 {model.candidateWindowCount}개 · 완전 관측 {model.completeWindowCount}
-          개 · 근거 불완전으로 제외 {model.excludedWindowCount}개
+          후보 {model.candidateWindowCount}개 · 완전 관측{" "}
+          {model.completeWindowCount}개 · 근거 불완전으로 제외{" "}
+          {model.excludedWindowCount}개
         </p>
       </header>
 
       {model.status === "ready" && model.worstWindow && model.bestWindow ? (
         <div className="grid gap-4 xl:grid-cols-2">
-          <RollingWindowCard label="최저 구간" tone="negative" window={model.worstWindow} />
-          <RollingWindowCard label="최고 구간" tone="positive" window={model.bestWindow} />
+          <RollingWindowCard
+            label="최저 구간"
+            tone="negative"
+            window={model.worstWindow}
+          />
+          <RollingWindowCard
+            label="최고 구간"
+            tone="positive"
+            window={model.bestWindow}
+          />
         </div>
       ) : (
         <div className="border-y border-[#eadfbe] bg-[#fffaf0] px-4 py-4 text-sm text-[#725f2d]">
@@ -80,11 +88,13 @@ function RollingWindowCard({
             {label}
           </h3>
           <p className="text-sm tabular-nums text-[#626b5f]">
-            {formatDate(window.startServiceDate)} ~ {formatDate(window.endServiceDate)}
+            {formatDate(window.startServiceDate)} ~{" "}
+            {formatDate(window.endServiceDate)}
           </p>
         </div>
         <p className="mt-1 text-xs text-[#777e73]">
-          {window.observationCount}개 관측일 · 실제 흐름 {window.actualFlowCount}건
+          {window.observationCount}개 관측일 · 실제 흐름{" "}
+          {window.actualFlowCount}건
         </p>
       </header>
 

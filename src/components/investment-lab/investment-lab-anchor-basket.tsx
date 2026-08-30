@@ -1,4 +1,5 @@
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
+import { InvestmentLabQueryFields } from "./investment-lab-query-controls";
 import type { InvestmentLabAnchorBlocker } from "@/lib/investment-lab-anchor-basket-anchor";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
@@ -22,7 +23,7 @@ export function InvestmentLabAnchorBasket({
 
   return (
     <section
-      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-16 sm:px-8 lg:px-10"
+      className="min-w-0 py-6"
       data-anchor-basket-candidate-dates={anchor.candidateAnchorDates.length}
       data-anchor-basket-comparison-dates={
         ready ? model.summary!.comparisonDateCount : 0
@@ -56,7 +57,7 @@ export function InvestmentLabAnchorBasket({
             <p className="text-[10px] font-medium uppercase text-[#777d75]">
               ANCHOR RECONSTRUCTION
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-normal sm:text-3xl">
+            <h2 className="mt-3 text-lg font-medium sm:text-xl">
               기준일 바스켓: 초기 동일비중·흐름 균등배분
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#687064]">
@@ -109,8 +110,8 @@ export function InvestmentLabAnchorBasket({
         <p className="text-xs leading-5 text-[#73786c]">
           현재 보유 종목을 더 오래된 과거로 소급하지 않습니다. ticker·시장·통화,
           종가, USD/KRW 근거가 한 종목이라도 없으면 일부 종목만 제외한 그래프를
-          만들지 않고 전체 비교를 중단합니다. 이 결과는 연구용 비교이며 목표비중,
-          추천 또는 주문 근거가 아닙니다.
+          만들지 않고 전체 비교를 중단합니다. 이 결과는 연구용 비교이며
+          목표비중, 추천 또는 주문 근거가 아닙니다.
         </p>
       </div>
     </section>
@@ -217,10 +218,11 @@ function SpecialHoldingEvidence({
   );
 }
 
-type ReadyScenario = InvestmentLabAnchorBasketScenario & Readonly<{
-  status: "ready";
-  summary: NonNullable<InvestmentLabAnchorBasketScenario["summary"]>;
-}>;
+type ReadyScenario = InvestmentLabAnchorBasketScenario &
+  Readonly<{
+    status: "ready";
+    summary: NonNullable<InvestmentLabAnchorBasketScenario["summary"]>;
+  }>;
 
 function ReadyResult({ model }: { model: ReadyScenario }) {
   const summary = model.summary!;
@@ -268,8 +270,8 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
         />
       </div>
       <p className="text-sm text-[#687064]">
-        종목 {summary.instrumentCount}개 · 비교일 {summary.comparisonDateCount}개
-        · 실제 흐름 {model.coverage.sourceFlowCount}건 · 종목별 체결 근거 {" "}
+        종목 {summary.instrumentCount}개 · 비교일 {summary.comparisonDateCount}
+        개 · 실제 흐름 {model.coverage.sourceFlowCount}건 · 종목별 체결 근거{" "}
         {model.coverage.scenarioFlowLegCount}건
       </p>
       {model.coverage.manualValuationComponentCount > 0 ? (
@@ -282,14 +284,20 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
   );
 }
 
-function UnavailableResult({ model }: { model: InvestmentLabAnchorBasketScenario }) {
+function UnavailableResult({
+  model,
+}: {
+  model: InvestmentLabAnchorBasketScenario;
+}) {
   const reasons = [
     ...model.anchor.blockers.map(anchorBlockerLabel),
-    ...model.evidenceBlockers.slice(0, 4).map((row) =>
-      [evidenceBlockerLabel(row.reason), row.instrumentKey, row.evidenceDate]
-        .filter(Boolean)
-        .join(" · "),
-    ),
+    ...model.evidenceBlockers
+      .slice(0, 4)
+      .map((row) =>
+        [evidenceBlockerLabel(row.reason), row.instrumentKey, row.evidenceDate]
+          .filter(Boolean)
+          .join(" · "),
+      ),
   ];
   return (
     <div className="border-y border-[#d8c69d] py-4 text-sm leading-6 text-[#73551b]">
@@ -321,8 +329,13 @@ function AnchorForm({
 }) {
   if (anchorDates.length === 0) return null;
   return (
-    <form action="/investment-lab" className="flex items-end gap-2" method="get">
+    <form
+      action="/investment-lab"
+      className="flex items-end gap-2"
+      method="get"
+    >
       <input name="scope" type="hidden" value={scopeKey} />
+      <InvestmentLabQueryFields />
       <PeriodHiddenInputs period={period} />
       {fixedMixSelection.kodexWeightPct !== null ? (
         <input
@@ -355,7 +368,11 @@ function AnchorForm({
   );
 }
 
-function PeriodHiddenInputs({ period }: { period: InvestmentLabPeriodSelection }) {
+function PeriodHiddenInputs({
+  period,
+}: {
+  period: InvestmentLabPeriodSelection;
+}) {
   if (
     period.status !== "selected" ||
     !period.selectedStartServiceDate ||
@@ -365,7 +382,11 @@ function PeriodHiddenInputs({ period }: { period: InvestmentLabPeriodSelection }
   }
   return (
     <>
-      <input name="start" type="hidden" value={period.selectedStartServiceDate} />
+      <input
+        name="start"
+        type="hidden"
+        value={period.selectedStartServiceDate}
+      />
       <input name="end" type="hidden" value={period.selectedEndServiceDate} />
     </>
   );
@@ -401,7 +422,8 @@ function SummaryCell({
 function anchorBlockerLabel(reason: InvestmentLabAnchorBlocker) {
   const labels: Record<InvestmentLabAnchorBlocker, string> = {
     invalid_service_date_axis: "비교 날짜 축이 유효하지 않음",
-    no_complete_anchor_evidence: "포트폴리오와 포지션이 함께 저장된 기준일 없음",
+    no_complete_anchor_evidence:
+      "포트폴리오와 포지션이 함께 저장된 기준일 없음",
     requested_anchor_unavailable: "선택한 기준일 근거 없음",
     ambiguous_portfolio_source: "포트폴리오 저장 출처가 중복됨",
     tickerless_anchor_holding: "ticker가 없는 저장 포지션 존재",
@@ -418,7 +440,8 @@ function anchorBlockerLabel(reason: InvestmentLabAnchorBlocker) {
 }
 
 function evidenceBlockerLabel(reason: string) {
-  if (reason.includes("manual")) return "금현물 수동 평가 근거 누락 또는 불일치";
+  if (reason.includes("manual"))
+    return "금현물 수동 평가 근거 누락 또는 불일치";
   if (reason.includes("price")) return "필요 종가 근거 누락 또는 중복";
   if (reason.includes("fx")) return "필요 환율 근거 누락 또는 중복";
   if (reason.includes("execution")) return "매수·매도 체결 근거 불완전";
@@ -432,12 +455,10 @@ function specialHoldingReasonLabel(
     InvestmentLabAnchorSpecialHoldingEvidence["reason"],
     string
   > = {
-    stored_snapshot_ticker_recovered:
-      "Base44 이관 포지션 ticker 합의로 복구",
+    stored_snapshot_ticker_recovered: "Base44 이관 포지션 ticker 합의로 복구",
     stored_snapshot_ticker_conflict: "이관 포지션 ticker가 서로 충돌",
     stored_snapshot_metadata_mismatch: "이관 포지션 메타데이터 불일치",
-    manual_valuation_history_required:
-      "금현물의 명시적 수동 평가 이력이 필요",
+    manual_valuation_history_required: "금현물의 명시적 수동 평가 이력이 필요",
     stored_manual_valuation_history_covered:
       "날짜별 저장 수동 평가와 저장가 유지 근거가 확인됨",
     instrument_keyed_official_close_required:
@@ -490,9 +511,9 @@ function formatKrw(value: number) {
 }
 
 function formatSignedKrw(value: number) {
-  return `${value >= 0 ? "+" : "-"}₩${Math.abs(Math.round(value)).toLocaleString(
-    "ko-KR",
-  )}`;
+  return `${value >= 0 ? "+" : "-"}₩${Math.abs(
+    Math.round(value),
+  ).toLocaleString("ko-KR")}`;
 }
 
 function formatSignedPercent(value: number) {

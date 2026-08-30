@@ -8,7 +8,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
   const training = model.training;
   return (
     <section
-      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-12 sm:px-8 lg:px-10"
+      className="min-w-0 border-t border-[#dde1db] py-6"
       data-preperiod-min-volatility-candidate-common-price-dates={
         model.coverage.commonPriceDateCount
       }
@@ -31,8 +31,10 @@ export function InvestmentLabPreperiodMinVolatilityView({
         <div className="border-b border-[#dde1db] pb-6">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-[11px] font-medium text-[#777d75]">PRE-PERIOD MODEL</p>
-              <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">
+              <p className="text-[11px] font-medium text-[#777d75]">
+                PRE-PERIOD MODEL
+              </p>
+              <h2 className="mt-2 text-lg font-medium sm:text-xl">
                 기간 시작 전 최소변동성 비교
               </h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-[#687064]">
@@ -93,9 +95,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
                   종료 평가액{" "}
                   {formatKrw(model.scenario.summary.scenarioEndValueKrw)} · 기간
                   수익률{" "}
-                  {formatPercent(
-                    model.scenario.returnEstimate.scenarioReturn,
-                  )}
+                  {formatPercent(model.scenario.returnEstimate.scenarioReturn)}
                 </p>
               </>
             ) : (
@@ -134,8 +134,8 @@ export function InvestmentLabPreperiodMinVolatilityView({
 
         <p className="py-4 text-xs leading-5 text-[#73786c]">
           미래 데이터, 보간, provider backfill, 현재 보유비중, 목표비중을
-          사용하지 않습니다. 거래비용·세금·주문 가능성을 반영한 추천이
-          아니며, 산정 뒤 정기 리밸런싱도 하지 않습니다.
+          사용하지 않습니다. 거래비용·세금·주문 가능성을 반영한 추천이 아니며,
+          산정 뒤 정기 리밸런싱도 하지 않습니다.
         </p>
       </div>
     </section>

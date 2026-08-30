@@ -13,9 +13,12 @@ describe("analysis result journey navigation", () => {
     assert.match(component, /items\.map/);
   });
 
-  it("links every Investment Lab journey item to a stable target", () => {
+  it("keeps Investment Lab analysis sections inside accessible workspace tabs", () => {
     const page = read("src/app/investment-lab/page.tsx");
     const view = read("src/components/investment-lab/investment-lab-view.tsx");
+    const workspace = read(
+      "src/components/investment-lab/investment-lab-workspace.tsx",
+    );
     const source = `${page}\n${view}`;
     const targets = [
       "investment-lab-results",
@@ -24,9 +27,15 @@ describe("analysis result journey navigation", () => {
       "investment-lab-small-adjustment",
     ];
 
-    assert.match(view, /<AnalysisJourneyNav/);
+    assert.match(view, /<InvestmentLabWorkspace/);
+    assert.match(workspace, /role="tablist"/);
+    assert.match(workspace, /role="tabpanel"/);
+    assert.match(
+      workspace,
+      /const panels = \{ compare: comparison, weights: experiments, composition \}/,
+    );
+    assert.match(workspace, /hidden=\{selected !== view\.id\}/);
     for (const target of targets) {
-      assert.match(source, new RegExp(`href: "#${target}"`));
       assert.match(source, new RegExp(`id="${target}"`));
     }
   });

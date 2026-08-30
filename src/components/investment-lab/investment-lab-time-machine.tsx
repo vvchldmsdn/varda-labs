@@ -1,698 +1,412 @@
 "use client";
 
-import {
-  useId,
-  useMemo,
-  useState,
-  type PointerEvent,
-} from "react";
-
+import { useMemo, useState } from "react";
+import { Check, ChevronDown, Info } from "lucide-react";
 import type {
   InvestmentLabScenarioChart,
   InvestmentLabScenarioChartLine,
 } from "@/lib/investment-lab-scenario-chart";
 import type { InvestmentLabScenarioMatrixId } from "@/lib/investment-lab-scenario-matrix";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
+import { InvestmentLabChartCanvas } from "./investment-lab-chart-canvas";
+import { InvestmentLabDialog } from "./investment-lab-dialog";
+import {
+  defaultLabScenario,
+  labKrw,
+  labMoneyTone,
+  labPercent,
+  labScenarioDetail,
+  labScenarioLabel,
+  type InvestmentLabTimeMachineScenarioSummary,
+  type UnavailableLabScenario,
+} from "./investment-lab-chart-presentation";
 
-const CHART_WIDTH = 1120;
-const CHART_HEIGHT = 520;
-const PLOT_LEFT = 74;
-const PLOT_RIGHT = 36;
-const PLOT_TOP = 54;
-const PLOT_BOTTOM = 72;
-
-const DEFAULT_SCENARIO_ORDER = [
-  "approved_target_weight_monthly",
-  "anchor_current_weight_monthly",
-  "preperiod_min_volatility",
-  "anchor_value_weight",
-  "fixed_mix",
-  "kodex200",
-  "voo",
-  "anchor_equal_weight_monthly",
-  "anchor_basket",
-  "zero_return",
-] as const satisfies readonly InvestmentLabScenarioMatrixId[];
-
-export type InvestmentLabTimeMachineScenarioSummary = Readonly<{
-  id: InvestmentLabScenarioMatrixId;
-  endDifferenceKrw: number | null;
-  endValueKrw: number | null;
-  returnEstimate: number | null;
-  maximumDrawdown: number | null;
-  annualizedVolatility: number | null;
-}>;
+export type { InvestmentLabTimeMachineScenarioSummary } from "./investment-lab-chart-presentation";
 
 export function InvestmentLabTimeMachine({
   chart,
   scenarioSummaries,
+  unavailableScenarios = [],
 }: {
   chart: InvestmentLabScenarioChart;
   scenarioSummaries: readonly InvestmentLabTimeMachineScenarioSummary[];
+  unavailableScenarios?: readonly UnavailableLabScenario[];
 }) {
-  const rawId = useId();
-  const patternId = `investment-lab-difference-${rawId.replaceAll(":", "")}`;
-  const [requestedScenarioId, setRequestedScenarioId] =
-    useState<InvestmentLabScenarioMatrixId>(() => defaultScenarioId(chart));
-  const [requestedFocusIndex, setRequestedFocusIndex] = useState(
-    Math.max(chart.lines[0]?.points.length - 1, 0),
+  const [requested, setRequested] = useState<InvestmentLabScenarioMatrixId>(
+    () => defaultLabScenario(chart),
   );
-  const actualLine =
-    chart.lines.find((line) => line.id === "actual") ?? chart.lines[0];
-  const selectedLine =
-    chart.lines.find((line) => line.id === requestedScenarioId) ??
-    chart.lines.find((line) => line.id === defaultScenarioId(chart)) ??
-    actualLine;
-  const focusIndex = Math.min(
-    requestedFocusIndex,
-    Math.max((actualLine?.points.length ?? 1) - 1, 0),
-  );
-  const summaryById = useMemo(
-    () => new Map(scenarioSummaries.map((summary) => [summary.id, summary])),
+  const [unavailable, setUnavailable] =
+    useState<InvestmentLabScenarioMatrixId | null>(null);
+  const [showUnavailable, setShowUnavailable] = useState(false);
+  const actual = chart.lines.find((line) => line.id === "actual");
+  const selected =
+    chart.lines.find((line) => line.id === requested) ??
+    chart.lines.find((line) => line.id === defaultLabScenario(chart));
+  const summaries = useMemo(
+    () => new Map(scenarioSummaries.map((row) => [row.id, row])),
     [scenarioSummaries],
   );
-  const geometry = useMemo(
-    () => buildGeometry(chart),
-    [chart],
+  if (!actual || !selected || !chart.period) return null;
+
+  const summary = summaries.get(selected.id);
+  const actualSummary = summaries.get("actual");
+  const difference = summary?.endDifferenceKrw ?? null;
+  const ready = chart.lines.filter((line) => line.id !== "actual");
+  const unavailableDetail = unavailableScenarios.find(
+    (item) => item.id === unavailable,
   );
 
-  if (!actualLine || !selectedLine || !geometry) return null;
-
-  const actualGeometry = geometry.lines.get(actualLine.id)!;
-  const selectedGeometry = geometry.lines.get(selectedLine.id)!;
-  const actualPoint = actualLine.points[focusIndex];
-  const selectedPoint = selectedLine.points[focusIndex];
-  const focusX = geometry.x(focusIndex);
-  const actualY = geometry.y(actualPoint.valueKrw);
-  const selectedY = geometry.y(selectedPoint.valueKrw);
-  const selectedSummary = summaryById.get(selectedLine.id);
-  const differenceKrw = selectedPoint.valueKrw - actualPoint.valueKrw;
-  const differencePct =
-    actualPoint.valueKrw === 0
-      ? null
-      : differenceKrw / actualPoint.valueKrw;
-  const selectableLines = chart.lines.filter((line) => line.id !== "actual");
-
-  function updateFocus(event: PointerEvent<SVGSVGElement>) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    if (bounds.width <= 0) return;
-    const viewBoxX =
-      ((event.clientX - bounds.left) / bounds.width) * CHART_WIDTH;
-    const ratio =
-      (viewBoxX - PLOT_LEFT) /
-      Math.max(CHART_WIDTH - PLOT_LEFT - PLOT_RIGHT, 1);
-    const nextIndex = Math.round(
-      clamp(ratio, 0, 1) * Math.max(actualLine.points.length - 1, 0),
-    );
-    setRequestedFocusIndex(nextIndex);
-  }
-
   return (
-    <section
-      aria-labelledby="investment-lab-time-machine-title"
-      className="border-b border-[#dde1db]"
-    >
-      <div className="grid gap-8 border-b border-[#dde1db] py-9 lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.25fr)] lg:items-end">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-[11px] font-medium text-[#777d75]">
-              COUNTERFACTUAL LAB
-            </p>
-            <span className="border border-[#dce0da] bg-[#f1f3ef] px-2 py-1 text-[10px] font-medium text-[#626961]">
-              과거 재구성
-            </span>
-          </div>
-          <h1
-            className="mt-3 text-3xl font-semibold tracking-normal"
-            id="investment-lab-time-machine-title"
-          >
-            포트폴리오 타임머신
-          </h1>
-          <p className="mt-1 text-sm text-[#697069]">
-            {selectedLine.label} · {formatDate(actualPoint.serviceDate)}
-          </p>
-          <p
-            className={`mt-6 text-[clamp(2.8rem,5.2vw,5.8rem)] font-normal leading-none tracking-normal tabular-nums ${moneyTone(differenceKrw)}`}
-          >
-            {formatSignedKrw(differenceKrw)}
-          </p>
-          <p className="mt-4 max-w-xl text-xs leading-6 text-[#7a8078]">
-            {differenceLabel(differenceKrw)} · 실제와 같은 시작 자산, 관측일,
-            현금흐름을 사용한 과거 비교입니다.
-          </p>
-        </div>
-
-        <dl className="grid grid-cols-2 border-y border-[#dde1db] xl:grid-cols-4">
-          <HeroMetric
-            detail="저장된 실제 경로"
-            label="실제 평가액"
-            value={formatKrw(actualPoint.valueKrw)}
-          />
-          <HeroMetric
-            detail={selectedLine.label}
-            label="가상 평가액"
-            value={formatKrw(selectedPoint.valueKrw)}
-          />
-          <HeroMetric
-            detail={formatSignedPercent(differencePct)}
-            label="실제 대비"
-            value={formatSignedKrw(differenceKrw)}
-            valueClass={moneyTone(differenceKrw)}
-          />
-          <HeroMetric
-            detail={
-              selectedSummary?.annualizedVolatility === null ||
-              selectedSummary?.annualizedVolatility === undefined
-                ? "변동성 근거 부족"
-                : `변동성 ${formatPercent(selectedSummary.annualizedVolatility)}`
-            }
-            label="최대 낙폭"
-            value={formatPercent(selectedSummary?.maximumDrawdown ?? null, true)}
-          />
-        </dl>
-      </div>
-
-      <div className="border-b border-[#dde1db] py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-[#777d75]">세계선 선택</p>
-            <div
-              aria-label="대안 세계선"
-              className="mt-2 flex gap-6 overflow-x-auto pb-1"
-              role="group"
-            >
-              {selectableLines.map((line) => {
-                const active = line.id === selectedLine.id;
-                const summary = summaryById.get(line.id);
-                return (
-                  <button
-                    key={line.id}
-                    aria-pressed={active}
-                    className={`min-w-max border-b-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#347e62] ${
-                      active
-                        ? "border-[#20231f] text-[#20231f]"
-                        : "border-transparent text-[#777d75] hover:text-[#20231f]"
-                    }`}
-                    onClick={() => setRequestedScenarioId(line.id)}
-                    type="button"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <span
-                        aria-hidden="true"
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: line.color }}
-                      />
-                      {line.label}
-                    </span>
-                    <span
-                      className={`mt-1 block text-[11px] tabular-nums ${moneyTone(summary?.endDifferenceKrw ?? null)}`}
-                    >
-                      종료 시점 {formatSignedKrw(summary?.endDifferenceKrw ?? null)}
-                    </span>
-                  </button>
-                );
-              })}
+    <div data-lab-comparison="interactive" data-selected-scenario={selected.id}>
+      <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_290px] 2xl:grid-cols-[minmax(0,1fr)_312px]">
+        <section
+          className="min-w-0 py-6 xl:pr-9"
+          aria-label="포트폴리오 타임머신"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-medium text-[#7b847c]">
+                COUNTERFACTUAL LAB
+              </p>
+              <h2 className="mt-2 text-lg font-medium sm:text-xl">
+                다른 선택을 했다면
+              </h2>
+              <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-[#7b847c]">
+                <span>{labScenarioLabel(selected.id)}</span>
+                <span aria-hidden="true">·</span>
+                <span>종료일 실제 대비</span>
+              </p>
+              <p
+                className={`mt-2 text-[30px] font-medium tabular-nums leading-tight sm:text-[36px] ${labMoneyTone(difference)}`}
+                data-lab-end-difference
+              >
+                {labKrw(difference, true)}
+              </p>
             </div>
+            <InvestmentLabDialog
+              icon="info"
+              label="비교 기준"
+              title="무엇을 비교하나요?"
+            >
+              <div className="max-w-2xl space-y-5 text-sm leading-7 text-[#657267]">
+                <p>
+                  <strong className="font-medium text-[#263c30]">
+                    같은 기간, 같은 외부 입출금
+                  </strong>
+                  <br />
+                  검은 선은 저장된 실제 평가액, 초록 선은 같은 시작 평가액과
+                  입출금으로 계산한 선택 시나리오입니다. 계좌 사이의 이동은
+                  선택한 분석 범위에 맞춰 처리합니다.
+                </p>
+                <p>
+                  <strong className="font-medium text-[#263c30]">
+                    평가액 차이와 수익률은 다릅니다
+                  </strong>
+                  <br />
+                  평가액에는 입출금이 포함됩니다. 아래 추정수익률과 낙폭은 외부
+                  흐름을 조정한 기존 계산 결과를 사용합니다. 계산 근거가 없으면
+                  숫자를 만들지 않습니다.
+                </p>
+                <p>
+                  <strong className="font-medium text-[#263c30]">
+                    과거 비교이지 미래 예측이 아닙니다
+                  </strong>
+                  <br />
+                  KIS 원종가 경로에는 배당·기업행사 조정과 투자자 수준의
+                  거래비용·세금이 포함되지 않습니다. 곡선은 저장된 관측점을
+                  부드럽게 연결한 표시이며, 새로운 평가 데이터를 생성하지
+                  않습니다.
+                </p>
+              </div>
+            </InvestmentLabDialog>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-x-5 gap-y-2 text-xs text-[#5f665e]">
-            <Legend color={actualLine.color} label="실제 포트폴리오" />
-            <Legend color={selectedLine.color} label={selectedLine.label} />
-            <span className="inline-flex items-center gap-2">
-              <span className="h-3 w-5 bg-[#e9eee9]" />
-              두 경로의 간격
+
+          <InvestmentLabChartCanvas
+            actual={actual}
+            chart={chart}
+            selected={selected}
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e3e7e1] pt-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-[#66716a]">
+              <span className="inline-flex items-center gap-2">
+                <i aria-hidden="true" className="h-0.5 w-5 bg-[#303b35]" />
+                실제 포트폴리오
+              </span>
+              {selected.id !== "actual" ? (
+                <span className="inline-flex items-center gap-2">
+                  <i aria-hidden="true" className="h-0.5 w-5 bg-[#438f79]" />
+                  {labScenarioLabel(selected.id)}
+                </span>
+              ) : null}
+            </div>
+            <InvestmentLabDialog
+              icon="table"
+              label="날짜별 수치"
+              size="wide"
+              title={`${labScenarioLabel(selected.id)} · 날짜별 비교`}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] border-collapse text-sm">
+                  <thead className="text-left text-xs text-[#778077]">
+                    <tr>
+                      <th className="py-3">평가일</th>
+                      <th className="p-3 text-right">실제 평가액</th>
+                      <th className="p-3 text-right">비교 평가액</th>
+                      <th className="py-3 pl-3 text-right">차이</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {actual.points.map((point, index) => {
+                      const alternative = selected.points[index];
+                      if (
+                        !alternative ||
+                        alternative.serviceDate !== point.serviceDate
+                      )
+                        return null;
+                      const delta = alternative.valueKrw - point.valueKrw;
+                      return (
+                        <tr
+                          className="border-t border-[#e0e5dd] tabular-nums"
+                          key={point.serviceDate}
+                        >
+                          <th className="py-3 text-left font-normal">
+                            {point.serviceDate}
+                          </th>
+                          <td className="p-3 text-right">
+                            {labKrw(point.valueKrw)}
+                          </td>
+                          <td className="p-3 text-right">
+                            {labKrw(alternative.valueKrw)}
+                            {alternative.hasPendingExecution ? (
+                              <span className="ml-1 text-xs text-[#916e3b]">
+                                대기 거래
+                              </span>
+                            ) : null}
+                          </td>
+                          <td
+                            className={`py-3 pl-3 text-right ${labMoneyTone(delta)}`}
+                          >
+                            {labKrw(delta, true)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </InvestmentLabDialog>
+          </div>
+        </section>
+
+        <aside
+          className="min-w-0 border-t border-[#dde1db] py-5 xl:border-t-0 xl:border-l xl:pl-6"
+          aria-label="비교 시나리오"
+        >
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-xs font-medium text-[#56675b]">
+              비교 시나리오
+            </h3>
+            <span className="text-[10px] tabular-nums text-[#7e887e]">
+              {ready.length}개 경로
             </span>
           </div>
-        </div>
-      </div>
-
-      <div className="min-w-0 py-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[11px] font-medium text-[#777d75]">
-              VALUE PATHS
-            </p>
-            <h2 className="mt-1 text-xl font-semibold">
-              실제와 {selectedLine.label}
-            </h2>
+          <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#e1e5df] pb-4 text-xs">
+            <span className="inline-flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-[#303b35]" />
+              실제 포트폴리오
+            </span>
+            <span className="font-medium tabular-nums">
+              {labKrw(
+                actualSummary?.endValueKrw ?? actual.points.at(-1)!.valueKrw,
+              )}
+            </span>
           </div>
-          <p className="text-xs text-[#777d75]">
-            동일 축 · 누락값 보간 없음 · 마우스로 날짜 탐색
-          </p>
-        </div>
-
-        <div className="mt-5 overflow-x-auto">
-            <svg
-              aria-label="실제 포트폴리오와 선택한 대안 세계선 평가액 비교"
-              className="block h-auto min-w-[820px] w-full touch-none"
-              onPointerLeave={() =>
-                setRequestedFocusIndex(actualLine.points.length - 1)
-              }
-              onPointerMove={updateFocus}
-              role="img"
-              viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-            >
-              <defs>
-                <pattern
-                  height="8"
-                  id={patternId}
-                  patternUnits="userSpaceOnUse"
-                  width="8"
+          <div
+            className="grid gap-1 sm:grid-cols-2 xl:max-h-[410px] xl:grid-cols-1 xl:overflow-y-auto xl:pr-1"
+            data-lab-scenario-list
+          >
+            {ready.map((line) => {
+              const active = line.id === selected.id;
+              return (
+                <button
+                  aria-pressed={active}
+                  className={`group grid min-h-[70px] grid-cols-[minmax(0,1fr)_58px] items-center gap-3 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#438574] ${active ? "border-[#ceded3] bg-[#eaf1eb]" : "border-transparent hover:bg-[#f0f3ed]"}`}
+                  key={line.id}
+                  onClick={() => {
+                    setRequested(line.id);
+                    setUnavailable(null);
+                  }}
+                  title={line.label}
+                  type="button"
                 >
-                  <path d="M0 8L8 0" stroke="#ccd4cc" strokeWidth="1" />
-                </pattern>
-              </defs>
-
-              {geometry.ticks.map((tick) => (
-                <g key={tick.value}>
-                  <line
-                    stroke="#dfe3de"
-                    strokeDasharray="2 7"
-                    strokeWidth="1"
-                    x1={PLOT_LEFT}
-                    x2={CHART_WIDTH - PLOT_RIGHT}
-                    y1={tick.y}
-                    y2={tick.y}
-                  />
-                  <text
-                    fill="#7b817a"
-                    fontSize="12"
-                    textAnchor="end"
-                    x={PLOT_LEFT - 12}
-                    y={tick.y + 4}
-                  >
-                    {compactKrw(tick.value)}
-                  </text>
-                </g>
-              ))}
-
-              {selectedLine.id === actualLine.id
-                ? null
-                : actualLine.points.map((point, index) => {
-                    const nextActualY = geometry.y(point.valueKrw);
-                    const nextScenarioY = geometry.y(
-                      selectedLine.points[index].valueKrw,
-                    );
-                    return (
-                      <rect
-                        key={point.serviceDate}
-                        fill={
-                          selectedLine.points[index].valueKrw >= point.valueKrw
-                            ? selectedLine.color
-                            : `url(#${patternId})`
-                        }
-                        height={Math.max(Math.abs(nextScenarioY - nextActualY), 1)}
-                        opacity={
-                          selectedLine.points[index].valueKrw >= point.valueKrw
-                            ? 0.08
-                            : 0.75
-                        }
-                        width={geometry.differenceBarWidth}
-                        x={geometry.x(index) - geometry.differenceBarWidth / 2}
-                        y={Math.min(nextActualY, nextScenarioY)}
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-[12px] font-medium leading-5">
+                      {labScenarioLabel(line.id)}
+                      {active ? (
+                        <Check
+                          aria-hidden="true"
+                          className="shrink-0 text-[#438574]"
+                          size={12}
+                        />
+                      ) : null}
+                    </span>
+                    <span className="mt-1 block text-[11px] tabular-nums text-[#7a827b]">
+                      {labKrw(
+                        summaries.get(line.id)?.endDifferenceKrw ?? null,
+                        true,
+                      )}
+                    </span>
+                  </span>
+                  <MiniPath line={line} active={active} />
+                </button>
+              );
+            })}
+          </div>
+          {unavailableScenarios.length > 0 ? (
+            <div className="mt-4 border-t border-[#e1e5df] pt-3">
+              <button
+                aria-expanded={showUnavailable}
+                className="flex min-h-9 w-full items-center justify-between text-xs text-[#7c8177]"
+                onClick={() => setShowUnavailable(!showUnavailable)}
+                type="button"
+              >
+                <span>
+                  추가 근거가 필요한 경로 {unavailableScenarios.length}
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={showUnavailable ? "rotate-180" : ""}
+                  size={14}
+                />
+              </button>
+              {showUnavailable ? (
+                <div className="space-y-1">
+                  {unavailableScenarios.map((item) => (
+                    <button
+                      aria-expanded={unavailable === item.id}
+                      className="flex w-full items-start gap-2 rounded py-2 text-left text-xs text-[#857557] hover:text-[#303b35]"
+                      key={item.id}
+                      onClick={() =>
+                        setUnavailable(item.id === unavailable ? null : item.id)
+                      }
+                      type="button"
+                    >
+                      <Info
+                        aria-hidden="true"
+                        className="mt-0.5 shrink-0"
+                        size={13}
                       />
-                    );
-                  })}
-
-              <path
-                d={actualGeometry.path}
-                fill="none"
-                stroke={actualLine.color}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="4"
-              />
-              {selectedLine.id === actualLine.id ? null : (
-                <path
-                  d={selectedGeometry.path}
-                  fill="none"
-                  stroke={selectedLine.color}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="4"
-                />
-              )}
-
-              <line
-                stroke="#737a72"
-                strokeDasharray="3 6"
-                strokeWidth="1"
-                x1={focusX}
-                x2={focusX}
-                y1={PLOT_TOP - 8}
-                y2={CHART_HEIGHT - PLOT_BOTTOM + 12}
-              />
-              <circle
-                cx={focusX}
-                cy={actualY}
-                fill="#f8f9f6"
-                r="6"
-                stroke={actualLine.color}
-                strokeWidth="3"
-              />
-              {selectedLine.id === actualLine.id ? null : (
-                <circle
-                  cx={focusX}
-                  cy={selectedY}
-                  fill="#f8f9f6"
-                  r="6"
-                  stroke={selectedLine.color}
-                  strokeWidth="3"
-                />
-              )}
-
-              <Tooltip
-                actualValueKrw={actualPoint.valueKrw}
-                differenceKrw={differenceKrw}
-                scenarioColor={selectedLine.color}
-                scenarioValueKrw={selectedPoint.valueKrw}
-                serviceDate={actualPoint.serviceDate}
-                x={focusX > CHART_WIDTH * 0.7 ? focusX - 258 : focusX + 16}
-                y={PLOT_TOP + 8}
-              />
-
-              {geometry.dateTicks.map((tick) => (
-                <text
-                  key={tick.index}
-                  fill="#777d75"
-                  fontSize="12"
-                  textAnchor={tick.anchor}
-                  x={tick.x}
-                  y={CHART_HEIGHT - 24}
+                      {labScenarioLabel(item.id)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {showUnavailable && unavailableDetail ? (
+                <div
+                  className="mt-2 border-l-2 border-[#d2bea0] pl-3 text-xs leading-6"
+                  role="status"
                 >
-                  {shortDate(actualLine.points[tick.index].serviceDate)}
-                </text>
-              ))}
-            </svg>
-        </div>
-
-        <label className="mt-1 block text-[11px] font-medium text-[#777d75]">
-          날짜 탐색
-          <input
-            aria-label="비교 날짜 탐색"
-            className="portfolio-history-range mt-2 w-full"
-            max={Math.max(actualLine.points.length - 1, 0)}
-            min={0}
-            onChange={(event) =>
-              setRequestedFocusIndex(Number(event.currentTarget.value))
-            }
-            step={1}
-            type="range"
-            value={focusIndex}
-          />
-        </label>
+                  <p className="text-[#806a4e]">{unavailableDetail.reason}</p>
+                  <p className="mt-2 text-[#737d72]">
+                    {unavailableDetail.resolution}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </aside>
       </div>
 
-      <dl className="grid border-t border-[#dce1da] sm:grid-cols-2 xl:grid-cols-4">
+      <dl
+        className="grid grid-cols-2 border-y border-[#dde1db] lg:grid-cols-4"
+        data-lab-metrics
+      >
         <Metric
-          detail={`${formatDate(chart.period!.startServiceDate)} ~ ${formatDate(chart.period!.endServiceDate)}`}
-          label="비교 구간"
-          value={`${chart.period!.comparisonDateCount}개 관측일`}
+          label="비교 종료 평가액"
+          value={labKrw(summary?.endValueKrw ?? null)}
+          baseline={`실제 ${labKrw(actualSummary?.endValueKrw ?? null)}`}
         />
         <Metric
-          detail={formatDate(actualPoint.serviceDate)}
-          label="선택 관측일"
-          value={shortDate(actualPoint.serviceDate)}
+          label="추정수익률"
+          value={labPercent(summary?.returnEstimate ?? null, true)}
+          baseline={`실제 ${labPercent(actualSummary?.returnEstimate ?? null, true)}`}
         />
         <Metric
-          detail="현금흐름 조정 추정"
-          label="구간 수익률"
-          value={formatSignedPercent(selectedSummary?.returnEstimate ?? null)}
-          valueClass={moneyTone(selectedSummary?.returnEstimate ?? null)}
+          label="최대 낙폭"
+          value={labPercent(
+            summary?.maximumDrawdown == null
+              ? null
+              : -Math.abs(summary.maximumDrawdown),
+          )}
+          baseline={`실제 ${labPercent(actualSummary?.maximumDrawdown == null ? null : -Math.abs(actualSummary.maximumDrawdown))}`}
         />
         <Metric
-          detail="같은 관측일 수익률의 연환산"
           label="연환산 변동성"
-          value={formatPercent(selectedSummary?.annualizedVolatility ?? null)}
+          value={labPercent(summary?.annualizedVolatility ?? null)}
+          baseline={
+            summary?.annualizedVolatility == null
+              ? "연속 일간 수익률 근거 필요"
+              : `실제 ${labPercent(actualSummary?.annualizedVolatility ?? null)}`
+          }
         />
       </dl>
-    </section>
-  );
-}
-
-function buildGeometry(chart: InvestmentLabScenarioChart) {
-  const axis = chart.lines[0]?.points ?? [];
-  if (axis.length < 2) return null;
-  const values = chart.lines.flatMap((line) =>
-    line.points.map((point) => point.valueKrw),
-  );
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const rawRange = Math.max(maximum - minimum, 1);
-  const domainMin = Math.max(0, minimum - rawRange * 0.12);
-  const domainMax = maximum + rawRange * 0.12;
-  const x = (index: number) =>
-    PLOT_LEFT +
-    (index / Math.max(axis.length - 1, 1)) *
-      (CHART_WIDTH - PLOT_LEFT - PLOT_RIGHT);
-  const y = (value: number) =>
-    PLOT_TOP +
-    ((domainMax - value) / Math.max(domainMax - domainMin, 1)) *
-      (CHART_HEIGHT - PLOT_TOP - PLOT_BOTTOM);
-  const lines = new Map(
-    chart.lines.map((line) => [
-      line.id,
-      {
-        path: linePath(line, x, y),
-      },
-    ]),
-  );
-  const ticks = Array.from({ length: 5 }, (_, index) => {
-    const ratio = index / 4;
-    const value = domainMax - ratio * (domainMax - domainMin);
-    return { value, y: y(value) };
-  });
-  const dateIndexes = Array.from(
-    new Set(
-      [0, 0.25, 0.5, 0.75, 1].map((ratio) =>
-        Math.round(ratio * (axis.length - 1)),
-      ),
-    ),
-  );
-  const dateTicks = dateIndexes.map((index, tickIndex) => ({
-    index,
-    x: x(index),
-    anchor:
-      tickIndex === 0
-        ? ("start" as const)
-        : tickIndex === dateIndexes.length - 1
-          ? ("end" as const)
-          : ("middle" as const),
-  }));
-  return {
-    dateTicks,
-    differenceBarWidth: Math.max(
-      3,
-      ((CHART_WIDTH - PLOT_LEFT - PLOT_RIGHT) /
-        Math.max(axis.length - 1, 1)) *
-        0.55,
-    ),
-    lines,
-    ticks,
-    x,
-    y,
-  };
-}
-
-function linePath(
-  line: InvestmentLabScenarioChartLine,
-  x: (index: number) => number,
-  y: (value: number) => number,
-) {
-  return buildMonotoneCurvePath(
-    line.points.map((point, index) => ({
-      x: x(index),
-      y: y(point.valueKrw),
-    })),
-  );
-}
-
-function Tooltip({
-  actualValueKrw,
-  differenceKrw,
-  scenarioColor,
-  scenarioValueKrw,
-  serviceDate,
-  x,
-  y,
-}: {
-  actualValueKrw: number;
-  differenceKrw: number;
-  scenarioColor: string;
-  scenarioValueKrw: number;
-  serviceDate: string;
-  x: number;
-  y: number;
-}) {
-  return (
-    <g pointerEvents="none" transform={`translate(${x} ${y})`}>
-      <rect
-        fill="#fbfcf9"
-        height="126"
-        rx="4"
-        stroke="#cfd5ce"
-        width="238"
-      />
-      <text fill="#222622" fontSize="13" fontWeight="600" x="14" y="24">
-        {formatDate(serviceDate)}
-      </text>
-      <line stroke="#e0e4df" x1="14" x2="224" y1="34" y2="34" />
-      <text fill="#6d746c" fontSize="12" x="14" y="57">
-        실제
-      </text>
-      <text
-        fill="#252925"
-        fontSize="13"
-        fontWeight="600"
-        textAnchor="end"
-        x="224"
-        y="57"
-      >
-        {formatKrw(actualValueKrw)}
-      </text>
-      <text fill="#6d746c" fontSize="12" x="14" y="82">
-        대안
-      </text>
-      <text
-        fill={scenarioColor}
-        fontSize="13"
-        fontWeight="600"
-        textAnchor="end"
-        x="224"
-        y="82"
-      >
-        {formatKrw(scenarioValueKrw)}
-      </text>
-      <text fill="#6d746c" fontSize="12" x="14" y="107">
-        차이
-      </text>
-      <text
-        fill={differenceKrw >= 0 ? "#27735c" : "#c8524b"}
-        fontSize="13"
-        fontWeight="600"
-        textAnchor="end"
-        x="224"
-        y="107"
-      >
-        {formatSignedKrw(differenceKrw)}
-      </text>
-    </g>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        aria-hidden="true"
-        className="h-[3px] w-7 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </span>
+      <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-[11px] text-[#7c857b]">
+        <span>{labScenarioDetail(selected.id)}</span>
+        <span>
+          {chart.period.comparisonDateCount}개 평가일 · 같은 기간·입출금
+        </span>
+      </div>
+    </div>
   );
 }
 
 function Metric({
-  detail,
   label,
   value,
-  valueClass = "text-[#20231f]",
+  baseline,
 }: {
-  detail: string;
   label: string;
   value: string;
-  valueClass?: string;
+  baseline: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[#dce1da] px-5 py-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 lg:px-7">
-      <dt className="text-[11px] text-[#777d75]">{label}</dt>
-      <dd className={`mt-2 truncate text-xl font-medium tabular-nums ${valueClass}`}>
+    <div className="min-w-0 border-b border-[#e0e4dd] px-3 py-5 odd:border-r sm:px-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
+      <dt className="text-[11px] text-[#7b847b]">{label}</dt>
+      <dd className="mt-2 break-words text-lg font-medium tabular-nums sm:text-xl">
         {value}
       </dd>
-      <p className="mt-1 truncate text-xs text-[#777d75]">{detail}</p>
+      <dd className="mt-2 text-[11px] tabular-nums text-[#7b847b]">
+        {baseline}
+      </dd>
     </div>
   );
 }
 
-function HeroMetric({
-  detail,
-  label,
-  value,
-  valueClass = "text-[#20231f]",
+function MiniPath({
+  line,
+  active,
 }: {
-  detail: string;
-  label: string;
-  value: string;
-  valueClass?: string;
+  line: InvestmentLabScenarioChartLine;
+  active: boolean;
 }) {
-  return (
-    <div className="min-w-0 border-b border-r border-[#dde1db] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
-      <dt className="text-[11px] text-[#747a72]">{label}</dt>
-      <dd className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}>
-        {value}
-      </dd>
-      <dd className="mt-2 truncate text-[11px] text-[#858a83]">{detail}</dd>
-    </div>
+  const values = line.points.map((point) => point.valueKrw);
+  const min = Math.min(...values);
+  const range = Math.max(...values) - min || 1;
+  const path = buildMonotoneCurvePath(
+    values.map((value, index) => ({
+      x: 2 + (index / Math.max(values.length - 1, 1)) * 54,
+      y: 28 - ((value - min) / range) * 24,
+    })),
   );
-}
-
-function defaultScenarioId(chart: InvestmentLabScenarioChart) {
-  for (const id of DEFAULT_SCENARIO_ORDER) {
-    if (chart.lines.some((line) => line.id === id)) return id;
-  }
-  return chart.lines.find((line) => line.id !== "actual")?.id ?? "actual";
-}
-
-function compactKrw(value: number) {
-  const absolute = Math.abs(value);
-  if (absolute >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}억`;
-  if (absolute >= 10_000) return `${Math.round(value / 10_000)}만`;
-  return Math.round(value).toLocaleString("ko-KR");
-}
-
-function formatKrw(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  return `₩${Math.round(value).toLocaleString("ko-KR")}`;
-}
-
-function formatSignedKrw(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  if (Math.abs(value) < 0.5) return "₩0";
-  return `${value > 0 ? "+" : "-"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
-}
-
-function formatPercent(value: number | null, negative = false) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  const formatted = `${(Math.abs(value) * 100).toFixed(2)}%`;
-  return negative && value > 0 ? `-${formatted}` : formatted;
-}
-
-function formatSignedPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "-";
-  if (Math.abs(value) < 0.00005) return "0.00%";
-  return `${value > 0 ? "+" : "-"}${(Math.abs(value) * 100).toFixed(2)}%`;
-}
-
-function formatDate(value: string) {
-  return value.replaceAll("-", ".");
-}
-
-function shortDate(value: string) {
-  return value.slice(5).replace("-", ".");
-}
-
-function moneyTone(value: number | null) {
-  if (value === null || Math.abs(value) < 0.5) return "text-[#4f5650]";
-  return value > 0 ? "text-[#27735c]" : "text-[#c8524b]";
-}
-
-function differenceLabel(value: number) {
-  if (Math.abs(value) < 0.5) return "실제 포트폴리오와 같은 위치";
-  return value > 0
-    ? "실제 포트폴리오보다 높은 위치"
-    : "실제 포트폴리오보다 낮은 위치";
-}
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum);
+  return (
+    <svg aria-hidden="true" className="h-8 w-[58px]" viewBox="0 0 58 32">
+      <path
+        d={path}
+        fill="none"
+        stroke={active ? "#438f79" : "#aab8ad"}
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
 }

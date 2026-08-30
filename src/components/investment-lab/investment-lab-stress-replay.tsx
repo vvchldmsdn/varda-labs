@@ -20,7 +20,7 @@ export function InvestmentLabStressReplayView({
   return (
     <section
       aria-labelledby="investment-lab-stress-replay-title"
-      className="mx-auto w-full max-w-[1540px] space-y-10 border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10"
+      className="min-w-0 space-y-8 py-6"
       data-account-scope={model.account}
       data-section="investment-lab-stress-replay"
       data-window-count={model.windows.length}
@@ -30,7 +30,7 @@ export function InvestmentLabStressReplayView({
           STRESS REPLAY
         </p>
         <h2
-          className="mt-3 text-2xl font-semibold sm:text-3xl"
+          className="mt-3 text-lg font-medium sm:text-xl"
           id="investment-lab-stress-replay-title"
         >
           지금 구성으로 과거를 다시 지나갔다면
@@ -38,7 +38,8 @@ export function InvestmentLabStressReplayView({
         <p className="mt-3 max-w-4xl text-sm leading-7 text-[#626b5f]">
           현재 보유 비중을 각 과거 구간의 첫날에 적용한 뒤 리밸런싱 없이
           보유했다고 가정합니다. 당시 상장 전이거나 가격 근거가 부족한 종목은
-          임의로 채우지 않고 제외하며, 포함된 현재 평가액 비율을 함께 표시합니다.
+          임의로 채우지 않고 제외하며, 포함된 현재 평가액 비율을 함께
+          표시합니다.
         </p>
         <p className="mt-2 text-xs text-[#777e73]">
           세금·수수료·배당 재투자는 반영하지 않은 연구용 비교이며 투자 추천이
@@ -57,7 +58,7 @@ export function InvestmentLabStressReplayView({
 
 export function InvestmentLabStressReplaySkeleton() {
   return (
-    <section className="mx-auto w-full max-w-[1540px] space-y-4 border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10">
+    <section className="min-w-0 space-y-4 py-6">
       <div className="h-32 animate-pulse border-y border-[#dde1db] bg-[#f2f4ef]" />
       <div className="h-72 animate-pulse border-y border-[#dde1db] bg-[#f2f4ef]" />
     </section>
@@ -67,7 +68,7 @@ export function InvestmentLabStressReplaySkeleton() {
 export function InvestmentLabStressReplayUnavailable() {
   return (
     <section
-      className="mx-auto w-full max-w-[1540px] border-t border-[#dde1db] px-5 py-16 sm:px-8 lg:px-10"
+      className="min-w-0 py-6"
       data-section="investment-lab-stress-replay"
       data-stress-replay-status="unavailable"
     >
@@ -79,7 +80,11 @@ export function InvestmentLabStressReplayUnavailable() {
   );
 }
 
-function StressWindowCard({ window }: { window: InvestmentLabStressReplayWindow }) {
+function StressWindowCard({
+  window,
+}: {
+  window: InvestmentLabStressReplayWindow;
+}) {
   const readyStrategies = window.strategies.filter(
     (strategy) => strategy.status === "ready",
   );
@@ -243,7 +248,11 @@ function StressReplayChart({
   );
 }
 
-function StrategyRow({ strategy }: { strategy: InvestmentLabStressReplayStrategy }) {
+function StrategyRow({
+  strategy,
+}: {
+  strategy: InvestmentLabStressReplayStrategy;
+}) {
   return (
     <tr className="border-t border-[#e1e6dc]">
       <td className="px-4 py-3 font-medium">
@@ -269,7 +278,15 @@ function StrategyRow({ strategy }: { strategy: InvestmentLabStressReplayStrategy
   );
 }
 
-function Metric({ detail, label, value }: { detail: string; label: string; value: string }) {
+function Metric({
+  detail,
+  label,
+  value,
+}: {
+  detail: string;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="border-t border-[#e1e6dc] p-4 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
       <p className="text-xs font-semibold text-[#687064]">{label}</p>
@@ -279,9 +296,17 @@ function Metric({ detail, label, value }: { detail: string; label: string; value
   );
 }
 
-function StatusBadge({ status }: { status: InvestmentLabStressReplayWindow["status"] }) {
+function StatusBadge({
+  status,
+}: {
+  status: InvestmentLabStressReplayWindow["status"];
+}) {
   const label =
-    status === "ready" ? "전체 근거" : status === "partial" ? "부분 근거" : "근거 부족";
+    status === "ready"
+      ? "전체 근거"
+      : status === "partial"
+        ? "부분 근거"
+        : "근거 부족";
   const className =
     status === "ready"
       ? "border-[#cce2d5] bg-[#edf7f0] text-[#1d6546]"
@@ -289,7 +314,9 @@ function StatusBadge({ status }: { status: InvestmentLabStressReplayWindow["stat
         ? "border-[#eadfbe] bg-[#fff9e8] text-[#725f2d]"
         : "border-[#ead0d0] bg-[#fff1f1] text-[#8a3636]";
   return (
-    <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${className}`}>
+    <span
+      className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${className}`}
+    >
       {label}
     </span>
   );
@@ -314,7 +341,8 @@ function linePath(
         padding +
         (strategy.path.length > 1 ? index / (strategy.path.length - 1) : 0) *
           drawableWidth;
-      const y = padding + ((max - row.normalizedValue) / (max - min)) * drawableHeight;
+      const y =
+        padding + ((max - row.normalizedValue) / (max - min)) * drawableHeight;
       return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");

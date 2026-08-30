@@ -1,4 +1,7 @@
-import Link from "next/link";
+import {
+  InvestmentLabQueryFields,
+  InvestmentLabQueryLink,
+} from "./investment-lab-query-controls";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import {
@@ -47,7 +50,7 @@ export function InvestmentLabFixedMix({
 
   return (
     <section
-      className="border-t border-[#dde1db] bg-[#f8f9f6] px-5 py-12 sm:px-8 lg:px-10"
+      className="min-w-0 py-6"
       data-fixed-mix-comparison-dates={
         ready ? model.summary.comparisonDateCount : 0
       }
@@ -83,13 +86,13 @@ export function InvestmentLabFixedMix({
             <p className="text-[11px] font-medium text-[#777d75]">
               ALLOCATION SANDBOX
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-normal sm:text-3xl">
+            <h2 className="mt-2 text-lg font-medium sm:text-xl">
               KODEX 200·VOO 고정 배분 실험
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[#687064]">
-              초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두
-              종목에 적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로
-              두며 중간 재리밸런싱은 하지 않습니다.
+              초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두 종목에
+              적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로 두며 중간
+              재리밸런싱은 하지 않습니다.
             </p>
           </div>
           <MixForm
@@ -117,14 +120,18 @@ export function InvestmentLabFixedMix({
           <UnavailableMessage>
             KODEX 200 배분은 1~99 사이의 정수 퍼센트로 입력해야 합니다.
           </UnavailableMessage>
-        ) : periodReady && !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) && model?.status !== "ready" ? (
+        ) : periodReady &&
+          !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) &&
+          model?.status !== "ready" ? (
           <UnavailableMessage>
             {model?.blockers
               .map(investmentLabFixedMixBlockerLabel)
               .join(" · ") ??
               "기존 KODEX 200·VOO 경로 증거를 준비할 수 없습니다."}
           </UnavailableMessage>
-        ) : periodReady && !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) && model?.status === "ready" ? (
+        ) : periodReady &&
+          !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) &&
+          model?.status === "ready" ? (
           <div className="space-y-3">
             <h3 className="text-lg font-semibold">직접 입력한 비중 상세</h3>
             <FixedMixResult model={model} />
@@ -132,16 +139,15 @@ export function InvestmentLabFixedMix({
         ) : null}
 
         <p className="text-xs leading-5 text-[#73786c]">
-          두 leg 중 하나라도 가격·환율·체결·매도 가능성 검증에 실패하면
-          부분 결과를 표시하지 않습니다. 소수점 수량을 사용해 자동 잔여
-          현금을 만들지 않으며, 이 결과는 목표비중·추천·주문 근거가 아닌
-          과거 연구 비교입니다.
+          두 leg 중 하나라도 가격·환율·체결·매도 가능성 검증에 실패하면 부분
+          결과를 표시하지 않습니다. 소수점 수량을 사용해 자동 잔여 현금을 만들지
+          않으며, 이 결과는 목표비중·추천·주문 근거가 아닌 과거 연구 비교입니다.
         </p>
         <p className="text-xs leading-5 text-[#73786c]">
-          KODEX 200과 VOO는 화면에 표시된 저장 가격 근거를 사용하며,
-          KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. 서로 다른 가격 기준을 결합한
-          현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을
-          의미하지 않습니다.
+          KODEX 200과 VOO는 화면에 표시된 저장 가격 근거를 사용하며, KIS 원종가
+          구간은 배당·기업행사를 조정하지 않습니다. 서로 다른 가격 기준을 결합한
+          현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을 의미하지
+          않습니다.
         </p>
       </div>
     </section>
@@ -166,6 +172,7 @@ function MixForm({
       method="get"
     >
       <input name="scope" type="hidden" value={scopeKey} />
+      <InvestmentLabQueryFields />
       <PeriodHiddenInputs period={period} />
       <label className="grid gap-1 text-xs font-semibold text-[#586358]">
         KODEX 200 배분
@@ -204,21 +211,28 @@ function PresetLinks({
   scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
-    <nav aria-label="고정 배분 예시" className="flex flex-wrap gap-5 border-y border-[#dde1db] py-3">
+    <nav
+      aria-label="고정 배분 예시"
+      className="flex flex-wrap gap-5 border-y border-[#dde1db] py-3"
+    >
       {[25, 50, 75].map((kodexWeightPct) => (
-        <Link
+        <InvestmentLabQueryLink
           className="border-b border-transparent py-1 text-sm font-semibold text-[#586158] transition-colors hover:border-[#20231f] hover:text-[#20231f]"
           href={mixHref(scopeKey, period, kodexWeightPct)}
           key={kodexWeightPct}
         >
           {kodexWeightPct}:{100 - kodexWeightPct}
-        </Link>
+        </InvestmentLabQueryLink>
       ))}
     </nav>
   );
 }
 
-function FixedMixResult({ model }: { model: Extract<InvestmentLabFixedMixScenario, { status: "ready" }> }) {
+function FixedMixResult({
+  model,
+}: {
+  model: Extract<InvestmentLabFixedMixScenario, { status: "ready" }>;
+}) {
   const summary = model.summary;
   const estimate = model.returnEstimate;
   const kodexWeightPct = model.weights.kodexWeightBps / 100;
@@ -244,9 +258,7 @@ function FixedMixResult({ model }: { model: Extract<InvestmentLabFixedMixScenari
         <SummaryCell
           label="실제 대비 수익률 차이"
           tone={
-            estimate.differencePercentagePoints >= 0
-              ? "positive"
-              : "negative"
+            estimate.differencePercentagePoints >= 0 ? "positive" : "negative"
           }
           value={formatSignedPercentagePoints(
             estimate.differencePercentagePoints,
@@ -265,8 +277,8 @@ function FixedMixResult({ model }: { model: Extract<InvestmentLabFixedMixScenari
       </div>
 
       <p className="text-sm text-[#687064]">
-        관측일 {summary.comparisonDateCount}개 · 원본 현금흐름 {" "}
-        {model.coverage.componentFlowSourceCount}건 · 분할 체결 {" "}
+        관측일 {summary.comparisonDateCount}개 · 원본 현금흐름{" "}
+        {model.coverage.componentFlowSourceCount}건 · 분할 체결{" "}
         {model.coverage.scenarioFlowLegCount}건 · 두 시장 체결일이 달랐던
         현금흐름 {model.coverage.splitExecutionDateRows}건
       </p>
@@ -309,7 +321,11 @@ function UnavailableMessage({ children }: { children: string }) {
   );
 }
 
-function PeriodHiddenInputs({ period }: { period: InvestmentLabPeriodSelection }) {
+function PeriodHiddenInputs({
+  period,
+}: {
+  period: InvestmentLabPeriodSelection;
+}) {
   if (
     period.status !== "selected" ||
     !period.selectedStartServiceDate ||
@@ -319,7 +335,11 @@ function PeriodHiddenInputs({ period }: { period: InvestmentLabPeriodSelection }
   }
   return (
     <>
-      <input name="start" type="hidden" value={period.selectedStartServiceDate} />
+      <input
+        name="start"
+        type="hidden"
+        value={period.selectedStartServiceDate}
+      />
       <input name="end" type="hidden" value={period.selectedEndServiceDate} />
     </>
   );
@@ -341,11 +361,7 @@ function mixHref(
     query.start = period.selectedStartServiceDate;
     query.end = period.selectedEndServiceDate;
   }
-  return buildPortfolioAnalysisScopeHref(
-    "/investment-lab",
-    scopeKey,
-    query,
-  );
+  return buildPortfolioAnalysisScopeHref("/investment-lab", scopeKey, query);
 }
 
 function formatSignedPercentagePoints(value: number) {

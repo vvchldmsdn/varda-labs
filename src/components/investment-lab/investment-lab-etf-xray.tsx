@@ -22,7 +22,7 @@ export function InvestmentLabEtfXray({
   return (
     <section
       aria-labelledby="investment-lab-etf-xray-title"
-      className="mx-auto w-full max-w-[1540px] space-y-10 px-5 py-16 sm:px-8 lg:px-10"
+      className="min-w-0 space-y-8 py-6"
       data-ambiguous-valued-etf-references={
         summary.ambiguousReferenceValuedEtfCount
       }
@@ -34,13 +34,13 @@ export function InvestmentLabEtfXray({
       data-missing-valued-etf-references={
         summary.missingReferenceValuedEtfCount
       }
-      data-observed-valued-subset-exposure={
-        summary.observedValuedSubsetExposurePct.toFixed(6)
-      }
+      data-observed-valued-subset-exposure={summary.observedValuedSubsetExposurePct.toFixed(
+        6,
+      )}
       data-section="investment-lab-etf-xray"
-      data-uncovered-valued-subset-exposure={
-        summary.uncoveredValuedSubsetExposurePct.toFixed(6)
-      }
+      data-uncovered-valued-subset-exposure={summary.uncoveredValuedSubsetExposurePct.toFixed(
+        6,
+      )}
       data-valued-etf-weight={summary.valuedSubsetEtfWeightPct.toFixed(6)}
       data-valued-etfs={summary.valuedEtfCount}
       data-valued-holdings={summary.valuedHoldingCount}
@@ -53,10 +53,12 @@ export function InvestmentLabEtfXray({
       <header className="border-b border-[#dde1db] pb-8">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[10px] font-medium uppercase text-[#777d75]">LOOK-THROUGH</p>
+            <p className="text-[10px] font-medium uppercase text-[#777d75]">
+              LOOK-THROUGH
+            </p>
             <h2
               id="investment-lab-etf-xray-title"
-              className="mt-3 text-2xl font-semibold sm:text-3xl"
+              className="mt-3 text-lg font-medium sm:text-xl"
             >
               포트폴리오 ETF X-ray
             </h2>
@@ -106,11 +108,13 @@ export function InvestmentLabEtfXray({
 
       {summary.basePortfolioCoverageStatus === "partial" ? (
         <p className="border-y border-[#d8c7a1] py-4 text-sm leading-6 text-[#725f2d]">
-          가격·환율 근거가 없어 평가에서 제외된 자산이 {summary.excludedHoldingCount}
-          개이며, 그중 ETF 후보는 {summary.excludedEtfHoldingCount}개입니다. 따라서
-          아래 비중은 전체 포트폴리오가 아니라 평가 가능한 하위집합 기준입니다.
-          제외 사유: 가격 {summary.exclusionReasonCounts.missing_price} · 환율 {" "}
-          {summary.exclusionReasonCounts.missing_fx} · 미지원 통화 {" "}
+          가격·환율 근거가 없어 평가에서 제외된 자산이{" "}
+          {summary.excludedHoldingCount}
+          개이며, 그중 ETF 후보는 {summary.excludedEtfHoldingCount}개입니다.
+          따라서 아래 비중은 전체 포트폴리오가 아니라 평가 가능한 하위집합
+          기준입니다. 제외 사유: 가격{" "}
+          {summary.exclusionReasonCounts.missing_price} · 환율{" "}
+          {summary.exclusionReasonCounts.missing_fx} · 미지원 통화{" "}
           {summary.exclusionReasonCounts.unsupported_currency}.
         </p>
       ) : null}
@@ -183,14 +187,16 @@ export function InvestmentLabEtfXray({
         <div className="border-b border-[#e1e6dc] py-4">
           <h3 className="text-lg font-semibold">숨은 중복 노출</h3>
           <p className="mt-1 text-sm text-[#687064]">
-            두 개 이상의 보유 ETF가 공유하거나, 같은 종목을 포트폴리오에서
-            직접 보유한 경우입니다.
+            두 개 이상의 보유 ETF가 공유하거나, 같은 종목을 포트폴리오에서 직접
+            보유한 경우입니다.
           </p>
         </div>
         {overlapRows.length > 0 ? (
           <ComponentTable rows={overlapRows} />
         ) : (
-          <EmptyState>현재 exact identity 기준의 중복 노출이 없습니다.</EmptyState>
+          <EmptyState>
+            현재 exact identity 기준의 중복 노출이 없습니다.
+          </EmptyState>
         )}
       </section>
     </section>
@@ -199,7 +205,7 @@ export function InvestmentLabEtfXray({
 
 export function InvestmentLabEtfXraySkeleton() {
   return (
-    <section className="mx-auto w-full max-w-[1540px] space-y-3 px-5 py-16 sm:px-8 lg:px-10">
+    <section className="min-w-0 space-y-3 py-6">
       <div className="h-32 border-y border-[#dde1db] bg-[#f2f4ef]" />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((index) => (
@@ -217,7 +223,7 @@ export function InvestmentLabEtfXrayUnavailable() {
   return (
     <section
       aria-labelledby="investment-lab-etf-xray-unavailable-title"
-      className="mx-auto w-full max-w-[1540px] px-5 py-16 sm:px-8 lg:px-10"
+      className="min-w-0 py-6"
       data-section="investment-lab-etf-xray"
       data-xray-status="unavailable"
     >
@@ -240,9 +246,11 @@ function EtfCoverageRow({ row }: { row: InvestmentLabEtfXrayEtfRow }) {
   return (
     <tr className="border-t border-[#e1e6dc]">
       <td className="px-4 py-3">
-        <p className="font-semibold">{row.ticker ?? "ticker 없음"}</p>
-        <p className="mt-0.5 max-w-[240px] truncate text-xs text-[#687064]">
-          {row.name}
+        <p className="max-w-[240px] truncate font-medium" title={row.name}>
+          {row.name || row.ticker || "이름 없음"}
+        </p>
+        <p className="mt-0.5 text-xs text-[#687064]">
+          {row.ticker ?? "티커 없음"}
         </p>
       </td>
       <td className="px-3 py-3">{row.accounts.join(", ")}</td>
@@ -267,7 +275,8 @@ function EtfCoverageRow({ row }: { row: InvestmentLabEtfXrayEtfRow }) {
         <p className="font-medium">{coverageStatusLabel(row)}</p>
         {row.unmappedComponentCount > 0 || row.missingWeightCount > 0 ? (
           <p className="mt-1 text-xs text-[#8a6a2f]">
-            identity {row.unmappedComponentCount} · weight {row.missingWeightCount}
+            identity {row.unmappedComponentCount} · weight{" "}
+            {row.missingWeightCount}
           </p>
         ) : null}
       </td>
@@ -300,9 +309,11 @@ function ComponentTable({
               className="border-t border-[#e1e6dc]"
             >
               <td className="px-4 py-3">
-                <p className="font-semibold">{row.symbol}</p>
-                <p className="mt-0.5 max-w-[260px] truncate text-xs text-[#687064]">
-                  {row.name}
+                <p className="max-w-[260px] truncate font-medium" title={row.name}>
+                  {row.name || row.symbol}
+                </p>
+                <p className="mt-0.5 text-xs text-[#687064]">
+                  {row.symbol}
                 </p>
               </td>
               <td className="px-3 py-3 text-[#5f685d]">

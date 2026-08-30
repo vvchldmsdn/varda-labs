@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import {
   HoldingAnalysisDataPanel,
@@ -32,6 +32,7 @@ import {
   InvestmentLabSmallAdjustmentUnavailable,
 } from "@/components/investment-lab/investment-lab-small-adjustment";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
+import { InvestmentLabDisclosure } from "@/components/investment-lab/investment-lab-disclosure";
 import { getReadOnlyTenantInvestmentLabDataAvailabilityForScope } from "@/db/queries/investment-lab-data-availability";
 import { getReadOnlyTenantHoldingAnalysisDataReadinessForScope } from "@/db/queries/holding-analysis-data-readiness";
 import { getReadOnlyTenantInvestmentLabCounterfactualForScope } from "@/db/queries/investment-lab";
@@ -62,16 +63,21 @@ type InvestmentLabPageProps = {
     end?: string | string[];
     kodexWeight?: string | string[];
     basketAnchor?: string | string[];
+    view?: string | string[];
+    preview?: string | string[];
   }>;
 };
 
 export default async function InvestmentLabPage({
   searchParams,
 }: InvestmentLabPageProps) {
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const params = await searchParams;
+  if (process.env.NODE_ENV === "development" && params.preview === "design") {
+    const { InvestmentLabDesignPreview } =
+      await import("@/components/investment-lab/investment-lab-design-preview");
+    return <InvestmentLabDesignPreview query={params} />;
+  }
+  const resolution = await resolveCurrentTenantContext();
 
   if (!resolution.ok) {
     return (
@@ -106,6 +112,7 @@ export default async function InvestmentLabPage({
     end: params.end,
     kodexWeight: params.kodexWeight,
     basketAnchor: params.basketAnchor,
+    view: params.view,
   });
   const fixedMixSelection = resolveInvestmentLabFixedMixSelection(
     params.kodexWeight,
@@ -118,11 +125,13 @@ export default async function InvestmentLabPage({
       scope: selectedScope,
       tenantContext,
     });
-  const portfolioStructurePromise = getReadOnlyTenantPortfolioStructureForScope({
-    scope: selectedScope,
-    serviceDate,
-    tenantContext,
-  });
+  const portfolioStructurePromise = getReadOnlyTenantPortfolioStructureForScope(
+    {
+      scope: selectedScope,
+      serviceDate,
+      tenantContext,
+    },
+  );
   const dataAvailabilityPromise =
     getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
       evidencePromise: scopeEvidencePromise,
@@ -135,10 +144,9 @@ export default async function InvestmentLabPage({
       serviceDate,
       tenantContext,
     });
-  const etfXrayPromise =
-    getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
-      portfolioStructurePromise,
-    );
+  const etfXrayPromise = getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
+    portfolioStructurePromise,
+  );
   const modelPromise = getReadOnlyTenantInvestmentLabCounterfactualForScope({
     evidencePromise: scopeEvidencePromise,
     fixedMixSelection,
@@ -172,34 +180,47 @@ export default async function InvestmentLabPage({
           scopeCatalog={scopeContext.catalog.scopes}
           scopeQuery={scopeQuery}
           selectedScope={selectedScope}
+          readiness={
+            <Suspense fallback={<HoldingAnalysisDataPanelSkeleton />}>
+              <HoldingAnalysisDataPanel
+                resultPromise={analysisDataReadinessPromise}
+              />
+            </Suspense>
+          }
+          composition={
+            <div className="space-y-8 py-7">
+              <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
+                <div id="investment-lab-etf-xray">
+                  <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
+                </div>
+              </Suspense>
+              <InvestmentLabDisclosure
+                title="과거 충격 구간"
+                detail="최대 낙폭 · 회복 · 전체 기간"
+              >
+                <div id="investment-lab-stress">
+                  <Suspense fallback={<InvestmentLabStressReplaySkeleton />}>
+                    <InvestmentLabStressReplayContent
+                      modelPromise={stressReplayPromise}
+                    />
+                  </Suspense>
+                </div>
+              </InvestmentLabDisclosure>
+            </div>
+          }
+          smallAdjustment={
+            <div id="investment-lab-small-adjustment">
+              <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
+                <InvestmentLabSmallAdjustmentContent
+                  modelPromise={portfolioStructurePromise}
+                  scopeCatalog={scopeContext.catalog.scopes}
+                  selectedScope={selectedScope}
+                />
+              </Suspense>
+            </div>
+          }
         />
       </Suspense>
-      <div className="mx-auto w-full max-w-[1540px] px-5 pb-4 sm:px-8 lg:px-10">
-        <Suspense fallback={<HoldingAnalysisDataPanelSkeleton />}>
-          <HoldingAnalysisDataPanel
-            resultPromise={analysisDataReadinessPromise}
-          />
-        </Suspense>
-      </div>
-      <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
-        <div className="scroll-mt-4" id="investment-lab-etf-xray">
-          <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
-        </div>
-      </Suspense>
-      <div className="scroll-mt-4" id="investment-lab-stress">
-        <Suspense fallback={<InvestmentLabStressReplaySkeleton />}>
-          <InvestmentLabStressReplayContent modelPromise={stressReplayPromise} />
-        </Suspense>
-      </div>
-      <div className="scroll-mt-4" id="investment-lab-small-adjustment">
-        <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
-          <InvestmentLabSmallAdjustmentContent
-            modelPromise={portfolioStructurePromise}
-            scopeCatalog={scopeContext.catalog.scopes}
-            selectedScope={selectedScope}
-          />
-        </Suspense>
-      </div>
     </div>
   );
 }
@@ -219,6 +240,9 @@ async function InvestmentLabStressReplayContent({
 }
 
 async function InvestmentLabContent({
+  composition,
+  readiness,
+  smallAdjustment,
   dataAvailabilityPromise,
   fixedMixSelection,
   generatedAt,
@@ -227,6 +251,9 @@ async function InvestmentLabContent({
   scopeQuery,
   selectedScope,
 }: {
+  composition: ReactNode;
+  readiness: ReactNode;
+  smallAdjustment: ReactNode;
   scopeCatalog: readonly PortfolioAnalysisScope[];
   scopeQuery: PortfolioAnalysisScopeQuery;
   dataAvailabilityPromise: ReturnType<
@@ -255,56 +282,74 @@ async function InvestmentLabContent({
     rollingComparison,
   } = await modelPromise;
   return (
-    <>
-      <InvestmentLabView
-        accountComposition={accountComposition}
-        anchorBasketScenario={anchorBasketScenario}
-        anchorValueWeightScenario={anchorValueWeightScenario}
-        anchorCurrentWeightMonthlyScenario={
-          anchorCurrentWeightMonthlyScenario
-        }
-        anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
-        approvedTargetWeightScenario={approvedTargetWeightScenario}
-        dataAvailability={
-          <Suspense fallback={<InvestmentLabDataAvailabilitySkeleton />}>
-            <InvestmentLabDataAvailabilityContent
-              fountScopeStatus={fountScopeAdjustment.status}
-              modelPromise={dataAvailabilityPromise}
+    <InvestmentLabView
+      accountComposition={accountComposition}
+      anchorBasketScenario={anchorBasketScenario}
+      anchorValueWeightScenario={anchorValueWeightScenario}
+      anchorCurrentWeightMonthlyScenario={anchorCurrentWeightMonthlyScenario}
+      anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
+      approvedTargetWeightScenario={approvedTargetWeightScenario}
+      dataAvailability={
+        <Suspense fallback={<InvestmentLabDataAvailabilitySkeleton />}>
+          <InvestmentLabDataAvailabilityContent
+            fountScopeStatus={fountScopeAdjustment.status}
+            modelPromise={dataAvailabilityPromise}
+          />
+        </Suspense>
+      }
+      fountScopeAdjustment={fountScopeAdjustment}
+      fundingPreflight={fundingPreflight}
+      generatedAt={generatedAt}
+      model={model}
+      observedHistory={observedHistory}
+      composition={composition}
+      readiness={readiness}
+      experiments={
+        <div className="space-y-8 py-7">
+          <div id="investment-lab-optimizer">
+            <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
+          </div>
+          <InvestmentLabDisclosure
+            title="국내·미국 지수 비중 조정"
+            detail="KODEX 200 · Vanguard S&P 500 ETF"
+            open
+          >
+            <InvestmentLabFixedMix
+              comparison={model.fixedMixComparison}
+              model={model.fixedMixScenario}
+              period={period}
+              scopeKey={selectedScope.key}
+              selection={fixedMixSelection}
             />
-          </Suspense>
-        }
-        fountScopeAdjustment={fountScopeAdjustment}
-        fundingPreflight={fundingPreflight}
-        generatedAt={generatedAt}
-        model={model}
-        observedHistory={observedHistory}
-        optimizerStatus={preperiodOptimizer.status}
-        period={period}
-        scopeCatalog={scopeCatalog}
-        scopeQuery={scopeQuery}
-        selectedScope={selectedScope}
-      />
-      <InvestmentLabFixedMix
-        comparison={model.fixedMixComparison}
-        model={model.fixedMixScenario}
-        period={period}
-        scopeKey={selectedScope.key}
-        selection={fixedMixSelection}
-      />
-      <InvestmentLabPreperiodMinVolatilityView
-        model={model.preperiodMinVolatility}
-      />
-      <div className="scroll-mt-4" id="investment-lab-optimizer">
-        <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
-      </div>
-      <InvestmentLabAnchorBasket
-        fixedMixSelection={fixedMixSelection}
-        model={anchorBasketScenario}
-        period={period}
-        scopeKey={selectedScope.key}
-      />
-      <InvestmentLabRollingComparisonView model={rollingComparison} />
-    </>
+            <InvestmentLabPreperiodMinVolatilityView
+              model={model.preperiodMinVolatility}
+            />
+          </InvestmentLabDisclosure>
+          <InvestmentLabDisclosure
+            title="시작일 바스켓과 반복 비교"
+            detail="동일 비중 · 시간별 검증"
+          >
+            <InvestmentLabAnchorBasket
+              fixedMixSelection={fixedMixSelection}
+              model={anchorBasketScenario}
+              period={period}
+              scopeKey={selectedScope.key}
+            />
+            <InvestmentLabRollingComparisonView model={rollingComparison} />
+          </InvestmentLabDisclosure>
+          <InvestmentLabDisclosure
+            title="작은 조정 실험"
+            detail="보유 비중 변경 전후 구조"
+          >
+            {smallAdjustment}
+          </InvestmentLabDisclosure>
+        </div>
+      }
+      period={period}
+      scopeCatalog={scopeCatalog}
+      scopeQuery={scopeQuery}
+      selectedScope={selectedScope}
+    />
   );
 }
 
@@ -325,10 +370,7 @@ async function InvestmentLabDataAvailabilityContent({
   }
   return (
     <InvestmentLabDataAvailabilityView
-      model={applyInvestmentLabFountAvailabilityScope(
-        model,
-        fountScopeStatus,
-      )}
+      model={applyInvestmentLabFountAvailabilityScope(model, fountScopeStatus)}
     />
   );
 }
@@ -359,9 +401,7 @@ async function InvestmentLabSmallAdjustmentContent({
   scopeCatalog,
   selectedScope,
 }: {
-  modelPromise: ReturnType<
-    typeof getReadOnlyTenantPortfolioStructureForScope
-  >;
+  modelPromise: ReturnType<typeof getReadOnlyTenantPortfolioStructureForScope>;
   scopeCatalog: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
 }) {

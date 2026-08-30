@@ -603,10 +603,32 @@ describe("current tenant read scope runtime boundary", () => {
   it("keeps Investment Lab behind one resolved server tenant", () => {
     const source = read("src/app/investment-lab/page.tsx");
 
-    assert.match(source, /resolveCurrentTenantContext\(\)/);
-    assert.match(source, /Promise\.all/);
+    assert.equal(
+      source.match(/await resolveCurrentTenantContext\(\)/g)?.length,
+      1,
+    );
     assert.match(source, /if \(!resolution\.ok\)/);
     assert.match(source, /PortfolioReadAccessBoundary/);
+    for (const [promise, reader] of [
+      [
+        "scopeEvidencePromise",
+        "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence",
+      ],
+      [
+        "portfolioStructurePromise",
+        "getReadOnlyTenantPortfolioStructureForScope",
+      ],
+      [
+        "analysisDataReadinessPromise",
+        "getReadOnlyTenantHoldingAnalysisDataReadinessForScope",
+      ],
+    ]) {
+      assert.match(source, new RegExp(`const ${promise} =\\s*${reader}\\(`));
+      assert.ok(
+        source.indexOf("if (!resolution.ok)") <
+          source.indexOf(`const ${promise}`),
+      );
+    }
     for (const reader of [
       "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence",
       "getReadOnlyTenantInvestmentLabCounterfactualForScope",
