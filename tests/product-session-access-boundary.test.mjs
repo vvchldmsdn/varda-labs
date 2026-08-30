@@ -164,15 +164,15 @@ describe("product session access boundary", () => {
   it("routes each unresolved session to the correct recovery action", () => {
     assert.deepEqual(
       sessionResolutionNextAction(failure("unauthenticated", 401)),
-      { href: "/auth/sign-in", label: "Sign in" },
+      { href: "/auth/sign-in", label: "로그인" },
     );
     assert.deepEqual(
       sessionResolutionNextAction(failure("identity_unlinked", 403)),
-      { href: "/portfolio/onboarding", label: "Start portfolio" },
+      { href: "/portfolio/onboarding", label: "포트폴리오 시작" },
     );
     assert.deepEqual(
       sessionResolutionNextAction(failure("auth_provider_unavailable", 503)),
-      { href: "/auth/session", label: "Session evidence" },
+      { href: "/auth/session?view=account", label: "계정 연결 확인" },
     );
 
     const boundary = read("src/components/portfolio-read-access-boundary.tsx");

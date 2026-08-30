@@ -20,23 +20,19 @@ const authorization = `Basic ${Buffer.from(
 ).toString("base64")}`;
 
 const rootWithoutAuth = await request("/");
-assert.equal(rootWithoutAuth.status, 200);
-assert.match(rootWithoutAuth.body, /Portfolio user link/);
-assert.match(rootWithoutAuth.body, /Product database read/);
-assert.match(rootWithoutAuth.body, /Not attempted/);
+assert.equal(rootWithoutAuth.status, 307);
+assert.equal(new URL(rootWithoutAuth.location, BASE_URL).pathname, "/auth/sign-in");
 assert.doesNotMatch(rootWithoutAuth.body, LEAK_PATTERN);
 
 const signInWithoutAuth = await request("/auth/sign-in");
 assert.equal(signInWithoutAuth.status, 200);
-assert.match(signInWithoutAuth.body, />Sign in</);
-assert.match(signInWithoutAuth.body, /Portfolio access remains/);
+assert.match(signInWithoutAuth.body, /로그인/);
+assert.match(signInWithoutAuth.body, /Google/);
 assert.doesNotMatch(signInWithoutAuth.body, LEAK_PATTERN);
 
 const sessionWithoutAuth = await request("/auth/session");
-assert.equal(sessionWithoutAuth.status, 200);
-assert.match(sessionWithoutAuth.body, /Server session evidence/);
-assert.match(sessionWithoutAuth.body, /Not present/);
-assert.match(sessionWithoutAuth.body, /Not attempted/);
+assert.equal(sessionWithoutAuth.status, 307);
+assert.equal(new URL(sessionWithoutAuth.location, BASE_URL).pathname, "/auth/sign-in");
 assert.doesNotMatch(sessionWithoutAuth.body, LEAK_PATTERN);
 
 const authApiWithoutAuth = await request("/api/auth/get-session");

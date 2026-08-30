@@ -65,9 +65,10 @@ export function PortfolioPrimaryNavigation({
           </span>
           <PortfolioRefreshButton compact />
           <Link
-            aria-label="세션 정보"
+            aria-label="내 계정"
+            title="내 계정"
             className="varda-icon-button"
-            href="/auth/session"
+            href="/auth/session?view=account"
           >
             <UserRound size={16} strokeWidth={1.5} aria-hidden="true" />
           </Link>

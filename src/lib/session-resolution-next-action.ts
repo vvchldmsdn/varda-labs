@@ -7,19 +7,19 @@ export type SessionResolutionNextAction = Readonly<{
 
 const SIGN_IN_ACTION = Object.freeze({
   href: "/auth/sign-in",
-  label: "Sign in",
+  label: "로그인",
 });
 const START_PORTFOLIO_ACTION = Object.freeze({
   href: "/portfolio/onboarding",
-  label: "Start portfolio",
+  label: "포트폴리오 시작",
 });
 const SESSION_EVIDENCE_ACTION = Object.freeze({
-  href: "/auth/session",
-  label: "Session evidence",
+  href: "/auth/session?view=account",
+  label: "계정 연결 확인",
 });
 const DASHBOARD_ACTION = Object.freeze({
   href: "/",
-  label: "Dashboard",
+  label: "홈",
 });
 
 export function sessionResolutionNextAction(
