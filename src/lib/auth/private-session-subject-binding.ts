@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
+import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
 import {
   decodeSessionSubjectBindingHmacKey,
   readSessionSubjectBinding,
@@ -64,26 +65,24 @@ function createPrivateSessionSubjectPort():
     return Object.freeze({ state: "unavailable" });
   }
 
-  const auth = runtime.auth;
   return Object.freeze({
     state: "ready",
     port: Object.freeze({
       async read() {
         try {
-          const result = await auth.getSession();
-          if (result.error) {
+          const result = await readCurrentSessionSubject();
+          if (result.state === "unavailable" || result.state === "invalid") {
             return Object.freeze({ state: "unavailable" });
           }
 
-          const subject = result.data?.user.id;
-          if (typeof subject !== "string") {
+          if (result.state !== "authenticated" || result.provider !== "neon_auth") {
             return Object.freeze({ state: "missing" });
           }
 
           return Object.freeze({
             state: "verified",
             provider: "neon_auth",
-            subject,
+            subject: result.providerSubject,
             verificationSource: "server_verified_session",
           });
         } catch {

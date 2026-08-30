@@ -16,7 +16,10 @@ const IDENTITY_DML_PATTERN =
   /(?:\.insert|\.update|\.delete)\s*\(|(?:insert\s+into|update\s+|delete\s+from)\s+["']?(?:app_users|auth_identities)\b/i;
 const AUTH_SDK_DEPENDENCY_PATTERN =
   /^(?:@neondatabase\/auth|@auth\/|next-auth|better-auth)/i;
-const ALLOWED_PREVIEW_AUTH_SDK = "@neondatabase/auth";
+const ALLOWED_AUTH_SDKS = Object.freeze({
+  "@neondatabase/auth": "0.4.2-beta",
+  "@auth/core": "0.41.3",
+});
 
 export function auditSessionResolverContract({ root, writerRegistry }) {
   const findings = [];
@@ -74,33 +77,40 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
     join(root, RUNTIME_ADAPTER_PATH),
     "utf8",
   );
+  const sessionSource = readFileSync(
+    join(root, "src/lib/auth/current-session-subject.ts"),
+    "utf8",
+  );
   const runtimeBoundaryIntact =
     runtimeSource.startsWith('import "server-only";') &&
     [
       "cache(",
-      "getAuthTransportRuntime",
-      "auth.getSession()",
+      "readCurrentSessionSubject()",
+      "session.provider, session.providerSubject",
       "authIdentities",
       "appUsers",
       "resolveSessionToAppUser",
       ".limit(2)",
     ].every((marker) => runtimeSource.includes(marker)) &&
-    !IDENTITY_DML_PATTERN.test(runtimeSource) &&
+    sessionSource.startsWith('import "server-only";') &&
+    ["getAuthTransportRuntime", "auth.getSession()", "readNaverSession()", "resolveProviderSessions(neon, naver)", "emailVerified === true"].every((marker) => sessionSource.includes(marker)) &&
+    !IDENTITY_DML_PATTERN.test(runtimeSource + sessionSource) &&
     !/console\.|NextResponse|Response\(|\bfetch\s*\(/.test(runtimeSource);
   if (!runtimeBoundaryIntact) {
     findings.push("runtime_adapter_boundary_drift");
   }
 
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const dependencyNames = Object.keys({
+  const dependencies = {
     ...(packageJson.dependencies ?? {}),
     ...(packageJson.devDependencies ?? {}),
-  });
+  };
+  const dependencyNames = Object.keys(dependencies);
   const authSdkDependencies = dependencyNames.filter((name) =>
     AUTH_SDK_DEPENDENCY_PATTERN.test(name),
   );
   const unexpectedAuthSdkDependencies = authSdkDependencies.filter(
-    (name) => name !== ALLOWED_PREVIEW_AUTH_SDK,
+    (name) => !Object.hasOwn(ALLOWED_AUTH_SDKS, name) || dependencies[name] !== ALLOWED_AUTH_SDKS[name],
   );
   if (unexpectedAuthSdkDependencies.length !== 0) {
     findings.push("unexpected_auth_sdk_installed");
@@ -133,7 +143,7 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
       databaseWrites: 0,
       providerCalls: 1,
       routeCalls: 0,
-      cacheImplementations: 1,
+      cacheImplementations: 2,
     },
   };
 }

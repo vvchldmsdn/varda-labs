@@ -7,14 +7,16 @@ import { AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS } from "../src/lib/auth/auth-trans
 const read = (path) => readFileSync(path, "utf8");
 
 describe("auth and onboarding experience", () => {
-  it("keeps signup on the reviewed Google flow without enabling password authentication", () => {
+  it("connects social and email signup through the reviewed authentication boundary", () => {
     const signup = read("src/app/auth/sign-up/page.tsx");
     const controls = read("src/components/auth/auth-transport-controls.tsx");
     assert.match(signup, /mode="sign-up"/);
     assert.match(controls, /authClient\.signIn\.social/);
-    assert.match(controls, /provider: "google"/);
-    assert.doesNotMatch(controls, /signUp\.|signIn\.email|requestSignUp/);
-    assert.equal(AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS.length, 2);
+    assert.match(controls, /\["google", "github", "naver"\]/);
+    const email = read("src/components/auth/email-auth-form.tsx");
+    assert.match(email, /authClient.signUp.email/);
+    assert.match(email, /authClient.signIn.email/);
+    assert.equal(AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS.length, 7);
     assert.match(controls, /aria-busy=\{status === "pending"\}/);
   });
 

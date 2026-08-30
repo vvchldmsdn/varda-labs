@@ -100,6 +100,7 @@
     "import:base44:settings": "node --no-warnings scripts/import-base44-settings.mjs"
   },
   "dependencies": {
+    "@auth/core": "0.41.3",
     "@neondatabase/auth": "0.4.2-beta",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/speed-insights": "^2.0.0",

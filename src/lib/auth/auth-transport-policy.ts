@@ -13,12 +13,17 @@ export const AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS = Object.freeze([
   Object.freeze({
     method: "POST",
     path: Object.freeze(["sign-in", "social"]),
-    socialProvider: "google",
+    socialProviders: Object.freeze(["google", "github"]),
   }),
   Object.freeze({
     method: "POST",
     path: Object.freeze(["sign-out"]),
   }),
+  Object.freeze({ method: "POST", path: Object.freeze(["sign-in", "email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["sign-up", "email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["send-verification-email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["request-password-reset"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["reset-password"]) }),
 ] as const);
 
 export type AuthTransportEnvironment = Readonly<{
@@ -84,8 +89,8 @@ export function isAuthTransportApiRequestAllowed(
   if (!endpoint) return false;
 
   return (
-    !("socialProvider" in endpoint) ||
-    endpoint.socialProvider === request.socialProvider
+    !("socialProviders" in endpoint) ||
+    endpoint.socialProviders.some((provider) => provider === request.socialProvider)
   );
 }
 

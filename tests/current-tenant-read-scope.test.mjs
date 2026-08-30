@@ -11,8 +11,8 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /^import "server-only";/);
     for (const marker of [
       "cache(",
-      "getAuthTransportRuntime",
-      "auth.getSession()",
+      "readCurrentSessionSubject",
+      "session.provider, session.providerSubject",
       "authIdentities.provider",
       "authIdentities.providerSubject",
       "authIdentities.appUserId",

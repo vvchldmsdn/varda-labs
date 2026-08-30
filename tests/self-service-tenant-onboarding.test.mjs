@@ -90,7 +90,7 @@ describe("self-service empty tenant onboarding", () => {
   });
 
   it("keeps the Server Action thin and exposes onboarding only when unlinked", () => {
-    assert.match(resolverSource, /getAuthTransportRuntime\(\)/);
+    assert.match(resolverSource, /readCurrentSessionSubject\(\)/);
     assert.match(actionSource, /"use server"/);
     assert.match(actionSource, /createCurrentSessionTenant\(formData\)/);
     assert.match(actionSource, /redirect\("\/portfolio\/onboarding"\)/);

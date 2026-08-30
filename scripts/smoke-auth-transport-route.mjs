@@ -10,7 +10,7 @@ const PASSWORD =
   process.env.APP_ACCESS_PASSWORD?.trim();
 const USERNAME = process.env.VARDA_APP_USER?.trim() || "varda";
 const LEAK_PATTERN =
-  /provider[_-]?subject|ownerUserId|api[_-]?key|authorization|password|secret|access[_-]?token|refresh[_-]?token|id[_-]?token|DATABASE_URL|postgres(?:ql)?:\/\//i;
+  /provider[_-]?subject|ownerUserId|api[_-]?key|authorization|secret|access[_-]?token|refresh[_-]?token|id[_-]?token|DATABASE_URL|postgres(?:ql)?:\/\//i;
 
 if (!BASE_URL) throw new Error("--base-url is required");
 if (!PASSWORD) throw new Error("Dashboard access password is not configured");
@@ -28,6 +28,9 @@ const signInWithoutAuth = await request("/auth/sign-in");
 assert.equal(signInWithoutAuth.status, 200);
 assert.match(signInWithoutAuth.body, /로그인/);
 assert.match(signInWithoutAuth.body, /Google/);
+assert.match(signInWithoutAuth.body, /GitHub/);
+assert.match(signInWithoutAuth.body, /네이버/);
+assert.match(signInWithoutAuth.body, /이메일/);
 assert.doesNotMatch(signInWithoutAuth.body, LEAK_PATTERN);
 
 const sessionWithoutAuth = await request("/auth/session");
@@ -86,6 +89,10 @@ assert.match(
   signOut.setCookieHeaders.join("\n"),
   /__Secure-neon-auth\.session_data=.*(?:Max-Age=0|Expires=Thu, 01 Jan 1970)/i,
 );
+assert.match(
+  signOut.setCookieHeaders.join("\n"),
+  /__Host-varda\.naver\.session-token=.*Max-Age=0/i,
+);
 
 const callback = await request("/auth/callback");
 assert.equal(callback.status, 307);
@@ -128,9 +135,13 @@ async function request(path, authenticated = false, init = {}) {
     redirect: "manual",
     signal: AbortSignal.timeout(30_000),
   });
+  const body = await response.text();
+  for (const value of [PASSWORD, process.env.NEON_AUTH_COOKIE_SECRET, process.env.NAVER_CLIENT_SECRET, process.env.NAVER_AUTH_SECRET]) {
+    if (value) assert.equal(body.includes(value), false, "Configured credentials must not appear in a response");
+  }
   return {
     status: response.status,
-    body: await response.text(),
+    body,
     location: response.headers.get("location"),
     setCookieHeaders:
       typeof response.headers.getSetCookie === "function"
