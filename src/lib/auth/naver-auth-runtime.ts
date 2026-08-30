@@ -3,7 +3,6 @@ import "server-only";
 import { Auth } from "@auth/core";
 import { getToken } from "@auth/core/jwt";
 import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
 import { createNaverAuthConfig } from "./naver-auth-config";
 import {
   assessNaverAuthEnvironment,
@@ -120,34 +119,4 @@ export async function readNaverSession(): Promise<CurrentSessionSubjectResult> {
   } catch {
     return { state: "unavailable" };
   }
-}
-
-export function expireNaverSessionCookies(
-  request: Request,
-  response: Response,
-) {
-  const result = new NextResponse(response.body, response);
-  const names = new Set([
-    NAVER_AUTH_SESSION_COOKIE,
-    "__Host-varda.naver.csrf-token",
-    "__Host-varda.naver.state",
-    "__Host-varda.naver.callback-url",
-  ]);
-  for (const { name } of new NextRequest(request).cookies.getAll()) {
-    if (
-      name.startsWith(`${NAVER_AUTH_SESSION_COOKIE}.`) &&
-      /^\d+$/.test(name.slice(NAVER_AUTH_SESSION_COOKIE.length + 1))
-    )
-      names.add(name);
-  }
-  for (const name of names) {
-    result.cookies.set(name, "", {
-      maxAge: 0,
-      path: "/",
-      secure: true,
-      httpOnly: true,
-      sameSite: "lax",
-    });
-  }
-  return result;
 }

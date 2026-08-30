@@ -26,6 +26,7 @@ import {
 } from "../src/lib/auth/naver-auth-policy.ts";
 import {
   createReviewedNaverAuthRequest,
+  expireNaverSessionCookies,
   finalizeNaverAuthCallback,
 } from "../src/lib/auth/naver-auth-request.ts";
 import {
@@ -72,6 +73,107 @@ function authRequest(route, body, headers = {}, search = "") {
     body: JSON.stringify(body),
   });
 }
+
+describe("sign-out cookie cleanup", () => {
+  const neonCookies = [
+    "__Secure-neon-auth.session_token",
+    "__Secure-neon-auth.session_data",
+    "__Secure-neon-auth.local.session_data",
+  ];
+  const naverCookies = [
+    NAVER_AUTH_SESSION_COOKIE,
+    "__Host-varda.naver.csrf-token",
+    "__Host-varda.naver.state",
+    "__Host-varda.naver.callback-url",
+  ];
+
+  for (const [label, body] of [["missing", undefined], ["zero-length", ""], ["JSON", "{}"]]) {
+    it(`expires cookies after validation with a ${label} body`, async () => {
+      const request = new Request(`${ORIGIN}/api/auth/sign-out`, {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          ...(body === "{}" ? { "content-type": "application/json" } : {}),
+        },
+        body,
+      });
+      const reviewed = await createReviewedAuthRequest(request, ["sign-out"]);
+      assert.equal(reviewed?.kind, "sign-out");
+      assert.equal(request.bodyUsed, body !== undefined);
+
+      const headers = new Headers({ "cache-control": "public, max-age=60" });
+      for (const name of neonCookies) {
+        headers.append(
+          "set-cookie",
+          `${name}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`,
+        );
+      }
+      const response = expireNaverSessionCookies(
+        request,
+        Response.json({ success: true }, { headers }),
+      );
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.deepEqual(await response.json(), { success: true });
+      const deletionHeaders = response.headers.getSetCookie();
+      assert.deepEqual(
+        deletionHeaders.slice(0, neonCookies.length),
+        headers.getSetCookie(),
+        "Neon deletion headers must be preserved byte for byte",
+      );
+      const cookies = new ResponseCookies(response.headers);
+      for (const name of [...neonCookies, ...naverCookies]) {
+        const cookie = cookies.get(name);
+        assert.ok(cookie, `${name} must be expired`);
+        const deletion = deletionHeaders.find((header) =>
+          header.startsWith(`${name}=`),
+        );
+        assert.equal(deletion.split(";", 1)[0], `${name}=`);
+        assert.match(deletion, /;\s*Max-Age=0(?:;|$)/i);
+        assert.equal(cookie.path, "/");
+        assert.equal(cookie.secure, true);
+        assert.equal(cookie.httpOnly, true);
+      }
+    });
+  }
+
+  it("expires every Naver session chunk without touching unrelated cookies", async () => {
+    const chunks = [
+      `${NAVER_AUTH_SESSION_COOKIE}.0`,
+      `${NAVER_AUTH_SESSION_COOKIE}.1`,
+      `${NAVER_AUTH_SESSION_COOKIE}.10`,
+    ];
+    const unrelated = [
+      "theme",
+      `${NAVER_AUTH_SESSION_COOKIE}.backup`,
+      `${NAVER_AUTH_SESSION_COOKIE}-other`,
+    ];
+    const request = authRequest("sign-out", {}, {
+      cookie: [...neonCookies, ...naverCookies, ...chunks, ...unrelated]
+        .map((name) => `${name}=test-only-cookie`)
+        .join("; "),
+    });
+    assert.ok(await createReviewedAuthRequest(request, ["sign-out"]));
+    assert.equal(request.bodyUsed, true);
+    const response = expireNaverSessionCookies(
+      request,
+      Response.json({ success: true }),
+    );
+    const cookies = new ResponseCookies(response.headers);
+    for (const name of [...naverCookies, ...chunks]) {
+      const deletion = response.headers.getSetCookie().find((header) =>
+        header.startsWith(`${name}=`),
+      );
+      assert.ok(deletion, name);
+      assert.match(deletion, /;\s*Max-Age=0(?:;|$)/i);
+      assert.equal(cookies.get(name)?.expires?.getTime(), 0, name);
+    }
+    for (const name of unrelated) {
+      assert.equal(cookies.has(name), false, name);
+    }
+    assert.equal(cookies.getAll().length, naverCookies.length + chunks.length);
+  });
+});
 
 describe("reviewed email and social authentication", () => {
   it("forwards the fixed email routes without trimming passwords or accepting product identity", async () => {
