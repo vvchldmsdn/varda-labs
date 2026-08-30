@@ -5,13 +5,6 @@ export function OwnerWalkForwardValidationSection({
 }: {
   result: SimulationOwnerWalkForwardValidationResult;
 }) {
-  if (
-    result.status === "unavailable" &&
-    result.reason === "current_execution_unavailable"
-  ) {
-    return null;
-  }
-
   return (
     <section
       aria-labelledby="owner-walk-forward-validation-title"

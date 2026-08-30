@@ -1,4 +1,6 @@
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import Form from "next/form";
+import { SimulationContextFields } from "./simulation-query-controls";
 import type { SimulationResearchUniversePreflightModel } from "@/lib/simulation-research-universe-preflight";
 
 export function ResearchUniversePreflightSection({
@@ -40,11 +42,12 @@ export function ResearchUniversePreflightSection({
         </span>
       </div>
 
-      <form
+      <Form
         action="/simulation"
         className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
-        method="get"
+        scroll={false}
       >
+        <SimulationContextFields />
         <input
           name="scope"
           type="hidden"
@@ -86,7 +89,7 @@ export function ResearchUniversePreflightSection({
         >
           데이터 점검
         </button>
-      </form>
+      </Form>
       <p className="mt-2 text-xs leading-5 text-[#687064]">
         Fount는 managed:KRW:FOUNT:0, 금현물은
         krx-gold:KRW:GOLD_9999_1KG:0 형식으로 남길 수 있습니다. 0bps

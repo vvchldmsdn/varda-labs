@@ -9,12 +9,14 @@ export function InvestmentLabDialog({
   children,
   icon = "info",
   size = "regular",
+  compactLabel = false,
 }: {
   title: string;
   label: string;
   children: ReactNode;
   icon?: "info" | "calendar" | "table";
   size?: "regular" | "wide";
+  compactLabel?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -34,6 +36,8 @@ export function InvestmentLabDialog({
   return (
     <>
       <button
+        aria-label={label}
+        title={label}
         className="inline-flex min-h-9 items-center gap-2 rounded px-2 text-xs text-[#66746c] transition-colors hover:bg-[#eaf0eb] hover:text-[#203b31] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#438574]"
         onClick={() => {
           ref.current?.showModal();
@@ -42,7 +46,7 @@ export function InvestmentLabDialog({
         type="button"
       >
         <Icon aria-hidden="true" size={15} strokeWidth={1.6} />
-        {label}
+        <span className={compactLabel ? "hidden sm:inline" : undefined}>{label}</span>
       </button>
       <dialog
         aria-labelledby={id}

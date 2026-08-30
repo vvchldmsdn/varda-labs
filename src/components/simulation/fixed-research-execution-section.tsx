@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SimulationLink as Link } from "./simulation-query-controls";
 
 import type { FixedResearchSimulationResult } from "@/lib/simulation-fixed-research-execution";
 

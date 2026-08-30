@@ -139,6 +139,7 @@ import "./simulation-input-readiness.test.mjs";
 import "./simulation-research-horizon.test.mjs";
 import "./simulation-observed-return-comparison.test.mjs";
 import "./simulation-route.test.mjs";
+import "./simulation-presentation.test.mjs";
 import "./simulation-stationary-bootstrap.test.mjs";
 import "./simulation-gross-growth.test.mjs";
 import "./simulation-scenario-vector-review.test.mjs";

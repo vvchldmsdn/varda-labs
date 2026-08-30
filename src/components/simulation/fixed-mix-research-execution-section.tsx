@@ -1,5 +1,5 @@
 import Form from "next/form";
-import Link from "next/link";
+import { SimulationLink as Link, SimulationContextFields } from "./simulation-query-controls";
 
 import type { KodexVooFixedMixSelection } from "@/lib/kodex-voo-fixed-mix-selection";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
@@ -193,6 +193,7 @@ function MixForm({
 }) {
   return (
     <Form action="/simulation" className="flex flex-wrap items-end gap-2" scroll={false}>
+      <SimulationContextFields />
       <input name="scope" type="hidden" value={scopeKey} />
       {isDateKey(endServiceDate) ? (
         <input name="end" type="hidden" value={endServiceDate} />

@@ -50,6 +50,9 @@ type SimulationPageProps = {
     horizon?: string | string[];
     kodexWeight?: string | string[];
     researchUniverse?: string | string[];
+    view?: string | string[];
+    preview?: string | string[];
+    previewState?: string | string[];
   }>;
 };
 
@@ -64,10 +67,12 @@ type SimulationPreservedQuery = Readonly<{
 export default async function SimulationPage({
   searchParams,
 }: SimulationPageProps) {
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const previewParams = process.env.NODE_ENV === "development" ? await searchParams : null;
+  if (process.env.NODE_ENV === "development" && previewParams?.preview === "design") {
+    const { SimulationDesignPreview } = await import("@/components/simulation/simulation-design-preview");
+    return <SimulationDesignPreview query={previewParams} />;
+  }
+  const [params, resolution] = await Promise.all([searchParams, resolveCurrentTenantContext()]);
 
   if (!resolution.ok) {
     return (
@@ -233,6 +238,7 @@ async function SimulationContent({
   const model = await modelPromise;
   return (
     <SimulationInputReadinessView
+      scopeCatalog={scopeCatalog}
       historicalOutcomeValidation={
         <SimulationSectionErrorBoundary
           section="historical-outcome-validation"
@@ -473,7 +479,7 @@ async function OwnerCandidateComparisonContent({
 }) {
   const result = await resultPromise;
   return (
-    <OwnerCandidateComparisonSection comparison={result.candidateComparison} />
+    <OwnerCandidateComparisonSection comparison={result.candidateComparison} instruments={result.execution.instruments} />
   );
 }
 

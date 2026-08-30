@@ -14,15 +14,11 @@ type ReadyComparison = Extract<
 
 export function OwnerCandidateComparisonSection({
   comparison,
+  instruments = [],
 }: {
   comparison: SimulationOwnerCandidateComparisonResult;
+  instruments?: readonly { instrumentKey: string; name: string }[];
 }) {
-  if (
-    comparison.status === "unavailable" &&
-    comparison.reason === "current_execution_unavailable"
-  ) {
-    return null;
-  }
 
   return (
     <section
@@ -52,7 +48,7 @@ export function OwnerCandidateComparisonSection({
       </div>
 
       {comparison.status === "ready" ? (
-        <ReadyCandidateComparison comparison={comparison} />
+        <ReadyCandidateComparison comparison={comparison} instruments={instruments} />
       ) : (
         <div
           className="mt-4 rounded-md border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
@@ -71,8 +67,10 @@ export function OwnerCandidateComparisonSection({
 
 function ReadyCandidateComparison({
   comparison,
+  instruments,
 }: {
   comparison: ReadyComparison;
+  instruments: readonly { instrumentKey: string; name: string }[];
 }) {
   const current = {
     ...comparison.currentExecution,
@@ -169,7 +167,7 @@ function ReadyCandidateComparison({
                   key={row.instrumentKey}
                 >
                   <td className="px-4 py-3">
-                    <p className="font-semibold">{row.ticker}</p>
+                    <p className="font-semibold">{instruments.find((item) => item.instrumentKey === row.instrumentKey)?.name ?? row.ticker}</p>
                     <p className="mt-1 text-xs text-[#687064]">
                       {row.market} · {row.currency}
                     </p>
