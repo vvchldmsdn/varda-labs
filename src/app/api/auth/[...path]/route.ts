@@ -3,7 +3,7 @@ import { isEmailPasswordEnabled, isGitHubAuthEnabled } from "@/lib/auth/auth-met
 import { createAuthTransportUpstreamRequest } from "@/lib/auth/auth-transport-request";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 import { isAuthTransportApiRequestAllowed } from "@/lib/auth/auth-transport-policy";
-import { expireNaverSessionCookies } from "@/lib/auth/naver-auth-runtime";
+import { expireNaverSessionCookies } from "@/lib/auth/naver-auth-request";
 
 export const dynamic = "force-dynamic";
 

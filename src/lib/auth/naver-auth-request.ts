@@ -1,14 +1,63 @@
+import { NextRequest, NextResponse } from "next/server.js";
 import { z } from "zod";
 import {
   isSameOriginAuthRequest,
   readBoundedAuthBody,
 } from "./auth-request-validation.ts";
-import { NAVER_AUTH_BASE_PATH } from "./naver-auth-policy.ts";
+import {
+  NAVER_AUTH_BASE_PATH,
+  NAVER_AUTH_SESSION_COOKIE,
+} from "./naver-auth-policy.ts";
 
 const postSchema = z.strictObject({
   csrfToken: z.string().regex(/^[a-f0-9]{64}$/),
   callbackUrl: z.enum(["/auth/session", "/auth/sign-in"]),
 });
+
+export function expireNaverSessionCookies(
+  request: Pick<Request, "url" | "headers">,
+  response: Response,
+) {
+  const deletions = new NextResponse();
+  const names = new Set([
+    NAVER_AUTH_SESSION_COOKIE,
+    "__Host-varda.naver.csrf-token",
+    "__Host-varda.naver.state",
+    "__Host-varda.naver.callback-url",
+  ]);
+  // Validation has already consumed the POST body; cookie parsing only needs headers.
+  const cookieRequest = new NextRequest(request.url, {
+    headers: request.headers,
+  });
+  for (const { name } of cookieRequest.cookies.getAll()) {
+    if (
+      name.startsWith(`${NAVER_AUTH_SESSION_COOKIE}.`) &&
+      /^\d+$/.test(name.slice(NAVER_AUTH_SESSION_COOKIE.length + 1))
+    )
+      names.add(name);
+  }
+  for (const name of names) {
+    deletions.cookies.set(name, "", {
+      maxAge: 0,
+      expires: new Date(0),
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  }
+  // Preserve upstream deletion attributes instead of parsing and serializing them again.
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-store");
+  for (const cookie of deletions.headers.getSetCookie()) {
+    headers.append("Set-Cookie", cookie);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 export function finalizeNaverAuthCallback(response: Response, origin: string) {
   const headers = new Headers(response.headers);
