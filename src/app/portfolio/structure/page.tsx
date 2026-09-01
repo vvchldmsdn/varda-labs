@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 type PortfolioStructurePageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    preview?: string | string[];
     scope?: string | string[];
     window?: string | string[];
   }>;
@@ -23,8 +24,11 @@ type PortfolioStructurePageProps = {
 export default async function PortfolioStructurePage({
   searchParams,
 }: PortfolioStructurePageProps) {
-  if (process.env.NODE_ENV === "development") {
-    const params = await searchParams;
+  const params = await searchParams;
+  if (
+    process.env.NODE_ENV === "development" &&
+    firstSearchParam(params.preview) === "design"
+  ) {
     return (
       <PortfolioStructureView
         data={buildPortfolioStructureDesignPreview(params.scope)}
@@ -32,10 +36,7 @@ export default async function PortfolioStructurePage({
     );
   }
 
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok) {
     return (
       <PortfolioReadAccessBoundary
@@ -100,4 +101,8 @@ export default async function PortfolioStructurePage({
       }}
     />
   );
+}
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }

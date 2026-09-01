@@ -13,9 +13,9 @@ describe("investment lab historical counterfactual readiness", () => {
   it("maps a July 8 close into the July 9 service cycle", () => {
     const result = assessInvestmentLabCounterfactualReadiness(readinessInput());
 
-    assert.equal(result.status, "ready_for_engine_fixture");
+    assert.equal(result.status, "ready_for_production_engine");
     assert.deepEqual(result.blockers, []);
-    assert.equal(result.productionEngineReady, false);
+    assert.equal(result.productionEngineReady, true);
     assert.deepEqual(
       result.unresolvedPolicyGates,
       HISTORICAL_COUNTERFACTUAL_POLICY_GATES,
@@ -27,7 +27,7 @@ describe("investment lab historical counterfactual readiness", () => {
       readinessInput({ prices: { endDate: "2026-07-04" } }),
     );
 
-    assert.equal(result.status, "ready_for_engine_fixture");
+    assert.equal(result.status, "ready_for_production_engine");
     assert.deepEqual(result.blockers, []);
   });
 
@@ -128,7 +128,7 @@ describe("investment lab historical counterfactual readiness", () => {
 
     assert.equal(brokerage.trades.rowCount, 2);
     assert.equal(brokerage.trades.unknownAccountRows, 0);
-    assert.equal(all.kodex200.status, "ready_for_engine_fixture");
+    assert.equal(all.kodex200.status, "ready_for_production_engine");
     assert.deepEqual(result.evidence.allSnapshotReconciliation, {
       storedRows: 1,
       derivedRows: 2,
@@ -164,6 +164,8 @@ describe("investment lab historical counterfactual readiness", () => {
       source,
       /\b(?:insert\s+into|update\s+\w+\s+set|delete\s+from|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\b/i,
     );
+    assert.match(source, /canonical_owner_user_id\s*=\s*\$1::uuid/i);
+    assert.match(source, /ownerUserId is required/);
   });
 });
 

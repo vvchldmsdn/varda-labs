@@ -85,24 +85,24 @@ export function parseHoldingOnboardingInput(
     formData.get("newPortfolioGroupName"),
   );
   if (portfolioGroupId && !UUID_PATTERN.test(portfolioGroupId)) {
-    return invalid("portfolioGroup", "자산 그룹 선택이 올바르지 않습니다.");
+    return invalid("portfolioGroup", "분석 범위 선택이 올바르지 않습니다.");
   }
   if (portfolioGroupId && newPortfolioGroupName) {
     return invalid(
       "portfolioGroup",
-      "기존 자산 그룹 선택과 새 그룹 이름 중 하나만 입력해 주세요.",
+      "기존 분석 범위 선택과 새 범위 이름 중 하나만 입력해 주세요.",
     );
   }
   if (!portfolioGroupId && !newPortfolioGroupName) {
     return invalid(
       "portfolioGroup",
-      "기존 자산 그룹을 선택하거나 새 그룹 이름을 입력해 주세요.",
+      "기존 분석 범위를 선택하거나 새 범위 이름을 입력해 주세요.",
     );
   }
   if (newPortfolioGroupName && newPortfolioGroupName.length > 100) {
     return invalid(
       "portfolioGroup",
-      "새 자산 그룹 이름은 100자 이하여야 합니다.",
+      "새 분석 범위 이름은 100자 이하여야 합니다.",
     );
   }
 

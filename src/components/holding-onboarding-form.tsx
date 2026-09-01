@@ -53,14 +53,14 @@ export function HoldingOnboardingForm({
         </label>
 
         <label className="text-sm font-semibold text-[var(--ink)]">
-          기존 자산 그룹
+          기존 분석 범위
           <select
             aria-describedby="portfolio-group-help"
             className={fieldClassName}
             defaultValue=""
             name="portfolioGroupId"
           >
-            <option value="">새 그룹 사용</option>
+            <option value="">새 분석 범위 사용</option>
             {options.portfolioGroups.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -70,20 +70,20 @@ export function HoldingOnboardingForm({
         </label>
 
         <label className="text-sm font-semibold text-[var(--ink)] md:col-span-2">
-          새 자산 그룹 이름
+          새 분석 범위 이름
           <input
             aria-describedby="portfolio-group-help"
             className={fieldClassName}
             maxLength={100}
             name="newPortfolioGroupName"
-            placeholder="기존 그룹을 선택했다면 비워 두세요"
+            placeholder="기존 분석 범위를 선택했다면 비워 두세요"
             type="text"
           />
           <span
             className="mt-1 block text-xs font-normal text-[var(--muted)]"
             id="portfolio-group-help"
           >
-            기존 그룹 선택 또는 새 그룹 이름 중 하나만 사용합니다.
+            기존 분석 범위 선택 또는 새 범위 이름 중 하나만 사용합니다.
           </span>
         </label>
 

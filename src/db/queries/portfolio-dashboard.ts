@@ -19,7 +19,7 @@ import {
 import { db } from "@/db/client";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
-import { loadActiveTenantLegacyAssetGroups } from "@/db/queries/tenant-group-reads";
+import { loadActiveTenantAllocationGroups } from "@/db/queries/tenant-group-reads";
 import { loadLatestTenantPortfolioSettingsRows } from "@/db/queries/tenant-settings";
 import {
   accounts,
@@ -74,7 +74,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
         .from(accounts)
         .where(and(...activeOwnedAccountPredicates(tenantContext)))
         .orderBy(accounts.sortOrder, accounts.code),
-      loadActiveTenantLegacyAssetGroups(tenantContext),
+      loadActiveTenantAllocationGroups(tenantContext),
       assetScopePredicate === null
         ? Promise.resolve([])
         : db

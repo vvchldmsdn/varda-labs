@@ -393,12 +393,13 @@ describe("current tenant read scope runtime boundary", () => {
     );
     assert.match(source, /eq\(accounts\.isActive, true\)/);
     assert.match(source, /inArray\(accounts\.code, NAMED_PORTFOLIO_ACCOUNTS\)/);
-    assert.match(source, /eq\(assets\.account, accounts\.code\)/);
+    assert.match(source, /account:\s*accounts\.code/);
+    assert.doesNotMatch(source, /eq\(assets\.account, accounts\.code\)/);
     assert.match(
       source,
       /eq\(assets\.canonicalOwnerUserId, tenantContext\.ownerUserId\)/,
     );
-    assert.match(source, /loadActiveTenantLegacyAssetGroupBundle/);
+    assert.match(source, /loadActiveTenantAllocationGroupBundle/);
     assert.match(source, /selectedGroupIdByAssetId/);
     assert.match(groupReadSource, /public\.asset_groups/);
     assert.match(groupReadSource, /public\.asset_group_members/);

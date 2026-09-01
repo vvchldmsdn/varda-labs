@@ -15,9 +15,9 @@ import { cache } from "react";
 import { db } from "@/db/client";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
 import {
-  loadActiveTenantLegacyAssetGroupBundle,
-  type TenantLegacyAssetGroupMemberRow,
-  type TenantLegacyAssetGroupRow,
+  loadActiveTenantAllocationGroupBundle,
+  type TenantAllocationGroupMemberRow,
+  type TenantAllocationGroupRow,
 } from "@/db/queries/tenant-group-reads";
 import {
   loadLatestTenantPortfolioSettingsRows,
@@ -138,19 +138,21 @@ async function loadTenantPortfolioStructureRows({
       assetScopePredicate === null
         ? Promise.resolve([])
         : db
-            .select(getTableColumns(assets))
+            .select({
+              ...getTableColumns(assets),
+              account: accounts.code,
+            })
             .from(assets)
             .innerJoin(accounts, eq(assets.accountId, accounts.id))
             .where(
               and(
                 ...ownedAccountPredicates,
                 eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
-                eq(assets.account, accounts.code),
                 isNull(assets.archivedAt),
                 assetScopePredicate,
               ),
             ),
-      loadActiveTenantLegacyAssetGroupBundle(tenantContext),
+      loadActiveTenantAllocationGroupBundle(tenantContext),
       db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
       loadLatestTenantPortfolioSettingsRows(tenantContext),
     ]);
@@ -194,8 +196,8 @@ async function buildStructureFromRows({
   identityScope,
 }: {
   assetRows: (typeof assets.$inferSelect)[];
-  groupRows: readonly TenantLegacyAssetGroupRow[];
-  memberRows: readonly TenantLegacyAssetGroupMemberRow[];
+  groupRows: readonly TenantAllocationGroupRow[];
+  memberRows: readonly TenantAllocationGroupMemberRow[];
   latestFxRows: (typeof fxRates.$inferSelect)[];
   settingsRows: readonly TenantPortfolioSettingsRow[];
   selectedAccount: PortfolioStructureAccount;

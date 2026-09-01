@@ -77,7 +77,7 @@ export default async function AccountManagementPage() {
               <NavLink href="/">Dashboard</NavLink>
               <NavLink href="/portfolio/holdings">Holdings</NavLink>
               <NavLink href="/portfolio/holdings/new">Add holding</NavLink>
-              <NavLink href="/portfolio/groups">Asset groups</NavLink>
+              <NavLink href="/portfolio/groups">분석 범위</NavLink>
               <NavLink href="/portfolio/events?account=all">Events</NavLink>
             </nav>
           </div>

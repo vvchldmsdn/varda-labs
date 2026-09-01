@@ -67,7 +67,8 @@ describe("tenant daily snapshot job", () => {
     assert.match(route, /hasUnsupportedQuery/);
     assert.doesNotMatch(route, /SNAPSHOT_ACCOUNTS|parseAccount/);
     assert.doesNotMatch(route, /searchParams\.get\(["'](?:owner|ownerUserId|canonicalOwnerUserId)/);
-    assert.match(writer, /select\(getTableColumns\(assets\)\)/);
+    assert.match(writer, /\.\.\.getTableColumns\(assets\)/);
+    assert.match(writer, /account:\s*accounts\.code/);
     assert.match(writer, /eq\(accounts\.canonicalOwnerUserId, ownerUserId\)/);
     assert.match(writer, /canonicalOwnerUserId: context\.ownerUserId/);
     assert.match(writer, /mapWithConcurrency\(\s*targetAccounts,\s*2,/);

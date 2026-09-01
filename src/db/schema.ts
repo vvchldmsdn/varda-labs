@@ -446,7 +446,7 @@ export const assets = pgTable(
     market: varchar("market", { length: 20 }).notNull(),
     currency: varchar("currency", { length: 10 }).notNull(),
     account: varchar("account", { length: 50 }).notNull(),
-    accountId: uuid("account_id"),
+    accountId: uuid("account_id").notNull(),
 
     quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
     currentPrice: decimal("current_price", { precision: 20, scale: 4 }).notNull(),
@@ -500,6 +500,11 @@ export const assets = pgTable(
       table.id,
       table.accountId,
     ),
+    accountFk: foreignKey({
+      name: "assets_account_fk",
+      columns: [table.accountId],
+      foreignColumns: [accounts.id],
+    }).onDelete("restrict"),
     ownerAccountInstrumentUnique: uniqueIndex(
       "assets_owner_account_instrument_unique",
     )
@@ -2157,6 +2162,9 @@ export const globalMarketFactors = pgTable(
       table.factorKey,
       table.factorDate,
     ),
+    factorDateUnique: uniqueIndex(
+      "global_market_factors_factor_key_date_unique",
+    ).on(table.factorKey, table.factorDate),
     dateIdx: index("global_market_factors_date_idx").on(table.factorDate),
     familyDateIdx: index("global_market_factors_family_date_idx").on(
       table.factorFamily,

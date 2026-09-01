@@ -225,6 +225,7 @@ export function buildSimulationOwnerParametricFactorResearch(input: {
       input.matrix.matrix.map((row) => row.serviceDate),
     ),
     diagnostics: model.diagnostics,
+    remediation: null,
     exposures: Object.freeze(
       model.exposures.map((exposure) => {
         const instrument = instrumentByKey.get(exposure.assetKey);
@@ -272,6 +273,13 @@ function buildSource(
   return Object.freeze({
     matrixRowCount: matrix.matrix.length,
     alignedObservationCount: alignedRows.length,
+    requiredAlignedObservationCount:
+      SIMULATION_FACTOR_RESIDUAL_MODEL_POLICY.minimumObservationCount,
+    observationShortfall: Math.max(
+      0,
+      SIMULATION_FACTOR_RESIDUAL_MODEL_POLICY.minimumObservationCount -
+        alignedRows.length,
+    ),
     factorGapRowCount,
     firstAlignedServiceDate: alignedRows[0]?.serviceDate ?? null,
     lastAlignedServiceDate: alignedRows.at(-1)?.serviceDate ?? null,
@@ -318,6 +326,10 @@ function unavailable(
       Object.freeze({
         matrixRowCount: matrix?.matrix.length ?? 0,
         alignedObservationCount: 0,
+        requiredAlignedObservationCount:
+          SIMULATION_FACTOR_RESIDUAL_MODEL_POLICY.minimumObservationCount,
+        observationShortfall:
+          SIMULATION_FACTOR_RESIDUAL_MODEL_POLICY.minimumObservationCount,
         factorGapRowCount: matrix?.matrix.length ?? 0,
         firstAlignedServiceDate: null,
         lastAlignedServiceDate: null,
@@ -326,6 +338,41 @@ function unavailable(
       }),
     factorSources,
     diagnostics: null,
+    remediation: buildRemediation(reason, source, factorSources),
     exposures: Object.freeze([]),
+  });
+}
+
+function buildRemediation(
+  reason: UnavailableReason,
+  source: ReturnType<typeof buildSource> | undefined,
+  factorSources: ReturnType<
+    typeof buildSimulationRegimeFactorSourceSummaries
+  >,
+) {
+  if (reason !== "insufficient_factor_overlap") return null;
+  const alignedObservationCount = source?.alignedObservationCount ?? 0;
+  const requiredAlignedObservationCount =
+    SIMULATION_FACTOR_RESIDUAL_MODEL_POLICY.minimumObservationCount;
+  return Object.freeze({
+    code: "refresh_core_market_factor_history" as const,
+    automatedBy: "cron_market_cycle_best_effort" as const,
+    alignedObservationCount,
+    requiredAlignedObservationCount,
+    observationShortfall: Math.max(
+      0,
+      requiredAlignedObservationCount - alignedObservationCount,
+    ),
+    requiredSeries: Object.freeze(
+      SIMULATION_REGIME_FACTOR_DEFINITIONS.map((row) => row.factorKey),
+    ),
+    latestReleaseDates: Object.freeze(
+      factorSources.map((row) =>
+        Object.freeze({
+          factorKey: row.factorKey,
+          latestReleaseDate: row.latestReleaseDate,
+        }),
+      ),
+    ),
   });
 }

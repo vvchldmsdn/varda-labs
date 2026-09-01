@@ -493,14 +493,14 @@ export async function runDailySnapshot(
   const ownerUserId = options.tenantContext.ownerUserId;
   const context = await loadAccountContext(snapshotDate, ownerUserId);
   const allAssetRows = await db
-    .select(getTableColumns(assets))
+    .select({
+      ...getTableColumns(assets),
+      account: accounts.code,
+    })
     .from(assets)
     .innerJoin(
       accounts,
-      and(
-        eq(assets.accountId, accounts.id),
-        eq(assets.account, accounts.code),
-      ),
+      eq(assets.accountId, accounts.id),
     )
     .where(
       and(
@@ -510,7 +510,7 @@ export async function runDailySnapshot(
         isNull(assets.archivedAt),
       ),
     )
-    .orderBy(assets.account, assets.name);
+    .orderBy(accounts.code, assets.name);
   const investmentAssetRows = allAssetRows.filter((asset) =>
     isSnapshotInvestmentAssetType(asset.assetType),
   );
@@ -1487,13 +1487,7 @@ async function loadAccountContext(
       .selectDistinct(getTableColumns(assetGroups))
       .from(assetGroups)
       .innerJoin(assets, eq(assets.groupId, assetGroups.id))
-      .innerJoin(
-        accounts,
-        and(
-          eq(assets.accountId, accounts.id),
-          eq(assets.account, accounts.code),
-        ),
-      )
+      .innerJoin(accounts, eq(assets.accountId, accounts.id))
       .where(
         and(
           eq(accounts.canonicalOwnerUserId, ownerUserId),

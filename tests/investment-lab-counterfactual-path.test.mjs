@@ -244,6 +244,7 @@ describe("investment lab deterministic counterfactual path", () => {
       "scripts/lib/investment-lab-counterfactual-path-audit.mjs",
       "scripts/lib/investment-lab-event-flow-data.mjs",
       "scripts/lib/investment-lab-event-flow-sql.mjs",
+      "scripts/lib/investment-lab-close-evidence.mjs",
     ]
       .map((path) => readFileSync(path, "utf8"))
       .join("\n");
@@ -253,6 +254,8 @@ describe("investment lab deterministic counterfactual path", () => {
       source,
       /\b(?:insert\s+into|update\s+\w+\s+set|delete\s+from|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\b/i,
     );
+    assert.match(source, /canonical_owner_user_id\s*=\s*\$1::uuid/i);
+    assert.match(source, /ownerUserId is required/);
   });
 
   it("keeps the return estimate separate from path generation", () => {

@@ -117,10 +117,16 @@ export async function GET(request: Request) {
   const unauthorized = requireAdminJob(request);
   if (unauthorized) return unauthorized;
 
+  const requestedLimit = Number(new URL(request.url).searchParams.get("limit"));
+  const limit = Number.isSafeInteger(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 500)
+    : 100;
+
   const rows = await db
     .select(assetEntityApiSelection)
     .from(assets)
-    .orderBy(desc(assets.createdAt));
+    .orderBy(desc(assets.createdAt))
+    .limit(limit);
 
   return NextResponse.json(rows);
 }
@@ -153,6 +159,13 @@ export async function POST(request: Request) {
   if (currentPrice === undefined) {
     return NextResponse.json(
       { error: "currentPrice is required" },
+      { status: 400 },
+    );
+  }
+
+  if (accountId === null) {
+    return NextResponse.json(
+      { error: "accountId is required" },
       { status: 400 },
     );
   }

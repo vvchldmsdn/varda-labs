@@ -344,6 +344,13 @@
   justify-content: center;
   flex-shrink: 0;
 }
+.googleMark {
+  color: #316ee8;
+  font-family: Arial, sans-serif;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+}
 .naverMark {
   color: #03a94d;
   font-family: Arial, sans-serif;

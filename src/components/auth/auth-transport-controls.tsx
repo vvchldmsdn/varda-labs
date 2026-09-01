@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GoogleIcon, GitHubIcon } from "@neondatabase/auth/react/ui";
-import { LoaderCircle, LogOut } from "lucide-react";
+import { Code2, LoaderCircle, LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
 import { authErrorMessage } from "@/lib/auth/auth-error-message";
 import {
@@ -121,9 +120,9 @@ export function SocialSignInButtons({
               ) : (
                 <span className={styles.providerIcon} aria-hidden="true">
                   {provider === "google" ? (
-                    <GoogleIcon />
+                    <span className={styles.googleMark}>G</span>
                   ) : provider === "github" ? (
-                    <GitHubIcon />
+                    <Code2 size={20} />
                   ) : (
                     <span className={styles.naverMark}>N</span>
                   )}

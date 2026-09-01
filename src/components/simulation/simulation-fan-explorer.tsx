@@ -24,7 +24,7 @@ export function SimulationFanExplorer({
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
   const [width, setWidth] = useState(960);
-  const [mode, setMode] = useState<"band" | "paths">(large ? "paths" : "band");
+  const [mode, setMode] = useState<"band" | "paths">("band");
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [unit, setUnit] = useState<"index" | "return">("return");
 
@@ -128,7 +128,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={mode === key}
               onClick={() => setMode(key)}
-              className={`flex min-h-8 items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${mode === key ? "bg-[var(--paper)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              className={`flex min-h-10 items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${mode === key ? "bg-[var(--paper)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon size={14} aria-hidden="true" />
               {label}
@@ -151,7 +151,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={unit === key}
               onClick={() => setUnit(key)}
-              className={`min-h-8 border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
+              className={`min-h-10 border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
             >
               {label}
             </button>

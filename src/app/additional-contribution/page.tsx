@@ -14,6 +14,7 @@ type AdditionalContributionPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     amount?: string | string[];
+    preview?: string | string[];
     scope?: string | string[];
   }>;
 };
@@ -25,7 +26,10 @@ export default async function AdditionalContributionPage({
   const params = await searchParams;
   const amountKrw = normalizeAmount(params.amount);
 
-  if (process.env.NODE_ENV === "development") {
+  if (
+    process.env.NODE_ENV === "development" &&
+    firstSearchParam(params.preview) === "design"
+  ) {
     const { buildAdditionalContributionDesignPreview } = await import(
       "@/lib/additional-contribution-design-preview"
     );
@@ -91,6 +95,10 @@ export default async function AdditionalContributionPage({
       selectedScope={selectedScope}
     />
   );
+}
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function normalizeAmount(value: string | string[] | undefined) {

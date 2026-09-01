@@ -105,7 +105,7 @@ describe("holding onboarding contract", () => {
     assert.deepEqual(conflictingGroup, {
       ok: false,
       field: "portfolioGroup",
-      message: "기존 자산 그룹 선택과 새 그룹 이름 중 하나만 입력해 주세요.",
+      message: "기존 분석 범위 선택과 새 범위 이름 중 하나만 입력해 주세요.",
     });
     assert.equal(zeroCost.ok, false);
     assert.equal(zeroCost.field, "averageCost");

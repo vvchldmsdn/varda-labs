@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 type HomeProps = {
   searchParams: Promise<{
     account?: string | string[];
+    preview?: string | string[];
     scope?: string | string[];
   }>;
 };
@@ -21,7 +22,10 @@ type HomeProps = {
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
 
-  if (process.env.NODE_ENV === "development") {
+  if (
+    process.env.NODE_ENV === "development" &&
+    firstSearchParam(params.preview) === "design"
+  ) {
     return (
       <PortfolioDashboard
         data={buildHomeDesignPreview(params.scope)}
@@ -78,6 +82,10 @@ async function DashboardContent({
 }) {
   const dashboard = await dashboardPromise;
   return <PortfolioDashboard data={dashboard} liveSyncEnabled />;
+}
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function DashboardSkeleton() {

@@ -236,6 +236,7 @@ describe("investment lab event-flow semantics", () => {
       "scripts/lib/investment-lab-event-flow-audit.mjs",
       "scripts/lib/investment-lab-event-flow-data.mjs",
       "scripts/lib/investment-lab-event-flow-sql.mjs",
+      "scripts/lib/investment-lab-close-evidence.mjs",
     ]
       .map((path) => readFileSync(path, "utf8"))
       .join("\n");
@@ -245,6 +246,8 @@ describe("investment lab event-flow semantics", () => {
       source,
       /\b(?:insert\s+into|update\s+\w+\s+set|delete\s+from|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\b/i,
     );
+    assert.match(source, /canonical_owner_user_id\s*=\s*\$1::uuid/i);
+    assert.match(source, /ownerUserId is required/);
   });
 });
 
@@ -270,15 +273,31 @@ function auditFixture() {
       eventRow("deposit", "2026-07-11", 3, 50),
       eventRow("asset_added", "2026-07-11", 4, null),
     ],
-    closeRows: [
-      { price_date: "2026-07-10", adjusted_close_price: "100" },
-      { price_date: "2026-07-13", adjusted_close_price: "101" },
-    ],
+    closeRows: [auditCloseRow("2026-07-10", "100"), auditCloseRow("2026-07-13", "101")],
     snapshot: {
       row_count: 4,
       nonzero_cash_rows: 0,
       positive_market_value_rows: 4,
     },
+  };
+}
+
+function auditCloseRow(priceDate, adjustedClosePrice) {
+  return {
+    ticker: "069500",
+    market: "korea",
+    currency: "KRW",
+    price_date: priceDate,
+    close_price: adjustedClosePrice,
+    adjusted_close_price: adjustedClosePrice,
+    adjusted_close_basis: "provider_adjusted_close_v1",
+    adjusted_close_provider: "fixture-provider",
+    adjusted_close_source: "fixture-source",
+    adjusted_close_fetched_at: "2026-07-14T00:00:00.000Z",
+    provider_symbol: "069500",
+    provider_exchange: "KRX",
+    fetched_at: "2026-07-14T00:00:00.000Z",
+    source: "fixture-source",
   };
 }
 

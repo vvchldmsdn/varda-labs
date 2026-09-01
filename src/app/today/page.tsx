@@ -19,6 +19,7 @@ type TodayPageProps = {
     scope?: string | string[];
     ticker?: string | string[];
     market?: string | string[];
+    preview?: string | string[];
   }>;
 };
 
@@ -26,7 +27,10 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const params = await searchParams;
   const detailQuery = normalizeTodayHoldingDetailQuery(params);
 
-  if (process.env.NODE_ENV === "development") {
+  if (
+    process.env.NODE_ENV === "development" &&
+    firstSearchParam(params.preview) === "design"
+  ) {
     return (
       <TodayMovement
         data={buildHomeDesignPreview(params.scope ?? params.account)}
@@ -78,6 +82,10 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       />
     </Suspense>
   );
+}
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 async function TodayContent({

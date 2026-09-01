@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 
 import {
   formatDate,
@@ -84,7 +84,7 @@ export function PortfolioHistoryChart({
               key={item}
               type="button"
               aria-pressed={range === item}
-              className={`border-b py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
+              className={`min-h-10 border-b px-1 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
                 range === item
                   ? "border-[var(--ink)] text-[var(--ink)]"
                   : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
@@ -178,7 +178,13 @@ export function PortfolioHistoryChart({
                   <rect
                     key={`hit:${visiblePoints[index]?.date}`}
                     role="button"
-                    tabIndex={0}
+                    tabIndex={
+                      hoveredIndex === index ||
+                      (hoveredIndex === null && index === visiblePoints.length - 1)
+                        ? 0
+                        : -1
+                    }
+                    data-history-point-index={index}
                     aria-label={`${formatDate(visiblePoints[index]?.date ?? null)} ${formatKrw(visiblePoints[index]?.totalMarketValue ?? null)}`}
                     x={hitStart}
                     y={PLOT_TOP}
@@ -189,6 +195,9 @@ export function PortfolioHistoryChart({
                     style={{ outline: "none" }}
                     onBlur={() => setHoveredIndex(null)}
                     onFocus={() => setHoveredIndex(index)}
+                    onKeyDown={(event) =>
+                      moveHistoryPointFocus(event, index, visiblePoints.length)
+                    }
                     onPointerDown={(event) => event.preventDefault()}
                     onPointerEnter={() => setHoveredIndex(index)}
                   />
@@ -340,6 +349,41 @@ export function PortfolioHistoryChart({
               </span>
             </div>
           ) : null}
+
+          <details className="mt-6 border-y border-[var(--wash)] py-3 text-xs">
+            <summary className="min-h-10 cursor-pointer py-2 font-medium text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]">
+              그래프 데이터 표로 보기
+            </summary>
+            <div className="max-h-80 overflow-auto pb-2 pt-3">
+              <table className="w-full min-w-[34rem] border-collapse text-left tabular-nums">
+                <caption className="sr-only">
+                  선택 기간의 포트폴리오 평가액, 누적 손익, 수익률
+                </caption>
+                <thead className="sticky top-0 bg-[var(--paper)] text-[var(--muted)]">
+                  <tr className="border-b border-[var(--line)]">
+                    <th className="px-2 py-2 font-medium" scope="col">날짜</th>
+                    <th className="px-2 py-2 text-right font-medium" scope="col">평가액</th>
+                    <th className="px-2 py-2 text-right font-medium" scope="col">누적 손익</th>
+                    <th className="px-2 py-2 text-right font-medium" scope="col">수익률</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visiblePoints.map((point) => (
+                    <tr className="border-b border-[var(--wash)]" key={point.date}>
+                      <th className="px-2 py-2 font-medium text-[var(--ink)]" scope="row">
+                        {formatDate(point.date)}
+                      </th>
+                      <td className="px-2 py-2 text-right">{formatKrw(point.totalMarketValue)}</td>
+                      <td className="px-2 py-2 text-right">{formatKrw(point.totalPnl)}</td>
+                      <td className="px-2 py-2 text-right">
+                        {formatPercent(point.totalReturnPct, true)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         </>
       ) : (
         <div className="grid min-h-[280px] place-items-center border-y border-[var(--wash)] text-center">
@@ -351,6 +395,31 @@ export function PortfolioHistoryChart({
       )}
     </section>
   );
+}
+
+function moveHistoryPointFocus(
+  event: KeyboardEvent<SVGRectElement>,
+  currentIndex: number,
+  pointCount: number,
+) {
+  let targetIndex: number | null = null;
+  if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+    targetIndex = Math.max(0, currentIndex - 1);
+  } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+    targetIndex = Math.min(pointCount - 1, currentIndex + 1);
+  } else if (event.key === "Home") {
+    targetIndex = 0;
+  } else if (event.key === "End") {
+    targetIndex = pointCount - 1;
+  }
+  if (targetIndex === null || targetIndex === currentIndex) return;
+
+  event.preventDefault();
+  event.currentTarget.ownerSVGElement
+    ?.querySelector<SVGRectElement>(
+      `[data-history-point-index="${targetIndex}"]`,
+    )
+    ?.focus();
 }
 
 function pointsForRange(points: readonly HistoryPoint[], range: RangeKey) {

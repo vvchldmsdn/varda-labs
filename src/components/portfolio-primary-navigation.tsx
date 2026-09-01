@@ -4,6 +4,7 @@ import { UserRound } from "lucide-react";
 
 import { formatKstTime } from "@/components/home/portfolio-format";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
+import { ScrollableNavRail } from "@/components/scrollable-nav-rail";
 import {
   buildPortfolioAnalysisScopeHref,
   type PortfolioAnalysisScopeKey,
@@ -41,23 +42,24 @@ export function PortfolioPrimaryNavigation({
           <span>VARDA-LABS</span>
         </Link>
 
-        <nav aria-label="주요 메뉴" className="varda-main-menu">
-          <div>
-            {PRIMARY_NAV_ITEMS.map((item) => {
-              const active = item.href === activePath;
-              return (
-                <Link
-                  key={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className="font-medium"
-                  href={scopedHref(item.href, selectedScopeKey)}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+        <ScrollableNavRail
+          ariaLabel="주요 메뉴"
+          viewportClassName="varda-main-menu"
+        >
+          {PRIMARY_NAV_ITEMS.map((item) => {
+            const active = item.href === activePath;
+            return (
+              <Link
+                key={item.href}
+                aria-current={active ? "page" : undefined}
+                className="font-medium"
+                href={scopedHref(item.href, selectedScopeKey)}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </ScrollableNavRail>
 
         <div className="varda-navigation-actions">
           <span className="hidden text-xs text-[var(--muted)] md:inline">
