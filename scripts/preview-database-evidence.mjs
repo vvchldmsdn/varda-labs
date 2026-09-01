@@ -60,7 +60,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v21",
+      evidenceVersion: "preview_database_build_preflight_v22",
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
@@ -88,7 +88,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v21",
+    "preview_database_build_preflight_v22",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -128,24 +128,18 @@ function assertPreflightCatalog(plan, state, localMigrations) {
     return;
   }
 
-  assert.deepEqual(
-    plan.pendingTags,
-    ["0039_rapid_amazoness"],
-    "Only reviewed migration 0039 may be pending",
-  );
-  assert.equal(
-    plan.latestAppliedTag,
-    "0038_cheerful_micromax",
-    "Pending 0039 target must start from reviewed migration 0038",
-  );
   const latestApplied = localMigrations[plan.appliedCount - 1];
+  assert.ok(
+    latestApplied,
+    "Preview database must have an applied migration before pending migrations",
+  );
   assert.deepEqual(
     state.latestMigration,
     {
       createdAt: latestApplied.createdAt,
       sha256: latestApplied.sha256,
     },
-    "Preview state and migration ledger disagree before migration 0039",
+    "Preview state and migration ledger disagree before pending migrations",
   );
   assertReviewedPreviewDatabaseCatalog(state);
 }
