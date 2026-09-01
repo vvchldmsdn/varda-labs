@@ -23,12 +23,12 @@ export type TenantPortfolioGroupMembershipRows = Readonly<{
   assetMemberships: readonly TenantPortfolioGroupMembershipRow[];
 }>;
 
-export type TenantLegacyAssetGroupRows = Readonly<{
-  groups: readonly TenantLegacyAssetGroupRow[];
-  members: readonly TenantLegacyAssetGroupMemberRow[];
+export type TenantAllocationGroupRows = Readonly<{
+  groups: readonly TenantAllocationGroupRow[];
+  members: readonly TenantAllocationGroupMemberRow[];
 }>;
 
-export type TenantLegacyAssetGroupRow = Readonly<{
+export type TenantAllocationGroupRow = Readonly<{
   id: string;
   name: string;
   targetWeight: string | null;
@@ -36,7 +36,7 @@ export type TenantLegacyAssetGroupRow = Readonly<{
   sortOrder: number;
 }>;
 
-export type TenantLegacyAssetGroupMemberRow = Readonly<{
+export type TenantAllocationGroupMemberRow = Readonly<{
   groupId: string;
   assetId: string;
   allocationRatio: string | null;
@@ -88,9 +88,9 @@ export async function loadTenantPortfolioGroupMemberships({
   });
 }
 
-export async function loadActiveTenantLegacyAssetGroups(
+export async function loadActiveTenantAllocationGroups(
   tenantContext: TenantContext,
-): Promise<readonly TenantLegacyAssetGroupRow[]> {
+): Promise<readonly TenantAllocationGroupRow[]> {
   const [groupRows] = await runTenantReadTransaction(
     tenantContext.ownerUserId,
     (transaction) => [transaction.query(ACTIVE_LEGACY_ASSET_GROUPS_SQL)],
@@ -99,9 +99,9 @@ export async function loadActiveTenantLegacyAssetGroups(
   return Object.freeze(groupRows.map(projectLegacyAssetGroupRow));
 }
 
-export async function loadActiveTenantLegacyAssetGroupBundle(
+export async function loadActiveTenantAllocationGroupBundle(
   tenantContext: TenantContext,
-): Promise<TenantLegacyAssetGroupRows> {
+): Promise<TenantAllocationGroupRows> {
   const [groupRows, memberRows] = await runTenantReadTransaction(
     tenantContext.ownerUserId,
     (transaction) => [
@@ -226,7 +226,7 @@ function projectPortfolioGroupMembershipRow(
 
 function projectLegacyAssetGroupRow(
   row: Record<string, unknown>,
-): TenantLegacyAssetGroupRow {
+): TenantAllocationGroupRow {
   return Object.freeze({
     id: requiredString(row.id),
     name: requiredString(row.name),
@@ -238,7 +238,7 @@ function projectLegacyAssetGroupRow(
 
 function projectLegacyAssetGroupMemberRow(
   row: Record<string, unknown>,
-): TenantLegacyAssetGroupMemberRow {
+): TenantAllocationGroupMemberRow {
   return Object.freeze({
     groupId: requiredString(row.group_id),
     assetId: requiredString(row.asset_id),

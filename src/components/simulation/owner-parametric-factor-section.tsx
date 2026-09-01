@@ -90,6 +90,25 @@ export function OwnerParametricFactorSection({
             {unavailableReasonLabel(result.reason)} 기존 보유 비중 부트스트랩과 다른
             검증 결과는 그대로 유지됩니다.
           </p>
+          {result.remediation ? (
+            <dl className="mt-4 grid gap-3 border-t border-[var(--warning-soft)] pt-4 sm:grid-cols-3">
+              <Metric
+                detail="같은 날짜의 수익률·환율·금리"
+                label="현재 결합 관측"
+                value={`${result.remediation.alignedObservationCount}개`}
+              />
+              <Metric
+                detail={`부족 ${result.remediation.observationShortfall}개`}
+                label="최소 필요"
+                value={`${result.remediation.requiredAlignedObservationCount}개`}
+              />
+              <Metric
+                detail="일일 작업에서 별도로 재시도"
+                label="해결 경로"
+                value="팩터 자동 동기화"
+              />
+            </dl>
+          ) : null}
         </div>
       )}
     </section>

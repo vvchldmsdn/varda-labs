@@ -187,6 +187,7 @@ import "./today-movement-view.test.mjs";
 import "./portfolio-return-metrics.test.mjs";
 import "./etf-holdings.test.mjs";
 import "./market-context.test.mjs";
+import "./core-market-factor-refresh.test.mjs";
 import "./history-balance.test.mjs";
 import "./history-overview.test.mjs";
 import "./history-explorer.test.mjs";

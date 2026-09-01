@@ -98,6 +98,29 @@
   background: var(--paper);
   border-bottom: 1px solid var(--line);
 }
+.varda-scroll-rail {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.varda-scroll-rail::-webkit-scrollbar {
+  display: none;
+}
+.varda-scroll-rail > div > a {
+  scroll-snap-align: center;
+}
+.varda-scroll-rail[data-at-start="true"][data-at-end="false"] {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+}
+.varda-scroll-rail[data-at-start="false"][data-at-end="true"] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 100%);
+}
+.varda-scroll-rail[data-at-start="false"][data-at-end="false"] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+}
 .varda-navigation-inner {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -123,8 +146,6 @@
 }
 .varda-main-menu {
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 .varda-main-menu > div {
   display: flex;

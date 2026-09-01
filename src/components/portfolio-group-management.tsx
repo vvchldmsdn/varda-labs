@@ -44,7 +44,7 @@ export function PortfolioGroupCreateForm({
       <FormFooter
         pending={pending}
         state={state}
-        submitLabel="그룹 만들기"
+        submitLabel="분석 범위 만들기"
       />
     </form>
   );
@@ -114,14 +114,14 @@ export function PortfolioGroupEditor({
             type="checkbox"
             value="yes"
           />
-          <span>과거 기록을 유지한 채 이 그룹을 목록에서 삭제합니다.</span>
+          <span>과거 기록을 유지한 채 이 분석 범위를 목록에서 삭제합니다.</span>
         </label>
         <button
           className="rounded-md border border-[var(--warning-soft)] bg-white px-4 py-2 text-sm font-semibold text-[var(--negative)] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={archivePending}
           type="submit"
         >
-          {archivePending ? "삭제 중" : "그룹 삭제"}
+          {archivePending ? "삭제 중" : "분석 범위 삭제"}
         </button>
         <ActionMessage state={archiveState} />
       </form>
@@ -139,7 +139,7 @@ function TextFields({
   return (
     <div className="space-y-3">
       <label className="block text-sm font-semibold text-[var(--ink)]">
-        그룹 이름
+        분석 범위 이름
         <input
           className={fieldClassName}
           defaultValue={name}
@@ -183,7 +183,7 @@ function MembershipFields({
           계좌 전체 포함
         </legend>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          선택한 계좌에 나중에 추가되는 종목도 자동으로 이 그룹에 포함됩니다.
+          선택한 계좌에 나중에 추가되는 종목도 자동으로 이 분석 범위에 포함됩니다.
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {accounts.map((account) => (

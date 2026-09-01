@@ -10,6 +10,7 @@ import {
   claimCronMarketCycleRun,
   finishCronMarketCycleRun,
 } from "@/lib/cron-market-cycle-run-repository";
+import { runCoreMarketFactorRefreshJob } from "@/lib/market-data/core-market-factor-refresh-job";
 import { runUsdKrwFxRefreshJob } from "@/lib/market-data/fx-refresh-job";
 import {
   getKisPriceSyncCooldownStatus,
@@ -53,6 +54,14 @@ type LiveSyncSummary = {
   conflictCount: number;
 };
 
+type FactorSyncSummary = {
+  status: "not_attempted" | "written" | "skipped" | "failed";
+  candidateCount: number;
+  insertedCount: number;
+  skippedCount: number;
+  latestCandidateDate: string | null;
+};
+
 export type CronMarketCycleRunResult = {
   ok: boolean;
   status:
@@ -73,6 +82,7 @@ export type CronMarketCycleRunResult = {
     rateDate: string | null;
     source: string | null;
   };
+  factorSync: FactorSyncSummary;
   closeSync: CloseSyncSummary;
   liveSync: LiveSyncSummary;
   snapshot: {
@@ -119,6 +129,7 @@ export async function runCronMarketCycle({
   };
   let closeSync = emptyCloseSyncSummary();
   let liveSync = emptyLiveSyncSummary();
+  let factorSync = emptyFactorSyncSummary();
   let kisProvider: MarketDataProvider | null = null;
 
   try {
@@ -135,12 +146,30 @@ export async function runCronMarketCycle({
       source: fxResult.candidate.source,
     };
 
+    try {
+      const factorResult = await runCoreMarketFactorRefreshJob({
+        dryRun: false,
+        now,
+      });
+      factorSync = {
+        status: factorResult.insertedCount > 0 ? "written" : "skipped",
+        candidateCount: factorResult.candidateCount,
+        insertedCount: factorResult.insertedCount,
+        skippedCount: factorResult.skippedCount,
+        latestCandidateDate: factorResult.latestCandidateDate,
+      };
+    } catch {
+      // Shared factor history is auxiliary research evidence and must not block snapshots.
+      factorSync = { ...emptyFactorSyncSummary(), status: "failed" };
+    }
+
     let { snapshotJob, plan } = await loadPlan(now);
     if (!plan.ok) {
       return finishBlocked({
         runId,
         snapshotDate,
         fxSummary,
+        factorSync,
         closeSync,
         liveSync,
         plan,
@@ -155,6 +184,7 @@ export async function runCronMarketCycle({
           runId,
           snapshotDate,
           fxSummary,
+          factorSync,
           closeSync,
           liveSync,
           plan: {
@@ -175,6 +205,7 @@ export async function runCronMarketCycle({
           runId,
           snapshotDate,
           fxSummary,
+          factorSync,
           closeSync,
           liveSync,
           plan: {
@@ -200,6 +231,7 @@ export async function runCronMarketCycle({
         runId,
         snapshotDate,
         fx: fxSummary,
+        factorSync,
         closeSync,
         liveSync,
       });
@@ -213,6 +245,7 @@ export async function runCronMarketCycle({
         runId,
         snapshotDate,
         fxSummary,
+        factorSync,
         closeSync,
         liveSync,
         plan: {
@@ -232,6 +265,7 @@ export async function runCronMarketCycle({
         runId,
         snapshotDate,
         fxSummary,
+        factorSync,
         closeSync,
         liveSync,
         plan: {
@@ -263,6 +297,7 @@ export async function runCronMarketCycle({
         runId,
         snapshotDate,
         fx: fxSummary,
+        factorSync,
         closeSync,
         liveSync,
         snapshot: snapshotSummary,
@@ -278,6 +313,7 @@ export async function runCronMarketCycle({
       runId,
       snapshotDate,
       fx: fxSummary,
+      factorSync,
       closeSync,
       liveSync,
       snapshot: snapshotSummary,
@@ -292,6 +328,7 @@ export async function runCronMarketCycle({
       runId,
       snapshotDate,
       fx: fxSummary,
+      factorSync,
       closeSync,
       liveSync,
       blockers: ["unexpected_market_cycle_error"],
@@ -397,6 +434,7 @@ async function finishBlocked({
   runId,
   snapshotDate,
   fxSummary,
+  factorSync,
   closeSync,
   liveSync,
   plan,
@@ -405,6 +443,7 @@ async function finishBlocked({
   runId: string;
   snapshotDate: string;
   fxSummary: CronMarketCycleRunResult["fx"];
+  factorSync: FactorSyncSummary;
   closeSync: CloseSyncSummary;
   liveSync: LiveSyncSummary;
   plan: CronMarketCyclePlan;
@@ -416,6 +455,7 @@ async function finishBlocked({
     runId,
     snapshotDate,
     fx: fxSummary,
+    factorSync,
     closeSync,
     liveSync,
     snapshot: {
@@ -453,6 +493,7 @@ async function finishRun(
       phase: status,
       outcome: result.status,
       fx: result.fx,
+      factorSync: result.factorSync,
       closeSync: result.closeSync,
       liveSync: result.liveSync,
       snapshot: result.snapshot,
@@ -479,6 +520,7 @@ function emptyResult(
       rateDate: null,
       source: null,
     },
+    factorSync: overrides.factorSync ?? emptyFactorSyncSummary(),
     closeSync: overrides.closeSync ?? emptyCloseSyncSummary(),
     liveSync: overrides.liveSync ?? emptyLiveSyncSummary(),
     snapshot: overrides.snapshot ?? {
@@ -516,5 +558,15 @@ function emptyLiveSyncSummary(): LiveSyncSummary {
     insertedCount: 0,
     updatedCount: 0,
     conflictCount: 0,
+  };
+}
+
+function emptyFactorSyncSummary(): FactorSyncSummary {
+  return {
+    status: "not_attempted",
+    candidateCount: 0,
+    insertedCount: 0,
+    skippedCount: 0,
+    latestCandidateDate: null,
   };
 }

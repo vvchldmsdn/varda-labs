@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import {
   formatDate,
@@ -286,7 +292,7 @@ function MovementMatrix({
   const gridTemplateColumns = `minmax(174px, 214px) repeat(${history.dates.length}, ${cellWidth}px)`;
 
   return (
-    <div className="overflow-x-auto pb-1">
+    <div className="overflow-x-auto pb-1" data-heatmap-grid>
       <div
         className="min-w-max"
         style={{
@@ -300,7 +306,7 @@ function MovementMatrix({
         {history.dates.map((date, index) => (
           <div
             key={date}
-            className="h-4 text-center text-[8px] tabular-nums text-[var(--faint)]"
+            className="h-4 text-center text-[10px] tabular-nums text-[var(--faint)]"
             title={formatDate(date)}
           >
             {index === 0 || index === history.dates.length - 1 || index % 5 === 0
@@ -314,12 +320,14 @@ function MovementMatrix({
             key={row.holdingId}
             row={row}
             rowIndex={rowIndex}
+            rowCount={history.rows.length}
+            cellCount={history.dates.length}
             onSelect={onSelect}
             selection={selection}
           />
         ))}
       </div>
-      <div className="mt-3 flex items-center gap-3 text-[9px] text-[var(--faint)]">
+      <div className="mt-3 flex items-center gap-3 text-[11px] text-[var(--faint)]">
         <span>하락</span>
         <div className="flex flex-1 items-center gap-px" aria-hidden="true">
           <span className="h-1.5 flex-1 rounded-[3px]" style={{ backgroundColor: "color-mix(in srgb, var(--negative) 78%, transparent)" }} />
@@ -341,16 +349,20 @@ function HeatmapRow({
   onSelect,
   row,
   rowIndex,
+  rowCount,
+  cellCount,
   selection,
 }: {
   onSelect: (rowIndex: number, cellIndex: number) => void;
   row: PortfolioDashboardHoldingHistory["rows"][number];
   rowIndex: number;
+  rowCount: number;
+  cellCount: number;
   selection: { rowIndex: number; cellIndex: number } | null;
 }) {
   return (
     <>
-      <div className="flex min-w-0 items-center pr-2 text-[11px] font-medium text-[var(--ink)]" title={row.name}>
+      <div className="flex min-w-0 items-center pr-2 text-xs font-medium text-[var(--ink)]" title={row.name}>
         <span className="truncate">{row.name}</span>
       </div>
       {row.cells.map((cell, cellIndex) => {
@@ -364,11 +376,25 @@ function HeatmapRow({
             type="button"
             aria-label={`${row.name} ${formatDate(cell.date)} ${evidenceLabel}`}
             aria-pressed={selected}
-            className={`flex h-[18px] min-w-[22px] w-full items-center justify-center rounded-[6px] border border-white/30 text-[8px] font-semibold tabular-nums text-[var(--muted)] transition-[transform,box-shadow] hover:relative hover:z-10 hover:scale-[1.08] hover:shadow-[0_3px_8px_rgba(28,35,30,0.14)] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand)] ${
+            className={`flex h-7 min-w-[27px] w-full items-center justify-center rounded-[5px] border border-white/30 text-[10px] font-semibold tabular-nums text-[var(--muted)] transition-[transform,box-shadow] hover:relative hover:z-10 hover:scale-[1.05] hover:shadow-[0_3px_8px_rgba(28,35,30,0.14)] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand)] ${
               selected ? "ring-1 ring-[var(--brand)] ring-offset-1 ring-offset-[var(--paper)]" : ""
             }`}
+            data-cell-index={cellIndex}
+            data-heatmap-cell
+            data-row-index={rowIndex}
+            onKeyDown={(event) =>
+              moveHeatmapFocus({
+                cellCount,
+                cellIndex,
+                event,
+                onSelect,
+                rowCount,
+                rowIndex,
+              })
+            }
             onClick={() => onSelect(rowIndex, cellIndex)}
             style={heatmapStyle(cell)}
+            tabIndex={selected || (!selection && rowIndex === 0 && cellIndex === 0) ? 0 : -1}
             title={`${row.name}\n${formatDate(cell.date)}\n${evidenceLabel}`}
           >
             {cell.changePct === null ? "·" : null}
@@ -377,6 +403,43 @@ function HeatmapRow({
       })}
     </>
   );
+}
+
+function moveHeatmapFocus({
+  cellCount,
+  cellIndex,
+  event,
+  onSelect,
+  rowCount,
+  rowIndex,
+}: {
+  cellCount: number;
+  cellIndex: number;
+  event: KeyboardEvent<HTMLButtonElement>;
+  onSelect: (rowIndex: number, cellIndex: number) => void;
+  rowCount: number;
+  rowIndex: number;
+}) {
+  const movement = {
+    ArrowDown: [1, 0],
+    ArrowLeft: [0, -1],
+    ArrowRight: [0, 1],
+    ArrowUp: [-1, 0],
+  }[event.key];
+  if (!movement) return;
+  event.preventDefault();
+  const nextRow = Math.min(Math.max(rowIndex + movement[0], 0), rowCount - 1);
+  const nextCell = Math.min(
+    Math.max(cellIndex + movement[1], 0),
+    cellCount - 1,
+  );
+  onSelect(nextRow, nextCell);
+  event.currentTarget
+    .closest<HTMLElement>("[data-heatmap-grid]")
+    ?.querySelector<HTMLElement>(
+      `[data-heatmap-cell][data-row-index="${nextRow}"][data-cell-index="${nextCell}"]`,
+    )
+    ?.focus();
 }
 
 function ModeButton({

@@ -173,6 +173,13 @@ export async function PATCH(
       ? body.legacyBase44Id
       : body.legacy_base44_id;
 
+  if (accountId === null) {
+    return NextResponse.json(
+      { error: "accountId cannot be null" },
+      { status: 400 },
+    );
+  }
+
   const hasKnownUpdate = [
     legacyBase44Id,
     body.name,

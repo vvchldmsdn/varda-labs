@@ -76,6 +76,12 @@ describe("owner-scoped parametric factor research", () => {
     assert.equal(result.status, "unavailable");
     assert.equal(result.reason, "insufficient_factor_overlap");
     assert.ok(result.source.alignedObservationCount < 45);
+    assert.equal(result.remediation.code, "refresh_core_market_factor_history");
+    assert.equal(result.remediation.requiredAlignedObservationCount, 45);
+    assert.equal(
+      result.remediation.observationShortfall,
+      45 - result.source.alignedObservationCount,
+    );
     assert.equal(result.bands.length, 0);
     assert.equal(result.policy.fallback, "forbidden");
   });

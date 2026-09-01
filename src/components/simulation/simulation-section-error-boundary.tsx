@@ -1,6 +1,6 @@
 "use client";
 
-import { unstable_catchError, type ErrorInfo } from "next/error";
+import { catchError, type ErrorInfo } from "next/error";
 
 type SimulationSectionErrorBoundaryProps = {
   section: string;
@@ -9,7 +9,7 @@ type SimulationSectionErrorBoundaryProps = {
 
 function SimulationSectionErrorFallback(
   { section, title }: SimulationSectionErrorBoundaryProps,
-  { unstable_retry }: ErrorInfo,
+  { retry }: ErrorInfo,
 ) {
   return (
     <section
@@ -24,7 +24,7 @@ function SimulationSectionErrorFallback(
       </p>
       <button
         className="mt-3 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold"
-        onClick={() => unstable_retry()}
+        onClick={() => retry()}
         type="button"
       >
         다시 시도
@@ -33,6 +33,6 @@ function SimulationSectionErrorFallback(
   );
 }
 
-export const SimulationSectionErrorBoundary = unstable_catchError(
+export const SimulationSectionErrorBoundary = catchError(
   SimulationSectionErrorFallback,
 );

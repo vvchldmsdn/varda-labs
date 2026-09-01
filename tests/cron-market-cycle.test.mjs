@@ -142,6 +142,11 @@ describe("Cron market-cycle controller", () => {
     assert.match(route, /query_parameters_not_allowed/);
     assert.doesNotMatch(route, /confirmWrite|account=|snapshotDate=/);
     assert.match(runner, /acceptExistingVardaRow: true/);
+    assert.match(runner, /runCoreMarketFactorRefreshJob/);
+    assert.match(
+      runner,
+      /Shared factor history is auxiliary research evidence/,
+    );
     assert.match(runner, /mode: "close"/);
     assert.match(runner, /mode: "live"/);
     assert.match(runner, /live_quote_sync_incomplete/);

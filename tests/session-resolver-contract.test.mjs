@@ -320,6 +320,7 @@ describe("provider-neutral session resolver Phase 1G0", () => {
 
     assert.deepEqual(importSpecifiers.sort(), [
       "../src/lib/tenant-writer-registry.ts",
+      "./auth-sdk-version-policy.mjs",
       "./lib/session-resolver-contract-audit.mjs",
       "node:fs",
       "node:path",

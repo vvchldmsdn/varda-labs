@@ -68,8 +68,8 @@ export async function writeSessionPortfolioGroup(
       return state(
         "success",
         parsed.input.mode === "create"
-          ? "자산 그룹을 만들었습니다."
-          : "자산 그룹 구성을 저장했습니다.",
+          ? "분석 범위를 만들었습니다."
+          : "분석 범위 구성을 저장했습니다.",
       );
     }
     return saveConflictState(result, parsed.input);
@@ -82,7 +82,7 @@ export async function writeSessionPortfolioGroup(
     }
     return state(
       "error",
-      "자산 그룹을 저장하지 못했습니다. 잠시 후 다시 확인해 주세요.",
+      "분석 범위를 저장하지 못했습니다. 잠시 후 다시 확인해 주세요.",
     );
   }
 }
@@ -135,11 +135,11 @@ export async function archiveSessionPortfolioGroup(
     return number(result?.archived_count) === 1
       ? state(
           "success",
-          "자산 그룹을 보관했습니다. 과거 분석 기록은 유지됩니다.",
+          "분석 범위를 보관했습니다. 과거 분석 기록은 유지됩니다.",
         )
       : state(
           "conflict",
-          "자산 그룹이 변경되었거나 이미 보관되었습니다. 화면을 새로고침해 주세요.",
+          "분석 범위가 변경되었거나 이미 보관되었습니다. 화면을 새로고침해 주세요.",
         );
   } catch (error) {
     if (isDatabaseConflict(error)) {
@@ -150,7 +150,7 @@ export async function archiveSessionPortfolioGroup(
     }
     return state(
       "error",
-      "자산 그룹을 보관하지 못했습니다. 잠시 후 다시 확인해 주세요.",
+      "분석 범위를 보관하지 못했습니다. 잠시 후 다시 확인해 주세요.",
     );
   }
 }
@@ -190,7 +190,7 @@ function saveConflictState(
   input: PortfolioGroupSaveInput,
 ): PortfolioGroupManagementActionState {
   if (number(result.duplicate_name_count) > 0) {
-    return state("conflict", "같은 이름의 활성 자산 그룹이 이미 있습니다.");
+    return state("conflict", "같은 이름의 활성 분석 범위가 이미 있습니다.");
   }
   if (
     number(result.requested_account_count) !== number(result.owned_account_count) ||
@@ -214,10 +214,10 @@ function saveConflictState(
   ) {
     return state(
       "conflict",
-      "자산 그룹이 변경되었거나 보관되었습니다. 화면을 새로고침해 주세요.",
+      "분석 범위가 변경되었거나 보관되었습니다. 화면을 새로고침해 주세요.",
     );
   }
-  return state("conflict", "자산 그룹 변경 조건을 다시 확인해 주세요.");
+  return state("conflict", "분석 범위 변경 조건을 다시 확인해 주세요.");
 }
 
 function isDatabaseConflict(error: unknown) {

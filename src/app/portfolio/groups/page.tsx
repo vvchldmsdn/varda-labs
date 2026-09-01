@@ -17,10 +17,10 @@ export default async function PortfolioGroupsPage() {
   if (!resolution.ok) {
     return (
       <PortfolioReadAccessBoundary
-        closedMessage="로그인과 사용자 소유권이 확인되기 전에는 자산 그룹을 조회하거나 변경하지 않습니다."
+        closedMessage="로그인과 사용자 소유권이 확인되기 전에는 분석 범위를 조회하거나 변경하지 않습니다."
         description="여러 계좌 또는 일부 종목을 하나의 분석 범위로 묶습니다."
         resolution={resolution}
-        title="자산 그룹 관리"
+        title="분석 범위 관리"
       />
     );
   }
@@ -40,7 +40,7 @@ export default async function PortfolioGroupsPage() {
             <div>
               <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                자산 그룹 관리
+                분석 범위 관리
               </h1>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 실제 계좌와 별개로, 함께 분석할 계좌와 종목을 묶습니다.
@@ -58,7 +58,7 @@ export default async function PortfolioGroupsPage() {
               value={serviceDate.replaceAll("-", ".")}
             />
             <SummaryCell
-              label="활성 그룹"
+              label="활성 범위"
               value={model.state === "ready" ? `${model.groups.length}개` : "-"}
             />
             <SummaryCell
@@ -74,14 +74,14 @@ export default async function PortfolioGroupsPage() {
 
         {model.state !== "ready" ? (
           <section className="rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
-            자산 그룹 정보를 불러오지 못했습니다. 데이터 연결 상태를 확인해 주세요.
+            분석 범위 정보를 불러오지 못했습니다. 데이터 연결 상태를 확인해 주세요.
           </section>
         ) : (
           <>
             <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-              <h2 className="text-lg font-semibold">새 그룹</h2>
+              <h2 className="text-lg font-semibold">새 분석 범위</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                빈 그룹도 만들 수 있으며 구성은 언제든 바꿀 수 있습니다.
+                빈 범위도 만들 수 있으며 구성은 언제든 바꿀 수 있습니다.
               </p>
               <div className="mt-4">
                 <PortfolioGroupCreateForm
@@ -93,14 +93,14 @@ export default async function PortfolioGroupsPage() {
 
             <section className="space-y-3">
               <div className="px-1">
-                <h2 className="text-lg font-semibold">기존 그룹</h2>
+                <h2 className="text-lg font-semibold">기존 분석 범위</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   변경일 이후의 홈, 오늘 변동, 추가 투입, 위험, 투자랩과 시뮬레이션에 같은 범위가 적용됩니다.
                 </p>
               </div>
               {model.groups.length === 0 ? (
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
-                  아직 만든 자산 그룹이 없습니다.
+                  아직 만든 분석 범위가 없습니다.
                 </div>
               ) : (
                 model.groups.map((group) => (

@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, relative } from "node:path";
 
+import { REVIEWED_AUTH_SDK_VERSIONS } from "./auth-sdk-version-policy.mjs";
+
 const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
   "src/lib/auth/auth-transport-api-contract.ts",
   "src/lib/auth/auth-transport-policy.ts",
@@ -41,8 +43,12 @@ export function auditAuthTransportRuntime(root) {
 
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const authSdkVersion = packageJson.dependencies?.["@neondatabase/auth"];
-  const naverAuthSdkPinned = packageJson.dependencies?.["@auth/core"] === "0.41.3";
-  if (authSdkVersion !== "0.4.2-beta") {
+  const naverAuthSdkPinned =
+    packageJson.dependencies?.["@auth/core"] ===
+    REVIEWED_AUTH_SDK_VERSIONS["@auth/core"];
+  if (
+    authSdkVersion !== REVIEWED_AUTH_SDK_VERSIONS["@neondatabase/auth"]
+  ) {
     findings.push("auth_sdk_version_drift");
   }
 
@@ -262,7 +268,8 @@ export function auditAuthTransportRuntime(root) {
       publicAuthEnvironmentReferences: runtimeSources.filter((source) =>
         PUBLIC_AUTH_ENVIRONMENT.test(source),
       ).length,
-      authSdkPinned: authSdkVersion === "0.4.2-beta",
+      authSdkPinned:
+        authSdkVersion === REVIEWED_AUTH_SDK_VERSIONS["@neondatabase/auth"],
       naverAuthSdkPinned,
       previewRuntimeDisabled: !previewRuntimeEnabled,
       productionRuntimeEnabled,

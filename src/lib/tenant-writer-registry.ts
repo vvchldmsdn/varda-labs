@@ -623,6 +623,7 @@ export const TENANT_WRITER_REGISTRY = [
     entrypoints: ["/api/cron/market-cycle/run"],
     implementationPaths: [
       "src/lib/cron-market-cycle-run-repository.ts",
+      "src/lib/market-data/core-market-factor-refresh-job.ts",
       "src/lib/market-data/fx-refresh-job.ts",
       "src/lib/market-data/price-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
@@ -630,6 +631,7 @@ export const TENANT_WRITER_REGISTRY = [
     ],
     targets: [
       adminTarget("market_data_sync_runs", "insert", "update"),
+      sharedTarget("global_market_factors", "insert"),
       sharedTarget("fx_rates", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
       userTarget("daily_portfolio_snapshots", "insert", "update"),

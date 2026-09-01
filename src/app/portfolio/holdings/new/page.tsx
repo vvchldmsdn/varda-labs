@@ -29,7 +29,7 @@ export default async function NewHoldingPage() {
               className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
               href="/portfolio/groups"
             >
-              자산 그룹
+              분석 범위
             </Link>
             <Link
               className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
@@ -52,7 +52,7 @@ export default async function NewHoldingPage() {
           </div>
         ) : options?.state !== "ready" ? (
           <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
-            계좌와 자산 그룹 정보를 불러오지 못했습니다.
+            계좌와 분석 범위 정보를 불러오지 못했습니다.
           </p>
         ) : options.accounts.length === 0 ? (
           <div className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">

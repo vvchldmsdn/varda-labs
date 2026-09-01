@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ScrollableNavRail } from "@/components/scrollable-nav-rail";
 
 import {
   buildPortfolioAnalysisScopeHref,
@@ -23,12 +24,17 @@ export function PortfolioAnalysisScopeTabs({
   const underline = variant === "underline";
 
   return (
-    <nav
-      aria-label="자산 분석 범위"
-      className={
+    <ScrollableNavRail
+      ariaLabel="자산 분석 범위"
+      viewportClassName={
         underline
-          ? "flex max-w-full items-center gap-7 overflow-x-auto pb-1 text-sm sm:gap-10"
-          : "flex max-w-full gap-1 overflow-x-auto rounded-md border border-[var(--line)] bg-white p-1"
+          ? "max-w-full pb-1 text-sm"
+          : "max-w-full rounded-md border border-[var(--line)] bg-white p-1"
+      }
+      contentClassName={
+        underline
+          ? "flex w-max min-w-full items-center gap-7 sm:gap-10"
+          : "flex w-max min-w-full gap-1"
       }
     >
       {scopes.map((scope) => {
@@ -57,12 +63,12 @@ export function PortfolioAnalysisScopeTabs({
           </Link>
         );
       })}
-    </nav>
+    </ScrollableNavRail>
   );
 }
 
 function scopeKindLabel(scope: PortfolioAnalysisScope) {
-  if (scope.kind === "portfolio_group") return "자산 그룹";
+  if (scope.kind === "portfolio_group") return "분석 범위";
   if (scope.kind === "account") return "계좌";
   return "전체 자산";
 }

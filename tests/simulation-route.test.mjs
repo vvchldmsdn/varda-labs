@@ -136,8 +136,8 @@ describe("Simulation input readiness route boundary", () => {
       "owner input and result sections must reuse the started owner research promise",
     );
     assert.match(sectionErrorBoundary, /^"use client";/);
-    assert.match(sectionErrorBoundary, /unstable_catchError/);
-    assert.match(sectionErrorBoundary, /unstable_retry/);
+    assert.match(sectionErrorBoundary, /catchError/);
+    assert.match(sectionErrorBoundary, /retry/);
     assert.doesNotMatch(sectionErrorBoundary, /error\.message|error\.digest/);
     assert.match(page, /historicalOutcomeValidationPromise/);
     assert.match(page, /FanBandValidationSection/);

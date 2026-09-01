@@ -6,14 +6,19 @@ import {
   INVESTMENT_LAB_SNAPSHOT_BOUNDARY_SQL,
 } from "./investment-lab-event-flow-sql.mjs";
 
-export async function loadInvestmentLabEventFlowEvidence(sql) {
-  const [eventRows, closeRows, snapshotRows, actualPathRows, ownerRows] =
+export async function loadInvestmentLabActiveOwners(sql) {
+  return sql.query(INVESTMENT_LAB_ACTIVE_OWNER_SQL);
+}
+
+export async function loadInvestmentLabEventFlowEvidence(sql, ownerUserId) {
+  if (!ownerUserId) throw new Error("ownerUserId is required");
+
+  const [eventRows, closeRows, snapshotRows, actualPathRows] =
     await Promise.all([
-      sql.query(INVESTMENT_LAB_EVENT_FLOW_SQL),
+      sql.query(INVESTMENT_LAB_EVENT_FLOW_SQL, [ownerUserId]),
       sql.query(INVESTMENT_LAB_KODEX_CLOSE_SQL),
-      sql.query(INVESTMENT_LAB_SNAPSHOT_BOUNDARY_SQL),
-      sql.query(INVESTMENT_LAB_DERIVED_ALL_PATH_SQL),
-      sql.query(INVESTMENT_LAB_ACTIVE_OWNER_SQL),
+      sql.query(INVESTMENT_LAB_SNAPSHOT_BOUNDARY_SQL, [ownerUserId]),
+      sql.query(INVESTMENT_LAB_DERIVED_ALL_PATH_SQL, [ownerUserId]),
     ]);
 
   return {
@@ -21,6 +26,6 @@ export async function loadInvestmentLabEventFlowEvidence(sql) {
     closeRows,
     snapshot: snapshotRows[0] ?? {},
     actualPathRows,
-    ownerRows,
+    ownerRows: [{ owner_user_id: ownerUserId }],
   };
 }

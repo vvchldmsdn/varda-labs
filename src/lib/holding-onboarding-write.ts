@@ -194,12 +194,12 @@ export async function writeSessionHoldingOnboarding(
     } else {
       await db.batch([assetInsert, evidenceInsert, membershipInsert]);
     }
-    return state("success", "보유종목을 자산 그룹에 추가했습니다.", assetId);
+    return state("success", "보유종목을 분석 범위에 추가했습니다.", assetId);
   } catch (error) {
     if (isUniqueViolation(error)) {
       return state(
         "conflict",
-        "같은 종목이나 자산 그룹이 먼저 등록되었습니다. 화면을 새로고침해 주세요.",
+        "같은 종목이나 분석 범위가 먼저 등록되었습니다. 화면을 새로고침해 주세요.",
       );
     }
     return state(
@@ -244,7 +244,7 @@ async function resolvePortfolioGroup(
       ? Object.freeze({ ok: true, ...rows[0], create: false })
       : Object.freeze({
           ok: false,
-          message: "선택한 자산 그룹을 사용할 수 없습니다.",
+          message: "선택한 분석 범위를 사용할 수 없습니다.",
         });
   }
 
@@ -276,7 +276,7 @@ async function resolvePortfolioGroup(
   if (duplicate.length > 0) {
     return Object.freeze({
       ok: false,
-      message: "같은 이름의 자산 그룹이 이미 있습니다.",
+      message: "같은 이름의 분석 범위가 이미 있습니다.",
     });
   }
 
