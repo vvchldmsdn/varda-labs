@@ -17,7 +17,7 @@ export function OwnerResearchExecutionSection({
   return (
     <section
       aria-labelledby="owner-research-execution-title"
-      className="py-4 sm:py-5"
+      className="py-2"
       data-owner-research-execution
       data-owner-research-account={execution.account}
       data-owner-research-status={execution.status}
@@ -84,6 +84,16 @@ export function OwnerResearchExecutionSection({
               </p>
             </div>
           </div>
+          {execution.status === "ready" &&
+          execution.coverage.omittedWeightBps > 0 ? (
+            <p
+              data-owner-research-partial-coverage
+              className="mt-6 border-l-2 border-[var(--warning)] pl-3 text-sm leading-7 text-[var(--warning)]"
+            >
+              {formatWeight(execution.coverage.omittedWeightBps)} 제외 · 포함
+              종목만 100%로 환산한 부분 포트폴리오입니다.
+            </p>
+          ) : null}
           <div className="mt-6 overflow-x-auto border-y border-[var(--line)]">
             <table className="w-full min-w-[540px] text-left text-sm">
               <thead>
@@ -136,6 +146,30 @@ export function OwnerResearchExecutionSection({
               </tbody>
             </table>
           </div>
+          {execution.status === "ready" ? (
+            <div className="mt-8">
+              <h3 className="text-lg font-medium text-[var(--ink)]">
+                위험과 계산 근거
+              </h3>
+              <div className="mt-4 border-y border-[var(--line)]">
+                <SimulationTerminalRiskMetrics terminal={execution.terminal} />
+              </div>
+              <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
+                기준일 {formatDate(execution.source.endServiceDate)} · 입력
+                수익률 {execution.source.returnStepCount}개 · 평균 블록 5단계 ·
+                최초 배분 후 리밸런싱 없음
+              </p>
+              {execution.source.priceBasis === "raw_price_return" ? (
+                <p
+                  data-owner-research-raw-close-disclosure
+                  className="mt-2 text-sm leading-7 text-[var(--warning)]"
+                >
+                  저장된 KIS 미조정 종가·날짜별 환율 기준. 배당·액면분할 조정
+                  총수익률이 아닙니다.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </SimulationDialog>
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--faint)]">
@@ -153,16 +187,6 @@ export function OwnerResearchExecutionSection({
           {execution.coverage.modeledCurrentValuePct.toFixed(1)}% 포함
         </span>
       </p>
-      {execution.status === "ready" &&
-      execution.coverage.omittedWeightBps > 0 ? (
-        <p
-          data-owner-research-partial-coverage
-          className="mt-3 border-l-2 border-[var(--warning)] pl-3 text-xs leading-5 text-[var(--warning)]"
-        >
-          {formatWeight(execution.coverage.omittedWeightBps)} 제외 · 포함 종목만 100%로 환산
-          <span className="hidden sm:inline">한 부분 포트폴리오입니다.</span>
-        </p>
-      ) : null}
       {execution.status === "ready" ? (
         <ReadyOwnerExecution execution={execution} />
       ) : (
@@ -190,17 +214,17 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
   const terminalBand = execution.bands.at(-1);
   return (
     <div
-      className="mt-5"
+      className="mt-2"
       data-owner-research-horizon={execution.assumptions.horizon}
       data-owner-research-path-count={execution.assumptions.pathCount}
     >
-      <div className="flex items-end justify-between gap-3 border-b border-[var(--wash)] pb-4 sm:gap-5">
+      <div className="flex items-end justify-between gap-3 border-b border-[var(--wash)] pb-2 sm:gap-5">
         <div>
           <p className="text-xs text-[var(--faint)]">
             {execution.assumptions.horizon}단계 후 · 중앙값
           </p>
           <p
-            className={`mt-2 text-[32px] leading-none font-medium tabular-nums sm:text-[38px] ${execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}`}
+            className={`mt-1 text-[28px] leading-none font-medium tabular-nums sm:text-[34px] ${execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}`}
           >
             {simulationReturnLabel(100 + execution.terminal.p50ReturnPct)}
           </p>
@@ -208,43 +232,26 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
         <dl className="grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-3 sm:gap-9 sm:text-xs">
           <div>
             <dt className="text-[var(--faint)]">하위 경계 P10</dt>
-            <dd className="mt-2 text-lg tabular-nums">
+            <dd className="mt-1 text-base tabular-nums sm:text-lg">
               {terminalBand ? simulationReturnLabel(terminalBand.p10) : "-"}
             </dd>
           </div>
           <div>
             <dt className="text-[var(--faint)]">상위 경계 P90</dt>
-            <dd className="mt-2 text-lg tabular-nums">
+            <dd className="mt-1 text-base tabular-nums sm:text-lg">
               {terminalBand ? simulationReturnLabel(terminalBand.p90) : "-"}
             </dd>
           </div>
           <div className="hidden sm:block">
             <dt className="text-[var(--faint)]">계산 경로</dt>
-            <dd className="mt-2 text-lg tabular-nums">
+            <dd className="mt-1 text-base tabular-nums sm:text-lg">
               {execution.assumptions.pathCount}
               <span className="ml-1 text-xs text-[var(--faint)]">개</span>
             </dd>
           </div>
         </dl>
       </div>
-      <ResearchFanChart execution={execution} large />
-      <div className="border-y border-[var(--line)]">
-        <SimulationTerminalRiskMetrics terminal={execution.terminal} />
-      </div>
-      <p className="mt-3 text-[11px] leading-6 text-[var(--faint)]">
-        기준일 {formatDate(execution.source.endServiceDate)} · 입력 수익률{" "}
-        {execution.source.returnStepCount}개 · 평균 블록 5단계 · 최초 배분 후
-        리밸런싱 없음
-      </p>
-      {execution.source.priceBasis === "raw_price_return" ? (
-        <p
-          data-owner-research-raw-close-disclosure
-          className="text-[11px] leading-6 text-[var(--warning)]"
-        >
-          저장된 KIS 미조정 종가·날짜별 환율 기준. 배당·액면분할 조정 총수익률이
-          아닙니다.
-        </p>
-      ) : null}
+      <ResearchFanChart compact execution={execution} />
     </div>
   );
 }

@@ -57,8 +57,8 @@ export function InvestmentLabWorkspace({
   }
 
   return (
-    <div data-lab-workspace={selected}>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
+    <div className="varda-workspace-deck" data-lab-workspace={selected}>
+      <div className="varda-workspace-tabs flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
         <div
           aria-label="투자랩 분석"
           className="flex min-w-0 gap-5 sm:gap-8"
@@ -92,7 +92,7 @@ export function InvestmentLabWorkspace({
           id={`${id}-${view.id}-panel`}
           role="tabpanel"
           tabIndex={0}
-          className="min-w-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
+          className="varda-workspace-panel min-w-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
         >
           {panels[view.id]}
         </div>

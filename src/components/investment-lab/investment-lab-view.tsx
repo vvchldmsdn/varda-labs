@@ -4,7 +4,6 @@ import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navig
 import { InvestmentLabWorkspace } from "./investment-lab-workspace";
 import { InvestmentLabScopeTabs } from "./investment-lab-scope-tabs";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
-import { InvestmentLabDisclosure } from "./investment-lab-disclosure";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabScenarioChartView } from "./investment-lab-scenario-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
@@ -20,6 +19,7 @@ import type { InvestmentLabApprovedTargetWeightScenario } from "@/lib/investment
 import type { InvestmentLabAccountComposition } from "@/lib/investment-lab-account-composition";
 import type { InvestmentLabAccountFundingPreflight } from "@/lib/investment-lab-account-funding-preflight";
 import type { InvestmentLabCounterfactualReadModel } from "@/lib/investment-lab-counterfactual-read-model";
+import type { InvestmentLabFixedMixWeights } from "@/lib/investment-lab-fixed-mix-types";
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabFountRuntimeScope } from "@/lib/investment-lab-fount-runtime-scope";
 import type { InvestmentLabObservedHistory } from "@/lib/investment-lab-observed-history-segments";
@@ -80,7 +80,7 @@ export function InvestmentLabView({
 
   return (
     <main
-      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-account-composition-status={accountComposition.status}
       data-analysis-scope={selectedScope.key}
@@ -177,8 +177,8 @@ export function InvestmentLabView({
         selectedScopeKey={selectedScope.key}
       />
 
-      <div className="varda-content">
-        <header>
+      <div className="varda-content varda-presentation-content flex flex-col">
+        <header className="shrink-0">
           <div className="flex items-center justify-between gap-5 text-[11px] text-[var(--muted)]">
             <p>PORTFOLIO / LAB</p>
             <p className="tabular-nums">분석 범위 {selectedScope.label}</p>
@@ -192,7 +192,7 @@ export function InvestmentLabView({
           </div>
         </header>
 
-        <div className="mt-8 scroll-mt-4" id="investment-lab-results">
+        <div className="mt-5 min-h-0 flex-1 overflow-hidden" id="investment-lab-results">
           <InvestmentLabWorkspace
             tools={
               <>
@@ -304,141 +304,162 @@ function ReadyView({
         anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
         approvedTargetWeightScenario={approvedTargetWeightScenario}
         model={model}
+        details={
+          <>
+            <InvestmentLabDialog
+              label="가정"
+              title="기간과 계산 가정"
+              size="wide"
+            >
+              <CurrentWriterSegmentNotice
+                fountScopeAdjustment={fountScopeAdjustment}
+                model={model}
+                period={period}
+                selectedScope={selectedScope}
+              />
+            </InvestmentLabDialog>
+
+            <InvestmentLabDialog
+              label="시나리오"
+              title="모든 시나리오 비교"
+              size="wide"
+            >
+              <InvestmentLabScenarioMatrix
+                anchorBasketScenario={anchorBasketScenario}
+                anchorValueWeightScenario={anchorValueWeightScenario}
+                anchorCurrentWeightMonthlyScenario={
+                  anchorCurrentWeightMonthlyScenario
+                }
+                anchorEqualWeightMonthlyScenario={
+                  anchorEqualWeightMonthlyScenario
+                }
+                approvedTargetWeightScenario={approvedTargetWeightScenario}
+                model={model}
+              />
+            </InvestmentLabDialog>
+
+            <InvestmentLabDialog
+              label="근거"
+              title="현금흐름과 수익률 상세"
+              size="wide"
+            >
+              <InvestmentLabCalculationEvidence
+                fixedMixWeights={fixedMixWeights}
+                model={model}
+                observedSummary={observedSummary}
+              />
+            </InvestmentLabDialog>
+          </>
+        }
+      />
+    </>
+  );
+}
+
+function InvestmentLabCalculationEvidence({
+  fixedMixWeights,
+  model,
+  observedSummary,
+}: {
+  fixedMixWeights: InvestmentLabFixedMixWeights | null;
+  model: InvestmentLabCounterfactualReadModel;
+  observedSummary: NonNullable<
+    InvestmentLabCounterfactualReadModel["observedPath"]["summary"]
+  >;
+}) {
+  return (
+    <div className="space-y-6">
+      <InvestmentLabCashComparisonView comparison={model.cashComparison} />
+
+      <ReturnEstimateSection model={model} />
+      <VooComparisonSection model={model} />
+
+      <InvestmentLabContributionExperiment
+        fixedMixWeights={fixedMixWeights}
+        key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
+        scenarios={model.contributionExperimentScenarios}
       />
 
-      <InvestmentLabDisclosure
-        title="기간과 계산 가정"
-        detail="비교 범위 · 제외 자산 · 가격 기준"
-      >
-        <CurrentWriterSegmentNotice
-          fountScopeAdjustment={fountScopeAdjustment}
-          model={model}
-          period={period}
-          selectedScope={selectedScope}
-        />
-      </InvestmentLabDisclosure>
-
-      <InvestmentLabDisclosure
-        title="모든 시나리오 비교"
-        detail="전체 수치 · 미계산 사유 · 해결 방법"
-      >
-        <InvestmentLabScenarioMatrix
-          anchorBasketScenario={anchorBasketScenario}
-          anchorValueWeightScenario={anchorValueWeightScenario}
-          anchorCurrentWeightMonthlyScenario={
-            anchorCurrentWeightMonthlyScenario
-          }
-          anchorEqualWeightMonthlyScenario={anchorEqualWeightMonthlyScenario}
-          approvedTargetWeightScenario={approvedTargetWeightScenario}
-          model={model}
-        />
-      </InvestmentLabDisclosure>
-
-      <InvestmentLabDisclosure
-        title="현금흐름과 수익률 상세"
-        detail="실제 기록 · 지수 비교 · 매수 시점"
-      >
-        <div className="space-y-6">
-          <InvestmentLabCashComparisonView comparison={model.cashComparison} />
-        </div>
-
-        <div className="mt-6">
-          <ReturnEstimateSection model={model} />
-        </div>
-
-        <div className="mt-6">
-          <VooComparisonSection model={model} />
-        </div>
-
-        <div className="mt-6">
-          <InvestmentLabContributionExperiment
-            fixedMixWeights={fixedMixWeights}
-            key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
-            scenarios={model.contributionExperimentScenarios}
-          />
-        </div>
-
-        {model.status === "ready" ? (
-          <section className="overflow-hidden border-y border-[var(--line)]">
-            <div className="flex flex-col gap-1 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">비교 데이터</h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  평가액과 해당 시점에 사용된 KODEX 200 가격 기준일을 함께
-                  확인합니다.
-                </p>
-              </div>
-              <p className="text-sm text-[var(--muted)]">
-                기간 내 반영 거래 {model.coverage.appliedFlowRows}건 · 지연 체결{" "}
-                {model.coverage.delayedExecutionRows}건
+      {model.status === "ready" ? (
+        <section className="overflow-hidden border-y border-[var(--line)]">
+          <div className="flex flex-col gap-1 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">비교 데이터</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                평가액과 해당 시점에 사용된 KODEX 200 가격 기준일을 함께
+                확인합니다.
               </p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
-                    <th className="px-4 py-3">평가일</th>
-                    <th className="px-3 py-3 text-right">실제 평가액</th>
-                    <th className="px-3 py-3 text-right">KODEX 200</th>
-                    <th className="px-3 py-3 text-right">차이</th>
-                    <th className="px-4 py-3">가격 기준</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {model.rows.map((row) => (
-                    <tr
-                      key={row.serviceDate}
-                      className="border-t border-[var(--wash)]"
+            <p className="text-sm text-[var(--muted)]">
+              기간 내 반영 거래 {model.coverage.appliedFlowRows}건 · 지연 체결{" "}
+              {model.coverage.delayedExecutionRows}건
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
+                  <th className="px-4 py-3">평가일</th>
+                  <th className="px-3 py-3 text-right">실제 평가액</th>
+                  <th className="px-3 py-3 text-right">KODEX 200</th>
+                  <th className="px-3 py-3 text-right">차이</th>
+                  <th className="px-4 py-3">가격 기준</th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.rows.map((row) => (
+                  <tr
+                    key={row.serviceDate}
+                    className="border-t border-[var(--wash)]"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      {formatDate(row.serviceDate)}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {formatKrw(row.actualMarketValueKrw)}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {formatKrw(row.scenarioMarketValueKrw)}
+                    </td>
+                    <td
+                      className={`px-3 py-3 text-right font-semibold tabular-nums ${moneyTone(row.differenceKrw)}`}
                     >
-                      <td className="px-4 py-3 font-medium">
-                        {formatDate(row.serviceDate)}
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums">
-                        {formatKrw(row.actualMarketValueKrw)}
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums">
-                        {formatKrw(row.scenarioMarketValueKrw)}
-                      </td>
-                      <td
-                        className={`px-3 py-3 text-right font-semibold tabular-nums ${moneyTone(row.differenceKrw)}`}
-                      >
-                        {formatSignedKrw(row.differenceKrw)}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--muted)]">
-                        {formatDate(row.valuationPriceDate)}
-                        {row.hasPendingExecution ? " · 지연 체결" : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="border-y border-[var(--line)] py-5">
-          <h2 className="text-lg font-semibold">데이터 상태</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <EvidenceCell
-              label="완전한 비교일"
-              value={`${model.coverage.completeComparisonDates}일`}
-            />
-            <EvidenceCell
-              label="평가 스냅샷"
-              value={`${model.coverage.snapshotSourceRows}행`}
-            />
-            <EvidenceCell
-              label={`KODEX 200 ${kodexPriceBasisLabel(model.scenario.priceBasis)}`}
-              value={`${model.coverage.scenarioCloseRows}행`}
-            />
-            <EvidenceCell
-              label="종료 시 대기 거래"
-              value={`${model.coverage.pendingAtEndRows}건`}
-            />
+                      {formatSignedKrw(row.differenceKrw)}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--muted)]">
+                      {formatDate(row.valuationPriceDate)}
+                      {row.hasPendingExecution ? " · 지연 체결" : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
-      </InvestmentLabDisclosure>
-    </>
+      ) : null}
+
+      <section className="border-y border-[var(--line)] py-5">
+        <h2 className="text-lg font-semibold">데이터 상태</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <EvidenceCell
+            label="완전한 비교일"
+            value={`${model.coverage.completeComparisonDates}일`}
+          />
+          <EvidenceCell
+            label="평가 스냅샷"
+            value={`${model.coverage.snapshotSourceRows}행`}
+          />
+          <EvidenceCell
+            label={`KODEX 200 ${kodexPriceBasisLabel(model.scenario.priceBasis)}`}
+            value={`${model.coverage.scenarioCloseRows}행`}
+          />
+          <EvidenceCell
+            label="종료 시 대기 거래"
+            value={`${model.coverage.pendingAtEndRows}건`}
+          />
+        </div>
+      </section>
+    </div>
   );
 }
 

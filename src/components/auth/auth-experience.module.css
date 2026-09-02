@@ -1,7 +1,9 @@
 .shell {
-  min-height: 100svh;
+  height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--paper);
   color: var(--ink);
 }
@@ -39,10 +41,12 @@
 }
 .stage {
   flex: 1;
+  min-height: 0;
   display: grid;
   align-content: center;
   justify-items: center;
-  padding: 64px 24px 96px;
+  padding: 36px 24px 48px;
+  overflow: hidden;
 }
 .panel {
   width: min(100%, 416px);
@@ -169,6 +173,36 @@
   padding-bottom: 24px;
   color: var(--faint);
   font-size: 10px;
+}
+
+@media (max-height: 760px) {
+  .header {
+    min-height: 64px;
+  }
+  .stage {
+    padding-top: 16px;
+    padding-bottom: 20px;
+  }
+  .heading {
+    margin-bottom: 24px;
+  }
+  .heading h1 {
+    font-size: 34px;
+  }
+  .description {
+    margin-top: 12px;
+    line-height: 1.65;
+  }
+  .form {
+    gap: 16px;
+  }
+  .divider {
+    margin: 20px 0 14px;
+  }
+  .footer {
+    min-height: 42px;
+    padding-bottom: 10px;
+  }
 }
 .footer span:last-child {
   display: flex;

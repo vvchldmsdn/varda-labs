@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { PresentationDeck } from "@/components/presentation/presentation-deck";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 import { buildHistoryOverview } from "@/lib/history-overview";
@@ -51,11 +53,19 @@ export function HistoryView({
     rows: history.portfolioRows,
     account: history.selectedScope.key,
   });
+  const scenes = [
+    { id: "timeline", label: "성과 그래프" },
+    ...(overview.status === "ready"
+      ? [{ id: "insights", label: "움직임" }]
+      : []),
+    { id: "activity", label: "활동" },
+    { id: "evidence", label: "검증 근거" },
+  ];
 
   return (
     <main
       data-page="history"
-      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
     >
       <PortfolioPrimaryNavigation
         activePath="/history"
@@ -63,7 +73,9 @@ export function HistoryView({
         selectedScopeKey={history.selectedScope.key}
       />
 
-      <div className="varda-content">
+      <div className="varda-content varda-presentation-content">
+        <PresentationDeck ariaLabel="히스토리 프레젠테이션" scenes={scenes}>
+        <div className="varda-presentation-frame">
         <header>
           <div className="flex items-center justify-between gap-5 text-[11px] text-[var(--muted)]">
             <p>PORTFOLIO / HISTORY</p>
@@ -93,8 +105,10 @@ export function HistoryView({
           model={overview}
           scopeLabel={history.selectedScope.label}
         />
+        </div>
 
         {overview.status === "ready" ? (
+          <div className="varda-presentation-frame justify-center">
           <section className="border-b border-[var(--line)] py-8">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -135,15 +149,27 @@ export function HistoryView({
               />
             </dl>
           </section>
+          </div>
         ) : null}
 
+        <div className="varda-presentation-frame justify-center">
         <HistoryActivityStream result={events} supported={eventsSupported} />
+        </div>
 
-        <details className="mt-8 border-y border-[var(--line)] py-5">
-          <summary className="cursor-pointer list-none text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]">
-            원시 기록과 검증 근거 보기
-          </summary>
-          <div className="mt-6 space-y-10">
+        <div className="varda-presentation-frame justify-center">
+          <section className="border-y border-[var(--line)] py-10">
+            <p className="varda-kicker">AUDIT TRAIL</p>
+            <h2 className="mt-2 text-2xl font-medium">저장 기록을 그대로 검증합니다</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+              성과 그래프에서 사용한 저장점, 포지션 비교와 이벤트 원문은 별도 검증 창에서 확인할 수 있습니다.
+            </p>
+            <div className="mt-8">
+            <PresentationDialog
+              label="원시 기록과 검증 근거 보기"
+              title="히스토리 원시 기록"
+              wide
+            >
+          <div className="space-y-10">
             <p
               data-history-semantic="stored-evidence-not-recomputed"
               className="max-w-4xl text-sm leading-7 text-[var(--muted)]"
@@ -232,7 +258,11 @@ export function HistoryView({
               </RawSection>
             ) : null}
           </div>
-        </details>
+            </PresentationDialog>
+            </div>
+          </section>
+        </div>
+        </PresentationDeck>
       </div>
     </main>
   );

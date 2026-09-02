@@ -6,7 +6,7 @@ import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabTimeMachine } from "./investment-lab-time-machine";
 import { InvestmentLabFixedMix } from "./investment-lab-fixed-mix";
 import { InvestmentLabEtfXray } from "./investment-lab-etf-xray";
-import { InvestmentLabDisclosure } from "./investment-lab-disclosure";
+import { InvestmentLabDialog } from "./investment-lab-dialog";
 import {
   labKrw,
   labPercent,
@@ -22,7 +22,7 @@ export function InvestmentLabDesignPreview({
     buildInvestmentLabDesignPreview(query);
   return (
     <main
-      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
       data-lab-design-preview
     >
       <PortfolioPrimaryNavigation
@@ -30,8 +30,8 @@ export function InvestmentLabDesignPreview({
         generatedAt={dashboard.generatedAt}
         selectedScopeKey={dashboard.selectedScope.key}
       />
-      <div className="varda-content">
-        <header>
+      <div className="varda-content varda-presentation-content flex flex-col">
+        <header className="shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--muted)]">
             <p>PORTFOLIO / LAB</p>
             <p>디자인 미리보기 · 예시 데이터</p>
@@ -44,7 +44,7 @@ export function InvestmentLabDesignPreview({
             />
           </div>
         </header>
-        <div className="mt-8">
+        <div className="mt-5 min-h-0 flex-1 overflow-hidden">
           <InvestmentLabWorkspace
             tools={
               <InvestmentLabPeriodSelector
@@ -54,29 +54,29 @@ export function InvestmentLabDesignPreview({
               />
             }
             comparison={
-              <>
-                <InvestmentLabTimeMachine
-                  chart={chart}
-                  scenarioSummaries={summaries}
-                  unavailableScenarios={[
-                    {
-                      id: "approved_target_weight_monthly",
-                      reason: "일부 계좌에 목표 비중이 설정되어 있지 않습니다.",
-                      resolution:
-                        "목표 비중을 설정하면 해당 효력일 이후의 비교를 계산할 수 있습니다.",
-                    },
-                    {
-                      id: "preperiod_min_volatility",
-                      reason: "시작일 이전의 공통 가격 이력이 부족합니다.",
-                      resolution:
-                        "데이터 준비에서 누락된 종목과 날짜를 확인하거나 비교 시작일을 조정할 수 있습니다.",
-                    },
-                  ]}
-                />
-                <InvestmentLabDisclosure
-                  title="모든 시나리오 비교"
-                  detail={`${summaries.length}개 경로`}
-                >
+              <InvestmentLabTimeMachine
+                chart={chart}
+                scenarioSummaries={summaries}
+                unavailableScenarios={[
+                  {
+                    id: "approved_target_weight_monthly",
+                    reason: "일부 계좌에 목표 비중이 설정되어 있지 않습니다.",
+                    resolution:
+                      "목표 비중을 설정하면 해당 효력일 이후의 비교를 계산할 수 있습니다.",
+                  },
+                  {
+                    id: "preperiod_min_volatility",
+                    reason: "시작일 이전의 공통 가격 이력이 부족합니다.",
+                    resolution:
+                      "데이터 준비에서 누락된 종목과 날짜를 확인하거나 비교 시작일을 조정할 수 있습니다.",
+                  },
+                ]}
+                details={
+                  <InvestmentLabDialog
+                    label="시나리오"
+                    title="모든 시나리오 비교"
+                    size="wide"
+                  >
                   <div className="overflow-x-auto pb-5">
                     <table className="w-full min-w-[570px] text-left text-sm">
                       <thead className="text-xs text-[var(--muted)]">
@@ -104,8 +104,9 @@ export function InvestmentLabDesignPreview({
                       </tbody>
                     </table>
                   </div>
-                </InvestmentLabDisclosure>
-              </>
+                  </InvestmentLabDialog>
+                }
+              />
             }
             experiments={
               <InvestmentLabFixedMix

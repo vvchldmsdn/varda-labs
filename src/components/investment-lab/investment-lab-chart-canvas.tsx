@@ -26,10 +26,12 @@ export function InvestmentLabChartCanvas({
   chart,
   actual,
   selected,
+  compact = false,
 }: {
   chart: InvestmentLabScenarioChart;
   actual: InvestmentLabScenarioChartLine;
   selected: InvestmentLabScenarioChartLine;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(920);
@@ -46,7 +48,7 @@ export function InvestmentLabChartCanvas({
     return () => observer.disconnect();
   }, []);
 
-  const height = width < 550 ? 310 : 365;
+  const height = compact ? (width < 550 ? 155 : 230) : width < 550 ? 310 : 365;
   const left = width < 550 ? 42 : 54;
   const right = 12;
   const top = 24;
@@ -118,7 +120,7 @@ export function InvestmentLabChartCanvas({
   }
 
   return (
-    <div className="relative mt-5 w-full" ref={ref} data-lab-chart>
+    <div className={compact ? "relative mt-2 w-full" : "relative mt-5 w-full"} ref={ref} data-lab-chart>
       <svg
         aria-label={`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`}
         className="block w-full touch-pan-y"

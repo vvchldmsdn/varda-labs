@@ -2,6 +2,7 @@ import {
   InvestmentLabTimeMachine,
   type InvestmentLabTimeMachineScenarioSummary,
 } from "@/components/investment-lab/investment-lab-time-machine";
+import type { ReactNode } from "react";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
@@ -17,6 +18,7 @@ export function InvestmentLabScenarioChartView({
   anchorCurrentWeightMonthlyScenario,
   anchorEqualWeightMonthlyScenario,
   approvedTargetWeightScenario,
+  details,
   model,
 }: {
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
@@ -24,6 +26,7 @@ export function InvestmentLabScenarioChartView({
   anchorCurrentWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   anchorEqualWeightMonthlyScenario: InvestmentLabAnchorScheduledRebalanceScenario;
   approvedTargetWeightScenario: InvestmentLabApprovedTargetWeightScenario;
+  details?: ReactNode;
   model: InvestmentLabCounterfactualReadModel;
 }) {
   const input = {
@@ -76,6 +79,7 @@ export function InvestmentLabScenarioChartView({
     >
       <InvestmentLabTimeMachine
         chart={chart}
+        details={details}
         scenarioSummaries={scenarioSummaries}
         unavailableScenarios={chart.unavailableScenarioIds.map((id) => ({
           id,

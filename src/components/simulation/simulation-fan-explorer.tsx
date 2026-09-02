@@ -16,10 +16,12 @@ export function SimulationFanExplorer({
   execution,
   valueDomain,
   large = false,
+  compact = false,
 }: {
   execution: ResearchFanChartData;
   valueDomain?: ResearchFanChartValueDomain;
   large?: boolean;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -37,7 +39,15 @@ export function SimulationFanExplorer({
     return () => observer.disconnect();
   }, []);
 
-  const height = large ? (width < 600 ? 340 : 430) : 280;
+  const height = compact
+    ? width < 600
+      ? 150
+      : 160
+    : large
+      ? width < 600
+        ? 340
+        : 430
+      : 280;
   const left = 52;
   const right = width - 16;
   const top = 20;
@@ -111,7 +121,9 @@ export function SimulationFanExplorer({
       data-research-fan-chart={execution.id}
       data-fan-mode={mode}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 text-xs ${compact ? "py-1.5" : "py-3"}`}
+      >
         <div
           className="flex gap-1 rounded-md bg-[var(--wash)] p-1"
           role="group"
@@ -128,7 +140,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={mode === key}
               onClick={() => setMode(key)}
-              className={`flex min-h-10 items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${mode === key ? "bg-[var(--paper)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              className={`flex items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${compact ? "min-h-9" : "min-h-10"} ${mode === key ? "bg-[var(--paper)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon size={14} aria-hidden="true" />
               {label}
@@ -151,7 +163,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={unit === key}
               onClick={() => setUnit(key)}
-              className={`min-h-10 border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
+              className={`${compact ? "min-h-9" : "min-h-10"} border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
             >
               {label}
             </button>
@@ -373,19 +385,21 @@ export function SimulationFanExplorer({
           {band?.stepIndex ?? execution.assumptions.horizon}단계
         </span>
       </div>
-      <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
-        <span className="flex items-center gap-2">
-          <i className="h-0.5 w-5 bg-[var(--brand)]" />
-          중앙값 P50
-        </span>
-        <span className="flex items-center gap-2">
-          <i className="h-2.5 w-5 rounded-sm bg-[var(--line)]" />
-          P10~P90 · 모형 내 80% 구간
-        </span>
-        <span>
-          표본 경로 {execution.samplePaths.length}개 · 연구 분포, 수익 보장 아님
-        </span>
-      </figcaption>
+      {compact ? null : (
+        <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
+          <span className="flex items-center gap-2">
+            <i className="h-0.5 w-5 bg-[var(--brand)]" />
+            중앙값 P50
+          </span>
+          <span className="flex items-center gap-2">
+            <i className="h-2.5 w-5 rounded-sm bg-[var(--line)]" />
+            P10~P90 · 모형 내 80% 구간
+          </span>
+          <span>
+            표본 경로 {execution.samplePaths.length}개 · 연구 분포, 수익 보장 아님
+          </span>
+        </figcaption>
+      )}
     </figure>
   );
 }

@@ -10,6 +10,8 @@ import {
 } from "@/components/home/portfolio-format";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { PresentationDeck } from "@/components/presentation/presentation-deck";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import {
   TodayContributionExplorer,
   type TodayContributionDisplayRow,
@@ -76,10 +78,17 @@ export function TodayMovement({
     })
     .filter((row): row is TodayContributionDisplayRow => row !== null)
     .toSorted(compareContributionRows);
+  const hasHoldingDetail = detail.status !== "empty";
+  const scenes = [
+    { id: "summary", label: "오늘" },
+    { id: "contributors", label: "종목별 기여" },
+    ...(hasHoldingDetail ? [{ id: "holding", label: "선택 종목" }] : []),
+    { id: "evidence", label: "계산 근거" },
+  ];
 
   return (
     <main
-      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
       data-page="today"
     >
       <PortfolioPrimaryNavigation
@@ -88,7 +97,9 @@ export function TodayMovement({
         selectedScopeKey={data.selectedScope.key}
       />
 
-      <div className="varda-content">
+      <div className="varda-content varda-presentation-content">
+        <PresentationDeck ariaLabel="오늘 변동 프레젠테이션" scenes={scenes}>
+        <div className="varda-presentation-frame justify-center">
         <section aria-labelledby="today-movement-title">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
@@ -167,8 +178,10 @@ export function TodayMovement({
           priceImpactKrw={attribution.priceImpactKrw}
           tradeFlowKrw={attribution.tradeFlowKrw}
         />
+        </div>
 
-        <section className="mt-12" aria-labelledby="contribution-title">
+        <div className="varda-presentation-frame justify-center">
+        <section aria-labelledby="contribution-title">
           <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">
@@ -184,15 +197,21 @@ export function TodayMovement({
           </div>
           <TodayContributionExplorer rows={rows} />
         </section>
+        </div>
 
-        <HoldingDetailPanel
-          data={data}
-          detail={detail}
-          selectedScopeKey={data.selectedScope.key}
-        />
+        {hasHoldingDetail ? (
+          <div className="varda-presentation-frame justify-center">
+            <HoldingDetailPanel
+              data={data}
+              detail={detail}
+              selectedScopeKey={data.selectedScope.key}
+            />
+          </div>
+        ) : null}
 
+        <div className="varda-presentation-frame justify-center">
         <section
-          className="mt-12 border-y border-[var(--line)]"
+          className="border-y border-[var(--line)]"
           aria-label="데이터 근거"
         >
           <div className="grid sm:grid-cols-2 lg:grid-cols-4">
@@ -223,11 +242,14 @@ export function TodayMovement({
         </section>
 
         {movement.exclusions.length > 0 ? (
-          <details className="mt-6 border-y border-[var(--line)] py-4">
-            <summary className="cursor-pointer text-sm font-medium text-[var(--muted)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]">
-              계산 제외 근거 {movement.exclusions.length}건
-            </summary>
-            <div className="mt-4 divide-y divide-[var(--wash)] border-t border-[var(--wash)]">
+          <div className="mt-6">
+            <PresentationDialog
+              description="현재 변동 합계에서 제외된 항목과 그 이유를 원문 근거대로 표시합니다."
+              label={`계산 제외 근거 ${movement.exclusions.length}건`}
+              title="변동 계산 제외 근거"
+              wide
+            >
+            <div className="divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
               {movement.exclusions.map((row, index) => (
                 <div
                   key={`${row.subject}-${row.reason}-${row.holdingId ?? row.snapshotId ?? index}`}
@@ -245,13 +267,16 @@ export function TodayMovement({
                 </div>
               ))}
             </div>
-          </details>
+            </PresentationDialog>
+          </div>
         ) : null}
 
         <footer className="mt-7 flex flex-col justify-between gap-2 text-xs text-[var(--muted)] sm:flex-row">
           <span>평가액 변동 = 가격 영향 + 환율 영향</span>
           <span>순매매는 성과 변동과 분리해 현재 비교 평가액에만 반영</span>
         </footer>
+        </div>
+        </PresentationDeck>
       </div>
     </main>
   );
@@ -394,7 +419,7 @@ function HoldingDetailPanel({
 
   return (
     <section
-      className="mt-12 border-y border-[var(--line)]"
+      className="border-y border-[var(--line)]"
       aria-labelledby="holding-detail-title"
     >
       <div className="flex flex-col justify-between gap-4 py-5 sm:flex-row sm:items-end">

@@ -1,9 +1,14 @@
 import Link from "next/link";
 
-import { AdditionalContributionResult } from "@/components/additional-contribution/additional-contribution-result";
+import {
+  AdditionalContributionEvidenceScene,
+  AdditionalContributionFlowScene,
+  AdditionalContributionWeightScene,
+} from "@/components/additional-contribution/additional-contribution-result";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { PresentationDeck } from "@/components/presentation/presentation-deck";
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
 import {
   buildPortfolioAnalysisScopeHref,
@@ -32,9 +37,21 @@ export function AdditionalContributionPageView({
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
 }) {
+  const scenes = [
+    { id: "amount", label: "투입 금액" },
+    ...(preview.status === "ready"
+      ? [
+          { id: "flow", label: "자금 흐름" },
+          { id: "weights", label: "비중 변화" },
+          { id: "evidence", label: "계산 근거" },
+        ]
+      : [{ id: "readiness", label: "계산 준비" }]),
+    { id: "actions", label: "다음 작업" },
+  ];
+
   return (
     <main
-      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
       data-page="additional-contribution"
       data-preview-status={preview.status}
     >
@@ -44,7 +61,9 @@ export function AdditionalContributionPageView({
         selectedScopeKey={selectedScope.key}
       />
 
-      <div className="varda-content">
+      <div className="varda-content varda-presentation-content">
+        <PresentationDeck ariaLabel="추가 투입 프레젠테이션" scenes={scenes}>
+        <div className="varda-presentation-frame justify-center">
         <section aria-labelledby="additional-contribution-title">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
@@ -135,16 +154,26 @@ export function AdditionalContributionPageView({
             </nav>
           </div>
         </section>
+        </div>
 
         {preview.status === "ready" ? (
-          <AdditionalContributionResult preview={preview} />
+          <AdditionalContributionFlowScene preview={preview} />
         ) : (
-          <BlockedPreview blockers={preview.blockers} />
+          <div className="varda-presentation-frame justify-center">
+            <BlockedPreview blockers={preview.blockers} />
+          </div>
         )}
+        {preview.status === "ready" ? (
+          <AdditionalContributionWeightScene preview={preview} />
+        ) : null}
+        {preview.status === "ready" ? (
+          <AdditionalContributionEvidenceScene preview={preview} />
+        ) : null}
 
+        <div className="varda-presentation-frame justify-center">
         <section
           aria-label="빠른 작업"
-          className="mt-12 grid gap-6 border-y border-[var(--line)] py-7 sm:grid-cols-3 sm:gap-0"
+          className="grid gap-6 border-y border-[var(--line)] py-10 sm:grid-cols-3 sm:gap-0"
         >
           <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
             {enableLivePriceSync ? (
@@ -181,6 +210,8 @@ export function AdditionalContributionPageView({
             </Link>
           </div>
         </section>
+        </div>
+        </PresentationDeck>
       </div>
     </main>
   );
