@@ -13,37 +13,34 @@ export function AdditionalContributionResult({
 }: {
   preview: AdditionalContributionResultPreview;
 }) {
+  return (
+    <>
+      <AdditionalContributionFlowScene preview={preview} />
+      <AdditionalContributionWeightScene preview={preview} />
+      <AdditionalContributionEvidenceScene preview={preview} />
+    </>
+  );
+}
+
+export function AdditionalContributionFlowScene({
+  preview,
+}: {
+  preview: AdditionalContributionResultPreview;
+}) {
   const view = buildAdditionalContributionView({
     ...preview,
     cashAmountKrw: preview.totalAvailableFundsKrw,
   });
-  const allocationRows = preview.rows
-    .filter((row) => row.allocationKrw > 0)
-    .toSorted(
-      (left, right) =>
-        right.allocationKrw - left.allocationKrw ||
-        left.name.localeCompare(right.name, "ko"),
-    );
-  const weightScaleMax = Math.max(
-    1,
-    ...preview.rows.flatMap((row) => [
-      row.currentWeightPct,
-      row.targetWeightPct,
-      row.postTopupWeightPct,
-    ]),
-  );
 
   return (
-    <>
-      <div className="mb-9">
-        <AdditionalContributionFlowMap
-          cashAmountKrw={preview.cashAmountKrw}
-          availableFundsKrw={preview.totalAvailableFundsKrw}
-          trimProceedsKrw={preview.totalTrimProceedsKrw}
-          rows={view.flowRows}
-        />
-      </div>
-      <section aria-label="배분 요약" className="border-y border-[var(--line)]">
+    <div className="varda-presentation-frame justify-center">
+      <AdditionalContributionFlowMap
+        cashAmountKrw={preview.cashAmountKrw}
+        availableFundsKrw={preview.totalAvailableFundsKrw}
+        trimProceedsKrw={preview.totalTrimProceedsKrw}
+        rows={view.flowRows}
+      />
+      <section aria-label="배분 요약" className="mt-7 border-y border-[var(--line)]">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4">
           <SummaryMetric
             label="배분 금액"
@@ -71,10 +68,35 @@ export function AdditionalContributionResult({
           />
         </div>
       </section>
+    </div>
+  );
+}
 
+export function AdditionalContributionWeightScene({
+  preview,
+}: {
+  preview: AdditionalContributionResultPreview;
+}) {
+  const allocationRows = preview.rows
+    .filter((row) => row.allocationKrw > 0)
+    .toSorted(
+      (left, right) =>
+        right.allocationKrw - left.allocationKrw ||
+        left.name.localeCompare(right.name, "ko"),
+    );
+  const weightScaleMax = Math.max(
+    1,
+    ...preview.rows.flatMap((row) => [
+      row.currentWeightPct,
+      row.targetWeightPct,
+      row.postTopupWeightPct,
+    ]),
+  );
+
+  return (
       <section
         aria-labelledby="weight-map-title"
-        className="mt-14 border-t border-[var(--line)] pt-9"
+        className="varda-presentation-frame justify-center"
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -92,16 +114,25 @@ export function AdditionalContributionResult({
           </div>
         </div>
 
-        <div className="mt-6 divide-y divide-[var(--wash)] border-y border-[var(--line)]">
+        <div className="mt-6 max-h-[min(56dvh,520px)] divide-y divide-[var(--wash)] overflow-auto border-y border-[var(--line)] pr-2">
           {allocationRows.map((row) => (
             <WeightRow key={rowKey(row)} row={row} scaleMax={weightScaleMax} />
           ))}
         </div>
       </section>
+  );
+}
 
+export function AdditionalContributionEvidenceScene({
+  preview,
+}: {
+  preview: AdditionalContributionResultPreview;
+}) {
+  return (
+    <div className="varda-presentation-frame justify-center">
       <section
         aria-labelledby="allocation-detail-title"
-        className="mt-14 border-y border-[var(--line)] py-6"
+        className="border-y border-[var(--line)] py-8"
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -133,7 +164,7 @@ export function AdditionalContributionResult({
         <p>읽기 전용 계산 · 주문, 저장, 매도 없음</p>
         <p>{ma120SummaryDetail(preview.ma120Evidence)}</p>
       </footer>
-    </>
+    </div>
   );
 }
 

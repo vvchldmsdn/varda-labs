@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Info } from "lucide-react";
 import type {
   InvestmentLabScenarioChart,
@@ -25,10 +25,12 @@ export type { InvestmentLabTimeMachineScenarioSummary } from "./investment-lab-c
 
 export function InvestmentLabTimeMachine({
   chart,
+  details,
   scenarioSummaries,
   unavailableScenarios = [],
 }: {
   chart: InvestmentLabScenarioChart;
+  details?: ReactNode;
   scenarioSummaries: readonly InvestmentLabTimeMachineScenarioSummary[];
   unavailableScenarios?: readonly UnavailableLabScenario[];
 }) {
@@ -83,11 +85,31 @@ export function InvestmentLabTimeMachine({
                 {labKrw(difference, true)}
               </p>
             </div>
-            <InvestmentLabDialog
-              icon="info"
-              label="비교 기준"
-              title="무엇을 비교하나요?"
-            >
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {details ? <div className="contents">{details}</div> : null}
+              <label className="sr-only" htmlFor="investment-lab-scenario-select">
+                비교 시나리오
+              </label>
+              <select
+                className="min-h-9 max-w-[230px] border-b border-[var(--line)] bg-transparent px-2 text-xs"
+                id="investment-lab-scenario-select"
+                onChange={(event) => {
+                  setRequested(event.target.value as InvestmentLabScenarioMatrixId);
+                  setUnavailable(null);
+                }}
+                value={selected.id}
+              >
+                {ready.map((line) => (
+                  <option key={line.id} value={line.id}>
+                    {labScenarioLabel(line.id)}
+                  </option>
+                ))}
+              </select>
+              <InvestmentLabDialog
+                icon="info"
+                label="비교 기준"
+                title="무엇을 비교하나요?"
+              >
               <div className="max-w-2xl space-y-5 text-sm leading-7 text-[var(--muted)]">
                 <p>
                   <strong className="font-medium text-[var(--ink)]">
@@ -118,12 +140,14 @@ export function InvestmentLabTimeMachine({
                   않습니다.
                 </p>
               </div>
-            </InvestmentLabDialog>
+              </InvestmentLabDialog>
+            </div>
           </div>
 
           <InvestmentLabChartCanvas
             actual={actual}
             chart={chart}
+            compact
             selected={selected}
           />
 

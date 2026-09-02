@@ -11,6 +11,7 @@ export function ResearchFanChart(props: {
   execution: ResearchFanChartData;
   valueDomain?: ResearchFanChartValueDomain;
   large?: boolean;
+  compact?: boolean;
 }) {
   return <SimulationFanExplorer key={props.execution.id} {...props} />;
 }

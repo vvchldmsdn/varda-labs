@@ -107,6 +107,66 @@ describe("presentation design system", () => {
       assert.match(source, /varda-dialog/);
     }
   });
+  it("keeps primary analysis routes inside a fixed presentation viewport", () => {
+    assert.match(
+      css,
+      /\.varda-presentation-page\s*\{[^}]*height: 100dvh;[^}]*overflow: hidden;/s,
+    );
+    assert.match(
+      css,
+      /\.varda-presentation-content\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;/s,
+    );
+    assert.match(
+      css,
+      /\.varda-workspace-panel\s*\{[^}]*overflow: hidden;/s,
+    );
+    assert.match(
+      css,
+      /\.varda-presentation-dialog-content\s*\{[^}]*overflow: auto;/s,
+    );
+  });
+  it("keeps presentation scenes accessible and addressable by browser history", () => {
+    const deck = read("src/components/presentation/presentation-deck.tsx");
+    assert.match(deck, /role="tablist"/);
+    assert.match(deck, /role="tab"/);
+    assert.match(deck, /role="tabpanel"/);
+    assert.match(deck, /aria-hidden=\{!active\}/);
+    assert.match(deck, /inert=\{!active\}/);
+    assert.match(deck, /window\.history\[.*pushState/s);
+    assert.match(deck, /addEventListener\("hashchange"/);
+    assert.match(deck, /addEventListener\("popstate"/);
+    assert.match(deck, /event\.key === "ArrowRight"/);
+    assert.match(deck, /isSwipeSurface/);
+  });
+  it("uses animated scenes for primary stories and dialogs for focused evidence", () => {
+    for (const file of [
+      "portfolio-dashboard",
+      "today-movement",
+      "additional-contribution/additional-contribution-page-view",
+      "portfolio/portfolio-structure-view",
+      "history/history-view",
+    ]) {
+      assert.match(
+        read(`src/components/${file}.tsx`),
+        /<PresentationDeck/,
+        file,
+      );
+    }
+
+    const dialog = read("src/components/presentation/presentation-dialog.tsx");
+    assert.match(dialog, /<dialog/);
+    assert.match(dialog, /showModal/);
+    assert.match(dialog, /document\.body\.style\.overflow = "hidden"/);
+
+    for (const file of [
+      "today-movement",
+      "history/history-time-explorer",
+      "portfolio/portfolio-structure-view",
+      "investment-lab/investment-lab-disclosure",
+    ]) {
+      assert.doesNotMatch(read(`src/components/${file}.tsx`), /<details/);
+    }
+  });
   it("keeps the new history preview strictly development-only", () => {
     const source = read("src/app/history/page.tsx");
     assert.match(source, /process.env.NODE_ENV === "development"/);

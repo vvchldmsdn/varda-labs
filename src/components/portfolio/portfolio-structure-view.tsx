@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { PresentationDeck } from "@/components/presentation/presentation-deck";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import { DirectHoldingsBaseline } from "@/components/portfolio/direct-holdings-baseline";
 import { PortfolioAllocationExplorer } from "@/components/portfolio/portfolio-allocation-explorer";
 import { PortfolioFxShock } from "@/components/portfolio/portfolio-fx-shock";
@@ -44,7 +46,7 @@ export function PortfolioStructureView({
 
   return (
     <main
-      className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
       data-page="portfolio-structure"
     >
       <PortfolioPrimaryNavigation
@@ -53,7 +55,20 @@ export function PortfolioStructureView({
         selectedScopeKey={data.selectedScope.key}
       />
 
-      <div className="varda-content">
+      <div className="varda-content varda-presentation-content">
+        <PresentationDeck
+          ariaLabel="포트 구조 프레젠테이션"
+          scenes={[
+            { id: "overview", label: "구조 요약" },
+            { id: "allocation", label: "무게중심" },
+            { id: "risk", label: "위험 지형" },
+            { id: "holdings", label: "직접 보유" },
+            { id: "fx", label: "환율 충격" },
+            { id: "coverage", label: "특수 자산" },
+            { id: "evidence", label: "원자료" },
+          ]}
+        >
+        <div className="varda-presentation-frame justify-center">
         <section aria-labelledby="portfolio-structure-title">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
@@ -107,11 +122,6 @@ export function PortfolioStructureView({
           </div>
         </section>
 
-        <PortfolioAllocationExplorer
-          groupRows={data.structure.groupRows}
-          holdingRows={data.structure.holdingRows}
-        />
-
         <section aria-label="포트 구조 핵심 근거" className="border-b border-[var(--line)]">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4">
             <EvidenceMetric
@@ -148,8 +158,16 @@ export function PortfolioStructureView({
             />
           </div>
         </section>
+        </div>
 
-        <div className="mt-12 lg:mt-16">
+        <div className="varda-presentation-frame justify-center">
+          <PortfolioAllocationExplorer
+            groupRows={data.structure.groupRows}
+            holdingRows={data.structure.holdingRows}
+          />
+        </div>
+
+        <div className="varda-presentation-frame justify-center">
           <PortfolioStructureRiskAnalytics
             model={data.riskModel}
             scopeKey={data.selectedScope.key}
@@ -157,56 +175,58 @@ export function PortfolioStructureView({
           />
         </div>
 
-        <div className="mt-12 space-y-12 lg:mt-16 lg:space-y-16">
+        <div className="varda-presentation-frame justify-center">
           <DirectHoldingsBaseline
             model={data.directHoldingsBaseline}
             scopeLabel={data.selectedScope.label}
           />
+        </div>
 
+        <div className="varda-presentation-frame justify-center">
           <PortfolioFxShock
             baseline={data.directHoldingsBaseline}
             currentUsdKrwRate={data.structure.usdKrwRate}
           />
+        </div>
 
+        <div className="varda-presentation-frame justify-center">
           <SpecialHoldingsCoverage model={data.specialHoldingsCoverage} />
         </div>
 
-        <section className="mt-12 border-t border-[var(--line)] pt-8 lg:mt-16 lg:pt-10">
-          <details className="group">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]">
-              <span>보유 종목 원자료</span>
-              <span className="text-xs font-normal text-[var(--muted)] group-open:hidden">
-                {data.structure.holdingRows.length}행 보기 ＋
-              </span>
-              <span className="hidden text-xs font-normal text-[var(--muted)] group-open:inline">
-                접기 －
-              </span>
-            </summary>
-            <HoldingEvidenceTable rows={data.structure.holdingRows} />
-          </details>
-
-          {data.structure.exclusions.length > 0 ? (
-            <details className="group border-t border-[var(--wash)]">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]">
-                <span>평가 제외 근거</span>
-                <span className="text-xs font-normal text-[var(--muted)] group-open:hidden">
-                  {data.structure.exclusions.length}행 보기 ＋
-                </span>
-                <span className="hidden text-xs font-normal text-[var(--muted)] group-open:inline">
-                  접기 －
-                </span>
-              </summary>
-              <ExclusionTable rows={data.structure.exclusions} />
-            </details>
-          ) : null}
+        <div className="varda-presentation-frame justify-center">
+        <section className="border-y border-[var(--line)] py-10">
+          <p className="varda-kicker">SOURCE EVIDENCE</p>
+          <h2 className="mt-2 text-2xl font-medium">계산에 사용한 원자료</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+            긴 표는 현재 장면을 밀어내지 않습니다. 필요한 근거만 선택해 별도 창에서 확인합니다.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <PresentationDialog
+              label={`보유 종목 ${data.structure.holdingRows.length}행`}
+              title="보유 종목 원자료"
+              wide
+            >
+              <HoldingEvidenceTable rows={data.structure.holdingRows} />
+            </PresentationDialog>
+            {data.structure.exclusions.length > 0 ? (
+              <PresentationDialog
+                label={`평가 제외 ${data.structure.exclusions.length}행`}
+                title="평가 제외 근거"
+                wide
+              >
+                <ExclusionTable rows={data.structure.exclusions} />
+              </PresentationDialog>
+            ) : null}
+          </div>
         </section>
-
         <footer className="flex flex-col gap-2 border-t border-[var(--line)] pt-5 text-[11px] text-[var(--faint)] sm:flex-row sm:items-center sm:justify-between">
           <p>
             USD/KRW {formatNumber(data.structure.usdKrwRate, 2)} · 현재 저장·실시간 평가 근거
           </p>
           <p>읽기 전용 · 추천·주문 아님 · 목표비중은 승인 정책만 표시</p>
         </footer>
+        </div>
+        </PresentationDeck>
       </div>
     </main>
   );

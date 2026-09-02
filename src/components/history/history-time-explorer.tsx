@@ -10,6 +10,7 @@ import {
 } from "@/components/history/history-format";
 import { HistoryPerformanceChart } from "@/components/history/history-performance-chart";
 import { HistorySnapshotRail } from "@/components/history/history-snapshot-rail";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import {
   historyPointMetric,
   historyPointsWithMetric,
@@ -98,7 +99,7 @@ export function HistoryTimeExplorer({
   }
 
   return (
-    <section aria-labelledby="history-time-explorer-title">
+    <section aria-labelledby="history-time-explorer-title" className="varda-history-explorer">
       <div className="varda-history-heading">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
@@ -151,22 +152,42 @@ export function HistoryTimeExplorer({
             onClick={() => changeMode("return")}
           />
         </div>
-        <div className="flex items-center gap-5" aria-label="조회 기간">
-          {RANGE_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={range === option.key}
-              className={`border-b py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
-                range === option.key
-                  ? "border-[var(--ink)] text-[var(--ink)]"
-                  : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-              }`}
-              onClick={() => changeRange(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-end gap-5">
+          <div className="flex items-center gap-5" aria-label="조회 기간">
+            {RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={range === option.key}
+                className={`border-b py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
+                  range === option.key
+                    ? "border-[var(--ink)] text-[var(--ink)]"
+                    : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+                onClick={() => changeRange(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <PresentationDialog
+            description="선택 범위의 변화 요약, 날짜별 저장 근거와 저장된 위험 지표를 한곳에서 검토합니다."
+            label="계산 근거"
+            title="히스토리 계산 근거"
+            wide
+          >
+            <RangeMetrics summary={rangeSummary} className="grid" />
+            <RangeSummary summary={rangeSummary} />
+            <SelectedDayEvidence point={selectedPoint} />
+            <HistoryCalendar
+              onSelect={setSelectedDate}
+              points={visiblePoints}
+              selectedDate={selectedPoint?.date ?? null}
+            />
+            {model.riskPointCount > 0 ? (
+              <StoredRiskHistory points={visiblePoints} />
+            ) : null}
+          </PresentationDialog>
         </div>
       </div>
 
@@ -183,18 +204,6 @@ export function HistoryTimeExplorer({
           selectedDate={selectedPoint?.date ?? null}
         />
       </div>
-
-      <RangeMetrics summary={rangeSummary} className="grid md:hidden" />
-      <RangeSummary summary={rangeSummary} />
-      <SelectedDayEvidence point={selectedPoint} />
-      <HistoryCalendar
-        onSelect={setSelectedDate}
-        points={visiblePoints}
-        selectedDate={selectedPoint?.date ?? null}
-      />
-      {model.riskPointCount > 0 ? (
-        <StoredRiskHistory points={visiblePoints} />
-      ) : null}
     </section>
   );
 }

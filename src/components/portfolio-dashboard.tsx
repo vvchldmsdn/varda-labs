@@ -13,6 +13,7 @@ import {
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { PresentationDeck } from "@/components/presentation/presentation-deck";
 import { selectLargestMovementContributor } from "@/lib/home-metrics";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
 import {
@@ -55,15 +56,25 @@ export function PortfolioDashboard({
   const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key);
 
   return (
-    <main className="varda-page min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]" data-page="home">
+    <main className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]" data-page="home">
       <PortfolioPrimaryNavigation
         activePath="/"
         generatedAt={data.generatedAt}
         selectedScopeKey={data.selectedScope.key}
       />
 
-      <div className="varda-content">
-        <section aria-labelledby="portfolio-overview-title">
+      <div className="varda-content varda-presentation-content">
+        <PresentationDeck
+          ariaLabel="포트폴리오 프레젠테이션"
+          scenes={[
+            { id: "overview", label: "자산" },
+            { id: "history", label: "흐름" },
+            { id: "pulse", label: "종목" },
+            { id: "evidence", label: "오늘의 근거" },
+          ]}
+        >
+        <div className="varda-presentation-frame">
+        <section aria-labelledby="portfolio-overview-title" className="varda-presentation-grow flex flex-col justify-center">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
@@ -101,8 +112,9 @@ export function PortfolioDashboard({
             </dl>
           </div>
         </section>
+        </div>
 
-        <div className="grid gap-12 pt-3 lg:gap-16">
+        <div className="varda-presentation-frame justify-center">
           <div className="min-w-0">
             <PortfolioHistoryChart
               events={data.eventActivity.map((event) => ({
@@ -118,25 +130,28 @@ export function PortfolioDashboard({
               points={data.recentSnapshots}
             />
           </div>
-          <div className="min-w-0 border-t border-[var(--line)] pt-9">
+        </div>
+
+        <div className="varda-presentation-frame justify-center">
+          <div className="min-w-0">
             <HoldingMovementHeatmap
               history={data.holdingHistory}
               riskHref={riskHref}
               structureHref={structureHref}
             />
           </div>
+          <div className="mt-5 flex justify-end">
+            <Link
+              className="inline-flex items-center gap-3 text-sm font-medium text-[var(--ink)] hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
+              href={scopedHref("/today", data.selectedScope.key)}
+            >
+              오늘의 흐름 전체 보기 <span aria-hidden="true">→</span>
+            </Link>
+          </div>
         </div>
 
-        <div className="mt-8 flex justify-end">
-          <Link
-            className="inline-flex items-center gap-3 text-sm font-medium text-[var(--ink)] hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
-            href={scopedHref("/today", data.selectedScope.key)}
-          >
-            오늘의 흐름 전체 보기 <span aria-hidden="true">→</span>
-          </Link>
-        </div>
-
-        <section aria-label="오늘의 핵심 근거" className="mt-5 border-y border-[var(--line)]">
+        <div className="varda-presentation-frame justify-center">
+        <section aria-label="오늘의 핵심 근거" className="border-y border-[var(--line)]">
           <div className="grid sm:grid-cols-2 lg:grid-cols-5">
             <EvidenceMetric
               label="평가액 변동"
@@ -208,6 +223,8 @@ export function PortfolioDashboard({
           </p>
           <p>{movementBasisText(data)}</p>
         </footer>
+        </div>
+        </PresentationDeck>
       </div>
     </main>
   );

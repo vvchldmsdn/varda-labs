@@ -60,8 +60,8 @@ export function SimulationWorkspace({
   }
 
   return (
-    <div data-simulation-workspace={selected}>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
+    <div className="varda-workspace-deck" data-simulation-workspace={selected}>
+      <div className="varda-workspace-tabs flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
         <div
           className="flex max-w-full gap-4 overflow-x-auto sm:gap-8"
           role="tablist"
@@ -101,7 +101,7 @@ export function SimulationWorkspace({
           id={`${id}-${view.id}-panel`}
           aria-labelledby={`${id}-${view.id}-tab`}
           hidden={selected !== view.id}
-          className="min-w-0 focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
+          className="varda-workspace-panel min-w-0 focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
           tabIndex={0}
         >
           {panels[view.id]}
