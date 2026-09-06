@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { X } from "lucide-react";
 import {
   useMemo,
   useState,
@@ -45,7 +46,7 @@ export function HoldingMovementHeatmap({
   );
 
   return (
-    <section aria-labelledby="holding-heatmap-title" className="min-w-0">
+    <section aria-labelledby="holding-heatmap-title" className="relative min-w-0">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">HOLDING PULSE</p>
@@ -67,7 +68,17 @@ export function HoldingMovementHeatmap({
       </div>
 
       {mode === "movement" ? (
-        <MovementMatrix history={history} onSelect={(rowIndex, cellIndex) => setSelection({ rowIndex, cellIndex })} selection={selection} />
+        <MovementMatrix
+          history={history}
+          onSelect={(rowIndex, cellIndex) =>
+            setSelection((current) =>
+              current?.rowIndex === rowIndex && current.cellIndex === cellIndex
+                ? null
+                : { rowIndex, cellIndex },
+            )
+          }
+          selection={selection}
+        />
       ) : null}
 
       {mode === "allocation" ? (
@@ -97,8 +108,9 @@ export function HoldingMovementHeatmap({
       ) : null}
 
       {mode === "movement" && selectedRow && selectedCell ? (
-        <div className="mt-4 grid gap-3 border-t border-[var(--wash)] pt-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-          <div>
+        <div className="varda-heatmap-popover" aria-live="polite">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--ink)]">{selectedRow.name}</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               {formatDate(selectedCell.date)}
@@ -106,8 +118,18 @@ export function HoldingMovementHeatmap({
               {selectedCell.basis === "market_value" ? " · 평가액 변동 근거" : ""}
               {selectedCell.basis === "live_movement" ? " · 실시간 변동 근거" : ""}
             </p>
+            </div>
+            <button
+              aria-label="선택한 종목 정보 닫기"
+              className="varda-icon-button -mr-2 -mt-2"
+              onClick={() => setSelection(null)}
+              title="닫기"
+              type="button"
+            >
+              <X aria-hidden="true" size={15} />
+            </button>
           </div>
-          <dl className="grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-5">
+          <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-[var(--wash)] pt-4 text-xs sm:grid-cols-5">
             <HeatmapDetail
               label="등락"
               value={selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true)}

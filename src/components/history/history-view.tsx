@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
-import { PresentationDeck } from "@/components/presentation/presentation-deck";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
@@ -53,15 +52,6 @@ export function HistoryView({
     rows: history.portfolioRows,
     account: history.selectedScope.key,
   });
-  const scenes = [
-    { id: "timeline", label: "성과 그래프" },
-    ...(overview.status === "ready"
-      ? [{ id: "insights", label: "움직임" }]
-      : []),
-    { id: "activity", label: "활동" },
-    { id: "evidence", label: "검증 근거" },
-  ];
-
   return (
     <main
       data-page="history"
@@ -74,101 +64,54 @@ export function HistoryView({
       />
 
       <div className="varda-content varda-presentation-content">
-        <PresentationDeck ariaLabel="히스토리 프레젠테이션" scenes={scenes}>
-        <div className="varda-presentation-frame">
-        <header>
-          <div className="flex items-center justify-between gap-5 text-[11px] text-[var(--muted)]">
-            <p>PORTFOLIO / HISTORY</p>
-            <p className="tabular-nums">
-              기준일 {formatDisplayDate(overview.endDate)}
-            </p>
-          </div>
-          <div className="mt-3">
-            <PortfolioAnalysisScopeTabs
-              basePath="/history"
-              scopes={history.analysisScopes}
-              selectedScopeKey={history.selectedScope.key}
-              variant="underline"
-            />
-          </div>
-        </header>
-
-        {history.unavailableSources.length > 0 ? (
-          <p className="mt-7 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
-            일부 기록을 읽지 못했습니다: {history.unavailableSources
-              .map(historyReadSourceLabel)
-              .join(", ")}. 읽을 수 있는 저장 기록만 계속 표시합니다.
-          </p>
-        ) : null}
-
-        <HistoryTimeExplorer
-          model={overview}
-          scopeLabel={history.selectedScope.label}
-        />
-        </div>
-
-        {overview.status === "ready" ? (
-          <div className="varda-presentation-frame justify-center">
-          <section className="border-b border-[var(--line)] py-8">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-[11px] font-medium text-[var(--muted)]">
-                  MOVEMENT INSIGHTS
-                </p>
-                <h2 className="mt-1 text-xl font-semibold">움직임 인사이트</h2>
+        <div className="varda-screen">
+          <header className="varda-screen-header">
+            <div className="varda-screen-heading">
+              <div className="varda-screen-title-row">
+                <div>
+                  <p className="varda-kicker">PORTFOLIO / HISTORY</p>
+                  <h1 className="varda-page-title">히스토리</h1>
+                </div>
+                <p className="text-xs tabular-nums text-[var(--muted)]">기준일 {formatDisplayDate(overview.endDate)}</p>
               </div>
-              <p className="text-xs text-[var(--muted)]">
-                저장점 간 변화 · 현금흐름 미보정
-              </p>
             </div>
-            <dl
-              className="mt-5 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4"
-              aria-label="히스토리 움직임 지표"
-            >
-              <InsightMetric
-                label="저장 저점"
-                value={formatHistoryKrw(overview.lowestValueKrw)}
-                detail={formatDisplayDate(overview.lowestDate)}
+            <div className="varda-screen-scope">
+              <PortfolioAnalysisScopeTabs
+                basePath="/history"
+                scopes={history.analysisScopes}
+                selectedScopeKey={history.selectedScope.key}
+                variant="underline"
               />
-              <InsightMetric
-                label="가장 크게 오른 저장점"
-                value={formatMovement(overview.bestMovement?.amountKrw ?? null)}
-                detail={movementDetail(overview.bestMovement)}
-                valueClass={tone(overview.bestMovement?.amountKrw ?? null)}
-              />
-              <InsightMetric
-                label="가장 크게 내린 저장점"
-                value={formatMovement(overview.worstMovement?.amountKrw ?? null)}
-                detail={movementDetail(overview.worstMovement)}
-                valueClass={tone(overview.worstMovement?.amountKrw ?? null)}
-              />
-              <InsightMetric
-                label="연속 움직임"
-                value={`상승 ${overview.longestGainStreak} · 하락 ${overview.longestLossStreak}`}
-                detail="저장점 간 방향 기준"
-              />
-            </dl>
-          </section>
-          </div>
-        ) : null}
+            </div>
+          </header>
 
-        <div className="varda-presentation-frame justify-center">
-        <HistoryActivityStream result={events} supported={eventsSupported} />
-        </div>
+          <div className="varda-workspace-grid">
+            <div className="varda-main-visual varda-history-main">
+              <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} />
+            </div>
 
-        <div className="varda-presentation-frame justify-center">
-          <section className="border-y border-[var(--line)] py-10">
-            <p className="varda-kicker">AUDIT TRAIL</p>
-            <h2 className="mt-2 text-2xl font-medium">저장 기록을 그대로 검증합니다</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-              성과 그래프에서 사용한 저장점, 포지션 비교와 이벤트 원문은 별도 검증 창에서 확인할 수 있습니다.
-            </p>
-            <div className="mt-8">
-            <PresentationDialog
-              label="원시 기록과 검증 근거 보기"
-              title="히스토리 원시 기록"
-              wide
-            >
+            <aside className="varda-context-rail" aria-label="히스토리 인사이트와 검증 근거">
+              {overview.status === "ready" ? (
+                <section className="varda-rail-section">
+                  <p className="varda-kicker">MOVEMENT INSIGHTS</p>
+                  <h2 className="mt-1 text-sm font-medium">저장점 사이의 움직임</h2>
+                  <dl className="varda-rail-metrics mt-3">
+                    <RailInsight label="저장 저점" value={formatHistoryKrw(overview.lowestValueKrw)} detail={formatDisplayDate(overview.lowestDate)} />
+                    <RailInsight label="최대 상승" value={formatMovement(overview.bestMovement?.amountKrw ?? null)} detail={movementDetail(overview.bestMovement)} valueClass={tone(overview.bestMovement?.amountKrw ?? null)} />
+                    <RailInsight label="최대 하락" value={formatMovement(overview.worstMovement?.amountKrw ?? null)} detail={movementDetail(overview.worstMovement)} valueClass={tone(overview.worstMovement?.amountKrw ?? null)} />
+                    <RailInsight label="연속 움직임" value={`상승 ${overview.longestGainStreak} · 하락 ${overview.longestLossStreak}`} detail="저장점 방향 기준" />
+                  </dl>
+                </section>
+              ) : null}
+
+              <section className="varda-rail-section">
+                <p className="varda-kicker">CONTEXT</p>
+                <h2 className="mt-1 text-sm font-medium">활동과 원자료</h2>
+                <div className="mt-4 grid gap-2">
+                  <PresentationDialog label="최근 활동 보기" title="저장된 활동" wide>
+                    <HistoryActivityStream result={events} supported={eventsSupported} />
+                  </PresentationDialog>
+                  <PresentationDialog label="원시 기록 검증" title="히스토리 원시 기록" wide>
           <div className="space-y-10">
             <p
               data-history-semantic="stored-evidence-not-recomputed"
@@ -258,11 +201,25 @@ export function HistoryView({
               </RawSection>
             ) : null}
           </div>
-            </PresentationDialog>
-            </div>
-          </section>
+                  </PresentationDialog>
+                </div>
+              </section>
+
+              {history.unavailableSources.length > 0 ? (
+                <section className="varda-rail-section text-[var(--warning)]">
+                  <p className="text-xs leading-5">
+                    일부 기록을 읽지 못했습니다: {history.unavailableSources.map(historyReadSourceLabel).join(", ")}. 읽을 수 있는 저장 기록만 표시합니다.
+                  </p>
+                </section>
+              ) : null}
+            </aside>
+          </div>
+
+          <footer className="varda-screen-footer">
+            <span>저장된 평가액과 이벤트를 임의 보간하지 않음</span>
+            <span>성과 그래프와 원자료의 범위는 동일한 분석 스코프 사용</span>
+          </footer>
         </div>
-        </PresentationDeck>
       </div>
     </main>
   );
@@ -288,7 +245,7 @@ function finiteNumber(value: number | string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function InsightMetric({
+function RailInsight({
   detail,
   label,
   value,
@@ -300,12 +257,12 @@ function InsightMetric({
   valueClass?: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[var(--line)] px-4 py-5 first:pl-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className={`mt-2 truncate text-lg font-semibold tabular-nums ${valueClass}`}>
+    <div className="varda-rail-metric">
+      <dt>{label}</dt>
+      <dd className={valueClass} title={value}>
         {value}
       </dd>
-      <dd className="mt-2 text-xs text-[var(--faint)]">{detail}</dd>
+      <dd className="mt-1 truncate text-[9px] font-normal text-[var(--faint)]" title={detail}>{detail}</dd>
     </div>
   );
 }

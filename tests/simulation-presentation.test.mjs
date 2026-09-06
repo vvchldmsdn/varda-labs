@@ -93,7 +93,7 @@ describe("simulation presentation", () => {
         source.indexOf("const ownerResearchPromise"),
     );
   });
-  it("retains query selections and supports keyboard tabs without scrolling", () => {
+  it("retains query selections and keeps focused analysis in history-aware dialogs", () => {
     const controls = readFileSync(
       "src/components/simulation/simulation-query-controls.tsx",
       "utf8",
@@ -114,7 +114,17 @@ describe("simulation presentation", () => {
     }
     assert.match(controls, /scroll=\{false\}/);
     assert.match(workspace, /window\.history\.pushState/);
-    for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"])
-      assert.ok(workspace.includes(key));
+    assert.match(workspace, /<dialog/);
+    assert.match(workspace, /addEventListener\("popstate"/);
+    assert.match(workspace, /data-simulation-workspace="integrated"/);
+    assert.doesNotMatch(workspace, /role="tablist"/);
+  });
+  it("keeps the portfolio probability chart as the dominant simulation visual", () => {
+    const source = readFileSync(
+      "src/components/simulation/owner-research-execution-section.tsx",
+      "utf8",
+    );
+    assert.match(source, /<ResearchFanChart large execution=\{execution\} \/>/);
+    assert.doesNotMatch(source, /<ResearchFanChart compact/);
   });
 });

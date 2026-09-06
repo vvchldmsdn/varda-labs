@@ -1,14 +1,15 @@
 "use client";
 
-import { useId, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChartNoAxesCombined, Layers3, SlidersHorizontal } from "lucide-react";
+import {
+  ChartNoAxesCombined,
+  Layers3,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
-const VIEWS = [
-  { id: "compare", label: "과거 비교", icon: ChartNoAxesCombined },
-  { id: "weights", label: "비중 실험", icon: SlidersHorizontal },
-  { id: "composition", label: "구성 분석", icon: Layers3 },
-] as const;
+type LabOverlay = "weights" | "composition";
 
 export function InvestmentLabWorkspace({
   comparison,
@@ -22,81 +23,135 @@ export function InvestmentLabWorkspace({
   tools?: ReactNode;
 }) {
   const params = useSearchParams();
-  const id = useId();
-  const selected =
-    VIEWS.find((view) => view.id === params.get("view"))?.id ?? "compare";
-  const panels = { compare: comparison, weights: experiments, composition };
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [activeOverlay, setActiveOverlay] = useState<LabOverlay | null>(() => {
+    const requested = params.get("view");
+    return isLabOverlay(requested) ? requested : null;
+  });
 
-  function select(view: string) {
+  useEffect(() => {
+    if (!activeOverlay || dialogRef.current?.open) return;
+    dialogRef.current?.showModal();
+  }, [activeOverlay]);
+
+  useEffect(() => {
+    if (!activeOverlay) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [activeOverlay]);
+
+  useEffect(() => {
+    function syncOverlayFromHistory() {
+      const requested = new URLSearchParams(window.location.search).get("view");
+      const nextOverlay = isLabOverlay(requested) ? requested : null;
+      setActiveOverlay(nextOverlay);
+      if (!nextOverlay && dialogRef.current?.open) dialogRef.current.close();
+    }
+
+    window.addEventListener("popstate", syncOverlayFromHistory);
+    return () => window.removeEventListener("popstate", syncOverlayFromHistory);
+  }, []);
+
+  function openOverlay(view: LabOverlay) {
+    setActiveOverlay(view);
     const next = new URLSearchParams(window.location.search);
-    if (view === "compare") next.delete("view");
-    else next.set("view", view);
-    window.history.pushState(
+    next.set("view", view);
+    window.history.pushState(null, "", `${window.location.pathname}?${next}`);
+  }
+
+  function closeOverlay() {
+    dialogRef.current?.close();
+  }
+
+  function finishClose() {
+    setActiveOverlay(null);
+    const next = new URLSearchParams(window.location.search);
+    next.delete("view");
+    const query = next.toString();
+    window.history.replaceState(
       null,
       "",
-      `${window.location.pathname}?${next.toString()}`,
+      query ? `${window.location.pathname}?${query}` : window.location.pathname,
     );
   }
 
-  function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const nextIndex =
-      event.key === "ArrowRight"
-        ? (index + 1) % VIEWS.length
-        : event.key === "ArrowLeft"
-          ? (index + VIEWS.length - 1) % VIEWS.length
-          : event.key === "Home"
-            ? 0
-            : event.key === "End"
-              ? VIEWS.length - 1
-              : null;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const next = VIEWS[nextIndex]!;
-    select(next.id);
-    document.getElementById(`${id}-${next.id}-tab`)?.focus();
-  }
+  const activeContent =
+    activeOverlay === "weights" ? experiments : composition;
+  const activeTitle =
+    activeOverlay === "weights" ? "비중 실험" : "포트폴리오 구성 분석";
 
   return (
-    <div className="varda-workspace-deck" data-lab-workspace={selected}>
-      <div className="varda-workspace-tabs flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
-        <div
-          aria-label="투자랩 분석"
-          className="flex min-w-0 gap-5 sm:gap-8"
-          role="tablist"
-        >
-          {VIEWS.map(({ id: view, label, icon: Icon }, index) => (
+    <div className="varda-workspace-main" data-lab-workspace="integrated">
+      <div className="varda-workspace-commandbar">
+        <div>
+          <ChartNoAxesCombined aria-hidden="true" size={16} strokeWidth={1.6} />
+          <span className="text-xs font-medium text-[var(--muted)]">
+            실제 경로와 대안 시나리오
+          </span>
+        </div>
+        <div>
+          {tools}
+          <button
+            className="varda-inline-action"
+            onClick={() => openOverlay("weights")}
+            type="button"
+          >
+            <SlidersHorizontal aria-hidden="true" size={15} strokeWidth={1.6} />
+            비중 실험
+          </button>
+          <button
+            className="varda-inline-action"
+            onClick={() => openOverlay("composition")}
+            type="button"
+          >
+            <Layers3 aria-hidden="true" size={15} strokeWidth={1.6} />
+            구성 분석
+          </button>
+        </div>
+      </div>
+
+      <div className="varda-workspace-canvas">{comparison}</div>
+
+      <dialog
+        aria-labelledby={titleId}
+        className="varda-dialog varda-presentation-dialog varda-presentation-dialog-wide"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeOverlay();
+        }}
+        onClose={finishClose}
+        ref={dialogRef}
+      >
+        <div className="varda-presentation-dialog-shell">
+          <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
+            <div>
+              <p className="varda-kicker">LAB WORKSPACE</p>
+              <h2 className="mt-1 text-xl font-medium" id={titleId}>
+                {activeTitle}
+              </h2>
+            </div>
             <button
-              key={view}
-              aria-controls={`${id}-${view}-panel`}
-              aria-selected={selected === view}
-              className={`flex min-h-12 items-center gap-2 border-b-2 px-0.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] sm:text-sm ${selected === view ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"}`}
-              id={`${id}-${view}-tab`}
-              onClick={() => select(view)}
-              onKeyDown={(event) => navigate(event, index)}
-              role="tab"
-              tabIndex={selected === view ? 0 : -1}
+              aria-label="닫기"
+              className="varda-icon-button"
+              onClick={closeOverlay}
+              title="닫기"
               type="button"
             >
-              <Icon aria-hidden="true" size={15} strokeWidth={1.6} />
-              {label}
+              <X aria-hidden="true" size={18} />
             </button>
-          ))}
+          </header>
+          <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
+            {activeContent}
+          </div>
         </div>
-        <div className="flex min-h-12 items-center gap-4">{tools}</div>
-      </div>
-      {VIEWS.map((view) => (
-        <div
-          key={view.id}
-          aria-labelledby={`${id}-${view.id}-tab`}
-          hidden={selected !== view.id}
-          id={`${id}-${view.id}-panel`}
-          role="tabpanel"
-          tabIndex={0}
-          className="varda-workspace-panel min-w-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
-        >
-          {panels[view.id]}
-        </div>
-      ))}
+      </dialog>
     </div>
   );
+}
+
+function isLabOverlay(value: string | null): value is LabOverlay {
+  return value === "weights" || value === "composition";
 }

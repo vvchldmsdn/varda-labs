@@ -44,7 +44,7 @@ export function InvestmentLabDesignPreview({
             />
           </div>
         </header>
-        <div className="mt-5 min-h-0 flex-1 overflow-hidden">
+        <div className="varda-workspace-shell mt-5 min-h-0 flex-1 overflow-hidden">
           <InvestmentLabWorkspace
             tools={
               <InvestmentLabPeriodSelector

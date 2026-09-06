@@ -1,20 +1,22 @@
 "use client";
 
-import { useId, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ChartNoAxesCombined,
-  SlidersHorizontal,
-  ScanLine,
   Database,
+  ScanLine,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 
-const VIEWS = [
-  { id: "paths", label: "확률 경로", icon: ChartNoAxesCombined },
-  { id: "weights", label: "비중 실험", icon: SlidersHorizontal },
-  { id: "validation", label: "과거 검증", icon: ScanLine },
-  { id: "evidence", label: "모형·데이터", icon: Database },
-] as const;
+type SimulationOverlay = "weights" | "validation" | "evidence";
+
+const OVERLAYS = {
+  weights: { label: "비중 실험", icon: SlidersHorizontal },
+  validation: { label: "과거 검증", icon: ScanLine },
+  evidence: { label: "모형·데이터", icon: Database },
+} as const;
 
 export function SimulationWorkspace({
   paths,
@@ -30,83 +32,133 @@ export function SimulationWorkspace({
   tools?: ReactNode;
 }) {
   const params = useSearchParams();
-  const id = useId();
-  const selected =
-    VIEWS.find((view) => view.id === params.get("view"))?.id ?? "paths";
-  const panels = { paths, weights, validation, evidence };
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [activeOverlay, setActiveOverlay] = useState<SimulationOverlay | null>(
+    () => {
+      const requested = params.get("view");
+      return isSimulationOverlay(requested) ? requested : null;
+    },
+  );
+  const panels = { weights, validation, evidence };
 
-  function select(view: string) {
+  useEffect(() => {
+    if (!activeOverlay || dialogRef.current?.open) return;
+    dialogRef.current?.showModal();
+  }, [activeOverlay]);
+
+  useEffect(() => {
+    if (!activeOverlay) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [activeOverlay]);
+
+  useEffect(() => {
+    function syncOverlayFromHistory() {
+      const requested = new URLSearchParams(window.location.search).get("view");
+      const nextOverlay = isSimulationOverlay(requested) ? requested : null;
+      setActiveOverlay(nextOverlay);
+      if (!nextOverlay && dialogRef.current?.open) dialogRef.current.close();
+    }
+
+    window.addEventListener("popstate", syncOverlayFromHistory);
+    return () => window.removeEventListener("popstate", syncOverlayFromHistory);
+  }, []);
+
+  function openOverlay(view: SimulationOverlay) {
+    setActiveOverlay(view);
     const next = new URLSearchParams(window.location.search);
-    if (view === "paths") next.delete("view");
-    else next.set("view", view);
+    next.set("view", view);
     window.history.pushState(null, "", `${window.location.pathname}?${next}`);
   }
 
-  function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const next =
-      event.key === "ArrowRight"
-        ? (index + 1) % VIEWS.length
-        : event.key === "ArrowLeft"
-          ? (index + VIEWS.length - 1) % VIEWS.length
-          : event.key === "Home"
-            ? 0
-            : event.key === "End"
-              ? VIEWS.length - 1
-              : null;
-    if (next === null) return;
-    event.preventDefault();
-    select(VIEWS[next].id);
-    document.getElementById(`${id}-${VIEWS[next].id}-tab`)?.focus();
+  function closeOverlay() {
+    dialogRef.current?.close();
   }
 
+  function finishClose() {
+    setActiveOverlay(null);
+    const next = new URLSearchParams(window.location.search);
+    next.delete("view");
+    const query = next.toString();
+    window.history.replaceState(
+      null,
+      "",
+      query ? `${window.location.pathname}?${query}` : window.location.pathname,
+    );
+  }
+
+  const activeDefinition = activeOverlay ? OVERLAYS[activeOverlay] : null;
+
   return (
-    <div className="varda-workspace-deck" data-simulation-workspace={selected}>
-      <div className="varda-workspace-tabs flex flex-wrap items-center justify-between gap-x-6 border-b border-[var(--line)]">
-        <div
-          className="flex max-w-full gap-4 overflow-x-auto sm:gap-8"
-          role="tablist"
-          aria-label="시뮬레이션 분석"
-        >
-          {VIEWS.map(({ id: view, label, icon: Icon }, index) => (
-            <button
-              key={view}
-              type="button"
-              role="tab"
-              id={`${id}-${view}-tab`}
-              aria-controls={`${id}-${view}-panel`}
-              aria-selected={selected === view}
-              tabIndex={selected === view ? 0 : -1}
-              onClick={() => select(view)}
-              onKeyDown={(event) => navigate(event, index)}
-              className={`flex min-h-12 shrink-0 items-center gap-2 border-b-2 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-[var(--brand)] sm:text-sm ${selected === view ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"}`}
-            >
-              <Icon
-                aria-hidden="true"
-                size={15}
-                strokeWidth={1.6}
-                className="hidden sm:block"
-              />
-              {label}
-            </button>
-          ))}
+    <div className="varda-workspace-main" data-simulation-workspace="integrated">
+      <div className="varda-workspace-commandbar">
+        <div>
+          <ChartNoAxesCombined aria-hidden="true" size={16} strokeWidth={1.6} />
+          <span className="text-xs font-medium text-[var(--muted)]">
+            확률 경로와 하방 범위
+          </span>
         </div>
-        {tools ? (
-          <div className="flex min-h-11 items-center gap-3">{tools}</div>
-        ) : null}
+        <div>
+          {tools}
+          {(Object.keys(OVERLAYS) as SimulationOverlay[]).map((view) => {
+            const { icon: Icon, label } = OVERLAYS[view];
+            return (
+              <button
+                className="varda-inline-action"
+                key={view}
+                onClick={() => openOverlay(view)}
+                type="button"
+              >
+                <Icon aria-hidden="true" size={15} strokeWidth={1.6} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      {VIEWS.map((view) => (
-        <div
-          key={view.id}
-          role="tabpanel"
-          id={`${id}-${view.id}-panel`}
-          aria-labelledby={`${id}-${view.id}-tab`}
-          hidden={selected !== view.id}
-          className="varda-workspace-panel min-w-0 focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
-          tabIndex={0}
-        >
-          {panels[view.id]}
+
+      <div className="varda-workspace-canvas">{paths}</div>
+
+      <dialog
+        aria-labelledby={titleId}
+        className="varda-dialog varda-presentation-dialog varda-presentation-dialog-wide"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeOverlay();
+        }}
+        onClose={finishClose}
+        ref={dialogRef}
+      >
+        <div className="varda-presentation-dialog-shell">
+          <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
+            <div>
+              <p className="varda-kicker">SIMULATION WORKSPACE</p>
+              <h2 className="mt-1 text-xl font-medium" id={titleId}>
+                {activeDefinition?.label ?? "시뮬레이션 상세"}
+              </h2>
+            </div>
+            <button
+              aria-label="닫기"
+              className="varda-icon-button"
+              onClick={closeOverlay}
+              title="닫기"
+              type="button"
+            >
+              <X aria-hidden="true" size={18} />
+            </button>
+          </header>
+          <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
+            {activeOverlay ? panels[activeOverlay] : null}
+          </div>
         </div>
-      ))}
+      </dialog>
     </div>
   );
+}
+
+function isSimulationOverlay(value: string | null): value is SimulationOverlay {
+  return value === "weights" || value === "validation" || value === "evidence";
 }

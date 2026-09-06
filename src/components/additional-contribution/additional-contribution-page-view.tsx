@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChartNoAxesCombined, ListTree, RefreshCw, Target } from "lucide-react";
 
 import {
   AdditionalContributionEvidenceScene,
@@ -8,7 +9,7 @@ import {
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
-import { PresentationDeck } from "@/components/presentation/presentation-deck";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
 import {
   buildPortfolioAnalysisScopeHref,
@@ -37,18 +38,6 @@ export function AdditionalContributionPageView({
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
 }) {
-  const scenes = [
-    { id: "amount", label: "투입 금액" },
-    ...(preview.status === "ready"
-      ? [
-          { id: "flow", label: "자금 흐름" },
-          { id: "weights", label: "비중 변화" },
-          { id: "evidence", label: "계산 근거" },
-        ]
-      : [{ id: "readiness", label: "계산 준비" }]),
-    { id: "actions", label: "다음 작업" },
-  ];
-
   return (
     <main
       className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
@@ -62,156 +51,111 @@ export function AdditionalContributionPageView({
       />
 
       <div className="varda-content varda-presentation-content">
-        <PresentationDeck ariaLabel="추가 투입 프레젠테이션" scenes={scenes}>
-        <div className="varda-presentation-frame justify-center">
-        <section aria-labelledby="additional-contribution-title">
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-              <div>
-                <p className="text-[11px] font-medium text-[var(--muted)]">
-                  PORTFOLIO / ADDITIONAL CONTRIBUTION
-                </p>
-                <h1 id="additional-contribution-title" className="varda-page-title">
-                  추가 투입
-                </h1>
+        <div className="varda-screen">
+          <header className="varda-screen-header">
+            <div className="varda-screen-heading">
+              <div className="varda-screen-title-row">
+                <div>
+                  <p className="varda-kicker">PORTFOLIO / ADDITIONAL CONTRIBUTION</p>
+                  <h1 id="additional-contribution-title" className="varda-page-title">추가 투입</h1>
+                </div>
+                <p className="text-xs text-[var(--muted)]">실제 주문 전 읽기 전용 미리보기</p>
               </div>
-              <p className="text-xs text-[var(--muted)]">
-                실제 주문 전 읽기 전용 미리보기
-              </p>
+            </div>
+            <div className="varda-screen-scope">
+              <PortfolioAnalysisScopeTabs
+                basePath="/additional-contribution"
+                query={{ amount: String(amountKrw) }}
+                scopes={scopes}
+                selectedScopeKey={selectedScope.key}
+                variant="underline"
+              />
+            </div>
+          </header>
+
+          <div className="varda-workspace-grid">
+            <div className="varda-main-visual varda-contribution-main">
+              {preview.status === "ready" ? (
+                <AdditionalContributionFlowScene preview={preview} />
+              ) : (
+                <BlockedPreview blockers={preview.blockers} />
+              )}
             </div>
 
-            <PortfolioAnalysisScopeTabs
-              basePath="/additional-contribution"
-              query={{ amount: String(amountKrw) }}
-              scopes={scopes}
-              selectedScopeKey={selectedScope.key}
-              variant="underline"
-            />
+            <aside className="varda-context-rail" aria-label="추가 투입 계산 제어">
+              <section className="varda-rail-section">
+                <p className="varda-kicker">CONTRIBUTION AMOUNT</p>
+                <h2 className="mt-1 text-sm font-medium">새로 투입할 금액</h2>
+                <form action="/additional-contribution" method="get" className="mt-5">
+                  <input type="hidden" name="scope" value={selectedScope.key} />
+                  <label className="sr-only" htmlFor="additional-contribution-amount">투입 금액</label>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 border-b border-[var(--line)] pb-2">
+                    <input
+                      id="additional-contribution-amount"
+                      aria-describedby="additional-contribution-amount-hint"
+                      className="min-w-0 border-0 bg-transparent py-1 text-right !text-3xl font-normal tabular-nums outline-none placeholder:text-[var(--line)] focus-visible:ring-0"
+                      defaultValue={amountKrw ? formatInputKrw(amountKrw) : ""}
+                      inputMode="numeric"
+                      name="amount"
+                      pattern="[0-9,]*"
+                      placeholder="0"
+                      required
+                      type="text"
+                    />
+                    <span className="pb-1 text-sm text-[var(--muted)]">원</span>
+                  </div>
+                  <button type="submit" className="varda-action mt-4 w-full">계산하기</button>
+                </form>
+                <p id="additional-contribution-amount-hint" className="mt-3 text-[10px] text-[var(--faint)]">
+                  {formatKrw(amountKrw)} · 만 원 단위 입력 권장
+                </p>
+                <nav aria-label="투입 금액 빠른 선택" className="mt-4 grid grid-cols-2 gap-2">
+                  {AMOUNT_PRESETS.map((preset) => (
+                    <Link
+                      key={preset}
+                      className={`min-h-8 border px-2 py-2 text-center text-[10px] font-medium ${amountKrw === preset ? "border-[var(--brand)] bg-[var(--brand-wash)] text-[var(--ink)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]"}`}
+                      href={buildPortfolioAnalysisScopeHref("/additional-contribution", selectedScope.key, { amount: String(preset) })}
+                    >
+                      {formatCompactKrw(preset)}
+                    </Link>
+                  ))}
+                </nav>
+              </section>
+
+              {preview.status === "ready" ? (
+                <section className="varda-rail-section">
+                  <p className="varda-kicker">CALCULATION VIEWS</p>
+                  <h2 className="mt-1 text-sm font-medium">배분안을 더 자세히 보기</h2>
+                  <div className="mt-4 grid gap-2">
+                    <PresentationDialog label="비중 변화" title="투입 전후 비중 변화" wide>
+                      <AdditionalContributionWeightScene preview={preview} />
+                    </PresentationDialog>
+                    <PresentationDialog label="계산 근거" title="추가 투입 계산 근거" wide>
+                      <AdditionalContributionEvidenceScene preview={preview} />
+                    </PresentationDialog>
+                  </div>
+                </section>
+              ) : null}
+            </aside>
           </div>
 
-          <div className="varda-summary-stage varda-contribution-controls">
-            <p className="text-xs font-medium text-[var(--muted)]">
-              {selectedScope.label}에 새로 투입할 금액
-            </p>
-            <form
-              action="/additional-contribution"
-              method="get"
-              className="mx-auto mt-3 grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_auto] items-center justify-center gap-x-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-x-0"
-            >
-              <input type="hidden" name="scope" value={selectedScope.key} />
-              <label className="sr-only" htmlFor="additional-contribution-amount">
-                투입 금액
-              </label>
-              <input
-                id="additional-contribution-amount"
-                aria-describedby="additional-contribution-amount-hint"
-                className="min-w-0 border-0 bg-transparent py-2 text-right !text-4xl font-normal tabular-nums outline-none placeholder:text-[var(--line)] focus-visible:ring-0 min-[420px]:!text-5xl sm:!text-6xl lg:!text-[80px]"
-                defaultValue={amountKrw ? formatInputKrw(amountKrw) : ""}
-                inputMode="numeric"
-                name="amount"
-                pattern="[0-9,]*"
-                placeholder="0"
-                required
-                type="text"
-              />
-              <span className="shrink-0 text-2xl font-normal text-[var(--muted)] min-[420px]:text-3xl sm:ml-3 sm:text-4xl lg:text-5xl">
-                원
-              </span>
-              <button
-                type="submit"
-                className="col-span-2 mx-auto mt-3 shrink-0 border-b border-[var(--ink)] px-1 py-2 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] sm:col-span-1 sm:ml-8 sm:mt-0"
-              >
-                계산
-              </button>
-            </form>
-            <p
-              id="additional-contribution-amount-hint"
-              className="mt-3 text-xs text-[var(--faint)]"
-            >
-              {formatKrw(amountKrw)} · 만 원 단위 입력 권장
-            </p>
-            <nav
-              aria-label="투입 금액 빠른 선택"
-              className="mt-7 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-sm"
-            >
-              {AMOUNT_PRESETS.map((preset) => (
-                <Link
-                  key={preset}
-                  className={`border-b py-1 font-medium focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
-                    amountKrw === preset
-                      ? "border-[var(--ink)] text-[var(--ink)]"
-                      : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-                  }`}
-                  href={buildPortfolioAnalysisScopeHref(
-                    "/additional-contribution",
-                    selectedScope.key,
-                    { amount: String(preset) },
-                  )}
-                >
-                  {formatCompactKrw(preset)}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </section>
-        </div>
-
-        {preview.status === "ready" ? (
-          <AdditionalContributionFlowScene preview={preview} />
-        ) : (
-          <div className="varda-presentation-frame justify-center">
-            <BlockedPreview blockers={preview.blockers} />
-          </div>
-        )}
-        {preview.status === "ready" ? (
-          <AdditionalContributionWeightScene preview={preview} />
-        ) : null}
-        {preview.status === "ready" ? (
-          <AdditionalContributionEvidenceScene preview={preview} />
-        ) : null}
-
-        <div className="varda-presentation-frame justify-center">
-        <section
-          aria-label="빠른 작업"
-          className="grid gap-6 border-y border-[var(--line)] py-10 sm:grid-cols-3 sm:gap-0"
-        >
-          <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
-            {enableLivePriceSync ? (
-              <PortfolioRefreshButton autoSync />
-            ) : (
-              <span className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[var(--muted)]">
-                <span aria-hidden="true" className="text-xl">◎</span>
-                디자인 샘플 데이터
-              </span>
-            )}
-          </div>
-          <div className="flex justify-center sm:border-r sm:border-[var(--line)]">
-            <Link
-              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
-              href={buildPortfolioAnalysisScopeHref(
-                "/portfolio/targets",
-                selectedScope.key,
+          <footer className="varda-screen-footer">
+            <div className="varda-inline-actions" aria-label="빠른 작업">
+              {enableLivePriceSync ? (
+                <PortfolioRefreshButton autoSync />
+              ) : (
+                <span className="varda-inline-action"><RefreshCw aria-hidden="true" size={15} />디자인 샘플 데이터</span>
               )}
-            >
-              <span aria-hidden="true" className="text-xl">◎</span>
-              목표비중 확인
-            </Link>
-          </div>
-          <div className="flex justify-center">
-            <Link
-              className="inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
-              href={buildPortfolioAnalysisScopeHref(
-                "/portfolio/holdings",
-                selectedScope.key,
-              )}
-            >
-              <span aria-hidden="true" className="text-xl">＋</span>
-              보유 종목 관리
-            </Link>
-          </div>
-        </section>
+              <Link className="varda-inline-action" href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)}>
+                <Target aria-hidden="true" size={15} />목표비중 확인
+              </Link>
+              <Link className="varda-inline-action" href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}>
+                <ListTree aria-hidden="true" size={15} />보유 종목 관리
+              </Link>
+            </div>
+            <span className="inline-flex items-center gap-2"><ChartNoAxesCombined aria-hidden="true" size={13} />계산 결과는 저장·주문하지 않음</span>
+          </footer>
         </div>
-        </PresentationDeck>
       </div>
     </main>
   );

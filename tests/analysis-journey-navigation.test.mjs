@@ -13,7 +13,7 @@ describe("analysis result journey navigation", () => {
     assert.match(component, /items\.map/);
   });
 
-  it("keeps Investment Lab analysis sections inside accessible workspace tabs", () => {
+  it("keeps the Investment Lab comparison visible and opens deep analysis in a dialog", () => {
     const page = read("src/app/investment-lab/page.tsx");
     const view = read("src/components/investment-lab/investment-lab-view.tsx");
     const workspace = read(
@@ -28,19 +28,16 @@ describe("analysis result journey navigation", () => {
     ];
 
     assert.match(view, /<InvestmentLabWorkspace/);
-    assert.match(workspace, /role="tablist"/);
-    assert.match(workspace, /role="tabpanel"/);
-    assert.match(
-      workspace,
-      /const panels = \{ compare: comparison, weights: experiments, composition \}/,
-    );
-    assert.match(workspace, /hidden=\{selected !== view\.id\}/);
+    assert.match(workspace, /data-lab-workspace="integrated"/);
+    assert.match(workspace, /<dialog/);
+    assert.match(workspace, /varda-workspace-canvas.*\{comparison\}/s);
+    assert.doesNotMatch(workspace, /role="tablist"/);
     for (const target of targets) {
       assert.match(source, new RegExp(`id="${target}"`));
     }
   });
 
-  it("preserves every Simulation section in accessible workspace tabs", () => {
+  it("keeps Simulation paths visible and preserves every deep section in dialogs", () => {
     const view = read(
       "src/components/simulation/simulation-input-readiness-view.tsx",
     );
@@ -53,9 +50,10 @@ describe("analysis result journey navigation", () => {
 
     const workspace = read("src/components/simulation/simulation-workspace.tsx");
     assert.match(view, /<SimulationWorkspace/);
-    assert.match(workspace, /role="tablist"/);
-    assert.match(workspace, /role="tabpanel"/);
-    assert.match(workspace, /hidden=\{selected !== view\.id\}/);
+    assert.match(workspace, /data-simulation-workspace="integrated"/);
+    assert.match(workspace, /<dialog/);
+    assert.match(workspace, /varda-workspace-canvas.*\{paths\}/s);
+    assert.doesNotMatch(workspace, /role="tablist"/);
     for (const target of targets) {
       assert.match(view, new RegExp(`id="${target}"`));
     }

@@ -272,7 +272,7 @@ export function PortfolioHistoryChart({
 
             {activePoint && activeGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[var(--line)] bg-[rgba(250,252,249,0.96)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
+                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_96%,transparent)] p-3.5 text-xs shadow-[0_14px_36px_rgba(0,0,0,0.42)] backdrop-blur-sm md:block"
                 style={{
                   left: `${Math.min(76, Math.max(5, (activeGeometry.x / WIDTH) * 100 + 2))}%`,
                   top: `${Math.min(55, Math.max(3, (activeGeometry.y / HEIGHT) * 100 - 4))}%`,
@@ -300,7 +300,7 @@ export function PortfolioHistoryChart({
 
             {activeEvent && activeEventGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[var(--line)] bg-[rgba(250,252,249,0.98)] p-3.5 text-xs shadow-[0_14px_36px_rgba(26,34,29,0.12)] backdrop-blur-sm md:block"
+                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_98%,transparent)] p-3.5 text-xs shadow-[0_14px_36px_rgba(0,0,0,0.42)] backdrop-blur-sm md:block"
                 style={{
                   bottom: "9%",
                   left: `${Math.min(74, Math.max(3, (activeEventGeometry.x / WIDTH) * 100 + 1.5))}%`,

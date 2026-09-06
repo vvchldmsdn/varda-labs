@@ -171,8 +171,8 @@ export function SimulationInputReadinessView({
             대체하지 않았습니다.
           </p>
         ) : null}
-        <div className="min-h-0 flex-1 overflow-hidden">
-        <SimulationWorkspace
+        <div className="varda-workspace-shell min-h-0 flex-1 overflow-hidden">
+          <SimulationWorkspace
           tools={
             <ResearchHorizonSelector
               scopeKey={selectedScopeKey}
@@ -348,7 +348,7 @@ export function SimulationInputReadinessView({
               </SimulationDisclosure>
             </div>
           }
-        />
+          />
         </div>
         <footer className="shrink-0 border-t border-[var(--line)] pt-2 text-[10px] leading-4 text-[var(--faint)]">
           현재 구성 기준 연구 · 수수료·세금·현금수익률 미포함 · 결과는 수익
