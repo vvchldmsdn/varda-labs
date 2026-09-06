@@ -102,14 +102,14 @@ describe("investment lab presentation", () => {
     }
   });
 
-  it("keeps presentation switches local and preserves their query state", () => {
+  it("keeps the main comparison visible and preserves dialog query state", () => {
     const workspace = component("investment-lab-workspace");
     const controls = component("investment-lab-query-controls");
     assert.match(workspace, /window\.history\.pushState/);
-    assert.match(workspace, /role="tablist"/);
-    assert.match(workspace, /hidden=\{selected !== view\.id\}/);
-    assert.match(workspace, /ArrowRight/);
-    assert.match(workspace, /ArrowLeft/);
+    assert.match(workspace, /<dialog/);
+    assert.match(workspace, /data-lab-workspace="integrated"/);
+    assert.match(workspace, /varda-workspace-canvas.*\{comparison\}/s);
+    assert.doesNotMatch(workspace, /role="tablist"/);
     assert.match(controls, /\["view", "preview"\]/);
     assert.match(controls, /scroll=\{false\}/);
     for (const name of [

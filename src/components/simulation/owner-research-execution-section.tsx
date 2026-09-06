@@ -251,7 +251,7 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
           </div>
         </dl>
       </div>
-      <ResearchFanChart compact execution={execution} />
+      <ResearchFanChart large execution={execution} />
     </div>
   );
 }

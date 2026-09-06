@@ -14,6 +14,12 @@ function luminance(hex) {
   return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
 }
 
+function contrast(first, second) {
+  const lighter = Math.max(luminance(first), luminance(second));
+  const darker = Math.min(luminance(first), luminance(second));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 describe("presentation design system", () => {
   it("uses complete available funds for the contribution diagram and its denominator", () => {
     const result = read(
@@ -45,7 +51,8 @@ describe("presentation design system", () => {
     assert.match(layout, /import "\.\/presentation\.css"/);
     assert.doesNotMatch(read("src/app/globals.css"), /@import.*presentation/);
   });
-  it("keeps text, action and signed-value colors readable on the warm canvas", () => {
+  it("uses a restrained dark canvas with readable text and signed values", () => {
+    assert.ok(luminance(color("paper")) < luminance(color("surface")));
     for (const name of [
       "ink",
       "muted",
@@ -54,8 +61,7 @@ describe("presentation design system", () => {
       "negative",
       "warning",
     ]) {
-      const ratio =
-        (luminance(color("paper")) + 0.05) / (luminance(color(name)) + 0.05);
+      const ratio = contrast(color("paper"), color(name));
       assert.ok(ratio >= 4.5, `${name}: ${ratio}`);
     }
   });
@@ -124,21 +130,19 @@ describe("presentation design system", () => {
       css,
       /\.varda-presentation-dialog-content\s*\{[^}]*overflow: auto;/s,
     );
+    assert.match(
+      css,
+      /@media \(max-width: 760px\)[\s\S]*\.varda-workspace-shell\s*\{[^}]*flex: none;[^}]*overflow: visible;/,
+    );
+    for (const file of [
+      "investment-lab/investment-lab-view",
+      "investment-lab/investment-lab-design-preview",
+      "simulation/simulation-input-readiness-view",
+    ]) {
+      assert.match(read(`src/components/${file}.tsx`), /varda-workspace-shell/);
+    }
   });
-  it("keeps presentation scenes accessible and addressable by browser history", () => {
-    const deck = read("src/components/presentation/presentation-deck.tsx");
-    assert.match(deck, /role="tablist"/);
-    assert.match(deck, /role="tab"/);
-    assert.match(deck, /role="tabpanel"/);
-    assert.match(deck, /aria-hidden=\{!active\}/);
-    assert.match(deck, /inert=\{!active\}/);
-    assert.match(deck, /window\.history\[.*pushState/s);
-    assert.match(deck, /addEventListener\("hashchange"/);
-    assert.match(deck, /addEventListener\("popstate"/);
-    assert.match(deck, /event\.key === "ArrowRight"/);
-    assert.match(deck, /isSwipeSurface/);
-  });
-  it("uses animated scenes for primary stories and dialogs for focused evidence", () => {
+  it("keeps related primary information together instead of hiding it in scene tabs", () => {
     for (const file of [
       "portfolio-dashboard",
       "today-movement",
@@ -146,12 +150,18 @@ describe("presentation design system", () => {
       "portfolio/portfolio-structure-view",
       "history/history-view",
     ]) {
-      assert.match(
-        read(`src/components/${file}.tsx`),
-        /<PresentationDeck/,
-        file,
-      );
+      const source = read(`src/components/${file}.tsx`);
+      assert.match(source, /varda-screen/);
+      assert.doesNotMatch(source, /<PresentationDeck/, file);
     }
+
+    assert.match(read("src/components/portfolio-dashboard.tsx"), /HoldingMovementHeatmap/);
+    assert.match(read("src/components/portfolio-dashboard.tsx"), /PortfolioHistoryChart/);
+    assert.match(read("src/components/today-movement.tsx"), /TodayContributionExplorer/);
+    assert.match(read("src/components/history/history-view.tsx"), /HistoryTimeExplorer/);
+  });
+
+  it("uses animated dialogs and drawers for focused evidence", () => {
 
     const dialog = read("src/components/presentation/presentation-dialog.tsx");
     assert.match(dialog, /<dialog/);
@@ -166,6 +176,10 @@ describe("presentation design system", () => {
     ]) {
       assert.doesNotMatch(read(`src/components/${file}.tsx`), /<details/);
     }
+
+    assert.match(css, /@keyframes varda-dialog-in/);
+    assert.match(css, /@keyframes varda-drawer-in/);
+    assert.match(css, /@keyframes varda-cell-detail-in/);
   });
   it("keeps the new history preview strictly development-only", () => {
     const source = read("src/app/history/page.tsx");

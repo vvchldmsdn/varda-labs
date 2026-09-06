@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { ChartPie, LayoutGrid } from "lucide-react";
 import { PortfolioAllocationRing } from "./portfolio-allocation-ring";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 
 import type {
   PortfolioStructureGroupRow,
@@ -11,9 +12,11 @@ import type {
 import { layoutPortfolioTreemap } from "@/lib/portfolio-structure-treemap";
 
 export function PortfolioAllocationExplorer({
+  compact = false,
   groupRows,
   holdingRows,
 }: {
+  compact?: boolean;
   groupRows: readonly PortfolioStructureGroupRow[];
   holdingRows: readonly PortfolioStructureHoldingRow[];
 }) {
@@ -45,6 +48,7 @@ export function PortfolioAllocationExplorer({
     <section
       aria-labelledby="allocation-explorer-title"
       className="border-y border-[var(--line)] py-7 lg:py-8"
+      data-compact={compact ? "true" : "false"}
       data-section="allocation-explorer"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -192,7 +196,17 @@ export function PortfolioAllocationExplorer({
         </p>
       )}
 
-      {groupRows.length > 0 ? (
+      {groupRows.length > 0 && compact ? (
+        <div className="mt-4 flex justify-end">
+          <PresentationDialog label={`그룹 비중 ${groupRows.length}개`} title="그룹별 현재 비중과 승인 목표" wide>
+            <div className="grid gap-x-10 gap-y-7 md:grid-cols-2">
+              {groupRows.map((row) => (
+                <GroupAllocationRow key={row.name} row={row} />
+              ))}
+            </div>
+          </PresentationDialog>
+        </div>
+      ) : groupRows.length > 0 ? (
         <div className="mt-10 border-t border-[var(--line)] pt-7">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-sm font-medium text-[var(--ink)]">그룹 비중</h3>

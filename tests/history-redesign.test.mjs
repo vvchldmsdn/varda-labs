@@ -28,7 +28,8 @@ describe("history redesign boundaries", () => {
     assert.match(view, /<HistoryActivityStream/);
     assert.match(view, /<HistoryTrajectoryChart/);
     assert.match(view, /<PortfolioHistoryTable/);
-    assert.match(view, /원시 기록과 검증 근거 보기/);
+    assert.match(view, /원시 기록 검증/);
+    assert.match(view, /<PresentationDialog/);
   });
 
   it("isolates interaction in a serializable client component with no browser-side data fetch", () => {

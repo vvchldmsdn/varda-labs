@@ -14,7 +14,7 @@ export function AuthShell({
   preview?: boolean;
 }) {
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} varda-secondary-page`}>
       {preview ? (
         <p className={styles.preview}>
           화면 미리보기 · 로그인 및 데이터 저장 없음

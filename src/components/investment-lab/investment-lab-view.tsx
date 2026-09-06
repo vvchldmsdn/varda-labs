@@ -192,7 +192,10 @@ export function InvestmentLabView({
           </div>
         </header>
 
-        <div className="mt-5 min-h-0 flex-1 overflow-hidden" id="investment-lab-results">
+        <div
+          className="varda-workspace-shell mt-5 min-h-0 flex-1 overflow-hidden"
+          id="investment-lab-results"
+        >
           <InvestmentLabWorkspace
             tools={
               <>
