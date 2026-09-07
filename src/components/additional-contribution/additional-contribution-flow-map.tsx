@@ -177,7 +177,7 @@ export function AdditionalContributionFlowMap({
             {activeId === row.id ? (
               <span className="col-span-2 mt-4 grid grid-cols-2 gap-3 text-xs text-[var(--muted)]">
                 <span>목표 {formatPercent(row.targetWeightPct)}</span>
-                <span>투입 후 {formatPercent(row.postTopupWeightPct)}</span>
+                <span>최종 배분 후 {formatPercent(row.postTopupWeightPct)}</span>
               </span>
             ) : null}
           </button>
@@ -239,7 +239,7 @@ function FlowTooltip({
           </dd>
         </div>
         <div>
-          <dt className="text-[var(--muted)]">투입 후</dt>
+          <dt className="text-[var(--muted)]">최종 배분 후</dt>
           <dd className="mt-1 font-medium">
             {formatPercent(row.postTopupWeightPct)}
           </dd>
@@ -247,7 +247,7 @@ function FlowTooltip({
       </dl>
       {row.reductionKrw > 0 ? (
         <p className="mt-3 text-xs text-[var(--warning)]">
-          MA120 근거로 {formatKrw(row.reductionKrw)} 현금 보류
+          {row.kind === "cash" ? "추세 적용 전보다 현금 잔액" : "기본 매수안보다 매수금"} {formatKrw(row.reductionKrw)} {row.kind === "cash" ? "증가" : "감소"}
         </p>
       ) : null}
     </div>

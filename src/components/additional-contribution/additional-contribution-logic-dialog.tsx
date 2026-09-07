@@ -81,18 +81,25 @@ export function AdditionalContributionLogicDialog({
               <PolicyFact
                 label="1. 초과 종목 정리"
                 value={`목표 대비 +${formatNumber(preview.calculationParameters.trimDriftThresholdPct)}% 이상`}
-                detail={`수익 중인 종목만 목표비중의 ${formatNumber(preview.calculationPolicy.trimLandingTargetMultiplier * 100)}% 지점까지 계산상 매도하고, 그 금액을 투입금에 더합니다.`}
+                detail={`투입 전 비중으로 초과 폭을 판단합니다. 원가 근거가 있고 평가손익이 0 이상인 종목만, 투입 후 총액 기준 목표비중의 ${formatNumber(preview.calculationPolicy.trimLandingTargetMultiplier * 100)}% 지점까지 계산상 매도합니다.`}
               />
               <PolicyFact
                 label="2. MA120 매수 강도"
                 value="자산 성격별로 목표 부족액 조정"
-                detail="금과 채권은 감점하지 않습니다. 그 외 자산은 MA120 아래 3%까지 단계적으로, 그보다 낮으면 자산군 배율을 전부 적용합니다."
+                detail={preview.ma120Evidence.mode === "off" ? "추세 필터가 꺼져 있어 원래 목표비중을 사용합니다." : "금·채권은 감액하지 않습니다. MA120 아래 3% 구간은 선형 보간하고, 그 아래에서는 자산군 배율을 전부 적용합니다. 근거가 없는 종목은 임의 감액하지 않습니다."}
               />
               <PolicyFact
-                label="3. 최소 집행 확인"
+                label="3. 집행 참고기준"
                 value={`${formatKrw(preview.minimumExecutionTargetKrw)} · ${preview.minimumExecutionSatisfied ? "충족" : "미충족"}`}
-                detail={`기준 ${formatNumber(preview.calculationParameters.minimumExecutionRatioPct)}%. 다만 목표 부족액을 넘겨 억지로 매수하지는 않습니다.`}
+                detail={`매수 가능 재원의 ${formatNumber(preview.calculationParameters.minimumExecutionRatioPct)}%를 참고기준으로 확인합니다. 유효 목표 부족액이 작으면 미달할 수 있으며, 기준을 맞추기 위한 추가 매수는 하지 않습니다.`}
               />
+            </section>
+
+            <section className="border-b border-[var(--line)] pb-5 text-xs leading-6 text-[var(--muted)]" aria-label="배분 공식">
+              <p>유효 목표액 = (현재 총평가액 + 신규 투입금) × 목표비중 × MA120 배율</p>
+              <p>종목별 부족액 = 유효 목표액 − 계산상 매도 후 평가액 (0 미만이면 0)</p>
+              <p>신규 투입금 + 계산상 매도대금을 부족액 비례로 배분합니다. 매도 종목은 다시 매수하지 않습니다. 원 단위 최대잔여 방식으로 결정하며 매도는 보유 평가액, 매수는 유효 부족액을 넘지 않습니다.</p>
+              <p>목표 0% 종목도 손실이 아니고 원가 근거가 있을 때 정리합니다. 원 단위로 표현할 수 없는 1원 미만 평가액은 남을 수 있습니다. 수수료·세금·주문 단위는 반영하지 않은 금액 계획입니다.</p>
             </section>
 
             <section className="mt-7" aria-labelledby="holding-calculation-title">
@@ -122,18 +129,19 @@ export function AdditionalContributionLogicDialog({
                   </thead>
                   <tbody>
                     {rows.map((row) => (
-                      <tr key={`${row.accountCode}:${row.ticker ?? row.name}`} className="border-t border-[var(--wash)] align-top">
+                      <tr key={row.allocationKey ?? `${row.accountCode}:${row.market}:${row.currency}:${row.ticker ?? row.name}`} className="border-t border-[var(--wash)] align-top">
                         <td className="px-2 py-3">
                           <p className="font-medium">{row.name}</p>
                           <p className="mt-0.5 text-xs text-[var(--muted)]">{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</p>
                         </td>
-                        <td className="px-2 py-3 text-right tabular-nums">{formatPercent(row.currentWeightPct)} → {formatPercent(row.targetWeightPct)}</td>
+                        <td className="px-2 py-3 text-right tabular-nums"><p>{formatPercent(row.currentWeightPct)} → {formatPercent(row.targetWeightPct)}</p><p className="mt-0.5 text-xs text-[var(--muted)]">{row.driftRatioPct === null ? "목표 0%" : `드리프트 ${formatSignedPercent(row.driftRatioPct)}`}</p></td>
                         <td className="px-2 py-3 text-right tabular-nums">{row.unrealizedReturnPct === null ? "근거 없음" : formatSignedPercent(row.unrealizedReturnPct)}</td>
                         <td className="px-2 py-3 text-right tabular-nums">{row.trimAmountKrw > 0 ? formatKrw(row.trimAmountKrw) : "-"}</td>
                         <td className="px-2 py-3 text-right tabular-nums">{formatKrw(row.strategicAllocationKrw)}</td>
                         <td className="px-2 py-3 text-right tabular-nums">
                           <p>{formatPercent(row.effectiveTargetWeightPct)}</p>
                           <p className="mt-0.5 text-xs text-[var(--muted)]">× {formatNumber(row.maEffectiveMultiplier)}</p>
+                          <p className="mt-0.5 text-xs text-[var(--muted)]">부족액 {formatKrw(row.baseNeedKrw)}</p>
                         </td>
                         <td className={`px-2 py-3 text-right font-medium tabular-nums ${actionTone(row.action)}`}>{actionLabel(row)}</td>
                         <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]">{decisionReason(row)}</td>
@@ -176,13 +184,16 @@ function actionTone(action: "buy" | "hold" | "trim") {
 }
 
 function decisionReason(row: AdditionalContributionResultPreview["rows"][number]) {
-  if (row.action === "trim") return row.trimReason === "eligible_zero_target_exit" ? "목표비중이 0%이고 수익 중이라 전액을 계산상 매도했습니다." : "목표 대비 초과 폭이 기준을 넘고 수익 중이라 목표의 105%까지 계산상 매도했습니다.";
-  if (row.trimReason === "loss_position" || row.trimReason === "target_zero_but_loss") return "비중은 높지만 손실 중이어서 매도하지 않았습니다.";
-  if (row.trimReason === "cost_basis_unavailable" || row.trimReason === "target_zero_cost_basis_unavailable") return "매입원가 근거가 없어 자동 매도를 막았습니다.";
-  if (row.maAdjustmentReason === "asset_class_exempt") return row.action === "buy" ? "금·채권 자산은 MA120 감점 없이 목표 부족액을 배분했습니다." : "금·채권 자산은 MA120 감점 대상이 아니며 현재 추가 매수가 필요하지 않습니다.";
-  if (row.maAdjustmentReason === "below_ma120_full_adjustment" || row.maAdjustmentReason === "below_ma120_buffer") return row.action === "buy" ? "MA120 아래에 있어 자산군별 매수 강도를 적용한 뒤 배분했습니다." : "MA120 아래 조정 후에는 추가 매수 부족액이 없었습니다.";
-  if (row.action === "buy") return "목표비중보다 부족해 사용 가능한 재원을 부족액 비례로 배분했습니다.";
-  return "현재 비중이 목표에 가깝거나 다른 종목의 부족 정도가 더 컸습니다.";
+  if (row.action === "trim") return row.trimReason === "eligible_zero_target_exit" ? "목표가 0%이고 원가가 확인되며 손실이 없어 원 단위로 정리합니다. 1원 미만 평가액은 남을 수 있습니다." : "원가 근거와 0 이상 손익을 확인했습니다. 투입 후 총액 기준 목표의 105%까지 계산상 매도합니다.";
+  const reasons: string[] = [];
+  if (row.trimReason === "loss_position" || row.trimReason === "target_zero_but_loss") reasons.push("손실 중이므로 매도하지 않습니다.");
+  if (row.trimReason === "cost_basis_unavailable" || row.trimReason === "target_zero_cost_basis_unavailable") reasons.push("매입원가 근거가 없어 매도하지 않습니다.");
+  if (row.maAdjustmentReason === "asset_class_exempt") reasons.push("MA120 감액 제외 자산입니다.");
+  if (row.maAdjustmentReason === "asset_rule_disabled") reasons.push("추세 필터 또는 종목별 MA 규칙이 꺼져 있습니다.");
+  if (row.maAdjustmentReason === "evidence_unavailable") reasons.push("MA120 근거가 없어 목표를 임의 감액하지 않습니다.");
+  if (row.maAdjustmentReason === "below_ma120_full_adjustment" || row.maAdjustmentReason === "below_ma120_buffer") reasons.push(`MA120 배율 ${formatNumber(row.maEffectiveMultiplier)}을 반영했습니다.`);
+  reasons.push(row.action === "buy" ? "계산상 매도 후 유효 목표 부족액에 비례해 매수금을 배분했습니다." : row.baseNeedKrw > 0 ? "부족액은 있으나 원 단위 상한과 재원 배분 결과 매수금이 없습니다." : "유효 목표 부족액이 없어 추가 매수하지 않습니다.");
+  return reasons.join(" ");
 }
 
 function formatKrw(value: number) {

@@ -4,6 +4,21 @@ import { describe, it } from "node:test";
 import { buildAdditionalContributionView } from "../src/lib/additional-contribution-view.ts";
 
 describe("additional contribution presentation view", () => {
+  it("keeps identical tickers in separate account UUIDs independently selectable", () => {
+    const view = buildAdditionalContributionView({
+      cashAmountKrw: 20,
+      currentPortfolioTotalKrw: 100,
+      postTopupTotalKrw: 120,
+      totalAllocatedKrw: 20,
+      residualCashKrw: 0,
+      rows: [
+        row({ allocationKey: "account-a:asset-a", allocationKrw: 10, strategicAllocationKrw: 10 }),
+        row({ allocationKey: "account-b:asset-b", allocationKrw: 10, strategicAllocationKrw: 10 }),
+      ],
+    });
+    assert.deepEqual(view.flowRows.map((item) => item.id), ["account-a:asset-a", "account-b:asset-b"]);
+    assert.equal(view.recipientCount, 2);
+  });
   it("reconciles both displayed flows to funds including trim proceeds", () => {
     const view = buildAdditionalContributionView({
       cashAmountKrw: 150,
