@@ -32,7 +32,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
           <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)} title="목표비중 설정"><Target size={16} aria-hidden="true" /><span>목표비중</span><ArrowUpRight size={13} aria-hidden="true" /></Link></div>
         </header>
         <ContributionCalculator amountKrw={amountKrw} scopeKey={selectedScope.key} isDesignPreview={!enableLivePriceSync} status={preview.status} allocations={preview.status === "ready" ? <FeaturedAllocation preview={preview} /> : undefined}>
-          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span>배분의 시작은 목표비중에서</span><strong>계산 근거를<br />확인해 주세요.</strong><p>{preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."}</p></div>}
+          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span>배분의 시작은 목표비중에서</span><strong>계산 근거를<br />확인해 주세요.</strong><p>{preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."}</p></div>}
         </ContributionCalculator>
         <footer className={styles.footer}>
           {preview.status === "ready" ? <>
@@ -54,7 +54,7 @@ function FeaturedAllocation({ preview }: { preview: AdditionalContributionResult
   const featured = ranked.slice(0,4);
   return <div className={styles.featured}>
     <div className={styles.featuredHeading}><span>ALLOCATION</span><h2>주요 배분</h2><p>금액 순 {featured.length}종목 · 전체 {preview.rows.length}종목</p></div>
-    <ul>{featured.map((row,index) => <li key={`${row.accountCode}:${row.ticker ?? row.name}:${index}`}><div><strong>{row.name}</strong><span>{row.accountName} · {row.currentWeightPct.toFixed(1)}% → {row.postTopupWeightPct.toFixed(1)}%</span></div><p data-action={row.action}><small>{row.action === "trim" ? "매도" : "매수"}</small>{formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}</p></li>)}</ul>
+    <ul>{featured.map((row,index) => <li key={row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`}><div><strong>{row.name}</strong><span>{row.accountName} · {row.currentWeightPct.toFixed(1)}% → {row.postTopupWeightPct.toFixed(1)}%</span></div><p data-action={row.action}><small>{row.action === "trim" ? "매도" : "매수"}</small>{formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}</p></li>)}</ul>
     {featured.length === 0 ? <p className={styles.modalNote}>계산된 매수·매도 종목이 없습니다. 재원은 현금으로 유지합니다.</p> : null}
   </div>;
 }
@@ -105,6 +105,14 @@ function blockerLabel(blocker: string) {
     valuation_identity_missing: "일부 목표 종목의 현재 평가액이 없습니다.",
     valuation_identity_duplicate: "현재 평가액 종목 식별자가 중복되었습니다.",
     invalid_cash_amount: "투입 금액은 1원 이상의 정수여야 합니다.",
+    empty_valuation_universe: "계산에 사용할 보유 평가액이 없습니다.",
+    invalid_current_value: "일부 종목의 평가액이 없거나 유효하지 않습니다.",
+    invalid_cost_basis: "일부 종목의 매입원가 값이 유효하지 않습니다.",
+    invalid_target_weight: "목표비중은 0~100% 범위여야 합니다.",
+    target_policy_incomplete: "선택 범위의 목표비중 합계가 100%가 아닙니다.",
+    duplicate_allocation_key: "같은 종목의 보유 식별자가 중복되어 계산을 중단했습니다.",
+    invalid_policy_parameter: "매도 기준이나 집행 참고비율이 유효하지 않습니다.",
+    allocation_invariant_failed: "금액 합계와 원 단위 배분을 검증하지 못했습니다.",
     unallocatable_target_deficit:
       "부족 비중을 매수 가능한 종목에 배분할 수 없습니다.",
   };

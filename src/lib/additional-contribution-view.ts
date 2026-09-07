@@ -8,6 +8,7 @@ export type AdditionalContributionViewInput = Readonly<{
 }>;
 
 export type AdditionalContributionViewInputRow = Readonly<{
+  allocationKey?: string;
   accountCode: string;
   accountName: string;
   allocationKrw: number;
@@ -259,6 +260,7 @@ function totalVariationDistance(
 }
 
 function stableRowId(row: AdditionalContributionViewInputRow) {
+  if (row.allocationKey) return row.allocationKey;
   return [
     row.accountCode,
     row.market ?? "unknown",

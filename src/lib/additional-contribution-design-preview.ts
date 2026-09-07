@@ -99,6 +99,7 @@ export function buildAdditionalContributionDesignPreview({
   }
 
   const rows = calculation.rows.map((row) => Object.freeze({
+      allocationKey: row.allocationKey,
       accountCode: row.metadata.accountCode,
       accountName: row.metadata.accountName,
       action: row.action,

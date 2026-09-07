@@ -75,7 +75,7 @@ export function AdditionalContributionFlowScene({
           <SummaryMetric
             label="현금 보류"
             value={formatKrw(preview.residualCashKrw)}
-            detail={residualDetail(view.totalReductionKrw)}
+            detail="유효 목표 부족분과 원 단위 배분 후 잔액"
           />
           <SummaryMetric
             label="배분 종목"
@@ -88,7 +88,9 @@ export function AdditionalContributionFlowScene({
             detail={
               view.targetDistanceImprovementPct > 0
                 ? `${formatPercent(view.targetDistanceImprovementPct)}p 가까워짐`
-                : "현재 비중과 동일"
+                : view.targetDistanceImprovementPct < 0
+                  ? `${formatPercent(-view.targetDistanceImprovementPct)}p 멀어짐`
+                  : "현재 비중과 동일"
             }
           />
         </div>
@@ -103,7 +105,6 @@ export function AdditionalContributionWeightScene({
   preview: AdditionalContributionResultPreview;
 }) {
   const allocationRows = preview.rows
-    .filter((row) => row.allocationKrw > 0)
     .toSorted(
       (left, right) =>
         right.allocationKrw - left.allocationKrw ||
@@ -261,8 +262,8 @@ function WeightRow({
         />
       </div>
       <div className="flex items-baseline justify-between gap-4 md:block md:min-w-32 md:text-right">
-        <p className="text-base font-medium tabular-nums text-[var(--brand)]">
-          {formatKrw(row.allocationKrw)}
+        <p className={`text-base font-medium tabular-nums ${row.action === "trim" ? "text-[var(--negative)]" : "text-[var(--brand)]"}`}>
+          {row.action === "hold" ? "유지" : `${row.action === "trim" ? "매도" : "매수"} ${formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}`}
         </p>
         <p className="mt-1 text-xs tabular-nums text-[var(--muted)]">
           {formatPercent(row.currentWeightPct)} →{" "}
@@ -283,13 +284,8 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 }
 
 function rowKey(row: AdditionalContributionResultRow) {
+  if (row.allocationKey) return row.allocationKey;
   return `${row.accountCode}:${row.market ?? "unknown"}:${row.currency ?? "unknown"}:${row.ticker ?? row.name}`;
-}
-
-function residualDetail(totalReductionKrw: number) {
-  return totalReductionKrw > 0
-    ? `MA120 조정 ${formatKrw(totalReductionKrw)} 포함`
-    : "목표 부족분 배분 후 잔액";
 }
 
 function ma120SummaryDetail(
@@ -301,8 +297,8 @@ function ma120SummaryDetail(
   if (evidence.status === "unavailable")
     return "사용 가능한 가격 이력 없음 · 기본 배분 사용";
   if (evidence.status === "partial")
-    return `MA120 일부 적용 · ${formatKrw(evidence.totalReductionKrw)} 현금 보류`;
-  return `MA120 ${evidence.usableCount}종목 적용 · ${formatKrw(evidence.totalReductionKrw)} 현금 보류`;
+    return `MA120 일부 근거 확보 · 기본 매수안 대비 감소액 ${formatKrw(evidence.totalReductionKrw)}`;
+  return `MA120 ${evidence.usableCount}종목 근거 확보 · 기본 매수안 대비 감소액 ${formatKrw(evidence.totalReductionKrw)}`;
 }
 
 function formatKrw(value: number) {

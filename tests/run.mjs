@@ -112,6 +112,8 @@ import "./additional-contribution-scope.test.mjs";
 import "./additional-contribution-preview.test.mjs";
 import "./additional-contribution-view.test.mjs";
 import "./additional-contribution-policy-engine.test.mjs";
+import "./additional-contribution-policy-input.test.mjs";
+import "./additional-contribution-query-integration.test.mjs";
 import "./additional-contribution-ma120-evidence.test.mjs";
 import "./additional-contribution-ma120-overlay.test.mjs";
 import "./simulation-return-matrix.test.mjs";

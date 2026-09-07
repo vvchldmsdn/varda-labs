@@ -14,6 +14,12 @@ import {
 } from "@/lib/additional-contribution-preview";
 import type { AdditionalContributionMa120OverlayMode } from "@/lib/additional-contribution-ma120-overlay";
 import { calculateExplainableAdditionalContribution } from "@/lib/additional-contribution-policy-engine";
+import {
+  additionalContributionInstrumentKey as instrumentKey,
+  additionalContributionMaAssetClass,
+  matchLegacyAdditionalContributionTargets,
+  resolveAdditionalContributionPolicyParameters as resolvePolicyParameters,
+} from "@/lib/additional-contribution-policy-input";
 import type { AdditionalContributionMa120EvidenceView } from "@/lib/additional-contribution-view";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
@@ -99,6 +105,16 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
   );
   const policyParameters = resolvePolicyParameters(settingsRows[0]);
 
+  if (model.status !== "ready") {
+    return scopedBlocked(scope, serviceDate, ["valuation_universe_invalid"]);
+  }
+  if (scope.kind === "account" && model.rows.some((row) => row.accountId !== scope.accountId || row.accountCode.toLowerCase() !== scope.accountCode.toLowerCase())) {
+    return scopedBlocked(scope, serviceDate, ["valuation_account_mismatch"]);
+  }
+  if (model.rows.some((row) => row.currentValueKrw === null)) {
+    return scopedBlocked(scope, serviceDate, ["valuation_identity_missing"]);
+  }
+
   if (
     model.policyValidation.status === "missing" &&
     scope.kind === "account" &&
@@ -119,16 +135,10 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     });
   }
 
-  if (model.status !== "ready") {
-    return scopedBlocked(scope, serviceDate, ["valuation_universe_invalid"]);
-  }
   if (model.policyValidation.status !== "available") {
     return scopedBlocked(scope, serviceDate, [
       scopedPolicyBlocker(model.policyValidation.status),
     ]);
-  }
-  if (model.rows.some((row) => row.currentValueKrw === null)) {
-    return scopedBlocked(scope, serviceDate, ["valuation_identity_missing"]);
   }
 
   let ma120Read;
@@ -187,19 +197,20 @@ function adaptLegacyPreview({
       scopeKey: scope.key,
     });
   }
-  const legacyTargets = new Map(
-    preview.rows.map((row) => [instrumentKey(row), Math.round(row.targetWeightPct * 100)]),
-  );
-  const legacyEvidence = new Map(
-    preview.rows.map((row) => [instrumentKey(row), row.ma120Evidence]),
-  );
+  const match = matchLegacyAdditionalContributionTargets({
+    modelRows: model.rows,
+    legacyRows: preview.rows,
+    accountId: scope.accountId,
+    accountCode: scope.accountCode,
+  });
+  if (match.status !== "ready") return scopedBlocked(scope, preview.serviceDate, match.blockers);
   const result = calculateExplainableAdditionalContribution({
     cashAmountKrw: preview.cashAmountKrw,
     minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
     trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
     rows: model.rows.map((row) => {
-      const key = instrumentKey(row);
-      const evidence = legacyEvidence.get(key) ?? unavailableMa120Evidence();
+      const target = match.targetsByAsset.get(row.assetId)!;
+      const evidence = target.ma120Evidence;
       return Object.freeze({
         allocationKey: `${row.accountId}:${row.assetId}`,
         assetType: row.assetType ?? null,
@@ -210,7 +221,7 @@ function adaptLegacyPreview({
           distanceFromMaPct: evidence.distanceFromMaPct,
           status: evidence.status,
         }),
-        maAssetClass: row.maAssetClass ?? null,
+        maAssetClass: additionalContributionMaAssetClass({ ...row, maAssetClass: row.maAssetClass ?? null }),
         maRuleEnabled: policyParameters.useTrendFilter && (row.maRuleEnabled ?? true),
         metadata: Object.freeze({
           accountCode: row.accountCode,
@@ -221,7 +232,7 @@ function adaptLegacyPreview({
           market: row.market,
           ticker: row.ticker,
         }),
-        targetWeightBps: legacyTargets.get(key) ?? 0,
+        targetWeightBps: Math.round(target.targetWeightPct * 100),
       });
     }),
   });
@@ -271,7 +282,7 @@ function buildPolicyRows({
         distanceFromMaPct: evidence.distanceFromMaPct,
         status: evidence.status,
       }),
-      maAssetClass: row.maAssetClass ?? null,
+      maAssetClass: additionalContributionMaAssetClass({ ...row, maAssetClass: row.maAssetClass ?? null }),
       maRuleEnabled: useTrendFilter && (row.maRuleEnabled ?? true),
       metadata: Object.freeze({
         accountCode: row.accountCode,
@@ -349,6 +360,7 @@ function mapPolicyResult<T extends Readonly<{
     rows: Object.freeze(result.rows.map((row) => Object.freeze({
       accountCode: row.metadata.accountCode,
       accountName: row.metadata.accountName,
+      allocationKey: row.allocationKey,
       action: row.action,
       allocationKrw: row.allocationKrw,
       baseNeedKrw: row.baseNeedKrw,
@@ -400,47 +412,6 @@ function unavailableMa120Evidence() {
     ma120: null,
     distanceFromMaPct: null,
   });
-}
-
-function instrumentKey(row: {
-  market: string | null;
-  currency: string | null;
-  ticker: string | null;
-}) {
-  const market = normalizeInstrumentPart(row.market, "lower");
-  const currency = normalizeInstrumentPart(row.currency, "upper");
-  const ticker = normalizeInstrumentPart(row.ticker, "upper");
-  return market && currency && ticker
-    ? `${market}:${currency}:${ticker}`
-    : null;
-}
-
-function normalizeInstrumentPart(
-  value: string | null,
-  casing: "lower" | "upper",
-) {
-  const normalized = String(value ?? "").trim();
-  if (!normalized) return null;
-  return casing === "lower"
-    ? normalized.toLowerCase()
-    : normalized.toUpperCase();
-}
-
-function resolvePolicyParameters(
-  settings: Awaited<ReturnType<typeof loadLatestTenantPortfolioSettingsRows>>[number] | undefined,
-) {
-  return Object.freeze({
-    minimumExecutionRatioPct: boundedPercent(settings?.minExecutionRatioPct, 85),
-    trimDriftThresholdPct: boundedPercent(settings?.trimDriftThreshold, 12),
-    useTrendFilter: settings?.useTrendFilter ?? false,
-  });
-}
-
-function boundedPercent(value: string | null | undefined, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100
-    ? parsed
-    : fallback;
 }
 
 function scopedBlocked(

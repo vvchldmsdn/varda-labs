@@ -2,6 +2,12 @@ export const ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY = Object.freeze({
   version: "gyeol_fin_explainable_rebalance_v1",
   targetWeightTotalBps: 10_000,
   trimLandingTargetMultiplier: 1.05,
+  trimRequiresNonnegativeUnrealizedReturn: true,
+  trimRounding: "floor_krw_with_sub_krw_holding_remainder",
+  allocation: "post_trim_effective_target_deficit_proportional",
+  rounding: "integer_krw_largest_remainder_then_allocation_key_with_deficit_cap",
+  minimumExecution: "reference_only_without_forced_topup",
+  unavailableMaEvidence: "do_not_reduce_target",
   ma120BufferPct: 3,
   ma120ClassMultipliers: Object.freeze({
     broad_index: 0.8,
@@ -121,6 +127,9 @@ export function calculateExplainableAdditionalContribution<T>({
   if (currentPortfolioTotalKrw <= 0 || !Number.isFinite(currentPortfolioTotalKrw)) {
     return blocked(new Set(["empty_valuation_universe"]));
   }
+  if (currentPortfolioTotalKrw > Number.MAX_SAFE_INTEGER - cashAmountKrw) {
+    return blocked(new Set(["allocation_invariant_failed"]));
+  }
   const postContributionTotalKrw = currentPortfolioTotalKrw + cashAmountKrw;
   const rows: WorkingRow<T>[] = sourceRows.map((row) => {
     const currentWeightPct = (row.currentValueKrw / currentPortfolioTotalKrw) * 100;
@@ -143,7 +152,7 @@ export function calculateExplainableAdditionalContribution<T>({
     const strategicTargetValueKrw =
       (row.targetWeightBps / ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.targetWeightTotalBps) *
       postContributionTotalKrw;
-    const postTrimValueKrw = Math.max(0, row.currentValueKrw - trim.amountKrw);
+    const postTrimValueKrw = row.currentValueKrw - trim.amountKrw;
 
     return {
       ...row,
@@ -172,6 +181,9 @@ export function calculateExplainableAdditionalContribution<T>({
 
   const totalTrimProceedsKrw = sum(rows, (row) => row.trimAmountKrw);
   const totalAvailableFundsKrw = cashAmountKrw + totalTrimProceedsKrw;
+  if (!Number.isSafeInteger(totalAvailableFundsKrw)) {
+    return blocked(new Set(["allocation_invariant_failed"]));
+  }
   for (const row of rows) {
     row.effectiveTargetValueKrw =
       (row.effectiveTargetWeightBps /
@@ -187,14 +199,14 @@ export function calculateExplainableAdditionalContribution<T>({
   const strategic = allocateWithCaps(
     totalAvailableFundsKrw,
     rows.filter(isBuyCandidate).map((row) => ({
-      capKrw: Math.max(0, Math.round(row.strategicNeedKrw)),
+      needKrw: row.strategicNeedKrw,
       key: row.allocationKey,
     })),
   );
   const final = allocateWithCaps(
     totalAvailableFundsKrw,
     rows.filter(isBuyCandidate).map((row) => ({
-      capKrw: Math.max(0, Math.round(row.baseNeedKrw)),
+      needKrw: row.baseNeedKrw,
       key: row.allocationKey,
     })),
   );
@@ -212,10 +224,9 @@ export function calculateExplainableAdditionalContribution<T>({
   const totalAllocatedKrw = sum(rows, (row) => row.allocationKrw);
   const residualCashKrw = totalAvailableFundsKrw - totalAllocatedKrw;
   const totalBaseNeedKrw = sum(rows.filter(isBuyCandidate), (row) => row.baseNeedKrw);
-  const minimumExecutionTargetKrw = Math.min(
+  const minimumExecutionTargetKrw = minimumExecutionReferenceKrw(
     totalAvailableFundsKrw,
-    Math.round(totalBaseNeedKrw),
-    Math.round(totalAvailableFundsKrw * (minimumExecutionRatioPct / 100)),
+    minimumExecutionRatioPct,
   );
   if (!invariantsHold({
     currentPortfolioTotalKrw,
@@ -288,8 +299,8 @@ function validateInputs<T>({ cashAmountKrw, minimumExecutionRatioPct, rows, trim
   for (const row of rows) {
     if (!row.allocationKey || keys.has(row.allocationKey)) blockers.add("duplicate_allocation_key");
     keys.add(row.allocationKey);
-    if (!Number.isFinite(row.currentValueKrw) || row.currentValueKrw < 0) blockers.add("invalid_current_value");
-    if (row.costBasisKrw !== null && (!Number.isFinite(row.costBasisKrw) || row.costBasisKrw < 0)) blockers.add("invalid_cost_basis");
+    if (!validMoney(row.currentValueKrw)) blockers.add("invalid_current_value");
+    if (row.costBasisKrw !== null && !validMoney(row.costBasisKrw)) blockers.add("invalid_cost_basis");
     if (!Number.isSafeInteger(row.targetWeightBps) || row.targetWeightBps < 0 || row.targetWeightBps > 10_000) blockers.add("invalid_target_weight");
   }
   if (rows.length > 0 && sum(rows, (row) => row.targetWeightBps) !== 10_000) blockers.add("target_policy_incomplete");
@@ -307,16 +318,16 @@ function resolveTrim({ currentValueKrw, driftRatioPct, postContributionTotalKrw,
   if (targetWeightBps === 0 && currentValueKrw > 0) {
     if (unrealizedReturnPct === null) return trimResult(0, "target_zero_cost_basis_unavailable");
     if (unrealizedReturnPct < 0) return trimResult(0, "target_zero_but_loss");
-    return trimResult(Math.max(0, Math.round(currentValueKrw)), "eligible_zero_target_exit");
+    return trimResult(Math.floor(currentValueKrw), "eligible_zero_target_exit");
   }
-  if (driftRatioPct === null || driftRatioPct < trimDriftThresholdPct) return trimResult(0, "not_overweight");
+  if (driftRatioPct === null || belowThreshold(driftRatioPct, trimDriftThresholdPct)) return trimResult(0, "not_overweight");
   if (unrealizedReturnPct === null) return trimResult(0, "cost_basis_unavailable");
   if (unrealizedReturnPct < 0) return trimResult(0, "loss_position");
   const landingValueKrw =
     (targetWeightBps / 10_000) *
     ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.trimLandingTargetMultiplier *
     postContributionTotalKrw;
-  return trimResult(Math.max(0, Math.round(currentValueKrw - landingValueKrw)), "eligible_overweight");
+  return trimResult(Math.max(0, Math.floor(currentValueKrw - landingValueKrw)), "eligible_overweight");
 }
 
 function trimResult(amountKrw: number, reason: TrimReason) {
@@ -331,7 +342,7 @@ function resolveMaAdjustment<T>(row: AdditionalContributionPolicyRow<T>) {
   if (["savings", "pension", "housing_subscription", "fixed_deposit"].includes(assetType ?? "") || assetClass === "defensive_gold" || assetClass === "bond") {
     return { baseMultiplier: 1, multiplier: 1, reason: "asset_class_exempt" as const };
   }
-  if (row.ma120Evidence.status !== "below_ma" || row.ma120Evidence.distanceFromMaPct === null || !Number.isFinite(row.ma120Evidence.distanceFromMaPct)) {
+  if (row.ma120Evidence.status !== "below_ma" || row.ma120Evidence.distanceFromMaPct === null || !Number.isFinite(row.ma120Evidence.distanceFromMaPct) || row.ma120Evidence.distanceFromMaPct >= 0) {
     const known = row.ma120Evidence.status === "above_ma" || row.ma120Evidence.status === "at_ma";
     return { baseMultiplier, multiplier: 1, reason: known ? "above_or_at_ma120" as const : "evidence_unavailable" as const };
   }
@@ -345,18 +356,20 @@ function resolveMaAdjustment<T>(row: AdditionalContributionPolicyRow<T>) {
 
 function maClassMultiplier(assetClass: string) {
   const values = ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.ma120ClassMultipliers;
-  return assetClass in values ? values[assetClass as keyof typeof values] : values.other;
+  return Object.hasOwn(values, assetClass) ? values[assetClass as keyof typeof values] : values.other;
 }
 
-function allocateWithCaps(availableKrw: number, rows: readonly { capKrw: number; key: string }[]) {
-  const totalCapKrw = sum(rows, (row) => row.capKrw);
-  const deployKrw = Math.min(availableKrw, totalCapKrw);
-  if (deployKrw <= 0 || totalCapKrw <= 0) return rows.map((row) => ({ ...row, amountKrw: 0 }));
+function allocateWithCaps(availableKrw: number, rows: readonly { needKrw: number; key: string }[]) {
+  const totalNeedKrw = sum(rows, (row) => row.needKrw);
+  const deployKrw = Math.min(availableKrw, totalNeedKrw);
+  if (deployKrw <= 0 || totalNeedKrw <= 0) return rows.map((row) => ({ ...row, amountKrw: 0 }));
   const working = rows.map((row) => {
-    const idealKrw = deployKrw * (row.capKrw / totalCapKrw);
-    return { ...row, amountKrw: Math.min(row.capKrw, Math.floor(idealKrw)), idealKrw };
+    // Keep the exact deficit as the weight; only executable KRW has an integer cap.
+    const capKrw = Math.floor(row.needKrw);
+    const idealKrw = deployKrw * (row.needKrw / totalNeedKrw);
+    return { ...row, capKrw, amountKrw: Math.min(capKrw, Math.floor(idealKrw)), idealKrw };
   });
-  let remainder = deployKrw - sum(working, (row) => row.amountKrw);
+  let remainder = Math.floor(deployKrw) - sum(working, (row) => row.amountKrw);
   for (const row of working.toSorted((a, b) => fractionalPart(b.idealKrw) - fractionalPart(a.idealKrw) || a.key.localeCompare(b.key))) {
     if (remainder <= 0) break;
     if (row.amountKrw < row.capKrw) { row.amountKrw += 1; remainder -= 1; }
@@ -377,13 +390,34 @@ function invariantsHold<T>({ currentPortfolioTotalKrw, postContributionTotalKrw,
   totalAvailableFundsKrw: number;
   totalTrimProceedsKrw: number;
 }) {
-  if (![totalAllocatedKrw, totalTrimProceedsKrw, residualCashKrw].every(Number.isSafeInteger)) return false;
+  if (![totalAllocatedKrw, totalTrimProceedsKrw, residualCashKrw, totalAvailableFundsKrw].every(Number.isSafeInteger)) return false;
+  if (!validMoney(currentPortfolioTotalKrw) || !validMoney(postContributionTotalKrw)) return false;
   if (residualCashKrw < 0 || totalAllocatedKrw + residualCashKrw !== totalAvailableFundsKrw) return false;
-  if (rows.some((row) => !Number.isSafeInteger(row.allocationKrw) || !Number.isSafeInteger(row.trimAmountKrw) || row.allocationKrw < 0 || row.trimAmountKrw < 0 || row.allocationKrw > Math.round(row.baseNeedKrw) || (row.trimAmountKrw > 0 && row.allocationKrw > 0))) return false;
+  if (rows.some((row) =>
+    !Number.isSafeInteger(row.allocationKrw) || !Number.isSafeInteger(row.trimAmountKrw) ||
+    !Number.isSafeInteger(row.strategicAllocationKrw) ||
+    row.allocationKrw < 0 || row.trimAmountKrw < 0 || row.strategicAllocationKrw < 0 ||
+    row.allocationKrw > Math.floor(row.baseNeedKrw) ||
+    row.strategicAllocationKrw > Math.floor(row.strategicNeedKrw) ||
+    row.trimAmountKrw > row.currentValueKrw ||
+    !validMoney(row.postTrimValueKrw) || !validMoney(row.postTradeValueKrw) ||
+    !validMoney(row.baseNeedKrw) || !validMoney(row.strategicNeedKrw) ||
+    !Number.isFinite(row.postTradeWeightPct) ||
+    (row.unrealizedReturnPct !== null && !Number.isFinite(row.unrealizedReturnPct)) ||
+    (row.trimAmountKrw > 0 && (row.allocationKrw > 0 || row.strategicAllocationKrw > 0 || row.unrealizedReturnPct === null || row.unrealizedReturnPct < 0)) ||
+    (!row.buyable && (row.allocationKrw > 0 || row.strategicAllocationKrw > 0))
+  )) return false;
+  if (sum(rows, (row) => row.strategicAllocationKrw) > totalAvailableFundsKrw) return false;
   const holdingsAfterTradeKrw = sum(rows, (row) => row.postTradeValueKrw);
   const holdingsAfterTrimKrw = sum(rows, (row) => row.postTrimValueKrw);
-  return Math.abs(holdingsAfterTrimKrw - (currentPortfolioTotalKrw - totalTrimProceedsKrw)) <= EPSILON_KRW &&
-    Math.abs(holdingsAfterTradeKrw + residualCashKrw - postContributionTotalKrw) <= EPSILON_KRW;
+  // Valuations may contain fractional KRW. Allow their accumulated floating-point
+  // error while keeping every integer cash identity and row cap exact above.
+  const valuationToleranceKrw = Math.min(0.25, Math.max(
+    EPSILON_KRW,
+    Number.EPSILON * Math.max(1, rows.length) * postContributionTotalKrw * 4,
+  ));
+  return Math.abs(holdingsAfterTrimKrw - (currentPortfolioTotalKrw - totalTrimProceedsKrw)) <= valuationToleranceKrw &&
+    Math.abs(holdingsAfterTradeKrw + residualCashKrw - postContributionTotalKrw) <= valuationToleranceKrw;
 }
 
 function blocked(blockers: Set<AdditionalContributionPolicyBlocker>) {
@@ -408,6 +442,27 @@ function blocked(blockers: Set<AdditionalContributionPolicyBlocker>) {
 
 function validPercent(value: number) {
   return Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function validMoney(value: number) {
+  return Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+}
+
+function minimumExecutionReferenceKrw(availableKrw: number, ratioPct: number) {
+  // Decimal percentage arithmetic avoids ceil(100 * 0.07) becoming 8 KRW.
+  const [mantissa, exponent = "0"] = ratioPct.toString().split("e");
+  const [whole, fractional = ""] = mantissa.split(".");
+  const scale = Number(exponent) - fractional.length;
+  const power = BigInt(`1${"0".repeat(Math.abs(scale))}`);
+  const numerator = BigInt(`${whole}${fractional}`) * (scale > 0 ? power : BigInt(1));
+  const denominator = BigInt(100) * (scale < 0 ? power : BigInt(1));
+  const amount = BigInt(availableKrw) * numerator;
+  return Number((amount + denominator - BigInt(1)) / denominator);
+}
+
+function belowThreshold(value: number, threshold: number) {
+  const comparisonTolerance = Number.EPSILON * 16 * Math.max(1, Math.abs(value), threshold);
+  return value < threshold - comparisonTolerance;
 }
 
 function normalize(value: string | null) {
