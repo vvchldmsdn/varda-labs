@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 type PortfolioRiskPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    preview?: string | string[];
     scope?: string | string[];
     window?: string | string[];
   }>;
@@ -18,6 +19,14 @@ type PortfolioRiskPageProps = {
 export default async function PortfolioRiskPage({
   searchParams,
 }: PortfolioRiskPageProps) {
+  if (process.env.NODE_ENV === "development") {
+    const previewParams = await searchParams;
+    if ((Array.isArray(previewParams.preview) ? previewParams.preview[0] : previewParams.preview) === "design") {
+      const { buildPortfolioStructureDesignPreview } = await import("@/lib/portfolio-structure-design-preview");
+      const sample = buildPortfolioStructureDesignPreview(previewParams.scope);
+      return <PortfolioRiskView model={sample.riskModel} scopes={sample.analysisScopes} selectedScope={sample.selectedScope} isDesignPreview />;
+    }
+  }
   const [params, resolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),

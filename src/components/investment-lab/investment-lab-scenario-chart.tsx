@@ -70,6 +70,7 @@ export function InvestmentLabScenarioChartView({
 
   return (
     <section
+      className="flex min-h-0 flex-1 flex-col"
       data-scenario-chart-anchor={chart.policy.initialAnchorRequirement}
       data-scenario-chart-domain={chart.policy.yDomain}
       data-scenario-chart-lines={chart.lines.length}

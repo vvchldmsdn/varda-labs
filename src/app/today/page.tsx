@@ -34,6 +34,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     return (
       <TodayMovement
         data={buildHomeDesignPreview(params.scope ?? params.account)}
+        designPreview
         detailQuery={detailQuery}
       />
     );

@@ -4,6 +4,9 @@ import { Geist, Noto_Sans_KR } from "next/font/google";
 
 import "./globals.css";
 import "./presentation.css";
+import "./modern.css";
+import "./motion.css";
+import "./stage.css";
 
 const geist = Geist({
   display: "swap",
@@ -19,8 +22,8 @@ const notoSansKr = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "Varda Labs Portfolio",
-  description: "Read-only portfolio dashboard",
+  title: "VARDA LABS · 나의 포트폴리오",
+  description: "자산의 흐름을 확인하고, 나의 포트폴리오를 계획하는 공간.",
 };
 
 export default function RootLayout({

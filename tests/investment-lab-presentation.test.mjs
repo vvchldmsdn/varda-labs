@@ -108,7 +108,7 @@ describe("investment lab presentation", () => {
     assert.match(workspace, /window\.history\.pushState/);
     assert.match(workspace, /<dialog/);
     assert.match(workspace, /data-lab-workspace="integrated"/);
-    assert.match(workspace, /varda-workspace-canvas.*\{comparison\}/s);
+    assert.match(workspace, /styles.canvas.*\{comparison\}/s);
     assert.doesNotMatch(workspace, /role="tablist"/);
     assert.match(controls, /\["view", "preview"\]/);
     assert.match(controls, /scroll=\{false\}/);

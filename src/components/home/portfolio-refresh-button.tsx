@@ -16,9 +16,11 @@ let activeSyncRequest: Promise<SyncResponse> | null = null;
 export function PortfolioRefreshButton({
   autoSync = false,
   compact = false,
+  designPreview = false,
 }: {
   autoSync?: boolean;
   compact?: boolean;
+  designPreview?: boolean;
 }) {
   const router = useRouter();
   const [refreshPending, startTransition] = useTransition();
@@ -57,7 +59,7 @@ export function PortfolioRefreshButton({
   );
 
   useEffect(() => {
-    if (!autoSync) return;
+    if (!autoSync || designPreview) return;
 
     const bucket = Math.floor(
       Date.now() / TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds,
@@ -72,7 +74,7 @@ export function PortfolioRefreshButton({
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [autoSync, sync]);
+  }, [autoSync, designPreview, sync]);
 
   return (
     <button
@@ -84,8 +86,8 @@ export function PortfolioRefreshButton({
           : "inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[var(--ink)] transition-colors hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] disabled:opacity-40"
       }
       disabled={pending}
-      onClick={() => void sync("manual")}
-      title={syncTitle(syncState)}
+      onClick={() => designPreview ? startTransition(() => router.refresh()) : void sync("manual")}
+      title={designPreview ? "디자인 미리보기 새로고침" : syncTitle(syncState)}
     >
       <span aria-hidden="true" className={pending ? "animate-spin" : undefined}>
         <RefreshCw size={15} strokeWidth={1.5} />

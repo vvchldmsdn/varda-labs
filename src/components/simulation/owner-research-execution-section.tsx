@@ -3,6 +3,7 @@ import { InvestmentLabDialog as SimulationDialog } from "@/components/investment
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 import { simulationReturnLabel } from "./simulation-presentation";
+import styles from "./simulation-workspace.module.css";
 
 type ReadyExecution = Extract<
   SimulationOwnerResearchExecutionResult,
@@ -17,17 +18,16 @@ export function OwnerResearchExecutionSection({
   return (
     <section
       aria-labelledby="owner-research-execution-title"
-      className="py-2"
+      className={styles.execution}
       data-owner-research-execution
       data-owner-research-account={execution.account}
       data-owner-research-status={execution.status}
       data-owner-research-end-source={execution.endSelection.source}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className={`${styles.executionHeader} flex flex-wrap items-start justify-between gap-4`}>
         <div>
-          <p className="hidden text-[10px] text-[var(--faint)] sm:block">PROBABILITY EXPLORER</p>
           <h2
-            className="mt-1 text-base font-medium sm:text-lg"
+            className="text-base font-semibold sm:text-lg"
             id="owner-research-execution-title"
           >
             내 포트폴리오 확률 경로
@@ -170,9 +170,10 @@ export function OwnerResearchExecutionSection({
               ) : null}
             </div>
           ) : null}
+          {execution.status === "ready" ? <ExecutionAssumptions execution={execution} /> : null}
         </SimulationDialog>
       </div>
-      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--faint)]">
+      <p className={styles.executionMeta}>
         <span>
           {execution.endSelection.endServiceDate
             ? formatDate(execution.endSelection.endServiceDate)
@@ -186,6 +187,7 @@ export function OwnerResearchExecutionSection({
         <span>
           {execution.coverage.modeledCurrentValuePct.toFixed(1)}% 포함
         </span>
+        {execution.coverage.omittedWeightBps > 0 ? <span className="text-[var(--warning)]">일부 종목 제외</span> : null}
       </p>
       {execution.status === "ready" ? (
         <ReadyOwnerExecution execution={execution} />
@@ -201,7 +203,7 @@ export function OwnerResearchExecutionSection({
             {unavailableReasonLabel(execution.reason)}
           </p>
           <p className="mt-2 text-xs leading-6 text-[var(--warning)]">
-            모형·데이터 탭에서 종목별 누락과 출처를 확인할 수 있습니다. 부족한
+            모형·데이터에서 종목별 누락과 출처를 확인할 수 있습니다. 부족한
             값을 0이나 예시 경로로 대체하지 않습니다.
           </p>
         </div>
@@ -211,49 +213,51 @@ export function OwnerResearchExecutionSection({
 }
 
 function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
-  const terminalBand = execution.bands.at(-1);
   return (
     <div
-      className="mt-2"
+      className={styles.resultLayout}
       data-owner-research-horizon={execution.assumptions.horizon}
       data-owner-research-path-count={execution.assumptions.pathCount}
     >
-      <div className="flex items-end justify-between gap-3 border-b border-[var(--wash)] pb-2 sm:gap-5">
+      <dl className={styles.resultSummary}>
         <div>
-          <p className="text-xs text-[var(--faint)]">
-            {execution.assumptions.horizon}단계 후 · 중앙값
-          </p>
-          <p
-            className={`mt-1 text-[28px] leading-none font-medium tabular-nums sm:text-[34px] ${execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}`}
-          >
+          <dt>{execution.assumptions.horizon}단계 후 중앙 수익률</dt>
+          <dd className={execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}>
             {simulationReturnLabel(100 + execution.terminal.p50ReturnPct)}
-          </p>
+          </dd>
+          <p>전체 계산 경로의 중앙값 P50</p>
         </div>
-        <dl className="grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-3 sm:gap-9 sm:text-xs">
-          <div>
-            <dt className="text-[var(--faint)]">하위 경계 P10</dt>
-            <dd className="mt-1 text-base tabular-nums sm:text-lg">
-              {terminalBand ? simulationReturnLabel(terminalBand.p10) : "-"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[var(--faint)]">상위 경계 P90</dt>
-            <dd className="mt-1 text-base tabular-nums sm:text-lg">
-              {terminalBand ? simulationReturnLabel(terminalBand.p90) : "-"}
-            </dd>
-          </div>
-          <div className="hidden sm:block">
-            <dt className="text-[var(--faint)]">계산 경로</dt>
-            <dd className="mt-1 text-base tabular-nums sm:text-lg">
-              {execution.assumptions.pathCount}
-              <span className="ml-1 text-xs text-[var(--faint)]">개</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
+        <div>
+          <dt>손실로 끝날 확률</dt>
+          <dd>{execution.terminal.lossProbabilityPct.toFixed(1)}%</dd>
+          <p>종료값이 시작값보다 낮은 경로 비율</p>
+        </div>
+        <div>
+          <dt>큰 하락폭 · MDD P90</dt>
+          <dd className="text-[var(--negative)]">{execution.terminal.maxDrawdownP90Pct.toFixed(1)}%</dd>
+          <p>경로 내 최대 낙폭의 더 큰 손실 쪽 경계</p>
+        </div>
+      </dl>
       <ResearchFanChart large execution={execution} />
+
     </div>
   );
+}
+
+function ExecutionAssumptions({ execution }: { execution: ReadyExecution }) {
+  const terminalBand = execution.bands.at(-1);
+  return <div className="mt-6">
+      <div className={styles.boundaries}>
+        <span>하위 경계 P10<strong>{terminalBand ? simulationReturnLabel(terminalBand.p10) : "기록 없음"}</strong></span>
+        <span>상위 경계 P90<strong>{terminalBand ? simulationReturnLabel(terminalBand.p90) : "기록 없음"}</strong></span>
+        <span>계산 경로<strong>{execution.assumptions.pathCount}개</strong></span>
+      </div>
+      <dl className={styles.method}>
+        <div><dt>현재 구성에서 출발</dt><dd>현재 평가액의 {execution.coverage.modeledCurrentValuePct.toFixed(1)}%를 포함하며, 계산 종목의 비중을 100%로 환산합니다.</dd></div>
+        <div><dt>관측 데이터로 계산</dt><dd>최근 90개 공동 수익률을 재표본 추출합니다. 수수료·세금·현금수익률은 포함하지 않습니다.</dd></div>
+        <div><dt>범위로 읽는 결과</dt><dd>P10~P90은 모형 안의 분포입니다. 실제 미래의 보장 범위가 아니며 조회 시 계산한 연구 결과입니다.</dd></div>
+      </dl>
+  </div>;
 }
 
 function unavailableReasonLabel(

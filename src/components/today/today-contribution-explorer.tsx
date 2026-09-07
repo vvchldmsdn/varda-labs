@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState, type CSSProperties } from "react";
+import styles from "@/components/home/portfolio-overview.module.css";
 
 import {
   formatPercent,
@@ -51,20 +52,39 @@ export function TodayContributionExplorer({
   }
 
   return (
-    <div className="grid border-y border-[var(--wash)] lg:grid-cols-[minmax(0,1fr)_300px]">
-      <div className="min-w-0 py-3 lg:border-r lg:border-[var(--wash)]">
-        <div className="divide-y divide-[var(--wash)]">
-          {rows.map((row) => {
-            const width = Math.max(1.5, (Math.abs(row.changeKrw) / maxMagnitude) * 48);
-            const positive = row.changeKrw >= 0;
+    <div className={styles.explorer}>
+      <div className={styles.contributionRows}>
+        <div className={styles.axisLabels} aria-hidden="true"><span>감소</span><span>증가</span></div>
+        <div
+          className={styles.contributionScroll}
+          tabIndex={0}
+          aria-label="종목별 변동 기여 목록"
+          onKeyDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            const viewport = event.currentTarget;
+            const positions: Record<string, number> = {
+              Home: 0,
+              End: viewport.scrollHeight,
+              PageDown: viewport.scrollTop + viewport.clientHeight * .85,
+              PageUp: viewport.scrollTop - viewport.clientHeight * .85,
+              ArrowDown: viewport.scrollTop + 58,
+              ArrowUp: viewport.scrollTop - 58,
+            };
+            const position = positions[event.key];
+            if (position === undefined) return;
+            event.preventDefault();
+            viewport.scrollTop = position;
+          }}
+        >
+          {rows.map((row, rowIndex) => {
 
             return (
               <Link
                 key={row.key}
                 aria-current={row.selected ? "true" : undefined}
-                className={`group grid min-h-14 grid-cols-[minmax(0,1fr)_88px] items-center gap-4 px-1 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand)] sm:grid-cols-[minmax(130px,220px)_minmax(150px,1fr)_100px] sm:px-3 ${
-                  row.selected ? "bg-[var(--surface)]" : "hover:bg-[var(--paper)]"
-                }`}
+                className={styles.contributionRow}
+                data-active={activeRow?.key === row.key}
+                style={{ "--row-delay": `${Math.min(rowIndex * 35, 280)}ms` } as CSSProperties}
                 href={row.href}
                 scroll={false}
                 onBlur={() => setHoveredHref(null)}
@@ -82,19 +102,7 @@ export function TodayContributionExplorer({
                   </span>
                 </span>
 
-                <span className="relative hidden h-5 sm:block" aria-hidden="true">
-                  <span className="absolute inset-y-0 left-1/2 w-px bg-[var(--line)]" />
-                  <span
-                    className={`absolute top-1/2 h-2 -translate-y-1/2 rounded-full transition-[width] duration-200 ${
-                      positive ? "bg-[var(--brand)]" : "bg-[var(--negative-mid)]"
-                    }`}
-                    style={
-                      positive
-                        ? { left: "50%", width: `${width}%` }
-                        : { right: "50%", width: `${width}%` }
-                    }
-                  />
-                </span>
+                <DotContributionBar value={row.changeKrw} maximum={maxMagnitude} active={activeRow?.key === row.key} />
 
                 <span className="text-right">
                   <span className={`block text-sm font-semibold ${toneClass(row.changeKrw)}`}>
@@ -110,14 +118,14 @@ export function TodayContributionExplorer({
         </div>
       </div>
 
-      <aside className="min-h-60 px-5 py-5 lg:min-h-full lg:px-6">
-        <p className="text-[11px] font-medium text-[var(--muted)]">ACTIVE CONTRIBUTION</p>
-        <h3 className="mt-3 text-xl font-medium text-[var(--ink)]">
+      <aside className={styles.activeContribution} aria-live="polite">
+        <p className={styles.eyebrow}>CONTRIBUTION DETAIL</p>
+        <h3 key={`name:${activeRow?.key}`} className={styles.activeValue}>
           {activeRow?.name ?? "-"}
         </h3>
-        <p className={`mt-1 text-3xl font-medium ${toneClass(activeRow?.changeKrw ?? null)}`}>
+        <strong key={`value:${activeRow?.key}`} className={`${styles.activeValue} ${toneClass(activeRow?.changeKrw ?? null)}`}>
           {formatSignedKrw(activeRow?.changeKrw ?? null)}
-        </p>
+        </strong>
 
         <dl className="mt-8 divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
           <AttributionRow label="가격 영향" value={activeRow?.priceImpactKrw ?? null} />
@@ -125,11 +133,40 @@ export function TodayContributionExplorer({
           <AttributionRow label="순매매" value={activeRow?.tradeFlowKrw ?? null} />
         </dl>
 
-        <p className="mt-5 text-xs leading-5 text-[var(--muted)]">
-          행을 가리키면 변동 구성이 바뀝니다. 선택하면 해당 종목의 현재·기준 근거를 확인합니다.
-        </p>
+        {activeRow ? <Link href={activeRow.href} scroll={false} className={styles.textLink}>종목 상세 보기 →</Link> : null}
       </aside>
     </div>
+  );
+}
+
+function DotContributionBar({ value, maximum, active }: { value: number; maximum: number; active: boolean }) {
+  const patternId = useId();
+  const center = 250;
+  const length = Math.abs(value) / maximum * 238;
+  const positive = value >= 0;
+  return (
+    <span className={styles.contributionBar} aria-hidden="true">
+      <svg viewBox="0 0 500 32" preserveAspectRatio="xMidYMid meet" className={styles.dotMatrix}>
+        <defs>
+          <pattern id={`${patternId}-track`} width="8" height="8" patternUnits="userSpaceOnUse">
+            <circle cx="4" cy="4" r="1.7" fill="var(--line)" />
+          </pattern>
+          <pattern id={`${patternId}-value`} width="8" height="8" patternUnits="userSpaceOnUse">
+            <circle cx="4" cy="4" r={active ? 2.55 : 2.05} fill={positive ? active ? "var(--accent)" : "var(--ink)" : "var(--negative)"} className={styles.matrixDot} />
+          </pattern>
+        </defs>
+        <rect x="10" y="0" width="480" height="32" fill={`url(#${patternId}-track)`} opacity=".55" />
+        <rect
+          x={positive ? center : center - length}
+          y="0"
+          width={length}
+          height="32"
+          fill={`url(#${patternId}-value)`}
+          className={positive ? styles.dotRevealPositive : styles.dotRevealNegative}
+        />
+        <line x1={center} x2={center} y1="-3" y2="35" stroke="var(--muted)" strokeWidth=".6" />
+      </svg>
+    </span>
   );
 }
 

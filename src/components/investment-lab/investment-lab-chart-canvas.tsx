@@ -7,12 +7,14 @@ import {
   useRef,
   useState,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import type {
   InvestmentLabScenarioChart,
   InvestmentLabScenarioChartLine,
 } from "@/lib/investment-lab-scenario-chart";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
+import styles from "./investment-lab-modern.module.css";
 import {
   labCompactKrw,
   labKrw,
@@ -27,28 +29,32 @@ export function InvestmentLabChartCanvas({
   actual,
   selected,
   compact = false,
+  sidebar,
 }: {
   chart: InvestmentLabScenarioChart;
   actual: InvestmentLabScenarioChartLine;
   selected: InvestmentLabScenarioChartLine;
   compact?: boolean;
+  sidebar?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(920);
+  const [plotHeight, setPlotHeight] = useState(370);
   const [hover, setHover] = useState<number | null>(null);
   const [keyboardIndex, setKeyboardIndex] = useState(0);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
+  const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
   const id = useId();
   useEffect(() => {
     if (!ref.current) return;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(240, entry.contentRect.width));
+      if (entry) { setWidth(Math.max(180, entry.contentRect.width)); setPlotHeight(Math.max(160, entry.contentRect.height)); }
     });
     observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
 
-  const height = compact ? (width < 550 ? 155 : 230) : width < 550 ? 310 : 365;
+  const height = compact ? (width < 550 ? 155 : 230) : plotHeight;
   const left = width < 550 ? 42 : 54;
   const right = 12;
   const top = 24;
@@ -90,7 +96,7 @@ export function InvestmentLabChartCanvas({
       };
     }, [actual.points, selected.points, width, left, bottom, domain]);
   const focusIndex =
-    hover ?? (keyboardFocus ? Math.min(keyboardIndex, dates.length - 1) : null);
+    hover ?? (keyboardFocus ? Math.min(keyboardIndex, dates.length - 1) : pinnedIndex === null ? dates.length - 1 : Math.min(pinnedIndex, dates.length - 1));
   const actualPoint = focusIndex === null ? null : actual.points[focusIndex];
   const selectedPoint =
     focusIndex === null ? null : selected.points[focusIndex];
@@ -103,11 +109,6 @@ export function InvestmentLabChartCanvas({
     ),
   ];
   const focusX = actualPoint ? x(actualPoint.serviceDate) : 0;
-  const tooltipWidth = Math.min(258, width - 12);
-  const tooltipLeft = Math.min(
-    Math.max(6, focusX + (focusX > width * 0.58 ? -tooltipWidth - 15 : 15)),
-    width - tooltipWidth - 6,
-  );
 
   function move(event: PointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -120,18 +121,31 @@ export function InvestmentLabChartCanvas({
   }
 
   return (
-    <div className={compact ? "relative mt-2 w-full" : "relative mt-5 w-full"} ref={ref} data-lab-chart>
+    <div className={compact ? styles.compactCanvas : styles.chartCanvas} data-lab-chart>
+      <aside className={styles.chartRail}>
+        {sidebar}
+      {actualPoint && selectedPoint ? (
+        <div className={styles.chartReadout} data-lab-tooltip>
+          <div><p>{actualPoint.serviceDate.replaceAll("-", ".")}<span>{hover === null && pinnedIndex === null && !keyboardFocus ? "종료일의 차이" : "선택일의 차이"}</span></p><strong className={labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}>{labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}</strong></div>
+          <dl><div><dt>실제</dt><dd>{labKrw(actualPoint.valueKrw)}</dd></div><div><dt>가상</dt><dd>{labKrw(selectedPoint.valueKrw)}</dd></div></dl>
+          {selectedPoint.hasPendingExecution ? <p className="text-[11px] text-[var(--warning)]">이 평가일에는 대기 거래가 포함됩니다.</p> : null}
+        </div>
+      ) : null}
+      </aside>
+      <div className={styles.chartPlot} ref={ref}>
       <svg
         aria-label={`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`}
-        className="block w-full touch-pan-y"
+        className="block h-full w-full touch-pan-y"
         height={height}
         onPointerLeave={() => setHover(null)}
         onPointerMove={move}
         onPointerDown={move}
+        onClick={() => setPinnedIndex(hover)}
         role="img"
         viewBox={`0 0 ${width} ${height}`}
       >
         <defs>
+          <pattern id={`${id}-dots`} width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".75" fill="var(--accent)" opacity=".32" /></pattern>
           <clipPath id={`${id}-plot`}>
             <rect
               x={left - 1}
@@ -169,24 +183,27 @@ export function InvestmentLabChartCanvas({
         })}
         <g clipPath={`url(#${id}-plot)`}>
           {selected.id !== "actual" ? (
-            <polygon points={area} fill="var(--brand)" opacity="0.075" />
+            <polygon key={`area-${selected.id}`} points={area} fill={`url(#${id}-dots)`} className={styles.chartReveal} />
           ) : null}
           <path
             d={actualPath}
             fill="none"
             stroke="var(--ink)"
+            className={styles.drawLine}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth="1.8"
+            strokeWidth="2.6"
           />
           {selected.id !== "actual" ? (
             <path
+              key={selected.id}
               d={selectedPath}
               fill="none"
-              stroke="var(--brand)"
+              stroke="var(--accent)"
+              className={styles.drawLine}
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth="2.3"
+              strokeWidth="3"
             />
           ) : null}
         </g>
@@ -211,68 +228,33 @@ export function InvestmentLabChartCanvas({
         {actualPoint && selectedPoint ? (
           <g>
             <line
-              stroke="var(--faint)"
+              stroke="var(--line)"
               strokeDasharray="3 5"
               x1={focusX}
               x2={focusX}
               y1={top}
               y2={bottom}
             />
+            <line stroke="var(--accent)" strokeWidth="2" x1={focusX} x2={focusX} y1={y(actualPoint.valueKrw)} y2={y(selectedPoint.valueKrw)} />
             <circle
               cx={focusX}
               cy={y(actualPoint.valueKrw)}
-              r="4"
+              r="5"
               stroke="var(--ink)"
               strokeWidth="1.5"
-              fill="var(--paper)"
+              fill="var(--ink)"
             />
             <circle
               cx={focusX}
               cy={y(selectedPoint.valueKrw)}
-              r="4"
-              stroke="var(--brand)"
-              strokeWidth="1.5"
-              fill="var(--paper)"
+              r="6"
+              stroke="var(--paper)"
+              strokeWidth="2.5"
+              fill="var(--accent)"
             />
           </g>
         ) : null}
       </svg>
-      {actualPoint && selectedPoint ? (
-        <div
-          className="pointer-events-none absolute top-3 rounded-md border border-[var(--line)] bg-[var(--surface)]/95 p-3 text-xs shadow-lg shadow-[var(--ink)]/5"
-          data-lab-tooltip
-          style={{ left: tooltipLeft, width: tooltipWidth }}
-        >
-          <p className="mb-2 border-b border-[var(--wash)] pb-2 font-medium tabular-nums">
-            {actualPoint.serviceDate.replaceAll("-", ".")}
-          </p>
-          <dl className="space-y-2">
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--muted)]">실제 평가액</dt>
-              <dd className="tabular-nums">{labKrw(actualPoint.valueKrw)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--brand)]">비교 평가액</dt>
-              <dd className="tabular-nums text-[var(--brand)]">
-                {labKrw(selectedPoint.valueKrw)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--muted)]">차이</dt>
-              <dd
-                className={`font-medium tabular-nums ${labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}`}
-              >
-                {labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}
-              </dd>
-            </div>
-          </dl>
-          {selectedPoint.hasPendingExecution ? (
-            <p className="mt-2 text-[11px] text-[var(--warning)]">
-              이 평가일에는 대기 거래가 포함됩니다.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
       <input
         aria-label="비교 그래프 날짜 탐색"
         aria-valuetext={`${dates[Math.min(keyboardIndex, dates.length - 1)]} 실제 ${labKrw(actual.points[Math.min(keyboardIndex, dates.length - 1)]?.valueKrw ?? null)} 비교 ${labKrw(selected.points[Math.min(keyboardIndex, dates.length - 1)]?.valueKrw ?? null)}`}
@@ -285,6 +267,7 @@ export function InvestmentLabChartCanvas({
         type="range"
         value={Math.min(keyboardIndex, dates.length - 1)}
       />
+      </div>
     </div>
   );
 }

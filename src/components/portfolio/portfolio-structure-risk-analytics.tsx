@@ -8,10 +8,12 @@ export function PortfolioStructureRiskAnalytics({
   model,
   scopeKey,
   totalHoldingCount,
+  isDesignPreview = false,
 }: {
   model: PortfolioRiskReadModel;
   scopeKey: string;
   totalHoldingCount: number;
+  isDesignPreview?: boolean;
 }) {
   const portfolio = model.calculation.portfolio;
   const observationLabel = `${model.provenance.usableReturnObservations}/${model.provenance.requestedReturnObservations}일`;
@@ -42,7 +44,7 @@ export function PortfolioStructureRiskAnalytics({
         </div>
 
         <div className="flex items-center gap-1 border-b border-[var(--line)] text-sm">
-          {WINDOWS.map((window) => (
+          {(isDesignPreview ? [model.selection.window] : WINDOWS).map((window) => (
             <Link
               aria-current={model.selection.window === window ? "page" : undefined}
               className={`px-3 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] ${
@@ -50,11 +52,11 @@ export function PortfolioStructureRiskAnalytics({
                   ? "border-b border-[var(--ink)] text-[var(--ink)]"
                   : "text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
-              href={riskWindowHref(scopeKey, window)}
+              href={`${riskWindowHref(scopeKey, window)}${isDesignPreview ? "&preview=design" : ""}`}
               key={window}
               scroll={false}
             >
-              {window === 252 ? "1년" : `${window}일`}
+              {window === 252 ? "1년" : `${window}일`}{isDesignPreview ? " 예시" : ""}
             </Link>
           ))}
         </div>

@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { ArrowUpRight, ArrowRight } from "lucide-react";
+import styles from "../portfolio-structure/structure-stage.module.css";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
@@ -30,140 +33,27 @@ export type PortfolioStructureViewData = Readonly<{
   directHoldingsBaseline: PortfolioDirectHoldingsBaseline;
   specialHoldingsCoverage: PortfolioSpecialHoldingsModel;
   riskModel: PortfolioRiskReadModel;
+  isDesignPreview?: boolean;
 }>;
 
-export function PortfolioStructureView({
-  data,
-}: {
-  data: PortfolioStructureViewData;
-}) {
-  const policyStatus = policyStatusLabel(data.targetProjection.status);
-  const policyDetail = policyStatusDetail({
-    effectiveServiceDate: data.targetEffectiveServiceDate,
-    projection: data.targetProjection,
-  });
-  const riskPortfolio = data.riskModel.calculation.portfolio;
-
-  return (
-    <main
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
-      data-page="portfolio-structure"
-    >
-      <PortfolioPrimaryNavigation
-        activePath="/portfolio/structure"
-        generatedAt={data.generatedAt}
-        selectedScopeKey={data.selectedScope.key}
-      />
-
-      <div className="varda-content varda-presentation-content">
-        <div className="varda-screen">
-          <header className="varda-screen-header">
-            <div className="varda-screen-heading">
-              <div className="varda-screen-title-row">
-                <div>
-                  <p className="varda-kicker">PORTFOLIO / STRUCTURE</p>
-                  <h1 className="varda-page-title" id="portfolio-structure-title">포트 구조</h1>
-                </div>
-                <p className="text-xs text-[var(--muted)]">기준일 {formatDate(data.serviceDate)}</p>
-              </div>
-            </div>
-            <div className="varda-screen-scope">
-              <PortfolioAnalysisScopeTabs
-                basePath="/portfolio/structure"
-                scopes={data.analysisScopes}
-                selectedScopeKey={data.selectedScope.key}
-                variant="underline"
-              />
-            </div>
-          </header>
-
-          <section className="varda-hero-strip" aria-labelledby="portfolio-structure-title">
-            <div className="varda-hero-value">
-              <span className="text-xs font-medium text-[var(--muted)]">{data.selectedScope.label} 현재 평가액</span>
-              <strong>{formatKrw(data.structure.totalValueKrw)}</strong>
-            </div>
-            <dl className="varda-hero-metrics">
-              <HeroMetric label="보유 종목" value={`${data.structure.includedHoldingCount}개`} />
-              <HeroMetric
-                label="유효 분산 수 ENB"
-                value={riskPortfolio ? formatNumber(riskPortfolio.riskContributionEnb.value, 2) : "계산 대기"}
-              />
-              <HeroMetric label="목표 정책" value={policyStatus} />
-            </dl>
-          </section>
-
-          <div className="varda-workspace-grid">
-            <div className="varda-main-visual varda-structure-main">
-              <PortfolioAllocationExplorer
-                compact
-                groupRows={data.structure.groupRows}
-                holdingRows={data.structure.holdingRows}
-              />
-            </div>
-
-            <aside className="varda-context-rail" aria-label="포트 구조 핵심 지표와 상세 분석">
-              <section className="varda-rail-section">
-                <p className="varda-kicker">RISK SNAPSHOT</p>
-                <h2 className="mt-1 text-sm font-medium">위험 지형 요약</h2>
-                <dl className="varda-rail-metrics mt-3">
-                  <RailMetric label="Sharpe" value={riskPortfolio ? formatNumber(riskPortfolio.sharpe.value, 2) : "-"} />
-                  <RailMetric label="평균 상관" value={riskPortfolio ? formatNumber(riskPortfolio.weightedAverageCorrelation.value, 2) : "-"} />
-                  <RailMetric label="스트레스 상관" value={riskPortfolio ? formatNumber(riskPortfolio.stress.weightedAverageCorrelation.value, 2) : "-"} />
-                  <RailMetric label="최대 낙폭" value={formatRiskPercent(data.riskModel.pathAnalytics.maximumDrawdownPct.value)} />
-                </dl>
-                <div className="mt-4">
-                  <PresentationDialog label="위험 분석 전체 보기" title="상관·분산·베타 분석" wide>
-                    <PortfolioStructureRiskAnalytics
-                      model={data.riskModel}
-                      scopeKey={data.selectedScope.key}
-                      totalHoldingCount={data.structure.includedHoldingCount}
-                    />
-                  </PresentationDialog>
-                </div>
-              </section>
-
-              <section className="varda-rail-section">
-                <p className="varda-kicker">STRUCTURE DETAILS</p>
-                <h2 className="mt-1 text-sm font-medium">구조를 다른 각도로 보기</h2>
-                <div className="mt-4 grid gap-2">
-                  <PresentationDialog label="직접 보유 집중도" title="직접 보유 기준선" wide>
-                    <DirectHoldingsBaseline model={data.directHoldingsBaseline} scopeLabel={data.selectedScope.label} />
-                  </PresentationDialog>
-                  <PresentationDialog label="환율 충격" title="USD/KRW 충격 시나리오" wide>
-                    <PortfolioFxShock baseline={data.directHoldingsBaseline} currentUsdKrwRate={data.structure.usdKrwRate} />
-                  </PresentationDialog>
-                  <PresentationDialog label="특수 자산" title="특수 자산 분석 커버리지" wide>
-                    <SpecialHoldingsCoverage model={data.specialHoldingsCoverage} />
-                  </PresentationDialog>
-                </div>
-              </section>
-
-              <section className="varda-rail-section">
-                <p className="text-[10px] leading-4 text-[var(--faint)]" title={policyDetail}>{policyDetail}</p>
-                <p className="mt-2 text-[10px] leading-4 text-[var(--faint)]">{dataHealthDetail(data.structure)}</p>
-              </section>
-            </aside>
-          </div>
-
-          <footer className="varda-screen-footer">
-            <div className="varda-inline-actions">
-              <PresentationDialog label={`보유 원자료 ${data.structure.holdingRows.length}행`} title="보유 종목 원자료" wide>
-                <HoldingEvidenceTable rows={data.structure.holdingRows} />
-              </PresentationDialog>
-              {data.structure.exclusions.length > 0 ? (
-                <PresentationDialog label={`평가 제외 ${data.structure.exclusions.length}행`} title="평가 제외 근거" wide>
-                  <ExclusionTable rows={data.structure.exclusions} />
-                </PresentationDialog>
-              ) : null}
-            </div>
-            <p>USD/KRW {formatNumber(data.structure.usdKrwRate, 2)} · 읽기 전용 · 추천·주문 아님</p>
-          </footer>
-        </div>
-      </div>
-    </main>
-  );
+export function PortfolioStructureView({data}:{data:PortfolioStructureViewData}) {
+  const policyStatus=policyStatusLabel(data.targetProjection.status);
+  const policyDetail=policyStatusDetail({effectiveServiceDate:data.targetEffectiveServiceDate,projection:data.targetProjection});
+  const riskPortfolio=data.riskModel.calculation.portfolio;
+  const summary=<div className={styles.coreSummary}><div className={styles.total}><span>{data.selectedScope.label} 평가액</span><strong>{formatKrw(data.structure.totalValueKrw)}</strong></div><dl className={styles.overviewMetrics}><HeroMetric label="보유 종목" value={`${data.structure.includedHoldingCount}개`}/><HeroMetric label="유효 분산 수 ENB" value={riskPortfolio?formatNumber(riskPortfolio.riskContributionEnb.value,2):"근거 부족"}/><HeroMetric label="목표비중" value={policyStatus}/></dl></div>;
+  const details=<>
+    <PresentationDialog label="위험 분석" title="상관·분산·베타 분석" wide><dl className={styles.riskMetrics}><RailMetric label="Sharpe" value={riskPortfolio?formatNumber(riskPortfolio.sharpe.value,2):"근거 부족"} detail="위험 대비 수익 · 무위험 수익률 가정 포함"/><RailMetric label="평균 상관" value={riskPortfolio?formatNumber(riskPortfolio.weightedAverageCorrelation.value,2):"근거 부족"} detail="종목들이 함께 움직이는 정도"/><RailMetric label="하락 구간 상관" value={riskPortfolio?formatNumber(riskPortfolio.stress.weightedAverageCorrelation.value,2):"근거 부족"} detail="하락일에 관측한 동반 움직임"/><RailMetric label="최대 낙폭" value={data.riskModel.pathAnalytics.maximumDrawdownPct.value===null?"근거 부족":formatRiskPercent(data.riskModel.pathAnalytics.maximumDrawdownPct.value)} detail="분석 기간 고점 대비 최대 하락"/></dl><PortfolioStructureRiskAnalytics model={data.riskModel} scopeKey={data.selectedScope.key} totalHoldingCount={data.structure.includedHoldingCount} isDesignPreview={data.isDesignPreview}/><Link className={styles.headerLink} href={`/portfolio/risk?scope=${encodeURIComponent(data.selectedScope.key)}${data.isDesignPreview?"&preview=design":""}`}>종목별 위험과 데이터 근거 <ArrowRight size={13} aria-hidden="true"/></Link></PresentationDialog>
+    <PresentationDialog label="보유 근거" title="보유 종목과 데이터 근거" wide><p className={styles.evidenceNote}>{policyDetail} · {dataHealthDetail(data.structure)}<br/>USD/KRW {formatNumber(data.structure.usdKrwRate,2)} · 기준일 {formatDate(data.serviceDate)} · 읽기 전용 분석</p><HoldingEvidenceTable rows={data.structure.holdingRows}/>{data.structure.exclusions.length?<section className={styles.modalSection}><h3>평가 제외 {data.structure.exclusions.length}행</h3><ExclusionTable rows={data.structure.exclusions}/></section>:null}</PresentationDialog>
+    <PresentationDialog label="집중·환율" title="집중도와 환율 노출" wide><DirectHoldingsBaseline model={data.directHoldingsBaseline} scopeLabel={data.selectedScope.label}/><div className={styles.modalSection}><PortfolioFxShock baseline={data.directHoldingsBaseline} currentUsdKrwRate={data.structure.usdKrwRate}/></div><div className={styles.modalSection}><SpecialHoldingsCoverage model={data.specialHoldingsCoverage}/></div></PresentationDialog>
+  </>;
+  return <main className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="portfolio-structure">
+    <PortfolioPrimaryNavigation activePath="/portfolio/structure" generatedAt={data.generatedAt} selectedScopeKey={data.selectedScope.key}/>
+    <div className={`varda-content varda-stage-content ${styles.page}`}>
+      <header className={styles.header}><div className={styles.title}><h1 id="portfolio-structure-title">내 포트의 구조.</h1>{data.isDesignPreview?<span className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다.">예시 데이터</span>:null}</div><div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/portfolio/structure" scopes={data.analysisScopes} selectedScopeKey={data.selectedScope.key} query={data.isDesignPreview?{preview:"design"}:undefined} variant="underline"/></div><Link className={styles.headerLink} href={`/portfolio/targets?scope=${encodeURIComponent(data.selectedScope.key)}`} title="목표비중 설정"><span>목표비중</span><ArrowUpRight size={15} aria-hidden="true"/></Link></header>
+      <section className={styles.allocation} aria-label="자산 배분 구성"><PortfolioAllocationExplorer compact groupRows={data.structure.groupRows} holdingRows={data.structure.holdingRows} summary={summary} footer={details} serviceDate={data.serviceDate}/></section>
+    </div>
+  </main>;
 }
-
 function HoldingEvidenceTable({
   rows,
 }: {
@@ -259,18 +149,18 @@ function HeroMetric({
   value: string;
 }) {
   return (
-    <div className="varda-hero-metric">
+    <div className={styles.overviewMetric}>
       <dt>{label}</dt>
       <dd title={value}>{value}</dd>
     </div>
   );
 }
 
-function RailMetric({ label, value }: { label: string; value: string }) {
+function RailMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="varda-rail-metric">
+    <div className={styles.riskMetric}>
       <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
+      <dd title={value}>{value}<span>{detail}</span></dd>
     </div>
   );
 }

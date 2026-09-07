@@ -3,19 +3,19 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  ChartNoAxesCombined,
   Database,
   ScanLine,
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import styles from "./simulation-workspace.module.css";
 
 type SimulationOverlay = "weights" | "validation" | "evidence";
 
 const OVERLAYS = {
-  weights: { label: "비중 실험", icon: SlidersHorizontal },
-  validation: { label: "과거 검증", icon: ScanLine },
-  evidence: { label: "모형·데이터", icon: Database },
+  weights: { label: "비중 실험", icon: SlidersHorizontal, description: "구성을 조정했을 때 분포와 위험의 차이를 비교합니다." },
+  validation: { label: "과거 검증", icon: ScanLine, description: "과거 구간 밖에서 실제 결과와 모형의 예측을 대조합니다." },
+  evidence: { label: "모형·데이터", icon: Database, description: "포함 종목과 데이터 누락, 모형의 가정을 확인합니다." },
 } as const;
 
 export function SimulationWorkspace({
@@ -94,34 +94,22 @@ export function SimulationWorkspace({
   const activeDefinition = activeOverlay ? OVERLAYS[activeOverlay] : null;
 
   return (
-    <div className="varda-workspace-main" data-simulation-workspace="integrated">
-      <div className="varda-workspace-commandbar">
-        <div>
-          <ChartNoAxesCombined aria-hidden="true" size={16} strokeWidth={1.6} />
-          <span className="text-xs font-medium text-[var(--muted)]">
-            확률 경로와 하방 범위
-          </span>
-        </div>
-        <div>
-          {tools}
-          {(Object.keys(OVERLAYS) as SimulationOverlay[]).map((view) => {
-            const { icon: Icon, label } = OVERLAYS[view];
-            return (
-              <button
-                className="varda-inline-action"
-                key={view}
-                onClick={() => openOverlay(view)}
-                type="button"
-              >
-                <Icon aria-hidden="true" size={15} strokeWidth={1.6} />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className={styles.workspace} data-simulation-workspace="integrated">
+      <div className={styles.toolbar}><span>현재 보유 구성 · 연구 분포</span><div>{tools}</div></div>
 
-      <div className="varda-workspace-canvas">{paths}</div>
+      <div className={styles.canvas}>{paths}</div>
+
+      <div className={styles.launchers}>
+        {(Object.keys(OVERLAYS) as SimulationOverlay[]).map((view) => {
+          const { icon: Icon, label, description } = OVERLAYS[view];
+          return (
+            <button className={styles.launcher} key={view} onClick={() => openOverlay(view)} type="button">
+              <Icon aria-hidden="true" size={21} strokeWidth={1.6} />
+              <span><strong>{label}</strong><span className="sr-only">{description}</span></span>
+            </button>
+          );
+        })}
+      </div>
 
       <dialog
         aria-labelledby={titleId}

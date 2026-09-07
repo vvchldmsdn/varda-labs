@@ -26,6 +26,7 @@ import {
   PortfolioHistoryTable,
 } from "./history-tables";
 import { TenantHistoryEvents } from "./tenant-history-events";
+import styles from "./history-modern.module.css";
 
 export function HistoryView({
   events,
@@ -55,7 +56,7 @@ export function HistoryView({
   return (
     <main
       data-page="history"
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
     >
       <PortfolioPrimaryNavigation
         activePath="/history"
@@ -63,38 +64,23 @@ export function HistoryView({
         selectedScopeKey={history.selectedScope.key}
       />
 
-      <div className="varda-content varda-presentation-content">
-        <div className="varda-screen">
-          <header className="varda-screen-header">
-            <div className="varda-screen-heading">
-              <div className="varda-screen-title-row">
-                <div>
-                  <p className="varda-kicker">PORTFOLIO / HISTORY</p>
-                  <h1 className="varda-page-title">히스토리</h1>
-                </div>
-                <p className="text-xs tabular-nums text-[var(--muted)]">기준일 {formatDisplayDate(overview.endDate)}</p>
-              </div>
-            </div>
-            <div className="varda-screen-scope">
-              <PortfolioAnalysisScopeTabs
-                basePath="/history"
-                scopes={history.analysisScopes}
-                selectedScopeKey={history.selectedScope.key}
-                variant="underline"
-              />
-            </div>
+      <div className="varda-content varda-presentation-content varda-stage-content">
+        <div className={styles.page}>
+          <header className={styles.header}>
+            <h1 className="varda-page-title">히스토리</h1>
+            <PortfolioAnalysisScopeTabs basePath="/history" scopes={history.analysisScopes} selectedScopeKey={history.selectedScope.key} variant="underline" />
           </header>
 
-          <div className="varda-workspace-grid">
-            <div className="varda-main-visual varda-history-main">
-              <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} />
+          <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} status={history.unavailableSources.length ? `일부 기록 확인 필요 · ${history.unavailableSources.map(historyReadSourceLabel).join(", ")}` : undefined} details={
+            <PresentationDialog label="기록·이벤트" title="기록에서 발견한 변화" wide>
+          <div className={styles.support}>
+            <div className={styles.activity}>
+              <HistoryActivityStream result={events} supported={eventsSupported} />
             </div>
-
-            <aside className="varda-context-rail" aria-label="히스토리 인사이트와 검증 근거">
+            <aside className={styles.insights} aria-label="히스토리 인사이트와 검증 근거">
               {overview.status === "ready" ? (
                 <section className="varda-rail-section">
-                  <p className="varda-kicker">MOVEMENT INSIGHTS</p>
-                  <h2 className="mt-1 text-sm font-medium">저장점 사이의 움직임</h2>
+                  <h2 className="text-base font-semibold">기록에서 발견한 변화</h2>
                   <dl className="varda-rail-metrics mt-3">
                     <RailInsight label="저장 저점" value={formatHistoryKrw(overview.lowestValueKrw)} detail={formatDisplayDate(overview.lowestDate)} />
                     <RailInsight label="최대 상승" value={formatMovement(overview.bestMovement?.amountKrw ?? null)} detail={movementDetail(overview.bestMovement)} valueClass={tone(overview.bestMovement?.amountKrw ?? null)} />
@@ -105,12 +91,8 @@ export function HistoryView({
               ) : null}
 
               <section className="varda-rail-section">
-                <p className="varda-kicker">CONTEXT</p>
-                <h2 className="mt-1 text-sm font-medium">활동과 원자료</h2>
+                  <h2 className="text-sm font-medium">저장 근거 확인</h2>
                 <div className="mt-4 grid gap-2">
-                  <PresentationDialog label="최근 활동 보기" title="저장된 활동" wide>
-                    <HistoryActivityStream result={events} supported={eventsSupported} />
-                  </PresentationDialog>
                   <PresentationDialog label="원시 기록 검증" title="히스토리 원시 기록" wide>
           <div className="space-y-10">
             <p
@@ -215,10 +197,8 @@ export function HistoryView({
             </aside>
           </div>
 
-          <footer className="varda-screen-footer">
-            <span>저장된 평가액과 이벤트를 임의 보간하지 않음</span>
-            <span>성과 그래프와 원자료의 범위는 동일한 분석 스코프 사용</span>
-          </footer>
+            </PresentationDialog>
+          } />
         </div>
       </div>
     </main>

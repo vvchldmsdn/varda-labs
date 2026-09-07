@@ -29,6 +29,7 @@ export default async function Home({ searchParams }: HomeProps) {
     return (
       <PortfolioDashboard
         data={buildHomeDesignPreview(params.scope)}
+        designPreview
         liveSyncEnabled={false}
       />
     );

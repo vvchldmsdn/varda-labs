@@ -34,7 +34,7 @@ export function InvestmentLabPeriodSelector({
       title="비교 기간"
     >
       <section data-period-status={period.status}>
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+        <div className="grid gap-5">
           <div className="min-w-0">
             <p className="text-[10px] font-medium text-[var(--muted)]">
               COMPARISON WINDOW

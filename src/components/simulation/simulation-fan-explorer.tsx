@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AreaChart, ChartNoAxesCombined } from "lucide-react";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 import {
@@ -26,28 +26,23 @@ export function SimulationFanExplorer({
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
   const [width, setWidth] = useState(960);
+  const [plotHeight, setPlotHeight] = useState(430);
   const [mode, setMode] = useState<"band" | "paths">("band");
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [unit, setUnit] = useState<"index" | "return">("return");
+  const [hoveredPath, setHoveredPath] = useState<number | null>(null);
+  const [selectedPath, setSelectedPath] = useState<number | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry.contentRect.width > 0) setWidth(entry.contentRect.width);
+      if (entry.contentRect.width > 0) { setWidth(entry.contentRect.width); setPlotHeight(Math.max(150, entry.contentRect.height)); }
     });
     observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
 
-  const height = compact
-    ? width < 600
-      ? 150
-      : 160
-    : large
-      ? width < 600
-        ? 340
-        : 430
-      : 280;
+  const height = compact ? (width < 600 ? 150 : 160) : large ? plotHeight : 280;
   const left = 52;
   const right = width - 16;
   const top = 20;
@@ -81,8 +76,13 @@ export function SimulationFanExplorer({
       areaPoints
         .map(([px, py], index) => `${index ? "L" : "M"}${px},${py}`)
         .join(" ") + " Z";
+    const halfArea = (upper: "p90" | "p50", lower: "p50" | "p10") => {
+      const coordinates = [...execution.bands.map((band) => [x(band.stepIndex), y(band[upper])]), ...execution.bands.toReversed().map((band) => [x(band.stepIndex), y(band[lower])])];
+      return coordinates.map(([px, py], index) => `${index ? "L" : "M"}${px},${py}`).join(" ") + " Z";
+    };
     const paths = execution.samplePaths.map((path) => ({
       id: path.pathIndex,
+      points: path.points.map((point) => ({ x: x(point.stepIndex), y: y(point.indexValue), step: point.stepIndex, value: point.indexValue })),
       d: path.points
         .map(
           (point, index) =>
@@ -96,36 +96,52 @@ export function SimulationFanExplorer({
       min,
       max,
       area,
+      upperArea: halfArea("p90", "p50"),
+      lowerArea: halfArea("p50", "p10"),
       paths,
       median: line("p50"),
       lower: line("p10"),
       upper: line("p90"),
     };
   }, [execution, valueDomain, right, bottom]);
-  const band =
-    activeStep === null
-      ? null
-      : nearestSimulationBand(execution.bands, activeStep);
+  const band = nearestSimulationBand(execution.bands, activeStep ?? execution.assumptions.horizon);
   const format = (value: number) =>
     unit === "return" ? simulationReturnLabel(value) : value.toFixed(1);
   const activeX = band ? geometry.x(band.stepIndex) : 0;
-  const tooltipLeft = Math.max(
-    8,
-    Math.min(width - 192, activeX + (activeX > width * 0.65 ? -196 : 16)),
-  );
+  const focusedPath = hoveredPath ?? selectedPath;
+  const inspectedPath = mode === "paths" ? geometry.paths.find((path) => path.id === focusedPath) : null;
+  const pathPoint = inspectedPath?.points.reduce<(typeof inspectedPath.points)[number] | undefined>((nearest, point) => !nearest || Math.abs(point.step - (band?.stepIndex ?? 0)) < Math.abs(nearest.step - (band?.stepIndex ?? 0)) ? point : nearest, undefined);
   const axisSteps = width < 480 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+
+  function inspect(event: PointerEvent<SVGSVGElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const px = ((event.clientX - bounds.left) / bounds.width) * width;
+    const py = ((event.clientY - bounds.top) / bounds.height) * height;
+    const step = Math.max(0, Math.min(execution.assumptions.horizon, ((px - left) / (right - left)) * execution.assumptions.horizon));
+    setActiveStep(step);
+    if (mode !== "paths") return;
+    let candidate: number | null = null;
+    let distance = 24;
+    for (const path of geometry.paths) {
+      const point = path.points.reduce<(typeof path.points)[number] | undefined>((nearest, current) => !nearest || Math.abs(current.step - step) < Math.abs(nearest.step - step) ? current : nearest, undefined);
+      if (point && Math.abs(point.y - py) < distance) { candidate = path.id; distance = Math.abs(point.y - py); }
+    }
+    setHoveredPath(candidate);
+  }
+
+  function leave() { setActiveStep(null); setHoveredPath(null); }
 
   return (
     <figure
-      className="min-w-0"
+      className={large ? styles.stageFan : "min-w-0"}
       data-research-fan-chart={execution.id}
       data-fan-mode={mode}
     >
       <div
-        className={`flex flex-wrap items-center justify-between gap-3 text-xs ${compact ? "py-1.5" : "py-3"}`}
+        className={`${styles.fanControls} flex flex-wrap items-center justify-between gap-3 text-xs ${compact ? "py-1.5" : "py-3"}`}
       >
         <div
-          className="flex gap-1 rounded-md bg-[var(--wash)] p-1"
+          className="flex gap-1"
           role="group"
           aria-label="경로 표시"
         >
@@ -140,7 +156,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={mode === key}
               onClick={() => setMode(key)}
-              className={`flex items-center gap-2 rounded px-3 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${compact ? "min-h-9" : "min-h-10"} ${mode === key ? "bg-[var(--paper)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              className={`flex items-center gap-2 rounded-full px-4 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${compact ? "min-h-9" : "min-h-10"} ${mode === key ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon size={14} aria-hidden="true" />
               {label}
@@ -170,24 +186,26 @@ export function SimulationFanExplorer({
           ))}
         </div>
       </div>
-      <div ref={ref} className="relative w-full" style={{ height }}>
+      {band && !compact ? <div className={styles.fanReadout} data-fan-readout>
+        <p>{band.stepIndex === 0 ? "현재" : `${band.stepIndex}단계`}<span>{pathPoint && focusedPath !== null ? `표본 ${focusedPath + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}` : "분포의 세 지점"}</span></p>
+        {pathPoint ? <strong>{format(pathPoint.value)}</strong> : <dl><div><dt>P10</dt><dd>{format(band.p10)}</dd></div><div><dt>P50</dt><dd>{format(band.p50)}</dd></div><div><dt>P90</dt><dd>{format(band.p90)}</dd></div></dl>}
+      </div> : null}
+      <div ref={ref} className={large ? styles.fanPlot : "relative w-full"} style={large ? undefined : { height }}>
         {execution.bands.length ? (
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-full w-full"
+            className="block h-full w-full touch-pan-y"
             role="img"
+            onPointerMove={inspect}
+            onPointerDown={inspect}
+            onPointerLeave={leave}
+            onPointerCancel={leave}
+            onClick={() => { if (mode === "paths") setSelectedPath(hoveredPath === selectedPath ? null : hoveredPath); }}
             aria-label={`${execution.name} 연구 시뮬레이션 경로와 P10 P50 P90 구간`}
           >
             <title>{`${execution.name} 확률 분포`}</title>
             <defs>
-              <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.24" />
-                <stop
-                  offset="100%"
-                  stopColor="var(--brand)"
-                  stopOpacity="0.04"
-                />
-              </linearGradient>
+              <pattern id={`${id}-dots`} width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="var(--accent)" opacity=".48" /></pattern>
             </defs>
             {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
               const value =
@@ -222,21 +240,16 @@ export function SimulationFanExplorer({
               stroke="var(--faint)"
               strokeDasharray="4 5"
             />
-            <path
-              d={geometry.area}
-              fill={`url(#${id}-fill)`}
-              opacity={mode === "band" ? 1 : 0.4}
-            />
+            <g key={`${execution.id}-${mode}`} className={styles.fanReveal}>
+            <path d={geometry.upperArea} fill="var(--accent)" opacity={mode === "band" ? ".09" : ".025"} />
+            <path d={geometry.lowerArea} fill="var(--negative)" opacity={mode === "band" ? ".07" : ".025"} />
+            <path d={geometry.area} fill={`url(#${id}-dots)`} opacity={mode === "band" ? 1 : .18} />
             {mode === "paths"
               ? geometry.paths.map((path) => (
-                  <path
-                    key={path.id}
-                    d={path.d}
-                    fill="none"
-                    stroke={path.id % 3 === 0 ? "var(--faint)" : "var(--brand)"}
-                    strokeWidth="1"
-                    opacity="0.35"
-                  />
+                  <g key={path.id} className={styles.samplePath} opacity={focusedPath === null ? .65 : focusedPath === path.id ? 1 : .16}>
+                    <path d={path.d} fill="none" stroke={focusedPath === path.id ? "var(--ink)" : "var(--faint)"} strokeWidth={focusedPath === path.id ? 1.8 : .6} opacity={focusedPath === path.id ? 1 : .45} />
+                    {path.points.filter((_, index) => index % Math.max(1, Math.ceil(path.points.length / 28)) === 0 || index === path.points.length - 1).map((point) => <circle key={point.step} cx={point.x} cy={point.y} r={focusedPath === path.id ? 2.5 : 1.8} fill={focusedPath === path.id ? "var(--accent)" : "var(--ink)"} />)}
+                  </g>
                 ))
               : null}
             <path
@@ -256,9 +269,10 @@ export function SimulationFanExplorer({
             <path
               d={geometry.median}
               fill="none"
-              stroke="var(--brand)"
-              strokeWidth="2.5"
+              stroke="var(--ink)"
+              strokeWidth="2.8"
             />
+            </g>
             {axisSteps.map((ratio) => (
               <text
                 key={ratio}
@@ -284,7 +298,7 @@ export function SimulationFanExplorer({
                   x2={activeX}
                   y1={top}
                   y2={bottom}
-                  stroke="var(--brand-mid)"
+                  stroke="var(--line)"
                   strokeDasharray="3 4"
                 />
                 {(["p10", "p50", "p90"] as const).map((key) => (
@@ -292,71 +306,25 @@ export function SimulationFanExplorer({
                     key={key}
                     cx={activeX}
                     cy={geometry.y(band[key])}
-                    r={key === "p50" ? 4 : 3}
-                    fill="var(--paper)"
-                    stroke="var(--brand)"
+                    r={key === "p50" ? 5 : 3}
+                    fill={key === "p50" ? "var(--accent)" : "var(--paper)"}
+                    stroke={key === "p50" ? "var(--paper)" : "var(--faint)"}
                     strokeWidth="1.5"
                   />
                 ))}
+                {pathPoint ? <circle cx={pathPoint.x} cy={pathPoint.y} r="6" fill="var(--accent)" stroke="var(--paper)" strokeWidth="2" /> : null}
               </g>
             ) : null}
-            <rect
-              x={left}
-              y={top}
-              width={Math.max(right - left, 0)}
-              height={bottom - top}
-              fill="transparent"
-              onPointerMove={(event) => {
-                const rect =
-                  event.currentTarget.ownerSVGElement!.getBoundingClientRect();
-                setActiveStep(
-                  Math.max(
-                    0,
-                    Math.min(
-                      execution.assumptions.horizon,
-                      ((((event.clientX - rect.left) / rect.width) * width -
-                        left) /
-                        (right - left)) *
-                        execution.assumptions.horizon,
-                    ),
-                  ),
-                );
-              }}
-              onPointerLeave={() => setActiveStep(null)}
-              onPointerCancel={() => setActiveStep(null)}
-            />
           </svg>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-[var(--muted)]">
             표시할 확률 경로가 없습니다.
           </div>
         )}
-        {band ? (
-          <div
-            role="tooltip"
-            className="pointer-events-none absolute top-5 w-[184px] rounded-md border border-[var(--line)] bg-[var(--surface)]/95 p-3 text-xs shadow-lg"
-            style={{ left: tooltipLeft }}
-          >
-            <p className="mb-2 border-b border-[var(--wash)] pb-2 font-medium">
-              {band.stepIndex === 0 ? "현재" : `${band.stepIndex}단계`}
-            </p>
-            <dl className="space-y-2">
-              {(
-                [
-                  ["P90", band.p90],
-                  ["P50 · 중앙값", band.p50],
-                  ["P10", band.p10],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-3">
-                  <dt className="text-[var(--muted)]">{label}</dt>
-                  <dd className="font-medium tabular-nums">{format(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
       </div>
+      {mode === "paths" && !compact ? <div className={styles.pathChoices} aria-label="표본 경로 선택">
+        <span>표본</span>{geometry.paths.map((path) => <button key={path.id} type="button" aria-label={`표본 경로 ${path.id + 1} 선택`} aria-pressed={selectedPath === path.id} onClick={() => setSelectedPath(selectedPath === path.id ? null : path.id)}>{String(path.id + 1).padStart(2, "0")}</button>)}
+      </div> : null}
       <div className="mt-2 flex items-center gap-4">
         <input
           className={styles.scrubber}
@@ -388,7 +356,7 @@ export function SimulationFanExplorer({
       {compact ? null : (
         <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
           <span className="flex items-center gap-2">
-            <i className="h-0.5 w-5 bg-[var(--brand)]" />
+            <i className="h-0.5 w-5 bg-[var(--ink)]" />
             중앙값 P50
           </span>
           <span className="flex items-center gap-2">

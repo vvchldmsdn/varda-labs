@@ -1,0 +1,39 @@
+/* Motion explains entry, navigation and direct interaction; it never delays data. */
+@keyframes varda-page-in {
+  from { opacity: .35; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes varda-dot-in {
+  from { opacity: 0; transform: translateY(5px) scale(.6); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes varda-pending {
+  0%, 100% { opacity: .2; transform: scale(.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@keyframes varda-loading-bar {
+  0%, 100% { opacity: .3; transform: scaleY(.7); }
+  50% { opacity: .7; transform: scaleY(1); }
+}
+.varda-content, .varda-presentation-content { animation: varda-page-in 420ms var(--motion-ease) both; }
+.varda-link-pending { position: absolute; top: 11px; right: 12px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: 0; pointer-events: none; }
+.varda-link-pending[data-pending] { animation: varda-pending 850ms ease-in-out 120ms infinite; }
+.varda-mobile-bottom .varda-link-pending { top: 0; right: 13px; }
+:where(.varda-page, .varda-secondary-page) :where(button:not(:disabled), a, summary) { transition: color 160ms, background-color 160ms, opacity 160ms, scale 200ms var(--motion-ease); }
+.varda-page :where(button:not(:disabled), .varda-action, .varda-icon-button):active { scale: .97; }
+[data-motion="dot"] { transform-box: fill-box; transform-origin: center; animation: varda-dot-in 420ms var(--motion-ease) both; }
+.varda-loading { max-width: 1100px; margin: 50px auto; }
+.varda-loading > p { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+.varda-loading-dots { display: inline-flex; align-items: center; gap: 4px; }
+.varda-loading-dots i { width: 4px; height: 4px; background: var(--accent); border-radius: 50%; animation: varda-pending 850ms ease-in-out infinite; }
+.varda-loading-dots i:nth-child(2) { animation-delay: 120ms; }
+.varda-loading-dots i:nth-child(3) { animation-delay: 240ms; }
+.varda-loading-title { width: min(65%, 460px); height: 58px; margin-top: 36px; background: var(--wash); border-radius: 5px; }
+.varda-loading-visual { margin-top: 50px; min-height: 260px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 20px; }
+.varda-loading-visual i { flex: 1; max-width: 12px; background: var(--line); border-radius: 12px; transform-origin: bottom; animation: varda-loading-bar 1.2s ease-in-out infinite; }
+.varda-loading-footer { height: 1px; background: var(--line); margin-top: 60px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+  .varda-content, .varda-presentation-content, [data-motion="dot"] { opacity: 1; transform: none; }
+  .varda-link-pending[data-pending] { opacity: 1; }
+}

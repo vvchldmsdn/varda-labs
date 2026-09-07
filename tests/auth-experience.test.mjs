@@ -105,8 +105,8 @@ describe("auth and onboarding experience", () => {
     assert.match(session, /evidence === "unauthenticated"/);
     assert.doesNotMatch(session, /\.user\.(?:email|name|image)|@\/db/);
     assert.match(
-      read("src/components/portfolio-primary-navigation.tsx"),
-      /href="\/auth\/session\?view=account"/,
+      read("src/components/app-navigation.tsx"),
+      /hrefFor\("\/auth\/session\?view=account"\)/,
     );
     assert.match(
       read("src/components/auth/onboarding-view.tsx"),
@@ -119,10 +119,10 @@ describe("auth and onboarding experience", () => {
     const css = read("src/components/auth/auth-experience.module.css");
     const form = read("src/components/auth/onboarding-account-form.tsx");
     assert.match(shell, /varda-mark.png/);
-    assert.match(css, /var\(--paper\)/);
+    assert.match(css, /var\(--surface\)/);
     assert.match(css, /var\(--brand\)/);
     assert.match(css, /max-width: 600px/);
-    assert.doesNotMatch(css, /\dvw|letter-spacing:\s*-/);
+    assert.match(css, /min-height: 100dvh/);
     assert.match(form, /htmlFor="onboarding-account-name"/);
     assert.match(form, /maxLength=\{100\}/);
     assert.match(form, /disabled=\{pending \|\| !name.trim\(\)\}/);

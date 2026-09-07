@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import styles from "@/components/home/portfolio-overview.module.css";
 
 import {
   formatDate,
@@ -31,6 +32,7 @@ export function SelectedHoldingHistoryChart({
   const geometry = useMemo(() => buildChartGeometry(points), [points]);
   const activePoint = activeIndex === null ? null : points[activeIndex] ?? null;
   const activeGeometry = activeIndex === null ? null : geometry.points[activeIndex] ?? null;
+  const markerGeometry = activeGeometry ?? geometry.points.at(-1);
   const basis = points[0]?.basis ?? null;
   const firstDate = points[0]?.date;
   const lastDate = points.at(-1)?.date;
@@ -79,34 +81,30 @@ export function SelectedHoldingHistoryChart({
             })}
 
             <path
-              d={`${geometry.areaPath} Z`}
-              fill="var(--wash)"
-              opacity="0.72"
-            />
-            <path
+              className={styles.historyLine}
               d={geometry.path}
               fill="none"
-              stroke="var(--brand)"
-              strokeWidth="1.75"
+              stroke="var(--ink)"
+              strokeWidth="2.1"
               vectorEffect="non-scaling-stroke"
             />
 
-            {activeGeometry ? (
+            {markerGeometry ? (
               <g>
                 <line
-                  stroke="var(--brand)"
+                  stroke="var(--muted)"
                   strokeDasharray="2 5"
-                  x1={activeGeometry.x}
-                  x2={activeGeometry.x}
+                  x1={markerGeometry.x}
+                  x2={markerGeometry.x}
                   y1={PLOT_TOP}
                   y2={PLOT_BOTTOM}
                 />
                 <circle
-                  cx={activeGeometry.x}
-                  cy={activeGeometry.y}
-                  fill="var(--paper)"
+                  cx={markerGeometry.x}
+                  cy={markerGeometry.y}
+                  fill="var(--accent)"
                   r="5"
-                  stroke="var(--brand)"
+                  stroke="var(--paper)"
                   strokeWidth="2"
                   vectorEffect="non-scaling-stroke"
                 />
@@ -122,6 +120,7 @@ export function SelectedHoldingHistoryChart({
               return (
                 <rect
                   key={points[index]?.date}
+                  data-selected-history-index={index}
                   aria-label={`${formatDate(points[index]?.date ?? null)} ${formatChartValue(points[index] ?? null)}`}
                   className="outline-none"
                   fill="transparent"
@@ -133,9 +132,18 @@ export function SelectedHoldingHistoryChart({
                     setActiveIndex(index);
                   }}
                   onPointerEnter={() => setActiveIndex(index)}
+                  onClick={() => setActiveIndex(index)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveIndex(index); return; }
+                    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? points.length - 1 : event.key === "ArrowLeft" ? Math.max(0, index - 1) : event.key === "ArrowRight" ? Math.min(points.length - 1, index + 1) : null;
+                    if (nextIndex === null) return;
+                    event.preventDefault();
+                    setActiveIndex(nextIndex);
+                    event.currentTarget.ownerSVGElement?.querySelector<SVGRectElement>(`[data-selected-history-index="${nextIndex}"]`)?.focus();
+                  }}
                   role="button"
                   style={{ outline: "none" }}
-                  tabIndex={0}
+                  tabIndex={(activeIndex ?? points.length - 1) === index ? 0 : -1}
                   width={Math.max(1, hitEnd - hitStart)}
                   x={hitStart}
                   y={PLOT_TOP}
@@ -151,8 +159,8 @@ export function SelectedHoldingHistoryChart({
 
           {activePoint && activeGeometry ? (
             <div
-              className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-xs shadow-[0_12px_30px_rgba(35,43,37,0.10)]"
-              style={{ left: `${clamp((activeGeometry.x / WIDTH) * 100, 10, 90)}%` }}
+              className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-xs shadow-[0_12px_30px_rgba(35,43,37,0.10)]"
+              style={{ left: `clamp(92px, ${(activeGeometry.x / WIDTH) * 100}%, calc(100% - 92px))` }}
             >
               <p className="font-medium text-[var(--ink)]">{formatDate(activePoint.date)}</p>
               <div className="mt-2 flex items-baseline justify-between gap-3">
@@ -209,10 +217,6 @@ function buildChartGeometry(points: readonly TodayHoldingHistoryPoint[]) {
     path,
     points: chartPoints,
   };
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function formatChartValue(point: TodayHoldingHistoryPoint | null) {

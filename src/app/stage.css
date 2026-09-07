@@ -1,0 +1,120 @@
+/* A viewport is a composed scene. Long evidence belongs in an explicit detail view. */
+.varda-page.varda-stage-page:has(.varda-app-navigation) {
+  --stage-top: 64px;
+  --stage-bottom: 0px;
+  height: 100dvh;
+  min-height: 0;
+  padding-bottom: var(--stage-bottom);
+  overflow: visible;
+}
+.varda-stage-page .varda-topbar { min-height: var(--stage-top); height: var(--stage-top); padding-inline: 36px; }
+.varda-stage-page .varda-nav-placeholder { height: var(--stage-top); }
+.varda-stage-page .varda-stage-content {
+  height: calc(100dvh - var(--stage-top) - var(--stage-bottom));
+  min-height: 0;
+  max-width: 1760px;
+  padding: 12px 36px 20px;
+  overflow: visible;
+}
+.varda-stage-content > :not(dialog) { min-height: 0; }
+.varda-stage-page nav[aria-label="자산 분석 범위"] { padding: 0; min-width: 0; }
+.varda-stage-page nav[aria-label="자산 분석 범위"] a { font-size: 12px; min-height: 38px; padding-block: 6px 12px; }
+.varda-stage-page .varda-presentation-detail-trigger { min-height: 36px; padding: 7px 12px; background: transparent; font-size: 11px; border-radius: 20px; }
+.varda-stage-page .varda-presentation-detail-trigger:hover { background: var(--wash); }
+.varda-stage-page .varda-sidebar { padding-top: 22px; padding-bottom: 14px; }
+.varda-stage-page .varda-sidebar-brand { margin-bottom: 22px; }
+.varda-stage-page .varda-sidebar-groups { gap: 7px; }
+.varda-stage-page .varda-sidebar-link { min-height: 54px; padding-block: 9px; gap: 5px; }
+.varda-stage-page .varda-sidebar-bottom { padding-top: 16px; }
+.varda-stage-page .varda-sidebar-account { padding-top: 12px; }
+.varda-stage-page .varda-preview-label { padding-bottom: 10px; }
+.varda-stage-page .varda-mobile-menu .varda-sidebar-groups { gap: 28px; }
+.varda-stage-page .varda-mobile-menu .varda-sidebar-link { min-height: 52px; padding: 12px 14px; gap: 18px; }
+.varda-stage-page .varda-dialog { max-height: calc(100dvh - 32px); }
+.varda-stage-page .varda-presentation-dialog-content { overscroll-behavior: contain; }
+
+@media (max-width: 1180px) {
+  .varda-stage-page .varda-stage-content { padding-inline: 26px; }
+  .varda-stage-page .varda-topbar { padding-inline: 26px; }
+}
+@media (max-width: 760px) {
+  .varda-page.varda-stage-page:has(.varda-app-navigation) { --stage-top: 56px; --stage-bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .varda-stage-page .varda-stage-content { padding: 8px 20px 12px; }
+  .varda-stage-page .varda-topbar { padding-inline: 20px; }
+  .varda-stage-page .varda-mobile-bottom { padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .varda-stage-page .varda-mobile-bottom a { min-height: 56px; }
+  .varda-stage-page nav[aria-label="자산 분석 범위"] a { font-size: 11px; }
+  .varda-stage-page .varda-presentation-detail-trigger { font-size: 10px; padding: 6px 9px; }
+  .varda-stage-page .varda-dialog { max-height: calc(100dvh - 16px); }
+}
+/* Small windows and enlarged text retain access rather than clipping a fixed slide. */
+@media (max-height: 640px) {
+  .varda-page.varda-stage-page:has(.varda-app-navigation) { height: auto; min-height: 100dvh; }
+  .varda-stage-page .varda-stage-content { height: auto; min-height: calc(100dvh - var(--stage-top) - var(--stage-bottom)); }
+}
+
+/* Management is an index of four chapters; forms keep their dedicated routes. */
+.varda-management-stage { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: clamp(36px, 6vw, 110px); }
+.varda-management-cover { align-self: center; }
+.varda-management-cover h1 { font-size: clamp(38px, 4.4vw, 66px); line-height: 1.15; font-weight: 600; letter-spacing: -.07em; margin-top: 22px; }
+.varda-management-cover-note { color: var(--muted); font-size: 13px; line-height: 1.9; margin-top: 25px; }
+.varda-management-cover .varda-action { display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; }
+.varda-management-index { min-height: 0; display: grid; grid-template-rows: repeat(4,minmax(0,1fr)); padding: 26px 0 28px; }
+.varda-stage-page .varda-management-chapter { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; width: 100%; padding: 16px 4px; display: flex; justify-content: space-between; text-align: left; }
+.varda-management-chapter:first-child { border-top: 1px solid var(--line); }
+.varda-management-chapter > span { min-width: 0; display: flex; align-items: baseline; gap: clamp(20px,3vw,48px); }
+.varda-management-chapter-number { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.varda-management-chapter-title { min-width: 0; }
+.varda-management-chapter-title strong { display: block; color: var(--ink); font-weight: 500; font-size: clamp(26px,2.7vw,40px); letter-spacing: -.045em; }
+.varda-management-chapter-title small { display: block; margin-top: 10px; color: var(--muted); font-size: 11px; }
+.varda-management-chapter > svg { width: 22px; height: 22px; flex: none; margin-left: 16px; }
+.varda-management-chapter:hover .varda-management-chapter-title strong { color: var(--brand); }
+.varda-management-stage-footer { grid-column: 1/-1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.varda-management-stage-footer > span { color: var(--muted); font-size: 11px; }
+.varda-management-stage-footer .varda-presentation-detail-trigger > span { display: flex; gap: 7px; align-items: center; }
+.varda-management-guide { display: grid; gap: 30px; padding-block: 12px; }
+.varda-management-guide strong { font-size: 18px; font-weight: 550; }
+.varda-management-guide p { color: var(--muted); margin-top: 8px; line-height: 1.8; }
+.varda-management-guide a { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; color: var(--brand); }
+@media (max-width:760px) {
+  .varda-management-stage { grid-template-columns: 1fr; grid-template-rows: auto minmax(0,1fr) auto; }
+  .varda-management-cover { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; padding-top: 10px; align-items: center; }
+  .varda-management-cover .varda-kicker { grid-column: 1/-1; font-size: 9px; }
+  .varda-management-cover h1 { font-size: 29px; margin-top: 0; }
+  .varda-management-cover h1 br { display: none; }
+  .varda-management-cover-note { grid-column: 1/-1; grid-row: 3; font-size: 11px; margin-top: 0; }
+  .varda-management-cover-note br { display: none; }
+  .varda-management-cover .varda-action { margin: 0; min-height: 34px; font-size: 10px; padding-inline: 12px; }
+  .varda-management-cover .varda-action svg { display: none; }
+  .varda-management-index { padding: 20px 0; }
+  .varda-stage-page .varda-management-chapter { padding-block: 12px; }
+  .varda-management-chapter > span { gap: 18px; }
+  .varda-management-chapter-title strong { font-size: 27px; }
+  .varda-management-chapter-title small { font-size: 9px; margin-top: 6px; }
+  .varda-management-stage-footer { padding-top: 7px; }
+  .varda-management-stage-footer > span { max-width: 145px; font-size: 10px; }
+}
+@media (max-height:640px) {
+  .varda-management-stage { height: auto; min-height: 550px; }
+  .varda-management-index { grid-auto-rows: minmax(100px,auto); }
+}
+
+.varda-scene-pager { display: none; }
+.varda-stage-page .varda-scene-pager { display: flex; align-items: center; gap: 5px; padding-right: 18px; border-right: 1px solid var(--line); }
+.varda-scene-pager > a, .varda-scene-pager > span[aria-hidden] { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; }
+.varda-scene-pager > a:hover { background: var(--wash); color: var(--brand); }
+.varda-scene-number { display: flex; align-items: center; gap: 8px; font-size: 10px; font-variant-numeric: tabular-nums; }
+.varda-scene-number i { color: var(--faint); font-style: normal; }
+@media (max-width:760px) { .varda-stage-page .varda-scene-pager { display: none; } }
+
+.varda-stage-page .varda-loading { display: grid; grid-template-columns: minmax(180px, 24%) minmax(0,1fr); grid-template-rows: auto minmax(0,1fr) 1px; gap: 26px 45px; height: 100%; min-height: 0; max-width: none; margin: 0; }
+.varda-stage-page .varda-loading > p { grid-column: 1/-1; }
+.varda-stage-page .varda-loading-title { width: 100%; margin: 0; align-self: center; }
+.varda-stage-page .varda-loading-visual { height: 100%; min-height: 0; margin: 0; align-items: center; padding: 0; border: 0; gap: 8px; }
+.varda-stage-page .varda-loading-footer { grid-column: 1/-1; margin: 0; }
+@media (max-width:760px) {
+  .varda-stage-page .varda-loading { grid-template-columns: 1fr; grid-template-rows: auto 60px minmax(0,1fr) 1px; gap: 22px; }
+  .varda-stage-page .varda-loading-title { width: 80%; }
+  .varda-stage-page .varda-loading-visual { gap: 5px; }
+}
+@media (max-height:640px) { .varda-stage-page .varda-loading { min-height: 390px; } }
