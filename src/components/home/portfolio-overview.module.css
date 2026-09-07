@@ -1,0 +1,287 @@
+.page { display: grid; gap: 34px; min-width: 0; padding-bottom: 44px; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.eyebrow { display: block; margin-bottom: 9px; font-size: 10px; font-weight: 550; letter-spacing: .15em; color: var(--muted); }
+.title { font-size: clamp(32px, 3.2vw, 44px); font-weight: 500; line-height: 1.18; letter-spacing: -.055em; }
+.subtitle { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.headerActions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+.scope { min-width: 0; border-bottom: 1px solid var(--line); }
+.summary { display: grid; grid-template-columns: minmax(0, 1.65fr) 1fr 1fr; align-items: end; padding: 8px 0 34px; border-bottom: 1px solid var(--line); }
+.balance { padding-right: 24px; }
+.balance > span, .summaryMetric dt { display: block; font-size: 11px; color: var(--muted); }
+.balance > strong { display: block; margin-top: 14px; font-size: clamp(36px, 4.4vw, 65px); line-height: 1.05; letter-spacing: -.065em; font-weight: 450; font-variant-numeric: tabular-nums; }
+.balance p { margin-top: 18px; font-size: 11px; color: var(--muted); }
+.summaryMetric { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 0 28px; border-left: 1px solid var(--line); }
+.summaryMetric dd { font-size: clamp(22px, 2.3vw, 31px); letter-spacing: -.045em; font-weight: 450; font-variant-numeric: tabular-nums; }
+.summaryMetric dd.status { color: var(--muted); font-size: 11px; font-weight: 400; letter-spacing: 0; }
+.primaryGrid { display: grid; grid-template-columns: 1fr; gap: 26px; min-width: 0; }
+.panel { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.chartPanel { min-width: 0; }
+.chartPanel :global(.varda-home-chart) { height: 370px; min-height: 370px; }
+.chartPanel details { margin-top: 10px; border-bottom: 0; padding-bottom: 0; }
+.chartPanel details summary { color: var(--muted); font-size: 10px; }
+.panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.panelTitle { font-size: 17px; font-weight: 500; letter-spacing: -.035em; }
+.evidence { display: grid; grid-template-columns: .8fr 1.4fr .8fr; align-content: start; align-items: start; gap: 38px; padding: 30px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.evidenceIntro { font-size: 11px; color: var(--muted); line-height: 1.8; margin-top: 9px; }
+.metrics { display: grid; gap: 15px; }
+.metric { display: flex; align-items: baseline; justify-content: space-between; gap: 15px; font-size: 11px; }
+.metric dt { color: var(--muted); }
+.metric dd { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.status { color: var(--muted); font-size: 10px; line-height: 1.7; }
+.textLink { display: inline-flex; align-items: center; gap: 7px; width: fit-content; color: var(--brand); font-size: 11px; font-weight: 500; transition: gap 180ms ease; }
+.textLink:hover { gap: 11px; }
+.textLink:focus-visible { outline: 2px solid var(--brand); outline-offset: 5px; }
+.heatmapPanel { min-width: 0; border: 1px solid var(--line); border-radius: 18px; padding: 28px; background: var(--surface); }
+.heatmapPanel :global([data-heatmap-grid]) { max-height: none; }
+.heatmapPanel :global(.varda-heatmap-popover) { background: var(--surface); border-radius: 12px; box-shadow: 0 10px 32px #20211f14; }
+.footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.footerLinks { display: flex; gap: 24px; flex-wrap: wrap; }
+.contributionPanel { min-width: 0; }
+.contributionHeader { margin-bottom: 30px; }
+.todayEvidence { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; padding-top: 30px; border-top: 1px solid var(--line); }
+.bridge { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 24px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.bridgeStep { position: relative; padding: 23px 18px; }
+.bridgeStep:first-child { padding-left: 0; }
+.bridgeStep:last-child { padding-right: 0; }
+.bridgeStep + .bridgeStep::before { content: '+'; position: absolute; left: -9px; top: 50%; color: var(--faint); font-size: 12px; }
+.bridgeStep:last-child::before { content: '='; }
+.bridgeStep dt { font-size: 10px; color: var(--muted); }
+.bridgeStep dd { margin-top: 12px; white-space: nowrap; font-size: clamp(15px, 1.5vw, 21px); font-weight: 450; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.bridgeStep:last-child dd { color: var(--ink); }
+.explorer { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 40px; align-items: start; }
+.contributionRows { min-width: 0; }
+.axisLabels { display: flex; justify-content: space-between; padding: 0 103px 12px 190px; font-size: 10px; color: var(--faint); }
+.contributionRow { display: grid; grid-template-columns: minmax(125px, 170px) minmax(100px, 1fr) 105px; gap: 18px; align-items: center; min-height: 70px; padding: 13px 0; border-top: 1px solid var(--line); transition: opacity 170ms; animation: row-enter 340ms both; animation-delay: var(--row-delay, 0ms); }
+.contributionRow:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
+.contributionRow[data-active='true'] > span:first-child { color: var(--brand); }
+.contributionRow > span:first-child { transition: transform 180ms ease; }
+.contributionRow:hover > span:first-child { transform: translateX(4px); }
+.contributionBar { position: relative; display: block; height: 31px; }
+.dotMatrix { display: block; width: 100%; height: 100%; overflow: visible; }
+.matrixDot { transition: r 180ms ease, fill 180ms ease; }
+.dotRevealPositive { animation: reveal-positive 650ms cubic-bezier(.2,.65,.25,1) both; animation-delay: var(--row-delay, 0ms); }
+.dotRevealNegative { animation: reveal-negative 650ms cubic-bezier(.2,.65,.25,1) both; animation-delay: var(--row-delay, 0ms); }
+.activeContribution { position: sticky; top: 90px; align-self: start; padding: 26px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.activeContribution h3 { margin-top: 28px; font-size: 20px; font-weight: 450; line-height: 1.4; letter-spacing: -.04em; }
+.activeContribution > strong { display: block; margin-top: 13px; font-size: 34px; font-weight: 450; letter-spacing: -.055em; font-variant-numeric: tabular-nums; }
+.activeContribution dl { margin-top: 35px; }
+.activeContribution .textLink { margin-top: 27px; }
+.activeValue { animation: value-enter 220ms ease-out both; }
+.holdingDialog { position: fixed; inset: 20px 20px 20px auto; margin: 0; width: min(820px, calc(100vw - 40px)); height: calc(100dvh - 40px); max-width: none; max-height: none; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 18px; padding: 0 26px 26px; background: var(--paper); color: var(--ink); box-shadow: -12px 0 70px #20211f1c; }
+.holdingDialog[open] { animation: drawer-enter 240ms cubic-bezier(.2,.65,.25,1) both; }
+.holdingDialog::backdrop { background: #20211f45; backdrop-filter: blur(3px); }
+.chartHeading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 18px; }
+.chartRanges { display: flex; align-items: center; gap: 6px; }
+.rangeButton { min-width: 40px; min-height: 34px; border-radius: 999px; padding: 5px 11px; font-size: 11px; color: var(--muted); cursor: pointer; transition: color 160ms, background 160ms; }
+.rangeButton:hover { background: var(--wash); color: var(--ink); }
+.rangeButton[aria-pressed='true'] { color: var(--paper); background: var(--ink); }
+.rangeButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.chartReadout { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 24px 0 6px; }
+.chartReadout span { font-size: 10px; color: var(--muted); }
+.chartReadout strong { display: block; margin-top: 7px; font-size: 26px; font-weight: 450; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.chartReadout p { color: var(--faint); font-size: 10px; line-height: 1.7; text-align: right; }
+.historyCanvas { position: relative; width: 100%; }
+.historyLine { stroke-dasharray: none; clip-path: inset(-6px); animation: draw-line 1000ms cubic-bezier(.2,.6,.25,1) both; }
+.observationDot { animation: dot-enter 700ms both; animation-delay: var(--dot-delay, 0ms); }
+.markerHalo { transition: r 160ms ease-out; }
+.historyMarker { pointer-events: none; }
+.heatmapCell { display: flex; width: 100%; min-width: 27px; height: 28px; align-items: center; justify-content: center; border: 1px solid #ffffff50; border-radius: 3px; font-size: 10px; color: var(--muted); cursor: crosshair; transition: transform 160ms, border-radius 160ms, box-shadow 160ms; animation: cell-enter 480ms both; animation-delay: var(--cell-delay, 0ms); }
+.heatmapCell:hover { position: relative; z-index: 2; transform: scale(.85); border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent); }
+.heatmapCell[aria-pressed='true'] { position: relative; z-index: 3; border-radius: 50%; outline: 2px solid var(--accent); outline-offset: 2px; }
+.heatmapCell:focus-visible { position: relative; z-index: 3; outline: 2px solid var(--accent); outline-offset: 2px; }
+.heatmapRowLabel { display: flex; min-width: 0; align-items: center; padding-right: 8px; font-size: 11px; color: var(--ink); transition: color 160ms; }
+.heatmapRowLabel[data-selected='true'] { color: var(--brand); }
+.stage { display: flex; flex: 1; min-height: 0; min-width: 0; height: 100%; flex-direction: column; gap: 24px; }
+.stageHeader { display: flex; align-items: center; gap: 30px; min-width: 0; flex: none; border-bottom: 1px solid var(--line); padding-bottom: 15px; }
+.stageTitle { flex: none; font-size: 23px; font-weight: 500; letter-spacing: -.05em; }
+.stageScope { flex: 1; min-width: 0; max-width: 640px; }
+.stageScope :global(nav) { margin: 0; }
+.stageScope :global(a) { font-size: 11px; }
+.stageScope :global(.scrollable-nav-rail-content) { gap: 22px; }
+.stageRefresh { margin-left: auto; flex: none; }
+.stageRefresh button { width: 34px; height: 34px; min-height: 34px; font-size: 0; padding: 0; display: grid; place-items: center; }
+.stageRefresh button > span:not([aria-hidden]) { display: none; }
+.homeStageMain, .todayStageMain { flex: 1; min-height: 0; min-width: 0; display: grid; gap: clamp(24px, 3vw, 48px); grid-template-columns: minmax(235px, .28fr) minmax(0, 1fr); }
+.stageSummary { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(22px, 4vh, 44px); padding: 12px 0; }
+.stageSummary .balance { padding: 0; }
+.stageSummary .balance > strong { font-size: clamp(32px, 2.9vw, 46px); margin-top: 16px; white-space: nowrap; }
+.stageSummary .balance p { margin-top: 14px; }
+.stageSummary .summaryMetric { padding: 0; border: 0; gap: 9px; }
+.stageSummary .summaryMetric dd { font-size: clamp(24px, 2.4vw, 32px); }
+.stageSummary .summaryMetric dd.status { font-size: 10px; }
+.stageNote { padding-top: 20px; border-top: 1px solid var(--line); }
+.stageNote > span { display: block; color: var(--muted); font-size: 10px; }
+.stageNote > strong { display: block; margin-top: 7px; font-size: 13px; font-weight: 500; }
+.stageNote > p { color: var(--muted); font-size: 10px; line-height: 1.7; margin-top: 7px; }
+.stageVisual { min-width: 0; min-height: 0; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.stageHeatmap { position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.stageHeatmap > :first-child { flex: none; margin-bottom: 20px; gap: 12px; }
+.stageHeatmapViewport { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.stageMatrix { height: 100%; display: flex; flex-direction: column; }
+.stageGridViewport { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.stageMatrixGrid { height: 100%; min-width: 660px; }
+.stageMatrix .heatmapCell { min-width: 0; height: 100%; }
+.stageMatrix .heatmapRowLabel { position: sticky; left: 0; z-index: 4; background: var(--surface); padding-right: 14px; font-size: 10px; }
+.stageMatrix > :last-child { flex: none; padding-bottom: 3px; }
+.stageHeatmap :global(.varda-heatmap-popover) { background: var(--surface); border-radius: 12px; box-shadow: 0 10px 32px #20211f14; }
+.stageFooter { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; min-height: 44px; border-top: 1px solid var(--line); padding-top: 12px; }
+.stageFooter > p { font-size: 10px; line-height: 1.6; text-align: right; color: var(--muted); }
+.stageLaunchers { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 22px; }
+.detailStack { display: grid; gap: 30px; }
+.stageContribution { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding-top: 9px; }
+.stageContribution .contributionHeader { flex: none; margin-bottom: 20px; }
+.stageContribution .explorer { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) 215px; gap: 24px; align-items: stretch; }
+.stageContribution .contributionRows { min-height: 0; display: flex; flex-direction: column; }
+.contributionScroll { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 5px; }
+.contributionScroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stageContribution .axisLabels { padding: 0 100px 10px 135px; flex: none; }
+.stageContribution .contributionRow { grid-template-columns: minmax(105px, .8fr) minmax(90px, 1fr) 95px; gap: 8px; min-height: 58px; padding-block: 10px; }
+.stageContribution .contributionRow > span:first-child > span:first-child { font-size: 11px; }
+.stageContribution .contributionRow > span:first-child > span:last-child { font-size: 10px; }
+.stageContribution .contributionRow > span:last-child > span:first-child { font-size: 12px; }
+.stageContribution .activeContribution { position: static; display: flex; flex-direction: column; justify-content: center; align-self: stretch; padding: 22px 18px; min-height: 0; overflow: auto; }
+.stageContribution .activeContribution h3 { font-size: 19px; margin-top: 22px; }
+.stageContribution .activeContribution > strong { font-size: 28px; }
+.stageContribution .activeContribution dl { margin-top: 28px; }
+.stageContribution .activeContribution dl dt, .stageContribution .activeContribution dl dd { font-size: 11px; }
+@keyframes draw-line { from { clip-path: inset(-6px 100% -6px -6px); } to { clip-path: inset(-6px); } }
+@keyframes dot-enter { from { opacity: 0; } to { opacity: .3; } }
+@keyframes reveal-positive { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes reveal-negative { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0); } }
+@keyframes row-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+@keyframes value-enter { from { opacity: .3; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes cell-enter { from { opacity: .15; } to { opacity: 1; } }
+@keyframes drawer-enter { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@media (max-width: 1100px) {
+  .summary { grid-template-columns: 1.4fr 1fr 1fr; }
+  .summaryMetric { padding-left: 22px; }
+  .explorer { grid-template-columns: minmax(0, 1fr) 230px; gap: 26px; }
+  .contributionRow { grid-template-columns: 135px minmax(90px, 1fr) 95px; gap: 12px; }
+  .axisLabels { padding-left: 150px; padding-right: 95px; }
+  .evidence { grid-template-columns: 1fr 1.2fr; }
+  .evidence > :last-child { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 20px; align-items: center; }
+}
+@media (max-width: 850px) {
+  .page { gap: 28px; }
+  .summary { grid-template-columns: 1fr 1fr; row-gap: 28px; }
+  .balance { grid-column: 1 / -1; }
+  .balance > strong { font-size: clamp(42px, 8vw, 62px); }
+  .summaryMetric { border-left: 0; padding-left: 0; }
+  .summaryMetric:last-child { padding-left: 24px; border-left: 1px solid var(--line); }
+  .todayEvidence { grid-template-columns: 1fr; gap: 22px; }
+  .explorer { grid-template-columns: 1fr; gap: 26px; }
+  .activeContribution { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 0 25px; }
+  .activeContribution h3, .activeContribution > strong { grid-column: 1; }
+  .activeContribution h3 { margin-top: 15px; }
+  .activeContribution dl { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; }
+  .activeContribution .textLink { grid-column: 1 / -1; }
+  .bridge { grid-template-columns: 1fr; margin-top: 20px; }
+  .bridgeStep, .bridgeStep:first-child, .bridgeStep:last-child { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; padding: 15px 0; }
+  .bridgeStep + .bridgeStep { border-top: 1px solid var(--line); }
+  .bridgeStep + .bridgeStep::before { content: none; }
+  .bridgeStep dd { margin-top: 0; font-size: 19px; }
+}
+@media (max-width: 600px) {
+  .page { gap: 22px; }
+  .title { font-size: 31px; }
+  .header { align-items: flex-start; }
+  .headerActions { margin-top: 3px; }
+  .headerActions button { font-size: 0; gap: 0; min-height: 36px; width: 36px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; }
+  .headerActions button > span:not([aria-hidden]) { display: none; }
+  .subtitle { display: none; }
+  .summary { padding-bottom: 22px; row-gap: 20px; }
+  .balance > strong { margin-top: 10px; }
+  .balance p { margin-top: 10px; }
+  .summaryMetric { gap: 8px; }
+  .summaryMetric dd { font-size: 25px; }
+  .summaryMetric dd.status { font-size: 10px; }
+  .evidence { grid-template-columns: 1fr; gap: 22px; padding-block: 25px; }
+  .evidence > :last-child { display: block; }
+  .chartPanel :global(.varda-home-chart) { height: 260px; min-height: 260px; }
+  .chartReadout { padding-top: 16px; }
+  .chartReadout > div { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .chartReadout strong { font-size: 19px; margin-top: 0; }
+  .chartReadout p { display: none; }
+  .chartRanges { gap: 0; }
+  .rangeButton { min-width: 35px; padding-inline: 8px; }
+  .heatmapPanel { padding: 20px 16px; border-radius: 14px; }
+  .footer { align-items: flex-start; flex-direction: column; }
+  .axisLabels { display: none; }
+  .contributionHeader { margin-bottom: 22px; }
+  .contributionRow { grid-template-columns: 1fr 105px; gap: 9px 12px; padding: 15px 0; }
+  .contributionBar { grid-row: 2; grid-column: 1 / -1; height: 28px; }
+  .activeContribution { padding: 21px 18px; gap: 0 18px; border-radius: 14px; }
+  .activeContribution h3 { font-size: 17px; }
+  .activeContribution > strong { font-size: 28px; }
+  .holdingDialog { inset: 10px; width: calc(100vw - 20px); height: calc(100dvh - 20px); padding: 0 18px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .historyLine, .observationDot, .dotRevealPositive, .dotRevealNegative, .contributionRow, .activeValue, .heatmapCell, .holdingDialog[open] { animation: none; }
+  .historyLine { stroke-dashoffset: 0; }
+  .markerHalo, .matrixDot, .heatmapCell, .contributionRow > span:first-child, .textLink { transition: none; }
+  .heatmapCell:hover, .contributionRow:hover > span:first-child { transform: none; }
+}
+@media (max-width: 1050px) and (min-width: 701px) {
+  .stageHeader { gap: 20px; }
+  .stageTitle { font-size: 21px; }
+  .homeStageMain, .todayStageMain { grid-template-columns: 215px minmax(0, 1fr); gap: 24px; }
+  .stageSummary .balance > strong { font-size: 32px; }
+  .stageContribution .explorer { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 15px; }
+  .stageContribution .activeContribution { display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; padding: 16px; }
+  .stageContribution .activeContribution .eyebrow, .stageContribution .activeContribution dl { display: none; }
+  .stageContribution .activeContribution h3, .stageContribution .activeContribution > strong, .stageContribution .activeContribution .textLink { margin: 0; }
+  .stageContribution .activeContribution .textLink { grid-column: 1 / -1; }
+  .stageFooter > p { max-width: 250px; }
+}
+@media (max-width: 700px) {
+  .stage { gap: 14px; }
+  .stageHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; padding-bottom: 6px; }
+  .stageTitle { font-size: 21px; }
+  .stageScope { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .stageScope :global(a) { font-size: 10px; padding-block: 6px; }
+  .stageRefresh { grid-column: 2; grid-row: 1; }
+  .homeStageMain, .todayStageMain { display: flex; flex-direction: column; gap: 18px; }
+  .stageSummary { display: grid; grid-template-columns: 1fr 1fr; gap: 13px 20px; flex: none; padding: 0; }
+  .stageSummary .balance { grid-column: 1 / -1; }
+  .stageSummary .balance > span { font-size: 10px; }
+  .stageSummary .balance > strong { margin-top: 8px; font-size: 37px; }
+  .stageSummary .balance p { margin-top: 5px; font-size: 10px; }
+  .stageSummary .summaryMetric { gap: 4px; }
+  .stageSummary .summaryMetric dt { font-size: 10px; }
+  .stageSummary .summaryMetric dd { font-size: 21px; }
+  .stageSummary .summaryMetric dd.status { font-size: 9px; }
+  .stageSummary .stageNote { display: none; }
+  .stageVisual { flex: 1; padding: 15px 12px; min-height: 0; border-radius: 14px; }
+  .stageHeatmap > :first-child { margin-bottom: 12px; gap: 6px; }
+  .stageHeatmap > :first-child > div:first-child > p { display: none; }
+  .stageHeatmap .panelTitle { font-size: 14px; }
+  .stageHeatmap .rangeButton { font-size: 10px; min-width: 32px; min-height: 30px; padding-inline: 7px; }
+  .stageMatrixGrid { min-width: 650px; }
+  .stageMatrix .heatmapRowLabel { font-size: 10px; }
+  .stageMatrix > :last-child { font-size: 9px; gap: 6px; }
+  .stageFooter { min-height: 38px; padding-top: 8px; }
+  .stageFooter > p, .stageLaunchers > a { display: none; }
+  .stageLaunchers { width: 100%; gap: 12px; }
+  .stageLaunchers > button { flex: 1; justify-content: space-between; min-height: 36px; }
+  .stageContribution { flex: 1; padding-top: 0; }
+  .stageContribution .contributionHeader { margin-bottom: 8px; gap: 8px; }
+  .stageContribution .contributionHeader .panelTitle { font-size: 14px; }
+  .stageContribution .contributionHeader .evidenceIntro { margin-top: 3px; font-size: 9px; }
+  .stageContribution .contributionHeader > .status { font-size: 9px; white-space: nowrap; }
+  .stageContribution .explorer { display: flex; flex-direction: column; gap: 10px; }
+  .stageContribution .contributionRows { flex: 1; }
+  .stageContribution .contributionRow { grid-template-columns: 1fr 88px; min-height: 58px; gap: 3px 8px; padding-block: 8px; }
+  .stageContribution .contributionBar { grid-column: 1 / -1; grid-row: 2; height: 22px; }
+  .stageContribution .activeContribution { display: grid; grid-template-columns: 1fr auto; flex: none; gap: 5px 14px; padding: 11px 13px; border-radius: 12px; }
+  .stageContribution .activeContribution .eyebrow, .stageContribution .activeContribution dl { display: none; }
+  .stageContribution .activeContribution h3 { grid-column: 1; grid-row: 1; font-size: 12px; line-height: 1.5; margin: 0; }
+  .stageContribution .activeContribution > strong { grid-column: 2; grid-row: 1; font-size: 19px; margin: 0; }
+  .stageContribution .activeContribution .textLink { grid-column: 1 / -1; font-size: 10px; margin: 0; }
+  .stageHeatmap :global(.varda-heatmap-popover) { bottom: 8px; right: 0; width: 100%; padding: 14px; max-height: 100%; overflow: auto; }
+  .stageSummary .stageWarning { display: block; grid-column: 1 / -1; padding-top: 6px; }
+}
+@media (max-height: 640px) {
+  .stage { height: auto; min-height: 560px; }
+  .homeStageMain, .todayStageMain { min-height: 390px; }
+  .stageVisual, .stageContribution { min-height: 360px; }
+}

@@ -38,7 +38,7 @@ export function RiskAnalysisBasis({
         <RiskSummaryCard
           label="분석 범위 / 기간"
           value={`${scopeLabel} / ${selection.window}일`}
-          detail={`${provenance.usableReturnObservations}/${provenance.requestedReturnObservations} observations`}
+          detail={`${provenance.usableReturnObservations}/${provenance.requestedReturnObservations} 관측치`}
         />
         <RiskSummaryCard
           label="계산 상태"
@@ -76,7 +76,6 @@ export function RiskAnalysisBasis({
           detail={`FX from ${provenance.fxSourceDateFrom}`}
         />
       </div>
-      <RiskCalculationNotice model={model} />
     </RiskSection>
   );
 }
@@ -92,7 +91,7 @@ export function RiskPortfolioSummary({
   return (
     <RiskSection
       title="포트폴리오 위험 요약"
-      detail={`${portfolio.observationCount} return observations`}
+      detail={`${portfolio.observationCount} 수익률 관측치`}
       marker="portfolio-summary"
     >
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -104,22 +103,22 @@ export function RiskPortfolioSummary({
         <RiskSummaryCard
           label="Sharpe"
           value={formatRiskMetric(portfolio.sharpe)}
-          detail={metricDetail(portfolio.sharpe.reason, "RF 0% assumption")}
+          detail={metricDetail(portfolio.sharpe.reason, "무위험 수익률 0% 가정")}
         />
         <RiskSummaryCard
           label="평균 상관"
           value={formatRiskMetric(portfolio.weightedAverageCorrelation)}
           detail={metricDetail(
             portfolio.weightedAverageCorrelation.reason,
-            "positive-weight pairs",
+            "보유 비중이 있는 종목 쌍",
           )}
         />
         <RiskSummaryCard
-          label="Risk-contribution ENB"
+          label="유효 분산 수 ENB"
           value={formatRiskMetric(portfolio.riskContributionEnb)}
           detail={metricDetail(
             portfolio.riskContributionEnb.reason,
-            "absolute risk shares",
+            "절대 위험 기여도 기준",
           )}
         />
         <RiskSummaryCard
@@ -130,7 +129,7 @@ export function RiskPortfolioSummary({
           )}
           detail={metricDetail(
             portfolio.diversificationBenefitPct.reason,
-            "vs weighted standalone volatility",
+            "개별 변동성의 가중합 대비",
           )}
         />
         <RiskSummaryCard
@@ -138,7 +137,7 @@ export function RiskPortfolioSummary({
           value={formatRiskMetric(portfolio.stress.weightedAverageCorrelation)}
           detail={metricDetail(
             portfolio.stress.weightedAverageCorrelation.reason,
-            `${portfolio.stress.downDayObservations} down days`,
+            `${portfolio.stress.downDayObservations} 하락일`,
           )}
         />
       </div>
@@ -170,19 +169,19 @@ export function RiskStandaloneSummary({
         <RiskSummaryCard
           label="연환산 변동성"
           value={formatRiskRatioPercent(instrument.volatilityAnnualized)}
-          detail={`${instrument.observationCount} observations`}
+          detail={`${instrument.observationCount} 관측치`}
         />
         <RiskSummaryCard
           label="Sharpe"
           value={formatRiskMetric(instrument.sharpe)}
-          detail={metricDetail(instrument.sharpe.reason, "RF 0% assumption")}
+          detail={metricDetail(instrument.sharpe.reason, "무위험 수익률 0% 가정")}
         />
       </div>
     </RiskSection>
   );
 }
 
-function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel }) {
+export function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel }) {
   const { calculation, inputHealth, provenance } = model;
   if (
     calculation.calculationStatus === "complete" &&

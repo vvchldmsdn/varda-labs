@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, Plus, Sigma } from "lucide-react";
+import { ArrowUpRight, Sigma } from "lucide-react";
+import styles from "@/components/home/portfolio-overview.module.css";
 
 import { FxImpactPopover } from "@/components/home/fx-impact-popover";
 import { HoldingMovementHeatmap } from "@/components/home/holding-movement-heatmap";
@@ -14,6 +15,7 @@ import {
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import { selectLargestMovementContributor } from "@/lib/home-metrics";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
 import {
@@ -24,9 +26,11 @@ import {
 
 export function PortfolioDashboard({
   data,
+  designPreview = false,
   liveSyncEnabled = false,
 }: {
   data: DashboardData;
+  designPreview?: boolean;
   liveSyncEnabled?: boolean;
 }) {
   const movementReady = data.dataHealth.movementReady;
@@ -51,157 +55,118 @@ export function PortfolioDashboard({
           (holding) => holding.movementEligible && holding.dailyChangeKrw !== null,
         ).length
       : 0;
-  const structureHref = scopedHref("/portfolio/structure", data.selectedScope.key);
-  const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key);
+  const structureHref = scopedHref("/portfolio/structure", data.selectedScope.key, designPreview);
+  const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key, designPreview);
 
   return (
-    <main className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]" data-page="home">
+    <main className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="home">
       <PortfolioPrimaryNavigation
         activePath="/"
         generatedAt={data.generatedAt}
         selectedScopeKey={data.selectedScope.key}
       />
 
-      <div className="varda-content varda-presentation-content">
-        <div className="varda-screen">
-          <header className="varda-screen-header">
-            <div className="varda-screen-heading">
-              <div className="varda-screen-title-row">
-                <div>
-                  <p className="varda-kicker">PORTFOLIO / OVERVIEW</p>
-                  <h1 id="portfolio-overview-title" className="varda-page-title">자산의 흐름</h1>
-                </div>
-                <p className="text-xs text-[var(--muted)]">
-                  기준일 {formatDate(data.movementBaselineDate)}
-                </p>
-              </div>
+      <div className="varda-content varda-presentation-content varda-stage-content">
+        <div className={styles.stage}>
+          <header className={styles.stageHeader}>
+            <h1 id="portfolio-overview-title" className={styles.stageTitle}>자산의 흐름</h1>
+            <div className={styles.stageScope}>
+            <PortfolioAnalysisScopeTabs
+              basePath="/"
+              query={designPreview ? { preview: "design" } : undefined}
+              scopes={[...data.analysisScopes].toSorted(compareHomeScope)}
+              selectedScopeKey={data.selectedScope.key}
+              variant="underline"
+            />
             </div>
-            <div className="varda-screen-scope">
-              <PortfolioAnalysisScopeTabs
-                basePath="/"
-                scopes={[...data.analysisScopes].toSorted(compareHomeScope)}
-                selectedScopeKey={data.selectedScope.key}
-                variant="underline"
-              />
+            <div className={styles.stageRefresh}>
+              <PortfolioRefreshButton autoSync={liveSyncEnabled} designPreview={designPreview} />
             </div>
           </header>
 
-          <section className="varda-hero-strip" aria-labelledby="portfolio-overview-title">
-            <div className="varda-hero-value">
-              <span className="text-xs font-medium text-[var(--muted)]">
-                {homeScopeLabel(data.selectedScope)} 현재 평가액
-              </span>
+          <div className={styles.homeStageMain}>
+          <section className={styles.stageSummary} aria-labelledby="portfolio-overview-title">
+            <div className={styles.balance}>
+              <span>{homeScopeLabel(data.selectedScope)} 현재 평가액</span>
               <strong>{formatKrw(data.totalValueKrw)}</strong>
+              <p>{data.holdings.length}개 보유 종목 · {data.accountSummaries.length}개 계좌</p>
             </div>
-            <dl className="varda-hero-metrics">
-              <HeroMetric
-                label="오늘 변동"
-                value={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"}
-                tone={todayChangeKrw}
-              />
-              <HeroMetric
-                label="누적 수익률"
-                value={formatPercent(data.totalReturnPct, true)}
-                tone={data.totalReturnPct}
-              />
-              <HeroMetric
-                label="환율 영향"
-                value={formatSignedKrw(data.todayFxChangeKrw)}
-                tone={data.todayFxChangeKrw}
-              />
+            <dl className={styles.summaryMetric}>
+              <dt>오늘 변동</dt>
+              <dd className={toneClass(todayChangeKrw)}>
+                {movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"}
+              </dd>
+              <dd className={styles.status}>기준일 {formatDate(data.movementBaselineDate)}</dd>
             </dl>
+            <dl className={styles.summaryMetric}>
+              <dt>누적 수익률</dt>
+              <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
+              <dd className={styles.status}>누적 손익 {formatSignedKrw(data.totalPnlKrw)}</dd>
+            </dl>
+            <div className={styles.stageNote}>
+              <span>오늘의 최대 기여</span>
+              <strong>{movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"}</strong>
+              <p>{movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)}</p>
+            </div>
           </section>
 
-          <div className="varda-workspace-grid">
-            <div className="varda-main-visual varda-home-main">
-              <HoldingMovementHeatmap
-                history={data.holdingHistory}
-                riskHref={riskHref}
-                structureHref={structureHref}
-              />
-            </div>
+          <div className={styles.stageVisual}>
+            <HoldingMovementHeatmap key={data.selectedScope.key} history={data.holdingHistory} riskHref={riskHref} structureHref={structureHref} stage />
+          </div>
+          </div>
 
-            <aside className="varda-context-rail" aria-label="오늘의 근거와 자산 흐름">
-              <section className="varda-rail-section">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <p className="varda-kicker">TODAY / EVIDENCE</p>
-                    <h2 className="mt-1 text-sm font-medium">오늘의 핵심 근거</h2>
-                  </div>
-                  <Link
-                    className="varda-icon-button"
-                    href={scopedHref("/today", data.selectedScope.key)}
-                    aria-label="오늘 변동 상세 보기"
-                    title="오늘 변동 상세 보기"
-                  >
+          <footer className={styles.stageFooter}>
+            <div className={styles.stageLaunchers}>
+              <PresentationDialog label="평가액 흐름" title="포트폴리오 평가액 흐름" description="저장된 실제 평가액과 입출금·매매 기록을 함께 확인합니다." wide>
+              <section className={styles.chartPanel} aria-label="자산 이력">
+              <PortfolioHistoryChart
+                key={data.selectedScope.key}
+                events={data.eventActivity.map((event) => ({
+                  id: event.id,
+                  eventDate: event.eventDate,
+                  eventType: event.eventType,
+                  accountLabel: event.accountLabel,
+                  assetName: event.assetName,
+                  ticker: event.ticker,
+                  amountKrw: event.amountKrw,
+                  quantityDelta: event.quantityDelta,
+                }))}
+                points={data.recentSnapshots}
+              />
+              </section>
+              </PresentationDialog>
+
+              <PresentationDialog label="변동 근거" title="오늘의 근거와 자산 흐름" wide>
+              <aside className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
+              <div>
+                <div className={styles.panelHeader}>
+                  <h2 className={styles.panelTitle}>오늘의 핵심 근거</h2>
+                  <Link className="varda-icon-button" href={scopedHref("/today", data.selectedScope.key, designPreview)} aria-label="오늘 변동 상세 보기" title="오늘 변동 상세 보기">
                     <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.6} />
                   </Link>
                 </div>
-                <dl className="varda-rail-metrics mt-3">
-                  <RailMetric
-                    label="평가액 변동"
-                    value={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"}
-                    tone={todayChangeKrw}
-                  />
-                  <RailMetric
-                    label="최대 기여"
-                    value={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"}
-                    tone={topContributor?.dailyChangeKrw ?? null}
-                  />
-                  <RailMetric
-                    label="가격 영향"
-                    value={movementReady ? formatSignedKrw(priceImpactKrw ?? 0) : "계산 대기"}
-                    tone={priceImpactKrw}
-                  />
-                  <RailMetric
-                    label="시세 근거"
-                    value={`${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`}
-                  />
-                </dl>
-                <div className="varda-compact-fx">
-                  <FxImpactPopover
-                    basisDate={data.movementBaselineDate}
-                    impactKrw={data.todayFxChangeKrw}
-                    impactPct={fxImpactPct}
-                    points={data.fxTrend}
-                  />
-                </div>
-                <p className="mt-3 truncate text-[10px] text-[var(--faint)]" title={dataStatusText(data, data.dataHealth.movementExcludedAssetCount)}>
-                  {movementReady
-                    ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount)
-                    : movementPendingReason(data)}
+                <p className={styles.evidenceIntro}>평가액의 변화를 가격과 환율로 나누어 확인합니다.</p>
+              </div>
+              <dl className={styles.metrics}>
+                <RailMetric label="평가액 변동" value={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"} tone={todayChangeKrw} />
+                <RailMetric label="가격 영향" value={movementReady ? formatSignedKrw(priceImpactKrw ?? 0) : "계산 대기"} tone={priceImpactKrw} />
+                <RailMetric label="환율 영향" value={formatSignedKrw(data.todayFxChangeKrw)} tone={data.todayFxChangeKrw} />
+                <RailMetric label="최대 기여" value={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} tone={topContributor?.dailyChangeKrw ?? null} />
+                <RailMetric label="시세 근거" value={`${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`} />
+                <RailMetric label="USD/KRW" value={data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"} />
+              </dl>
+              <div>
+                <FxImpactPopover compact basisDate={data.movementBaselineDate} impactKrw={data.todayFxChangeKrw} impactPct={fxImpactPct} points={data.fxTrend} />
+                <p className={`${styles.status} mt-3`}>
+                  {movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)}
                 </p>
-              </section>
-
-              <section className="varda-rail-section varda-home-history">
-                <PortfolioHistoryChart
-                  events={data.eventActivity.map((event) => ({
-                    id: event.id,
-                    eventDate: event.eventDate,
-                    eventType: event.eventType,
-                    accountLabel: event.accountLabel,
-                    assetName: event.assetName,
-                    ticker: event.ticker,
-                    amountKrw: event.amountKrw,
-                    quantityDelta: event.quantityDelta,
-                  }))}
-                  points={data.recentSnapshots}
-                />
-              </section>
-            </aside>
-          </div>
-
-          <footer className="varda-screen-footer">
-            <div className="varda-inline-actions" aria-label="빠른 작업">
-              <PortfolioRefreshButton autoSync={liveSyncEnabled} />
-              <Link className="varda-inline-action" href="/portfolio/holdings/new">
-                <Plus aria-hidden="true" size={15} strokeWidth={1.6} />
-                보유 종목 추가
+              </div>
+              </aside>
+              </PresentationDialog>
+              <Link className={styles.textLink} href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)}>
+                <Sigma aria-hidden="true" size={15} strokeWidth={1.6} /> 투입 금액 계산
               </Link>
-              <Link className="varda-inline-action" href={scopedHref("/additional-contribution", data.selectedScope.key)}>
-                <Sigma aria-hidden="true" size={15} strokeWidth={1.6} />
-                투입 금액 계산
-              </Link>
+              <Link className={styles.textLink} href={structureHref}>포트폴리오 구조 <ArrowUpRight aria-hidden="true" size={14} /></Link>
             </div>
             <p>
               USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}
@@ -215,23 +180,6 @@ export function PortfolioDashboard({
   );
 }
 
-function HeroMetric({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone: number | null;
-  value: string;
-}) {
-  return (
-    <div className="varda-hero-metric">
-      <dt>{label}</dt>
-      <dd className={toneClass(tone)} title={value}>{value}</dd>
-    </div>
-  );
-}
-
 function RailMetric({
   label,
   tone = null,
@@ -242,7 +190,7 @@ function RailMetric({
   value: string;
 }) {
   return (
-    <div className="varda-rail-metric">
+    <div className={styles.metric}>
       <dt>{label}</dt>
       <dd className={toneClass(tone)} title={value}>{value}</dd>
     </div>
@@ -285,8 +233,8 @@ function percentageOfPrevious(value: number | null, previousValue: number) {
   return (value / previousValue) * 100;
 }
 
-function scopedHref(path: string, selectedScopeKey: PortfolioAnalysisScopeKey) {
-  return buildPortfolioAnalysisScopeHref(path, selectedScopeKey);
+function scopedHref(path: string, selectedScopeKey: PortfolioAnalysisScopeKey, designPreview = false) {
+  return buildPortfolioAnalysisScopeHref(path, selectedScopeKey, designPreview ? { preview: "design" } : {});
 }
 
 function homeScopeLabel(scope: PortfolioAnalysisScope) {

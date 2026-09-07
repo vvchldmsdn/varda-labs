@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import {
   formatHistoryKrw,
@@ -11,8 +11,8 @@ import {
 import { HistoryPerformanceChart } from "@/components/history/history-performance-chart";
 import { HistorySnapshotRail } from "@/components/history/history-snapshot-rail";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
+import styles from "./history-modern.module.css";
 import {
-  historyPointMetric,
   historyPointsWithMetric,
   selectHistoryRange,
   summarizeHistoryRange,
@@ -38,15 +38,19 @@ const RANGE_OPTIONS: readonly Readonly<{
 export function HistoryTimeExplorer({
   model,
   scopeLabel,
+  details,
+  status,
 }: {
   model: HistoryOverviewModel;
   scopeLabel: string;
+  details?: ReactNode;
+  status?: ReactNode;
 }) {
   const returnAvailable = model.points.some(
     (point) => point.totalReturnPct !== null,
   );
   const [mode, setMode] = useState<HistoryExplorerMode>(
-    returnAvailable ? "return" : "value",
+    "value",
   );
   const [range, setRange] = useState<HistoryExplorerRange>("90D");
   const visiblePoints = useMemo(
@@ -60,10 +64,12 @@ export function HistoryTimeExplorer({
   const [selectedDate, setSelectedDate] = useState(
     model.points.at(-1)?.date ?? null,
   );
+  const [inspectedDate, setInspectedDate] = useState<string | null>(null);
   const selectedPoint =
     visiblePoints.find((point) => point.date === selectedDate) ??
     visiblePoints.at(-1) ??
     null;
+  const inspectedPoint = visiblePoints.find((point) => point.date === inspectedDate) ?? selectedPoint;
 
   if (model.status === "no_data") {
     return (
@@ -81,6 +87,7 @@ export function HistoryTimeExplorer({
   }
 
   function changeRange(nextRange: HistoryExplorerRange) {
+    setInspectedDate(null);
     const nextPoints = selectHistoryRange(model.points, nextRange);
     const nextMetricPoints = historyPointsWithMetric(nextPoints, mode);
     setRange(nextRange);
@@ -91,6 +98,7 @@ export function HistoryTimeExplorer({
 
   function changeMode(nextMode: HistoryExplorerMode) {
     if (nextMode === "return" && !returnAvailable) return;
+    setInspectedDate(null);
     const nextMetricPoints = historyPointsWithMetric(visiblePoints, nextMode);
     setMode(nextMode);
     setSelectedDate(
@@ -99,111 +107,57 @@ export function HistoryTimeExplorer({
   }
 
   return (
-    <section aria-labelledby="history-time-explorer-title" className="varda-history-explorer">
-      <div className="varda-history-heading">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-[11px] font-medium text-[var(--muted)]">
-              HISTORY
-            </p>
-            <span className="border border-[var(--line)] bg-[var(--wash)] px-2 py-1 text-[10px] font-medium text-[var(--muted)]">
-              실제 저장 기록
-            </span>
+    <section aria-labelledby="history-time-explorer-title" className={styles.explorer}>
+      <div className={styles.stageMain}>
+        <aside className={styles.hero} aria-label="선택한 저장일">
+          <div className={styles.heroNumbers}>
+            <p className={styles.heroDate}>{formatDate(inspectedPoint?.date ?? null)}</p>
+            <p className={styles.heroValue} data-history-inspected-value>{mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)}</p>
+            <p className={styles.heroCaption}>{mode === "value" ? "총평가액" : "저장 수익률"}<span className={tone(inspectedPoint?.movementKrw ?? null)}>이전 대비 {formatSignedKrw(inspectedPoint?.movementKrw ?? null)}</span></p>
           </div>
-          <h1 id="history-time-explorer-title" className="varda-page-title">
-            시간으로 보는 자산
-          </h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {scopeLabel} · {formatDate(selectedPoint?.date ?? null)}
-          </p>
-          <p
-            className={`varda-primary-number mt-5 ${
-              mode === "return"
-                ? tone(selectedPoint?.totalReturnPct ?? null)
-                : "text-[var(--ink)]"
-            }`}
-          >
-            {formatPrimaryMetric(selectedPoint, mode)}
-          </p>
-          <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-            {selectedPoint
-              ? `${historySourceLabel(selectedPoint.source)} · ${modeDescription(mode)}`
-              : "선택한 날짜의 저장 근거가 없습니다."}
-          </p>
+          <div className={styles.controls}>
+            <div className={styles.modeControls} aria-label="그래프 지표">
+              <ModeButton active={mode === "value"} label="평가액" onClick={() => changeMode("value")} />
+              <ModeButton active={mode === "return"} disabled={!returnAvailable} label="수익률" onClick={() => changeMode("return")} />
+            </div>
+            <div className={styles.periodControls} aria-label="조회 기간">
+              {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{option.label}</button>)}
+            </div>
+          </div>
+          <p className={styles.railNote}>{scopeLabel} · {rangeSummary.pointCount}개 저장점<br />저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다.</p>
+          {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{status}</div> : null}
+        </aside>
+        <div className={styles.plot}>
+          <div className={styles.chartTitle}>
+            <h2 id="history-time-explorer-title">{mode === "value" ? "자산의 흐름" : "수익률의 흐름"}</h2>
+            <p>날짜를 따라 탐색</p>
+          </div>
+          <div className="varda-history-canvas">
+            <HistoryPerformanceChart key={`${mode}-${range}`} mode={mode} onSelect={setSelectedDate} onInspect={setInspectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
+          </div>
         </div>
-
-        <RangeMetrics summary={rangeSummary} className="hidden md:grid" />
       </div>
-
-      <div className="varda-history-controls flex flex-col gap-5 border-b border-[var(--line)] py-5 sm:flex-row sm:items-center sm:justify-between">
-        <div
-          className="inline-flex w-fit border border-[var(--line)] bg-[var(--wash)] p-1"
-          aria-label="그래프 지표"
-        >
-          <ModeButton
-            active={mode === "value"}
-            label="평가액"
-            onClick={() => changeMode("value")}
-          />
-          <ModeButton
-            active={mode === "return"}
-            disabled={!returnAvailable}
-            label="수익률"
-            onClick={() => changeMode("return")}
-          />
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-5">
-          <div className="flex items-center gap-5" aria-label="조회 기간">
-            {RANGE_OPTIONS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={range === option.key}
-                className={`border-b py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
-                  range === option.key
-                    ? "border-[var(--ink)] text-[var(--ink)]"
-                    : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-                }`}
-                onClick={() => changeRange(option.key)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <PresentationDialog
-            description="선택 범위의 변화 요약, 날짜별 저장 근거와 저장된 위험 지표를 한곳에서 검토합니다."
-            label="계산 근거"
-            title="히스토리 계산 근거"
-            wide
-          >
+      <footer className={styles.stageFooter}>
+        <p>저장값 · 현금흐름 미보정</p>
+        <div>
+          <PresentationDialog label="날짜별 기록" title="날짜별 저장 기록">
+            <HistorySnapshotRail onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
+          </PresentationDialog>
+          <PresentationDialog label="기간 요약·근거" title="히스토리 계산 근거" description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." wide>
+            <dl className={styles.overview}>
+              <div><dt className={styles.label}>저장 수익률</dt><dd className={`${styles.value} ${tone(inspectedPoint?.totalReturnPct ?? null)}`}>{formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)}</dd><dd className={styles.note}>손익 {formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)}</dd></div>
+              <div><dt className={styles.label}>기간 평가액 변화</dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{formatSignedKrw(rangeSummary.changeKrw)}</dd><dd className={styles.note}>현금흐름 미보정</dd></div>
+              <div><dt className={styles.label}>기간 최대 낙폭</dt><dd className={`${styles.value} ${tone(rangeSummary.maxDrawdownPct)}`}>{formatSignedPercent(rangeSummary.maxDrawdownPct)}</dd><dd className={styles.note}>{formatDate(rangeSummary.maxDrawdownDate)}</dd></div>
+            </dl>
             <RangeMetrics summary={rangeSummary} className="grid" />
             <RangeSummary summary={rangeSummary} />
             <SelectedDayEvidence point={selectedPoint} />
-            <HistoryCalendar
-              onSelect={setSelectedDate}
-              points={visiblePoints}
-              selectedDate={selectedPoint?.date ?? null}
-            />
-            {model.riskPointCount > 0 ? (
-              <StoredRiskHistory points={visiblePoints} />
-            ) : null}
+            <HistoryCalendar onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
+            {model.riskPointCount > 0 ? <StoredRiskHistory points={visiblePoints} /> : null}
           </PresentationDialog>
+          {details}
         </div>
-      </div>
-
-      <div className="varda-history-canvas">
-        <HistoryPerformanceChart
-          mode={mode}
-          onSelect={setSelectedDate}
-          points={visiblePoints}
-          selectedDate={selectedPoint?.date ?? null}
-        />
-        <HistorySnapshotRail
-          onSelect={setSelectedDate}
-          points={visiblePoints}
-          selectedDate={selectedPoint?.date ?? null}
-        />
-      </div>
+      </footer>
     </section>
   );
 }
@@ -260,9 +214,9 @@ function ModeButton({
     <button
       type="button"
       aria-pressed={active}
-      className={`min-w-20 px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`min-h-10 min-w-20 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40 ${
         active
-          ? "bg-[var(--ink)] text-white"
+          ? "bg-[var(--ink)] text-[var(--paper)]"
           : "text-[var(--muted)] hover:text-[var(--ink)]"
       }`}
       disabled={disabled}
@@ -644,19 +598,6 @@ function movementColor(point: HistoryOverviewPoint, maxMovement: number) {
   if (intensity > 0.66) return "var(--negative-mid)";
   if (intensity > 0.33) return "var(--warning-soft)";
   return "var(--warning-soft)";
-}
-
-function formatPrimaryMetric(
-  point: HistoryOverviewPoint | null,
-  mode: HistoryExplorerMode,
-) {
-  if (!point) return "기록 없음";
-  if (mode === "value") return formatHistoryKrw(point.valueKrw);
-  return formatSignedPercent(historyPointMetric(point, mode));
-}
-
-function modeDescription(mode: HistoryExplorerMode) {
-  return mode === "value" ? "저장 평가액 기준" : "저장된 총 수익률 기준";
 }
 
 function eventTypeLabel(event: HistoryOverviewEvent) {

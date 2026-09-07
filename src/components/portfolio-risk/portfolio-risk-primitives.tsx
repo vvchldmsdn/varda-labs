@@ -37,9 +37,9 @@ export function RiskSummaryCard({
   detail?: string | null;
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-[var(--line)] bg-white px-3 py-3">
+    <div className="min-w-0 border-l border-[var(--line)] px-4 py-2">
       <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
-      <p className="mt-1 break-words text-lg font-semibold tracking-normal text-[var(--ink)]">
+      <p className="mt-2 break-words text-2xl font-medium tracking-tight tabular-nums text-[var(--ink)]">
         {value}
       </p>
       {detail ? (

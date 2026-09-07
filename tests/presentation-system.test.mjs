@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 const read = (path) => readFileSync(path, "utf8");
 const css = read("src/app/presentation.css");
+const modernCss = read("src/app/modern.css");
 const color = (name) => css.match(new RegExp(`--${name}: (#[0-9a-f]{6})`))[1];
 function luminance(hex) {
   const rgb = hex
@@ -20,7 +21,7 @@ function contrast(first, second) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-describe("presentation design system", () => {
+describe("simple modern design system", () => {
   it("uses complete available funds for the contribution diagram and its denominator", () => {
     const result = read(
       "src/components/additional-contribution/additional-contribution-result.tsx",
@@ -38,11 +39,12 @@ describe("presentation design system", () => {
   });
   it("keeps movement amounts unbroken and stacks the value bridge on mobile", () => {
     const today = read("src/components/today-movement.tsx");
-    assert.match(today, /varda-value-bridge/);
-    assert.match(today, /whitespace-nowrap text-xl/);
+    assert.match(today, /MovementBridge/);
+    const overviewCss = read("src/components/home/portfolio-overview.module.css");
+    assert.match(overviewCss, /\.bridgeStep dd[^}]*white-space: nowrap/s);
     assert.match(
-      css,
-      /\.varda-value-bridge\s*\{[^}]*grid-template-columns: 1fr/s,
+      overviewCss,
+      /\.bridge\s*\{[^}]*grid-template-columns: 1fr/s,
     );
   });
   it("loads Tailwind and the presentation tokens directly from the root layout", () => {
@@ -51,8 +53,9 @@ describe("presentation design system", () => {
     assert.match(layout, /import "\.\/presentation\.css"/);
     assert.doesNotMatch(read("src/app/globals.css"), /@import.*presentation/);
   });
-  it("uses a restrained dark canvas with readable text and signed values", () => {
-    assert.ok(luminance(color("paper")) < luminance(color("surface")));
+  it("uses a light canvas with readable text and signed values", () => {
+    assert.ok(luminance(color("paper")) > 0.8);
+    assert.ok(luminance(color("surface")) > luminance(color("paper")));
     for (const name of [
       "ink",
       "muted",
@@ -82,10 +85,10 @@ describe("presentation design system", () => {
     }
   });
   it("uses the compact shared logo and preserves primary navigation", () => {
-    const source = read("src/components/portfolio-primary-navigation.tsx");
-    assert.match(source, /VARDA-LABS/);
+    const source = read("src/components/app-navigation.tsx");
+    assert.match(source, /VARDA/);
     assert.match(source, /varda-mark\.png/);
-    assert.match(source, /width=\{24\} height=\{24\}/);
+    assert.match(source, /buildPortfolioAnalysisScopeHref/);
     assert.match(source, /aria-current/);
     assert.match(css, /prefers-reduced-motion/);
   });
@@ -113,34 +116,14 @@ describe("presentation design system", () => {
       assert.match(source, /varda-dialog/);
     }
   });
-  it("keeps primary analysis routes inside a fixed presentation viewport", () => {
-    assert.match(
-      css,
-      /\.varda-presentation-page\s*\{[^}]*height: 100dvh;[^}]*overflow: hidden;/s,
-    );
-    assert.match(
-      css,
-      /\.varda-presentation-content\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;/s,
-    );
-    assert.match(
-      css,
-      /\.varda-workspace-panel\s*\{[^}]*overflow: hidden;/s,
-    );
-    assert.match(
-      css,
-      /\.varda-presentation-dialog-content\s*\{[^}]*overflow: auto;/s,
-    );
-    assert.match(
-      css,
-      /@media \(max-width: 760px\)[\s\S]*\.varda-workspace-shell\s*\{[^}]*flex: none;[^}]*overflow: visible;/,
-    );
-    for (const file of [
-      "investment-lab/investment-lab-view",
-      "investment-lab/investment-lab-design-preview",
-      "simulation/simulation-input-readiness-view",
-    ]) {
-      assert.match(read(`src/components/${file}.tsx`), /varda-workspace-shell/);
-    }
+  it("allows document scrolling and preserves mobile navigation", () => {
+    assert.match(modernCss, /min-height: 100dvh; height: auto; overflow: visible/);
+    assert.match(modernCss, /@media \(max-width: 760px\)/);
+    const navigation = read("src/components/app-navigation.tsx");
+    assert.match(navigation, /aria-label="메뉴 열기"/);
+    assert.match(navigation, /<dialog/);
+    assert.match(navigation, /showModal/);
+    assert.match(navigation, /메뉴 닫기/);
   });
   it("keeps related primary information together instead of hiding it in scene tabs", () => {
     for (const file of [
@@ -151,7 +134,7 @@ describe("presentation design system", () => {
       "history/history-view",
     ]) {
       const source = read(`src/components/${file}.tsx`);
-      assert.match(source, /varda-screen/);
+      assert.match(source, /PortfolioPrimaryNavigation/);
       assert.doesNotMatch(source, /<PresentationDeck/, file);
     }
 
@@ -167,15 +150,6 @@ describe("presentation design system", () => {
     assert.match(dialog, /<dialog/);
     assert.match(dialog, /showModal/);
     assert.match(dialog, /document\.body\.style\.overflow = "hidden"/);
-
-    for (const file of [
-      "today-movement",
-      "history/history-time-explorer",
-      "portfolio/portfolio-structure-view",
-      "investment-lab/investment-lab-disclosure",
-    ]) {
-      assert.doesNotMatch(read(`src/components/${file}.tsx`), /<details/);
-    }
 
     assert.match(css, /@keyframes varda-dialog-in/);
     assert.match(css, /@keyframes varda-drawer-in/);

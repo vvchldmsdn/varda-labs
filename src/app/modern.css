@@ -1,0 +1,161 @@
+/* Paper, ink and one intentional accent. Views own their primary visual. */
+:root { --sidebar-width: 96px; --motion-ease: cubic-bezier(.22, 1, .36, 1); }
+html { color-scheme: light; scroll-padding-top: 30px; }
+body { font-size: 14px; line-height: 1.6; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+:where(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
+:where(h1, h2, h3, p, dt, label) { word-break: keep-all; }
+.varda-app-navigation { position: relative; flex: none; z-index: 45; min-width: 0; }
+.varda-page:has(.varda-app-navigation), .varda-secondary-page:has(.varda-app-navigation) { padding: 0 0 40px var(--sidebar-width); min-height: 100dvh; height: auto; overflow: visible; display: block; }
+.varda-sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width); padding: 30px 8px 18px; display: flex; flex-direction: column; background: var(--paper); border-right: 1px solid var(--line); z-index: 50; overflow-y: auto; scrollbar-width: none; }
+.varda-sidebar-brand { display: flex; align-items: center; flex-direction: column; gap: 8px; margin-bottom: 38px; }
+.varda-sidebar-brand img { width: 29px; height: 29px; filter: brightness(.16) saturate(0); }
+.varda-sidebar-brand span { font-size: 9px; letter-spacing: .21em; font-weight: 750; }
+.varda-sidebar-groups { display: grid; gap: 15px; }
+.varda-sidebar-group > p { display: none; }
+.varda-sidebar-link { position: relative; display: flex; align-items: center; flex-direction: column; gap: 7px; padding: 12px 2px; margin: 3px 0; min-height: 62px; font-size: 10px; color: var(--muted); transition: color 180ms, transform 180ms var(--motion-ease); }
+.varda-sidebar-link::before { content: ""; position: absolute; left: 1px; top: 23px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); transform: scale(0); transition: transform 240ms var(--motion-ease); }
+.varda-sidebar-link:hover { color: var(--ink); transform: translateY(-2px); }
+.varda-sidebar-link[aria-current="page"] { color: var(--ink); font-weight: 700; }
+.varda-sidebar-link[aria-current="page"]::before { transform: scale(1); }
+.varda-sidebar-link[aria-current="page"] svg { stroke-width: 2; }
+.varda-sidebar-bottom { margin-top: auto; padding-top: 28px; }
+.varda-sidebar-account { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 16px 0 0; border-top: 1px solid var(--line); font-size: 10px; color: var(--muted); }
+.varda-preview-label { display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 9px; color: var(--muted); padding-bottom: 15px; }
+.varda-preview-label i, .varda-topbar-preview i { display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.varda-topbar { min-height: 80px; padding: 0 52px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.varda-topbar-location, .varda-topbar-actions { display: flex; align-items: center; gap: 18px; font-size: 11px; }
+.varda-topbar-location strong { font-size: 11px; font-weight: 500; }
+.varda-breadcrumb { color: var(--muted); font-size: 9px; letter-spacing: .12em; }
+.varda-breadcrumb-slash { color: #b9bab4; }
+.varda-updated-at { color: var(--muted); font-size: 10px; }
+.varda-topbar-add { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 7px 0 7px 12px; font-size: 11px; }
+.varda-topbar-add:hover { color: var(--brand); }
+.varda-topbar-preview { display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--muted); }
+.varda-mobile-menu-button, .varda-mobile-bottom, .varda-mobile-brand { display: none; }
+.varda-content-anchor { display: block; width: 0; height: 0; scroll-margin-top: 20px; }
+.varda-nav-placeholder { height: 80px; }
+.varda-skip-link { position: fixed; top: -80px; left: 116px; padding: 10px 20px; background: var(--ink); color: white; border-radius: 24px; z-index: 100; }
+.varda-skip-link:focus { top: 12px; }
+.varda-mobile-menu { width: min(420px, 100vw); height: 100dvh; max-height: 100dvh; max-width: none; margin: 0 0 0 auto; border: 0; border-left: 1px solid var(--line); border-radius: 0; padding: 0; overscroll-behavior: contain; background: var(--paper); }
+.varda-mobile-menu-inner { padding: 24px; }
+.varda-mobile-menu-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+.varda-mobile-menu-heading .varda-wordmark { font-size: 15px; letter-spacing: .12em; }
+.varda-mobile-menu .varda-sidebar-groups { gap: 28px; }
+.varda-mobile-menu .varda-sidebar-group > p { display: block; font-size: 10px; letter-spacing: .04em; color: var(--muted); padding: 0 10px 10px; }
+.varda-mobile-menu .varda-sidebar-link { flex-direction: row; gap: 18px; font-size: 16px; padding: 12px 14px; min-height: 52px; }
+.varda-mobile-menu .varda-sidebar-link::before { left: 0; top: 25px; }
+.varda-menu-account { display: flex; align-items: center; gap: 16px; padding: 22px 14px; margin-top: 28px; border-top: 1px solid var(--line); }
+.varda-menu-account svg:last-child { margin-left: auto; }
+.varda-mobile-menu::backdrop { background: #20211f3d; backdrop-filter: blur(5px); }
+html:has(.varda-mobile-menu[open]) { overflow: hidden; }
+.varda-content, .varda-presentation-content { max-width: 1450px; padding: 25px 52px 44px; margin-inline: auto; width: 100%; min-width: 0; min-height: 0; overflow: visible; }
+.varda-presentation-page { height: auto; min-height: 100dvh; overflow: visible; }
+.varda-presentation-content { flex: auto; }
+.varda-screen { height: auto; min-height: 0; overflow: visible; gap: 30px; }
+.varda-screen-header { gap: 20px 28px; align-items: center; }
+.varda-screen-heading { padding-block: 0; }
+.varda-screen-title-row { align-items: center; }
+.varda-page-title { font-size: clamp(28px, 2.8vw, 40px); font-weight: 650; letter-spacing: -.065em; line-height: 1.3; }
+.varda-kicker { color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .13em; }
+.varda-kicker + .varda-page-title { margin-top: 8px; }
+.varda-primary-number { font-size: clamp(42px, 5vw, 76px); font-weight: 600; letter-spacing: -.065em; }
+.varda-hero-strip { min-height: 128px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 22px 0 30px; }
+.varda-hero-value { padding: 0 28px 0 0; }
+.varda-hero-value strong { font-size: clamp(38px, 4.4vw, 64px); line-height: 1.1; font-weight: 650; letter-spacing: -.065em; white-space: normal; }
+.varda-hero-metrics { border-left: 1px solid var(--line); align-items: center; }
+.varda-hero-metric { padding: 6px 24px; gap: 8px; }
+.varda-hero-metric dd { font-size: clamp(20px, 2.1vw, 30px); font-weight: 550; letter-spacing: -.04em; }
+.varda-workspace-grid { grid-template-columns: minmax(0, 1.85fr) minmax(270px, 1fr); gap: 36px; flex: auto; overflow: visible; }
+.varda-main-visual { padding: 28px 0; border: 0; border-radius: 0; background: transparent; overflow: visible; min-width: 0; }
+.varda-context-rail { border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; padding: 20px 0 20px 30px; overflow: visible; }
+.varda-rail-section { padding: 0 0 24px; }
+.varda-rail-section + .varda-rail-section { padding-top: 24px; }
+.varda-rail-section:last-child { padding-bottom: 0; }
+.varda-screen-footer { border-top: 1px solid var(--line); font-size: 10px; gap: 16px; padding-top: 20px; }
+.varda-inline-action { min-height: 36px; color: var(--muted); font-size: 12px; }
+.varda-icon-button { min-width: 36px; min-height: 36px; border-radius: 50%; display: inline-grid; place-items: center; }
+.varda-action { min-height: 42px; border-radius: 28px; font-size: 12px; background: var(--ink); color: var(--surface); padding-inline: 22px; }
+.varda-segmented { padding: 3px; border-radius: 30px; background: var(--wash); }
+.varda-segmented button { min-height: 32px; font-size: 11px; border-radius: 24px; }
+.varda-segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px #20211f08; }
+.varda-page nav[aria-label="자산 분석 범위"] { border: 0; border-radius: 0; background: transparent !important; padding-bottom: 5px; }
+.varda-page nav[aria-label="자산 분석 범위"] a { position: relative; border-color: transparent; border-radius: 0; background: transparent; color: var(--muted); padding-block: 9px 15px; padding-inline: 3px; min-width: 50px; font-size: 13px; font-weight: 550; }
+.varda-page nav[aria-label="자산 분석 범위"] a[aria-current="page"] { color: var(--ink); background: transparent !important; }
+.varda-page nav[aria-label="자산 분석 범위"] a[aria-current="page"]::after { content: ""; position: absolute; bottom: 4px; left: calc(50% - 2.5px); width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.varda-dialog, .varda-presentation-dialog { border-radius: 22px; }
+.varda-dialog[open]::backdrop { background: #20211f3d; backdrop-filter: blur(5px); }
+.varda-detail-drawer { background: var(--surface); box-shadow: -15px 0 65px #20211f12; }
+.varda-detail-drawer-backdrop { background: #20211f3d; }
+.varda-secondary-page:has(.varda-app-navigation) > :not(.varda-app-navigation) { flex: auto; min-height: 0; overflow: visible; max-width: 1240px; margin: 32px auto 0; width: calc(100% - 104px); }
+.varda-secondary-page:has(.varda-app-navigation) section { border-radius: 0; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 28px 0; }
+.varda-secondary-page:has(.varda-app-navigation) section section { padding: 24px 0; border: 0; background: transparent; }
+.varda-secondary-page:has(.varda-app-navigation) h1 { font-size: 36px; font-weight: 650; letter-spacing: -.06em; }
+.varda-secondary-page:has(.varda-app-navigation) dl > div { border-radius: 0; padding: 15px 0; background: transparent; border: 0; }
+.varda-secondary-page:has(.varda-app-navigation) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) { border-radius: 8px; min-height: 44px; background: var(--surface); }
+.varda-secondary-page:has(.varda-app-navigation) :where(th) { background: transparent; color: var(--muted); font-size: 11px; padding-block: 14px; }
+.varda-secondary-page:has(.varda-app-navigation) :where(td) { padding-block: 18px; }
+.varda-management-intro { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 20px 0 34px; }
+.varda-management-intro p { color: var(--muted); font-size: 13px; margin-top: 12px; }
+.varda-management-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 60px; }
+.varda-management-section { border-top: 1px solid var(--line); padding: 24px 0 0; }
+.varda-management-section h2 { font-size: 19px; font-weight: 600; margin-bottom: 18px; letter-spacing: -.035em; }
+.varda-management-link { display: flex; align-items: center; gap: 18px; padding: 21px 0; border-bottom: 1px solid var(--line); transition: padding 200ms var(--motion-ease); }
+.varda-management-link > svg:first-child { color: var(--ink); flex: none; }
+.varda-management-link > span { flex: 1; font-size: 14px; font-weight: 550; }
+.varda-management-link small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.varda-management-link:hover { color: var(--brand); padding-left: 8px; }
+.varda-management-link > svg:last-child { color: var(--muted); transition: transform 200ms var(--motion-ease); }
+.varda-management-link:hover > svg:last-child { transform: translateX(5px); color: var(--brand); }
+.varda-management-note { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; padding-top: 18px; }
+@media (max-width: 1180px) {
+  :root { --sidebar-width: 80px; }
+  .varda-content, .varda-presentation-content { padding: 26px 32px 40px; }
+  .varda-topbar { padding-inline: 32px; }
+  .varda-screen-header { grid-template-columns: 1fr; gap: 16px; }
+  .varda-workspace-grid { grid-template-columns: minmax(0, 1fr); }
+  .varda-context-rail { border-left: 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding-left: 0; }
+  .varda-rail-section + .varda-rail-section { padding-top: 0; }
+  .varda-hero-strip { grid-template-columns: 1fr; gap: 24px; }
+  .varda-hero-metrics { border-left: 0; border-top: 1px solid var(--line); padding-top: 22px; }
+  .varda-hero-metric:first-child { padding-left: 0; }
+}
+@media (max-width: 760px) {
+  :root { --sidebar-width: 0px; }
+  .varda-sidebar { display: none; }
+  .varda-page:has(.varda-app-navigation), .varda-secondary-page:has(.varda-app-navigation) { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
+  .varda-topbar { min-height: 68px; padding-inline: 22px; gap: 8px; }
+  .varda-topbar-location, .varda-topbar-actions { gap: 13px; }
+  .varda-mobile-brand { display: block; font-size: 15px; font-weight: 750; letter-spacing: .25em; }
+  .varda-mobile-menu-button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
+  .varda-breadcrumb, .varda-breadcrumb-slash, .varda-updated-at, .varda-topbar-location strong { display: none; }
+  .varda-topbar-add { min-height: 36px; padding: 8px; }
+  .varda-topbar-add span { display: none; }
+  .varda-topbar-preview { font-size: 9px; }
+  .varda-mobile-bottom { position: fixed; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; inset: auto 0 0; padding: 11px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(16px); z-index: 50; }
+  .varda-mobile-bottom a { position: relative; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; font-size: 10px; font-weight: 500; color: var(--muted); }
+  .varda-mobile-bottom a[aria-current="page"] { color: var(--ink); font-weight: 700; }
+  .varda-mobile-bottom a[aria-current="page"] svg { stroke-width: 2; }
+  .varda-mobile-bottom a::after { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); opacity: 0; position: absolute; bottom: 0; }
+  .varda-mobile-bottom a[aria-current="page"]::after { opacity: 1; }
+  .varda-content, .varda-presentation-content { padding: 24px 22px 32px; }
+  .varda-screen { height: auto; overflow: visible; gap: 25px; }
+  .varda-screen-title-row { align-items: center; gap: 14px; }
+  .varda-page-title { font-size: 28px; }
+  .varda-hero-strip { padding: 20px 0; }
+  .varda-hero-value { padding: 0; }
+  .varda-hero-value strong { font-size: 48px; }
+  .varda-hero-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .varda-hero-metric { padding: 0 12px; gap: 8px; }
+  .varda-hero-metric dt { font-size: 10px; }
+  .varda-hero-metric dd { font-size: 18px; }
+  .varda-main-visual, .varda-context-rail { padding: 22px 0; }
+  .varda-context-rail { display: flex; flex-direction: column; gap: 20px; }
+  .varda-screen-footer { flex-direction: column; align-items: flex-start; }
+  .varda-secondary-page:has(.varda-app-navigation) > :not(.varda-app-navigation) { width: calc(100% - 44px); margin-top: 24px; }
+  .varda-secondary-page:has(.varda-app-navigation) section { padding: 22px 0; }
+  .varda-secondary-page:has(.varda-app-navigation) h1 { font-size: 28px; }
+  .varda-management-intro { align-items: flex-start; flex-direction: column; gap: 20px; padding-bottom: 20px; }
+  .varda-management-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .varda-skip-link { left: 16px; }
+}

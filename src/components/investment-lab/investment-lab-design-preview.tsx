@@ -7,6 +7,7 @@ import { InvestmentLabTimeMachine } from "./investment-lab-time-machine";
 import { InvestmentLabFixedMix } from "./investment-lab-fixed-mix";
 import { InvestmentLabEtfXray } from "./investment-lab-etf-xray";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
+import styles from "./investment-lab-modern.module.css";
 import {
   labKrw,
   labPercent,
@@ -22,7 +23,7 @@ export function InvestmentLabDesignPreview({
     buildInvestmentLabDesignPreview(query);
   return (
     <main
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
       data-lab-design-preview
     >
       <PortfolioPrimaryNavigation
@@ -30,21 +31,12 @@ export function InvestmentLabDesignPreview({
         generatedAt={dashboard.generatedAt}
         selectedScopeKey={dashboard.selectedScope.key}
       />
-      <div className="varda-content varda-presentation-content flex flex-col">
-        <header className="shrink-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--muted)]">
-            <p>PORTFOLIO / LAB</p>
-            <p>디자인 미리보기 · 예시 데이터</p>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-            <h1 className="varda-page-title">투자 랩</h1>
-            <InvestmentLabScopeTabs
-              scopes={dashboard.analysisScopes}
-              selectedScopeKey={dashboard.selectedScope.key}
-            />
-          </div>
+      <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
+        <header className={styles.stageHeader}>
+          <h1 className="varda-page-title">투자 랩</h1>
+          <InvestmentLabScopeTabs scopes={dashboard.analysisScopes} selectedScopeKey={dashboard.selectedScope.key} />
         </header>
-        <div className="varda-workspace-shell mt-5 min-h-0 flex-1 overflow-hidden">
+        <div className={styles.workspaceSlot}>
           <InvestmentLabWorkspace
             tools={
               <InvestmentLabPeriodSelector

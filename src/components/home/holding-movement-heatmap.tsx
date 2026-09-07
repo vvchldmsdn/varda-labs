@@ -4,6 +4,8 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import {
   useMemo,
+  useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -22,6 +24,7 @@ import type {
   PortfolioDashboardHoldingHistory,
 } from "@/lib/portfolio-dashboard-history";
 import { buildHoldingConnectionGraph } from "@/lib/holding-connection-graph";
+import styles from "@/components/home/portfolio-overview.module.css";
 
 type HeatmapMode = "movement" | "allocation" | "connections";
 
@@ -29,10 +32,12 @@ export function HoldingMovementHeatmap({
   history,
   riskHref,
   structureHref,
+  stage = false,
 }: {
   history: PortfolioDashboardHoldingHistory;
   riskHref: string;
   structureHref: string;
+  stage?: boolean;
 }) {
   const [mode, setMode] = useState<HeatmapMode>("movement");
   const [selection, setSelection] = useState<{ rowIndex: number; cellIndex: number } | null>(null);
@@ -46,15 +51,15 @@ export function HoldingMovementHeatmap({
   );
 
   return (
-    <section aria-labelledby="holding-heatmap-title" className="relative min-w-0">
-      <div className="mb-5 flex items-end justify-between gap-4">
+    <section aria-labelledby="holding-heatmap-title" className={stage ? styles.stageHeatmap : "relative min-w-0"}>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium text-[var(--muted)]">HOLDING PULSE</p>
-          <h2 id="holding-heatmap-title" className="mt-1 text-base font-semibold">
+          <h2 id="holding-heatmap-title" className={styles.panelTitle}>
             종목 흐름
           </h2>
+          <p className="mt-1.5 text-[11px] text-[var(--muted)]">날짜별 변동과 자산의 구성을 확인하세요.</p>
         </div>
-        <div className="flex gap-5 text-xs" aria-label="종목 흐름 보기 방식">
+        <div className={styles.chartRanges} aria-label="종목 흐름 보기 방식">
           <ModeButton active={mode === "movement"} onClick={() => setMode("movement")}>
             일별 변동
           </ModeButton>
@@ -67,9 +72,11 @@ export function HoldingMovementHeatmap({
         </div>
       </div>
 
+      <div className={stage ? styles.stageHeatmapViewport : undefined}>
       {mode === "movement" ? (
         <MovementMatrix
           history={history}
+          stage={stage}
           onSelect={(rowIndex, cellIndex) =>
             setSelection((current) =>
               current?.rowIndex === rowIndex && current.cellIndex === cellIndex
@@ -106,6 +113,7 @@ export function HoldingMovementHeatmap({
       {mode === "connections" ? (
         <ConnectionMap history={history} riskHref={riskHref} />
       ) : null}
+      </div>
 
       {mode === "movement" && selectedRow && selectedCell ? (
         <div className="varda-heatmap-popover" aria-live="polite">
@@ -294,11 +302,19 @@ function MovementMatrix({
   history,
   onSelect,
   selection,
+  stage = false,
 }: {
   history: PortfolioDashboardHoldingHistory;
   onSelect: (rowIndex: number, cellIndex: number) => void;
   selection: { rowIndex: number; cellIndex: number } | null;
+  stage?: boolean;
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (stage && viewport) viewport.scrollLeft = viewport.scrollWidth;
+  }, [stage, history.dates]);
+
   if (history.rows.length === 0 || history.dates.length === 0) {
     return (
       <div className="grid min-h-[310px] place-items-center border-y border-[var(--wash)] px-6 text-center">
@@ -311,16 +327,20 @@ function MovementMatrix({
   }
 
   const cellWidth = history.dates.length <= 20 ? 34 : 27;
-  const gridTemplateColumns = `minmax(174px, 214px) repeat(${history.dates.length}, ${cellWidth}px)`;
+  const gridTemplateColumns = stage
+    ? `minmax(118px, .26fr) repeat(${history.dates.length}, minmax(16px, 1fr))`
+    : `minmax(174px, 214px) repeat(${history.dates.length}, ${cellWidth}px)`;
 
   return (
-    <div className="overflow-x-auto pb-1" data-heatmap-grid>
+    <div className={stage ? styles.stageMatrix : "overflow-x-auto pb-1"} data-heatmap-grid>
+      <div className={stage ? styles.stageGridViewport : undefined} ref={viewportRef}>
       <div
-        className="min-w-max"
+        className={stage ? styles.stageMatrixGrid : "min-w-max"}
         style={{
           columnGap: "1px",
           display: "grid",
           gridTemplateColumns,
+          gridTemplateRows: stage ? `20px repeat(${history.rows.length}, minmax(32px, 1fr))` : undefined,
           rowGap: "2px",
         }}
       >
@@ -348,6 +368,7 @@ function MovementMatrix({
             selection={selection}
           />
         ))}
+      </div>
       </div>
       <div className="mt-3 flex items-center gap-3 text-[11px] text-[var(--faint)]">
         <span>하락</span>
@@ -384,7 +405,7 @@ function HeatmapRow({
 }) {
   return (
     <>
-      <div className="flex min-w-0 items-center pr-2 text-xs font-medium text-[var(--ink)]" title={row.name}>
+      <div className={styles.heatmapRowLabel} data-selected={selection?.rowIndex === rowIndex} title={row.name}>
         <span className="truncate">{row.name}</span>
       </div>
       {row.cells.map((cell, cellIndex) => {
@@ -398,9 +419,7 @@ function HeatmapRow({
             type="button"
             aria-label={`${row.name} ${formatDate(cell.date)} ${evidenceLabel}`}
             aria-pressed={selected}
-            className={`flex h-7 min-w-[27px] w-full items-center justify-center rounded-[5px] border border-white/30 text-[10px] font-semibold tabular-nums text-[var(--muted)] transition-[transform,box-shadow] hover:relative hover:z-10 hover:scale-[1.05] hover:shadow-[0_3px_8px_rgba(28,35,30,0.14)] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand)] ${
-              selected ? "ring-1 ring-[var(--brand)] ring-offset-1 ring-offset-[var(--paper)]" : ""
-            }`}
+            className={styles.heatmapCell}
             data-cell-index={cellIndex}
             data-heatmap-cell
             data-row-index={rowIndex}
@@ -415,7 +434,7 @@ function HeatmapRow({
               })
             }
             onClick={() => onSelect(rowIndex, cellIndex)}
-            style={heatmapStyle(cell)}
+            style={{ ...heatmapStyle(cell), "--cell-delay": `${Math.min((rowIndex + cellIndex) * 10, 320)}ms` } as CSSProperties}
             tabIndex={selected || (!selection && rowIndex === 0 && cellIndex === 0) ? 0 : -1}
             title={`${row.name}\n${formatDate(cell.date)}\n${evidenceLabel}`}
           >
@@ -477,11 +496,7 @@ function ModeButton({
     <button
       type="button"
       aria-pressed={active}
-      className={`border-b py-1 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
-        active
-          ? "border-[var(--ink)] text-[var(--ink)]"
-          : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-      }`}
+      className={styles.rangeButton}
       onClick={onClick}
     >
       {children}
@@ -509,7 +524,7 @@ function HeatmapDetail({
 function heatmapColor(cell: PortfolioDashboardHeatmapCell) {
   if (cell.changePct === null) return "var(--wash)";
   const alpha = Math.min(0.82, 0.22 + (Math.abs(cell.changePct) / 4) * 0.6);
-  if (cell.changePct > 0) return `color-mix(in srgb, var(--brand) ${(alpha * 100).toFixed(1)}%, transparent)`;
+  if (cell.changePct > 0) return `color-mix(in srgb, var(--accent) ${(alpha * 100).toFixed(1)}%, transparent)`;
   if (cell.changePct < 0) return `color-mix(in srgb, var(--negative) ${(alpha * 100).toFixed(1)}%, transparent)`;
   return "var(--wash)";
 }

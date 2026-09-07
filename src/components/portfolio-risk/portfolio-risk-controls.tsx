@@ -14,10 +14,12 @@ export function PortfolioRiskControls({
   scopes,
   selectedScope,
   selection,
+  isDesignPreview = false,
 }: {
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
   selection: PortfolioRiskSelection;
+  isDesignPreview?: boolean;
 }) {
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -26,6 +28,7 @@ export function PortfolioRiskControls({
         <PortfolioAnalysisScopeTabs
           basePath="/portfolio/risk"
           query={{
+            ...(isDesignPreview ? { preview: "design" } : {}),
             window:
               selection.window === 90 ? null : String(selection.window),
           }}
@@ -34,13 +37,13 @@ export function PortfolioRiskControls({
         />
       </div>
       <RiskOptionGroup label="기간">
-        {WINDOWS.map((window) => (
+        {(isDesignPreview ? [selection.window] : WINDOWS).map((window) => (
           <RiskOptionLink
             key={window}
-            href={buildPortfolioRiskHref(selectedScope.key, window)}
+            href={`${buildPortfolioRiskHref(selectedScope.key, window)}${isDesignPreview ? "&preview=design" : ""}`}
             active={selection.window === window}
           >
-            {window}일
+            {window}일{isDesignPreview ? " 예시" : ""}
           </RiskOptionLink>
         ))}
       </RiskOptionGroup>

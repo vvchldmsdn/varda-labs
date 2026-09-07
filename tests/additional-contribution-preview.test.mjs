@@ -161,6 +161,10 @@ describe("additional contribution tenant preview", () => {
       "src/components/additional-contribution/additional-contribution-page-view.tsx",
       "utf8",
     );
+    const calculator = readFileSync(
+      "src/components/additional-contribution/contribution-calculator.tsx",
+      "utf8",
+    );
     const proxy = readFileSync("src/proxy.ts", "utf8");
 
     for (const source of [
@@ -195,7 +199,9 @@ describe("additional contribution tenant preview", () => {
     assert.doesNotMatch(pageView, /^"use client";/);
     assert.doesNotMatch(pageView, /fetch\s*\(|\/api\//);
     assert.match(route, /searchParams: Promise/);
-    assert.match(pageView, /method="get"/);
+    assert.match(pageView, /ContributionCalculator/);
+    assert.match(calculator, /method="get"/);
+    assert.doesNotMatch(calculator, /fetch\s*\(|\/api\/|@\/db\//);
     assert.match(route, /resolveCurrentTenantContext/);
     assert.match(route, /if \(!resolution\.ok\)/);
     assert.match(route, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
@@ -206,7 +212,7 @@ describe("additional contribution tenant preview", () => {
       /getReadOnlyTenantAdditionalContributionPreviewForScope/,
     );
     assert.doesNotMatch(route, /resolveAdditionalContributionScope/);
-    assert.match(pageView, /name="scope"/);
+    assert.match(calculator, /name="scope"/);
     assert.doesNotMatch(
       proxy,
       /"\/additional-contribution(?:\/:path\*)?"/,

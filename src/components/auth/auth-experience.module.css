@@ -1,10 +1,8 @@
 .shell {
-  height: 100dvh;
-  min-height: 0;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: var(--paper);
+  background: var(--surface);
   color: var(--ink);
 }
 .header,
@@ -43,11 +41,24 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  align-content: center;
-  justify-items: center;
-  padding: 36px 24px 48px;
-  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  width: min(1200px, calc(100% - 96px));
+  margin: 12px auto 32px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  overflow: clip;
 }
+.introduction { align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding: 64px 54px; background: #f0f5f2; border-right: 1px solid var(--line); }
+.introEyebrow { font-size: 10px; letter-spacing: .12em; color: var(--brand); margin-bottom: 30px; }
+.introduction h2 { font-size: clamp(34px, 3.5vw, 48px); font-weight: 500; letter-spacing: -.07em; line-height: 1.45; }
+.introduction > p:not(.introEyebrow):not(.introSignature) { color: var(--muted); font-size: 14px; line-height: 1.9; margin-top: 24px; }
+.introFeatures { display: grid; gap: 18px; margin-top: 48px; }
+.introFeatures span { display: flex; gap: 12px; align-items: center; font-size: 12px; color: #536d60; }
+.introFeatures svg { color: var(--brand); stroke-width: 1.5; }
+.introSignature { margin-top: 64px; color: var(--muted); font-size: 9px; letter-spacing: .13em; }
+.formStage { min-width: 0; padding: 42px 48px; display: grid; justify-items: center; }
 .panel {
   width: min(100%, 416px);
   min-width: 0;
@@ -57,24 +68,25 @@
   min-width: 0;
 }
 .heading {
-  margin-bottom: 40px;
+  margin-bottom: 26px;
 }
 .eyebrow {
   font-size: 10px;
   color: var(--brand);
   font-weight: 600;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 .heading h1 {
-  font-size: 42px;
+  font-size: 30px;
   line-height: 1.25;
-  font-weight: 400;
+  font-weight: 550;
+  letter-spacing: -.045em;
   text-wrap: balance;
 }
 .description {
-  margin-top: 20px;
-  font-size: 15px;
-  line-height: 1.9;
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.8;
   color: var(--muted);
   text-wrap: pretty;
 }
@@ -86,11 +98,11 @@
 .secondaryButton {
   display: flex;
   width: 100%;
-  min-height: 54px;
+  min-height: 46px;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 14px 20px;
   font-size: 14px;
   font-weight: 500;
@@ -271,7 +283,7 @@
   padding: 14px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--ink);
   font-size: 16px;
 }
@@ -345,7 +357,7 @@
 }
 .socialButton {
   min-width: 0;
-  height: 88px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -353,7 +365,7 @@
   gap: 8px;
   padding: 12px 8px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   background: var(--surface);
   font-size: 12px;
   color: var(--ink);
@@ -467,6 +479,11 @@
   font-size: 12px;
   line-height: 1.8;
 }
+@media (max-width: 900px) {
+  .stage { grid-template-columns: minmax(0, 1fr); width: min(560px, calc(100% - 40px)); margin-block: 16px 32px; overflow: visible; }
+  .introduction { display: none; }
+  .formStage { padding: 32px; }
+}
 @media (max-width: 600px) {
   .header,
   .footer {
@@ -476,13 +493,19 @@
     min-height: 72px;
   }
   .stage {
-    padding: 44px 24px 60px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    width: 100%;
+    margin-top: 4px;
+    align-content: start;
   }
+  .formStage { padding: 24px; }
   .heading {
     margin-bottom: 32px;
   }
   .heading h1 {
-    font-size: 34px;
+    font-size: 28px;
   }
   .description {
     font-size: 14px;
@@ -506,4 +529,56 @@
   .secondaryButton {
     transition: none;
   }
+}
+
+/* Editorial sign-in: one quiet page and one interactive brand figure. */
+.shell { background: var(--paper); }
+.header { min-height: 96px; }
+.header :global(.varda-wordmark) { font-size: 14px; letter-spacing: .12em; }
+.header :global(.varda-wordmark img) { filter: brightness(.16) saturate(0); }
+.stage { width: min(1160px, calc(100% - 112px)); border: 0; border-radius: 0; background: transparent; overflow: visible; gap: 70px; margin-top: 16px; }
+.introduction { border: 0; background: transparent; padding: 30px 0; justify-content: flex-start; }
+.introEyebrow { margin-bottom: 22px; color: var(--muted); letter-spacing: .14em; }
+.introduction h2 { font-size: clamp(40px, 4.5vw, 64px); line-height: 1.2; font-weight: 650; letter-spacing: -.07em; }
+.introduction > p:not(.introEyebrow):not(.introSignature) { font-size: 13px; margin-top: 20px; }
+.introFeatures { grid-template-columns: 1fr; gap: 11px; margin-top: 16px; }
+.introFeatures span { color: var(--muted); font-size: 11px; }
+.introFeatures svg { color: var(--ink); width: 15px; height: 15px; }
+.introSignature { margin-top: 26px; font-size: 9px; }
+.formStage { padding: 36px 0 36px 56px; border-left: 1px solid var(--line); }
+.heading h1 { font-size: 34px; font-weight: 650; letter-spacing: -.055em; }
+.primaryButton { background: var(--ink); border-radius: 28px; }
+.primaryButton:hover { background: var(--brand); }
+.primaryButton:active, .secondaryButton:active, .socialButton:active { scale: .98; }
+.primaryButton, .secondaryButton, .socialButton { transition: background 180ms, color 180ms, border-color 180ms, scale 180ms; }
+.primaryButton[aria-busy="true"] { animation: varda-pending 900ms ease-in-out infinite; }
+.secondaryButton { border-radius: 28px; }
+.socialButton { background: transparent; border-radius: 10px; }
+.socialButton:hover:not(:disabled) { background: var(--surface); border-color: var(--ink); }
+.input, .emailForm .input { background: var(--surface); border-radius: 8px; }
+.orbit { width: min(100%, 350px); margin: 2px 0 0; aspect-ratio: 360 / 290; touch-action: pan-y; }
+.orbit svg { width: 100%; height: 100%; overflow: visible; }
+.orbitDots { color: var(--ink); transform: translate(var(--orbit-x, 0px), var(--orbit-y, 0px)); transition: transform 650ms var(--motion-ease); }
+.orbitDots circle { animation: varda-dot-in 650ms var(--motion-ease) both; transform-box: fill-box; transform-origin: center; }
+.orbitFocus { transform: translate(calc(var(--orbit-x, 0px) * -1), calc(var(--orbit-y, 0px) * -1)); transition: transform 900ms var(--motion-ease); }
+.orbitSatellite { transform: translate(calc(var(--orbit-x, 0px) * 1.8), calc(var(--orbit-y, 0px) * 1.8)); transition: transform 900ms var(--motion-ease); }
+@media (max-width: 1050px) {
+  .stage { gap: 40px; width: calc(100% - 80px); }
+  .formStage { padding-left: 36px; }
+}
+@media (max-width: 900px) {
+  .stage { width: min(560px, calc(100% - 48px)); margin: 26px auto; }
+  .formStage { padding: 16px 0; border-left: 0; }
+  .introduction { display: none; }
+}
+@media (max-width: 600px) {
+  .stage { width: calc(100% - 44px); margin-top: 16px; }
+  .header { min-height: 80px; padding-inline: 22px; }
+  .formStage { padding-top: 16px; }
+  .heading h1 { font-size: 32px; }
+  .description { font-size: 13px; }
+  .footer { padding-inline: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbitDots, .orbitFocus, .orbitSatellite { transform: none; }
 }

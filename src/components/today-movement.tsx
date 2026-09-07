@@ -1,4 +1,5 @@
 import Link from "next/link";
+import styles from "@/components/home/portfolio-overview.module.css";
 import type { ReactNode } from "react";
 
 import {
@@ -16,6 +17,7 @@ import {
   type TodayContributionDisplayRow,
 } from "@/components/today/today-contribution-explorer";
 import { SelectedHoldingHistoryChart } from "@/components/today/selected-holding-history-chart";
+import { HoldingDetailDrawer } from "@/components/today/holding-detail-drawer";
 import type {
   DashboardData,
   DashboardHolding,
@@ -38,9 +40,11 @@ import {
 
 export function TodayMovement({
   data,
+  designPreview = false,
   detailQuery = { holdingAccount: null, ticker: null, market: null },
 }: {
   data: DashboardData;
+  designPreview?: boolean;
   detailQuery?: TodayHoldingDetailQuery;
 }) {
   const movement = data.todayMovement;
@@ -61,7 +65,7 @@ export function TodayMovement({
           accountLabelByCode.get(holding.account) ?? holding.account,
         changeKrw: row.changeKrw,
         fxImpactKrw: row.fxChangeKrw,
-        href: todayHoldingDetailHref(data.selectedScope.key, holding),
+        href: previewHref(todayHoldingDetailHref(data.selectedScope.key, holding), designPreview),
         key: [
           holding.account,
           holding.market,
@@ -81,7 +85,7 @@ export function TodayMovement({
 
   return (
     <main
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
       data-page="today"
     >
       <PortfolioPrimaryNavigation
@@ -90,46 +94,71 @@ export function TodayMovement({
         selectedScopeKey={data.selectedScope.key}
       />
 
-      <div className="varda-content varda-presentation-content">
-        <div className="varda-screen">
-          <header className="varda-screen-header">
-            <div className="varda-screen-heading">
-              <div className="varda-screen-title-row">
-                <div>
-                  <p className="varda-kicker">PORTFOLIO / TODAY</p>
-                  <h1 id="today-movement-title" className="varda-page-title">오늘의 움직임</h1>
-                </div>
-                <p className="text-xs text-[var(--muted)]">기준일 {formatDate(data.movementBaselineDate)}</p>
-              </div>
-            </div>
-            <div className="varda-screen-scope">
-              <PortfolioAnalysisScopeTabs
-                basePath="/today"
-                query={detailQuery.ticker ? detailQuery : undefined}
-                scopes={[...data.analysisScopes].toSorted(compareTodayScope)}
-                selectedScopeKey={data.selectedScope.key}
-                variant="underline"
-              />
+      <div className="varda-content varda-presentation-content varda-stage-content">
+        <div className={styles.stage}>
+          <header className={styles.stageHeader}>
+            <h1 id="today-movement-title" className={styles.stageTitle}>오늘의 움직임</h1>
+            <div className={styles.stageScope}>
+            <PortfolioAnalysisScopeTabs
+              basePath="/today"
+              query={{ ...(detailQuery.ticker ? detailQuery : {}), ...(designPreview ? { preview: "design" } : {}) }}
+              scopes={[...data.analysisScopes].toSorted(compareTodayScope)}
+              selectedScopeKey={data.selectedScope.key}
+              variant="underline"
+            />
             </div>
           </header>
 
-          <section className="varda-hero-strip" aria-labelledby="today-movement-title">
-            <div className="varda-hero-value">
-              <span className="text-xs font-medium text-[var(--muted)]">
-                {scopeLabel(data.selectedScope)} 오늘 평가액 변동
-              </span>
+          <div className={styles.todayStageMain}>
+          <section className={styles.stageSummary} aria-labelledby="today-movement-title">
+            <div className={styles.balance}>
+              <span>{scopeLabel(data.selectedScope)} 오늘 평가액 변동</span>
               <strong className={toneClass(attribution.changeKrw)}>
                 {movement.ready ? formatSignedKrw(attribution.changeKrw) : "계산 대기"}
               </strong>
+              <p>변동률 <span className={toneClass(movement.returnPct)}>{formatPercent(movement.returnPct, true)}</span></p>
             </div>
-            <dl className="varda-hero-metrics">
-              <HeroFact label="변동률" value={formatPercent(movement.returnPct, true)} tone={movement.returnPct} />
-              <HeroFact label="가격 영향" value={formatSignedKrw(attribution.priceImpactKrw)} tone={attribution.priceImpactKrw} />
-              <HeroFact label="환율 영향" value={formatSignedKrw(attribution.fxImpactKrw)} tone={attribution.fxImpactKrw} />
+            <dl className={styles.summaryMetric}>
+              <dt>가격 영향</dt>
+              <dd className={toneClass(attribution.priceImpactKrw)}>{formatSignedKrw(attribution.priceImpactKrw)}</dd>
+              <dd className={styles.status}>보유 종목의 가격 변화</dd>
             </dl>
+            <dl className={styles.summaryMetric}>
+              <dt>환율 영향</dt>
+              <dd className={toneClass(attribution.fxImpactKrw)}>{formatSignedKrw(attribution.fxImpactKrw)}</dd>
+              <dd className={styles.status}>원화 환산 가치의 변화</dd>
+            </dl>
+          {!movement.ready ? (
+            <div className={`${styles.stageNote} ${styles.stageWarning} text-[var(--warning)]`}>
+              <p className="text-sm font-medium">{reasonLabel(movement.reason)}</p>
+              <p className="mt-2 text-xs leading-5">현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다.</p>
+            </div>
+          ) : (
+            <div className={styles.stageNote}>
+              <span>비교 기준</span>
+              <strong>{formatDate(data.movementBaselineDate)}</strong>
+              <p>{sourceLabel(movement.source)} · {rows.length}개 기여 근거</p>
+            </div>
+          )}
           </section>
 
-          <div className="varda-bridge-compact">
+          <section className={styles.stageContribution} aria-labelledby="contribution-title">
+            <div className={`${styles.panelHeader} ${styles.contributionHeader}`}>
+              <div>
+                <h2 id="contribution-title" className={styles.panelTitle}>종목별 기여</h2>
+                <p className={styles.evidenceIntro}>점의 길이는 실제 변동액에 비례합니다.</p>
+              </div>
+              <p className={styles.status}>절대 변동액 순 · {rows.length}개 종목</p>
+            </div>
+            <TodayContributionExplorer rows={rows} />
+          </section>
+          </div>
+
+          <footer className={styles.stageFooter}>
+          <div className={styles.stageLaunchers}>
+          <PresentationDialog label="변동 구성·계산 근거" title="오늘 변동의 구성과 근거" description="가격·환율·순매매를 실제 기준 가격과 현재 가격으로 비교합니다." wide>
+          <div className={styles.detailStack}>
+          <section aria-label="평가액 구성">
             <MovementBridge
               currentEvidenceKrw={attribution.currentEvidenceKrw}
               movementExcludedCurrentValueKrw={attribution.movementExcludedCurrentValueKrw}
@@ -138,71 +167,53 @@ export function TodayMovement({
               priceImpactKrw={attribution.priceImpactKrw}
               tradeFlowKrw={attribution.tradeFlowKrw}
             />
+          </section>
+
+          <div className={styles.todayEvidence}>
+            <div>
+              <h2 className={styles.panelTitle}>계산 근거</h2>
+              <p className={styles.evidenceIntro}>
+                {movement.contributionRows.length}개 기여 근거 · {formatDate(data.dataHealth.latestFxRateDate)} 환율
+              </p>
+            </div>
+            <dl className={styles.metrics}>
+              <RailEvidence label="기준 근거" value={sourceLabel(movement.source)} />
+              <RailEvidence label="현재가" value={formatCoverage(movement.coverage.currentCoveragePct)} />
+              <RailEvidence label="스냅샷" value={formatCoverage(movement.coverage.snapshotCoveragePct)} />
+              <RailEvidence label="USD/KRW" value={formatNumber(data.usdKrwRate)} />
+            </dl>
           </div>
 
-          <div className="varda-workspace-grid">
-            <section className="varda-main-visual varda-today-main" aria-labelledby="contribution-title">
-              <div className="mb-3 flex items-end justify-between gap-4">
-                <div>
-                  <p className="varda-kicker">MOVEMENT ATTRIBUTION</p>
-                  <h2 id="contribution-title" className="mt-1 text-lg font-medium">종목별 기여</h2>
-                </div>
-                <p className="text-[10px] text-[var(--muted)]">절대 변동액 순 · {rows.length}개 종목</p>
-              </div>
-              <TodayContributionExplorer rows={rows} />
-            </section>
-
-            <aside className="varda-context-rail" aria-label="오늘 변동 데이터 근거">
-              {!movement.ready ? (
-                <section className="varda-rail-section text-[var(--warning)]">
-                  <p className="text-sm font-medium">{reasonLabel(movement.reason)}</p>
-                  <p className="mt-2 text-xs leading-5">현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다.</p>
-                </section>
-              ) : null}
-              <section className="varda-rail-section">
-                <p className="varda-kicker">SOURCE EVIDENCE</p>
-                <h2 className="mt-1 text-sm font-medium">계산 근거</h2>
-                <dl className="varda-rail-metrics mt-3">
-                  <RailEvidence label="기준 근거" value={sourceLabel(movement.source)} />
-                  <RailEvidence label="현재가" value={formatCoverage(movement.coverage.currentCoveragePct)} />
-                  <RailEvidence label="스냅샷" value={formatCoverage(movement.coverage.snapshotCoveragePct)} />
-                  <RailEvidence label="USD/KRW" value={formatNumber(data.usdKrwRate)} />
-                </dl>
-                <p className="mt-3 text-[10px] leading-4 text-[var(--faint)]">
-                  {movement.contributionRows.length}개 기여 근거 · {formatDate(data.dataHealth.latestFxRateDate)} 환율
-                </p>
-              </section>
-              {movement.exclusions.length > 0 ? (
-                <section className="varda-rail-section">
-                  <PresentationDialog
-                    description="현재 변동 합계에서 제외된 항목과 그 이유를 원문 근거대로 표시합니다."
-                    label={`계산 제외 ${movement.exclusions.length}건`}
-                    title="변동 계산 제외 근거"
-                    wide
-                  >
-                    <div className="divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
-                      {movement.exclusions.map((row, index) => (
-                        <div key={`${row.subject}-${row.reason}-${row.holdingId ?? row.snapshotId ?? index}`} className="grid gap-1 py-3 text-sm sm:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto] sm:gap-5">
-                          <span className="font-medium">{row.assetName ?? row.ticker ?? row.subject}</span>
-                          <span className="text-[var(--muted)]">{reasonLabel(row.reason)}</span>
-                          <span className="text-[var(--muted)]">{row.account ?? sourceLabel(row.source)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </PresentationDialog>
-                </section>
-              ) : null}
-            </aside>
-          </div>
-
-          <footer className="varda-screen-footer">
+          <p className={styles.footer}>
             <span>평가액 변동 = 가격 영향 + 환율 영향</span>
             <span>순매매는 성과와 분리해 현재 비교 평가액에만 반영</span>
+          </p>
+          </div>
+          </PresentationDialog>
+          {movement.exclusions.length > 0 ? (
+            <PresentationDialog
+              description="현재 변동 합계에서 제외된 항목과 그 이유를 원문 근거대로 표시합니다."
+              label={`계산 제외 ${movement.exclusions.length}건`}
+              title="변동 계산 제외 근거"
+              wide
+            >
+              <div className="divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
+                {movement.exclusions.map((row, index) => (
+                  <div key={`${row.subject}-${row.reason}-${row.holdingId ?? row.snapshotId ?? index}`} className="grid gap-1 py-3 text-sm sm:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto] sm:gap-5">
+                    <span className="font-medium">{row.assetName ?? row.ticker ?? row.subject}</span>
+                    <span className="text-[var(--muted)]">{reasonLabel(row.reason)}</span>
+                    <span className="text-[var(--muted)]">{row.account ?? sourceLabel(row.source)}</span>
+                  </div>
+                ))}
+              </div>
+            </PresentationDialog>
+          ) : null}
+          </div>
+          <p>가격 영향 + 환율 영향 = 평가액 변동</p>
           </footer>
         </div>
-
         {hasHoldingDetail ? (
-          <HoldingDetailPanel data={data} detail={detail} selectedScopeKey={data.selectedScope.key} />
+          <HoldingDetailPanel data={data} designPreview={designPreview} detail={detail} selectedScopeKey={data.selectedScope.key} />
         ) : null}
       </div>
     </main>
@@ -234,82 +245,58 @@ function MovementBridge({
 
   return (
     <section aria-labelledby="movement-bridge-title">
-      <div className="mb-4 flex items-end justify-between gap-4">
+      <div className={styles.panelHeader}>
         <div>
-          <p className="text-[11px] font-medium text-[var(--muted)]">
-            VALUE BRIDGE
-          </p>
-          <h2 id="movement-bridge-title" className="mt-1 text-xl font-medium">
-            오늘 변동 구성
-          </h2>
+          <h2 id="movement-bridge-title" className={styles.panelTitle}>오늘 변동 구성</h2>
+          <p className={styles.evidenceIntro}>저장된 기준과 현재 근거 비교</p>
         </div>
-        <div className="hidden text-right text-xs text-[var(--muted)] sm:block">
-          <p>저장된 기준과 현재 근거 비교</p>
-          {movementExcludedCurrentValueKrw > 0 ? (
-            <p className="mt-1">
-              변동 제외 보유액 {formatKrw(movementExcludedCurrentValueKrw)} 정적
-              포함
-            </p>
-          ) : null}
-        </div>
+        {movementExcludedCurrentValueKrw > 0 ? (
+          <p className={styles.status}>변동 제외 보유액 {formatKrw(movementExcludedCurrentValueKrw)} 정적 포함</p>
+        ) : null}
       </div>
-      <div className="overflow-x-auto border-y border-[var(--line)]">
-        <div className="varda-value-bridge grid min-w-[1100px] grid-cols-5">
-          {steps.map((step, index) => (
-            <div
-              key={step.label}
-              className={`relative min-h-32 px-5 py-5 ${index > 0 ? "border-l border-[var(--wash)]" : ""}`}
-            >
-              <p className="text-xs text-[var(--muted)]">{step.label}</p>
-              <p
-                className={`mt-4 whitespace-nowrap text-xl font-medium tabular-nums ${step.signed ? toneClass(step.value) : "text-[var(--ink)]"}`}
-              >
-                {step.signed
-                  ? formatSignedKrw(step.value)
-                  : formatNullableKrw(step.value)}
-              </p>
-              {index < steps.length - 1 ? (
-                <span
-                  className="absolute -right-2.5 top-1/2 z-10 grid h-5 w-5 -translate-y-1/2 place-items-center bg-[var(--paper)] text-[var(--faint)]"
-                  aria-hidden="true"
-                >
-                  →
-                </span>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
+      <dl className={styles.bridge}>
+        {steps.map((step) => (
+          <div key={step.label} className={styles.bridgeStep}>
+            <dt>{step.label}</dt>
+            <dd className={step.signed ? toneClass(step.value) : "text-[var(--ink)]"}>
+              {step.signed ? formatSignedKrw(step.value) : formatNullableKrw(step.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
-
 function HoldingDetailPanel({
   data,
+  designPreview,
   detail,
   selectedScopeKey,
 }: {
   data: DashboardData;
+  designPreview: boolean;
   detail: TodayHoldingDetailResult;
   selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   if (detail.status === "empty") return null;
+  const clearHref = buildPortfolioAnalysisScopeHref("/today", selectedScopeKey, designPreview ? { preview: "design" } : {});
 
   if (detail.status === "not_found" || detail.status === "ambiguous") {
     return (
-      <section className="mt-10 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4 text-sm text-[var(--warning)]">
-        <p className="font-medium">
+      <HoldingDetailDrawer closeHref={clearHref}>
+      <section className="py-7 text-sm text-[var(--warning)]">
+        <h2 id="holding-detail-title" className="text-xl font-medium">
           {detail.status === "not_found"
             ? "선택한 종목을 찾지 못했습니다."
             : "같은 티커가 여러 계좌에 있어 계좌 선택이 필요합니다."}
-        </p>
+        </h2>
         {detail.status === "ambiguous" ? (
           <div className="mt-3 flex flex-wrap gap-4">
             {detail.candidates.map((candidate) => (
               <Link
                 key={`${candidate.account}-${candidate.market}-${candidate.ticker}`}
                 className="border-b border-[var(--warning)] pb-0.5 text-xs font-medium"
-                href={todayHoldingDetailHref(selectedScopeKey, candidate)}
+                href={previewHref(todayHoldingDetailHref(selectedScopeKey, candidate), designPreview)}
                 scroll={false}
               >
                 {candidate.name} · {candidate.account}
@@ -317,7 +304,9 @@ function HoldingDetailPanel({
             ))}
           </div>
         ) : null}
+        <Link className="mt-6 inline-flex border-b border-current pb-1" href={clearHref} scroll={false}>선택 해제</Link>
       </section>
+      </HoldingDetailDrawer>
     );
   }
 
@@ -344,17 +333,8 @@ function HoldingDetailPanel({
     ? selectTodayHoldingHistory(data.holdingHistory, historyHolding.id)
     : [];
 
-  const clearHref = buildPortfolioAnalysisScopeHref("/today", selectedScopeKey);
-
   return (
-    <>
-    <Link
-      aria-label="선택 종목 상세 닫기"
-      className="varda-detail-drawer-backdrop"
-      href={clearHref}
-      scroll={false}
-    />
-    <aside className="varda-detail-drawer" role="dialog" aria-labelledby="holding-detail-title">
+    <HoldingDetailDrawer closeHref={clearHref}>
     <section>
       <div className="flex flex-col justify-between gap-4 py-5 sm:flex-row sm:items-end">
         <div>
@@ -465,31 +445,13 @@ function HoldingDetailPanel({
         </DetailColumn>
       </div>
     </section>
-    </aside>
-    </>
-  );
-}
-
-function HeroFact({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone: number | null;
-  value: string;
-}) {
-  return (
-    <div className="varda-hero-metric">
-      <dt>{label}</dt>
-      <dd className={toneClass(tone)}>{value}</dd>
-    </div>
+    </HoldingDetailDrawer>
   );
 }
 
 function RailEvidence({ label, value }: { label: string; value: string }) {
   return (
-    <div className="varda-rail-metric">
+    <div className={styles.metric}>
       <dt>{label}</dt>
       <dd title={value}>{value}</dd>
     </div>
@@ -594,6 +556,10 @@ function reasonLabel(reason: string | null) {
 
 function formatNullableKrw(value: number | null) {
   return value === null ? "-" : formatKrw(value);
+}
+
+function previewHref(href: string, designPreview: boolean) {
+  return designPreview ? `${href}${href.includes("?") ? "&" : "?"}preview=design` : href;
 }
 
 function formatCoverage(value: number | null) {

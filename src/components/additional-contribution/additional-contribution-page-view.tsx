@@ -1,36 +1,19 @@
 import Link from "next/link";
-import { ChartNoAxesCombined, ListTree, RefreshCw, Target } from "lucide-react";
-
-import {
-  AdditionalContributionEvidenceScene,
-  AdditionalContributionFlowScene,
-  AdditionalContributionWeightScene,
-} from "@/components/additional-contribution/additional-contribution-result";
+import { ArrowUpRight, Target } from "lucide-react";
+import { AdditionalContributionAllocationTable, AdditionalContributionFlowScene, AdditionalContributionWeightScene } from "./additional-contribution-result";
+import { AdditionalContributionLogicDialog } from "./additional-contribution-logic-dialog";
+import { ContributionCalculator, ContributionFundingVisual } from "./contribution-calculator";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
-import {
-  buildPortfolioAnalysisScopeHref,
-  type PortfolioAnalysisScope,
-} from "@/lib/portfolio-analysis-scope";
+import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import styles from "./contribution-stage.module.css";
 
-const AMOUNT_PRESETS = [1_000_000, 3_000_000, 5_000_000, 10_000_000] as const;
+type BlockedPreview = Readonly<{ status: "blocked"; blockers: readonly string[] }>;
 
-type BlockedPreview = Readonly<{
-  status: "blocked";
-  blockers: readonly string[];
-}>;
-
-export function AdditionalContributionPageView({
-  amountKrw,
-  enableLivePriceSync = true,
-  generatedAt,
-  preview,
-  scopes,
-  selectedScope,
-}: {
+export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync = true, generatedAt, preview, scopes, selectedScope }: {
   amountKrw: number;
   enableLivePriceSync?: boolean;
   generatedAt: string;
@@ -38,129 +21,43 @@ export function AdditionalContributionPageView({
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
 }) {
+  const designQuery = enableLivePriceSync ? {} : { preview: "design" };
   return (
-    <main
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
-      data-page="additional-contribution"
-      data-preview-status={preview.status}
-    >
-      <PortfolioPrimaryNavigation
-        activePath="/additional-contribution"
-        generatedAt={generatedAt}
-        selectedScopeKey={selectedScope.key}
-      />
-
-      <div className="varda-content varda-presentation-content">
-        <div className="varda-screen">
-          <header className="varda-screen-header">
-            <div className="varda-screen-heading">
-              <div className="varda-screen-title-row">
-                <div>
-                  <p className="varda-kicker">PORTFOLIO / ADDITIONAL CONTRIBUTION</p>
-                  <h1 id="additional-contribution-title" className="varda-page-title">추가 투입</h1>
-                </div>
-                <p className="text-xs text-[var(--muted)]">실제 주문 전 읽기 전용 미리보기</p>
-              </div>
+    <main className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="additional-contribution" data-preview-status={preview.status}>
+      <PortfolioPrimaryNavigation activePath="/additional-contribution" generatedAt={generatedAt} selectedScopeKey={selectedScope.key} />
+      <div className={`varda-content varda-stage-content ${styles.page}`}>
+        <header className={styles.header}>
+          <div className={styles.title}><h1 id="additional-contribution-title">다음 투입의 균형.</h1>{!enableLivePriceSync ? <span className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다.">예시 데이터</span> : null}</div>
+          <div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/additional-contribution" query={{ amount: String(amountKrw), ...designQuery }} scopes={scopes} selectedScopeKey={selectedScope.key} variant="underline" /></div>
+          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)} title="목표비중 설정"><Target size={16} aria-hidden="true" /><span>목표비중</span><ArrowUpRight size={13} aria-hidden="true" /></Link></div>
+        </header>
+        <ContributionCalculator amountKrw={amountKrw} scopeKey={selectedScope.key} isDesignPreview={!enableLivePriceSync} status={preview.status} allocations={preview.status === "ready" ? <FeaturedAllocation preview={preview} /> : undefined}>
+          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span>배분의 시작은 목표비중에서</span><strong>계산 근거를<br />확인해 주세요.</strong><p>{preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."}</p></div>}
+        </ContributionCalculator>
+        <footer className={styles.footer}>
+          {preview.status === "ready" ? <>
+            <dl className={styles.footerNumbers}><div><dt>총 매수</dt><dd>{formatKrw(preview.totalAllocatedKrw)}</dd></div><div><dt>남는 현금</dt><dd>{formatKrw(preview.residualCashKrw)}</dd></div></dl>
+            <div className={styles.detailActions}>
+              <PresentationDialog label={`전체 ${preview.rows.length}종목 배분`} title="종목별 전체 배분안" description={`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`} wide><AdditionalContributionAllocationTable preview={preview} /><p className={styles.modalNote}>목표 부족분과 MA120 근거를 반영한 계산입니다. 남는 재원은 현금으로 유지됩니다. MA120 {preview.ma120Evidence.mode === "off" ? "미적용" : `${preview.ma120Evidence.usableCount}/${preview.rows.length}종목 근거 확보${preview.ma120Evidence.status === "ready" ? "" : " · 일부 근거 부족"}`}.</p><Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}>보유 종목 관리 <ArrowUpRight size={13} aria-hidden="true" /></Link></PresentationDialog>
+              <AdditionalContributionLogicDialog preview={preview} />
+              <PresentationDialog label="비중·자금 흐름" title="추가투입 전후 변화" wide><AdditionalContributionWeightScene preview={preview} /><AdditionalContributionFlowScene preview={preview} /></PresentationDialog>
             </div>
-            <div className="varda-screen-scope">
-              <PortfolioAnalysisScopeTabs
-                basePath="/additional-contribution"
-                query={{ amount: String(amountKrw) }}
-                scopes={scopes}
-                selectedScopeKey={selectedScope.key}
-                variant="underline"
-              />
-            </div>
-          </header>
-
-          <div className="varda-workspace-grid">
-            <div className="varda-main-visual varda-contribution-main">
-              {preview.status === "ready" ? (
-                <AdditionalContributionFlowScene preview={preview} />
-              ) : (
-                <BlockedPreview blockers={preview.blockers} />
-              )}
-            </div>
-
-            <aside className="varda-context-rail" aria-label="추가 투입 계산 제어">
-              <section className="varda-rail-section">
-                <p className="varda-kicker">CONTRIBUTION AMOUNT</p>
-                <h2 className="mt-1 text-sm font-medium">새로 투입할 금액</h2>
-                <form action="/additional-contribution" method="get" className="mt-5">
-                  <input type="hidden" name="scope" value={selectedScope.key} />
-                  <label className="sr-only" htmlFor="additional-contribution-amount">투입 금액</label>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 border-b border-[var(--line)] pb-2">
-                    <input
-                      id="additional-contribution-amount"
-                      aria-describedby="additional-contribution-amount-hint"
-                      className="min-w-0 border-0 bg-transparent py-1 text-right !text-3xl font-normal tabular-nums outline-none placeholder:text-[var(--line)] focus-visible:ring-0"
-                      defaultValue={amountKrw ? formatInputKrw(amountKrw) : ""}
-                      inputMode="numeric"
-                      name="amount"
-                      pattern="[0-9,]*"
-                      placeholder="0"
-                      required
-                      type="text"
-                    />
-                    <span className="pb-1 text-sm text-[var(--muted)]">원</span>
-                  </div>
-                  <button type="submit" className="varda-action mt-4 w-full">계산하기</button>
-                </form>
-                <p id="additional-contribution-amount-hint" className="mt-3 text-[10px] text-[var(--faint)]">
-                  {formatKrw(amountKrw)} · 만 원 단위 입력 권장
-                </p>
-                <nav aria-label="투입 금액 빠른 선택" className="mt-4 grid grid-cols-2 gap-2">
-                  {AMOUNT_PRESETS.map((preset) => (
-                    <Link
-                      key={preset}
-                      className={`min-h-8 border px-2 py-2 text-center text-[10px] font-medium ${amountKrw === preset ? "border-[var(--brand)] bg-[var(--brand-wash)] text-[var(--ink)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]"}`}
-                      href={buildPortfolioAnalysisScopeHref("/additional-contribution", selectedScope.key, { amount: String(preset) })}
-                    >
-                      {formatCompactKrw(preset)}
-                    </Link>
-                  ))}
-                </nav>
-              </section>
-
-              {preview.status === "ready" ? (
-                <section className="varda-rail-section">
-                  <p className="varda-kicker">CALCULATION VIEWS</p>
-                  <h2 className="mt-1 text-sm font-medium">배분안을 더 자세히 보기</h2>
-                  <div className="mt-4 grid gap-2">
-                    <PresentationDialog label="비중 변화" title="투입 전후 비중 변화" wide>
-                      <AdditionalContributionWeightScene preview={preview} />
-                    </PresentationDialog>
-                    <PresentationDialog label="계산 근거" title="추가 투입 계산 근거" wide>
-                      <AdditionalContributionEvidenceScene preview={preview} />
-                    </PresentationDialog>
-                  </div>
-                </section>
-              ) : null}
-            </aside>
-          </div>
-
-          <footer className="varda-screen-footer">
-            <div className="varda-inline-actions" aria-label="빠른 작업">
-              {enableLivePriceSync ? (
-                <PortfolioRefreshButton autoSync />
-              ) : (
-                <span className="varda-inline-action"><RefreshCw aria-hidden="true" size={15} />디자인 샘플 데이터</span>
-              )}
-              <Link className="varda-inline-action" href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)}>
-                <Target aria-hidden="true" size={15} />목표비중 확인
-              </Link>
-              <Link className="varda-inline-action" href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}>
-                <ListTree aria-hidden="true" size={15} />보유 종목 관리
-              </Link>
-            </div>
-            <span className="inline-flex items-center gap-2"><ChartNoAxesCombined aria-hidden="true" size={13} />계산 결과는 저장·주문하지 않음</span>
-          </footer>
-        </div>
+          </> : <><span className={styles.modalNote}>계산 결과만 제공하며 실제 주문은 실행하지 않습니다.</span><PresentationDialog label="계산 근거 확인" title="배분안을 계산할 수 없는 이유" wide><BlockedPreview blockers={preview.blockers} /></PresentationDialog></>}
+        </footer>
       </div>
     </main>
   );
 }
 
+function FeaturedAllocation({ preview }: { preview: AdditionalContributionResultPreview }) {
+  const ranked = preview.rows.filter(row => row.action !== "hold").toSorted((a,b) => Math.max(b.allocationKrw,b.trimAmountKrw) - Math.max(a.allocationKrw,a.trimAmountKrw));
+  const featured = ranked.slice(0,4);
+  return <div className={styles.featured}>
+    <div className={styles.featuredHeading}><span>ALLOCATION</span><h2>주요 배분</h2><p>금액 순 {featured.length}종목 · 전체 {preview.rows.length}종목</p></div>
+    <ul>{featured.map((row,index) => <li key={`${row.accountCode}:${row.ticker ?? row.name}:${index}`}><div><strong>{row.name}</strong><span>{row.accountName} · {row.currentWeightPct.toFixed(1)}% → {row.postTopupWeightPct.toFixed(1)}%</span></div><p data-action={row.action}><small>{row.action === "trim" ? "매도" : "매수"}</small>{formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}</p></li>)}</ul>
+    {featured.length === 0 ? <p className={styles.modalNote}>계산된 매수·매도 종목이 없습니다. 재원은 현금으로 유지합니다.</p> : null}
+  </div>;
+}
 function BlockedPreview({ blockers }: { blockers: readonly string[] }) {
   return (
     <section
@@ -218,18 +115,6 @@ function formatKrw(value: number) {
   return new Intl.NumberFormat("ko-KR", {
     style: "currency",
     currency: "KRW",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatCompactKrw(value: number) {
-  if (value >= 100_000_000) return `${value / 100_000_000}억원`;
-  if (value >= 10_000) return `${value / 10_000}만원`;
-  return `${value}원`;
-}
-
-function formatInputKrw(value: number) {
-  return new Intl.NumberFormat("ko-KR", {
     maximumFractionDigits: 0,
   }).format(value);
 }

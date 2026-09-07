@@ -104,26 +104,21 @@ export function SimulationInputReadinessView({
       data-page="simulation-input-readiness"
       data-runtime-trust-status={model.runtimeTrustStatus}
       data-end-query-status={model.endServiceDateSelection.status}
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
     >
       <PortfolioPrimaryNavigation
         activePath="/simulation"
         selectedScopeKey={selectedScopeKey}
         generatedAt={model.generatedAt}
       />
-      <div className="varda-content varda-presentation-content flex flex-col">
-        <header className="mb-3 shrink-0">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] text-[var(--faint)]">
-                PORTFOLIO / SIMULATION
-              </p>
-              <h1 className="varda-page-title">시뮬레이션 검증</h1>
-            </div>
+      <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
+        <header className={styles.stageHeader}>
+          <div className={styles.stageHeading}><h1 className="varda-page-title">시뮬레이션</h1>
             <SimulationDialog
               label="계산 조건"
               title="시뮬레이션 계산 조건"
               icon="calendar"
+              compactLabel
             >
               <SimulationDateControl />
               <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--muted)]">
@@ -144,12 +139,7 @@ export function SimulationInputReadinessView({
               </div>
             </SimulationDialog>
           </div>
-          <div className="mt-2">
-            <SimulationScopeTabs
-              scopes={scopeCatalog}
-              selectedScopeKey={selectedScopeKey}
-            />
-          </div>
+          <SimulationScopeTabs scopes={scopeCatalog} selectedScopeKey={selectedScopeKey} />
         </header>
         {model.endServiceDateSelection.status === "invalid" ? (
           <p
@@ -171,7 +161,7 @@ export function SimulationInputReadinessView({
             대체하지 않았습니다.
           </p>
         ) : null}
-        <div className="varda-workspace-shell min-h-0 flex-1 overflow-hidden">
+        <div className={styles.workspaceSlot}>
           <SimulationWorkspace
           tools={
             <ResearchHorizonSelector
@@ -183,7 +173,7 @@ export function SimulationInputReadinessView({
             />
           }
           paths={
-            <div id="simulation-current-result">{ownerResearchExecution}</div>
+            <div className={styles.currentResult} id="simulation-current-result">{ownerResearchExecution}</div>
           }
           weights={
             <div className={styles.details} id="simulation-weight-experiment">
@@ -350,7 +340,7 @@ export function SimulationInputReadinessView({
           }
           />
         </div>
-        <footer className="shrink-0 border-t border-[var(--line)] pt-2 text-[10px] leading-4 text-[var(--faint)]">
+        <footer className={styles.stageFootnote}>
           현재 구성 기준 연구 · 수수료·세금·현금수익률 미포함 · 결과는 수익
           보장, 추천 또는 주문 근거가 아닙니다.
         </footer>

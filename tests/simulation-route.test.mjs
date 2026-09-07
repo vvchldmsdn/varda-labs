@@ -335,7 +335,7 @@ describe("Simulation input readiness route boundary", () => {
     const proxy = read("src/proxy.ts");
     const dashboard = read("src/components/portfolio-dashboard.tsx");
     const primaryNavigation = read(
-      "src/components/portfolio-primary-navigation.tsx",
+      "src/components/app-navigation.tsx",
     );
     const smoke = read("scripts/smoke-simulation-route.mjs");
 

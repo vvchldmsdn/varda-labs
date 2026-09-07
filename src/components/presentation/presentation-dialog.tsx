@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Maximize2, X } from "lucide-react";
 
 export function PresentationDialog({
@@ -8,12 +8,14 @@ export function PresentationDialog({
   description,
   label,
   title,
+  triggerClassName,
   wide = false,
 }: {
   children: ReactNode;
   description?: string;
-  label: string;
+  label: ReactNode;
   title: string;
+  triggerClassName?: string;
   wide?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -34,10 +36,22 @@ export function PresentationDialog({
     dialogRef.current?.close();
   }
 
+  function keepFocusInside(event: KeyboardEvent<HTMLDialogElement>) {
+    if (event.key !== "Tab") return;
+    const controls = [...event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getClientRects().length > 0 && !element.closest("[inert]"));
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+
   return (
     <>
       <button
-        className="varda-presentation-detail-trigger"
+        className={`varda-presentation-detail-trigger ${triggerClassName ?? ""}`}
         onClick={() => {
           dialogRef.current?.showModal();
           setOpen(true);
@@ -55,6 +69,7 @@ export function PresentationDialog({
           if (event.target === event.currentTarget) close();
         }}
         onClose={() => setOpen(false)}
+        onKeyDown={keepFocusInside}
         ref={dialogRef}
       >
         <div className="varda-presentation-dialog-shell">
@@ -72,6 +87,7 @@ export function PresentationDialog({
             </div>
             <button
               aria-label="닫기"
+              autoFocus
               className="varda-icon-button"
               onClick={close}
               title="닫기"

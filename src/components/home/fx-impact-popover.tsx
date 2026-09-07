@@ -27,11 +27,13 @@ type PanelPosition = {
 
 export function FxImpactPopover({
   basisDate,
+  compact = false,
   impactKrw,
   impactPct,
   points,
 }: {
   basisDate: string | null;
+  compact?: boolean;
   impactKrw: number | null;
   impactPct: number | null;
   points: readonly DashboardFxTrendPoint[];
@@ -212,19 +214,20 @@ export function FxImpactPopover({
     <>
       <div
         ref={rootRef}
-        className="relative min-w-0 border-b border-[var(--wash)] sm:even:border-r sm:even:border-[var(--wash)] lg:border-b-0 lg:border-r lg:border-[var(--wash)]"
+        className={compact ? "relative min-w-0" : "relative min-w-0 border-b border-[var(--wash)] sm:even:border-r sm:even:border-[var(--wash)] lg:border-b-0 lg:border-r lg:border-[var(--wash)]"}
       >
         <button
           ref={triggerRef}
           type="button"
           aria-expanded={open}
           aria-haspopup="dialog"
-          className="block min-h-full w-full px-5 py-6 text-left transition-colors hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand)]"
+          className={compact ? "inline-flex min-h-9 items-center gap-2 text-xs font-medium text-[var(--brand)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]" : "block min-h-full w-full px-5 py-6 text-left transition-colors hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand)]"}
           onClick={() => {
             setPanelPosition(null);
             setOpen((value) => !value);
           }}
         >
+          {compact ? <>환율 추세 살펴보기 <span aria-hidden="true">↗</span></> : <>
           <span className="flex items-center justify-between gap-3 text-xs font-medium text-[var(--muted)]">
             환율 영향
             <span aria-hidden="true" className="text-base text-[var(--faint)]">↗</span>
@@ -235,6 +238,7 @@ export function FxImpactPopover({
           <span className="mt-2 block truncate text-xs text-[var(--muted)]">
             {formatPercent(impactPct, true)}
           </span>
+          </>}
         </button>
       </div>
       {panel}

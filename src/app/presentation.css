@@ -1,34 +1,35 @@
 :root {
-  --paper: #0b0d10;
-  --surface: #111419;
-  --surface-raised: #171b21;
-  --ink: #f4f6f8;
-  --muted: #9aa3ae;
-  --faint: #737d89;
-  --line: #2a3039;
-  --wash: #1a1f26;
-  --brand: #5d8fff;
-  --brand-mid: #386bd8;
-  --brand-soft: #25365e;
-  --brand-wash: #16213a;
-  --negative: #ff717b;
-  --negative-mid: #b84f59;
-  --negative-soft: #49252a;
-  --warning: #e2b66c;
-  --warning-soft: #4a3820;
-  --warning-wash: #251d13;
-  --secondary: #a98ee8;
-  --secondary-soft: #332a4b;
-  --chart-teal: #54c7ad;
+  --paper: #f7f7f5;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --ink: #20211f;
+  --muted: #6c6d68;
+  --faint: #6f706b;
+  --line: #e1e1dc;
+  --wash: #eeeee9;
+  --accent: #ef5a32;
+  --brand: #c64623;
+  --brand-mid: #ef5a32;
+  --brand-soft: #f3d3c6;
+  --brand-wash: #fbefea;
+  --negative: #3568ae;
+  --negative-mid: #7498c0;
+  --negative-soft: #dce5ef;
+  --warning: #8b681e;
+  --warning-soft: #e4d8b6;
+  --warning-wash: #f7f2e6;
+  --secondary: #6b6593;
+  --secondary-soft: #e8e5ee;
+  --chart-teal: #707d77;
   --brand-contrast: #ffffff;
   --background: var(--paper);
   --foreground: var(--ink);
-  --dialog-shadow: 0 32px 120px #00000080;
+  --dialog-shadow: 0 24px 80px #20211f1f;
 }
 
 @layer base {
   html {
-    color-scheme: dark;
+    color-scheme: light;
     scrollbar-gutter: stable;
   }
   body {
@@ -79,8 +80,8 @@
     box-shadow: var(--dialog-shadow);
   }
   dialog::backdrop {
-    background: #050607cc;
-    backdrop-filter: blur(10px);
+    background: #172b2955;
+    backdrop-filter: blur(3px);
   }
   :where([role="tooltip"]) {
     border: 1px solid var(--line);
@@ -524,11 +525,6 @@
 .varda-page [class*="bg-white/"],
 .varda-secondary-page [class*="bg-white/"] {
   background-color: color-mix(in srgb, var(--surface) 88%, transparent) !important;
-}
-.varda-page [class*="bg-[var(--ink)]"],
-.varda-secondary-page [class*="bg-[var(--ink)]"] {
-  background-color: var(--brand) !important;
-  color: var(--brand-contrast) !important;
 }
 .varda-screen {
   display: flex;

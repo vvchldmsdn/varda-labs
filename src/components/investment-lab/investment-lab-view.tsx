@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { InvestmentLabWorkspace } from "./investment-lab-workspace";
+import styles from "./investment-lab-modern.module.css";
 import { InvestmentLabScopeTabs } from "./investment-lab-scope-tabs";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
@@ -80,7 +81,7 @@ export function InvestmentLabView({
 
   return (
     <main
-      className="varda-page varda-presentation-page bg-[var(--paper)] text-[var(--ink)]"
+      className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
       data-applied-flows={periodReady ? model.coverage.appliedFlowRows : 0}
       data-account-composition-status={accountComposition.status}
       data-analysis-scope={selectedScope.key}
@@ -177,23 +178,14 @@ export function InvestmentLabView({
         selectedScopeKey={selectedScope.key}
       />
 
-      <div className="varda-content varda-presentation-content flex flex-col">
-        <header className="shrink-0">
-          <div className="flex items-center justify-between gap-5 text-[11px] text-[var(--muted)]">
-            <p>PORTFOLIO / LAB</p>
-            <p className="tabular-nums">분석 범위 {selectedScope.label}</p>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-            <h1 className="varda-page-title">투자 랩</h1>
-            <InvestmentLabScopeTabs
-              scopes={scopeCatalog}
-              selectedScopeKey={selectedScope.key}
-            />
-          </div>
+      <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
+        <header className={styles.stageHeader}>
+          <h1 className="varda-page-title">투자 랩</h1>
+          <InvestmentLabScopeTabs scopes={scopeCatalog} selectedScopeKey={selectedScope.key} />
         </header>
 
         <div
-          className="varda-workspace-shell mt-5 min-h-0 flex-1 overflow-hidden"
+          className={styles.workspaceSlot}
           id="investment-lab-results"
         >
           <InvestmentLabWorkspace

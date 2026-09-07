@@ -30,7 +30,7 @@ describe("analysis result journey navigation", () => {
     assert.match(view, /<InvestmentLabWorkspace/);
     assert.match(workspace, /data-lab-workspace="integrated"/);
     assert.match(workspace, /<dialog/);
-    assert.match(workspace, /varda-workspace-canvas.*\{comparison\}/s);
+    assert.match(workspace, /styles.canvas.*\{comparison\}/s);
     assert.doesNotMatch(workspace, /role="tablist"/);
     for (const target of targets) {
       assert.match(source, new RegExp(`id="${target}"`));
@@ -52,7 +52,7 @@ describe("analysis result journey navigation", () => {
     assert.match(view, /<SimulationWorkspace/);
     assert.match(workspace, /data-simulation-workspace="integrated"/);
     assert.match(workspace, /<dialog/);
-    assert.match(workspace, /varda-workspace-canvas.*\{paths\}/s);
+    assert.match(workspace, /styles.canvas.*\{paths\}/s);
     assert.doesNotMatch(workspace, /role="tablist"/);
     for (const target of targets) {
       assert.match(view, new RegExp(`id="${target}"`));

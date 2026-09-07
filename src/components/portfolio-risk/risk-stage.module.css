@@ -1,0 +1,54 @@
+.page { display:flex; flex-direction:column; gap:12px; }
+.header { display:flex; align-items:center; gap:27px; flex-shrink:0; min-height:55px; }
+.title { flex-shrink:0; }
+.title h1 { font-size:28px; font-weight:540; letter-spacing:-.05em; line-height:1.2; }
+.previewNote { display:block; font-size:9px; color:var(--muted); margin-top:6px; }
+.controls { flex:1; min-width:0; }
+.controls > div { margin:0; display:flex; align-items:center; justify-content:flex-end; gap:24px; }
+.controls > div > div:first-child { flex:1; min-width:0; }
+.controls > div > div > p { display:none; }
+.controls > div > div:last-child { flex:0 0 185px; }
+.controls > div > div:last-child > div { margin-top:0; flex-wrap:nowrap; min-height:34px; padding:3px; }
+.controls > div > div:last-child > div > a { flex:1; min-width:0; padding:6px; font-size:10px; white-space:nowrap; }
+.headerLink { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; white-space:nowrap; }
+.statusLine { display:flex; gap:8px 18px; align-items:center; color:var(--muted); font-size:9px; flex-shrink:0; }
+.statusLine strong { color:var(--brand); font-weight:500; }
+.notice { flex-shrink:0; }
+.notice:empty { display:none; }
+.notice > div { margin-top:0; font-size:11px; line-height:1.7; }
+.riskStage { display:grid; grid-template-columns:minmax(0,1fr) 180px; gap:30px; flex:1; min-height:0; }
+.matrix { display:flex; flex-direction:column; gap:12px; min-height:0; background:var(--surface); border-radius:24px; padding:22px 26px 15px; }
+.matrixHeading { display:flex; justify-content:space-between; align-items:baseline; gap:15px; flex-shrink:0; }
+.matrixHeading h2 { font-size:19px; font-weight:530; letter-spacing:-.035em; }
+.matrixHeading p { color:var(--muted); font-size:9px; }
+.compactMatrix { display:grid; grid-template-rows:auto auto minmax(0,1fr) auto; gap:7px; flex:1; min-height:0; }
+.compactMatrix [data-matrix-readout] { margin:0; gap:23px; min-height:42px; }
+.compactMatrix [data-matrix-readout] > strong { font-size:37px; }
+.compactMatrix [data-matrix-readout] > div > span { font-size:8px; }
+.compactMatrix [data-matrix-readout] p { font-size:12px; margin-top:3px; }
+.compactMatrix [data-matrix-readout] > span { font-size:9px; }
+.compactMatrix [data-matrix-pair] { margin:0; font-size:9px; }
+.compactMatrix [data-matrix-scroll] { min-height:0; height:100%; padding:1px 1px 4px; }
+.compactMatrix table { height:100%; border-spacing:3px; }
+.compactMatrix th { font-size:9px; height:22px; }
+.compactMatrix th:first-child { width:58px; }
+.compactMatrix td { height:auto; }
+.compactMatrix td > button { min-height:22px; height:100%; font-size:10px; }
+.compactMatrix [data-matrix-legend] { padding:2px 0 0; font-size:8px; }
+.compactMatrix [data-matrix-legend] small { font-size:8px; }
+.coreSummary { display:flex; flex-direction:column; justify-content:center; gap:32px; min-width:0; }
+.coreMetric dt { color:var(--muted); font-size:10px; }
+.coreMetric dd { margin-top:10px; font-size:33px; font-weight:450; letter-spacing:-.05em; font-variant-numeric:tabular-nums; }
+.coreMetric small { display:block; font-size:9px; color:var(--muted); line-height:1.7; margin-top:7px; letter-spacing:0; font-weight:400; }
+.emptyStage { display:flex; flex-direction:column; justify-content:center; min-height:0; flex:1; padding:28px; border-radius:24px; background:var(--surface); }
+.emptyStage h2 { font-size:26px; font-weight:500; letter-spacing:-.04em; }
+.emptyStage > p { color:var(--muted); font-size:12px; margin-top:12px; line-height:1.8; }
+.footer { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-shrink:0; min-height:42px; }
+.footer > span { color:var(--muted); font-size:9px; }
+.launchers { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.modalSection { margin-top:26px; padding-top:24px; border-top:1px solid var(--line); }
+@media (max-width:1180px) { .header { gap:18px; } .title h1 { font-size:25px; } .controls > div { gap:14px; } .controls > div > div:last-child { flex-basis:150px; } .riskStage { grid-template-columns:minmax(0,1fr) 155px; gap:22px; } .matrix { padding:20px; } .coreMetric dd { font-size:29px; } }
+@media (max-width:980px) { .header { flex-wrap:wrap; gap:5px 18px; } .title { flex:1; } .controls { flex-basis:100%; order:3; } .controls > div > div:last-child { flex-basis:160px; } .riskStage { grid-template-columns:minmax(0,1fr) 135px; gap:16px; } .coreMetric dd { font-size:25px; } .coreSummary { gap:25px; } }
+@media (max-width:760px) { .page { gap:9px; } .header { gap:3px 10px; } .title { display:flex; align-items:baseline; gap:10px; } .title h1 { font-size:23px; } .previewNote { font-size:8px; margin:0; } .controls > div { gap:8px; } .controls > div > div:last-child { flex-basis:110px; } .controls > div > div:last-child > div > a { font-size:9px; padding:6px 4px; } .headerLink { font-size:10px; } .statusLine { gap:7px 13px; font-size:8px; } .statusLine > span:last-child { display:none; } .riskStage { display:flex; flex-direction:column; gap:12px; } .matrix { flex:1; padding:16px 14px 11px; border-radius:20px; gap:8px; } .matrixHeading h2 { font-size:16px; } .matrixHeading p { font-size:8px; } .coreSummary { order:-1; flex-direction:row; justify-content:space-between; gap:14px; padding:2px 0; flex-shrink:0; } .coreMetric dt { font-size:8px; } .coreMetric dd { font-size:23px; margin-top:6px; } .coreMetric small { display:none; } .compactMatrix { gap:5px; } .compactMatrix [data-matrix-readout] { min-height:34px; gap:10px; } .compactMatrix [data-matrix-readout] > strong { font-size:30px; } .compactMatrix [data-matrix-readout] p { font-size:10px; } .compactMatrix [data-matrix-readout] > div > span { font-size:7px; } .compactMatrix [data-matrix-pair] { font-size:8px; gap:3px 6px; } .compactMatrix table { border-spacing:2px; } .compactMatrix th { font-size:7px; padding:0 1px; height:18px; } .compactMatrix th:first-child { width:41px; } .compactMatrix td > button { min-height:20px; font-size:8px; border-radius:4px; } .compactMatrix [data-matrix-legend] { font-size:7px; gap:3px; } .compactMatrix [data-matrix-legend] > i { width:50px; } .compactMatrix [data-matrix-legend] b { font-size:7px; margin-inline:3px; } .footer { justify-content:center; min-height:0; } .footer > span { display:none; } .launchers { justify-content:space-between; width:100%; gap:1px; } }
+@media (max-height:640px) { .riskStage { min-height:450px; flex:none; } }
+@media (max-height:640px) and (max-width:760px) { .riskStage { min-height:510px; } }

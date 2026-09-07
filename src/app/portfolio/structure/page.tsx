@@ -31,7 +31,7 @@ export default async function PortfolioStructurePage({
   ) {
     return (
       <PortfolioStructureView
-        data={buildPortfolioStructureDesignPreview(params.scope)}
+        data={{ ...buildPortfolioStructureDesignPreview(params.scope), isDesignPreview: true }}
       />
     );
   }

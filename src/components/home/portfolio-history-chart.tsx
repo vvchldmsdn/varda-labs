@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import styles from "@/components/home/portfolio-overview.module.css";
 
 import {
   formatDate,
@@ -50,6 +51,7 @@ export function PortfolioHistoryChart({
   events: readonly HistoryEvent[];
   points: readonly HistoryPoint[];
 }) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [range, setRange] = useState<RangeKey>("ALL");
   const visiblePoints = useMemo(() => pointsForRange(points, range), [points, range]);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -60,8 +62,9 @@ export function PortfolioHistoryChart({
     mobileIndex,
     Math.max(visiblePoints.length - 1, 0),
   );
-  const activePoint = hoveredIndex === null ? null : visiblePoints[hoveredIndex] ?? null;
-  const activeGeometry = hoveredIndex === null ? null : geometry.points[hoveredIndex] ?? null;
+  const markerIndex = hoveredIndex ?? selectedIndex ?? visiblePoints.length - 1;
+  const activePoint = visiblePoints[markerIndex] ?? null;
+  const activeGeometry = geometry.points[markerIndex] ?? null;
   const mobilePoint = visiblePoints[mobileActiveIndex] ?? null;
   const visibleEvents = groupedVisibleEvents(events, visiblePoints);
   const activeEvent = visibleEvents.find((event) => event.key === activeEventKey) ?? null;
@@ -71,26 +74,23 @@ export function PortfolioHistoryChart({
 
   return (
     <section aria-labelledby="portfolio-history-title" className="min-w-0">
-      <div className="mb-5 flex items-end justify-between gap-4">
+      <div className={styles.chartHeading}>
         <div>
-          <p className="text-[11px] font-medium text-[var(--muted)]">VALUE HISTORY</p>
-          <h2 id="portfolio-history-title" className="mt-1 text-base font-semibold">
+          <h2 id="portfolio-history-title" className={styles.panelTitle}>
             포트폴리오 흐름
           </h2>
+          <p className="mt-1.5 text-[11px] text-[var(--muted)]">저장된 실제 평가액 추이</p>
         </div>
-        <div className="flex items-center gap-5" aria-label="조회 기간">
+        <div className={styles.chartRanges} aria-label="조회 기간">
           {(["1M", "3M", "6M", "ALL"] as const).map((item) => (
             <button
               key={item}
               type="button"
               aria-pressed={range === item}
-              className={`min-h-10 border-b px-1 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] ${
-                range === item
-                  ? "border-[var(--ink)] text-[var(--ink)]"
-                  : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-              }`}
+              className={styles.rangeButton}
               onClick={() => {
                 setRange(item);
+                setSelectedIndex(null);
                 setHoveredIndex(null);
                 setActiveEventKey(null);
                 setMobileIndex(Math.max(pointsForRange(points, item).length - 1, 0));
@@ -104,8 +104,15 @@ export function PortfolioHistoryChart({
 
       {visiblePoints.length > 1 ? (
         <>
+          <div className={styles.chartReadout}>
+            <div>
+              <span>{formatDate(activePoint?.date ?? null)}{selectedIndex !== null ? " · 선택한 날짜" : ""}</span>
+              <strong>{formatKrw(activePoint?.totalMarketValue ?? null)}</strong>
+            </div>
+            <p>점을 선택하면 날짜가 고정됩니다.<br />키보드 방향키로 이력을 탐색하세요.</p>
+          </div>
           <div
-            className="varda-home-chart relative w-full"
+            className={`varda-home-chart ${styles.historyCanvas}`}
             onPointerLeave={() => {
               setHoveredIndex(null);
               setActiveEventKey(null);
@@ -132,36 +139,28 @@ export function PortfolioHistoryChart({
                   x2={PLOT_RIGHT}
                   y1={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
                   y2={PLOT_TOP + (PLOT_BOTTOM - PLOT_TOP) * fraction}
-                  stroke="var(--wash)"
-                  strokeDasharray="2 7"
+                  stroke="var(--line)"
+                  strokeDasharray="1 8"
                 />
               ))}
               <path
+                key={range}
+                className={styles.historyLine}
                 d={geometry.path}
                 fill="none"
-                stroke="var(--brand)"
-                strokeWidth="1.8"
+                stroke="var(--ink)"
+                strokeWidth="2.2"
                 vectorEffect="non-scaling-stroke"
               />
+              {geometry.points.map((point, index) => index % Math.max(1, Math.ceil(geometry.points.length / 36)) === 0 ? (
+                <circle key={`sample:${index}`} cx={point.x} cy={point.y} r="1.65" fill="var(--ink)" opacity=".3" className={styles.observationDot} style={{ "--dot-delay": `${index * 3}ms` } as CSSProperties} />
+              ) : null)}
               {activePoint && activeGeometry ? (
-                <g>
-                  <line
-                    x1={activeGeometry.x}
-                    x2={activeGeometry.x}
-                    y1={PLOT_TOP}
-                    y2={PLOT_BOTTOM}
-                    stroke="var(--brand)"
-                    strokeDasharray="2 5"
-                  />
-                  <circle
-                    cx={activeGeometry.x}
-                    cy={activeGeometry.y}
-                    r="5"
-                    fill="var(--surface)"
-                    stroke="var(--brand)"
-                    strokeWidth="2"
-                    vectorEffect="non-scaling-stroke"
-                  />
+                <g className={styles.historyMarker}>
+                  <line x1={activeGeometry.x} x2={activeGeometry.x} y1={PLOT_TOP} y2={PLOT_BOTTOM} stroke="var(--muted)" strokeDasharray="2 5" opacity=".5" />
+                  <line x1={PLOT_LEFT} x2={PLOT_RIGHT} y1={activeGeometry.y} y2={activeGeometry.y} stroke="var(--muted)" strokeDasharray="2 6" opacity=".2" />
+                  <circle cx={activeGeometry.x} cy={activeGeometry.y} r={selectedIndex === markerIndex ? 16 : 12} fill="var(--accent)" opacity=".12" className={styles.markerHalo} />
+                  <circle cx={activeGeometry.x} cy={activeGeometry.y} r="4.5" fill="var(--accent)" stroke="var(--paper)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                 </g>
               ) : null}
               {geometry.points.map((point, index) => {
@@ -178,12 +177,8 @@ export function PortfolioHistoryChart({
                   <rect
                     key={`hit:${visiblePoints[index]?.date}`}
                     role="button"
-                    tabIndex={
-                      hoveredIndex === index ||
-                      (hoveredIndex === null && index === visiblePoints.length - 1)
-                        ? 0
-                        : -1
-                    }
+                    tabIndex={markerIndex === index ? 0 : -1}
+                    aria-pressed={selectedIndex === index}
                     data-history-point-index={index}
                     aria-label={`${formatDate(visiblePoints[index]?.date ?? null)} ${formatKrw(visiblePoints[index]?.totalMarketValue ?? null)}`}
                     x={hitStart}
@@ -195,9 +190,16 @@ export function PortfolioHistoryChart({
                     style={{ outline: "none" }}
                     onBlur={() => setHoveredIndex(null)}
                     onFocus={() => setHoveredIndex(index)}
-                    onKeyDown={(event) =>
-                      moveHistoryPointFocus(event, index, visiblePoints.length)
-                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedIndex((current) => current === index ? null : index);
+                        return;
+                      }
+                      if (event.key === "Escape") { setSelectedIndex(null); return; }
+                      moveHistoryPointFocus(event, index, visiblePoints.length);
+                    }}
+                    onClick={() => setSelectedIndex((current) => current === index ? null : index)}
                     onPointerDown={(event) => event.preventDefault()}
                     onPointerEnter={() => setHoveredIndex(index)}
                   />
@@ -270,9 +272,9 @@ export function PortfolioHistoryChart({
               })}
             </svg>
 
-            {activePoint && activeGeometry ? (
+            {(hoveredIndex !== null || selectedIndex !== null) && activePoint && activeGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_96%,transparent)] p-3.5 text-xs shadow-[0_14px_36px_rgba(0,0,0,0.42)] backdrop-blur-sm md:block"
+                className="pointer-events-none absolute hidden w-52 rounded-[6px] border border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_96%,transparent)] p-3.5 text-xs shadow-[0_12px_32px_#172b291a] backdrop-blur-sm md:block"
                 style={{
                   left: `${Math.min(76, Math.max(5, (activeGeometry.x / WIDTH) * 100 + 2))}%`,
                   top: `${Math.min(55, Math.max(3, (activeGeometry.y / HEIGHT) * 100 - 4))}%`,
@@ -300,7 +302,7 @@ export function PortfolioHistoryChart({
 
             {activeEvent && activeEventGeometry ? (
               <div
-                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_98%,transparent)] p-3.5 text-xs shadow-[0_14px_36px_rgba(0,0,0,0.42)] backdrop-blur-sm md:block"
+                className="pointer-events-none absolute hidden w-64 rounded-[7px] border border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_98%,transparent)] p-3.5 text-xs shadow-[0_12px_32px_#172b291a] backdrop-blur-sm md:block"
                 style={{
                   bottom: "9%",
                   left: `${Math.min(74, Math.max(3, (activeEventGeometry.x / WIDTH) * 100 + 1.5))}%`,
@@ -336,7 +338,7 @@ export function PortfolioHistoryChart({
             className="portfolio-history-range mt-2 w-full md:hidden"
             max={Math.max(visiblePoints.length - 1, 0)}
             min="0"
-            onChange={(event) => setMobileIndex(Number(event.target.value))}
+            onChange={(event) => { setMobileIndex(Number(event.target.value)); setSelectedIndex(Number(event.target.value)); }}
             type="range"
             value={mobileActiveIndex}
           />

@@ -3,11 +3,12 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  ChartNoAxesCombined,
+  ArrowUpRight,
   Layers3,
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import styles from "./investment-lab-modern.module.css";
 
 type LabOverlay = "weights" | "composition";
 
@@ -85,36 +86,24 @@ export function InvestmentLabWorkspace({
     activeOverlay === "weights" ? "비중 실험" : "포트폴리오 구성 분석";
 
   return (
-    <div className="varda-workspace-main" data-lab-workspace="integrated">
-      <div className="varda-workspace-commandbar">
-        <div>
-          <ChartNoAxesCombined aria-hidden="true" size={16} strokeWidth={1.6} />
-          <span className="text-xs font-medium text-[var(--muted)]">
-            실제 경로와 대안 시나리오
-          </span>
-        </div>
-        <div>
-          {tools}
-          <button
-            className="varda-inline-action"
-            onClick={() => openOverlay("weights")}
-            type="button"
-          >
-            <SlidersHorizontal aria-hidden="true" size={15} strokeWidth={1.6} />
-            비중 실험
-          </button>
-          <button
-            className="varda-inline-action"
-            onClick={() => openOverlay("composition")}
-            type="button"
-          >
-            <Layers3 aria-hidden="true" size={15} strokeWidth={1.6} />
-            구성 분석
-          </button>
-        </div>
-      </div>
+    <div className={styles.workspace} data-lab-workspace="integrated">
+      <div className={styles.toolbar}><span>같은 기간 · 같은 입출금</span><div>{tools}</div></div>
 
-      <div className="varda-workspace-canvas">{comparison}</div>
+      <div className={styles.canvas}>{comparison}</div>
+
+      <div className={styles.launchers}>
+        <button className={styles.launcher} onClick={() => openOverlay("weights")} type="button">
+          <SlidersHorizontal aria-hidden="true" size={22} strokeWidth={1.6} />
+          <span><strong>비중 실험</strong><span className="sr-only">자산 비중을 바꾸고 실제 경로와 비교해 보세요.</span></span>
+          <ArrowUpRight aria-hidden="true" size={18} />
+        </button>
+        <button className={styles.launcher} onClick={() => openOverlay("composition")} type="button">
+          <Layers3 aria-hidden="true" size={22} strokeWidth={1.6} />
+          <span><strong>구성 분석</strong><span className="sr-only">포트폴리오 구성과 종목 간 노출을 살펴보세요.</span></span>
+          <ArrowUpRight aria-hidden="true" size={18} />
+        </button>
+      </div>
+      <p className={styles.stageFootnote}>과거 기록과 가정의 비교입니다. 투자 추천이나 실제 주문으로 이어지지 않습니다.</p>
 
       <dialog
         aria-labelledby={titleId}

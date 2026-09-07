@@ -10,6 +10,7 @@ import type { InvestmentLabScenarioMatrixId } from "@/lib/investment-lab-scenari
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 import { InvestmentLabChartCanvas } from "./investment-lab-chart-canvas";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
+import styles from "./investment-lab-modern.module.css";
 import {
   defaultLabScenario,
   labKrw,
@@ -52,46 +53,28 @@ export function InvestmentLabTimeMachine({
 
   const summary = summaries.get(selected.id);
   const actualSummary = summaries.get("actual");
-  const difference = summary?.endDifferenceKrw ?? null;
   const ready = chart.lines.filter((line) => line.id !== "actual");
   const unavailableDetail = unavailableScenarios.find(
     (item) => item.id === unavailable,
   );
 
   return (
-    <div data-lab-comparison="interactive" data-selected-scenario={selected.id}>
-      <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_290px] 2xl:grid-cols-[minmax(0,1fr)_312px]">
-        <section
-          className="min-w-0 py-6 xl:pr-9"
-          aria-label="포트폴리오 타임머신"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className={styles.comparison} data-lab-comparison="interactive" data-selected-scenario={selected.id}>
+      <InvestmentLabChartCanvas actual={actual} chart={chart} selected={selected} sidebar={
+          <div className={styles.headline}>
+            {unavailableScenarios.length ? <p className={styles.readinessNote}>{unavailableScenarios.length}개 시나리오 · 추가 근거 필요</p> : null}
             <div>
-              <p className="text-[10px] font-medium text-[var(--faint)]">
-                COUNTERFACTUAL LAB
-              </p>
-              <h2 className="mt-2 text-lg font-medium sm:text-xl">
-                다른 선택을 했다면
+              <h2>
+                비교 시나리오
               </h2>
-              <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-[var(--faint)]">
-                <span>{labScenarioLabel(selected.id)}</span>
-                <span aria-hidden="true">·</span>
-                <span>종료일 실제 대비</span>
-              </p>
-              <p
-                className={`mt-2 text-[30px] font-medium tabular-nums leading-tight sm:text-[36px] ${labMoneyTone(difference)}`}
-                data-lab-end-difference
-              >
-                {labKrw(difference, true)}
-              </p>
+
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {details ? <div className="contents">{details}</div> : null}
               <label className="sr-only" htmlFor="investment-lab-scenario-select">
                 비교 시나리오
               </label>
               <select
-                className="min-h-9 max-w-[230px] border-b border-[var(--line)] bg-transparent px-2 text-xs"
+                className="min-h-10 max-w-[230px] rounded-full border border-[var(--line)] bg-transparent px-4 text-xs"
                 id="investment-lab-scenario-select"
                 onChange={(event) => {
                   setRequested(event.target.value as InvestmentLabScenarioMatrixId);
@@ -109,6 +92,7 @@ export function InvestmentLabTimeMachine({
                 icon="info"
                 label="비교 기준"
                 title="무엇을 비교하나요?"
+                compactLabel
               >
               <div className="max-w-2xl space-y-5 text-sm leading-7 text-[var(--muted)]">
                 <p>
@@ -116,7 +100,7 @@ export function InvestmentLabTimeMachine({
                     같은 기간, 같은 외부 입출금
                   </strong>
                   <br />
-                  검은 선은 저장된 실제 평가액, 파란 선은 같은 시작 평가액과
+                  검은 선은 저장된 실제 평가액, 주황 선은 같은 시작 평가액과
                   입출금으로 계산한 선택 시나리오입니다. 계좌 사이의 이동은
                   선택한 분석 범위에 맞춰 처리합니다.
                 </p>
@@ -144,14 +128,9 @@ export function InvestmentLabTimeMachine({
             </div>
           </div>
 
-          <InvestmentLabChartCanvas
-            actual={actual}
-            chart={chart}
-            compact
-            selected={selected}
-          />
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--wash)] pt-3">
+      } />
+          <div className={styles.chartFooter}>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-[var(--muted)]">
               <span className="inline-flex items-center gap-2">
                 <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--ink)]" />
@@ -159,7 +138,7 @@ export function InvestmentLabTimeMachine({
               </span>
               {selected.id !== "actual" ? (
                 <span className="inline-flex items-center gap-2">
-                  <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--brand)]" />
+                  <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--accent)]" />
                   {labScenarioLabel(selected.id)}
                 </span>
               ) : null}
@@ -220,11 +199,10 @@ export function InvestmentLabTimeMachine({
                 </table>
               </div>
             </InvestmentLabDialog>
-          </div>
-        </section>
-
+          <InvestmentLabDialog label="시나리오·성과" title="시나리오와 성과 비교" size="wide">
+        {details ? <div className="mb-6 flex flex-wrap gap-3">{details}</div> : null}
         <aside
-          className="min-w-0 border-t border-[var(--line)] py-5 xl:border-t-0 xl:border-l xl:pl-6"
+          className={styles.scenarios}
           aria-label="비교 시나리오"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -235,7 +213,7 @@ export function InvestmentLabTimeMachine({
               {ready.length}개 경로
             </span>
           </div>
-          <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--wash)] pb-4 text-xs">
+          <div className="mb-4 flex items-center justify-between gap-3 text-xs">
             <span className="inline-flex items-center gap-2">
               <span className="size-1.5 rounded-full bg-[var(--ink)]" />
               실제 포트폴리오
@@ -247,7 +225,7 @@ export function InvestmentLabTimeMachine({
             </span>
           </div>
           <div
-            className="grid gap-1 sm:grid-cols-2 xl:max-h-[410px] xl:grid-cols-1 xl:overflow-y-auto xl:pr-1"
+            className={styles.scenarioList}
             data-lab-scenario-list
           >
             {ready.map((line) => {
@@ -255,7 +233,7 @@ export function InvestmentLabTimeMachine({
               return (
                 <button
                   aria-pressed={active}
-                  className={`group grid min-h-[70px] grid-cols-[minmax(0,1fr)_58px] items-center gap-3 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand)] ${active ? "border-[var(--line)] bg-[var(--wash)]" : "border-transparent hover:bg-[var(--wash)]"}`}
+                  className={`${styles.scenario} ${active ? styles.scenarioActive : ""}`}
                   key={line.id}
                   onClick={() => {
                     setRequested(line.id);
@@ -339,11 +317,8 @@ export function InvestmentLabTimeMachine({
               ) : null}
             </div>
           ) : null}
-        </aside>
-      </div>
-
-      <dl
-        className="grid grid-cols-2 border-y border-[var(--line)] lg:grid-cols-4"
+        </aside>      <dl
+        className={styles.metrics}
         data-lab-metrics
       >
         <Metric
@@ -381,6 +356,8 @@ export function InvestmentLabTimeMachine({
           {chart.period.comparisonDateCount}개 평가일 · 같은 기간·입출금
         </span>
       </div>
+          </InvestmentLabDialog>
+          </div>
     </div>
   );
 }
@@ -395,7 +372,7 @@ function Metric({
   baseline: string;
 }) {
   return (
-    <div className="min-w-0 border-b border-[var(--wash)] px-3 py-5 odd:border-r sm:px-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
+    <div className="min-w-0">
       <dt className="text-[11px] text-[var(--faint)]">{label}</dt>
       <dd className="mt-2 break-words text-lg font-medium tabular-nums sm:text-xl">
         {value}

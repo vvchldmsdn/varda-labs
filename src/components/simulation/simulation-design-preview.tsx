@@ -17,10 +17,7 @@ export function SimulationDesignPreview({
   const { portfolio, execution, comparison, validation, preflight, model } =
     preview;
   return (
-    <div className="relative h-[100dvh] overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-[var(--brand-wash)] px-5 py-1 text-center text-[10px] text-[var(--brand)]">
-        디자인 미리보기 · 예시 데이터 · 실제 계좌 및 시세와 무관
-      </div>
+    <div className="relative min-h-screen">
       <SimulationInputReadinessView
         model={model}
         scopeCatalog={portfolio.analysisScopes}
