@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { ServiceSpeedInsights } from "@/components/service-speed-insights";
 import { Geist, Noto_Sans_KR } from "next/font/google";
 
@@ -40,6 +41,7 @@ export default function RootLayout({
     >
       <body>
         {children}
+        <Analytics />
         <ServiceSpeedInsights />
       </body>
     </html>
