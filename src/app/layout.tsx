@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ServiceWebAnalytics } from "@/components/service-web-analytics";
 import { ServiceSpeedInsights } from "@/components/service-speed-insights";
 import { Geist, Noto_Sans_KR } from "next/font/google";
 
@@ -40,6 +41,7 @@ export default function RootLayout({
     >
       <body>
         {children}
+        <ServiceWebAnalytics />
         <ServiceSpeedInsights />
       </body>
     </html>
