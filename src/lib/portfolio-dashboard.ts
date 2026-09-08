@@ -9,6 +9,7 @@ import {
   livePriceQuotes,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import { isDashboardInvestmentAsset, type PortfolioDashboardDemand } from "@/lib/portfolio-dashboard-demand";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -52,7 +53,6 @@ import {
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { buildCycleForSnapshotDate, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
-const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const NON_INVESTMENT_ASSET_TYPES = new Set([
   "savings",
   "fixed_deposit",
@@ -247,10 +247,12 @@ export type DashboardTodayMovement = {
 export async function getPortfolioDashboard(
   {
     analysisScopes,
+    demand = { surface: "home" },
     scope,
     tenantContext,
   }: {
     analysisScopes: readonly PortfolioAnalysisScope[];
+    demand?: PortfolioDashboardDemand;
     scope: PortfolioAnalysisScope;
     tenantContext: TenantContext;
   },
@@ -267,12 +269,14 @@ export async function getPortfolioDashboard(
     latestPositionRows,
     baselineReferenceDate,
     recentPositionRows,
+    historyAssetIds,
     recentPortfolioRows,
     eventRows,
     unmatchedSnapshotCountRows,
     liveQuoteRows,
     recentPriceRows,
   } = await getReadOnlyTenantPortfolioDashboardSources({
+    demand,
     scope,
     tenantContext,
     serviceDate: movementCycle.snapshotDate,
@@ -280,9 +284,7 @@ export async function getPortfolioDashboard(
 
   const movementBaselineDate = baselineReferenceDate;
 
-  const investmentAssetRows = assetRows.filter((asset) =>
-    INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
-  );
+  const investmentAssetRows = assetRows.filter(isDashboardInvestmentAsset);
   const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
   const valuationAssetRows = investmentAssetRows.map((asset) =>
     applyLiveQuote(
@@ -424,11 +426,13 @@ export async function getPortfolioDashboard(
   );
   const holdingHistory = buildPortfolioDashboardHoldingHistory({
     currentDate: movementCycle.snapshotDate,
-    holdings,
+    holdings: demand.surface === "home"
+      ? holdings
+      : holdings.filter((holding) => historyAssetIds.includes(holding.id)),
     rows: recentPositionRows,
   });
   const recentSnapshots =
-    scope.kind === "portfolio_group"
+    demand.surface !== "home" ? [] : scope.kind === "portfolio_group"
       ? buildPortfolioDashboardPositionTrend({
           holdings,
           rows: recentPositionRows,
@@ -460,7 +464,7 @@ export async function getPortfolioDashboard(
     analysisScopes,
     generatedAt: new Date().toISOString(),
     usdKrwRate,
-    fxTrend: buildDashboardFxTrend(recentFxRows),
+    fxTrend: demand.surface === "home" ? buildDashboardFxTrend(recentFxRows) : [],
     movementBaselineDate,
     marketPriceReferenceDate,
     totalValueKrw,
@@ -490,12 +494,12 @@ export async function getPortfolioDashboard(
     ),
     recentSnapshots,
     holdingHistory,
-    eventActivity: buildEventActivity({
+    eventActivity: demand.surface === "home" ? buildEventActivity({
       eventRows,
       assetRows: investmentAssetRows,
       accountLabels,
       returnSummary,
-    }),
+    }) : [],
     topMovers: [...holdings]
       .filter((holding) => holding.dailyChangeKrw !== null)
       .sort(

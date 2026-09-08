@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
-import { PresentationDialog } from "@/components/presentation/presentation-dialog";
+import { HistoryRecordsDialog, HistoryDetailLink } from "./history-records-dialog";
+import { historyEvidencePage, normalizeHistoryDetail, type HistoryDetailParams } from "./history-detail-state";
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 import { buildHistoryOverview } from "@/lib/history-overview";
@@ -33,25 +34,18 @@ export function HistoryView({
   eventsSupported,
   generatedAt,
   history,
+  detailParams = {},
 }: {
   events: TenantEventLedgerQueryResult | null;
   eventsSupported: boolean;
   generatedAt: string;
   history: ReadOnlyHistoryBalance;
+  detailParams?: HistoryDetailParams;
 }) {
+  const detail = normalizeHistoryDetail(detailParams);
   const overview = buildHistoryOverview({
     rows: history.portfolioRows,
     events: historyOverviewEvents(events),
-  });
-  const balanceTrajectory = history.balanceAccount
-    ? buildBalanceHistoryTrajectory({
-        rows: history.balanceRows,
-        account: history.balanceAccount,
-      })
-    : null;
-  const portfolioTrajectory = buildPortfolioHistoryTrajectory({
-    rows: history.portfolioRows,
-    account: history.selectedScope.key,
   });
   return (
     <main
@@ -68,11 +62,12 @@ export function HistoryView({
         <div className={styles.page}>
           <header className={styles.header}>
             <h1 className="varda-page-title">히스토리</h1>
-            <PortfolioAnalysisScopeTabs basePath="/history" scopes={history.analysisScopes} selectedScopeKey={history.selectedScope.key} variant="underline" />
+            <PortfolioAnalysisScopeTabs basePath="/history" query={detailParams.preview === "design" ? { preview: "design" } : undefined} scopes={history.analysisScopes} selectedScopeKey={history.selectedScope.key} variant="underline" />
           </header>
 
           <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} status={history.unavailableSources.length ? `일부 기록 확인 필요 · ${history.unavailableSources.map(historyReadSourceLabel).join(", ")}` : undefined} details={
-            <PresentationDialog label="기록·이벤트" title="기록에서 발견한 변화" wide>
+            <HistoryRecordsDialog panel={detail}>
+              {detail === "raw" ? <HistoryRawEvidence history={history} events={events} overview={overview} detailParams={detailParams} /> : detail === "records" ? (
           <div className={styles.support}>
             <div className={styles.activity}>
               <HistoryActivityStream result={events} supported={eventsSupported} />
@@ -93,7 +88,46 @@ export function HistoryView({
               <section className="varda-rail-section">
                   <h2 className="text-sm font-medium">저장 근거 확인</h2>
                 <div className="mt-4 grid gap-2">
-                  <PresentationDialog label="원시 기록 검증" title="히스토리 원시 기록" wide>
+                  <HistoryDetailLink changes={{ detail: "raw" }}>원시 기록 검증</HistoryDetailLink>
+                </div>
+              </section>
+
+              {history.unavailableSources.length > 0 ? (
+                <section className="varda-rail-section text-[var(--warning)]">
+                  <p className="text-xs leading-5">
+                    일부 기록을 읽지 못했습니다: {history.unavailableSources.map(historyReadSourceLabel).join(", ")}. 읽을 수 있는 저장 기록만 표시합니다.
+                  </p>
+                </section>
+              ) : null}
+            </aside>
+          </div>
+
+            ) : null}
+            </HistoryRecordsDialog>
+          } />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function HistoryRawEvidence({ history, events, overview, detailParams }: { history: ReadOnlyHistoryBalance; events: TenantEventLedgerQueryResult | null; overview: ReturnType<typeof buildHistoryOverview>; detailParams: HistoryDetailParams }) {
+  const balanceTrajectory = history.balanceAccount
+    ? buildBalanceHistoryTrajectory({
+        rows: history.balanceRows,
+        account: history.balanceAccount,
+      })
+    : null;
+  const portfolioTrajectory = buildPortfolioHistoryTrajectory({
+    rows: history.portfolioRows,
+    account: history.selectedScope.key,
+  });
+  const balancePage = historyEvidencePage(history.balanceRows, detailParams.balancePage);
+  const portfolioPage = historyEvidencePage(history.portfolioRows, detailParams.portfolioPage);
+  const eventPage = historyEvidencePage(events?.state === "ready" || events?.state === "partial" ? events.events : [], detailParams.eventPage);
+  return <>
+    <div className="mb-5"><HistoryDetailLink changes={{ detail: "records" }}>기록·이벤트로 돌아가기</HistoryDetailLink></div>
+
           <div className="space-y-10">
             <p
               data-history-semantic="stored-evidence-not-recomputed"
@@ -131,9 +165,10 @@ export function HistoryView({
                   <>
                     <HistoryTrajectoryChart model={balanceTrajectory} />
                     <BalanceHistoryTable
-                      rows={history.balanceRows}
+                      rows={balancePage.rows}
                       account={history.balanceAccount}
                     />
+                    <EvidencePagination pagination={balancePage} queryKey="balancePage" label="잔액 기록" />
                   </>
                 ) : (
                   <UnsupportedScopeMessage>
@@ -163,18 +198,22 @@ export function HistoryView({
                   </UnsupportedScopeMessage>
                 )}
                 <PortfolioHistoryTable
-                  rows={history.portfolioRows}
+                  rows={portfolioPage.rows}
                   lane={history.lane}
                   positionDetail={history.positionDetail}
                   selectedScope={history.selectedScope}
                 />
+                <EvidencePagination pagination={portfolioPage} queryKey="portfolioPage" label="포트폴리오 기록" />
               </RawSection>
             ) : null}
 
             {history.lane === "all" || history.lane === "events" ? (
               <RawSection title="이벤트 원문" detail="소유 계정에 연결된 저장 근거">
                 {events ? (
-                  <TenantHistoryEvents result={events} />
+                  <>
+                    <TenantHistoryEvents result={events} visibleEvents={eventPage.rows} />
+                    <EvidencePagination pagination={eventPage} queryKey="eventPage" label="이벤트 원문" />
+                  </>
                 ) : (
                   <UnsupportedScopeMessage>
                     이 범위의 이벤트 포함 규칙이 없거나 조회가 시작되지 않았습니다.
@@ -183,26 +222,18 @@ export function HistoryView({
               </RawSection>
             ) : null}
           </div>
-                  </PresentationDialog>
-                </div>
-              </section>
 
-              {history.unavailableSources.length > 0 ? (
-                <section className="varda-rail-section text-[var(--warning)]">
-                  <p className="text-xs leading-5">
-                    일부 기록을 읽지 못했습니다: {history.unavailableSources.map(historyReadSourceLabel).join(", ")}. 읽을 수 있는 저장 기록만 표시합니다.
-                  </p>
-                </section>
-              ) : null}
-            </aside>
-          </div>
+  </>;
+}
 
-            </PresentationDialog>
-          } />
-        </div>
-      </div>
-    </main>
-  );
+function EvidencePagination({ pagination, queryKey, label }: { pagination: { page: number; pageCount: number; total: number; start: number; end: number }; queryKey: string; label: string }) {
+  return <nav aria-label={`${label} 페이지`} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
+    <span>{pagination.total}건 중 {pagination.start}–{pagination.end} · {pagination.page}/{pagination.pageCount}페이지</span>
+    <div className="flex gap-2">
+      {pagination.page > 1 ? <HistoryDetailLink changes={{ [queryKey]: String(pagination.page - 1), detail: "raw" }}>이전</HistoryDetailLink> : null}
+      {pagination.page < pagination.pageCount ? <HistoryDetailLink changes={{ [queryKey]: String(pagination.page + 1), detail: "raw" }}>다음</HistoryDetailLink> : null}
+    </div>
+  </nav>;
 }
 
 function historyOverviewEvents(events: TenantEventLedgerQueryResult | null) {

@@ -4,8 +4,10 @@ import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 
 export function TenantHistoryEvents({
   result,
+  visibleEvents,
 }: {
   result: TenantEventLedgerQueryResult;
+  visibleEvents?: Extract<TenantEventLedgerQueryResult, { state: "ready" | "partial" }>["events"];
 }) {
   if (result.state === "ready" || result.state === "partial") {
     return (
@@ -17,7 +19,7 @@ export function TenantHistoryEvents({
           </p>
         ) : null}
         <TenantEventSummary result={result} />
-        <TenantEventTable events={result.events} />
+        <TenantEventTable events={visibleEvents ?? result.events} />
       </>
     );
   }

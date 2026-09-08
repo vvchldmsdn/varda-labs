@@ -13,6 +13,10 @@ export async function HoldingAnalysisDataPanel({
     result = Object.freeze({ state: "unavailable" as const });
   }
 
+  return <HoldingAnalysisDataPanelView result={result} />;
+}
+
+export function HoldingAnalysisDataPanelView({ result }: { result: ScopedHoldingAnalysisDataReadinessQueryResult }) {
   if (result.state !== "ready") {
     return (
       <section

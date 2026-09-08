@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { useResearchPanelNavigation } from "./research-detail-resource";
+import type { InvestmentLabWeightEvidence } from "@/lib/investment-lab-weight-evidence";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { resolveInvestmentLabPanel, type InvestmentLabPanel } from "@/lib/investment-lab-panel";
 import {
@@ -12,30 +15,24 @@ import {
 } from "lucide-react";
 import styles from "./investment-lab-modern.module.css";
 
+const RemotePanel = dynamic(() => import("./investment-lab-remote-panel"), { loading: () => <p role="status" className="py-10 text-sm">상세 분석을 불러오고 있습니다.</p> });
+
 type LabOverlay = InvestmentLabPanel;
 
 export function InvestmentLabWorkspace({
   comparison,
-  experiments,
-  composition,
+  weights,
+  scopeKey,
   tools,
-  loadedPanel,
 }: {
   comparison: ReactNode;
-  experiments: ReactNode;
-  composition: ReactNode;
+  weights: InvestmentLabWeightEvidence;
+  scopeKey: PortfolioAnalysisScopeKey;
   tools?: ReactNode;
-  loadedPanel: InvestmentLabPanel | null;
 }) {
-  const params = useSearchParams();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { panel: activeOverlay, select, query } = useResearchPanelNavigation(resolveInvestmentLabPanel);
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [activeOverlay, setActiveOverlay] = useState<LabOverlay | null>(() => {
-    const requested = params.getAll("view");
-    return resolveInvestmentLabPanel(requested.length === 1 ? requested[0] : null);
-  });
 
   useEffect(() => {
     if (!activeOverlay || dialogRef.current?.open) return;
@@ -47,43 +44,14 @@ export function InvestmentLabWorkspace({
     return acquireBodyScrollLock(document.body);
   }, [activeOverlay]);
 
-  useEffect(() => {
-    function syncOverlayFromHistory() {
-      const requested = new URLSearchParams(window.location.search).getAll("view");
-      const nextOverlay = resolveInvestmentLabPanel(requested.length === 1 ? requested[0] : null);
-      setActiveOverlay(nextOverlay);
-      if (!nextOverlay && dialogRef.current?.open) dialogRef.current.close();
-    }
-
-    window.addEventListener("popstate", syncOverlayFromHistory);
-    return () => window.removeEventListener("popstate", syncOverlayFromHistory);
-  }, []);
-
-  function openOverlay(view: LabOverlay) {
-    setActiveOverlay(view);
-    const next = new URLSearchParams(window.location.search);
-    next.set("view", view);
-    startTransition(() => {
-      router.push(`${window.location.pathname}?${next}`, { scroll: false });
-    });
-  }
-
+  function openOverlay(view: LabOverlay) { select(view); }
   function closeOverlay() {
     dialogRef.current?.close();
   }
 
-  function finishClose() {
-    setActiveOverlay(null);
-    const next = new URLSearchParams(window.location.search);
-    next.delete("view");
-    const query = next.toString();
-    const href = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-    if (isPending) startTransition(() => router.replace(href, { scroll: false }));
-    else window.history.replaceState(null, "", href);
-  }
+  function finishClose() { select(null); }
+  useEffect(() => { if (!activeOverlay && dialogRef.current?.open) dialogRef.current.close(); }, [activeOverlay]);
 
-  const activeContent =
-    activeOverlay === "weights" ? experiments : composition;
   const activeTitle =
     activeOverlay === "weights" ? "비중 실험" : "포트폴리오 구성 분석";
 
@@ -115,7 +83,7 @@ export function InvestmentLabWorkspace({
         }}
         onClose={(event) => {
           event.stopPropagation();
-          if (event.target === event.currentTarget) finishClose();
+          if (event.target === event.currentTarget && !dialogRef.current?.open) finishClose();
         }}
         ref={dialogRef}
       >
@@ -138,9 +106,7 @@ export function InvestmentLabWorkspace({
             </button>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
-            {activeOverlay && loadedPanel !== activeOverlay
-              ? <p role="status" className="motion-safe:animate-pulse py-10 text-sm text-[var(--muted)]">선택한 분석을 계산하고 있습니다.</p>
-              : activeOverlay ? activeContent : null}
+            {activeOverlay ? <RemotePanel query={query} weights={weights} scopeKey={scopeKey} /> : null}
           </div>
         </div>
       </dialog>

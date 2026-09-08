@@ -19,7 +19,8 @@ describe("analysis result journey navigation", () => {
     const workspace = read(
       "src/components/investment-lab/investment-lab-workspace.tsx",
     );
-    const source = `${page}\n${view}`;
+    const remote = read("src/components/investment-lab/investment-lab-remote-panel.tsx");
+    const source = `${page}\n${view}\n${remote}`;
     const targets = [
       "investment-lab-results",
       "investment-lab-optimizer",
@@ -41,6 +42,7 @@ describe("analysis result journey navigation", () => {
     const view = read(
       "src/components/simulation/simulation-input-readiness-view.tsx",
     );
+    const details = read("src/components/simulation/simulation-detail-view.tsx");
     const targets = [
       "simulation-current-result",
       "simulation-weight-experiment",
@@ -55,7 +57,7 @@ describe("analysis result journey navigation", () => {
     assert.match(workspace, /styles.canvas.*\{paths\}/s);
     assert.doesNotMatch(workspace, /role="tablist"/);
     for (const target of targets) {
-      assert.match(view, new RegExp(`id="${target}"`));
+      assert.match(`${view}\n${details}`, new RegExp(`id="${target}"`));
     }
   });
 });

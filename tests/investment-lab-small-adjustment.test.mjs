@@ -256,12 +256,13 @@ describe("investment lab small adjustment", () => {
     );
     assert.match(querySource, /cache\(\s*loadTenantPortfolioStructure,\s*\)/);
     assert.match(querySource, /tenantContext,\s*selectedAccount/);
-    assert.match(
-      pageSource,
-      /getReadOnlyTenantPortfolioStructureForScope\s*\(\s*\{/,
-    );
-    assert.match(pageSource, /InvestmentLabSmallAdjustmentSkeleton/);
-    assert.match(pageSource, /InvestmentLabSmallAdjustmentUnavailable/);
+    assert.doesNotMatch(pageSource, /getReadOnlyTenantPortfolioStructureForScope/);
+    const detail = readFileSync(new URL("../src/db/queries/investment-lab-detail.ts", import.meta.url), "utf8");
+    const remote = readFileSync(new URL("../src/components/investment-lab/investment-lab-remote-panel.tsx", import.meta.url), "utf8");
+    assert.match(detail, /getReadOnlyTenantPortfolioStructureForScope/);
+    assert.match(detail, /buildInvestmentLabSmallAdjustmentModel/);
+    assert.match(remote, /ResearchDetailStatus/);
+    assert.match(remote, /InvestmentLabSmallAdjustment model=\{data\.adjustment\}/);
   });
 });
 

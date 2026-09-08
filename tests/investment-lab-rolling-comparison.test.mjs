@@ -75,7 +75,7 @@ describe("investment lab rolling same-flow comparison", () => {
     assert.equal(model.worstWindow, null);
   });
 
-  it("reuses the server read model without a client fetch or new route", () => {
+  it("reuses the main read model in the deferred detail component", () => {
     const loader = readFileSync(
       "src/lib/investment-lab-counterfactual-read-loader.ts",
       "utf8",
@@ -87,7 +87,9 @@ describe("investment lab rolling same-flow comparison", () => {
     const page = readFileSync("src/app/investment-lab/page.tsx", "utf8");
 
     assert.match(loader, /buildInvestmentLabRollingComparison/);
-    assert.match(page, /InvestmentLabRollingComparisonView/);
+    assert.match(page, /weightEvidence=\{\{[^\n]*rollingComparison/);
+    const remote = readFileSync("src/components/investment-lab/investment-lab-remote-panel.tsx", "utf8");
+    assert.match(remote, /InvestmentLabRollingComparisonView model=\{weights\.rollingComparison\}/);
     assert.doesNotMatch(component, /["']use client["']|\bfetch\s*\(|\/api\//);
     assert.doesNotMatch(loader, /\bfetch\s*\(|\/api\//);
   });

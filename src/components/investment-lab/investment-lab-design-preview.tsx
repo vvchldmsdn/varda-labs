@@ -1,12 +1,9 @@
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { buildInvestmentLabDesignPreview } from "@/lib/investment-lab-design-preview";
-import { resolveInvestmentLabPanel } from "@/lib/investment-lab-panel";
 import { InvestmentLabWorkspace } from "./investment-lab-workspace";
 import { InvestmentLabScopeTabs } from "./investment-lab-scope-tabs";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
 import { InvestmentLabTimeMachine } from "./investment-lab-time-machine";
-import { InvestmentLabFixedMix } from "./investment-lab-fixed-mix";
-import { InvestmentLabEtfXray } from "./investment-lab-etf-xray";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
 import styles from "./investment-lab-modern.module.css";
 import {
@@ -22,8 +19,7 @@ export function InvestmentLabDesignPreview({
     view?: string | readonly string[];
   };
 }) {
-  const loadedPanel = resolveInvestmentLabPanel(query.view);
-  const { dashboard, chart, summaries, period, selection, model, etfXray } =
+  const { dashboard, chart, summaries, period, selection, model } =
     buildInvestmentLabDesignPreview(query);
   return (
     <main
@@ -42,7 +38,8 @@ export function InvestmentLabDesignPreview({
         </header>
         <div className={styles.workspaceSlot}>
           <InvestmentLabWorkspace
-            loadedPanel={loadedPanel}
+            scopeKey={dashboard.selectedScope.key}
+            weights={{ period, selection, fixedMixScenario: model.fixedMixScenario, fixedMixComparison: model.fixedMixComparison, preperiodMinVolatility: model.preperiodMinVolatility }}
             tools={
               <InvestmentLabPeriodSelector
                 period={period}
@@ -105,17 +102,7 @@ export function InvestmentLabDesignPreview({
                 }
               />
             }
-            experiments={
-              loadedPanel === "weights" ?
-              <InvestmentLabFixedMix
-                comparison={model.fixedMixComparison}
-                model={model.fixedMixScenario}
-                period={period}
-                scopeKey={dashboard.selectedScope.key}
-                selection={selection}
-              /> : null
-            }
-            composition={loadedPanel === "composition" ? <InvestmentLabEtfXray model={etfXray} /> : null}
+
           />
         </div>
       </div>

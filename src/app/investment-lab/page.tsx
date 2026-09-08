@@ -12,40 +12,14 @@ import {
   InvestmentLabDataAvailabilityUnavailable,
   InvestmentLabDataAvailabilityView,
 } from "@/components/investment-lab/investment-lab-data-availability";
-import {
-  InvestmentLabEtfXray,
-  InvestmentLabEtfXraySkeleton,
-  InvestmentLabEtfXrayUnavailable,
-} from "@/components/investment-lab/investment-lab-etf-xray";
-import { InvestmentLabFixedMix } from "@/components/investment-lab/investment-lab-fixed-mix";
-import { InvestmentLabAnchorBasket } from "@/components/investment-lab/investment-lab-anchor-basket";
-import { InvestmentLabPreperiodMinVolatilityView } from "@/components/investment-lab/investment-lab-preperiod-min-volatility";
-import { InvestmentLabPreperiodOptimizerView } from "@/components/investment-lab/investment-lab-preperiod-optimizer";
-import { InvestmentLabRollingComparisonView } from "@/components/investment-lab/investment-lab-rolling-comparison";
-import {
-  InvestmentLabStressReplaySkeleton,
-  InvestmentLabStressReplayUnavailable,
-  InvestmentLabStressReplayView,
-} from "@/components/investment-lab/investment-lab-stress-replay";
-import {
-  InvestmentLabSmallAdjustment,
-  InvestmentLabSmallAdjustmentSkeleton,
-  InvestmentLabSmallAdjustmentUnavailable,
-} from "@/components/investment-lab/investment-lab-small-adjustment";
 import { InvestmentLabView } from "@/components/investment-lab/investment-lab-view";
-import { InvestmentLabDisclosure } from "@/components/investment-lab/investment-lab-disclosure";
 import { getReadOnlyTenantInvestmentLabDataAvailabilityForScope } from "@/db/queries/investment-lab-data-availability";
 import { getReadOnlyTenantHoldingAnalysisDataReadinessForScope } from "@/db/queries/holding-analysis-data-readiness";
 import { getReadOnlyTenantInvestmentLabCounterfactualForScope } from "@/db/queries/investment-lab";
-import { getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio } from "@/db/queries/investment-lab-etf-xray";
 import { getReadOnlyTenantInvestmentLabAnalysisScopeEvidence } from "@/db/queries/investment-lab-scope-evidence";
-import { getReadOnlyTenantInvestmentLabStressReplay } from "@/db/queries/investment-lab-stress-replay";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
-import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfolio-structure";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { applyInvestmentLabFountAvailabilityScope } from "@/lib/investment-lab-data-availability";
-import { buildInvestmentLabSmallAdjustmentModel } from "@/lib/investment-lab-small-adjustment";
-import { applyInvestmentLabCurrentHoldingScope } from "@/lib/investment-lab-current-holding-scope";
 import { resolveInvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-mix-selection";
 import type {
@@ -53,11 +27,6 @@ import type {
   PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
-import {
-  resolveInvestmentLabPanel,
-  startInvestmentLabPanelQueries,
-  type InvestmentLabPanel,
-} from "@/lib/investment-lab-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +84,6 @@ export default async function InvestmentLabPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  const requestedPanel = resolveInvestmentLabPanel(params.view);
   const scopeQuery = Object.freeze({
     start: params.start,
     end: params.end,
@@ -133,23 +101,6 @@ export default async function InvestmentLabPage({
     getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
       scope: selectedScope,
       tenantContext,
-    });
-  const { portfolioStructurePromise, etfXrayPromise, stressReplayPromise } =
-    startInvestmentLabPanelQueries(requestedPanel, {
-      portfolio: () => getReadOnlyTenantPortfolioStructureForScope({
-        scope: selectedScope,
-        serviceDate,
-        tenantContext,
-      }),
-      etfXray: (portfolioStructurePromise) =>
-        getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
-          portfolioStructurePromise,
-        ),
-      stressReplay: (portfolioStructurePromise) =>
-        getReadOnlyTenantInvestmentLabStressReplay({
-          account: selectedScope.key,
-          portfolioStructurePromise,
-        }),
     });
   const dataAvailabilityPromise =
     getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
@@ -185,7 +136,6 @@ export default async function InvestmentLabPage({
     >
       <Suspense fallback={<InvestmentLabSkeleton />}>
         <InvestmentLabContent
-          requestedPanel={requestedPanel}
           dataAvailabilityPromise={dataAvailabilityPromise}
           fixedMixSelection={fixedMixSelection}
           generatedAt={generatedAt.toISOString()}
@@ -200,65 +150,15 @@ export default async function InvestmentLabPage({
               />
             </Suspense>
           }
-          composition={
-            requestedPanel === "composition" && etfXrayPromise && stressReplayPromise ?
-            <div className="space-y-8 py-7">
-              <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
-                <div id="investment-lab-etf-xray">
-                  <InvestmentLabEtfXrayContent modelPromise={etfXrayPromise} />
-                </div>
-              </Suspense>
-              <InvestmentLabDisclosure
-                title="과거 충격 구간"
-                detail="최대 낙폭 · 회복 · 전체 기간"
-              >
-                <div id="investment-lab-stress">
-                  <Suspense fallback={<InvestmentLabStressReplaySkeleton />}>
-                    <InvestmentLabStressReplayContent
-                      modelPromise={stressReplayPromise}
-                    />
-                  </Suspense>
-                </div>
-              </InvestmentLabDisclosure>
-            </div> : null
-          }
-          smallAdjustment={
-            requestedPanel === "weights" && portfolioStructurePromise ?
-            <div id="investment-lab-small-adjustment">
-              <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
-                <InvestmentLabSmallAdjustmentContent
-                  modelPromise={portfolioStructurePromise}
-                  scopeCatalog={scopeContext.catalog.scopes}
-                  selectedScope={selectedScope}
-                />
-              </Suspense>
-            </div> : null
-          }
+
         />
       </Suspense>
     </div>
   );
 }
 
-async function InvestmentLabStressReplayContent({
-  modelPromise,
-}: {
-  modelPromise: ReturnType<typeof getReadOnlyTenantInvestmentLabStressReplay>;
-}) {
-  let model;
-  try {
-    model = await modelPromise;
-  } catch {
-    return <InvestmentLabStressReplayUnavailable />;
-  }
-  return <InvestmentLabStressReplayView model={model} />;
-}
-
 async function InvestmentLabContent({
-  requestedPanel,
-  composition,
   readiness,
-  smallAdjustment,
   dataAvailabilityPromise,
   fixedMixSelection,
   generatedAt,
@@ -267,10 +167,7 @@ async function InvestmentLabContent({
   scopeQuery,
   selectedScope,
 }: {
-  requestedPanel: InvestmentLabPanel | null;
-  composition: ReactNode;
   readiness: ReactNode;
-  smallAdjustment: ReactNode;
   scopeCatalog: readonly PortfolioAnalysisScope[];
   scopeQuery: PortfolioAnalysisScopeQuery;
   dataAvailabilityPromise: ReturnType<
@@ -300,7 +197,7 @@ async function InvestmentLabContent({
   } = await modelPromise;
   return (
     <InvestmentLabView
-      loadedPanel={requestedPanel}
+      weightEvidence={{ period, selection: fixedMixSelection, fixedMixScenario: model.fixedMixScenario, fixedMixComparison: model.fixedMixComparison, preperiodMinVolatility: model.preperiodMinVolatility, optimizer: preperiodOptimizer, anchorBasket: anchorBasketScenario, rollingComparison }}
       accountComposition={accountComposition}
       anchorBasketScenario={anchorBasketScenario}
       anchorValueWeightScenario={anchorValueWeightScenario}
@@ -320,50 +217,8 @@ async function InvestmentLabContent({
       generatedAt={generatedAt}
       model={model}
       observedHistory={observedHistory}
-      composition={composition}
       readiness={readiness}
-      experiments={
-        requestedPanel === "weights" ?
-        <div className="space-y-8 py-7">
-          <div id="investment-lab-optimizer">
-            <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
-          </div>
-          <InvestmentLabDisclosure
-            title="국내·미국 지수 비중 조정"
-            detail="KODEX 200 · Vanguard S&P 500 ETF"
-            open
-          >
-            <InvestmentLabFixedMix
-              comparison={model.fixedMixComparison}
-              model={model.fixedMixScenario}
-              period={period}
-              scopeKey={selectedScope.key}
-              selection={fixedMixSelection}
-            />
-            <InvestmentLabPreperiodMinVolatilityView
-              model={model.preperiodMinVolatility}
-            />
-          </InvestmentLabDisclosure>
-          <InvestmentLabDisclosure
-            title="시작일 바스켓과 반복 비교"
-            detail="동일 비중 · 시간별 검증"
-          >
-            <InvestmentLabAnchorBasket
-              fixedMixSelection={fixedMixSelection}
-              model={anchorBasketScenario}
-              period={period}
-              scopeKey={selectedScope.key}
-            />
-            <InvestmentLabRollingComparisonView model={rollingComparison} />
-          </InvestmentLabDisclosure>
-          <InvestmentLabDisclosure
-            title="작은 조정 실험"
-            detail="보유 비중 변경 전후 구조"
-          >
-            {smallAdjustment}
-          </InvestmentLabDisclosure>
-        </div> : null
-      }
+
       period={period}
       scopeCatalog={scopeCatalog}
       scopeQuery={scopeQuery}
@@ -397,55 +252,6 @@ async function InvestmentLabDataAvailabilityContent({
 function normalizeSingleParam(value: string | string[] | undefined) {
   if (Array.isArray(value)) return "__ambiguous__";
   return value ?? null;
-}
-
-async function InvestmentLabEtfXrayContent({
-  modelPromise,
-}: {
-  modelPromise: ReturnType<
-    typeof getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio
-  >;
-}) {
-  let model;
-  try {
-    model = await modelPromise;
-  } catch {
-    return <InvestmentLabEtfXrayUnavailable />;
-  }
-  return <InvestmentLabEtfXray model={model} />;
-}
-
-async function InvestmentLabSmallAdjustmentContent({
-  modelPromise,
-  scopeCatalog,
-  selectedScope,
-}: {
-  modelPromise: ReturnType<typeof getReadOnlyTenantPortfolioStructureForScope>;
-  scopeCatalog: readonly PortfolioAnalysisScope[];
-  selectedScope: PortfolioAnalysisScope;
-}) {
-  let portfolio;
-  try {
-    portfolio = await modelPromise;
-  } catch {
-    return <InvestmentLabSmallAdjustmentUnavailable />;
-  }
-  return (
-    <InvestmentLabSmallAdjustment
-      key={selectedScope.key}
-      model={buildInvestmentLabSmallAdjustmentModel(
-        applyInvestmentLabCurrentHoldingScope(portfolio).portfolio,
-        portfolio.holdingRows.map((row) => row.account),
-        new Map(
-          scopeCatalog.flatMap((scope) =>
-            scope.kind === "account"
-              ? [[scope.accountCode, scope.label] as const]
-              : [],
-          ),
-        ),
-      )}
-    />
-  );
 }
 
 function InvestmentLabSkeleton() {

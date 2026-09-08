@@ -41,8 +41,6 @@ export function InvestmentLabChartCanvas({
   const [width, setWidth] = useState(920);
   const [plotHeight, setPlotHeight] = useState(370);
   const [hover, setHover] = useState<number | null>(null);
-  const [keyboardIndex, setKeyboardIndex] = useState(0);
-  const [keyboardFocus, setKeyboardFocus] = useState(false);
   const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
   const id = useId();
   useEffect(() => {
@@ -96,7 +94,7 @@ export function InvestmentLabChartCanvas({
       };
     }, [actual.points, selected.points, width, left, bottom, domain]);
   const focusIndex =
-    hover ?? (keyboardFocus ? Math.min(keyboardIndex, dates.length - 1) : pinnedIndex === null ? dates.length - 1 : Math.min(pinnedIndex, dates.length - 1));
+    Math.max(0, Math.min(hover ?? pinnedIndex ?? dates.length - 1, dates.length - 1));
   const actualPoint = focusIndex === null ? null : actual.points[focusIndex];
   const selectedPoint =
     focusIndex === null ? null : selected.points[focusIndex];
@@ -126,7 +124,7 @@ export function InvestmentLabChartCanvas({
         {sidebar}
       {actualPoint && selectedPoint ? (
         <div className={styles.chartReadout} data-lab-tooltip>
-          <div><p>{actualPoint.serviceDate.replaceAll("-", ".")}<span>{hover === null && pinnedIndex === null && !keyboardFocus ? "종료일의 차이" : "선택일의 차이"}</span></p><strong className={labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}>{labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}</strong></div>
+          <div><p>{actualPoint.serviceDate.replaceAll("-", ".")}<span>{hover === null && pinnedIndex === null ? "종료일의 차이" : "선택일의 차이"}</span></p><strong className={labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}>{labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}</strong></div>
           <dl><div><dt>실제</dt><dd>{labKrw(actualPoint.valueKrw)}</dd></div><div><dt>가상</dt><dd>{labKrw(selectedPoint.valueKrw)}</dd></div></dl>
           {selectedPoint.hasPendingExecution ? <p className="text-[11px] text-[var(--warning)]">이 평가일에는 대기 거래가 포함됩니다.</p> : null}
         </div>
@@ -257,15 +255,13 @@ export function InvestmentLabChartCanvas({
       </svg>
       <input
         aria-label="비교 그래프 날짜 탐색"
-        aria-valuetext={`${dates[Math.min(keyboardIndex, dates.length - 1)]} 실제 ${labKrw(actual.points[Math.min(keyboardIndex, dates.length - 1)]?.valueKrw ?? null)} 비교 ${labKrw(selected.points[Math.min(keyboardIndex, dates.length - 1)]?.valueKrw ?? null)}`}
+        aria-valuetext={`${dates[focusIndex]} 실제 ${labKrw(actualPoint?.valueKrw ?? null)} 비교 ${labKrw(selectedPoint?.valueKrw ?? null)}`}
         className="absolute inset-x-0 bottom-0 h-3 w-full opacity-0 accent-[var(--brand)] focus:opacity-100"
         max={dates.length - 1}
         min={0}
-        onBlur={() => setKeyboardFocus(false)}
-        onChange={(event) => setKeyboardIndex(Number(event.target.value))}
-        onFocus={() => setKeyboardFocus(true)}
+        onChange={(event) => { setHover(null); setPinnedIndex(Number(event.target.value)); }}
         type="range"
-        value={Math.min(keyboardIndex, dates.length - 1)}
+        value={focusIndex}
       />
       </div>
     </div>

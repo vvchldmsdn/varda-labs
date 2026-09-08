@@ -120,9 +120,7 @@ export function selectTodayHoldingDetail(
     return { status: "empty", query };
   }
 
-  const candidates = data.holdings.filter((holding) =>
-    matchesHoldingSelector(holding, query),
-  );
+  const candidates = selectTodayHoldingCandidates(data.holdings, query);
 
   if (candidates.length === 0) {
     return { status: "not_found", query };
@@ -165,8 +163,15 @@ export function todayHoldingDetailHref(
   });
 }
 
+export function selectTodayHoldingCandidates<
+  THolding extends Pick<TodayHoldingDetailHolding, "account" | "ticker" | "market">,
+>(holdings: readonly THolding[], query: TodayHoldingDetailQuery): THolding[] {
+  if (!query.ticker) return [];
+  return holdings.filter((holding) => matchesHoldingSelector(holding, query));
+}
+
 function matchesHoldingSelector(
-  holding: DetailHoldingInput,
+  holding: Pick<TodayHoldingDetailHolding, "account" | "ticker" | "market">,
   query: TodayHoldingDetailQuery,
 ) {
   if (query.holdingAccount && holding.account !== query.holdingAccount) {

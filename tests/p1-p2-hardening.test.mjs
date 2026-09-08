@@ -35,7 +35,7 @@ describe("P1/P2 hardening boundaries", () => {
     );
     const panel = read("src/components/holding-analysis-data-panel.tsx");
     const investmentLab = read("src/app/investment-lab/page.tsx");
-    const simulation = read("src/app/simulation/page.tsx");
+    const simulation = read("src/components/simulation/simulation-remote-panel.tsx");
 
     assert.match(query, /^import "server-only";/);
     assert.match(query, /getReadOnlyTenantHoldings\(options\)/);

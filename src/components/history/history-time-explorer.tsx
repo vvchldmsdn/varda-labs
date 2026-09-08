@@ -82,6 +82,7 @@ export function HistoryTimeExplorer({
           평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면
           같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다.
         </p>
+        {details ? <div className="mt-6 flex justify-center">{details}</div> : null}
       </section>
     );
   }
@@ -140,10 +141,10 @@ export function HistoryTimeExplorer({
       <footer className={styles.stageFooter}>
         <p>저장값 · 현금흐름 미보정</p>
         <div>
-          <PresentationDialog label="날짜별 기록" title="날짜별 저장 기록">
+          <PresentationDialog mountOnOpen label="날짜별 기록" title="날짜별 저장 기록">
             <HistorySnapshotRail onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
           </PresentationDialog>
-          <PresentationDialog label="기간 요약·근거" title="히스토리 계산 근거" description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." wide>
+          <PresentationDialog mountOnOpen label="기간 요약·근거" title="히스토리 계산 근거" description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." wide>
             <dl className={styles.overview}>
               <div><dt className={styles.label}>저장 수익률</dt><dd className={`${styles.value} ${tone(inspectedPoint?.totalReturnPct ?? null)}`}>{formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)}</dd><dd className={styles.note}>손익 {formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)}</dd></div>
               <div><dt className={styles.label}>기간 평가액 변화</dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{formatSignedKrw(rangeSummary.changeKrw)}</dd><dd className={styles.note}>현금흐름 미보정</dd></div>

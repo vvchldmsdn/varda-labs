@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { HistoryEvidenceLink as Link, HistoryEvidenceForm } from "./history-records-dialog";
 
 import type { HistoryPositionComparisonModel } from "@/lib/history-position-comparison";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
@@ -86,9 +86,7 @@ function ComparisonForm({
   scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
-    <form
-      action="/history"
-      method="get"
+    <HistoryEvidenceForm
       className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
     >
       <input type="hidden" name="scope" value={scopeKey} />
@@ -116,7 +114,7 @@ function ComparisonForm({
           비교
         </button>
       </div>
-    </form>
+    </HistoryEvidenceForm>
   );
 }
 

@@ -113,10 +113,14 @@ describe("simulation presentation", () => {
       assert.ok(controls.includes(JSON.stringify(key)));
     }
     assert.match(controls, /scroll=\{false\}/);
-    assert.match(workspace, /router\.push/);
-    assert.match(workspace, /loadedPanel !== activeOverlay/);
+    assert.match(workspace, /useResearchPanelNavigation/);
+    assert.match(workspace, /<RemotePanel/);
+    assert.doesNotMatch(workspace, /router\.push|loadedPanel/);
     assert.match(workspace, /<dialog/);
-    assert.match(workspace, /addEventListener\("popstate"/);
+    const resource = readFileSync("src/components/investment-lab/research-detail-resource.tsx", "utf8");
+    assert.match(resource, /useSearchParams/);
+    assert.match(resource, /window\.history\.pushState/);
+    assert.match(resource, /window\.history\.replaceState/);
     assert.match(workspace, /data-simulation-workspace="integrated"/);
     assert.doesNotMatch(workspace, /role="tablist"/);
   });

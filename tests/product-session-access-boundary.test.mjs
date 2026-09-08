@@ -27,11 +27,8 @@ const PRODUCT_PAGES = Object.freeze([
     "src/app/investment-lab/page.tsx",
     [
       "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({",
-      "getReadOnlyTenantPortfolioStructureForScope({",
       "getReadOnlyTenantInvestmentLabDataAvailabilityForScope({",
-      "getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(",
       "getReadOnlyTenantInvestmentLabCounterfactualForScope({",
-      "getReadOnlyTenantInvestmentLabStressReplay({",
     ],
   ],
   [
@@ -39,10 +36,6 @@ const PRODUCT_PAGES = Object.freeze([
     [
       "getReadOnlySimulationInputReadiness({",
       "getReadOnlyTenantSimulationOwnerResearch({",
-      "getReadOnlySimulationHistoricalOutcomeValidation({",
-      "getReadOnlySimulationRegimeBootstrap({",
-      "getReadOnlySimulationRegimeHistoricalOutcomeValidation({",
-      "getReadOnlySimulationResearchUniversePreflight({",
     ],
   ],
   ["src/app/etfs/page.tsx", ["searchReadOnlyEtfMasters({"]],
@@ -106,6 +99,17 @@ describe("product session access boundary", () => {
       }
       assert.doesNotMatch(source, /\bfetch\s*\(/, `${path}: browser/API refetch`);
     }
+  });
+
+  it("authenticates deferred research requests before starting tenant detail reads", () => {
+    for (const domain of ["investment-lab", "simulation"]) {
+      const source = read(`src/app/api/research/${domain}/route.ts`);
+      assert.match(source, /resolveResearchDetailContext\(query\)/);
+      assert.ok(source.indexOf("if (!context.ok)") < source.indexOf(domain === "simulation" ? "await loadSimulationDetail" : "await loadInvestmentLabDetail"));
+      assert.match(source, /RESEARCH_DETAIL_HEADERS/);
+    }
+    const context = read("src/lib/auth/research-detail-context.ts");
+    assert.ok(context.indexOf("if (!resolution.ok)") < context.indexOf("await getReadOnlyTenantPortfolioAnalysisScopeContext"));
   });
 
   it("derives Simulation owner inputs from the resolved tenant portfolio", () => {

@@ -51,6 +51,34 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
   const resolvedMa120Mode =
     ma120Mode ?? resolveMa120Mode(settingsRows?.[0]?.useTrendFilter ?? false);
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
+  return buildLegacyPreviewFromEvidence({
+    account,
+    cashAmountKrw,
+    serviceDate,
+    approvedPolicyRead,
+    currentUniverse,
+    structure,
+    ma120Mode: resolvedMa120Mode,
+  });
+}
+
+async function buildLegacyPreviewFromEvidence({
+  account,
+  cashAmountKrw,
+  serviceDate,
+  approvedPolicyRead,
+  currentUniverse,
+  structure,
+  ma120Mode,
+}: {
+  account: string;
+  cashAmountKrw: number;
+  serviceDate: string;
+  approvedPolicyRead: Awaited<ReturnType<typeof getReadOnlyTenantApprovedTargetPolicy>>;
+  currentUniverse: Awaited<ReturnType<typeof getReadOnlyTenantTargetPolicyHoldingUniverse>>;
+  structure: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioStructure>>;
+  ma120Mode: AdditionalContributionMa120OverlayMode;
+}) {
   const preview = buildAdditionalContributionPreview({
     account,
     cashAmountKrw,
@@ -76,7 +104,7 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
   return attachAdditionalContributionMa120Evidence({
     preview,
     ma120Read,
-    mode: resolvedMa120Mode,
+    mode: ma120Mode,
   });
 }
 
@@ -120,12 +148,40 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     scope.kind === "account" &&
     LEGACY_TARGET_POLICY_ACCOUNTS.has(scope.accountCode.toLowerCase())
   ) {
-    const legacyPreview = await getReadOnlyTenantAdditionalContributionPreview({
-      account: scope.accountCode,
-      cashAmountKrw,
+    const account = scope.accountCode.toLowerCase();
+    const approvedPolicyRead = await getReadOnlyTenantApprovedTargetPolicy({
+      account,
       tenantContext,
+    });
+    if (approvedPolicyRead.status !== "available") {
+      return Object.freeze({
+        ...scopedBlocked(scope, serviceDate, [
+          approvedPolicyRead.status === "conflict"
+            ? "target_policy_conflict"
+            : "target_policy_missing",
+        ]),
+        source: "legacy_account_policy" as const,
+      });
+    }
+    // The legacy universe includes all current holdings, including instruments
+    // excluded by the scoped investment model. Keep its independent hash check,
+    // but reuse the valuation already authorized for this exact account UUID.
+    const currentUniverse = await getReadOnlyTenantTargetPolicyHoldingUniverse({
+      account,
+      tenantContext,
+    });
+    const legacyPreview = await buildLegacyPreviewFromEvidence({
+      account,
+      cashAmountKrw,
+      serviceDate,
+      approvedPolicyRead,
+      currentUniverse,
+      structure: {
+        ...model.structure,
+        selectedAccount: account as "brokerage" | "isa" | "irp",
+        holdingRows: [...model.ma120HoldingRows],
+      },
       ma120Mode,
-      now,
     });
     return adaptLegacyPreview({
       model,

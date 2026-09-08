@@ -73,89 +73,40 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /endServiceDate: params\.end/);
     assert.match(page, /horizon: params\.horizon/);
     assert.match(page, /kodexWeight: params\.kodexWeight/);
-    assert.match(
-      page,
-      /researchUniverse: params\.researchUniverse/,
-    );
+    const detailQuery = read("src/db/queries/simulation-detail.ts");
+    const detailRoute = read("src/app/api/research/simulation/route.ts");
+    const remote = read("src/components/simulation/simulation-remote-panel.tsx");
     assert.match(page, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
     assert.match(page, /scope: selectedScope/);
-    assert.match(page, /const serviceDate = resolveSnapshotCycle/);
-    assert.match(
-      page,
-      /getReadOnlyTenantHoldingAnalysisDataReadinessForScope\([\s\S]*scope: selectedScope,[\s\S]*serviceDate,[\s\S]*tenantContext: resolution\.tenantContext/,
-    );
-    assert.match(page, /HoldingAnalysisDataPanel/);
     assert.match(page, /tenantContext: resolution\.tenantContext/);
+    assert.match(page, /includeResearch: false/);
     assert.match(page, /getReadOnlyTenantSimulationOwnerResearch/);
-    assert.match(
-      page,
-      /getReadOnlyTenantSimulationOwnerParametricFactorResearch/,
-    );
-    assert.match(
-      page,
-      /getReadOnlyTenantSimulationOwnerModelComparison/,
-    );
-    assert.match(
-      page,
-      /getReadOnlyTenantSimulationOwnerModelCalibration/,
-    );
-    assert.match(
-      page,
-      /researchUniverse=\{preservedQuery\.researchUniverse\}/,
-    );
+    assert.doesNotMatch(page, /requestedPanel|loadSimulationDetail|getReadOnlySimulationRegimeBootstrap/);
+    assert.match(detailQuery, /^import "server-only";/);
+    assert.match(detailQuery, /endServiceDate: query\.end/);
+    assert.match(detailQuery, /horizon: query\.horizon/);
+    assert.match(detailQuery, /researchUniverse: query\.researchUniverse/);
+    assert.match(detailQuery, /panel === "evidence"/);
+    assert.match(detailQuery, /panel === "validation"/);
+    assert.match(detailQuery, /panel === "weights"/);
+    assert.match(detailQuery, /Promise\.all\(\[ownerPromise/);
+    assert.match(detailRoute, /resolveResearchDetailContext\(query\)/);
+    assert.ok(detailRoute.indexOf("if (!context.ok)") < detailRoute.indexOf("await loadSimulationDetail"));
     assert.match(inputReadinessView, /buildSimulationHref/);
     assert.doesNotMatch(inputReadinessView, /new URLSearchParams/);
     assert.match(fixedMixView, /buildSimulationHref/);
     assert.match(fixedMixView, /name="researchUniverse"/);
     assert.doesNotMatch(fixedMixView, /new URLSearchParams/);
-    assert.match(navigation, /params\.set\("researchUniverse"/);
-    assert.match(navigation, /params\.set\("scope"/);
-    assert.match(navigation, /params\.set\("account"/);
-    assert.match(page, /getReadOnlySimulationRegimeBootstrap/);
-    assert.match(
-      page,
-      /getReadOnlySimulationRegimeHistoricalOutcomeValidation/,
-    );
-    assert.match(page, /getReadOnlySimulationHistoricalOutcomeValidation/);
-    assert.equal(
-      page.match(/<SimulationSectionErrorBoundary/g)?.length,
-      12,
-      "each independent simulation query section must have its own error boundary",
-    );
-    assert.match(page, /ownerResearchExecution=\{/);
-    assert.match(page, /ownerCandidateComparison=\{/);
-    assert.match(page, /ownerWalkForwardValidation=\{/);
-    assert.match(page, /ownerHistoricalValidation=\{/);
+    for (const key of ["researchUniverse", "scope", "account"]) assert.ok(navigation.includes(`params.set("${key}"`));
+    assert.match(page, /<SimulationSectionErrorBoundary/);
     assert.match(page, /OwnerResearchExecutionContent/);
-    assert.match(page, /OwnerCandidateComparisonContent/);
-    assert.match(page, /OwnerWalkForwardValidationContent/);
-    assert.match(page, /OwnerHistoricalValidationContent/);
-    assert.equal(
-      page.match(/resultPromise=\{ownerResearchPromise\}/g)?.length,
-      5,
-      "owner input and result sections must reuse the started owner research promise",
-    );
+    for (const section of ["OwnerCandidateComparisonSection", "OwnerWalkForwardValidationSection", "OwnerHistoricalOutcomeValidationSection", "OwnerInputPreflightSection", "HoldingAnalysisDataPanelView", "OwnerParametricFactorSection", "OwnerModelComparisonSection", "OwnerModelCalibrationSection", "FanBandValidationSection", "DownsideOutcomeValidationSection", "RegimeHistoricalOutcomeValidationSection", "RegimeReadinessHistoryPanel", "RegimeBootstrapResearchSection", "ResearchUniversePreflightSection"]) {
+      assert.ok(remote.includes(`protect("${section}", <${section}`), `${section} retains an independent render boundary`);
+    }
     assert.match(sectionErrorBoundary, /^"use client";/);
     assert.match(sectionErrorBoundary, /catchError/);
     assert.match(sectionErrorBoundary, /retry/);
     assert.doesNotMatch(sectionErrorBoundary, /error\.message|error\.digest/);
-    assert.match(page, /historicalOutcomeValidationPromise/);
-    assert.match(page, /FanBandValidationSection/);
-    assert.match(page, /DownsideOutcomeValidationSection/);
-    assert.match(
-      page,
-      /<Suspense fallback=\{<HistoricalOutcomeValidationSkeleton \/>\}>/,
-    );
-    assert.match(page, /regimePromise/);
-    assert.match(page, /RegimeReadinessHistoryPanel/);
-    assert.match(page, /RegimeHistoricalOutcomeValidationSection/);
-    assert.match(page, /regimeHistoricalOutcomeValidationPromise/);
-    assert.match(
-      page,
-      /<RegimeHistoricalOutcomeValidationSkeleton \/>/,
-    );
-    assert.match(page, /RegimeBootstrapResearchSection/);
-    assert.match(page, /<Suspense fallback=\{<RegimeBootstrapSkeleton \/>\}>/);
     assert.doesNotMatch(page, /params\.end\[0\]/);
     assert.match(query, /resolveSimulationEndServiceDateSelection/);
     assert.match(query, /getReadOnlySimulationPeriodPreflightBatch/);
@@ -610,6 +561,7 @@ function read(path) {
 
 function readSimulationView() {
   return [
+    "src/components/simulation/simulation-detail-view.tsx",
     "src/components/simulation/simulation-input-readiness-view.tsx",
     "src/components/simulation/fixed-mix-research-execution-section.tsx",
     "src/components/simulation/fixed-mix-research-comparison-section.tsx",
