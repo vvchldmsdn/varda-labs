@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
+import { resolveInvestmentLabPanel, type InvestmentLabPanel } from "@/lib/investment-lab-panel";
 import {
   ArrowUpRight,
   Layers3,
@@ -10,25 +12,29 @@ import {
 } from "lucide-react";
 import styles from "./investment-lab-modern.module.css";
 
-type LabOverlay = "weights" | "composition";
+type LabOverlay = InvestmentLabPanel;
 
 export function InvestmentLabWorkspace({
   comparison,
   experiments,
   composition,
   tools,
+  loadedPanel,
 }: {
   comparison: ReactNode;
   experiments: ReactNode;
   composition: ReactNode;
   tools?: ReactNode;
+  loadedPanel: InvestmentLabPanel | null;
 }) {
   const params = useSearchParams();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [activeOverlay, setActiveOverlay] = useState<LabOverlay | null>(() => {
-    const requested = params.get("view");
-    return isLabOverlay(requested) ? requested : null;
+    const requested = params.getAll("view");
+    return resolveInvestmentLabPanel(requested.length === 1 ? requested[0] : null);
   });
 
   useEffect(() => {
@@ -38,17 +44,13 @@ export function InvestmentLabWorkspace({
 
   useEffect(() => {
     if (!activeOverlay) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return acquireBodyScrollLock(document.body);
   }, [activeOverlay]);
 
   useEffect(() => {
     function syncOverlayFromHistory() {
-      const requested = new URLSearchParams(window.location.search).get("view");
-      const nextOverlay = isLabOverlay(requested) ? requested : null;
+      const requested = new URLSearchParams(window.location.search).getAll("view");
+      const nextOverlay = resolveInvestmentLabPanel(requested.length === 1 ? requested[0] : null);
       setActiveOverlay(nextOverlay);
       if (!nextOverlay && dialogRef.current?.open) dialogRef.current.close();
     }
@@ -61,7 +63,9 @@ export function InvestmentLabWorkspace({
     setActiveOverlay(view);
     const next = new URLSearchParams(window.location.search);
     next.set("view", view);
-    window.history.pushState(null, "", `${window.location.pathname}?${next}`);
+    startTransition(() => {
+      router.push(`${window.location.pathname}?${next}`, { scroll: false });
+    });
   }
 
   function closeOverlay() {
@@ -73,11 +77,9 @@ export function InvestmentLabWorkspace({
     const next = new URLSearchParams(window.location.search);
     next.delete("view");
     const query = next.toString();
-    window.history.replaceState(
-      null,
-      "",
-      query ? `${window.location.pathname}?${query}` : window.location.pathname,
-    );
+    const href = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    if (isPending) startTransition(() => router.replace(href, { scroll: false }));
+    else window.history.replaceState(null, "", href);
   }
 
   const activeContent =
@@ -111,7 +113,10 @@ export function InvestmentLabWorkspace({
         onClick={(event) => {
           if (event.target === event.currentTarget) closeOverlay();
         }}
-        onClose={finishClose}
+        onClose={(event) => {
+          event.stopPropagation();
+          if (event.target === event.currentTarget) finishClose();
+        }}
         ref={dialogRef}
       >
         <div className="varda-presentation-dialog-shell">
@@ -133,14 +138,12 @@ export function InvestmentLabWorkspace({
             </button>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
-            {activeContent}
+            {activeOverlay && loadedPanel !== activeOverlay
+              ? <p role="status" className="motion-safe:animate-pulse py-10 text-sm text-[var(--muted)]">선택한 분석을 계산하고 있습니다.</p>
+              : activeOverlay ? activeContent : null}
           </div>
         </div>
       </dialog>
     </div>
   );
-}
-
-function isLabOverlay(value: string | null): value is LabOverlay {
-  return value === "weights" || value === "composition";
 }

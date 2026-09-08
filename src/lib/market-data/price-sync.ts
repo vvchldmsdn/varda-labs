@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
 import {
   accounts,
   assets,
@@ -245,7 +246,7 @@ export async function getKisPriceSyncCooldownStatus(
   };
 }
 
-export async function runMarketPriceSync(options: {
+type MarketPriceSyncOptions = {
   mode: PriceSyncMode;
   dryRun?: boolean;
   fixture?: boolean;
@@ -254,7 +255,25 @@ export async function runMarketPriceSync(options: {
   targetLimit?: number;
   targetFilter?: PriceSyncTargetFilter;
   explicitTargets?: readonly ExplicitPriceSyncTarget[];
-}): Promise<PriceSyncRunResult> {
+};
+
+export async function runMarketPriceSync(options: MarketPriceSyncOptions): Promise<PriceSyncRunResult> {
+  if (options.provider?.name !== "kis" || (options.dryRun ?? true)) {
+    return runMarketPriceSyncWithLease(options);
+  }
+  try {
+    return await withKisRefreshLease(() => runMarketPriceSyncWithLease(options));
+  } catch (error) {
+    if (error instanceof KisRefreshLeaseBusyError) {
+      throw new PriceSyncRequestError("provider_cooldown", error.message, {
+        retryAfterSeconds: error.retryAfterSeconds,
+      }, 429);
+    }
+    throw error;
+  }
+}
+
+async function runMarketPriceSyncWithLease(options: MarketPriceSyncOptions): Promise<PriceSyncRunResult> {
   const provider = options.provider ?? createStubMarketDataProvider();
   const dryRun = options.dryRun ?? true;
   const fixture = options.fixture ?? false;

@@ -7,6 +7,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "보유 종목 추가 | VARDA LABS" };
+
 export default async function NewHoldingPage() {
   const resolution = await resolveCurrentTenantContext();
   const options = resolution.ok

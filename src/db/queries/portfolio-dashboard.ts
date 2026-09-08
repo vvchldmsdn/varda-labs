@@ -21,6 +21,7 @@ import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
 import { loadActiveTenantAllocationGroups } from "@/db/queries/tenant-group-reads";
 import { loadLatestTenantPortfolioSettingsRows } from "@/db/queries/tenant-settings";
+import { loadUsablePortfolioFxRows } from "@/db/queries/portfolio-fx-rates";
 import {
   accounts,
   assetPriceSnapshots,
@@ -28,7 +29,6 @@ import {
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
   eventLedgerEntries,
-  fxRates,
   livePriceQuotes,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
@@ -91,22 +91,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
               ),
             ),
       loadLatestTenantPortfolioSettingsRows(tenantContext),
-      db
-        .select()
-        .from(fxRates)
-        .where(
-          and(
-            eq(fxRates.isSample, false),
-            eq(sql<string>`lower(trim(${fxRates.status}))`, "ok"),
-            sql`${fxRates.usdKrw} > 0`,
-          ),
-        )
-        .orderBy(
-          desc(fxRates.rateDate),
-          sql`${fxRates.fetchedAt} desc nulls last`,
-          desc(fxRates.createdAt),
-        )
-        .limit(RECENT_FX_OBSERVATION_LIMIT),
+      loadUsablePortfolioFxRows(RECENT_FX_OBSERVATION_LIMIT),
     ]);
 
   const activeAccountIds = new Set(allAccountRows.map((account) => account.id));

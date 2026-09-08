@@ -1,5 +1,6 @@
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense } from "react";
+import { resolveSimulationPanel, type SimulationPanel } from "@/lib/simulation-panel";
 
 import {
   HoldingAnalysisDataPanel,
@@ -42,6 +43,8 @@ import type {
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "시뮬레이션 | VARDA LABS" };
 
 type SimulationPageProps = {
   searchParams: Promise<{
@@ -105,14 +108,16 @@ export default async function SimulationPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  const requestedPanel = resolveSimulationPanel(params.view);
   const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
-  const analysisDataReadinessPromise =
+  const analysisDataReadinessPromise = requestedPanel === "evidence" ?
     getReadOnlyTenantHoldingAnalysisDataReadinessForScope({
       scope: selectedScope,
       serviceDate,
       tenantContext: resolution.tenantContext,
-    });
+    }) : null;
   const modelPromise = getReadOnlySimulationInputReadiness({
+    includeResearch: requestedPanel === "validation" || requestedPanel === "evidence",
     endServiceDate: params.end,
     horizon: params.horizon,
     kodexWeight: params.kodexWeight,
@@ -125,37 +130,37 @@ export default async function SimulationPage({
       serviceDate,
       tenantContext: resolution.tenantContext,
     });
-  const ownerParametricFactorPromise =
+  const ownerParametricFactorPromise = requestedPanel === "evidence" ?
     getReadOnlyTenantSimulationOwnerParametricFactorResearch({
       ownerResearchPromise,
-    });
-  const ownerModelComparisonPromise =
+    }) : null;
+  const ownerModelComparisonPromise = requestedPanel === "evidence" ?
     getReadOnlyTenantSimulationOwnerModelComparison({
       ownerResearchPromise,
-      parametricFactorPromise: ownerParametricFactorPromise,
-    });
-  const ownerModelCalibrationPromise =
+      parametricFactorPromise: ownerParametricFactorPromise!,
+    }) : null;
+  const ownerModelCalibrationPromise = requestedPanel === "evidence" ?
     getReadOnlyTenantSimulationOwnerModelCalibration({
       ownerResearchPromise,
-    });
-  const historicalOutcomeValidationPromise =
+    }) : null;
+  const historicalOutcomeValidationPromise = requestedPanel === "validation" ?
     getReadOnlySimulationHistoricalOutcomeValidation({
       endServiceDate: params.end,
       horizon: params.horizon,
-    });
-  const regimePromise = getReadOnlySimulationRegimeBootstrap({
+    }) : null;
+  const regimePromise = requestedPanel === "evidence" ? getReadOnlySimulationRegimeBootstrap({
     endServiceDate: params.end,
     kodexWeight: params.kodexWeight,
-  });
-  const regimeHistoricalOutcomeValidationPromise =
+  }) : null;
+  const regimeHistoricalOutcomeValidationPromise = requestedPanel === "validation" ?
     getReadOnlySimulationRegimeHistoricalOutcomeValidation({
       endServiceDate: params.end,
-    });
-  const researchUniversePreflightPromise =
+    }) : null;
+  const researchUniversePreflightPromise = requestedPanel === "evidence" ?
     getReadOnlySimulationResearchUniversePreflight({
       endServiceDate: params.end,
       researchUniverse: params.researchUniverse,
-    });
+    }) : null;
   const preservedQuery = Object.freeze({
     scope: selectedScope.key,
     end: singleQueryValue(params.end),
@@ -167,6 +172,7 @@ export default async function SimulationPage({
   return (
     <Suspense fallback={<SimulationSkeleton />}>
       <SimulationContent
+        requestedPanel={requestedPanel}
         historicalOutcomeValidationPromise={
           historicalOutcomeValidationPromise
         }
@@ -192,6 +198,7 @@ export default async function SimulationPage({
 }
 
 async function SimulationContent({
+  requestedPanel,
   analysisDataReadinessPromise,
   historicalOutcomeValidationPromise,
   modelPromise,
@@ -206,32 +213,33 @@ async function SimulationContent({
   scopeCatalog,
   selectedScope,
 }: {
+  requestedPanel: SimulationPanel | null;
   analysisDataReadinessPromise: ReturnType<
     typeof getReadOnlyTenantHoldingAnalysisDataReadinessForScope
-  >;
+  > | null;
   historicalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationHistoricalOutcomeValidation
-  >;
+  > | null;
   modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
   ownerResearchPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerResearch
   >;
   ownerParametricFactorPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerParametricFactorResearch
-  >;
+  > | null;
   ownerModelCalibrationPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerModelCalibration
-  >;
+  > | null;
   ownerModelComparisonPromise: ReturnType<
     typeof getReadOnlyTenantSimulationOwnerModelComparison
-  >;
-  regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
+  > | null;
+  regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap> | null;
   regimeHistoricalOutcomeValidationPromise: ReturnType<
     typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
-  >;
+  > | null;
   researchUniversePreflightPromise: ReturnType<
     typeof getReadOnlySimulationResearchUniversePreflight
-  >;
+  > | null;
   preservedQuery: SimulationPreservedQuery;
   scopeCatalog: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
@@ -239,8 +247,9 @@ async function SimulationContent({
   const model = await modelPromise;
   return (
     <SimulationInputReadinessView
+      loadedPanel={requestedPanel}
       scopeCatalog={scopeCatalog}
-      historicalOutcomeValidation={
+      historicalOutcomeValidation={historicalOutcomeValidationPromise &&
         <SimulationSectionErrorBoundary
           section="historical-outcome-validation"
           title="과거 결과 검증"
@@ -255,7 +264,7 @@ async function SimulationContent({
         </SimulationSectionErrorBoundary>
       }
       model={model}
-      ownerInputPreflight={
+      ownerInputPreflight={analysisDataReadinessPromise &&
         <SimulationSectionErrorBoundary
           section="owner-input-preflight"
           title="내 포트폴리오 입력 점검"
@@ -296,7 +305,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      ownerCandidateComparison={
+      ownerCandidateComparison={requestedPanel === "weights" &&
         <SimulationSectionErrorBoundary
           section="owner-candidate-comparison"
           title="변동성 완화 후보 비교"
@@ -315,7 +324,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      ownerWalkForwardValidation={
+      ownerWalkForwardValidation={requestedPanel === "validation" &&
         <SimulationSectionErrorBoundary
           section="owner-walk-forward-validation"
           title="과거 구간 밖 검증"
@@ -334,7 +343,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      ownerHistoricalValidation={
+      ownerHistoricalValidation={requestedPanel === "validation" &&
         <SimulationSectionErrorBoundary
           section="owner-historical-validation"
           title="내 포트폴리오 예측 범위와 실제 결과"
@@ -353,7 +362,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      ownerParametricFactor={
+      ownerParametricFactor={ownerParametricFactorPromise &&
         <SimulationSectionErrorBoundary
           section="owner-parametric-factor"
           title="환율·금리 요인 확률모형"
@@ -365,7 +374,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      ownerModelComparison={
+      ownerModelComparison={ownerModelComparisonPromise &&
         <SimulationSectionErrorBoundary
           section="owner-model-comparison"
           title="두 확률모형 비교"
@@ -377,7 +386,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      ownerModelCalibration={
+      ownerModelCalibration={ownerModelCalibrationPromise &&
         <SimulationSectionErrorBoundary
           section="owner-model-calibration"
           title="과거 결과 모형 점검"
@@ -391,7 +400,7 @@ async function SimulationContent({
       }
       researchUniverse={preservedQuery.researchUniverse}
       selectedScopeKey={preservedQuery.scope}
-      researchUniversePreflight={
+      researchUniversePreflight={researchUniversePreflightPromise &&
         <SimulationSectionErrorBoundary
           section="research-universe-preflight"
           title="연구 종목 데이터 점검"
@@ -404,7 +413,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      regimeHistoricalOutcomeValidation={
+      regimeHistoricalOutcomeValidation={regimeHistoricalOutcomeValidationPromise &&
         <SimulationSectionErrorBoundary
           section="regime-historical-outcome-validation"
           title="시장 국면 모델 과거 결과 대조"
@@ -422,7 +431,7 @@ async function SimulationContent({
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
-      regimeBootstrap={
+      regimeBootstrap={regimePromise &&
         <SimulationSectionErrorBoundary
           section="regime-bootstrap"
           title="시장 국면 사후 연구"

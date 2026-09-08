@@ -24,6 +24,8 @@ const notoSansKr = Noto_Sans_KR({
 export const metadata: Metadata = {
   title: "VARDA LABS · 나의 포트폴리오",
   description: "자산의 흐름을 확인하고, 나의 포트폴리오를 계획하는 공간.",
+  // All current routes belong to the private portfolio application.
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

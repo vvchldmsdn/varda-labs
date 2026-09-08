@@ -15,6 +15,8 @@ import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "거래·자산 이벤트 | VARDA LABS" };
+
 type TenantEventsPageProps = {
   searchParams: Promise<{
     account?: string | string[];

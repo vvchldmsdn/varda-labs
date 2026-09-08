@@ -2,18 +2,14 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
 import {
-  accounts,
   assetPriceSnapshots,
-  assets,
   etfMasters,
-  holdingOnboardingEvidence,
   livePriceQuotes,
-  portfolioGroupAssetMemberships,
-  portfolioGroups,
 } from "@/db/schema";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
@@ -24,7 +20,6 @@ import {
 } from "@/lib/holding-onboarding";
 import {
   assertActiveTenantWriteAllowed,
-  canonicalOwnerAssignment,
   prepareTenantWriteContext,
 } from "@/lib/tenant-write-context";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
@@ -51,51 +46,6 @@ export async function writeSessionHoldingOnboarding(
   const ownerUserId = resolution.tenantContext.ownerUserId;
 
   try {
-    const accountRows = await db
-      .select({
-        id: accounts.id,
-        code: accounts.code,
-        ownerUserId: accounts.canonicalOwnerUserId,
-      })
-      .from(accounts)
-      .where(
-        and(
-          eq(accounts.id, parsed.input.accountId),
-          eq(accounts.canonicalOwnerUserId, ownerUserId),
-          eq(accounts.isActive, true),
-        ),
-      )
-      .limit(2);
-    if (accountRows.length !== 1) {
-      return state("conflict", "선택한 계좌를 사용할 수 없습니다.");
-    }
-    const [account] = accountRows;
-
-    const group = await resolvePortfolioGroup(parsed.input, ownerUserId);
-    if (!group.ok) return state("conflict", group.message);
-
-    const duplicate = await db
-      .select({ id: assets.id, archivedAt: assets.archivedAt })
-      .from(assets)
-      .where(
-        and(
-          eq(assets.canonicalOwnerUserId, ownerUserId),
-          eq(assets.accountId, account.id),
-          sql`lower(btrim(${assets.market})) = ${parsed.input.market}`,
-          sql`upper(btrim(${assets.currency})) = ${parsed.input.currency}`,
-          sql`upper(btrim(${assets.ticker})) = ${parsed.input.ticker}`,
-        ),
-      )
-      .limit(1);
-    if (duplicate.length > 0) {
-      return state(
-        "conflict",
-        duplicate[0]?.archivedAt === null
-          ? "같은 계좌에 이미 등록된 종목입니다. 기존 보유종목을 수정해 주세요."
-          : "같은 계좌에 종료된 보유종목이 있습니다. 보유종목 화면에서 복원해 주세요.",
-      );
-    }
-
     const [price, resolvedName] = await Promise.all([
       resolvePriceEvidence(parsed.input),
       resolveAssetName(parsed.input),
@@ -118,81 +68,25 @@ export async function writeSessionHoldingOnboarding(
     assertActiveTenantWriteAllowed({
       context: writeContext,
       operation: "insert",
-      referencedOwnerUserIds: [account.ownerUserId, group.ownerUserId],
+      referencedOwnerUserIds: [ownerUserId],
     });
 
     const recordedAt = new Date();
     const assetId = randomUUID();
-    const canonicalOwner = canonicalOwnerAssignment(writeContext);
-    const canonicalOwnerUserId = canonicalOwner.canonicalOwnerUserId;
-    if (!canonicalOwnerUserId) {
-      return state("error", "사용자 소유권을 확인하지 못했습니다.");
-    }
-    const assetInsert = db.insert(assets).values({
-      id: assetId,
-      canonicalOwnerUserId,
-      name: resolvedName,
-      ticker: parsed.input.ticker,
-      assetType: parsed.input.assetType,
-      market: parsed.input.market,
-      currency: parsed.input.currency,
-      account: account.code,
-      accountId: account.id,
-      quantity: parsed.input.quantity,
-      averageCost: parsed.input.averageCost,
-      currentPrice: price.currentPrice,
-      priceSource: price.priceSource,
-      priceFetchedAt: price.priceFetchedAt,
-      priceAsOf: price.priceAsOf,
-      priceQuoteType: price.priceQuoteType,
-      priceStatus: "ok",
-      createdAt: recordedAt,
-      updatedAt: recordedAt,
-    });
-    const evidenceInsert = db.insert(holdingOnboardingEvidence).values({
-      id: randomUUID(),
-      canonicalOwnerUserId,
-      assetId,
-      accountId: account.id,
-      quantity: parsed.input.quantity,
-      averageCost: parsed.input.averageCost,
-      currentPrice: price.currentPrice,
-      reportedReturnPct: parsed.input.reportedReturnPct,
-      currency: parsed.input.currency,
-      priceSource: price.priceSource,
-      priceAsOf: price.priceAsOf,
-      policyVersion: HOLDING_ONBOARDING_POLICY.version,
-      recordedAt,
-      createdAt: recordedAt,
-    });
-    const membershipInsert = db
-      .insert(portfolioGroupAssetMemberships)
-      .values({
-        id: randomUUID(),
-        canonicalOwnerUserId,
-        portfolioGroupId: group.id,
-        assetId,
-        validFrom: resolveSnapshotCycle(recordedAt).snapshotDate,
-        createdAt: recordedAt,
-      });
-
-    if (group.create) {
-      const groupInsert = db.insert(portfolioGroups).values({
-        id: group.id,
-        canonicalOwnerUserId,
-        name: group.name,
-        sortOrder: group.sortOrder,
-        createdAt: recordedAt,
-        updatedAt: recordedAt,
-      });
-      await db.batch([
-        groupInsert,
-        assetInsert,
-        evidenceInsert,
-        membershipInsert,
-      ]);
-    } else {
-      await db.batch([assetInsert, evidenceInsert, membershipInsert]);
+    const input = parsed.input;
+    // The owner lock is acquired before the transaction rechecks account/group
+    // ownership and lifecycle. Market evidence above is shared, read-only data.
+    const rows = await runPortfolioMutation(ownerUserId, ATOMIC_ONBOARDING_QUERY, [
+      ownerUserId, assetId, input.accountId, input.portfolioGroupId,
+      randomUUID(), input.newPortfolioGroupName, recordedAt.toISOString(),
+      resolveSnapshotCycle(recordedAt).snapshotDate, resolvedName, input.ticker,
+      input.assetType, input.market, input.currency, input.quantity,
+      input.averageCost, price.currentPrice, price.priceSource,
+      price.priceFetchedAt.toISOString(), price.priceAsOf?.toISOString() ?? null,
+      price.priceQuoteType, input.reportedReturnPct, HOLDING_ONBOARDING_POLICY.version,
+    ]);
+    if (Number(rows[0]?.saved_count ?? 0) !== 1) {
+      return state("conflict", "계좌 또는 분석 범위가 변경되었거나 보관되었습니다. 화면을 새로고침해 주세요.");
     }
     return state("success", "보유종목을 분석 범위에 추가했습니다.", assetId);
   } catch (error) {
@@ -202,92 +96,16 @@ export async function writeSessionHoldingOnboarding(
         "같은 종목이나 분석 범위가 먼저 등록되었습니다. 화면을 새로고침해 주세요.",
       );
     }
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? String(error.code) : null;
+    if (["23503", "55P03", "57014"].includes(code ?? "")) {
+      return state("conflict", "다른 변경이 먼저 반영되었습니다. 화면을 새로고침해 주세요.");
+    }
     return state(
       "error",
       "보유종목을 저장하지 못했습니다. 잠시 후 다시 확인해 주세요.",
     );
   }
-}
-
-async function resolvePortfolioGroup(
-  input: HoldingOnboardingInput,
-  ownerUserId: string,
-): Promise<
-  | Readonly<{
-      ok: true;
-      id: string;
-      name: string;
-      ownerUserId: string;
-      create: boolean;
-      sortOrder: number;
-    }>
-  | Readonly<{ ok: false; message: string }>
-> {
-  if (input.portfolioGroupId) {
-    const rows = await db
-      .select({
-        id: portfolioGroups.id,
-        name: portfolioGroups.name,
-        ownerUserId: portfolioGroups.canonicalOwnerUserId,
-        sortOrder: portfolioGroups.sortOrder,
-      })
-      .from(portfolioGroups)
-      .where(
-        and(
-          eq(portfolioGroups.id, input.portfolioGroupId),
-          eq(portfolioGroups.canonicalOwnerUserId, ownerUserId),
-          isNull(portfolioGroups.archivedAt),
-        ),
-      )
-      .limit(2);
-    return rows.length === 1
-      ? Object.freeze({ ok: true, ...rows[0], create: false })
-      : Object.freeze({
-          ok: false,
-          message: "선택한 분석 범위를 사용할 수 없습니다.",
-        });
-  }
-
-  const name = input.newPortfolioGroupName!;
-  const [duplicate, latest] = await Promise.all([
-    db
-      .select({ id: portfolioGroups.id })
-      .from(portfolioGroups)
-      .where(
-        and(
-          eq(portfolioGroups.canonicalOwnerUserId, ownerUserId),
-          isNull(portfolioGroups.archivedAt),
-          sql`lower(btrim(${portfolioGroups.name})) = ${name.toLowerCase()}`,
-        ),
-      )
-      .limit(1),
-    db
-      .select({ sortOrder: portfolioGroups.sortOrder })
-      .from(portfolioGroups)
-      .where(
-        and(
-          eq(portfolioGroups.canonicalOwnerUserId, ownerUserId),
-          isNull(portfolioGroups.archivedAt),
-        ),
-      )
-      .orderBy(desc(portfolioGroups.sortOrder))
-      .limit(1),
-  ]);
-  if (duplicate.length > 0) {
-    return Object.freeze({
-      ok: false,
-      message: "같은 이름의 분석 범위가 이미 있습니다.",
-    });
-  }
-
-  return Object.freeze({
-    ok: true,
-    id: randomUUID(),
-    name,
-    ownerUserId,
-    create: true,
-    sortOrder: (latest[0]?.sortOrder ?? -1) + 1,
-  });
 }
 
 async function resolveAssetName(input: HoldingOnboardingInput) {
@@ -402,3 +220,56 @@ function state(
 ): HoldingOnboardingActionState {
   return Object.freeze({ status, message, ...(assetId ? { assetId } : {}) });
 }
+
+const ATOMIC_ONBOARDING_QUERY = `
+with owned_account as materialized (
+  select id, code from accounts
+  where id = $3::uuid and canonical_owner_user_id = $1::uuid and is_active = true
+  for update
+), existing_group as materialized (
+  select id from portfolio_groups
+  where id = $4::uuid and canonical_owner_user_id = $1::uuid and archived_at is null
+  for update
+), created_group as (
+  insert into portfolio_groups (id, canonical_owner_user_id, name, sort_order, created_at, updated_at)
+  select $5::uuid, $1::uuid, $6::varchar,
+    coalesce((select max(sort_order) from portfolio_groups where canonical_owner_user_id = $1::uuid), -1) + 1,
+    $7::timestamptz, $7::timestamptz
+  where $4::uuid is null and $6::varchar is not null
+    and exists (select 1 from owned_account)
+    and not exists (select 1 from portfolio_groups
+      where canonical_owner_user_id = $1::uuid and archived_at is null and lower(name) = lower($6::varchar))
+  returning id
+), selected_group as materialized (
+  select id from existing_group union all select id from created_group
+), inserted_asset as (
+  insert into assets (
+    id, canonical_owner_user_id, account_id, account, name, ticker, asset_type,
+    market, currency, quantity, average_cost, current_price, price_source,
+    price_fetched_at, price_as_of, price_quote_type, price_status, created_at, updated_at
+  )
+  select $2::uuid, $1::uuid, account.id, account.code, $9::varchar, $10::varchar,
+    $11::varchar, $12::varchar, $13::varchar, $14::numeric, $15::numeric, $16::numeric,
+    $17::varchar, $18::timestamptz, $19::timestamptz, $20::varchar, 'ok', $7::timestamptz, $7::timestamptz
+  from owned_account account cross join selected_group
+  returning id
+), inserted_evidence as (
+  insert into holding_onboarding_evidence (
+    id, canonical_owner_user_id, asset_id, account_id, quantity, average_cost,
+    current_price, reported_return_pct, currency, price_source, price_as_of,
+    policy_version, recorded_at, created_at
+  )
+  select gen_random_uuid(), $1::uuid, asset.id, $3::uuid, $14::numeric, $15::numeric,
+    $16::numeric, $21::numeric, $13::varchar, $17::varchar, $19::timestamptz,
+    $22::varchar, $7::timestamptz, $7::timestamptz from inserted_asset asset
+  returning asset_id
+), inserted_membership as (
+  insert into portfolio_group_asset_memberships (
+    id, canonical_owner_user_id, portfolio_group_id, asset_id, valid_from, created_at
+  )
+  select gen_random_uuid(), $1::uuid, group_row.id, evidence.asset_id, $8::date, $7::timestamptz
+  from inserted_evidence evidence cross join selected_group group_row
+  returning asset_id
+)
+select count(*) as saved_count from inserted_membership
+`;

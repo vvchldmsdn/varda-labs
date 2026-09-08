@@ -67,6 +67,8 @@ export type PortfolioMovementPositionSnapshotInput = {
   currentPrice: string | number | null;
   fxRate: string | number | null;
   previousFxRate: string | number | null;
+  quantity?: string | number | null;
+  currency?: string | null;
 };
 
 export type PortfolioMovementEventInput = {
@@ -111,8 +113,8 @@ export type PortfolioMovementContribution = {
   changeKrw: number;
   returnPct: number | null;
   tradeFlowKrw: number;
-  priceChangeKrw: number;
-  fxChangeKrw: number;
+  priceChangeKrw: number | null;
+  fxChangeKrw: number | null;
   previousPrice: number;
   currentPrice: number;
   previousFxRate: number;
@@ -128,6 +130,11 @@ export type PortfolioMovementExclusionReason =
   | "unsupported_currency"
   | "missing_current_fx"
   | "missing_baseline_fx"
+  | "missing_baseline_price"
+  | "incomplete_trade_attribution"
+  | "ambiguous_trade_identity"
+  | "ambiguous_baseline_identity"
+  | "missing_trade_amount"
   | "coverage_below_threshold";
 
 export type PortfolioMovementExclusion = {
@@ -240,6 +247,24 @@ export function buildDailyPositionMovement({
 
   const contributions = new Map<string, PortfolioMovementContribution>();
   const exclusions: PortfolioMovementExclusion[] = [];
+  const ambiguousBaseline = accountRows.some((row) =>
+    movementHoldings.filter((holding) => positionSnapshotMatchesHolding(row, holding)).length > 1,
+  ) || movementHoldings.some((holding) =>
+    accountRows.filter((row) => positionSnapshotMatchesHolding(row, holding)).length > 1,
+  );
+  if (ambiguousBaseline) {
+    return emptyMovement("ambiguous_baseline_identity", emptyCoverage, {
+      previousTotalKrw: snapshotTotalValue,
+      exclusions: [aggregateExclusion("ambiguous_baseline_identity", "daily_position_snapshot")],
+    });
+  }
+  const tradeIndex = indexMovementTrades(eventRows, movementHoldings, accountRows, selectedAccount, baselineDate);
+  if ("reason" in tradeIndex) {
+    return emptyMovement(tradeIndex.reason, emptyCoverage, {
+      previousTotalKrw: snapshotTotalValue,
+      exclusions: [aggregateExclusion(tradeIndex.reason, "daily_position_snapshot")],
+    });
+  }
   const matchedSnapshotIds = new Set<string>();
   const currentHoldingSnapshotIds = new Set<string>();
   let matchedCurrentValue = 0;
@@ -248,6 +273,7 @@ export function buildDailyPositionMovement({
   let tradeFlowKrw = 0;
   let priceChangeKrw = 0;
   let fxChangeKrw = 0;
+  let completeAttribution = true;
   let fxEvidenceChangeKrw = 0;
   let fxEvidenceRequiredValueKrw = 0;
   let fxEvidenceMatchedValueKrw = 0;
@@ -299,12 +325,8 @@ export function buildDailyPositionMovement({
       );
       continue;
     }
-    const holdingTradeFlowKrw = calculateTradeFlowForHolding(
-      eventRows,
-      holding,
-      selectedAccount,
-      baselineDate,
-    );
+    const holdingTrades = tradeIndex.byHolding.get(holding.id) ?? [];
+    const holdingTradeFlowKrw = sumTradeFlows(holdingTrades);
     const previousFxRate =
       currentFx.requiresFx
         ? toNumber(snapshot.fxRate) ?? toNumber(snapshot.previousFxRate)
@@ -323,6 +345,7 @@ export function buildDailyPositionMovement({
         : currentFx.rate;
     if (
       currentFx.requiresFx &&
+      holdingTrades.length === 0 &&
       Number.isFinite(holding.currentPrice) &&
       holding.currentPrice > 0
     ) {
@@ -343,9 +366,15 @@ export function buildDailyPositionMovement({
       );
       continue;
     }
-    const previousPrice = snapshotPositionPrice(snapshot, holding.currentPrice);
+    const previousPrice = snapshotPositionPrice(snapshot);
+    if (previousPrice === null) {
+      exclusions.push(holdingExclusion(holding, "missing_baseline_price", "daily_position_snapshot"));
+      continue;
+    }
     const movement = calculateFxAwareSnapshotMovementKrw({
       quantity: holding.quantity,
+      previousQuantity: toNumber(snapshot.quantity),
+      trades: movementTradeLegs(holdingTrades, currentFx.requiresFx),
       currentPrice: holding.currentPrice,
       currentValueKrw: holding.valueKrw,
       previousPrice,
@@ -354,8 +383,11 @@ export function buildDailyPositionMovement({
       previousFxRate: effectivePreviousFxRate,
       tradeFlowKrw: holdingTradeFlowKrw,
     });
-    const holdingFxChangeKrw =
-      currentFx.requiresFx ? movement.fxChangeKrw : 0;
+    const holdingFxChangeKrw = movement.fxChangeKrw;
+    if (movement.priceChangeKrw === null || holdingFxChangeKrw === null) {
+      completeAttribution = false;
+      exclusions.push(holdingExclusion(holding, "incomplete_trade_attribution", "daily_position_snapshot"));
+    }
 
     contributions.set(holding.id, {
       holdingId: holding.id,
@@ -376,8 +408,8 @@ export function buildDailyPositionMovement({
     matchedSnapshotValue += previousValueKrw;
     matchedCount += 1;
     tradeFlowKrw += holdingTradeFlowKrw;
-    priceChangeKrw += movement.priceChangeKrw;
-    fxChangeKrw += holdingFxChangeKrw;
+    priceChangeKrw += movement.priceChangeKrw ?? 0;
+    fxChangeKrw += holdingFxChangeKrw ?? 0;
   }
 
   const currentCoverage = currentTotalValue > 0 ? matchedCurrentValue / currentTotalValue : 0;
@@ -424,14 +456,18 @@ export function buildDailyPositionMovement({
     if (currentHoldingSnapshotIds.has(row.id)) continue;
     const previousValueKrw = snapshotMarketValue(row);
     if (previousValueKrw <= 0) continue;
-    const removedTradeFlowKrw = calculateTradeFlowForSnapshot(
-      eventRows,
-      row,
-      selectedAccount,
-      baselineDate,
-    );
+    const removedTrades = tradeIndex.bySnapshot.get(row.id) ?? [];
+    const removedTradeFlowKrw = sumTradeFlows(removedTrades);
     changeKrw += -previousValueKrw - removedTradeFlowKrw;
     tradeFlowKrw += removedTradeFlowKrw;
+    const exitMovement = calculateExitedPositionAttribution(row, removedTrades, previousValueKrw, removedTradeFlowKrw);
+    if (exitMovement?.priceChangeKrw !== null && exitMovement?.priceChangeKrw !== undefined && exitMovement.fxChangeKrw !== null) {
+      priceChangeKrw += exitMovement.priceChangeKrw;
+      fxChangeKrw += exitMovement.fxChangeKrw;
+    } else {
+      completeAttribution = false;
+      exclusions.push(snapshotExclusion(row, "incomplete_trade_attribution", "daily_position_snapshot"));
+    }
   }
 
   return {
@@ -442,8 +478,8 @@ export function buildDailyPositionMovement({
     changeKrw,
     returnPct: percentOrNull(changeKrw, snapshotTotalValue),
     tradeFlowKrw,
-    priceChangeKrw,
-    fxChangeKrw: independentFxChangeKrw ?? fxChangeKrw,
+    priceChangeKrw: completeAttribution ? priceChangeKrw : null,
+    fxChangeKrw: completeAttribution ? fxChangeKrw : null,
     contributions,
     contributionRows: [...contributions.values()],
     exclusions,
@@ -509,11 +545,11 @@ export function buildPreviousCloseMovement({
       referenceDate,
       usdKrwRate,
     );
-    if (!previous) {
+    if (typeof previous === "string") {
       exclusions.push(
         holdingExclusion(
           holding,
-          "missing_previous_close_fallback",
+          previous,
           "asset_price_snapshot",
         ),
       );
@@ -525,8 +561,8 @@ export function buildPreviousCloseMovement({
     matchedCount += 1;
     previousTotalKrw += previous.previousValueKrw;
     changeKrw += previous.changeKrw;
-    priceChangeKrw += previous.priceChangeKrw;
-    fxChangeKrw += previous.fxChangeKrw;
+    priceChangeKrw += previous.priceChangeKrw ?? 0;
+    fxChangeKrw += previous.fxChangeKrw ?? 0;
   }
 
   const valueCoverage =
@@ -626,24 +662,25 @@ function calculatePreviousCloseContribution(
   usdKrwRate: number,
 ) {
   const ticker = normalizeTicker(holding.ticker);
-  if (!ticker || !referenceDate) return null;
+  if (!ticker || !referenceDate) return "missing_previous_close_fallback" as const;
 
   const previousRow = findPreviousClosePriceRow(
     priceRows,
     holding,
     referenceDate,
   );
-  if (!previousRow) return null;
+  if (!previousRow) return "missing_previous_close_fallback" as const;
 
   const closePrice = resolveOperationalClosePrice(previousRow);
-  if (closePrice === null || closePrice <= 0) return null;
+  if (closePrice === null || closePrice <= 0) return "missing_previous_close_fallback" as const;
 
   const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
-  if (!currentFx.ok) return null;
+  if (!currentFx.ok) return "missing_current_fx" as const;
 
   const previousFxRate = currentFx.requiresFx
-    ? toNumber(previousRow.fxRate) ?? inferFxRateFromClose(previousRow) ?? currentFx.rate
+    ? positiveNumber(previousRow.fxRate) ?? inferFxRateFromClose(previousRow)
     : 1;
+  if (previousFxRate === null || previousFxRate <= 0) return "missing_baseline_fx" as const;
   const currentBaseValueKrw =
     holding.quantity * holding.currentPrice * currentFx.rate;
   const fractionalKrwValue = Math.max(holding.valueKrw - currentBaseValueKrw, 0);
@@ -679,10 +716,10 @@ function findPreviousClosePriceRow(
 ) {
   return rows
     .filter((row) => isSamePriceInstrument(row, holding))
-    .filter((row) => row.priceDate < referenceDate)
+    .filter((row) => row.priceDate <= referenceDate)
     .filter((row) => {
       const ageDays = diffDays(referenceDate, row.priceDate);
-      return ageDays >= 1 && ageDays <= PREVIOUS_CLOSE_MAX_AGE_DAYS;
+      return ageDays >= 0 && ageDays <= PREVIOUS_CLOSE_MAX_AGE_DAYS;
     })
     .sort((a, b) => b.priceDate.localeCompare(a.priceDate))[0];
 }
@@ -798,7 +835,8 @@ function findPositionSnapshotForHolding(
   holding: PortfolioMovementHoldingInput,
   rows: PortfolioMovementPositionSnapshotInput[],
 ) {
-  return rows.find((row) => positionSnapshotMatchesHolding(row, holding));
+  const matches = rows.filter((row) => positionSnapshotMatchesHolding(row, holding));
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 function isPortfolioMovementEligibleSnapshot(
@@ -817,49 +855,11 @@ function positionSnapshotMatchesHolding(
   holding: PortfolioMovementHoldingInput,
 ) {
   if (row.account !== holding.account) return false;
-  if (row.assetId && row.assetId === holding.id) return true;
-  if (row.legacyAssetId && row.legacyAssetId === holding.legacyBase44Id) {
-    return true;
-  }
+  if (row.assetId) return row.assetId === holding.id;
+  if (row.legacyAssetId) return row.legacyAssetId === holding.legacyBase44Id;
   const holdingTicker = normalizeTicker(holding.ticker);
   if (holdingTicker && normalizeTicker(row.ticker) === holdingTicker) return true;
   return row.assetName === holding.name;
-}
-
-function calculateTradeFlowForHolding(
-  events: PortfolioMovementEventInput[],
-  holding: PortfolioMovementHoldingInput,
-  selectedAccount: PortfolioMovementSelectedAccount,
-  baselineDate: string,
-) {
-  return events
-    .filter((event) => event.eventDate > baselineDate)
-    .filter((event) => event.eventType === "buy" || event.eventType === "sell")
-    .filter((event) => eventMatchesHolding(event, holding, selectedAccount))
-    .reduce((sum, event) => {
-      const amount = toNumber(event.amountKrw) ?? 0;
-      if (event.eventType === "buy") return sum + Math.abs(amount);
-      if (event.eventType === "sell") return sum - Math.abs(amount);
-      return sum;
-    }, 0);
-}
-
-function calculateTradeFlowForSnapshot(
-  events: PortfolioMovementEventInput[],
-  snapshot: PortfolioMovementPositionSnapshotInput,
-  selectedAccount: PortfolioMovementSelectedAccount,
-  baselineDate: string,
-) {
-  return events
-    .filter((event) => event.eventDate > baselineDate)
-    .filter((event) => event.eventType === "buy" || event.eventType === "sell")
-    .filter((event) => eventMatchesSnapshot(event, snapshot, selectedAccount))
-    .reduce((sum, event) => {
-      const amount = toNumber(event.amountKrw) ?? 0;
-      if (event.eventType === "buy") return sum + Math.abs(amount);
-      if (event.eventType === "sell") return sum - Math.abs(amount);
-      return sum;
-    }, 0);
 }
 
 function eventMatchesHolding(
@@ -870,13 +870,11 @@ function eventMatchesHolding(
   if (!eventMatchesSelectedAccount(event, selectedAccount, holding.account)) {
     return false;
   }
-  if (event.assetId && event.assetId === holding.id) return true;
-  if (event.legacyAssetId && event.legacyAssetId === holding.legacyBase44Id) {
-    return true;
-  }
+  if (event.assetId) return event.assetId === holding.id;
+  if (event.legacyAssetId) return event.legacyAssetId === holding.legacyBase44Id;
   const eventTicker = normalizeTicker(event.ticker);
   const holdingTicker = normalizeTicker(holding.ticker);
-  if (eventTicker && holdingTicker && eventTicker === holdingTicker) return true;
+  if (eventTicker) return eventTicker === holdingTicker;
   return event.assetName === holding.name;
 }
 
@@ -888,15 +886,12 @@ function eventMatchesSnapshot(
   if (!eventMatchesSelectedAccount(event, selectedAccount, snapshot.account)) {
     return false;
   }
-  if (event.assetId && snapshot.assetId && event.assetId === snapshot.assetId) {
-    return true;
-  }
-  if (event.legacyAssetId && event.legacyAssetId === snapshot.legacyAssetId) {
-    return true;
-  }
+  if (event.assetId && snapshot.assetId) return event.assetId === snapshot.assetId;
+  if (event.legacyAssetId) return event.legacyAssetId === snapshot.legacyAssetId;
+  if (event.assetId) return false;
   const eventTicker = normalizeTicker(event.ticker);
   const snapshotTicker = normalizeTicker(snapshot.ticker);
-  if (eventTicker && snapshotTicker && eventTicker === snapshotTicker) return true;
+  if (eventTicker) return eventTicker === snapshotTicker;
   return event.assetName === snapshot.assetName;
 }
 
@@ -905,7 +900,6 @@ function eventMatchesSelectedAccount(
   selectedAccount: PortfolioMovementSelectedAccount,
   fallbackAccount: string | null,
 ) {
-  if (selectedAccount === "all") return true;
   const eventAccount = portfolioEventAccount({
     ...event,
     legacyAssetId: event.legacyAssetId ?? "",
@@ -917,9 +911,10 @@ function eventMatchesSelectedAccount(
     recordedAt: event.recordedAt ?? null,
     createdAt: event.createdAt ?? new Date(0).toISOString(),
   });
-  if (eventAccount) return eventAccount === selectedAccount;
-  if (fallbackAccount) return fallbackAccount === selectedAccount;
-  return selectedAccount === "brokerage";
+  if (selectedAccount !== "all" && fallbackAccount !== selectedAccount) return false;
+  if (eventAccount) return eventAccount === fallbackAccount;
+  // The caller admits an accountless event only when its identity has one candidate.
+  return true;
 }
 
 function snapshotMarketValue(row: PortfolioMovementPositionSnapshotInput) {
@@ -928,14 +923,128 @@ function snapshotMarketValue(row: PortfolioMovementPositionSnapshotInput) {
 
 function snapshotPositionPrice(
   row: PortfolioMovementPositionSnapshotInput,
-  fallbackPrice: number,
 ) {
   return (
-    toNumber(row.unitPrice) ??
-    toNumber(row.closePrice) ??
-    toNumber(row.currentPrice) ??
-    fallbackPrice
+    positiveNumber(row.unitPrice) ??
+    positiveNumber(row.closePrice) ??
+    positiveNumber(row.currentPrice)
   );
+}
+
+function positiveNumber(value: unknown) {
+  const number = toNumber(value);
+  return number !== null && number > 0 ? number : null;
+}
+
+function isMovementTrade(event: PortfolioMovementEventInput, baselineDate: string) {
+  return event.eventDate > baselineDate && (event.eventType === "buy" || event.eventType === "sell");
+}
+
+type ResolvedMovementTrade = PortfolioMovementEventInput & { amountKrw: number };
+
+function indexMovementTrades(
+  events: PortfolioMovementEventInput[],
+  holdings: PortfolioMovementHoldingInput[],
+  snapshots: PortfolioMovementPositionSnapshotInput[],
+  selectedAccount: PortfolioMovementSelectedAccount,
+  baselineDate: string,
+): { byHolding: Map<string, ResolvedMovementTrade[]>; bySnapshot: Map<string, ResolvedMovementTrade[]> } |
+   { reason: "ambiguous_trade_identity" | "missing_trade_amount" } {
+  const byHolding = new Map<string, ResolvedMovementTrade[]>();
+  const bySnapshot = new Map<string, ResolvedMovementTrade[]>();
+  const exitedSnapshots = snapshots.filter((snapshot) =>
+    !holdings.some((holding) => positionSnapshotMatchesHolding(snapshot, holding)),
+  );
+  for (const event of events.filter((row) => isMovementTrade(row, baselineDate))) {
+    const holdingMatches = holdings.filter((holding) => eventMatchesHolding(event, holding, selectedAccount));
+    const snapshotMatches = exitedSnapshots.filter((snapshot) => eventMatchesSnapshot(event, snapshot, selectedAccount));
+    if (holdingMatches.length + snapshotMatches.length > 1) return { reason: "ambiguous_trade_identity" };
+    if (holdingMatches.length + snapshotMatches.length === 0) continue;
+    const amountKrw = resolveMovementTradeAmount(event, holdingMatches[0]?.currency ?? snapshotMatches[0]?.currency);
+    if (amountKrw === null) return { reason: "missing_trade_amount" };
+    const resolvedEvent = { ...event, amountKrw };
+    if (holdingMatches.length === 1) {
+      const id = holdingMatches[0].id;
+      byHolding.set(id, [...(byHolding.get(id) ?? []), resolvedEvent]);
+      continue;
+    }
+    if (snapshotMatches.length === 1) {
+      const id = snapshotMatches[0].id;
+      bySnapshot.set(id, [...(bySnapshot.get(id) ?? []), resolvedEvent]);
+    }
+  }
+  return { byHolding, bySnapshot };
+}
+
+function sumTradeFlows(events: ResolvedMovementTrade[]) {
+  return sumBy(events, (event) => Math.abs(event.amountKrw) * (event.eventType === "sell" ? -1 : 1));
+}
+
+function resolveMovementTradeAmount(event: PortfolioMovementEventInput, currency: string | null | undefined) {
+  const explicitAmount = toNumber(event.amountKrw);
+  if (explicitAmount !== null) return Math.abs(explicitAmount);
+  const code = currency?.trim().toUpperCase();
+  if (code !== "KRW" && code !== "USD") return null;
+  const leg = movementTradeLegs([event], code === "USD")?.[0];
+  if (!leg) return null;
+  const amount = Math.abs(leg.quantityDelta * leg.price * leg.fxRate);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function movementTradeLegs(events: PortfolioMovementEventInput[], requiresFx: boolean) {
+  const legs: { quantityDelta: number; price: number; fxRate: number }[] = [];
+  for (const event of events) {
+    const before = parseMovementObject(event.beforeValue);
+    const after = parseMovementObject(event.afterValue);
+    const beforeQuantity = toNumber(before.quantity);
+    const afterQuantity = toNumber(after.quantity);
+    const quantity = Math.abs(toNumber(event.quantityDelta) ??
+      (beforeQuantity !== null && afterQuantity !== null ? afterQuantity - beforeQuantity : 0));
+    const price = positiveNumber(event.price);
+    const fxRate = requiresFx ? positiveNumber(event.fxRate) : 1;
+    if (!(quantity > 0) || price === null || fxRate === null) return null;
+    legs.push({ quantityDelta: quantity * (event.eventType === "sell" ? -1 : 1), price, fxRate });
+  }
+  return legs;
+}
+
+function calculateExitedPositionAttribution(
+  snapshot: PortfolioMovementPositionSnapshotInput,
+  events: PortfolioMovementEventInput[],
+  previousValueKrw: number,
+  tradeFlowKrw: number,
+) {
+  const currency = snapshot.currency?.trim().toUpperCase();
+  if (currency !== "KRW" && currency !== "USD") return null;
+  const orderedEvents = [...events].sort((left, right) =>
+    left.eventDate.localeCompare(right.eventDate) ||
+    timestampMs(left.recordedAt ?? left.createdAt) - timestampMs(right.recordedAt ?? right.createdAt),
+  );
+  const trades = movementTradeLegs(orderedEvents, currency === "USD");
+  const finalTrade = trades?.at(-1);
+  const previousPrice = snapshotPositionPrice(snapshot);
+  const previousFxRate = currency === "KRW" ? 1 : positiveNumber(snapshot.fxRate) ?? positiveNumber(snapshot.previousFxRate);
+  if (!finalTrade || previousPrice === null || previousFxRate === null) return null;
+  return calculateFxAwareSnapshotMovementKrw({
+    quantity: 0,
+    previousQuantity: toNumber(snapshot.quantity),
+    trades,
+    currentPrice: finalTrade.price,
+    currentValueKrw: 0,
+    previousPrice,
+    previousValueKrw,
+    currentFxRate: finalTrade.fxRate,
+    previousFxRate,
+    tradeFlowKrw,
+  });
+}
+
+function parseMovementObject(value: unknown): Record<string, unknown> {
+  if (typeof value === "string") {
+    try { return parseMovementObject(JSON.parse(value)); } catch { return {}; }
+  }
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
 }
 
 function isInvestmentSnapshot(row: PortfolioMovementPositionSnapshotInput) {

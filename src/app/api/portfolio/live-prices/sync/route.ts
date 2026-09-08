@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { getTenantLivePriceTargets } from "@/db/queries/tenant-live-price-targets";
 import { fxRates, livePriceQuotes } from "@/db/schema";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
 import {
   getKisPriceSyncCooldownStatus,
   PriceSyncError,
@@ -104,10 +105,20 @@ export async function POST(request: Request) {
     const kisSession = createKisProviderRequestSession();
     const fxTarget = selectKisUsdKrwQuoteTarget({ targets, quotes });
 
-    const [priceOutcome, fxOutcome] = await Promise.all([
-      refreshKisPrices(requestedTargets, kisSession),
-      refreshUsdKrw(fxPlan, fxTarget, kisSession),
-    ]);
+    const refresh = async () => {
+      // Keep the provider lease until both branches stop, including a DB failure
+      // in one branch while the other still awaits a provider response.
+      const [prices, fx] = await Promise.allSettled([
+        refreshKisPrices(requestedTargets, kisSession),
+        refreshUsdKrw(fxPlan, fxTarget, kisSession),
+      ]);
+      if (prices.status === "rejected") throw prices.reason;
+      if (fx.status === "rejected") throw fx.reason;
+      return [prices.value, fx.value] as const;
+    };
+    const [priceOutcome, fxOutcome] = requestedTargets.length > 0 || fxPlan.shouldRefresh
+      ? await withKisRefreshLease(refresh)
+      : await refresh();
 
     return combinedRefreshResponse({
       freshTargetCount: plan.freshTargetCount,
@@ -116,6 +127,11 @@ export async function POST(request: Request) {
       targetCount: plan.targets.length,
     });
   } catch (error) {
+    if (error instanceof KisRefreshLeaseBusyError) {
+      return response({ state: "cooldown", retryAfterSeconds: error.retryAfterSeconds }, 429, {
+        "Retry-After": String(error.retryAfterSeconds),
+      });
+    }
     if (error instanceof PriceSyncRequestError) {
       return response({ state: "sync_request_rejected" }, error.statusCode);
     }

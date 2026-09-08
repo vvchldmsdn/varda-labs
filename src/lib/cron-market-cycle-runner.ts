@@ -12,6 +12,7 @@ import {
 } from "@/lib/cron-market-cycle-run-repository";
 import { runCoreMarketFactorRefreshJob } from "@/lib/market-data/core-market-factor-refresh-job";
 import { runUsdKrwFxRefreshJob } from "@/lib/market-data/fx-refresh-job";
+import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
 import {
   getKisPriceSyncCooldownStatus,
   runMarketPriceSync,
@@ -94,7 +95,25 @@ export type CronMarketCycleRunResult = {
   blockers: string[];
 };
 
-export async function runCronMarketCycle({
+type CronMarketCycleOptions = { now?: Date; cronScheduleUtc?: string | null };
+
+export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): Promise<CronMarketCycleRunResult> {
+  try {
+    // All close groups and the following live refresh share one internal lease.
+    return await withKisRefreshLease(() => runMarketCycleWithLease(options));
+  } catch (error) {
+    if (error instanceof KisRefreshLeaseBusyError) {
+      return emptyResult({
+        ok: false, status: "active_conflict", runId: null,
+        snapshotDate: resolveSnapshotCycle(options.now ?? new Date()).snapshotDate,
+        blockers: ["kis_provider_refresh_busy"],
+      });
+    }
+    throw error;
+  }
+}
+
+async function runMarketCycleWithLease({
   now = new Date(),
   cronScheduleUtc = null,
 }: {

@@ -20,6 +20,8 @@ import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "히스토리 | VARDA LABS" };
+
 type HistoryPageProps = {
   searchParams: Promise<{
     account?: string | string[];

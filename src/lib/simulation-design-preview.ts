@@ -19,6 +19,7 @@ import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "./portfolio-analysis
 import { isRiskDate } from "./portfolio-risk-calendar.ts";
 
 export type SimulationPreviewQuery = {
+  view?: string | readonly string[];
   scope?: string | readonly string[];
   end?: string | string[];
   horizon?: string | string[];

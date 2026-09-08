@@ -548,6 +548,11 @@ function reasonLabel(reason: string | null) {
     unsupported_currency: "지원하지 않는 통화가 포함되어 있습니다.",
     missing_current_fx: "현재 환율 근거가 없습니다.",
     missing_baseline_fx: "기준 환율 근거가 없습니다.",
+    missing_baseline_price: "기준 가격 근거가 없습니다.",
+    incomplete_trade_attribution: "거래 근거가 부족하거나 평가액과 맞지 않아 가격·환율 분해를 보류했습니다.",
+    ambiguous_trade_identity: "거래가 어느 계좌·종목에 해당하는지 확인할 수 없습니다.",
+    ambiguous_baseline_identity: "기준 스냅샷과 보유 종목의 연결이 중복되어 확인이 필요합니다.",
+    missing_trade_amount: "매매대금 근거가 부족해 변동 계산을 보류했습니다.",
     coverage_below_threshold:
       "현재 가격 또는 기준 스냅샷의 커버리지가 부족합니다.",
   };

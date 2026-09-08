@@ -7,6 +7,7 @@ import { OwnerResearchExecutionSection } from "./owner-research-execution-sectio
 import { OwnerCandidateComparisonSection } from "./owner-candidate-comparison-section";
 import { OwnerWalkForwardValidationSection } from "./owner-walk-forward-validation-section";
 import { OwnerInputPreflightSection } from "./owner-input-preflight-section";
+import { resolveSimulationPanel } from "@/lib/simulation-panel";
 
 export function SimulationDesignPreview({
   query,
@@ -14,11 +15,13 @@ export function SimulationDesignPreview({
   query: SimulationPreviewQuery;
 }) {
   const preview = buildSimulationDesignPreview(query);
+  const requestedPanel = resolveSimulationPanel(query.view);
   const { portfolio, execution, comparison, validation, preflight, model } =
     preview;
   return (
     <div className="relative min-h-screen">
       <SimulationInputReadinessView
+        loadedPanel={requestedPanel}
         model={model}
         scopeCatalog={portfolio.analysisScopes}
         selectedScopeKey={portfolio.selectedScope.key}
@@ -26,16 +29,16 @@ export function SimulationDesignPreview({
         ownerResearchExecution={
           <OwnerResearchExecutionSection execution={execution} />
         }
-        ownerCandidateComparison={
+        ownerCandidateComparison={requestedPanel === "weights" &&
           <OwnerCandidateComparisonSection
             comparison={comparison}
             instruments={execution.instruments}
           />
         }
-        ownerWalkForwardValidation={
+        ownerWalkForwardValidation={requestedPanel === "validation" &&
           <OwnerWalkForwardValidationSection result={validation} />
         }
-        ownerInputPreflight={
+        ownerInputPreflight={requestedPanel === "evidence" &&
           <OwnerInputPreflightSection
             model={preflight}
             scopes={portfolio.analysisScopes}

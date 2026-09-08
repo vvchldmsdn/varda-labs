@@ -58,8 +58,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 31);
-    assert.equal(registeredPaths.length, 38);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 32);
+    assert.equal(registeredPaths.length, 39);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -132,7 +132,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 20,
       intentionally_skipped_legacy: 1,
-      not_applicable: 10,
+      not_applicable: 11,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
@@ -218,6 +218,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         "base44_market_context_import",
         "cron_market_cycle_controller",
         "operator_investment_lab_stress_history_completion",
+        "session_portfolio_live_price_sync",
       ],
     );
 
@@ -281,6 +282,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         if (
           [
             "post_consume_account_owner_assignment",
+            "session_holding_onboarding",
             "session_holding_state_correction",
             "session_holding_lifecycle",
             "session_portfolio_group_management",
@@ -307,12 +309,46 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(canonicalOwnerWriters, [
       "post_consume_account_owner_assignment",
+      "session_holding_onboarding",
       "session_holding_state_correction",
       "session_holding_lifecycle",
       "session_portfolio_group_management",
       "session_account_management",
       "portfolio_target_policy_session_write",
     ]);
+  });
+
+  it("keeps atomic onboarding owner parameters tied to the verified session", () => {
+    const source = readFileSync(join(ROOT, "src/lib/holding-onboarding-write.ts"), "utf8");
+    assert.match(source, /const ownerUserId = resolution\.tenantContext\.ownerUserId/);
+    assert.match(source, /prepareTenantWriteContext\([\s\S]*?canonicalOwnerUserId: ownerUserId/);
+    assert.match(source, /assertActiveTenantWriteAllowed\(/);
+    assert.match(source, /runPortfolioMutation\(ownerUserId, ATOMIC_ONBOARDING_QUERY, \[\s*ownerUserId,/);
+    assert.match(source, /where id = \$3::uuid and canonical_owner_user_id = \$1::uuid and is_active = true/);
+    assert.match(source, /where id = \$4::uuid and canonical_owner_user_id = \$1::uuid and archived_at is null/);
+    assert.doesNotMatch(source, /(?:formData\.get|input\.)\(?["']?canonicalOwner/);
+  });
+
+  it("registers provider leases for both machine and verified-session callers without owner targets", () => {
+    const leasePath = "src/lib/market-data/kis-refresh-lease.ts";
+    const leaseWriters = TENANT_WRITER_REGISTRY.filter((writer) => writer.implementationPaths.includes(leasePath));
+    assert.deepEqual(leaseWriters.map(({ id, authorization }) => ({ id, authorization })), [
+      { id: "admin_market_price_sync", authorization: "machine_admin" },
+      { id: "session_portfolio_live_price_sync", authorization: "server_verified_session" },
+      { id: "cron_market_cycle_controller", authorization: "machine_admin" },
+    ]);
+    const sessionWriter = leaseWriters.find(({ id }) => id === "session_portfolio_live_price_sync");
+    assert.deepEqual(sessionWriter.entrypoints, ["/api/portfolio/live-prices/sync"]);
+    assert.ok(sessionWriter.targets.every(({ ownerPolicy }) => ownerPolicy === "owner_forbidden"));
+    for (const writer of leaseWriters) {
+      assert.ok(writer.targets.some(({ table, classification }) => table === "market_data_sync_runs" && classification === "admin_system"));
+    }
+    const route = readFileSync(join(ROOT, "src/app/api/portfolio/live-prices/sync/route.ts"), "utf8");
+    assert.ok(route.indexOf("await resolveCurrentTenantContext()") < route.indexOf("await withKisRefreshLease(refresh)"));
+    assert.match(route, /getTenantLivePriceTargets\(resolution\.tenantContext\)/);
+    const lease = readFileSync(join(ROOT, leasePath), "utf8");
+    assert.match(lease, /const context = new AsyncLocalStorage/);
+    assert.doesNotMatch(lease, /canonicalOwnerUserId|canonical_owner_user_id|export const context/);
   });
 
   it("separates legacy import evidence from verified canonical ownership", () => {

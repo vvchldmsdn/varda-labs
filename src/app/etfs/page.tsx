@@ -17,6 +17,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "ETF 정보 | VARDA LABS" };
+
 type EtfsPageProps = {
   searchParams: Promise<{
     q?: string | string[];

@@ -113,7 +113,8 @@ describe("simulation presentation", () => {
       assert.ok(controls.includes(JSON.stringify(key)));
     }
     assert.match(controls, /scroll=\{false\}/);
-    assert.match(workspace, /window\.history\.pushState/);
+    assert.match(workspace, /router\.push/);
+    assert.match(workspace, /loadedPanel !== activeOverlay/);
     assert.match(workspace, /<dialog/);
     assert.match(workspace, /addEventListener\("popstate"/);
     assert.match(workspace, /data-simulation-workspace="integrated"/);

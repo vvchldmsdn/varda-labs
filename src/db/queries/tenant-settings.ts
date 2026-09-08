@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -13,13 +14,19 @@ export type TenantPortfolioSettingsRow = Readonly<{
 export async function loadLatestTenantPortfolioSettingsRows(
   tenantContext: TenantContext,
 ): Promise<readonly TenantPortfolioSettingsRow[]> {
+  return loadLatestTenantPortfolioSettingsByOwner(tenantContext.ownerUserId);
+}
+
+const loadLatestTenantPortfolioSettingsByOwner = cache(async (
+  ownerUserId: string,
+): Promise<readonly TenantPortfolioSettingsRow[]> => {
   const [rows] = await runTenantReadTransaction(
-    tenantContext.ownerUserId,
+    ownerUserId,
     (transaction) => [transaction.query(LATEST_TENANT_SETTINGS_SQL)],
   );
 
   return Object.freeze(rows.map(projectTenantPortfolioSettingsRow));
-}
+});
 
 const LATEST_TENANT_SETTINGS_SQL = `
   select

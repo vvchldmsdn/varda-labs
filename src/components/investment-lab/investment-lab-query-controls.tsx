@@ -18,8 +18,13 @@ export function InvestmentLabQueryFields() {
 
 export function InvestmentLabQueryLink({
   href,
+  onClick,
+  resetForm = false,
   ...props
-}: Omit<ComponentProps<typeof Link>, "href"> & { href: string }) {
+}: Omit<ComponentProps<typeof Link>, "href"> & {
+  href: string;
+  resetForm?: boolean;
+}) {
   const params = useSearchParams();
   const target = new URL(href, "https://varda.local");
   for (const name of PRESENTATION_PARAMS) {
@@ -31,6 +36,18 @@ export function InvestmentLabQueryLink({
     <Link
       {...props}
       href={`${target.pathname}${target.search}${target.hash}`}
+      onClick={(event) => {
+        onClick?.(event);
+        // Also reset dirty fields when the latest-period URL is already active.
+        if (
+          resetForm &&
+          !event.defaultPrevented &&
+          event.button === 0 &&
+          !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+        ) {
+          event.currentTarget.closest("form")?.reset();
+        }
+      }}
       scroll={false}
     />
   );

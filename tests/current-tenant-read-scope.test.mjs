@@ -616,10 +616,6 @@ describe("current tenant read scope runtime boundary", () => {
         "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence",
       ],
       [
-        "portfolioStructurePromise",
-        "getReadOnlyTenantPortfolioStructureForScope",
-      ],
-      [
         "analysisDataReadinessPromise",
         "getReadOnlyTenantHoldingAnalysisDataReadinessForScope",
       ],
@@ -630,6 +626,14 @@ describe("current tenant read scope runtime boundary", () => {
           source.indexOf(`const ${promise}`),
       );
     }
+    assert.match(
+      source,
+      /portfolio: \(\) => getReadOnlyTenantPortfolioStructureForScope\(\{\s*scope: selectedScope,\s*serviceDate,\s*tenantContext,/,
+    );
+    assert.ok(
+      source.indexOf("if (!resolution.ok)") <
+        source.indexOf("startInvestmentLabPanelQueries(requestedPanel"),
+    );
     for (const reader of [
       "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence",
       "getReadOnlyTenantInvestmentLabCounterfactualForScope",

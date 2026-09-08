@@ -13,11 +13,11 @@ import {
 export type TodayContributionDisplayRow = Readonly<{
   accountLabel: string;
   changeKrw: number;
-  fxImpactKrw: number;
+  fxImpactKrw: number | null;
   href: string;
   key: string;
   name: string;
-  priceImpactKrw: number;
+  priceImpactKrw: number | null;
   returnPct: number | null;
   selected: boolean;
   ticker: string | null;
@@ -130,6 +130,9 @@ export function TodayContributionExplorer({
         <dl className="mt-8 divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
           <AttributionRow label="가격 영향" value={activeRow?.priceImpactKrw ?? null} />
           <AttributionRow label="환율 영향" value={activeRow?.fxImpactKrw ?? null} />
+          {activeRow && (activeRow.priceImpactKrw === null || activeRow.fxImpactKrw === null) ? (
+            <p className="text-xs text-[var(--muted)]">거래·평가 근거 확인이 필요해 원인별 분해를 보류했습니다.</p>
+          ) : null}
           <AttributionRow label="순매매" value={activeRow?.tradeFlowKrw ?? null} />
         </dl>
 

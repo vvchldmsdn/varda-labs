@@ -105,7 +105,8 @@ describe("investment lab presentation", () => {
   it("keeps the main comparison visible and preserves dialog query state", () => {
     const workspace = component("investment-lab-workspace");
     const controls = component("investment-lab-query-controls");
-    assert.match(workspace, /window\.history\.pushState/);
+    assert.match(workspace, /router\.push/);
+    assert.match(workspace, /loadedPanel !== activeOverlay/);
     assert.match(workspace, /<dialog/);
     assert.match(workspace, /data-lab-workspace="integrated"/);
     assert.match(workspace, /styles.canvas.*\{comparison\}/s);
@@ -135,8 +136,9 @@ describe("investment lab presentation", () => {
     assert.match(dialog, /\.showModal\(\)/);
     assert.match(dialog, /<dialog/);
     assert.match(dialog, /max-h-\[min\(88dvh,850px\)\]/);
-    assert.match(dialog, /event\.key !== "Escape"/);
-    assert.match(dialog, /onClose=\{\(\) => setOpen\(false\)\}/);
+    assert.match(dialog, /onCancel=/);
+    assert.match(dialog, /event\.stopPropagation\(\)/);
+    assert.match(dialog, /event\.target === event\.currentTarget/);
     assert.match(chart, /onPointerLeave=\{\(\) => setHover\(null\)\}/);
     assert.match(chart, /aria-valuetext/);
   });

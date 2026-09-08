@@ -14,6 +14,8 @@ import type {
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "시장 데이터 동기화 | VARDA LABS" };
+
 export default async function AdminMarketSyncPage() {
   const status = await getAdminMarketSyncStatus();
 

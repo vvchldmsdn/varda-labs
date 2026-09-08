@@ -22,6 +22,7 @@ export type PortfolioReturnAssetRow = {
   averageCost: string | number | null;
   currentPrice: string | number | null;
   fractionalAvgCost: string | number | null;
+  fractionalKrwValue?: string | number | null;
 };
 
 export type PortfolioReturnEventRow = {
@@ -56,7 +57,7 @@ type AssetMaps = {
 export type AssetReturnMetrics = {
   assetKey: string;
   account: string;
-  costBasisKrw: number;
+  costBasisKrw: number | null;
   realizedCostBasisKrw: number;
   realizedPnlKrw: number;
   missingCost: boolean;
@@ -115,13 +116,14 @@ export function buildReturnMetricsSummary(
 
   for (const asset of assetRows) {
     const key = assetMetricKey(asset);
+    const costBasisKrw = fallbackCostBasisKrw(asset, usdKrwRate);
     metricsByAssetKey.set(key, {
       assetKey: key,
       account: asset.account,
-      costBasisKrw: fallbackCostBasisKrw(asset, usdKrwRate),
+      costBasisKrw,
       realizedCostBasisKrw: 0,
       realizedPnlKrw: 0,
-      missingCost: false,
+      missingCost: costBasisKrw === null,
     });
   }
 
@@ -220,14 +222,15 @@ export function getAssetReturnMetrics(
   usdKrwRate: number,
 ) {
   const key = assetMetricKey(asset);
+  const costBasisKrw = fallbackCostBasisKrw(asset, usdKrwRate);
   return (
     summary.metricsByAssetKey.get(key) ?? {
       assetKey: key,
       account: asset.account,
-      costBasisKrw: fallbackCostBasisKrw(asset, usdKrwRate),
+      costBasisKrw,
       realizedCostBasisKrw: 0,
       realizedPnlKrw: 0,
-      missingCost: false,
+      missingCost: costBasisKrw === null,
     }
   );
 }
@@ -385,14 +388,16 @@ function estimateDisposedCostFromEvent(
 }
 
 function fallbackCostBasisKrw(asset: PortfolioReturnAssetRow, usdKrwRate: number) {
-  const quantity = toNumber(asset.quantity) ?? 0;
-  const averageCost =
-    toNumber(asset.averageCost) ?? toNumber(asset.currentPrice) ?? 0;
-  const localCostBasis = quantity * averageCost;
-  return (
-    (convertToKrw(localCostBasis, asset.currency, usdKrwRate) ?? 0) +
-    (toNumber(asset.fractionalAvgCost) ?? 0)
-  );
+  const quantity = toNumber(asset.quantity);
+  const averageCost = toNumber(asset.averageCost);
+  const fractionalCost = toNumber(asset.fractionalAvgCost);
+  if (quantity === null || quantity < 0 || (quantity > 0 && (averageCost === null || averageCost < 0))) return null;
+  if ((toNumber(asset.fractionalKrwValue) ?? 0) > 0 && fractionalCost === null) return null;
+  if (fractionalCost !== null && fractionalCost < 0) return null;
+  const baseCost = quantity === 0 ? 0 : convertToKrw(quantity * (averageCost ?? 0), asset.currency, usdKrwRate);
+  if (baseCost === null) return null;
+  const total = baseCost + (fractionalCost ?? 0);
+  return Number.isFinite(total) ? total : null;
 }
 
 function buildAssetMaps(assetRows: PortfolioReturnAssetRow[]): AssetMaps {

@@ -12,6 +12,8 @@ import { normalizeTodayHoldingDetailQuery } from "@/lib/today-holding-detail";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "오늘 변동 | VARDA LABS" };
+
 type TodayPageProps = {
   searchParams: Promise<{
     account?: string | string[];

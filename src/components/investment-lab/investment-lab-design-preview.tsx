@@ -1,5 +1,6 @@
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { buildInvestmentLabDesignPreview } from "@/lib/investment-lab-design-preview";
+import { resolveInvestmentLabPanel } from "@/lib/investment-lab-panel";
 import { InvestmentLabWorkspace } from "./investment-lab-workspace";
 import { InvestmentLabScopeTabs } from "./investment-lab-scope-tabs";
 import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
@@ -17,8 +18,11 @@ import {
 export function InvestmentLabDesignPreview({
   query,
 }: {
-  query: Parameters<typeof buildInvestmentLabDesignPreview>[0];
+  query: Parameters<typeof buildInvestmentLabDesignPreview>[0] & {
+    view?: string | readonly string[];
+  };
 }) {
+  const loadedPanel = resolveInvestmentLabPanel(query.view);
   const { dashboard, chart, summaries, period, selection, model, etfXray } =
     buildInvestmentLabDesignPreview(query);
   return (
@@ -38,6 +42,7 @@ export function InvestmentLabDesignPreview({
         </header>
         <div className={styles.workspaceSlot}>
           <InvestmentLabWorkspace
+            loadedPanel={loadedPanel}
             tools={
               <InvestmentLabPeriodSelector
                 period={period}
@@ -101,15 +106,16 @@ export function InvestmentLabDesignPreview({
               />
             }
             experiments={
+              loadedPanel === "weights" ?
               <InvestmentLabFixedMix
                 comparison={model.fixedMixComparison}
                 model={model.fixedMixScenario}
                 period={period}
                 scopeKey={dashboard.selectedScope.key}
                 selection={selection}
-              />
+              /> : null
             }
-            composition={<InvestmentLabEtfXray model={etfXray} />}
+            composition={loadedPanel === "composition" ? <InvestmentLabEtfXray model={etfXray} /> : null}
           />
         </div>
       </div>

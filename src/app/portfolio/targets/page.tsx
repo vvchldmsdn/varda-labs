@@ -12,6 +12,8 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "목표비중 | VARDA LABS" };
+
 type PortfolioTargetsPageProps = {
   searchParams: Promise<{
     account?: string | string[];

@@ -37,8 +37,8 @@ export type TodayHoldingDetailContribution = {
   changeKrw: number;
   returnPct: number | null;
   tradeFlowKrw: number;
-  priceChangeKrw: number;
-  fxChangeKrw: number;
+  priceChangeKrw: number | null;
+  fxChangeKrw: number | null;
   previousPrice: number;
   currentPrice: number;
   previousFxRate: number;

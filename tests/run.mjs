@@ -1,4 +1,10 @@
 import "./market-calendar.test.mjs";
+import "./body-scroll-lock.test.mjs";
+import "./investment-lab-panel.test.mjs";
+import "./simulation-deferred-research.test.mjs";
+import "./financial-correctness-regression.test.mjs";
+import "./portfolio-mutation-integration.test.mjs";
+import "./kis-refresh-lease-integration.test.mjs";
 import "./presentation-system.test.mjs";
 import "./auth-experience.test.mjs";
 import "./multi-provider-auth.test.mjs";

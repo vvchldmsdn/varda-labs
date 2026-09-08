@@ -7,6 +7,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "위험 분석 | VARDA LABS" };
+
 type PortfolioRiskPageProps = {
   searchParams: Promise<{
     account?: string | string[];

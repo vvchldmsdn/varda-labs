@@ -572,6 +572,7 @@ export const TENANT_WRITER_REGISTRY = [
     ],
     implementationPaths: [
       "src/lib/market-data/price-sync.ts",
+      "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/kis-history-cache-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
     ],
@@ -579,6 +580,32 @@ export const TENANT_WRITER_REGISTRY = [
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("live_price_quotes", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
+    ],
+    transition: {
+      prepare: "split_target_classes",
+      activate: "keep_owner_absent",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "session_portfolio_live_price_sync",
+    classification: "mixed",
+    authorization: "server_verified_session",
+    entrypoints: ["/api/portfolio/live-prices/sync"],
+    implementationPaths: [
+      "src/lib/market-data/kis-refresh-lease.ts",
+      "src/lib/market-data/price-sync.ts",
+      "src/lib/market-data/asset-price-snapshot-repository.ts",
+      "src/lib/market-data/fx-refresh-job.ts",
+    ],
+    targets: [
+      adminTarget("market_data_sync_runs", "insert", "update"),
+      sharedTarget("live_price_quotes", "insert", "update"),
+      sharedTarget("asset_price_snapshots", "insert", "update"),
+      sharedTarget("fx_rates", "insert", "update"),
     ],
     transition: {
       prepare: "split_target_classes",
@@ -626,6 +653,7 @@ export const TENANT_WRITER_REGISTRY = [
       "src/lib/market-data/core-market-factor-refresh-job.ts",
       "src/lib/market-data/fx-refresh-job.ts",
       "src/lib/market-data/price-sync.ts",
+      "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
       "src/lib/snapshots/daily.ts",
     ],

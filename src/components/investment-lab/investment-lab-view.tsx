@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { InvestmentLabPanel } from "@/lib/investment-lab-panel";
 
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { InvestmentLabWorkspace } from "./investment-lab-workspace";
@@ -30,6 +31,7 @@ import type {
 } from "@/lib/portfolio-analysis-scope";
 
 export function InvestmentLabView({
+  loadedPanel,
   accountComposition,
   anchorBasketScenario,
   anchorValueWeightScenario,
@@ -50,6 +52,7 @@ export function InvestmentLabView({
   scopeQuery,
   selectedScope,
 }: {
+  loadedPanel: InvestmentLabPanel | null;
   accountComposition: InvestmentLabAccountComposition;
   anchorBasketScenario: InvestmentLabAnchorBasketScenario;
   anchorValueWeightScenario: InvestmentLabAnchorValueWeightScenario;
@@ -189,6 +192,7 @@ export function InvestmentLabView({
           id="investment-lab-results"
         >
           <InvestmentLabWorkspace
+            loadedPanel={loadedPanel}
             tools={
               <>
                 <InvestmentLabPeriodSelector

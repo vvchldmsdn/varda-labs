@@ -1,4 +1,5 @@
 import "server-only";
+import { lazyValue } from "@/lib/lazy-value";
 
 import {
   getReadOnlyTenantPortfolioStructure,
@@ -130,7 +131,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     matrix,
     preparedPaths,
   });
-  const candidateComparison = buildSimulationOwnerCandidateComparison({
+  const candidateComparison = lazyValue(() => buildSimulationOwnerCandidateComparison({
     account: candidate.account,
     prepared:
       preparedPaths?.status === "ready" ? preparedPaths : null,
@@ -138,19 +139,19 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     currentWeights: execution.executionWeights,
     samplePathCount:
       SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.samplePathCount,
-  });
-  const walkForwardValidation = buildSimulationOwnerWalkForwardValidation({
+  }));
+  const walkForwardValidation = lazyValue(() => buildSimulationOwnerWalkForwardValidation({
     account: candidate.account,
     currentExecutionReady: execution.status === "ready",
     matrix,
     currentWeights: execution.executionWeights,
-  });
-  const historicalValidation =
+  }));
+  const historicalValidation = lazyValue(() =>
     buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
       availableServiceDates,
       endpoints: historicalValidationEndpoints,
-    });
+    }));
   const parametricFactorInput =
     execution.status === "ready" && matrix?.status === "ready"
       ? Object.freeze({
@@ -164,9 +165,9 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
   return Object.freeze({
     inputPreflight,
     execution,
-    candidateComparison,
-    walkForwardValidation,
-    historicalValidation,
+    get candidateComparison() { return candidateComparison(); },
+    get walkForwardValidation() { return walkForwardValidation(); },
+    get historicalValidation() { return historicalValidation(); },
     parametricFactorInput,
     modelCalibrationInput: Object.freeze({
       factorAsOfServiceDate:

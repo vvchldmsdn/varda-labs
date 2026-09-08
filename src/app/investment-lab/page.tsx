@@ -53,8 +53,15 @@ import type {
   PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import {
+  resolveInvestmentLabPanel,
+  startInvestmentLabPanelQueries,
+  type InvestmentLabPanel,
+} from "@/lib/investment-lab-panel";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "투자 랩 | VARDA LABS" };
 
 type InvestmentLabPageProps = {
   searchParams: Promise<{
@@ -108,6 +115,7 @@ export default async function InvestmentLabPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  const requestedPanel = resolveInvestmentLabPanel(params.view);
   const scopeQuery = Object.freeze({
     start: params.start,
     end: params.end,
@@ -126,13 +134,23 @@ export default async function InvestmentLabPage({
       scope: selectedScope,
       tenantContext,
     });
-  const portfolioStructurePromise = getReadOnlyTenantPortfolioStructureForScope(
-    {
-      scope: selectedScope,
-      serviceDate,
-      tenantContext,
-    },
-  );
+  const { portfolioStructurePromise, etfXrayPromise, stressReplayPromise } =
+    startInvestmentLabPanelQueries(requestedPanel, {
+      portfolio: () => getReadOnlyTenantPortfolioStructureForScope({
+        scope: selectedScope,
+        serviceDate,
+        tenantContext,
+      }),
+      etfXray: (portfolioStructurePromise) =>
+        getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
+          portfolioStructurePromise,
+        ),
+      stressReplay: (portfolioStructurePromise) =>
+        getReadOnlyTenantInvestmentLabStressReplay({
+          account: selectedScope.key,
+          portfolioStructurePromise,
+        }),
+    });
   const dataAvailabilityPromise =
     getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
       evidencePromise: scopeEvidencePromise,
@@ -145,9 +163,6 @@ export default async function InvestmentLabPage({
       serviceDate,
       tenantContext,
     });
-  const etfXrayPromise = getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio(
-    portfolioStructurePromise,
-  );
   const modelPromise = getReadOnlyTenantInvestmentLabCounterfactualForScope({
     evidencePromise: scopeEvidencePromise,
     fixedMixSelection,
@@ -162,10 +177,6 @@ export default async function InvestmentLabPage({
     scope: selectedScope,
     tenantContext,
   });
-  const stressReplayPromise = getReadOnlyTenantInvestmentLabStressReplay({
-    account: selectedScope.key,
-    portfolioStructurePromise,
-  });
 
   return (
     <div
@@ -174,6 +185,7 @@ export default async function InvestmentLabPage({
     >
       <Suspense fallback={<InvestmentLabSkeleton />}>
         <InvestmentLabContent
+          requestedPanel={requestedPanel}
           dataAvailabilityPromise={dataAvailabilityPromise}
           fixedMixSelection={fixedMixSelection}
           generatedAt={generatedAt.toISOString()}
@@ -189,6 +201,7 @@ export default async function InvestmentLabPage({
             </Suspense>
           }
           composition={
+            requestedPanel === "composition" && etfXrayPromise && stressReplayPromise ?
             <div className="space-y-8 py-7">
               <Suspense fallback={<InvestmentLabEtfXraySkeleton />}>
                 <div id="investment-lab-etf-xray">
@@ -207,9 +220,10 @@ export default async function InvestmentLabPage({
                   </Suspense>
                 </div>
               </InvestmentLabDisclosure>
-            </div>
+            </div> : null
           }
           smallAdjustment={
+            requestedPanel === "weights" && portfolioStructurePromise ?
             <div id="investment-lab-small-adjustment">
               <Suspense fallback={<InvestmentLabSmallAdjustmentSkeleton />}>
                 <InvestmentLabSmallAdjustmentContent
@@ -218,7 +232,7 @@ export default async function InvestmentLabPage({
                   selectedScope={selectedScope}
                 />
               </Suspense>
-            </div>
+            </div> : null
           }
         />
       </Suspense>
@@ -241,6 +255,7 @@ async function InvestmentLabStressReplayContent({
 }
 
 async function InvestmentLabContent({
+  requestedPanel,
   composition,
   readiness,
   smallAdjustment,
@@ -252,6 +267,7 @@ async function InvestmentLabContent({
   scopeQuery,
   selectedScope,
 }: {
+  requestedPanel: InvestmentLabPanel | null;
   composition: ReactNode;
   readiness: ReactNode;
   smallAdjustment: ReactNode;
@@ -284,6 +300,7 @@ async function InvestmentLabContent({
   } = await modelPromise;
   return (
     <InvestmentLabView
+      loadedPanel={requestedPanel}
       accountComposition={accountComposition}
       anchorBasketScenario={anchorBasketScenario}
       anchorValueWeightScenario={anchorValueWeightScenario}
@@ -306,6 +323,7 @@ async function InvestmentLabContent({
       composition={composition}
       readiness={readiness}
       experiments={
+        requestedPanel === "weights" ?
         <div className="space-y-8 py-7">
           <div id="investment-lab-optimizer">
             <InvestmentLabPreperiodOptimizerView model={preperiodOptimizer} />
@@ -344,7 +362,7 @@ async function InvestmentLabContent({
           >
             {smallAdjustment}
           </InvestmentLabDisclosure>
-        </div>
+        </div> : null
       }
       period={period}
       scopeCatalog={scopeCatalog}
