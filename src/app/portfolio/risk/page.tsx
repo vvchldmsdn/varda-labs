@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { PortfolioRiskView } from "@/components/portfolio-risk/portfolio-risk-view";
@@ -7,7 +8,9 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "위험 분석 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "위험 분석 | VARDA LABS" }, "Risk analysis | VARDA LABS");
+}
 
 type PortfolioRiskPageProps = {
   searchParams: Promise<{
@@ -38,7 +41,7 @@ export default async function PortfolioRiskPage({
     return (
       <PortfolioReadAccessBoundary
         resolution={resolution}
-        title="Portfolio risk"
+        title="위험 분석" titleEn="Portfolio risk"
       />
     );
   }
@@ -56,7 +59,7 @@ export default async function PortfolioRiskPage({
       <PortfolioAnalysisScopeBoundary
         basePath="/portfolio/risk"
         context={scopeContext}
-        title="Portfolio risk"
+        title="위험 분석" titleEn="Portfolio risk"
       />
     );
   }

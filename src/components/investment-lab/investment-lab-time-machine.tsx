@@ -1,5 +1,9 @@
 "use client";
 
+import { LabText } from "./lab-text";
+import { labEnglish } from "./lab-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
+
 import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Info } from "lucide-react";
 import type {
@@ -62,17 +66,13 @@ export function InvestmentLabTimeMachine({
     <div className={styles.comparison} data-lab-comparison="interactive" data-selected-scenario={selected.id}>
       <InvestmentLabChartCanvas actual={actual} chart={chart} selected={selected} sidebar={
           <div className={styles.headline}>
-            {unavailableScenarios.length ? <p className={styles.readinessNote}>{unavailableScenarios.length}개 시나리오 · 추가 근거 필요</p> : null}
+            {unavailableScenarios.length ? <p className={styles.readinessNote}>{unavailableScenarios.length}<LabText value="개 시나리오 · 추가 근거 필요" /></p> : null}
             <div>
-              <h2>
-                비교 시나리오
-              </h2>
+              <h2><LabText value=" 비교 시나리오 " /></h2>
 
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <label className="sr-only" htmlFor="investment-lab-scenario-select">
-                비교 시나리오
-              </label>
+              <label className="sr-only" htmlFor="investment-lab-scenario-select"><LabText value=" 비교 시나리오 " /></label>
               <select
                 className="min-h-10 max-w-[230px] rounded-full border border-[var(--line)] bg-transparent px-4 text-xs"
                 id="investment-lab-scenario-select"
@@ -84,7 +84,7 @@ export function InvestmentLabTimeMachine({
               >
                 {ready.map((line) => (
                   <option key={line.id} value={line.id}>
-                    {labScenarioLabel(line.id)}
+                    <LabText value={labScenarioLabel(line.id)} />
                   </option>
                 ))}
               </select>
@@ -96,33 +96,14 @@ export function InvestmentLabTimeMachine({
               >
               <div className="max-w-2xl space-y-5 text-sm leading-7 text-[var(--muted)]">
                 <p>
-                  <strong className="font-medium text-[var(--ink)]">
-                    같은 기간, 같은 외부 입출금
-                  </strong>
-                  <br />
-                  검은 선은 저장된 실제 평가액, 주황 선은 같은 시작 평가액과
-                  입출금으로 계산한 선택 시나리오입니다. 계좌 사이의 이동은
-                  선택한 분석 범위에 맞춰 처리합니다.
-                </p>
+                  <strong className="font-medium text-[var(--ink)]"><LabText value=" 같은 기간, 같은 외부 입출금 " /></strong>
+                  <br /><LabText value=" 검은 선은 저장된 실제 평가액, 주황 선은 같은 시작 평가액과 입출금으로 계산한 선택 시나리오입니다. 계좌 사이의 이동은 선택한 분석 범위에 맞춰 처리합니다. " /></p>
                 <p>
-                  <strong className="font-medium text-[var(--ink)]">
-                    평가액 차이와 수익률은 다릅니다
-                  </strong>
-                  <br />
-                  평가액에는 입출금이 포함됩니다. 아래 추정수익률과 낙폭은 외부
-                  흐름을 조정한 기존 계산 결과를 사용합니다. 계산 근거가 없으면
-                  숫자를 만들지 않습니다.
-                </p>
+                  <strong className="font-medium text-[var(--ink)]"><LabText value=" 평가액 차이와 수익률은 다릅니다 " /></strong>
+                  <br /><LabText value=" 평가액에는 입출금이 포함됩니다. 아래 추정수익률과 낙폭은 외부 흐름을 조정한 기존 계산 결과를 사용합니다. 계산 근거가 없으면 숫자를 만들지 않습니다. " /></p>
                 <p>
-                  <strong className="font-medium text-[var(--ink)]">
-                    과거 비교이지 미래 예측이 아닙니다
-                  </strong>
-                  <br />
-                  KIS 원종가 경로에는 배당·기업행사 조정과 투자자 수준의
-                  거래비용·세금이 포함되지 않습니다. 곡선은 저장된 관측점을
-                  부드럽게 연결한 표시이며, 새로운 평가 데이터를 생성하지
-                  않습니다.
-                </p>
+                  <strong className="font-medium text-[var(--ink)]"><LabText value=" 과거 비교이지 미래 예측이 아닙니다 " /></strong>
+                  <br /><LabText value=" KIS 원종가 경로에는 배당·기업행사 조정과 투자자 수준의 거래비용·세금이 포함되지 않습니다. 곡선은 저장된 관측점을 부드럽게 연결한 표시이며, 새로운 평가 데이터를 생성하지 않습니다. " /></p>
               </div>
               </InvestmentLabDialog>
             </div>
@@ -133,13 +114,11 @@ export function InvestmentLabTimeMachine({
           <div className={styles.chartFooter}>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-[var(--muted)]">
               <span className="inline-flex items-center gap-2">
-                <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--ink)]" />
-                실제 포트폴리오
-              </span>
+                <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--ink)]" /><LabText value=" 실제 포트폴리오 " /></span>
               {selected.id !== "actual" ? (
                 <span className="inline-flex items-center gap-2">
                   <i aria-hidden="true" className="h-0.5 w-5 bg-[var(--accent)]" />
-                  {labScenarioLabel(selected.id)}
+                  <LabText value={labScenarioLabel(selected.id)} />
                 </span>
               ) : null}
             </div>
@@ -154,10 +133,10 @@ export function InvestmentLabTimeMachine({
                 <table className="w-full min-w-[520px] border-collapse text-sm">
                   <thead className="text-left text-xs text-[var(--muted)]">
                     <tr>
-                      <th className="py-3">평가일</th>
-                      <th className="p-3 text-right">실제 평가액</th>
-                      <th className="p-3 text-right">비교 평가액</th>
-                      <th className="py-3 pl-3 text-right">차이</th>
+                      <th className="py-3"><LabText value="평가일" /></th>
+                      <th className="p-3 text-right"><LabText value="실제 평가액" /></th>
+                      <th className="p-3 text-right"><LabText value="비교 평가액" /></th>
+                      <th className="py-3 pl-3 text-right"><LabText value="차이" /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -183,9 +162,7 @@ export function InvestmentLabTimeMachine({
                           <td className="p-3 text-right">
                             {labKrw(alternative.valueKrw)}
                             {alternative.hasPendingExecution ? (
-                              <span className="ml-1 text-xs text-[var(--warning)]">
-                                대기 거래
-                              </span>
+                              <span className="ml-1 text-xs text-[var(--warning)]"><LabText value=" 대기 거래 " /></span>
                             ) : null}
                           </td>
                           <td
@@ -204,23 +181,18 @@ export function InvestmentLabTimeMachine({
           <InvestmentLabDialog label="시나리오·성과" title="시나리오와 성과 비교" size="wide">
         {() => <>
         {details ? <div className="mb-6 flex flex-wrap gap-3">{details}</div> : null}
-        <aside
+        <LocalizedElement as="aside"
           className={styles.scenarios}
-          aria-label="비교 시나리오"
+          aria-label="비교 시나리오" en={{"aria-label": labEnglish("비교 시나리오")}}
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-xs font-medium text-[var(--muted)]">
-              비교 시나리오
-            </h3>
+            <h3 className="text-xs font-medium text-[var(--muted)]"><LabText value=" 비교 시나리오 " /></h3>
             <span className="text-[10px] tabular-nums text-[var(--faint)]">
-              {ready.length}개 경로
-            </span>
+              {ready.length}<LabText value="개 경로 " /></span>
           </div>
           <div className="mb-4 flex items-center justify-between gap-3 text-xs">
             <span className="inline-flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-[var(--ink)]" />
-              실제 포트폴리오
-            </span>
+              <span className="size-1.5 rounded-full bg-[var(--ink)]" /><LabText value=" 실제 포트폴리오 " /></span>
             <span className="font-medium tabular-nums">
               {labKrw(
                 actualSummary?.endValueKrw ?? actual.points.at(-1)!.valueKrw,
@@ -247,7 +219,7 @@ export function InvestmentLabTimeMachine({
                 >
                   <span className="min-w-0">
                     <span className="flex items-center gap-1.5 text-[12px] font-medium leading-5">
-                      {labScenarioLabel(line.id)}
+                      <LabText value={labScenarioLabel(line.id)} />
                       {active ? (
                         <Check
                           aria-hidden="true"
@@ -276,8 +248,7 @@ export function InvestmentLabTimeMachine({
                 onClick={() => setShowUnavailable(!showUnavailable)}
                 type="button"
               >
-                <span>
-                  추가 근거가 필요한 경로 {unavailableScenarios.length}
+                <span><LabText value=" 추가 근거가 필요한 경로 " />{unavailableScenarios.length}
                 </span>
                 <ChevronDown
                   aria-hidden="true"
@@ -302,7 +273,7 @@ export function InvestmentLabTimeMachine({
                         className="mt-0.5 shrink-0"
                         size={13}
                       />
-                      {labScenarioLabel(item.id)}
+                      <LabText value={labScenarioLabel(item.id)} />
                     </button>
                   ))}
                 </div>
@@ -312,15 +283,15 @@ export function InvestmentLabTimeMachine({
                   className="mt-2 border-l-2 border-[var(--warning-soft)] pl-3 text-xs leading-6"
                   role="status"
                 >
-                  <p className="text-[var(--warning)]">{unavailableDetail.reason}</p>
+                  <p className="text-[var(--warning)]"><LabText value={unavailableDetail.reason} /></p>
                   <p className="mt-2 text-[var(--muted)]">
-                    {unavailableDetail.resolution}
+                    <LabText value={unavailableDetail.resolution} />
                   </p>
                 </div>
               ) : null}
             </div>
           ) : null}
-        </aside>      <dl
+        </LocalizedElement>      <dl
         className={styles.metrics}
         data-lab-metrics
       >
@@ -354,10 +325,9 @@ export function InvestmentLabTimeMachine({
         />
       </dl>
       <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-[11px] text-[var(--faint)]">
-        <span>{labScenarioDetail(selected.id)}</span>
+        <span><LabText value={labScenarioDetail(selected.id)} /></span>
         <span>
-          {chart.period!.comparisonDateCount}개 평가일 · 같은 기간·입출금
-        </span>
+          {chart.period!.comparisonDateCount}<LabText value="개 평가일 · 같은 기간·입출금 " /></span>
       </div>
            </>}
            </InvestmentLabDialog>
@@ -377,12 +347,12 @@ function Metric({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-[var(--faint)]">{label}</dt>
+      <dt className="text-[11px] text-[var(--faint)]"><LabText value={label} /></dt>
       <dd className="mt-2 break-words text-lg font-medium tabular-nums sm:text-xl">
-        {value}
+        <LabText value={value} />
       </dd>
       <dd className="mt-2 text-[11px] tabular-nums text-[var(--faint)]">
-        {baseline}
+        <LabText value={baseline} />
       </dd>
     </div>
   );

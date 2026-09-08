@@ -1,4 +1,8 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { useI18n } from "@/components/i18n/locale-provider";
+
 
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -46,6 +50,7 @@ export function HistoryTimeExplorer({
   details?: ReactNode;
   status?: ReactNode;
 }) {
+  const { t } = useI18n();
   const returnAvailable = model.points.some(
     (point) => point.totalReturnPct !== null,
   );
@@ -75,13 +80,8 @@ export function HistoryTimeExplorer({
     return (
       <section className="border-y border-[var(--line)] py-16 text-center">
         <p className="text-xs font-medium text-[var(--muted)]">HISTORY</p>
-        <h1 className="mt-3 text-2xl font-semibold">
-          아직 탐색할 기록이 없습니다.
-        </h1>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
-          평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면
-          같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다.
-        </p>
+        <h1 className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]"><T ko="평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다." en="Values are not interpolated. Once daily portfolio snapshots are recorded, you can explore values and events by date here."/></p>
         {details ? <div className="mt-6 flex justify-center">{details}</div> : null}
       </section>
     );
@@ -110,28 +110,28 @@ export function HistoryTimeExplorer({
   return (
     <section aria-labelledby="history-time-explorer-title" className={styles.explorer}>
       <div className={styles.stageMain}>
-        <aside className={styles.hero} aria-label="선택한 저장일">
+        <aside className={styles.hero} aria-label={t("선택한 저장일", "Selected recorded date")}>
           <div className={styles.heroNumbers}>
-            <p className={styles.heroDate}>{formatDate(inspectedPoint?.date ?? null)}</p>
-            <p className={styles.heroValue} data-history-inspected-value>{mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)}</p>
-            <p className={styles.heroCaption}>{mode === "value" ? "총평가액" : "저장 수익률"}<span className={tone(inspectedPoint?.movementKrw ?? null)}>이전 대비 {formatSignedKrw(inspectedPoint?.movementKrw ?? null)}</span></p>
+            <p className={styles.heroDate}>{<T ko={formatDate(inspectedPoint?.date ?? null)} en={translateHomeHistory(formatDate(inspectedPoint?.date ?? null))}/>}</p>
+            <p className={styles.heroValue} data-history-inspected-value>{<T ko={mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </p>
+            <p className={styles.heroCaption}>{<T ko={mode === "value" ? "총평가액" : "저장 수익률"} en={translateHomeHistory(mode === "value" ? "총평가액" : "저장 수익률")}/>}<span className={tone(inspectedPoint?.movementKrw ?? null)}><T ko="이전 대비" en="Previous change"/> {<T ko={formatSignedKrw(inspectedPoint?.movementKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.movementKrw ?? null))}/>}</span></p>
           </div>
           <div className={styles.controls}>
-            <div className={styles.modeControls} aria-label="그래프 지표">
-              <ModeButton active={mode === "value"} label="평가액" onClick={() => changeMode("value")} />
-              <ModeButton active={mode === "return"} disabled={!returnAvailable} label="수익률" onClick={() => changeMode("return")} />
+            <div className={styles.modeControls} aria-label={t("그래프 지표", "Chart metric")}>
+              <ModeButton active={mode === "value"} label={t("평가액", "Value")} onClick={() => changeMode("value")} />
+              <ModeButton active={mode === "return"} disabled={!returnAvailable} label={t("수익률", "Return")} onClick={() => changeMode("return")} />
             </div>
-            <div className={styles.periodControls} aria-label="조회 기간">
-              {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{option.label}</button>)}
+            <div className={styles.periodControls} aria-label={t("조회 기간", "Time range")}>
+              {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</button>)}
             </div>
           </div>
-          <p className={styles.railNote}>{scopeLabel} · {rangeSummary.pointCount}개 저장점<br />저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다.</p>
-          {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{status}</div> : null}
+          <p className={styles.railNote}>{scopeLabel} · {rangeSummary.pointCount}<T ko="개 저장점" en=" recorded points"/><br /><T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/></p>
+          {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{typeof status === "string" ? <T ko={status} en={translateHomeHistory(status)}/> : status}</div> : null}
         </aside>
         <div className={styles.plot}>
           <div className={styles.chartTitle}>
-            <h2 id="history-time-explorer-title">{mode === "value" ? "자산의 흐름" : "수익률의 흐름"}</h2>
-            <p>날짜를 따라 탐색</p>
+            <h2 id="history-time-explorer-title">{<T ko={mode === "value" ? "자산의 흐름" : "수익률의 흐름"} en={translateHomeHistory(mode === "value" ? "자산의 흐름" : "수익률의 흐름")}/>}</h2>
+            <p><T ko="날짜를 따라 탐색" en="Explore by date"/></p>
           </div>
           <div className="varda-history-canvas">
             <HistoryPerformanceChart key={`${mode}-${range}`} mode={mode} onSelect={setSelectedDate} onInspect={setInspectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
@@ -139,16 +139,16 @@ export function HistoryTimeExplorer({
         </div>
       </div>
       <footer className={styles.stageFooter}>
-        <p>저장값 · 현금흐름 미보정</p>
+        <p><T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/></p>
         <div>
-          <PresentationDialog mountOnOpen label="날짜별 기록" title="날짜별 저장 기록">
+          <PresentationDialog mountOnOpen label="날짜별 기록" labelEn={"Records by date"} title="날짜별 저장 기록" titleEn={"Recorded values by date"}>
             <HistorySnapshotRail onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
           </PresentationDialog>
-          <PresentationDialog mountOnOpen label="기간 요약·근거" title="히스토리 계산 근거" description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." wide>
+          <PresentationDialog mountOnOpen label="기간 요약·근거" labelEn={"Period summary and sources"} title="히스토리 계산 근거" titleEn={"History calculation sources"} description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." descriptionEn={"Review changes over the selected period and the records behind each date."} wide>
             <dl className={styles.overview}>
-              <div><dt className={styles.label}>저장 수익률</dt><dd className={`${styles.value} ${tone(inspectedPoint?.totalReturnPct ?? null)}`}>{formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)}</dd><dd className={styles.note}>손익 {formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)}</dd></div>
-              <div><dt className={styles.label}>기간 평가액 변화</dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{formatSignedKrw(rangeSummary.changeKrw)}</dd><dd className={styles.note}>현금흐름 미보정</dd></div>
-              <div><dt className={styles.label}>기간 최대 낙폭</dt><dd className={`${styles.value} ${tone(rangeSummary.maxDrawdownPct)}`}>{formatSignedPercent(rangeSummary.maxDrawdownPct)}</dd><dd className={styles.note}>{formatDate(rangeSummary.maxDrawdownDate)}</dd></div>
+              <div><dt className={styles.label}><T ko="저장 수익률" en="Recorded return"/></dt><dd className={`${styles.value} ${tone(inspectedPoint?.totalReturnPct ?? null)}`}>{<T ko={formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </dd><dd className={styles.note}><T ko="손익" en="Gain/loss"/> {<T ko={formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null))}/>}</dd></div>
+              <div><dt className={styles.label}><T ko="기간 평가액 변화" en="Period value change"/></dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{<T ko={formatSignedKrw(rangeSummary.changeKrw)} en={translateHomeHistory(formatSignedKrw(rangeSummary.changeKrw))}/>}</dd><dd className={styles.note}><T ko="현금흐름 미보정" en="Not adjusted for cash flows"/></dd></div>
+              <div><dt className={styles.label}><T ko="기간 최대 낙폭" en="Period maximum drawdown"/></dt><dd className={`${styles.value} ${tone(rangeSummary.maxDrawdownPct)}`}>{<T ko={formatSignedPercent(rangeSummary.maxDrawdownPct)} en={translateHomeHistory(formatSignedPercent(rangeSummary.maxDrawdownPct))}/>} </dd><dd className={styles.note}>{<T ko={formatDate(rangeSummary.maxDrawdownDate)} en={translateHomeHistory(formatDate(rangeSummary.maxDrawdownDate))}/>}</dd></div>
             </dl>
             <RangeMetrics summary={rangeSummary} className="grid" />
             <RangeSummary summary={rangeSummary} />
@@ -170,31 +170,32 @@ function RangeMetrics({
   summary: ReturnType<typeof summarizeHistoryRange>;
   className: string;
 }) {
+  const { t } = useI18n();
   return (
     <dl
       className={`${className} grid-cols-2 border-y border-[var(--line)] xl:grid-cols-4`}
     >
       <SummaryMetric
-        detail={formatDate(rangeSummary.peakDate)}
-        label="표시 범위 최고 평가액"
+        detail={t(formatDate(rangeSummary.peakDate), translateHomeHistory(formatDate(rangeSummary.peakDate)))}
+        label={t("표시 범위 최고 평가액", "Highest displayed value")}
         value={formatHistoryKrw(rangeSummary.peakValueKrw)}
       />
       <SummaryMetric
-        detail={formatDate(rangeSummary.maxDrawdownDate)}
-        label="최대 낙폭"
+        detail={t(formatDate(rangeSummary.maxDrawdownDate), translateHomeHistory(formatDate(rangeSummary.maxDrawdownDate)))}
+        label={t("최대 낙폭", "Maximum drawdown")}
         value={formatSignedPercent(rangeSummary.maxDrawdownPct)}
         valueClass={tone(rangeSummary.maxDrawdownPct)}
       />
       <SummaryMetric
         detail={formatSignedPercent(rangeSummary.changePct)}
-        label="표시 범위 변화"
-        value={formatSignedKrw(rangeSummary.changeKrw)}
+        label={t("표시 범위 변화", "Displayed period change")}
+        value={t(formatSignedKrw(rangeSummary.changeKrw), translateHomeHistory(formatSignedKrw(rangeSummary.changeKrw)))}
         valueClass={tone(rangeSummary.changeKrw)}
       />
       <SummaryMetric
-        detail={`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`}
-        label="기록점"
-        value={`${rangeSummary.pointCount}개`}
+        detail={t(`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`, translateHomeHistory(`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`))}
+        label={t("기록점", "Recorded points")}
+        value={t(`${rangeSummary.pointCount}개`, translateHomeHistory(`${rangeSummary.pointCount}개`))}
       />
     </dl>
   );
@@ -223,7 +224,7 @@ function ModeButton({
       disabled={disabled}
       onClick={onClick}
     >
-      {label}
+      {<T ko={label} en={translateHomeHistory(label)}/>}
     </button>
   );
 }
@@ -241,14 +242,14 @@ function SummaryMetric({
 }) {
   return (
     <div className="min-w-0 border-b border-r border-[var(--line)] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
-      <dt className="text-[11px] text-[var(--muted)]">{label}</dt>
+      <dt className="text-[11px] text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd
         className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}
       >
-        {value}
+        <T ko={value} en={translateHomeHistory(value)}/>
       </dd>
       <dd className="mt-2 truncate text-[11px] text-[var(--faint)]">
-        {detail}
+        {<T ko={detail} en={translateHomeHistory(detail)}/>}
       </dd>
     </div>
   );
@@ -259,29 +260,30 @@ function RangeSummary({
 }: {
   summary: ReturnType<typeof summarizeHistoryRange>;
 }) {
+  const { t } = useI18n();
   return (
     <dl className="grid border-b border-[var(--line)] py-5 sm:grid-cols-[1fr_auto_1fr_1.2fr] sm:items-center">
       <RangeValue
-        detail={formatDate(summary.startDate)}
-        label="시작 평가액"
+        detail={t(formatDate(summary.startDate), translateHomeHistory(formatDate(summary.startDate)))}
+        label={t("시작 평가액", "Starting value")}
         value={formatHistoryKrw(summary.startValueKrw)}
       />
       <div className="hidden px-7 text-xl text-[var(--faint)] sm:block">→</div>
       <RangeValue
-        detail={formatDate(summary.endDate)}
-        label="종료 평가액"
+        detail={t(formatDate(summary.endDate), translateHomeHistory(formatDate(summary.endDate)))}
+        label={t("종료 평가액", "Ending value")}
         value={formatHistoryKrw(summary.endValueKrw)}
       />
       <div className="mt-4 grid grid-cols-2 gap-5 border-t border-[var(--wash)] pt-4 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-7 sm:pt-0">
         <RangeValue
-          detail="평가액 변화"
-          label="변화 금액"
-          value={formatSignedKrw(summary.changeKrw)}
+          detail={t("평가액 변화", "Value change")}
+          label={t("변화 금액", "Amount changed")}
+          value={t(formatSignedKrw(summary.changeKrw), translateHomeHistory(formatSignedKrw(summary.changeKrw)))}
           valueClass={tone(summary.changeKrw)}
         />
         <RangeValue
-          detail="현금흐름 미보정"
-          label="변화율"
+          detail={t("현금흐름 미보정", "Not adjusted for cash flows")}
+          label={t("변화율", "Percentage change")}
           value={formatSignedPercent(summary.changePct)}
           valueClass={tone(summary.changePct)}
         />
@@ -303,11 +305,11 @@ function RangeValue({
 }) {
   return (
     <div className="py-2">
-      <dt className="text-[11px] text-[var(--muted)]">{label}</dt>
+      <dt className="text-[11px] text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd className={`mt-2 text-lg font-semibold tabular-nums ${valueClass}`}>
-        {value}
+        <T ko={value} en={translateHomeHistory(value)}/>
       </dd>
-      <dd className="mt-1 text-[11px] text-[var(--faint)]">{detail}</dd>
+      <dd className="mt-1 text-[11px] text-[var(--faint)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</dd>
     </div>
   );
 }
@@ -317,6 +319,7 @@ function SelectedDayEvidence({
 }: {
   point: HistoryOverviewPoint | null;
 }) {
+  const { t } = useI18n();
   if (!point) return null;
 
   return (
@@ -327,46 +330,46 @@ function SelectedDayEvidence({
             SELECTED DATE
           </p>
           <h2 className="mt-1 text-xl font-semibold">
-            {formatDate(point.date)}
+            {<T ko={formatDate(point.date)} en={translateHomeHistory(formatDate(point.date))}/>}
           </h2>
         </div>
         <p className="text-xs text-[var(--muted)]">
-          {historySourceLabel(point.source)}
+          {<T ko={historySourceLabel(point.source)} en={translateHomeHistory(historySourceLabel(point.source))}/>}
         </p>
       </div>
 
       <dl className="mt-5 grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceMetric
-          detail={
-            point.gapDays === null
+          detail={t(point.gapDays === null
               ? "첫 저장점"
-              : `${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`
-          }
-          label="이전 저장점 대비"
-          value={formatSignedKrw(point.movementKrw)}
+              : `${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`, translateHomeHistory(point.gapDays === null
+              ? "첫 저장점"
+              : `${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`))}
+          label={t("이전 저장점 대비", "Versus the previous record")}
+          value={t(formatSignedKrw(point.movementKrw), translateHomeHistory(formatSignedKrw(point.movementKrw)))}
           valueClass={tone(point.movementKrw)}
         />
         <EvidenceMetric
           detail={formatSignedPercent(point.totalReturnPct)}
-          label="저장 손익"
-          value={formatSignedKrw(point.totalPnlKrw)}
+          label={t("저장 손익", "Recorded gain/loss")}
+          value={t(formatSignedKrw(point.totalPnlKrw), translateHomeHistory(formatSignedKrw(point.totalPnlKrw)))}
           valueClass={tone(point.totalPnlKrw)}
         />
         <EvidenceMetric
           detail={formatSignedPercent(point.drawdownPct)}
-          label="고점 대비"
-          value={formatSignedKrw(point.drawdownKrw)}
+          label={t("고점 대비", "Versus the peak")}
+          value={t(formatSignedKrw(point.drawdownKrw), translateHomeHistory(formatSignedKrw(point.drawdownKrw)))}
           valueClass={tone(point.drawdownKrw)}
         />
         <EvidenceMetric
-          detail="저장된 현금성 평가액"
-          label="현금"
+          detail={t("저장된 현금성 평가액", "Recorded cash-equivalent value")}
+          label={t("현금", "Cash")}
           value={formatHistoryKrw(point.cashValueKrw)}
         />
       </dl>
 
       <div className="mt-5">
-        <p className="text-xs font-semibold">같은 날짜의 활동</p>
+        <p className="text-xs font-semibold"><T ko="같은 날짜의 활동" en="Activity on this date"/></p>
         {point.events.length > 0 ? (
           <ul className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {point.events.slice(0, 4).map((event, index) => (
@@ -377,25 +380,23 @@ function SelectedDayEvidence({
                 <span className="mt-1 h-2 w-2 rounded-full bg-[var(--brand)]" />
                 <div className="min-w-0">
                   <p className="truncate font-medium">
-                    {eventTypeLabel(event)} · {event.assetName}
+                    {<T ko={eventTypeLabel(event)} en={translateHomeHistory(eventTypeLabel(event))}/>} · {event.assetName}
                   </p>
                   <p className="mt-1 truncate text-xs text-[var(--muted)]">
-                    {[event.accountName, formatOptionalKrw(event.amountKrw)]
+                    {<T ko={[event.accountName, formatOptionalKrw(event.amountKrw)]
                       .filter(Boolean)
-                      .join(" · ")}
+                      .join(" · ")} en={translateHomeHistory([event.accountName, formatOptionalKrw(event.amountKrw)]
+                      .filter(Boolean)
+                      .join(" · "))}/>}
                   </p>
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm text-[var(--muted)]">
-            이 날짜에 연결된 저장 이벤트가 없습니다.
-          </p>
+          <p className="mt-3 text-sm text-[var(--muted)]"><T ko="이 날짜에 연결된 저장 이벤트가 없습니다." en="No recorded events are linked to this date."/></p>
         )}
-        <p className="mt-4 text-xs leading-5 text-[var(--faint)]">
-          같은 날짜에 저장된 활동이며 평가액 변화의 원인으로 단정하지 않습니다.
-        </p>
+        <p className="mt-4 text-xs leading-5 text-[var(--faint)]"><T ko="같은 날짜에 저장된 활동이며 평가액 변화의 원인으로 단정하지 않습니다." en="These activities were recorded on the same date; they do not establish the cause of value changes."/></p>
       </div>
     </section>
   );
@@ -414,11 +415,11 @@ function EvidenceMetric({
 }) {
   return (
     <div className="border-b border-[var(--wash)] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
+      <dt className="text-xs text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd className={`mt-2 text-lg font-semibold tabular-nums ${valueClass}`}>
-        {value}
+        <T ko={value} en={translateHomeHistory(value)}/>
       </dd>
-      <dd className="mt-2 text-xs leading-5 text-[var(--faint)]">{detail}</dd>
+      <dd className="mt-2 text-xs leading-5 text-[var(--faint)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</dd>
     </div>
   );
 }
@@ -432,6 +433,7 @@ function HistoryCalendar({
   points: readonly HistoryOverviewPoint[];
   selectedDate: string | null;
 }) {
+  const { t } = useI18n();
   const layout = useMemo(() => calendarLayout(points), [points]);
   if (layout.cells.length === 0) return null;
 
@@ -442,14 +444,14 @@ function HistoryCalendar({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             VALUE RHYTHM
           </p>
-          <h2 className="mt-1 text-base font-semibold">기록 리듬</h2>
+          <h2 className="mt-1 text-base font-semibold"><T ko="기록 리듬" en="Record calendar"/></h2>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-[var(--muted)]">
-          <span>하락</span>
+          <span><T ko="하락" en="Down"/></span>
           <span className="h-3 w-7 rounded-[3px] bg-[var(--negative-mid)]" />
           <span className="h-3 w-7 rounded-[3px] bg-[var(--wash)]" />
           <span className="h-3 w-7 rounded-[3px] bg-[var(--brand)]" />
-          <span>상승</span>
+          <span><T ko="상승" en="Up"/></span>
         </div>
       </div>
       <div className="mt-5 overflow-x-auto pb-2">
@@ -465,8 +467,8 @@ function HistoryCalendar({
             <button
               key={cell.point.date}
               type="button"
-              title={`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`}
-              aria-label={`${formatDate(cell.point.date)} 이전 저장점 대비 ${formatSignedKrw(cell.point.movementKrw)}`}
+              title={t(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`, translateHomeHistory(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`))}
+              aria-label={t(`${formatDate(cell.point.date)} 이전 저장점 대비 ${formatSignedKrw(cell.point.movementKrw)}`, translateHomeHistory(`${formatDate(cell.point.date)} 이전 저장점 대비 ${formatSignedKrw(cell.point.movementKrw)}`))}
               aria-pressed={cell.point.date === selectedDate}
               className={`h-[17px] w-[17px] rounded-[4px] border transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] ${
                 cell.point.date === selectedDate
@@ -484,9 +486,9 @@ function HistoryCalendar({
         </div>
       </div>
       <div className="mt-2 flex justify-between text-[11px] text-[var(--faint)]">
-        <span>{formatDate(points[0]?.date ?? null)}</span>
-        <span>빈 날짜는 보간하지 않음</span>
-        <span>{formatDate(points.at(-1)?.date ?? null)}</span>
+        <span>{<T ko={formatDate(points[0]?.date ?? null)} en={translateHomeHistory(formatDate(points[0]?.date ?? null))}/>}</span>
+        <span><T ko="빈 날짜는 보간하지 않음" en="Dates without records are not interpolated"/></span>
+        <span>{<T ko={formatDate(points.at(-1)?.date ?? null)} en={translateHomeHistory(formatDate(points.at(-1)?.date ?? null))}/>}</span>
       </div>
     </section>
   );
@@ -497,6 +499,7 @@ function StoredRiskHistory({
 }: {
   points: readonly HistoryOverviewPoint[];
 }) {
+  const { t } = useI18n();
   const riskPoints = points.filter((point) => point.risk !== null);
   const latest = riskPoints.at(-1)?.risk ?? null;
   if (!latest) return null;
@@ -508,36 +511,34 @@ function StoredRiskHistory({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             STORED RISK
           </p>
-          <h2 className="mt-1 text-base font-semibold">저장된 위험 기록</h2>
+          <h2 className="mt-1 text-base font-semibold"><T ko="저장된 위험 기록" en="Recorded risk metrics"/></h2>
         </div>
-        <p className="text-xs text-[var(--muted)]">
-          저장값이 있는 {riskPoints.length}개 날짜
-        </p>
+        <p className="text-xs text-[var(--muted)]"><T ko="저장값이 있는" en="Recorded on"/>{riskPoints.length}<T ko="개 날짜" en=" dates"/></p>
       </div>
       <dl className="mt-5 grid border-t border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <RiskMetric
-          detail="실제로 분산 효과를 내는 종목 수"
-          label="유효 분산 수"
+          detail={t("실제로 분산 효과를 내는 종목 수", "Effective number of diversifying holdings")}
+          label={t("유효 분산 수", "Effective diversification")}
           value={formatHistoryNumber(latest.enb)}
         />
         <RiskMetric
-          detail="종목들이 함께 움직인 정도"
-          label="평균 상관계수"
+          detail={t("종목들이 함께 움직인 정도", "How closely the holdings moved together")}
+          label={t("평균 상관계수", "Average correlation")}
           value={formatHistoryNumber(latest.avgCorrelation)}
         />
         <RiskMetric
-          detail="저장된 위험 계산 결과"
-          label="포트 변동성"
+          detail={t("저장된 위험 계산 결과", "Recorded risk calculation")}
+          label={t("포트 변동성", "Portfolio volatility")}
           value={formatHistoryPercent(latest.portfolioVolatility)}
         />
         <RiskMetric
-          detail={
-            latest.regimeScore === null
+          detail={t(latest.regimeScore === null
               ? "점수 기록 없음"
-              : `저장 점수 ${formatHistoryNumber(latest.regimeScore)}`
-          }
-          label="시장 국면"
-          value={latest.regimeLabel ?? "기록 없음"}
+              : `저장 점수 ${formatHistoryNumber(latest.regimeScore)}`, translateHomeHistory(latest.regimeScore === null
+              ? "점수 기록 없음"
+              : `저장 점수 ${formatHistoryNumber(latest.regimeScore)}`))}
+          label={t("시장 국면", "Market regime")}
+          value={t(latest.regimeLabel ?? "기록 없음", translateHomeHistory(latest.regimeLabel ?? "기록 없음"))}
         />
       </dl>
     </section>
@@ -555,9 +556,9 @@ function RiskMetric({
 }) {
   return (
     <div className="border-b border-[var(--wash)] py-4 sm:px-5 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-2 text-xl font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-2 text-xs leading-5 text-[var(--faint)]">{detail}</dd>
+      <dt className="text-xs text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dd className="mt-2 text-xl font-semibold tabular-nums"><T ko={value} en={translateHomeHistory(value)}/></dd>
+      <dd className="mt-2 text-xs leading-5 text-[var(--faint)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</dd>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementText } from "@/components/i18n/management-text";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, Check, RotateCcw } from "lucide-react";
@@ -13,10 +15,12 @@ import {
 import styles from "@/components/auth/auth-experience.module.css";
 
 export const dynamic = "force-dynamic";
-export const metadata = {
+export async function generateMetadata() {
+  return localizedMetadata({
   title: "내 계정 | VARDA-LABS",
   robots: { index: false, follow: false },
-};
+}, "My account | VARDA LABS");
+}
 type SessionEvidence = "authenticated" | "unauthenticated" | "unavailable" | "unverified" | "invalid";
 
 export default async function SessionPage({
@@ -60,9 +64,7 @@ export default async function SessionPage({
         {evidence === "authenticated" ? (
           <>
             <p className={styles.sessionState}>
-              <Check size={16} aria-hidden="true" />
-              계정 로그인 확인됨
-            </p>
+              <Check size={16} aria-hidden="true" /><ManagementText>{"계정 로그인 확인됨"}</ManagementText></p>
             <div className={styles.stack}>
               <Link
                 className={styles.primaryButton}
@@ -71,9 +73,7 @@ export default async function SessionPage({
                     ? "/portfolio/onboarding?preview=design"
                     : "/portfolio/onboarding"
                 }
-              >
-                포트폴리오로 계속
-                <ArrowRight size={16} aria-hidden="true" />
+              ><ManagementText>{"포트폴리오로 계속"}</ManagementText><ArrowRight size={16} aria-hidden="true" />
               </Link>
               {!preview ? (
                 <SignOutButton />
@@ -81,24 +81,16 @@ export default async function SessionPage({
                 <Link
                   className={styles.secondaryButton}
                   href="/auth/sign-in?preview=design"
-                >
-                  로그인 화면 보기
-                </Link>
+                ><ManagementText>{"로그인 화면 보기"}</ManagementText></Link>
               )}
             </div>
             <details className={styles.disclosure} id="existing-data">
-              <summary>기존 데이터 연결</summary>
-              <p>
-                이전 서비스의 자산 기록은 별도로 확인한 연결 코드로만
-                연결됩니다. 코드를 다른 사람에게 공유하지 마세요.
-              </p>
+              <summary><ManagementText>{"기존 데이터 연결"}</ManagementText></summary>
+              <p><ManagementText>{"이전 서비스의 자산 기록은 별도로 확인한 연결 코드로만 연결됩니다. 코드를 다른 사람에게 공유하지 마세요."}</ManagementText></p>
               {presentationRuntime.state === "enabled" && !preview ? (
                 <IdentityBootstrapClaimForm />
               ) : (
-                <p>
-                  현재 연결 코드 입력이 열려 있지 않습니다. 기존 기록이 있다면
-                  신규 포트폴리오 생성 전에 운영자에게 연결을 요청해 주세요.
-                </p>
+                <p><ManagementText>{"현재 연결 코드 입력이 열려 있지 않습니다. 기존 기록이 있다면 신규 포트폴리오 생성 전에 운영자에게 연결을 요청해 주세요."}</ManagementText></p>
               )}
             </details>
           </>
@@ -108,12 +100,8 @@ export default async function SessionPage({
               className={styles.primaryButton}
               href="/auth/session?view=account"
             >
-              <RotateCcw size={16} aria-hidden="true" />
-              로그인 상태 다시 확인
-            </Link>
-            <Link className={styles.secondaryButton} href="/auth/sign-in">
-              로그인 화면으로
-            </Link>
+              <RotateCcw size={16} aria-hidden="true" /><ManagementText>{"로그인 상태 다시 확인"}</ManagementText></Link>
+            <Link className={styles.secondaryButton} href="/auth/sign-in"><ManagementText>{"로그인 화면으로"}</ManagementText></Link>
           </div>
         )}
       </section>

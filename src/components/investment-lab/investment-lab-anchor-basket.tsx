@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabQueryFields } from "./investment-lab-query-controls";
 import type { InvestmentLabAnchorBlocker } from "@/lib/investment-lab-anchor-basket-anchor";
@@ -57,14 +58,8 @@ export function InvestmentLabAnchorBasket({
             <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
               ANCHOR RECONSTRUCTION
             </p>
-            <h2 className="mt-3 text-lg font-medium sm:text-xl">
-              기준일 바스켓: 초기 동일비중·흐름 균등배분
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-              선택한 과거 기준일에 실제로 저장된 종목만 사용합니다. 기준일에만
-              동일비중으로 시작하고 이후 실제 매수·매도 금액은 종목마다 같은
-              비율로 나눠 적용하며 자동 리밸런싱은 하지 않습니다.
-            </p>
+            <h2 className="mt-3 text-lg font-medium sm:text-xl"><LabText value=" 기준일 바스켓: 초기 동일비중·흐름 균등배분 " /></h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 선택한 과거 기준일에 실제로 저장된 종목만 사용합니다. 기준일에만 동일비중으로 시작하고 이후 실제 매수·매도 금액은 종목마다 같은 비율로 나눠 적용하며 자동 리밸런싱은 하지 않습니다. " /></p>
           </div>
           <AnchorForm
             anchorDates={anchor.candidateAnchorDates}
@@ -107,12 +102,7 @@ export function InvestmentLabAnchorBasket({
 
         <SpecialHoldingEvidence rows={anchor.specialHoldingEvidence} />
 
-        <p className="text-xs leading-5 text-[var(--muted)]">
-          현재 보유 종목을 더 오래된 과거로 소급하지 않습니다. ticker·시장·통화,
-          종가, USD/KRW 근거가 한 종목이라도 없으면 일부 종목만 제외한 그래프를
-          만들지 않고 전체 비교를 중단합니다. 이 결과는 연구용 비교이며
-          목표비중, 추천 또는 주문 근거가 아닙니다.
-        </p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><LabText value=" 현재 보유 종목을 더 오래된 과거로 소급하지 않습니다. ticker·시장·통화, 종가, USD/KRW 근거가 한 종목이라도 없으면 일부 종목만 제외한 그래프를 만들지 않고 전체 비교를 중단합니다. 이 결과는 연구용 비교이며 목표비중, 추천 또는 주문 근거가 아닙니다. " /></p>
       </div>
     </section>
   );
@@ -164,21 +154,18 @@ function SpecialHoldingEvidence({
       data-section="investment-lab-anchor-special-holding-evidence"
     >
       <div className="border-b border-[var(--wash)] py-4">
-        <h3 className="font-semibold">ticker 없는 저장 포지션 근거</h3>
-        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-          이름이나 현재 자산값으로 종목을 추론하지 않습니다. 같은 legacy 자산의
-          Base44 이관 스냅샷 메타데이터와 ticker가 합의될 때만 복구합니다.
-        </p>
+        <h3 className="font-semibold"><LabText value="ticker 없는 저장 포지션 근거" /></h3>
+        <p className="mt-1 text-xs leading-5 text-[var(--muted)]"><LabText value=" 이름이나 현재 자산값으로 종목을 추론하지 않습니다. 같은 legacy 자산의 Base44 이관 스냅샷 메타데이터와 ticker가 합의될 때만 복구합니다. " /></p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
             <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
-              <th className="px-4 py-3">저장 포지션</th>
-              <th className="px-3 py-3">계좌·축</th>
-              <th className="px-3 py-3">identity 상태</th>
-              <th className="px-3 py-3">과거 평가 판정</th>
-              <th className="px-4 py-3">판정 근거</th>
+              <th className="px-4 py-3"><LabText value="저장 포지션" /></th>
+              <th className="px-3 py-3"><LabText value="계좌·축" /></th>
+              <th className="px-3 py-3"><LabText value="identity 상태" /></th>
+              <th className="px-3 py-3"><LabText value="과거 평가 판정" /></th>
+              <th className="px-4 py-3"><LabText value="판정 근거" /></th>
             </tr>
           </thead>
           <tbody>
@@ -204,10 +191,10 @@ function SpecialHoldingEvidence({
                   </span>
                 </td>
                 <td className="px-3 py-3 font-semibold text-[var(--ink)]">
-                  {specialHoldingOutcomeLabel(row)}
+                  <LabText value={specialHoldingOutcomeLabel(row)} />
                 </td>
                 <td className="px-4 py-3 text-[var(--muted)]">
-                  {specialHoldingReasonLabel(row.reason)}
+                  <LabText value={specialHoldingReasonLabel(row.reason)} />
                 </td>
               </tr>
             ))}
@@ -269,16 +256,10 @@ function ReadyResult({ model }: { model: ReadyScenario }) {
           title="실제 포트폴리오와 기준일 보유 바스켓 비교"
         />
       </div>
-      <p className="text-sm text-[var(--muted)]">
-        종목 {summary.instrumentCount}개 · 비교일 {summary.comparisonDateCount}
-        개 · 실제 흐름 {model.coverage.sourceFlowCount}건 · 종목별 체결 근거{" "}
-        {model.coverage.scenarioFlowLegCount}건
-      </p>
+      <p className="text-sm text-[var(--muted)]"><LabText value=" 종목 " />{summary.instrumentCount}<LabText value="개 · 비교일 " />{summary.comparisonDateCount}<LabText value=" 개 · 실제 흐름 " />{model.coverage.sourceFlowCount}<LabText value="건 · 종목별 체결 근거" />{" "}
+        {model.coverage.scenarioFlowLegCount}<LabText value="건 " /></p>
       {model.coverage.manualValuationComponentCount > 0 ? (
-        <p className="text-xs leading-5 text-[var(--muted)]">
-          금현물은 저장된 수동 평가 {model.coverage.manualObservationRows}건과
-          저장가 유지 {model.coverage.manualCarryRows}건만 사용했습니다.
-        </p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><LabText value=" 금현물은 저장된 수동 평가 " />{model.coverage.manualObservationRows}<LabText value="건과 저장가 유지 " />{model.coverage.manualCarryRows}<LabText value="건만 사용했습니다. " /></p>
       ) : null}
     </div>
   );
@@ -301,15 +282,13 @@ function UnavailableResult({
   ];
   return (
     <div className="border-y border-[var(--warning-soft)] py-4 text-sm leading-6 text-[var(--warning)]">
-      <p className="font-semibold">전체 바스켓 비교를 만들 수 없습니다.</p>
+      <p className="font-semibold"><LabText value="전체 바스켓 비교를 만들 수 없습니다." /></p>
       <p>
-        {reasons.length > 0
+        <LabText value={reasons.length > 0
           ? reasons.join(" / ")
-          : "필요한 저장 포지션·가격·환율 근거가 완전하지 않습니다."}
+          : "필요한 저장 포지션·가격·환율 근거가 완전하지 않습니다."} />
       </p>
-      <p className="mt-1">
-        식별 가능한 종목만 골라 결과를 과장하지 않기 위해 그래프를 숨겼습니다.
-      </p>
+      <p className="mt-1"><LabText value=" 식별 가능한 종목만 골라 결과를 과장하지 않기 위해 그래프를 숨겼습니다. " /></p>
     </div>
   );
 }
@@ -344,9 +323,7 @@ function AnchorForm({
           value={fixedMixSelection.kodexWeightPct}
         />
       ) : null}
-      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
-        기준일
-        <select
+      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" 기준일 " /><select
           className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm outline-none"
           defaultValue={selectedAnchorDate ?? anchorDates[0]}
           name="basketAnchor"
@@ -361,9 +338,7 @@ function AnchorForm({
       <button
         className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
-      >
-        적용
-      </button>
+      ><LabText value=" 적용 " /></button>
     </form>
   );
 }
@@ -403,7 +378,7 @@ function SummaryCell({
 }) {
   return (
     <div className="min-w-0 border-b border-[var(--line)] px-4 py-5 first:pl-0 last:pr-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><LabText value={label} /></p>
       <p
         className={`mt-2 text-xl font-semibold tabular-nums ${
           tone === "positive"
@@ -413,7 +388,7 @@ function SummaryCell({
               : "text-[var(--ink)]"
         }`}
       >
-        {value}
+        <LabText value={value} />
       </p>
     </div>
   );

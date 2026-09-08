@@ -1,3 +1,6 @@
+import { LabText } from "./lab-text";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
+import { labEnglish } from "./lab-copy";
 type InvestmentLabComparisonChartRow = Readonly<{
   serviceDate: string;
   actualMarketValueKrw: number;
@@ -51,7 +54,7 @@ export function InvestmentLabComparisonChart({
       <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--muted)]">
         <Legend color="var(--ink)" label="실제 포트폴리오" />
         <Legend color="var(--negative)" label={scenarioLabel} />
-        <span>원 표시는 지연 체결 비교일</span>
+        <span><LabText value="원 표시는 지연 체결 비교일" /></span>
       </div>
       <svg
         aria-labelledby={`${chartId}-title ${chartId}-description`}
@@ -59,8 +62,8 @@ export function InvestmentLabComparisonChart({
         role="img"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       >
-        <title id={`${chartId}-title`}>{title}</title>
-        <desc id={`${chartId}-description`}>{description}</desc>
+        <LocalizedSvgText as="title" id={`${chartId}-title`} ko={title} en={labEnglish(title)} />
+        <LocalizedSvgText as="desc" id={`${chartId}-description`} ko={description} en={labEnglish(description)} />
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const lineY = PADDING_Y + ratio * (HEIGHT - PADDING_Y * 2);
           return (
@@ -122,7 +125,7 @@ function Legend({ color, label }: { color: string; label: string }) {
         className="h-1 w-7 rounded-full"
         style={{ backgroundColor: color }}
       />
-      {label}
+      <LabText value={label} />
     </span>
   );
 }

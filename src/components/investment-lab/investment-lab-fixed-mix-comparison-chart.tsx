@@ -1,3 +1,6 @@
+import { LabText } from "./lab-text";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
+import { labEnglish } from "./lab-copy";
 import type { InvestmentLabFixedMixComparisonEntry } from "@/lib/investment-lab-fixed-mix-comparison";
 
 const WIDTH = 1000;
@@ -57,13 +60,8 @@ export function InvestmentLabFixedMixComparisonChart({
         role="img"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       >
-        <title id="investment-lab-standard-mix-title">
-          실제 포트폴리오와 세 가지 고정비중 경로 비교
-        </title>
-        <desc id="investment-lab-standard-mix-description">
-          같은 관측 날짜와 외부 현금흐름을 사용한 KODEX 200 및 VOO 고정비중
-          연구 경로입니다.
-        </desc>
+        <LocalizedSvgText as="title" id="investment-lab-standard-mix-title" ko="실제 포트폴리오와 세 가지 고정비중 경로 비교" en={labEnglish("실제 포트폴리오와 세 가지 고정비중 경로 비교")} />
+        <LocalizedSvgText as="desc" id="investment-lab-standard-mix-description" ko="같은 관측 날짜와 외부 현금흐름을 사용한 KODEX 200 및 VOO 고정비중 연구 경로입니다." en={labEnglish("같은 관측 날짜와 외부 현금흐름을 사용한 KODEX 200 및 VOO 고정비중 연구 경로입니다.")} />
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const lineY = PADDING_Y + ratio * (HEIGHT - PADDING_Y * 2);
           return (
@@ -117,7 +115,7 @@ function Legend({ color, label }: { color: string; label: string }) {
         className="h-1 w-7 rounded-full"
         style={{ backgroundColor: color }}
       />
-      {label}
+      <LabText value={label} />
     </span>
   );
 }

@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import type {
   InvestmentLabDataAvailability,
   InvestmentLabRepairItem,
@@ -33,14 +34,10 @@ export function InvestmentLabDataAvailabilityView({
       <div className="border-b border-[var(--wash)] py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">계산 데이터 준비 상태</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              보여줄 수 있는 근거와 아직 보완해야 하는 근거를 분리합니다.
-            </p>
+            <h2 className="text-lg font-semibold"><LabText value="계산 데이터 준비 상태" /></h2>
+            <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 보여줄 수 있는 근거와 아직 보완해야 하는 근거를 분리합니다. " /></p>
           </div>
-          <span className="w-fit border-b border-[var(--muted)] pb-1 text-xs font-semibold text-[var(--muted)]">
-            자동 보완·DB 쓰기 없음
-          </span>
+          <span className="w-fit border-b border-[var(--muted)] pb-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" 자동 보완·DB 쓰기 없음 " /></span>
         </div>
       </div>
 
@@ -76,18 +73,16 @@ export function InvestmentLabDataAvailabilityView({
 
       <div className="px-4 py-4">
         <div className="mb-3">
-          <h3 className="font-semibold">시나리오별 현재 판단</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            시장가격이 있어도 실제 평가액 근거나 과거 시점 정책이 없으면 별도로 표시합니다.
-          </p>
+          <h3 className="font-semibold"><LabText value="시나리오별 현재 판단" /></h3>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 시장가격이 있어도 실제 평가액 근거나 과거 시점 정책이 없으면 별도로 표시합니다. " /></p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead>
               <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
-                <th className="px-3 py-3">시나리오 묶음</th>
-                <th className="px-3 py-3">상태</th>
-                <th className="px-3 py-3">판단 근거</th>
+                <th className="px-3 py-3"><LabText value="시나리오 묶음" /></th>
+                <th className="px-3 py-3"><LabText value="상태" /></th>
+                <th className="px-3 py-3"><LabText value="판단 근거" /></th>
               </tr>
             </thead>
             <tbody>
@@ -99,13 +94,13 @@ export function InvestmentLabDataAvailabilityView({
                   key={row.id}
                 >
                   <td className="px-3 py-3 font-semibold">
-                    {scenarioLabel(row.id)}
+                    <LabText value={scenarioLabel(row.id)} />
                   </td>
                   <td className="px-3 py-3">
                     <StatusBadge status={row.status} />
                   </td>
                   <td className="px-3 py-3 text-[var(--muted)]">
-                    {row.reasons.map(scenarioReasonLabel).join(" · ")}
+                    <LabText value={row.reasons.map(scenarioReasonLabel).join(" · ")} />
                   </td>
                 </tr>
               ))}
@@ -116,31 +111,29 @@ export function InvestmentLabDataAvailabilityView({
 
       <div className="grid border-t border-[var(--wash)] lg:grid-cols-2">
         <div className="px-4 py-4 lg:border-r lg:border-[var(--wash)]">
-          <h3 className="font-semibold">보완 경로</h3>
+          <h3 className="font-semibold"><LabText value="보완 경로" /></h3>
           <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
             {model.repairItems.map((item) => (
               <li key={item.id}>
-                {repairItemLabel(item, model.manualValuationHistory)}
+                <LabText value={repairItemLabel(item, model.manualValuationHistory)} />
               </li>
             ))}
           </ul>
         </div>
         <div className="border-t border-[var(--wash)] px-4 py-4 lg:border-t-0">
-          <h3 className="font-semibold">특수 보유자산</h3>
+          <h3 className="font-semibold"><LabText value="특수 보유자산" /></h3>
           {model.specialHoldings.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--muted)]">
-              이 계정 범위에는 별도 처리 대상이 없습니다.
-            </p>
+            <p className="mt-3 text-sm text-[var(--muted)]"><LabText value=" 이 계정 범위에는 별도 처리 대상이 없습니다. " /></p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
               {model.specialHoldings.map((holding) => (
                 <li key={`${holding.account}:${holding.name}`}>
                   <strong className="text-[var(--ink)]">{holding.name}</strong>
                   {" · "}
-                  {specialHoldingLabel(
+                  <LabText value={specialHoldingLabel(
                     holding.kind,
                     model.manualValuationHistory.status,
-                  )}
+                  )} />
                   {holding.kind === "krx_gold" ? (
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       {manualValuationSummary(model.manualValuationHistory)}
@@ -168,9 +161,7 @@ export function InvestmentLabDataAvailabilityUnavailable() {
       className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]"
       data-availability-status="unavailable"
       data-section="investment-lab-data-availability"
-    >
-      계산 데이터 준비 상태를 읽지 못했습니다. 기존 계산 결과를 추정값으로 대체하지 않습니다.
-    </section>
+    ><LabText value=" 계산 데이터 준비 상태를 읽지 못했습니다. 기존 계산 결과를 추정값으로 대체하지 않습니다. " /></section>
   );
 }
 
@@ -185,9 +176,9 @@ function AvailabilityMetric({
 }) {
   return (
     <div className="border-b border-[var(--wash)] px-4 py-4 last:border-b-0 sm:border-r sm:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
-      <p className="mt-2 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><LabText value={label} /></p>
+      <p className="mt-2 text-xl font-semibold tabular-nums"><LabText value={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }
@@ -203,7 +194,7 @@ function StatusBadge({ status }: { status: InvestmentLabScenarioAvailabilityStat
           : "border-[var(--warning-soft)] bg-[var(--surface)] text-[var(--warning)]";
   return (
     <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${style}`}>
-      {statusLabel(status)}
+      <LabText value={statusLabel(status)} />
     </span>
   );
 }

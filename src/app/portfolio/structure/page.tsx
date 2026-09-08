@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { PortfolioStructureView } from "@/components/portfolio/portfolio-structure-view";
@@ -12,7 +13,9 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "포트 구조 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "포트 구조 | VARDA LABS" }, "Allocation | VARDA LABS");
+}
 
 type PortfolioStructurePageProps = {
   searchParams: Promise<{
@@ -43,7 +46,7 @@ export default async function PortfolioStructurePage({
     return (
       <PortfolioReadAccessBoundary
         resolution={resolution}
-        title="Portfolio structure"
+        title="포트 구조" titleEn="Portfolio structure"
       />
     );
   }
@@ -62,6 +65,7 @@ export default async function PortfolioStructurePage({
         basePath="/portfolio/structure"
         context={scopeContext}
         title="포트 구조"
+        titleEn="Portfolio structure"
       />
     );
   }

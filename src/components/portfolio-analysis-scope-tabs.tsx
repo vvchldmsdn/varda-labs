@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useI18n } from "@/components/i18n/locale-provider";
 import { ScrollableNavRail } from "@/components/scrollable-nav-rail";
 
 import {
@@ -21,11 +24,13 @@ export function PortfolioAnalysisScopeTabs({
   selectedScopeKey: PortfolioAnalysisScopeKey | null;
   variant?: "segmented" | "underline";
 }) {
+  const {t} = useI18n();
   const underline = variant === "underline";
 
   return (
     <ScrollableNavRail
-      ariaLabel="자산 분석 범위"
+      ariaLabel={t("자산 분석 범위", "Portfolio scope")}
+      scopeRail
       viewportClassName={
         underline
           ? "max-w-full pb-1 text-sm"
@@ -43,7 +48,7 @@ export function PortfolioAnalysisScopeTabs({
           <Link
             key={scope.key}
             aria-current={selected ? "page" : undefined}
-            aria-label={`${scope.label} ${scopeKindLabel(scope)}`}
+            aria-label={`${scope.kind === "all" ? t("전체 자산") : scope.label} ${t(scopeKindLabel(scope))}`}
             className={
               underline
                 ? `shrink-0 border-b py-2 font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
@@ -59,7 +64,7 @@ export function PortfolioAnalysisScopeTabs({
             }
             href={buildPortfolioAnalysisScopeHref(basePath, scope.key, query)}
           >
-            {underline && scope.kind === "all" ? "전체 자산" : scope.label}
+            {scope.kind === "all" ? t(underline ? "전체 자산" : "전체") : scope.label}
           </Link>
         );
       })}

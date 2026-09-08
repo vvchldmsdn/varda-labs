@@ -1,3 +1,4 @@
+import { AuthElement, AuthText } from "./auth-localized";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AuthHeading, AuthShell } from "./auth-shell";
@@ -40,7 +41,7 @@ export async function AuthEntry({
       preview={designPreview}
       alternate={{ href: alternateHref, label: alternateLabel }}
     >
-      <section
+      <AuthElement as="section"
         className={styles.panel}
         data-auth-entry
         aria-label={signingUp ? "회원가입" : "로그인"}
@@ -50,48 +51,29 @@ export async function AuthEntry({
           title={signingUp ? "회원가입" : "로그인"}
           description={
             signingUp ? (
-              <>
-                나의 자산, 나의 기록.
-                <br />
-                편한 방법으로 시작하세요.
-              </>
+              <><AuthText>{"나의 자산, 나의 기록."}</AuthText><br /><AuthText>{"편한 방법으로 시작하세요."}</AuthText></>
             ) : (
-              <>
-                다시, 나의 자산 흐름으로.
-                <br />
-                가입한 방법으로 로그인하세요.
-              </>
+              <><AuthText>{"다시, 나의 자산 흐름으로."}</AuthText><br /><AuthText>{"가입한 방법으로 로그인하세요."}</AuthText></>
             )
           }
         />
         {sessionState === "invalid" ? (
           <div className={styles.stack}>
-            <p role="alert" className={styles.notice}>
-              여러 로그인 정보가 함께 남아 있습니다. 로그아웃 후 사용할 계정
-              하나로 다시 로그인해 주세요.
-            </p>
+            <p role="alert" className={styles.notice}><AuthText>{"여러 로그인 정보가 함께 남아 있습니다. 로그아웃 후 사용할 계정 하나로 다시 로그인해 주세요."}</AuthText></p>
             <SignOutButton />
           </div>
         ) : runtime.state === "ready" || designPreview ? (
           <>
             {sessionState === "unverified" ? (
-              <p className={styles.entryNotice}>
-                이메일 인증 후 로그인해 주세요.{" "}
-                <Link href="/auth/verify-email" className={styles.textLink}>
-                  인증 메일 다시 받기
-                </Link>
+              <p className={styles.entryNotice}><AuthText>{"이메일 인증 후 로그인해 주세요."}</AuthText>{" "}
+                <Link href="/auth/verify-email" className={styles.textLink}><AuthText>{"인증 메일 다시 받기"}</AuthText></Link>
               </p>
             ) : null}
             {verified ? (
-              <p role="status" className={styles.entryNotice}>
-                메일의 인증 결과를 확인한 뒤 로그인해 주세요.
-              </p>
+              <p role="status" className={styles.entryNotice}><AuthText>{"메일의 인증 결과를 확인한 뒤 로그인해 주세요."}</AuthText></p>
             ) : null}
             {callbackError ? (
-              <p role="alert" className={styles.entryNotice}>
-                로그인을 완료하지 못했습니다. 다시 시도하거나 다른 방법을 선택해
-                주세요.
-              </p>
+              <p role="alert" className={styles.entryNotice}><AuthText>{"로그인을 완료하지 못했습니다. 다시 시도하거나 다른 방법을 선택해 주세요."}</AuthText></p>
             ) : null}
             <SocialSignInButtons
               mode={mode}
@@ -99,7 +81,7 @@ export async function AuthEntry({
               preview={designPreview}
             />
             <div className={styles.methodDivider}>
-              <span>또는 이메일로 계속</span>
+              <span><AuthText>{"또는 이메일로 계속"}</AuthText></span>
             </div>
             <EmailAuthForm
               mode={mode}
@@ -108,18 +90,16 @@ export async function AuthEntry({
             />
           </>
         ) : (
-          <p role="alert" className={styles.notice}>
-            지금은 로그인에 연결할 수 없습니다. 잠시 후 다시 방문해 주세요.
-          </p>
+          <p role="alert" className={styles.notice}><AuthText>{"지금은 로그인에 연결할 수 없습니다. 잠시 후 다시 방문해 주세요."}</AuthText></p>
         )}
         <div className={styles.divider} />
         <p className={styles.switchLine}>
-          {signingUp ? "이미 계정이 있나요?" : "처음 방문하셨나요?"}
+          <AuthText>{signingUp ? "이미 계정이 있나요?" : "처음 방문하셨나요?"}</AuthText>
           <Link href={alternateHref} className={styles.textLink}>
-            {alternateLabel}
+            <AuthText>{alternateLabel}</AuthText>
           </Link>
         </p>
-      </section>
+      </AuthElement>
     </AuthShell>
   );
 }

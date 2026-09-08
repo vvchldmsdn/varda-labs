@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthElement, AuthText } from "./auth-localized";
 import { useState } from "react";
 import { Code2, LoaderCircle, LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
@@ -94,12 +95,12 @@ export function SocialSignInButtons({
 
   return (
     <div className={styles.stack}>
-      <div className={styles.socialGroup} aria-label="소셜 로그인">
+      <AuthElement as="div" className={styles.socialGroup} aria-label="소셜 로그인">
         {(["google", "github", "naver"] as const).map((provider) => {
           const enabled = preview || availability[provider];
           const label = SOCIAL_AUTH_LABELS[provider];
           return (
-            <button
+            <AuthElement as="button"
               key={provider}
               type="button"
               onClick={() => signIn(provider)}
@@ -128,20 +129,18 @@ export function SocialSignInButtons({
                   )}
                 </span>
               )}
-              <span>{label}</span>
-              {!enabled ? <small>준비 중</small> : null}
-            </button>
+              <span><AuthText>{label}</AuthText></span>
+              {!enabled ? <small><AuthText>{"준비 중"}</AuthText></small> : null}
+            </AuthElement>
           );
         })}
-      </div>
+      </AuthElement>
       {previewNotice ? (
-        <p role="status" className={styles.notice}>
-          화면 미리보기입니다. 실제 로그인은 운영 서비스에서 진행할 수 있습니다.
-        </p>
+        <p role="status" className={styles.notice}><AuthText>{"화면 미리보기입니다. 실제 로그인은 운영 서비스에서 진행할 수 있습니다."}</AuthText></p>
       ) : null}
       {error ? (
         <p role="alert" className={styles.error}>
-          {error}
+          <AuthText>{error}</AuthText>
         </p>
       ) : null}
     </div>
@@ -176,13 +175,10 @@ export function SignOutButton() {
         aria-busy={status === "pending"}
       >
         <LogOut size={16} aria-hidden="true" />
-        {status === "pending" ? "로그아웃 중" : "로그아웃"}
+        <AuthText>{status === "pending" ? "로그아웃 중" : "로그아웃"}</AuthText>
       </button>
       {status === "failed" ? (
-        <p role="alert" className={styles.error}>
-          로그아웃하지 못했습니다. 로그인 상태가 유지되고 있으니 다시 시도해
-          주세요.
-        </p>
+        <p role="alert" className={styles.error}><AuthText>{"로그아웃하지 못했습니다. 로그인 상태가 유지되고 있으니 다시 시도해 주세요."}</AuthText></p>
       ) : null}
     </div>
   );

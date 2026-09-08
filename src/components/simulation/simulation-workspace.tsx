@@ -1,5 +1,8 @@
 "use client";
 
+import { SimulationText, useSimulationText } from "@/components/simulation/simulation-text";
+
+
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useResearchPanelNavigation } from "@/components/investment-lab/research-detail-resource";
@@ -13,7 +16,7 @@ import {
 } from "lucide-react";
 import styles from "./simulation-workspace.module.css";
 
-const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <p role="status" className="py-10 text-sm">상세 분석을 불러오고 있습니다.</p> });
+const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <p role="status" className="py-10 text-sm"><SimulationText ko={"상세 분석을 불러오고 있습니다."} /></p> });
 
 type SimulationOverlay = "weights" | "validation" | "evidence";
 
@@ -30,6 +33,7 @@ export function SimulationWorkspace({
   paths: ReactNode;
   tools?: ReactNode;
 }) {
+  const pt = useSimulationText();
   const { panel: activeOverlay, select, query } = useResearchPanelNavigation(resolveSimulationPanel);
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -56,7 +60,7 @@ export function SimulationWorkspace({
 
   return (
     <div className={styles.workspace} data-simulation-workspace="integrated">
-      <div className={styles.toolbar}><span>현재 보유 구성 · 연구 분포</span><div>{tools}</div></div>
+      <div className={styles.toolbar}><span><SimulationText ko={"현재 보유 구성 · 연구 분포"} /></span><div>{tools}</div></div>
 
       <div className={styles.canvas}>{paths}</div>
 
@@ -66,7 +70,7 @@ export function SimulationWorkspace({
           return (
             <button className={styles.launcher} key={view} onClick={() => openOverlay(view)} type="button">
               <Icon aria-hidden="true" size={21} strokeWidth={1.6} />
-              <span><strong>{label}</strong><span className="sr-only">{description}</span></span>
+              <span><strong><SimulationText ko={label} /></strong><span className="sr-only"><SimulationText ko={description} /></span></span>
             </button>
           );
         })}
@@ -90,14 +94,14 @@ export function SimulationWorkspace({
             <div>
               <p className="varda-kicker">SIMULATION WORKSPACE</p>
               <h2 className="mt-1 text-xl font-medium" id={titleId}>
-                {activeDefinition?.label ?? "시뮬레이션 상세"}
+                <SimulationText ko={activeDefinition?.label ?? "시뮬레이션 상세"} />
               </h2>
             </div>
             <button
-              aria-label="닫기"
+              aria-label={pt("닫기")}
               className="varda-icon-button"
               onClick={closeOverlay}
-              title="닫기"
+              title={pt("닫기")}
               type="button"
             >
               <X aria-hidden="true" size={18} />

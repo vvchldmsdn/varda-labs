@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
 import {
@@ -28,18 +29,18 @@ export function RiskInstrumentTable({
       marker="instrument-risk"
     >
       {instruments.length === 0 ? (
-        <RiskEmptyMessage>계산 가능한 종목이 없습니다.</RiskEmptyMessage>
+        <RiskEmptyMessage><PortfolioText ko={"계산 가능한 종목이 없습니다."} /></RiskEmptyMessage>
       ) : (
         <div className="mt-3 max-w-full overflow-x-auto">
           <table className="w-full min-w-[1040px] border-separate border-spacing-0">
             <thead>
               <tr>
-                <RiskTableHeader>종목</RiskTableHeader>
-                <RiskTableHeader>시장 / 통화</RiskTableHeader>
-                <RiskTableHeader>계좌</RiskTableHeader>
-                <RiskTableHeader align="right">계산 비중</RiskTableHeader>
-                <RiskTableHeader align="right">관측치</RiskTableHeader>
-                <RiskTableHeader align="right">연환산 변동성</RiskTableHeader>
+                <RiskTableHeader><PortfolioText ko={"종목"} /></RiskTableHeader>
+                <RiskTableHeader><PortfolioText ko={"시장 / 통화"} /></RiskTableHeader>
+                <RiskTableHeader><PortfolioText ko={"계좌"} /></RiskTableHeader>
+                <RiskTableHeader align="right"><PortfolioText ko={"계산 비중"} /></RiskTableHeader>
+                <RiskTableHeader align="right"><PortfolioText ko={"관측치"} /></RiskTableHeader>
+                <RiskTableHeader align="right"><PortfolioText ko={"연환산 변동성"} /></RiskTableHeader>
                 <RiskTableHeader align="right">Sharpe</RiskTableHeader>
                 <RiskTableHeader align="right">Signed RC</RiskTableHeader>
                 <RiskTableHeader align="right">Absolute share</RiskTableHeader>
@@ -109,8 +110,8 @@ function MetricTableValue({
   const detail = metricReasonLabel(reason);
   return (
     <div>
-      <div>{value}</div>
-      {detail ? <div className="text-xs text-[var(--warning)]">{detail}</div> : null}
+      <div><PortfolioText ko={value} /></div>
+      {detail ? <div className="text-xs text-[var(--warning)]"><PortfolioText ko={detail} /></div> : null}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { buildInvestmentLabDesignPreview } from "@/lib/investment-lab-design-preview";
 import { InvestmentLabWorkspace } from "./investment-lab-workspace";
@@ -33,7 +34,7 @@ export function InvestmentLabDesignPreview({
       />
       <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
         <header className={styles.stageHeader}>
-          <h1 className="varda-page-title">투자 랩</h1>
+          <h1 className="varda-page-title"><LabText value="투자 랩" /></h1>
           <InvestmentLabScopeTabs scopes={dashboard.analysisScopes} selectedScopeKey={dashboard.selectedScope.key} />
         </header>
         <div className={styles.workspaceSlot}>
@@ -75,10 +76,10 @@ export function InvestmentLabDesignPreview({
                     <table className="w-full min-w-[570px] text-left text-sm">
                       <thead className="text-xs text-[var(--muted)]">
                         <tr>
-                          <th className="py-4 font-normal">시나리오</th>
-                          <th className="font-normal">종료 평가액</th>
-                          <th className="font-normal">실제 대비</th>
-                          <th className="font-normal">추정수익률</th>
+                          <th className="py-4 font-normal"><LabText value="시나리오" /></th>
+                          <th className="font-normal"><LabText value="종료 평가액" /></th>
+                          <th className="font-normal"><LabText value="실제 대비" /></th>
+                          <th className="font-normal"><LabText value="추정수익률" /></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -88,7 +89,7 @@ export function InvestmentLabDesignPreview({
                             key={row.id}
                           >
                             <th className="py-4 font-medium">
-                              {labScenarioLabel(row.id)}
+                              <LabText value={labScenarioLabel(row.id)} />
                             </th>
                             <td>{labKrw(row.endValueKrw)}</td>
                             <td>{labKrw(row.endDifferenceKrw, true)}</td>

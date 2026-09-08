@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationRegimeResearchResult } from "@/lib/simulation-regime-research-execution";
 
 import { RegimeFixedMixComparisonPanel } from "./regime-fixed-mix-comparison-panel";
@@ -37,18 +38,12 @@ export function RegimeBootstrapResearchSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="regime-bootstrap-research-title" className="text-lg font-semibold">
-            시장 국면 사후 연구
-          </h2>
+            <SimulationText ko={"시장 국면 사후 연구"} />{" "}</h2>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
-            저장된 환율·미국 금리·장단기 금리차로 선택 기준일과 유사한 과거
-            구간을 찾아 교차시장 수익률 블록을 뽑습니다. 공개시각과 revision
-            vintage가 없어 당시 예측을 재현한 결과는 아니며, 기존 stationary
-            bootstrap의 결손을 대신하지 않습니다.
-          </p>
+            <SimulationText ko={"저장된 환율·미국 금리·장단기 금리차로 선택 기준일과 유사한 과거 구간을 찾아 교차시장 수익률 블록을 뽑습니다. 공개시각과 revision vintage가 없어 당시 예측을 재현한 결과는 아니며, 기존 stationary bootstrap의 결손을 대신하지 않습니다."} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
-          사후 연구용 · 저장 안 함 · 추천 아님
-        </span>
+          <SimulationText ko={"사후 연구용 · 저장 안 함 · 추천 아님"} />{" "}</span>
       </div>
 
       <div className="mt-4 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4">
@@ -92,11 +87,9 @@ export function RegimeBootstrapResearchSection({
 
       {model.status === "unavailable" ? (
         <div className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4">
-          <p className="font-semibold">국면 조건부 경로를 계산하지 않았습니다.</p>
+          <p className="font-semibold"><SimulationText ko={"국면 조건부 경로를 계산하지 않았습니다."} /></p>
           <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
-            {unavailableReasonLabel(model.reason)} 기존의 정적 부트스트랩 결과는
-            이 상태와 독립적으로 유지됩니다.
-          </p>
+            <SimulationText ko={unavailableReasonLabel(model.reason)} /> {" "}<SimulationText ko={"기존의 정적 부트스트랩 결과는 이 상태와 독립적으로 유지됩니다."} />{" "}</p>
         </div>
       ) : null}
 
@@ -105,10 +98,10 @@ export function RegimeBootstrapResearchSection({
           <table className="w-full min-w-[680px] border-collapse text-left text-sm">
             <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-3 font-semibold">요인</th>
-                <th className="px-3 py-3 font-semibold">최신 공개일</th>
-                <th className="px-3 py-3 font-semibold">선택일 적용 공개일</th>
-                <th className="px-3 py-3 text-right font-semibold">정렬 커버리지</th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"요인"} /></th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"최신 공개일"} /></th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"선택일 적용 공개일"} /></th>
+                <th className="px-3 py-3 text-right font-semibold"><SimulationText ko={"정렬 커버리지"} /></th>
               </tr>
             </thead>
             <tbody>
@@ -124,7 +117,7 @@ export function RegimeBootstrapResearchSection({
                     {formatDate(factor.latestReleaseDate)}
                   </td>
                   <td className="px-3 py-3 tabular-nums">
-                    {formatCurrentRelease(factor.currentReleaseDate, factor.currentCarryDays)}
+                    <SimulationText ko={formatCurrentRelease(factor.currentReleaseDate, factor.currentCarryDays)} />
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">
                     {factor.alignedStateCount}/{model.policy.sourceReturnStepCount}
@@ -143,12 +136,9 @@ export function RegimeBootstrapResearchSection({
 
       {model.status === "ready" ? (
         <div className="mt-5 border-t border-[var(--line)] pt-5">
-            <h3 className="text-base font-semibold">단일 종목·직접 입력 참고 경로</h3>
+            <h3 className="text-base font-semibold"><SimulationText ko={"단일 종목·직접 입력 참고 경로"} /></h3>
             <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-              단일 종목 두 경로와 25·50·75 이외의 직접 입력 비중만 별도로
-              표시합니다. 고정 비중 3안과 같은 국면 상태와 추출 계획을
-              사용합니다.
-            </p>
+              <SimulationText ko={"단일 종목 두 경로와 25·50·75 이외의 직접 입력 비중만 별도로 표시합니다. 고정 비중 3안과 같은 국면 상태와 추출 계획을 사용합니다."} />{" "}</p>
             <div className="mt-4 grid gap-4 xl:grid-cols-3">
               {model.scenarios.map((scenario) =>
                 scenario.status === "ready" ? (
@@ -179,8 +169,7 @@ export function RegimeBootstrapResearchSection({
                   >
                     <p className="font-semibold">{scenario.name}</p>
                     <p className="mt-2 text-sm text-[var(--warning)]">
-                      명시 비중 입력이 유효하지 않아 이 시나리오만 제외했습니다.
-                    </p>
+                      <SimulationText ko={"명시 비중 입력이 유효하지 않아 이 시나리오만 제외했습니다."} />{" "}</p>
                   </div>
                 ),
               )}
@@ -189,14 +178,7 @@ export function RegimeBootstrapResearchSection({
       ) : null}
 
       <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-        방법: 공개일이 선택일 이전인 3개 일별 요인의 수준·20일 변동성을
-        robust scaling한 뒤 가까운 과거 국면을 선택합니다. 120개 완전 수익률
-        행, 수익률 5~20단계 연속 블록, 서비스 기준일 수익률 63단계,
-        500경로를 사용합니다. DB 적재시각은
-        과거 공개시점으로 간주하지 않습니다. 공개시각과 revision vintage가
-        보존되기 전에는 엄격한 시점 검증 결과로 승격하지 않습니다. 현재 보유,
-        계좌, Fount, 금현물, 승인 벡터, 주문 가능성은 입력에 포함하지 않습니다.
-      </p>
+        <SimulationText ko={"방법: 공개일이 선택일 이전인 3개 일별 요인의 수준·20일 변동성을 robust scaling한 뒤 가까운 과거 국면을 선택합니다. 120개 완전 수익률 행, 수익률 5~20단계 연속 블록, 서비스 기준일 수익률 63단계, 500경로를 사용합니다. DB 적재시각은 과거 공개시점으로 간주하지 않습니다. 공개시각과 revision vintage가 보존되기 전에는 엄격한 시점 검증 결과로 승격하지 않습니다. 현재 보유, 계좌, Fount, 금현물, 승인 벡터, 주문 가능성은 입력에 포함하지 않습니다."} />{" "}</p>
     </section>
   );
 }
@@ -212,9 +194,9 @@ function SummaryItem({
 }) {
   return (
     <div className="border-b border-r border-[var(--line)] px-4 py-3 last:border-r-0 xl:border-b-0">
-      <p className="text-xs text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></p>
+      <p className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></p>
     </div>
   );
 }

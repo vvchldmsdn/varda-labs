@@ -1,3 +1,6 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
+import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
 
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
@@ -35,12 +38,9 @@ export function PortfolioStructureRiskAnalytics({
             className="mt-2 text-2xl font-medium tracking-normal text-[var(--ink)] sm:text-3xl"
             id="portfolio-risk-landscape-title"
           >
-            위험 지형
-          </h2>
+            <PortfolioText ko={"위험 지형"} />{" "}</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            각 종목이 따로 움직이는지, 하락할 때 함께 무너지는지, 위험이 몇
-            종목에 집중되는지를 같은 KRW 투자자 수익률로 봅니다.
-          </p>
+            <PortfolioText ko={"각 종목이 따로 움직이는지, 하락할 때 함께 무너지는지, 위험이 몇 종목에 집중되는지를 같은 KRW 투자자 수익률로 봅니다."} />{" "}</p>
         </div>
 
         <div className="flex items-center gap-1 border-b border-[var(--line)] text-sm">
@@ -56,7 +56,7 @@ export function PortfolioStructureRiskAnalytics({
               key={window}
               scroll={false}
             >
-              {window === 252 ? "1년" : `${window}일`}{isDesignPreview ? " 예시" : ""}
+              <PortfolioText ko={window === 252 ? "1년" : `${window}일`} /><PortfolioText ko={isDesignPreview ? " 예시" : ""} />
             </Link>
           ))}
         </div>
@@ -64,24 +64,22 @@ export function PortfolioStructureRiskAnalytics({
 
       <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-[var(--wash)] py-3 text-xs text-[var(--muted)]">
         <span className="font-medium text-[var(--ink)]">
-          {riskStatusLabel(model)}
+          <PortfolioText ko={riskStatusLabel(model)} />
         </span>
-        <span>관측 {observationLabel}</span>
+        <span><PortfolioText ko={"관측"} />{" "}<PortfolioText ko={observationLabel} /></span>
         <span>
-          시계열 종목 {model.provenance.includedInstrumentCount}/{totalHoldingCount}개
-        </span>
+          <PortfolioText ko={"시계열 종목"} />{" "}{model.provenance.includedInstrumentCount}/{totalHoldingCount}<PortfolioText ko={"개"} />{" "}</span>
         <span>
           {formatDate(model.provenance.firstServiceDate)} ~ {formatDate(model.provenance.lastServiceDate)}
         </span>
-        <span>KRW 환산 수익률</span>
-        <span>조정종가 우선 · 검증된 KIS 원종가 보완</span>
+        <span><PortfolioText ko={"KRW 환산 수익률"} /></span>
+        <span><PortfolioText ko={"조정종가 우선 · 검증된 KIS 원종가 보완"} /></span>
         {excludedHoldingCount > 0 ? (
           <span className="text-[var(--warning)]">
-            시계열 없는 특수자산 {excludedHoldingCount}개 제외
-          </span>
+            <PortfolioText ko={"시계열 없는 특수자산"} />{" "}{excludedHoldingCount}<PortfolioText ko={"개 제외"} />{" "}</span>
         ) : null}
         {model.inputHealth.status === "partial" ? (
-          <span className="text-[var(--warning)]">일부 관측치로 계산</span>
+          <span className="text-[var(--warning)]"><PortfolioText ko={"일부 관측치로 계산"} /></span>
         ) : null}
       </div>
 
@@ -110,10 +108,9 @@ export function PortfolioStructureRiskAnalytics({
               />
             ) : (
               <div className="py-8">
-                <p className="text-lg font-medium">스트레스 상관계수</p>
+                <p className="text-lg font-medium"><PortfolioText ko={"스트레스 상관계수"} /></p>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                  하락일이 {portfolio.stress.downDayObservations}일이라 최소 {portfolio.stress.minimumObservations}일 기준을 충족하지 못했습니다.
-                </p>
+                  <PortfolioText ko={"하락일이"} />{" "}{portfolio.stress.downDayObservations}<PortfolioText ko={"일이라 최소"} />{" "}{portfolio.stress.minimumObservations}<PortfolioText ko={"일 기준을 충족하지 못했습니다."} />{" "}</p>
               </div>
             )}
           </div>
@@ -192,13 +189,13 @@ function RiskMetricStrip({ model }: { model: PortfolioRiskReadModel }) {
           }`}
           key={metric.label}
         >
-          <dt className="text-xs font-medium text-[var(--muted)]">{metric.label}</dt>
+          <dt className="text-xs font-medium text-[var(--muted)]"><PortfolioText ko={metric.label} /></dt>
           <dd className="mt-3 text-2xl font-medium tabular-nums text-[var(--ink)]">
-            {metric.value}
+            <PortfolioText ko={metric.value} />
           </dd>
-          <p className="mt-2 truncate text-xs text-[var(--muted)]" title={metric.detail}>
-            {metric.detail}
-          </p>
+          <LocalizedElement className="mt-2 truncate text-xs text-[var(--muted)]" title={metric.detail} as="p" en={{"title": portfolioEnglish(metric.detail)}}>
+            <PortfolioText ko={metric.detail} />
+          </LocalizedElement>
         </div>
       ))}
     </dl>
@@ -220,20 +217,20 @@ function CorrelationMatrix({
   const minimumWidth = 210 + instruments.length * (cellSize + 3);
 
   return (
-    <section aria-label={title} className="min-w-0">
+    <LocalizedElement aria-label={title} className="min-w-0" as="section" en={{"aria-label": portfolioEnglish(title)}}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-lg font-medium text-[var(--ink)]">{title}</h3>
+          <h3 className="text-lg font-medium text-[var(--ink)]"><PortfolioText ko={title} /></h3>
           <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--muted)]">
-            {description}
+            <PortfolioText ko={description} />
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-[var(--muted)]">
-          <span>분산</span>
+          <span><PortfolioText ko={"분산"} /></span>
           <span className="h-2 w-14 rounded-full bg-[var(--brand-mid)]" />
           <span className="h-2 w-14 rounded-full bg-[var(--wash)]" />
           <span className="h-2 w-14 rounded-full bg-[var(--negative-mid)]" />
-          <span>동조</span>
+          <span><PortfolioText ko={"동조"} /></span>
         </div>
       </div>
 
@@ -297,7 +294,7 @@ function CorrelationMatrix({
           </tbody>
         </table>
       </div>
-    </section>
+    </LocalizedElement>
   );
 }
 
@@ -314,11 +311,9 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
   return (
     <section aria-labelledby="risk-contribution-title" className="min-w-0">
       <h3 className="text-lg font-medium" id="risk-contribution-title">
-        종목별 위험 기여
-      </h3>
+        <PortfolioText ko={"종목별 위험 기여"} />{" "}</h3>
       <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-        투자금 비중이 아니라 전체 변동성에 실제로 더한 몫입니다. 값이 큰 종목부터 표시합니다.
-      </p>
+        <PortfolioText ko={"투자금 비중이 아니라 전체 변동성에 실제로 더한 몫입니다. 값이 큰 종목부터 표시합니다."} />{" "}</p>
 
       <div className="mt-5 divide-y divide-[var(--wash)] border-y border-[var(--line)]">
         {rows.map((row) => {
@@ -334,7 +329,7 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
                     {instrumentName(row)}
                   </p>
                   <p className="shrink-0 text-xs tabular-nums text-[var(--muted)]">
-                    비중 {formatRatioPercent(row.weight)}
+                    <PortfolioText ko={"비중"} />{" "}{formatRatioPercent(row.weight)}
                   </p>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--wash)]">
@@ -364,9 +359,9 @@ function RiskMetricGuide() {
   return (
     <details className="group mt-10 border-y border-[var(--line)] py-1">
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]">
-        <span>지표 읽는 법</span>
-        <span className="text-xs font-normal text-[var(--muted)] group-open:hidden">설명 보기 ＋</span>
-        <span className="hidden text-xs font-normal text-[var(--muted)] group-open:inline">접기 －</span>
+        <span><PortfolioText ko={"지표 읽는 법"} /></span>
+        <span className="text-xs font-normal text-[var(--muted)] group-open:hidden"><PortfolioText ko={"설명 보기 ＋"} /></span>
+        <span className="hidden text-xs font-normal text-[var(--muted)] group-open:inline"><PortfolioText ko={"접기 －"} /></span>
       </summary>
       <div className="grid gap-x-10 gap-y-7 border-t border-[var(--wash)] py-7 sm:grid-cols-2 lg:grid-cols-3">
         <GuideItem
@@ -401,8 +396,8 @@ function RiskMetricGuide() {
 function GuideItem({ body, title }: { body: string; title: string }) {
   return (
     <div>
-      <h4 className="text-sm font-medium text-[var(--ink)]">{title}</h4>
-      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{body}</p>
+      <h4 className="text-sm font-medium text-[var(--ink)]"><PortfolioText ko={title} /></h4>
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={body} /></p>
     </div>
   );
 }
@@ -410,10 +405,9 @@ function GuideItem({ body, title }: { body: string; title: string }) {
 function RiskUnavailable({ model }: { model: PortfolioRiskReadModel }) {
   return (
     <div className="mt-8 border-y border-[var(--line)] py-10">
-      <p className="text-lg font-medium">위험 분석 근거가 아직 충분하지 않습니다.</p>
+      <p className="text-lg font-medium"><PortfolioText ko={"위험 분석 근거가 아직 충분하지 않습니다."} /></p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-        현재 {model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}일의 수익률을 사용할 수 있습니다. 가격 이력을 지우거나 임의 평균으로 채우지 않으며, 조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다.
-      </p>
+        <PortfolioText ko={"현재"} />{" "}{model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}<PortfolioText ko={"일의 수익률을 사용할 수 있습니다. 가격 이력을 지우거나 임의 평균으로 채우지 않으며, 조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다."} />{" "}</p>
     </div>
   );
 }

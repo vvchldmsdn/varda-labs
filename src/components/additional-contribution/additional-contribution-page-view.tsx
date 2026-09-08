@@ -1,3 +1,6 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
+import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
 import { ArrowUpRight, Target } from "lucide-react";
 import { AdditionalContributionAllocationTable, AdditionalContributionFlowScene, AdditionalContributionWeightScene } from "./additional-contribution-result";
@@ -27,22 +30,22 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
       <PortfolioPrimaryNavigation activePath="/additional-contribution" generatedAt={generatedAt} selectedScopeKey={selectedScope.key} />
       <div className={`varda-content varda-stage-content ${styles.page}`}>
         <header className={styles.header}>
-          <div className={styles.title}><h1 id="additional-contribution-title">다음 투입의 균형.</h1>{!enableLivePriceSync ? <span className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다.">예시 데이터</span> : null}</div>
+          <div className={styles.title}><h1 id="additional-contribution-title"><PortfolioText ko={"다음 투입의 균형."} /></h1>{!enableLivePriceSync ? <LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement> : null}</div>
           <div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/additional-contribution" query={{ amount: String(amountKrw), ...designQuery }} scopes={scopes} selectedScopeKey={selectedScope.key} variant="underline" /></div>
-          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)} title="목표비중 설정"><Target size={16} aria-hidden="true" /><span>목표비중</span><ArrowUpRight size={13} aria-hidden="true" /></Link></div>
+          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)} title="목표비중 설정"><Target size={16} aria-hidden="true" /><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={13} aria-hidden="true" /></Link></div>
         </header>
         <ContributionCalculator amountKrw={amountKrw} scopeKey={selectedScope.key} isDesignPreview={!enableLivePriceSync} status={preview.status} allocations={preview.status === "ready" ? <FeaturedAllocation preview={preview} /> : undefined}>
-          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span>배분의 시작은 목표비중에서</span><strong>계산 근거를<br />확인해 주세요.</strong><p>{preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."}</p></div>}
+          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span><PortfolioText ko={"배분의 시작은 목표비중에서"} /></span><strong><PortfolioText ko={"계산 근거를"} /><br /><PortfolioText ko={"확인해 주세요."} /></strong><p><PortfolioText ko={preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."} /></p></div>}
         </ContributionCalculator>
         <footer className={styles.footer}>
           {preview.status === "ready" ? <>
-            <dl className={styles.footerNumbers}><div><dt>총 매수</dt><dd>{formatKrw(preview.totalAllocatedKrw)}</dd></div><div><dt>남는 현금</dt><dd>{formatKrw(preview.residualCashKrw)}</dd></div></dl>
+            <dl className={styles.footerNumbers}><div><dt><PortfolioText ko={"총 매수"} /></dt><dd>{formatKrw(preview.totalAllocatedKrw)}</dd></div><div><dt><PortfolioText ko={"남는 현금"} /></dt><dd>{formatKrw(preview.residualCashKrw)}</dd></div></dl>
             <div className={styles.detailActions}>
-              <PresentationDialog label={`전체 ${preview.rows.length}종목 배분`} title="종목별 전체 배분안" description={`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`} wide><AdditionalContributionAllocationTable preview={preview} /><p className={styles.modalNote}>목표 부족분과 MA120 근거를 반영한 계산입니다. 남는 재원은 현금으로 유지됩니다. MA120 {preview.ma120Evidence.mode === "off" ? "미적용" : `${preview.ma120Evidence.usableCount}/${preview.rows.length}종목 근거 확보${preview.ma120Evidence.status === "ready" ? "" : " · 일부 근거 부족"}`}.</p><Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}>보유 종목 관리 <ArrowUpRight size={13} aria-hidden="true" /></Link></PresentationDialog>
+              <PresentationDialog label={`전체 ${preview.rows.length}종목 배분`} labelEn={portfolioEnglish(`전체 ${preview.rows.length}종목 배분`)} title="종목별 전체 배분안" titleEn={portfolioEnglish("종목별 전체 배분안")} description={`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`} descriptionEn={portfolioEnglish(`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`)} wide><AdditionalContributionAllocationTable preview={preview} /><p className={styles.modalNote}><PortfolioText ko={"목표 부족분과 MA120 근거를 반영한 계산입니다. 남는 재원은 현금으로 유지됩니다. MA120"} />{" "}<PortfolioText ko={preview.ma120Evidence.mode === "off" ? "미적용" : `${preview.ma120Evidence.usableCount}/${preview.rows.length}종목 근거 확보${preview.ma120Evidence.status === "ready" ? "" : " · 일부 근거 부족"}`} />.</p><Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}><PortfolioText ko={"보유 종목 관리"} />{" "}<ArrowUpRight size={13} aria-hidden="true" /></Link></PresentationDialog>
               <AdditionalContributionLogicDialog preview={preview} />
-              <PresentationDialog label="비중·자금 흐름" title="추가투입 전후 변화" wide><AdditionalContributionWeightScene preview={preview} /><AdditionalContributionFlowScene preview={preview} /></PresentationDialog>
+              <PresentationDialog label="비중·자금 흐름" labelEn={portfolioEnglish("비중·자금 흐름")} title="추가투입 전후 변화" titleEn={portfolioEnglish("추가투입 전후 변화")} wide><AdditionalContributionWeightScene preview={preview} /><AdditionalContributionFlowScene preview={preview} /></PresentationDialog>
             </div>
-          </> : <><span className={styles.modalNote}>계산 결과만 제공하며 실제 주문은 실행하지 않습니다.</span><PresentationDialog label="계산 근거 확인" title="배분안을 계산할 수 없는 이유" wide><BlockedPreview blockers={preview.blockers} /></PresentationDialog></>}
+          </> : <><span className={styles.modalNote}><PortfolioText ko={"계산 결과만 제공하며 실제 주문은 실행하지 않습니다."} /></span><PresentationDialog label="계산 근거 확인" labelEn={portfolioEnglish("계산 근거 확인")} title="배분안을 계산할 수 없는 이유" titleEn={portfolioEnglish("배분안을 계산할 수 없는 이유")} wide><BlockedPreview blockers={preview.blockers} /></PresentationDialog></>}
         </footer>
       </div>
     </main>
@@ -53,9 +56,9 @@ function FeaturedAllocation({ preview }: { preview: AdditionalContributionResult
   const ranked = preview.rows.filter(row => row.action !== "hold").toSorted((a,b) => Math.max(b.allocationKrw,b.trimAmountKrw) - Math.max(a.allocationKrw,a.trimAmountKrw));
   const featured = ranked.slice(0,4);
   return <div className={styles.featured}>
-    <div className={styles.featuredHeading}><span>ALLOCATION</span><h2>주요 배분</h2><p>금액 순 {featured.length}종목 · 전체 {preview.rows.length}종목</p></div>
-    <ul>{featured.map((row,index) => <li key={row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`}><div><strong>{row.name}</strong><span>{row.accountName} · {row.currentWeightPct.toFixed(1)}% → {row.postTopupWeightPct.toFixed(1)}%</span></div><p data-action={row.action}><small>{row.action === "trim" ? "매도" : "매수"}</small>{formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}</p></li>)}</ul>
-    {featured.length === 0 ? <p className={styles.modalNote}>계산된 매수·매도 종목이 없습니다. 재원은 현금으로 유지합니다.</p> : null}
+    <div className={styles.featuredHeading}><span>ALLOCATION</span><h2><PortfolioText ko={"주요 배분"} /></h2><p><PortfolioText ko={"금액 순"} />{" "}{featured.length}<PortfolioText ko={"종목 · 전체"} />{" "}{preview.rows.length}<PortfolioText ko="종목" en=" holdings" /></p></div>
+    <ul>{featured.map((row,index) => <li key={row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`}><div><strong>{row.name}</strong><span>{row.accountName} · {row.currentWeightPct.toFixed(1)}% → {row.postTopupWeightPct.toFixed(1)}%</span></div><p data-action={row.action}><small><PortfolioText ko={row.action === "trim" ? "매도" : "매수"} /></small>{formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}</p></li>)}</ul>
+    {featured.length === 0 ? <p className={styles.modalNote}><PortfolioText ko={"계산된 매수·매도 종목이 없습니다. 재원은 현금으로 유지합니다."} /></p> : null}
   </div>;
 }
 function BlockedPreview({ blockers }: { blockers: readonly string[] }) {
@@ -66,12 +69,11 @@ function BlockedPreview({ blockers }: { blockers: readonly string[] }) {
     >
       <p className="text-[11px] font-medium text-[var(--muted)]">CALCULATION STATUS</p>
       <h2 id="blocked-title" className="mt-2 text-2xl font-medium">
-        지금은 배분안을 계산할 수 없습니다
-      </h2>
+        <PortfolioText ko={"지금은 배분안을 계산할 수 없습니다"} />{" "}</h2>
       <ul className="mt-6 max-w-3xl divide-y divide-[var(--wash)] border-y border-[var(--line)] text-sm text-[var(--warning)]">
         {blockers.map((blocker) => (
           <li key={blocker} className="py-4">
-            {blockerLabel(blocker)}
+            <PortfolioText ko={blockerLabel(blocker)} />
           </li>
         ))}
       </ul>

@@ -1,3 +1,6 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 
 import { formatHistoryKrw } from "./history-format";
@@ -19,12 +22,10 @@ export function HistoryActivityStream({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">ACTIVITY TAPE</p>
-          <h2 id="history-activity-title" className="mt-1 text-xl font-semibold">
-            기록된 활동
-          </h2>
+          <h2 id="history-activity-title" className="mt-1 text-xl font-semibold"><T ko="기록된 활동" en="Recorded activity"/></h2>
         </div>
         <p className="text-xs text-[var(--muted)]">
-          {events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준"}
+          {<T ko={events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준"} en={translateHomeHistory(events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준")}/>}
         </p>
       </div>
 
@@ -43,32 +44,38 @@ export function HistoryActivityStream({
                   {event.assetName}
                 </p>
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  {eventTypeLabel(event.eventType)} · {event.accountName}
+                  {<T ko={eventTypeLabel(event.eventType)} en={translateHomeHistory(eventTypeLabel(event.eventType))}/>} · {event.accountName}
                   {event.groupName ? ` · ${event.groupName}` : ""}
                 </p>
               </div>
               <p className="text-sm font-semibold tabular-nums sm:text-right">
-                {event.amountKrw === null
+                {<T ko={event.amountKrw === null
                   ? quantityLabel(event.quantityDelta)
-                  : signedKrw(event.amountKrw)}
+                  : signedKrw(event.amountKrw)} en={translateHomeHistory(event.amountKrw === null
+                  ? quantityLabel(event.quantityDelta)
+                  : signedKrw(event.amountKrw))}/>}
               </p>
             </li>
           ))}
         </ol>
       ) : (
         <p className="mt-6 border-y border-[var(--wash)] py-8 text-sm leading-6 text-[var(--muted)]">
-          {!supported
+          {<T ko={!supported
             ? "이 자산그룹의 이벤트 포함 규칙은 아직 정의되지 않아 계좌 이벤트를 임의로 합산하지 않습니다."
             : result?.state === "integrity_error"
               ? "이벤트와 계정 소유권 관계가 일치하지 않아 활동 표시를 차단했습니다."
               : result?.state === "unavailable"
                 ? "이벤트 기록을 현재 읽을 수 없습니다."
-                : "이 범위에 연결된 저장 이벤트가 없습니다."}
+                : "이 범위에 연결된 저장 이벤트가 없습니다."} en={translateHomeHistory(!supported
+            ? "이 자산그룹의 이벤트 포함 규칙은 아직 정의되지 않아 계좌 이벤트를 임의로 합산하지 않습니다."
+            : result?.state === "integrity_error"
+              ? "이벤트와 계정 소유권 관계가 일치하지 않아 활동 표시를 차단했습니다."
+              : result?.state === "unavailable"
+                ? "이벤트 기록을 현재 읽을 수 없습니다."
+                : "이 범위에 연결된 저장 이벤트가 없습니다.")}/>}
         </p>
       )}
-      <p className="mt-3 text-xs leading-5 text-[var(--faint)]">
-        이벤트는 활동 맥락으로 표시하며 같은 날의 평가액 변화에 자동 귀속하지 않습니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--faint)]"><T ko="이벤트는 활동 맥락으로 표시하며 같은 날의 평가액 변화에 자동 귀속하지 않습니다." en="Events provide activity context and are not automatically attributed to same-day value changes."/></p>
     </section>
   );
 }

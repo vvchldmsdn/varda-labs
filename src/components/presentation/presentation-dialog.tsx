@@ -4,12 +4,16 @@ import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Maximize2, X } from "lucide-react";
+import { useI18n } from "@/components/i18n/locale-provider";
 
 export function PresentationDialog({
   children,
   description,
   label,
   title,
+  labelEn,
+  titleEn,
+  descriptionEn,
   triggerClassName,
   mountOnOpen = false,
   wide = false,
@@ -18,11 +22,15 @@ export function PresentationDialog({
   description?: string;
   label: ReactNode;
   title: string;
+  labelEn?: string;
+  titleEn?: string;
+  descriptionEn?: string;
   triggerClassName?: string;
   /** For children built in a Client Component; server children must be deferred at the server boundary. */
   mountOnOpen?: boolean;
   wide?: boolean;
 }) {
+  const {t} = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -59,7 +67,7 @@ export function PresentationDialog({
         }}
         type="button"
       >
-        <span>{label}</span>
+        <span>{typeof label === "string" ? t(label, labelEn) : label}</span>
         <Maximize2 aria-hidden="true" size={15} strokeWidth={1.6} />
       </button>
       <dialog
@@ -81,20 +89,20 @@ export function PresentationDialog({
             <div className="min-w-0">
               <p className="varda-kicker">DETAIL VIEW</p>
               <h2 className="mt-2 text-xl font-medium" id={titleId}>
-                {title}
+                {t(title, titleEn)}
               </h2>
               {description ? (
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]" id={descriptionId}>
-                  {description}
+                  {t(description, descriptionEn)}
                 </p>
               ) : null}
             </div>
             <button
-              aria-label="닫기"
+              aria-label={t("닫기", "Close")}
               autoFocus
               className="varda-icon-button"
               onClick={close}
-              title="닫기"
+              title={t("닫기", "Close")}
               type="button"
             >
               <X aria-hidden="true" size={18} />

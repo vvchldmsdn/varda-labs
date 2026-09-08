@@ -1,5 +1,6 @@
 "use client";
 
+import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState } from "react";
 
 import { prepareHoldingAnalysisData } from "@/app/portfolio/holdings/actions";
@@ -27,7 +28,7 @@ export function HoldingAnalysisDataForm({
   const messageId = `holding-analysis-data-${holdingId}`;
 
   if (!readiness) {
-    return <p className="text-xs text-[var(--warning)]">상태 확인 불가</p>;
+    return <p className="text-xs text-[var(--warning)]"><ManagementText>{"상태 확인 불가"}</ManagementText></p>;
   }
 
   return (
@@ -37,15 +38,12 @@ export function HoldingAnalysisDataForm({
       </p>
       {readiness.state !== "unsupported" && readiness.state !== "blocked" ? (
         <>
-          <p className="mt-1 tabular-nums">
-            가격 {readiness.observationCount}일
-            {readiness.latestSourceDate
+          <p className="mt-1 tabular-nums"><ManagementText>{"가격"}</ManagementText>{readiness.observationCount}<ManagementText>{"일"}</ManagementText><ManagementText>{readiness.latestSourceDate
               ? ` · 최신 ${readiness.latestSourceDate}`
-              : ""}
+              : ""}</ManagementText>
           </p>
-          <p className="mt-1">
-            시뮬레이션 {readiness.simulationReady ? "가능" : "준비 중"} · 추세{" "}
-            {readiness.trendReady ? "가능" : "준비 중"}
+          <p className="mt-1"><ManagementText>{"시뮬레이션"}</ManagementText><ManagementText>{readiness.simulationReady ? "가능" : "준비 중"}</ManagementText><ManagementText>{"· 추세"}</ManagementText>{" "}
+            <ManagementText>{readiness.trendReady ? "가능" : "준비 중"}</ManagementText>
           </p>
         </>
       ) : null}
@@ -58,7 +56,7 @@ export function HoldingAnalysisDataForm({
             disabled={pending}
             type="submit"
           >
-            {pending ? "가격 확인 중" : "과거 가격 준비"}
+            <ManagementText>{pending ? "가격 확인 중" : "과거 가격 준비"}</ManagementText>
           </button>
         </form>
       ) : null}
@@ -72,7 +70,7 @@ export function HoldingAnalysisDataForm({
         ].join(" ")}
         id={messageId}
       >
-        {state.message}
+        <ManagementText>{state.message}</ManagementText>
       </p>
     </div>
   );

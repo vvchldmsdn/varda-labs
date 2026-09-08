@@ -1,5 +1,6 @@
 "use client";
 
+import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState, useMemo, useState } from "react";
 
 import { savePortfolioTargetPolicy } from "@/app/portfolio/targets/actions";
@@ -58,11 +59,11 @@ export function PortfolioTargetPolicyForm({
         <table className="w-full min-w-[850px] border-collapse text-sm">
           <thead className="bg-[var(--wash)] text-left text-xs text-[var(--muted)]">
             <tr>
-              <th className="px-3 py-3">종목</th>
-              <th className="px-3 py-3">계좌</th>
-              <th className="px-3 py-3">시장</th>
-              <th className="px-3 py-3 text-right">현재 평가액</th>
-              <th className="px-3 py-3 text-right">목표 비중</th>
+              <th className="px-3 py-3"><ManagementText>{"종목"}</ManagementText></th>
+              <th className="px-3 py-3"><ManagementText>{"계좌"}</ManagementText></th>
+              <th className="px-3 py-3"><ManagementText>{"시장"}</ManagementText></th>
+              <th className="px-3 py-3 text-right"><ManagementText>{"현재 평가액"}</ManagementText></th>
+              <th className="px-3 py-3 text-right"><ManagementText>{"목표 비중"}</ManagementText></th>
             </tr>
           </thead>
           <tbody>
@@ -83,7 +84,7 @@ export function PortfolioTargetPolicyForm({
                   <td className="px-3 py-3 text-[var(--muted)]">
                     {row.market} · {row.currency}
                     {!buyable ? (
-                      <span className="ml-2 text-[var(--warning)]">목표 0%만 가능</span>
+                      <span className="ml-2 text-[var(--warning)]"><ManagementText>{"목표 0%만 가능"}</ManagementText></span>
                     ) : null}
                   </td>
                   <td className="px-3 py-3 text-right">
@@ -92,8 +93,7 @@ export function PortfolioTargetPolicyForm({
                   <td className="px-3 py-3 text-right">
                     <label className="inline-flex items-center gap-2">
                       <span className="sr-only">
-                        {row.ticker ?? row.assetName} 목표 비중
-                      </span>
+                        {row.ticker ?? row.assetName}<ManagementText>{"목표 비중"}</ManagementText></span>
                       <input
                         className="w-24 rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-right font-semibold outline-none focus:border-[var(--ink)] disabled:bg-[var(--wash)]"
                         disabled={!buyable || pending}
@@ -126,19 +126,16 @@ export function PortfolioTargetPolicyForm({
 
       <div className="flex flex-col gap-3 rounded-md border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold">
-            합계 {Number.isFinite(totalBps) ? formatPercent(totalBps) : "입력 확인"}
+          <p className="text-sm font-semibold"><ManagementText>{"합계"}</ManagementText><ManagementText>{Number.isFinite(totalBps) ? formatPercent(totalBps) : "입력 확인"}</ManagementText>
           </p>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            정확히 100%인 비중만 저장합니다. 이 값은 추천이나 주문이 아니라 사용자가 정한 기준입니다.
-          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]"><ManagementText>{"정확히 100%인 비중만 저장합니다. 이 값은 추천이나 주문이 아니라 사용자가 정한 기준입니다."}</ManagementText></p>
         </div>
         <button
           className="rounded-md bg-[var(--ink)] px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           disabled={pending || !totalIsValid || rows.length === 0}
           type="submit"
         >
-          {pending ? "저장 중" : "목표비중 저장"}
+          <ManagementText>{pending ? "저장 중" : "목표비중 저장"}</ManagementText>
         </button>
       </div>
 
@@ -150,7 +147,7 @@ export function PortfolioTargetPolicyForm({
             : "text-sm text-[var(--warning)]"
         }
       >
-        {state.message}
+        <ManagementText>{state.message}</ManagementText>
       </p>
     </form>
   );

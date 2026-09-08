@@ -1,3 +1,7 @@
+import { LocalizedElement } from "@/components/i18n/localized-element";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
+import { simulationEnglish } from "./simulation-copy";
+import { SimulationText } from "@/components/simulation/simulation-text";
 type ComparisonPoint = Readonly<{
   stepIndex: number;
   indexValue: number;
@@ -56,17 +60,17 @@ export function SimulationPathComparisonChart({
               className="h-0.5 w-5"
               style={{ backgroundColor: item.color }}
             />
-            {item.label}
+            <SimulationText ko={item.label} />
           </span>
         ))}
       </div>
-      <svg
+      <LocalizedElement as="svg" en={{"aria-label": simulationEnglish(ariaLabel)}}
         aria-label={ariaLabel}
         className="mt-3 block aspect-[18/7] w-full min-w-[560px]"
         role="img"
         viewBox={`0 0 ${width} ${height}`}
       >
-        <title>{ariaLabel}</title>
+        <LocalizedSvgText as="title" ko={ariaLabel} en={simulationEnglish(ariaLabel)} />
         {yTicks.map((tick) => (
           <g key={tick.y}>
             <line
@@ -113,8 +117,7 @@ export function SimulationPathComparisonChart({
           x={padding.left}
           y={height - 8}
         >
-          검증 시작
-        </text>
+          <SimulationText ko={"검증 시작"} />{" "}</text>
         <text
           fill="var(--muted)"
           fontSize="10"
@@ -122,9 +125,8 @@ export function SimulationPathComparisonChart({
           x={width - padding.right}
           y={height - 8}
         >
-          {maximumStep}개 관측 후
-        </text>
-      </svg>
+          {maximumStep}<SimulationText ko={"개 관측 후"} />{" "}</text>
+      </LocalizedElement>
     </figure>
   );
 }

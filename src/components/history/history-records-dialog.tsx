@@ -1,4 +1,8 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { useI18n } from "@/components/i18n/locale-provider";
+
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,6 +13,7 @@ import { historyDetailHref, type HistoryDetailPanel } from "./history-detail-sta
 
 /** Children are built by the authenticated server page only for the requested panel. */
 export function HistoryRecordsDialog({ panel, children }: { panel: HistoryDetailPanel; children?: ReactNode }) {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -48,7 +53,7 @@ export function HistoryRecordsDialog({ panel, children }: { panel: HistoryDetail
 
   return <>
     <button className="varda-presentation-detail-trigger" type="button" ref={triggerRef} aria-disabled={pending} aria-busy={pending} onClick={() => { if (!pending) navigate({ detail: "records" }); }}>
-      <span>{pending ? "기록 불러오는 중…" : "기록·이벤트"}</span><Maximize2 aria-hidden="true" size={15} strokeWidth={1.6} />
+      <span>{<T ko={pending ? "기록 불러오는 중…" : "기록·이벤트"} en={translateHomeHistory(pending ? "기록 불러오는 중…" : "기록·이벤트")}/>}</span><Maximize2 aria-hidden="true" size={15} strokeWidth={1.6} />
     </button>
     <dialog ref={dialogRef} aria-labelledby={titleId} className="varda-dialog varda-presentation-dialog varda-presentation-dialog-wide"
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
@@ -63,8 +68,8 @@ export function HistoryRecordsDialog({ panel, children }: { panel: HistoryDetail
       }}>
       {panel ? <div className="varda-presentation-dialog-shell">
         <header className="varda-dialog-header flex shrink-0 items-start justify-between gap-5">
-          <div><p className="varda-kicker">DETAIL VIEW</p><h2 className="mt-2 text-xl font-medium" id={titleId}>{panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화"}</h2></div>
-          <button aria-label="닫기" autoFocus className="varda-icon-button" type="button" onClick={close}><X aria-hidden="true" size={18} /></button>
+          <div><p className="varda-kicker">DETAIL VIEW</p><h2 className="mt-2 text-xl font-medium" id={titleId}>{<T ko={panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화"} en={translateHomeHistory(panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화")}/>}</h2></div>
+          <button aria-label={t("닫기", "Close")} autoFocus className="varda-icon-button" type="button" onClick={close}><X aria-hidden="true" size={18} /></button>
         </header>
         <div className="varda-dialog-content varda-presentation-dialog-content">{children}</div>
       </div> : null}

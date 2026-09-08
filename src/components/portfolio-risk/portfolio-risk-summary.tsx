@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
 import {
@@ -197,10 +198,7 @@ export function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel
     return (
       <RiskNotice tone="warning">
         <span data-historical-price-admission="unavailable">
-          검증된 분석용 가격 이력이 없습니다. 현재가와 운영 종가는 계속 사용할
-          수 있지만, 수익률·상관관계·Sharpe 계산에는 사용하지 않습니다. 분석은
-          조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다.
-        </span>
+          <PortfolioText ko={"검증된 분석용 가격 이력이 없습니다. 현재가와 운영 종가는 계속 사용할 수 있지만, 수익률·상관관계·Sharpe 계산에는 사용하지 않습니다. 분석은 조정종가를 우선하고 검증된 KIS 원종가로 부족한 기간을 보완합니다."} />{" "}</span>
       </RiskNotice>
     );
   }
@@ -208,19 +206,16 @@ export function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel
   if (inputHealth.status === "partial") {
     return (
       <RiskNotice tone="warning">
-        일부 관측치만으로 계산했습니다. 실제 사용 관측치는{" "}
+        <PortfolioText ko={"일부 관측치만으로 계산했습니다. 실제 사용 관측치는"} />{" "}
         {provenance.usableReturnObservations}/
-        {provenance.requestedReturnObservations}입니다.
-      </RiskNotice>
+        {provenance.requestedReturnObservations}<PortfolioText ko={"입니다."} />{" "}</RiskNotice>
     );
   }
 
   if (calculation.calculationStatus === "standalone_only") {
     return (
       <RiskNotice>
-        계산 가능한 종목이 1개이므로 변동성과 Sharpe만 표시합니다. 상관,
-        위험 기여와 ENB는 계산하지 않습니다.
-      </RiskNotice>
+        <PortfolioText ko={"계산 가능한 종목이 1개이므로 변동성과 Sharpe만 표시합니다. 상관, 위험 기여와 ENB는 계산하지 않습니다."} />{" "}</RiskNotice>
     );
   }
 
@@ -234,7 +229,7 @@ export function RiskCalculationNotice({ model }: { model: PortfolioRiskReadModel
       tone={calculation.calculationStatus === "invalid" ? "danger" : "warning"}
     >
       {reason ?? inputStatusLabel(inputHealth.status)}
-      {coverageDetail}
+      <PortfolioText ko={coverageDetail} />
     </RiskNotice>
   );
 }

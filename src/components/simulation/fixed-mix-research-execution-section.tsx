@@ -1,3 +1,6 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { simulationEnglish } from "@/components/simulation/simulation-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import Form from "next/form";
 import { SimulationLink as Link, SimulationContextFields } from "./simulation-query-controls";
 
@@ -45,18 +48,12 @@ export function FixedMixResearchExecutionSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="fixed-mix-research-title" className="text-lg font-semibold">
-            명시 비중 공동 포트폴리오 연구
-          </h2>
+            <SimulationText ko={"명시 비중 공동 포트폴리오 연구"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            KODEX 200과 VOO의 같은 기준일 수익률 쌍을 한 행으로 묶어 함께
-            재표본합니다. 선택한 최초 비중만 적용하고 이후에는 리밸런싱하지
-            않아, 두 자산의 성과에 따라 비중이 자연스럽게 달라지는
-            buy-and-hold 경로입니다.
-          </p>
+            <SimulationText ko={"KODEX 200과 VOO의 같은 기준일 수익률 쌍을 한 행으로 묶어 함께 재표본합니다. 선택한 최초 비중만 적용하고 이후에는 리밸런싱하지 않아, 두 자산의 성과에 따라 비중이 자연스럽게 달라지는 buy-and-hold 경로입니다."} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
-          고정 연구 가정 · 추천 아님
-        </span>
+          <SimulationText ko={"고정 연구 가정 · 추천 아님"} />{" "}</span>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 border-y border-[var(--line)] py-4 lg:flex-row lg:items-end lg:justify-between">
@@ -83,11 +80,9 @@ export function FixedMixResearchExecutionSection({
           className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-joint-research-unavailable-reason={execution.reason}
         >
-          <p className="font-semibold">공동 경로를 계산하지 않았습니다.</p>
+          <p className="font-semibold"><SimulationText ko={"공동 경로를 계산하지 않았습니다."} /></p>
           <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
-            {unavailableReasonLabel(execution.reason)} 단일 종목 입력이 준비된 경우에는
-            위 결과를 그대로 볼 수 있습니다.
-          </p>
+            <SimulationText ko={unavailableReasonLabel(execution.reason)} /> {" "}<SimulationText ko={"단일 종목 입력이 준비된 경우에는 위 결과를 그대로 볼 수 있습니다."} />{" "}</p>
         </div>
       )}
 
@@ -95,12 +90,8 @@ export function FixedMixResearchExecutionSection({
         className="mt-3 text-xs leading-5 text-[var(--muted)]"
         data-joint-research-methodology="paired-stationary-bootstrap-v1"
       >
-        방법 v2: 완전한 KRW 투자자 기준 수익률 쌍 90개 · stationary
-        bootstrap · 평균 블록 5단계 · 서비스 기준일 수익률 {researchHorizon}
-        단계 · 500경로. 같은 입력 행렬,
-        엔진 정책, 고정 seed에서만 결과가 동일합니다. 시장 국면 조건, 미래
-        예측, 계좌 보유비중, Fount, 금현물은 사용하지 않습니다.
-      </p>
+        <SimulationText ko={"방법 v2: 완전한 KRW 투자자 기준 수익률 쌍 90개 · stationary bootstrap · 평균 블록 5단계 · 서비스 기준일 수익률"} />{" "}{researchHorizon}
+        <SimulationText ko={"단계 · 500경로. 같은 입력 행렬, 엔진 정책, 고정 seed에서만 결과가 동일합니다. 시장 국면 조건, 미래 예측, 계좌 보유비중, Fount, 금현물은 사용하지 않습니다."} />{" "}</p>
     </section>
   );
 }
@@ -121,17 +112,14 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
       <header className="flex flex-col gap-3 border-b border-[var(--line)] px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            공통 날짜쌍 공동 재표본
-          </p>
+            <SimulationText ko={"공통 날짜쌍 공동 재표본"} />{" "}</p>
           <h3 className="mt-1 text-lg font-semibold">{execution.name}</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">
             069500 {formatBps(execution.weights[0].weightBps)} · VOO{" "}
-            {formatBps(execution.weights[1].weightBps)} · 최초 배분 후 리밸런싱 없음
-          </p>
+            {formatBps(execution.weights[1].weightBps)} {" "}<SimulationText ko={"· 최초 배분 후 리밸런싱 없음"} />{" "}</p>
         </div>
         <span className="w-fit rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
-          계산 완료
-        </span>
+          <SimulationText ko={"계산 완료"} />{" "}</span>
       </header>
 
       <SimulationTerminalRiskMetrics terminal={execution.terminal} />
@@ -140,14 +128,13 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
 
       <div className="grid border-t border-[var(--line)] text-xs text-[var(--muted)] sm:grid-cols-2">
         <p className="px-4 py-3 sm:border-r sm:border-[var(--line)]">
-          종료 분포 P10 {execution.terminal.p10Index.toFixed(1)} · P50{" "}
+          <SimulationText ko={"종료 분포 P10"} />{" "}{execution.terminal.p10Index.toFixed(1)} · P50{" "}
           {execution.terminal.p50Index.toFixed(1)} · P90{" "}
           {execution.terminal.p90Index.toFixed(1)}
         </p>
         <p className="px-4 py-3">
-          기준일 {formatDate(execution.source.endServiceDate)} · 공통 수익률 쌍{" "}
-          {execution.source.returnStepCount}개 · 시작지수 100
-        </p>
+          <SimulationText ko={"기준일"} />{" "}{formatDate(execution.source.endServiceDate)} {" "}<SimulationText ko={"· 공통 수익률 쌍"} />{" "}
+          {execution.source.returnStepCount}<SimulationText ko={"개 · 시작지수 100"} />{" "}</p>
       </div>
     </article>
   );
@@ -207,8 +194,7 @@ function MixForm({
         />
       ) : null}
       <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
-        KODEX 200 최초 비중
-        <span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
+        <SimulationText ko={"KODEX 200 최초 비중"} />{" "}<span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
           <input
             className="h-10 w-24 bg-transparent px-3 text-right text-sm tabular-nums outline-none"
             defaultValue={kodexWeightPct}
@@ -229,8 +215,7 @@ function MixForm({
         className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
       >
-        이 비중으로 계산
-      </button>
+        <SimulationText ko={"이 비중으로 계산"} />{" "}</button>
     </Form>
   );
 }
@@ -247,7 +232,7 @@ function PresetLinks({
   researchUniverse: string | null;
 }) {
   return (
-    <nav aria-label="공동 연구 비중 예시" className="flex flex-wrap gap-2">
+    <LocalizedElement aria-label="공동 연구 비중 예시" className="flex flex-wrap gap-2" as="nav" en={{"aria-label": simulationEnglish("공동 연구 비중 예시")}}>
       {[25, 50, 75].map((kodexWeightPct) => (
         <Link
           className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--ink)]"
@@ -266,7 +251,7 @@ function PresetLinks({
           {kodexWeightPct}:{100 - kodexWeightPct}
         </Link>
       ))}
-    </nav>
+    </LocalizedElement>
   );
 }
 

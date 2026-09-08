@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthElement, AuthText } from "./auth-localized";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle, MailCheck } from "lucide-react";
@@ -82,7 +83,7 @@ export function EmailAuthForm({
     );
   }
   return (
-    <form
+    <AuthElement as="form"
       onSubmit={submit}
       className={styles.emailForm}
       aria-label={signingUp ? "이메일 회원가입" : "이메일 로그인"}
@@ -93,8 +94,8 @@ export function EmailAuthForm({
       >
         {signingUp ? (
           <div className={styles.field}>
-            <label htmlFor="auth-name">이름</label>
-            <input
+            <label htmlFor="auth-name"><AuthText>{"이름"}</AuthText></label>
+            <AuthElement as="input"
               id="auth-name"
               name="name"
               type="text"
@@ -107,8 +108,8 @@ export function EmailAuthForm({
           </div>
         ) : null}
         <div className={styles.field}>
-          <label htmlFor="auth-email">이메일</label>
-          <input
+          <label htmlFor="auth-email"><AuthText>{"이메일"}</AuthText></label>
+          <AuthElement as="input"
             id="auth-email"
             name="email"
             type="email"
@@ -132,12 +133,12 @@ export function EmailAuthForm({
         ) : null}
         {error ? (
           <p role="alert" className={styles.error}>
-            {error}
+            <AuthText>{error}</AuthText>
           </p>
         ) : null}
         {notice ? (
           <p role="status" className={styles.notice}>
-            {notice}
+            <AuthText>{notice}</AuthText>
           </p>
         ) : null}
         <button
@@ -146,11 +147,11 @@ export function EmailAuthForm({
           aria-busy={pending}
         >
           <span className={styles.buttonLabel}>
-            {pending
+            <AuthText>{pending
               ? "확인 중"
               : signingUp
                 ? "이메일로 가입하기"
-                : "이메일로 로그인"}
+                : "이메일로 로그인"}</AuthText>
           </span>
           {pending ? (
             <LoaderCircle
@@ -164,23 +165,19 @@ export function EmailAuthForm({
         </button>
       </fieldset>
       {!enabled && !preview ? (
-        <p className={styles.note}>이메일 로그인은 준비 중입니다.</p>
+        <p className={styles.note}><AuthText>{"이메일 로그인은 준비 중입니다."}</AuthText></p>
       ) : null}
       <div className={styles.recoveryLinks}>
         <Link
           href={`/auth/forgot-password${preview ? "?preview=design" : ""}`}
           className={styles.textLink}
-        >
-          비밀번호 찾기
-        </Link>
+        ><AuthText>{"비밀번호 찾기"}</AuthText></Link>
         <Link
           href={`/auth/verify-email${preview ? "?preview=design" : ""}`}
           className={styles.textLink}
-        >
-          인증 메일 재전송
-        </Link>
+        ><AuthText>{"인증 메일 재전송"}</AuthText></Link>
       </div>
-    </form>
+    </AuthElement>
   );
 }
 
@@ -224,14 +221,11 @@ function VerificationNotice({
     <div className={styles.stack} role="status">
       <div className={styles.verificationState}>
         <MailCheck size={22} aria-hidden="true" />
-        <strong>이메일을 확인해 주세요</strong>
+        <strong><AuthText>{"이메일을 확인해 주세요"}</AuthText></strong>
       </div>
       <p className={styles.note}>
-        <span className={styles.emailAddress}>{email}</span>으로 받은 인증
-        메일의 링크를 연 뒤 로그인해 주세요.
-      </p>
-      <Link href="/auth/sign-in" className={styles.primaryButton}>
-        로그인으로 계속 <ArrowRight size={16} aria-hidden="true" />
+        <span className={styles.emailAddress}>{email}</span><AuthText>{"으로 받은 인증 메일의 링크를 연 뒤 로그인해 주세요."}</AuthText></p>
+      <Link href="/auth/sign-in" className={styles.primaryButton}><AuthText>{"로그인으로 계속"}</AuthText><ArrowRight size={16} aria-hidden="true" />
       </Link>
       <button
         type="button"
@@ -239,16 +233,14 @@ function VerificationNotice({
         onClick={resend}
         disabled={pending || seconds > 0}
       >
-        {pending
+        <AuthText>{pending
           ? "요청 중"
           : seconds > 0
             ? `${seconds}초 후 재전송`
-            : "인증 메일 재전송"}
+            : "인증 메일 재전송"}</AuthText>
       </button>
-      {message ? <p className={styles.note}>{message}</p> : null}
-      <button type="button" onClick={onBack} className={styles.textLink}>
-        다른 이메일 사용
-      </button>
+      {message ? <p className={styles.note}><AuthText>{message}</AuthText></p> : null}
+      <button type="button" onClick={onBack} className={styles.textLink}><AuthText>{"다른 이메일 사용"}</AuthText></button>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import "./presentation-system.test.mjs";
 import "./auth-experience.test.mjs";
 import "./multi-provider-auth.test.mjs";
 import "./web-analytics-event.test.mjs";
+import "./locale-preference.test.mjs";
+import "./portfolio-simulation-copy.test.mjs";
 import "./home-metrics.test.mjs";
 import "./portfolio-format.test.mjs";
 import "./map-with-concurrency.test.mjs";

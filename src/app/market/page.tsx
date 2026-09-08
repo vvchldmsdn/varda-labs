@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -15,7 +16,9 @@ import type { MarketRegimeDuplicateGroup } from "@/lib/market-context";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "시장 데이터 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "시장 데이터 | VARDA LABS" }, "Market data | VARDA LABS");
+}
 
 export default async function MarketPage() {
   const resolution = await resolveCurrentTenantContext();
@@ -23,10 +26,13 @@ export default async function MarketPage() {
   if (!resolution.ok) {
     return (
       <PortfolioReadAccessBoundary
-        closedMessage="Market context remains closed until the signed-in product user is resolved."
-        description="Benchmarks and global factors are shared references. Account regime rows are selected only through accounts owned by the current user."
+        closedMessage="로그인한 사용자가 확인되기 전에는 시장 현황을 조회하지 않습니다."
+        closedMessageEn="Market context remains closed until the signed-in product user is resolved."
+        description="벤치마크와 글로벌 요인은 공통 참고 데이터입니다. 계좌별 시장 국면은 현재 사용자 소유의 계좌에서만 조회합니다."
+        descriptionEn="Benchmarks and global factors are shared references. Account regime rows are selected only through accounts owned by the current user."
         resolution={resolution}
-        title="Market Context"
+        title="시장 현황"
+        titleEn="Market Context"
       />
     );
   }

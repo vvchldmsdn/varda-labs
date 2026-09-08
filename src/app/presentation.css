@@ -1021,7 +1021,7 @@
 .varda-page :where(details) {
   scroll-margin-top: 20px;
 }
-.varda-page nav[aria-label="자산 분석 범위"] {
+.varda-page nav[data-scope-rail] {
   scrollbar-width: none;
 }
 .varda-page :where(summary) {

@@ -1,3 +1,6 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { simulationEnglish } from "@/components/simulation/simulation-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import Form from "next/form";
 import { SimulationContextFields } from "./simulation-query-controls";
@@ -30,16 +33,12 @@ export function ResearchUniversePreflightSection({
             className="text-lg font-semibold"
             id="research-universe-preflight-title"
           >
-            연구 종목 데이터 점검
-          </h2>
+            <SimulationText ko={"연구 종목 데이터 점검"} />{" "}</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            계정과 연결하지 않은 연구 입력입니다. 저장된 가격·환율·출처만
-            확인하며 시뮬레이션은 실행하지 않습니다.
-          </p>
+            <SimulationText ko={"계정과 연결하지 않은 연구 입력입니다. 저장된 가격·환율·출처만 확인하며 시뮬레이션은 실행하지 않습니다."} />{" "}</p>
         </div>
         <span className="text-xs font-semibold text-[var(--muted)]">
-          실행 권한 미확립
-        </span>
+          <SimulationText ko={"실행 권한 미확립"} />{" "}</span>
       </div>
 
       <Form
@@ -74,34 +73,30 @@ export function ResearchUniversePreflightSection({
           <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
             market:currency:ticker:weight_bps
           </span>
-          <input
+          <LocalizedElement
             aria-label="연구 종목과 비중"
             className="h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--brand)]"
             defaultValue={model.rawValue ?? ""}
             name="researchUniverse"
             placeholder="korea:KRW:069500:5000,us:USD:QQQ:5000"
-            type="text"
+            type="text" as="input" en={{"aria-label": simulationEnglish("연구 종목과 비중")}}
           />
         </label>
         <button
           className="h-11 self-end rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-[var(--ink)]"
           type="submit"
         >
-          데이터 점검
-        </button>
+          <SimulationText ko={"데이터 점검"} />{" "}</button>
       </Form>
       <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-        Fount는 managed:KRW:FOUNT:0, 금현물은
-        krx-gold:KRW:GOLD_9999_1KG:0 형식으로 남길 수 있습니다. 0bps
-        행도 삭제하지 않습니다.
-      </p>
+        <SimulationText ko={"Fount는 managed:KRW:FOUNT:0, 금현물은 krx-gold:KRW:GOLD_9999_1KG:0 형식으로 남길 수 있습니다. 0bps 행도 삭제하지 않습니다."} />{" "}</p>
 
       {model.selectionStatus === "invalid" ? (
         <div
           className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]"
           data-research-universe-invalid
         >
-          {model.issues.map(issueLabel).join(" · ")}
+          <SimulationText ko={model.issues.map(issueLabel).join(" · ")} />
         </div>
       ) : null}
 
@@ -132,14 +127,13 @@ export function ResearchUniversePreflightSection({
             <table className="w-full min-w-[960px] border-collapse text-left text-sm">
               <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
                 <tr>
-                  <th className="px-3 py-3 font-semibold">종목</th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"종목"} /></th>
                   <th className="px-3 py-3 text-right font-semibold">
-                    비중
-                  </th>
-                  <th className="px-3 py-3 font-semibold">저장 이력</th>
-                  <th className="px-3 py-3 font-semibold">환율</th>
-                  <th className="px-3 py-3 font-semibold">출처 근거</th>
-                  <th className="px-3 py-3 font-semibold">판정</th>
+                    <SimulationText ko={"비중"} />{" "}</th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"저장 이력"} /></th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"환율"} /></th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"출처 근거"} /></th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"판정"} /></th>
                 </tr>
               </thead>
               <tbody>
@@ -160,17 +154,17 @@ export function ResearchUniversePreflightSection({
                       {formatWeight(row.weightBps)}
                     </td>
                     <td className="px-3 py-3">
-                      {formatStoredCoverage(row.storedCoverage)}
+                      <SimulationText ko={formatStoredCoverage(row.storedCoverage)} />
                     </td>
                     <td className="px-3 py-3">
-                      {formatFxCoverage(row.storedCoverage)}
+                      <SimulationText ko={formatFxCoverage(row.storedCoverage)} />
                     </td>
                     <td className="px-3 py-3">
                       <p className="font-semibold">
-                        {provenanceLabel(row.provenance.status)}
+                        <SimulationText ko={provenanceLabel(row.provenance.status)} />
                       </p>
                       <p className="mt-1 max-w-[260px] text-xs leading-5 text-[var(--muted)]">
-                        {formatProvenance(row.provenance)}
+                        <SimulationText ko={formatProvenance(row.provenance)} />
                       </p>
                     </td>
                     <td className="px-3 py-3">
@@ -186,7 +180,7 @@ export function ResearchUniversePreflightSection({
                               : "font-semibold text-[var(--warning)]"
                         }
                       >
-                        {instrumentStatusLabel(row.status)}
+                        <SimulationText ko={instrumentStatusLabel(row.status)} />
                       </p>
                       {row.admissionIssues.length > 0 ? (
                         <p className="mt-1 max-w-[260px] text-xs leading-5 text-[var(--warning)]">
@@ -204,7 +198,7 @@ export function ResearchUniversePreflightSection({
             className="mt-4 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
             data-research-universe-result-boundary
           >
-            {resultBoundaryLabel(model.status)}
+            <SimulationText ko={resultBoundaryLabel(model.status)} />
           </div>
         </>
       ) : null}
@@ -215,8 +209,8 @@ export function ResearchUniversePreflightSection({
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <p className="text-xs text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
+      <p className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></p>
+      <p className="mt-1 text-lg font-semibold"><SimulationText ko={value} /></p>
     </div>
   );
 }

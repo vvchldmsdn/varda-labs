@@ -1,9 +1,15 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
+import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
 import { ArrowRight, CircleHelp, Database, FolderOpen, Landmark, Layers3, ListChecks, Plus, RefreshCw, SlidersHorizontal, Wallet } from "lucide-react";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 
-export const metadata = { title: "관리 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "관리 | VARDA LABS" }, "Manage | VARDA LABS");
+}
 
 const groups = [
   { title: "자산과 계좌", links: [
@@ -34,16 +40,16 @@ export default function PortfolioManagementPage() {
       <div className="varda-management-stage">
         <header className="varda-management-cover">
           <p className="varda-kicker">YOUR WORKSPACE</p>
-          <h1>나의 자산, <br />나의 기준.</h1>
-          <p className="varda-management-cover-note">포트폴리오를 이루는 데이터와 <br />분석의 기준을 관리하세요.</p>
-          <Link href="/portfolio/holdings/new" className="varda-action"><Plus size={16} aria-hidden="true" />보유 종목 추가</Link>
+          <h1><PortfolioText ko={"나의 자산,"} />{" "}<br /><PortfolioText ko={"나의 기준."} /></h1>
+          <p className="varda-management-cover-note"><PortfolioText ko={"포트폴리오를 이루는 데이터와"} />{" "}<br /><PortfolioText ko={"분석의 기준을 관리하세요."} /></p>
+          <Link href="/portfolio/holdings/new" className="varda-action"><Plus size={16} aria-hidden="true" /><PortfolioText ko={"보유 종목 추가"} /></Link>
         </header>
-        <div className="varda-management-index" aria-label="관리할 데이터 선택">
-          {groups.map((group, index) => <PresentationDialog key={group.title} title={group.title} triggerClassName="varda-management-chapter" label={<><span className="varda-management-chapter-number">0{index + 1}</span><span className="varda-management-chapter-title"><strong>{group.title}</strong><small>{group.links.map(link => link.title).join(" · ")}</small></span></>}>
-            <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span>{title}<small>{description}</small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
+        <LocalizedElement className="varda-management-index" aria-label="관리할 데이터 선택" as="div" en={{"aria-label": portfolioEnglish("관리할 데이터 선택")}}>
+          {groups.map((group, index) => <PresentationDialog key={group.title} title={group.title} titleEn={portfolioEnglish(group.title)} triggerClassName="varda-management-chapter" label={<><span className="varda-management-chapter-number">0{index + 1}</span><span className="varda-management-chapter-title"><strong><PortfolioText ko={group.title} /></strong><small><PortfolioText ko={group.links.map(link => link.title).join(" · ")} /></small></span></>}>
+            <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span><PortfolioText ko={title} /><small><PortfolioText ko={description} /></small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
           </PresentationDialog>)}
-        </div>
-        <footer className="varda-management-stage-footer"><span>정리된 데이터에서 시작하는 분석</span><PresentationDialog label={<><CircleHelp size={14} aria-hidden="true" />처음 시작하기</>} title="포트폴리오를 만드는 순서"><ol className="varda-management-guide"><li><strong>01 · 계좌 등록</strong><p>증권·연금 계좌를 만들고 분석할 자산을 정리하세요.</p><Link href="/portfolio/accounts">계좌 관리 <ArrowRight size={14} /></Link></li><li><strong>02 · 보유 종목 등록</strong><p>수량과 매입원가를 입력하면 자산 평가와 손익의 근거가 됩니다.</p><Link href="/portfolio/holdings/new">종목 추가 <ArrowRight size={14} /></Link></li><li><strong>03 · 목표비중 설정</strong><p>금현물을 포함해 관리하려는 종목의 목표비중을 정하세요.</p><Link href="/portfolio/targets">목표비중 관리 <ArrowRight size={14} /></Link></li></ol></PresentationDialog></footer>
+        </LocalizedElement>
+        <footer className="varda-management-stage-footer"><span><PortfolioText ko={"정리된 데이터에서 시작하는 분석"} /></span><PresentationDialog label={<><CircleHelp size={14} aria-hidden="true" /><PortfolioText ko={"처음 시작하기"} /></>} title="포트폴리오를 만드는 순서" titleEn={portfolioEnglish("포트폴리오를 만드는 순서")}><ol className="varda-management-guide"><li><strong><PortfolioText ko={"01 · 계좌 등록"} /></strong><p><PortfolioText ko={"증권·연금 계좌를 만들고 분석할 자산을 정리하세요."} /></p><Link href="/portfolio/accounts"><PortfolioText ko={"계좌 관리"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"02 · 보유 종목 등록"} /></strong><p><PortfolioText ko={"수량과 매입원가를 입력하면 자산 평가와 손익의 근거가 됩니다."} /></p><Link href="/portfolio/holdings/new"><PortfolioText ko={"종목 추가"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"03 · 목표비중 설정"} /></strong><p><PortfolioText ko={"금현물을 포함해 관리하려는 종목의 목표비중을 정하세요."} /></p><Link href="/portfolio/targets"><PortfolioText ko={"목표비중 관리"} />{" "}<ArrowRight size={14} /></Link></li></ol></PresentationDialog></footer>
       </div>
     </div>
   </main>;

@@ -1,3 +1,9 @@
+
+import { LocalizedLink } from "@/components/i18n/localized-link";
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
 import { ArrowUpRight, Sigma } from "lucide-react";
 import styles from "@/components/home/portfolio-overview.module.css";
@@ -69,7 +75,7 @@ export function PortfolioDashboard({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.stage}>
           <header className={styles.stageHeader}>
-            <h1 id="portfolio-overview-title" className={styles.stageTitle}>자산의 흐름</h1>
+            <h1 id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></h1>
             <div className={styles.stageScope}>
             <PortfolioAnalysisScopeTabs
               basePath="/"
@@ -87,26 +93,26 @@ export function PortfolioDashboard({
           <div className={styles.homeStageMain}>
           <section className={styles.stageSummary} aria-labelledby="portfolio-overview-title">
             <div className={styles.balance}>
-              <span>{homeScopeLabel(data.selectedScope)} 현재 평가액</span>
-              <strong>{formatKrw(data.totalValueKrw)}</strong>
-              <p>{data.holdings.length}개 보유 종목 · {data.accountSummaries.length}개 계좌</p>
+              <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="현재 평가액" en="Current value"/></span>
+              <strong>{<T ko={formatKrw(data.totalValueKrw)} en={translateHomeHistory(formatKrw(data.totalValueKrw))}/>}</strong>
+              <p><T ko={`${data.holdings.length}개 보유 종목 · ${data.accountSummaries.length}개 계좌`} en={`${data.holdings.length} holdings · ${data.accountSummaries.length} accounts`}/></p>
             </div>
             <dl className={styles.summaryMetric}>
-              <dt>오늘 변동</dt>
+              <dt><T ko="오늘 변동" en="Today"/></dt>
               <dd className={toneClass(todayChangeKrw)}>
-                {movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"}
+                {<T ko={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"} en={translateHomeHistory(movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기")}/>}
               </dd>
-              <dd className={styles.status}>기준일 {formatDate(data.movementBaselineDate)}</dd>
+              <dd className={styles.status}><T ko="기준일" en="As of"/> {<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</dd>
             </dl>
             <dl className={styles.summaryMetric}>
-              <dt>누적 수익률</dt>
+              <dt><T ko="누적 수익률" en="Total return"/></dt>
               <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
-              <dd className={styles.status}>{data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`}</dd>
+              <dd className={styles.status}>{<T ko={data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)}/>}</dd>
             </dl>
             <div className={styles.stageNote}>
-              <span>오늘의 최대 기여</span>
-              <strong>{movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"}</strong>
-              <p>{movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)}</p>
+              <span><T ko="오늘의 최대 기여" en="Largest contributor today"/></span>
+              <strong><T ko={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} en={movementReady ? topContributor?.name ?? "No change" : "Awaiting data"}/></strong>
+              <p><T ko={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)} en={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount, "en") : translateHomeHistory(movementPendingReason(data))}/></p>
             </div>
           </section>
 
@@ -117,8 +123,8 @@ export function PortfolioDashboard({
 
           <footer className={styles.stageFooter}>
             <div className={styles.stageLaunchers}>
-              <PresentationDialog label="평가액 흐름" title="포트폴리오 평가액 흐름" description="저장된 실제 평가액과 입출금·매매 기록을 함께 확인합니다." wide>
-              <section className={styles.chartPanel} aria-label="자산 이력">
+              <PresentationDialog label="평가액 흐름" labelEn={"Value history"} title="포트폴리오 평가액 흐름" titleEn={"Portfolio value history"} description="저장된 실제 평가액과 입출금·매매 기록을 함께 확인합니다." descriptionEn={"Review recorded portfolio values alongside cash flows and trades."} wide>
+              <LocalizedElement as="section" en={{"aria-label": "Asset history"}} className={styles.chartPanel} aria-label="자산 이력">
               <PortfolioHistoryChart
                 key={data.selectedScope.key}
                 events={data.eventActivity.map((event) => ({
@@ -133,45 +139,44 @@ export function PortfolioDashboard({
                 }))}
                 points={data.recentSnapshots}
               />
-              </section>
+              </LocalizedElement>
               </PresentationDialog>
 
-              <PresentationDialog label="변동 근거" title="오늘의 근거와 자산 흐름" wide>
-              <aside className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
+              <PresentationDialog label="변동 근거" labelEn={"Change details"} title="오늘의 근거와 자산 흐름" titleEn={"Today's changes and their sources"} wide>
+              <LocalizedElement as="aside" en={{"aria-label": "Today's changes and their sources"}} className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
               <div>
                 <div className={styles.panelHeader}>
-                  <h2 className={styles.panelTitle}>오늘의 핵심 근거</h2>
-                  <Link className="varda-icon-button" href={scopedHref("/today", data.selectedScope.key, designPreview)} aria-label="오늘 변동 상세 보기" title="오늘 변동 상세 보기">
+                  <h2 className={styles.panelTitle}><T ko="오늘의 핵심 근거" en="Today's key sources"/></h2>
+                  <LocalizedLink en={{"aria-label": translateHomeHistory("오늘 변동 상세 보기"), "title": translateHomeHistory("오늘 변동 상세 보기")}} className="varda-icon-button" href={scopedHref("/today", data.selectedScope.key, designPreview)} aria-label="오늘 변동 상세 보기" title="오늘 변동 상세 보기">
                     <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.6} />
-                  </Link>
+                  </LocalizedLink>
                 </div>
-                <p className={styles.evidenceIntro}>평가액의 변화를 가격과 환율로 나누어 확인합니다.</p>
+                <p className={styles.evidenceIntro}><T ko="평가액의 변화를 가격과 환율로 나누어 확인합니다." en="See how prices and exchange rates contributed to the change in value."/></p>
               </div>
               <dl className={styles.metrics}>
                 <RailMetric label="평가액 변동" value={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"} tone={todayChangeKrw} />
                 <RailMetric label="가격 영향" value={movementReady ? formatSignedKrw(priceImpactKrw ?? 0) : "계산 대기"} tone={priceImpactKrw} />
                 <RailMetric label="환율 영향" value={formatSignedKrw(data.todayFxChangeKrw)} tone={data.todayFxChangeKrw} />
-                <RailMetric label="최대 기여" value={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} tone={topContributor?.dailyChangeKrw ?? null} />
+                <RailMetric label="최대 기여" value={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} valueEn={movementReady ? topContributor?.name ?? "No change" : "Awaiting data"} tone={topContributor?.dailyChangeKrw ?? null} />
                 <RailMetric label="시세 근거" value={`${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`} />
                 <RailMetric label="USD/KRW" value={data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"} />
               </dl>
               <div>
                 <FxImpactPopover compact basisDate={data.movementBaselineDate} impactKrw={data.todayFxChangeKrw} impactPct={fxImpactPct} points={data.fxTrend} />
                 <p className={`${styles.status} mt-3`}>
-                  {movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)}
+                  {<T ko={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)} en={translateHomeHistory(movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data))}/>}
                 </p>
               </div>
-              </aside>
+              </LocalizedElement>
               </PresentationDialog>
               <Link className={styles.textLink} href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)}>
-                <Sigma aria-hidden="true" size={15} strokeWidth={1.6} /> 투입 금액 계산
-              </Link>
-              <Link className={styles.textLink} href={structureHref}>포트폴리오 구조 <ArrowUpRight aria-hidden="true" size={14} /></Link>
+                <Sigma aria-hidden="true" size={15} strokeWidth={1.6} /><T ko="투입 금액 계산" en="Plan a contribution"/></Link>
+              <Link className={styles.textLink} href={structureHref}><T ko="포트폴리오 구조" en="Portfolio allocation"/> <ArrowUpRight aria-hidden="true" size={14} /></Link>
             </div>
             <p>
               USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}
-              {data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : ""}
-              {` · ${movementBasisText(data)}`}
+              {<T ko={data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : ""} en={translateHomeHistory(data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : "")}/>}
+              {<T ko={` · ${movementBasisText(data)}`} en={translateHomeHistory(` · ${movementBasisText(data)}`)}/>}
             </p>
           </footer>
         </div>
@@ -184,15 +189,17 @@ function RailMetric({
   label,
   tone = null,
   value,
+  valueEn,
 }: {
   label: string;
   tone?: number | null;
   value: string;
+  valueEn?: string;
 }) {
   return (
     <div className={styles.metric}>
-      <dt>{label}</dt>
-      <dd className={toneClass(tone)} title={value}>{value}</dd>
+      <dt>{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <LocalizedElement as="dd" className={toneClass(tone)} title={value} en={{title: valueEn ?? translateHomeHistory(value)}}><T ko={value} en={valueEn ?? translateHomeHistory(value)}/></LocalizedElement>
     </div>
   );
 }
@@ -200,6 +207,7 @@ function RailMetric({
 function dataStatusText(
   data: DashboardData,
   movementExcludedAssetCount: number,
+  locale: "ko" | "en" = "ko",
 ) {
   const historyCoverage = data.holdingHistory.coveragePct;
   const evidenceText = data.dataHealth.movementReason === "missing_fresh_live_prices"
@@ -211,7 +219,10 @@ function dataStatusText(
     ? `수동 평가 ${movementExcludedAssetCount}종 제외`
     : null;
 
-  return [evidenceText, exclusionText].filter(Boolean).join(" · ");
+  return [evidenceText, exclusionText]
+    .filter((text): text is string => text !== null)
+    .map((text) => locale === "en" ? translateHomeHistory(text) : text)
+    .join(" · ");
 }
 
 function movementBasisText(data: DashboardData) {

@@ -1,5 +1,8 @@
 "use client";
 
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
+
+
 import { useMemo, useState } from "react";
 
 import type { PortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
@@ -63,16 +66,12 @@ export function PortfolioFxShock({
             className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="portfolio-fx-shock-title"
           >
-            직접 보유 USD 환율 충격 실험
-          </h2>
+            <PortfolioText ko={"직접 보유 USD 환율 충격 실험"} />{" "}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            USD 직접 보유 종목의 현지 가격은 고정하고 USD/KRW만 바뀐다고
-            가정합니다. 원화 상장 ETF의 해외 구성 종목은 추정하지 않습니다.
-          </p>
+            <PortfolioText ko={"USD 직접 보유 종목의 현지 가격은 고정하고 USD/KRW만 바뀐다고 가정합니다. 원화 상장 ETF의 해외 구성 종목은 추정하지 않습니다."} />{" "}</p>
         </div>
         <label className="flex w-full max-w-52 flex-col gap-1 text-xs font-semibold text-[var(--muted)]">
-          USD/KRW 변동률
-          <span className="flex items-center gap-2">
+          <PortfolioText ko={"USD/KRW 변동률"} />{" "}<span className="flex items-center gap-2">
             <input
               className="min-w-0 flex-1 border-b border-[var(--faint)] bg-transparent px-2 py-2 text-right text-sm tabular-nums outline-none focus:border-[var(--ink)]"
               inputMode="decimal"
@@ -123,15 +122,13 @@ export function PortfolioFxShock({
         </div>
       ) : (
         <p className="mt-7 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
-          {reasonLabel(result.reason)}
+          <PortfolioText ko={reasonLabel(result.reason)} />
         </p>
       )}
 
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        현재 계산 가능한 직접 보유 자산만 사용 · 제외/식별 불가/평가 오류 {" "}
-        {result.excludedEvidenceCount}건 · 브라우저에서만 계산하며 저장하지 않음 ·
-        전망, VaR, 추천, 주문 아님
-      </p>
+        <PortfolioText ko={"현재 계산 가능한 직접 보유 자산만 사용 · 제외/식별 불가/평가 오류"} />{" "}{" "}
+        {result.excludedEvidenceCount}<PortfolioText ko={"건 · 브라우저에서만 계산하며 저장하지 않음 · 전망, VaR, 추천, 주문 아님"} />{" "}</p>
     </section>
   );
 }
@@ -147,11 +144,11 @@ function Metric({
 }) {
   return (
     <div className="min-w-0 border-b border-[var(--wash)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
       <p className="mt-3 text-lg font-medium tracking-normal tabular-nums text-[var(--ink)]">
-        {value}
+        <PortfolioText ko={value} />
       </p>
-      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={detail} /></p>
     </div>
   );
 }

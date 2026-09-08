@@ -1,3 +1,7 @@
+
+import { LocalizedSvgText, T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import type {
   HistoryTrajectoryModel,
   HistoryTrajectoryPoint,
@@ -39,35 +43,32 @@ export function HistoryTrajectoryChart({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="text-base font-semibold tracking-normal">
-            {model.lane === "balance"
+            {<T ko={model.lane === "balance"
               ? "저장 잔액 궤적"
-              : "포트폴리오 평가액 궤적"}
+              : "포트폴리오 평가액 궤적"} en={translateHomeHistory(model.lane === "balance"
+              ? "저장 잔액 궤적"
+              : "포트폴리오 평가액 궤적")}/>}
           </h3>
           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-            {historyAccountLabel(model.account)} · 금액 추세만 표시 · 수익률,
-            TWR, MDD, 성과 순위 아님
-          </p>
+            {<T ko={historyAccountLabel(model.account)} en={translateHomeHistory(historyAccountLabel(model.account))}/>}<T ko="· 금액 추세만 표시 · 수익률, TWR, MDD, 성과 순위 아님" en="· Value trend only · Not returns, TWR, MDD or performance rankings"/></p>
         </div>
         <p className="text-xs text-[var(--muted)]">
-          {model.minDate && model.maxDate
+          {<T ko={model.minDate && model.maxDate
             ? `${model.minDate} ~ ${model.maxDate}`
-            : "표시할 저장점 없음"}
+            : "표시할 저장점 없음"} en={translateHomeHistory(model.minDate && model.maxDate
+            ? `${model.minDate} ~ ${model.maxDate}`
+            : "표시할 저장점 없음")}/>}
         </p>
       </div>
 
       {model.status === "ready" ? (
         <ReadyChart model={model} />
       ) : (
-        <p className="mt-3 border-y border-[var(--wash)] py-4 text-sm text-[var(--muted)]">
-          유효한 저장 금액점이 없어 차트를 표시하지 않습니다.
-        </p>
+        <p className="mt-3 border-y border-[var(--wash)] py-4 text-sm text-[var(--muted)]"><T ko="유효한 저장 금액점이 없어 차트를 표시하지 않습니다." en="No chart is shown because there are no valid recorded amounts."/></p>
       )}
 
-      <figcaption className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        선은 같은 출처·같은 행 구분의 달력상 연속 날짜만 연결합니다. 저장 행이
-        없는 날짜는 보간하거나 평평한 값으로 채우지 않습니다. 제외된 값 {" "}
-        {model.excludedPointCount}건 · 분리된 날짜 간격 {model.disconnectedGapCount}건
-      </figcaption>
+      <figcaption className="mt-3 text-xs leading-5 text-[var(--muted)]"><T ko="선은 같은 출처·같은 행 구분의 달력상 연속 날짜만 연결합니다. 저장 행이 없는 날짜는 보간하거나 평평한 값으로 채우지 않습니다. 제외된 값" en="Lines connect consecutive calendar dates from the same source and row type. Missing dates are not interpolated or filled with flat values. Excluded values:"/>{" "}
+        {model.excludedPointCount}<T ko="건 · 분리된 날짜 간격" en="records · Disconnected date gaps:"/> {model.disconnectedGapCount}<T ko="건" en=" records"/></figcaption>
     </figure>
   );
 }
@@ -96,6 +97,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
   const chartTitle = `${historyAccountLabel(model.account)} ${
     model.lane === "balance" ? "저장 잔액" : "포트폴리오 평가액"
   } 궤적`;
+  const chartTitleEn = `${historyAccountLabel(model.account, "en")} ${model.lane === "balance" ? "recorded balance" : "portfolio value"} path`;
   const toX = (date: string) =>
     minTimestamp === maxTimestamp
       ? LEFT + plotWidth / 2
@@ -128,20 +130,19 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                     : undefined,
               }}
             />
-            {historySourceLabel(group.source)} · {rowKindLabel(group.rowKind)} {" "}
-            {group.pointCount}점/{group.segmentCount}구간
-          </span>
+            {<T ko={historySourceLabel(group.source)} en={translateHomeHistory(historySourceLabel(group.source))}/>} · {<T ko={rowKindLabel(group.rowKind)} en={translateHomeHistory(rowKindLabel(group.rowKind))}/>} {" "}
+            {group.pointCount}<T ko="점/" en=" points /"/>{group.segmentCount}<T ko="구간" en=" segments"/></span>
         ))}
       </div>
 
       <div className="mt-3 overflow-x-auto border-y border-[var(--wash)] bg-white py-2">
-        <svg
+        <LocalizedElement as="svg" en={{"aria-label": `${chartTitleEn} chart`}}
           aria-label={`${chartTitle} 차트`}
           className="h-auto w-full min-w-[760px]"
           role="img"
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         >
-          <title>{chartTitle}</title>
+          <LocalizedSvgText as="title" ko={chartTitle} en={chartTitleEn}/>
           {yTicks.map((tick, index) => {
             const y = TOP + (index / 4) * plotHeight;
             return (
@@ -162,7 +163,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                   x={LEFT - 10}
                   y={y}
                 >
-                  {formatCompactKrw(tick)}
+                  {<T ko={formatCompactKrw(tick)} en={translateHomeHistory(formatCompactKrw(tick))}/>}
                 </text>
               </g>
             );
@@ -207,7 +208,7 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
                     stroke={color}
                     strokeWidth="2"
                   >
-                    <title>{pointTitle(point)}</title>
+                    <LocalizedSvgText as="title" ko={pointTitle(point)} en={pointTitle(point, "en")}/>
                   </circle>
                 ))}
               </g>
@@ -232,18 +233,18 @@ function ReadyChart({ model }: { model: HistoryTrajectoryModel }) {
               {date.replaceAll("-", ".")}
             </text>
           ))}
-        </svg>
+        </LocalizedElement>
       </div>
     </>
   );
 }
 
-function pointTitle(point: HistoryTrajectoryPoint) {
+function pointTitle(point: HistoryTrajectoryPoint, locale: "ko" | "en" = "ko") {
   return [
     point.date,
     formatHistoryKrw(point.valueKrw),
-    historySourceLabel(point.source),
-    rowKindLabel(point.rowKind),
+    locale === "en" ? translateHomeHistory(historySourceLabel(point.source)) : historySourceLabel(point.source),
+    locale === "en" ? translateHomeHistory(rowKindLabel(point.rowKind)) : rowKindLabel(point.rowKind),
   ].join(" · ");
 }
 

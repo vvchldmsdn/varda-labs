@@ -1,5 +1,6 @@
 "use client";
 
+import { ManagementText, ManagementElement } from "@/components/i18n/management-text";
 import { useActionState } from "react";
 
 import {
@@ -28,15 +29,11 @@ export function HoldingArchiveForm({
 
   return (
     <details className="mt-3 min-w-[230px] border-t border-[var(--wash)] pt-3">
-      <summary className="cursor-pointer text-sm font-semibold text-[var(--warning)]">
-        보유 종료
-      </summary>
+      <summary className="cursor-pointer text-sm font-semibold text-[var(--warning)]"><ManagementText>{"보유 종료"}</ManagementText></summary>
       <form action={action} className="mt-3 space-y-3">
         <input name="assetId" type="hidden" value={holdingId} />
         <input name="expectedUpdatedAt" type="hidden" value={updatedAt} />
-        <label className="block text-xs font-semibold text-[var(--ink)]">
-          종료 메모 (선택)
-          <input
+        <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"종료 메모 (선택)"}</ManagementText><ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}
             maxLength={HOLDING_LIFECYCLE_POLICY.reasonMaximumLength}
@@ -52,15 +49,13 @@ export function HoldingArchiveForm({
             required
             type="checkbox"
             value="yes"
-          />
-          현재 계산에서 제외하되 수량·매입원가·과거 기록은 보존합니다.
-        </label>
+          /><ManagementText>{"현재 계산에서 제외하되 수량·매입원가·과거 기록은 보존합니다."}</ManagementText></label>
         <button
           className="w-full rounded-md border border-[var(--negative-mid)] bg-white px-3 py-2 text-xs font-semibold text-[var(--warning)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
           type="submit"
         >
-          {pending ? "종료 중" : "보유 종료"}
+          <ManagementText>{pending ? "종료 중" : "보유 종료"}</ManagementText>
         </button>
         <ActionMessage id={messageId} state={state} />
       </form>
@@ -82,7 +77,7 @@ export function HoldingRestoreForm({
     <form action={action} className="min-w-[210px] space-y-2">
       <input name="assetId" type="hidden" value={holdingId} />
       <input name="expectedUpdatedAt" type="hidden" value={updatedAt} />
-      <input
+      <ManagementElement as="input"
         aria-describedby={messageId}
         className={fieldClassName}
         maxLength={HOLDING_LIFECYCLE_POLICY.reasonMaximumLength}
@@ -95,7 +90,7 @@ export function HoldingRestoreForm({
         disabled={pending}
         type="submit"
       >
-        {pending ? "복원 중" : "보유 복원"}
+        <ManagementText>{pending ? "복원 중" : "보유 복원"}</ManagementText>
       </button>
       <ActionMessage id={messageId} state={state} />
     </form>
@@ -118,7 +113,7 @@ function ActionMessage({
       ].join(" ")}
       id={id}
     >
-      {state.message}
+      <ManagementText>{state.message}</ManagementText>
     </p>
   );
 }

@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementElement, ManagementText } from "@/components/i18n/management-text";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
@@ -17,7 +19,9 @@ import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "포트폴리오 스냅샷 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "포트폴리오 스냅샷 | VARDA LABS" }, "Portfolio snapshots | VARDA LABS");
+}
 
 type TenantPortfolioSnapshotsPageProps = {
   searchParams: Promise<{
@@ -76,14 +80,14 @@ export default async function TenantPortfolioSnapshotsPage({
               Account-level daily totals authorized through owned accounts
             </p>
           </div>
-          <nav className="flex flex-wrap gap-2" aria-label="Related evidence">
+          <ManagementElement as="nav" className="flex flex-wrap gap-2" aria-label="Related evidence">
             <PageLink href="/portfolio/accounts?account=all">Accounts</PageLink>
             <PageLink href="/portfolio/holdings?account=all">Holdings</PageLink>
             <PageLink href="/portfolio/position-snapshots?account=all">
               Positions
             </PageLink>
             <PageLink href="/auth/session">Session evidence</PageLink>
-          </nav>
+          </ManagementElement>
         </div>
 
         {selectedScope ? (
@@ -127,7 +131,7 @@ function PageLink({ href, children }: { href: string; children: React.ReactNode 
       href={href}
       className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </Link>
   );
 }

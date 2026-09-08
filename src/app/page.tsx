@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense } from "react";
 
@@ -11,7 +12,9 @@ import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "홈 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "홈 | VARDA LABS" }, "Home | VARDA LABS");
+}
 
 type HomeProps = {
   searchParams: Promise<{
@@ -61,6 +64,7 @@ export default async function Home({ searchParams }: HomeProps) {
         basePath="/"
         context={scopeContext}
         title="포트폴리오 요약"
+        titleEn="Portfolio summary"
       />
     );
   }

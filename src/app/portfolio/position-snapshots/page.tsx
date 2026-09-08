@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementText } from "@/components/i18n/management-text";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
@@ -15,7 +17,9 @@ import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "종목 스냅샷 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "종목 스냅샷 | VARDA LABS" }, "Position snapshots | VARDA LABS");
+}
 
 type TenantPositionSnapshotsPageProps = {
   searchParams: Promise<{
@@ -216,7 +220,7 @@ function PageLink({ href, children }: { href: string; children: React.ReactNode 
       href={href}
       className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </Link>
   );
 }
@@ -224,7 +228,7 @@ function PageLink({ href, children }: { href: string; children: React.ReactNode 
 function EvidenceCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{label}</ManagementText></p>
       <p className="mt-2 break-words text-lg font-semibold">{value}</p>
     </div>
   );
@@ -241,7 +245,7 @@ function TableHeading({
     <th
       className={`px-4 py-3 font-semibold ${align === "right" ? "text-right" : ""}`}
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </th>
   );
 }

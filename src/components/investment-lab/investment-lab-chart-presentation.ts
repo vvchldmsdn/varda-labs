@@ -135,7 +135,8 @@ export function labPercent(value: number | null, signed = false) {
   return `${value < 0 ? "−" : signed && value > 0 ? "+" : ""}${Math.abs(value * 100).toFixed(2)}%`;
 }
 
-export function labCompactKrw(value: number) {
+export function labCompactKrw(value: number, locale: "ko" | "en" = "ko") {
+  if (locale === "en") return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
   if (Math.abs(value) >= 100_000_000)
     return `${(value / 100_000_000).toFixed(1)}억`;
   if (Math.abs(value) >= 10_000)

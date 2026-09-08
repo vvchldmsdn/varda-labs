@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 const read = (path) => readFileSync(path, "utf8");
 const css = read("src/app/presentation.css");
@@ -116,14 +119,41 @@ describe("simple modern design system", () => {
       assert.match(source, /varda-dialog/);
     }
   });
-  it("allows document scrolling and preserves mobile navigation", () => {
+  it("allows document scrolling and preserves mobile navigation in either language", async () => {
     assert.match(modernCss, /min-height: 100dvh; height: auto; overflow: visible/);
     assert.match(modernCss, /@media \(max-width: 760px\)/);
     const navigation = read("src/components/app-navigation.tsx");
-    assert.match(navigation, /aria-label="메뉴 열기"/);
     assert.match(navigation, /<dialog/);
     assert.match(navigation, /showModal/);
-    assert.match(navigation, /메뉴 닫기/);
+    const scope = "account:11111111-1111-4111-8111-111111111111";
+    const [{ AppNavigation }, { LocaleProvider }] = await importUiWithPorts([
+      "src/components/app-navigation.tsx",
+      "src/components/i18n/locale-provider.tsx",
+    ], {
+      "next/navigation": {
+        usePathname: () => "/history",
+        useSearchParams: () => new URLSearchParams({ scope }),
+        useRouter: () => ({ refresh() { throw new Error("Navigation SSR must not refresh data"); } }),
+      },
+      "next/link": {
+        default: ({ children, ...props }) => createElement("a", props, children),
+        useLinkStatus: () => ({ pending: false }),
+      },
+      "next/image": { default: (props) => createElement("img", props) },
+    });
+    for (const [locale, open, close, quick] of [
+      ["ko", "메뉴 열기", "메뉴 닫기", "빠른 메뉴"],
+      ["en", "Open menu", "Close menu", "Quick navigation"],
+    ]) {
+      const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale: locale },
+        createElement(AppNavigation, { activePath: "/history", selectedScopeKey: scope })));
+      assert.ok(html.includes(`aria-label="${open}"`), `${locale}: menu opener has an accessible name`);
+      assert.ok(html.includes(`aria-label="${close}"`), `${locale}: menu closer has an accessible name`);
+      const mobile = html.match(/<nav class="varda-mobile-bottom"[^>]*>[\s\S]*?<\/nav>/)?.[0];
+      assert.ok(mobile?.includes(`aria-label="${quick}"`), `${locale}: mobile navigation is labeled`);
+      assert.equal((mobile.match(/<a /g) ?? []).length, 5);
+      assert.ok(mobile.includes(`href="/history?scope=${encodeURIComponent(scope)}" aria-current="page"`), `${locale}: current page and selected scope survive localization`);
+    }
   });
   it("keeps related primary information together instead of hiding it in scene tabs", () => {
     for (const file of [

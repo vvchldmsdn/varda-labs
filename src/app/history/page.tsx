@@ -1,3 +1,7 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
@@ -21,7 +25,9 @@ import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "히스토리 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "히스토리 | VARDA LABS" }, "History | VARDA LABS");
+}
 
 type HistoryPageProps = {
   searchParams: Promise<{
@@ -71,7 +77,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       <PortfolioAnalysisScopeBoundary
         basePath="/history"
         context={scopeContext}
-        title="히스토리"
+        title="히스토리" titleEn={"History"}
       />
     );
   }
@@ -146,12 +152,8 @@ function HistoryAccessBoundary({
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-          히스토리
-        </h1>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          로그인 세션과 사용자 소유권이 확인된 기록만 조회합니다.
-        </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko="히스토리" en="History"/></h1>
+        <p className="mt-2 text-sm text-[var(--muted)]"><T ko="로그인 세션과 사용자 소유권이 확인된 기록만 조회합니다." en="Only records with a verified session and ownership are retrieved."/></p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell
             label="사용자 연결"
@@ -159,16 +161,11 @@ function HistoryAccessBoundary({
           />
           <EvidenceCell label="상품 데이터 조회" value="시도하지 않음" />
         </dl>
-        <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-          로그인과 사용자 연결이 확인되기 전에는 히스토리 데이터를 읽지
-          않습니다.
-        </p>
+        <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]"><T ko="로그인과 사용자 연결이 확인되기 전에는 히스토리 데이터를 읽지 않습니다." en="History is not retrieved until the session and user connection are verified."/></p>
         <Link
           href="/auth/sign-in"
           className="mt-5 inline-flex rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-        >
-          로그인
-        </Link>
+        ><T ko="로그인" en="Sign in"/></Link>
       </section>
     </main>
   );
@@ -177,8 +174,8 @@ function HistoryAccessBoundary({
 function EvidenceCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
-      <dd className="mt-2 font-semibold">{value}</dd>
+      <dt className="text-xs font-semibold text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dd className="mt-2 font-semibold"><T ko={value} en={translateHomeHistory(value)}/></dd>
     </div>
   );
 }

@@ -1,4 +1,8 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { useI18n } from "@/components/i18n/locale-provider";
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,6 +42,7 @@ export function FxImpactPopover({
   impactPct: number | null;
   points: readonly DashboardFxTrendPoint[];
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -121,7 +126,7 @@ export function FxImpactPopover({
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="원 달러 환율 추세"
+          aria-label={t("원 달러 환율 추세", "USD/KRW exchange rate trend")}
           data-placement={panelPosition?.placement}
           tabIndex={-1}
           className="z-50 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(26,32,27,0.16)] focus:outline-none"
@@ -137,14 +142,14 @@ export function FxImpactPopover({
           <div className="flex items-start justify-between gap-5">
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">USD / KRW</p>
-              <h3 className="mt-1 text-base font-semibold text-[var(--ink)]">원/달러 추세</h3>
+              <h3 className="mt-1 text-base font-semibold text-[var(--ink)]"><T ko="원/달러 추세" en="USD/KRW trend"/></h3>
               <p className="mt-1 text-[11px] text-[var(--faint)]">
-                {latest ? `${formatDate(latest.date)} · 최근 ${points.length}개 관측치` : "저장 이력 없음"}
+                {<T ko={latest ? `${formatDate(latest.date)} · 최근 ${points.length}개 관측치` : "저장 이력 없음"} en={translateHomeHistory(latest ? `${formatDate(latest.date)} · 최근 ${points.length}개 관측치` : "저장 이력 없음")}/>}
               </p>
             </div>
             <button
               type="button"
-              aria-label="환율 추세 닫기"
+              aria-label={t("환율 추세 닫기", "Close exchange rate trend")}
               className="grid h-8 w-8 place-items-center rounded-full text-xl text-[var(--muted)] hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
               onClick={() => {
                 setOpen(false);
@@ -159,13 +164,13 @@ export function FxImpactPopover({
           {latest && chart ? (
             <>
               <dl className="mt-5 grid grid-cols-3 border-y border-[var(--wash)] py-3 text-xs">
-                <FxValue label="현재" value={latest.rate} />
-                <FxValue label="60일선" value={latest.ma60} divided />
-                <FxValue label="120일선" value={latest.ma120} divided />
+                <FxValue label={t("현재", "Current")} value={latest.rate} />
+                <FxValue label={t("60일선", "60-day MA")} value={latest.ma60} divided />
+                <FxValue label={t("120일선", "120-day MA")} value={latest.ma120} divided />
               </dl>
               <div className="mt-4">
                 <svg
-                  aria-label="원 달러 환율과 60일선, 120일선 추세"
+                  aria-label={t("원 달러 환율과 60일선, 120일선 추세", "USD/KRW with 60-day and 120-day moving averages")}
                   className="h-[150px] w-full overflow-visible"
                   role="img"
                   viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
@@ -186,24 +191,19 @@ export function FxImpactPopover({
                   <path d={chart.ratePath} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                 </svg>
                 <div className="mt-1 flex items-center justify-between text-[10px] tabular-nums text-[var(--faint)]">
-                  <span>{formatDate(points[0].date)}</span>
-                  <span>{formatDate(latest.date)}</span>
+                  <span>{<T ko={formatDate(points[0].date)} en={translateHomeHistory(formatDate(points[0].date))}/>}</span>
+                  <span>{<T ko={formatDate(latest.date)} en={translateHomeHistory(formatDate(latest.date))}/>}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[10px] text-[var(--muted)]">
-                  <Legend color="var(--ink)" label="원/달러" />
-                  <Legend color="var(--brand-mid)" label="60일선" />
-                  <Legend color="var(--warning)" label="120일선" />
+                  <Legend color="var(--ink)" label={t("원/달러", "USD/KRW")} />
+                  <Legend color="var(--brand-mid)" label={t("60일선", "60-day MA")} />
+                  <Legend color="var(--warning)" label={t("120일선", "120-day MA")} />
                 </div>
-                <p className="mt-4 border-t border-[var(--wash)] pt-3 text-[10px] leading-4 text-[var(--faint)]">
-                  오늘 영향은 {basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근"} 기준 스냅샷 이후의 환율 차이입니다.
-                  직전 주기의 환율 변동은 이미 평가액과 이력에 반영됩니다.
-                </p>
+                <p className="mt-4 border-t border-[var(--wash)] pt-3 text-[10px] leading-4 text-[var(--faint)]"><T ko="오늘 영향은" en="Today's FX impact is measured from"/>{<T ko={basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근"} en={translateHomeHistory(basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근")}/>}<T ko="기준 스냅샷 이후의 환율 차이입니다. 직전 주기의 환율 변동은 이미 평가액과 이력에 반영됩니다." en="baseline snapshot. Earlier FX changes are already reflected in portfolio values and history."/></p>
               </div>
             </>
           ) : (
-            <p className="mt-6 border-y border-[var(--wash)] py-8 text-center text-sm text-[var(--muted)]">
-              표시할 환율 이력이 아직 없습니다.
-            </p>
+            <p className="mt-6 border-y border-[var(--wash)] py-8 text-center text-sm text-[var(--muted)]"><T ko="표시할 환율 이력이 아직 없습니다." en="No exchange rate history is available yet."/></p>
           )}
         </div>,
         document.body,
@@ -227,13 +227,11 @@ export function FxImpactPopover({
             setOpen((value) => !value);
           }}
         >
-          {compact ? <>환율 추세 살펴보기 <span aria-hidden="true">↗</span></> : <>
-          <span className="flex items-center justify-between gap-3 text-xs font-medium text-[var(--muted)]">
-            환율 영향
-            <span aria-hidden="true" className="text-base text-[var(--faint)]">↗</span>
+          {compact ? <><T ko="환율 추세 살펴보기" en="Explore the exchange rate"/> <span aria-hidden="true">↗</span></> : <>
+          <span className="flex items-center justify-between gap-3 text-xs font-medium text-[var(--muted)]"><T ko="환율 영향" en="FX impact"/><span aria-hidden="true" className="text-base text-[var(--faint)]">↗</span>
           </span>
           <span className={`mt-3 block truncate text-xl font-medium tabular-nums ${toneClass(impactKrw)}`}>
-            {formatSignedKrw(impactKrw)}
+            {<T ko={formatSignedKrw(impactKrw)} en={translateHomeHistory(formatSignedKrw(impactKrw))}/>}
           </span>
           <span className="mt-2 block truncate text-xs text-[var(--muted)]">
             {formatPercent(impactPct, true)}
@@ -249,7 +247,7 @@ export function FxImpactPopover({
 function FxValue({ divided = false, label, value }: { divided?: boolean; label: string; value: number | null }) {
   return (
     <div className={`min-w-0 px-3 first:pl-0 last:pr-0 ${divided ? "border-l border-[var(--wash)]" : ""}`}>
-      <dt className="text-[var(--faint)]">{label}</dt>
+      <dt className="text-[var(--faint)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd className="mt-1 truncate font-medium tabular-nums text-[var(--ink)]">
         {value === null ? "-" : value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </dd>
@@ -261,7 +259,7 @@ function Legend({ color, label }: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span aria-hidden="true" className="h-px w-5" style={{ backgroundColor: color }} />
-      {label}
+      {<T ko={label} en={translateHomeHistory(label)}/>}
     </span>
   );
 }

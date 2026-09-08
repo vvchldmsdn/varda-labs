@@ -1,3 +1,4 @@
+import { ManagementElement, ManagementText } from "@/components/i18n/management-text";
 export type AnalysisJourneyItem = Readonly<{
   description: string;
   href: `#${string}`;
@@ -16,7 +17,7 @@ export function AnalysisJourneyNav({
 }) {
   if (variant === "editorial") {
     return (
-      <nav
+      <ManagementElement as="nav"
         aria-label={title}
         className="border-y border-[var(--line)]"
         data-analysis-journey-nav
@@ -39,26 +40,26 @@ export function AnalysisJourneyNav({
                 ) : null}
               </span>
               <strong className="mt-5 block text-sm font-semibold transition-colors group-hover:text-[var(--brand)]">
-                {item.label}
+                <ManagementText>{item.label}</ManagementText>
               </strong>
               <span className="mt-1 block text-[11px] text-[var(--faint)]">
-                {item.description}
+                <ManagementText>{item.description}</ManagementText>
               </span>
             </a>
           ))}
         </div>
-      </nav>
+      </ManagementElement>
     );
   }
 
   return (
-    <section
+    <ManagementElement as="section"
       aria-label={title}
       className="border-y border-[var(--line)] bg-[var(--surface)]"
       data-analysis-journey-nav
     >
       <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">{title}</h2>
+        <h2 className="text-sm font-semibold text-[var(--ink)]"><ManagementText>{title}</ManagementText></h2>
       </div>
       <nav className="grid border-t border-[var(--wash)] sm:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => (
@@ -69,10 +70,10 @@ export function AnalysisJourneyNav({
           >
             <span>
               <span className="block text-sm font-semibold text-[var(--ink)] group-hover:text-[var(--ink)]">
-                {item.label}
+                <ManagementText>{item.label}</ManagementText>
               </span>
               <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">
-                {item.description}
+                <ManagementText>{item.description}</ManagementText>
               </span>
             </span>
             {item.status ? (
@@ -83,6 +84,6 @@ export function AnalysisJourneyNav({
           </a>
         ))}
       </nav>
-    </section>
+    </ManagementElement>
   );
 }

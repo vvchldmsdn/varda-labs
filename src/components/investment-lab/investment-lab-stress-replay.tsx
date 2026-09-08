@@ -1,3 +1,6 @@
+import { LabText } from "./lab-text";
+import { labEnglish } from "./lab-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import type {
   InvestmentLabStressReplay,
   InvestmentLabStressReplayStrategy,
@@ -32,19 +35,9 @@ export function InvestmentLabStressReplayView({
         <h2
           className="mt-3 text-lg font-medium sm:text-xl"
           id="investment-lab-stress-replay-title"
-        >
-          지금 구성으로 과거를 다시 지나갔다면
-        </h2>
-        <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--muted)]">
-          현재 보유 비중을 각 과거 구간의 첫날에 적용한 뒤 리밸런싱 없이
-          보유했다고 가정합니다. 당시 상장 전이거나 가격 근거가 부족한 종목은
-          임의로 채우지 않고 제외하며, 포함된 현재 평가액 비율을 함께
-          표시합니다.
-        </p>
-        <p className="mt-2 text-xs text-[var(--muted)]">
-          세금·수수료·배당 재투자는 반영하지 않은 연구용 비교이며 투자 추천이
-          아닙니다.
-        </p>
+        ><LabText value=" 지금 구성으로 과거를 다시 지나갔다면 " /></h2>
+        <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 현재 보유 비중을 각 과거 구간의 첫날에 적용한 뒤 리밸런싱 없이 보유했다고 가정합니다. 당시 상장 전이거나 가격 근거가 부족한 종목은 임의로 채우지 않고 제외하며, 포함된 현재 평가액 비율을 함께 표시합니다. " /></p>
+        <p className="mt-2 text-xs text-[var(--muted)]"><LabText value=" 세금·수수료·배당 재투자는 반영하지 않은 연구용 비교이며 투자 추천이 아닙니다. " /></p>
       </header>
 
       <div className="space-y-4">
@@ -72,10 +65,7 @@ export function InvestmentLabStressReplayUnavailable() {
       data-section="investment-lab-stress-replay"
       data-stress-replay-status="unavailable"
     >
-      <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
-        과거 구간 비교 근거를 읽지 못했습니다. 기존 투자 랩 결과를 추정값으로
-        대체하지 않았습니다.
-      </div>
+      <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]"><LabText value=" 과거 구간 비교 근거를 읽지 못했습니다. 기존 투자 랩 결과를 추정값으로 대체하지 않았습니다. " /></div>
     </section>
   );
 }
@@ -103,8 +93,8 @@ function StressWindowCard({
       <header className="border-b border-[var(--wash)] px-4 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold">{window.label}</h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">{window.description}</p>
+            <h3 className="text-lg font-semibold"><LabText value={window.label} /></h3>
+            <p className="mt-1 text-sm text-[var(--muted)]"><LabText value={window.description} /></p>
             <p className="mt-1 text-xs tabular-nums text-[var(--muted)]">
               {formatDate(window.startDate)} ~ {formatDate(window.endDate)}
             </p>
@@ -140,10 +130,10 @@ function StressWindowCard({
             <table className="w-full min-w-[680px] border-collapse text-sm">
               <thead>
                 <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
-                  <th className="px-4 py-3">비교 구성</th>
-                  <th className="px-3 py-3 text-right">구간 수익률</th>
-                  <th className="px-3 py-3 text-right">최대 낙폭</th>
-                  <th className="px-4 py-3 text-right">최악의 하루</th>
+                  <th className="px-4 py-3"><LabText value="비교 구성" /></th>
+                  <th className="px-3 py-3 text-right"><LabText value="구간 수익률" /></th>
+                  <th className="px-3 py-3 text-right"><LabText value="최대 낙폭" /></th>
+                  <th className="px-4 py-3 text-right"><LabText value="최악의 하루" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -155,24 +145,19 @@ function StressWindowCard({
           </div>
         </>
       ) : (
-        <div className="p-4 text-sm text-[var(--warning)]">
-          이 구간을 재생할 수 있는 가격 근거가 아직 없습니다. 종목을 임의의
-          평균값으로 대체하지 않았습니다.
-        </div>
+        <div className="p-4 text-sm text-[var(--warning)]"><LabText value=" 이 구간을 재생할 수 있는 가격 근거가 아직 없습니다. 종목을 임의의 평균값으로 대체하지 않았습니다. " /></div>
       )}
 
       {window.excludedHoldings.length > 0 ? (
         <details className="border-t border-[var(--wash)] px-4 py-3 text-sm">
-          <summary className="cursor-pointer font-semibold text-[var(--muted)]">
-            제외 근거 {window.excludedHoldings.length}건
-          </summary>
+          <summary className="cursor-pointer font-semibold text-[var(--muted)]"><LabText value=" 제외 근거 " />{window.excludedHoldings.length}<LabText value="건 " /></summary>
           <ul className="mt-3 grid gap-2 text-[var(--muted)] sm:grid-cols-2">
             {window.excludedHoldings.map((row, index) => (
               <li key={`${row.account}:${row.ticker ?? row.name}:${index}`}>
                 <strong className="text-[var(--ink)]">
                   {row.ticker ?? row.name}
                 </strong>{" "}
-                · {row.account} · {exclusionReasonLabel(row.reason)}
+                · {row.account} · <LabText value={exclusionReasonLabel(row.reason)} />
               </li>
             ))}
           </ul>
@@ -209,16 +194,16 @@ function StressReplayChart({
               className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: STRATEGY_COLORS[strategy.id] }}
             />
-            {strategy.label}
+            <LabText value={strategy.label} />
           </span>
         ))}
       </div>
       <div className="overflow-x-auto">
-        <svg
+        <LocalizedElement as="svg"
           aria-label="과거 구간 정규화 자산 경로"
           className="h-auto min-w-[680px] w-full"
           role="img"
-          viewBox={`0 0 ${width} ${height}`}
+          viewBox={`0 0 ${width} ${height}`} en={{"aria-label": labEnglish("과거 구간 정규화 자산 경로")}}
         >
           {[0.25, 0.5, 0.75].map((ratio) => (
             <line
@@ -242,7 +227,7 @@ function StressReplayChart({
               strokeWidth={strategy.id === "current_composition" ? 3 : 2}
             />
           ))}
-        </svg>
+        </LocalizedElement>
       </div>
     </div>
   );
@@ -261,7 +246,7 @@ function StrategyRow({
           className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
           style={{ backgroundColor: STRATEGY_COLORS[strategy.id] }}
         />
-        {strategy.label}
+        <LabText value={strategy.label} />
       </td>
       <td className="px-3 py-3 text-right tabular-nums">
         {formatSignedPct(strategy.periodReturnPct)}
@@ -289,9 +274,9 @@ function Metric({
 }) {
   return (
     <div className="border-t border-[var(--wash)] p-4 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><LabText value={label} /></p>
+      <p className="mt-1 text-lg font-semibold tabular-nums"><LabText value={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }
@@ -317,7 +302,7 @@ function StatusBadge({
     <span
       className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${className}`}
     >
-      {label}
+      <LabText value={label} />
     </span>
   );
 }

@@ -124,10 +124,15 @@ describe("History demand-driven server evidence", () => {
   it("uses the existing dynamic page authentication and resolved scope before any requested raw read", async () => {
     const { history } = fixture(5);
     const reads = [];
+    let localeCookieValue = "en";
     let resolution = { ok: false, reason: "unauthenticated" };
     let context = { state: "ready", resolution: { state: "resolved", scope }, catalog: { scopes: [scope] } };
     const [page] = await importUiWithPorts(["src/app/history/page.tsx"], {
       ...routingPorts,
+      "next/headers": { cookies: async () => ({ get: name => {
+        assert.equal(name, "varda-locale");
+        return localeCookieValue === undefined ? undefined : { value: localeCookieValue };
+      } }) },
       "@/components/secondary-page-header": { SecondaryPageHeader: () => null },
       "@/components/portfolio-analysis-scope-boundary": { PortfolioAnalysisScopeBoundary: () => null },
       "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => resolution },
@@ -136,6 +141,10 @@ describe("History demand-driven server evidence", () => {
       "@/db/queries/tenant-events": { getReadOnlyTenantEvents: async () => null },
     });
     assert.equal(page.dynamic, "force-dynamic");
+    assert.equal((await page.generateMetadata()).title, "History | VARDA LABS");
+    localeCookieValue = undefined;
+    assert.equal((await page.generateMetadata()).title, "히스토리 | VARDA LABS");
+    assert.equal(reads.length, 0, "localized metadata must not trigger a financial evidence read");
     await page.default({ searchParams: Promise.resolve({ detail: "raw", scope: scope.key }) });
     assert.equal(reads.length, 0);
     resolution = { ok: true, tenantContext: { ownerUserId: owner } };

@@ -285,3 +285,69 @@
   .homeStageMain, .todayStageMain { min-height: 390px; }
   .stageVisual, .stageContribution { min-height: 360px; }
 }
+
+.mobileMovements { display: none; }
+@media (max-width: 760px), (max-width: 1000px) and (max-height: 500px) {
+  .stage { height: auto; min-height: 0; gap: 24px; }
+  .stageHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-bottom: 4px; }
+  .stageTitle { font-size: 24px; line-height: 1.4; }
+  .stageScope { grid-column: 1 / -1; grid-row: 2; max-width: 100%; width: 100%; }
+  .stageScope :global(.scrollable-nav-rail-content) { gap: 24px; }
+  .stageRefresh { grid-column: 2; grid-row: 1; }
+  .stageRefresh button { min-width: 44px; min-height: 44px; }
+  .homeStageMain, .todayStageMain { display: flex; flex-direction: column; flex: none; min-height: 0; gap: 28px; }
+  .stageSummary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px 16px; padding: 0; }
+  .stageSummary .balance { grid-column: 1 / -1; }
+  .stageSummary .balance > span { font-size: 12px; }
+  .stageSummary .balance > strong { margin-top: 12px; font-size: clamp(32px, 9.2vw, 44px); letter-spacing: -.055em; white-space: normal; overflow-wrap: anywhere; }
+  .stageSummary .balance p { margin-top: 10px; font-size: 11px; }
+  .stageSummary .summaryMetric { border: 0; padding: 0; gap: 8px; }
+  .stageSummary .summaryMetric dt { font-size: 12px; }
+  .stageSummary .summaryMetric dd { font-size: clamp(20px, 5.8vw, 26px); overflow-wrap: anywhere; }
+  .stageSummary .summaryMetric dd.status { font-size: 11px; line-height: 1.65; }
+  .stageSummary .stageNote { display: block; grid-column: 1 / -1; padding-top: 18px; }
+  .stageNote > span, .stageNote > p { font-size: 11px; }
+  .stageNote > strong { font-size: 14px; line-height: 1.6; }
+  .stageVisual { flex: none; min-height: 0; padding: 22px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
+  .stageHeatmap, .stageHeatmapViewport, .stageMatrix { height: auto; min-height: 0; overflow: visible; flex: none; }
+  .stageHeatmap > :first-child { align-items: center; gap: 12px; margin-bottom: 14px; }
+  .stageHeatmap .panelTitle { font-size: 18px; }
+  .stageHeatmap .rangeButton { min-height: 44px; min-width: 44px; padding-inline: 11px; font-size: 12px; }
+  .stageMatrix .stageGridViewport, .stageMatrix > :last-child { display: none; }
+  .mobileMovements { display: block; }
+  .mobileMovementDate { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 10px; color: var(--muted); font-size: 12px; }
+  .mobileMovementDate select { min-height: 44px; padding: 8px 28px 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; color: var(--ink); font-size: 14px; }
+  .mobileMovementRows { display: grid; }
+  .mobileMovementRow { display: grid; grid-template-columns: 5px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 72px; border-top: 1px solid var(--line); padding: 14px 0; text-align: left; }
+  .mobileMovementRow > i { width: 5px; height: 30px; border-radius: 5px; }
+  .mobileMovementRow > span { display: grid; gap: 5px; min-width: 0; }
+  .mobileMovementRow > span:last-child { text-align: right; }
+  .mobileMovementRow strong { font-size: 13px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
+  .mobileMovementRow small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mobileMovementRow > span:last-child strong { white-space: nowrap; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .mobileMovementRow[aria-pressed="true"] { background: var(--wash); }
+  .mobileMovementRow:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .stageHeatmap :global(.varda-heatmap-popover) { position: fixed; inset: auto 12px calc(88px + env(safe-area-inset-bottom)); z-index: 55; width: auto; max-height: 55dvh; margin: 0; padding: 20px; overflow: auto; border: 1px solid var(--line); box-shadow: 0 8px 42px #20211f26; }
+  .stageFooter { min-height: 0; padding-top: 18px; }
+  .stageFooter > p { display: none; }
+  .stageLaunchers { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stageLaunchers > a { display: inline-flex; font-size: 12px; min-height: 44px; }
+  .stageLaunchers > button { min-height: 48px; }
+  .stageContribution { flex: none; min-height: 0; padding: 0; }
+  .stageContribution .contributionHeader { flex-wrap: wrap; margin-bottom: 18px; }
+  .stageContribution .contributionHeader .panelTitle { font-size: 18px; }
+  .stageContribution .contributionHeader .evidenceIntro, .stageContribution .contributionHeader > .status { font-size: 11px; line-height: 1.6; }
+  .stageContribution .explorer { display: flex; flex-direction: column; gap: 22px; }
+  .contributionScroll { overflow: visible; padding: 0; }
+  .stageContribution .axisLabels { display: none; }
+  .stageContribution .contributionRow { grid-template-columns: minmax(0, 1fr) 100px; min-height: 90px; gap: 10px 12px; padding-block: 16px; }
+  .stageContribution .contributionRow > span:first-child > span:first-child { font-size: 13px; }
+  .stageContribution .contributionRow > span:first-child > span:last-child { font-size: 11px; }
+  .stageContribution .contributionRow > span:last-child > span:first-child { font-size: 14px; }
+  .stageContribution .contributionBar { grid-column: 1 / -1; grid-row: 2; height: 24px; }
+  .stageContribution .activeContribution { position: sticky; bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 5; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; padding: 16px; box-shadow: 0 5px 25px #20211f12; }
+  .stageContribution .activeContribution h3 { margin: 0; font-size: 14px; }
+  .stageContribution .activeContribution > strong { margin: 0; font-size: 22px; }
+  .stageContribution .activeContribution dl, .stageContribution .activeContribution .eyebrow { display: none; }
+  .stageContribution .activeContribution .textLink { margin: 0; min-height: 36px; font-size: 12px; }
+}

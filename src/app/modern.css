@@ -79,10 +79,10 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
 .varda-segmented { padding: 3px; border-radius: 30px; background: var(--wash); }
 .varda-segmented button { min-height: 32px; font-size: 11px; border-radius: 24px; }
 .varda-segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px #20211f08; }
-.varda-page nav[aria-label="자산 분석 범위"] { border: 0; border-radius: 0; background: transparent !important; padding-bottom: 5px; }
-.varda-page nav[aria-label="자산 분석 범위"] a { position: relative; border-color: transparent; border-radius: 0; background: transparent; color: var(--muted); padding-block: 9px 15px; padding-inline: 3px; min-width: 50px; font-size: 13px; font-weight: 550; }
-.varda-page nav[aria-label="자산 분석 범위"] a[aria-current="page"] { color: var(--ink); background: transparent !important; }
-.varda-page nav[aria-label="자산 분석 범위"] a[aria-current="page"]::after { content: ""; position: absolute; bottom: 4px; left: calc(50% - 2.5px); width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.varda-page nav[data-scope-rail] { border: 0; border-radius: 0; background: transparent !important; padding-bottom: 5px; }
+.varda-page nav[data-scope-rail] a { position: relative; border-color: transparent; border-radius: 0; background: transparent; color: var(--muted); padding-block: 9px 15px; padding-inline: 3px; min-width: 50px; font-size: 13px; font-weight: 550; }
+.varda-page nav[data-scope-rail] a[aria-current="page"] { color: var(--ink); background: transparent !important; }
+.varda-page nav[data-scope-rail] a[aria-current="page"]::after { content: ""; position: absolute; bottom: 4px; left: calc(50% - 2.5px); width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
 .varda-dialog, .varda-presentation-dialog { border-radius: 22px; }
 .varda-dialog[open]::backdrop { background: #20211f3d; backdrop-filter: blur(5px); }
 .varda-detail-drawer { background: var(--surface); box-shadow: -15px 0 65px #20211f12; }

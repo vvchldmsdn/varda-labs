@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthText, AuthElement } from "./auth-localized";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle } from "lucide-react";
@@ -43,9 +44,7 @@ export function OnboardingAccountForm({
           : undefined
       }
     >
-      <label className={styles.field} htmlFor="onboarding-account-name">
-        계좌 이름
-        <input
+      <label className={styles.field} htmlFor="onboarding-account-name"><AuthText>{"계좌 이름"}</AuthText><AuthElement as="input"
           id="onboarding-account-name"
           className={styles.input}
           name="name"
@@ -64,10 +63,7 @@ export function OnboardingAccountForm({
           }
         />
       </label>
-      <p className={styles.notice}>
-        이 계좌의 기준 통화는 KRW입니다. 미국 종목도 종목별 거래 통화로 기록할
-        수 있습니다.
-      </p>
+      <p className={styles.notice}><AuthText>{"이 계좌의 기준 통화는 KRW입니다. 미국 종목도 종목별 거래 통화로 기록할 수 있습니다."}</AuthText></p>
       {state.status in messages ? (
         <p id="account-error" role="alert" className={styles.error}>
           {messages[state.status as keyof typeof messages]}
@@ -79,7 +75,7 @@ export function OnboardingAccountForm({
         disabled={pending || !name.trim()}
         aria-busy={pending}
       >
-        {pending ? "계좌 등록 중" : "계좌 등록하고 계속"}
+        <AuthText>{pending ? "계좌 등록 중" : "계좌 등록하고 계속"}</AuthText>
         {pending ? (
           <LoaderCircle
             size={17}

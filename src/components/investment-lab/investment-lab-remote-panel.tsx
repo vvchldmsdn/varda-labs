@@ -1,4 +1,6 @@
 "use client";
+
+import { LabText } from "./lab-text";
 import type { InvestmentLabDetailData } from "@/db/queries/investment-lab-detail";
 import type { InvestmentLabWeightEvidence } from "@/lib/investment-lab-weight-evidence";
 import { useResearchDetail, ResearchDetailStatus } from "./research-detail-resource";
@@ -17,7 +19,7 @@ export default function InvestmentLabRemotePanel({ query, weights, scopeKey }: {
   const { data, error, retry } = useResearchDetail<InvestmentLabDetailData>("/api/research/investment-lab", query);
   if (!data) return <ResearchDetailStatus error={error} retry={retry} />;
   if (data.panel === "composition") return <div className="space-y-8 py-5">
-    {data.unavailableSections.length ? <p role="status" className="text-sm text-[var(--warning)]">읽지 못한 근거: {data.unavailableSections.join(", ")}</p> : null}
+    {data.unavailableSections.length ? <p role="status" className="text-sm text-[var(--warning)]"><LabText value="읽지 못한 근거: " />{data.unavailableSections.join(", ")}</p> : null}
     {data.xray && <div id="investment-lab-etf-xray"><InvestmentLabEtfXray model={data.xray} /></div>}{data.stress && <InvestmentLabStressReplayView model={data.stress} />}
   </div>;
   return <div className="space-y-8 py-7">

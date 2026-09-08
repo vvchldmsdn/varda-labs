@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import { InvestmentLabDeferredPerformance } from "./investment-lab-deferred-performance";
 import type { InvestmentLabWeightEvidence } from "@/lib/investment-lab-weight-evidence";
 import type { ReactNode } from "react";
@@ -175,7 +176,7 @@ export function InvestmentLabView({
 
       <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
         <header className={styles.stageHeader}>
-          <h1 className="varda-page-title">투자 랩</h1>
+          <h1 className="varda-page-title"><LabText value="투자 랩" /></h1>
           <InvestmentLabScopeTabs scopes={scopeCatalog} selectedScopeKey={selectedScope.key} />
         </header>
 
@@ -302,15 +303,11 @@ function BlockedView({
 }) {
   return (
     <section className="border-y border-[var(--brand-soft)] py-6">
-      <h2 className="text-lg font-semibold text-[var(--warning)]">
-        현재 계산할 수 없습니다
-      </h2>
-      <p className="mt-2 text-sm text-[var(--warning)]">
-        일부 결과를 추정해서 표시하지 않고 입력 증거를 차단했습니다.
-      </p>
+      <h2 className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 현재 계산할 수 없습니다 " /></h2>
+      <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" 일부 결과를 추정해서 표시하지 않고 입력 증거를 차단했습니다. " /></p>
       <ul className="mt-4 space-y-2 text-sm text-[var(--warning)]">
         {model.blockers.map((blocker) => (
-          <li key={blocker}>{blockerLabel(blocker)}</li>
+          <li key={blocker}><LabText value={blockerLabel(blocker)} /></li>
         ))}
       </ul>
     </section>

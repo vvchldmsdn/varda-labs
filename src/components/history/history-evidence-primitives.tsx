@@ -1,3 +1,6 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import type { ReactNode } from "react";
 
 export function HistoryEvidenceSummaryCell({
@@ -11,9 +14,9 @@ export function HistoryEvidenceSummaryCell({
 }) {
   return (
     <div className="border-b border-[var(--wash)] px-3 py-3 sm:border-r lg:border-b-0 lg:last:border-r-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tracking-normal">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</p>
+      <p className="mt-1 text-lg font-semibold tracking-normal"><T ko={value} en={translateHomeHistory(value)}/></p>
+      <p className="mt-1 text-xs text-[var(--muted)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</p>
     </div>
   );
 }

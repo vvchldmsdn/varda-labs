@@ -1,5 +1,6 @@
 "use client";
 
+import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState, useEffect, useRef } from "react";
 
 import {
@@ -114,14 +115,14 @@ export function PortfolioGroupEditor({
             type="checkbox"
             value="yes"
           />
-          <span>과거 기록을 유지한 채 이 분석 범위를 목록에서 삭제합니다.</span>
+          <span><ManagementText>{"과거 기록을 유지한 채 이 분석 범위를 목록에서 삭제합니다."}</ManagementText></span>
         </label>
         <button
           className="rounded-md border border-[var(--warning-soft)] bg-white px-4 py-2 text-sm font-semibold text-[var(--negative)] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={archivePending}
           type="submit"
         >
-          {archivePending ? "삭제 중" : "분석 범위 삭제"}
+          <ManagementText>{archivePending ? "삭제 중" : "분석 범위 삭제"}</ManagementText>
         </button>
         <ActionMessage state={archiveState} />
       </form>
@@ -138,9 +139,7 @@ function TextFields({
 }) {
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-semibold text-[var(--ink)]">
-        분석 범위 이름
-        <input
+      <label className="block text-sm font-semibold text-[var(--ink)]"><ManagementText>{"분석 범위 이름"}</ManagementText><input
           className={fieldClassName}
           defaultValue={name}
           maxLength={100}
@@ -149,9 +148,7 @@ function TextFields({
           type="text"
         />
       </label>
-      <label className="block text-sm font-semibold text-[var(--ink)]">
-        설명 (선택)
-        <textarea
+      <label className="block text-sm font-semibold text-[var(--ink)]"><ManagementText>{"설명 (선택)"}</ManagementText><textarea
           className={`${fieldClassName} min-h-24 resize-y`}
           defaultValue={description}
           maxLength={500}
@@ -179,12 +176,8 @@ function MembershipFields({
   return (
     <div className="space-y-4">
       <fieldset>
-        <legend className="text-sm font-semibold text-[var(--ink)]">
-          계좌 전체 포함
-        </legend>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          선택한 계좌에 나중에 추가되는 종목도 자동으로 이 분석 범위에 포함됩니다.
-        </p>
+        <legend className="text-sm font-semibold text-[var(--ink)]"><ManagementText>{"계좌 전체 포함"}</ManagementText></legend>
+        <p className="mt-1 text-xs text-[var(--muted)]"><ManagementText>{"선택한 계좌에 나중에 추가되는 종목도 자동으로 이 분석 범위에 포함됩니다."}</ManagementText></p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {accounts.map((account) => (
             <label className={checkboxClassName} key={account.id}>
@@ -205,15 +198,11 @@ function MembershipFields({
       </fieldset>
 
       <fieldset>
-        <legend className="text-sm font-semibold text-[var(--ink)]">
-          개별 종목 포함
-        </legend>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          계좌 전체와 겹치는 개별 선택은 저장할 때 자동으로 정리됩니다.
-        </p>
+        <legend className="text-sm font-semibold text-[var(--ink)]"><ManagementText>{"개별 종목 포함"}</ManagementText></legend>
+        <p className="mt-1 text-xs text-[var(--muted)]"><ManagementText>{"계좌 전체와 겹치는 개별 선택은 저장할 때 자동으로 정리됩니다."}</ManagementText></p>
         <div className="mt-2 grid max-h-64 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
           {assets.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">선택할 보유종목이 없습니다.</p>
+            <p className="text-sm text-[var(--muted)]"><ManagementText>{"선택할 보유종목이 없습니다."}</ManagementText></p>
           ) : (
             assets.map((asset) => (
               <label className={checkboxClassName} key={asset.id}>
@@ -257,7 +246,7 @@ function FormFooter({
         disabled={pending}
         type="submit"
       >
-        {pending ? "저장 중" : submitLabel}
+        <ManagementText>{pending ? "저장 중" : submitLabel}</ManagementText>
       </button>
       <ActionMessage state={state} />
     </div>
@@ -274,7 +263,7 @@ function ActionMessage({ state }: { state: PortfolioGroupManagementActionState }
           : "text-sm text-[var(--warning)]"
       }
     >
-      {state.message}
+      <ManagementText>{state.message}</ManagementText>
     </p>
   );
 }

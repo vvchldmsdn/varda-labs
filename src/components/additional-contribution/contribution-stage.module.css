@@ -80,3 +80,46 @@
 @media (max-height:640px) { .workspace { flex:none; min-height:420px; } }
 @media (max-height:640px) and (max-width:760px) { .workspace { min-height:460px; } }
 @media (prefers-reduced-motion:reduce) { .fundingSegment,.spinner,.workspace[data-calculating="true"] .pendingLine { animation:none; } .fundingSegment,.fundingPanel,.amountInput { transition:none; } .fundingSegment[aria-pressed="true"] { translate:none; } .workspace[data-calculating="true"] .pendingLine { width:100%; } }
+
+@media (max-width:760px), (max-width:1000px) and (max-height:500px) {
+  .page { gap:24px; height:auto; min-height:0; }
+  .header { flex-wrap:wrap; gap:12px; }
+  .title { flex:1; display:block; }
+  .title h1 { font-size:24px; }
+  .previewNote { font-size:10px; margin-top:6px; white-space:normal; }
+  .scopeBar { flex-basis:100%; order:3; }
+  .headerActions .textLink { min-width:44px; min-height:44px; justify-content:center; }
+  .workspace { display:flex; flex-direction:column; flex:none; justify-content:flex-start; align-items:stretch; min-height:0; padding:0; gap:28px; background:transparent; border-radius:0; }
+  .form > label { font-size:15px; }
+  .amountInput { margin-top:18px; padding-bottom:14px; }
+  .amountInput input { font-size:clamp(34px,10vw,44px); }
+  .presets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:14px; }
+  .presets button { min-height:44px; padding:10px 8px; font-size:12px; background:var(--surface); border:1px solid var(--line); border-radius:10px; }
+  .submitRow { margin-top:18px; }
+  .calculate { width:100%; min-height:50px; padding:14px 18px; font-size:14px; border-radius:12px; }
+  .calculationStatus { font-size:11px; }
+  .hint { margin-top:12px; font-size:11px; line-height:1.8; }
+  .fundingPanel { flex:none; min-height:0; padding-top:26px; }
+  .fundingSources { font-size:11px; gap:6px 8px; line-height:1.7; }
+  .fundingTotal { display:block; margin-top:18px; }
+  .fundingTotal > span { font-size:12px; margin-bottom:10px; }
+  .fundingTotal strong { font-size:36px; }
+  .fundingBar { height:48px; margin-top:22px; }
+  .fundingSelection { font-size:12px; margin-top:16px; }
+  .fundingLegend { display:flex; gap:4px 12px; margin-top:16px; padding-top:12px; }
+  .fundingLegend button { min-height:44px; font-size:12px; }
+  .fundingLegend i { width:8px; height:8px; }
+  .featuredPanel { display:block; border-left:0; padding:26px 0 0; border-top:1px solid var(--line); }
+  .featuredHeading > span,.featuredHeading > p { font-size:11px; line-height:1.7; }
+  .featuredHeading h2 { font-size:20px; margin-top:8px; }
+  .featured li { padding:16px 0; }
+  .featured li strong { font-size:14px; }
+  .featured li span,.featured li small { font-size:11px; line-height:1.7; }
+  .featured li p { font-size:22px; }
+  .footer { flex-direction:column; align-items:stretch; gap:20px; }
+  .footerNumbers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+  .footerNumbers > div { display:block; }
+  .footerNumbers dt { font-size:12px; }
+  .footerNumbers dd { margin-top:8px; font-size:22px; }
+  .detailActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+}

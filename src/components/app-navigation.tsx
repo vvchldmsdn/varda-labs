@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef } from "react";
+import { useI18n } from "@/components/i18n/locale-provider";
+import { LanguageSwitch } from "@/components/i18n/language-switch";
 import { ArrowUpRight, ChartNoAxesCombined, ChartPie, ChevronLeft, ChevronRight, FlaskConical, History, House, Menu, Plus, Settings2, TrendingUp, UserRound, X } from "lucide-react";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { formatKstTime } from "@/components/home/portfolio-format";
@@ -41,6 +43,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
   generatedAt?: string;
   selectedScopeKey?: PortfolioAnalysisScopeKey;
 }) {
+  const {t, locale} = useI18n();
   const pathname = usePathname();
   const params = useSearchParams();
   const menuRef = useRef<HTMLDialogElement>(null);
@@ -76,15 +79,15 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
   const previousItem = currentIndex > 0 ? allItems[currentIndex - 1] : null;
   const nextItem = currentIndex >= 0 ? allItems[currentIndex + 1] : null;
   const links = (
-    <nav className="varda-sidebar-groups" aria-label="주요 메뉴">
+    <nav className="varda-sidebar-groups" aria-label={t("주요 메뉴", "Main navigation")}>
       {navigation.map((group) => (
         <div className="varda-sidebar-group" key={group.title}>
-          <p>{group.title}</p>
+          <p>{t(group.title, group.title === "계획과 탐색" ? "Plan & explore" : group.title === "나의 데이터" ? "My data" : "Portfolio")}</p>
           {group.items.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}
               className="varda-sidebar-link" onClick={() => menuRef.current?.close()}>
               <Icon size={21} strokeWidth={1.6} aria-hidden="true" />
-              <span>{label}</span><PendingHint />
+              <span>{t(label)}</span><PendingHint />
             </Link>
           ))}
         </div>
@@ -94,17 +97,17 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
 
   return (
     <header className="varda-app-navigation">
-      <a className="varda-skip-link" href="#varda-main-content">본문으로 건너뛰기</a>
-      <aside className="varda-sidebar" aria-label="서비스 탐색">
-        <Link className="varda-sidebar-brand" href={hrefFor("/")} aria-label="VARDA LABS 홈">
+      <a className="varda-skip-link" href="#varda-main-content">{t("본문으로 건너뛰기", "Skip to content")}</a>
+      <aside className="varda-sidebar" aria-label={t("서비스 탐색", "App navigation")}>
+        <Link className="varda-sidebar-brand" href={hrefFor("/")} aria-label={t("VARDA LABS 홈", "VARDA LABS home")}>
           <Image src="/varda-mark.png" alt="" width={29} height={29} />
           <span>VARDA</span>
         </Link>
         {links}
         <div className="varda-sidebar-bottom">
-          {preview ? <span className="varda-preview-label" title="디자인 미리보기 · 예시 데이터"><i />예시</span> : null}
+          {preview ? <span className="varda-preview-label" title={t("디자인 미리보기 · 예시 데이터", "Design preview · Demo data")}><i />{t("예시")}</span> : null}
           <Link href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
-            <UserRound size={20} strokeWidth={1.6} aria-hidden="true" /><span>내 계정</span>
+            <UserRound size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계정")}</span>
           </Link>
         </div>
       </aside>
@@ -112,41 +115,42 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
         <div className="varda-topbar-location">
           <span className="varda-mobile-brand">VARDA</span>
           <span className="varda-breadcrumb">PORTFOLIO</span><span className="varda-breadcrumb-slash">/</span>
-          <strong>{currentItem?.label ?? "관리"}</strong>
+          <strong>{t(currentItem?.label ?? "관리")}</strong>
         </div>
         <div className="varda-topbar-actions">
-          <nav className="varda-scene-pager" aria-label="화면 순서 이동">
-            {previousItem ? <Link href={hrefFor(previousItem.href)} aria-label={`이전 화면: ${previousItem.label}`} title={previousItem.label}><ChevronLeft size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
+          <nav className="varda-scene-pager" aria-label={t("화면 순서 이동", "Previous and next page")}>
+            {previousItem ? <Link href={hrefFor(previousItem.href)} aria-label={t(`이전 화면: ${previousItem.label}`, `Previous page: ${t(previousItem.label)}`)} title={t(previousItem.label)}><ChevronLeft size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
             <span className="varda-scene-number">{String(Math.max(0, currentIndex) + 1).padStart(2, "0")}<i>/</i>{String(allItems.length).padStart(2, "0")}</span>
-            {nextItem ? <Link href={hrefFor(nextItem.href)} aria-label={`다음 화면: ${nextItem.label}`} title={nextItem.label}><ChevronRight size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
+            {nextItem ? <Link href={hrefFor(nextItem.href)} aria-label={t(`다음 화면: ${nextItem.label}`, `Next page: ${t(nextItem.label)}`)} title={t(nextItem.label)}><ChevronRight size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
           </nav>
-          {preview ? <span className="varda-topbar-preview"><i />예시 데이터</span>
-            : generatedAt ? <span className="varda-updated-at">{formatKstTime(generatedAt)} 기준</span> : null}
+          {preview ? <span className="varda-topbar-preview"><i />{t("예시 데이터")}</span>
+            : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `${formatKstTime(generatedAt)} 기준`}</span> : null}
           {!preview && generatedAt ? <PortfolioRefreshButton compact /> : null}
-          <Link className="varda-topbar-add" aria-label="종목 추가" href={hrefFor("/portfolio/holdings/new")}>
-            <Plus size={18} aria-hidden="true" /><span>종목 추가</span>
+          <LanguageSwitch />
+          <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
+            <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
           </Link>
-          <button type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label="메뉴 열기">
+          <button type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")}>
             <Menu size={22} strokeWidth={1.6} aria-hidden="true" />
           </button>
         </div>
       </div>
-      <nav className="varda-mobile-bottom" aria-label="빠른 메뉴">
+      <nav className="varda-mobile-bottom" aria-label={t("빠른 메뉴", "Quick navigation")}>
         {mobileNavigation.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}>
-            <Icon size={23} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span><PendingHint />
+            <Icon size={23} strokeWidth={1.6} aria-hidden="true" /><span>{t(label)}</span><PendingHint />
           </Link>
         ))}
       </nav>
-      <dialog ref={menuRef} className="varda-mobile-menu" aria-label="전체 메뉴"
+      <dialog ref={menuRef} className="varda-mobile-menu" aria-label={t("전체 메뉴", "All navigation")}
         onClick={(event) => { if (event.target === event.currentTarget) menuRef.current?.close(); }}>
         <div className="varda-mobile-menu-inner">
           <div className="varda-mobile-menu-heading"><span className="varda-wordmark">VARDA LABS</span>
-            <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label="메뉴 닫기"><X size={22} /></button>
+            <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></button>
           </div>
           {links}
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
-            <UserRound size={18} />내 계정<ArrowUpRight size={15} />
+            <UserRound size={18} />{t("내 계정")}<ArrowUpRight size={15} />
           </Link>
         </div>
       </dialog>

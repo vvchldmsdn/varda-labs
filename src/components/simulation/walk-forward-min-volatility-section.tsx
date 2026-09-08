@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationWalkForwardMinimumVolatilityResult } from "@/lib/simulation-walk-forward-min-volatility";
 
 import { SimulationPathComparisonChart } from "./simulation-path-comparison-chart";
@@ -24,23 +25,17 @@ export function WalkForwardMinimumVolatilitySection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            사후 검증 연구 · 계좌 및 목표비중과 무관
-          </p>
+            <SimulationText ko={"사후 검증 연구 · 계좌 및 목표비중과 무관"} />{" "}</p>
           <h2
             className="mt-1 text-lg font-semibold"
             id="walk-forward-min-volatility-title"
           >
-            워크포워드 최소변동성 연구
-          </h2>
+            <SimulationText ko={"워크포워드 최소변동성 연구"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            KODEX 200과 VOO의 공동 원화 수익률만 사용합니다. 직전 60개
-            관측으로 비중을 계산하고 다음 10개 관측에만 적용하는 과정을 3번
-            반복합니다.
-          </p>
+            <SimulationText ko={"KODEX 200과 VOO의 공동 원화 수익률만 사용합니다. 직전 60개 관측으로 비중을 계산하고 다음 10개 관측에만 적용하는 과정을 3번 반복합니다."} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
-          미래 예측·추천 아님
-        </span>
+          <SimulationText ko={"미래 예측·추천 아님"} />{" "}</span>
       </div>
 
       {result.status === "ready" ? (
@@ -50,11 +45,9 @@ export function WalkForwardMinimumVolatilitySection({
           className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-walk-forward-min-volatility-unavailable-reason={result.reason}
         >
-          <p className="font-semibold">이 연구 경로만 계산할 수 없습니다.</p>
+          <p className="font-semibold"><SimulationText ko={"이 연구 경로만 계산할 수 없습니다."} /></p>
           <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
-            {unavailableReasonLabel(result.reason)} 기존 단일 종목, 고정 비중,
-            stationary bootstrap 및 시장 국면 결과는 그대로 유지합니다.
-          </p>
+            <SimulationText ko={unavailableReasonLabel(result.reason)} /> {" "}<SimulationText ko={"기존 단일 종목, 고정 비중, stationary bootstrap 및 시장 국면 결과는 그대로 유지합니다."} />{" "}</p>
         </div>
       )}
     </section>
@@ -115,16 +108,15 @@ function ReadyResearch({ result }: { result: ReadyResult }) {
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">
           <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
             <tr>
-              <th className="px-3 py-3 font-semibold">구간</th>
-              <th className="px-3 py-3 font-semibold">학습기간</th>
-              <th className="px-3 py-3 font-semibold">검증기간</th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"구간"} /></th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"학습기간"} /></th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"검증기간"} /></th>
               <th className="px-3 py-3 text-right font-semibold">
                 KODEX 200
               </th>
               <th className="px-3 py-3 text-right font-semibold">VOO</th>
               <th className="px-3 py-3 text-right font-semibold">
-                학습 추정 변동성
-              </th>
+                <SimulationText ko={"학습 추정 변동성"} />{" "}</th>
             </tr>
           </thead>
           <tbody>
@@ -159,11 +151,7 @@ function ReadyResearch({ result }: { result: ReadyResult }) {
       </div>
 
       <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-        long-only·100% 투자, 10개 관측마다 비용 없이 재조정하고 구간 안에서는
-        비중 변화를 그대로 둡니다. 표본 공분산은 10% 대각 축소를 적용합니다.
-        거래비용·세금·환전비용은 0으로 가정하며 VOO의 원화 수익률에는 저장된
-        일자별 환율 변동이 이미 포함됩니다.
-      </p>
+        <SimulationText ko={"long-only·100% 투자, 10개 관측마다 비용 없이 재조정하고 구간 안에서는 비중 변화를 그대로 둡니다. 표본 공분산은 10% 대각 축소를 적용합니다. 거래비용·세금·환전비용은 0으로 가정하며 VOO의 원화 수익률에는 저장된 일자별 환율 변동이 이미 포함됩니다."} />{" "}</p>
     </div>
   );
 }
@@ -179,9 +167,9 @@ function Metric({
 }) {
   return (
     <dl className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[var(--muted)]">{detail}</dd>
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></dd>
     </dl>
   );
 }

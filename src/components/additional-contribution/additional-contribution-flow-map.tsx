@@ -1,5 +1,8 @@
 "use client";
 
+import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
+
+
 import { useMemo, useState } from "react";
 
 import type { AdditionalContributionFlowRow } from "@/lib/additional-contribution-view";
@@ -17,6 +20,7 @@ export function AdditionalContributionFlowMap({
   trimProceedsKrw: number;
   rows: readonly AdditionalContributionFlowRow[];
 }) {
+  const pt = usePortfolioText();
   const hasOverlay = rows.some((row) => row.reductionKrw > 0);
   const [mode, setMode] = useState<FlowMode>("final");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -34,17 +38,16 @@ export function AdditionalContributionFlowMap({
             ALLOCATION FLOW
           </p>
           <h2 id="allocation-flow-title" className="mt-1 text-xl font-medium">
-            투입금 흐름
-          </h2>
+            <PortfolioText ko={"투입금 흐름"} />{" "}</h2>
           <p className="mt-2 text-xs text-[var(--muted)]">
-            신규 {formatKrw(cashAmountKrw)} · 계산상 매도{" "}
+            <PortfolioText ko={"신규"} />{" "}{formatKrw(cashAmountKrw)} {" "}<PortfolioText ko={"· 계산상 매도"} />{" "}
             {formatKrw(trimProceedsKrw)}
           </p>
         </div>
 
         {hasOverlay ? (
           <div
-            aria-label="배분안 비교"
+            aria-label={pt("배분안 비교")}
             className="flex w-fit items-center gap-5 text-sm"
             role="group"
           >
@@ -66,14 +69,13 @@ export function AdditionalContributionFlowMap({
         {activeRow ? <FlowTooltip mode={mode} row={activeRow} /> : null}
 
         <svg
-          aria-label={`${formatKrw(availableFundsKrw)} 재원 배분 흐름`}
+          aria-label={pt(`${formatKrw(availableFundsKrw)} 재원 배분 흐름`)}
           className="h-[390px] w-full overflow-visible"
           role="img"
           viewBox="0 0 1000 420"
         >
           <text fill="var(--muted)" fontSize="11" x="72" y="48">
-            배분 재원
-          </text>
+            <PortfolioText ko={"배분 재원"} />{" "}</text>
           <text
             fill="var(--ink)"
             fontSize="30"
@@ -82,7 +84,7 @@ export function AdditionalContributionFlowMap({
             x="145"
             y="220"
           >
-            {formatCompactKrw(availableFundsKrw)}
+            <PortfolioText ko={formatCompactKrw(availableFundsKrw)} />
           </text>
           <circle cx="145" cy="210" fill="none" r="72" stroke="var(--line)" />
           <circle cx="217" cy="210" fill="var(--brand)" r="4" />
@@ -126,7 +128,7 @@ export function AdditionalContributionFlowMap({
                   x="840"
                   y={item.targetY - 3}
                 >
-                  {truncateName(item.row.name)}
+                  {truncateName(item.row.kind === "cash" ? pt(item.row.name) : item.row.name)}
                 </text>
                 <text
                   fill="var(--muted)"
@@ -152,7 +154,7 @@ export function AdditionalContributionFlowMap({
           >
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium">
-                {row.name}
+                {row.kind === "cash" ? <PortfolioText ko={row.name} /> : row.name}
               </span>
               <span className="mt-1 block truncate text-xs text-[var(--muted)]">
                 {row.accountName}
@@ -176,8 +178,8 @@ export function AdditionalContributionFlowMap({
             </span>
             {activeId === row.id ? (
               <span className="col-span-2 mt-4 grid grid-cols-2 gap-3 text-xs text-[var(--muted)]">
-                <span>목표 {formatPercent(row.targetWeightPct)}</span>
-                <span>최종 배분 후 {formatPercent(row.postTopupWeightPct)}</span>
+                <span><PortfolioText ko={"목표"} />{" "}{formatPercent(row.targetWeightPct)}</span>
+                <span><PortfolioText ko={"최종 배분 후"} />{" "}{formatPercent(row.postTopupWeightPct)}</span>
               </span>
             ) : null}
           </button>
@@ -207,7 +209,7 @@ function ModeButton({
       }`}
       onClick={onClick}
     >
-      {label}
+      <PortfolioText ko={label} />
     </button>
   );
 }
@@ -233,13 +235,13 @@ function FlowTooltip({
       </p>
       <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--wash)] pt-3 text-xs">
         <div>
-          <dt className="text-[var(--muted)]">목표 비중</dt>
+          <dt className="text-[var(--muted)]"><PortfolioText ko={"목표 비중"} /></dt>
           <dd className="mt-1 font-medium">
             {formatPercent(row.targetWeightPct)}
           </dd>
         </div>
         <div>
-          <dt className="text-[var(--muted)]">최종 배분 후</dt>
+          <dt className="text-[var(--muted)]"><PortfolioText ko={"최종 배분 후"} /></dt>
           <dd className="mt-1 font-medium">
             {formatPercent(row.postTopupWeightPct)}
           </dd>
@@ -247,7 +249,7 @@ function FlowTooltip({
       </dl>
       {row.reductionKrw > 0 ? (
         <p className="mt-3 text-xs text-[var(--warning)]">
-          {row.kind === "cash" ? "추세 적용 전보다 현금 잔액" : "기본 매수안보다 매수금"} {formatKrw(row.reductionKrw)} {row.kind === "cash" ? "증가" : "감소"}
+          <PortfolioText ko={row.kind === "cash" ? "추세 적용 전보다 현금 잔액" : "기본 매수안보다 매수금"} /> {formatKrw(row.reductionKrw)} <PortfolioText ko={row.kind === "cash" ? "증가" : "감소"} />
         </p>
       ) : null}
     </div>

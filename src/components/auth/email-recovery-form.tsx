@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthText, AuthElement } from "./auth-localized";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Check, LoaderCircle } from "lucide-react";
@@ -105,27 +106,20 @@ export function EmailRecoveryForm({
     return (
       <div className={styles.stack}>
         <p className={styles.verificationState} role="status">
-          <Check size={20} aria-hidden="true" />
-          비밀번호를 변경했습니다.
-        </p>
-        <Link href="/auth/sign-in" className={styles.primaryButton}>
-          로그인 <ArrowRight size={16} aria-hidden="true" />
+          <Check size={20} aria-hidden="true" /><AuthText>{"비밀번호를 변경했습니다."}</AuthText></p>
+        <Link href="/auth/sign-in" className={styles.primaryButton}><AuthText>{"로그인"}</AuthText><ArrowRight size={16} aria-hidden="true" />
         </Link>
       </div>
     );
   if (resetting && !token && !preview)
     return (
       <div className={styles.stack}>
-        <p className={styles.notice} role="alert">
-          유효한 재설정 링크가 필요합니다. 새 메일을 요청해 주세요.
-        </p>
-        <Link href="/auth/forgot-password" className={styles.primaryButton}>
-          재설정 메일 요청
-        </Link>
+        <p className={styles.notice} role="alert"><AuthText>{"유효한 재설정 링크가 필요합니다. 새 메일을 요청해 주세요."}</AuthText></p>
+        <Link href="/auth/forgot-password" className={styles.primaryButton}><AuthText>{"재설정 메일 요청"}</AuthText></Link>
       </div>
     );
   return (
-    <form
+    <AuthElement as="form"
       onSubmit={submit}
       className={styles.emailForm}
       aria-label={resetting ? "비밀번호 재설정" : "인증 메일 요청"}
@@ -149,8 +143,8 @@ export function EmailRecoveryForm({
           </>
         ) : (
           <div className={styles.field}>
-            <label htmlFor="recovery-email">이메일</label>
-            <input
+            <label htmlFor="recovery-email"><AuthText>{"이메일"}</AuthText></label>
+            <AuthElement as="input"
               id="recovery-email"
               name="email"
               type="email"
@@ -166,19 +160,16 @@ export function EmailRecoveryForm({
           </div>
         )}
         {sent && !resetting ? (
-          <p className={styles.notice} role="status">
-            입력한 이메일에 연결된 계정이 있다면 안내 메일을 보냈습니다.
-            스팸함도 확인해 주세요.
-          </p>
+          <p className={styles.notice} role="status"><AuthText>{"입력한 이메일에 연결된 계정이 있다면 안내 메일을 보냈습니다. 스팸함도 확인해 주세요."}</AuthText></p>
         ) : null}
         {error ? (
           <p className={styles.error} role="alert">
-            {error}
+            <AuthText>{error}</AuthText>
           </p>
         ) : null}
         {notice ? (
           <p className={styles.notice} role="status">
-            {notice}
+            <AuthText>{notice}</AuthText>
           </p>
         ) : null}
         <button
@@ -188,7 +179,7 @@ export function EmailRecoveryForm({
           aria-busy={pending}
         >
           <span className={styles.buttonLabel}>
-            {pending
+            <AuthText>{pending
               ? "요청 중"
               : seconds > 0
                 ? `${seconds}초 후 재전송`
@@ -196,7 +187,7 @@ export function EmailRecoveryForm({
                   ? "비밀번호 변경"
                   : mode === "verify-email"
                     ? "인증 메일 보내기"
-                    : "재설정 링크 보내기"}
+                    : "재설정 링크 보내기"}</AuthText>
           </span>
           {pending ? (
             <LoaderCircle
@@ -210,16 +201,14 @@ export function EmailRecoveryForm({
         </button>
       </fieldset>
       {!enabled && !preview ? (
-        <p className={styles.note}>이메일 인증은 준비 중입니다.</p>
+        <p className={styles.note}><AuthText>{"이메일 인증은 준비 중입니다."}</AuthText></p>
       ) : null}
       <div className={styles.recoveryLinks}>
         <Link
           href={`/auth/sign-in${preview ? "?preview=design" : ""}`}
           className={styles.textLink}
-        >
-          로그인으로 돌아가기
-        </Link>
+        ><AuthText>{"로그인으로 돌아가기"}</AuthText></Link>
       </div>
-    </form>
+    </AuthElement>
   );
 }

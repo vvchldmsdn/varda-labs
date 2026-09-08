@@ -457,7 +457,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /성과 순위·추천 아님/);
     assert.match(
       view,
-      /서비스 기준일 수익률 \{researchHorizon\}단계 연구 시뮬레이션/,
+      /<SimulationText ko=\{"서비스 기준일 수익률"\} \/>\{" "\}\{researchHorizon\}<SimulationText ko=\{"단계 연구 시뮬레이션"\} \/>/,
     );
     assert.match(view, /명시 비중 공동 포트폴리오 연구/);
     assert.match(view, /KODEX 200 최초 비중/);
@@ -465,7 +465,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /같은 기준일 수익률 쌍/);
     assert.match(view, /리밸런싱하지\s*않아/);
     assert.match(view, /연구용 · 저장 안 함 · 예측 아님/);
-    assert.match(view, /서비스 기준일 수익률 \{researchHorizon\}단계/);
+    assert.match(view, /서비스 기준일 수익률"\} \/>\{" "\}\{researchHorizon\}<SimulationText ko=\{"단계/);
     assert.match(view, /stationary\s+bootstrap/);
     assert.match(view, /같은 입력 행렬,/);
     assert.match(view, /엔진 정책, 고정 seed에서만 결과가 동일합니다/);
@@ -511,8 +511,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /환율 직전값 적용/);
     assert.match(view, /시작 100으로 누적/);
     assert.match(view, /두 입력 공통/);
-    assert.match(view, /\{rows\.length\}개 관측 수익률/);
-    assert.match(view, /전체 \{rows\.length\}개 수익률 표 보기/);
+    assert.match(view, /\{rows\.length\}<SimulationText ko=\{"개 관측 수익률"\} \/>/);
+    assert.match(view, /<SimulationText ko=\{"전체"\} \/>\{" "\}\{rows\.length\}<SimulationText ko=\{"개 수익률 표 보기"\} \/>/);
     assert.match(view, /예측·시뮬레이션 경로 아님/);
     assert.match(view, /결과는 수익\s*보장, 추천 또는 주문 근거가 아닙니다/);
     assert.match(view, /과거\s*날짜로 자동 대체/);

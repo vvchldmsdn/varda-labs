@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, RotateCcw } from "lucide-react";
@@ -10,10 +11,12 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import styles from "@/components/auth/auth-experience.module.css";
 
 export const dynamic = "force-dynamic";
-export const metadata = {
+export async function generateMetadata() {
+  return localizedMetadata({
   title: "포트폴리오 시작 | VARDA-LABS",
   robots: { index: false, follow: false },
-};
+}, "Get started | VARDA LABS");
+}
 
 export default async function PortfolioOnboardingPage({
   searchParams,
