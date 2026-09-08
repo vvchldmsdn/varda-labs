@@ -66,7 +66,7 @@ export function HistoryView({
           </header>
 
           <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} status={history.unavailableSources.length ? `일부 기록 확인 필요 · ${history.unavailableSources.map(historyReadSourceLabel).join(", ")}` : undefined} details={
-            <HistoryRecordsDialog panel={detail}>
+            <HistoryRecordsDialog key="history-records" panel={detail}>
               {detail === "raw" ? <HistoryRawEvidence history={history} events={events} overview={overview} detailParams={detailParams} /> : detail === "records" ? (
           <div className={styles.support}>
             <div className={styles.activity}>
