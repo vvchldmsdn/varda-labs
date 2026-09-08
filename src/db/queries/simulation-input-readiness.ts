@@ -44,6 +44,7 @@ const VOO = Object.freeze({
 const INPUTS = Object.freeze([KODEX_200, VOO]);
 
 export async function getReadOnlySimulationInputReadiness(options?: {
+  includeResearch?: boolean;
   endServiceDate?: string | string[];
   horizon?: string | string[];
   kodexWeight?: string | string[];
@@ -118,18 +119,19 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     options?.horizon,
   );
   const researchHorizon = researchHorizonSelection.horizon;
+  const executionEndServiceDate = options?.includeResearch === false ? null : explicitEndServiceDate;
   const researchExecutions = INPUTS.map((descriptor, index) =>
     buildFixedResearchSimulation({
       id: descriptor.id,
       name: descriptor.name,
       ticker: descriptor.ticker,
-      explicitEndServiceDate,
+      explicitEndServiceDate: executionEndServiceDate,
       matrix: preflights[index]?.matrixArtifact ?? null,
       horizon: researchHorizon,
     }),
   );
   const fixedMixResearchContext = prepareFixedMixResearchContext({
-    explicitEndServiceDate,
+    explicitEndServiceDate: executionEndServiceDate,
     matrix: comparisonPreflight.matrixArtifact,
     horizon: researchHorizon,
   });
@@ -141,13 +143,13 @@ export async function getReadOnlySimulationInputReadiness(options?: {
     buildFixedMixResearchComparisonFromContext(fixedMixResearchContext);
   const walkForwardMinimumVolatility =
     buildSimulationWalkForwardMinimumVolatility({
-      explicitEndServiceDate,
+      explicitEndServiceDate: executionEndServiceDate,
       matrix: comparisonPreflight.matrixArtifact,
     });
   const walkForwardStabilityHistory =
     buildSimulationWalkForwardStabilityHistory({
-      explicitEndServiceDate,
-      endpoints: explicitEndServiceDate
+      explicitEndServiceDate: executionEndServiceDate,
+      endpoints: executionEndServiceDate
         ? comparisonDates.map((serviceDate, index) => ({
             serviceDate,
             matrix: comparisonPreflights[index]?.matrixArtifact ?? null,

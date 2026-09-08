@@ -1,5 +1,7 @@
 "use client";
 
+import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
+
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Maximize2, X } from "lucide-react";
 
@@ -25,11 +27,7 @@ export function PresentationDialog({
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return acquireBodyScrollLock(document.body);
   }, [open]);
 
   function close() {
@@ -68,7 +66,10 @@ export function PresentationDialog({
         onClick={(event) => {
           if (event.target === event.currentTarget) close();
         }}
-        onClose={() => setOpen(false)}
+        onClose={(event) => {
+          event.stopPropagation();
+          if (event.target === event.currentTarget) setOpen(false);
+        }}
         onKeyDown={keepFocusInside}
         ref={dialogRef}
       >

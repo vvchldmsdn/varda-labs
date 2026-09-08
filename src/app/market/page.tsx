@@ -15,6 +15,8 @@ import type { MarketRegimeDuplicateGroup } from "@/lib/market-context";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "시장 데이터 | VARDA LABS" };
+
 export default async function MarketPage() {
   const resolution = await resolveCurrentTenantContext();
 

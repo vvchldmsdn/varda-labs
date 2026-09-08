@@ -73,7 +73,7 @@ export function buildHomeDesignPreview(scopeInput: string | readonly string[] | 
   const selectedTotal = selectedSeeds.reduce((sum, seed) => sum + seed[6], 0);
   const holdings = selectedSeeds.map((seed) => buildHolding(seed, selectedTotal));
   const todayChangeKrw = holdings.reduce((sum, holding) => sum + (holding.dailyChangeKrw ?? 0), 0);
-  const costBasisKrw = holdings.reduce((sum, holding) => sum + holding.costBasisKrw, 0);
+  const costBasisKrw = holdings.reduce((sum, holding) => sum + (holding.costBasisKrw ?? 0), 0);
   const totalPnlKrw = selectedTotal - costBasisKrw;
   const latestDate = "2026-08-21";
   const recentSnapshots = buildPortfolioHistory(selectedTotal, 122, latestDate);
@@ -302,7 +302,7 @@ function buildAccountSummaries(holdings: readonly DashboardHolding[]) {
     const rows = holdings.filter((holding) => holding.account === code);
     if (rows.length === 0) return [];
     const totalValueKrw = rows.reduce((sum, row) => sum + row.valueKrw, 0);
-    const costBasisKrw = rows.reduce((sum, row) => sum + row.costBasisKrw, 0);
+    const costBasisKrw = rows.reduce((sum, row) => sum + (row.costBasisKrw ?? 0), 0);
     const totalPnlKrw = totalValueKrw - costBasisKrw;
     return [{
       code,

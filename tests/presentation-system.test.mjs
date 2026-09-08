@@ -112,7 +112,7 @@ describe("simple modern design system", () => {
       assert.match(source, /<dialog/);
       assert.match(source, /showModal/);
       assert.match(source, /onClose/);
-      assert.match(source, /document.body.style.overflow/);
+      assert.match(source, /document\.body\.style\.overflow|acquireBodyScrollLock\(document\.body\)/);
       assert.match(source, /varda-dialog/);
     }
   });
@@ -149,7 +149,7 @@ describe("simple modern design system", () => {
     const dialog = read("src/components/presentation/presentation-dialog.tsx");
     assert.match(dialog, /<dialog/);
     assert.match(dialog, /showModal/);
-    assert.match(dialog, /document\.body\.style\.overflow = "hidden"/);
+    assert.match(dialog, /acquireBodyScrollLock\(document\.body\)/);
 
     assert.match(css, /@keyframes varda-dialog-in/);
     assert.match(css, /@keyframes varda-drawer-in/);

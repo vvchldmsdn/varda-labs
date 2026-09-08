@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { sqlClient } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
 import {
   ACCOUNT_MANAGEMENT_POLICY,
   generatedAccountCode,
@@ -211,12 +211,8 @@ async function authorize(operation: "insert" | "update") {
 }
 
 async function runAtomicQuery(query: string, parameters: unknown[]) {
-  const results = await sqlClient.transaction((transaction) => [
-    transaction.query("set local lock_timeout = '2s'"),
-    transaction.query("set local statement_timeout = '8s'"),
-    transaction.query(query, parameters),
-  ]);
-  return (results[2]?.[0] ?? {}) as WriteResult;
+  const rows = await runPortfolioMutation(String(parameters[1]), query, parameters);
+  return (rows[0] ?? {}) as WriteResult;
 }
 
 function lockName(ownerUserId: string) {

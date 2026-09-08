@@ -16,6 +16,8 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "계좌 관리 | VARDA LABS" };
+
 export default async function AccountManagementPage() {
   const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok) {

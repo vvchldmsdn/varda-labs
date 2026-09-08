@@ -101,7 +101,7 @@ export function PortfolioDashboard({
             <dl className={styles.summaryMetric}>
               <dt>누적 수익률</dt>
               <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
-              <dd className={styles.status}>누적 손익 {formatSignedKrw(data.totalPnlKrw)}</dd>
+              <dd className={styles.status}>{data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`}</dd>
             </dl>
             <div className={styles.stageNote}>
               <span>오늘의 최대 기여</span>

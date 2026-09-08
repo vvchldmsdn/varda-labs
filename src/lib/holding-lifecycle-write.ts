@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sqlClient } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
   HOLDING_LIFECYCLE_POLICY,
@@ -125,24 +125,21 @@ async function runAtomicLifecycle({
   serviceDate: string;
   occurredAt: string;
 }) {
-  const results = await sqlClient.transaction((transaction) => [
-    transaction.query("set local lock_timeout = '2s'"),
-    transaction.query("set local statement_timeout = '8s'"),
-    transaction.query(
-      operation === "archive" ? ATOMIC_ARCHIVE_QUERY : ATOMIC_RESTORE_QUERY,
-      [
-        `varda.holding_lifecycle.v1:${ownerUserId}:${input.assetId}`,
-        ownerUserId,
-        input.assetId,
-        input.expectedUpdatedAt,
-        serviceDate,
-        occurredAt,
-        input.reason,
-        HOLDING_LIFECYCLE_POLICY.version,
-      ],
-    ),
-  ]);
-  return (results[2]?.[0] ?? {}) as LifecycleResult;
+  const rows = await runPortfolioMutation(
+    ownerUserId,
+    operation === "archive" ? ATOMIC_ARCHIVE_QUERY : ATOMIC_RESTORE_QUERY,
+    [
+      `varda.holding_lifecycle.v1:${ownerUserId}:${input.assetId}`,
+      ownerUserId,
+      input.assetId,
+      input.expectedUpdatedAt,
+      serviceDate,
+      occurredAt,
+      input.reason,
+      HOLDING_LIFECYCLE_POLICY.version,
+    ],
+  );
+  return (rows[0] ?? {}) as LifecycleResult;
 }
 
 function number(value: string | number | undefined) {

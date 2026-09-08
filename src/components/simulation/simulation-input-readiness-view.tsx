@@ -4,6 +4,7 @@ import {
   SimulationDateControl,
 } from "./simulation-query-controls";
 import type { ReactNode } from "react";
+import type { SimulationPanel } from "@/lib/simulation-panel";
 
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { InvestmentLabDialog as SimulationDialog } from "@/components/investment-lab/investment-lab-dialog";
@@ -51,6 +52,7 @@ export function SimulationInputReadinessView({
   regimeBootstrap,
   selectedScopeKey,
   scopeCatalog,
+  loadedPanel,
 }: {
   model: SimulationInputReadinessPageModel;
   historicalOutcomeValidation?: ReactNode;
@@ -68,6 +70,7 @@ export function SimulationInputReadinessView({
   regimeBootstrap?: ReactNode;
   selectedScopeKey: PortfolioAnalysisScopeKey;
   scopeCatalog: readonly PortfolioAnalysisScope[];
+  loadedPanel: SimulationPanel | null;
 }) {
   const sharedReturnScale = resolveSharedObservedReturnScale(model.inputs);
   const recommendedEndServiceDate = sharedNearestPriorDate(model.inputs);
@@ -163,6 +166,7 @@ export function SimulationInputReadinessView({
         ) : null}
         <div className={styles.workspaceSlot}>
           <SimulationWorkspace
+          loadedPanel={loadedPanel}
           tools={
             <ResearchHorizonSelector
               scopeKey={selectedScopeKey}

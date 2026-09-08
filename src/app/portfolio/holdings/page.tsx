@@ -28,6 +28,8 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "보유 종목 | VARDA LABS" };
+
 type TenantHoldingsPageProps = {
   searchParams: Promise<{
     account?: string | string[];

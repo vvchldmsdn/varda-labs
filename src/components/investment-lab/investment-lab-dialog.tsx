@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CalendarDays, Info, Table2, X } from "lucide-react";
+import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 
 export function InvestmentLabDialog({
   title,
@@ -26,11 +27,7 @@ export function InvestmentLabDialog({
 
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return acquireBodyScrollLock(document.body);
   }, [open]);
 
   return (
@@ -54,12 +51,14 @@ export function InvestmentLabDialog({
         onClick={(event) => {
           if (event.target === event.currentTarget) ref.current?.close();
         }}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.preventDefault();
-          ref.current?.close();
+        onCancel={(event) => {
+          // The browser cancels only the top modal; keep that event local.
+          event.stopPropagation();
         }}
-        onClose={() => setOpen(false)}
+        onClose={(event) => {
+          event.stopPropagation();
+          if (event.target === event.currentTarget) setOpen(false);
+        }}
         ref={ref}
       >
         <div className="flex max-h-[min(88dvh,850px)] flex-col">

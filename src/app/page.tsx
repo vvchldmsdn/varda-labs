@@ -11,6 +11,8 @@ import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "홈 | VARDA LABS" };
+
 type HomeProps = {
   searchParams: Promise<{
     account?: string | string[];

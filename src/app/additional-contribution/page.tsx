@@ -7,6 +7,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "추가 투입 | VARDA LABS" };
+
 const DEFAULT_AMOUNT_KRW = 3_000_000;
 const MAX_AMOUNT_KRW = 100_000_000_000;
 

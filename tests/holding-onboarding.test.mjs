@@ -146,11 +146,11 @@ describe("holding onboarding contract", () => {
   it("keeps ownership server-derived and commits the onboarding set atomically", () => {
     assert.match(writerSource, /resolveCurrentTenantContext\(\)/);
     assert.match(writerSource, /prepareTenantWriteContext\(/);
-    assert.match(writerSource, /canonicalOwnerAssignment\(writeContext\)/);
-    assert.match(writerSource, /await db\.batch\(/);
+    assert.match(writerSource, /runPortfolioMutation\(ownerUserId, ATOMIC_ONBOARDING_QUERY/);
+    assert.match(writerSource, /insert into holding_onboarding_evidence/);
     assert.match(
       writerSource,
-      /validFrom:\s*resolveSnapshotCycle\(recordedAt\)\.snapshotDate/,
+      /resolveSnapshotCycle\(recordedAt\)\.snapshotDate/,
     );
     assert.doesNotMatch(formSource, /name=["'](?:canonicalOwnerUserId|ownerUserId)["']/);
     assert.doesNotMatch(writerSource, /\bfetch\s*\(/);

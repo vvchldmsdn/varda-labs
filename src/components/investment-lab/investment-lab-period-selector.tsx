@@ -59,6 +59,14 @@ export function InvestmentLabPeriodSelector({
           <form
             action="/investment-lab"
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            key={[
+              scopeKey,
+              period.status,
+              period.requestedStartServiceDate,
+              period.requestedEndServiceDate,
+              period.selectedStartServiceDate,
+              period.selectedEndServiceDate,
+            ].join(":")}
             method="get"
           >
             <input name="scope" type="hidden" value={scopeKey} />
@@ -91,6 +99,7 @@ export function InvestmentLabPeriodSelector({
                 구간 적용
               </button>
               <InvestmentLabQueryLink
+                resetForm
                 className="flex h-9 items-center border-b border-transparent px-1 text-sm text-[var(--muted)] transition-colors hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
                 href={buildPortfolioAnalysisScopeHref(
                   "/investment-lab",

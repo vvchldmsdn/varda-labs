@@ -17,6 +17,8 @@ import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "포트폴리오 스냅샷 | VARDA LABS" };
+
 type TenantPortfolioSnapshotsPageProps = {
   searchParams: Promise<{
     account?: string | string[];

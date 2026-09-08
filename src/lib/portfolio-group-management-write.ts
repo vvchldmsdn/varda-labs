@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { sqlClient } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
   parsePortfolioGroupArchiveInput,
@@ -117,19 +117,15 @@ export async function archiveSessionPortfolioGroup(
   try {
     const now = new Date();
     const lockName = `varda.portfolio_group_management.v1:${ownerUserId}`;
-    const results = await sqlClient.transaction((transaction) => [
-      transaction.query("set local lock_timeout = '2s'"),
-      transaction.query("set local statement_timeout = '8s'"),
-      transaction.query(ATOMIC_ARCHIVE_QUERY, [
-        lockName,
-        ownerUserId,
-        parsed.input.groupId,
-        parsed.input.expectedUpdatedAt,
-        resolveSnapshotCycle(now).snapshotDate,
-        now.toISOString(),
-      ]),
+    const rows = await runPortfolioMutation(ownerUserId, ATOMIC_ARCHIVE_QUERY, [
+      lockName,
+      ownerUserId,
+      parsed.input.groupId,
+      parsed.input.expectedUpdatedAt,
+      resolveSnapshotCycle(now).snapshotDate,
+      now.toISOString(),
     ]);
-    const result = results[2]?.[0] as
+    const result = rows[0] as
       | { archived_count?: string | number }
       | undefined;
     return number(result?.archived_count) === 1
@@ -165,24 +161,20 @@ async function savePortfolioGroup({
   const now = new Date();
   const groupId = input.groupId ?? randomUUID();
   const lockName = `varda.portfolio_group_management.v1:${ownerUserId}`;
-  const results = await sqlClient.transaction((transaction) => [
-    transaction.query("set local lock_timeout = '2s'"),
-    transaction.query("set local statement_timeout = '8s'"),
-    transaction.query(ATOMIC_SAVE_QUERY, [
-      lockName,
-      ownerUserId,
-      groupId,
-      input.mode,
-      input.expectedUpdatedAt,
-      input.name,
-      input.description,
-      resolveSnapshotCycle(now).snapshotDate,
-      now.toISOString(),
-      JSON.stringify(input.accountIds),
-      JSON.stringify(input.assetIds),
-    ]),
+  const rows = await runPortfolioMutation(ownerUserId, ATOMIC_SAVE_QUERY, [
+    lockName,
+    ownerUserId,
+    groupId,
+    input.mode,
+    input.expectedUpdatedAt,
+    input.name,
+    input.description,
+    resolveSnapshotCycle(now).snapshotDate,
+    now.toISOString(),
+    JSON.stringify(input.accountIds),
+    JSON.stringify(input.assetIds),
   ]);
-  return (results[2]?.[0] ?? {}) as SaveResultRow;
+  return (rows[0] ?? {}) as SaveResultRow;
 }
 
 function saveConflictState(
