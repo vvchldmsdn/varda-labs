@@ -2,6 +2,7 @@ import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { HistoryView } from "@/components/history/history-view";
+import { normalizeHistoryDetail } from "@/components/history/history-detail-state";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { getReadOnlyTenantEvents } from "@/db/queries/tenant-events";
@@ -32,6 +33,10 @@ type HistoryPageProps = {
     comparisonFrom?: string | string[];
     comparisonTo?: string | string[];
     preview?: string | string[];
+    detail?: string | string[];
+    balancePage?: string | string[];
+    portfolioPage?: string | string[];
+    eventPage?: string | string[];
   }>;
 };
 
@@ -40,7 +45,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     const previewParams = await searchParams;
     if (previewParams.preview === "design") {
       const { HistoryDesignPreview } = await import("@/components/history/history-design-preview");
-      return <HistoryDesignPreview scope={previewParams.scope} />;
+      return <HistoryDesignPreview scope={previewParams.scope} detailParams={previewParams} />;
     }
   }
   const [params, resolution] = await Promise.all([
@@ -97,6 +102,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       lane,
       positionSelection,
       positionComparisonSelection,
+      includeRawEvidence: normalizeHistoryDetail(params) === "raw",
     }),
     eventScope !== null && (lane === "all" || lane === "events")
       ? getReadOnlyTenantEvents({
@@ -112,6 +118,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       eventsSupported={eventScope !== null}
       generatedAt={new Date().toISOString()}
       history={history}
+      detailParams={params}
     />
   );
 }

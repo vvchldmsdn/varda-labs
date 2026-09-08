@@ -144,7 +144,7 @@ describe("investment lab ETF X-ray", () => {
     });
   }
 
-  it("keeps the production adapter server-only, read-only, and separately suspended", () => {
+  it("keeps the production adapter server-only, read-only, and requested only through authenticated detail reads", () => {
     const querySource = readFileSync(
       new URL(
         "../src/db/queries/investment-lab-etf-xray.ts",
@@ -160,12 +160,13 @@ describe("investment lab ETF X-ray", () => {
     assert.match(querySource, /import "server-only"/);
     assert.doesNotMatch(querySource, /\.(insert|update|delete)\s*\(/);
     assert.doesNotMatch(querySource, /\bfetch\s*\(/);
-    assert.match(
-      pageSource,
-      /getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio\(\s*portfolioStructurePromise/,
-    );
-    assert.match(pageSource, /InvestmentLabEtfXraySkeleton/);
-    assert.match(pageSource, /InvestmentLabEtfXrayUnavailable/);
+    assert.doesNotMatch(pageSource, /getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio/);
+    const detail = readFileSync(new URL("../src/db/queries/investment-lab-detail.ts", import.meta.url), "utf8");
+    const route = readFileSync(new URL("../src/app/api/research/investment-lab/route.ts", import.meta.url), "utf8");
+    assert.match(detail, /getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio\(portfolioPromise/);
+    assert.match(detail, /panel === "composition"/);
+    assert.match(route, /resolveResearchDetailContext\(query\)/);
+    assert.match(route, /RESEARCH_DETAIL_HEADERS/);
   });
 });
 

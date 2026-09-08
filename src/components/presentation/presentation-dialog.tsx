@@ -11,6 +11,7 @@ export function PresentationDialog({
   label,
   title,
   triggerClassName,
+  mountOnOpen = false,
   wide = false,
 }: {
   children: ReactNode;
@@ -18,6 +19,8 @@ export function PresentationDialog({
   label: ReactNode;
   title: string;
   triggerClassName?: string;
+  /** For children built in a Client Component; server children must be deferred at the server boundary. */
+  mountOnOpen?: boolean;
   wide?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -98,7 +101,7 @@ export function PresentationDialog({
             </button>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content">
-            {children}
+            {!mountOnOpen || open ? children : null}
           </div>
         </div>
       </dialog>

@@ -73,6 +73,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
   const dashboardPromise = getPortfolioDashboard({
     analysisScopes: scopeContext.catalog.scopes,
+    demand: { surface: "today", holdingDetail: detailQuery },
     scope: scopeContext.resolution.scope,
     tenantContext: resolution.tenantContext,
   });

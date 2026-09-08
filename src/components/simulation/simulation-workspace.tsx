@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { useResearchPanelNavigation } from "@/components/investment-lab/research-detail-resource";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
-import { resolveSimulationPanel, type SimulationPanel } from "@/lib/simulation-panel";
+import { resolveSimulationPanel } from "@/lib/simulation-panel";
 import {
   Database,
   ScanLine,
@@ -11,6 +12,8 @@ import {
   X,
 } from "lucide-react";
 import styles from "./simulation-workspace.module.css";
+
+const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <p role="status" className="py-10 text-sm">상세 분석을 불러오고 있습니다.</p> });
 
 type SimulationOverlay = "weights" | "validation" | "evidence";
 
@@ -22,31 +25,14 @@ const OVERLAYS = {
 
 export function SimulationWorkspace({
   paths,
-  weights,
-  validation,
-  evidence,
   tools,
-  loadedPanel,
 }: {
   paths: ReactNode;
-  weights: ReactNode;
-  validation: ReactNode;
-  evidence: ReactNode;
   tools?: ReactNode;
-  loadedPanel: SimulationPanel | null;
 }) {
-  const params = useSearchParams();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { panel: activeOverlay, select, query } = useResearchPanelNavigation(resolveSimulationPanel);
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [activeOverlay, setActiveOverlay] = useState<SimulationOverlay | null>(
-    () => {
-      const requested = params.getAll("view");
-      return requested.length === 1 && isSimulationOverlay(requested[0]) ? requested[0] : null;
-    },
-  );
-  const panels = { weights, validation, evidence };
 
   useEffect(() => {
     if (!activeOverlay || dialogRef.current?.open) return;
@@ -58,40 +44,13 @@ export function SimulationWorkspace({
     return acquireBodyScrollLock(document.body);
   }, [activeOverlay]);
 
-  useEffect(() => {
-    function syncOverlayFromHistory() {
-      const requested = new URLSearchParams(window.location.search).getAll("view");
-      const nextOverlay = requested.length === 1 && isSimulationOverlay(requested[0]) ? requested[0] : null;
-      setActiveOverlay(nextOverlay);
-      if (!nextOverlay && dialogRef.current?.open) dialogRef.current.close();
-    }
-
-    window.addEventListener("popstate", syncOverlayFromHistory);
-    return () => window.removeEventListener("popstate", syncOverlayFromHistory);
-  }, []);
-
-  function openOverlay(view: SimulationOverlay) {
-    setActiveOverlay(view);
-    const next = new URLSearchParams(window.location.search);
-    next.set("view", view);
-    startTransition(() => {
-      router.push(`${window.location.pathname}?${next}`, { scroll: false });
-    });
-  }
-
+  function openOverlay(view: SimulationOverlay) { select(view); }
   function closeOverlay() {
     dialogRef.current?.close();
   }
 
-  function finishClose() {
-    setActiveOverlay(null);
-    const next = new URLSearchParams(window.location.search);
-    next.delete("view");
-    const query = next.toString();
-    const href = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-    if (isPending) startTransition(() => router.replace(href, { scroll: false }));
-    else window.history.replaceState(null, "", href);
-  }
+  function finishClose() { select(null); }
+  useEffect(() => { if (!activeOverlay && dialogRef.current?.open) dialogRef.current.close(); }, [activeOverlay]);
 
   const activeDefinition = activeOverlay ? OVERLAYS[activeOverlay] : null;
 
@@ -122,7 +81,7 @@ export function SimulationWorkspace({
         onClose={(event) => {
           if (event.target !== event.currentTarget) return;
           event.stopPropagation();
-          finishClose();
+          if (!dialogRef.current?.open) finishClose();
         }}
         ref={dialogRef}
       >
@@ -145,16 +104,10 @@ export function SimulationWorkspace({
             </button>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
-            {activeOverlay && loadedPanel !== activeOverlay
-              ? <p role="status" className="motion-safe:animate-pulse py-10 text-sm text-[var(--muted)]">선택한 분석을 계산하고 있습니다.</p>
-              : activeOverlay ? panels[activeOverlay] : null}
+            {activeOverlay ? <RemotePanel query={query} /> : null}
           </div>
         </div>
       </dialog>
     </div>
   );
-}
-
-function isSimulationOverlay(value: string | null): value is SimulationOverlay {
-  return resolveSimulationPanel(value) !== null;
 }

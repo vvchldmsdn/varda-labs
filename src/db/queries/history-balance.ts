@@ -89,6 +89,7 @@ export async function getReadOnlyTenantHistoryBalance({
   lane,
   positionSelection,
   positionComparisonSelection,
+  includeRawEvidence = true,
 }: {
   analysisScopes: readonly PortfolioAnalysisScope[];
   tenantContext: TenantContext;
@@ -96,6 +97,8 @@ export async function getReadOnlyTenantHistoryBalance({
   lane: HistoryLane;
   positionSelection: HistoryPositionSelection;
   positionComparisonSelection: HistoryPositionComparisonSelection;
+  /** The main overview still reads the complete portfolio series. */
+  includeRawEvidence?: boolean;
 }): Promise<ReadOnlyHistoryBalance> {
   const balanceAccount = balanceAccountForScope(scope);
   const portfolioAccount = portfolioAccountForScope(scope);
@@ -105,18 +108,18 @@ export async function getReadOnlyTenantHistoryBalance({
   const [balanceResult, portfolioResult, positionResult, comparisonResult] =
     await Promise.all([
       captureLoad(
-        balanceAccount !== null && (lane === "all" || lane === "balance"),
+        includeRawEvidence && balanceAccount !== null && (lane === "all" || lane === "balance"),
         () => loadBalanceRows(tenantContext),
       ),
       captureLoad(lane === "all" || lane === "portfolio", () =>
         loadPortfolioRows(tenantContext, scope),
       ),
-      positionSelection.status === "requested"
+      includeRawEvidence && positionSelection.status === "requested"
         ? captureLoad(true, () =>
             loadPositionRows(tenantContext, scope, positionSelection),
           )
         : Promise.resolve(Object.freeze({ state: "not_requested" } as const)),
-      positionComparisonSelection.status === "requested"
+      includeRawEvidence && positionComparisonSelection.status === "requested"
         ? captureLoad(true, () =>
             loadPositionComparisonRows(
               tenantContext,
@@ -144,14 +147,14 @@ export async function getReadOnlyTenantHistoryBalance({
     account: portfolioAccount,
     lane,
     selection: positionSelection,
-    portfolioRows,
+    portfolioRows: includeRawEvidence ? portfolioRows : [],
     positionRows,
   });
   const positionComparison = buildHistoryPositionComparison({
     account: portfolioAccount,
     lane,
     selection: positionComparisonSelection,
-    portfolioRows,
+    portfolioRows: includeRawEvidence ? portfolioRows : [],
     fromRows: positionComparisonRows.fromRows,
     toRows: positionComparisonRows.toRows,
   });

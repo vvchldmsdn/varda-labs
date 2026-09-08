@@ -112,7 +112,9 @@ describe("investment lab standard fixed-mix comparison", () => {
       standardComparison,
       /data-section="investment-lab-fixed-mix-comparison"/,
     );
-    assert.match(page, /comparison=\{model\.fixedMixComparison\}/);
+    assert.match(page, /fixedMixComparison: model\.fixedMixComparison/);
+    const remote = readFileSync("src/components/investment-lab/investment-lab-remote-panel.tsx", "utf8");
+    assert.match(remote, /comparison=\{weights\.fixedMixComparison\}/);
   });
 });
 

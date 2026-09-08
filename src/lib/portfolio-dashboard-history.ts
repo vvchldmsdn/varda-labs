@@ -15,6 +15,7 @@ export type PortfolioDashboardPositionHistoryRow = Readonly<{
   costKrw: unknown;
   pnlKrw: unknown;
   source: string | null;
+  cycleEndAt?: Date | string | null;
   capturedAt: Date | string | null;
   createdAt: Date | string | null;
 }>;
@@ -83,9 +84,9 @@ export function buildPortfolioDashboardHoldingHistory({
     ? [...holdings]
     : holdings.slice(0, Math.max(0, maxRows));
   const selectedHoldingIds = new Set(selectedHoldings.map((holding) => holding.id));
-  const preferred = preferredPositionRows(rows, selectedHoldingIds);
+  const preferred = preferredPositionRows(rows, selectedHoldingIds, portfolioDashboardHistoryDisplayDate);
   const observedDates = [...new Set([
-    ...[...preferred.values()].map((row) => row.snapshotDate),
+    ...[...preferred.values()].map(portfolioDashboardHistoryDisplayDate),
     ...(isIsoDate(currentDate) ? [currentDate] : []),
   ])]
     .sort((left, right) => left.localeCompare(right));
@@ -99,11 +100,9 @@ export function buildPortfolioDashboardHoldingHistory({
     account: holding.account,
     currentWeight: holding.currentWeight,
     cells: dates.map((date) => {
-      const liveCell = date === currentDate
-        ? currentMovementCell(date, holding)
-        : null;
-      if (liveCell) {
-        observedCellCount += 1;
+      if (date === currentDate) {
+        const liveCell = currentMovementCell(date, holding);
+        if (liveCell.basis !== "missing") observedCellCount += 1;
         return liveCell;
       }
 
@@ -148,13 +147,21 @@ export function buildPortfolioDashboardHoldingHistory({
 function currentMovementCell(
   date: string,
   holding: PortfolioDashboardHistoryHolding,
-): PortfolioDashboardHeatmapCell | null {
+): PortfolioDashboardHeatmapCell {
   const changePct = toNumber(holding.dailyReturnPct);
   const changeKrw = toNumber(holding.dailyChangeKrw);
   const marketValueKrw = toNumber(holding.valueKrw);
 
   if (changePct === null || changeKrw === null || marketValueKrw === null) {
-    return null;
+    return Object.freeze({
+      date,
+      changePct: null,
+      marketValueKrw,
+      changeKrw: null,
+      priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
+      fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
+      basis: "missing" as const,
+    });
   }
 
   return Object.freeze({
@@ -243,12 +250,13 @@ export function buildPortfolioDashboardPositionTrend({
 function preferredPositionRows(
   rows: readonly PortfolioDashboardPositionHistoryRow[],
   selectedHoldingIds: ReadonlySet<string>,
+  displayDate: (row: PortfolioDashboardPositionHistoryRow) => string = (row) => row.snapshotDate,
 ) {
   const preferred = new Map<string, PortfolioDashboardPositionHistoryRow>();
 
   for (const row of rows) {
     if (!row.assetId || !selectedHoldingIds.has(row.assetId)) continue;
-    const key = positionRowKey(row.snapshotDate, row.assetId);
+    const key = positionRowKey(displayDate(row), row.assetId);
     const existing = preferred.get(key);
     if (!existing || compareEvidenceRecency(row, existing) > 0) {
       preferred.set(key, row);
@@ -256,6 +264,22 @@ function preferredPositionRows(
   }
 
   return preferred;
+}
+
+/**
+ * This writer stores a completed service day under its following 07:00 KST cutoff.
+ * Quote reference dates can be older (holidays), so they are not display dates.
+ * Imported/unknown writers retain their own date semantics until verified.
+ */
+export function portfolioDashboardHistoryDisplayDate(
+  row: Pick<PortfolioDashboardPositionHistoryRow, "snapshotDate" | "source" | "cycleEndAt">,
+) {
+  if (row.source !== "varda_manual_daily_snapshot") return row.snapshotDate;
+  const cycleEnd = timestamp(row.cycleEndAt ?? null);
+  const cutoffDate = cycleEnd > 0
+    ? new Date(cycleEnd + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : row.snapshotDate;
+  return shiftIsoDate(cutoffDate, -1);
 }
 
 function positionRowKey(date: string, assetId: string) {

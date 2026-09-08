@@ -14,7 +14,7 @@ export function InvestmentLabDialog({
 }: {
   title: string;
   label: string;
-  children: ReactNode;
+  children: ReactNode | (() => ReactNode);
   icon?: "info" | "calendar" | "table";
   size?: "regular" | "wide";
   compactLabel?: boolean;
@@ -77,7 +77,7 @@ export function InvestmentLabDialog({
             </button>
           </header>
           <div className="varda-dialog-content min-h-0 overflow-y-auto overscroll-contain">
-            {children}
+            {open ? typeof children === "function" ? children() : children : null}
           </div>
         </div>
       </dialog>

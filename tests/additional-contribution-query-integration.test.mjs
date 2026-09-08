@@ -96,6 +96,44 @@ describe("additional contribution query to policy integration", () => {
     assert.deepEqual(result.rows.map((row) => row.targetWeightPct), [100, 0]);
     assert.equal(result.rows[1].trimReason, "eligible_zero_target_exit");
     assert.deepEqual(result.rows.map((row) => row.allocationKey), fixture.model.rows.map((row) => `${accountId}:${row.assetId}`));
+    assert.equal(fixture.calls.filter((call) => call.kind === "universe").length, 1);
+    assert.equal(fixture.calls.filter((call) => call.kind === "structure").length, 0);
+  });
+
+  it("stops a missing or conflicting legacy policy without a second universe or valuation read", async () => {
+    for (const status of ["missing", "conflict"]) {
+      const fixture = makeFixture();
+      fixture.model.policyValidation.status = "missing";
+      fixture.legacy.policy = { status, policy: null };
+      const result = await run(await loadQuery(fixture));
+      assert.equal(result.status, "blocked");
+      assert.equal(result.source, "legacy_account_policy");
+      assert.deepEqual(result.blockers, [status === "missing" ? "target_policy_missing" : "target_policy_conflict"]);
+      assert.equal(fixture.calls.filter((call) => call.kind === "legacy").length, 1);
+      assert.equal(fixture.calls.some((call) => ["universe", "structure"].includes(call.kind)), false);
+    }
+  });
+
+  it("reuses the exact scoped valuation but still validates the independently read legacy universe", async () => {
+    const fixture = makeFixture();
+    fixture.model.policyValidation.status = "missing";
+    fixture.legacy.structure = {
+      ...fixture.legacy.structure,
+      holdingRows: fixture.legacy.structure.holdingRows.map((row) => ({ ...row, currentValueKrw: 999999 })),
+    };
+    const query = await loadQuery(fixture);
+    const result = await run(query);
+    assert.equal(result.status, "ready");
+    assert.deepEqual(result.rows.map((row) => row.currentValueKrw), [550000, 450000]);
+    assert.equal(fixture.calls.some((call) => call.kind === "structure"), false);
+
+    fixture.legacy.universe = buildTargetPolicyHoldingUniverse({
+      account: "isa",
+      holdings: [...fixture.legacy.universe.rows, { name: "new holding", market: "korea", currency: "KRW", ticker: "CCC" }],
+    });
+    const changedUniverse = await run(query);
+    assert.equal(changedUniverse.status, "blocked");
+    assert.ok(changedUniverse.blockers.includes("target_policy_universe_mismatch"));
   });
 
   it("blocks model omissions and duplicate legacy mappings instead of borrowing an instrument target", async () => {
@@ -185,10 +223,11 @@ function modelRow(ticker, currentValueKrw, targetWeightBps, overrides = {}) {
 
 function makeFixture() {
   const rows = [modelRow("AAA", 550000, 5000), modelRow("BBB", 450000, 5000)];
+  const legacy = legacyFixture(rows);
   return {
     calls: [], settings: [{ minExecutionRatioPct: null, trimDriftThreshold: null, useTrendFilter: false }],
-    model: { status: "ready", rows, ma120HoldingRows: rows, policyValidation: { status: "available" }, approvedPolicy: { policy: { effectiveServiceDate: "2026-07-01", policyVersion: "fixture-v1" } } },
-    ma: evidence(rows), maFailure: false, legacy: legacyFixture(rows),
+    model: { status: "ready", rows, structure: { ...legacy.structure, selectedAccount: "all" }, ma120HoldingRows: legacy.structure.holdingRows, policyValidation: { status: "available" }, approvedPolicy: { policy: { effectiveServiceDate: "2026-07-01", policyVersion: "fixture-v1" } } },
+    ma: evidence(rows), maFailure: false, legacy,
   };
 }
 

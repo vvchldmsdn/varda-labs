@@ -158,8 +158,10 @@ describe("investment lab historical stress replay", () => {
       "utf8",
     );
 
-    assert.match(page, /InvestmentLabStressReplayContent/);
-    assert.match(page, /portfolioStructurePromise/);
+    assert.doesNotMatch(page, /InvestmentLabStressReplayContent|portfolioStructurePromise/);
+    const detail = readFileSync("src/db/queries/investment-lab-detail.ts", "utf8");
+    assert.match(detail, /panel === "composition"/);
+    assert.match(detail, /getReadOnlyTenantInvestmentLabStressReplay\(\{ account: selectedScope\.key, portfolioStructurePromise: portfolioPromise/);
     assert.match(component, /hasMarketEvidence/);
     assert.doesNotMatch(component, /["']use client["']|\bfetch\s*\(|\/api\//);
     assert.doesNotMatch(query, /\bfetch\s*\(|createKis|runKis|\/api\//);

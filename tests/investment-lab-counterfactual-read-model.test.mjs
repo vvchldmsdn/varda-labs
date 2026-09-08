@@ -403,7 +403,9 @@ describe("investment lab counterfactual read model", () => {
       cashComparison,
       /\bfetch\s*\(|\/api\/|localStorage|sessionStorage|URLSearchParams|console\./,
     );
-    assert.match(view, /InvestmentLabCashComparisonView/);
+    assert.match(view, /InvestmentLabDeferredPerformance/);
+    const details = readFileSync("src/components/investment-lab/investment-lab-performance-details.tsx", "utf8");
+    assert.match(details, /InvestmentLabCashComparisonView/);
     assert.match(view, /data-read-model-status/);
     assert.match(view, /data-source-authority-status/);
     assert.match(view, /data-source-transition-count/);

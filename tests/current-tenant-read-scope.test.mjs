@@ -626,20 +626,16 @@ describe("current tenant read scope runtime boundary", () => {
           source.indexOf(`const ${promise}`),
       );
     }
-    assert.match(
-      source,
-      /portfolio: \(\) => getReadOnlyTenantPortfolioStructureForScope\(\{\s*scope: selectedScope,\s*serviceDate,\s*tenantContext,/,
-    );
-    assert.ok(
-      source.indexOf("if (!resolution.ok)") <
-        source.indexOf("startInvestmentLabPanelQueries(requestedPanel"),
-    );
+    const detail = read("src/db/queries/investment-lab-detail.ts");
+    const detailRoute = read("src/app/api/research/investment-lab/route.ts");
+    assert.match(detail, /getReadOnlyTenantPortfolioStructureForScope\(\{ scope: selectedScope, serviceDate: resolveSnapshotCycle\(new Date\(\)\)\.snapshotDate, tenantContext \}/);
+    assert.match(detail, /getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio/);
+    assert.match(detailRoute, /resolveResearchDetailContext\(query\)/);
+    assert.ok(detailRoute.indexOf("if (!context.ok)") < detailRoute.indexOf("await loadInvestmentLabDetail"));
     for (const reader of [
       "getReadOnlyTenantInvestmentLabAnalysisScopeEvidence",
       "getReadOnlyTenantInvestmentLabCounterfactualForScope",
       "getReadOnlyTenantInvestmentLabDataAvailabilityForScope",
-      "getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio",
-      "getReadOnlyTenantPortfolioStructureForScope",
     ]) {
       assert.match(source, new RegExp(reader));
     }

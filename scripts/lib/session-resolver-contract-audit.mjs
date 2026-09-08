@@ -11,7 +11,7 @@ const RUNTIME_ADAPTER_PATH =
   "src/lib/auth/current-tenant-context.ts";
 const CONTRACT_IMPORT_PATTERN = /session-resolver-(?:contract|policy)/;
 const IMPORT_FROM_PATTERN =
-  /^\s*import\s+([\s\S]*?)\s+from\s+["']([^"']+)["'];?[ \t]*(?:\r?\n|$)/gm;
+  /^\s*import\s+([^;]*?)\s+from\s+["']([^"']+)["'];?[ \t]*(?:\r?\n|$)/gm;
 const PURE_CONTRACT_FORBIDDEN_PATTERN =
   /^\s*import\s|@neondatabase|drizzle|DATABASE_URL|process\.env|\bfetch\s*\(|\bcookies\s*\(|\bheaders\s*\(|next\/server|from\s+["']react["']|\bcache\s*\(/m;
 const IDENTITY_DML_PATTERN =

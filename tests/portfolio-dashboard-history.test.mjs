@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   buildPortfolioDashboardHoldingHistory,
   buildPortfolioDashboardPositionTrend,
+  portfolioDashboardHistoryDisplayDate,
 } from "../src/lib/portfolio-dashboard-history.ts";
 
 const holdings = [
@@ -36,7 +37,7 @@ describe("portfolio dashboard holding history", () => {
           capturedAt: "2026-08-02T07:00:00.000Z",
         }),
         row({
-          snapshotDate: "2026-08-01",
+          snapshotDate: "2026-08-02",
           assetId: "asset-kodex",
           unitValueChangePct: 2.5,
           marketValueChangePct: 9,
@@ -207,6 +208,64 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[1]?.cells[1]?.changePct, 0);
     assert.equal(result.rows[1]?.cells[1]?.basis, "live_movement");
   });
+
+  it("preserves Friday, weekend, Monday and today's live movement on separate service days", () => {
+    const result = buildPortfolioDashboardHoldingHistory({
+      currentDate: "2026-09-08",
+      holdings: [{ ...holdings[0], valueKrw: 1000, dailyChangeKrw: -10, dailyReturnPct: -1 }],
+      rows: [["2026-09-05", 2], ["2026-09-06", 0], ["2026-09-07", 0], ["2026-09-08", 1]].map(([date, change]) => row({
+        snapshotDate: date, assetId: "asset-kodex", source: "varda_manual_daily_snapshot",
+        cycleEndAt: new Date(`${date}T07:00:00+09:00`),
+        unitValueChangePct: change, marketValueChangeKrw: change * 10,
+      })),
+    });
+    assert.deepEqual(result.dates, ["2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08"]);
+    assert.deepEqual(result.rows[0].cells.map((cell) => cell.changePct), [2, 0, 0, 1, -1]);
+    assert.equal(result.observedCellCount, 5);
+  });
+
+  it("uses the verified cutoff rather than holiday quote reference dates or capture time", () => {
+    const generated = row({
+      snapshotDate: "2026-09-08", source: "varda_manual_daily_snapshot",
+      cycleEndAt: "2026-09-07T22:00:00Z", capturedAt: "2026-09-10T01:00:00Z",
+      referenceDate: "2026-09-04", fxReferenceDate: "2026-09-08",
+    });
+    assert.equal(portfolioDashboardHistoryDisplayDate(generated), "2026-09-07");
+    assert.equal(portfolioDashboardHistoryDisplayDate({ ...generated, cycleEndAt: null }), "2026-09-07");
+    assert.equal(portfolioDashboardHistoryDisplayDate({ ...generated, cycleEndAt: "invalid" }), "2026-09-07");
+    for (const source of ["base44_import", "legacy_automation", null]) {
+      assert.equal(portfolioDashboardHistoryDisplayDate({ ...generated, source }), "2026-09-08");
+    }
+  });
+
+  it("keeps a holiday FX-only change rather than coercing weekends or holidays to zero", () => {
+    const result = buildPortfolioDashboardHoldingHistory({
+      currentDate: "2026-09-08", holdings: [holdings[1]],
+      rows: [row({ snapshotDate: "2026-09-08", assetId: "asset-voo", source: "varda_manual_daily_snapshot",
+        unitValueChangePct: 0.062793, marketValueChangeKrw: 627.93, priceChangeKrw: 0, fxChangeKrw: 627.93 })],
+    });
+    assert.equal(result.rows[0].cells[0].date, "2026-09-07");
+    assert.equal(result.rows[0].cells[0].changePct, 0.062793);
+    assert.equal(result.rows[0].cells[0].priceChangeKrw, 0);
+    assert.equal(result.rows[0].cells[0].fxChangeKrw, 627.93);
+    assert.equal(result.rows[0].cells[1].basis, "missing");
+    assert.equal(result.observedCellCount, 1);
+  });
+
+  for (const missing of ["dailyReturnPct", "dailyChangeKrw", "valueKrw"]) {
+    it(`does not fall through to a stored zero when today's ${missing} is unavailable`, () => {
+      const result = buildPortfolioDashboardHoldingHistory({
+        currentDate: "2026-09-08",
+        holdings: [{ ...holdings[0], valueKrw: 1000, dailyReturnPct: 1, dailyChangeKrw: 10, [missing]: null }],
+        rows: [row({ snapshotDate: "2026-09-08", assetId: "asset-kodex", unitValueChangePct: 0, marketValueChangeKrw: 0, marketValueKrw: 1000 })],
+      });
+      assert.equal(result.rows[0].cells[0].basis, "missing");
+      assert.equal(result.rows[0].cells[0].changePct, null);
+      assert.equal(result.rows[0].cells[0].changeKrw, null);
+      assert.equal(result.observedCellCount, 0);
+      assert.equal(result.coveragePct, 0);
+    });
+  }
 });
 
 function row(overrides) {

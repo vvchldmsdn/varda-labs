@@ -32,6 +32,7 @@ import {
   livePriceQuotes,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import { selectDashboardHistoryAssetIds, type PortfolioDashboardDemand } from "@/lib/portfolio-dashboard-demand";
 import {
   portfolioDashboardBaselineWindowStart,
   selectLatestPortfolioDashboardBaselineRows,
@@ -47,10 +48,12 @@ const MAX_RECENT_POSITION_SOURCES_PER_ASSET = 3;
 const RECENT_FX_OBSERVATION_LIMIT = 260;
 
 export async function getReadOnlyTenantPortfolioDashboardSources({
+  demand = { surface: "home" },
   scope,
   serviceDate,
   tenantContext,
 }: {
+  demand?: PortfolioDashboardDemand;
   scope: PortfolioAnalysisScope;
   serviceDate: string;
   tenantContext: TenantContext;
@@ -67,6 +70,47 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
         inArrayWhenPresent(assets.id, targets.directAssetIds),
       ]);
 
+  const assetRowsPromise = Promise.resolve(
+    assetScopePredicate === null
+      ? []
+      : db
+          .select(getTableColumns(assets))
+          .from(assets)
+          .innerJoin(accounts, eq(assets.accountId, accounts.id))
+          .where(
+            and(
+              ...activeOwnedAccountPredicates(tenantContext),
+              eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
+              eq(assets.account, accounts.code),
+              isNull(assets.archivedAt),
+              assetScopePredicate,
+            ),
+          ),
+  );
+  // Attach both dependent branches immediately, including their rejection handlers.
+  // Slow history/settings reads must not postpone asset-dependent market reads.
+  const [sources, quotes] = await Promise.all([
+    loadDashboardContextSources({ assetRowsPromise, demand, scope, serviceDate, targets, tenantContext }),
+    assetRowsPromise.then(loadDashboardQuoteRows),
+  ]);
+  return { ...sources, ...quotes };
+}
+
+async function loadDashboardContextSources({
+  assetRowsPromise,
+  demand,
+  scope,
+  serviceDate,
+  targets,
+  tenantContext,
+}: {
+  assetRowsPromise: Promise<(typeof assets.$inferSelect)[]>;
+  demand: PortfolioDashboardDemand;
+  scope: PortfolioAnalysisScope;
+  serviceDate: string;
+  targets: Awaited<ReturnType<typeof getPortfolioAnalysisScopeTargets>>;
+  tenantContext: TenantContext;
+}) {
   const [allAccountRows, assetGroupRows, assetRows, settingsRows, recentFxRows] =
     await Promise.all([
       db
@@ -75,23 +119,9 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
         .where(and(...activeOwnedAccountPredicates(tenantContext)))
         .orderBy(accounts.sortOrder, accounts.code),
       loadActiveTenantAllocationGroups(tenantContext),
-      assetScopePredicate === null
-        ? Promise.resolve([])
-        : db
-            .select(getTableColumns(assets))
-            .from(assets)
-            .innerJoin(accounts, eq(assets.accountId, accounts.id))
-            .where(
-              and(
-                ...activeOwnedAccountPredicates(tenantContext),
-                eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
-                eq(assets.account, accounts.code),
-                isNull(assets.archivedAt),
-                assetScopePredicate,
-              ),
-            ),
+      assetRowsPromise,
       loadLatestTenantPortfolioSettingsRows(tenantContext),
-      loadUsablePortfolioFxRows(RECENT_FX_OBSERVATION_LIMIT),
+      loadUsablePortfolioFxRows(demand.surface === "home" ? RECENT_FX_OBSERVATION_LIMIT : 1),
     ]);
 
   const activeAccountIds = new Set(allAccountRows.map((account) => account.id));
@@ -121,6 +151,12 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     inArrayWhenPresent(dailyPositionSnapshots.accountId, wholeAccountIds),
     inArrayWhenPresent(dailyPositionSnapshots.assetId, targets.directAssetIds),
   ]);
+  const historyAssetIds = selectDashboardHistoryAssetIds(assetRows, demand);
+  const historyPositionPredicate = demand.surface === "home"
+    ? positionScopePredicate
+    : positionScopePredicate && historyAssetIds.length > 0
+      ? and(positionScopePredicate, inArray(dailyPositionSnapshots.assetId, historyAssetIds))!
+      : null;
   const eventScopePredicate = combineScopePredicates([
     inArrayWhenPresent(eventLedgerEntries.accountId, wholeAccountIds),
     inArrayWhenPresent(eventLedgerEntries.assetId, targets.directAssetIds),
@@ -131,12 +167,12 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     Math.max(wholeAccountIds.length, 1) *
     MAX_RECENT_SNAPSHOT_SOURCES_PER_ACCOUNT;
   const selectedPositionDateCount =
-    scope.kind === "portfolio_group"
+    demand.surface === "home" && scope.kind === "portfolio_group"
       ? PORTFOLIO_GROUP_POSITION_DATE_COUNT
       : RECENT_POSITION_DATE_COUNT;
   const selectedPositionRowLimit =
     selectedPositionDateCount *
-    Math.max(assetRows.length, 1) *
+    Math.max(demand.surface === "home" ? assetRows.length : historyAssetIds.length, 1) *
     MAX_RECENT_POSITION_SOURCES_PER_ASSET;
   const baselineWindowStart =
     portfolioDashboardBaselineWindowStart(serviceDate);
@@ -169,11 +205,12 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
             sql`${dailyPositionSnapshots.capturedAt} desc nulls last`,
             desc(dailyPositionSnapshots.createdAt),
           ),
-    positionScopePredicate === null
+    historyPositionPredicate === null
       ? Promise.resolve([])
       : db
           .select({
             snapshotDate: dailyPositionSnapshots.snapshotDate,
+            cycleEndAt: dailyPositionSnapshots.cycleEndAt,
             assetId: dailyPositionSnapshots.assetId,
             ticker: dailyPositionSnapshots.ticker,
             assetName: dailyPositionSnapshots.assetName,
@@ -195,7 +232,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
           .where(
             and(
               ...activeOwnedAccountPredicates(tenantContext),
-              positionScopePredicate,
+              historyPositionPredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
               lte(dailyPositionSnapshots.snapshotDate, serviceDate),
@@ -207,7 +244,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
             desc(dailyPositionSnapshots.createdAt),
           )
           .limit(selectedPositionRowLimit),
-    wholeAccountIds.length === 0
+    demand.surface !== "home" || wholeAccountIds.length === 0
       ? Promise.resolve([])
       : db
           .select(getTableColumns(dailyPortfolioSnapshots))
@@ -265,6 +302,24 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
     serviceDate,
   );
 
+  return {
+    accountRows,
+    assetGroupRows,
+    assetRows,
+    settingsRows,
+    latestFxRows: recentFxRows.slice(0, 1),
+    recentFxRows,
+    latestPositionRows: baselineSelection.rows,
+    baselineReferenceDate: baselineSelection.baselineReferenceDate,
+    recentPositionRows,
+    historyAssetIds,
+    recentPortfolioRows,
+    eventRows,
+    unmatchedSnapshotCountRows,
+  };
+}
+
+async function loadDashboardQuoteRows(assetRows: readonly (typeof assets.$inferSelect)[]) {
   const quoteTickers = uniqueStrings(
     assetRows
       .map((asset) => normalizeTicker(asset.ticker))
@@ -273,7 +328,6 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
   const selectedPriceInstruments = assetRows.map(
     ({ market, currency, ticker }) => ({ market, currency, ticker }),
   );
-
   const [liveQuoteRows, recentPriceRows] = await Promise.all([
     quoteTickers.length > 0
       ? db
@@ -293,22 +347,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
       : Promise.resolve([]),
   ]);
 
-  return {
-    accountRows,
-    assetGroupRows,
-    assetRows,
-    settingsRows,
-    latestFxRows: recentFxRows.slice(0, 1),
-    recentFxRows,
-    latestPositionRows: baselineSelection.rows,
-    baselineReferenceDate: baselineSelection.baselineReferenceDate,
-    recentPositionRows,
-    recentPortfolioRows,
-    eventRows,
-    unmatchedSnapshotCountRows,
-    liveQuoteRows,
-    recentPriceRows,
-  };
+  return { liveQuoteRows, recentPriceRows };
 }
 
 function activeOwnedAccountPredicates(tenantContext: TenantContext) {

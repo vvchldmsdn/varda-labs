@@ -149,6 +149,7 @@ export function InvestmentLabTimeMachine({
               size="wide"
               title={`${labScenarioLabel(selected.id)} · 날짜별 비교`}
             >
+              {() => (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] border-collapse text-sm">
                   <thead className="text-left text-xs text-[var(--muted)]">
@@ -198,8 +199,10 @@ export function InvestmentLabTimeMachine({
                   </tbody>
                 </table>
               </div>
+              )}
             </InvestmentLabDialog>
           <InvestmentLabDialog label="시나리오·성과" title="시나리오와 성과 비교" size="wide">
+        {() => <>
         {details ? <div className="mb-6 flex flex-wrap gap-3">{details}</div> : null}
         <aside
           className={styles.scenarios}
@@ -353,10 +356,11 @@ export function InvestmentLabTimeMachine({
       <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-[11px] text-[var(--faint)]">
         <span>{labScenarioDetail(selected.id)}</span>
         <span>
-          {chart.period.comparisonDateCount}개 평가일 · 같은 기간·입출금
+          {chart.period!.comparisonDateCount}개 평가일 · 같은 기간·입출금
         </span>
       </div>
-          </InvestmentLabDialog>
+           </>}
+           </InvestmentLabDialog>
           </div>
     </div>
   );

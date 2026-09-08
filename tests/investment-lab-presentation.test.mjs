@@ -105,8 +105,9 @@ describe("investment lab presentation", () => {
   it("keeps the main comparison visible and preserves dialog query state", () => {
     const workspace = component("investment-lab-workspace");
     const controls = component("investment-lab-query-controls");
-    assert.match(workspace, /router\.push/);
-    assert.match(workspace, /loadedPanel !== activeOverlay/);
+    assert.match(workspace, /useResearchPanelNavigation/);
+    assert.match(workspace, /<RemotePanel/);
+    assert.doesNotMatch(workspace, /router\.push|loadedPanel/);
     assert.match(workspace, /<dialog/);
     assert.match(workspace, /data-lab-workspace="integrated"/);
     assert.match(workspace, /styles.canvas.*\{comparison\}/s);

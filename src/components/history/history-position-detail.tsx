@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { HistoryEvidenceLink as Link } from "./history-records-dialog";
 
 import type {
   HistoryPositionDetailModel,
