@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationRegimeScenarioResult } from "@/lib/simulation-regime-bootstrap";
 
 import {
@@ -48,13 +49,11 @@ export function RegimeScenarioCard({
           <h3 className="mt-1 text-lg font-semibold">{scenario.name}</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">
             069500 {formatBps(scenario.weightsBps[0])} · VOO{" "}
-            {formatBps(scenario.weightsBps[1])} · 최초 배분 후 리밸런싱 없음
-          </p>
+            {formatBps(scenario.weightsBps[1])} {" "}<SimulationText ko={"· 최초 배분 후 리밸런싱 없음"} />{" "}</p>
         </div>
         {selected ? (
           <span className="shrink-0 rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
-            현재 입력
-          </span>
+            <SimulationText ko={"현재 입력"} />{" "}</span>
         ) : null}
       </header>
       <SimulationTerminalRiskMetrics compact terminal={scenario.terminal} />

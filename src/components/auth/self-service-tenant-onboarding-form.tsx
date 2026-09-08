@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthText } from "./auth-localized";
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle } from "lucide-react";
@@ -43,18 +44,18 @@ export function SelfServiceTenantOnboardingForm({
           value={SELF_SERVICE_TENANT_ONBOARDING_POLICY.confirmationValue}
           disabled={pending}
         />
-        <span>연결해야 할 기존 기록이 없으며, 새 포트폴리오로 시작합니다.</span>
+        <span><AuthText>{"연결해야 할 기존 기록이 없으며, 새 포트폴리오로 시작합니다."}</AuthText></span>
       </label>
 
       {state.status !== "idle" ? (
         <p role="alert" className={styles.error}>
-          {state.status === "invalid"
+          <AuthText>{state.status === "invalid"
             ? "새 포트폴리오로 시작하는지 확인해 주세요."
             : state.status === "unauthorized"
               ? "로그인 상태를 확인하지 못했습니다. 다시 로그인해 주세요."
               : state.status === "conflict"
                 ? "계정 연결 상태가 변경됐습니다. 새로고침 후 기존 기록을 확인해 주세요."
-                : "포트폴리오를 만들지 못했습니다. 잠시 후 다시 시도해 주세요."}
+                : "포트폴리오를 만들지 못했습니다. 잠시 후 다시 시도해 주세요."}</AuthText>
         </p>
       ) : null}
 
@@ -64,7 +65,7 @@ export function SelfServiceTenantOnboardingForm({
         className={styles.primaryButton}
         aria-busy={pending}
       >
-        {pending ? "포트폴리오 만드는 중" : "새 포트폴리오 만들기"}
+        <AuthText>{pending ? "포트폴리오 만드는 중" : "새 포트폴리오 만들기"}</AuthText>
         {pending ? (
           <LoaderCircle
             size={17}

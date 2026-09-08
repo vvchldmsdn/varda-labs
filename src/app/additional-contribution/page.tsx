@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { AdditionalContributionPageView } from "@/components/additional-contribution/additional-contribution-page-view";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
@@ -7,7 +8,9 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "추가 투입 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "추가 투입 | VARDA LABS" }, "Contribute | VARDA LABS");
+}
 
 const DEFAULT_AMOUNT_KRW = 3_000_000;
 const MAX_AMOUNT_KRW = 100_000_000_000;
@@ -56,9 +59,11 @@ export default async function AdditionalContributionPage({
     return (
       <PortfolioReadAccessBoundary
         closedMessage="로그인과 계정 소유권이 확인되기 전에는 추가 투입 계산 데이터를 읽지 않습니다."
+        closedMessageEn="Contribution data is read only after sign-in and account ownership are verified."
         description="승인된 목표비중과 현재 평가액을 로그인한 사용자의 계정 범위에서만 읽습니다."
+        descriptionEn="Approved targets and current valuations are read only within the signed-in user’s account scope."
         resolution={resolution}
-        title="추가 투입"
+        title="추가 투입" titleEn="Contribution"
       />
     );
   }
@@ -76,7 +81,7 @@ export default async function AdditionalContributionPage({
       <PortfolioAnalysisScopeBoundary
         basePath="/additional-contribution"
         context={scopeContext}
-        title="추가 투입"
+        title="추가 투입" titleEn="Contribution"
       />
     );
   }

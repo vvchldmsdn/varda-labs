@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationRegimeHistoricalOutcomeValidationResult } from "@/lib/simulation-regime-historical-outcome-validation";
 
 export function RegimeHistoricalOutcomeValidationSection({
@@ -25,25 +26,17 @@ export function RegimeHistoricalOutcomeValidationSection({
             className="text-lg font-semibold"
             id="regime-historical-outcome-title"
           >
-            시장 국면 모델 과거 결과 대조
-          </h2>
+            <SimulationText ko={"시장 국면 모델 과거 결과 대조"} />{" "}</h2>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
-            과거 각 기준일에서 이전 120개 수익률과 당시까지 공개된
-            시장 요인만 사용해 분포를 만든 뒤, 실제 다음 63개 서비스
-            기준일 결과와 비교합니다.
-          </p>
+            <SimulationText ko={"과거 각 기준일에서 이전 120개 수익률과 당시까지 공개된 시장 요인만 사용해 분포를 만든 뒤, 실제 다음 63개 서비스 기준일 결과와 비교합니다."} />{" "}</p>
           <p className="mt-1 text-sm font-medium text-[var(--ink)]">
-            고정 연구 시나리오: KODEX 200 50% + VOO 50%, 최초 배분 후
-            리밸런싱 없음
-          </p>
+            <SimulationText ko={"고정 연구 시나리오: KODEX 200 50% + VOO 50%, 최초 배분 후 리밸런싱 없음"} />{" "}</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
           <span className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[var(--brand)]">
-            사후 연구
-          </span>
+            <SimulationText ko={"사후 연구"} />{" "}</span>
           <span className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-3 py-1.5 text-[var(--warning)]">
-            시점 증거 미확립
-          </span>
+            <SimulationText ko={"시점 증거 미확립"} />{" "}</span>
         </div>
       </div>
 
@@ -83,21 +76,17 @@ export function RegimeHistoricalOutcomeValidationSection({
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-3 font-semibold">결과 기준일</th>
-                <th className="px-3 py-3 font-semibold">연구 기준일</th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"결과 기준일"} /></th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"연구 기준일"} /></th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  예측 P10-P90
-                </th>
+                  <SimulationText ko={"예측 P10-P90"} />{" "}</th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  예측 P50
-                </th>
+                  <SimulationText ko={"예측 P50"} />{" "}</th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  실제 수익률
-                </th>
+                  <SimulationText ko={"실제 수익률"} />{" "}</th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  실제 MDD / 예측 P90
-                </th>
-                <th className="px-3 py-3 font-semibold">상태</th>
+                  <SimulationText ko={"실제 MDD / 예측 P90"} />{" "}</th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"상태"} /></th>
               </tr>
             </thead>
             <tbody>
@@ -138,19 +127,18 @@ export function RegimeHistoricalOutcomeValidationSection({
                         {formatPct(row.predictedMaxDrawdownP90Pct)}
                       </td>
                       <td className="px-3 py-3">
-                        {row.inP10P90Band
+                        <SimulationText ko={row.inP10P90Band
                           ? "예측 구간 안"
-                          : "예측 구간 밖"}
+                          : "예측 구간 밖"} />
                       </td>
                     </>
                   ) : (
                     <>
                       <td className="px-3 py-3" colSpan={5}>
-                        {reasonLabel(row.reason)}
+                        <SimulationText ko={reasonLabel(row.reason)} />
                       </td>
                       <td className="px-3 py-3 text-[var(--warning)]">
-                        계산 불가
-                      </td>
+                        <SimulationText ko={"계산 불가"} />{" "}</td>
                     </>
                   )}
                 </tr>
@@ -160,18 +148,11 @@ export function RegimeHistoricalOutcomeValidationSection({
         </div>
       ) : (
         <p className="mt-4 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4 text-sm text-[var(--warning)]">
-          검증할 명시적 기준일과 입력 행이 아직 준비되지 않았습니다.
-        </p>
+          <SimulationText ko={"검증할 명시적 기준일과 입력 행이 아직 준비되지 않았습니다."} />{" "}</p>
       )}
 
       <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-        공개 시각과 과거 데이터 revision 이력이 현재 DB에 보존되지
-        않아 이 결과는 엄격한 과거 시점 재현이 아닙니다. 서로 겹치는
-        7개 구간은 독립 표본으로 세지 않으며, 합격 판정이나 모델
-        순위, 현재 보유 종목 추천에 사용하지 않습니다. 한 기준일의
-        입력이 비어 있으면 그 행만 계산 불가로 남기고 다른 결과는
-        유지합니다.
-      </p>
+        <SimulationText ko={"공개 시각과 과거 데이터 revision 이력이 현재 DB에 보존되지 않아 이 결과는 엄격한 과거 시점 재현이 아닙니다. 서로 겹치는 7개 구간은 독립 표본으로 세지 않으며, 합격 판정이나 모델 순위, 현재 보유 종목 추천에 사용하지 않습니다. 한 기준일의 입력이 비어 있으면 그 행만 계산 불가로 남기고 다른 결과는 유지합니다."} />{" "}</p>
     </section>
   );
 }
@@ -187,9 +168,9 @@ function SummaryItem({
 }) {
   return (
     <div className="border-b border-r border-[var(--line)] px-4 py-3 last:border-r-0 xl:border-b-0">
-      <p className="text-xs text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></p>
+      <p className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></p>
     </div>
   );
 }

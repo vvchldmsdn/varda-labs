@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerCandidateComparisonResult } from "@/lib/simulation-owner-candidate-comparison";
 
 import { OwnerOutcomeCandidateExplorer } from "./owner-outcome-candidate-explorer";
@@ -31,20 +32,14 @@ export function OwnerCandidateComparisonSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            현재안과 같은 500개 경로
-          </p>
+            <SimulationText ko={"현재안과 같은 500개 경로"} />{" "}</p>
           <h2 className="mt-1 text-lg font-semibold" id="owner-candidate-comparison-title">
-            변동성 완화 후보 비교
-          </h2>
+            <SimulationText ko={"변동성 완화 후보 비교"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            최근 90개 공동 수익률에서 변동성이 낮았던 비중을 찾고, 현재
-            비중과 동일한 날짜 추출·무작위 경로로 나란히 계산합니다. 회전율과
-            외화 비중 변화를 제한한 연구 후보이며 투자 추천이 아닙니다.
-          </p>
+            <SimulationText ko={"최근 90개 공동 수익률에서 변동성이 낮았던 비중을 찾고, 현재 비중과 동일한 날짜 추출·무작위 경로로 나란히 계산합니다. 회전율과 외화 비중 변화를 제한한 연구 후보이며 투자 추천이 아닙니다."} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
-          조회 시 계산 · 저장 안 함
-        </span>
+          <SimulationText ko={"조회 시 계산 · 저장 안 함"} />{" "}</span>
       </div>
 
       {comparison.status === "ready" ? (
@@ -54,11 +49,9 @@ export function OwnerCandidateComparisonSection({
           className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-owner-candidate-comparison-unavailable-reason={comparison.reason}
         >
-          <p className="font-semibold">후보 비중 비교를 만들지 않았습니다.</p>
+          <p className="font-semibold"><SimulationText ko={"후보 비중 비교를 만들지 않았습니다."} /></p>
           <p className="mt-1 text-sm leading-6 text-[var(--warning)]">
-            {unavailableReasonLabel(comparison.reason)} 현재 포트폴리오 확률
-            경로는 그대로 유지됩니다.
-          </p>
+            <SimulationText ko={unavailableReasonLabel(comparison.reason)} /> {" "}<SimulationText ko={"현재 포트폴리오 확률 경로는 그대로 유지됩니다."} />{" "}</p>
         </div>
       )}
     </section>
@@ -123,12 +116,7 @@ function ReadyCandidateComparison({
       </dl>
 
       <p className="mt-4 border-y border-[var(--line)] py-3 text-xs leading-5 text-[var(--muted)]">
-        두 그래프는 동일한 세로축과 동일한 bootstrap 추출 경로를 사용합니다.
-        후보는 종목당 최대 {formatWeight(comparison.constraints.maximumInstrumentWeightBps)},
-        한 방향 회전율 최대 {formatWeight(comparison.constraints.maximumOneWayTurnoverBps)},
-        외화 비중 변화 최대 {formatWeight(comparison.constraints.maximumFxExposureChangeBps)}로
-        제한했습니다.
-      </p>
+        <SimulationText ko={"두 그래프는 동일한 세로축과 동일한 bootstrap 추출 경로를 사용합니다. 후보는 종목당 최대"} />{" "}{formatWeight(comparison.constraints.maximumInstrumentWeightBps)}<SimulationText ko={", 한 방향 회전율 최대"} />{" "}{formatWeight(comparison.constraints.maximumOneWayTurnoverBps)}<SimulationText ko={", 외화 비중 변화 최대"} />{" "}{formatWeight(comparison.constraints.maximumFxExposureChangeBps)}<SimulationText ko={"로 제한했습니다."} />{" "}</p>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <ComparisonCard
@@ -147,10 +135,10 @@ function ReadyCandidateComparison({
         <table className="w-full min-w-[620px] border-collapse text-left text-sm">
           <thead className="text-xs text-[var(--muted)]">
             <tr>
-              <th className="px-4 py-3 font-semibold">종목</th>
-              <th className="px-4 py-3 text-right font-semibold">현재</th>
-              <th className="px-4 py-3 text-right font-semibold">후보</th>
-              <th className="px-4 py-3 text-right font-semibold">변화</th>
+              <th className="px-4 py-3 font-semibold"><SimulationText ko={"종목"} /></th>
+              <th className="px-4 py-3 text-right font-semibold"><SimulationText ko={"현재"} /></th>
+              <th className="px-4 py-3 text-right font-semibold"><SimulationText ko={"후보"} /></th>
+              <th className="px-4 py-3 text-right font-semibold"><SimulationText ko={"변화"} /></th>
             </tr>
           </thead>
           <tbody>
@@ -196,11 +184,7 @@ function ReadyCandidateComparison({
       />
 
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        이 후보는 같은 90개 과거 행으로 비중을 추정하고 미래 경로도 만들기
-        때문에 아직 표본 내 연구 결과입니다. 수수료·세금은 0으로 가정했으며,
-        별도의 시점별 검증을 통과하기 전에는 추천·주문 비중으로 사용할 수
-        없습니다.
-      </p>
+        <SimulationText ko={"이 후보는 같은 90개 과거 행으로 비중을 추정하고 미래 경로도 만들기 때문에 아직 표본 내 연구 결과입니다. 수수료·세금은 0으로 가정했으며, 별도의 시점별 검증을 통과하기 전에는 추천·주문 비중으로 사용할 수 없습니다."} />{" "}</p>
     </div>
   );
 }
@@ -220,7 +204,7 @@ function ComparisonCard({
   return (
     <article className="overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]">
       <h3 className="border-b border-[var(--line)] px-4 py-3 font-semibold">
-        {label}
+        <SimulationText ko={label} />
       </h3>
       <SimulationTerminalRiskMetrics compact terminal={execution.terminal} />
       <ResearchFanChart execution={execution} valueDomain={valueDomain} />
@@ -239,9 +223,9 @@ function Metric({
 }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[var(--muted)]">{detail}</dd>
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></dd>
     </div>
   );
 }

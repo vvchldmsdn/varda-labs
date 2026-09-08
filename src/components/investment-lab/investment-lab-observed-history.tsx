@@ -1,3 +1,6 @@
+import { LabText } from "./lab-text";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
+import { labEnglish } from "./lab-copy";
 import Link from "next/link";
 
 import type {
@@ -52,24 +55,16 @@ export function InvestmentLabObservedHistoryView({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold">선택 구간 관측 경로</h2>
-            <span className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-2 py-1 text-xs font-semibold text-[var(--warning)]">
-              부분 표시
-            </span>
+            <h2 className="text-lg font-semibold"><LabText value="선택 구간 관측 경로" /></h2>
+            <span className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-2 py-1 text-xs font-semibold text-[var(--warning)]"><LabText value=" 부분 표시 " /></span>
           </div>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            저장 방식이 바뀐 지점은 연결하지 않았습니다. 아래 선은 실제로 저장된
-            평가액만 표시하며, 비어 있는 날짜의 평균값 생성이나 외부 API 보충은
-            하지 않습니다.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 저장 방식이 바뀐 지점은 연결하지 않았습니다. 아래 선은 실제로 저장된 평가액만 표시하며, 비어 있는 날짜의 평균값 생성이나 외부 API 보충은 하지 않습니다. " /></p>
         </div>
         {latestCalculationHref ? (
           <Link
             className="inline-flex h-10 items-center justify-center rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-[var(--ink)]"
             href={latestCalculationHref}
-          >
-            최신 계산 가능 구간 열기
-          </Link>
+          ><LabText value=" 최신 계산 가능 구간 열기 " /></Link>
         ) : null}
       </div>
 
@@ -86,13 +81,10 @@ export function InvestmentLabObservedHistoryView({
         ))}
       </div>
 
-      <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-        관측일 {model.coverage.admittedDateCount}일
-        {model.coverage.skippedDateCount > 0
+      <p className="mt-4 text-xs leading-5 text-[var(--muted)]"><LabText value=" 관측일 " />{model.coverage.admittedDateCount}<LabText value="일 " /><LabText value={model.coverage.skippedDateCount > 0
           ? ` · 입력 검증에서 제외 ${model.coverage.skippedDateCount}일`
-          : ""}
-        {" · "}구간 사이에는 수익률·시나리오 계산을 적용하지 않습니다.
-      </p>
+          : ""} />
+        {" · "}<LabText value="구간 사이에는 수익률·시나리오 계산을 적용하지 않습니다. " /></p>
     </section>
   );
 }
@@ -127,7 +119,7 @@ function ObservedHistoryChart({
       <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--muted)]">
         <Legend color="var(--warning)" label="이전 서비스 관측" />
         <Legend color="var(--ink)" label="현재 저장기 관측" />
-        <span>점 하나가 실제 저장 관측일입니다.</span>
+        <span><LabText value="점 하나가 실제 저장 관측일입니다." /></span>
       </div>
       <svg
         aria-labelledby="observed-history-title observed-history-description"
@@ -135,10 +127,8 @@ function ObservedHistoryChart({
         role="img"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       >
-        <title id="observed-history-title">저장 출처별 실제 평가액 관측 경로</title>
-        <desc id="observed-history-description">
-          레거시 관측과 현재 저장기 관측을 서로 연결하지 않고 표시한 그래프
-        </desc>
+        <LocalizedSvgText as="title" id="observed-history-title" ko="저장 출처별 실제 평가액 관측 경로" en={labEnglish("저장 출처별 실제 평가액 관측 경로")} />
+        <LocalizedSvgText as="desc" id="observed-history-description" ko="레거시 관측과 현재 저장기 관측을 서로 연결하지 않고 표시한 그래프" en={labEnglish("레거시 관측과 현재 저장기 관측을 서로 연결하지 않고 표시한 그래프")} />
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const lineY = PADDING_Y + ratio * (HEIGHT - PADDING_Y * 2);
           return (
@@ -206,13 +196,12 @@ function SegmentSummary({
   const lastValue = segment.rows.at(-1)!.totalMarketValueKrw;
   return (
     <div className="border-l-2 border-[var(--line)] pl-3">
-      <p className="text-sm font-semibold">{segmentLabel(segment.role)}</p>
+      <p className="text-sm font-semibold"><LabText value={segmentLabel(segment.role)} /></p>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {formatDate(segment.startServiceDate)} ~ {formatDate(segment.endServiceDate)}
-        {" · "}{segment.observationCount}개 관측
-      </p>
+        {" · "}{segment.observationCount}<LabText value="개 관측 " /></p>
       <p className="mt-2 text-sm tabular-nums text-[var(--ink)]">
-        {formatKrw(firstValue)} → {formatKrw(lastValue)}
+        <LabText value={formatKrw(firstValue)} /> → <LabText value={formatKrw(lastValue)} />
       </p>
     </div>
   );
@@ -226,7 +215,7 @@ function Legend({ color, label }: { color: string; label: string }) {
         className="h-1 w-7 rounded-full"
         style={{ backgroundColor: color }}
       />
-      {label}
+      <LabText value={label} />
     </span>
   );
 }

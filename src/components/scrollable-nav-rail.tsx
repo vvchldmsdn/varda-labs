@@ -7,11 +7,13 @@ export function ScrollableNavRail({
   children,
   contentClassName = "",
   viewportClassName = "",
+  scopeRail = false,
 }: {
   ariaLabel: string;
   children: ReactNode;
   contentClassName?: string;
   viewportClassName?: string;
+  scopeRail?: boolean;
 }) {
   const viewportRef = useRef<HTMLElement>(null);
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
@@ -47,6 +49,7 @@ export function ScrollableNavRail({
     <nav
       ref={viewportRef}
       aria-label={ariaLabel}
+      data-scope-rail={scopeRail || undefined}
       className={`varda-scroll-rail ${viewportClassName}`}
       data-at-end={edges.atEnd}
       data-at-start={edges.atStart}

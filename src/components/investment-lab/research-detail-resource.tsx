@@ -1,5 +1,7 @@
 "use client";
 
+import { LabText } from "./lab-text";
+
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -45,6 +47,6 @@ export function useResearchDetail<T>(endpoint: string, query: string) {
 }
 
 export function ResearchDetailStatus({ error, retry }: { error?: string; retry: () => void }) {
-  return error ? <div role="alert" className="space-y-4 py-8 text-sm text-[var(--warning)]"><p>{error}</p><button type="button" onClick={retry} className="varda-action">다시 시도</button></div>
-    : <p role="status" className="motion-safe:animate-pulse py-10 text-sm text-[var(--muted)]">선택한 분석을 계산하고 있습니다.</p>;
+  return error ? <div role="alert" className="space-y-4 py-8 text-sm text-[var(--warning)]"><p><LabText value={error} /></p><button type="button" onClick={retry} className="varda-action"><LabText value="다시 시도" /></button></div>
+    : <p role="status" className="motion-safe:animate-pulse py-10 text-sm text-[var(--muted)]"><LabText value="선택한 분석을 계산하고 있습니다." /></p>;
 }

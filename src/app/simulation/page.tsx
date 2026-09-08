@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { SimulationText } from "@/components/simulation/simulation-text";
 import { Suspense } from "react";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
@@ -12,7 +14,9 @@ import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulatio
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "시뮬레이션 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "시뮬레이션 | VARDA LABS" }, "Simulation | VARDA LABS");
+}
 type SimulationPageProps = {
   searchParams: Promise<{
     account?: string | string[];
@@ -40,10 +44,12 @@ export default async function SimulationPage({
   if (!resolution.ok) {
     return (
       <PortfolioReadAccessBoundary
-        closedMessage="Simulation research remains closed until the session and user link are available."
-        description="This view reads shared market research only after the signed-in user is resolved on the server."
+        closedMessage="로그인과 사용자 연결이 확인된 뒤에 시뮬레이션을 읽습니다."
+        closedMessageEn="Simulation research remains closed until the session and user link are available."
+        description="서버에서 로그인한 사용자를 확인한 뒤에 시장 연구 데이터를 읽습니다."
+        descriptionEn="This view reads shared market research only after the signed-in user is resolved on the server."
         resolution={resolution}
-        title="Simulation validation"
+        title="시뮬레이션 검증" titleEn="Simulation validation"
       />
     );
   }
@@ -61,7 +67,7 @@ export default async function SimulationPage({
       <PortfolioAnalysisScopeBoundary
         basePath="/simulation"
         context={scopeContext}
-        title="Simulation validation"
+        title="시뮬레이션 검증" titleEn="Simulation validation"
       />
     );
   }
@@ -77,7 +83,7 @@ async function SimulationContent({modelPromise, ownerResearchPromise, scopeCatal
 }) {
  const model = await modelPromise;
  return <SimulationInputReadinessView model={model} scopeCatalog={scopeCatalog} selectedScopeKey={selectedScope.key} researchUniverse={researchUniverse}
- ownerResearchExecution={<SimulationSectionErrorBoundary section="owner-research-execution" title="내 포트폴리오 확률 경로"><Suspense fallback={<p role="status">확률 경로를 계산하고 있습니다.</p>}><OwnerResearchExecutionContent resultPromise={ownerResearchPromise} /></Suspense></SimulationSectionErrorBoundary>} />;
+ ownerResearchExecution={<SimulationSectionErrorBoundary section="owner-research-execution" title="내 포트폴리오 확률 경로"><Suspense fallback={<p role="status"><SimulationText ko="확률 경로를 계산하고 있습니다." /></p>}><OwnerResearchExecutionContent resultPromise={ownerResearchPromise} /></Suspense></SimulationSectionErrorBoundary>} />;
 }
 async function OwnerResearchExecutionContent({resultPromise}: {resultPromise: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch>}) { const result = await resultPromise; return <OwnerResearchExecutionSection execution={result.execution} />; }
 function SimulationSkeleton() {

@@ -1,5 +1,8 @@
 "use client";
 
+import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
+
+
 import { useState, type CSSProperties } from "react";
 import styles from "../portfolio-structure/allocation-ring.module.css";
 
@@ -12,6 +15,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect }: {
   selectedKey: string;
   onSelect: (key: string) => void;
 }) {
+  const pt = usePortfolioText();
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const active = entries.find((entry) => entry.key === (hoveredKey ?? selectedKey)) ?? entries[0];
   const positive = entries.filter((entry) => Number.isFinite(entry.weightPct) && entry.weightPct > 0);
@@ -27,7 +31,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect }: {
 
   return (
     <div className={styles.ring} data-allocation-ring onPointerLeave={() => setHoveredKey(null)}>
-      <svg className={styles.svg} viewBox="0 0 520 520" role="group" aria-label="보유 종목별 평가액 비중">
+      <svg className={styles.svg} viewBox="0 0 520 520" role="group" aria-label={pt("보유 종목별 평가액 비중")}>
         {segments.length === 0 ? <circle cx="260" cy="260" r="185" fill="none" stroke="var(--line)" strokeWidth="52" /> : null}
         {segments.map((segment, index) => {
           const middle = segment.start + segment.span / 2;
@@ -71,13 +75,13 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect }: {
         })}
       </svg>
       <div className={styles.center}>
-        <span className={styles.centerLabel}>{hoveredKey ? "살펴보는 종목" : "선택한 종목"}</span>
+        <span className={styles.centerLabel}><PortfolioText ko={hoveredKey ? "살펴보는 종목" : "선택한 종목"} /></span>
         <div key={active?.key} className={styles.centerValue}>
           <strong>{active && Number.isFinite(active.weightPct) ? <>{active.weightPct.toFixed(2)}<small>%</small></> : "—"}</strong>
-          <p>{active?.name ?? "보유 종목 없음"}</p>
+          <p>{active?.name ?? <PortfolioText ko="보유 종목 없음" />}</p>
         </div>
       </div>
-      <p className={styles.hint}>조각을 선택해 비중과 목표를 비교하세요</p>
+      <p className={styles.hint}><PortfolioText ko={"조각을 선택해 비중과 목표를 비교하세요"} /></p>
     </div>
   );
 }

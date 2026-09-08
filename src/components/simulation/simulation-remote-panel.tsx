@@ -1,5 +1,8 @@
 "use client";
 
+import { SimulationText } from "@/components/simulation/simulation-text";
+
+
 import type { ReactNode } from "react";
 import { SimulationSectionErrorBoundary } from "./simulation-section-error-boundary";
 import type { SimulationDetailData } from "@/db/queries/simulation-detail";
@@ -25,7 +28,7 @@ export default function SimulationRemotePanel({ query }: { query: string }) {
   if (!data) return <ResearchDetailStatus error={error} retry={retry} />;
   if (data.panel === "weights" && data.candidateComparison) return <div id="simulation-weight-experiment">{protect("OwnerCandidateComparisonSection", <OwnerCandidateComparisonSection comparison={data.candidateComparison} instruments={data.instruments} />)}</div>;
   return <>
-    {data.unavailableSections.length ? <p role="status" className="py-3 text-sm text-[var(--warning)]">읽지 못한 근거: {data.unavailableSections.join(", ")}. 준비된 결과는 아래에 표시합니다.</p> : null}
+    {data.unavailableSections.length ? <p role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"읽지 못한 근거:"} />{" "}{data.unavailableSections.join(", ")}<SimulationText ko={". 준비된 결과는 아래에 표시합니다."} /></p> : null}
     {protect("simulation-detail", <SimulationDetailView panel={data.panel} model={data.model} scopeCatalog={data.scopeCatalog} selectedScopeKey={data.selectedScope.key} researchUniverse={data.preservedQuery.researchUniverse}
       ownerWalkForwardValidation={data.walkForwardValidation && protect("OwnerWalkForwardValidationSection", <OwnerWalkForwardValidationSection result={data.walkForwardValidation} />)}
       ownerHistoricalValidation={data.historicalValidation && protect("OwnerHistoricalOutcomeValidationSection", <OwnerHistoricalOutcomeValidationSection result={data.historicalValidation} />)}

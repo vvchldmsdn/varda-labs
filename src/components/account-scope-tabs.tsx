@@ -1,3 +1,4 @@
+import { ManagementElement, ManagementText } from "@/components/i18n/management-text";
 import Link from "next/link";
 
 import {
@@ -23,7 +24,7 @@ export function AccountScopeTabs({
   selectedAccount: PortfolioAccountScope;
 }) {
   return (
-    <nav
+    <ManagementElement as="nav"
       aria-label="계좌 범위"
       className="flex w-fit max-w-full overflow-x-auto rounded-md border border-[var(--line)] bg-white p-1"
     >
@@ -44,11 +45,11 @@ export function AccountScopeTabs({
               query,
             )}
           >
-            {tab.label}
+            <ManagementText>{tab.label}</ManagementText>
           </Link>
         );
       })}
-    </nav>
+    </ManagementElement>
   );
 }
 

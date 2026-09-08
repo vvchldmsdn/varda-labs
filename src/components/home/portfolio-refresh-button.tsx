@@ -1,4 +1,8 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { useI18n } from "@/components/i18n/locale-provider";
+
 
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
@@ -22,6 +26,7 @@ export function PortfolioRefreshButton({
   compact?: boolean;
   designPreview?: boolean;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [refreshPending, startTransition] = useTransition();
   const [syncState, setSyncState] = useState<SyncState>("idle");
@@ -79,7 +84,7 @@ export function PortfolioRefreshButton({
   return (
     <button
       type="button"
-      aria-label="실시간 시세 갱신"
+      aria-label={t("실시간 시세 갱신", "Refresh live prices")}
       className={
         compact
           ? "grid h-9 w-9 place-items-center text-xl text-[var(--ink)] transition-colors hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] disabled:opacity-40"
@@ -87,12 +92,12 @@ export function PortfolioRefreshButton({
       }
       disabled={pending}
       onClick={() => designPreview ? startTransition(() => router.refresh()) : void sync("manual")}
-      title={designPreview ? "디자인 미리보기 새로고침" : syncTitle(syncState)}
+      title={t(designPreview ? "디자인 미리보기 새로고침" : syncTitle(syncState), translateHomeHistory(designPreview ? "디자인 미리보기 새로고침" : syncTitle(syncState)))}
     >
       <span aria-hidden="true" className={pending ? "animate-spin" : undefined}>
         <RefreshCw size={15} strokeWidth={1.5} />
       </span>
-      {compact ? null : <span aria-live="polite">{syncLabel(syncState)}</span>}
+      {compact ? null : <span aria-live="polite">{<T ko={syncLabel(syncState)} en={translateHomeHistory(syncLabel(syncState))}/>}</span>}
     </button>
   );
 }

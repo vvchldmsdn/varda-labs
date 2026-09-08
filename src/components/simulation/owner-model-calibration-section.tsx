@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerModelCalibrationResult } from "@/lib/simulation-owner-model-calibration";
 
 type CalibrationRow =
@@ -26,24 +27,17 @@ export function OwnerModelCalibrationSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            같은 과거 구간에서 실제 결과와 대조
-          </p>
+            <SimulationText ko={"같은 과거 구간에서 실제 결과와 대조"} />{" "}</p>
           <h2
             className="mt-1 text-lg font-semibold"
             id="owner-model-calibration-title"
           >
-            과거 결과로 두 모형 점검
-          </h2>
+            <SimulationText ko={"과거 결과로 두 모형 점검"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            부트스트랩과 요인·잔차 모형이 예측한 범위를 이후 21거래일의
-            실제 결과와 같은 조건에서 비교합니다. 숫자가 낮을수록 과거
-            오차가 작았다는 뜻일 뿐, 우승 모형이나 투자 추천을 정하지
-            않습니다.
-          </p>
+            <SimulationText ko={"부트스트랩과 요인·잔차 모형이 예측한 범위를 이후 21거래일의 실제 결과와 같은 조건에서 비교합니다. 숫자가 낮을수록 과거 오차가 작았다는 뜻일 뿐, 우승 모형이나 투자 추천을 정하지 않습니다."} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
-          읽기 전용 · 모형 선택 금지
-        </span>
+          <SimulationText ko={"읽기 전용 · 모형 선택 금지"} />{" "}</span>
       </div>
 
       <dl className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -99,13 +93,13 @@ export function OwnerModelCalibrationSection({
         <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
-              <th className="px-3 py-2 font-semibold">결과 기준일</th>
-              <th className="px-3 py-2 text-right font-semibold">실제 수익률</th>
-              <th className="px-3 py-2 text-right font-semibold">부트스트랩 중앙값</th>
-              <th className="px-3 py-2 text-right font-semibold">부트스트랩 오차</th>
-              <th className="px-3 py-2 text-right font-semibold">요인 모형 중앙값</th>
-              <th className="px-3 py-2 text-right font-semibold">요인 모형 오차</th>
-              <th className="px-3 py-2 font-semibold">상태</th>
+              <th className="px-3 py-2 font-semibold"><SimulationText ko={"결과 기준일"} /></th>
+              <th className="px-3 py-2 text-right font-semibold"><SimulationText ko={"실제 수익률"} /></th>
+              <th className="px-3 py-2 text-right font-semibold"><SimulationText ko={"부트스트랩 중앙값"} /></th>
+              <th className="px-3 py-2 text-right font-semibold"><SimulationText ko={"부트스트랩 오차"} /></th>
+              <th className="px-3 py-2 text-right font-semibold"><SimulationText ko={"요인 모형 중앙값"} /></th>
+              <th className="px-3 py-2 text-right font-semibold"><SimulationText ko={"요인 모형 오차"} /></th>
+              <th className="px-3 py-2 font-semibold"><SimulationText ko={"상태"} /></th>
             </tr>
           </thead>
           <tbody>
@@ -121,9 +115,7 @@ export function OwnerModelCalibrationSection({
           className="mt-3 text-sm text-[var(--warning)]"
           data-owner-model-calibration-partial
         >
-          비교할 수 없는 구간 {result.summary.unavailableEndpointCount}개도
-          숨기지 않고 표에 남겼습니다.
-        </p>
+          <SimulationText ko={"비교할 수 없는 구간"} />{" "}{result.summary.unavailableEndpointCount}<SimulationText ko={"개도 숨기지 않고 표에 남겼습니다."} />{" "}</p>
       ) : null}
 
       {result.summary.endpointCount > 0 &&
@@ -132,21 +124,13 @@ export function OwnerModelCalibrationSection({
           className="mt-3 text-sm text-[var(--muted)]"
           data-owner-model-calibration-history-limited
         >
-          현재 저장 이력으로는 서로 겹치지 않는 구간을 최대{" "}
-          {result.policy.maximumEndpointCount}개 중 {result.summary.endpointCount}
-          개 구성할 수 있습니다. 부족한 과거 구간은 평균값이나 현재 가격으로
-          만들지 않았습니다.
-        </p>
+          <SimulationText ko={"현재 저장 이력으로는 서로 겹치지 않는 구간을 최대"} />{" "}
+          {result.policy.maximumEndpointCount}<SimulationText ko={"개 중"} />{" "}{result.summary.endpointCount}
+          <SimulationText ko={"개 구성할 수 있습니다. 부족한 과거 구간은 평균값이나 현재 가격으로 만들지 않았습니다."} />{" "}</p>
       ) : null}
 
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        현재 계좌 구성과 비중을 과거 구간에 소급 적용한 진단입니다. 21거래일
-        결과 구간은 저장된 서비스 날짜 축에서 수익률이 서로 겹치지 않게
-        구성합니다. 그래도 표본 수가 적으므로 통계적 신뢰도나 모형 순위를
-        주장하지 않습니다. 요인 데이터는 당시 공개일 기준으로만 사용하지만
-        데이터의 과거 버전 기록은 보존되지 않아, 이후 정정된 값이 포함될 수
-        있습니다.
-      </p>
+        <SimulationText ko={"현재 계좌 구성과 비중을 과거 구간에 소급 적용한 진단입니다. 21거래일 결과 구간은 저장된 서비스 날짜 축에서 수익률이 서로 겹치지 않게 구성합니다. 그래도 표본 수가 적으므로 통계적 신뢰도나 모형 순위를 주장하지 않습니다. 요인 데이터는 당시 공개일 기준으로만 사용하지만 데이터의 과거 버전 기록은 보존되지 않아, 이후 정정된 값이 포함될 수 있습니다."} />{" "}</p>
     </section>
   );
 }
@@ -160,9 +144,8 @@ function CalibrationTableRow({ row }: { row: CalibrationRow }) {
       >
         <td className="px-3 py-3 tabular-nums">{row.outcomeEndServiceDate}</td>
         <td className="px-3 py-3 text-right" colSpan={5}>
-          비교 자료 부족
-        </td>
-        <td className="px-3 py-3">{unavailableReason(row.reason)}</td>
+          <SimulationText ko={"비교 자료 부족"} />{" "}</td>
+        <td className="px-3 py-3"><SimulationText ko={unavailableReason(row.reason)} /></td>
       </tr>
     );
   }
@@ -184,9 +167,9 @@ function CalibrationTableRow({ row }: { row: CalibrationRow }) {
         {formatPctPoint(row.factor.absoluteP50ErrorPctPoints)}
       </td>
       <td className="px-3 py-3">
-        {row.bootstrap.inP10P90Band ? "부트스트랩 범위 적중" : "부트스트랩 범위 밖"}
+        <SimulationText ko={row.bootstrap.inP10P90Band ? "부트스트랩 범위 적중" : "부트스트랩 범위 밖"} />
         {" · "}
-        {row.factor.inP10P90Band ? "요인 범위 적중" : "요인 범위 밖"}
+        <SimulationText ko={row.factor.inP10P90Band ? "요인 범위 적중" : "요인 범위 밖"} />
       </td>
     </tr>
   );
@@ -203,9 +186,9 @@ function Metric({
 }) {
   return (
     <div className="border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</dd>
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
+      <dd className="mt-1 text-xs leading-5 text-[var(--muted)]"><SimulationText ko={detail} /></dd>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
@@ -56,16 +57,13 @@ export function InvestmentLabScenarioMatrix({
       <div className="border-b border-[var(--wash)] px-4 py-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">시나리오 한눈에 비교</h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-              이미 계산된 경로만 같은 기간으로 맞춰 표시합니다. 순위나 추천이
-              아니라 계산 근거와 불가 사유를 확인하는 연구용 비교표입니다.
-            </p>
+            <h2 className="text-lg font-semibold"><LabText value="시나리오 한눈에 비교" /></h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 이미 계산된 경로만 같은 기간으로 맞춰 표시합니다. 순위나 추천이 아니라 계산 근거와 불가 사유를 확인하는 연구용 비교표입니다. " /></p>
           </div>
           <p className="text-xs leading-5 text-[var(--muted)]">
-            {matrix.period
+            <LabText value={matrix.period
               ? `${formatDate(matrix.period.startServiceDate)} ~ ${formatDate(matrix.period.endServiceDate)} · ${matrix.period.comparisonDateCount}개 평가일`
-              : "공통 비교 구간 없음"}
+              : "공통 비교 구간 없음"} />
           </p>
         </div>
       </div>
@@ -74,15 +72,15 @@ export function InvestmentLabScenarioMatrix({
         <table className="w-full min-w-[1380px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
-              <th className="px-4 py-3">시나리오</th>
-              <th className="px-3 py-3">상태</th>
-              <th className="px-3 py-3 text-right">종료 평가액</th>
-              <th className="px-3 py-3 text-right">실제 대비</th>
-              <th className="px-3 py-3 text-right">추정수익률</th>
-              <th className="px-3 py-3 text-right">관측 기준 MDD</th>
-              <th className="px-3 py-3 text-right">연환산 변동성</th>
-              <th className="px-3 py-3 text-right">흐름 / 대기 평가일</th>
-              <th className="px-4 py-3">가격·환율 근거</th>
+              <th className="px-4 py-3"><LabText value="시나리오" /></th>
+              <th className="px-3 py-3"><LabText value="상태" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="종료 평가액" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="실제 대비" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="추정수익률" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="관측 기준 MDD" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="연환산 변동성" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="흐름 / 대기 평가일" /></th>
+              <th className="px-4 py-3"><LabText value="가격·환율 근거" /></th>
             </tr>
           </thead>
           <tbody>
@@ -93,16 +91,7 @@ export function InvestmentLabScenarioMatrix({
         </table>
       </div>
 
-      <p className="border-t border-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">
-        MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을
-        연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만
-        표시합니다. 변동성은 최소 {MINIMUM_VOLATILITY_PERIODS}개의 연속 1일
-        기간수익률이 있을 때만 {VOLATILITY_ANNUALIZATION_FACTOR}일 기준으로
-        연환산합니다. KODEX 200과 VOO는 각 행에 표시된 단일 가격 근거를
-        사용하며, KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. USD
-        경로는 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가
-        아닙니다.
-      </p>
+      <p className="border-t border-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을 연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만 표시합니다. 변동성은 최소 " />{MINIMUM_VOLATILITY_PERIODS}<LabText value="개의 연속 1일 기간수익률이 있을 때만 " />{VOLATILITY_ANNUALIZATION_FACTOR}<LabText value="일 기준으로 연환산합니다. KODEX 200과 VOO는 각 행에 표시된 단일 가격 근거를 사용하며, KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. USD 경로는 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가 아닙니다. " /></p>
     </section>
   );
 }
@@ -126,7 +115,7 @@ function ScenarioRow({
     >
       <td className="px-4 py-3">
         <p className="font-semibold text-[var(--ink)]">
-          {scenarioLabel(row.id, model)}
+          <LabText value={scenarioLabel(row.id, model)} />
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
           {scenarioDetail(row.id, model)}
@@ -140,17 +129,17 @@ function ScenarioRow({
               : "font-semibold text-[var(--warning)]"
           }
         >
-          {row.status === "ready" ? "경로 계산" : "계산 불가"}
+          <LabText value={row.status === "ready" ? "경로 계산" : "계산 불가"} />
         </span>
         {row.status === "unavailable" ||
         row.returnEstimate.status === "unavailable" ? (
           <div className="mt-1 max-w-72 space-y-1 text-xs leading-5">
             <p className="text-[var(--warning)]">
-              <span className="font-semibold">원인</span> {diagnosis.reason}
+              <span className="font-semibold"><LabText value="원인" /></span> <LabText value={diagnosis.reason} />
             </p>
             <p className="text-[var(--muted)]">
-              <span className="font-semibold">해결</span>{" "}
-              {diagnosis.resolution}
+              <span className="font-semibold"><LabText value="해결" /></span>{" "}
+              <LabText value={diagnosis.resolution} />
             </p>
           </div>
         ) : null}
@@ -180,20 +169,20 @@ function ScenarioRow({
           {formatRiskPercentOrDash(row.riskMetrics.annualizedVolatility)}
         </p>
         <p className="mt-1 text-xs font-normal text-[var(--muted)]">
-          {riskEvidenceLabel(row.riskMetrics)}
+          <LabText value={riskEvidenceLabel(row.riskMetrics)} />
         </p>
       </td>
       <td className="px-3 py-3 text-right tabular-nums text-[var(--muted)]">
-        <p>{row.flowCount === null ? "-" : `${row.flowCount}건`}</p>
+        <p><LabText value={row.flowCount === null ? "-" : `${row.flowCount}건`} /></p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          {row.pendingComparisonCount === null
+          <LabText value={row.pendingComparisonCount === null
             ? "대기 해당 없음"
-            : `대기 ${row.pendingComparisonCount}일`}
+            : `대기 ${row.pendingComparisonCount}일`} />
         </p>
       </td>
       <td className="px-4 py-3 text-xs leading-5 text-[var(--muted)]">
-        <p>{priceBasisLabel(row.priceBasis)}</p>
-        <p className="text-[var(--muted)]">{fxBasisLabel(row.fxBasis)}</p>
+        <p><LabText value={priceBasisLabel(row.priceBasis)} /></p>
+        <p className="text-[var(--muted)]"><LabText value={fxBasisLabel(row.fxBasis)} /></p>
       </td>
     </tr>
   );

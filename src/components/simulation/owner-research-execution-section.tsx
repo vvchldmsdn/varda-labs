@@ -1,3 +1,5 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { simulationEnglish } from "@/components/simulation/simulation-copy";
 import type { SimulationOwnerResearchExecutionResult } from "@/lib/simulation-owner-research-execution";
 import { InvestmentLabDialog as SimulationDialog } from "@/components/investment-lab/investment-lab-dialog";
 import { ResearchFanChart } from "./research-fan-chart";
@@ -30,12 +32,11 @@ export function OwnerResearchExecutionSection({
             className="text-base font-semibold sm:text-lg"
             id="owner-research-execution-title"
           >
-            내 포트폴리오 확률 경로
-          </h2>
+            <SimulationText ko={"내 포트폴리오 확률 경로"} />{" "}</h2>
         </div>
         <SimulationDialog
-          label="결과 해석·계산 근거"
-          title="확률 경로를 읽는 방법"
+          label="결과 해석·계산 근거" labelEn={simulationEnglish("결과 해석·계산 근거")}
+          title="확률 경로를 읽는 방법" titleEn={simulationEnglish("확률 경로를 읽는 방법")}
           size="wide"
           compactLabel
         >
@@ -45,43 +46,26 @@ export function OwnerResearchExecutionSection({
                 P10 · P50 · P90
               </h3>
               <p>
-                각 시점에서 계산 경로의 아래 10%, 중앙 50%, 위 90% 경계입니다.
-                P10~P90은 모형 안에서 약 80%의 경로가 위치하는 구간이며, 실제
-                미래에 대한 80% 보장 구간은 아닙니다.
-              </p>
+                <SimulationText ko={"각 시점에서 계산 경로의 아래 10%, 중앙 50%, 위 90% 경계입니다. P10~P90은 모형 안에서 약 80%의 경로가 위치하는 구간이며, 실제 미래에 대한 80% 보장 구간은 아닙니다."} />{" "}</p>
             </div>
             <div>
               <h3 className="mb-2 font-medium text-[var(--ink)]">
-                손실 확률과 최대 낙폭
-              </h3>
+                <SimulationText ko={"손실 확률과 최대 낙폭"} />{" "}</h3>
               <p>
-                손실 종료 확률은 종료값이 시작값보다 작은 경로의 비율입니다.
-                MDD는 경로 안에서 고점 대비 가장 크게 하락한 폭입니다. P90 MDD는
-                더 큰 손실 쪽 경계입니다.
-              </p>
+                <SimulationText ko={"손실 종료 확률은 종료값이 시작값보다 작은 경로의 비율입니다. MDD는 경로 안에서 고점 대비 가장 크게 하락한 폭입니다. P90 MDD는 더 큰 손실 쪽 경계입니다."} />{" "}</p>
             </div>
             <div>
               <h3 className="mb-2 font-medium text-[var(--ink)]">
-                500개 경로 · 12개 표본
-              </h3>
+                <SimulationText ko={"500개 경로 · 12개 표본"} />{" "}</h3>
               <p>
-                최근 90개 공동 수익률을 평균 5단계 블록으로 재표본 추출합니다.
-                최초 배분 후 리밸런싱 없이 500개 경로를 계산하며, 차트에는 분포
-                또는 대표 표본 12개를 표시합니다. 표본만으로 전체 손실 확률을
-                판단하지 않습니다.
-              </p>
+                <SimulationText ko={"최근 90개 공동 수익률을 평균 5단계 블록으로 재표본 추출합니다. 최초 배분 후 리밸런싱 없이 500개 경로를 계산하며, 차트에는 분포 또는 대표 표본 12개를 표시합니다. 표본만으로 전체 손실 확률을 판단하지 않습니다."} />{" "}</p>
             </div>
             <div>
               <h3 className="mb-2 font-medium text-[var(--ink)]">
-                포함 범위와 가정
-              </h3>
+                <SimulationText ko={"포함 범위와 가정"} />{" "}</h3>
               <p>
-                현재 평가액의{" "}
-                {execution.coverage.modeledCurrentValuePct.toFixed(2)}%가 계산
-                대상입니다. 제외한 비중은 이력을 꾸며내지 않고 남겨 두며, 포함
-                종목만 100%로 다시 환산합니다. 수수료·세금·현금수익률 미포함,
-                조회 시 계산 · 저장 안 함.
-              </p>
+                <SimulationText ko={"현재 평가액의"} />{" "}
+                {execution.coverage.modeledCurrentValuePct.toFixed(2)}<SimulationText ko={"%가 계산 대상입니다. 제외한 비중은 이력을 꾸며내지 않고 남겨 두며, 포함 종목만 100%로 다시 환산합니다. 수수료·세금·현금수익률 미포함, 조회 시 계산 · 저장 안 함."} />{" "}</p>
             </div>
           </div>
           {execution.status === "ready" &&
@@ -90,18 +74,16 @@ export function OwnerResearchExecutionSection({
               data-owner-research-partial-coverage
               className="mt-6 border-l-2 border-[var(--warning)] pl-3 text-sm leading-7 text-[var(--warning)]"
             >
-              {formatWeight(execution.coverage.omittedWeightBps)} 제외 · 포함
-              종목만 100%로 환산한 부분 포트폴리오입니다.
-            </p>
+              {formatWeight(execution.coverage.omittedWeightBps)} {" "}<SimulationText ko={"제외 · 포함 종목만 100%로 환산한 부분 포트폴리오입니다."} />{" "}</p>
           ) : null}
           <div className="mt-6 overflow-x-auto border-y border-[var(--line)]">
             <table className="w-full min-w-[540px] text-left text-sm">
               <thead>
                 <tr className="text-xs text-[var(--muted)]">
-                  <th className="py-3 font-normal">종목</th>
-                  <th className="py-3 text-right font-normal">현재 비중</th>
-                  <th className="py-3 text-right font-normal">계산 비중</th>
-                  <th className="py-3 text-right font-normal">포함 여부</th>
+                  <th className="py-3 font-normal"><SimulationText ko={"종목"} /></th>
+                  <th className="py-3 text-right font-normal"><SimulationText ko={"현재 비중"} /></th>
+                  <th className="py-3 text-right font-normal"><SimulationText ko={"계산 비중"} /></th>
+                  <th className="py-3 text-right font-normal"><SimulationText ko={"포함 여부"} /></th>
                 </tr>
               </thead>
               <tbody>
@@ -124,21 +106,21 @@ export function OwnerResearchExecutionSection({
                         </span>
                       </td>
                       <td className="py-3 text-right tabular-nums">
-                        {row.originalWeightBps === null
+                        <SimulationText ko={row.originalWeightBps === null
                           ? "미확인"
-                          : formatWeight(row.originalWeightBps)}
+                          : formatWeight(row.originalWeightBps)} />
                       </td>
                       <td className="py-3 text-right tabular-nums">
                         {weight ? formatWeight(weight.weightBps) : "-"}
                       </td>
                       <td className="py-3 text-right text-xs text-[var(--muted)]">
-                        {row.executionRole === "omitted_manual_history"
+                        <SimulationText ko={row.executionRole === "omitted_manual_history"
                           ? "수동 평가 제외"
                           : row.executionRole === "omitted_zero_weight"
                             ? "비중 없음"
                             : execution.status === "ready"
                               ? "포함"
-                              : "입력 확인 필요"}
+                              : "입력 확인 필요"} />
                       </td>
                     </tr>
                   );
@@ -149,24 +131,18 @@ export function OwnerResearchExecutionSection({
           {execution.status === "ready" ? (
             <div className="mt-8">
               <h3 className="text-lg font-medium text-[var(--ink)]">
-                위험과 계산 근거
-              </h3>
+                <SimulationText ko={"위험과 계산 근거"} />{" "}</h3>
               <div className="mt-4 border-y border-[var(--line)]">
                 <SimulationTerminalRiskMetrics terminal={execution.terminal} />
               </div>
               <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
-                기준일 {formatDate(execution.source.endServiceDate)} · 입력
-                수익률 {execution.source.returnStepCount}개 · 평균 블록 5단계 ·
-                최초 배분 후 리밸런싱 없음
-              </p>
+                <SimulationText ko={"기준일"} />{" "}{formatDate(execution.source.endServiceDate)} {" "}<SimulationText ko={"· 입력 수익률"} />{" "}{execution.source.returnStepCount}<SimulationText ko={"개 · 평균 블록 5단계 · 최초 배분 후 리밸런싱 없음"} />{" "}</p>
               {execution.source.priceBasis === "raw_price_return" ? (
                 <p
                   data-owner-research-raw-close-disclosure
                   className="mt-2 text-sm leading-7 text-[var(--warning)]"
                 >
-                  저장된 KIS 미조정 종가·날짜별 환율 기준. 배당·액면분할 조정
-                  총수익률이 아닙니다.
-                </p>
+                  <SimulationText ko={"저장된 KIS 미조정 종가·날짜별 환율 기준. 배당·액면분할 조정 총수익률이 아닙니다."} />{" "}</p>
               ) : null}
             </div>
           ) : null}
@@ -175,19 +151,17 @@ export function OwnerResearchExecutionSection({
       </div>
       <p className={styles.executionMeta}>
         <span>
-          {execution.endSelection.endServiceDate
+          <SimulationText ko={execution.endSelection.endServiceDate
             ? formatDate(execution.endSelection.endServiceDate)
-            : "기준일 미확인"}{" "}
-          <span className="hidden sm:inline"> · {endSourceLabel(execution.endSelection.source)}</span>
+            : "기준일 미확인"} />{" "}
+          <span className="hidden sm:inline"> · <SimulationText ko={endSourceLabel(execution.endSelection.source)} /></span>
         </span>
         <span>
           {execution.coverage.modeledInstrumentCount} /{" "}
-          {execution.coverage.candidateInstrumentCount}종목
-        </span>
+          {execution.coverage.candidateInstrumentCount}<SimulationText ko={"종목"} en=" holdings" />{" "}</span>
         <span>
-          {execution.coverage.modeledCurrentValuePct.toFixed(1)}% 포함
-        </span>
-        {execution.coverage.omittedWeightBps > 0 ? <span className="text-[var(--warning)]">일부 종목 제외</span> : null}
+          {execution.coverage.modeledCurrentValuePct.toFixed(1)}<SimulationText ko={"% 포함"} />{" "}</span>
+        {execution.coverage.omittedWeightBps > 0 ? <span className="text-[var(--warning)]"><SimulationText ko={"일부 종목 제외"} /></span> : null}
       </p>
       {execution.status === "ready" ? (
         <ReadyOwnerExecution execution={execution} />
@@ -197,15 +171,12 @@ export function OwnerResearchExecutionSection({
           className="my-8 flex min-h-64 flex-col justify-center border-y border-[var(--line)]"
         >
           <p className="text-xl font-medium">
-            계산에 필요한 근거를 확인하고 있습니다.
-          </p>
+            <SimulationText ko={"계산에 필요한 근거를 확인하고 있습니다."} />{" "}</p>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-            {unavailableReasonLabel(execution.reason)}
+            <SimulationText ko={unavailableReasonLabel(execution.reason)} />
           </p>
           <p className="mt-2 text-xs leading-6 text-[var(--warning)]">
-            모형·데이터에서 종목별 누락과 출처를 확인할 수 있습니다. 부족한
-            값을 0이나 예시 경로로 대체하지 않습니다.
-          </p>
+            <SimulationText ko={"모형·데이터에서 종목별 누락과 출처를 확인할 수 있습니다. 부족한 값을 0이나 예시 경로로 대체하지 않습니다."} />{" "}</p>
         </div>
       )}
     </section>
@@ -221,21 +192,21 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
     >
       <dl className={styles.resultSummary}>
         <div>
-          <dt>{execution.assumptions.horizon}단계 후 중앙 수익률</dt>
+          <dt>{execution.assumptions.horizon}<SimulationText ko={"단계 후 중앙 수익률"} /></dt>
           <dd className={execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}>
-            {simulationReturnLabel(100 + execution.terminal.p50ReturnPct)}
+            <SimulationText ko={simulationReturnLabel(100 + execution.terminal.p50ReturnPct)} />
           </dd>
-          <p>전체 계산 경로의 중앙값 P50</p>
+          <p><SimulationText ko={"전체 계산 경로의 중앙값 P50"} /></p>
         </div>
         <div>
-          <dt>손실로 끝날 확률</dt>
+          <dt><SimulationText ko={"손실로 끝날 확률"} /></dt>
           <dd>{execution.terminal.lossProbabilityPct.toFixed(1)}%</dd>
-          <p>종료값이 시작값보다 낮은 경로 비율</p>
+          <p><SimulationText ko={"종료값이 시작값보다 낮은 경로 비율"} /></p>
         </div>
         <div>
-          <dt>큰 하락폭 · MDD P90</dt>
+          <dt><SimulationText ko={"큰 하락폭 · MDD P90"} /></dt>
           <dd className="text-[var(--negative)]">{execution.terminal.maxDrawdownP90Pct.toFixed(1)}%</dd>
-          <p>경로 내 최대 낙폭의 더 큰 손실 쪽 경계</p>
+          <p><SimulationText ko={"경로 내 최대 낙폭의 더 큰 손실 쪽 경계"} /></p>
         </div>
       </dl>
       <ResearchFanChart large execution={execution} />
@@ -248,14 +219,14 @@ function ExecutionAssumptions({ execution }: { execution: ReadyExecution }) {
   const terminalBand = execution.bands.at(-1);
   return <div className="mt-6">
       <div className={styles.boundaries}>
-        <span>하위 경계 P10<strong>{terminalBand ? simulationReturnLabel(terminalBand.p10) : "기록 없음"}</strong></span>
-        <span>상위 경계 P90<strong>{terminalBand ? simulationReturnLabel(terminalBand.p90) : "기록 없음"}</strong></span>
-        <span>계산 경로<strong>{execution.assumptions.pathCount}개</strong></span>
+        <span><SimulationText ko={"하위 경계 P10"} /><strong><SimulationText ko={terminalBand ? simulationReturnLabel(terminalBand.p10) : "기록 없음"} /></strong></span>
+        <span><SimulationText ko={"상위 경계 P90"} /><strong><SimulationText ko={terminalBand ? simulationReturnLabel(terminalBand.p90) : "기록 없음"} /></strong></span>
+        <span><SimulationText ko={"계산 경로"} /><strong>{execution.assumptions.pathCount}<SimulationText ko={"개"} /></strong></span>
       </div>
       <dl className={styles.method}>
-        <div><dt>현재 구성에서 출발</dt><dd>현재 평가액의 {execution.coverage.modeledCurrentValuePct.toFixed(1)}%를 포함하며, 계산 종목의 비중을 100%로 환산합니다.</dd></div>
-        <div><dt>관측 데이터로 계산</dt><dd>최근 90개 공동 수익률을 재표본 추출합니다. 수수료·세금·현금수익률은 포함하지 않습니다.</dd></div>
-        <div><dt>범위로 읽는 결과</dt><dd>P10~P90은 모형 안의 분포입니다. 실제 미래의 보장 범위가 아니며 조회 시 계산한 연구 결과입니다.</dd></div>
+        <div><dt><SimulationText ko={"현재 구성에서 출발"} /></dt><dd><SimulationText ko={"현재 평가액의"} />{" "}{execution.coverage.modeledCurrentValuePct.toFixed(1)}<SimulationText ko={"%를 포함하며, 계산 종목의 비중을 100%로 환산합니다."} /></dd></div>
+        <div><dt><SimulationText ko={"관측 데이터로 계산"} /></dt><dd><SimulationText ko={"최근 90개 공동 수익률을 재표본 추출합니다. 수수료·세금·현금수익률은 포함하지 않습니다."} /></dd></div>
+        <div><dt><SimulationText ko={"범위로 읽는 결과"} /></dt><dd><SimulationText ko={"P10~P90은 모형 안의 분포입니다. 실제 미래의 보장 범위가 아니며 조회 시 계산한 연구 결과입니다."} /></dd></div>
       </dl>
   </div>;
 }

@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
@@ -14,7 +15,7 @@ export function InvestmentLabPerformanceDetails({ data }: { data: InvestmentLabP
  return <>
  <InvestmentLabDialog label="가정" title="기간과 계산 가정" size="wide">{() => <CurrentWriterSegmentNotice fountScopeAdjustment={fountScopeAdjustment} model={model} period={period} selectedScope={selectedScope} />}</InvestmentLabDialog>
  <InvestmentLabDialog label="시나리오" title="모든 시나리오 비교" size="wide">{() => <InvestmentLabScenarioMatrix {...scenarios} model={model} />}</InvestmentLabDialog>
- <InvestmentLabDialog label="근거" title="현금흐름과 수익률 상세" size="wide">{() => model.observedPath.summary ? <InvestmentLabCalculationEvidence fixedMixWeights={model.fixedMixScenario?.weights ?? null} model={model} observedSummary={model.observedPath.summary} /> : <p>관측 경로 근거가 부족합니다.</p>}</InvestmentLabDialog>
+ <InvestmentLabDialog label="근거" title="현금흐름과 수익률 상세" size="wide">{() => model.observedPath.summary ? <InvestmentLabCalculationEvidence fixedMixWeights={model.fixedMixScenario?.weights ?? null} model={model} observedSummary={model.observedPath.summary} /> : <p><LabText value="관측 경로 근거가 부족합니다." /></p>}</InvestmentLabDialog>
  </>;
 }
 function InvestmentLabCalculationEvidence({
@@ -45,26 +46,21 @@ function InvestmentLabCalculationEvidence({
         <section className="overflow-hidden border-y border-[var(--line)]">
           <div className="flex flex-col gap-1 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">비교 데이터</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                평가액과 해당 시점에 사용된 KODEX 200 가격 기준일을 함께
-                확인합니다.
-              </p>
+              <h2 className="text-lg font-semibold"><LabText value="비교 데이터" /></h2>
+              <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 평가액과 해당 시점에 사용된 KODEX 200 가격 기준일을 함께 확인합니다. " /></p>
             </div>
-            <p className="text-sm text-[var(--muted)]">
-              기간 내 반영 거래 {model.coverage.appliedFlowRows}건 · 지연 체결{" "}
-              {model.coverage.delayedExecutionRows}건
-            </p>
+            <p className="text-sm text-[var(--muted)]"><LabText value=" 기간 내 반영 거래 " />{model.coverage.appliedFlowRows}<LabText value="건 · 지연 체결" />{" "}
+              {model.coverage.delayedExecutionRows}<LabText value="건 " /></p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
-                  <th className="px-4 py-3">평가일</th>
-                  <th className="px-3 py-3 text-right">실제 평가액</th>
+                  <th className="px-4 py-3"><LabText value="평가일" /></th>
+                  <th className="px-3 py-3 text-right"><LabText value="실제 평가액" /></th>
                   <th className="px-3 py-3 text-right">KODEX 200</th>
-                  <th className="px-3 py-3 text-right">차이</th>
-                  <th className="px-4 py-3">가격 기준</th>
+                  <th className="px-3 py-3 text-right"><LabText value="차이" /></th>
+                  <th className="px-4 py-3"><LabText value="가격 기준" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -77,19 +73,19 @@ function InvestmentLabCalculationEvidence({
                       {formatDate(row.serviceDate)}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">
-                      {formatKrw(row.actualMarketValueKrw)}
+                      <LabText value={formatKrw(row.actualMarketValueKrw)} />
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">
-                      {formatKrw(row.scenarioMarketValueKrw)}
+                      <LabText value={formatKrw(row.scenarioMarketValueKrw)} />
                     </td>
                     <td
                       className={`px-3 py-3 text-right font-semibold tabular-nums ${moneyTone(row.differenceKrw)}`}
                     >
-                      {formatSignedKrw(row.differenceKrw)}
+                      <LabText value={formatSignedKrw(row.differenceKrw)} />
                     </td>
                     <td className="px-4 py-3 text-[var(--muted)]">
                       {formatDate(row.valuationPriceDate)}
-                      {row.hasPendingExecution ? " · 지연 체결" : ""}
+                      <LabText value={row.hasPendingExecution ? " · 지연 체결" : ""} />
                     </td>
                   </tr>
                 ))}
@@ -100,7 +96,7 @@ function InvestmentLabCalculationEvidence({
       ) : null}
 
       <section className="border-y border-[var(--line)] py-5">
-        <h2 className="text-lg font-semibold">데이터 상태</h2>
+        <h2 className="text-lg font-semibold"><LabText value="데이터 상태" /></h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <EvidenceCell
             label="완전한 비교일"
@@ -147,7 +143,7 @@ function CurrentWriterSegmentNotice({
 }) {
   const summary = model.observedPath.summary;
   if (!summary) {
-    return <p role="status" className="py-5 text-sm text-[var(--muted)]">관측 경로 근거가 부족해 기간과 계산 가정을 표시할 수 없습니다. 기간과 데이터 상태를 확인해 주세요.</p>;
+    return <p role="status" className="py-5 text-sm text-[var(--muted)]"><LabText value="관측 경로 근거가 부족해 기간과 계산 가정을 표시할 수 없습니다. 기간과 데이터 상태를 확인해 주세요." /></p>;
   }
   return (
     <section
@@ -156,27 +152,21 @@ function CurrentWriterSegmentNotice({
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="font-semibold">최신 writer 관측 구간 연구 비교</h2>
+          <h2 className="font-semibold"><LabText value="최신 writer 관측 구간 연구 비교" /></h2>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
             {formatDate(summary.startServiceDate)} ~{" "}
-            {formatDate(summary.endServiceDate)} · {summary.comparisonDateCount}
-            개 평가일만 사용합니다. 레거시 구간과 이어 붙이지 않았고, 짧은
-            구간이므로 연환산·순위·스트레스 결론을 만들지 않습니다.
-          </p>
+            {formatDate(summary.endServiceDate)} · {summary.comparisonDateCount}<LabText value=" 개 평가일만 사용합니다. 레거시 구간과 이어 붙이지 않았고, 짧은 구간이므로 연환산·순위·스트레스 결론을 만들지 않습니다. " /></p>
         </div>
         <span className="w-fit border border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">
-          {period.status === "current_writer"
+          <LabText value={period.status === "current_writer"
             ? "최신 구간 자동 적용"
-            : "명시 구간 적용"}
+            : "명시 구간 적용"} />
         </span>
       </div>
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        {selectedScope.label} 범위의 연구용 반사실 비교이며, 계정별 매수 가능
-        상품·환전·세금·주문 가능성을 검증한 투자 권고가 아닙니다. 금현물은
-        저장된 수동 평가 이력을 사용합니다.
-        {fountScopeAdjustment.status === "applied"
+        {selectedScope.label}<LabText value=" 범위의 연구용 반사실 비교이며, 계정별 매수 가능 상품·환전·세금·주문 가능성을 검증한 투자 권고가 아닙니다. 금현물은 저장된 수동 평가 이력을 사용합니다. " /><LabText value={fountScopeAdjustment.status === "applied"
           ? ` Fount는 ${fountScopeAdjustment.adjustedDateCount}개 평가일에서 제외했습니다.`
-          : ""}
+          : ""} />
       </p>
     </section>
   );
@@ -191,17 +181,12 @@ function ReturnEstimateSection({
   if (!estimate || estimate.status === "blocked") {
     return (
       <section className="border-y border-[var(--brand-soft)] py-5">
-        <h2 className="text-lg font-semibold text-[var(--warning)]">
-          현금흐름 조정 추정수익률
-        </h2>
-        <p className="mt-2 text-sm text-[var(--warning)]">
-          평가액 비교는 유지하지만 가격 기준 또는 계산 입력이 불충분해 수익률
-          추정치는 표시하지 않습니다.
-        </p>
+        <h2 className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 현금흐름 조정 추정수익률 " /></h2>
+        <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" 평가액 비교는 유지하지만 가격 기준 또는 계산 입력이 불충분해 수익률 추정치는 표시하지 않습니다. " /></p>
         {estimate ? (
           <ul className="mt-3 space-y-1 text-sm text-[var(--warning)]">
             {estimate.blockers.map((blocker) => (
-              <li key={blocker}>{returnBlockerLabel(blocker)}</li>
+              <li key={blocker}><LabText value={returnBlockerLabel(blocker)} /></li>
             ))}
           </ul>
         ) : null}
@@ -216,14 +201,10 @@ function ReturnEstimateSection({
     >
       <div className="flex flex-col gap-1 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">현금흐름 조정 추정수익률</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            관측 평가일 사이의 일별 가중 현금흐름을 반영한 Modified Dietz 추정치
-          </p>
+          <h2 className="text-lg font-semibold"><LabText value="현금흐름 조정 추정수익률" /></h2>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 관측 평가일 사이의 일별 가중 현금흐름을 반영한 Modified Dietz 추정치 " /></p>
         </div>
-        <p className="text-xs text-[var(--muted)]">
-          가격수익 기준 · 배당·수수료·세금 별도 반영 안 함
-        </p>
+        <p className="text-xs text-[var(--muted)]"><LabText value=" 가격수익 기준 · 배당·수수료·세금 별도 반영 안 함 " /></p>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <ReturnMetricCell
@@ -249,10 +230,7 @@ function ReturnEstimateSection({
           }
         />
       </div>
-      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        현금흐름 직전 전체 평가액이 없는 구간을 날짜 가중 방식으로 추정한
-        값이며, 정확한 일별 TWR 또는 총수익률을 의미하지 않습니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" 현금흐름 직전 전체 평가액이 없는 구간을 날짜 가중 방식으로 추정한 값이며, 정확한 일별 TWR 또는 총수익률을 의미하지 않습니다. " /></p>
     </section>
   );
 }
@@ -288,12 +266,10 @@ function VooComparisonSection({
       >
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">전액 VOO 비교</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              실제와 같은 원화 매수·매도 금액을 VOO에 적용한 가격수익 경로
-            </p>
+            <h2 className="text-lg font-semibold"><LabText value="전액 VOO 비교" /></h2>
+            <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 실제와 같은 원화 매수·매도 금액을 VOO에 적용한 가격수익 경로 " /></p>
           </div>
-          <p className="text-sm font-semibold text-[var(--brand)]">계산 완료</p>
+          <p className="text-sm font-semibold text-[var(--brand)]"><LabText value="계산 완료" /></p>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -342,10 +318,7 @@ function VooComparisonSection({
             />
           </div>
         ) : (
-          <p className="mt-4 border-y border-[var(--brand-soft)] py-3 text-sm text-[var(--warning)]">
-            경로는 계산됐지만 현금·이벤트 근거가 불충분해 추정수익률은 표시하지
-            않습니다.
-          </p>
+          <p className="mt-4 border-y border-[var(--brand-soft)] py-3 text-sm text-[var(--warning)]"><LabText value=" 경로는 계산됐지만 현금·이벤트 근거가 불충분해 추정수익률은 표시하지 않습니다. " /></p>
         )}
 
         <div className="mt-5 border-t border-[var(--wash)] pt-4">
@@ -357,11 +330,7 @@ function VooComparisonSection({
             title="실제 포트폴리오와 VOO 시나리오 비교"
           />
         </div>
-        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-          소수점 수량을 허용해 잔여 현금을 만들지 않으며, 보유 수량을 넘는
-          매도는 축소·차입 없이 전체 시나리오를 차단합니다. VOO raw close와 같은
-          서비스 날짜에 저장된 환율을 사용하고 배당 재투자는 제외합니다.
-        </p>
+        <p className="mt-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" 소수점 수량을 허용해 잔여 현금을 만들지 않으며, 보유 수량을 넘는 매도는 축소·차입 없이 전체 시나리오를 차단합니다. VOO raw close와 같은 서비스 날짜에 저장된 환율을 사용하고 배당 재투자는 제외합니다. " /></p>
       </section>
     );
   }
@@ -380,11 +349,8 @@ function VooComparisonSection({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">전액 VOO 비교 준비도</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            미국 종가·환율·체결일 증거가 모두 맞을 때만 다음 단계에서 경로를
-            계산합니다.
-          </p>
+          <h2 className="text-lg font-semibold"><LabText value="전액 VOO 비교 준비도" /></h2>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 미국 종가·환율·체결일 증거가 모두 맞을 때만 다음 단계에서 경로를 계산합니다. " /></p>
         </div>
         <p
           className={
@@ -393,7 +359,7 @@ function VooComparisonSection({
               : "text-sm font-semibold text-[var(--warning)]"
           }
         >
-          {readiness.status === "ready" ? "계산 입력 준비" : "증거 보완 필요"}
+          <LabText value={readiness.status === "ready" ? "계산 입력 준비" : "증거 보완 필요"} />
         </p>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -413,15 +379,11 @@ function VooComparisonSection({
           detail="체결 가격일 exact FX"
         />
       </div>
-      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        실제 포트폴리오와 같은 가격수익 기준을 위해 VOO raw close를 사용하고
-        배당 재투자는 제외합니다. 준비 전에는 부분 경로나 추정값을 표시하지
-        않습니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" 실제 포트폴리오와 같은 가격수익 기준을 위해 VOO raw close를 사용하고 배당 재투자는 제외합니다. 준비 전에는 부분 경로나 추정값을 표시하지 않습니다. " /></p>
       {readiness.blockers.length > 0 ? (
         <ul className="mt-3 space-y-1 text-sm text-[var(--warning)]">
           {readiness.blockers.map((blocker) => (
-            <li key={blocker}>{vooReadinessBlockerLabel(blocker)}</li>
+            <li key={blocker}><LabText value={vooReadinessBlockerLabel(blocker)} /></li>
           ))}
         </ul>
       ) : null}
@@ -432,8 +394,8 @@ function VooComparisonSection({
 function EvidenceCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-l-2 border-[var(--line)] pl-3">
-      <p className="text-xs text-[var(--muted)]">{label}</p>
-      <p className="mt-1 font-semibold tabular-nums">{value}</p>
+      <p className="text-xs text-[var(--muted)]"><LabText value={label} /></p>
+      <p className="mt-1 font-semibold tabular-nums"><LabText value={value} /></p>
     </div>
   );
 }
@@ -451,15 +413,15 @@ function ReturnMetricCell({
 }) {
   return (
     <div className="border-l-2 border-[var(--line)] pl-3">
-      <p className="text-sm text-[var(--muted)]">{label}</p>
+      <p className="text-sm text-[var(--muted)]"><LabText value={label} /></p>
       <p
         className={`mt-1 text-xl font-semibold tabular-nums ${
           tone === "positive" ? "text-[var(--brand)]" : "text-[var(--negative)]"
         }`}
       >
-        {value}
+        <LabText value={value} />
       </p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }
@@ -475,9 +437,9 @@ function ReadinessMetric({
 }) {
   return (
     <div className="border-l-2 border-[var(--line)] pl-3">
-      <p className="text-sm text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-sm text-[var(--muted)]"><LabText value={label} /></p>
+      <p className="mt-1 text-xl font-semibold tabular-nums"><LabText value={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }

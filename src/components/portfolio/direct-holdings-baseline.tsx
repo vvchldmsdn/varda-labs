@@ -1,3 +1,6 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
+import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import type { PortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
 
 const ACCOUNT_LABELS: Record<
@@ -39,16 +42,12 @@ export function DirectHoldingsBaseline({
             className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="direct-holdings-baseline-title"
           >
-            직접 보유 집중도·통화 노출
-          </h2>
+            <PortfolioText ko={"직접 보유 집중도·통화 노출"} />{" "}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            {scopeLabel ?? ACCOUNT_LABELS[model.selectedAccount]}의 현재 평가액을 직접 보유
-            종목 기준으로 계산했습니다. ETF 내부 구성, 목표비중, 추천, 주문은
-            포함하지 않습니다.
-          </p>
+            {scopeLabel ?? ACCOUNT_LABELS[model.selectedAccount]}<PortfolioText ko={"의 현재 평가액을 직접 보유 종목 기준으로 계산했습니다. ETF 내부 구성, 목표비중, 추천, 주문은 포함하지 않습니다."} />{" "}</p>
         </div>
         <p className="text-sm font-medium text-[var(--muted)]">
-          평가 완전성 {statusLabel(model.status)}
+          <PortfolioText ko={"평가 완전성"} />{" "}<PortfolioText ko={statusLabel(model.status)} />
         </p>
       </div>
 
@@ -83,7 +82,7 @@ export function DirectHoldingsBaseline({
           </div>
 
           <div className="mt-8">
-            <h3 className="text-sm font-medium text-[var(--ink)]">통화별 노출</h3>
+            <h3 className="text-sm font-medium text-[var(--ink)]"><PortfolioText ko={"통화별 노출"} /></h3>
             <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
               {metrics.currencyExposures.map((row) => (
                 <div
@@ -97,8 +96,7 @@ export function DirectHoldingsBaseline({
                     </span>
                   </div>
                   <p className="mt-2 text-xs tabular-nums text-[var(--muted)]">
-                    {formatKrw(row.currentValueKrw)} · {row.holdingCount}개
-                  </p>
+                    {formatKrw(row.currentValueKrw)} · {row.holdingCount}<PortfolioText ko={"개"} />{" "}</p>
                 </div>
               ))}
             </div>
@@ -106,24 +104,19 @@ export function DirectHoldingsBaseline({
         </>
       ) : (
         <p className="mt-7 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
-          식별 가능하고 평가액이 있는 직접 보유 종목이 없어 집중도와 통화
-          노출을 계산하지 않았습니다.
-        </p>
+          <PortfolioText ko={"식별 가능하고 평가액이 있는 직접 보유 종목이 없어 집중도와 통화 노출을 계산하지 않았습니다."} />{" "}</p>
       )}
 
       {model.status === "partial" ? (
         <p className="mt-6 border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-xs leading-5 text-[var(--warning)]">
-          표시된 값은 확인 가능한 종목만의 부분 계산입니다. 평가 제외 {" "}
-          {model.excludedHoldingCount}개 · 식별 불가 {" "}
-          {model.unresolvedIdentityCount}개 · 평가액 오류 {" "}
-          {model.invalidValueCount}개
-        </p>
+          <PortfolioText ko={"표시된 값은 확인 가능한 종목만의 부분 계산입니다. 평가 제외"} />{" "}{" "}
+          {model.excludedHoldingCount}<PortfolioText ko={"개 · 식별 불가"} />{" "}{" "}
+          {model.unresolvedIdentityCount}<PortfolioText ko={"개 · 평가액 오류"} />{" "}{" "}
+          {model.invalidValueCount}<PortfolioText ko={"개"} />{" "}</p>
       ) : null}
 
       <p className="mt-3 text-xs text-[var(--muted)]">
-        평가 근거 {model.resolvedInputHoldingCount}/{model.inputHoldingCount}행 ·
-        identity: account + market + currency + ticker
-      </p>
+        <PortfolioText ko={"평가 근거"} />{" "}{model.resolvedInputHoldingCount}/{model.inputHoldingCount}<PortfolioText ko={"행 · identity: account + market + currency + ticker"} />{" "}</p>
     </section>
   );
 }
@@ -139,13 +132,13 @@ function MetricCell({
 }) {
   return (
     <div className="min-w-0 border-b border-[var(--wash)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
       <p className="mt-3 text-xl font-medium tracking-normal tabular-nums text-[var(--ink)]">
-        {value}
+        <PortfolioText ko={value} />
       </p>
-      <p className="mt-1 truncate text-xs text-[var(--muted)]" title={detail}>
-        {detail}
-      </p>
+      <LocalizedElement className="mt-1 truncate text-xs text-[var(--muted)]" title={detail} as="p" en={{"title": portfolioEnglish(detail)}}>
+        <PortfolioText ko={detail} />
+      </LocalizedElement>
     </div>
   );
 }

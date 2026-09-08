@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthText, AuthElement } from "./auth-localized";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import {
@@ -20,9 +21,9 @@ export function AuthPasswordField({
   const [visible, setVisible] = useState(false);
   return (
     <div className={styles.field}>
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}><AuthText>{label}</AuthText></label>
       <div className={styles.passwordField}>
-        <input
+        <AuthElement as="input"
           id={id}
           name={id}
           type={visible ? "text" : "password"}
@@ -33,7 +34,7 @@ export function AuthPasswordField({
           required
           className={styles.input}
         />
-        <button
+        <AuthElement as="button"
           type="button"
           className={styles.passwordToggle}
           onClick={() => setVisible(!visible)}
@@ -46,7 +47,7 @@ export function AuthPasswordField({
           ) : (
             <Eye size={18} aria-hidden="true" />
           )}
-        </button>
+        </AuthElement>
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementText } from "@/components/i18n/management-text";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -16,7 +18,9 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "계좌 관리 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "계좌 관리 | VARDA LABS" }, "Accounts | VARDA LABS");
+}
 
 export default async function AccountManagementPage() {
   const resolution = await resolveCurrentTenantContext();
@@ -26,10 +30,13 @@ export default async function AccountManagementPage() {
     }
     return (
       <PortfolioReadAccessBoundary
-        closedMessage="Accounts remain closed until the signed-in portfolio owner is resolved."
-        description="Create and manage custody accounts without mixing them with analysis groups."
+        closedMessage="로그인한 포트폴리오 소유자가 확인되기 전에는 계좌를 조회하지 않습니다."
+        closedMessageEn="Accounts remain closed until the signed-in portfolio owner is resolved."
+        description="분석 그룹과 구분하여 실제 자산을 보관하는 계좌를 만들고 관리합니다."
+        descriptionEn="Create and manage custody accounts without mixing them with analysis groups."
         resolution={resolution}
-        title="Account management"
+        title="계좌 관리"
+        titleEn="Account management"
       />
     );
   }
@@ -168,7 +175,7 @@ export default async function AccountManagementPage() {
 function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
+      <dt className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{label}</ManagementText></dt>
       <dd className="mt-2 text-lg font-semibold">{value}</dd>
     </div>
   );
@@ -180,7 +187,7 @@ function NavLink({ href, children }: { href: string; children: string }) {
       className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
       href={href}
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </Link>
   );
 }

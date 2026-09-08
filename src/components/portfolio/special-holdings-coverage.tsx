@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type {
   PortfolioHoldingAdjustmentReason,
   PortfolioHoldingClassification,
@@ -32,15 +33,12 @@ export function SpecialHoldingsCoverage({
             className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="special-holdings-coverage-title"
           >
-            특수 보유자산 커버리지·조정 가능성
-          </h2>
+            <PortfolioText ko={"특수 보유자산 커버리지·조정 가능성"} />{" "}</h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--muted)]">
-            저장된 상품 유형과 상장 식별 근거만 사용합니다. 이름으로 상품
-            유형을 추론하지 않으며, 이 표시는 추천·주문 권한이 아닙니다.
-          </p>
+            <PortfolioText ko={"저장된 상품 유형과 상장 식별 근거만 사용합니다. 이름으로 상품 유형을 추론하지 않으며, 이 표시는 추천·주문 권한이 아닙니다."} />{" "}</p>
         </div>
         <p className="text-sm font-medium text-[var(--muted)]">
-          상태 {statusLabel(model.status)}
+          <PortfolioText ko={"상태"} />{" "}<PortfolioText ko={statusLabel(model.status)} />
         </p>
       </div>
 
@@ -74,21 +72,19 @@ export function SpecialHoldingsCoverage({
 
       {model.attentionRows.length === 0 ? (
         <p className="mt-6 border-y border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--brand)]">
-          현재 선택 범위의 모든 보유자산이 상장 종목 identity와 평가 근거를
-          갖고 있습니다.
-        </p>
+          <PortfolioText ko={"현재 선택 범위의 모든 보유자산이 상장 종목 identity와 평가 근거를 갖고 있습니다."} />{" "}</p>
       ) : (
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left text-sm">
             <thead className="text-xs uppercase text-[var(--muted)]">
               <tr>
-                <TableHeader>보유자산</TableHeader>
-                <TableHeader>계정</TableHeader>
-                <TableHeader>분류</TableHeader>
-                <TableHeader>평가 상태</TableHeader>
-                <TableHeader align="right">평가액</TableHeader>
-                <TableHeader align="right">평가 비중</TableHeader>
-                <TableHeader>조정 제외 이유</TableHeader>
+                <TableHeader><PortfolioText ko={"보유자산"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"계정"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"분류"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"평가 상태"} /></TableHeader>
+                <TableHeader align="right"><PortfolioText ko={"평가액"} /></TableHeader>
+                <TableHeader align="right"><PortfolioText ko={"평가 비중"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"조정 제외 이유"} /></TableHeader>
               </tr>
             </thead>
             <tbody>
@@ -97,17 +93,17 @@ export function SpecialHoldingsCoverage({
                   <TableCell strong>
                     <div>{row.name}</div>
                     <div className="text-xs font-normal text-[var(--muted)]">
-                      {row.ticker ?? "종목 코드 없음"}
+                      {row.ticker ?? <PortfolioText ko="종목 코드 없음" />}
                     </div>
                   </TableCell>
                   <TableCell>{row.account}</TableCell>
-                  <TableCell>{classificationLabel(row.classification)}</TableCell>
-                  <TableCell>{valuationLabel(row.valuationStatus)}</TableCell>
+                  <TableCell><PortfolioText ko={classificationLabel(row.classification)} /></TableCell>
+                  <TableCell><PortfolioText ko={valuationLabel(row.valuationStatus)} /></TableCell>
                   <TableCell align="right">{formatKrw(row.currentValueKrw)}</TableCell>
                   <TableCell align="right">
                     {formatPercent(row.currentWeightPct)}
                   </TableCell>
-                  <TableCell>{reasonLabel(row.adjustmentReason)}</TableCell>
+                  <TableCell><PortfolioText ko={reasonLabel(row.adjustmentReason)} /></TableCell>
                 </tr>
               ))}
             </tbody>
@@ -116,9 +112,8 @@ export function SpecialHoldingsCoverage({
       )}
 
       <p className="mt-3 text-xs text-[var(--muted)]">
-        평가 완료 {model.valuedPositionCount}개 · 평가 제외 {" "}
-        {model.excludedPositionCount}개 · 조정 제외 {model.ineligiblePositionCount}개
-      </p>
+        <PortfolioText ko={"평가 완료"} />{" "}{model.valuedPositionCount}<PortfolioText ko={"개 · 평가 제외"} />{" "}{" "}
+        {model.excludedPositionCount}<PortfolioText ko={"개 · 조정 제외"} />{" "}{model.ineligiblePositionCount}<PortfolioText ko={"개"} />{" "}</p>
     </section>
   );
 }
@@ -134,11 +129,11 @@ function SummaryCell({
 }) {
   return (
     <div className="min-w-0 border-b border-[var(--wash)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
       <p className="mt-3 text-xl font-medium tabular-nums text-[var(--ink)]">
-        {value}
+        <PortfolioText ko={value} />
       </p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><PortfolioText ko={detail} /></p>
     </div>
   );
 }

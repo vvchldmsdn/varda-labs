@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import type {
   PortfolioAnalysisScope,
@@ -30,16 +31,11 @@ export function OwnerInputPreflightSection({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            로그인 사용자 보유종목 기준
-          </p>
+            <SimulationText ko={"로그인 사용자 보유종목 기준"} />{" "}</p>
           <h2 className="mt-1 text-lg font-semibold" id="owner-simulation-input-title">
-            내 포트폴리오 입력 점검
-          </h2>
+            <SimulationText ko={"내 포트폴리오 입력 점검"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            현재 보유 구성과 저장된 과거 가격 이력을 계좌별로 점검합니다. 이 비중은
-            아래의 일회성 연구 계산에만 사용하며 저장된 목표 비중, 최적화, 추천 또는
-            주문 근거로 사용하지 않습니다.
-          </p>
+            <SimulationText ko={"현재 보유 구성과 저장된 과거 가격 이력을 계좌별로 점검합니다. 이 비중은 아래의 일회성 연구 계산에만 사용하며 저장된 목표 비중, 최적화, 추천 또는 주문 근거로 사용하지 않습니다."} />{" "}</p>
         </div>
         <PortfolioAnalysisScopeTabs
           basePath="/simulation"
@@ -73,10 +69,7 @@ export function OwnerInputPreflightSection({
           className="mt-3 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--warning)]"
           data-owner-simulation-raw-close-basis
         >
-          현재 단일 사용자 연구 모드는 저장된 KIS 종가를 사용합니다. 배당과
-          액면분할·병합 조정은 주장하지 않으며, 이 결과는 추천이나 주문 근거로
-          저장되지 않습니다.
-        </p>
+          <SimulationText ko={"현재 단일 사용자 연구 모드는 저장된 KIS 종가를 사용합니다. 배당과 액면분할·병합 조정은 주장하지 않으며, 이 결과는 추천이나 주문 근거로 저장되지 않습니다."} />{" "}</p>
       ) : null}
 
       {model.summary.fountExcludedHoldingCount > 0 ? (
@@ -84,9 +77,7 @@ export function OwnerInputPreflightSection({
           className="mt-3 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
           data-owner-simulation-fount-excluded
         >
-          Fount {model.summary.fountExcludedHoldingCount}건은 사용자 결정에 따라 투자 랩과
-          시뮬레이션에서 제외했습니다. 제외 금액은 {formatKrw(model.summary.fountExcludedCurrentValueKrw)}입니다.
-        </p>
+          Fount {model.summary.fountExcludedHoldingCount}<SimulationText ko={"건은 사용자 결정에 따라 투자 랩과 시뮬레이션에서 제외했습니다. 제외 금액은"} />{" "}<SimulationText ko={formatKrw(model.summary.fountExcludedCurrentValueKrw)} /><SimulationText ko={"입니다."} />{" "}</p>
       ) : null}
 
       {model.blockers.length > 0 ? (
@@ -94,8 +85,8 @@ export function OwnerInputPreflightSection({
           className="mt-3 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]"
           data-owner-simulation-blockers={model.blockers.join(",")}
         >
-          <p className="font-semibold">입력 후보를 확정하지 않았습니다.</p>
-          <p className="mt-1 leading-6">{model.blockers.map(blockerLabel).join(" · ")}</p>
+          <p className="font-semibold"><SimulationText ko={"입력 후보를 확정하지 않았습니다."} /></p>
+          <p className="mt-1 leading-6"><SimulationText ko={model.blockers.map(blockerLabel).join(" · ")} /></p>
         </div>
       ) : null}
 
@@ -103,11 +94,11 @@ export function OwnerInputPreflightSection({
         <table className="w-full min-w-[820px] border-collapse text-left text-sm">
           <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
             <tr>
-              <th className="px-3 py-3 font-semibold">종목</th>
-              <th className="px-3 py-3 font-semibold">계좌</th>
-              <th className="px-3 py-3 text-right font-semibold">현재 평가액</th>
-              <th className="px-3 py-3 text-right font-semibold">현재 비중</th>
-              <th className="px-3 py-3 font-semibold">과거 이력 상태</th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"종목"} /></th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"계좌"} /></th>
+              <th className="px-3 py-3 text-right font-semibold"><SimulationText ko={"현재 평가액"} /></th>
+              <th className="px-3 py-3 text-right font-semibold"><SimulationText ko={"현재 비중"} /></th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"과거 이력 상태"} /></th>
             </tr>
           </thead>
           <tbody>
@@ -126,19 +117,18 @@ export function OwnerInputPreflightSection({
                 </td>
                 <td className="px-3 py-3">{row.accounts.join(", ")}</td>
                 <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                  {formatKrw(row.currentValueKrw)}
+                  <SimulationText ko={formatKrw(row.currentValueKrw)} />
                 </td>
                 <td className="px-3 py-3 text-right font-semibold tabular-nums">
                   {row.weightBps === null ? "-" : formatWeight(row.weightBps)}
                 </td>
                 <td className="px-3 py-3">
                   <p className={historyStatusClass(row.historicalStatus)}>
-                    {historyStatusLabel(row.historicalStatus)}
+                    <SimulationText ko={historyStatusLabel(row.historicalStatus)} />
                   </p>
                   {row.classification === "physical_commodity_position" ? (
                     <p className="mt-1 text-xs leading-5 text-[var(--warning)]">
-                      금현물은 사용자가 기록한 평가 이력만 사용합니다.
-                    </p>
+                      <SimulationText ko={"금현물은 사용자가 기록한 평가 이력만 사용합니다."} />{" "}</p>
                   ) : null}
                 </td>
               </tr>
@@ -149,11 +139,11 @@ export function OwnerInputPreflightSection({
 
       {model.valuationGaps.length > 0 ? (
         <div className="mt-4" data-owner-simulation-valuation-gaps>
-          <h3 className="text-sm font-semibold">평가액을 확인하지 못한 보유종목</h3>
+          <h3 className="text-sm font-semibold"><SimulationText ko={"평가액을 확인하지 못한 보유종목"} /></h3>
           <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.valuationGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>
-                {gap.name} · {gap.account} · {valuationGapLabel(gap.reason)}
+                {gap.name} · {gap.account} · <SimulationText ko={valuationGapLabel(gap.reason)} />
               </li>
             ))}
           </ul>
@@ -162,11 +152,11 @@ export function OwnerInputPreflightSection({
 
       {model.identityGaps.length > 0 ? (
         <div className="mt-4" data-owner-simulation-identity-gaps>
-          <h3 className="text-sm font-semibold">종목 식별을 완료하지 못한 보유종목</h3>
+          <h3 className="text-sm font-semibold"><SimulationText ko={"종목 식별을 완료하지 못한 보유종목"} /></h3>
           <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.identityGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>
-                {gap.name} · {gap.account} · {formatKrw(gap.currentValueKrw)}
+                {gap.name} · {gap.account} · <SimulationText ko={formatKrw(gap.currentValueKrw)} />
               </li>
             ))}
           </ul>
@@ -174,10 +164,7 @@ export function OwnerInputPreflightSection({
       ) : null}
 
       <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-        저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다. 부족한
-        상장 종목은 임의의 평균값이나 현재 가격으로 과거를 만들지 않으며, 공급자 보강
-        경로가 준비되기 전까지 부족한 범위를 명시한 진단을 제공합니다.
-      </p>
+        <SimulationText ko={"저장 이력이 일부 부족해도 확인 가능한 종목과 비중은 숨기지 않습니다. 부족한 상장 종목은 임의의 평균값이나 현재 가격으로 과거를 만들지 않으며, 공급자 보강 경로가 준비되기 전까지 부족한 범위를 명시한 진단을 제공합니다."} />{" "}</p>
     </section>
   );
 }
@@ -193,9 +180,9 @@ function Metric({
 }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold">{value}</dd>
-      {detail ? <dd className="mt-1 text-xs text-[var(--muted)]">{detail}</dd> : null}
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold"><SimulationText ko={value} /></dd>
+      {detail ? <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></dd> : null}
     </div>
   );
 }

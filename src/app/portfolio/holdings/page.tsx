@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementText } from "@/components/i18n/management-text";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
@@ -28,7 +30,9 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "보유 종목 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "보유 종목 | VARDA LABS" }, "Holdings | VARDA LABS");
+}
 
 type TenantHoldingsPageProps = {
   searchParams: Promise<{
@@ -114,15 +118,11 @@ export default async function TenantHoldingsPage({
             <Link
               href="/portfolio/holdings/new"
               className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)]"
-            >
-              보유종목 추가
-            </Link>
+            ><ManagementText>{"보유종목 추가"}</ManagementText></Link>
             <Link
               href="/portfolio/groups"
               className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-            >
-              분석 범위
-            </Link>
+            ><ManagementText>{"분석 범위"}</ManagementText></Link>
             <Link
               href="/portfolio/accounts?account=all"
               className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
@@ -152,9 +152,9 @@ export default async function TenantHoldingsPage({
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-6">
           <div>
-            <p className="text-xs font-semibold text-[var(--muted)]">조회 범위</p>
+            <p className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{"조회 범위"}</ManagementText></p>
             <p className="mt-1 text-sm font-semibold">
-              {selectedScope?.label ?? "범위를 확인할 수 없습니다"}
+              <ManagementText>{selectedScope?.label ?? "범위를 확인할 수 없습니다"}</ManagementText>
             </p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               {holdingReadEvidence(
@@ -197,16 +197,14 @@ export default async function TenantHoldingsPage({
                     Stored price
                   </th>
                   <th className="px-4 py-3 font-semibold">Price evidence</th>
-                  <th className="px-4 py-3 font-semibold">분석 데이터</th>
+                  <th className="px-4 py-3 font-semibold"><ManagementText>{"분석 데이터"}</ManagementText></th>
                   <th className="px-4 py-3 font-semibold">Correction</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--wash)]">
                 {activeHoldings.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-5 text-[var(--muted)]" colSpan={9}>
-                      이 범위에 현재 보유 중인 종목이 없습니다.
-                    </td>
+                    <td className="px-4 py-5 text-[var(--muted)]" colSpan={9}><ManagementText>{"이 범위에 현재 보유 중인 종목이 없습니다."}</ManagementText></td>
                   </tr>
                 ) : (
                   activeHoldings.map((holding) => (
@@ -287,10 +285,8 @@ export default async function TenantHoldingsPage({
         archivedHoldings.length > 0 ? (
           <section className="mt-8 border-t border-[var(--line)] pt-6">
             <div>
-              <h2 className="text-lg font-semibold">종료된 보유종목</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                평가와 분석에서는 제외되며 수량·매입원가·과거 기록은 보존됩니다.
-              </p>
+              <h2 className="text-lg font-semibold"><ManagementText>{"종료된 보유종목"}</ManagementText></h2>
+              <p className="mt-1 text-sm text-[var(--muted)]"><ManagementText>{"평가와 분석에서는 제외되며 수량·매입원가·과거 기록은 보존됩니다."}</ManagementText></p>
             </div>
             <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
               <table className="min-w-[820px] w-full border-collapse text-left text-sm">
@@ -298,9 +294,9 @@ export default async function TenantHoldingsPage({
                   <tr>
                     <th className="px-4 py-3 font-semibold">Holding</th>
                     <th className="px-4 py-3 font-semibold">Account</th>
-                    <th className="px-4 py-3 font-semibold">종료 시각</th>
-                    <th className="px-4 py-3 text-right font-semibold">수량</th>
-                    <th className="px-4 py-3 font-semibold">복원</th>
+                    <th className="px-4 py-3 font-semibold"><ManagementText>{"종료 시각"}</ManagementText></th>
+                    <th className="px-4 py-3 text-right font-semibold"><ManagementText>{"수량"}</ManagementText></th>
+                    <th className="px-4 py-3 font-semibold"><ManagementText>{"복원"}</ManagementText></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--wash)]">

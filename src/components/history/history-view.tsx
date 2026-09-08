@@ -1,3 +1,7 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import type { ReactNode } from "react";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -61,7 +65,7 @@ export function HistoryView({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.page}>
           <header className={styles.header}>
-            <h1 className="varda-page-title">히스토리</h1>
+            <h1 className="varda-page-title"><T ko="히스토리" en="History"/></h1>
             <PortfolioAnalysisScopeTabs basePath="/history" query={detailParams.preview === "design" ? { preview: "design" } : undefined} scopes={history.analysisScopes} selectedScopeKey={history.selectedScope.key} variant="underline" />
           </header>
 
@@ -72,10 +76,10 @@ export function HistoryView({
             <div className={styles.activity}>
               <HistoryActivityStream result={events} supported={eventsSupported} />
             </div>
-            <aside className={styles.insights} aria-label="히스토리 인사이트와 검증 근거">
+            <LocalizedElement as="aside" en={{"aria-label": "History insights and verification sources"}} className={styles.insights} aria-label="히스토리 인사이트와 검증 근거">
               {overview.status === "ready" ? (
                 <section className="varda-rail-section">
-                  <h2 className="text-base font-semibold">기록에서 발견한 변화</h2>
+                  <h2 className="text-base font-semibold"><T ko="기록에서 발견한 변화" en="Changes in your records"/></h2>
                   <dl className="varda-rail-metrics mt-3">
                     <RailInsight label="저장 저점" value={formatHistoryKrw(overview.lowestValueKrw)} detail={formatDisplayDate(overview.lowestDate)} />
                     <RailInsight label="최대 상승" value={formatMovement(overview.bestMovement?.amountKrw ?? null)} detail={movementDetail(overview.bestMovement)} valueClass={tone(overview.bestMovement?.amountKrw ?? null)} />
@@ -86,20 +90,18 @@ export function HistoryView({
               ) : null}
 
               <section className="varda-rail-section">
-                  <h2 className="text-sm font-medium">저장 근거 확인</h2>
+                  <h2 className="text-sm font-medium"><T ko="저장 근거 확인" en="Check recorded sources"/></h2>
                 <div className="mt-4 grid gap-2">
-                  <HistoryDetailLink changes={{ detail: "raw" }}>원시 기록 검증</HistoryDetailLink>
+                  <HistoryDetailLink changes={{ detail: "raw" }}><T ko="원시 기록 검증" en="Inspect raw records"/></HistoryDetailLink>
                 </div>
               </section>
 
               {history.unavailableSources.length > 0 ? (
                 <section className="varda-rail-section text-[var(--warning)]">
-                  <p className="text-xs leading-5">
-                    일부 기록을 읽지 못했습니다: {history.unavailableSources.map(historyReadSourceLabel).join(", ")}. 읽을 수 있는 저장 기록만 표시합니다.
-                  </p>
+                  <p className="text-xs leading-5"><T ko="일부 기록을 읽지 못했습니다:" en="Some records could not be read:"/>{history.unavailableSources.map(historyReadSourceLabel).join(", ")}<T ko=". 읽을 수 있는 저장 기록만 표시합니다." en=". Only available recorded data is displayed."/></p>
                 </section>
               ) : null}
-            </aside>
+            </LocalizedElement>
           </div>
 
             ) : null}
@@ -126,15 +128,13 @@ function HistoryRawEvidence({ history, events, overview, detailParams }: { histo
   const portfolioPage = historyEvidencePage(history.portfolioRows, detailParams.portfolioPage);
   const eventPage = historyEvidencePage(events?.state === "ready" || events?.state === "partial" ? events.events : [], detailParams.eventPage);
   return <>
-    <div className="mb-5"><HistoryDetailLink changes={{ detail: "records" }}>기록·이벤트로 돌아가기</HistoryDetailLink></div>
+    <div className="mb-5"><HistoryDetailLink changes={{ detail: "records" }}><T ko="기록·이벤트로 돌아가기" en="Back to records and events"/></HistoryDetailLink></div>
 
           <div className="space-y-10">
             <p
               data-history-semantic="stored-evidence-not-recomputed"
               className="max-w-4xl text-sm leading-7 text-[var(--muted)]"
-            >
-              계좌 성과는 저장된 계좌 스냅샷을 읽고, 자산그룹 성과는 각 기준일에 유효했던 멤버십과 포지션 스냅샷으로 계산합니다. 누락값을 임의 보간하지 않으며 잔액 기록과 성과 시계열을 합치지 않습니다.
-            </p>
+            ><T ko="계좌 성과는 저장된 계좌 스냅샷을 읽고, 자산그룹 성과는 각 기준일에 유효했던 멤버십과 포지션 스냅샷으로 계산합니다. 누락값을 임의 보간하지 않으며 잔액 기록과 성과 시계열을 합치지 않습니다." en="Account performance uses recorded account snapshots. Asset-group performance uses membership and position snapshots valid on each date. Missing values are not interpolated, and balance records are kept separate from performance series."/></p>
 
             <dl className="grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
               <EvidenceMetric
@@ -171,9 +171,7 @@ function HistoryRawEvidence({ history, events, overview, detailParams }: { histo
                     <EvidencePagination pagination={balancePage} queryKey="balancePage" label="잔액 기록" />
                   </>
                 ) : (
-                  <UnsupportedScopeMessage>
-                    이 범위에는 배분 기준이 없는 레거시 잔액 기록을 적용하지 않습니다.
-                  </UnsupportedScopeMessage>
+                  <UnsupportedScopeMessage><T ko="이 범위에는 배분 기준이 없는 레거시 잔액 기록을 적용하지 않습니다." en="Legacy balance records without allocation rules are not applied to this scope."/></UnsupportedScopeMessage>
                 )}
               </RawSection>
             ) : null}
@@ -193,9 +191,7 @@ function HistoryRawEvidence({ history, events, overview, detailParams }: { histo
                     />
                   </>
                 ) : (
-                  <UnsupportedScopeMessage>
-                    전체·자산그룹의 과거 보유 상세 비교는 계좌 경계를 넘는 별도 증거 모델이 필요해 표시하지 않습니다.
-                  </UnsupportedScopeMessage>
+                  <UnsupportedScopeMessage><T ko="전체·자산그룹의 과거 보유 상세 비교는 계좌 경계를 넘는 별도 증거 모델이 필요해 표시하지 않습니다." en="Historical holding comparisons for all assets or asset groups are unavailable because they require a separate model across account boundaries."/></UnsupportedScopeMessage>
                 )}
                 <PortfolioHistoryTable
                   rows={portfolioPage.rows}
@@ -215,9 +211,7 @@ function HistoryRawEvidence({ history, events, overview, detailParams }: { histo
                     <EvidencePagination pagination={eventPage} queryKey="eventPage" label="이벤트 원문" />
                   </>
                 ) : (
-                  <UnsupportedScopeMessage>
-                    이 범위의 이벤트 포함 규칙이 없거나 조회가 시작되지 않았습니다.
-                  </UnsupportedScopeMessage>
+                  <UnsupportedScopeMessage><T ko="이 범위의 이벤트 포함 규칙이 없거나 조회가 시작되지 않았습니다." en="Event inclusion rules for this scope are unavailable, or retrieval has not started."/></UnsupportedScopeMessage>
                 )}
               </RawSection>
             ) : null}
@@ -227,13 +221,13 @@ function HistoryRawEvidence({ history, events, overview, detailParams }: { histo
 }
 
 function EvidencePagination({ pagination, queryKey, label }: { pagination: { page: number; pageCount: number; total: number; start: number; end: number }; queryKey: string; label: string }) {
-  return <nav aria-label={`${label} 페이지`} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
-    <span>{pagination.total}건 중 {pagination.start}–{pagination.end} · {pagination.page}/{pagination.pageCount}페이지</span>
+  return <LocalizedElement as="nav" en={{"aria-label": translateHomeHistory(`${label} 페이지`)}} aria-label={`${label} 페이지`} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
+    <span>{pagination.total}<T ko="건 중" en="records; showing"/> {pagination.start}–{pagination.end} · {pagination.page}/{pagination.pageCount}<T ko="페이지" en="page"/></span>
     <div className="flex gap-2">
-      {pagination.page > 1 ? <HistoryDetailLink changes={{ [queryKey]: String(pagination.page - 1), detail: "raw" }}>이전</HistoryDetailLink> : null}
-      {pagination.page < pagination.pageCount ? <HistoryDetailLink changes={{ [queryKey]: String(pagination.page + 1), detail: "raw" }}>다음</HistoryDetailLink> : null}
+      {pagination.page > 1 ? <HistoryDetailLink changes={{ [queryKey]: String(pagination.page - 1), detail: "raw" }}><T ko="이전" en="Previous"/></HistoryDetailLink> : null}
+      {pagination.page < pagination.pageCount ? <HistoryDetailLink changes={{ [queryKey]: String(pagination.page + 1), detail: "raw" }}><T ko="다음" en="Next"/></HistoryDetailLink> : null}
     </div>
-  </nav>;
+  </LocalizedElement>;
 }
 
 function historyOverviewEvents(events: TenantEventLedgerQueryResult | null) {
@@ -269,11 +263,11 @@ function RailInsight({
 }) {
   return (
     <div className="varda-rail-metric">
-      <dt>{label}</dt>
+      <dt>{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd className={valueClass} title={value}>
-        {value}
+        <T ko={value} en={translateHomeHistory(value)}/>
       </dd>
-      <dd className="mt-1 truncate text-[9px] font-normal text-[var(--faint)]" title={detail}>{detail}</dd>
+      <LocalizedElement as="dd" en={{"title": translateHomeHistory(detail)}} className="mt-1 truncate text-[9px] font-normal text-[var(--faint)]" title={detail}>{<T ko={detail} en={translateHomeHistory(detail)}/>}</LocalizedElement>
     </div>
   );
 }
@@ -289,9 +283,9 @@ function EvidenceMetric({
 }) {
   return (
     <div className="border-b border-[var(--wash)] px-4 py-4 first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-2 text-xl font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[var(--faint)]">{detail}</dd>
+      <dt className="text-xs text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dd className="mt-2 text-xl font-semibold tabular-nums"><T ko={value} en={translateHomeHistory(value)}/></dd>
+      <dd className="mt-1 text-xs text-[var(--faint)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</dd>
     </div>
   );
 }
@@ -308,8 +302,8 @@ function RawSection({
   return (
     <section>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-xs text-[var(--muted)]">{detail}</p>
+        <h2 className="text-lg font-semibold">{<T ko={title} en={translateHomeHistory(title)}/>}</h2>
+        <p className="text-xs text-[var(--muted)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</p>
       </div>
       {children}
     </section>

@@ -1,3 +1,6 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { HistoryEvidenceLink as Link, HistoryEvidenceForm } from "./history-records-dialog";
 
 import type { HistoryPositionComparisonModel } from "@/lib/history-position-comparison";
@@ -35,24 +38,15 @@ export function HistoryPositionComparison({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[var(--muted)]">
-            저장 스냅샷 비교
-          </p>
-          <h3 className="mt-1 text-base font-semibold tracking-normal">
-            두 시점 보유 변화
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-            같은 계정·출처의 두 저장점을 비교합니다. 실시간 시세나 현재 자산
-            정보로 과거 기록을 보완하지 않습니다.
-          </p>
+          <p className="text-xs font-semibold text-[var(--muted)]"><T ko="저장 스냅샷 비교" en="Compare recorded snapshots"/></p>
+          <h3 className="mt-1 text-base font-semibold tracking-normal"><T ko="두 시점 보유 변화" en="Holdings between two dates"/></h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]"><T ko="같은 계정·출처의 두 저장점을 비교합니다. 실시간 시세나 현재 자산 정보로 과거 기록을 보완하지 않습니다." en="Compare two snapshots from the same account and source. Historical records are not supplemented with live prices or current asset information."/></p>
         </div>
         {model.selection.status !== "idle" ? (
           <Link
             href={baseHistoryHref(model, scopeKey)}
             className="w-fit rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--wash)]"
-          >
-            비교 닫기
-          </Link>
+          ><T ko="비교 닫기" en="Close comparison"/></Link>
         ) : null}
       </div>
 
@@ -67,7 +61,7 @@ export function HistoryPositionComparison({
         <HistoryPositionComparisonResult model={model} />
       ) : (
         <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[var(--muted)]">
-          {statusMessage(model)}
+          {<T ko={statusMessage(model)} en={translateHomeHistory(statusMessage(model))}/>}
         </p>
       )}
     </section>
@@ -110,9 +104,7 @@ function ComparisonForm({
           type="submit"
           disabled={!canCompare}
           className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:bg-[var(--line)]"
-        >
-          비교
-        </button>
+        ><T ko="비교" en="Compare"/></button>
       </div>
     </HistoryEvidenceForm>
   );
@@ -133,17 +125,17 @@ function EndpointSelect({
 }) {
   return (
     <label className="grid min-w-0 gap-1 text-xs font-semibold text-[var(--muted)]">
-      {label}
+      {<T ko={label} en={translateHomeHistory(label)}/>}
       <select
         name={name}
         defaultValue={defaultValue ?? ""}
         disabled={disabled}
         className="min-w-0 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] disabled:bg-[var(--wash)]"
       >
-        {options.length === 0 ? <option value="">저장점 없음</option> : null}
+        {options.length === 0 ? <option value=""><T ko="저장점 없음" en="No snapshot"/></option> : null}
         {options.map((option) => (
           <option key={option.token} value={option.token}>
-            {option.snapshotDate} · {historySourceLabel(option.source)}
+            {option.snapshotDate} · {<T ko={historySourceLabel(option.source)} en={translateHomeHistory(historySourceLabel(option.source))}/>}
           </option>
         ))}
       </select>

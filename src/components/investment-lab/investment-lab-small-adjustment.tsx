@@ -1,5 +1,9 @@
 "use client";
 
+import { LabText } from "./lab-text";
+import { labEnglish } from "./lab-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
+
 import { useState, type FormEvent } from "react";
 
 import { InvestmentLabSmallAdjustmentResult } from "./investment-lab-small-adjustment-result";
@@ -72,25 +76,19 @@ export function InvestmentLabSmallAdjustment({
             <h2
               id="investment-lab-small-adjustment-title"
               className="mt-3 text-lg font-medium sm:text-xl"
-            >
-              작은 조정 영향 실험
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-              같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다. 외부
-              현금, 목표비중, 추천, 주문은 반영하지 않습니다.
-            </p>
+            ><LabText value=" 작은 조정 영향 실험 " /></h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다. 외부 현금, 목표비중, 추천, 주문은 반영하지 않습니다. " /></p>
           </div>
-          <p className="text-sm font-semibold text-[var(--muted)]">
-            계산 가능 계정 {readyAccountCount}/{model.accounts.length}
+          <p className="text-sm font-semibold text-[var(--muted)]"><LabText value=" 계산 가능 계정 " />{readyAccountCount}/{model.accounts.length}
           </p>
         </div>
       </header>
 
       <div className="rounded-[4px] border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-6">
-        <div
+        <LocalizedElement as="div"
           aria-label="조정 계정"
           className="flex max-w-full gap-7 overflow-x-auto border-b border-[var(--line)]"
-          role="group"
+          role="group" en={{"aria-label": labEnglish("조정 계정")}}
         >
           {model.accounts.map((account) => (
             <button
@@ -109,16 +107,14 @@ export function InvestmentLabSmallAdjustment({
               {account.label}
             </button>
           ))}
-        </div>
+        </LocalizedElement>
 
         {!selectedAccount || selectedAccount.status !== "ready" ? (
           <AccountUnavailable account={selectedAccount} />
         ) : (
           <form className="mt-4 space-y-4" onSubmit={submit}>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_220px_auto] lg:items-end">
-              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]">
-                줄일 보유자산
-                <select
+              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 줄일 보유자산 " /><select
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
                     setSourceKey(event.target.value);
@@ -126,19 +122,17 @@ export function InvestmentLabSmallAdjustment({
                   }}
                   value={sourceKey}
                 >
-                  <option value="">선택 안 함</option>
+                  <option value=""><LabText value="선택 안 함" /></option>
                   {selectedAccount.holdings.map((holding) => (
                     <option key={holding.key} value={holding.key}>
                       {holdingLabel(holding)} ·{" "}
-                      {formatKrw(holding.currentValueKrw)}
+                      <LabText value={formatKrw(holding.currentValueKrw)} />
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]">
-                늘릴 보유자산
-                <select
+              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 늘릴 보유자산 " /><select
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
                     setDestinationKey(event.target.value);
@@ -146,7 +140,7 @@ export function InvestmentLabSmallAdjustment({
                   }}
                   value={destinationKey}
                 >
-                  <option value="">선택 안 함</option>
+                  <option value=""><LabText value="선택 안 함" /></option>
                   {selectedAccount.holdings.map((holding) => (
                     <option
                       disabled={holding.key === sourceKey}
@@ -154,15 +148,13 @@ export function InvestmentLabSmallAdjustment({
                       value={holding.key}
                     >
                       {holdingLabel(holding)} ·{" "}
-                      {formatKrw(holding.currentValueKrw)}
+                      <LabText value={formatKrw(holding.currentValueKrw)} />
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]">
-                이동 금액
-                <input
+              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 이동 금액 " /><input
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal tabular-nums text-[var(--ink)]"
                   inputMode="numeric"
                   max={source ? Math.floor(source.currentValueKrw) : undefined}
@@ -182,18 +174,15 @@ export function InvestmentLabSmallAdjustment({
                 className="min-h-11 rounded-md bg-[var(--ink)] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[var(--faint)]"
                 disabled={!sourceKey || !destinationKey || !amount}
                 type="submit"
-              >
-                영향 계산
-              </button>
+              ><LabText value=" 영향 계산 " /></button>
             </div>
 
             <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--muted)]">
-              <span>
-                계정 평가액 {formatKrw(selectedAccount.totalValueKrw)}
+              <span><LabText value=" 계정 평가액 " /><LabText value={formatKrw(selectedAccount.totalValueKrw)} />
               </span>
-              <span>직접 보유 {selectedAccount.holdings.length}개</span>
+              <span><LabText value="직접 보유 " />{selectedAccount.holdings.length}<LabText value="개" /></span>
               {source ? (
-                <span>이동 가능 상한 {formatKrw(source.currentValueKrw)}</span>
+                <span><LabText value="이동 가능 상한 " /><LabText value={formatKrw(source.currentValueKrw)} /></span>
               ) : null}
             </div>
           </form>
@@ -220,24 +209,21 @@ function AccountUnavailable({
 }) {
   return (
     <div className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
-      <p className="font-semibold">이 계정은 조정 계산을 차단했습니다.</p>
+      <p className="font-semibold"><LabText value="이 계정은 조정 계산을 차단했습니다." /></p>
       <ul className="mt-2 space-y-1">
         {(account?.blockers ?? []).map((blocker) => (
-          <li key={blocker}>{accountBlockerLabel(blocker)}</li>
+          <li key={blocker}><LabText value={accountBlockerLabel(blocker)} /></li>
         ))}
       </ul>
       {account?.excludedHoldingCount ? (
-        <p className="mt-2 text-xs">
-          평가 제외 {account.excludedHoldingCount}개 · 가격{" "}
-          {account.exclusionReasonCounts.missingPrice} · 환율{" "}
-          {account.exclusionReasonCounts.missingFx} · 미지원 통화{" "}
+        <p className="mt-2 text-xs"><LabText value=" 평가 제외 " />{account.excludedHoldingCount}<LabText value="개 · 가격" />{" "}
+          {account.exclusionReasonCounts.missingPrice}<LabText value=" · 환율" />{" "}
+          {account.exclusionReasonCounts.missingFx}<LabText value=" · 미지원 통화" />{" "}
           {account.exclusionReasonCounts.unsupportedCurrency}
         </p>
       ) : null}
       {account?.unresolvedInstrumentCount ? (
-        <p className="mt-2 text-xs">
-          식별 불가 직접 보유 {account.unresolvedInstrumentCount}개
-        </p>
+        <p className="mt-2 text-xs"><LabText value=" 식별 불가 직접 보유 " />{account.unresolvedInstrumentCount}<LabText value="개 " /></p>
       ) : null}
     </div>
   );
@@ -255,10 +241,8 @@ export function InvestmentLabSmallAdjustmentUnavailable() {
   return (
     <section className="min-w-0 py-6">
       <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
-        <h2 className="text-lg font-semibold">작은 조정 영향 실험</h2>
-        <p className="mt-2">
-          현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다.
-        </p>
+        <h2 className="text-lg font-semibold"><LabText value="작은 조정 영향 실험" /></h2>
+        <p className="mt-2"><LabText value=" 현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다. " /></p>
       </div>
     </section>
   );

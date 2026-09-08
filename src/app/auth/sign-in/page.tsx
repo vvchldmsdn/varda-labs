@@ -1,10 +1,13 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { AuthEntry } from "@/components/auth/auth-entry";
 
 export const dynamic = "force-dynamic";
-export const metadata = {
+export async function generateMetadata() {
+  return localizedMetadata({
   title: "로그인 | VARDA-LABS",
   robots: { index: false, follow: false },
-};
+}, "Sign in | VARDA LABS");
+}
 
 export default async function SignInPage({
   searchParams,

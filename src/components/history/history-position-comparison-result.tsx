@@ -1,3 +1,6 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import Link from "next/link";
 
 import type {
@@ -25,10 +28,7 @@ export function HistoryPositionComparisonResult({
   return (
     <>
       {model.status === "partial" ? (
-        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]">
-          일부 저장 근거가 중복되었거나 비어 있습니다. 확인 가능한 변화만
-          표시하고, 판단할 수 없는 행은 미확인으로 남깁니다.
-        </p>
+        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]"><T ko="일부 저장 근거가 중복되었거나 비어 있습니다. 확인 가능한 변화만 표시하고, 판단할 수 없는 행은 미확인으로 남깁니다." en="Some records are duplicated or incomplete. Only verifiable changes are shown; unresolved rows remain unverified."/></p>
       ) : null}
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -44,16 +44,11 @@ export function HistoryPositionComparisonResult({
       <ComparisonTable rows={model.rows} />
 
       <div className="mt-3 flex flex-col gap-2 text-xs leading-5 text-[var(--muted)] sm:flex-row sm:items-start sm:justify-between">
-        <p>
-          저장 평가액 변화는 수익률·손익 또는 이벤트 원인을 뜻하지 않습니다.
-          실시간 가격, 현재 환율, 보간값을 섞지 않았습니다.
-        </p>
+        <p><T ko="저장 평가액 변화는 수익률·손익 또는 이벤트 원인을 뜻하지 않습니다. 실시간 가격, 현재 환율, 보간값을 섞지 않았습니다." en="Changes in recorded value do not establish returns, profit/loss or event causation. No live prices, current FX rates or interpolated values are included."/></p>
         <Link
           href={eventHistoryHref(model)}
           className="w-fit font-semibold text-[var(--ink)] underline underline-offset-2"
-        >
-          이벤트 기록은 별도 연대기로 보기
-        </Link>
+        ><T ko="이벤트 기록은 별도 연대기로 보기" en="View events in a separate timeline"/></Link>
       </div>
     </>
   );
@@ -68,9 +63,9 @@ function EndpointEvidence({
 }) {
   return (
     <div className="border border-[var(--wash)] bg-white p-3">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</p>
       <p className="mt-1 text-sm font-semibold">
-        {endpoint.snapshotDate} · {historySourceLabel(endpoint.source)}
+        {endpoint.snapshotDate} · {<T ko={historySourceLabel(endpoint.source)} en={translateHomeHistory(historySourceLabel(endpoint.source))}/>}
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
         <EvidenceValue
@@ -105,8 +100,8 @@ function EndpointEvidence({
 function EvidenceValue({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 font-semibold text-[var(--ink)]">{value}</dd>
+      <dt className="text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dd className="mt-1 font-semibold text-[var(--ink)]"><T ko={value} en={translateHomeHistory(value)}/></dd>
     </div>
   );
 }
@@ -153,16 +148,16 @@ function ComparisonTable({
       <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
         <thead className="text-xs text-[var(--muted)]">
           <tr>
-            <TableHeader>변화</TableHeader>
-            <TableHeader>종목</TableHeader>
-            <TableHeader>시장 / 통화</TableHeader>
-            <TableHeader>저장 참조</TableHeader>
-            <TableHeader align="right">이전 수량</TableHeader>
-            <TableHeader align="right">이후 수량</TableHeader>
-            <TableHeader align="right">수량 변화</TableHeader>
-            <TableHeader align="right">이전 평가액</TableHeader>
-            <TableHeader align="right">이후 평가액</TableHeader>
-            <TableHeader align="right">저장 평가액 변화</TableHeader>
+            <TableHeader><T ko="변화" en="Change"/></TableHeader>
+            <TableHeader><T ko="종목" en="Holding"/></TableHeader>
+            <TableHeader><T ko="시장 / 통화" en="Market / currency"/></TableHeader>
+            <TableHeader><T ko="저장 참조" en="Recorded reference"/></TableHeader>
+            <TableHeader align="right"><T ko="이전 수량" en="Earlier quantity"/></TableHeader>
+            <TableHeader align="right"><T ko="이후 수량" en="Later quantity"/></TableHeader>
+            <TableHeader align="right"><T ko="수량 변화" en="Quantity change"/></TableHeader>
+            <TableHeader align="right"><T ko="이전 평가액" en="Earlier value"/></TableHeader>
+            <TableHeader align="right"><T ko="이후 평가액" en="Later value"/></TableHeader>
+            <TableHeader align="right"><T ko="저장 평가액 변화" en="Change in recorded value"/></TableHeader>
           </tr>
         </thead>
         <tbody>
@@ -186,13 +181,13 @@ function ComparisonRow({ row }: { row: HistoryPositionComparisonRow }) {
       data-history-position-comparison-evidence={row.evidenceStatus}
     >
       <TableCell strong>
-        <span className="block">{changeKindLabel(row.changeKind)}</span>
+        <span className="block">{<T ko={changeKindLabel(row.changeKind)} en={translateHomeHistory(changeKindLabel(row.changeKind))}/>}</span>
         <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
-          {changeReasonLabel(row)}
+          {<T ko={changeReasonLabel(row)} en={translateHomeHistory(changeReasonLabel(row))}/>}
         </span>
       </TableCell>
       <TableCell strong>
-        <span className="block">{row.ticker ?? "티커 없음"}</span>
+        <span className="block">{<T ko={row.ticker ?? "티커 없음"} en={translateHomeHistory(row.ticker ?? "티커 없음")}/>}</span>
         <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
           {row.assetName}
         </span>
@@ -201,7 +196,7 @@ function ComparisonRow({ row }: { row: HistoryPositionComparisonRow }) {
         {[row.market, row.currency].filter(Boolean).join(" / ") || "n/a"}
       </TableCell>
       <TableCell>
-        {referenceLabel(row.fromReferenceStatus)} → {referenceLabel(row.toReferenceStatus)}
+        {<T ko={referenceLabel(row.fromReferenceStatus)} en={translateHomeHistory(referenceLabel(row.fromReferenceStatus))}/>} → {<T ko={referenceLabel(row.toReferenceStatus)} en={translateHomeHistory(referenceLabel(row.toReferenceStatus))}/>}
       </TableCell>
       <TableCell align="right">
         {formatHistoryNumber(row.fromQuantity)}
@@ -219,7 +214,7 @@ function ComparisonRow({ row }: { row: HistoryPositionComparisonRow }) {
         {formatHistoryKrw(row.toMarketValueKrw)}
       </TableCell>
       <TableCell align="right">
-        {formatSignedKrw(row.marketValueChangeKrw)}
+        {<T ko={formatSignedKrw(row.marketValueChangeKrw)} en={translateHomeHistory(formatSignedKrw(row.marketValueChangeKrw))}/>}
       </TableCell>
     </tr>
   );

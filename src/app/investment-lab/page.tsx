@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense, type ReactNode } from "react";
 
@@ -30,7 +31,9 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "투자 랩 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "투자 랩 | VARDA LABS" }, "Investment Lab | VARDA LABS");
+}
 
 type InvestmentLabPageProps = {
   searchParams: Promise<{

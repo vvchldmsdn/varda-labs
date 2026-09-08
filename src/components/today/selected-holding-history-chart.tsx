@@ -1,4 +1,8 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { useI18n } from "@/components/i18n/locale-provider";
+
 
 import { useMemo, useState } from "react";
 import styles from "@/components/home/portfolio-overview.module.css";
@@ -28,6 +32,7 @@ export function SelectedHoldingHistoryChart({
   name: string;
   points: readonly TodayHoldingHistoryPoint[];
 }) {
+  const { t } = useI18n();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const geometry = useMemo(() => buildChartGeometry(points), [points]);
   const activePoint = activeIndex === null ? null : points[activeIndex] ?? null;
@@ -43,13 +48,15 @@ export function SelectedHoldingHistoryChart({
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">HOLDING HISTORY</p>
           <h3 className="mt-1 text-base font-medium">
-            {basis === "normalized_return" ? "종목 흐름" : "평가액 흐름"}
+            {<T ko={basis === "normalized_return" ? "종목 흐름" : "평가액 흐름"} en={translateHomeHistory(basis === "normalized_return" ? "종목 흐름" : "평가액 흐름")}/>}
           </h3>
         </div>
         <p className="text-xs text-[var(--muted)]">
-          {basis === "normalized_return"
+          {<T ko={basis === "normalized_return"
             ? "저장된 일별 등락률 복리 지수 · 시작=100"
-            : "저장된 일일 포지션 평가액 · 최대 31일"}
+            : "저장된 일일 포지션 평가액 · 최대 31일"} en={translateHomeHistory(basis === "normalized_return"
+            ? "저장된 일별 등락률 복리 지수 · 시작=100"
+            : "저장된 일일 포지션 평가액 · 최대 31일")}/>}
         </p>
       </div>
 
@@ -59,7 +66,7 @@ export function SelectedHoldingHistoryChart({
           onPointerLeave={() => setActiveIndex(null)}
         >
           <svg
-            aria-label={`${name} 평가액 이력`}
+            aria-label={t(`${name} 평가액 이력`, translateHomeHistory(`${name} 평가액 이력`))}
             className="h-full w-full overflow-visible"
             preserveAspectRatio="none"
             role="img"
@@ -121,7 +128,7 @@ export function SelectedHoldingHistoryChart({
                 <rect
                   key={points[index]?.date}
                   data-selected-history-index={index}
-                  aria-label={`${formatDate(points[index]?.date ?? null)} ${formatChartValue(points[index] ?? null)}`}
+                  aria-label={t(`${formatDate(points[index]?.date ?? null)} ${formatChartValue(points[index] ?? null)}`, translateHomeHistory(`${formatDate(points[index]?.date ?? null)} ${formatChartValue(points[index] ?? null)}`))}
                   className="outline-none"
                   fill="transparent"
                   height={PLOT_BOTTOM - PLOT_TOP}
@@ -162,21 +169,23 @@ export function SelectedHoldingHistoryChart({
               className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-xs shadow-[0_12px_30px_rgba(35,43,37,0.10)]"
               style={{ left: `clamp(92px, ${(activeGeometry.x / WIDTH) * 100}%, calc(100% - 92px))` }}
             >
-              <p className="font-medium text-[var(--ink)]">{formatDate(activePoint.date)}</p>
+              <p className="font-medium text-[var(--ink)]">{<T ko={formatDate(activePoint.date)} en={translateHomeHistory(formatDate(activePoint.date))}/>}</p>
               <div className="mt-2 flex items-baseline justify-between gap-3">
                 <span className="text-[var(--muted)]">
-                  {activePoint.basis === "market_value" ? "평가액" : "누적 지수"}
+                  {<T ko={activePoint.basis === "market_value" ? "평가액" : "누적 지수"} en={translateHomeHistory(activePoint.basis === "market_value" ? "평가액" : "누적 지수")}/>}
                 </span>
                 <span className="font-medium text-[var(--ink)]">{formatChartValue(activePoint)}</span>
               </div>
               <div className="mt-1 flex items-baseline justify-between gap-3">
-                <span className="text-[var(--muted)]">일일 변동</span>
+                <span className="text-[var(--muted)]"><T ko="일일 변동" en="Daily change"/></span>
                 <span className="font-medium text-[var(--ink)]">{formatPercent(activePoint.changePct, true)}</span>
               </div>
               <p className="mt-2 text-[10px] text-[var(--faint)]">
-                {activePoint.basis === "market_value"
+                {<T ko={activePoint.basis === "market_value"
                   ? `${currency} 보유 평가액의 KRW 환산 근거`
-                  : "저장된 일별 변동률을 연결한 비교 지수"}
+                  : "저장된 일별 변동률을 연결한 비교 지수"} en={translateHomeHistory(activePoint.basis === "market_value"
+                  ? `${currency} 보유 평가액의 KRW 환산 근거`
+                  : "저장된 일별 변동률을 연결한 비교 지수")}/>}
               </p>
             </div>
           ) : null}
@@ -184,8 +193,8 @@ export function SelectedHoldingHistoryChart({
       ) : (
         <div className="mt-5 grid min-h-40 place-items-center border-y border-[var(--wash)] text-center">
           <div>
-            <p className="text-sm font-medium text-[var(--muted)]">차트를 그릴 이력이 부족합니다.</p>
-            <p className="mt-1 text-xs text-[var(--muted)]">일일 포지션 스냅샷이 2개 이상 쌓이면 표시됩니다.</p>
+            <p className="text-sm font-medium text-[var(--muted)]"><T ko="차트를 그릴 이력이 부족합니다." en="There is not enough history to draw a chart."/></p>
+            <p className="mt-1 text-xs text-[var(--muted)]"><T ko="일일 포지션 스냅샷이 2개 이상 쌓이면 표시됩니다." en="The chart appears when at least two daily position snapshots are available."/></p>
           </div>
         </div>
       )}

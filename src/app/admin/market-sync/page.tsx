@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -14,7 +15,9 @@ import type {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "시장 데이터 동기화 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "시장 데이터 동기화 | VARDA LABS" }, "Market sync | VARDA LABS");
+}
 
 export default async function AdminMarketSyncPage() {
   const status = await getAdminMarketSyncStatus();

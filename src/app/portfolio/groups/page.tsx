@@ -1,3 +1,5 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementText } from "@/components/i18n/management-text";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
@@ -12,7 +14,9 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "분석 범위 관리 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "분석 범위 관리 | VARDA LABS" }, "Analysis scopes | VARDA LABS");
+}
 
 export default async function PortfolioGroupsPage() {
   const resolution = await resolveCurrentTenantContext();
@@ -20,9 +24,12 @@ export default async function PortfolioGroupsPage() {
     return (
       <PortfolioReadAccessBoundary
         closedMessage="로그인과 사용자 소유권이 확인되기 전에는 분석 범위를 조회하거나 변경하지 않습니다."
+        closedMessageEn="Analysis scopes cannot be read or changed until sign-in and ownership are verified."
         description="여러 계좌 또는 일부 종목을 하나의 분석 범위로 묶습니다."
+        descriptionEn="Group accounts or selected holdings into one analysis scope."
         resolution={resolution}
         title="분석 범위 관리"
+        titleEn="Manage analysis scopes"
       />
     );
   }
@@ -41,12 +48,8 @@ export default async function PortfolioGroupsPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                분석 범위 관리
-              </h1>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                실제 계좌와 별개로, 함께 분석할 계좌와 종목을 묶습니다.
-              </p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-normal"><ManagementText>{"분석 범위 관리"}</ManagementText></h1>
+              <p className="mt-2 text-sm text-[var(--muted)]"><ManagementText>{"실제 계좌와 별개로, 함께 분석할 계좌와 종목을 묶습니다."}</ManagementText></p>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
               <NavLink href="/">홈</NavLink>
@@ -75,16 +78,12 @@ export default async function PortfolioGroupsPage() {
         </section>
 
         {model.state !== "ready" ? (
-          <section className="rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
-            분석 범위 정보를 불러오지 못했습니다. 데이터 연결 상태를 확인해 주세요.
-          </section>
+          <section className="rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]"><ManagementText>{"분석 범위 정보를 불러오지 못했습니다. 데이터 연결 상태를 확인해 주세요."}</ManagementText></section>
         ) : (
           <>
             <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-              <h2 className="text-lg font-semibold">새 분석 범위</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                빈 범위도 만들 수 있으며 구성은 언제든 바꿀 수 있습니다.
-              </p>
+              <h2 className="text-lg font-semibold"><ManagementText>{"새 분석 범위"}</ManagementText></h2>
+              <p className="mt-1 text-sm text-[var(--muted)]"><ManagementText>{"빈 범위도 만들 수 있으며 구성은 언제든 바꿀 수 있습니다."}</ManagementText></p>
               <div className="mt-4">
                 <PortfolioGroupCreateForm
                   accounts={model.accounts}
@@ -95,15 +94,11 @@ export default async function PortfolioGroupsPage() {
 
             <section className="space-y-3">
               <div className="px-1">
-                <h2 className="text-lg font-semibold">기존 분석 범위</h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  변경일 이후의 홈, 오늘 변동, 추가 투입, 위험, 투자랩과 시뮬레이션에 같은 범위가 적용됩니다.
-                </p>
+                <h2 className="text-lg font-semibold"><ManagementText>{"기존 분석 범위"}</ManagementText></h2>
+                <p className="mt-1 text-sm text-[var(--muted)]"><ManagementText>{"변경일 이후의 홈, 오늘 변동, 추가 투입, 위험, 투자랩과 시뮬레이션에 같은 범위가 적용됩니다."}</ManagementText></p>
               </div>
               {model.groups.length === 0 ? (
-                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
-                  아직 만든 분석 범위가 없습니다.
-                </div>
+                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]"><ManagementText>{"아직 만든 분석 범위가 없습니다."}</ManagementText></div>
               ) : (
                 model.groups.map((group) => (
                   <PortfolioGroupEditor
@@ -125,8 +120,8 @@ export default async function PortfolioGroupsPage() {
 function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
-      <dd className="mt-2 text-lg font-semibold">{value}</dd>
+      <dt className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{label}</ManagementText></dt>
+      <dd className="mt-2 text-lg font-semibold"><ManagementText>{value}</ManagementText></dd>
     </div>
   );
 }
@@ -137,7 +132,7 @@ function NavLink({ href, children }: { href: string; children: string }) {
       className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
       href={href}
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </Link>
   );
 }

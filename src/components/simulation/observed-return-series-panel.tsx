@@ -1,3 +1,7 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { simulationEnglish } from "@/components/simulation/simulation-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
 import {
@@ -61,16 +65,14 @@ export function ObservedReturnSeriesPanel({
             id={`observed-returns-${input.id}`}
             className="text-sm font-semibold"
           >
-            {rows.length}개 관측 수익률
-          </h3>
+            {rows.length}<SimulationText ko={"개 관측 수익률"} />{" "}</h3>
           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-            저장된 조정종가와 기준일별 환율로 계산한 과거 KRW 단순수익률입니다.
-          </p>
+            <SimulationText ko={"저장된 조정종가와 기준일별 환율로 계산한 과거 KRW 단순수익률입니다."} />{" "}</p>
         </div>
         <div className="text-right text-xs leading-5 text-[var(--muted)]">
-          <p>예측·시뮬레이션 경로 아님</p>
+          <p><SimulationText ko={"예측·시뮬레이션 경로 아님"} /></p>
           <p data-return-scale-mode={scaleMode}>
-            {scaleMode === "shared" ? "두 입력 공통" : "개별"} 세로축 {" "}
+            <SimulationText ko={scaleMode === "shared" ? "두 입력 공통" : "개별"} /> {" "}<SimulationText ko={"세로축"} />{" "}{" "}
             {formatReturnRange(chartScale)}
           </p>
         </div>
@@ -87,13 +89,13 @@ export function ObservedReturnSeriesPanel({
       </dl>
 
       <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
-        <svg
+        <LocalizedElement
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           role="img"
           aria-label={`${input.ticker}의 과거 ${rows.length}개 KRW 단순수익률 차트`}
-          className="h-auto w-full min-w-[640px]"
+          className="h-auto w-full min-w-[640px]" as="svg" en={{"aria-label": simulationEnglish(`${input.ticker}의 과거 ${rows.length}개 KRW 단순수익률 차트`)}}
         >
-          <title>{`${input.ticker} 과거 KRW 단순수익률`}</title>
+          <LocalizedSvgText as="title" ko={`${input.ticker} 과거 KRW 단순수익률`} en={simulationEnglish(`${input.ticker} 과거 KRW 단순수익률`)} />
           {ticks.map((tick) => {
             const y =
               topPadding +
@@ -129,7 +131,7 @@ export function ObservedReturnSeriesPanel({
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-        </svg>
+        </LocalizedElement>
       </div>
       <div className="mt-2 flex justify-between text-xs text-[var(--muted)]">
         <span>{formatSimulationDate(rows[0]?.serviceDate ?? null)}</span>
@@ -141,15 +143,14 @@ export function ObservedReturnSeriesPanel({
         className="mt-4 border-t border-[var(--line)] pt-3"
       >
         <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]">
-          전체 {rows.length}개 수익률 표 보기
-        </summary>
+          <SimulationText ko={"전체"} />{" "}{rows.length}<SimulationText ko={"개 수익률 표 보기"} />{" "}</summary>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-left text-sm">
             <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-2 font-semibold">이전 기준일</th>
-                <th className="px-3 py-2 font-semibold">기준일</th>
-                <th className="px-3 py-2 text-right font-semibold">KRW 수익률</th>
+                <th className="px-3 py-2 font-semibold"><SimulationText ko={"이전 기준일"} /></th>
+                <th className="px-3 py-2 font-semibold"><SimulationText ko={"기준일"} /></th>
+                <th className="px-3 py-2 text-right font-semibold"><SimulationText ko={"KRW 수익률"} /></th>
               </tr>
             </thead>
             <tbody>
@@ -202,8 +203,8 @@ export function resolveSharedObservedReturnScale(
 function ReturnSummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-[var(--surface)] px-3 py-2">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 font-semibold tabular-nums"><SimulationText ko={value} /></dd>
     </div>
   );
 }

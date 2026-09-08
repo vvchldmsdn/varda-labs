@@ -1,4 +1,7 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+
 
 import { formatHistoryKrw } from "@/components/history/history-format";
 import type { HistoryOverviewPoint } from "@/lib/history-overview";
@@ -19,11 +22,10 @@ export function HistorySnapshotRail({
       <div className="flex items-end justify-between border-b border-[var(--line)] py-4 lg:pt-0">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">SNAPSHOTS</p>
-          <h2 className="mt-1 text-base font-semibold">날짜별 기록</h2>
+          <h2 className="mt-1 text-base font-semibold"><T ko="날짜별 기록" en="Records by date"/></h2>
         </div>
         <p className="text-[11px] tabular-nums text-[var(--faint)]">
-          {points.length}개
-        </p>
+          {points.length}<T ko="개" en=" items"/></p>
       </div>
 
       <div className="max-h-[430px] overflow-y-auto overscroll-contain pr-1 lg:h-[430px]">
@@ -42,20 +44,22 @@ export function HistorySnapshotRail({
               onClick={() => onSelect(point.date)}
             >
               <span className="text-sm font-semibold tabular-nums">
-                {formatDate(point.date)}
+                {<T ko={formatDate(point.date)} en={translateHomeHistory(formatDate(point.date))}/>}
               </span>
               <span className="text-right text-sm font-semibold tabular-nums">
-                {formatCompactKrw(point.valueKrw)}
+                <T ko={formatCompactKrw(point.valueKrw)} en={formatCompactKrw(point.valueKrw, "en")}/>
               </span>
               <span className="mt-1 text-[11px] text-[var(--faint)]">
-                {point.events.length > 0
+                {<T ko={point.events.length > 0
                   ? `활동 ${point.events.length}건`
-                  : rowKindLabel(point.rowKind)}
+                  : rowKindLabel(point.rowKind)} en={translateHomeHistory(point.events.length > 0
+                  ? `활동 ${point.events.length}건`
+                  : rowKindLabel(point.rowKind))}/>}
               </span>
               <span
                 className={`mt-1 text-right text-xs font-medium tabular-nums ${tone(point.movementKrw)}`}
               >
-                {formatSignedKrw(point.movementKrw)}
+                <T ko={formatSignedKrw(point.movementKrw)} en={formatSignedKrw(point.movementKrw, "en")}/>
               </span>
             </button>
           );
@@ -71,7 +75,8 @@ function rowKindLabel(rowKind: HistoryOverviewPoint["rowKind"]) {
   return "표시용 합산";
 }
 
-function formatCompactKrw(value: number) {
+function formatCompactKrw(value: number, locale: "ko" | "en" = "ko") {
+  if (locale === "en") return ENGLISH_COMPACT_KRW.format(value);
   if (Math.abs(value) >= 100_000_000) {
     return `₩${(value / 100_000_000).toLocaleString("ko-KR", {
       maximumFractionDigits: 1,
@@ -83,11 +88,15 @@ function formatCompactKrw(value: number) {
   return formatHistoryKrw(value);
 }
 
-function formatSignedKrw(value: number | null) {
-  if (value === null) return "첫 기록";
+function formatSignedKrw(value: number | null, locale: "ko" | "en" = "ko") {
+  if (value === null) return locale === "en" ? "First record" : "첫 기록";
   if (Math.abs(value) < 0.5) return "₩0";
-  return `${value > 0 ? "+" : "-"}${formatCompactKrw(Math.abs(value))}`;
+  return `${value > 0 ? "+" : "-"}${formatCompactKrw(Math.abs(value), locale)}`;
 }
+
+const ENGLISH_COMPACT_KRW = new Intl.NumberFormat("en-US", {
+  style: "currency", currency: "KRW", notation: "compact", maximumFractionDigits: 1,
+});
 
 function formatDate(value: string) {
   return value.replaceAll("-", ".");

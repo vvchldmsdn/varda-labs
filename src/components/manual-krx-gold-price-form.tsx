@@ -1,5 +1,6 @@
 "use client";
 
+import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState } from "react";
 
 import {
@@ -25,9 +26,7 @@ export function ManualKrxGoldPriceForm({
 
   return (
     <form action={action} className="mt-3 min-w-[210px] space-y-2">
-      <label className="block text-xs font-semibold text-[var(--ink)]">
-        1g 평가액 (KRW)
-        <input
+      <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"1g 평가액 (KRW)"}</ManagementText><input
           aria-describedby="manual-gold-price-message"
           className="mt-1 w-full rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-[var(--ink)]"
           defaultValue={Number(currentPrice)}
@@ -45,7 +44,7 @@ export function ManualKrxGoldPriceForm({
         disabled={pending}
         type="submit"
       >
-        {pending ? "저장 중" : "수동 평가 저장"}
+        <ManagementText>{pending ? "저장 중" : "수동 평가 저장"}</ManagementText>
       </button>
       <p
         aria-live="polite"
@@ -55,7 +54,7 @@ export function ManualKrxGoldPriceForm({
         ].join(" ")}
         id="manual-gold-price-message"
       >
-        {state.message ?? "저장 전까지 기존 평가액을 계속 사용합니다."}
+        <ManagementText>{state.message ?? "저장 전까지 기존 평가액을 계속 사용합니다."}</ManagementText>
       </p>
     </form>
   );

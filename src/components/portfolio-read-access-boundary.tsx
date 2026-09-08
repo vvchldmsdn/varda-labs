@@ -1,4 +1,5 @@
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
+import { T } from "@/components/i18n/localized-text";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -13,11 +14,17 @@ export function PortfolioReadAccessBoundary({
     "This view reads portfolio data only after the signed-in user and canonical account ownership are resolved on the server.",
   resolution,
   title,
+  titleEn,
+  descriptionEn,
+  closedMessageEn,
 }: {
   closedMessage?: string;
   description?: string;
   resolution: SessionResolverResult;
   title: string;
+  titleEn?: string;
+  descriptionEn?: string;
+  closedMessageEn?: string;
 }) {
   if (!resolution.ok && resolution.failure.code === "unauthenticated") redirect("/auth/sign-in");
   if (!resolution.ok && resolution.failure.code === "identity_unlinked") redirect("/portfolio/onboarding");
@@ -28,8 +35,8 @@ export function PortfolioReadAccessBoundary({
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal">{title}</h1>
-        <p className="mt-2 text-sm text-[var(--muted)]">{description}</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko={title} en={titleEn ?? title} /></h1>
+        <p className="mt-2 text-sm text-[var(--muted)]"><T ko={description} en={descriptionEn ?? description} /></p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell
             label="Portfolio user link"
@@ -38,7 +45,7 @@ export function PortfolioReadAccessBoundary({
           <EvidenceCell label="Product database read" value="Not attempted" />
         </dl>
         <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-          {closedMessage}
+          <T ko={closedMessage} en={closedMessageEn ?? closedMessage} />
         </p>
         <Link
           href={nextAction.href}

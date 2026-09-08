@@ -52,3 +52,41 @@
 @media (max-width:760px) { .page { gap:9px; } .header { gap:3px 10px; } .title { display:flex; align-items:baseline; gap:10px; } .title h1 { font-size:23px; } .previewNote { font-size:8px; margin:0; } .controls > div { gap:8px; } .controls > div > div:last-child { flex-basis:110px; } .controls > div > div:last-child > div > a { font-size:9px; padding:6px 4px; } .headerLink { font-size:10px; } .statusLine { gap:7px 13px; font-size:8px; } .statusLine > span:last-child { display:none; } .riskStage { display:flex; flex-direction:column; gap:12px; } .matrix { flex:1; padding:16px 14px 11px; border-radius:20px; gap:8px; } .matrixHeading h2 { font-size:16px; } .matrixHeading p { font-size:8px; } .coreSummary { order:-1; flex-direction:row; justify-content:space-between; gap:14px; padding:2px 0; flex-shrink:0; } .coreMetric dt { font-size:8px; } .coreMetric dd { font-size:23px; margin-top:6px; } .coreMetric small { display:none; } .compactMatrix { gap:5px; } .compactMatrix [data-matrix-readout] { min-height:34px; gap:10px; } .compactMatrix [data-matrix-readout] > strong { font-size:30px; } .compactMatrix [data-matrix-readout] p { font-size:10px; } .compactMatrix [data-matrix-readout] > div > span { font-size:7px; } .compactMatrix [data-matrix-pair] { font-size:8px; gap:3px 6px; } .compactMatrix table { border-spacing:2px; } .compactMatrix th { font-size:7px; padding:0 1px; height:18px; } .compactMatrix th:first-child { width:41px; } .compactMatrix td > button { min-height:20px; font-size:8px; border-radius:4px; } .compactMatrix [data-matrix-legend] { font-size:7px; gap:3px; } .compactMatrix [data-matrix-legend] > i { width:50px; } .compactMatrix [data-matrix-legend] b { font-size:7px; margin-inline:3px; } .footer { justify-content:center; min-height:0; } .footer > span { display:none; } .launchers { justify-content:space-between; width:100%; gap:1px; } }
 @media (max-height:640px) { .riskStage { min-height:450px; flex:none; } }
 @media (max-height:640px) and (max-width:760px) { .riskStage { min-height:510px; } }
+
+@media (max-width:760px), (max-width:1000px) and (max-height:500px) {
+  .page { height:auto; min-height:0; gap:22px; }
+  .header { flex-wrap:wrap; gap:12px; }
+  .title { flex:1; display:block; }
+  .title h1 { font-size:24px; }
+  .previewNote { margin-top:6px; font-size:10px; }
+  .headerLink { min-height:44px; font-size:12px; }
+  .controls { flex-basis:100%; order:3; }
+  .controls > div { flex-wrap:wrap; gap:14px; }
+  .controls > div > div:first-child { flex-basis:100%; }
+  .controls > div > div:last-child { flex-basis:100%; }
+  .controls > div > div:last-child > div > a { min-height:44px; font-size:12px; display:flex; align-items:center; justify-content:center; }
+  .statusLine { flex-wrap:wrap; gap:8px 16px; font-size:11px; line-height:1.7; }
+  .riskStage { display:flex; flex-direction:column; flex:none; min-height:0; gap:26px; }
+  .coreSummary { order:-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+  .coreMetric dt { font-size:12px; }
+  .coreMetric dd { font-size:30px; }
+  .coreMetric small { display:block; font-size:11px; line-height:1.7; }
+  .matrix { flex:none; padding:22px 0 0; background:transparent; border-radius:0; border-top:1px solid var(--line); gap:16px; }
+  .matrixHeading { flex-wrap:wrap; gap:8px; }
+  .matrixHeading h2 { font-size:19px; }
+  .matrixHeading p { font-size:11px; }
+  .compactMatrix { grid-template-rows:auto auto auto auto; gap:14px; }
+  .compactMatrix [data-matrix-readout] { gap:16px; min-height:48px; flex-wrap:wrap; }
+  .compactMatrix [data-matrix-readout] > strong { font-size:36px; }
+  .compactMatrix [data-matrix-readout] > div > span { font-size:11px; }
+  .compactMatrix [data-matrix-readout] p { font-size:13px; }
+  .compactMatrix [data-matrix-pair] { font-size:11px; line-height:1.7; }
+  .compactMatrix [data-matrix-scroll] { height:auto; overflow:auto; max-height:420px; }
+  .compactMatrix table { height:auto; width:max-content; min-width:100%; border-spacing:4px; }
+  .compactMatrix th { min-width:46px; height:32px; font-size:10px; }
+  .compactMatrix th:first-child { min-width:64px; width:64px; position:sticky; left:0; z-index:2; background:var(--paper); }
+  .compactMatrix td > button { width:46px; min-height:44px; font-size:11px; border-radius:7px; }
+  .compactMatrix [data-matrix-legend],.compactMatrix [data-matrix-legend] small,.compactMatrix [data-matrix-legend] b { font-size:10px; }
+  .footer { justify-content:stretch; }
+  .launchers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:8px; }
+}

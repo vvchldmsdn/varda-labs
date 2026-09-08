@@ -62,3 +62,48 @@
 @media (max-height:760px) and (min-width:761px) { .coreSummary { gap:23px; } .overviewMetrics { gap:20px; } .holdingFacts > div { padding-block:9px; } .targetComparison { margin-top:16px; } .holdingNote { margin-top:16px; } }
 @media (max-height:640px) { .allocation { flex:none; height:540px; } }
 @media (max-height:640px) and (max-width:760px) { .allocation { height:600px; } }
+
+@media (max-width:760px), (max-width:1000px) and (max-height:500px) {
+  .page { height:auto; min-height:0; gap:24px; }
+  .header { flex-wrap:wrap; gap:12px; }
+  .title { flex:1; display:block; }
+  .title h1 { font-size:24px; }
+  .previewNote { margin-top:6px; font-size:10px; }
+  .scopeBar { flex-basis:100%; order:3; }
+  .headerLink { min-width:44px; min-height:44px; justify-content:center; }
+  .allocation { height:auto; min-height:0; padding:0; background:transparent; border-radius:0; flex:none; }
+  .explorer { height:auto; min-height:0; gap:22px; }
+  .explorerHeading { flex-wrap:wrap; gap:12px; }
+  .explorerHeading h2 { font-size:18px; }
+  .explorerHeading button { min-height:44px; padding:10px 14px; font-size:12px; }
+  .explorerBody { display:flex; flex-direction:column; gap:24px; align-items:stretch; }
+  .summaryCell { padding:0; }
+  .coreSummary { display:block; }
+  .total { gap:12px; }
+  .total > span { font-size:12px; }
+  .total > strong { font-size:clamp(30px,9vw,40px); overflow-wrap:anywhere; }
+  .overviewMetrics { flex-direction:row; gap:24px; margin-top:24px; }
+  .overviewMetric dt { font-size:12px; margin-bottom:10px; }
+  .overviewMetric dd { font-size:24px; }
+  .overviewMetric:last-child { display:block; }
+  .overviewMetric:last-child dd { font-size:14px; line-height:1.7; }
+  .visualCell { height:260px; min-height:260px; container-type:normal; }
+  .visualCell :global([data-allocation-ring]) { width:240px; max-width:100%; }
+  .visualCell :global([data-allocation-ring]) > p:last-child { font-size:10px; }
+  .mapFrame { height:260px; }
+  .mapLegend { font-size:10px; }
+  .selectedDetail { display:flex; flex-direction:column; gap:0; padding-top:20px; border-top:1px solid var(--line); }
+  .holdingSelect { min-height:48px; margin-bottom:18px; font-size:16px; }
+  .selectedDesktop { display:block; }
+  .selectedMobile { display:none; }
+  .holdingEvidence h3 { font-size:21px; }
+  .holdingIdentity { font-size:12px; line-height:1.7; }
+  .holdingFacts > div { padding:14px 0; font-size:13px; }
+  .targetComparison > div:first-child { font-size:12px; }
+  .holdingNote { font-size:11px; line-height:1.8; }
+  .explorerFooter { padding-top:18px; }
+  .explorerFooter > span { display:block; font-size:11px; line-height:1.7; }
+  .launchers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:8px; }
+  .groupRows { grid-template-columns:1fr; }
+  .riskMetrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}

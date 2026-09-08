@@ -1,3 +1,6 @@
+import { LabText } from "./lab-text";
+import { labEnglish } from "./lab-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import {
   InvestmentLabQueryFields,
   InvestmentLabQueryLink,
@@ -86,14 +89,8 @@ export function InvestmentLabFixedMix({
             <p className="text-[11px] font-medium text-[var(--muted)]">
               ALLOCATION SANDBOX
             </p>
-            <h2 className="mt-2 text-lg font-medium sm:text-xl">
-              KODEX 200·VOO 고정 배분 실험
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-              초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두 종목에
-              적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로 두며 중간
-              재리밸런싱은 하지 않습니다.
-            </p>
+            <h2 className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" KODEX 200·VOO 고정 배분 실험 " /></h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두 종목에 적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로 두며 중간 재리밸런싱은 하지 않습니다. " /></p>
           </div>
           <MixForm
             kodexWeightPct={kodexWeightPct}
@@ -106,9 +103,7 @@ export function InvestmentLabFixedMix({
         <PresetLinks period={period} scopeKey={scopeKey} />
 
         {!periodReady ? (
-          <UnavailableMessage>
-            먼저 사용할 수 있는 과거 비교 구간을 선택해야 합니다.
-          </UnavailableMessage>
+          <UnavailableMessage><LabText value=" 먼저 사용할 수 있는 과거 비교 구간을 선택해야 합니다. " /></UnavailableMessage>
         ) : (
           <InvestmentLabFixedMixStandardComparison
             model={comparison}
@@ -117,9 +112,7 @@ export function InvestmentLabFixedMix({
         )}
 
         {periodReady && selection.status === "invalid" ? (
-          <UnavailableMessage>
-            KODEX 200 배분은 1~99 사이의 정수 퍼센트로 입력해야 합니다.
-          </UnavailableMessage>
+          <UnavailableMessage><LabText value=" KODEX 200 배분은 1~99 사이의 정수 퍼센트로 입력해야 합니다. " /></UnavailableMessage>
         ) : periodReady &&
           !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) &&
           model?.status !== "ready" ? (
@@ -133,22 +126,13 @@ export function InvestmentLabFixedMix({
           !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) &&
           model?.status === "ready" ? (
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold">직접 입력한 비중 상세</h3>
+            <h3 className="text-lg font-semibold"><LabText value="직접 입력한 비중 상세" /></h3>
             <FixedMixResult model={model} />
           </div>
         ) : null}
 
-        <p className="text-xs leading-5 text-[var(--muted)]">
-          두 leg 중 하나라도 가격·환율·체결·매도 가능성 검증에 실패하면 부분
-          결과를 표시하지 않습니다. 소수점 수량을 사용해 자동 잔여 현금을 만들지
-          않으며, 이 결과는 목표비중·추천·주문 근거가 아닌 과거 연구 비교입니다.
-        </p>
-        <p className="text-xs leading-5 text-[var(--muted)]">
-          KODEX 200과 VOO는 화면에 표시된 저장 가격 근거를 사용하며, KIS 원종가
-          구간은 배당·기업행사를 조정하지 않습니다. 서로 다른 가격 기준을 결합한
-          현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을 의미하지
-          않습니다.
-        </p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><LabText value=" 두 leg 중 하나라도 가격·환율·체결·매도 가능성 검증에 실패하면 부분 결과를 표시하지 않습니다. 소수점 수량을 사용해 자동 잔여 현금을 만들지 않으며, 이 결과는 목표비중·추천·주문 근거가 아닌 과거 연구 비교입니다. " /></p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><LabText value=" KODEX 200과 VOO는 화면에 표시된 저장 가격 근거를 사용하며, KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. 서로 다른 가격 기준을 결합한 현금흐름 조정 추정치이므로 정확한 일별 TWR 또는 총수익률을 의미하지 않습니다. " /></p>
       </div>
     </section>
   );
@@ -174,9 +158,7 @@ function MixForm({
       <input name="scope" type="hidden" value={scopeKey} />
       <InvestmentLabQueryFields />
       <PeriodHiddenInputs period={period} />
-      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
-        KODEX 200 배분
-        <span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
+      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" KODEX 200 배분 " /><span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
           <input
             className="h-10 w-24 bg-transparent px-3 text-right text-sm tabular-nums outline-none"
             defaultValue={kodexWeightPct}
@@ -196,9 +178,7 @@ function MixForm({
       <button
         className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
-      >
-        계산
-      </button>
+      ><LabText value=" 계산 " /></button>
     </form>
   );
 }
@@ -211,9 +191,9 @@ function PresetLinks({
   scopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
-    <nav
+    <LocalizedElement as="nav"
       aria-label="고정 배분 예시"
-      className="flex flex-wrap gap-5 border-y border-[var(--line)] py-3"
+      className="flex flex-wrap gap-5 border-y border-[var(--line)] py-3" en={{"aria-label": labEnglish("고정 배분 예시")}}
     >
       {[25, 50, 75].map((kodexWeightPct) => (
         <InvestmentLabQueryLink
@@ -224,7 +204,7 @@ function PresetLinks({
           {kodexWeightPct}:{100 - kodexWeightPct}
         </InvestmentLabQueryLink>
       ))}
-    </nav>
+    </LocalizedElement>
   );
 }
 
@@ -276,12 +256,9 @@ function FixedMixResult({
         />
       </div>
 
-      <p className="text-sm text-[var(--muted)]">
-        관측일 {summary.comparisonDateCount}개 · 원본 현금흐름{" "}
-        {model.coverage.componentFlowSourceCount}건 · 분할 체결{" "}
-        {model.coverage.scenarioFlowLegCount}건 · 두 시장 체결일이 달랐던
-        현금흐름 {model.coverage.splitExecutionDateRows}건
-      </p>
+      <p className="text-sm text-[var(--muted)]"><LabText value=" 관측일 " />{summary.comparisonDateCount}<LabText value="개 · 원본 현금흐름" />{" "}
+        {model.coverage.componentFlowSourceCount}<LabText value="건 · 분할 체결" />{" "}
+        {model.coverage.scenarioFlowLegCount}<LabText value="건 · 두 시장 체결일이 달랐던 현금흐름 " />{model.coverage.splitExecutionDateRows}<LabText value="건 " /></p>
     </div>
   );
 }
@@ -297,7 +274,7 @@ function SummaryCell({
 }) {
   return (
     <div className="border-b border-[var(--line)] px-4 py-5 first:border-l-0 xl:border-r">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><LabText value={label} /></p>
       <p
         className={`mt-2 text-xl font-semibold tabular-nums ${
           tone === "positive"
@@ -307,16 +284,16 @@ function SummaryCell({
               : "text-[var(--ink)]"
         }`}
       >
-        {value}
+        <LabText value={value} />
       </p>
     </div>
   );
 }
 
-function UnavailableMessage({ children }: { children: string }) {
+function UnavailableMessage({ children }: { children: import("react").ReactNode }) {
   return (
     <p className="border-y border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)]">
-      {children}
+      <LabText value={children} />
     </p>
   );
 }

@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 type SimulationTerminalRiskSummary = Readonly<{
   p50ReturnPct: number;
   p5ReturnPct: number;
@@ -37,8 +38,8 @@ export function SimulationTerminalRiskMetrics({
     >
       {metrics.map(([label, value]) => (
         <div className="min-w-0 px-3 py-3" key={label}>
-          <dt className="text-xs leading-5 text-[var(--muted)]">{label}</dt>
-          <dd className="mt-1 font-semibold tabular-nums">{value}</dd>
+          <dt className="text-xs leading-5 text-[var(--muted)]"><SimulationText ko={label} /></dt>
+          <dd className="mt-1 font-semibold tabular-nums"><SimulationText ko={value} /></dd>
         </div>
       ))}
     </dl>

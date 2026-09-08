@@ -1,5 +1,8 @@
 "use client";
 
+import { SimulationText, useSimulationText } from "@/components/simulation/simulation-text";
+
+
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AreaChart, ChartNoAxesCombined } from "lucide-react";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
@@ -23,6 +26,10 @@ export function SimulationFanExplorer({
   large?: boolean;
   compact?: boolean;
 }) {
+  const pt = useSimulationText();
+  const executionName = execution.id.startsWith("owner-") && execution.name === "내 포트폴리오"
+    ? pt("내 포트폴리오", "My portfolio")
+    : execution.name;
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
   const [width, setWidth] = useState(960);
@@ -143,7 +150,7 @@ export function SimulationFanExplorer({
         <div
           className="flex gap-1"
           role="group"
-          aria-label="경로 표시"
+          aria-label={pt("경로 표시")}
         >
           {(
             [
@@ -159,14 +166,14 @@ export function SimulationFanExplorer({
               className={`flex items-center gap-2 rounded-full px-4 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${compact ? "min-h-9" : "min-h-10"} ${mode === key ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon size={14} aria-hidden="true" />
-              {label}
+              <SimulationText ko={label} />
             </button>
           ))}
         </div>
         <div
           className="flex items-center gap-3"
           role="group"
-          aria-label="차트 단위"
+          aria-label={pt("차트 단위")}
         >
           {(
             [
@@ -181,13 +188,13 @@ export function SimulationFanExplorer({
               onClick={() => setUnit(key)}
               className={`${compact ? "min-h-9" : "min-h-10"} border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
             >
-              {label}
+              <SimulationText ko={label} />
             </button>
           ))}
         </div>
       </div>
       {band && !compact ? <div className={styles.fanReadout} data-fan-readout>
-        <p>{band.stepIndex === 0 ? "현재" : `${band.stepIndex}단계`}<span>{pathPoint && focusedPath !== null ? `표본 ${focusedPath + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}` : "분포의 세 지점"}</span></p>
+        <p><SimulationText ko={band.stepIndex === 0 ? "현재" : `${band.stepIndex}단계`} /><span><SimulationText ko={pathPoint && focusedPath !== null ? `표본 ${focusedPath + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}` : "분포의 세 지점"} /></span></p>
         {pathPoint ? <strong>{format(pathPoint.value)}</strong> : <dl><div><dt>P10</dt><dd>{format(band.p10)}</dd></div><div><dt>P50</dt><dd>{format(band.p50)}</dd></div><div><dt>P90</dt><dd>{format(band.p90)}</dd></div></dl>}
       </div> : null}
       <div ref={ref} className={large ? styles.fanPlot : "relative w-full"} style={large ? undefined : { height }}>
@@ -201,9 +208,9 @@ export function SimulationFanExplorer({
             onPointerLeave={leave}
             onPointerCancel={leave}
             onClick={() => { if (mode === "paths") setSelectedPath(hoveredPath === selectedPath ? null : hoveredPath); }}
-            aria-label={`${execution.name} 연구 시뮬레이션 경로와 P10 P50 P90 구간`}
+            aria-label={pt(`${executionName} 연구 시뮬레이션 경로와 P10 P50 P90 구간`)}
           >
-            <title>{`${execution.name} 확률 분포`}</title>
+            <title>{pt(`${executionName} 확률 분포`)}</title>
             <defs>
               <pattern id={`${id}-dots`} width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="var(--accent)" opacity=".48" /></pattern>
             </defs>
@@ -286,9 +293,9 @@ export function SimulationFanExplorer({
                   ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"
                 }
               >
-                {ratio === 0
+                <SimulationText ko={ratio === 0
                   ? "현재"
-                  : `${Math.round(execution.assumptions.horizon * ratio)}단계`}
+                  : `${Math.round(execution.assumptions.horizon * ratio)}단계`} />
               </text>
             ))}
             {band ? (
@@ -318,18 +325,17 @@ export function SimulationFanExplorer({
           </svg>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-[var(--muted)]">
-            표시할 확률 경로가 없습니다.
-          </div>
+            <SimulationText ko={"표시할 확률 경로가 없습니다."} />{" "}</div>
         )}
       </div>
-      {mode === "paths" && !compact ? <div className={styles.pathChoices} aria-label="표본 경로 선택">
-        <span>표본</span>{geometry.paths.map((path) => <button key={path.id} type="button" aria-label={`표본 경로 ${path.id + 1} 선택`} aria-pressed={selectedPath === path.id} onClick={() => setSelectedPath(selectedPath === path.id ? null : path.id)}>{String(path.id + 1).padStart(2, "0")}</button>)}
+      {mode === "paths" && !compact ? <div className={styles.pathChoices} aria-label={pt("표본 경로 선택")}>
+        <span><SimulationText ko={"표본"} /></span>{geometry.paths.map((path) => <button key={path.id} type="button" aria-label={pt(`표본 경로 ${path.id + 1} 선택`)} aria-pressed={selectedPath === path.id} onClick={() => setSelectedPath(selectedPath === path.id ? null : path.id)}>{String(path.id + 1).padStart(2, "0")}</button>)}
       </div> : null}
       <div className="mt-2 flex items-center gap-4">
         <input
           className={styles.scrubber}
           type="range"
-          aria-label={`${execution.name} 경로 시점`}
+          aria-label={pt(`${executionName} 경로 시점`)}
           min={0}
           max={execution.assumptions.horizon}
           value={Math.round(activeStep ?? execution.assumptions.horizon)}
@@ -343,29 +349,23 @@ export function SimulationFanExplorer({
               event.currentTarget.blur();
             }
           }}
-          aria-valuetext={
-            band
+          aria-valuetext={pt(band
               ? `${band.stepIndex}단계, 중앙값 ${format(band.p50)}`
-              : `${execution.assumptions.horizon}단계`
-          }
+              : `${execution.assumptions.horizon}단계`)}
         />
         <span className="w-16 text-right text-[11px] tabular-nums text-[var(--muted)]">
-          {band?.stepIndex ?? execution.assumptions.horizon}단계
-        </span>
+          {band?.stepIndex ?? execution.assumptions.horizon}<SimulationText ko={"단계"} />{" "}</span>
       </div>
       {compact ? null : (
         <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
           <span className="flex items-center gap-2">
             <i className="h-0.5 w-5 bg-[var(--ink)]" />
-            중앙값 P50
-          </span>
+            <SimulationText ko={"중앙값 P50"} />{" "}</span>
           <span className="flex items-center gap-2">
             <i className="h-2.5 w-5 rounded-sm bg-[var(--line)]" />
-            P10~P90 · 모형 내 80% 구간
-          </span>
+            <SimulationText ko={"P10~P90 · 모형 내 80% 구간"} />{" "}</span>
           <span>
-            표본 경로 {execution.samplePaths.length}개 · 연구 분포, 수익 보장 아님
-          </span>
+            <SimulationText ko={"표본 경로"} />{" "}{execution.samplePaths.length}<SimulationText ko={"개 · 연구 분포, 수익 보장 아님"} />{" "}</span>
         </figcaption>
       )}
     </figure>

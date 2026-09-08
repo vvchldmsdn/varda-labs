@@ -1,4 +1,8 @@
 "use client";
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { useI18n } from "@/components/i18n/locale-provider";
+
 
 import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { formatHistoryKrw, formatHistoryPercent } from "@/components/history/history-format";
@@ -21,6 +25,7 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
   points: readonly HistoryOverviewPoint[];
   selectedDate: string | null;
 }) {
+  const { t } = useI18n();
   const id = useId();
   const pathRef = useRef<SVGPathElement>(null);
   const displayPoints = useMemo(() => historyPointsWithMetric(points, mode), [mode, points]);
@@ -61,14 +66,14 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
 
   if (!displayPoints.length) return (
     <div className="flex min-h-[320px] items-center justify-center border-y border-[var(--line)] text-center">
-      <div className="max-w-md px-6"><p className="text-base font-semibold">저장된 수익률 근거가 없습니다.</p><p className="mt-2 text-sm leading-6 text-[var(--muted)]">평가액 보기를 선택하면 저장 평가액 경로는 계속 확인할 수 있습니다. 수익률을 임의 계산하거나 누락값을 보간하지 않습니다.</p></div>
+      <div className="max-w-md px-6"><p className="text-base font-semibold"><T ko="저장된 수익률 근거가 없습니다." en="No recorded return data is available."/></p><p className="mt-2 text-sm leading-6 text-[var(--muted)]"><T ko="평가액 보기를 선택하면 저장 평가액 경로는 계속 확인할 수 있습니다. 수익률을 임의 계산하거나 누락값을 보간하지 않습니다." en="Select Value to view the recorded value history. Returns are not estimated and missing values are not interpolated."/></p></div>
     </div>
   );
 
   return (
     <div className={styles.chart} data-history-chart>
       <div className="varda-history-chart relative w-full">
-        <svg role="img" aria-label={mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름"}
+        <svg role="img" aria-label={t(mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름", translateHomeHistory(mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름"))}
           className="h-full w-full touch-pan-y overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none"
           onPointerMove={inspect} onPointerDown={inspect} onPointerLeave={leave} onPointerCancel={leave}
           onClick={() => { if (activePoint) onSelect(activePoint.date); }}>
@@ -90,12 +95,12 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
       </div>
       <div className={styles.chartFoot}>
         <span>{displayPoints[0]!.date.replaceAll("-", ".")}</span>
-        <span className={styles.observationNote}>{pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색"}</span>
+        <span className={styles.observationNote}>{<T ko={pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색"} en={translateHomeHistory(pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색")}/>}</span>
         <span>{displayPoints.at(-1)!.date.replaceAll("-", ".")}</span>
       </div>
       <input className={styles.chartKeyboard} type="range" min="0" max={displayPoints.length - 1} value={selectedIndex}
-        aria-label="히스토리 그래프 날짜 탐색"
-        aria-valuetext={`${displayPoints[selectedIndex]!.date} ${metricLabel(displayPoints[selectedIndex]!, mode)}`}
+        aria-label={t("히스토리 그래프 날짜 탐색", "Explore dates on the history chart")}
+        aria-valuetext={t(`${displayPoints[selectedIndex]!.date} ${metricLabel(displayPoints[selectedIndex]!, mode)}`, translateHomeHistory(`${displayPoints[selectedIndex]!.date} ${metricLabel(displayPoints[selectedIndex]!, mode)}`))}
         onChange={(event) => { leave(); onSelect(displayPoints[Number(event.target.value)]!.date); }} />
     </div>
   );

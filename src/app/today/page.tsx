@@ -1,3 +1,6 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+
+
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense } from "react";
 
@@ -12,7 +15,9 @@ import { normalizeTodayHoldingDetailQuery } from "@/lib/today-holding-detail";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "오늘 변동 | VARDA LABS" };
+export async function generateMetadata() {
+  return localizedMetadata({ title: "오늘 변동 | VARDA LABS" }, "Today | VARDA LABS");
+}
 
 type TodayPageProps = {
   searchParams: Promise<{
@@ -66,7 +71,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       <PortfolioAnalysisScopeBoundary
         basePath="/today"
         context={scopeContext}
-        title="오늘 변동"
+        title="오늘 변동" titleEn={"Today"}
       />
     );
   }

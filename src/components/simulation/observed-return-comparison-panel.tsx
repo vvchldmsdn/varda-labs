@@ -1,3 +1,7 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { simulationEnglish } from "@/components/simulation/simulation-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 
 import {
@@ -26,15 +30,12 @@ export function ObservedReturnComparisonPanel({
           id="observed-return-comparison-title"
           className="text-lg font-semibold tracking-normal"
         >
-          90개 관측구간 누적지수 비교
-        </h2>
+          <SimulationText ko={"90개 관측구간 누적지수 비교"} />{" "}</h2>
         <p className="mt-2 text-sm text-[var(--warning)]">
-          {formatUnavailableReason(comparison.reason)}
+          <SimulationText ko={formatUnavailableReason(comparison.reason)} />
         </p>
         <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-          두 입력이 같은 91개 날짜축으로 모두 준비될 때만 표시합니다. 날짜 자동
-          대체나 부분 비교는 하지 않습니다.
-        </p>
+          <SimulationText ko={"두 입력이 같은 91개 날짜축으로 모두 준비될 때만 표시합니다. 날짜 자동 대체나 부분 비교는 하지 않습니다."} />{" "}</p>
       </section>
     );
   }
@@ -89,16 +90,12 @@ export function ObservedReturnComparisonPanel({
             id="observed-return-comparison-title"
             className="text-lg font-semibold tracking-normal"
           >
-            90개 관측구간 누적지수 비교
-          </h2>
+            <SimulationText ko={"90개 관측구간 누적지수 비교"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            두 독립 연구 입력의 과거 KRW 수익률을 각각 시작 100으로 누적했습니다.
-            휴장일에는 아래 정렬 근거의 허용 범위 안에서 직전 저장값이 적용될 수
-            있습니다. 포트폴리오 조합·예측·시뮬레이션 경로가 아닙니다.
-          </p>
+            <SimulationText ko={"두 독립 연구 입력의 과거 KRW 수익률을 각각 시작 100으로 누적했습니다. 휴장일에는 아래 정렬 근거의 허용 범위 안에서 직전 저장값이 적용될 수 있습니다. 포트폴리오 조합·예측·시뮬레이션 경로가 아닙니다."} />{" "}</p>
         </div>
         <p className="text-xs text-[var(--muted)]">
-          공통 날짜축 {formatSimulationDate(comparison.baselineServiceDate)} ~ {" "}
+          <SimulationText ko={"공통 날짜축"} />{" "}{formatSimulationDate(comparison.baselineServiceDate)} ~ {" "}
           {formatSimulationDate(comparison.endServiceDate)}
         </p>
       </div>
@@ -119,7 +116,7 @@ export function ObservedReturnComparisonPanel({
                 {formatIndexValue(series.finalIndexValue)}
               </span>
               <span className="text-sm text-[var(--muted)]">
-                누적 {formatSignedReturn(series.totalReturn)}
+                <SimulationText ko={"누적"} />{" "}{formatSignedReturn(series.totalReturn)}
               </span>
             </dd>
           </div>
@@ -127,13 +124,13 @@ export function ObservedReturnComparisonPanel({
       </dl>
 
       <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
-        <svg
+        <LocalizedElement
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           role="img"
           aria-label="KODEX 200과 VOO의 과거 KRW 누적 관측지수 공통축 비교 차트"
-          className="h-auto w-full min-w-[760px]"
+          className="h-auto w-full min-w-[760px]" as="svg" en={{"aria-label": simulationEnglish("KODEX 200과 VOO의 과거 KRW 누적 관측지수 공통축 비교 차트")}}
         >
-          <title>KODEX 200과 VOO의 과거 KRW 누적 관측지수 비교</title>
+          <LocalizedSvgText as="title" ko="KODEX 200과 VOO의 과거 KRW 누적 관측지수 비교" en={simulationEnglish("KODEX 200과 VOO의 과거 KRW 누적 관측지수 비교")} />
           {yTicks.map((tick) => {
             const y = toY(tick);
             return (
@@ -202,25 +199,23 @@ export function ObservedReturnComparisonPanel({
               {formatSimulationDate(label.serviceDate)}
             </text>
           ))}
-        </svg>
+        </LocalizedElement>
       </div>
 
       <details className="mt-4 border-t border-[var(--line)] pt-3">
         <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]">
-          전체 {comparison.pointCount}개 누적지수 표 보기
-        </summary>
+          <SimulationText ko={"전체"} />{" "}{comparison.pointCount}<SimulationText ko={"개 누적지수 표 보기"} />{" "}</summary>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[620px] border-collapse text-left text-sm">
             <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-2 font-semibold">기준일</th>
+                <th className="px-3 py-2 font-semibold"><SimulationText ko={"기준일"} /></th>
                 {comparison.series.map((series) => (
                   <th
                     key={series.id}
                     className="px-3 py-2 text-right font-semibold"
                   >
-                    {series.ticker} 지수
-                  </th>
+                    {series.ticker} {" "}<SimulationText ko={"지수"} />{" "}</th>
                 ))}
               </tr>
             </thead>

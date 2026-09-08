@@ -1,3 +1,6 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { HistoryEvidenceLink as Link } from "./history-records-dialog";
 
 import type {
@@ -45,16 +48,12 @@ export function HistoryPositionDetail({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[var(--muted)]">
-            저장 포지션 근거
-          </p>
-          <h3 className="mt-1 text-base font-semibold tracking-normal">
-            과거 보유 상세
-          </h3>
+          <p className="text-xs font-semibold text-[var(--muted)]"><T ko="저장 포지션 근거" en="Recorded position data"/></p>
+          <h3 className="mt-1 text-base font-semibold tracking-normal"><T ko="과거 보유 상세" en="Historical holding details"/></h3>
           {model.snapshotDate && model.source ? (
             <p className="mt-1 text-xs text-[var(--muted)]">
-              {model.snapshotDate} · {historyAccountLabel(model.account)} · {" "}
-              {historySourceLabel(model.source)}
+              {model.snapshotDate} · {<T ko={historyAccountLabel(model.account)} en={translateHomeHistory(historyAccountLabel(model.account))}/>} · {" "}
+              {<T ko={historySourceLabel(model.source)} en={translateHomeHistory(historySourceLabel(model.source))}/>}
             </p>
           ) : null}
         </div>
@@ -62,9 +61,7 @@ export function HistoryPositionDetail({
           <Link
             href={clearDetailHref(model, scopeKey)}
             className="w-fit rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--wash)]"
-          >
-            상세 닫기
-          </Link>
+          ><T ko="상세 닫기" en="Close details"/></Link>
         ) : null}
       </div>
 
@@ -72,7 +69,7 @@ export function HistoryPositionDetail({
         <ReadyDetail model={model} />
       ) : (
         <p className="mt-3 bg-white px-3 py-3 text-sm leading-6 text-[var(--muted)]">
-          {statusMessage(model)}
+          {<T ko={statusMessage(model)} en={translateHomeHistory(statusMessage(model))}/>}
         </p>
       )}
     </section>
@@ -83,10 +80,7 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
   return (
     <>
       {model.status === "partial" ? (
-        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]">
-          일부 저장 근거가 불완전합니다. 확인 가능한 행은 그대로 표시하며
-          누락값을 보간하거나 현재 자산 정보로 대체하지 않습니다.
-        </p>
+        <p className="mt-3 border border-[var(--brand-soft)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--warning)]"><T ko="일부 저장 근거가 불완전합니다. 확인 가능한 행은 그대로 표시하며 누락값을 보간하거나 현재 자산 정보로 대체하지 않습니다." en="Some recorded data is incomplete. Verifiable rows remain visible; missing values are not interpolated or replaced with current asset information."/></p>
       ) : null}
 
       <div className="mt-3 grid border-t border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
@@ -112,29 +106,28 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
         />
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        저장 자산 참조 {model.positionCount - model.legacyOnlyCount}행 · 레거시
-        전용 {model.legacyOnlyCount}행 · 중복 근거 {model.duplicateIdentityCount}행
-        {model.rowLimitExceeded
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]"><T ko="저장 자산 참조" en="Recorded asset reference"/>{model.positionCount - model.legacyOnlyCount}<T ko="행 · 레거시 전용" en="rows · Legacy only"/>{model.legacyOnlyCount}<T ko="행 · 중복 근거" en="rows · Duplicate data"/> {model.duplicateIdentityCount}<T ko="행" en="rows"/>{<T ko={model.rowLimitExceeded
           ? ` · 최대 ${model.policy.rowLimit}행만 표시`
-          : ""}
+          : ""} en={translateHomeHistory(model.rowLimitExceeded
+          ? ` · 최대 ${model.policy.rowLimit}행만 표시`
+          : "")}/>}
       </p>
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[1380px] border-separate border-spacing-0 text-left text-sm">
           <thead className="text-xs text-[var(--muted)]">
             <tr>
-              <TableHeader>종목</TableHeader>
-              <TableHeader>근거 상태</TableHeader>
-              <TableHeader>시장 / 통화</TableHeader>
-              <TableHeader align="right">수량</TableHeader>
-              <TableHeader align="right">저장 현재가</TableHeader>
-              <TableHeader align="right">현지 평가액</TableHeader>
-              <TableHeader align="right">원화 평가액</TableHeader>
-              <TableHeader align="right">비용 기준</TableHeader>
-              <TableHeader align="right">손익</TableHeader>
-              <TableHeader align="right">저장 비중</TableHeader>
-              <TableHeader>가격 근거</TableHeader>
+              <TableHeader><T ko="종목" en="Holding"/></TableHeader>
+              <TableHeader><T ko="근거 상태" en="Data status"/></TableHeader>
+              <TableHeader><T ko="시장 / 통화" en="Market / currency"/></TableHeader>
+              <TableHeader align="right"><T ko="수량" en="Quantity"/></TableHeader>
+              <TableHeader align="right"><T ko="저장 현재가" en="Recorded market price"/></TableHeader>
+              <TableHeader align="right"><T ko="현지 평가액" en="Value in local currency"/></TableHeader>
+              <TableHeader align="right"><T ko="원화 평가액" en="Value in KRW"/></TableHeader>
+              <TableHeader align="right"><T ko="비용 기준" en="Cost basis"/></TableHeader>
+              <TableHeader align="right"><T ko="손익" en="Gain/loss"/></TableHeader>
+              <TableHeader align="right"><T ko="저장 비중" en="Recorded weight"/></TableHeader>
+              <TableHeader><T ko="가격 근거" en="Price data"/></TableHeader>
             </tr>
           </thead>
           <tbody>
@@ -148,11 +141,7 @@ function ReadyDetail({ model }: { model: HistoryPositionDetailModel }) {
         </table>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        이 상세는 선택한 날짜·계정·출처의 저장 포지션만 표시합니다. 실시간
-        가격, 현재 자산 이름, ETF 내부 구성, 목표 비중, 추천 또는 주문 정보로
-        보완하지 않습니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]"><T ko="이 상세는 선택한 날짜·계정·출처의 저장 포지션만 표시합니다. 실시간 가격, 현재 자산 이름, ETF 내부 구성, 목표 비중, 추천 또는 주문 정보로 보완하지 않습니다." en="These details show only recorded positions for the selected date, account and source. Live prices, current asset names, ETF constituents, targets, recommendations and order information are not added."/></p>
     </>
   );
 }
@@ -166,15 +155,15 @@ function PositionRow({ row }: { row: HistoryPositionDisplayRow }) {
       className="border-t border-[var(--wash)]"
     >
       <TableCell strong>
-        <span className="block">{row.ticker ?? "티커 없음"}</span>
+        <span className="block">{<T ko={row.ticker ?? "티커 없음"} en={translateHomeHistory(row.ticker ?? "티커 없음")}/>}</span>
         <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
           {row.assetName}
         </span>
       </TableCell>
       <TableCell>
-        <span className="block">{mappingLabel(row.mappingStatus)}</span>
+        <span className="block">{<T ko={mappingLabel(row.mappingStatus)} en={translateHomeHistory(mappingLabel(row.mappingStatus))}/>}</span>
         <span className="mt-1 block text-xs text-[var(--muted)]">
-          {evidenceLabel(row)}
+          {<T ko={evidenceLabel(row)} en={translateHomeHistory(evidenceLabel(row))}/>}
         </span>
       </TableCell>
       <TableCell>

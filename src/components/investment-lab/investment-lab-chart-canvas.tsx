@@ -1,5 +1,9 @@
 "use client";
 
+import { LabText, useLabI18n } from "./lab-text";
+import { labEnglish } from "./lab-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
+
 import {
   useEffect,
   useId,
@@ -37,6 +41,7 @@ export function InvestmentLabChartCanvas({
   compact?: boolean;
   sidebar?: ReactNode;
 }) {
+  const { locale } = useLabI18n();
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(920);
   const [plotHeight, setPlotHeight] = useState(370);
@@ -124,14 +129,14 @@ export function InvestmentLabChartCanvas({
         {sidebar}
       {actualPoint && selectedPoint ? (
         <div className={styles.chartReadout} data-lab-tooltip>
-          <div><p>{actualPoint.serviceDate.replaceAll("-", ".")}<span>{hover === null && pinnedIndex === null ? "종료일의 차이" : "선택일의 차이"}</span></p><strong className={labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}>{labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}</strong></div>
-          <dl><div><dt>실제</dt><dd>{labKrw(actualPoint.valueKrw)}</dd></div><div><dt>가상</dt><dd>{labKrw(selectedPoint.valueKrw)}</dd></div></dl>
-          {selectedPoint.hasPendingExecution ? <p className="text-[11px] text-[var(--warning)]">이 평가일에는 대기 거래가 포함됩니다.</p> : null}
+          <div><p>{actualPoint.serviceDate.replaceAll("-", ".")}<span><LabText value={hover === null && pinnedIndex === null ? "종료일의 차이" : "선택일의 차이"} /></span></p><strong className={labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}>{labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}</strong></div>
+          <dl><div><dt><LabText value="실제" /></dt><dd>{labKrw(actualPoint.valueKrw)}</dd></div><div><dt><LabText value="가상" /></dt><dd>{labKrw(selectedPoint.valueKrw)}</dd></div></dl>
+          {selectedPoint.hasPendingExecution ? <p className="text-[11px] text-[var(--warning)]"><LabText value="이 평가일에는 대기 거래가 포함됩니다." /></p> : null}
         </div>
       ) : null}
       </aside>
       <div className={styles.chartPlot} ref={ref}>
-      <svg
+      <LocalizedElement as="svg"
         aria-label={`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`}
         className="block h-full w-full touch-pan-y"
         height={height}
@@ -140,7 +145,7 @@ export function InvestmentLabChartCanvas({
         onPointerDown={move}
         onClick={() => setPinnedIndex(hover)}
         role="img"
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${width} ${height}`} en={{"aria-label": labEnglish(`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`)}}
       >
         <defs>
           <pattern id={`${id}-dots`} width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".75" fill="var(--accent)" opacity=".32" /></pattern>
@@ -174,7 +179,7 @@ export function InvestmentLabChartCanvas({
                 x={left - 10}
                 y={lineY + 3}
               >
-                {labCompactKrw(value)}
+                {labCompactKrw(value, locale)}
               </text>
             </g>
           );
@@ -252,8 +257,8 @@ export function InvestmentLabChartCanvas({
             />
           </g>
         ) : null}
-      </svg>
-      <input
+      </LocalizedElement>
+      <LocalizedElement as="input"
         aria-label="비교 그래프 날짜 탐색"
         aria-valuetext={`${dates[focusIndex]} 실제 ${labKrw(actualPoint?.valueKrw ?? null)} 비교 ${labKrw(selectedPoint?.valueKrw ?? null)}`}
         className="absolute inset-x-0 bottom-0 h-3 w-full opacity-0 accent-[var(--brand)] focus:opacity-100"
@@ -261,7 +266,7 @@ export function InvestmentLabChartCanvas({
         min={0}
         onChange={(event) => { setHover(null); setPinnedIndex(Number(event.target.value)); }}
         type="range"
-        value={focusIndex}
+        value={focusIndex} en={{"aria-label": labEnglish("비교 그래프 날짜 탐색"), "aria-valuetext": labEnglish(`${dates[focusIndex]} 실제 ${labKrw(actualPoint?.valueKrw ?? null)} 비교 ${labKrw(selectedPoint?.valueKrw ?? null)}`)}}
       />
       </div>
     </div>

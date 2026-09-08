@@ -1,5 +1,8 @@
 "use client";
 
+import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
+
+
 import { useEffect, useRef, useState } from "react";
 import { Workflow, X } from "lucide-react";
 
@@ -10,6 +13,7 @@ export function AdditionalContributionLogicDialog({
 }: {
   preview: AdditionalContributionResultPreview;
 }) {
+  const pt = usePortfolioText();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -32,8 +36,7 @@ export function AdditionalContributionLogicDialog({
         className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-[var(--brand)]"
         onClick={() => { dialogRef.current?.showModal(); setOpen(true); }}
       >
-        <Workflow size={16} aria-hidden="true" /> 계산 로직 보기
-      </button>
+        <Workflow size={16} aria-hidden="true" /> {" "}<PortfolioText ko={"계산 로직 보기"} />{" "}</button>
 
       <dialog
         ref={dialogRef}
@@ -49,15 +52,13 @@ export function AdditionalContributionLogicDialog({
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">CALCULATION LOGIC</p>
               <h2 id="contribution-logic-title" className="mt-1 text-xl font-medium">
-                이번 추가 투입안이 만들어진 과정
-              </h2>
+                <PortfolioText ko={"이번 추가 투입안이 만들어진 과정"} />{" "}</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                실제 주문이 아닌 읽기 전용 계산입니다. 각 단계의 재원과 종목별 판단을 그대로 표시합니다.
-              </p>
+                <PortfolioText ko={"실제 주문이 아닌 읽기 전용 계산입니다. 각 단계의 재원과 종목별 판단을 그대로 표시합니다."} />{" "}</p>
             </div>
             <button
               type="button"
-              aria-label="계산 로직 닫기"
+              aria-label={pt("계산 로직 닫기")}
               className="varda-icon-button"
               onClick={() => dialogRef.current?.close()}
             >
@@ -67,7 +68,7 @@ export function AdditionalContributionLogicDialog({
 
           <div className="varda-dialog-content min-h-0 overflow-y-auto overscroll-contain">
             <section aria-labelledby="calculation-flow-title">
-              <h3 id="calculation-flow-title" className="text-sm font-medium">금액 흐름</h3>
+              <h3 id="calculation-flow-title" className="text-sm font-medium"><PortfolioText ko={"금액 흐름"} /></h3>
               <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)] sm:grid-cols-5">
                 <FlowStep index="01" label="신규 투입금" value={formatKrw(preview.cashAmountKrw)} />
                 <FlowStep index="02" label="계산상 매도" value={`+${formatKrw(preview.totalTrimProceedsKrw)}`} />
@@ -95,36 +96,35 @@ export function AdditionalContributionLogicDialog({
               />
             </section>
 
-            <section className="border-b border-[var(--line)] pb-5 text-xs leading-6 text-[var(--muted)]" aria-label="배분 공식">
-              <p>유효 목표액 = (현재 총평가액 + 신규 투입금) × 목표비중 × MA120 배율</p>
-              <p>종목별 부족액 = 유효 목표액 − 계산상 매도 후 평가액 (0 미만이면 0)</p>
-              <p>신규 투입금 + 계산상 매도대금을 부족액 비례로 배분합니다. 매도 종목은 다시 매수하지 않습니다. 원 단위 최대잔여 방식으로 결정하며 매도는 보유 평가액, 매수는 유효 부족액을 넘지 않습니다.</p>
-              <p>목표 0% 종목도 손실이 아니고 원가 근거가 있을 때 정리합니다. 원 단위로 표현할 수 없는 1원 미만 평가액은 남을 수 있습니다. 수수료·세금·주문 단위는 반영하지 않은 금액 계획입니다.</p>
+            <section className="border-b border-[var(--line)] pb-5 text-xs leading-6 text-[var(--muted)]" aria-label={pt("배분 공식")}>
+              <p><PortfolioText ko={"유효 목표액 = (현재 총평가액 + 신규 투입금) × 목표비중 × MA120 배율"} /></p>
+              <p><PortfolioText ko={"종목별 부족액 = 유효 목표액 − 계산상 매도 후 평가액 (0 미만이면 0)"} /></p>
+              <p><PortfolioText ko={"신규 투입금 + 계산상 매도대금을 부족액 비례로 배분합니다. 매도 종목은 다시 매수하지 않습니다. 원 단위 최대잔여 방식으로 결정하며 매도는 보유 평가액, 매수는 유효 부족액을 넘지 않습니다."} /></p>
+              <p><PortfolioText ko={"목표 0% 종목도 손실이 아니고 원가 근거가 있을 때 정리합니다. 원 단위로 표현할 수 없는 1원 미만 평가액은 남을 수 있습니다. 수수료·세금·주문 단위는 반영하지 않은 금액 계획입니다."} /></p>
             </section>
 
             <section className="mt-7" aria-labelledby="holding-calculation-title">
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <h3 id="holding-calculation-title" className="text-sm font-medium">종목별 계산 근거</h3>
+                  <h3 id="holding-calculation-title" className="text-sm font-medium"><PortfolioText ko={"종목별 계산 근거"} /></h3>
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    원래 목표로 계산한 금액과 MA120 반영 후 최종 금액을 함께 비교합니다.
-                  </p>
+                    <PortfolioText ko={"원래 목표로 계산한 금액과 MA120 반영 후 최종 금액을 함께 비교합니다."} />{" "}</p>
                 </div>
-                <span className="text-xs text-[var(--muted)]">{rows.length}개 종목</span>
+                <span className="text-xs text-[var(--muted)]">{rows.length}<PortfolioText ko={"개 종목"} /></span>
               </div>
 
               <div className="mt-3 overflow-x-auto border-y border-[var(--line)]">
                 <table className="w-full min-w-[1080px] border-collapse text-sm">
                   <thead className="text-left text-[11px] font-medium text-[var(--muted)]">
                     <tr>
-                      <th className="px-2 py-3">종목</th>
-                      <th className="px-2 py-3 text-right">현재 → 목표</th>
-                      <th className="px-2 py-3 text-right">평가손익</th>
-                      <th className="px-2 py-3 text-right">계산상 매도</th>
-                      <th className="px-2 py-3 text-right">기본 매수안</th>
-                      <th className="px-2 py-3 text-right">MA 반영 목표</th>
-                      <th className="px-2 py-3 text-right">최종 결과</th>
-                      <th className="px-2 py-3">판단 이유</th>
+                      <th className="px-2 py-3"><PortfolioText ko={"종목"} /></th>
+                      <th className="px-2 py-3 text-right"><PortfolioText ko={"현재 → 목표"} /></th>
+                      <th className="px-2 py-3 text-right"><PortfolioText ko={"평가손익"} /></th>
+                      <th className="px-2 py-3 text-right"><PortfolioText ko={"계산상 매도"} /></th>
+                      <th className="px-2 py-3 text-right"><PortfolioText ko={"기본 매수안"} /></th>
+                      <th className="px-2 py-3 text-right"><PortfolioText ko={"MA 반영 목표"} /></th>
+                      <th className="px-2 py-3 text-right"><PortfolioText ko={"최종 결과"} /></th>
+                      <th className="px-2 py-3"><PortfolioText ko={"판단 이유"} /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -134,17 +134,17 @@ export function AdditionalContributionLogicDialog({
                           <p className="font-medium">{row.name}</p>
                           <p className="mt-0.5 text-xs text-[var(--muted)]">{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</p>
                         </td>
-                        <td className="px-2 py-3 text-right tabular-nums"><p>{formatPercent(row.currentWeightPct)} → {formatPercent(row.targetWeightPct)}</p><p className="mt-0.5 text-xs text-[var(--muted)]">{row.driftRatioPct === null ? "목표 0%" : `드리프트 ${formatSignedPercent(row.driftRatioPct)}`}</p></td>
-                        <td className="px-2 py-3 text-right tabular-nums">{row.unrealizedReturnPct === null ? "근거 없음" : formatSignedPercent(row.unrealizedReturnPct)}</td>
+                        <td className="px-2 py-3 text-right tabular-nums"><p>{formatPercent(row.currentWeightPct)} → {formatPercent(row.targetWeightPct)}</p><p className="mt-0.5 text-xs text-[var(--muted)]"><PortfolioText ko={row.driftRatioPct === null ? "목표 0%" : `드리프트 ${formatSignedPercent(row.driftRatioPct)}`} /></p></td>
+                        <td className="px-2 py-3 text-right tabular-nums"><PortfolioText ko={row.unrealizedReturnPct === null ? "근거 없음" : formatSignedPercent(row.unrealizedReturnPct)} /></td>
                         <td className="px-2 py-3 text-right tabular-nums">{row.trimAmountKrw > 0 ? formatKrw(row.trimAmountKrw) : "-"}</td>
                         <td className="px-2 py-3 text-right tabular-nums">{formatKrw(row.strategicAllocationKrw)}</td>
                         <td className="px-2 py-3 text-right tabular-nums">
                           <p>{formatPercent(row.effectiveTargetWeightPct)}</p>
                           <p className="mt-0.5 text-xs text-[var(--muted)]">× {formatNumber(row.maEffectiveMultiplier)}</p>
-                          <p className="mt-0.5 text-xs text-[var(--muted)]">부족액 {formatKrw(row.baseNeedKrw)}</p>
+                          <p className="mt-0.5 text-xs text-[var(--muted)]"><PortfolioText ko={"부족액"} />{" "}{formatKrw(row.baseNeedKrw)}</p>
                         </td>
-                        <td className={`px-2 py-3 text-right font-medium tabular-nums ${actionTone(row.action)}`}>{actionLabel(row)}</td>
-                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]">{decisionReason(row)}</td>
+                        <td className={`px-2 py-3 text-right font-medium tabular-nums ${actionTone(row.action)}`}><PortfolioText ko={actionLabel(row)} /></td>
+                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={decisionReason(row)} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -153,10 +153,9 @@ export function AdditionalContributionLogicDialog({
             </section>
 
             <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
-              <h3 className="font-medium">현재 계산 범위</h3>
+              <h3 className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></h3>
               <p className="mt-1 leading-6 text-[var(--muted)]">
-                원 서비스 후반부에 있던 환율 진입시점, 위험기여, 시장 레짐, 뉴스, 성과감시 감액은 사용자별 정규화 근거가 아직 없어 이번 계산에 임의로 넣지 않았습니다. 근거가 연결되면 같은 단계에 추가할 수 있습니다.
-              </p>
+                <PortfolioText ko={"원 서비스 후반부에 있던 환율 진입시점, 위험기여, 시장 레짐, 뉴스, 성과감시 감액은 사용자별 정규화 근거가 아직 없어 이번 계산에 임의로 넣지 않았습니다. 근거가 연결되면 같은 단계에 추가할 수 있습니다."} />{" "}</p>
             </section>
           </div>
         </div>
@@ -166,11 +165,11 @@ export function AdditionalContributionLogicDialog({
 }
 
 function FlowStep({ index, label, value }: { index: string; label: string; value: string }) {
-  return <div className="bg-[var(--paper)] px-4 py-4"><p className="text-[10px] text-[var(--faint)]">{index}</p><p className="mt-2 text-xs text-[var(--muted)]">{label}</p><p className="mt-1 font-medium tabular-nums">{value}</p></div>;
+  return <div className="bg-[var(--paper)] px-4 py-4"><p className="text-[10px] text-[var(--faint)]">{index}</p><p className="mt-2 text-xs text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-1 font-medium tabular-nums"><PortfolioText ko={value} /></p></div>;
 }
 
 function PolicyFact({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return <div><p className="text-[11px] font-medium text-[var(--muted)]">{label}</p><p className="mt-2 font-medium">{value}</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</p></div>;
+  return <div><p className="text-[11px] font-medium text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-2 font-medium"><PortfolioText ko={value} /></p><p className="mt-1 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={detail} /></p></div>;
 }
 
 function actionLabel(row: AdditionalContributionResultPreview["rows"][number]) {

@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import type {
   InvestmentLabEtfXrayEtfRow,
   InvestmentLabEtfXrayModel,
@@ -59,17 +60,11 @@ export function InvestmentLabEtfXray({
             <h2
               id="investment-lab-etf-xray-title"
               className="mt-3 text-lg font-medium sm:text-xl"
-            >
-              포트폴리오 ETF X-ray
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-              보유 ETF를 구성종목까지 펼쳐 직접 보유와 ETF 간 중복을 확인합니다.
-              ETF별 최신 기준일을 각각 유지하며, 관측된 노출을 100%로
-              재정규화하지 않습니다.
-            </p>
+            ><LabText value=" 포트폴리오 ETF X-ray " /></h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 보유 ETF를 구성종목까지 펼쳐 직접 보유와 ETF 간 중복을 확인합니다. ETF별 최신 기준일을 각각 유지하며, 관측된 노출을 100%로 재정규화하지 않습니다. " /></p>
           </div>
           <p className="text-sm font-semibold text-[var(--muted)]">
-            {xrayStatusLabel(model.status)}
+            <LabText value={xrayStatusLabel(model.status)} />
           </p>
         </div>
       </header>
@@ -107,24 +102,16 @@ export function InvestmentLabEtfXray({
       </div>
 
       {summary.basePortfolioCoverageStatus === "partial" ? (
-        <p className="border-y border-[var(--warning-soft)] py-4 text-sm leading-6 text-[var(--warning)]">
-          가격·환율 근거가 없어 평가에서 제외된 자산이{" "}
-          {summary.excludedHoldingCount}
-          개이며, 그중 ETF 후보는 {summary.excludedEtfHoldingCount}개입니다.
-          따라서 아래 비중은 전체 포트폴리오가 아니라 평가 가능한 하위집합
-          기준입니다. 제외 사유: 가격{" "}
-          {summary.exclusionReasonCounts.missing_price} · 환율{" "}
-          {summary.exclusionReasonCounts.missing_fx} · 미지원 통화{" "}
+        <p className="border-y border-[var(--warning-soft)] py-4 text-sm leading-6 text-[var(--warning)]"><LabText value=" 가격·환율 근거가 없어 평가에서 제외된 자산이" />{" "}
+          {summary.excludedHoldingCount}<LabText value=" 개이며, 그중 ETF 후보는 " />{summary.excludedEtfHoldingCount}<LabText value="개입니다. 따라서 아래 비중은 전체 포트폴리오가 아니라 평가 가능한 하위집합 기준입니다. 제외 사유: 가격" />{" "}
+          {summary.exclusionReasonCounts.missing_price}<LabText value=" · 환율" />{" "}
+          {summary.exclusionReasonCounts.missing_fx}<LabText value=" · 미지원 통화" />{" "}
           {summary.exclusionReasonCounts.unsupported_currency}.
         </p>
       ) : null}
 
       {summary.mixedAsOfDates ? (
-        <p className="border-y border-[var(--warning-soft)] py-4 text-sm leading-6 text-[var(--warning)]">
-          ETF별 구성종목 기준일이 {summary.asOfDates.length}개로 섞여 있습니다.
-          아래 수치는 각 ETF의 최신 저장 근거를 합친 참고값이며, 하나의 공통
-          시점 포트폴리오로 해석하지 않습니다.
-        </p>
+        <p className="border-y border-[var(--warning-soft)] py-4 text-sm leading-6 text-[var(--warning)]"><LabText value=" ETF별 구성종목 기준일이 " />{summary.asOfDates.length}<LabText value="개로 섞여 있습니다. 아래 수치는 각 ETF의 최신 저장 근거를 합친 참고값이며, 하나의 공통 시점 포트폴리오로 해석하지 않습니다. " /></p>
       ) : null}
 
       <InvestmentLabEtfShock
@@ -137,23 +124,21 @@ export function InvestmentLabEtfXray({
 
       <section className="overflow-hidden border-y border-[var(--line)]">
         <div className="border-b border-[var(--wash)] py-4">
-          <h3 className="text-lg font-semibold">보유 ETF 커버리지</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            reference 매핑, ETF별 기준일, 구성종목 비중 누락을 함께 표시합니다.
-          </p>
+          <h3 className="text-lg font-semibold"><LabText value="보유 ETF 커버리지" /></h3>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" reference 매핑, ETF별 기준일, 구성종목 비중 누락을 함께 표시합니다. " /></p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] border-collapse text-sm">
             <thead>
               <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
                 <th className="px-4 py-3">ETF</th>
-                <th className="px-3 py-3">계정</th>
-                <th className="px-3 py-3">구성 기준일</th>
-                <th className="px-3 py-3 text-right">평가 하위집합 비중</th>
-                <th className="px-3 py-3 text-right">구성종목</th>
-                <th className="px-3 py-3 text-right">관측 비중</th>
-                <th className="px-3 py-3 text-right">미커버</th>
-                <th className="px-4 py-3">상태</th>
+                <th className="px-3 py-3"><LabText value="계정" /></th>
+                <th className="px-3 py-3"><LabText value="구성 기준일" /></th>
+                <th className="px-3 py-3 text-right"><LabText value="평가 하위집합 비중" /></th>
+                <th className="px-3 py-3 text-right"><LabText value="구성종목" /></th>
+                <th className="px-3 py-3 text-right"><LabText value="관측 비중" /></th>
+                <th className="px-3 py-3 text-right"><LabText value="미커버" /></th>
+                <th className="px-4 py-3"><LabText value="상태" /></th>
               </tr>
             </thead>
             <tbody>
@@ -170,33 +155,25 @@ export function InvestmentLabEtfXray({
 
       <section className="overflow-hidden border-y border-[var(--line)]">
         <div className="border-b border-[var(--wash)] py-4">
-          <h3 className="text-lg font-semibold">상위 구성종목 노출</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            유효한 market · currency · ticker와 비중이 모두 있는 구성종목만
-            합산합니다.
-          </p>
+          <h3 className="text-lg font-semibold"><LabText value="상위 구성종목 노출" /></h3>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 유효한 market · currency · ticker와 비중이 모두 있는 구성종목만 합산합니다. " /></p>
         </div>
         {topComponents.length > 0 ? (
           <ComponentTable rows={topComponents} />
         ) : (
-          <EmptyState>표시할 수 있는 구성종목 근거가 없습니다.</EmptyState>
+          <EmptyState><LabText value="표시할 수 있는 구성종목 근거가 없습니다." /></EmptyState>
         )}
       </section>
 
       <section className="overflow-hidden border-y border-[var(--line)]">
         <div className="border-b border-[var(--wash)] py-4">
-          <h3 className="text-lg font-semibold">숨은 중복 노출</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            두 개 이상의 보유 ETF가 공유하거나, 같은 종목을 포트폴리오에서 직접
-            보유한 경우입니다.
-          </p>
+          <h3 className="text-lg font-semibold"><LabText value="숨은 중복 노출" /></h3>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 두 개 이상의 보유 ETF가 공유하거나, 같은 종목을 포트폴리오에서 직접 보유한 경우입니다. " /></p>
         </div>
         {overlapRows.length > 0 ? (
           <ComponentTable rows={overlapRows} />
         ) : (
-          <EmptyState>
-            현재 exact identity 기준의 중복 노출이 없습니다.
-          </EmptyState>
+          <EmptyState><LabText value=" 현재 exact identity 기준의 중복 노출이 없습니다. " /></EmptyState>
         )}
       </section>
     </section>
@@ -231,12 +208,8 @@ export function InvestmentLabEtfXrayUnavailable() {
         <h2
           id="investment-lab-etf-xray-unavailable-title"
           className="text-lg font-semibold text-[var(--warning)]"
-        >
-          포트폴리오 ETF X-ray
-        </h2>
-        <p className="mt-2 text-sm text-[var(--warning)]">
-          ETF reference 근거를 읽지 못해 이 섹션만 표시할 수 없습니다.
-        </p>
+        ><LabText value=" 포트폴리오 ETF X-ray " /></h2>
+        <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" ETF reference 근거를 읽지 못해 이 섹션만 표시할 수 없습니다. " /></p>
       </div>
     </section>
   );
@@ -272,7 +245,7 @@ function EtfCoverageRow({ row }: { row: InvestmentLabEtfXrayEtfRow }) {
         {formatPercent(row.uncoveredWeightPct)}
       </td>
       <td className="px-4 py-3">
-        <p className="font-medium">{coverageStatusLabel(row)}</p>
+        <p className="font-medium"><LabText value={coverageStatusLabel(row)} /></p>
         {row.unmappedComponentCount > 0 || row.missingWeightCount > 0 ? (
           <p className="mt-1 text-xs text-[var(--warning)]">
             identity {row.unmappedComponentCount} · weight{" "}
@@ -294,12 +267,12 @@ function ComponentTable({
       <table className="w-full min-w-[980px] border-collapse text-sm">
         <thead>
           <tr className="border-y border-[var(--wash)] text-left text-xs font-semibold text-[var(--muted)]">
-            <th className="px-4 py-3">구성종목</th>
+            <th className="px-4 py-3"><LabText value="구성종목" /></th>
             <th className="px-3 py-3">identity</th>
-            <th className="px-3 py-3 text-right">ETF 경유 노출</th>
-            <th className="px-3 py-3 text-right">직접 보유</th>
-            <th className="px-3 py-3">경유 ETF</th>
-            <th className="px-4 py-3">근거 기준일</th>
+            <th className="px-3 py-3 text-right"><LabText value="ETF 경유 노출" /></th>
+            <th className="px-3 py-3 text-right"><LabText value="직접 보유" /></th>
+            <th className="px-3 py-3"><LabText value="경유 ETF" /></th>
+            <th className="px-4 py-3"><LabText value="근거 기준일" /></th>
           </tr>
         </thead>
         <tbody>
@@ -329,8 +302,7 @@ function ComponentTable({
                 {row.throughEtfs.join(", ")}
                 {row.hasMultiEtfOverlap ? (
                   <span className="ml-2 text-xs font-semibold text-[var(--warning)]">
-                    {row.throughEtfCount}개 중복
-                  </span>
+                    {row.throughEtfCount}<LabText value="개 중복 " /></span>
                 ) : null}
               </td>
               <td className="px-4 py-3 tabular-nums text-[var(--muted)]">
@@ -355,15 +327,15 @@ function SummaryCell({
 }) {
   return (
     <div className="min-w-0 border-b border-[var(--line)] px-4 py-5 first:pl-0 last:pr-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
-      <p className="text-sm text-[var(--muted)]">{label}</p>
-      <p className="mt-2 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p>
+      <p className="text-sm text-[var(--muted)]"><LabText value={label} /></p>
+      <p className="mt-2 text-xl font-semibold tabular-nums"><LabText value={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }
 
-function EmptyState({ children }: { children: string }) {
-  return <p className="px-4 py-6 text-sm text-[var(--muted)]">{children}</p>;
+function EmptyState({ children }: { children: import("react").ReactNode }) {
+  return <p className="px-4 py-6 text-sm text-[var(--muted)]"><LabText value={children} /></p>;
 }
 
 function coverageStatusLabel(row: InvestmentLabEtfXrayEtfRow) {

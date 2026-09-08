@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { ReactNode } from "react";
 
 export function RiskSection({
@@ -17,9 +18,9 @@ export function RiskSection({
       className="border-t border-[var(--line)] py-5"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
+        <h2 className="text-lg font-semibold tracking-normal"><PortfolioText ko={title} /></h2>
         {detail ? (
-          <p className="text-xs font-semibold text-[var(--muted)]">{detail}</p>
+          <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={detail} /></p>
         ) : null}
       </div>
       {children}
@@ -38,12 +39,12 @@ export function RiskSummaryCard({
 }) {
   return (
     <div className="min-w-0 border-l border-[var(--line)] px-4 py-2">
-      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
       <p className="mt-2 break-words text-2xl font-medium tracking-tight tabular-nums text-[var(--ink)]">
-        {value}
+        <PortfolioText ko={value} />
       </p>
       {detail ? (
-        <p className="mt-1 break-words text-xs text-[var(--muted)]">{detail}</p>
+        <p className="mt-1 break-words text-xs text-[var(--muted)]"><PortfolioText ko={detail} /></p>
       ) : null}
     </div>
   );

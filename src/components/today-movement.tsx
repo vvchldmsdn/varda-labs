@@ -1,3 +1,7 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
 import styles from "@/components/home/portfolio-overview.module.css";
 import type { ReactNode } from "react";
@@ -97,7 +101,7 @@ export function TodayMovement({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.stage}>
           <header className={styles.stageHeader}>
-            <h1 id="today-movement-title" className={styles.stageTitle}>오늘의 움직임</h1>
+            <h1 id="today-movement-title" className={styles.stageTitle}><T ko="오늘의 움직임" en="What moved today"/></h1>
             <div className={styles.stageScope}>
             <PortfolioAnalysisScopeTabs
               basePath="/today"
@@ -112,32 +116,32 @@ export function TodayMovement({
           <div className={styles.todayStageMain}>
           <section className={styles.stageSummary} aria-labelledby="today-movement-title">
             <div className={styles.balance}>
-              <span>{scopeLabel(data.selectedScope)} 오늘 평가액 변동</span>
+              <span><T ko={scopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="오늘 평가액 변동" en="Today's value change"/></span>
               <strong className={toneClass(attribution.changeKrw)}>
-                {movement.ready ? formatSignedKrw(attribution.changeKrw) : "계산 대기"}
+                {<T ko={movement.ready ? formatSignedKrw(attribution.changeKrw) : "계산 대기"} en={translateHomeHistory(movement.ready ? formatSignedKrw(attribution.changeKrw) : "계산 대기")}/>}
               </strong>
-              <p>변동률 <span className={toneClass(movement.returnPct)}>{formatPercent(movement.returnPct, true)}</span></p>
+              <p><T ko="변동률" en="Change"/> <span className={toneClass(movement.returnPct)}>{formatPercent(movement.returnPct, true)}</span></p>
             </div>
             <dl className={styles.summaryMetric}>
-              <dt>가격 영향</dt>
-              <dd className={toneClass(attribution.priceImpactKrw)}>{formatSignedKrw(attribution.priceImpactKrw)}</dd>
-              <dd className={styles.status}>보유 종목의 가격 변화</dd>
+              <dt><T ko="가격 영향" en="Price impact"/></dt>
+              <dd className={toneClass(attribution.priceImpactKrw)}>{<T ko={formatSignedKrw(attribution.priceImpactKrw)} en={translateHomeHistory(formatSignedKrw(attribution.priceImpactKrw))}/>}</dd>
+              <dd className={styles.status}><T ko="보유 종목의 가격 변화" en="Changes in holding prices"/></dd>
             </dl>
             <dl className={styles.summaryMetric}>
-              <dt>환율 영향</dt>
-              <dd className={toneClass(attribution.fxImpactKrw)}>{formatSignedKrw(attribution.fxImpactKrw)}</dd>
-              <dd className={styles.status}>원화 환산 가치의 변화</dd>
+              <dt><T ko="환율 영향" en="FX impact"/></dt>
+              <dd className={toneClass(attribution.fxImpactKrw)}>{<T ko={formatSignedKrw(attribution.fxImpactKrw)} en={translateHomeHistory(formatSignedKrw(attribution.fxImpactKrw))}/>}</dd>
+              <dd className={styles.status}><T ko="원화 환산 가치의 변화" en="Changes in KRW conversion value"/></dd>
             </dl>
           {!movement.ready ? (
             <div className={`${styles.stageNote} ${styles.stageWarning} text-[var(--warning)]`}>
-              <p className="text-sm font-medium">{reasonLabel(movement.reason)}</p>
-              <p className="mt-2 text-xs leading-5">현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다.</p>
+              <p className="text-sm font-medium">{<T ko={reasonLabel(movement.reason)} en={translateHomeHistory(reasonLabel(movement.reason))}/>}</p>
+              <p className="mt-2 text-xs leading-5"><T ko="현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다." en="Values are not estimated until current prices can be matched to the baseline snapshot."/></p>
             </div>
           ) : (
             <div className={styles.stageNote}>
-              <span>비교 기준</span>
-              <strong>{formatDate(data.movementBaselineDate)}</strong>
-              <p>{sourceLabel(movement.source)} · {rows.length}개 기여 근거</p>
+              <span><T ko="비교 기준" en="Comparison baseline"/></span>
+              <strong>{<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</strong>
+              <p>{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p>
             </div>
           )}
           </section>
@@ -145,10 +149,10 @@ export function TodayMovement({
           <section className={styles.stageContribution} aria-labelledby="contribution-title">
             <div className={`${styles.panelHeader} ${styles.contributionHeader}`}>
               <div>
-                <h2 id="contribution-title" className={styles.panelTitle}>종목별 기여</h2>
-                <p className={styles.evidenceIntro}>점의 길이는 실제 변동액에 비례합니다.</p>
+                <h2 id="contribution-title" className={styles.panelTitle}><T ko="종목별 기여" en="Contribution by holding"/></h2>
+                <p className={styles.evidenceIntro}><T ko="점의 길이는 실제 변동액에 비례합니다." en="The dot bars scale with the actual amount of change."/></p>
               </div>
-              <p className={styles.status}>절대 변동액 순 · {rows.length}개 종목</p>
+              <p className={styles.status}><T ko="절대 변동액 순 ·" en="By absolute change ·"/> {rows.length}<T ko="개 종목" en=" holdings"/></p>
             </div>
             <TodayContributionExplorer rows={rows} />
           </section>
@@ -156,9 +160,9 @@ export function TodayMovement({
 
           <footer className={styles.stageFooter}>
           <div className={styles.stageLaunchers}>
-          <PresentationDialog label="변동 구성·계산 근거" title="오늘 변동의 구성과 근거" description="가격·환율·순매매를 실제 기준 가격과 현재 가격으로 비교합니다." wide>
+          <PresentationDialog label="변동 구성·계산 근거" labelEn={"Breakdown and calculation"} title="오늘 변동의 구성과 근거" titleEn={"Today's change breakdown"} description="가격·환율·순매매를 실제 기준 가격과 현재 가격으로 비교합니다." descriptionEn={"Compare price, FX and net trades using actual baseline and current prices."} wide>
           <div className={styles.detailStack}>
-          <section aria-label="평가액 구성">
+          <LocalizedElement as="section" en={{"aria-label": "Value breakdown"}} aria-label="평가액 구성">
             <MovementBridge
               currentEvidenceKrw={attribution.currentEvidenceKrw}
               movementExcludedCurrentValueKrw={attribution.movementExcludedCurrentValueKrw}
@@ -167,14 +171,13 @@ export function TodayMovement({
               priceImpactKrw={attribution.priceImpactKrw}
               tradeFlowKrw={attribution.tradeFlowKrw}
             />
-          </section>
+          </LocalizedElement>
 
           <div className={styles.todayEvidence}>
             <div>
-              <h2 className={styles.panelTitle}>계산 근거</h2>
+              <h2 className={styles.panelTitle}><T ko="계산 근거" en="Calculation sources"/></h2>
               <p className={styles.evidenceIntro}>
-                {movement.contributionRows.length}개 기여 근거 · {formatDate(data.dataHealth.latestFxRateDate)} 환율
-              </p>
+                {movement.contributionRows.length}<T ko="개 기여 근거 ·" en="contribution records ·"/> {<T ko={formatDate(data.dataHealth.latestFxRateDate)} en={translateHomeHistory(formatDate(data.dataHealth.latestFxRateDate))}/>}<T ko="환율" en="FX rate"/></p>
             </div>
             <dl className={styles.metrics}>
               <RailEvidence label="기준 근거" value={sourceLabel(movement.source)} />
@@ -185,31 +188,31 @@ export function TodayMovement({
           </div>
 
           <p className={styles.footer}>
-            <span>평가액 변동 = 가격 영향 + 환율 영향</span>
-            <span>순매매는 성과와 분리해 현재 비교 평가액에만 반영</span>
+            <span><T ko="평가액 변동 = 가격 영향 + 환율 영향" en="Value change = price impact + FX impact"/></span>
+            <span><T ko="순매매는 성과와 분리해 현재 비교 평가액에만 반영" en="Net trades adjust the comparable current value and are kept separate from performance."/></span>
           </p>
           </div>
           </PresentationDialog>
           {movement.exclusions.length > 0 ? (
             <PresentationDialog
-              description="현재 변동 합계에서 제외된 항목과 그 이유를 원문 근거대로 표시합니다."
-              label={`계산 제외 ${movement.exclusions.length}건`}
-              title="변동 계산 제외 근거"
+              description="현재 변동 합계에서 제외된 항목과 그 이유를 원문 근거대로 표시합니다." descriptionEn={"Review items excluded from the current change total and their recorded reasons."}
+              label={`계산 제외 ${movement.exclusions.length}건`} labelEn={translateHomeHistory(`계산 제외 ${movement.exclusions.length}건`)}
+              title="변동 계산 제외 근거" titleEn={"Exclusions from the change calculation"}
               wide
             >
               <div className="divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
                 {movement.exclusions.map((row, index) => (
                   <div key={`${row.subject}-${row.reason}-${row.holdingId ?? row.snapshotId ?? index}`} className="grid gap-1 py-3 text-sm sm:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto] sm:gap-5">
                     <span className="font-medium">{row.assetName ?? row.ticker ?? row.subject}</span>
-                    <span className="text-[var(--muted)]">{reasonLabel(row.reason)}</span>
-                    <span className="text-[var(--muted)]">{row.account ?? sourceLabel(row.source)}</span>
+                    <span className="text-[var(--muted)]">{<T ko={reasonLabel(row.reason)} en={translateHomeHistory(reasonLabel(row.reason))}/>}</span>
+                    <span className="text-[var(--muted)]">{<T ko={row.account ?? sourceLabel(row.source)} en={translateHomeHistory(row.account ?? sourceLabel(row.source))}/>}</span>
                   </div>
                 ))}
               </div>
             </PresentationDialog>
           ) : null}
           </div>
-          <p>가격 영향 + 환율 영향 = 평가액 변동</p>
+          <p><T ko="가격 영향 + 환율 영향 = 평가액 변동" en="Price impact + FX impact = value change"/></p>
           </footer>
         </div>
         {hasHoldingDetail ? (
@@ -247,19 +250,19 @@ function MovementBridge({
     <section aria-labelledby="movement-bridge-title">
       <div className={styles.panelHeader}>
         <div>
-          <h2 id="movement-bridge-title" className={styles.panelTitle}>오늘 변동 구성</h2>
-          <p className={styles.evidenceIntro}>저장된 기준과 현재 근거 비교</p>
+          <h2 id="movement-bridge-title" className={styles.panelTitle}><T ko="오늘 변동 구성" en="Today's change breakdown"/></h2>
+          <p className={styles.evidenceIntro}><T ko="저장된 기준과 현재 근거 비교" en="Recorded baseline versus current data"/></p>
         </div>
         {movementExcludedCurrentValueKrw > 0 ? (
-          <p className={styles.status}>변동 제외 보유액 {formatKrw(movementExcludedCurrentValueKrw)} 정적 포함</p>
+          <p className={styles.status}><T ko="변동 제외 보유액" en="Holdings excluded from change"/> {<T ko={formatKrw(movementExcludedCurrentValueKrw)} en={translateHomeHistory(formatKrw(movementExcludedCurrentValueKrw))}/>} <T ko="정적 포함" en="included at a fixed value"/></p>
         ) : null}
       </div>
       <dl className={styles.bridge}>
         {steps.map((step) => (
           <div key={step.label} className={styles.bridgeStep}>
-            <dt>{step.label}</dt>
+            <dt>{<T ko={step.label} en={translateHomeHistory(step.label)}/>}</dt>
             <dd className={step.signed ? toneClass(step.value) : "text-[var(--ink)]"}>
-              {step.signed ? formatSignedKrw(step.value) : formatNullableKrw(step.value)}
+              {<T ko={step.signed ? formatSignedKrw(step.value) : formatNullableKrw(step.value)} en={translateHomeHistory(step.signed ? formatSignedKrw(step.value) : formatNullableKrw(step.value))}/>}
             </dd>
           </div>
         ))}
@@ -286,9 +289,11 @@ function HoldingDetailPanel({
       <HoldingDetailDrawer closeHref={clearHref}>
       <section className="py-7 text-sm text-[var(--warning)]">
         <h2 id="holding-detail-title" className="text-xl font-medium">
-          {detail.status === "not_found"
+          {<T ko={detail.status === "not_found"
             ? "선택한 종목을 찾지 못했습니다."
-            : "같은 티커가 여러 계좌에 있어 계좌 선택이 필요합니다."}
+            : "같은 티커가 여러 계좌에 있어 계좌 선택이 필요합니다."} en={translateHomeHistory(detail.status === "not_found"
+            ? "선택한 종목을 찾지 못했습니다."
+            : "같은 티커가 여러 계좌에 있어 계좌 선택이 필요합니다.")}/>}
         </h2>
         {detail.status === "ambiguous" ? (
           <div className="mt-3 flex flex-wrap gap-4">
@@ -304,7 +309,7 @@ function HoldingDetailPanel({
             ))}
           </div>
         ) : null}
-        <Link className="mt-6 inline-flex border-b border-current pb-1" href={clearHref} scroll={false}>선택 해제</Link>
+        <Link className="mt-6 inline-flex border-b border-current pb-1" href={clearHref} scroll={false}><T ko="선택 해제" en="Clear selection"/></Link>
       </section>
       </HoldingDetailDrawer>
     );
@@ -345,7 +350,7 @@ function HoldingDetailPanel({
             {holding.name}
           </h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {holding.account} · {holding.ticker ?? "티커 없음"} ·{" "}
+            {holding.account} · {<T ko={holding.ticker ?? "티커 없음"} en={translateHomeHistory(holding.ticker ?? "티커 없음")}/>} ·{" "}
             {holding.market.toUpperCase()} · {holding.currency}
           </p>
         </div>
@@ -353,9 +358,7 @@ function HoldingDetailPanel({
           className="w-fit border-b border-[var(--ink)] pb-1 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
           href={clearHref}
           scroll={false}
-        >
-          선택 해제
-        </Link>
+        ><T ko="선택 해제" en="Clear selection"/></Link>
       </div>
 
       <SelectedHoldingHistoryChart
@@ -452,8 +455,8 @@ function HoldingDetailPanel({
 function RailEvidence({ label, value }: { label: string; value: string }) {
   return (
     <div className={styles.metric}>
-      <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
+      <dt>{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dd title={value}><T ko={value} en={translateHomeHistory(value)}/></dd>
     </div>
   );
 }
@@ -471,7 +474,7 @@ function DetailColumn({
     <div
       className={`min-h-64 py-6 lg:px-7 ${divided ? "border-t border-[var(--wash)] lg:border-l lg:border-t-0" : "lg:pr-7"}`}
     >
-      <h3 className="text-sm font-medium">{title}</h3>
+      <h3 className="text-sm font-medium">{<T ko={title} en={translateHomeHistory(title)}/>}</h3>
       <dl className="mt-5 divide-y divide-[var(--wash)]">{children}</dl>
     </div>
   );
@@ -488,11 +491,11 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-3 text-sm">
-      <dt className="text-[var(--muted)]">{label}</dt>
+      <dt className="text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd
         className={`max-w-[65%] text-right font-medium break-words ${tone === null ? "text-[var(--ink)]" : toneClass(tone)}`}
       >
-        {value}
+        <T ko={value} en={translateHomeHistory(value)}/>
       </dd>
     </div>
   );

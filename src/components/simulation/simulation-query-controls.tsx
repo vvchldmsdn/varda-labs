@@ -1,5 +1,8 @@
 "use client";
 
+import { SimulationText } from "@/components/simulation/simulation-text";
+
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ComponentProps } from "react";
@@ -85,8 +88,7 @@ export function SimulationDateControl() {
       <label className="min-w-0 text-xs text-[var(--muted)]">
         <span className="mb-2 flex items-center gap-2">
           <CalendarDays size={14} aria-hidden="true" />
-          기준일
-        </span>
+          <SimulationText ko={"기준일"} />{" "}</span>
         <input
           key={params.get("end") ?? "latest"}
           type="date"
@@ -99,8 +101,7 @@ export function SimulationDateControl() {
         type="submit"
         className="flex min-h-10 items-center gap-2 rounded border border-[var(--line)] px-3 text-sm hover:bg-[var(--wash)]"
       >
-        적용
-        <ArrowRight size={14} aria-hidden="true" />
+        <SimulationText ko={"적용"} />{" "}<ArrowRight size={14} aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -111,8 +112,7 @@ export function SimulationDateControl() {
           router.push(`/simulation?${next}`, { scroll: false });
         }}
       >
-        최신 공통 기준일
-      </button>
+        <SimulationText ko={"최신 공통 기준일"} />{" "}</button>
     </form>
   );
 }

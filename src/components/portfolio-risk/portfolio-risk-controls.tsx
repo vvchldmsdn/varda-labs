@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import Link from "next/link";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -24,7 +25,7 @@ export function PortfolioRiskControls({
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-2">
       <div>
-        <p className="mb-1 text-xs font-semibold text-[var(--muted)]">분석 범위</p>
+        <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={"분석 범위"} /></p>
         <PortfolioAnalysisScopeTabs
           basePath="/portfolio/risk"
           query={{
@@ -43,7 +44,7 @@ export function PortfolioRiskControls({
             href={`${buildPortfolioRiskHref(selectedScope.key, window)}${isDesignPreview ? "&preview=design" : ""}`}
             active={selection.window === window}
           >
-            {window}일{isDesignPreview ? " 예시" : ""}
+            {window}<PortfolioText ko={"일"} /><PortfolioText ko={isDesignPreview ? " 예시" : ""} />
           </RiskOptionLink>
         ))}
       </RiskOptionGroup>
@@ -60,7 +61,7 @@ function RiskOptionGroup({
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
       <div className="flex min-h-10 flex-wrap gap-1 rounded-md border border-[var(--line)] bg-white p-1">
         {children}
       </div>

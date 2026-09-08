@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   buildBalanceHistoryTrajectory,
@@ -119,7 +122,7 @@ describe("stored history amount trajectory", () => {
     assert.equal(model.maxDate, "2026-07-10");
   });
 
-  it("stays server-rendered and reuses the existing History read model", () => {
+  it("stays server-rendered and renders localized accessible titles from the existing History read model", async () => {
     const modelSource = readFileSync(
       new URL("../src/lib/history-trajectory.ts", import.meta.url),
       "utf8",
@@ -141,9 +144,37 @@ describe("stored history amount trajectory", () => {
     assert.doesNotMatch(chartSource, /fetch\s*\(|\/api\//i);
     assert.match(chartSource, /<polyline/);
     assert.match(chartSource, /<circle/);
-    assert.match(chartSource, /<title>\{chartTitle\}<\/title>/);
-    assert.doesNotMatch(chartSource, /<title>\s*\n\s*\{historyAccountLabel/);
     assert.match(viewSource, /<HistoryTrajectoryChart/);
+
+    const model = buildBalanceHistoryTrajectory({
+      account: "brokerage",
+      rows: [balance("2026-07-01", 0, 100, 0, 0), balance("2026-07-02", 0, 120, 0, 0)],
+    });
+    const before = structuredClone(model);
+    const [chart, provider] = await importUiWithPorts([
+      "src/components/history/history-trajectory-chart.tsx",
+      "src/components/i18n/locale-provider.tsx",
+    ], { "next/navigation": { usePathname: () => "/history" } });
+    const renderedPaths = [];
+    for (const [locale, title, accessibleName] of [
+      ["ko", "증권 저장 잔액 궤적", "증권 저장 잔액 궤적 차트"],
+      ["en", "Brokerage recorded balance path", "Brokerage recorded balance path chart"],
+    ]) {
+      const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale: locale },
+        React.createElement(chart.HistoryTrajectoryChart, { model }),
+      ));
+      assert.match(markup, new RegExp(`<title>${title}</title>`));
+      assert.match(markup, new RegExp(`aria-label="${accessibleName}"`));
+      assert.doesNotMatch(markup, /\[object Object\]/);
+      assert.equal((markup.match(/<title>/g) ?? []).length, 3);
+      assert.match(markup, /<title>2026-07-01 · ₩100 · /);
+      assert.match(markup, /<title>2026-07-02 · ₩120 · /);
+      assert.equal((markup.match(/<circle\b/g) ?? []).length, 2);
+      assert.equal((markup.match(/<polyline\b/g) ?? []).length, 1);
+      renderedPaths.push([...markup.matchAll(/<polyline\b[^>]*points="([^"]+)"/g)].map(match => match[1]));
+    }
+    assert.deepEqual(renderedPaths[0], renderedPaths[1], "localization must retain recorded numeric chart coordinates");
+    assert.deepEqual(model, before);
   });
 });
 

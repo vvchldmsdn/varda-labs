@@ -1,3 +1,6 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { simulationEnglish } from "@/components/simulation/simulation-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
 import {
   SimulationLink as Link,
 } from "./simulation-query-controls";
@@ -67,7 +70,7 @@ export function SimulationDetailView({
 }) {
   if (!model) {
     return <div className={styles.details} data-simulation-partial-detail={panel}>
-      <p role="status" className="py-3 text-sm text-[var(--warning)]">고정 종목의 연구 입력을 읽지 못했습니다. 준비된 보유 구성의 분석 결과는 계속 확인할 수 있습니다.</p>
+      <p role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"고정 종목의 연구 입력을 읽지 못했습니다. 준비된 보유 구성의 분석 결과는 계속 확인할 수 있습니다."} /></p>
       {ownerCandidateComparison}
       {ownerWalkForwardValidation}
       {ownerHistoricalValidation}
@@ -155,9 +158,9 @@ export function SimulationDetailView({
                 detail="KODEX 200·Vanguard S&P 500 ETF 독립 연구"
               >
                 {researchUniversePreflight}
-                <section
+                <LocalizedElement
                   aria-label="검사 요약"
-                  className="grid border-b border-[var(--line)] py-4 sm:grid-cols-2 xl:grid-cols-4"
+                  className="grid border-b border-[var(--line)] py-4 sm:grid-cols-2 xl:grid-cols-4" as="section" en={{"aria-label": simulationEnglish("검사 요약")}}
                 >
                   <SummaryItem
                     label="검사 기준일"
@@ -182,7 +185,7 @@ export function SimulationDetailView({
                     }
                     detail="연구용 · 저장 안 함"
                   />
-                </section>
+                </LocalizedElement>
 
                 <ObservedReturnComparisonPanel
                   comparison={model.observedReturnComparison}
@@ -219,9 +222,9 @@ export function SimulationDetailView({
                   selectedKodexWeightPct={selectedKodexWeightPct}
                 />
 
-                <section
+                <LocalizedElement
                   aria-label="독립 연구 입력"
-                  className="grid gap-4 py-5 lg:grid-cols-2"
+                  className="grid gap-4 py-5 lg:grid-cols-2" as="section" en={{"aria-label": simulationEnglish("독립 연구 입력")}}
                 >
                   {model.inputs.map((input) => (
                     <InputPanel
@@ -239,7 +242,7 @@ export function SimulationDetailView({
                       researchUniverse={researchUniverse}
                     />
                   ))}
-                </section>
+                </LocalizedElement>
 
                 {model.history.length > 0 ? (
                   <ReadinessHistory
@@ -253,12 +256,7 @@ export function SimulationDetailView({
                 ) : null}
 
                 <footer className="border-t border-[var(--line)] pt-4 text-sm leading-6 text-[var(--muted)]">
-                  두 종목은 서로 독립적으로 검사합니다. 현재 보유 종목, 기본
-                  포트폴리오, 목표 비중 또는 승인된 실행 벡터로 해석하지
-                  않습니다. 결손이 있으면 과거 날짜로 자동 대체하거나 범위를
-                  임의로 줄이지 않습니다. VOO는 투자 랩의 가격수익률 준비 상태를
-                  재사용하지 않고 별도의 조정종가·환율 증거를 검사합니다.
-                </footer>
+                  <SimulationText ko={"두 종목은 서로 독립적으로 검사합니다. 현재 보유 종목, 기본 포트폴리오, 목표 비중 또는 승인된 실행 벡터로 해석하지 않습니다. 결손이 있으면 과거 날짜로 자동 대체하거나 범위를 임의로 줄이지 않습니다. VOO는 투자 랩의 가격수익률 준비 상태를 재사용하지 않고 별도의 조정종가·환율 증거를 검사합니다."} />{" "}</footer>
               </SimulationDisclosure>
             </div>);
 }
@@ -299,24 +297,21 @@ function ReadinessHistory({
             id="simulation-readiness-history-title"
             className="text-lg font-semibold"
           >
-            최근 기준일 검사
-          </h2>
+            <SimulationText ko={"최근 기준일 검사"} />{" "}</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            저장된 실행 기록이 아니라, 최근 7개 기준일을 현재 저장 증거로 다시
-            검사한 결과입니다.
-          </p>
+            <SimulationText ko={"저장된 실행 기록이 아니라, 최근 7개 기준일을 현재 저장 증거로 다시 검사한 결과입니다."} />{" "}</p>
         </div>
-        <p className="text-xs text-[var(--muted)]">날짜 자동 대체 없음</p>
+        <p className="text-xs text-[var(--muted)]"><SimulationText ko={"날짜 자동 대체 없음"} /></p>
       </div>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
           <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
             <tr>
-              <th className="px-3 py-3 font-semibold">기준일</th>
+              <th className="px-3 py-3 font-semibold"><SimulationText ko={"기준일"} /></th>
               <th className="px-3 py-3 font-semibold">KODEX 200</th>
               <th className="px-3 py-3 font-semibold">VOO</th>
-              <th className="px-3 py-3 text-right font-semibold">검사</th>
+              <th className="px-3 py-3 text-right font-semibold"><SimulationText ko={"검사"} /></th>
             </tr>
           </thead>
           <tbody>
@@ -339,8 +334,7 @@ function ReadinessHistory({
                     {formatDate(row.serviceDate)}
                     {selected ? (
                       <span className="ml-2 text-xs font-medium text-[var(--brand)]">
-                        선택됨
-                      </span>
+                        <SimulationText ko={"선택됨"} />{" "}</span>
                     ) : null}
                   </td>
                   <HistoryStatusCell input={kodex200} />
@@ -348,8 +342,7 @@ function ReadinessHistory({
                   <td className="whitespace-nowrap px-3 py-3 text-right">
                     {selected ? (
                       <span className="text-xs font-semibold text-[var(--muted)]">
-                        현재 결과
-                      </span>
+                        <SimulationText ko={"현재 결과"} />{" "}</span>
                     ) : (
                       <Link
                         href={simulationDateHref(
@@ -361,8 +354,7 @@ function ReadinessHistory({
                         )}
                         className="inline-flex rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
                       >
-                        이 날짜 검사
-                      </Link>
+                        <SimulationText ko={"이 날짜 검사"} />{" "}</Link>
                     )}
                   </td>
                 </tr>
@@ -390,14 +382,14 @@ function HistoryStatusCell({
             : "font-semibold text-[var(--warning)]"
         }
       >
-        {ready ? "준비됨" : "사용 불가"}
+        <SimulationText ko={ready ? "준비됨" : "사용 불가"} />
       </p>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        {formatHistoryCoverage(input)}
+        <SimulationText ko={formatHistoryCoverage(input)} />
       </p>
       {!ready && input?.issueLabels[0] ? (
         <p className="mt-1 max-w-[300px] text-xs leading-5 text-[var(--warning)]">
-          {input.issueLabels[0]}
+          <SimulationText ko={input.issueLabels[0]} />
         </p>
       ) : null}
     </td>
@@ -443,7 +435,7 @@ function InputPanel({
       <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] p-4">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            {input.marketLabel} · {input.currency}
+            <SimulationText ko={input.marketLabel} /> · {input.currency}
           </p>
           <h2 className="mt-1 text-xl font-semibold tracking-normal">
             {input.ticker} · {input.name}
@@ -456,7 +448,7 @@ function InputPanel({
               : "rounded-md bg-[var(--brand-wash)] px-2.5 py-1 text-xs font-semibold text-[var(--warning)]"
           }
         >
-          {ready ? "준비됨" : "사용 불가"}
+          <SimulationText ko={ready ? "준비됨" : "사용 불가"} />
         </span>
       </header>
 
@@ -512,15 +504,15 @@ function InputPanel({
 
       <div className="border-t border-[var(--line)] p-4">
         <h3 className="text-sm font-semibold">
-          {ready ? "증거 결손" : "확인할 항목"}
+          <SimulationText ko={ready ? "증거 결손" : "확인할 항목"} />
         </h3>
         {input.issues.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--brand)]">확인된 결손이 없습니다.</p>
+          <p className="mt-2 text-sm text-[var(--brand)]"><SimulationText ko={"확인된 결손이 없습니다."} /></p>
         ) : (
           <ul className="mt-2 space-y-2 text-sm text-[var(--warning)]">
             {input.issues.map((issue) => (
               <li key={`${issue.code}-${issue.dates.join("-")}`}>
-                {issue.label}
+                <SimulationText ko={issue.label} />
                 {issue.dates.length > 0
                   ? ` (${issue.dates.map(formatDate).join(", ")})`
                   : ""}
@@ -540,9 +532,8 @@ function InputPanel({
             )}
             className="mt-4 inline-flex rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
           >
-            최근 관측 기준일 {formatDate(input.nearestPriorObservedServiceDate)}
-            로 다시 검사
-          </Link>
+            <SimulationText ko={"최근 관측 기준일"} />{" "}{formatDate(input.nearestPriorObservedServiceDate)}
+            <SimulationText ko={"로 다시 검사"} />{" "}</Link>
         ) : null}
       </div>
     </article>
@@ -560,9 +551,9 @@ function SummaryItem({
 }) {
   return (
     <div className="border-[var(--line)] px-4 py-2 first:pl-0 sm:border-r sm:last:border-r-0">
-      <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
-      {detail ? <p className="mt-1 text-xs text-[var(--muted)]">{detail}</p> : null}
+      <p className="text-xs font-medium text-[var(--muted)]"><SimulationText ko={label} /></p>
+      <p className="mt-1 text-lg font-semibold"><SimulationText ko={value} /></p>
+      {detail ? <p className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></p> : null}
     </div>
   );
 }
@@ -570,8 +561,8 @@ function SummaryItem({
 function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-b border-[var(--wash)] px-4 py-3 sm:odd:border-r">
-      <dt className="text-xs font-medium text-[var(--muted)]">{label}</dt>
-      <dd className="mt-1 text-sm font-semibold">{value}</dd>
+      <dt className="text-xs font-medium text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-sm font-semibold"><SimulationText ko={value} /></dd>
     </div>
   );
 }

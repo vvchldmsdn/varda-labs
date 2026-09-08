@@ -1,5 +1,6 @@
 "use client";
 
+import { ManagementText, ManagementElement } from "@/components/i18n/management-text";
 import { useActionState } from "react";
 
 import { correctHoldingState } from "@/app/portfolio/holdings/actions";
@@ -34,16 +35,12 @@ export function HoldingStateCorrectionForm({
 
   return (
     <details className="min-w-[230px]">
-      <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]">
-        수량·평균매입가 정정
-      </summary>
+      <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]"><ManagementText>{"수량·평균매입가 정정"}</ManagementText></summary>
       <form action={action} className="mt-3 space-y-3">
         <input name="assetId" type="hidden" value={holdingId} />
         <input name="expectedUpdatedAt" type="hidden" value={updatedAt} />
 
-        <label className="block text-xs font-semibold text-[var(--ink)]">
-          현재 보유 수량
-          <input
+        <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"현재 보유 수량"}</ManagementText><input
             aria-describedby={messageId}
             className={fieldClassName}
             defaultValue={quantity}
@@ -55,9 +52,8 @@ export function HoldingStateCorrectionForm({
             type="number"
           />
         </label>
-        <label className="block text-xs font-semibold text-[var(--ink)]">
-          1좌당 평균 매입가 ({currency})
-          <input
+        <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"1좌당 평균 매입가 ("}</ManagementText>{currency})
+          <ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}
             defaultValue={averageCost ?? ""}
@@ -70,9 +66,7 @@ export function HoldingStateCorrectionForm({
             type="number"
           />
         </label>
-        <label className="block text-xs font-semibold text-[var(--ink)]">
-          정정 사유 (선택)
-          <input
+        <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"정정 사유 (선택)"}</ManagementText><ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}
             maxLength={HOLDING_STATE_CORRECTION_POLICY.reasonMaximumLength}
@@ -82,16 +76,13 @@ export function HoldingStateCorrectionForm({
           />
         </label>
 
-        <p className="text-xs leading-5 text-[var(--muted)]">
-          오입력 정정 전용입니다. 매수·매도 거래나 현금 흐름으로 기록되지
-          않습니다.
-        </p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><ManagementText>{"오입력 정정 전용입니다. 매수·매도 거래나 현금 흐름으로 기록되지 않습니다."}</ManagementText></p>
         <button
           className="w-full rounded-md bg-[var(--ink)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
           type="submit"
         >
-          {pending ? "정정 중" : "현재 상태 정정"}
+          <ManagementText>{pending ? "정정 중" : "현재 상태 정정"}</ManagementText>
         </button>
         <p
           aria-live="polite"
@@ -101,7 +92,7 @@ export function HoldingStateCorrectionForm({
           ].join(" ")}
           id={messageId}
         >
-          {state.message}
+          <ManagementText>{state.message}</ManagementText>
         </p>
       </form>
     </details>

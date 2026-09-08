@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import type { InvestmentLabCashComparison } from "@/lib/investment-lab-cash-comparison";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
@@ -14,12 +15,8 @@ export function InvestmentLabCashComparisonView({
         data-cash-comparison-status="unavailable"
         data-section="investment-lab-cash-comparison"
       >
-        <h2 className="text-lg font-semibold text-[var(--warning)]">
-          제로수익 동일흐름 기준선
-        </h2>
-        <p className="mt-2 text-sm text-[var(--warning)]">
-          동일 자금 흐름으로 제로수익 기준선을 계산할 수 없습니다.
-        </p>
+        <h2 className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 제로수익 동일흐름 기준선 " /></h2>
+        <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" 동일 자금 흐름으로 제로수익 기준선을 계산할 수 없습니다. " /></p>
       </section>
     );
   }
@@ -38,13 +35,10 @@ export function InvestmentLabCashComparisonView({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">제로수익 동일흐름 기준선</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            첫 평가액과 실제 매수·매도 원화 금액은 같게 두고, 가격 수익은
-            0%라고 가정합니다.
-          </p>
+          <h2 className="text-lg font-semibold"><LabText value="제로수익 동일흐름 기준선" /></h2>
+          <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 첫 평가액과 실제 매수·매도 원화 금액은 같게 두고, 가격 수익은 0%라고 가정합니다. " /></p>
         </div>
-        <p className="text-sm font-semibold text-[var(--brand)]">계산 완료</p>
+        <p className="text-sm font-semibold text-[var(--brand)]"><LabText value="계산 완료" /></p>
       </div>
 
       <div className="mt-4 grid gap-3 border-y border-[var(--wash)] py-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -69,8 +63,7 @@ export function InvestmentLabCashComparisonView({
       </div>
 
       {returnComparison.status === "ready" ? (
-        <p className="mt-3 text-sm text-[var(--muted)]">
-          같은 기간 실제 추정수익률 대비 차이{" "}
+        <p className="mt-3 text-sm text-[var(--muted)]"><LabText value=" 같은 기간 실제 추정수익률 대비 차이" />{" "}
           <strong
             className={
               returnComparison.differencePercentagePoints >= 0
@@ -84,10 +77,7 @@ export function InvestmentLabCashComparisonView({
           </strong>
         </p>
       ) : (
-        <p className="mt-3 text-sm text-[var(--warning)]">
-          현금 경로는 계산됐지만 실제 포트폴리오 추정수익률 근거가 부족해
-          수익률 차이는 표시하지 않습니다.
-        </p>
+        <p className="mt-3 text-sm text-[var(--warning)]"><LabText value=" 현금 경로는 계산됐지만 실제 포트폴리오 추정수익률 근거가 부족해 수익률 차이는 표시하지 않습니다. " /></p>
       )}
 
       <div className="mt-5 border-t border-[var(--wash)] pt-4">
@@ -100,11 +90,7 @@ export function InvestmentLabCashComparisonView({
         />
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        이 기준선은 모든 자산을 현금으로 바꾼 평탄한 과거선이 아니며, 현재 현금 잔액이나 추가투입 분배 계산도 아닙니다. 이자,
-        세금, 수수료, 주문 가능 여부를 반영하지 않으며 저장하거나 주문으로
-        연결하지 않습니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" 이 기준선은 모든 자산을 현금으로 바꾼 평탄한 과거선이 아니며, 현재 현금 잔액이나 추가투입 분배 계산도 아닙니다. 이자, 세금, 수수료, 주문 가능 여부를 반영하지 않으며 저장하거나 주문으로 연결하지 않습니다. " /></p>
     </section>
   );
 }
@@ -120,7 +106,7 @@ function Metric({
 }) {
   return (
     <div className="border-l-2 border-[var(--line)] pl-3">
-      <p className="text-sm text-[var(--muted)]">{label}</p>
+      <p className="text-sm text-[var(--muted)]"><LabText value={label} /></p>
       <p
         className={`mt-1 text-xl font-semibold tabular-nums ${
           tone === "positive"
@@ -130,7 +116,7 @@ function Metric({
               : "text-[var(--ink)]"
         }`}
       >
-        {value}
+        <LabText value={value} />
       </p>
     </div>
   );

@@ -1,3 +1,6 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { TenantEventSummary } from "@/components/events/tenant-event-summary";
 import { TenantEventTable } from "@/components/events/tenant-event-table";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
@@ -13,10 +16,7 @@ export function TenantHistoryEvents({
     return (
       <>
         {result.state === "partial" ? (
-          <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-            저장 근거가 일부 비어 있거나 표시 한도에 도달했습니다. 확인된
-            이벤트는 계속 표시합니다.
-          </p>
+          <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]"><T ko="저장 근거가 일부 비어 있거나 표시 한도에 도달했습니다. 확인된 이벤트는 계속 표시합니다." en="Some recorded data is missing or the display limit was reached. Verified events remain visible."/></p>
         ) : null}
         <TenantEventSummary result={result} />
         <TenantEventTable events={visibleEvents ?? result.events} />
@@ -33,7 +33,7 @@ export function TenantHistoryEvents({
 
   return (
     <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-      {message}
+      {<T ko={message} en={translateHomeHistory(message)}/>}
     </p>
   );
 }

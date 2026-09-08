@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
 import {
@@ -82,12 +83,12 @@ export function RiskDataHealth({
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <div>
-          <h3 className="text-sm font-semibold">차단 및 제외</h3>
+          <h3 className="text-sm font-semibold"><PortfolioText ko={"차단 및 제외"} /></h3>
           <BlockerList blockers={inputHealth.blockers} />
           <ExclusionTable exclusions={inputHealth.exclusions} />
         </div>
         <div>
-          <h3 className="text-sm font-semibold">Source 집계</h3>
+          <h3 className="text-sm font-semibold"><PortfolioText ko={"Source 집계"} /></h3>
           <SourceCounts
             title="Price"
             sources={inputHealth.sourceRows.price.sources}
@@ -95,7 +96,7 @@ export function RiskDataHealth({
           <SourceCounts title="FX" sources={inputHealth.sourceRows.fx.sources} />
           {inputHealth.zeroVarianceInstruments.length > 0 ? (
             <div className="mt-3 text-sm text-[var(--muted)]">
-              변동성 0 종목:{" "}
+              <PortfolioText ko={"변동성 0 종목:"} />{" "}
               {inputHealth.zeroVarianceInstruments
                 .map(displayInstrumentKey)
                 .join(", ")}
@@ -113,13 +114,13 @@ function BlockerList({
   blockers: PortfolioRiskReadModel["inputHealth"]["blockers"];
 }) {
   if (blockers.length === 0) {
-    return <RiskEmptyMessage>차단 항목이 없습니다.</RiskEmptyMessage>;
+    return <RiskEmptyMessage><PortfolioText ko={"차단 항목이 없습니다."} /></RiskEmptyMessage>;
   }
   return (
     <ul className="mt-3 space-y-2 text-sm text-[var(--negative)]">
       {blockers.map((blocker) => (
         <li key={`${blocker.reason}-${blocker.dates.join("-")}`}>
-          {blockerDescription(blocker)}
+          <PortfolioText ko={blockerDescription(blocker)} />
         </li>
       ))}
     </ul>
@@ -132,16 +133,16 @@ function ExclusionTable({
   exclusions: PortfolioRiskReadModel["inputHealth"]["exclusions"];
 }) {
   if (exclusions.length === 0) {
-    return <RiskEmptyMessage>제외된 보유 종목이 없습니다.</RiskEmptyMessage>;
+    return <RiskEmptyMessage><PortfolioText ko={"제외된 보유 종목이 없습니다."} /></RiskEmptyMessage>;
   }
   return (
     <div className="mt-3 max-w-full overflow-x-auto">
       <table className="w-full min-w-[620px] border-separate border-spacing-0">
         <thead>
           <tr>
-            <RiskTableHeader>종목</RiskTableHeader>
-            <RiskTableHeader>계좌</RiskTableHeader>
-            <RiskTableHeader>사유</RiskTableHeader>
+            <RiskTableHeader><PortfolioText ko={"종목"} /></RiskTableHeader>
+            <RiskTableHeader><PortfolioText ko={"계좌"} /></RiskTableHeader>
+            <RiskTableHeader><PortfolioText ko={"사유"} /></RiskTableHeader>
           </tr>
         </thead>
         <tbody>
@@ -153,7 +154,7 @@ function ExclusionTable({
                 {exclusion.ticker ?? exclusion.name}
               </RiskTableCell>
               <RiskTableCell>{exclusion.account}</RiskTableCell>
-              <RiskTableCell>{exclusionReasonLabel(exclusion.reason)}</RiskTableCell>
+              <RiskTableCell><PortfolioText ko={exclusionReasonLabel(exclusion.reason)} /></RiskTableCell>
             </tr>
           ))}
         </tbody>
@@ -172,7 +173,7 @@ function SourceCounts({
   const rows = Object.entries(sources);
   return (
     <div className="mt-3 border-l-2 border-[var(--line)] pl-3 text-sm">
-      <div className="font-semibold">{title}</div>
+      <div className="font-semibold"><PortfolioText ko={title} /></div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[var(--muted)]">
         {rows.length > 0
           ? rows.map(([source, count]) => (

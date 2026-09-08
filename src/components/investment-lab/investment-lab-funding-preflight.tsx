@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import type { InvestmentLabAccountCompositionScenarioId } from "@/lib/investment-lab-account-composition-contract";
 import type {
   InvestmentLabAccountFundingPreflight,
@@ -40,14 +41,11 @@ export function InvestmentLabFundingPreflightView({
       <div className="border-b border-[var(--wash)] py-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">계정별 자금 경계</h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-              각 계정의 시작 평가액과 매수·매도 흐름만 사용한 연구 경로인지
-              확인합니다.
-            </p>
+            <h2 className="text-lg font-semibold"><LabText value="계정별 자금 경계" /></h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 각 계정의 시작 평가액과 매수·매도 흐름만 사용한 연구 경로인지 확인합니다. " /></p>
           </div>
           <p className="text-sm font-semibold text-[var(--ink)]">
-            {statusLabel(model.status)}
+            <LabText value={statusLabel(model.status)} />
           </p>
         </div>
       </div>
@@ -56,10 +54,10 @@ export function InvestmentLabFundingPreflightView({
         <table className="w-full min-w-[820px] border-collapse text-left text-sm">
           <thead className="text-xs font-semibold text-[var(--muted)]">
             <tr>
-              <th className="px-4 py-3">계정</th>
+              <th className="px-4 py-3"><LabText value="계정" /></th>
               {SCENARIOS.map(([, label]) => (
                 <th className="px-3 py-3" key={label}>
-                  {label}
+                  <LabText value={label} />
                 </th>
               ))}
             </tr>
@@ -85,7 +83,7 @@ export function InvestmentLabFundingPreflightView({
           {model.accountScope === "all" ? (
             <tfoot className="border-t-2 border-[var(--line)]">
               <tr>
-                <th className="px-4 py-3 font-semibold">전체 합산</th>
+                <th className="px-4 py-3 font-semibold"><LabText value="전체 합산" /></th>
                 {SCENARIOS.map(([id]) => (
                   <td className="px-3 py-3" key={id}>
                     <Resolution value={model.aggregateScenarios[id]} />
@@ -97,12 +95,7 @@ export function InvestmentLabFundingPreflightView({
         </table>
       </div>
 
-      <p className="border-t border-[var(--wash)] py-3 text-xs leading-5 text-[var(--muted)]">
-        전체는 통과한 증권·ISA·IRP 결과의 합이며 계정 간 자금을 합쳐 계산하지
-        않습니다. 상품 매수 가능 여부, 비용, 세금, 환전 스프레드와 주문 체결은
-        아직 검증하지 않은 연구 결과입니다. 따라서 ISA·IRP의 VOO 경로도 실제
-        매수 가능성을 뜻하지 않습니다.
-      </p>
+      <p className="border-t border-[var(--wash)] py-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" 전체는 통과한 증권·ISA·IRP 결과의 합이며 계정 간 자금을 합쳐 계산하지 않습니다. 상품 매수 가능 여부, 비용, 세금, 환전 스프레드와 주문 체결은 아직 검증하지 않은 연구 결과입니다. 따라서 ISA·IRP의 VOO 경로도 실제 매수 가능성을 뜻하지 않습니다. " /></p>
     </section>
   );
 }
@@ -116,11 +109,11 @@ function Resolution({ value }: { value: InvestmentLabFundingResolution }) {
         : "text-[var(--muted)]";
   return (
     <span className={`font-semibold ${classes}`} data-resolution={value.status}>
-      {value.status === "ready"
+      <LabText value={value.status === "ready"
         ? "통과"
         : value.status === "unavailable"
           ? "제외"
-          : "미선택"}
+          : "미선택"} />
     </span>
   );
 }
