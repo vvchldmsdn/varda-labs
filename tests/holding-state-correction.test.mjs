@@ -102,9 +102,9 @@ describe("owner-scoped holding state correction", () => {
 
   it("exposes only the resource and version evidence needed by the correction form", () => {
     assert.match(querySource, /asset\.average_cost::text as average_cost/);
-    assert.match(querySource, /asset\.updated_at::text as updated_at/);
+    assert.match(querySource, /to_char\(asset\.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'\) as updated_at/);
     assert.match(querySource, /averageCost: nullableString\(row\.average_cost\)/);
-    assert.match(querySource, /updatedAt: requiredTimestamp\(row\.updated_at\)/);
+    assert.match(querySource, /updatedAt: requiredString\(row\.updated_at\)/);
     assert.doesNotMatch(querySource, /\bfetch\s*\(/);
   });
 

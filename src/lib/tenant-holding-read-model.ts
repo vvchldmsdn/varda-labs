@@ -1,4 +1,5 @@
 import type { PortfolioAnalysisScope } from "./portfolio-analysis-scope.ts";
+import { isHoldingMutationVersion } from "./holding-mutation-version.ts";
 
 export type TenantHoldingReadRow = Readonly<{
   assetId: string;
@@ -20,7 +21,7 @@ export type TenantHoldingReadRow = Readonly<{
   priceAsOf: Date | null;
   priceStatus: string | null;
   archivedAt: Date | null;
-  updatedAt: Date;
+  updatedAt: string;
 }>;
 
 export type TenantHoldingDto = Readonly<{
@@ -114,8 +115,7 @@ export function projectTenantHoldingRows(
       (row.archivedAt !== null &&
         (!(row.archivedAt instanceof Date) ||
           !Number.isFinite(row.archivedAt.getTime()))) ||
-      !(row.updatedAt instanceof Date) ||
-      !Number.isFinite(row.updatedAt.getTime())
+      !isHoldingMutationVersion(row.updatedAt)
     ) {
       excludedHoldingCount += 1;
       continue;
@@ -140,7 +140,7 @@ export function projectTenantHoldingRows(
         priceAsOf: row.priceAsOf?.toISOString() ?? null,
         priceStatus: row.priceStatus,
         archivedAt: row.archivedAt?.toISOString() ?? null,
-        updatedAt: row.updatedAt.toISOString(),
+        updatedAt: row.updatedAt,
       }),
     );
   }

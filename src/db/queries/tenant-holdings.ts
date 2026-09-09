@@ -67,7 +67,7 @@ const TENANT_HOLDING_ROWS_SQL = `
     asset.price_as_of::text as price_as_of,
     asset.price_status,
     asset.archived_at::text as archived_at,
-    asset.updated_at::text as updated_at
+    to_char(asset.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
   from public.assets as asset
   inner join public.accounts as account on asset.account_id = account.id
   where account.is_active = true
@@ -98,7 +98,7 @@ function projectTenantHoldingSqlRow(
     priceAsOf: nullableTimestamp(row.price_as_of),
     priceStatus: nullableString(row.price_status),
     archivedAt: nullableTimestamp(row.archived_at),
-    updatedAt: requiredTimestamp(row.updated_at),
+    updatedAt: requiredString(row.updated_at),
   });
 }
 
