@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   defaultLabScenario,
@@ -102,7 +105,7 @@ describe("investment lab presentation", () => {
     }
   });
 
-  it("keeps the main comparison visible and preserves dialog query state", () => {
+  it("keeps a ready comparison visible, substitutes first steps only when requested, and preserves dialog query state", async () => {
     const workspace = component("investment-lab-workspace");
     const controls = component("investment-lab-query-controls");
     assert.match(workspace, /useResearchPanelNavigation/);
@@ -110,7 +113,24 @@ describe("investment lab presentation", () => {
     assert.doesNotMatch(workspace, /router\.push|loadedPanel/);
     assert.match(workspace, /<dialog/);
     assert.match(workspace, /data-lab-workspace="integrated"/);
-    assert.match(workspace, /styles.canvas.*\{comparison\}/s);
+    const [{ InvestmentLabWorkspace }] = await importUiWithPorts([
+      "src/components/investment-lab/investment-lab-workspace.tsx",
+    ], {
+      "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+      "next/dynamic": { default: () => () => null },
+      "./research-detail-resource": { useResearchPanelNavigation: () => ({ panel: null, select() {}, query: "scope=all" }) },
+    });
+    const render = showFirstSteps => renderToStaticMarkup(createElement(InvestmentLabWorkspace, {
+      scopeKey: "all", weights: {}, comparison: createElement("p", null, "READY_COMPARISON"),
+      ...(showFirstSteps === undefined ? {} : { showFirstSteps }),
+    }));
+    for (const ready of [render(undefined), render(false)]) {
+      assert.match(ready, /class="canvas"><p>READY_COMPARISON<\/p>/);
+      assert.doesNotMatch(ready, /data-lab-first-steps/);
+    }
+    const firstSteps = render(true);
+    assert.match(firstSteps, /class="canvas"><section[^>]*data-lab-first-steps/);
+    assert.doesNotMatch(firstSteps, /READY_COMPARISON/);
     assert.doesNotMatch(workspace, /role="tablist"/);
     assert.match(controls, /\["view", "preview"\]/);
     assert.match(controls, /scroll=\{false\}/);

@@ -55,6 +55,11 @@ export function HistoryView({
     events: historyOverviewEvents(events),
     liveValuation,
   });
+  // Record insights must never treat today's display-only valuation as a saved snapshot.
+  const recordedOverview = detail ? buildHistoryOverview({
+    rows: history.portfolioRows,
+    events: historyOverviewEvents(events),
+  }) : null;
   return (
     <main
       data-page="history"
@@ -78,23 +83,23 @@ export function HistoryView({
             {liveValuation && (liveValuation.state === "partial" || liveValuation.state === "unavailable") ? <p><T ko="현재 평가 근거가 부족해 오늘 값을 추가하지 않았습니다. 저장 기록은 그대로 표시합니다." en="Today's value is unavailable because current valuation evidence is incomplete. Recorded history remains visible."/></p> : null}
           </>} details={
             <HistoryRecordsDialog key="history-records" panel={detail}>
-              {detail === "raw" ? <HistoryRawEvidence history={history} events={events} overview={buildHistoryOverview({ rows: history.portfolioRows, events: historyOverviewEvents(events) })} detailParams={detailParams} /> : detail === "records" ? (
+              {detail === "raw" && recordedOverview ? <HistoryRawEvidence history={history} events={events} overview={recordedOverview} detailParams={detailParams} /> : detail === "records" ? (
           <div className={styles.support}>
             <div className={styles.activity}>
               <HistoryActivityStream result={events} supported={eventsSupported} />
             </div>
             <LocalizedElement as="aside" en={{"aria-label": "History insights and verification sources"}} className={styles.insights} aria-label="히스토리 인사이트와 검증 근거">
-              {overview.status === "ready" ? (
-                <section className="varda-rail-section">
+              {recordedOverview?.status === "ready" ? (
+                <section className="varda-rail-section" data-history-recorded-insights="saved">
                   <h2 className="text-base font-semibold"><T ko="기록에서 발견한 변화" en="Changes in your records"/></h2>
                   <dl className="varda-rail-metrics mt-3">
-                    <RailInsight label="저장 저점" value={formatHistoryKrw(overview.lowestValueKrw)} detail={formatDisplayDate(overview.lowestDate)} />
-                    <RailInsight label="최대 상승" value={formatMovement(overview.bestMovement?.amountKrw ?? null)} detail={movementDetail(overview.bestMovement)} valueClass={tone(overview.bestMovement?.amountKrw ?? null)} />
-                    <RailInsight label="최대 하락" value={formatMovement(overview.worstMovement?.amountKrw ?? null)} detail={movementDetail(overview.worstMovement)} valueClass={tone(overview.worstMovement?.amountKrw ?? null)} />
-                    <RailInsight label="연속 움직임" value={`상승 ${overview.longestGainStreak} · 하락 ${overview.longestLossStreak}`} detail="저장점 방향 기준" />
+                    <RailInsight label="저장 저점" value={formatHistoryKrw(recordedOverview.lowestValueKrw)} detail={formatDisplayDate(recordedOverview.lowestDate)} />
+                    <RailInsight label="최대 상승" value={formatMovement(recordedOverview.bestMovement?.amountKrw ?? null)} detail={movementDetail(recordedOverview.bestMovement)} valueClass={tone(recordedOverview.bestMovement?.amountKrw ?? null)} />
+                    <RailInsight label="최대 하락" value={formatMovement(recordedOverview.worstMovement?.amountKrw ?? null)} detail={movementDetail(recordedOverview.worstMovement)} valueClass={tone(recordedOverview.worstMovement?.amountKrw ?? null)} />
+                    <RailInsight label="연속 움직임" value={`상승 ${recordedOverview.longestGainStreak} · 하락 ${recordedOverview.longestLossStreak}`} detail="저장점 방향 기준" />
                   </dl>
                 </section>
-              ) : null}
+              ) : <p className="text-sm leading-6 text-[var(--muted)]"><T ko="아직 저장된 평가 기록이 없습니다. 오늘의 현재 평가는 그래프에서 확인할 수 있으며, 저장 스냅샷이 생기면 기록 간 변화를 요약합니다." en="No saved valuations yet. Today's current value is available in the chart; changes between records will appear once snapshots are saved." /></p>}
 
               <section className="varda-rail-section">
                   <h2 className="text-sm font-medium"><T ko="저장 근거 확인" en="Check recorded sources"/></h2>

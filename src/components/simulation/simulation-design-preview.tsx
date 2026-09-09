@@ -21,7 +21,7 @@ export function SimulationDesignPreview({
         selectedScopeKey={portfolio.selectedScope.key}
         researchUniverse={null}
         ownerResearchExecution={
-          <OwnerResearchExecutionSection execution={execution} />
+          <OwnerResearchExecutionSection execution={execution} selectedScopeKey={portfolio.selectedScope.key} />
         }
 
       />

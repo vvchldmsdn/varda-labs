@@ -9,6 +9,11 @@ import { calculateSimulationPathMaxDrawdowns } from "../src/lib/simulation-path-
 import { syntheticPathMaxDrawdownInput } from "./fixtures/simulation-path-max-drawdown.mjs";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
+const linkPort = { default: ({ href, children, prefetch, ...props }) => {
+  assert.equal(prefetch, false);
+  return React.createElement("a", { ...props, href }, children);
+} };
+
 describe("beginner simulation calculation guide", () => {
   it("describes the connected bootstrap settings without conflating sample paths and full-distribution results", () => {
     const policy = SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY;
@@ -73,7 +78,7 @@ describe("beginner simulation calculation guide", () => {
     const [provider, owner] = await importUiWithPorts([
       "src/components/i18n/locale-provider.tsx",
       "src/components/simulation/owner-research-execution-section.tsx",
-    ], { "next/dynamic": { default: () => function DeferredGuide() { throw new Error("The closed guide must not render its lazy contents"); } } });
+    ], { "next/link": linkPort, "next/dynamic": { default: () => function DeferredGuide() { throw new Error("The closed guide must not render its lazy contents"); } } });
     const base = {
       id: "owner-all", name: "내 포트폴리오", account: "all", instruments: [],
       endSelection: { endServiceDate: "2026-09-01", source: "latest_common_stored" },
@@ -90,11 +95,33 @@ describe("beginner simulation calculation guide", () => {
     for (const initialLocale of ["ko", "en"]) {
       for (const execution of [ready, blocked]) {
         const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale },
-          React.createElement(owner.OwnerResearchExecutionSection, { execution }),
+          React.createElement(owner.OwnerResearchExecutionSection, { execution, selectedScopeKey: "all" }),
         ));
         assert.ok(markup.includes(initialLocale === "ko" ? "계산 과정" : "How it works"));
         assert.match(markup, new RegExp(`data-owner-research-status="${execution.status}"`));
         assert.doesNotMatch(markup, /data-calculation-guide=/);
+      }
+    }
+  });
+
+  it("gives unavailable calculations an honest next action in the selected account or group", async () => {
+    const [provider, owner] = await importUiWithPorts([
+      "src/components/i18n/locale-provider.tsx", "src/components/simulation/owner-research-execution-section.tsx",
+    ], { "next/link": linkPort, "next/dynamic": { default: () => () => null } });
+    for (const selectedScopeKey of ["account:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "portfolio:cccccccc-cccc-4ccc-8ccc-cccccccccccc"]) {
+      for (const initialLocale of ["ko", "en"]) {
+        for (const reason of ["owner_input_unavailable", "historical_evidence_not_admitted", "input_matrix_unavailable", "invalid_end_service_date", "invalid_horizon_selection"]) {
+          const execution = { status: "unavailable", reason, account: selectedScopeKey, instruments: [], endSelection: { endServiceDate: null, source: "latest_common_stored" }, coverage: { modeledInstrumentCount: 0, candidateInstrumentCount: 2, modeledCurrentValuePct: 0, omittedWeightBps: 0 } };
+          const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale }, React.createElement(owner.OwnerResearchExecutionSection, { execution, selectedScopeKey })));
+          assert.match(markup, initialLocale === "ko" ? /아직 이 구성으로 계산할 수 없습니다/ : /This portfolio cannot be simulated yet/);
+          assert.doesNotMatch(markup, /계산에 필요한 근거를 확인하고 있습니다|We are checking the evidence/);
+          const href = markup.match(/href="([^"]+)"/)?.[1];
+          assert.ok(href);
+          const url = new URL(href.replaceAll("&amp;", "&"), "https://example.test");
+          assert.equal(url.searchParams.get("scope"), selectedScopeKey);
+          assert.equal(url.pathname, reason.startsWith("invalid_") ? "/simulation" : "/portfolio/holdings");
+          if (reason === "historical_evidence_not_admitted") assert.match(markup, initialLocale === "ko" ? /과거 가격·환율/ : /Historical prices, exchange rates/);
+        }
       }
     }
   });

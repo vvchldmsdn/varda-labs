@@ -56,7 +56,7 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /PortfolioReadAccessBoundary/);
     assert.ok(
       page.indexOf("if (!resolution.ok)") <
-        page.indexOf("const modelPromise"),
+        page.indexOf("const ownerResearchPromise"),
       "simulation data reads must start only after the session boundary",
     );
     assert.match(query, /^import "server-only";/);
@@ -79,7 +79,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(page, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
     assert.match(page, /scope: selectedScope/);
     assert.match(page, /tenantContext: resolution\.tenantContext/);
-    assert.match(page, /includeResearch: false/);
+    assert.match(page, /buildSimulationPageControls/);
+    assert.doesNotMatch(page, /getReadOnlySimulationInputReadiness|modelPromise/);
     assert.match(page, /getReadOnlyTenantSimulationOwnerResearch/);
     assert.doesNotMatch(page, /requestedPanel|loadSimulationDetail|getReadOnlySimulationRegimeBootstrap/);
     assert.match(detailQuery, /^import "server-only";/);

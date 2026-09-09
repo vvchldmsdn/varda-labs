@@ -34,7 +34,6 @@ const PRODUCT_PAGES = Object.freeze([
   [
     "src/app/simulation/page.tsx",
     [
-      "getReadOnlySimulationInputReadiness({",
       "getReadOnlyTenantSimulationOwnerResearch({",
     ],
   ],

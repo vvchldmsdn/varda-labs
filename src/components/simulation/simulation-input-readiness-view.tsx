@@ -6,13 +6,13 @@ import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navig
 import { InvestmentLabDialog as SimulationDialog } from "@/components/investment-lab/investment-lab-dialog";
 import { SimulationWorkspace } from "./simulation-workspace";
 import { SimulationLink as Link, SimulationScopeTabs, SimulationDateControl } from "./simulation-query-controls";
-import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
+import type { SimulationPageControls } from "@/lib/simulation-page-controls";
 import type { PortfolioAnalysisScope, PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import { SIMULATION_RESEARCH_HORIZON_POLICY } from "@/lib/simulation-research-horizon";
 import { buildSimulationHref } from "@/lib/simulation-navigation";
 import styles from "./simulation-workspace.module.css";
 export function SimulationInputReadinessView({model, ownerResearchExecution, researchUniverse, selectedScopeKey, scopeCatalog}: {
- model: SimulationInputReadinessPageModel; ownerResearchExecution?: ReactNode; researchUniverse: string | null;
+ model: SimulationPageControls; ownerResearchExecution?: ReactNode; researchUniverse: string | null;
  selectedScopeKey: PortfolioAnalysisScopeKey; scopeCatalog: readonly PortfolioAnalysisScope[];
 }) {
  const selectedKodexWeightPct = model.fixedMixSelection.kodexWeightPct;

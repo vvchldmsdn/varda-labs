@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { SimulationText } from "@/components/simulation/simulation-text";
+import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import type { SimulationOwnerResearchExecutionResult } from "@/lib/simulation-owner-research-execution";
 import { InvestmentLabDialog as SimulationDialog } from "@/components/investment-lab/investment-lab-dialog";
 import { CalculationGuideDialog } from "@/components/explanations/calculation-guide-dialog";
@@ -15,8 +17,10 @@ type ReadyExecution = Extract<
 
 export function OwnerResearchExecutionSection({
   execution,
+  selectedScopeKey,
 }: {
   execution: SimulationOwnerResearchExecutionResult;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   return (
     <section
@@ -184,12 +188,31 @@ export function OwnerResearchExecutionSection({
           className="my-8 flex min-h-64 flex-col justify-center border-y border-[var(--line)]"
         >
           <p className="text-xl font-medium">
-            <SimulationText ko={"계산에 필요한 근거를 확인하고 있습니다."} />{" "}</p>
+            <SimulationText ko="아직 이 구성으로 계산할 수 없습니다." en="This portfolio cannot be simulated yet." /></p>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-            <SimulationText ko={unavailableReasonLabel(execution.reason)} />
+            <SimulationText {...unavailableReasonLabel(execution.reason)} />
           </p>
-          <p className="mt-2 text-xs leading-6 text-[var(--warning)]">
-            <SimulationText ko={"모형·데이터에서 종목별 누락과 출처를 확인할 수 있습니다. 부족한 값을 0이나 예시 경로로 대체하지 않습니다."} />{" "}</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            {execution.reason === "invalid_end_service_date" || execution.reason === "invalid_horizon_selection" ? (
+              <SimulationText ko="최신 공통 기준일과 기본 기간으로 돌아가 다시 계산할 수 있습니다." en="Return to the latest common date and default period to recalculate." />
+            ) : (
+              <SimulationText ko="종목 관리에서 현재 가격과 과거 가격의 준비 상태를 확인하세요. 내 가입 전 시장 이력도 사용할 수 있으며, 개인 투자 기록이 쌓일 때까지 기다릴 필요는 없습니다." en="Check current prices and historical data readiness in holdings. Market history from before signup can be used; you do not need to wait for personal investment records." />
+            )}
+          </p>
+          <Link
+            href={buildPortfolioAnalysisScopeHref(
+              execution.reason === "invalid_end_service_date" || execution.reason === "invalid_horizon_selection" ? "/simulation" : "/portfolio/holdings",
+              selectedScopeKey,
+            )}
+            prefetch={false}
+            className="mt-5 inline-flex min-h-11 w-fit items-center rounded-full bg-[var(--ink)] px-5 py-2 text-sm font-medium text-[var(--paper)] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
+          >
+            {execution.reason === "invalid_end_service_date" || execution.reason === "invalid_horizon_selection" ? (
+              <SimulationText ko="기본 조건으로 다시 계산" en="Recalculate with default settings" />
+            ) : (
+              <SimulationText ko="종목·분석 데이터 확인" en="Check holdings and analysis data" />
+            )}
+          </Link>
         </div>
       )}
     </section>
@@ -274,7 +297,11 @@ function unavailableReasonLabel(
     summary_blocked:
       "경로는 계산했지만 분포·위험 요약 검증을 통과하지 못했습니다.",
   } as const;
-  return labels[reason];
+  if (reason === "historical_evidence_not_admitted") return {
+    ko: "종목별 과거 가격·환율의 출처와 날짜별 연결 근거가 부족합니다.",
+    en: "Historical prices, exchange rates or their source and date alignment are incomplete.",
+  };
+  return { ko: labels[reason] };
 }
 
 function endSourceLabel(
