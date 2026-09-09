@@ -1,4 +1,5 @@
 import "server-only";
+import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
 
 import {
   buildCronMarketCyclePlan,
@@ -98,6 +99,8 @@ export type CronMarketCycleRunResult = {
 type CronMarketCycleOptions = { now?: Date; cronScheduleUtc?: string | null };
 
 export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): Promise<CronMarketCycleRunResult> {
+  // Drain even when today's cycle was already completed; preserve snapshot ordering.
+  scheduleMarketCollection();
   try {
     // All close groups and the following live refresh share one internal lease.
     return await withKisRefreshLease(() => runMarketCycleWithLease(options));

@@ -5,6 +5,7 @@ import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-
 import { getReadOnlyTenantAdditionalContributionPreviewForScope } from "@/db/queries/additional-contribution";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { getContributionMarketContext } from "@/db/queries/contribution-market-context";
 
 export const dynamic = "force-dynamic";
 
@@ -87,17 +88,21 @@ export default async function AdditionalContributionPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  const preview = await getReadOnlyTenantAdditionalContributionPreviewForScope({
-    cashAmountKrw: amountKrw,
-    scope: selectedScope,
-    tenantContext: resolution.tenantContext,
-  });
+  const [preview, marketContext] = await Promise.all([
+    getReadOnlyTenantAdditionalContributionPreviewForScope({
+      cashAmountKrw: amountKrw,
+      scope: selectedScope,
+      tenantContext: resolution.tenantContext,
+    }),
+    getContributionMarketContext(new Date(generatedAt)),
+  ]);
 
   return (
     <AdditionalContributionPageView
       amountKrw={amountKrw}
       generatedAt={generatedAt}
       preview={preview}
+      marketContext={marketContext}
       scopes={scopeContext.catalog.scopes}
       selectedScope={selectedScope}
     />

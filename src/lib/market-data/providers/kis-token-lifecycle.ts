@@ -8,6 +8,7 @@ export type KisReusableToken = Readonly<{
 
 export type KisTokenSession = {
   tokenCache: KisReusableToken | null;
+  tokenFailure?: Readonly<{ cacheKey: string; retryAt: number }> | null;
   tokenRequest?: Readonly<{
     cacheKey: string;
     promise: Promise<KisReusableToken>;
@@ -20,8 +21,22 @@ type IssuedKisToken = Readonly<{
 }>;
 
 const MINIMUM_REMAINING_VALIDITY_MS = 60_000;
+const MINIMUM_FAILURE_COOLDOWN_MS = 60_000;
+const MAXIMUM_FAILURE_COOLDOWN_MS = 60 * 60_000;
 const memoryTokenCaches = new Map<string, KisReusableToken>();
 const inFlightTokenRequests = new Map<string, Promise<KisReusableToken>>();
+// Only retry timing is cached, never provider error bodies or credentials.
+const memoryTokenFailures = new Map<string, number>();
+
+export class KisTokenCooldownError extends Error {
+  readonly code = "provider_token_cooldown";
+  readonly retryAfterSeconds: number;
+  constructor(retryAt: number, now: number) {
+    super("KIS token issuance is temporarily cooling down");
+    this.name = "KisTokenCooldownError";
+    this.retryAfterSeconds = Math.max(1, Math.ceil((retryAt - now) / 1000));
+  }
+}
 
 export async function getReusableKisAccessToken({
   cacheKey,
@@ -62,9 +77,21 @@ export async function getReusableKisAccessToken({
       session.tokenCache = token;
       return token.accessToken;
     }
+
+    const retryAt = memoryTokenFailures.get(cacheKey);
+    if (retryAt !== undefined) {
+      if (retryAt > currentTime) throw new KisTokenCooldownError(retryAt, currentTime);
+      memoryTokenFailures.delete(cacheKey);
+    }
   }
 
-  const request = issueToken().then((issued) => {
+  const previousFailure = session.tokenFailure;
+  if (previousFailure?.cacheKey === cacheKey && previousFailure.retryAt > currentTime) {
+    throw new KisTokenCooldownError(previousFailure.retryAt, currentTime);
+  }
+  session.tokenFailure = null;
+
+  const request = Promise.resolve().then(issueToken).then((issued) => {
     const expiresInSeconds = Number.isFinite(issued.expiresInSeconds) &&
       issued.expiresInSeconds > 0
       ? issued.expiresInSeconds
@@ -75,8 +102,27 @@ export async function getReusableKisAccessToken({
       expiresAt: now() + expiresInSeconds * 1000,
     });
 
-    if (policy === "memory_cache") memoryTokenCaches.set(cacheKey, token);
+    session.tokenFailure = null;
+    if (policy === "memory_cache") {
+      memoryTokenCaches.set(cacheKey, token);
+      memoryTokenFailures.delete(cacheKey);
+    }
     return token;
+  }).catch((error: unknown) => {
+    const requestedSeconds = typeof error === "object" && error !== null && "retryAfterSeconds" in error
+      ? Number(error.retryAfterSeconds) : 0;
+    const retryDelay = Math.min(MAXIMUM_FAILURE_COOLDOWN_MS, Math.max(MINIMUM_FAILURE_COOLDOWN_MS,
+      Number.isFinite(requestedSeconds) && requestedSeconds > 0 ? requestedSeconds * 1000 : 0));
+    const retryAt = now() + retryDelay;
+    session.tokenFailure = Object.freeze({ cacheKey, retryAt });
+    if (policy === "memory_cache") {
+      // Expired failures are disposable. Keep the process-local safety net bounded
+      // even if a future caller supplies many distinct credential scopes.
+      for (const [key, expiration] of memoryTokenFailures) if (expiration <= now()) memoryTokenFailures.delete(key);
+      memoryTokenFailures.set(cacheKey, retryAt);
+      if (memoryTokenFailures.size > 64) memoryTokenFailures.delete(memoryTokenFailures.keys().next().value!);
+    }
+    throw error;
   });
 
   session.tokenRequest = Object.freeze({ cacheKey, promise: request });

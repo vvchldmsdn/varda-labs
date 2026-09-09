@@ -1,4 +1,5 @@
 import "server-only";
+import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
@@ -556,6 +557,7 @@ async function runMarketPriceSyncWithLease(options: MarketPriceSyncOptions): Pro
       })
       .where(eq(marketDataSyncRuns.id, run.id));
 
+    if (isProviderCollectionDeferred(error)) throw error;
     throw new PriceSyncError(safeError, run.id);
   }
 }

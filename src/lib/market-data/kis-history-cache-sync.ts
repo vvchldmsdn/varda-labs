@@ -1,4 +1,5 @@
 import "server-only";
+import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 
 import { eq } from "drizzle-orm";
 
@@ -218,6 +219,7 @@ export async function runKisHistoryCacheSync(options: {
         },
       })
       .where(eq(marketDataSyncRuns.id, run.id));
+    if (isProviderCollectionDeferred(error)) throw error;
     throw new KisHistoryCacheSyncError(message, run.id);
   }
 }

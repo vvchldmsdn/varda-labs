@@ -401,11 +401,15 @@ export const TENANT_WRITER_REGISTRY = [
       "/portfolio/holdings/new#createHoldingBatch",
     ],
     implementationPaths: [
+      "src/lib/market-data/provider-budget.ts",
+      "src/lib/market-data/collection-queue.ts",
       "src/lib/holding-onboarding-write.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/price-sync.ts",
     ],
     targets: [
+      adminTarget("market_provider_budgets", "insert", "update"),
+      adminTarget("market_collection_jobs", "insert", "update", "delete"),
       userTarget("portfolio_groups", "insert"),
       userTarget("assets", "insert"),
       userTarget("holding_onboarding_evidence", "insert"),
@@ -559,9 +563,11 @@ export const TENANT_WRITER_REGISTRY = [
     authorization: "migration_cli",
     entrypoints: ["scripts/complete-investment-lab-stress-history.ts"],
     implementationPaths: [
+      "src/lib/market-data/provider-budget.ts",
       "scripts/complete-investment-lab-stress-history.ts",
     ],
     targets: [
+      adminTarget("market_provider_budgets", "insert", "update"),
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
       sharedTarget("fx_rates", "insert"),
@@ -584,12 +590,14 @@ export const TENANT_WRITER_REGISTRY = [
       "/api/admin/market/prices/history",
     ],
     implementationPaths: [
+      "src/lib/market-data/provider-budget.ts",
       "src/lib/market-data/price-sync.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/kis-history-cache-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
     ],
     targets: [
+      adminTarget("market_provider_budgets", "insert", "update"),
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("live_price_quotes", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
@@ -609,12 +617,16 @@ export const TENANT_WRITER_REGISTRY = [
     authorization: "server_verified_session",
     entrypoints: ["/api/portfolio/live-prices/sync"],
     implementationPaths: [
+      "src/lib/market-data/provider-budget.ts",
+      "src/lib/market-data/collection-queue.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/price-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
       "src/lib/market-data/fx-refresh-job.ts",
     ],
     targets: [
+      adminTarget("market_provider_budgets", "insert", "update"),
+      adminTarget("market_collection_jobs", "insert", "update", "delete"),
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("live_price_quotes", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
@@ -638,11 +650,15 @@ export const TENANT_WRITER_REGISTRY = [
       "/portfolio/first-look#prepareHoldingAnalysisData",
     ],
     implementationPaths: [
+      "src/lib/market-data/provider-budget.ts",
+      "src/lib/market-data/collection-queue.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/kis-history-cache-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
     ],
     targets: [
+      adminTarget("market_provider_budgets", "insert", "update"),
+      adminTarget("market_collection_jobs", "insert", "update", "delete"),
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
     ],
@@ -688,6 +704,8 @@ export const TENANT_WRITER_REGISTRY = [
     authorization: "machine_admin",
     entrypoints: ["/api/cron/market-cycle/run"],
     implementationPaths: [
+      "src/lib/market-data/provider-budget.ts",
+      "src/lib/market-data/collection-queue.ts",
       "src/lib/cron-market-cycle-run-repository.ts",
       "src/lib/market-data/core-market-factor-refresh-job.ts",
       "src/lib/market-data/fx-refresh-job.ts",
@@ -697,6 +715,8 @@ export const TENANT_WRITER_REGISTRY = [
       "src/lib/snapshots/daily.ts",
     ],
     targets: [
+      adminTarget("market_provider_budgets", "insert", "update"),
+      adminTarget("market_collection_jobs", "insert", "update", "delete"),
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("global_market_factors", "insert"),
       sharedTarget("fx_rates", "insert", "update"),

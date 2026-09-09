@@ -106,6 +106,36 @@ describe("portfolio structure read model", () => {
     assertNoInternalIds(result);
   });
 
+  it("never borrows asset provenance to fill a live quote's missing source or observation time", () => {
+    const result = buildPortfolioStructure({
+      assets: [asset({ priceSource: "kis", priceAsOf: "2026-09-09T06:00:00Z", priceFetchedAt: "2026-09-09T06:00:00Z" })],
+      liveQuotes: [quote({ source: null, fetchedAt: null, priceAsOf: null })],
+      usdKrwRate: 1500,
+      selectedAccount: "brokerage",
+    });
+    const holding = result.holdingRows[0];
+    assert.equal(holding.currentPrice, 100);
+    assert.equal(holding.priceEvidenceSource, "live_price_quote");
+    assert.equal(holding.priceSource, null);
+    assert.equal(holding.priceAsOf, null);
+    assert.equal(holding.priceFetchedAt, null);
+  });
+
+  it("keeps fallback price and timestamps from the same asset when a quote is unusable", () => {
+    const result = buildPortfolioStructure({
+      assets: [asset({ priceSource: "manual_cache", priceAsOf: "2026-09-01T06:00:00Z", priceFetchedAt: "2026-09-01T07:00:00Z" })],
+      liveQuotes: [quote({ price: 0, priceAsOf: "2026-09-09T06:00:00Z", fetchedAt: "2026-09-09T06:00:00Z" })],
+      usdKrwRate: 1500,
+      selectedAccount: "brokerage",
+    });
+    const holding = result.holdingRows[0];
+    assert.equal(holding.currentPrice, 90);
+    assert.equal(holding.priceEvidenceSource, "asset_current_price_fallback");
+    assert.equal(holding.priceSource, "manual_cache");
+    assert.equal(holding.priceAsOf, "2026-09-01T06:00:00.000Z");
+    assert.equal(holding.priceFetchedAt, "2026-09-01T07:00:00.000Z");
+  });
+
   it("computes USD valuation with stored FX", () => {
     const result = buildPortfolioStructure({
       assets: [

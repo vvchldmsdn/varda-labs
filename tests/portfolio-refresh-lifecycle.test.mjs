@@ -116,7 +116,10 @@ describe("portfolio refresh lifecycle", () => {
     h.runMountTimer();
     await settle();
     assert.equal(h.requests.length, 1);
-    assert.deepEqual({ ...h.requests[0].options, body: JSON.parse(h.requests[0].options.body) }, {
+    const { signal, ...requestOptions } = h.requests[0].options;
+    assert.ok(signal instanceof AbortSignal, "refresh requests must have an abort deadline");
+    assert.equal(signal.aborted, false);
+    assert.deepEqual({ ...requestOptions, body: JSON.parse(requestOptions.body) }, {
       method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: { reason: "page_view" },
     });
     assert.equal(h.requests[0].url, "/api/portfolio/live-prices/sync");

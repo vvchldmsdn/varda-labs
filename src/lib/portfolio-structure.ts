@@ -342,9 +342,9 @@ function buildHoldingCandidate({
         memberAllocationRatioPct,
       }),
       priceEvidenceSource,
-      priceSource: quote?.source ?? asset.priceSource ?? null,
-      priceFetchedAt: timestampString(quote?.fetchedAt ?? asset.priceFetchedAt),
-      priceAsOf: timestampString(quote?.priceAsOf ?? asset.priceAsOf),
+      priceSource: (priceEvidenceSource === "live_price_quote" ? quote?.source : asset.priceSource) ?? null,
+      priceFetchedAt: timestampString(priceEvidenceSource === "live_price_quote" ? quote?.fetchedAt : asset.priceFetchedAt),
+      priceAsOf: timestampString(priceEvidenceSource === "live_price_quote" ? quote?.priceAsOf : asset.priceAsOf),
     },
   };
 }

@@ -1,6 +1,10 @@
 /** UI-only translations for validated management action messages.
  * Business results and persisted values remain in their original form. */
 export const managementActionEnglish: Readonly<Record<string, string>> = {
+  "준비 요청이 대기 중입니다. 과거 가격 준비를 눌러 다시 확인할 수 있습니다.": "Preparation is still pending. Select Prepare history to check again.",
+  "가격 확인 요청을 접수했습니다. 잠시 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요.": "Price lookup queued. Save again shortly, or enter the current price per unit.",
+  "과거 가격 준비를 접수했습니다. 저장된 범위부터 분석하며 준비 상황을 자동으로 확인합니다.": "Price history queued. Available records remain usable while preparation is checked automatically.",
+  "과거 가격 준비 요청을 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.": "Could not queue price history. Please try again shortly.",
   "보유 계좌를 다시 확인해 주세요.": "Check the holding account again.",
   "검색 결과에서 종목을 다시 선택해 주세요.": "Select the instrument from the search results again.",
   "종목 가격을 확인하지 못했습니다. 잠시 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요.": "The price could not be verified. Try saving again shortly or enter a current price per unit.",

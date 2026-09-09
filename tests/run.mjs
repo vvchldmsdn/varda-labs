@@ -1,4 +1,9 @@
 import "./market-calendar.test.mjs";
+import "./market-collection.test.mjs";
+import "./contribution-market-context.test.mjs";
+import "./contribution-adjustment-ui.test.mjs";
+import "./additional-contribution-cash-reserve.test.mjs";
+import "./additional-contribution-ma120-freshness.test.mjs";
 import "./onboarding-instrument-search.test.mjs";
 import "./first-portfolio-analysis.test.mjs";
 import "./holding-history-preparation-lease.test.mjs";

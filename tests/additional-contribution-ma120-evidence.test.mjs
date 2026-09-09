@@ -251,6 +251,8 @@ describe("additional contribution MA120 evidence Phase 2A", () => {
       instrumentKey: "korea:KRW:069500",
       asOfPriceDate: rows.at(-1).priceDate,
       comparisonPrice: 120,
+      comparisonPriceAsOf: `${rows.at(-1).priceDate}T06:00:00Z`,
+      evaluatedAt: `${rows.at(-1).priceDate}T06:00:00Z`,
       priceBasis: "private_kis_raw_close",
       observations: rows,
     });
@@ -271,6 +273,8 @@ describe("additional contribution MA120 evidence Phase 2A", () => {
       asOfPriceDate: "2026-07-12",
       comparisonPrice: 100,
       priceBasis: "legacy_asset_ma120",
+      comparisonPriceAsOf: "2026-07-12T06:00:00Z",
+      evaluatedAt: "2026-07-12T06:00:00Z",
       observations: [],
     });
 

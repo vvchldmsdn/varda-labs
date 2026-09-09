@@ -2,9 +2,10 @@ import {
   allocateAdditionalContribution,
   type AdditionalContributionBlockerReason,
 } from "./additional-contribution-allocator.ts";
-import type {
-  AdditionalContributionMa120OperationalEvidence,
-  AdditionalContributionMa120OperationalPriceBasis,
+import {
+  ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY,
+  type AdditionalContributionMa120OperationalEvidence,
+  type AdditionalContributionMa120OperationalPriceBasis,
 } from "./additional-contribution-ma120-operational-evidence.ts";
 import {
   ADDITIONAL_CONTRIBUTION_MA120_OVERLAY_POLICY,
@@ -390,7 +391,7 @@ export function additionalContributionMa120ReadFailure(
   suppliedHoldingCount: number,
 ): AdditionalContributionMa120ReadPort {
   return Object.freeze({
-    policyVersion: "additional_contribution_ma120_operational_evidence_v1",
+    policyVersion: ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.version,
     allocationEffect: "bounded_overlay",
     status: "read_failed",
     suppliedHoldingCount,
@@ -442,6 +443,11 @@ function compactMa120Evidence(
     ma120: row.evidence?.ma120 ?? null,
     distanceFromMaPct: row.evidence?.distanceFromMaPct ?? null,
     unavailableReason: row.unavailableReason,
+    blockers: row.evidence?.blockers ?? Object.freeze([]),
+    comparisonPriceAsOf: row.evidence?.comparisonPriceAsOf ?? null,
+    comparisonPriceAgeHours: row.evidence?.comparisonPriceAgeHours ?? null,
+    historyAgeCalendarDays: row.evidence?.historyAgeCalendarDays ?? null,
+    evaluatedAt: row.evidence?.evaluatedAt ?? null,
   });
 }
 

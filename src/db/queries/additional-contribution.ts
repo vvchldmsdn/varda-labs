@@ -59,6 +59,7 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
     currentUniverse,
     structure,
     ma120Mode: resolvedMa120Mode,
+    now,
   });
 }
 
@@ -70,6 +71,7 @@ async function buildLegacyPreviewFromEvidence({
   currentUniverse,
   structure,
   ma120Mode,
+  now,
 }: {
   account: string;
   cashAmountKrw: number;
@@ -78,6 +80,7 @@ async function buildLegacyPreviewFromEvidence({
   currentUniverse: Awaited<ReturnType<typeof getReadOnlyTenantTargetPolicyHoldingUniverse>>;
   structure: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioStructure>>;
   ma120Mode: AdditionalContributionMa120OverlayMode;
+  now: Date;
 }) {
   const preview = buildAdditionalContributionPreview({
     account,
@@ -94,6 +97,7 @@ async function buildLegacyPreviewFromEvidence({
     ma120Read = await getReadOnlyTenantAdditionalContributionMa120Evidence({
       holdings: structure.holdingRows,
       serviceDate,
+      now,
     });
   } catch {
     ma120Read = additionalContributionMa120ReadFailure(
@@ -182,6 +186,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
         holdingRows: [...model.ma120HoldingRows],
       },
       ma120Mode,
+      now,
     });
     return adaptLegacyPreview({
       model,
@@ -202,6 +207,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     ma120Read = await getReadOnlyTenantAdditionalContributionMa120Evidence({
       holdings: model.ma120HoldingRows,
       serviceDate,
+      now,
     });
   } catch {
     ma120Read = additionalContributionMa120ReadFailure(model.rows.length);
@@ -456,6 +462,12 @@ function compactMa120Evidence(
     latestWindowPriceDate: row.evidence?.latestWindowPriceDate ?? null,
     ma120: row.evidence?.ma120 ?? null,
     distanceFromMaPct: row.evidence?.distanceFromMaPct ?? null,
+    unavailableReason: row.unavailableReason,
+    blockers: row.evidence?.blockers ?? Object.freeze([]),
+    comparisonPriceAsOf: row.evidence?.comparisonPriceAsOf ?? null,
+    comparisonPriceAgeHours: row.evidence?.comparisonPriceAgeHours ?? null,
+    historyAgeCalendarDays: row.evidence?.historyAgeCalendarDays ?? null,
+    evaluatedAt: row.evidence?.evaluatedAt ?? null,
   });
 }
 
@@ -467,6 +479,7 @@ function unavailableMa120Evidence() {
     latestWindowPriceDate: null,
     ma120: null,
     distanceFromMaPct: null,
+    unavailableReason: "evidence_row_missing",
   });
 }
 
