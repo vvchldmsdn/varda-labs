@@ -39,7 +39,7 @@ const BROKERAGE = Object.freeze({
   priceAsOf: new Date("2026-07-09T04:20:00.000Z"),
   priceStatus: "ok",
   archivedAt: null,
-  updatedAt: new Date("2026-08-16T01:02:03.000Z"),
+  updatedAt: "2026-08-16T01:02:03.000Z",
 });
 
 const ISA = Object.freeze({
@@ -128,6 +128,19 @@ describe("tenant holding read model", () => {
 
     assert.equal(result.state, "ready");
     assert.equal(result.holdings[0]?.ticker, null);
+  });
+
+  it("preserves six-digit mutation versions and rejects lossy or malformed versions", () => {
+    const updatedAt = "2026-09-10T01:02:03.123456Z";
+    const result = projectTenantHoldingRows([{ ...BROKERAGE, updatedAt }], ALL_SCOPE);
+    assert.equal(result.state, "ready");
+    assert.equal(result.holdings[0].updatedAt, updatedAt);
+    for (const invalid of [new Date(updatedAt), "2026-09-10T01:02:03.1234567Z", "2026-02-30T01:02:03.123456Z"]) {
+      const rejected = projectTenantHoldingRows([{ ...BROKERAGE, updatedAt: invalid }], ALL_SCOPE);
+      assert.equal(rejected.state, "partial");
+      assert.equal(rejected.excludedHoldingCount, 1);
+      assert.equal(rejected.holdings.length, 0);
+    }
   });
 
   it("fails closed for account relation or selected-scope drift", () => {

@@ -133,7 +133,7 @@ async function runAtomicLifecycle({
       ownerUserId,
       input.assetId,
       input.expectedUpdatedAt,
-      serviceDate,
+      ...(operation === "archive" ? [serviceDate] : []),
       occurredAt,
       input.reason,
       HOLDING_LIFECYCLE_POLICY.version,
@@ -268,7 +268,7 @@ with lock_acquired as materialized (
   set
     archived_at = null,
     updated_at = greatest(
-      $6::timestamptz,
+      $5::timestamptz,
       existing.updated_at + interval '1 millisecond'
     )
   from existing_asset existing
@@ -288,7 +288,7 @@ with lock_acquired as materialized (
     $2::uuid, existing.id, existing.account_id, 'restored',
     existing.archived_at, changed.archived_at,
     existing.updated_at, changed.updated_at,
-    $7::text, $8::varchar, changed.updated_at
+    $6::text, $7::varchar, changed.updated_at
   from existing_asset existing
   join changed on changed.id = existing.id
   returning id
