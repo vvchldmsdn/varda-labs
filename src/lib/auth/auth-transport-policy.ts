@@ -22,6 +22,7 @@ export const AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS = Object.freeze([
   Object.freeze({ method: "POST", path: Object.freeze(["sign-in", "email"]) }),
   Object.freeze({ method: "POST", path: Object.freeze(["sign-up", "email"]) }),
   Object.freeze({ method: "POST", path: Object.freeze(["send-verification-email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["email-otp", "verify-email"]) }),
   Object.freeze({ method: "POST", path: Object.freeze(["request-password-reset"]) }),
   Object.freeze({ method: "POST", path: Object.freeze(["reset-password"]) }),
 ] as const);

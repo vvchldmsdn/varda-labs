@@ -15,6 +15,7 @@ import {
   AUTH_PASSWORD_RESET_PATH,
 } from "../src/lib/auth/auth-methods.ts";
 import { readBoundedAuthBody } from "../src/lib/auth/auth-request-validation.ts";
+import { isAuthTransportApiRequestAllowed } from "../src/lib/auth/auth-transport-policy.ts";
 import { authErrorMessage } from "../src/lib/auth/auth-error-message.ts";
 import { createNaverAuthConfig } from "../src/lib/auth/naver-auth-config.ts";
 import {
@@ -58,6 +59,7 @@ const acceptedBodies = new Map([
     "send-verification-email",
     { email: EMAIL, callbackURL: AUTH_EMAIL_VERIFIED_PATH },
   ],
+  ["email-otp/verify-email", { email: EMAIL, otp: "012345" }],
   [
     "request-password-reset",
     { email: EMAIL, redirectTo: AUTH_PASSWORD_RESET_PATH },
@@ -375,6 +377,112 @@ describe("reviewed email and social authentication", () => {
       isGitHubAuthEnabled({ VARDA_AUTH_GITHUB_ENABLED: "true" }),
       true,
     );
+  });
+});
+
+describe("numeric email ownership verification", () => {
+  const route = "email-otp/verify-email";
+  const path = route.split("/");
+
+  it("preserves all six digits and remains subject to the existing email method gate", async () => {
+    for (const otp of ["000000", "012345", "999999"]) {
+      const reviewed = await createReviewedAuthRequest(
+        authRequest(route, { email: ` ${EMAIL} `, otp }),
+        path,
+      );
+      assert.ok(reviewed);
+      assert.equal(reviewed.kind, "email");
+      assert.equal(reviewed.socialProvider, null);
+      assert.deepEqual(await reviewed.request.json(), { email: EMAIL, otp });
+      assert.equal(isAuthTransportApiRequestAllowed({ method: "POST", path }), true);
+    }
+  });
+
+  it("rejects missing, non-string, non-ASCII, padded and incorrectly sized codes", async () => {
+    for (const otp of [
+      undefined, null, 123456, ["123456"], { code: "123456" },
+      "", "12345", "1234567", "12345a", "１２３４５６", "١٢٣٤٥٦",
+      " 123456", "123456 ", "123456\n", "123\u0000456",
+    ]) {
+      assert.equal(
+        await createReviewedAuthRequest(authRequest(route, { email: EMAIL, otp }), path),
+        null,
+      );
+    }
+    for (const email of [undefined, null, "", "not-an-email", "a".repeat(255) + "@example.invalid"]) {
+      assert.equal(
+        await createReviewedAuthRequest(authRequest(route, { email, otp: "123456" }), path),
+        null,
+      );
+    }
+  });
+
+  it("does not accept identity claims, redirects, verification purpose or sign-in options", async () => {
+    for (const extra of [
+      { emailVerified: true }, { ownerUserId: "another-owner" },
+      { userId: "another-user" }, { role: "admin" },
+      { callbackURL: "/auth/session" }, { redirectTo: "https://attacker.example.invalid" },
+      { type: "sign-in" }, { rememberMe: true }, { password: PASSWORD },
+    ]) {
+      assert.equal(
+        await createReviewedAuthRequest(
+          authRequest(route, { email: EMAIL, otp: "123456", ...extra }), path,
+        ),
+        null,
+      );
+    }
+  });
+
+  it("keeps same-origin, JSON, no-query and bounded-body checks on verification", async () => {
+    const body = { email: EMAIL, otp: "123456" };
+    for (const headers of [
+      { origin: "https://attacker.example.invalid" }, { origin: "null" },
+      { origin: "" }, { "sec-fetch-site": "cross-site" },
+      { "content-type": "text/plain" }, { "content-length": "4097" },
+    ]) {
+      assert.equal(await createReviewedAuthRequest(authRequest(route, body, headers), path), null);
+    }
+    assert.equal(
+      await createReviewedAuthRequest(authRequest(route, body, {}, "?otp=123456"), path),
+      null,
+    );
+    for (const method of ["GET", "PUT", "PATCH", "DELETE"]) {
+      assert.equal(isAuthTransportApiRequestAllowed({ method, path }), false);
+      const request = new Request(`${ORIGIN}/api/auth/${route}`, {
+        method,
+        headers: { origin: ORIGIN, "content-type": "application/json" },
+        ...(method === "GET" ? {} : { body: JSON.stringify(body) }),
+      });
+      assert.equal(await createReviewedAuthRequest(request, path), null);
+    }
+    assert.equal(
+      await createReviewedAuthRequest(
+        authRequest(route, { email: EMAIL, otp: "0".repeat(4097) }), path,
+      ),
+      null,
+    );
+    assert.equal(
+      await createReviewedAuthRequest(authRequest("email-otp/verify-email/extra", body), path),
+      null,
+    );
+  });
+
+  it("does not enable passwordless sign-in or other email OTP plugin endpoints", async () => {
+    for (const blocked of [
+      "sign-in/email-otp", "email-otp/send-verification-otp",
+      "email-otp/check-verification-otp", "email-otp/passcode",
+      "email-otp/request-password-reset", "email-otp/reset-password",
+      "email-otp/request-email-change", "email-otp/change-email",
+    ]) {
+      const blockedPath = blocked.split("/");
+      assert.equal(isAuthTransportApiRequestAllowed({ method: "POST", path: blockedPath }), false);
+      assert.equal(
+        await createReviewedAuthRequest(
+          authRequest(blocked, { email: EMAIL, otp: "123456" }), blockedPath,
+        ),
+        null,
+      );
+    }
   });
 });
 

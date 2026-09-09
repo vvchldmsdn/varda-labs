@@ -25,6 +25,25 @@ export const authEnglish: Readonly<Record<string,string>> = {
   "비밀번호 찾기": "Forgot password",
   "가입한 이메일로 재설정 링크를 보내드립니다.": "We will send a reset link to your registered email.",
   "이메일 인증": "Verify email",
+  "메일로 받은 숫자 코드로 이메일을 확인해 주세요.": "Verify your email with the numeric code from your inbox.",
+  "인증 코드 요청": "Request verification code",
+  "인증 코드 확인": "Verify your code",
+  "인증 코드": "Verification code",
+  "이메일의 인증 코드를 입력해 주세요": "Enter the code from your email",
+  "메일에 있는 6자리 숫자를 입력해 주세요. 만료된 코드는 다시 요청할 수 있습니다.": "Enter the 6-digit code from your email. Request a new code if it has expired.",
+  "6자리 숫자": "6-digit code",
+  "인증하고 계속": "Verify and continue",
+  "이미 받은 코드 입력": "I already have a code",
+  "인증 코드 재전송": "Resend verification code",
+  "인증 코드를 요청했습니다. 해당 이메일의 미인증 계정이 있다면 메일이 발송됩니다. 스팸함도 확인해 주세요.": "Code requested. If this email has an unverified account, an email will be sent. Check your spam folder too.",
+  "이메일 인증을 완료했습니다.": "Your email has been verified.",
+  "가입할 때 설정한 비밀번호로 로그인해 주세요.": "Sign in with the password you set when you registered.",
+  "인증 결과를 확인하지 못했습니다. 로그인 화면에서 다시 확인해 주세요.": "We could not confirm verification. Please check again from the sign-in screen.",
+  "인증 코드가 올바르지 않습니다. 메일의 숫자를 다시 확인해 주세요.": "The verification code is incorrect. Check the digits in your email.",
+  "인증 코드가 만료되었습니다. 새 코드를 요청해 주세요.": "Your verification code has expired. Request a new code.",
+  "인증 시도 횟수를 초과했습니다. 잠시 후 새 코드를 요청해 주세요.": "Too many verification attempts. Wait a moment, then request a new code.",
+  "인증 완료 화면 미리보기": "Verification success preview",
+  "화면 미리보기입니다. 메일 전송과 실제 인증은 수행하지 않습니다.": "This is a preview. No email is sent and no real verification takes place.",
   "인증 메일의 링크를 열어 이메일을 확인해 주세요.": "Open the link in the verification email to confirm your address.",
   "새 비밀번호": "New password",
   "앞으로 사용할 비밀번호를 입력해 주세요.": "Enter the password you would like to use.",
@@ -99,6 +118,8 @@ export function translateAuthCopy(text: string): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   const exact = translationEntry(authEnglish, normalized) ?? translationEntry(commonEnglish, normalized);
   if (exact !== undefined) return exact;
+  const resendDelay = /^(\d+)초 후 재전송$/.exec(normalized);
+  if (resendDelay) return `Resend in ${resendDelay[1]}s`;
   const social = /^(Google|GitHub|네이버)로 (가입하기|로그인)(.*)$/.exec(normalized);
   if (social) return `${social[2] === "로그인" ? "Sign in" : "Sign up"} with ${social[1] === "네이버" ? "Naver" : social[1]}${social[3].replace("(설정 준비 중)", "(not available yet)")}`;
   const provider = /^(Google|GitHub|네이버)(로 계속| 로그인 설정 준비 중|로 연결하지 못했습니다\. 잠시 후 다시 시도해 주세요\.)$/.exec(normalized);

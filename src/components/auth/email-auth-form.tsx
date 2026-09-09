@@ -2,13 +2,14 @@
 
 import { AuthElement, AuthText } from "./auth-localized";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
-import { ArrowRight, LoaderCircle, MailCheck } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
 import { authErrorMessage } from "@/lib/auth/auth-error-message";
 import { AUTH_EMAIL_VERIFIED_PATH } from "@/lib/auth/auth-methods";
 import { AUTH_TRANSPORT_SESSION_PATH } from "@/lib/auth/auth-transport-routes";
 import { AuthPasswordField } from "./auth-password-field";
+import { EmailVerificationForm } from "./email-verification-form";
 import styles from "./auth-experience.module.css";
 
 export function EmailAuthForm({
@@ -38,6 +39,10 @@ export function EmailAuthForm({
       return;
     }
     if (preview) {
+      if (signingUp) {
+        setVerificationEmail(email);
+        return;
+      }
       setNotice(
         "화면 미리보기입니다. 입력한 정보는 전송하거나 저장하지 않습니다.",
       );
@@ -76,8 +81,11 @@ export function EmailAuthForm({
 
   if (verificationEmail) {
     return (
-      <VerificationNotice
-        email={verificationEmail}
+      <EmailVerificationForm
+        initialEmail={verificationEmail}
+        initialCooldownSeconds={signingUp ? 60 : 0}
+        enabled={enabled}
+        preview={preview}
         onBack={() => setVerificationEmail("")}
       />
     );
@@ -178,69 +186,5 @@ export function EmailAuthForm({
         ><AuthText>{"인증 메일 재전송"}</AuthText></Link>
       </div>
     </AuthElement>
-  );
-}
-
-function VerificationNotice({
-  email,
-  onBack,
-}: {
-  email: string;
-  onBack: () => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [seconds, setSeconds] = useState(60);
-  const [message, setMessage] = useState("");
-  useEffect(() => {
-    if (seconds <= 0) return;
-    const timer = window.setTimeout(() => setSeconds(seconds - 1), 1_000);
-    return () => window.clearTimeout(timer);
-  }, [seconds]);
-
-  async function resend() {
-    if (pending || seconds > 0) return;
-    setPending(true);
-    try {
-      const result = await authClient.sendVerificationEmail({
-        email,
-        callbackURL: AUTH_EMAIL_VERIFIED_PATH,
-      });
-      setMessage(
-        result.error
-          ? authErrorMessage(result.error)
-          : "인증 메일을 다시 요청했습니다. 스팸함도 확인해 주세요.",
-      );
-      if (!result.error) setSeconds(60);
-    } catch {
-      setMessage(authErrorMessage(null));
-    } finally {
-      setPending(false);
-    }
-  }
-  return (
-    <div className={styles.stack} role="status">
-      <div className={styles.verificationState}>
-        <MailCheck size={22} aria-hidden="true" />
-        <strong><AuthText>{"이메일을 확인해 주세요"}</AuthText></strong>
-      </div>
-      <p className={styles.note}>
-        <span className={styles.emailAddress}>{email}</span><AuthText>{"으로 받은 인증 메일의 링크를 연 뒤 로그인해 주세요."}</AuthText></p>
-      <Link href="/auth/sign-in" className={styles.primaryButton}><AuthText>{"로그인으로 계속"}</AuthText><ArrowRight size={16} aria-hidden="true" />
-      </Link>
-      <button
-        type="button"
-        className={styles.secondaryButton}
-        onClick={resend}
-        disabled={pending || seconds > 0}
-      >
-        <AuthText>{pending
-          ? "요청 중"
-          : seconds > 0
-            ? `${seconds}초 후 재전송`
-            : "인증 메일 재전송"}</AuthText>
-      </button>
-      {message ? <p className={styles.note}><AuthText>{message}</AuthText></p> : null}
-      <button type="button" onClick={onBack} className={styles.textLink}><AuthText>{"다른 이메일 사용"}</AuthText></button>
-    </div>
   );
 }

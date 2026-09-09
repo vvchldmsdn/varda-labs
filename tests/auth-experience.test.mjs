@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { derivePortfolioSetupProgress } from "../src/lib/portfolio-setup-progress.ts";
 import { AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS } from "../src/lib/auth/auth-transport-policy.ts";
+import { authErrorMessage } from "../src/lib/auth/auth-error-message.ts";
 
 const read = (path) => readFileSync(path, "utf8");
 
@@ -16,8 +17,16 @@ describe("auth and onboarding experience", () => {
     const email = read("src/components/auth/email-auth-form.tsx");
     assert.match(email, /authClient.signUp.email/);
     assert.match(email, /authClient.signIn.email/);
-    assert.equal(AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS.length, 7);
+    assert.equal(AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS.length, 8);
     assert.match(controls, /aria-busy=\{status === "pending"\}/);
+  });
+
+  it("gives actionable OTP errors without exposing managed provider messages", () => {
+    assert.match(authErrorMessage({ code: "INVALID_OTP" }), /코드가 올바르지/);
+    assert.match(authErrorMessage({ code: "OTP_EXPIRED" }), /코드가 만료/);
+    assert.match(authErrorMessage({ code: "TOO_MANY_ATTEMPTS" }), /시도 횟수/);
+    assert.match(authErrorMessage({ status: 429 }), /잠시 기다린/);
+    assert.equal(authErrorMessage({ code: "PRIVATE_PROVIDER_DETAIL" }), authErrorMessage(null));
   });
 
   it("keeps local UI previews away from authentication and tenant writes", () => {

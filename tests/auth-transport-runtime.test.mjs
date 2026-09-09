@@ -104,7 +104,7 @@ describe("auth session transport smoke", () => {
     assert.equal(AUTH_TRANSPORT_SESSION_PATH, "/auth/session");
   });
 
-  it("allows only the seven reviewed session and email transport requests", () => {
+  it("allows only the reviewed session and email transport requests", () => {
     assert.deepEqual(AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS, [
       {
         method: "POST",
@@ -115,6 +115,7 @@ describe("auth session transport smoke", () => {
       { method: "POST", path: ["sign-in", "email"] },
       { method: "POST", path: ["sign-up", "email"] },
       { method: "POST", path: ["send-verification-email"] },
+      { method: "POST", path: ["email-otp", "verify-email"] },
       { method: "POST", path: ["request-password-reset"] },
       { method: "POST", path: ["reset-password"] },
     ]);
@@ -341,7 +342,7 @@ describe("auth session transport smoke", () => {
       previewRuntimeDisabled: true,
       productionRuntimeEnabled: true,
       authTargetFingerprintGuardPresent: true,
-      allowedAuthApiEndpoints: 7,
+      allowedAuthApiEndpoints: 8,
       socialProvidersRestricted: true,
       strictAuthRequestBodies: true,
       naverIdentityProtected: true,
