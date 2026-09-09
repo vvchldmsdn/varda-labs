@@ -33,7 +33,18 @@ const groups = [
   ] },
 ] as const;
 
-export default function PortfolioManagementPage() {
+export default async function PortfolioManagementPage({ searchParams }: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const targetQuery = new URLSearchParams({ from: "manage" });
+  // Forward scope unchanged so the target page can validate ownership and reject ambiguous input.
+  for (const key of ["scope", "account"] as const) {
+    const value = params[key];
+    for (const item of typeof value === "string" ? [value] : value ?? []) targetQuery.append(key, item);
+  }
+  if (process.env.NODE_ENV === "development" && params.preview === "design") targetQuery.set("preview", "design");
+  const targetHref = `/portfolio/targets?${targetQuery}`;
   return <main className="varda-page varda-stage-page">
     <SecondaryPageHeader />
     <div className="varda-content varda-stage-content">
@@ -46,10 +57,10 @@ export default function PortfolioManagementPage() {
         </header>
         <LocalizedElement className="varda-management-index" aria-label="관리할 데이터 선택" as="div" en={{"aria-label": portfolioEnglish("관리할 데이터 선택")}}>
           {groups.map((group, index) => <PresentationDialog key={group.title} title={group.title} titleEn={portfolioEnglish(group.title)} triggerClassName="varda-management-chapter" label={<><span className="varda-management-chapter-number">0{index + 1}</span><span className="varda-management-chapter-title"><strong><PortfolioText ko={group.title} /></strong><small><PortfolioText ko={group.links.map(link => link.title).join(" · ")} /></small></span></>}>
-            <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span><PortfolioText ko={title} /><small><PortfolioText ko={description} /></small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
+            <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href === "/portfolio/targets" ? targetHref : href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span><PortfolioText ko={title} /><small><PortfolioText ko={description} /></small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
           </PresentationDialog>)}
         </LocalizedElement>
-        <footer className="varda-management-stage-footer"><span><PortfolioText ko={"정리된 데이터에서 시작하는 분석"} /></span><PresentationDialog label={<><CircleHelp size={14} aria-hidden="true" /><PortfolioText ko={"처음 시작하기"} /></>} title="포트폴리오를 만드는 순서" titleEn={portfolioEnglish("포트폴리오를 만드는 순서")}><ol className="varda-management-guide"><li><strong><PortfolioText ko={"01 · 계좌 등록"} /></strong><p><PortfolioText ko={"증권·연금 계좌를 만들고 분석할 자산을 정리하세요."} /></p><Link href="/portfolio/accounts"><PortfolioText ko={"계좌 관리"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"02 · 보유 종목 등록"} /></strong><p><PortfolioText ko={"수량과 매입원가를 입력하면 자산 평가와 손익의 근거가 됩니다."} /></p><Link href="/portfolio/holdings/new"><PortfolioText ko={"종목 추가"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"03 · 목표비중 설정"} /></strong><p><PortfolioText ko={"금현물을 포함해 관리하려는 종목의 목표비중을 정하세요."} /></p><Link href="/portfolio/targets"><PortfolioText ko={"목표비중 관리"} />{" "}<ArrowRight size={14} /></Link></li></ol></PresentationDialog></footer>
+        <footer className="varda-management-stage-footer"><span><PortfolioText ko={"정리된 데이터에서 시작하는 분석"} /></span><PresentationDialog label={<><CircleHelp size={14} aria-hidden="true" /><PortfolioText ko={"처음 시작하기"} /></>} title="포트폴리오를 만드는 순서" titleEn={portfolioEnglish("포트폴리오를 만드는 순서")}><ol className="varda-management-guide"><li><strong><PortfolioText ko={"01 · 계좌 등록"} /></strong><p><PortfolioText ko={"증권·연금 계좌를 만들고 분석할 자산을 정리하세요."} /></p><Link href="/portfolio/accounts"><PortfolioText ko={"계좌 관리"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"02 · 보유 종목 등록"} /></strong><p><PortfolioText ko={"수량과 매입원가를 입력하면 자산 평가와 손익의 근거가 됩니다."} /></p><Link href="/portfolio/holdings/new"><PortfolioText ko={"종목 추가"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"03 · 목표비중 설정"} /></strong><p><PortfolioText ko={"금현물을 포함해 관리하려는 종목의 목표비중을 정하세요."} /></p><Link href={targetHref}><PortfolioText ko={"목표비중 관리"} />{" "}<ArrowRight size={14} /></Link></li></ol></PresentationDialog></footer>
       </div>
     </div>
   </main>;

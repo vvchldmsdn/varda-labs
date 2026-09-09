@@ -296,8 +296,8 @@ function ma120SummaryDetail(
   if (evidence.status === "unavailable")
     return "사용 가능한 가격 이력 없음 · 기본 배분 사용";
   if (evidence.status === "partial")
-    return `MA120 일부 근거 확보 · 기본 매수안 대비 감소액 ${formatKrw(evidence.totalReductionKrw)}`;
-  return `MA120 ${evidence.usableCount}종목 근거 확보 · 기본 매수안 대비 감소액 ${formatKrw(evidence.totalReductionKrw)}`;
+    return `MA120 일부 근거 확보 · 감액 종목 감소 합계 ${formatKrw(evidence.totalReductionKrw)}`;
+  return `MA120 ${evidence.usableCount}종목 근거 확보 · 감액 종목 감소 합계 ${formatKrw(evidence.totalReductionKrw)}`;
 }
 
 function formatKrw(value: number) {

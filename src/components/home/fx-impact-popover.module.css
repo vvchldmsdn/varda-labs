@@ -1,0 +1,9 @@
+.root { min-width:0; }
+.trigger { display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:8px 0; font-size:13px; font-weight:500; color:var(--brand); }
+.trigger:hover { text-decoration:underline; text-underline-offset:4px; }
+.impactTrigger { display:block; width:100%; padding:20px; text-align:left; border-bottom:1px solid var(--line); }
+.trigger:focus-visible,.impactTrigger:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.panel { min-width:0; margin-top:12px; padding:20px 0 4px; border-top:1px solid var(--line); animation:reveal 180ms ease-out; }
+.panel > :first-child > button { width:44px; height:44px; flex:none; }
+@keyframes reveal { from { opacity:.3; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .panel { animation:none; } }

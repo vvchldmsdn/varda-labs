@@ -85,9 +85,12 @@ export function AdditionalContributionLogicDialog({
                 detail={`투입 전 비중으로 초과 폭을 판단합니다. 원가 근거가 있고 평가손익이 0 이상인 종목만, 투입 후 총액 기준 목표비중의 ${formatNumber(preview.calculationPolicy.trimLandingTargetMultiplier * 100)}% 지점까지 계산상 매도합니다.`}
               />
               <PolicyFact
-                label="2. MA120 매수 강도"
-                value="자산 성격별로 목표 부족액 조정"
-                detail={preview.ma120Evidence.mode === "off" ? "추세 필터가 꺼져 있어 원래 목표비중을 사용합니다." : "금·채권은 감액하지 않습니다. MA120 아래 3% 구간은 선형 보간하고, 그 아래에서는 자산군 배율을 전부 적용합니다. 근거가 없는 종목은 임의 감액하지 않습니다."}
+                label="2. 가격 추세 반영"
+                labelEn="2. Price trend adjustment"
+                value="목표 부족액을 조정해 다시 배분"
+                valueEn="Adjust target gaps, then allocate"
+                detail={preview.ma120Evidence.mode === "off" ? "추세 필터가 꺼져 있어 원래 목표비중을 사용합니다." : "MA120은 최근 120개 일별 가격의 평균입니다. 가격이 평균 아래이면 이번 계산의 목표액을 낮추고, 남은 부족액을 기준으로 재원을 나눕니다. 배율이 0.8이라고 최종 매수금이 반드시 20% 줄어드는 것은 아닙니다."}
+                detailEn={preview.ma120Evidence.mode === "off" ? "The trend filter is off, so original target weights are used." : "MA120 is the average of the latest 120 daily price observations. Below that average, this calculation lowers the target value and allocates funds using the remaining gaps. A 0.8 multiplier does not guarantee a 20% cut in the final purchase amount."}
               />
               <PolicyFact
                 label="3. 집행 참고기준"
@@ -96,12 +99,29 @@ export function AdditionalContributionLogicDialog({
               />
             </section>
 
+            <details className="border-b border-[var(--line)] pb-3 text-sm leading-7 text-[var(--muted)]">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium text-[var(--ink)]"><T ko="MA120 배율은 어떻게 쓰이나요?" en="How do MA120 multipliers work?" /></summary>
+              <p><T ko="저장한 목표비중은 그대로 둡니다. 이번 매수 계획에서만 목표액을 낮춰 부족액을 다시 계산합니다. 부족한 금액이 여전히 매수 재원보다 크면 매수금이 그대로일 수 있고, 다른 종목의 배분은 늘어날 수 있습니다." en="Your saved target weights stay unchanged. Only the target value for this purchase plan is lowered, then the gap is recalculated. If the gap still exceeds available funds, the purchase amount may stay the same; other holdings may receive more." /></p>
+              <div className="my-4 overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs sm:text-sm">
+                  <caption className="pb-2 text-left text-xs text-[var(--muted)]"><T ko="가격이 MA120보다 3% 이상 낮을 때의 목표액 배율" en="Target-value multipliers when the price is at least 3% below MA120" /></caption>
+                  <thead><tr className="border-b border-[var(--line)]"><th scope="col" className="py-2 font-medium"><T ko="자산 성격" en="Asset class" /></th><th scope="col" className="py-2 text-right font-medium"><T ko="배율" en="Multiplier" /></th></tr></thead>
+                  <tbody>{MA120_CLASS_EXPLANATIONS.map((item) => <tr key={item.key} className="border-b border-[var(--wash)]"><th scope="row" className="py-2 pr-3 font-normal"><T ko={item.ko} en={item.en} /></th><td className="py-2 text-right tabular-nums">{item.multiplier}</td></tr>)}</tbody>
+                </table>
+              </div>
+              <p><T ko="평균선 바로 아래에서 갑자기 크게 바뀌지 않도록, 0~3% 아래 구간에서는 배율을 서서히 낮춥니다. 예를 들어 광범위 지수형은 평균선에서 1.0, 1.5% 아래에서 0.9, 3% 이상 아래에서 0.8입니다." en="Between 0% and 3% below the average, the multiplier decreases gradually. For a broad index holding, it is 1.0 at the average, 0.9 at 1.5% below, and 0.8 at 3% or more below." /></p>
+              <p className="mt-2"><T ko="금·채권은 이 MA120 목표 조정에서 제외합니다. 예·적금, 연금형 자산 등 적용 제외 자산이나 규칙이 꺼진 종목도 배율 1.0을 사용합니다. 가격 근거가 부족하거나 맞지 않으면 목표를 임의로 낮추지 않습니다." en="Gold and bonds are exempt from this MA120 target adjustment. Exempt asset types such as savings, deposits and pension-type assets, or holdings with the rule disabled, also use 1.0. Missing or incompatible price evidence does not trigger a target reduction." /></p>
+              <p className="mt-2"><T ko="예시: 새로 넣는 돈이 10만원이고 유일한 매수 후보의 조정 후 부족액이 34만원이면, 최종 매수금은 10만원입니다. 반대로 부족액이 재원보다 작으면 그 부족액까지만 배분하고 나머지는 현금으로 남깁니다." en="Example: with ₩100,000 available and an adjusted gap of ₩340,000 for the only purchase candidate, the final purchase remains ₩100,000. If the gap is smaller than the available funds, the purchase is capped at that gap and the rest stays in cash." /></p>
+              <p className="mt-2 text-xs"><T ko="이 배율과 3% 구간은 기존 서비스에서 이어온 정책값입니다. 자산별 최적 배율이나 손실 방지 효과가 검증되었다는 뜻은 아닙니다. 금·채권의 적용 제외도 안전한 자산이라는 판정은 아닙니다." en="These multipliers and the 3% range are inherited policy settings, not proven optimal values or a guarantee against loss. Exemption does not mean that gold or bonds are risk-free." /></p>
+            </details>
+
             <details className="border-b border-[var(--line)] pb-5 text-sm leading-7 text-[var(--muted)]">
               <summary className="min-h-11 cursor-pointer py-3 font-medium text-[var(--ink)]"><T ko="정확한 계산식과 조정 규칙" en="Exact formulas and adjustment rules" /></summary>
               <p><PortfolioText ko={"유효 목표액 = (현재 총평가액 + 신규 투입금) × 목표비중 × MA120 배율"} /></p>
               <p><PortfolioText ko={"종목별 부족액 = 유효 목표액 − 계산상 매도 후 평가액 (0 미만이면 0)"} /></p>
               <p><PortfolioText ko={"신규 투입금 + 계산상 매도대금을 부족액 비례로 배분합니다. 매도 종목은 다시 매수하지 않습니다. 원 단위 최대잔여 방식으로 결정하며 매도는 보유 평가액, 매수는 유효 부족액을 넘지 않습니다."} /></p>
               <p><PortfolioText ko={"목표 0% 종목도 손실이 아니고 원가 근거가 있을 때 정리합니다. 원 단위로 표현할 수 없는 1원 미만 평가액은 남을 수 있습니다. 수수료·세금·주문 단위는 반영하지 않은 금액 계획입니다."} /></p>
+              <p><T ko="‘감액 종목 감소 합계’는 매수금이 줄어든 종목의 감소액을 합한 값입니다. 다른 종목으로 옮겨간 금액도 포함하므로, 총매수금 감소나 현금 증가와 같지는 않습니다." en="Total reductions across holdings sums decreases for holdings receiving less. It includes money reassigned to other holdings, so it is not the same as a decrease in total purchases or an increase in cash." /></p>
             </details>
 
             <details className="mt-4" aria-labelledby="holding-calculation-title">
@@ -156,7 +176,7 @@ export function AdditionalContributionLogicDialog({
             <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
               <h3 className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></h3>
               <p className="mt-1 leading-6 text-[var(--muted)]">
-                <T ko="목표비중과 현재 보유 상태, 확인된 가격 추세로 금액을 나눕니다. 환율 전망·뉴스·시장 상황에 따른 추가 조정과 수수료·세금·실제 주문 단위는 포함하지 않습니다." en="Amounts use your target weights, current holdings, and verified price trends. Extra adjustments for FX forecasts, news or market conditions, as well as fees, taxes and actual order sizes, are excluded." /></p>
+                <T ko="목표비중과 현재 보유 상태, 확인된 가격 추세로 금액을 나눕니다. 현재 환율은 원화 평가에 쓰지만, 환율 전망·뉴스·시장·금리·산업 전망으로 매수금을 추가 조정하지는 않습니다. 이러한 조정은 별도 검증 후 선택 기능으로 검토할 항목입니다. 수수료·세금·실제 주문 단위도 포함하지 않습니다." en="Amounts use your target weights, current holdings and available price-trend evidence. Current FX rates are used for KRW valuation, but FX forecasts, news, market conditions, rates and industry outlooks do not add purchase adjustments. Those adjustments are candidates for an optional feature after separate validation. Fees, taxes and actual order sizes are also excluded." /></p>
             </section>
           </div>
         </div>
@@ -169,9 +189,21 @@ function FlowStep({ index, label, value }: { index: string; label: string; value
   return <div className="bg-[var(--paper)] px-4 py-4"><p className="text-[10px] text-[var(--faint)]">{index}</p><p className="mt-2 text-xs text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-1 font-medium tabular-nums"><PortfolioText ko={value} /></p></div>;
 }
 
-function PolicyFact({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return <div><p className="text-xs font-medium text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-2 font-medium"><PortfolioText ko={value} /></p><details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs text-[var(--muted)]"><T ko="이 규칙 자세히 보기" en="About this rule" /></summary><p className="pb-3 text-sm leading-7 text-[var(--muted)]"><PortfolioText ko={detail} /></p></details></div>;
+function PolicyFact({ detail, detailEn, label, labelEn, value, valueEn }: { detail: string; detailEn?: string; label: string; labelEn?: string; value: string; valueEn?: string }) {
+  return <div><p className="text-xs font-medium text-[var(--muted)]"><PortfolioText ko={label} en={labelEn} /></p><p className="mt-2 font-medium"><PortfolioText ko={value} en={valueEn} /></p><details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs text-[var(--muted)]"><T ko="이 규칙 자세히 보기" en="About this rule" /></summary><p className="pb-3 text-sm leading-7 text-[var(--muted)]"><PortfolioText ko={detail} en={detailEn} /></p></details></div>;
 }
+
+// Display copy for the existing gyeol_fin_explainable_rebalance_v1 policy;
+// these are target-value multipliers, never final-purchase guarantees.
+const MA120_CLASS_EXPLANATIONS = [
+  { key: "broad_index", ko: "광범위 지수형", en: "Broad index", multiplier: "0.8" },
+  { key: "dividend_quality", ko: "배당·퀄리티형", en: "Dividend / quality", multiplier: "0.8" },
+  { key: "large_growth", ko: "대형 성장형", en: "Large growth", multiplier: "0.7" },
+  { key: "thematic", ko: "테마형", en: "Thematic", multiplier: "0.5" },
+  { key: "other", ko: "기타·분류 미지정", en: "Other / unclassified", multiplier: "0.8" },
+  { key: "defensive_gold", ko: "금 · MA120 조정 제외", en: "Gold · exempt from MA120 adjustment", multiplier: "1.0" },
+  { key: "bond", ko: "채권 · MA120 조정 제외", en: "Bonds · exempt from MA120 adjustment", multiplier: "1.0" },
+] as const;
 
 function actionLabel(row: AdditionalContributionResultPreview["rows"][number]) {
   if (row.action === "trim") return `매도 ${formatKrw(row.trimAmountKrw)}`;
