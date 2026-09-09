@@ -7,6 +7,7 @@ import { ArrowRight, LoaderCircle } from "lucide-react";
 import { createFirstAccount } from "@/app/portfolio/onboarding/actions";
 import type { AccountManagementActionState } from "@/lib/account-management";
 import styles from "./auth-experience.module.css";
+import { useI18n } from "@/components/i18n/locale-provider";
 
 const initialState: AccountManagementActionState = {
   status: "idle",
@@ -25,6 +26,7 @@ export function OnboardingAccountForm({
 }: {
   preview?: boolean;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [name, setName] = useState("");
   const [state, action, pending] = useActionState(
@@ -44,13 +46,14 @@ export function OnboardingAccountForm({
           : undefined
       }
     >
+      <input type="hidden" name="name" value={name.trim() || t("나의 증권 계좌", "My investment account")} />
+      <p className={styles.notice}>{t("‘나의 증권 계좌’로 바로 시작할 수 있어요. 이름은 나중에 바꿀 수 있습니다.", "Start with ‘My investment account’. You can rename it later.")}</p>
+      <details className={styles.disclosure}>
+        <summary>{t("계좌 이름 직접 정하기 (선택)", "Choose an account name (optional)")}</summary>
       <label className={styles.field} htmlFor="onboarding-account-name"><AuthText>{"계좌 이름"}</AuthText><AuthElement as="input"
           id="onboarding-account-name"
           className={styles.input}
-          name="name"
           type="text"
-          required
-          minLength={1}
           maxLength={100}
           autoComplete="off"
           placeholder="예: 나의 증권 계좌"
@@ -63,16 +66,17 @@ export function OnboardingAccountForm({
           }
         />
       </label>
+      </details>
       <p className={styles.notice}><AuthText>{"이 계좌의 기준 통화는 KRW입니다. 미국 종목도 종목별 거래 통화로 기록할 수 있습니다."}</AuthText></p>
       {state.status in messages ? (
         <p id="account-error" role="alert" className={styles.error}>
-          {messages[state.status as keyof typeof messages]}
+          <AuthText>{messages[state.status as keyof typeof messages]}</AuthText>
         </p>
       ) : null}
       <button
         type="submit"
         className={styles.primaryButton}
-        disabled={pending || !name.trim()}
+        disabled={pending}
         aria-busy={pending}
       >
         <AuthText>{pending ? "계좌 등록 중" : "계좌 등록하고 계속"}</AuthText>

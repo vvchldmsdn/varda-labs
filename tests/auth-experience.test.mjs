@@ -125,6 +125,7 @@ describe("auth and onboarding experience", () => {
     assert.match(css, /min-height: 100dvh/);
     assert.match(form, /htmlFor="onboarding-account-name"/);
     assert.match(form, /maxLength=\{100\}/);
-    assert.match(form, /disabled=\{pending \|\| !name.trim\(\)\}/);
+    assert.match(form, /disabled=\{pending\}/);
+    assert.match(form, /type="hidden" name="name" value=\{name.trim\(\) \|\| t\(/);
   });
 });

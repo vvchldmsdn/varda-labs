@@ -586,7 +586,7 @@ export const holdingOnboardingEvidence = pgTable(
     assetId: uuid("asset_id").notNull(),
     accountId: uuid("account_id").notNull(),
     quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
-    averageCost: decimal("average_cost", { precision: 20, scale: 4 }).notNull(),
+    averageCost: decimal("average_cost", { precision: 20, scale: 4 }),
     currentPrice: decimal("current_price", {
       precision: 20,
       scale: 4,

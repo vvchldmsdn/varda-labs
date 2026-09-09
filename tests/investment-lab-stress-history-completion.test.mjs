@@ -78,4 +78,15 @@ describe("investment lab stress history completion", () => {
     assert.doesNotMatch(script, /client\.db\.transaction/);
     assert.doesNotMatch(script, /retry|setTimeout|setInterval/i);
   });
+
+  it("includes custom active-account instruments alongside benchmark history", () => {
+    const result = planInvestmentLabStressHistoryCompletion({ holdings: [{ accountCode: "my-first-account", market: "us", currency: "USD", ticker: "MSFT", quantity: 2 }] });
+    assert.ok(result.plans.every(({ plan }) => plan.targets.some((target) => target.key === "us|USD|MSFT")));
+    for (const name of ["complete-simulation-kis-history", "complete-investment-lab-stress-history"]) {
+      const script = readFileSync(`scripts/${name}.ts`, "utf8");
+      assert.doesNotMatch(script, /inArray\(accounts\.code|activeOwnerRows\.length !== 1/);
+      assert.match(script, /eq\(assets\.canonicalOwnerUserId, accounts\.canonicalOwnerUserId\)/);
+      assert.match(script, /isNull\(assets\.archivedAt\)/);
+    }
+  });
 });

@@ -53,6 +53,17 @@ describe("simulation history completion planner", () => {
     assert.deepEqual(plan.batches.map((batch) => batch.length), [5, 5, 2]);
   });
 
+  it("prepares supported instruments from newly named accounts and keeps them shared", () => {
+    const plan = planSimulationHistoryCompletion({
+      startDate: "2026-04-01", endDate: "2026-07-01",
+      holdings: [holding({ accountCode: "personal-a1b2", ticker: "069500" }), holding({ accountCode: "another-user", ticker: "069500" }), holding({ accountCode: "  " }), holding({ accountCode: "personal", quantity: 0 })],
+    });
+    assert.equal(plan.targets.length, 1);
+    assert.equal(plan.selectedHoldingCount, 2);
+    assert.deepEqual(plan.targets[0].accounts, []);
+    assert.deepEqual(plan.excludedByReason, { account_identity_missing: 1, quantity_not_positive: 1 });
+  });
+
   it("rejects ranges beyond the bounded operator window", () => {
     assert.throws(
       () =>

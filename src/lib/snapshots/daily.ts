@@ -52,7 +52,6 @@ import {
 } from "@/lib/portfolio-return-metrics";
 import {
   calculateFxAwarePositionMovementKrw,
-  convertToKrw,
   normalizeTicker,
   normalizeCurrencyCode,
   percentOrNull,
@@ -61,6 +60,7 @@ import {
   toNumber,
   uniqueStrings,
 } from "@/lib/portfolio-math";
+import { snapshotPositionCostBasisKrw, summarizeSnapshotCostEvidence } from "@/lib/snapshots/cost-evidence";
 import {
   buildCycleForSnapshotDate,
   closeCalendarReferenceDateForAsset,
@@ -322,15 +322,15 @@ type AccountSnapshotPlan = {
   portfolioAction: SnapshotWriteAction;
   positionActions: Record<SnapshotWriteAction, number>;
   totalMarketValue: number;
-  totalCost: number;
-  openCostKrw: number;
-  unrealizedPnlKrw: number;
+  totalCost: number | null;
+  openCostKrw: number | null;
+  unrealizedPnlKrw: number | null;
   realizedPnlKrw: number;
   realizedCostBasisKrw: number;
   realizedSellEventCount: number;
   unmatchedRealizedSellEventCount: number;
   missingCostRealizedSellEventCount: number;
-  totalPnl: number;
+  totalPnl: number | null;
   totalReturnPct: number | null;
   usdKrw: number;
   blockers: string[];
@@ -343,15 +343,15 @@ type AllAccountSnapshotPlan = {
   accountsAggregated: number;
   portfolioAction: SnapshotWriteAction;
   totalMarketValue: number;
-  totalCost: number;
-  openCostKrw: number;
-  unrealizedPnlKrw: number;
+  totalCost: number | null;
+  openCostKrw: number | null;
+  unrealizedPnlKrw: number | null;
   realizedPnlKrw: number;
   realizedCostBasisKrw: number;
   realizedSellEventCount: number;
   unmatchedRealizedSellEventCount: number;
   missingCostRealizedSellEventCount: number;
-  totalPnl: number;
+  totalPnl: number | null;
   totalReturnPct: number | null;
   blockers: string[];
 };
@@ -393,10 +393,10 @@ type AccountComputed = {
   assets: AssetRow[];
   positions: NewDailyPositionSnapshot[];
   totalMarketValue: number;
-  totalCost: number;
-  totalPnl: number;
+  totalCost: number | null;
+  totalPnl: number | null;
   totalReturnPct: number | null;
-  investedAmount: number;
+  investedAmount: number | null;
   krValue: number;
   usValue: number;
   thematicValue: number;
@@ -404,8 +404,8 @@ type AccountComputed = {
   topHoldingName: string | null;
   topHoldingWeight: number | null;
   groupCount: number;
-  openCostKrw: number;
-  unrealizedPnlKrw: number;
+  openCostKrw: number | null;
+  unrealizedPnlKrw: number | null;
   realizedPnlKrw: number;
   realizedCostBasisKrw: number;
   realizedSellEventCount: number;
@@ -886,8 +886,6 @@ function buildAllAccountPlan({
   );
   const existingPortfolio = existingRows.find(isVardaGeneratedRow) ?? null;
   const totalMarketValue = sumBy(completed, (build) => build.totalMarketValue);
-  const openCostKrw = sumBy(completed, (build) => build.openCostKrw);
-  const unrealizedPnlKrw = sumBy(completed, (build) => build.unrealizedPnlKrw);
   const realizedPnlKrw = sumBy(completed, (build) => build.realizedPnlKrw);
   const realizedCostBasisKrw = sumBy(
     completed,
@@ -905,8 +903,10 @@ function buildAllAccountPlan({
     completed,
     (build) => build.missingCostRealizedSellEventCount,
   );
-  const totalCost = openCostKrw + realizedCostBasisKrw;
-  const totalPnl = unrealizedPnlKrw + realizedPnlKrw;
+  const { openCostKrw, unrealizedPnlKrw, totalCost, totalPnl } = summarizeSnapshotCostEvidence(
+    completed.map((build) => ({ costKrw: build.openCostKrw, pnlKrw: build.unrealizedPnlKrw })),
+    realizedCostBasisKrw, realizedPnlKrw,
+  );
   const investedAmount = totalCost;
   const topHolding = findTopHolding(
     accountBuilds.flatMap((build) => build.positions),
@@ -947,7 +947,7 @@ function buildAllAccountPlan({
             `valuation_basis=${portfolioValuationBasis(provenance)}`,
             `fx_source=${fx.source}`,
             "return_basis=unrealized_plus_event_ledger_realized_v1",
-            `open_cost_krw=${Math.round(openCostKrw)}`,
+            `open_cost_krw=${openCostKrw === null ? "unknown" : Math.round(openCostKrw)}`,
             `realized_pnl_krw=${Math.round(realizedPnlKrw)}`,
             `realized_cost_basis_krw=${Math.round(realizedCostBasisKrw)}`,
             `realized_sell_events=${realizedSellEventCount}`,
@@ -1081,7 +1081,7 @@ function computeAccountSnapshot({
     const prior = priorByAssetId.get(asset.id) ?? null;
     const quantity = toNumber(asset.quantity) ?? 0;
     const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
-    const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? 0;
+    const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? (fractionalKrwValue === 0 ? 0 : null);
     const priorFractionalQuantity = toNumber(prior?.estimatedFractionalQuantity);
     const estimatedFractionalQuantity =
       provenance.insertOnly && priorFractionalQuantity !== null
@@ -1150,8 +1150,8 @@ function computeAccountSnapshot({
       fxResolution.ok && fxResolution.requiresFx && movement
         ? movement.fxChangeKrw
         : 0;
-    const costKrw = costBasisKrw(asset, fx.usdKrw);
-    const pnlKrw = marketValueKrw - costKrw;
+    const costKrw = snapshotPositionCostBasisKrw(asset, fx.usdKrw);
+    const pnlKrw = costKrw === null ? null : marketValueKrw - costKrw;
     const exposureType = getFxExposureType(asset);
 
     if (asset.market === "korea") krValue += marketValueKrw;
@@ -1191,7 +1191,7 @@ function computeAccountSnapshot({
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
         `close_source=${selectedClose.source}${selectedClose.referenceDate ? `@${selectedClose.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
-        "cost_basis_source=asset_average_cost_fallback",
+        `cost_basis_source=${costKrw === null ? "unknown" : "asset_average_cost"}`,
         ...provenance.descriptionTags,
       ].join("; "),
       belowMa: false,
@@ -1208,7 +1208,7 @@ function computeAccountSnapshot({
       marketValueKrw: decimal(marketValueKrw),
       costKrw: decimal(costKrw),
       pnlKrw: decimal(pnlKrw),
-      pnlPct: decimal(percentOrZero(pnlKrw, costKrw)),
+      pnlPct: decimal(percentOrNull(pnlKrw, costKrw)),
       currentWeight: decimal(currentWeight),
       targetWeight: decimal(targetWeightRaw),
       targetWeightRaw: decimal(targetWeightRaw),
@@ -1258,12 +1258,12 @@ function computeAccountSnapshot({
     account,
     selectedAssetKeys,
   );
-  const openCostKrw = sumBy(positions, (position) => toNumber(position.costKrw) ?? 0);
-  const unrealizedPnlKrw = sumBy(positions, (position) => toNumber(position.pnlKrw) ?? 0);
   const realizedPnlKrw = accountRealized.realizedPnlKrw;
   const realizedCostBasisKrw = accountRealized.realizedCostBasisKrw;
-  const totalCost = openCostKrw + realizedCostBasisKrw;
-  const totalPnl = unrealizedPnlKrw + realizedPnlKrw;
+  const { openCostKrw, unrealizedPnlKrw, totalCost, totalPnl } = summarizeSnapshotCostEvidence(
+    positions.map((position) => ({ costKrw: toNumber(position.costKrw), pnlKrw: toNumber(position.pnlKrw) })),
+    realizedCostBasisKrw, realizedPnlKrw,
+  );
   const topHolding = findTopHolding(positions, totalMarketValue);
 
   return {
@@ -1314,7 +1314,7 @@ function buildPortfolioSnapshot(
       `valuation_basis=${portfolioValuationBasis(computed.provenance)}`,
       `fx_source=${fx.source}`,
       "return_basis=unrealized_plus_event_ledger_realized_v1",
-      `open_cost_krw=${Math.round(computed.openCostKrw)}`,
+      `open_cost_krw=${computed.openCostKrw === null ? "unknown" : Math.round(computed.openCostKrw)}`,
       `realized_pnl_krw=${Math.round(computed.realizedPnlKrw)}`,
       `realized_cost_basis_krw=${Math.round(computed.realizedCostBasisKrw)}`,
       `realized_sell_events=${computed.realizedSellEventCount}`,
@@ -2589,16 +2589,6 @@ function assetValueKrw(asset: AssetRow, price: number, fxRate: number) {
   const quantity = toNumber(asset.quantity) ?? 0;
   const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
   return quantity * price * fxRate + fractionalKrwValue;
-}
-
-function costBasisKrw(asset: AssetRow, usdKrw: number) {
-  const quantity = toNumber(asset.quantity) ?? 0;
-  const averageCost = toNumber(asset.averageCost) ?? toNumber(asset.currentPrice) ?? 0;
-  const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? 0;
-  return (
-    (convertToKrw(quantity * averageCost, asset.currency, usdKrw) ?? 0) +
-    fractionalAvgCost
-  );
 }
 
 function assetFxRate(asset: AssetRow, fx: ResolvedFxRate) {

@@ -1,67 +1,34 @@
-import { localizedMetadata } from "@/lib/i18n/server";
-import { ManagementText } from "@/components/i18n/management-text";
-import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
-
+import { ArrowLeft } from "lucide-react";
+import { localizedMetadata } from "@/lib/i18n/server";
+import { T } from "@/components/i18n/localized-text";
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { HoldingOnboardingForm } from "@/components/holding-onboarding-form";
-import { getHoldingOnboardingOptions } from "@/db/queries/holding-onboarding";
+import { getHoldingOnboardingOptions, type HoldingOnboardingOptions } from "@/db/queries/holding-onboarding";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import "@/components/onboarding/holding-onboarding.css";
 
 export const dynamic = "force-dynamic";
-
 export async function generateMetadata() {
-  return localizedMetadata({ title: "보유 종목 추가 | VARDA LABS" }, "Add holding | VARDA LABS");
+  return localizedMetadata({ title: "보유 종목 추가 | VARDA LABS" }, "Add holdings | VARDA LABS");
 }
 
-export default async function NewHoldingPage() {
-  const resolution = await resolveCurrentTenantContext();
-  const options = resolution.ok
-    ? await getHoldingOnboardingOptions(resolution.tenantContext)
-    : null;
-
-  return (
-    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
-      <SecondaryPageHeader />
-      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-normal"><ManagementText>{"보유종목 추가"}</ManagementText></h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-              href="/portfolio/groups"
-            ><ManagementText>{"분석 범위"}</ManagementText></Link>
-            <Link
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-              href="/portfolio/holdings?account=all"
-            ><ManagementText>{"보유종목"}</ManagementText></Link>
-          </div>
-        </div>
-
-        {!resolution.ok ? (
-          <div className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
-            <p><ManagementText>{"로그인 후 보유종목을 추가할 수 있습니다."}</ManagementText></p>
-            <Link
-              className="mt-3 inline-block font-semibold underline"
-              href="/auth/sign-in"
-            ><ManagementText>{"로그인"}</ManagementText></Link>
-          </div>
-        ) : options?.state !== "ready" ? (
-          <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]"><ManagementText>{"계좌와 분석 범위 정보를 불러오지 못했습니다."}</ManagementText></p>
-        ) : options.accounts.length === 0 ? (
-          <div className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
-            <p><ManagementText>{"먼저 보유 계좌를 만들어야 합니다."}</ManagementText></p>
-            <Link
-              className="mt-3 inline-block font-semibold underline"
-              href="/portfolio/accounts"
-            ><ManagementText>{"계좌 관리 열기"}</ManagementText></Link>
-          </div>
-        ) : (
-          <HoldingOnboardingForm options={options} />
-        )}
-      </section>
-    </main>
-  );
+export default async function NewHoldingPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
+  const params = await searchParams;
+  const preview = process.env.NODE_ENV === "development" && params.preview === "design";
+  const resolution = preview ? null : await resolveCurrentTenantContext();
+  const options: HoldingOnboardingOptions | { state: "unavailable" } | null = preview ? {
+    state: "ready", accounts: [{ id: "11111111-1111-4111-8111-111111111111", code: "preview", name: "나의 증권 계좌", accountType: "securities" }], portfolioGroups: [],
+  } : resolution?.ok ? await getHoldingOnboardingOptions(resolution.tenantContext) : null;
+  return <main className="varda-holding-add-page" data-design-preview={preview || undefined}>
+    <SecondaryPageHeader />
+    <div className="varda-holding-add-content">
+      <Link className="varda-holding-add-back" href={preview ? "/portfolio/onboarding?preview=design&step=holding" : "/portfolio/holdings"}><ArrowLeft size={15} /><T ko="돌아가기" en="Back" /></Link>
+      <header className="varda-holding-add-heading"><p className="varda-onboarding-eyebrow">YOUR PORTFOLIO STARTS HERE</p><h1><T ko="이름과 수량으로 시작해요." en="A name. A quantity. A start." /></h1><p><T ko="보유한 종목을 찾아 목록에 담아 주세요. 매입가와 세부 설정은 나중에 채워도 괜찮습니다." en="Find your holdings and add them to the list. Purchase prices and other details can come later." /></p></header>
+      {!preview && !resolution?.ok ? <div className="varda-onboarding-error"><T ko="로그인 후 보유종목을 추가할 수 있습니다." en="Sign in to add holdings." /><p><Link className="varda-onboarding-text-button" href="/auth/sign-in"><T ko="로그인" en="Sign in" /></Link></p></div>
+        : options?.state !== "ready" ? <p className="varda-onboarding-error"><T ko="계좌 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." en="Accounts could not be loaded. Please try again shortly." /></p>
+        : options.accounts.length === 0 ? <div><p><T ko="종목을 담을 첫 계좌를 먼저 준비해 주세요." en="Create your first account before adding holdings." /></p><Link className="varda-onboarding-text-button" href="/portfolio/onboarding"><T ko="첫 계좌 만들기" en="Create your first account" /></Link></div>
+        : <HoldingOnboardingForm options={options} preview={preview} />}
+    </div>
+  </main>;
 }

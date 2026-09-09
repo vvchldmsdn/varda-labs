@@ -1,4 +1,10 @@
 import "./market-calendar.test.mjs";
+import "./onboarding-instrument-search.test.mjs";
+import "./first-portfolio-analysis.test.mjs";
+import "./holding-history-preparation-lease.test.mjs";
+import "./holding-import.test.mjs";
+import "./holding-batch.test.mjs";
+import "./snapshot-cost-evidence.test.mjs";
 import "./body-scroll-lock.test.mjs";
 import "./today-mobile-interaction.test.mjs";
 import "./home-mobile-interaction.test.mjs";

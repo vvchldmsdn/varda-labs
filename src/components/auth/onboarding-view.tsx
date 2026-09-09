@@ -5,6 +5,7 @@ import { AuthHeading, AuthShell } from "./auth-shell";
 import { SelfServiceTenantOnboardingForm } from "./self-service-tenant-onboarding-form";
 import { OnboardingAccountForm } from "./onboarding-account-form";
 import styles from "./auth-experience.module.css";
+import { T } from "@/components/i18n/localized-text";
 
 export type OnboardingStep = "portfolio" | "account" | "holding";
 const steps = [
@@ -73,7 +74,7 @@ export function OnboardingView({
               eyebrow="02 / YOUR FIRST ACCOUNT"
               title="첫 계좌 등록"
               description={
-                <><AuthText>{"자산을 보관하는 곳의 이름을 정해주세요."}</AuthText><br /><AuthText>{"계좌번호나 금융기관 비밀번호는 필요하지 않습니다."}</AuthText></>
+                <><T ko="보유한 종목을 담을 공간을 준비할게요." en="Let’s prepare a home for your holdings." /><br /><AuthText>{"계좌번호나 금융기관 비밀번호는 필요하지 않습니다."}</AuthText></>
               }
             />
             <OnboardingAccountForm preview={preview} />
@@ -84,7 +85,7 @@ export function OnboardingView({
               eyebrow="03 / READY TO BEGIN"
               title="첫 종목을 기록해볼까요"
               description={
-                <><AuthText>{"포트폴리오와 계좌가 준비됐습니다."}</AuthText><br /><AuthText>{"보유한 종목을 추가하면 나의 자산 흐름이 시작됩니다."}</AuthText></>
+                <><T ko="종목 이름과 보유 수량만 있으면 시작할 수 있어요." en="A holding’s name and quantity are enough to get started." /><br /><T ko="매입가는 나중에 추가해도 괜찮습니다." en="You can add purchase prices later." /></>
               }
             />
             <div className={styles.accountSummary}>
@@ -97,7 +98,7 @@ export function OnboardingView({
             <div className={styles.stack}>
               <Link
                 className={styles.primaryButton}
-                href="/portfolio/holdings/new"
+                href={preview ? "/portfolio/holdings/new?preview=design" : "/portfolio/holdings/new"}
               >
                 <Plus size={17} aria-hidden="true" /><AuthText>{"보유 종목 추가"}</AuthText></Link>
               <Link className={styles.secondaryButton} href="/"><AuthText>{"지금은 홈 둘러보기"}</AuthText><ArrowRight size={16} aria-hidden="true" />

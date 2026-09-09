@@ -394,17 +394,30 @@ export const TENANT_WRITER_REGISTRY = [
   },
   {
     id: "session_holding_onboarding",
-    classification: "user_owned",
+    classification: "mixed",
     authorization: "server_verified_session",
-    entrypoints: ["/portfolio/holdings/new#createHoldingOnboarding"],
-    implementationPaths: ["src/lib/holding-onboarding-write.ts"],
+    entrypoints: [
+      "/portfolio/holdings/new#createHoldingOnboarding",
+      "/portfolio/holdings/new#createHoldingBatch",
+    ],
+    implementationPaths: [
+      "src/lib/holding-onboarding-write.ts",
+      "src/lib/market-data/kis-refresh-lease.ts",
+      "src/lib/market-data/price-sync.ts",
+    ],
     targets: [
       userTarget("portfolio_groups", "insert"),
       userTarget("assets", "insert"),
       userTarget("holding_onboarding_evidence", "insert"),
       userTarget("portfolio_group_asset_memberships", "insert"),
+      adminTarget("market_data_sync_runs", "insert", "update"),
+      sharedTarget("live_price_quotes", "insert", "update"),
     ],
-    transition: USER_API_TRANSITION,
+    transition: {
+      prepare: "split_target_classes",
+      activate: "owner_aware_repository_or_freeze",
+      freeze: "freeze_user_targets_only",
+    },
     canonicalOwnerRolloutScope: "in_scope",
     canonicalOwnerHttpInput: "forbidden",
     legacyOwnerEvidence: "not_applicable",
@@ -606,6 +619,32 @@ export const TENANT_WRITER_REGISTRY = [
       sharedTarget("live_price_quotes", "insert", "update"),
       sharedTarget("asset_price_snapshots", "insert", "update"),
       sharedTarget("fx_rates", "insert", "update"),
+    ],
+    transition: {
+      prepare: "split_target_classes",
+      activate: "keep_owner_absent",
+      freeze: "not_required",
+    },
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "session_holding_analysis_data_preparation",
+    classification: "mixed",
+    authorization: "server_verified_session",
+    entrypoints: [
+      "/portfolio/holdings#prepareHoldingAnalysisData",
+      "/portfolio/first-look#prepareHoldingAnalysisData",
+    ],
+    implementationPaths: [
+      "src/lib/market-data/kis-refresh-lease.ts",
+      "src/lib/market-data/kis-history-cache-sync.ts",
+      "src/lib/market-data/asset-price-snapshot-repository.ts",
+    ],
+    targets: [
+      adminTarget("market_data_sync_runs", "insert", "update"),
+      sharedTarget("asset_price_snapshots", "insert", "update"),
     ],
     transition: {
       prepare: "split_target_classes",

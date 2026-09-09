@@ -34,7 +34,7 @@ export function HoldingAnalysisDataForm({
   return (
     <div className="min-w-[190px] text-xs text-[var(--muted)]">
       <p className="font-semibold text-[var(--ink)]">
-        {readinessLabel(readiness)}
+        <ManagementText>{readinessLabel(readiness)}</ManagementText>
       </p>
       {readiness.state !== "unsupported" && readiness.state !== "blocked" ? (
         <>

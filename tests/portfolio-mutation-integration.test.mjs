@@ -25,7 +25,7 @@ function deferred() {
 }
 
 let database;
-async function fixture() {
+async function fixture(options = {}) {
   const pg = database ??= new PGlite();
   await pg.exec("drop schema public cascade; create schema public;" + DDL);
   await pg.query("insert into accounts(id, canonical_owner_user_id, code, name, account_type, currency, updated_at) values($1,$2,'acct_fixture','Fixture','investment','KRW',$3)", [account, owner, updated]);
@@ -44,6 +44,7 @@ async function fixture() {
     return typeof value === "function" ? value.bind(target) : value;
   } });
   const batches = [];
+  const priceRequests = [];
   const sqlClient = {
     async transaction(build, options) {
       const commands = build({ query: (text, params = []) => ({ text, params }) });
@@ -61,8 +62,22 @@ async function fixture() {
   ], {
     "@/db/client": { db: drizzle(client), sqlClient },
     "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => ({ ok: true, tenantContext: { ownerUserId: owner } }) },
+    "@/db/queries/onboarding-instrument-search": { resolveOnboardingInstrumentById: async (id) => options.instruments?.[id] ?? null },
+    "@/lib/market-data/providers/kis": {
+      getKisProviderPolicy: () => ({ configured: options.providerConfigured !== false }),
+      createKisMarketDataProvider: () => ({ name: "kis" }),
+    },
+    "@/lib/market-data/price-sync": { runMarketPriceSync: async (request) => {
+      priceRequests.push(request);
+      if (options.refreshFailure) throw options.refreshFailure;
+      if (options.refreshPrice) {
+        const target = request.explicitTargets[0];
+        await pg.query("insert into live_price_quotes(ticker,market,currency,price,source,quote_type,status,price_as_of,fetched_at) values($1,$2,$3,$4,'kis_test','live','ok',now(),now())", [target.ticker, target.market, target.currency, options.refreshPrice]);
+      }
+      return { status: "completed" };
+    } },
   });
-  return { pg, batches, holdings, accounts, groups, marketReadStarted,
+  return { pg, batches, priceRequests, holdings, accounts, groups, marketReadStarted,
     pauseMarketRead() { marketGate = deferred(); return marketGate; },
     async count(table) { return (await pg.query(`select count(*)::int as n from ${table}`)).rows[0].n; },
   };
@@ -117,6 +132,84 @@ describe("portfolio lifecycle mutation integration", () => {
     } finally { await f.pg.exec("discard all"); }
   });
 
+  it("reuses an owner-scoped default group and preserves unknown purchase cost", async () => {
+    const f = await fixture();
+    const withoutGroup = { portfolioGroupId: "", newPortfolioGroupName: "", averageCost: "" };
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm(withoutGroup))).status, "success");
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ...withoutGroup, ticker: "000660" }))).status, "success");
+    assert.equal(await f.count("portfolio_groups"), 2);
+    const rows = (await f.pg.query("select asset.average_cost, evidence.average_cost as recorded_cost, groups.name from assets asset join holding_onboarding_evidence evidence on evidence.asset_id=asset.id join portfolio_group_asset_memberships membership on membership.asset_id=asset.id join portfolio_groups groups on groups.id=membership.portfolio_group_id")).rows;
+    assert.equal(rows.length, 2);
+    assert.ok(rows.every((row) => row.average_cost === null && row.recorded_cost === null && row.name === "기본 포트폴리오"));
+    assert.equal(f.priceRequests.length, 0);
+  });
+
+  it("does not reuse another owner's default group or spend provider budget for their account", async () => {
+    const f = await fixture();
+    await f.pg.query("insert into portfolio_groups(id,canonical_owner_user_id,name) values(gen_random_uuid(),$1,'기본 포트폴리오')", [foreign]);
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ portfolioGroupId: "" }))).status, "success");
+    const owners = (await f.pg.query("select canonical_owner_user_id from portfolio_groups where name='기본 포트폴리오'")).rows;
+    assert.deepEqual(owners.map((row) => row.canonical_owner_user_id).sort(), [owner, foreign].sort());
+    const foreignAccount = "44444444-4444-4444-8444-444444444444";
+    await f.pg.query("insert into accounts(id,canonical_owner_user_id,code,name) values($1,$2,'foreign','Foreign')", [foreignAccount, foreign]);
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ accountId: foreignAccount, ticker: "000660", currentPrice: "" }))).status, "conflict");
+    assert.equal(f.priceRequests.length, 0);
+  });
+
+  it("reuses the same explicitly named group for subsequent batch rows", async () => {
+    const f = await fixture();
+    const grouping = { portfolioGroupId: "", newPortfolioGroupName: "Long term" };
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm(grouping))).status, "success");
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ...grouping, newPortfolioGroupName: "long TERM", ticker: "000660" }))).status, "success");
+    assert.equal(await f.count("portfolio_groups"), 2);
+    assert.equal((await f.pg.query("select count(distinct portfolio_group_id)::integer as n from portfolio_group_asset_memberships")).rows[0].n, 1);
+  });
+
+  it("prepares exactly one missing quote and preserves its source rather than manufacturing a price", async () => {
+    const f = await fixture({ refreshPrice: "145000" });
+    const result = await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ticker: "000660", currentPrice: "", averageCost: "" }));
+    assert.equal(result.status, "success");
+    assert.equal(f.priceRequests.length, 1);
+    const request = f.priceRequests[0];
+    assert.equal(request.mode, "live");
+    assert.equal(request.dryRun, false);
+    assert.equal(request.targetLimit, 1);
+    assert.deepEqual(request.explicitTargets, [{ ticker: "000660", market: "korea", currency: "KRW" }]);
+    const row = (await f.pg.query("select current_price,price_source,average_cost from assets")).rows[0];
+    assert.equal(Number(row.current_price), 145000);
+    assert.equal(row.price_source, "kis_test");
+    assert.equal(row.average_cost, null);
+  });
+
+  it("leaves all portfolio records untouched on quote cooldown and returns a retry interval", async () => {
+    const f = await fixture({ refreshFailure: { code: "provider_cooldown", details: { retryAfterSeconds: 42 } } });
+    const result = await f.holdings.writeSessionHoldingOnboarding(holdingForm({ portfolioGroupId: "", ticker: "000660", currentPrice: "" }));
+    assert.equal(result.status, "price_unavailable");
+    assert.equal(result.retryAfterSeconds, 42);
+    assert.equal(f.priceRequests.length, 1);
+    assert.equal(await f.count("assets"), 0);
+    assert.equal(await f.count("holding_onboarding_evidence"), 0);
+    assert.equal(await f.count("portfolio_groups"), 1);
+  });
+
+  it("rejects stale or future price evidence when no current quote can be obtained", async () => {
+    const f = await fixture({ providerConfigured: false });
+    await f.pg.query("update live_price_quotes set fetched_at=now()-interval '1 year'");
+    await f.pg.query("insert into asset_price_snapshots(ticker,market,currency,date,close_price,is_sample) values('005930','korea','KRW','2020-01-01',999,false),('005930','korea','KRW','2099-01-01',999,false)");
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ currentPrice: "" }))).status, "price_unavailable");
+    assert.equal(await f.count("assets"), 0);
+    assert.equal(f.priceRequests.length, 0);
+  });
+
+  it("revalidates a selected catalog identity before resolving its price", async () => {
+    const instrumentId = "stock:33333333-3333-4333-8333-333333333333";
+    const f = await fixture({ instruments: { [instrumentId]: { ticker: "005930", market: "korea", currency: "KRW", assetType: "stock", name: "Verified name" } } });
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ instrumentId, ticker: "000660", currentPrice: "" }))).status, "invalid");
+    assert.equal(f.priceRequests.length, 0);
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ instrumentId, name: "Client alias" }))).status, "success");
+    assert.equal((await f.pg.query("select name from assets")).rows[0].name, "Verified name");
+  });
+
   it("does not create a group or holding for a foreign account", async () => {
     const f = await fixture();
     try {
@@ -166,5 +259,6 @@ create unique index asset_members on portfolio_group_asset_memberships(portfolio
 create table portfolio_group_account_memberships(id uuid primary key, canonical_owner_user_id uuid, portfolio_group_id uuid, account_id uuid, valid_from date, valid_to date, created_at timestamptz);
 create unique index account_members on portfolio_group_account_memberships(portfolio_group_id,account_id) where valid_to is null;
 create table live_price_quotes(ticker text, market text, currency text, price numeric, source text, quote_type text, status text, price_as_of timestamptz, fetched_at timestamptz);
+create table asset_price_snapshots(ticker text,market text,currency text,date date,close_price numeric,source text,fetched_at timestamptz,is_sample boolean default false);
 insert into live_price_quotes values('005930','korea','KRW',110,'fixture','live','ok',now(),now());
 `;
