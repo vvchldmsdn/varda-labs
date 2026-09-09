@@ -89,6 +89,7 @@
   .previewNote { font-size:10px; margin-top:6px; white-space:normal; }
   .scopeBar { flex-basis:100%; order:3; }
   .headerActions .textLink { min-width:44px; min-height:44px; justify-content:center; }
+  .headerActions .textLink > span { display:inline; }
   .workspace { display:flex; flex-direction:column; flex:none; justify-content:flex-start; align-items:stretch; min-height:0; padding:0; gap:28px; background:transparent; border-radius:0; }
   .form > label { font-size:15px; }
   .amountInput { margin-top:18px; padding-bottom:14px; }

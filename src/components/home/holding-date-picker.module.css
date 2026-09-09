@@ -1,0 +1,14 @@
+.trigger { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:44px; padding:9px 13px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:13px; font-variant-numeric:tabular-nums; }
+.dialog { position:fixed; inset:0; margin:auto; width:min(360px,calc(100vw - 48px)); max-width:none; max-height:min(560px,72dvh); padding:0; overflow:hidden; border:1px solid var(--line); border-radius:18px; background:var(--surface); color:var(--ink); box-shadow:0 18px 70px #20211f25; }
+.dialog::backdrop { background:#20211f55; }
+.shell { display:flex; flex-direction:column; max-height:min(558px,calc(72dvh - 2px)); }
+.shell header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex:none; padding:20px 16px 16px 22px; border-bottom:1px solid var(--line); }
+.shell h3 { margin:0; font-size:18px; font-weight:500; }
+.shell header p { margin:6px 0 0; color:var(--muted); font-size:12px; line-height:1.6; }
+.shell header button { display:grid; place-items:center; min-width:44px; min-height:44px; margin-top:-8px; margin-right:-8px; }
+.dates { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:6px 20px; scrollbar-width:thin; }
+.dates button { display:flex; width:100%; min-height:48px; align-items:center; justify-content:space-between; gap:10px; padding:12px 3px; border-bottom:1px solid var(--wash); font-size:14px; font-variant-numeric:tabular-nums; }
+.dates button[aria-pressed="true"] { color:var(--accent); font-weight:500; }
+.shell footer { flex:none; padding:10px 20px; border-top:1px solid var(--line); }
+.shell footer button { min-height:44px; width:100%; font-size:13px; }
+.dialog button:focus-visible,.trigger:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; border-radius:5px; }

@@ -1,6 +1,7 @@
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
+import { LocalizedLink } from "@/components/i18n/localized-link";
 import Link from "next/link";
 import { ArrowUpRight, Target } from "lucide-react";
 import { AdditionalContributionAllocationTable, AdditionalContributionFlowScene, AdditionalContributionWeightScene } from "./additional-contribution-result";
@@ -12,6 +13,7 @@ import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navig
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
 import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
 import styles from "./contribution-stage.module.css";
 
 type BlockedPreview = Readonly<{ status: "blocked"; blockers: readonly string[] }>;
@@ -32,7 +34,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
         <header className={styles.header}>
           <div className={styles.title}><h1 id="additional-contribution-title"><PortfolioText ko={"다음 투입의 균형."} /></h1>{!enableLivePriceSync ? <LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement> : null}</div>
           <div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/additional-contribution" query={{ amount: String(amountKrw), ...designQuery }} scopes={scopes} selectedScopeKey={selectedScope.key} variant="underline" /></div>
-          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/targets", selectedScope.key)} title="목표비중 설정"><Target size={16} aria-hidden="true" /><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={13} aria-hidden="true" /></Link></div>
+          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<LocalizedLink className={styles.textLink} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }} href={buildPortfolioTargetNavigation({ scopeKey: selectedScope.key, from: "contribution", amount: String(amountKrw), isDesignPreview: !enableLivePriceSync }).settingsHref}><Target size={16} aria-hidden="true" /><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={13} aria-hidden="true" /></LocalizedLink></div>
         </header>
         <ContributionCalculator amountKrw={amountKrw} scopeKey={selectedScope.key} isDesignPreview={!enableLivePriceSync} status={preview.status} allocations={preview.status === "ready" ? <FeaturedAllocation preview={preview} /> : undefined}>
           {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span><PortfolioText ko={"배분의 시작은 목표비중에서"} /></span><strong><PortfolioText ko={"계산 근거를"} /><br /><PortfolioText ko={"확인해 주세요."} /></strong><p><PortfolioText ko={preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."} /></p></div>}

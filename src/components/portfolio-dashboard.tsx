@@ -5,7 +5,7 @@ import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
-import { ArrowUpRight, Sigma } from "lucide-react";
+import { ArrowUpRight, Sigma, Target } from "lucide-react";
 import styles from "@/components/home/portfolio-overview.module.css";
 
 import { FxImpactPopover } from "@/components/home/fx-impact-popover";
@@ -24,6 +24,7 @@ import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navig
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import { selectLargestMovementContributor } from "@/lib/home-metrics";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
+import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
 import {
   buildPortfolioAnalysisScopeHref,
   type PortfolioAnalysisScope,
@@ -63,6 +64,7 @@ export function PortfolioDashboard({
       : 0;
   const structureHref = scopedHref("/portfolio/structure", data.selectedScope.key, designPreview);
   const riskHref = scopedHref("/portfolio/risk", data.selectedScope.key, designPreview);
+  const targetNavigation = buildPortfolioTargetNavigation({ scopeKey: data.selectedScope.key, from: "home", isDesignPreview: designPreview });
 
   return (
     <main className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="home">
@@ -86,6 +88,9 @@ export function PortfolioDashboard({
             />
             </div>
             <div className={styles.stageRefresh}>
+              <LocalizedLink href={targetNavigation.settingsHref} className={styles.targetEntry} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }}>
+                <Target size={17} strokeWidth={1.6} aria-hidden="true" /><T ko="목표비중" en="Targets" />
+              </LocalizedLink>
               <PortfolioRefreshButton autoSync={liveSyncEnabled} designPreview={designPreview} />
             </div>
           </header>

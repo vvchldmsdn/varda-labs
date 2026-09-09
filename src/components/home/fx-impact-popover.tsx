@@ -2,40 +2,16 @@
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
-
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-
-import {
-  formatDate,
-  formatPercent,
-  formatSignedKrw,
-  toneClass,
-} from "@/components/home/portfolio-format";
+import { useId, useMemo, useRef, useState } from "react";
+import { formatDate, formatPercent, formatSignedKrw, toneClass } from "@/components/home/portfolio-format";
 import type { DashboardFxTrendPoint } from "@/lib/fx-trend";
+import styles from "./fx-impact-popover.module.css";
 
 const CHART_WIDTH = 420;
 const CHART_HEIGHT = 132;
 const CHART_PADDING = 10;
-const PANEL_WIDTH = 460;
-const PANEL_GAP = 10;
-const VIEWPORT_MARGIN = 16;
 
-type PanelPosition = {
-  left: number;
-  maxHeight: number;
-  placement: "top" | "bottom";
-  top: number;
-};
-
-export function FxImpactPopover({
-  basisDate,
-  compact = false,
-  impactKrw,
-  impactPct,
-  points,
-}: {
+export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactPct, points }: {
   basisDate: string | null;
   compact?: boolean;
   impactKrw: number | null;
@@ -44,101 +20,26 @@ export function FxImpactPopover({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const chart = useMemo(() => buildChart(points), [points]);
   const latest = points.at(-1) ?? null;
-
-  const updatePanelPosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const panel = panelRef.current;
-    if (!trigger || !panel) return;
-
-    const triggerRect = trigger.getBoundingClientRect();
-    const panelRect = panel.getBoundingClientRect();
-    const panelWidth = Math.min(PANEL_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
-    const maxHeight = Math.max(window.innerHeight - VIEWPORT_MARGIN * 2, 240);
-    const panelHeight = Math.min(panelRect.height, maxHeight);
-    const spaceAbove = triggerRect.top - VIEWPORT_MARGIN - PANEL_GAP;
-    const spaceBelow = window.innerHeight - triggerRect.bottom - VIEWPORT_MARGIN - PANEL_GAP;
-    const placement = spaceBelow >= panelHeight || spaceBelow >= spaceAbove ? "bottom" : "top";
-    const preferredLeft = window.innerWidth >= 1024
-      ? triggerRect.right - panelWidth
-      : triggerRect.left;
-    const left = Math.min(
-      Math.max(preferredLeft, VIEWPORT_MARGIN),
-      window.innerWidth - panelWidth - VIEWPORT_MARGIN,
-    );
-    const top = placement === "top"
-      ? Math.max(VIEWPORT_MARGIN, triggerRect.top - PANEL_GAP - panelHeight)
-      : Math.min(triggerRect.bottom + PANEL_GAP, window.innerHeight - VIEWPORT_MARGIN - panelHeight);
-
-    setPanelPosition({ left, maxHeight, placement, top });
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      updatePanelPosition();
-      panelRef.current?.focus();
-    });
-    window.addEventListener("resize", updatePanelPosition);
-    window.addEventListener("scroll", updatePanelPosition, true);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", updatePanelPosition);
-      window.removeEventListener("scroll", updatePanelPosition, true);
-    };
-  }, [open, updatePanelPosition]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (!rootRef.current?.contains(target) && !panelRef.current?.contains(target)) {
-        setOpen(false);
-        setPanelPosition(null);
-      }
-    }
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        setPanelPosition(null);
-        triggerRef.current?.focus();
-      }
-    }
-
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const panel = open && typeof document !== "undefined"
-    ? createPortal(
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-label={t("원 달러 환율 추세", "USD/KRW exchange rate trend")}
-          data-placement={panelPosition?.placement}
-          tabIndex={-1}
-          className="z-50 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(26,32,27,0.16)] focus:outline-none"
-          style={{
-            left: panelPosition?.left ?? VIEWPORT_MARGIN,
-            maxHeight: panelPosition?.maxHeight ?? `calc(100dvh - ${VIEWPORT_MARGIN * 2}px)`,
-            position: "fixed",
-            top: panelPosition?.top ?? VIEWPORT_MARGIN,
-            visibility: panelPosition ? "visible" : "hidden",
-            width: `min(${PANEL_WIDTH}px, calc(100vw - ${VIEWPORT_MARGIN * 2}px))`,
-          }}
-        >
+  return <div className={styles.root}>
+    <button ref={triggerRef} type="button" aria-expanded={open} aria-controls={panelId}
+      className={compact ? styles.trigger : styles.impactTrigger}
+      onClick={() => setOpen(value => !value)}>
+          {compact ? <><T ko="환율 추세 살펴보기" en="Explore the exchange rate"/> <span aria-hidden="true">{open ? "−" : "+"}</span></> : <>
+          <span className="flex items-center justify-between gap-3 text-xs font-medium text-[var(--muted)]"><T ko="환율 영향" en="FX impact"/><span aria-hidden="true" className="text-base text-[var(--faint)]">{open ? "−" : "+"}</span>
+          </span>
+          <span className={`mt-3 block truncate text-xl font-medium tabular-nums ${toneClass(impactKrw)}`}>
+            {<T ko={formatSignedKrw(impactKrw)} en={translateHomeHistory(formatSignedKrw(impactKrw))}/>}
+          </span>
+          <span className="mt-2 block truncate text-xs text-[var(--muted)]">
+            {formatPercent(impactPct, true)}
+          </span>
+          </>}
+    </button>
+    {open ? <section id={panelId} aria-label={t("원 달러 환율 추세", "USD/KRW exchange rate trend")} className={styles.panel}>
           <div className="flex items-start justify-between gap-5">
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">USD / KRW</p>
@@ -153,7 +54,6 @@ export function FxImpactPopover({
               className="grid h-8 w-8 place-items-center rounded-full text-xl text-[var(--muted)] hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
               onClick={() => {
                 setOpen(false);
-                setPanelPosition(null);
                 triggerRef.current?.focus();
               }}
             >
@@ -199,49 +99,15 @@ export function FxImpactPopover({
                   <Legend color="var(--brand-mid)" label={t("60일선", "60-day MA")} />
                   <Legend color="var(--warning)" label={t("120일선", "120-day MA")} />
                 </div>
-                <p className="mt-4 border-t border-[var(--wash)] pt-3 text-[10px] leading-4 text-[var(--faint)]"><T ko="오늘 영향은" en="Today's FX impact is measured from"/>{<T ko={basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근"} en={translateHomeHistory(basisDate ? `${formatDate(basisDate)} 오전 7시` : "최근")}/>}<T ko="기준 스냅샷 이후의 환율 차이입니다. 직전 주기의 환율 변동은 이미 평가액과 이력에 반영됩니다." en="baseline snapshot. Earlier FX changes are already reflected in portfolio values and history."/></p>
+                <p className="mt-4 border-t border-[var(--wash)] pt-3 text-[10px] leading-4 text-[var(--faint)]"><T ko={`오늘의 환율 영향은 ${basisDate ? formatDate(basisDate) : "최근"} 기준 스냅샷과 현재 환율의 차이로 계산합니다.`} en={`Today's FX impact compares the exchange rate in the ${basisDate ? formatDate(basisDate) : "latest"} baseline snapshot with the current rate.`}/></p>
               </div>
             </>
           ) : (
             <p className="mt-6 border-y border-[var(--wash)] py-8 text-center text-sm text-[var(--muted)]"><T ko="표시할 환율 이력이 아직 없습니다." en="No exchange rate history is available yet."/></p>
           )}
-        </div>,
-        document.body,
-      )
-    : null;
 
-  return (
-    <>
-      <div
-        ref={rootRef}
-        className={compact ? "relative min-w-0" : "relative min-w-0 border-b border-[var(--wash)] sm:even:border-r sm:even:border-[var(--wash)] lg:border-b-0 lg:border-r lg:border-[var(--wash)]"}
-      >
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          className={compact ? "inline-flex min-h-9 items-center gap-2 text-xs font-medium text-[var(--brand)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]" : "block min-h-full w-full px-5 py-6 text-left transition-colors hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand)]"}
-          onClick={() => {
-            setPanelPosition(null);
-            setOpen((value) => !value);
-          }}
-        >
-          {compact ? <><T ko="환율 추세 살펴보기" en="Explore the exchange rate"/> <span aria-hidden="true">↗</span></> : <>
-          <span className="flex items-center justify-between gap-3 text-xs font-medium text-[var(--muted)]"><T ko="환율 영향" en="FX impact"/><span aria-hidden="true" className="text-base text-[var(--faint)]">↗</span>
-          </span>
-          <span className={`mt-3 block truncate text-xl font-medium tabular-nums ${toneClass(impactKrw)}`}>
-            {<T ko={formatSignedKrw(impactKrw)} en={translateHomeHistory(formatSignedKrw(impactKrw))}/>}
-          </span>
-          <span className="mt-2 block truncate text-xs text-[var(--muted)]">
-            {formatPercent(impactPct, true)}
-          </span>
-          </>}
-        </button>
-      </div>
-      {panel}
-    </>
-  );
+    </section> : null}
+  </div>;
 }
 
 function FxValue({ divided = false, label, value }: { divided?: boolean; label: string; value: number | null }) {

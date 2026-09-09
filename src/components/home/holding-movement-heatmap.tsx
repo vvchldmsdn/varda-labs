@@ -28,6 +28,8 @@ import type {
   PortfolioDashboardHoldingHistory,
 } from "@/lib/portfolio-dashboard-history";
 import { buildHoldingConnectionGraph } from "@/lib/holding-connection-graph";
+import { HoldingDatePicker } from "./holding-date-picker";
+import { MobileHoldingConnections } from "./mobile-holding-connections";
 import styles from "@/components/home/portfolio-overview.module.css";
 
 type HeatmapMode = "movement" | "allocation" | "connections";
@@ -180,6 +182,8 @@ function ConnectionMap({
 
   return (
     <div className="border-y border-[var(--wash)] py-4">
+      <MobileHoldingConnections graph={graph} />
+      <div className={styles.connectionDesktop}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-[10px] text-[var(--muted)]">
         <p><T ko="최근 저장 일별 등락 · 상위" en="Recorded daily changes · Top"/> {graph.nodes.length}<T ko="종목" en="Holding"/></p>
         <div className="flex items-center gap-4" aria-label={t("연결선 범례", "Connection legend")}>
@@ -268,8 +272,9 @@ function ConnectionMap({
           ))}
         </svg>
       </div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-4 px-1 pt-1">
-        <p className="max-w-xl text-[10px] leading-4 text-[var(--faint)]"><T ko="선은 같은 날짜에 관측된 일별 등락의 방향만 요약합니다. ETF 내부 종목 겹침이나 투자 권고를 뜻하지 않습니다." en="Lines summarize daily changes observed on matching dates. They do not represent ETF overlap or investment recommendations."/></p>
+        <p className={`${styles.connectionDesktop} max-w-xl text-[10px] leading-4 text-[var(--faint)]`}><T ko="선은 같은 날짜에 관측된 일별 등락의 방향만 요약합니다. ETF 내부 종목 겹침이나 투자 권고를 뜻하지 않습니다." en="Lines summarize daily changes observed on matching dates. They do not represent ETF overlap or investment recommendations."/></p>
         <ConnectionLinks riskHref={riskHref} />
       </div>
     </div>
@@ -331,12 +336,10 @@ function MovementMatrix({
     <div className={stage ? styles.stageMatrix : "overflow-x-auto pb-1"} data-heatmap-grid>
       {stage ? (
         <div className={styles.mobileMovements}>
-          <label className={styles.mobileMovementDate}>
+          <div className={styles.mobileMovementDate}>
             <span><T ko="일별 변동" en="Daily changes"/></span>
-            <select value={selectedMobileDate} onChange={(event) => setMobileDate(event.target.value)}>
-              {[...history.dates].reverse().map((date) => <option key={date} value={date}>{<T ko={formatDate(date)} en={translateHomeHistory(formatDate(date))}/>}</option>)}
-            </select>
-          </label>
+            <HoldingDatePicker dates={history.dates} value={selectedMobileDate} onChange={setMobileDate} />
+          </div>
           <div className={styles.mobileMovementRows}>
             {history.rows.map((row, rowIndex) => {
               const cellIndex = row.cells.findIndex((cell) => cell.date === selectedMobileDate);

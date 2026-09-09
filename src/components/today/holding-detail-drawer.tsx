@@ -2,31 +2,50 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
-import styles from "@/components/home/portfolio-overview.module.css";
+import { X } from "lucide-react";
+import { useI18n } from "@/components/i18n/locale-provider";
+import styles from "./today-interaction.module.css";
 
 export function HoldingDetailDrawer({ children, closeHref }: { children: ReactNode; closeHref: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreRef = useRef<(() => void) | null>(null);
+  const backdropPointerRef = useRef(false);
+  const closingRef = useRef(false);
   const router = useRouter();
+  const { t } = useI18n();
 
   useEffect(() => {
     const dialog = dialogRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog?.showModal();
-    return () => {
+    const restore = () => {
       dialog?.close();
       document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      const trigger = previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
+        : Array.from(document.querySelectorAll<HTMLElement>('[data-holding-detail-trigger="summary"]')).find(element => element.getClientRects().length > 0);
+      trigger?.focus({ preventScroll: true });
     };
+    restoreRef.current = restore;
+    closingRef.current = false;
+    document.body.style.overflow = "hidden";
+    dialog?.showModal();
+    closeButtonRef.current?.focus({ preventScroll: true });
+    return restore;
   }, []);
 
-  const close = () => router.push(closeHref, { scroll: false });
+  const close = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    restoreRef.current?.();
+    router.push(closeHref, { scroll: false });
+  };
 
   return (
     <dialog
       ref={dialogRef}
-      className={styles.holdingDialog}
+      className={styles.dialog}
+      data-holding-dialog
       aria-labelledby="holding-detail-title"
       onCancel={(event) => { event.preventDefault(); close(); }}
       onKeyDown={(event) => {
@@ -45,13 +64,21 @@ export function HoldingDetailDrawer({ children, closeHref }: { children: ReactNo
           first.focus();
         }
       }}
-      onClick={(event) => {
-        if (event.target !== event.currentTarget) return;
+      onPointerDown={(event) => {
         const bounds = event.currentTarget.getBoundingClientRect();
-        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) close();
+        backdropPointerRef.current = event.target === event.currentTarget && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom);
+      }}
+      onClick={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (backdropPointerRef.current && event.target === event.currentTarget && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) close();
+        backdropPointerRef.current = false;
       }}
     >
-      {children}
+      <div className={styles.dialogToolbar}>
+        <span>{t("종목 상세", "Holding details")}</span>
+        <button ref={closeButtonRef} type="button" onClick={close} className={styles.closeButton} aria-label={t("종목 상세 닫기", "Close holding details")}><span>{t("닫기", "Close")}</span><X size={18} aria-hidden="true"/></button>
+      </div>
+      <div className={styles.dialogBody} data-holding-dialog-body>{children}</div>
     </dialog>
   );
 }
