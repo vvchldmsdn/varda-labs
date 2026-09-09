@@ -6,6 +6,7 @@ import {
   EmailRecoveryForm,
   type EmailRecoveryMode,
 } from "./email-recovery-form";
+import { EmailVerificationForm } from "./email-verification-form";
 import styles from "./auth-experience.module.css";
 
 const headings = {
@@ -15,7 +16,7 @@ const headings = {
   },
   "verify-email": {
     title: "이메일 인증",
-    description: "인증 메일의 링크를 열어 이메일을 확인해 주세요.",
+    description: "메일로 받은 숫자 코드로 이메일을 확인해 주세요.",
   },
   "reset-password": {
     title: "새 비밀번호",
@@ -46,12 +47,15 @@ export function AuthRecovery({
     >
       <section className={styles.panel} data-auth-entry>
         <AuthHeading eyebrow="YOUR ACCOUNT" {...headings[mode]} />
-        <EmailRecoveryForm
+        {mode === "verify-email" ? <EmailVerificationForm
+          enabled={availability.emailPassword}
+          preview={designPreview}
+        /> : <EmailRecoveryForm
           mode={mode}
           enabled={availability.emailPassword}
           preview={designPreview}
           resetToken={resetToken}
-        />
+        />}
       </section>
     </AuthShell>
   );

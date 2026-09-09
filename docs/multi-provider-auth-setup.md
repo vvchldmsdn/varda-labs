@@ -1,6 +1,6 @@
 # Multi-provider authentication
 
-Updated: 2026-08-30
+Updated: 2026-09-10
 
 ## Scope
 
@@ -57,7 +57,7 @@ transport at `/api/oauth/*`. Both session types resolve through the same existin
 
 1. Enable email/password in the production Neon Auth configuration.
 2. Require email verification. Configure verification mail on signup/sign-in,
-   the verification link lifetime, reset-password mail, and server-side rate
+   select **Verification code**, configure reset-password mail and server-side rate
    limits. The UI resend cooldown is not a security rate limiter.
 3. Configure the Neon email provider / production SMTP sender and verify sender
    domain delivery. Passwords and verification/reset token issuance remain in
@@ -81,6 +81,34 @@ analytics, and never persisted to local/session storage. Auth pages use
 New passwords require 12-128 characters. Existing shorter passwords can still
 be used for sign-in if accepted by the provider. Passwords are not trimmed, and
 password managers and paste remain supported.
+
+### Numeric email verification
+
+Signup, unverified password sign-in and `/auth/verify-email` share one code form.
+Users can request a code or enter a code they already received, without another
+signup. The six-digit value stays a string so leading zeros survive; it is not
+placed in URLs, browser storage, analytics or application logs. Only the managed
+`POST /api/auth/email-otp/verify-email` endpoint can consume and verify it. The
+application allows a strict email/code body under the existing same-origin,
+body-size and email-feature guards. Passwordless OTP sign-in and code lookup
+endpoints remain closed.
+
+Resending uses `sendVerificationEmail`; managed Neon sends the verification type
+selected in its branch configuration. A successful request does not prove either
+account existence or delivery. Incorrect, expired and attempt-limited codes have
+separate Korean/English guidance. Success requires the returned verified user
+and leads to normal sign-in; the app does not assume an authenticated session.
+
+The production mail diagnosis on 2026-09-10 found Gmail SMTP authentication
+failure (535 5.7.8), plus numeric verification configured against the former
+link-only UI. For the designated first-user test, Neon shared mail can provide
+numeric codes without a personal mailbox credential. This is a temporary
+development/testing arrangement with provider limits, not the long-term
+production mail plan. Once a user-controlled sending domain is available, use a
+custom sender such as Resend SMTP, with a sending-only, domain-restricted key.
+Neither a sender domain nor a Resend account is currently available; do not
+claim the custom sender is configured. SMTP/provider secrets are entered into
+the provider console, not this repository or a public Vercel variable.
 
 ## 3. Naver
 

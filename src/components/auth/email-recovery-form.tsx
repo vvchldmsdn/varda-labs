@@ -6,10 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Check, LoaderCircle } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
 import { authErrorMessage } from "@/lib/auth/auth-error-message";
-import {
-  AUTH_EMAIL_VERIFIED_PATH,
-  AUTH_PASSWORD_RESET_PATH,
-} from "@/lib/auth/auth-methods";
+import { AUTH_PASSWORD_RESET_PATH } from "@/lib/auth/auth-methods";
 import { AuthPasswordField } from "./auth-password-field";
 import styles from "./auth-experience.module.css";
 
@@ -24,7 +21,7 @@ export function EmailRecoveryForm({
   preview = false,
   resetToken = "",
 }: {
-  mode: EmailRecoveryMode;
+  mode: Exclude<EmailRecoveryMode, "verify-email">;
   enabled: boolean;
   preview?: boolean;
   resetToken?: string;
@@ -74,12 +71,7 @@ export function EmailRecoveryForm({
     try {
       const result = resetting
         ? await authClient.resetPassword({ newPassword: password, token })
-        : mode === "verify-email"
-          ? await authClient.sendVerificationEmail({
-              email,
-              callbackURL: AUTH_EMAIL_VERIFIED_PATH,
-            })
-          : await authClient.requestPasswordReset({
+        : await authClient.requestPasswordReset({
               email,
               redirectTo: AUTH_PASSWORD_RESET_PATH,
             });
@@ -185,9 +177,7 @@ export function EmailRecoveryForm({
                 ? `${seconds}초 후 재전송`
                 : resetting
                   ? "비밀번호 변경"
-                  : mode === "verify-email"
-                    ? "인증 메일 보내기"
-                    : "재설정 링크 보내기"}</AuthText>
+                  : "재설정 링크 보내기"}</AuthText>
           </span>
           {pending ? (
             <LoaderCircle

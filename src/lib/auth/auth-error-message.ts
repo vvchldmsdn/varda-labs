@@ -12,6 +12,12 @@ export function authErrorMessage(
   }
   if (error?.code === "EMAIL_NOT_VERIFIED")
     return "이메일 인증이 필요합니다. 받은 메일을 확인해 주세요.";
+  if (error?.code === "INVALID_OTP")
+    return "인증 코드가 올바르지 않습니다. 메일의 숫자를 다시 확인해 주세요.";
+  if (error?.code === "OTP_EXPIRED")
+    return "인증 코드가 만료되었습니다. 새 코드를 요청해 주세요.";
+  if (error?.code === "TOO_MANY_ATTEMPTS")
+    return "인증 시도 횟수를 초과했습니다. 잠시 후 새 코드를 요청해 주세요.";
   if (error?.code === "INVALID_TOKEN" || error?.code === "TOKEN_EXPIRED")
     return "링크가 만료되었거나 유효하지 않습니다. 새 메일을 요청해 주세요.";
   if (

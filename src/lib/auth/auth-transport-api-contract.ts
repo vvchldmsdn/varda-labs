@@ -60,6 +60,11 @@ const schemas = {
     email,
     callbackURL: z.literal(AUTH_EMAIL_VERIFIED_PATH),
   }),
+  "email-otp/verify-email": z.strictObject({
+    email,
+    // Keep leading zeroes; managed Neon Auth validates and consumes the code.
+    otp: z.string().regex(/^[0-9]{6}$/),
+  }),
   "request-password-reset": z.strictObject({
     email,
     redirectTo: z.literal(AUTH_PASSWORD_RESET_PATH),

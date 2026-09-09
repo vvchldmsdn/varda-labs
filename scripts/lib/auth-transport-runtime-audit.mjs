@@ -135,7 +135,7 @@ export function auditAuthTransportRuntime(root) {
     route.includes("forwardedRequest") &&
     route.indexOf("createReviewedAuthRequest") <
       route.indexOf("runtime.auth.handler()");
-  if (allowedAuthApiEndpoints !== 7) {
+  if (allowedAuthApiEndpoints !== 8) {
     findings.push("auth_endpoint_allowlist_drift");
   }
   if (!socialProvidersRestricted) {
