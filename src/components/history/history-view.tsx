@@ -11,6 +11,7 @@ import { historyEvidencePage, normalizeHistoryDetail, type HistoryDetailParams }
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 import { buildHistoryOverview } from "@/lib/history-overview";
+import type { HistoryLiveValuation } from "@/lib/history-live-valuation";
 import {
   buildBalanceHistoryTrajectory,
   buildPortfolioHistoryTrajectory,
@@ -39,17 +40,20 @@ export function HistoryView({
   generatedAt,
   history,
   detailParams = {},
+  liveValuation,
 }: {
   events: TenantEventLedgerQueryResult | null;
   eventsSupported: boolean;
   generatedAt: string;
   history: ReadOnlyHistoryBalance;
   detailParams?: HistoryDetailParams;
+  liveValuation?: HistoryLiveValuation | null;
 }) {
   const detail = normalizeHistoryDetail(detailParams);
   const overview = buildHistoryOverview({
     rows: history.portfolioRows,
     events: historyOverviewEvents(events),
+    liveValuation,
   });
   return (
     <main
@@ -69,9 +73,12 @@ export function HistoryView({
             <PortfolioAnalysisScopeTabs basePath="/history" query={detailParams.preview === "design" ? { preview: "design" } : undefined} scopes={history.analysisScopes} selectedScopeKey={history.selectedScope.key} variant="underline" />
           </header>
 
-          <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} status={history.unavailableSources.length ? `일부 기록 확인 필요 · ${history.unavailableSources.map(historyReadSourceLabel).join(", ")}` : undefined} details={
+          <HistoryTimeExplorer model={overview} scopeLabel={history.selectedScope.label} status={<>
+            {history.unavailableSources.length ? <T ko={`일부 기록 확인 필요 · ${history.unavailableSources.map(historyReadSourceLabel).join(", ")}`} en={`Some records need review · ${history.unavailableSources.map(source => translateHomeHistory(historyReadSourceLabel(source))).join(", ")}`}/> : null}
+            {liveValuation && (liveValuation.state === "partial" || liveValuation.state === "unavailable") ? <p><T ko="현재 평가 근거가 부족해 오늘 값을 추가하지 않았습니다. 저장 기록은 그대로 표시합니다." en="Today's value is unavailable because current valuation evidence is incomplete. Recorded history remains visible."/></p> : null}
+          </>} details={
             <HistoryRecordsDialog key="history-records" panel={detail}>
-              {detail === "raw" ? <HistoryRawEvidence history={history} events={events} overview={overview} detailParams={detailParams} /> : detail === "records" ? (
+              {detail === "raw" ? <HistoryRawEvidence history={history} events={events} overview={buildHistoryOverview({ rows: history.portfolioRows, events: historyOverviewEvents(events) })} detailParams={detailParams} /> : detail === "records" ? (
           <div className={styles.support}>
             <div className={styles.activity}>
               <HistoryActivityStream result={events} supported={eventsSupported} />

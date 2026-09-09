@@ -48,7 +48,8 @@ export function historyPointsWithMetric(
   points: readonly HistoryOverviewPoint[],
   mode: HistoryExplorerMode,
 ) {
-  return points.filter((point) => {
+  const observations = mode === "return" ? points.map(point => point.rowKind === "live" && point.recordedPoint ? point.recordedPoint : point) : points;
+  return observations.filter((point) => {
     const value = historyPointMetric(point, mode);
     return value !== null && Number.isFinite(value);
   });

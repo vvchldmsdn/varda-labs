@@ -12,7 +12,8 @@ describe("history redesign boundaries", () => {
     assert.match(page, /resolveCurrentTenantContext\(\)/);
     assert.match(page, /getReadOnlyTenantHistoryBalance/);
     assert.match(page, /getReadOnlyTenantEvents/);
-    assert.match(page, /const \[history, events\] = await Promise\.all/);
+    assert.match(page, /getReadOnlyTenantHistoryLiveValuation/);
+    assert.match(page, /const \[history, events, liveValuation\] = await Promise\.all/);
     assert.match(page, /generatedAt=\{new Date\(\)\.toISOString\(\)\}/);
     assert.doesNotMatch(page, /^"use client";/);
   });

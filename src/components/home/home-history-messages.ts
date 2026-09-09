@@ -2,6 +2,7 @@ import { translationEntry } from "../../lib/i18n/locale.ts";
 
 // Only service-authored display copy belongs here. Asset and account names stay intact.
 export const homeHistoryMessages: Readonly<Record<string, string>> = {
+  "현재 보유자산 평가": "Current holdings valuation",
   "날짜별 변동과 자산의 구성을 확인하세요.": "Explore daily changes and your asset allocation.",
   "종목 흐름 보기 방식": "Holding history view",
   "일별 변동": "Daily changes",

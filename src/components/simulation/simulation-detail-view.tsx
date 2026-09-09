@@ -7,7 +7,7 @@ import {
 import type { ReactNode } from "react";
 import type { SimulationPanel } from "@/lib/simulation-panel";
 
-import { InvestmentLabDisclosure as SimulationDisclosure } from "@/components/investment-lab/investment-lab-disclosure";
+import { SimulationDisclosure } from "./simulation-disclosure";
 import styles from "./simulation-workspace.module.css";
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
 import { buildSimulationHref } from "@/lib/simulation-navigation";

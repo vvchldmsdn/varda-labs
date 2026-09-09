@@ -26,7 +26,7 @@ const LABELS: Record<
   actual: { label: "실제 포트폴리오", detail: "저장된 실제 평가 이력" },
   kodex200: {
     label: "전액 KODEX 200",
-    detail: "동일한 입출금 · 국내 지수 ETF",
+    detail: "동일한 매수·매도 금액 · 국내 지수 ETF",
   },
   voo: { label: "전액 S&P 500", detail: "Vanguard S&P 500 ETF · 환율 반영" },
   fixed_mix: {
@@ -39,7 +39,7 @@ const LABELS: Record<
   },
   zero_return: {
     label: "수익률 0% 기준선",
-    detail: "동일 입출금 · 현금수익 가정 없음",
+    detail: "동일 투자금 흐름 · 이자 없음",
   },
   anchor_basket: {
     label: "처음부터 동일 비중",

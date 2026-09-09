@@ -24,7 +24,7 @@ export function buildHoldingConnectionGraph(
   history: PortfolioDashboardHoldingHistory,
 ) {
   const rows = [...history.rows]
-    .filter((row) => row.cells.some((cell) => cell.changePct !== null))
+    .filter((row) => row.cells.some((cell) => cell.basis !== "live_price" && cell.changePct !== null))
     .toSorted((left, right) => right.currentWeight - left.currentWeight)
     .slice(0, 7);
   const maxWeight = Math.max(...rows.map((row) => row.currentWeight), 1);
@@ -71,8 +71,9 @@ function pairwiseCorrelation(
   left: readonly PortfolioDashboardHeatmapCell[],
   right: readonly PortfolioDashboardHeatmapCell[],
 ) {
-  const rightByDate = new Map(right.map((cell) => [cell.date, cell.changePct]));
-  const pairs = left.flatMap((cell) => {
+  // Live native-price changes have a different basis from saved KRW unit-value changes.
+  const rightByDate = new Map(right.filter(cell => cell.basis !== "live_price").map((cell) => [cell.date, cell.changePct]));
+  const pairs = left.filter(cell => cell.basis !== "live_price").flatMap((cell) => {
     const rightValue = rightByDate.get(cell.date);
     return cell.changePct !== null && rightValue !== null && rightValue !== undefined
       ? [[cell.changePct, rightValue] as const]

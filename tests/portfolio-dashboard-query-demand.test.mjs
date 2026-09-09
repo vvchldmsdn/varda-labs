@@ -18,7 +18,7 @@ const assets = [baseAsset, { ...baseAsset, id: otherAssetId, accountId: otherAcc
 const event = { id: "event-fixture", assetId, accountId, account: "brokerage", ticker: "QQQ", eventDate: "2025-01-02", eventType: "sell", amountKrw: "154000", quantityDelta: "-1", beforeValue: { average_cost: 100, quantity: 11, currency: "USD" }, afterValue: { average_cost: 100, quantity: 10, currency: "USD" }, price: "110", fxRate: "1400", isSample: false };
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
 
-async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, baselineRows = [], liveRows = [], eventRows = [event] } = {}) {
+async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, baselineRows = [], liveRows = [], priceRows = [], eventRows = [event] } = {}) {
   const trace = [];
   const fxLimits = [];
   const dialect = new PgDialect();
@@ -37,6 +37,7 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
         if (request.table === "assets") rows = assetRows;
         if (request.table === "daily_position_snapshots" && request.projection?.id) rows = baselineRows;
         if (request.table === "live_price_quotes") rows = liveRows;
+        if (request.table === "asset_price_snapshots") rows = priceRows;
         if (request.projection?.count) rows = [{ count: 0 }];
         if (request.table === "event_ledger_entries") rows = eventRows;
         const gate = request.table === "event_ledger_entries" ? eventsGate?.promise : undefined;
@@ -61,6 +62,26 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
 const historicalPositionReads = (trace) => trace.filter((request) => request.table === "daily_position_snapshots" && request.limit !== null);
 
 describe("dashboard query demand and independent market reads", () => {
+  it("connects today's KST heatmap to native price return while preserving separate FX movement", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-08T15:20:00Z") });
+    const f = await fixture({ assetRows: [baseAsset], eventRows: [],
+      baselineRows: [{ id: "snapshot-fixture", snapshotDate: "2026-09-08", assetId, legacyAssetId: null, account: "brokerage", ticker: "QQQ", assetName: "QQQ", assetType: "etf", currency: "USD", quantity: "10", unitPrice: "100", marketValueKrw: "1000000", fxRate: "1000" }],
+      liveRows: [{ ticker: "QQQ", market: "us", currency: "USD", price: "103", status: "ok", quoteType: "live", fetchedAt: new Date("2026-09-08T15:19:30Z"), priceAsOf: new Date("2026-09-08T15:19:00Z") }],
+      priceRows: [{ ticker: "QQQ", market: "us", currency: "USD", priceDate: "2026-09-04", closePrice: "100", adjustedClosePrice: "98", fxRate: "1000", closePriceKrw: "100000" }],
+    });
+    const home = await f.model.getPortfolioDashboard({ analysisScopes: [scope], scope, tenantContext });
+    assert.equal(home.holdingHistory.dates.at(-1), "2026-09-09");
+    const cell = home.holdingHistory.rows[0].cells.at(-1);
+    assert.equal(home.holdings[0].dailyPriceReturn.changePct, 3);
+    assert.equal(cell.changePct, 3);
+    assert.equal(cell.basis, "live_price");
+    assert.equal(cell.changeKrw, 442_000);
+    assert.equal(cell.priceChangeKrw, 30_000);
+    assert.equal(cell.fxChangeKrw, 412_000);
+    assert.equal(home.holdings[0].dailyReturnPct, 44.2);
+    assert.equal(home.totalValueKrw, 1_442_000);
+  });
+
   it("starts quote reads after assets even while settings and then the ledger remain pending", async () => {
     const settingsGate = deferred();
     const eventsGate = deferred();

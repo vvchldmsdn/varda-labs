@@ -45,7 +45,7 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
     }
     const observed = geometry.points[index];
     if (!observed) return;
-    // The visual marker follows the curve; every displayed number remains a saved observation.
+    // The marker follows the curve; values remain observations, including the labeled current endpoint.
     let visual = observed;
     const path = pathRef.current;
     if (path && geometry.points.length > 1) {
@@ -73,7 +73,7 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
   return (
     <div className={styles.chart} data-history-chart>
       <div className="varda-history-chart relative w-full">
-        <svg role="img" aria-label={t(mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름", translateHomeHistory(mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름"))}
+        <svg role="img" aria-label={mode === "value" && displayPoints.some(point => point.rowKind === "live") ? t("과거 저장 기록과 오늘의 현재 포트폴리오 평가액 흐름", "Recorded history and today's current portfolio valuation") : t(mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름", translateHomeHistory(mode === "value" ? "저장된 날짜별 포트폴리오 평가액 흐름" : "저장된 날짜별 포트폴리오 수익률 흐름"))}
           className="h-full w-full touch-pan-y overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none"
           onPointerMove={inspect} onPointerDown={inspect} onPointerLeave={leave} onPointerCancel={leave}
           onClick={() => { if (activePoint) onSelect(activePoint.date); }}>
@@ -96,7 +96,7 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
       <div className={styles.chartFoot}>
         <span>{displayPoints[0]!.date.replaceAll("-", ".")}</span>
         <span className={styles.observationNote}>{<T ko={pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색"} en={translateHomeHistory(pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색")}/>}</span>
-        <span>{displayPoints.at(-1)!.date.replaceAll("-", ".")}</span>
+        <span>{displayPoints.at(-1)!.rowKind === "live" ? <T ko="현재 · " en="Current · "/> : null}{displayPoints.at(-1)!.date.replaceAll("-", ".")}</span>
       </div>
       <input className={styles.chartKeyboard} type="range" min="0" max={displayPoints.length - 1} value={selectedIndex}
         aria-label={t("히스토리 그래프 날짜 탐색", "Explore dates on the history chart")}

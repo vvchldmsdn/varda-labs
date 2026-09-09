@@ -15,7 +15,8 @@
   0%, 100% { opacity: .3; transform: scaleY(.7); }
   50% { opacity: .7; transform: scaleY(1); }
 }
-.varda-content, .varda-presentation-content { animation: varda-page-in 420ms var(--motion-ease) both; }
+/* Release the animated transform so fixed mobile details remain relative to the viewport. */
+.varda-content, .varda-presentation-content { animation: varda-page-in 420ms var(--motion-ease) backwards; }
 .varda-link-pending { position: absolute; top: 11px; right: 12px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: 0; pointer-events: none; }
 .varda-link-pending[data-pending] { animation: varda-pending 850ms ease-in-out 120ms infinite; }
 .varda-mobile-bottom .varda-link-pending { top: 0; right: 13px; }

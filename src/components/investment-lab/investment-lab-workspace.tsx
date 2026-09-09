@@ -1,6 +1,8 @@
 "use client";
 
 import { LabText } from "./lab-text";
+import { CalculationGuideDialog } from "@/components/explanations/calculation-guide-dialog";
+import { investmentLabCalculationGuide } from "./investment-lab-calculation-guide";
 import { labEnglish } from "./lab-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 
@@ -61,7 +63,7 @@ export function InvestmentLabWorkspace({
 
   return (
     <div className={styles.workspace} data-lab-workspace="integrated">
-      <div className={styles.toolbar}><span><LabText value="같은 기간 · 같은 입출금" /></span><div>{tools}</div></div>
+      <div className={styles.toolbar}><span><LabText value="같은 기간 · 같은 투자금 흐름" /></span><div>{tools}<CalculationGuideDialog guide={investmentLabCalculationGuide} label={{ ko: "계산 원리", en: "How it works" }} title={{ ko: "투자 방법만 바꿔 보면", en: "What if you changed the investment method?" }} /></div></div>
 
       <div className={styles.canvas}>{comparison}</div>
 

@@ -59,5 +59,9 @@ export function HistoryDesignPreview({ scope, detailParams = {} }: { scope?: str
       overlappingDateCount: 0,
     },
   };
-  return <HistoryView events={null} eventsSupported={false} generatedAt={data.generatedAt} history={history} detailParams={{ ...detailParams, preview: "design" }} />;
+  return <HistoryView events={null} eventsSupported={false} generatedAt={data.generatedAt} history={history} detailParams={{ ...detailParams, preview: "design" }} liveValuation={{
+    state: "ready", date: "2026-08-22", capturedAt: data.generatedAt, valueKrw: data.totalValueKrw,
+    holdingCount: data.holdings.length, excludedHoldingCount: 0, freshQuoteCount: data.holdings.length, recordedPriceCount: 0,
+    oldestPriceAt: "2026-08-22T09:16:00+09:00", priceSources: ["design_preview"],
+  }} />;
 }

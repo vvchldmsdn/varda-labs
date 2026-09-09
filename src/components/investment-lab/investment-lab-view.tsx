@@ -1,4 +1,7 @@
 import { LabText } from "./lab-text";
+import { T } from "@/components/i18n/localized-text";
+import { InvestmentLabEvidenceGroup } from "./investment-lab-evidence-group";
+import explanationStyles from "./investment-lab-explanation.module.css";
 import { InvestmentLabDeferredPerformance } from "./investment-lab-deferred-performance";
 import type { InvestmentLabWeightEvidence } from "@/lib/investment-lab-weight-evidence";
 import type { ReactNode } from "react";
@@ -199,12 +202,17 @@ export function InvestmentLabView({
                   label="데이터"
                   size="wide"
                 >
-                  <div className="space-y-6">
-                    {dataAvailability}
-                    <InvestmentLabFundingPreflightView
-                      model={fundingPreflight}
-                    />
-                    {readiness}
+                  <div>
+                    <p className={explanationStyles.intro}><T ko="비교가 가능한지 확인하는 세 가지 근거입니다. 궁금한 항목을 펼쳐 날짜와 원인을 확인하세요." en="These three checks determine whether the comparison is supported. Open a section to inspect its dates and any missing evidence." /></p>
+                    <InvestmentLabEvidenceGroup title={{ ko: "기간과 가격이 준비됐나요?", en: "Are the dates and prices available?" }} description={{ ko: "저장된 평가액 · 자산 가격 · 환율", en: "Recorded values, asset prices, and FX" }} open>
+                      {dataAvailability}
+                    </InvestmentLabEvidenceGroup>
+                    <InvestmentLabEvidenceGroup title={{ ko: "매매 금액이 맞나요?", en: "Do the investment flows reconcile?" }} description={{ ko: "계좌별 매수·매도와 사용 가능한 투자금", en: "Purchases, sales, and funding in each account" }}>
+                      <InvestmentLabFundingPreflightView model={fundingPreflight} />
+                    </InvestmentLabEvidenceGroup>
+                    <InvestmentLabEvidenceGroup title={{ ko: "계산 조건이 충족됐나요?", en: "Are the calculation requirements met?" }} description={{ ko: "계산할 수 있는 경로와 보류된 이유", en: "Available paths and reasons for withholding a calculation" }}>
+                      {readiness}
+                    </InvestmentLabEvidenceGroup>
                   </div>
                 </InvestmentLabDialog>
               </>
