@@ -68,7 +68,10 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     }
   });
   const router = { refresh: () => { refreshCount += 1; } };
-  const [component] = await importUiWithPorts(["src/components/home/portfolio-refresh-button.tsx"], {
+  const [component, polling] = await importUiWithPorts([
+    "src/components/home/portfolio-refresh-button.tsx",
+    "src/components/use-market-collection-polling.ts",
+  ], {
     react: {
       useCallback: callback => callback,
       useEffect: callback => { effects.push(callback); },
@@ -94,8 +97,18 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
       activeMounts.add(unmount);
       return { click: () => button.props.onClick(), unmount };
     },
+    mountPolling(keepCheckingHistory = false) {
+      const effectStart = effects.length;
+      polling.useMarketCollectionPolling(true, undefined, keepCheckingHistory);
+      const cleanups = effects.slice(effectStart).map(effect => effect()).filter(cleanup => typeof cleanup === "function");
+      let active = true;
+      const unmount = () => { if (!active) return; active = false; cleanups.forEach(cleanup => cleanup()); activeMounts.delete(unmount); };
+      activeMounts.add(unmount);
+      return { unmount };
+    },
     runMountTimer() { for (const [id, { callback, delay }] of [...timeouts]) { assert.equal(delay, 0); timeouts.delete(id); callback(); } },
     runInterval() { for (const { callback, delay } of [...intervals.values()]) { assert.equal(delay, WINDOW_MS); callback(); } },
+    async runPollingInterval() { for (const { callback, delay } of [...intervals.values()]) { assert.equal(delay, 10_000); await callback(); } },
     advanceBucket() { now += WINDOW_MS; },
     setVisibility(value) { fakeDocument.visibilityState = value; },
     visibilityChange() { for (const callback of [...documentListeners.get("visibilitychange") ?? []]) callback(); },
@@ -238,5 +251,41 @@ describe("portfolio refresh lifecycle", () => {
     await settle();
     assert.equal(h.requests.length, 0);
     assert.equal(h.refreshCount, 1);
+  });
+});
+
+describe("market collection quote and history polling", () => {
+  it("keeps fresh quotes fresh at timeout while still refreshing pending history", async test => {
+    const h = await refreshHarness(test, { responseState: "fresh" });
+    h.mountPolling(true);
+    h.runMountTimer();
+    for (let check = 0; check < 12; check++) await h.runPollingInterval();
+    assert.equal(h.requests.length, 12);
+    assert.equal(h.states.at(-1), "fresh", "history polling cannot turn confirmed fresh quotes into waiting quotes");
+    assert.equal(h.refreshCount, 5, "pending history still receives its periodic and final Server Component refreshes");
+    assert.equal(h.intervals.size, 0, "history polling remains bounded");
+    assert.deepEqual(JSON.parse(h.requests[0].options.body), { reason: "poll" });
+  });
+
+  it("does not refresh unchanged fresh quotes on every poll when history checking is disabled", async test => {
+    const h = await refreshHarness(test, { responseState: "fresh" });
+    h.mountPolling();
+    h.runMountTimer();
+    for (let check = 0; check < 12; check++) await h.runPollingInterval();
+    assert.equal(h.states.at(-1), "fresh");
+    assert.equal(h.refreshCount, 1);
+    assert.equal(h.intervals.size, 0);
+  });
+
+  it("retains waiting at timeout when the quote endpoint has not confirmed freshness", async test => {
+    const h = await refreshHarness(test, { responseState: "queued" });
+    h.mountPolling(true);
+    h.runMountTimer();
+    for (let check = 0; check < 11; check++) await h.runPollingInterval();
+    assert.equal(h.states.at(-1), "queued");
+    await h.runPollingInterval();
+    assert.equal(h.states.at(-1), "waiting");
+    assert.equal(h.refreshCount, 5);
+    assert.equal(h.intervals.size, 0);
   });
 });

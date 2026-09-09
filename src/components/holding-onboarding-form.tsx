@@ -44,7 +44,8 @@ export function HoldingOnboardingForm({ options, preview = false }: { options: H
     });
     return result;
   }, INITIAL_STATE);
-  const collectionState = useMarketCollectionPolling(!preview && state.results.some(item => item.result.status === "price_unavailable"), state, true);
+  const awaitingPrice = state.results.some(item => item.result.status === "price_unavailable");
+  const collectionState = useMarketCollectionPolling(!preview && awaitingPrice, state, true);
   const unsaved = rows.filter(row => !saved[row.key]);
   const hasSaved = Object.keys(saved).length > 0;
   const errorText = error === "duplicate" ? t("이 종목은 이미 목록에 있거나 저장되었습니다. 목록의 수량을 확인해 주세요.", "This holding is already queued or saved. Check its quantity in the list.")
@@ -119,8 +120,12 @@ export function HoldingOnboardingForm({ options, preview = false }: { options: H
         <details className="varda-onboarding-disclosure"><summary>{t("분석 그룹 설정 (선택)", "Analysis group (optional)")}</summary><p>{t("비워 두면 기본 그룹으로 정리됩니다. 나중에 관리 화면에서 바꿀 수 있어요.", "Leave blank to use a default group. You can change it later in Manage.")}</p><label>{t("기존 그룹", "Existing group")}<select value={groupId} disabled={pending || hasSaved} onChange={event => setGroupId(event.target.value)}><option value="">{t("기본 그룹 사용", "Use default group")}</option>{options.portfolioGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>{!groupId ? <label>{t("새 그룹 이름 (선택)", "New group name (optional)")}<input maxLength={100} value={groupName} disabled={pending || hasSaved} onChange={event => setGroupName(event.target.value)} /></label> : null}</details>
         <div className="varda-onboarding-save">
           {state.status === "invalid" && state.results.length === 0 ? <p role="alert" className="varda-onboarding-error">{t("입력한 목록을 확인한 뒤 다시 저장해 주세요.", "Check the holding list and try saving again.")}</p> : null}
-          {state.status === "partial" ? <p role="status" className="varda-onboarding-hint">{t("저장된 종목은 유지됩니다. 나머지만 확인한 뒤 다시 저장하세요.", "Saved holdings are kept. Review and retry only the remaining holdings.")}</p> : null}
-          {collectionState === "waiting" ? <p role="status" className="varda-onboarding-hint">{t("가격 확인이 대기 중입니다. 다시 저장을 눌러 확인하거나 현재 가격을 직접 입력해 주세요.", "Price lookup is still pending. Try saving again or enter a current price.")}</p> : null}
+          {state.status === "partial" ? <p role="status" className="varda-onboarding-hint">{hasSaved
+            ? t("저장된 종목은 유지됩니다. 나머지만 확인한 뒤 다시 저장하세요.", "Saved holdings are kept. Review and retry only the remaining holdings.")
+            : awaitingPrice
+              ? t("아직 저장된 종목이 없습니다. 가격 확인 후 다시 저장하거나 현재가를 직접 입력해 주세요.", "No holdings have been saved yet. Save again after prices are available, or enter current prices yourself.")
+              : t("아직 저장된 종목이 없습니다. 각 종목의 안내를 확인한 뒤 다시 저장해 주세요.", "No holdings have been saved yet. Check each holding's message before trying again.")}</p> : null}
+          {awaitingPrice && collectionState === "waiting" ? <p role="status" className="varda-onboarding-hint">{t("가격 확인이 대기 중입니다. 다시 저장을 눌러 확인하거나 현재 가격을 직접 입력해 주세요.", "Price lookup is still pending. Try saving again or enter a current price.")}</p> : null}
           <button type="submit" className="varda-onboarding-primary" disabled={preview || pending || unsaved.length === 0 || !accountId}>{pending ? t("종목을 확인하며 저장 중…", "Checking and saving holdings…") : t(`${unsaved.length}종목 저장`, `Save ${unsaved.length} holding${unsaved.length === 1 ? "" : "s"}`)}<ArrowRight size={18} /></button>
           <p className="varda-onboarding-hint">{preview ? t("예시 화면입니다. 편집은 가능하지만 저장하지 않습니다.", "Demo view. You can edit the list, but saving is disabled.") : t("주문을 실행하지 않습니다. 내 포트폴리오에 기록만 추가합니다.", "No orders are placed. These are records for your portfolio.")}</p>
           {hasSaved ? <div className="varda-onboarding-success" role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href="/portfolio/first-look">{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{rows.some(row => saved[row.key]) ? <button type="button" className="varda-onboarding-text-button" onClick={() => setRows(previous => previous.filter(row => !saved[row.key]))} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></button> : null}</div> : null}

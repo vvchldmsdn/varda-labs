@@ -34,7 +34,9 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
       const { state, signature } = await wakeCollection();
       inFlight = false;
       if (cancelled) return;
-      setOutcome(count >= 12 && (state !== "fresh" || keepCheckingHistory) ? "waiting" : state);
+      // This endpoint reports current quotes only. History readiness remains a
+      // server-read concern; continuing its refreshes must not relabel fresh quotes.
+      setOutcome(count >= 12 && state !== "fresh" ? "waiting" : state);
       // Refresh only changed quote readiness; history progresses in separate 30s checks.
       if (state !== "unavailable" && (signature !== previousSignature || keepCheckingHistory && (count % 3 === 1 || count === 12))) {
         startTransition(() => router.refresh());
