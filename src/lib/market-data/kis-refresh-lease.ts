@@ -25,6 +25,16 @@ export function kisRefreshCooldownSeconds() {
 
 /** The capability is private AsyncLocalStorage, never a request/form parameter. */
 export async function withKisRefreshLease<T>(task: () => Promise<T>): Promise<T> {
+  return withLease(task, kisRefreshCooldownSeconds());
+}
+
+/** Collection workers pace every actual HTTP request using the durable budget.
+ * They retain mutual exclusion but need no whole-job 90-second idle period. */
+export async function withKisCollectionLease<T>(task: () => Promise<T>): Promise<T> {
+  return withLease(task, 0);
+}
+
+async function withLease<T>(task: () => Promise<T>, cooldownSeconds: number): Promise<T> {
   const existing = context.getStore();
   if (existing) {
     if (!existing.active || Date.now() >= existing.expiresAt) {
@@ -39,7 +49,7 @@ export async function withKisRefreshLease<T>(task: () => Promise<T>): Promise<T>
     transaction.query("set local statement_timeout = '8s'"),
     // Must be a preceding statement, so the claim snapshot sees the last holder.
     transaction.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", ["varda.kis_provider_refresh.v1"]),
-    transaction.query(CLAIM_SQL, [runId, kisRefreshCooldownSeconds(), KIS_REFRESH_LEASE_SECONDS]),
+    transaction.query(CLAIM_SQL, [runId, cooldownSeconds, KIS_REFRESH_LEASE_SECONDS]),
   ], { isolationLevel: "ReadCommitted" });
   const row = results[3]?.[0];
   if (row?.claimed !== true) {

@@ -65,6 +65,7 @@ export type HoldingAnalysisDataPreparationActionState = Readonly<{
     | "success"
     | "already_ready"
     | "busy"
+    | "queued"
     | "invalid"
     | "unauthorized"
     | "conflict"

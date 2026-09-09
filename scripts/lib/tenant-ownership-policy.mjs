@@ -195,9 +195,16 @@ export const HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES =
   ...HOLDING_STATE_CORRECTION_TABLE_POLICIES,
   ]);
 
-export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+export const HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES,
   ...HOLDING_LIFECYCLE_TABLE_POLICIES,
+]);
+
+export const MARKET_COLLECTION_TABLE_POLICIES = Object.freeze([
+  adminSystem("market_collection_jobs"), adminSystem("market_provider_budgets"),
+]);
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES, ...MARKET_COLLECTION_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
@@ -417,6 +424,9 @@ export function resolveTenantTablePolicies(publicTableNames) {
     throw new Error("holding lifecycle tables must be expanded atomically");
   }
 
+  const presentCollectionTables = MARKET_COLLECTION_TABLE_POLICIES.filter(({ table }) => publicTableSet.has(table));
+  if (presentCollectionTables.length === 0) return HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES;
+  if (presentCollectionTables.length !== MARKET_COLLECTION_TABLE_POLICIES.length) throw new Error("market collection tables must be expanded atomically");
   return EXPANDED_TENANT_TABLE_POLICIES;
 }
 

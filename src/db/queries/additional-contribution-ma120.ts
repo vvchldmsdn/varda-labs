@@ -2,8 +2,10 @@ import "server-only";
 
 import { loadPortfolioRiskPriceCandidates } from "@/db/queries/portfolio-risk";
 import {
+  ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY,
   evaluateAdditionalContributionMa120OperationalEvidence,
   type AdditionalContributionMa120OperationalEvidence,
+  type AdditionalContributionMa120OperationalEvidenceBlocker,
   type AdditionalContributionMa120OperationalPriceBasis,
 } from "@/lib/additional-contribution-ma120-operational-evidence";
 import {
@@ -21,13 +23,15 @@ type Ma120HoldingInput = Pick<
   | "ticker"
   | "currentPrice"
   | "priceSource"
+  | "priceAsOf"
 >;
 
 export type AdditionalContributionMa120UnavailableReason =
   | "invalid_instrument_identity"
   | "price_history_missing"
   | "price_history_not_admitted"
-  | "comparison_price_source_incompatible";
+  | "comparison_price_source_incompatible"
+  | AdditionalContributionMa120OperationalEvidenceBlocker;
 
 export type AdditionalContributionMa120ReadRow = Readonly<{
   instrumentKey: string;
@@ -42,9 +46,11 @@ export type AdditionalContributionMa120ReadRow = Readonly<{
 export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
   holdings,
   serviceDate,
+  now = new Date(),
 }: {
   holdings: readonly Ma120HoldingInput[];
   serviceDate: string;
+  now?: Date;
 }) {
   const normalizedHoldings = holdings
     .map(normalizeHolding)
@@ -100,6 +106,8 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
         instrumentKey: holding.instrumentKey,
         asOfPriceDate: serviceDate,
         comparisonPrice: holding.currentPrice,
+        comparisonPriceAsOf: holding.priceAsOf,
+        evaluatedAt: now,
         priceBasis: selection.priceBasis,
         observations: selection.rows.map((row) => ({
           priceDate: row.priceDate,
@@ -111,7 +119,7 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
         status: evidence.status,
         priceBasis: selection.priceBasis,
         evidence,
-        unavailableReason: null,
+        unavailableReason: evidence.blockers[0] ?? null,
       });
     },
   );
@@ -122,8 +130,7 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
   ).length;
 
   return Object.freeze({
-    policyVersion:
-      "additional_contribution_ma120_operational_evidence_v1" as const,
+    policyVersion: ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.version,
     allocationEffect: "bounded_overlay" as const,
     status:
       usableCount === rows.length && rows.length > 0
@@ -151,6 +158,7 @@ function normalizeHolding(row: Ma120HoldingInput) {
     ticker,
     currentPrice,
     priceSource: normalizeText(row.priceSource),
+    priceAsOf: row.priceAsOf ?? null,
   });
 }
 

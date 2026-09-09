@@ -99,7 +99,9 @@ describe("tenant ownership policy", () => {
     assert.equal(holdingOnboardingExpandedNames.length, 36);
     assert.equal(portfolioTargetPolicyExpandedNames.length, 39);
     assert.equal(holdingStateCorrectionExpandedNames.length, 40);
-    assert.equal(expandedNames.length, 41);
+    assert.equal(expandedNames.length, 43);
+    assert.equal(resolveTenantTablePolicies(expandedNames.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets")).length, 41);
+    assert.throws(() => resolveTenantTablePolicies(expandedNames.filter(name => name !== "market_provider_budgets")), /market collection tables must be expanded atomically/);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
     assert.deepEqual(
       resolveTenantTablePolicies(coreExpandedNames),
@@ -178,7 +180,7 @@ describe("tenant ownership policy", () => {
       {
         user_owned: 29,
         shared_reference: 7,
-        admin_system: 1,
+        admin_system: 3,
         identity_system: 4,
         unresolved: 0,
       },

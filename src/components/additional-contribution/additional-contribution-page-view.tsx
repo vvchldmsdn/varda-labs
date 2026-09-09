@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ArrowUpRight, Target } from "lucide-react";
 import { AdditionalContributionAllocationTable, AdditionalContributionFlowScene, AdditionalContributionWeightScene } from "./additional-contribution-result";
 import { AdditionalContributionLogicDialog } from "./additional-contribution-logic-dialog";
+import { ContributionAdjustmentDialog } from "./contribution-adjustment-dialog";
+import type { ContributionMarketContext } from "@/lib/contribution-market-context";
 import { ContributionCalculator, ContributionFundingVisual } from "./contribution-calculator";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -18,13 +20,14 @@ import styles from "./contribution-stage.module.css";
 
 type BlockedPreview = Readonly<{ status: "blocked"; blockers: readonly string[] }>;
 
-export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync = true, generatedAt, preview, scopes, selectedScope }: {
+export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync = true, generatedAt, preview, scopes, selectedScope, marketContext }: {
   amountKrw: number;
   enableLivePriceSync?: boolean;
   generatedAt: string;
   preview: AdditionalContributionResultPreview | BlockedPreview;
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
+  marketContext?: ContributionMarketContext;
 }) {
   const designQuery = enableLivePriceSync ? {} : { preview: "design" };
   return (
@@ -45,6 +48,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
             <div className={styles.detailActions}>
               <PresentationDialog label={`전체 ${preview.rows.length}종목 배분`} labelEn={portfolioEnglish(`전체 ${preview.rows.length}종목 배분`)} title="종목별 전체 배분안" titleEn={portfolioEnglish("종목별 전체 배분안")} description={`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`} descriptionEn={portfolioEnglish(`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`)} wide><AdditionalContributionAllocationTable preview={preview} /><p className={styles.modalNote}><PortfolioText ko={"목표 부족분과 MA120 근거를 반영한 계산입니다. 남는 재원은 현금으로 유지됩니다. MA120"} />{" "}<PortfolioText ko={preview.ma120Evidence.mode === "off" ? "미적용" : `${preview.ma120Evidence.usableCount}/${preview.rows.length}종목 근거 확보${preview.ma120Evidence.status === "ready" ? "" : " · 일부 근거 부족"}`} />.</p><Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}><PortfolioText ko={"보유 종목 관리"} />{" "}<ArrowUpRight size={13} aria-hidden="true" /></Link></PresentationDialog>
               <AdditionalContributionLogicDialog preview={preview} />
+              <ContributionAdjustmentDialog preview={preview} context={marketContext} />
               <PresentationDialog label="비중·자금 흐름" labelEn={portfolioEnglish("비중·자금 흐름")} title="추가투입 전후 변화" titleEn={portfolioEnglish("추가투입 전후 변화")} wide><AdditionalContributionWeightScene preview={preview} /><AdditionalContributionFlowScene preview={preview} /></PresentationDialog>
             </div>
           </> : <><span className={styles.modalNote}><PortfolioText ko={"계산 결과만 제공하며 실제 주문은 실행하지 않습니다."} /></span><PresentationDialog label="계산 근거 확인" labelEn={portfolioEnglish("계산 근거 확인")} title="배분안을 계산할 수 없는 이유" titleEn={portfolioEnglish("배분안을 계산할 수 없는 이유")} wide><BlockedPreview blockers={preview.blockers} /></PresentationDialog></>}

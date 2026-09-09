@@ -38,6 +38,12 @@ export type AdditionalContributionMa120EvidenceView = Readonly<{
   latestWindowPriceDate: string | null;
   ma120: number | null;
   distanceFromMaPct: number | null;
+  unavailableReason?: string | null;
+  blockers?: readonly string[];
+  comparisonPriceAsOf?: string | null;
+  evaluatedAt?: string | null;
+  comparisonPriceAgeHours?: number | null;
+  historyAgeCalendarDays?: number | null;
 }>;
 
 export type AdditionalContributionResultRow = AdditionalContributionViewInputRow &

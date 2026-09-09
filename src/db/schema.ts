@@ -1747,6 +1747,46 @@ export const marketDataSyncRuns = pgTable(
   }),
 );
 
+// Server-only operational state. No tenant SELECT policy or browser grants.
+export const marketCollectionJobs = pgTable("market_collection_jobs", {
+  key: varchar("key", { length: 200 }).primaryKey(),
+  kind: varchar("kind", { length: 10 }).notNull(),
+  ticker: varchar("ticker", { length: 50 }).notNull(),
+  market: varchar("market", { length: 20 }).notNull(),
+  currency: varchar("currency", { length: 10 }).notNull(),
+  startDate: date("start_date"), endDate: date("end_date"),
+  status: varchar("status", { length: 10 }).default("pending").notNull(),
+  enqueuedAt: timestamp("enqueued_at", { withTimezone: true }).defaultNow().notNull(),
+  availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+  leasedUntil: timestamp("leased_until", { withTimezone: true }),
+  claimToken: uuid("claim_token"), attempts: integer("attempts").default(0).notNull(),
+  requestCount: integer("request_count").default(1).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  lastCode: varchar("last_code", { length: 50 }),
+}, (table) => ({
+  pendingIdx: index("market_collection_jobs_pending_idx").on(table.status, table.availableAt, table.enqueuedAt),
+  stateCheck: check("market_collection_jobs_state_check", sql`${table.status} in ('pending','running','done','failed') and ${table.attempts} >= 0 and ${table.requestCount} >= 1`),
+  identityCheck: check("market_collection_jobs_identity_check", sql`${table.kind} in ('live','history','fx') and ((${table.market}='korea' and ${table.currency}='KRW') or (${table.market}='us' and ${table.currency}='USD'))`),
+  datesCheck: check("market_collection_jobs_dates_check", sql`(${table.kind}='history' and ${table.startDate} is not null and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate}) or (${table.kind}<>'history' and ${table.startDate} is null and ${table.endDate} is null)`),
+})).enableRLS();
+
+export const marketProviderBudgets = pgTable("market_provider_budgets", {
+  scopeHash: varchar("scope_hash", { length: 64 }).primaryKey(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  windowRequests: integer("window_requests").default(0).notNull(),
+  nextAllowedAt: timestamp("next_allowed_at", { withTimezone: true }).defaultNow().notNull(),
+  tokenNextAllowedAt: timestamp("token_next_allowed_at", { withTimezone: true }).defaultNow().notNull(),
+  blockedUntil: timestamp("blocked_until", { withTimezone: true }).defaultNow().notNull(),
+  failureCount: integer("failure_count").default(0).notNull(),
+  requestCount: integer("request_count").default(0).notNull(),
+  limitedCount: integer("limited_count").default(0).notNull(),
+  lastCode: varchar("last_code", { length: 40 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  countsCheck: check("market_provider_budgets_counts_check", sql`${table.windowRequests} >= 0 and ${table.failureCount} >= 0 and ${table.requestCount} >= 0 and ${table.limitedCount} >= 0`),
+})).enableRLS();
+
 export const livePriceQuotes = pgTable(
   "live_price_quotes",
   {

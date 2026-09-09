@@ -165,7 +165,7 @@ export function AdditionalContributionLogicDialog({
                           <p className="mt-0.5 text-xs text-[var(--muted)]"><PortfolioText ko={"부족액"} />{" "}{formatKrw(row.baseNeedKrw)}</p>
                         </td>
                         <td className={`px-2 py-3 text-right font-medium tabular-nums ${actionTone(row.action)}`}><PortfolioText ko={actionLabel(row)} /></td>
-                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={decisionReason(row)} /></td>
+                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={decisionReason(row)} /><MaEvidenceDetails evidence={row.ma120Evidence} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -176,7 +176,7 @@ export function AdditionalContributionLogicDialog({
             <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
               <h3 className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></h3>
               <p className="mt-1 leading-6 text-[var(--muted)]">
-                <T ko="목표비중과 현재 보유 상태, 확인된 가격 추세로 금액을 나눕니다. 현재 환율은 원화 평가에 쓰지만, 환율 전망·뉴스·시장·금리·산업 전망으로 매수금을 추가 조정하지는 않습니다. 이러한 조정은 별도 검증 후 선택 기능으로 검토할 항목입니다. 수수료·세금·실제 주문 단위도 포함하지 않습니다." en="Amounts use your target weights, current holdings and available price-trend evidence. Current FX rates are used for KRW valuation, but FX forecasts, news, market conditions, rates and industry outlooks do not add purchase adjustments. Those adjustments are candidates for an optional feature after separate validation. Fees, taxes and actual order sizes are also excluded." /></p>
+                <T ko="목표비중과 현재 보유 상태, 확인된 가격 추세로 금액을 나눕니다. 현재가 시각이나 MA120 이력이 7일보다 오래되거나 검증되지 않으면 추세 감액을 적용하지 않습니다. 환율 전망·뉴스·금리·산업 전망을 자동 매수계수로 쓰지 않습니다. 시장·투입 가정에서 신규금 보류와 환율 변화를 기본안 옆에서 비교할 수 있습니다. 수수료·세금·실제 주문 단위는 포함하지 않습니다." en="Amounts use your targets, holdings and verified price trends. Trend reductions are skipped when the price timestamp or MA120 history is over seven days old or cannot be verified. FX forecasts, news, rates and industry outlooks are not automatic purchase multipliers. Market & cash assumptions lets you compare new-money reserves and FX changes alongside the base allocation. Fees, taxes and actual order sizes are excluded." /></p>
             </section>
           </div>
         </div>
@@ -213,6 +213,20 @@ function actionLabel(row: AdditionalContributionResultPreview["rows"][number]) {
 
 function actionTone(action: "buy" | "hold" | "trim") {
   return action === "buy" ? "text-[var(--brand)]" : action === "trim" ? "text-[var(--negative)]" : "text-[var(--muted)]";
+}
+
+function MaEvidenceDetails({ evidence }: { evidence: AdditionalContributionResultPreview["rows"][number]["ma120Evidence"] }) {
+  const reasons = evidence.blockers ?? [];
+  const stale = reasons.some((reason) => reason === "stale_comparison_price" || reason === "stale_history");
+  const future = reasons.some((reason) => reason.startsWith("future_"));
+  const timeMissing = reasons.some((reason) => reason.includes("price_time") || reason === "invalid_evaluation_time");
+  return <div className="mt-2 text-[10px] leading-5">
+    {stale ? <p className="text-[var(--warning)]"><T ko="관측이 7일보다 오래되어 추세 조정을 건너뛰었습니다." en="Trend adjustment skipped: an observation is more than seven days old." /></p> : null}
+    {future ? <p className="text-[var(--warning)]"><T ko="판단 시점보다 미래인 관측은 사용하지 않습니다." en="Observations after the evaluation time are excluded." /></p> : null}
+    {timeMissing ? <p className="text-[var(--warning)]"><T ko="가격의 실제 관측 시각을 확인하지 못했습니다." en="The actual price observation time could not be verified." /></p> : null}
+    {evidence.latestWindowPriceDate ? <p>MA120 <T ko="이력 끝" en="history ends" /> {evidence.latestWindowPriceDate}</p> : null}
+    {evidence.comparisonPriceAsOf ? <p><T ko="비교 가격 시각" en="Comparison price as of" /> {evidence.comparisonPriceAsOf}</p> : null}
+  </div>;
 }
 
 function decisionReason(row: AdditionalContributionResultPreview["rows"][number]) {

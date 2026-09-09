@@ -1,23 +1,22 @@
 import "server-only";
 
-import { desc, eq } from "drizzle-orm";
 
-import { db } from "@/db/client";
+
+
 import {
   getReadOnlyTenantHoldingAnalysisDataReadiness,
   getReadOnlyTenantHoldingAnalysisPreparationTarget,
 } from "@/db/queries/holding-analysis-data-readiness";
-import { marketDataSyncRuns } from "@/db/schema";
+
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
-  evaluateHoldingAnalysisDataCooldown,
   parseHoldingAnalysisDataPreparationInput,
   type HoldingAnalysisDataPreparationActionState,
 } from "@/lib/holding-analysis-data-readiness";
-import { runKisHistoryCacheSync } from "@/lib/market-data/kis-history-cache-sync";
-import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
+import { enqueueMarketCollection } from "@/lib/market-data/collection-queue";
+import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
+
 import {
-  createKisMarketDataProvider,
   getKisProviderPolicy,
 } from "@/lib/market-data/providers/kis";
 import { shiftRiskDate } from "@/lib/portfolio-risk-calendar";
@@ -26,7 +25,6 @@ import {
   resolveSnapshotCycle,
 } from "@/lib/snapshots/market-calendar";
 
-const DEFAULT_KIS_JOB_COOLDOWN_SECONDS = 90;
 const HISTORY_WINDOW_CALENDAR_DAYS = 400;
 
 export async function prepareSessionHoldingAnalysisData(
@@ -97,20 +95,6 @@ export async function prepareSessionHoldingAnalysisData(
       );
     }
 
-    const lastActivityAt = await getLatestKisActivityAt();
-    const cooldown = evaluateHoldingAnalysisDataCooldown({
-      now,
-      lastActivityAt,
-      cooldownSeconds: resolveKisCooldownSeconds(),
-    });
-    if (!cooldown.ready) {
-      return Object.freeze({
-        status: "busy" as const,
-        message: `다른 가격 조회 직후입니다. ${cooldown.retryAfterSeconds}초 후 다시 시도해 주세요.`,
-        retryAfterSeconds: cooldown.retryAfterSeconds,
-      });
-    }
-
     const ticker = target.ticker?.trim().toUpperCase();
     if (!ticker) {
       return state("invalid", "자동 조회에 필요한 티커가 없습니다.");
@@ -120,63 +104,14 @@ export async function prepareSessionHoldingAnalysisData(
       endDate,
       -(HISTORY_WINDOW_CALENDAR_DAYS - 1),
     );
-    const result = await withKisRefreshLease(() => runKisHistoryCacheSync({
-      targets: [
-        {
-          key: [target.market, target.currency, ticker].join("|"),
-          ticker,
-          market: target.market,
-          currency: target.currency,
-          accounts: [],
-          assetIds: [],
-          assetNames: [],
-        },
-      ],
-      startDate,
-      endDate,
-      provider: createKisMarketDataProvider(),
-    }));
-
-    return state(
-      "success",
-      result.failedCount > 0
-        ? `가격 기록 ${result.fetchedRowCount}개를 확인했습니다. 일부 구간은 제공자 응답이 없어 저장된 범위만 사용합니다.`
-        : `가격 기록 ${result.fetchedRowCount}개를 확인해 분석 데이터로 준비했습니다.`,
-    );
-  } catch (error) {
-    if (error instanceof KisRefreshLeaseBusyError) {
-      return Object.freeze({ status: "busy" as const, message: `다른 가격 조회가 진행 중입니다. ${error.retryAfterSeconds}초 후 다시 시도해 주세요.`, retryAfterSeconds: error.retryAfterSeconds });
-    }
-    return state(
-      "error",
-      "과거 가격을 준비하지 못했습니다. 저장된 데이터는 변경하지 않고 중단했습니다.",
-    );
+    await enqueueMarketCollection([{ kind: "history", ticker, market: target.market, currency: target.currency, startDate, endDate }]);
+    scheduleMarketCollection();
+    return Object.freeze({ status: "queued" as const, message: "과거 가격 준비를 접수했습니다. 저장된 범위부터 분석하며 준비 상황을 자동으로 확인합니다.", retryAfterSeconds: 10 });
+  } catch {
+    return state("error", "과거 가격 준비 요청을 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.");
   }
 }
 
-async function getLatestKisActivityAt() {
-  const rows = await db
-    .select({
-      startedAt: marketDataSyncRuns.startedAt,
-      finishedAt: marketDataSyncRuns.finishedAt,
-    })
-    .from(marketDataSyncRuns)
-    .where(eq(marketDataSyncRuns.source, "kis"))
-    .orderBy(desc(marketDataSyncRuns.startedAt))
-    .limit(1);
-  return rows[0]?.finishedAt ?? rows[0]?.startedAt ?? null;
-}
-
-function resolveKisCooldownSeconds() {
-  const configured = Number(process.env.KIS_JOB_COOLDOWN_SECONDS);
-  return Number.isSafeInteger(configured) && configured >= 0 && configured <= 600
-    ? configured
-    : DEFAULT_KIS_JOB_COOLDOWN_SECONDS;
-}
-
-function state(
-  status: HoldingAnalysisDataPreparationActionState["status"],
-  message: string,
-): HoldingAnalysisDataPreparationActionState {
+function state(status: HoldingAnalysisDataPreparationActionState["status"], message: string): HoldingAnalysisDataPreparationActionState {
   return Object.freeze({ status, message });
 }

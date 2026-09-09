@@ -9,8 +9,9 @@ import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { TENANT_LIVE_PRICE_SYNC_POLICY } from "@/lib/market-data/tenant-live-price-sync-policy";
+import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
 
-type SyncState = "idle" | "syncing" | "fresh" | "partial" | "cooldown" | "error";
+type SyncState = "idle" | "syncing" | "fresh" | "partial" | "cooldown" | "queued" | "waiting" | "error";
 type SyncResponse = {
   state?: string;
 };
@@ -30,6 +31,8 @@ export function PortfolioRefreshButton({
   const router = useRouter();
   const [refreshPending, startTransition] = useTransition();
   const [syncState, setSyncState] = useState<SyncState>("idle");
+  const collectionState = useMarketCollectionPolling(syncState === "queued" && !designPreview);
+  const displayState = syncState === "queued" && collectionState === "fresh" ? "fresh" : syncState === "queued" && collectionState === "waiting" ? "waiting" : syncState;
   const pending = syncState === "syncing" || refreshPending;
 
   const sync = useCallback(
@@ -40,6 +43,7 @@ export function PortfolioRefreshButton({
         const result = await requestLivePriceSync(reason);
 
         if (result.state === "synced") setSyncState("fresh");
+        else if (result.state === "queued") setSyncState("queued");
         else if (result.state === "partial") setSyncState("partial");
         else if (result.state === "fresh" || result.state === "empty") {
           setSyncState("fresh");
@@ -106,12 +110,12 @@ export function PortfolioRefreshButton({
       }
       disabled={pending}
       onClick={() => designPreview ? startTransition(() => router.refresh()) : void sync("manual")}
-      title={t(designPreview ? "디자인 미리보기 새로고침" : syncTitle(syncState), translateHomeHistory(designPreview ? "디자인 미리보기 새로고침" : syncTitle(syncState)))}
+      title={t(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState), translateHomeHistory(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState)))}
     >
       <span aria-hidden="true" className={pending ? "animate-spin" : undefined}>
         <RefreshCw size={15} strokeWidth={1.5} />
       </span>
-      {compact ? null : <span aria-live="polite">{<T ko={syncLabel(syncState)} en={translateHomeHistory(syncLabel(syncState))}/>}</span>}
+      {compact ? null : <span aria-live="polite">{<T ko={syncLabel(displayState)} en={displayState === "queued" ? "Refresh queued" : displayState === "waiting" ? "Pending · check again" : translateHomeHistory(syncLabel(displayState))}/>}</span>}
     </button>
   );
 }
@@ -123,6 +127,7 @@ function requestLivePriceSync(reason: "page_view" | "manual") {
     method: "POST",
     cache: "no-store",
     credentials: "same-origin",
+    signal: AbortSignal.timeout(15_000),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   })
@@ -141,6 +146,8 @@ function requestLivePriceSync(reason: "page_view" | "manual") {
 }
 
 function syncLabel(state: SyncState) {
+  if (state === "queued") return "시세 갱신 대기 중";
+  if (state === "waiting") return "대기 중 · 다시 확인";
   if (state === "syncing") return "시세 확인 중";
   if (state === "fresh") return "최신 시세 반영됨";
   if (state === "partial") return "일부 시세 반영됨";

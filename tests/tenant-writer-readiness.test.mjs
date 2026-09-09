@@ -59,7 +59,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 33);
-    assert.equal(registeredPaths.length, 39);
+    assert.equal(registeredPaths.length, 41);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -360,6 +360,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
       freeze: "freeze_user_targets_only",
     });
     assert.deepEqual(onboardingWriter.targets.map(({ table, ownerPolicy }) => ({ table, ownerPolicy })), [
+      { table: "market_provider_budgets", ownerPolicy: "owner_forbidden" },
+      { table: "market_collection_jobs", ownerPolicy: "owner_forbidden" },
       { table: "portfolio_groups", ownerPolicy: "trusted_context_required" },
       { table: "assets", ownerPolicy: "trusted_context_required" },
       { table: "holding_onboarding_evidence", ownerPolicy: "trusted_context_required" },
@@ -377,16 +379,17 @@ describe("tenant writer Phase 1D-A readiness", () => {
       assert.ok(writer.targets.some(({ table, classification }) => table === "market_data_sync_runs" && classification === "admin_system"));
     }
     const route = readFileSync(join(ROOT, "src/app/api/portfolio/live-prices/sync/route.ts"), "utf8");
-    assert.ok(route.indexOf("await resolveCurrentTenantContext()") < route.indexOf("await withKisRefreshLease(refresh)"));
+    assert.ok(route.indexOf("await resolveCurrentTenantContext()") < route.indexOf("await enqueueMarketCollection("));
     assert.match(route, /getTenantLivePriceTargets\(resolution\.tenantContext\)/);
     const preparation = readFileSync(join(ROOT, "src/lib/holding-analysis-data-preparation-write.ts"), "utf8");
     const sessionResolution = preparation.indexOf("await resolveCurrentTenantContext()");
     const ownedTargetRead = preparation.indexOf("await getReadOnlyTenantHoldingAnalysisPreparationTarget({");
-    const leasedHistoryPreparation = preparation.indexOf("await withKisRefreshLease(() => runKisHistoryCacheSync({");
+    const leasedHistoryPreparation = preparation.indexOf("await enqueueMarketCollection([");
     assert.ok(sessionResolution >= 0 && sessionResolution < ownedTargetRead && ownedTargetRead < leasedHistoryPreparation);
     assert.match(preparation, /getReadOnlyTenantHoldingAnalysisPreparationTarget\(\{\s+tenantContext: resolution\.tenantContext,\s+holdingId: parsed\.holdingId,/);
     const onboarding = readFileSync(join(ROOT, "src/lib/holding-onboarding-write.ts"), "utf8");
-    assert.match(onboarding, /runMarketPriceSync\(\{\s+mode: "live", dryRun: false, targetLimit: 1,\s+explicitTargets: \[\{ ticker: input\.ticker, market: input\.market, currency: input\.currency \}\]/);
+    assert.match(onboarding, /enqueueMarketCollection\(\[\{ kind: "live", ticker: input\.ticker, market: input\.market, currency: input\.currency \}\]/);
+    assert.doesNotMatch(onboarding, /runMarketPriceSync\(/);
     const lease = readFileSync(join(ROOT, leasePath), "utf8");
     assert.match(lease, /const context = new AsyncLocalStorage/);
     assert.doesNotMatch(lease, /canonicalOwnerUserId|canonical_owner_user_id|export const context/);

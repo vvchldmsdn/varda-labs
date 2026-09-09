@@ -302,6 +302,13 @@
       "when": 1788957060716,
       "tag": "0042_holding_onboarding_optional_cost",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788961110400,
+      "tag": "0043_powerful_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

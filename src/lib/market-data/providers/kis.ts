@@ -1,4 +1,6 @@
 import "server-only";
+import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
+import { fetchKisWithBudget } from "@/lib/market-data/provider-budget";
 
 import { createHash } from "node:crypto";
 
@@ -159,7 +161,7 @@ export async function fetchKisUsdKrwFxCandidate({
         EXCD: exchange,
         SYMB: ticker,
       });
-      const response = await fetch(
+      const response = await fetchKisWithBudget(config,
         `${config.baseUrl}/uapi/overseas-price/v1/quotations/price-detail?${params}`,
         {
           headers: kisHeaders(config, token, "HHDFS76200200"),
@@ -181,6 +183,7 @@ export async function fetchKisUsdKrwFxCandidate({
       if (parsed.ok) return parsed.candidate;
       errors.push(`${exchange}:${parsed.error}`);
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
@@ -222,6 +225,7 @@ async function fetchKisLiveQuotes(
   try {
     token = await getKisAccessToken(config, session);
   } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
     const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
@@ -242,6 +246,7 @@ async function fetchKisLiveQuotes(
       const liveRow = await fetchKisLiveRow(target, token, config);
       rows.push(toLiveQuote(target, liveRow, fetchedAt));
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       rows.push({
         ...toSkippedLiveQuote(target, context),
         status: "error",
@@ -294,6 +299,7 @@ async function fetchKisClosePrices(
   try {
     token = await getKisAccessToken(config, session);
   } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
     const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
@@ -315,6 +321,7 @@ async function fetchKisClosePrices(
       const historyRow = await fetchLatestCloseRow(target, token, config, context);
       rows.push(toClosePrice(target, historyRow, context, fetchedAt));
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       rows.push({
         ...toSkippedClosePrice(target, context),
         status: "error",
@@ -381,6 +388,7 @@ async function fetchKisHistoricalClosePrices(
   try {
     token = await getKisAccessToken(config, session);
   } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
     const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
@@ -470,6 +478,7 @@ async function fetchKisHistoricalClosePrices(
           targetSeries.push([...normalized.rows]);
         }
       } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
         failures.push(
           historyFailure({
             instrument,
@@ -532,7 +541,7 @@ async function getKisAccessToken(
 }
 
 async function issueKisAccessToken(config: KisConfig) {
-  const response = await fetch(`${config.baseUrl}/oauth2/tokenP`, {
+  const response = await fetchKisWithBudget(config, `${config.baseUrl}/oauth2/tokenP`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -576,7 +585,7 @@ async function fetchKoreanHistoryWindow(options: {
     fid_org_adj_prc: "1",
   });
   options.onRequest();
-  const response = await fetch(
+  const response = await fetchKisWithBudget(options.config,
     `${options.config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
     {
       headers: kisHeaders(options.config, options.token, "FHKST03010100"),
@@ -628,7 +637,7 @@ async function fetchUsHistoryWindow(options: {
         KEYB: "",
       });
       options.onRequest();
-      const response = await fetch(
+      const response = await fetchKisWithBudget(options.config,
         `${options.config.baseUrl}/uapi/overseas-price/v1/quotations/dailyprice?${params}`,
         {
           headers: kisHeaders(options.config, options.token, "HHDFS76240000"),
@@ -651,6 +660,7 @@ async function fetchUsHistoryWindow(options: {
         errors.push(`${exchange}:empty`);
       }
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
@@ -694,7 +704,7 @@ async function fetchKoreanLiveQuote(
     FID_COND_MRKT_DIV_CODE: "J",
     FID_INPUT_ISCD: target.ticker,
   });
-  const response = await fetch(
+  const response = await fetchKisWithBudget(config,
     `${config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-price?${params}`,
     {
       headers: kisHeaders(config, token, "FHKST01010100"),
@@ -735,7 +745,7 @@ async function fetchUsLiveQuote(
         EXCD: exchange,
         SYMB: target.ticker,
       });
-      const response = await fetch(
+      const response = await fetchKisWithBudget(config,
         `${config.baseUrl}/uapi/overseas-price/v1/quotations/price?${params}`,
         {
           headers: kisHeaders(config, token, "HHDFS00000300"),
@@ -762,6 +772,7 @@ async function fetchUsLiveQuote(
 
       errors.push(`${exchange}:empty`);
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
@@ -787,7 +798,7 @@ async function fetchKoreanClose(
     fid_period_div_code: "D",
     fid_org_adj_prc: "1",
   });
-  const response = await fetch(
+  const response = await fetchKisWithBudget(config,
     `${config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
     {
       headers: kisHeaders(config, token, "FHKST03010100"),
@@ -834,7 +845,7 @@ async function fetchUsClose(
         MODP: "1",
         KEYB: "",
       });
-      const response = await fetch(
+      const response = await fetchKisWithBudget(config,
         `${config.baseUrl}/uapi/overseas-price/v1/quotations/dailyprice?${params}`,
         {
           headers: kisHeaders(config, token, "HHDFS76240000"),
@@ -863,6 +874,7 @@ async function fetchUsClose(
       }
       errors.push(`${exchange}:empty`);
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 

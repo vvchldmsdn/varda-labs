@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { getReusableKisAccessToken } from "../src/lib/market-data/providers/kis-token-lifecycle.ts";
+import { getReusableKisAccessToken, KisTokenCooldownError } from "../src/lib/market-data/providers/kis-token-lifecycle.ts";
 
 describe("KIS token lifecycle", () => {
   it("coalesces concurrent token issuance inside one request session", async () => {
@@ -124,5 +124,59 @@ describe("KIS token lifecycle", () => {
     currentTime += 61_000;
     assert.equal(await getReusableKisAccessToken(options), "token-2");
     assert.equal(issueCount, 2);
+  });
+
+  it("coalesces a failed issue and prevents immediate retries across warm sessions", async () => {
+    let currentTime = 1_000;
+    let issueCount = 0;
+    const failure = new Error("provider returned a private failure body");
+    const options = {
+      cacheKey: "failure-shared-warm", policy: "memory_cache", now: () => currentTime,
+      issueToken: async () => {
+        issueCount++;
+        if (issueCount === 1) throw failure;
+        return { accessToken: "recovered-token", expiresInSeconds: 3600 };
+      },
+    };
+    const results = await Promise.allSettled([
+      getReusableKisAccessToken({ ...options, session: { tokenCache: null } }),
+      getReusableKisAccessToken({ ...options, session: { tokenCache: null } }),
+    ]);
+    assert.equal(issueCount, 1);
+    assert.ok(results.every(result => result.status === "rejected" && result.reason === failure));
+    await assert.rejects(getReusableKisAccessToken({ ...options, session: { tokenCache: null } }), error => {
+      assert.ok(error instanceof KisTokenCooldownError);
+      assert.equal(error.retryAfterSeconds, 60);
+      assert.doesNotMatch(error.message, /private failure body/);
+      return true;
+    });
+    assert.equal(issueCount, 1);
+    currentTime += 60_000;
+    assert.equal(await getReusableKisAccessToken({ ...options, session: { tokenCache: null } }), "recovered-token");
+    assert.equal(issueCount, 2);
+  });
+
+  it("retains failure cooldown within per-request sessions, including synchronous issuers", async () => {
+    const session = { tokenCache: null };
+    let calls = 0;
+    const options = { cacheKey: "failure-request", policy: "per_request", session, now: () => 100,
+      issueToken: () => { calls++; throw new Error("synchronous fixture failure"); } };
+    await assert.rejects(getReusableKisAccessToken(options), /synchronous fixture failure/);
+    assert.equal(session.tokenRequest, null);
+    await assert.rejects(getReusableKisAccessToken(options), KisTokenCooldownError);
+    assert.equal(calls, 1);
+    // A different credential scope is not blocked by another scope's failure.
+    const other = { ...options, cacheKey: "different-request-scope", issueToken: async () => ({ accessToken: "other-token", expiresInSeconds: 3600 }) };
+    assert.equal(await getReusableKisAccessToken(other), "other-token");
+  });
+
+  it("honors longer provider backoff and bounds malformed retry timings", async () => {
+    for (const [index, retryAfterSeconds, expected] of [[0, 180, 180], [1, Infinity, 60], [2, -1, 60], [3, 100_000, 3600]]) {
+      const session = { tokenCache: null };
+      const options = { cacheKey: `retry-timing-${index}`, policy: "per_request", session, now: () => 0,
+        issueToken: async () => { throw Object.assign(new Error("fixture backoff"), { retryAfterSeconds }); } };
+      await assert.rejects(getReusableKisAccessToken(options), /fixture backoff/);
+      await assert.rejects(getReusableKisAccessToken(options), error => error instanceof KisTokenCooldownError && error.retryAfterSeconds === expected);
+    }
   });
 });

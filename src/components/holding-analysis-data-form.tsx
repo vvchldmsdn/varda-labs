@@ -2,6 +2,7 @@
 
 import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState } from "react";
+import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
 
 import { prepareHoldingAnalysisData } from "@/app/portfolio/holdings/actions";
 import type {
@@ -26,6 +27,7 @@ export function HoldingAnalysisDataForm({
     INITIAL_STATE,
   );
   const messageId = `holding-analysis-data-${holdingId}`;
+  const collectionState = useMarketCollectionPolling(state.status === "queued" && readiness?.state !== "ready", state, true);
 
   if (!readiness) {
     return <p className="text-xs text-[var(--warning)]"><ManagementText>{"상태 확인 불가"}</ManagementText></p>;
@@ -70,7 +72,7 @@ export function HoldingAnalysisDataForm({
         ].join(" ")}
         id={messageId}
       >
-        <ManagementText>{state.message}</ManagementText>
+        <ManagementText>{collectionState === "waiting" ? "준비 요청이 대기 중입니다. 과거 가격 준비를 눌러 다시 확인할 수 있습니다." : state.message}</ManagementText>
       </p>
     </div>
   );

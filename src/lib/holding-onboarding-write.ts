@@ -27,8 +27,9 @@ import {
 } from "@/lib/tenant-write-context";
 import { closeCalendarReferenceDateForAsset, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { TENANT_LIVE_PRICE_SYNC_POLICY } from "@/lib/market-data/tenant-live-price-sync-policy";
-import { runMarketPriceSync } from "@/lib/market-data/price-sync";
-import { createKisMarketDataProvider, getKisProviderPolicy } from "@/lib/market-data/providers/kis";
+import { enqueueMarketCollection } from "@/lib/market-data/collection-queue";
+import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
+import { getKisProviderPolicy } from "@/lib/market-data/providers/kis";
 
 type PriceEvidence = Readonly<{
   currentPrice: string;
@@ -176,25 +177,9 @@ async function resolvePriceEvidence(
     throw new OnboardingPriceUnavailableError("자동 가격 조회가 준비되지 않았습니다. 현재 1좌 가격을 입력하거나 잠시 후 다시 저장해 주세요.");
   }
 
-  // One explicit instrument, with the existing shared KIS lease and cooldown.
-  // Never retry here, fetch the portfolio universe, or write a user's other assets.
-  try {
-    await runMarketPriceSync({
-      mode: "live", dryRun: false, targetLimit: 1,
-      explicitTargets: [{ ticker: input.ticker, market: input.market, currency: input.currency }],
-      provider: createKisMarketDataProvider(),
-    });
-  } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "provider_cooldown") {
-      const details = "details" in error ? error.details : null;
-      const wait = typeof details === "object" && details !== null && "retryAfterSeconds" in details
-        ? Number(details.retryAfterSeconds) : 90;
-      const retryAfterSeconds = Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : 90;
-      throw new OnboardingPriceUnavailableError(`가격 조회가 진행 중입니다. ${retryAfterSeconds}초 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요.`, retryAfterSeconds);
-    }
-    throw new OnboardingPriceUnavailableError("종목 가격을 확인하지 못했습니다. 잠시 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요.");
-  }
-  return readCurrentPriceEvidence(input, new Date());
+  await enqueueMarketCollection([{ kind: "live", ticker: input.ticker, market: input.market, currency: input.currency }]);
+  scheduleMarketCollection();
+  throw new OnboardingPriceUnavailableError("가격 확인 요청을 접수했습니다. 잠시 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요.", 10);
 }
 
 async function readCurrentPriceEvidence(input: HoldingOnboardingInput, now: Date): Promise<PriceEvidence | null> {

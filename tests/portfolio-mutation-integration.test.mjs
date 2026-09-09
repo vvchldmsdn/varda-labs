@@ -67,14 +67,11 @@ async function fixture(options = {}) {
       getKisProviderPolicy: () => ({ configured: options.providerConfigured !== false }),
       createKisMarketDataProvider: () => ({ name: "kis" }),
     },
-    "@/lib/market-data/price-sync": { runMarketPriceSync: async (request) => {
-      priceRequests.push(request);
+    "@/lib/market-data/collection-worker": { scheduleMarketCollection: () => {} },
+    "@/lib/market-data/collection-queue": { enqueueMarketCollection: async (request) => {
+      priceRequests.push(...request);
       if (options.refreshFailure) throw options.refreshFailure;
-      if (options.refreshPrice) {
-        const target = request.explicitTargets[0];
-        await pg.query("insert into live_price_quotes(ticker,market,currency,price,source,quote_type,status,price_as_of,fetched_at) values($1,$2,$3,$4,'kis_test','live','ok',now(),now())", [target.ticker, target.market, target.currency, options.refreshPrice]);
-      }
-      return { status: "completed" };
+      return { queuedCount: request.length, retryAfterSeconds: 10 };
     } },
   });
   return { pg, batches, priceRequests, holdings, accounts, groups, marketReadStarted,
@@ -165,27 +162,28 @@ describe("portfolio lifecycle mutation integration", () => {
     assert.equal((await f.pg.query("select count(distinct portfolio_group_id)::integer as n from portfolio_group_asset_memberships")).rows[0].n, 1);
   });
 
-  it("prepares exactly one missing quote and preserves its source rather than manufacturing a price", async () => {
-    const f = await fixture({ refreshPrice: "145000" });
+  it("queues one missing quote, saves nothing until evidence arrives, then preserves its source", async () => {
+    const f = await fixture();
     const result = await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ticker: "000660", currentPrice: "", averageCost: "" }));
-    assert.equal(result.status, "success");
+    assert.equal(result.status, "price_unavailable");
+    assert.equal(await f.count("assets"), 0);
     assert.equal(f.priceRequests.length, 1);
     const request = f.priceRequests[0];
-    assert.equal(request.mode, "live");
-    assert.equal(request.dryRun, false);
-    assert.equal(request.targetLimit, 1);
-    assert.deepEqual(request.explicitTargets, [{ ticker: "000660", market: "korea", currency: "KRW" }]);
+    assert.deepEqual(request, { kind: "live", ticker: "000660", market: "korea", currency: "KRW" });
+    await f.pg.query("insert into live_price_quotes(ticker,market,currency,price,source,quote_type,status,price_as_of,fetched_at) values('000660','korea','KRW','145000','kis_test','live','ok',now(),now())");
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ticker: "000660", currentPrice: "", averageCost: "" }))).status, "success");
+    assert.equal(f.priceRequests.length, 1);
     const row = (await f.pg.query("select current_price,price_source,average_cost from assets")).rows[0];
     assert.equal(Number(row.current_price), 145000);
     assert.equal(row.price_source, "kis_test");
     assert.equal(row.average_cost, null);
   });
 
-  it("leaves all portfolio records untouched on quote cooldown and returns a retry interval", async () => {
-    const f = await fixture({ refreshFailure: { code: "provider_cooldown", details: { retryAfterSeconds: 42 } } });
+  it("leaves all portfolio records untouched while a quote is queued and returns a retry interval", async () => {
+    const f = await fixture();
     const result = await f.holdings.writeSessionHoldingOnboarding(holdingForm({ portfolioGroupId: "", ticker: "000660", currentPrice: "" }));
     assert.equal(result.status, "price_unavailable");
-    assert.equal(result.retryAfterSeconds, 42);
+    assert.equal(result.retryAfterSeconds, 10);
     assert.equal(f.priceRequests.length, 1);
     assert.equal(await f.count("assets"), 0);
     assert.equal(await f.count("holding_onboarding_evidence"), 0);

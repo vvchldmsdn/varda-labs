@@ -174,8 +174,8 @@ describe("holding analysis data readiness", () => {
     assert.match(querySource, /where asset\.id = \$1::uuid/);
     assert.match(writerSource, /getReadOnlyTenantHoldingAnalysisPreparationTarget/);
     assert.match(writerSource, /ticker = target\.ticker/);
-    assert.match(writerSource, /accounts: \[\]/);
-    assert.match(writerSource, /assetIds: \[\]/);
+    assert.match(writerSource, /enqueueMarketCollection\(\[\{ kind: "history", ticker, market: target\.market, currency: target\.currency, startDate, endDate \}\]/);
+    assert.doesNotMatch(writerSource, /runKisHistoryCacheSync|createKisMarketDataProvider|accounts:|assetIds:/);
     assert.match(writerSource, /managed_sleeve_excluded/);
     assert.doesNotMatch(writerSource, /setTimeout|Start-Sleep|\bretry\b/i);
     assert.doesNotMatch(onboardingWriterSource, /\bfetch\s*\(/);
