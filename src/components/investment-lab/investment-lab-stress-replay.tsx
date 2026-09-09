@@ -1,4 +1,5 @@
 import { LabText } from "./lab-text";
+import { T } from "@/components/i18n/localized-text";
 import { labEnglish } from "./lab-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import type {
@@ -40,6 +41,7 @@ export function InvestmentLabStressReplayView({
         <p className="mt-2 text-xs text-[var(--muted)]"><LabText value=" 세금·수수료·배당 재투자는 반영하지 않은 연구용 비교이며 투자 추천이 아닙니다. " /></p>
       </header>
 
+      {model.valuationBlocker ? <p role="status" className="border-y border-[var(--line)] py-5 text-sm leading-7 text-[var(--warning)]"><T ko={`${model.valuationGapCount ?? 0}개 보유종목의 현재 평가액을 확인할 수 없어 과거 구성 비교를 보류했습니다. 평가액이 확인된 종목만으로 전체 비중을 다시 계산하지 않습니다. 보유종목에서 가격과 환율 근거를 확인해 주세요.`} en={`Current valuations are unavailable for ${model.valuationGapCount ?? 0} holdings, so this replay is paused. We do not reweight only the known holdings to represent your whole portfolio. Check their price and exchange-rate evidence in Holdings.`} /></p> : null}
       <div className="space-y-4">
         {model.windows.map((window) => (
           <StressWindowCard key={window.id} window={window} />

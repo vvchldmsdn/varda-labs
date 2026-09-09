@@ -1,0 +1,1 @@
+ALTER TABLE "holding_onboarding_evidence" ALTER COLUMN "average_cost" DROP NOT NULL;

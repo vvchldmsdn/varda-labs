@@ -1,0 +1,92 @@
+.varda-holding-add-page { min-height:100dvh; background:var(--paper); color:var(--ink); }
+.varda-holding-add-content { width:min(1120px,calc(100% - 64px)); margin:32px auto 88px; }
+.varda-holding-add-back { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--muted); font-size:12px; }
+.varda-holding-add-heading { padding:28px 0 32px; max-width:690px; }
+.varda-onboarding-eyebrow { color:var(--muted); font-size:10px; letter-spacing:.15em; font-weight:600; }
+.varda-holding-add-heading h1 { font-size:clamp(30px,4vw,46px); font-weight:550; letter-spacing:-.055em; line-height:1.25; margin:15px 0; }
+.varda-holding-add-heading > p:last-child { font-size:14px; line-height:1.8; color:var(--muted); }
+.varda-onboarding-account-line { display:flex; gap:24px; justify-content:space-between; align-items:center; padding:17px 0; border-block:1px solid var(--line); }
+.varda-onboarding-account-line label { display:flex; gap:18px; align-items:center; font-size:12px; color:var(--muted); }
+.varda-onboarding-account-line select { width:auto!important; min-width:120px; margin:0!important; font-size:13px; }
+.varda-onboarding-account-line > span { font-size:11px; color:var(--muted); }
+.varda-onboarding-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.85fr); gap:64px; padding-top:36px; }
+.varda-onboarding-compose, .varda-onboarding-review { min-width:0; }
+.varda-holding-onboarding input:not([type=hidden]), .varda-holding-onboarding select, .varda-holding-onboarding textarea { width:100%; min-width:0; min-height:46px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:7px; padding:9px 12px; margin-top:7px; font-size:14px; outline:none; }
+.varda-holding-onboarding input:focus, .varda-holding-onboarding select:focus, .varda-holding-onboarding textarea:focus { border-color:var(--ink); box-shadow:0 0 0 1px var(--ink); }
+.varda-holding-onboarding button { cursor:pointer; }
+.varda-holding-onboarding button:disabled, .varda-holding-onboarding input:disabled, .varda-holding-onboarding select:disabled { opacity:.55; cursor:default; }
+.varda-holding-onboarding button:focus-visible, .varda-holding-onboarding a:focus-visible, .varda-holding-onboarding summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.varda-instrument-search { margin-top:26px; }
+.varda-instrument-search > label { font-size:20px; font-weight:500; letter-spacing:-.03em; }
+.varda-instrument-search-input { display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--ink); margin:15px 0 10px; color:var(--muted); }
+.varda-instrument-search-input input { border:0!important; background:transparent!important; box-shadow:none!important; margin:0!important; padding-inline:0!important; min-height:56px!important; font-size:16px!important; }
+.varda-instrument-search-input > svg { flex:none; }
+.varda-onboarding-hint { font-size:11px; color:var(--muted); line-height:1.75; }
+.varda-instrument-results { list-style:none; padding:0; margin:18px 0; border-block:1px solid var(--line); max-height:310px; overflow:auto; overscroll-behavior:contain; }
+.varda-instrument-results li + li { border-top:1px solid var(--line); }
+.varda-instrument-results button { display:flex; align-items:center; justify-content:space-between; text-align:left; width:100%; gap:16px; padding:16px 6px; min-height:68px; transition:background 140ms; }
+.varda-instrument-results button:hover { background:var(--wash); }
+.varda-instrument-results button > span:first-child { min-width:0; }
+.varda-instrument-results strong { display:block; font-size:14px; font-weight:550; overflow-wrap:anywhere; }
+.varda-instrument-results small { display:block; margin-top:5px; color:var(--muted); font-size:11px; }
+.varda-instrument-results button > span:last-child { flex:none; color:var(--muted); font-size:10px; }
+.varda-onboarding-start-note { display:flex; gap:17px; padding:42px 0; }
+.varda-onboarding-start-note > span { font-size:32px; line-height:1; color:var(--accent); }
+.varda-onboarding-start-note p { font-size:13px; }
+.varda-onboarding-start-note small, .varda-onboarding-empty small { display:block; color:var(--muted); font-size:11px; line-height:1.7; margin-top:8px; }
+.varda-onboarding-selected { margin-top:27px; animation:varda-onboarding-enter 180ms ease-out; }
+.varda-onboarding-selected-title { display:flex; justify-content:space-between; gap:16px; align-items:center; padding-bottom:20px; }
+.varda-onboarding-selected-title strong { display:block; font-size:18px; font-weight:550; overflow-wrap:anywhere; }
+.varda-onboarding-selected-title span { display:block; font-size:11px; color:var(--muted); margin-top:6px; }
+.varda-onboarding-selected-title button, .varda-onboarding-row-heading button { display:grid; place-items:center; width:44px; height:44px; flex:none; color:var(--muted); }
+.varda-onboarding-quantity { display:block; font-size:12px; }
+.varda-onboarding-quantity input { font-size:30px!important; padding-block:13px!important; font-variant-numeric:tabular-nums; }
+.varda-onboarding-disclosure, .varda-holding-onboarding .varda-onboarding-details { border-top:1px solid var(--line); margin-top:22px; font-size:12px; }
+.varda-onboarding-disclosure > summary, .varda-holding-onboarding .varda-onboarding-details > summary { cursor:pointer; min-height:44px; padding:15px 0; color:var(--muted); line-height:1.6; }
+.varda-onboarding-disclosure p, .varda-holding-onboarding .varda-onboarding-details p { font-size:11px; line-height:1.75; color:var(--muted); margin:0 0 16px; }
+.varda-onboarding-disclosure label { display:block; font-size:11px; margin-bottom:16px; }
+.varda-onboarding-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.varda-onboarding-primary, .varda-onboarding-secondary { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:50px; padding:12px 17px; border-radius:7px; width:100%; font-size:13px; }
+.varda-onboarding-primary { background:var(--ink); color:var(--paper); }
+.varda-onboarding-secondary { border:1px solid var(--ink); justify-content:center; margin-top:15px; }
+.varda-onboarding-text-button { display:inline-flex; gap:10px; align-items:center; min-height:44px; color:var(--ink); font-size:12px; text-align:left; }
+.varda-onboarding-review-title { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.varda-onboarding-review-title > span { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+.varda-onboarding-empty { padding:37px 0 29px; display:flex; gap:23px; align-items:center; }
+.varda-onboarding-empty > span { font-size:58px; font-weight:300; color:var(--faint); letter-spacing:-.07em; }
+.varda-onboarding-empty p { font-size:13px; }
+.varda-onboarding-queue { margin:20px 0 0; padding:0; list-style:none; }
+.varda-onboarding-queue > li { padding:20px 0; border-top:1px solid var(--line); }
+.varda-onboarding-row-heading { display:flex; gap:12px; align-items:center; }
+.varda-onboarding-row-number { color:var(--muted); font-size:10px; flex:none; width:22px; }
+.varda-onboarding-row-heading > div { flex:1; min-width:0; }
+.varda-onboarding-row-heading strong { display:block; font-size:14px; font-weight:550; overflow-wrap:anywhere; }
+.varda-onboarding-row-heading small { display:block; margin-top:5px; font-size:10px; color:var(--muted); }
+.varda-onboarding-row-quantity { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-top:13px; font-size:11px; color:var(--muted); }
+.varda-onboarding-row-quantity input { width:125px!important; text-align:right; margin:0!important; }
+.varda-onboarding-queue > li[data-saved=true] .varda-onboarding-row-number { color:var(--accent); }
+.varda-onboarding-queue .varda-onboarding-disclosure { border-top:0; margin-top:5px; }
+.varda-onboarding-save { margin-top:24px; }
+.varda-onboarding-save > .varda-onboarding-hint { margin-top:11px; }
+.varda-onboarding-error { color:var(--warning); font-size:12px; line-height:1.7; margin:14px 0; }
+.varda-onboarding-success { padding-top:24px; margin-top:24px; border-top:1px solid var(--line); display:grid; gap:12px; }
+.varda-onboarding-success > svg { color:var(--accent); }
+.varda-onboarding-success strong { font-size:14px; font-weight:550; }
+.varda-onboarding-success a { display:inline-flex; align-items:center; gap:10px; min-height:44px; color:var(--accent); font-size:13px; }
+@keyframes varda-onboarding-enter { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+@media (max-width:760px) {
+  .varda-holding-add-content { width:calc(100% - 40px); margin:16px auto 90px; }
+  .varda-holding-add-heading { padding:21px 0 24px; }
+  .varda-holding-add-heading h1 { font-size:31px; }
+  .varda-holding-add-heading > p:last-child { font-size:12px; }
+  .varda-onboarding-account-line { display:block; }
+  .varda-onboarding-account-line label { justify-content:space-between; }
+  .varda-onboarding-account-line > span { display:block; margin-top:12px; font-size:10px; }
+  .varda-onboarding-workspace { display:block; padding-top:29px; }
+  .varda-instrument-search > label { font-size:19px; }
+  .varda-onboarding-review { margin-top:34px; padding-top:28px; border-top:1px solid var(--ink); }
+  .varda-onboarding-start-note { padding:27px 0 17px; }
+  .varda-onboarding-fields { gap:11px; }
+  .varda-holding-onboarding input:not([type=hidden]), .varda-holding-onboarding select, .varda-holding-onboarding textarea { font-size:16px; }
+}
+@media (prefers-reduced-motion:reduce) { .varda-onboarding-selected { animation:none; } }

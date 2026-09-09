@@ -10,6 +10,7 @@ import {
   INVESTMENT_LAB_STRESS_REPLAY_POLICY,
   INVESTMENT_LAB_STRESS_WINDOWS,
   type InvestmentLabStressPriceInput,
+  type InvestmentLabStressReplay,
 } from "@/lib/investment-lab-stress-replay";
 import {
   admitAdjustedHistoricalPriceRows,
@@ -27,11 +28,22 @@ export async function getReadOnlyTenantInvestmentLabStressReplay({
 }: {
   account: string;
   portfolioStructurePromise: Promise<PortfolioStructureResult>;
-}) {
+}): Promise<InvestmentLabStressReplay> {
   const portfolioStructure = await portfolioStructurePromise;
   const scopedPortfolio = applyInvestmentLabCurrentHoldingScope(
     portfolioStructure,
   ).portfolio;
+  // Historical exclusions have measurable coverage; missing current values do not.
+  // Never normalize the known subset to 100% and describe it as this portfolio.
+  if (scopedPortfolio.exclusions.length > 0) {
+    return Object.freeze({
+      policy: INVESTMENT_LAB_STRESS_REPLAY_POLICY,
+      account,
+      valuationBlocker: "current_valuation_incomplete" as const,
+      valuationGapCount: scopedPortfolio.exclusions.length,
+      windows: Object.freeze([]),
+    });
+  }
   const tickers = [
     ...new Set([
       ...scopedPortfolio.holdingRows

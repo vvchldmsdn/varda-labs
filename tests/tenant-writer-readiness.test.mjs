@@ -58,7 +58,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 32);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 33);
     assert.equal(registeredPaths.length, 39);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
@@ -132,7 +132,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 20,
       intentionally_skipped_legacy: 1,
-      not_applicable: 11,
+      not_applicable: 12,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
@@ -218,6 +218,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
         "base44_market_context_import",
         "cron_market_cycle_controller",
         "operator_investment_lab_stress_history_completion",
+        "session_holding_analysis_data_preparation",
+        "session_holding_onboarding",
         "session_portfolio_live_price_sync",
       ],
     );
@@ -325,27 +327,66 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.match(source, /assertActiveTenantWriteAllowed\(/);
     assert.match(source, /runPortfolioMutation\(ownerUserId, ATOMIC_ONBOARDING_QUERY, \[\s*ownerUserId,/);
     assert.match(source, /where id = \$3::uuid and canonical_owner_user_id = \$1::uuid and is_active = true/);
-    assert.match(source, /where id = \$4::uuid and canonical_owner_user_id = \$1::uuid and archived_at is null/);
+    const groupSelection = source
+      .split("), existing_group as materialized (")[1]
+      ?.split("), created_group as (")[0];
+    assert.ok(groupSelection, "onboarding selects a group in its owner-locked mutation");
+    assert.match(groupSelection, /where canonical_owner_user_id = \$1::uuid and archived_at is null\s+and \(id = \$4::uuid or \(\$4::uuid is null and lower\(name\) = lower\(coalesce\(\$6::varchar, '\$\{DEFAULT_HOLDING_PORTFOLIO_GROUP_NAME\}'\)\)\)\)/);
+    assert.match(groupSelection, /for update/);
     assert.doesNotMatch(source, /(?:formData\.get|input\.)\(?["']?canonicalOwner/);
   });
 
-  it("registers provider leases for both machine and verified-session callers without owner targets", () => {
+  it("registers provider leases for machine and verified-session callers with separate owner targets", () => {
     const leasePath = "src/lib/market-data/kis-refresh-lease.ts";
     const leaseWriters = TENANT_WRITER_REGISTRY.filter((writer) => writer.implementationPaths.includes(leasePath));
     assert.deepEqual(leaseWriters.map(({ id, authorization }) => ({ id, authorization })), [
+      { id: "session_holding_onboarding", authorization: "server_verified_session" },
       { id: "admin_market_price_sync", authorization: "machine_admin" },
       { id: "session_portfolio_live_price_sync", authorization: "server_verified_session" },
+      { id: "session_holding_analysis_data_preparation", authorization: "server_verified_session" },
       { id: "cron_market_cycle_controller", authorization: "machine_admin" },
     ]);
     const sessionWriter = leaseWriters.find(({ id }) => id === "session_portfolio_live_price_sync");
     assert.deepEqual(sessionWriter.entrypoints, ["/api/portfolio/live-prices/sync"]);
     assert.ok(sessionWriter.targets.every(({ ownerPolicy }) => ownerPolicy === "owner_forbidden"));
+    const onboardingWriter = leaseWriters.find(({ id }) => id === "session_holding_onboarding");
+    assert.deepEqual(onboardingWriter.entrypoints, [
+      "/portfolio/holdings/new#createHoldingOnboarding",
+      "/portfolio/holdings/new#createHoldingBatch",
+    ]);
+    assert.deepEqual(onboardingWriter.transition, {
+      prepare: "split_target_classes",
+      activate: "owner_aware_repository_or_freeze",
+      freeze: "freeze_user_targets_only",
+    });
+    assert.deepEqual(onboardingWriter.targets.map(({ table, ownerPolicy }) => ({ table, ownerPolicy })), [
+      { table: "portfolio_groups", ownerPolicy: "trusted_context_required" },
+      { table: "assets", ownerPolicy: "trusted_context_required" },
+      { table: "holding_onboarding_evidence", ownerPolicy: "trusted_context_required" },
+      { table: "portfolio_group_asset_memberships", ownerPolicy: "trusted_context_required" },
+      { table: "market_data_sync_runs", ownerPolicy: "owner_forbidden" },
+      { table: "live_price_quotes", ownerPolicy: "owner_forbidden" },
+    ]);
+    const historyWriter = leaseWriters.find(({ id }) => id === "session_holding_analysis_data_preparation");
+    assert.deepEqual(historyWriter.entrypoints, [
+      "/portfolio/holdings#prepareHoldingAnalysisData",
+      "/portfolio/first-look#prepareHoldingAnalysisData",
+    ]);
+    assert.ok(historyWriter.targets.every(({ ownerPolicy }) => ownerPolicy === "owner_forbidden"));
     for (const writer of leaseWriters) {
       assert.ok(writer.targets.some(({ table, classification }) => table === "market_data_sync_runs" && classification === "admin_system"));
     }
     const route = readFileSync(join(ROOT, "src/app/api/portfolio/live-prices/sync/route.ts"), "utf8");
     assert.ok(route.indexOf("await resolveCurrentTenantContext()") < route.indexOf("await withKisRefreshLease(refresh)"));
     assert.match(route, /getTenantLivePriceTargets\(resolution\.tenantContext\)/);
+    const preparation = readFileSync(join(ROOT, "src/lib/holding-analysis-data-preparation-write.ts"), "utf8");
+    const sessionResolution = preparation.indexOf("await resolveCurrentTenantContext()");
+    const ownedTargetRead = preparation.indexOf("await getReadOnlyTenantHoldingAnalysisPreparationTarget({");
+    const leasedHistoryPreparation = preparation.indexOf("await withKisRefreshLease(() => runKisHistoryCacheSync({");
+    assert.ok(sessionResolution >= 0 && sessionResolution < ownedTargetRead && ownedTargetRead < leasedHistoryPreparation);
+    assert.match(preparation, /getReadOnlyTenantHoldingAnalysisPreparationTarget\(\{\s+tenantContext: resolution\.tenantContext,\s+holdingId: parsed\.holdingId,/);
+    const onboarding = readFileSync(join(ROOT, "src/lib/holding-onboarding-write.ts"), "utf8");
+    assert.match(onboarding, /runMarketPriceSync\(\{\s+mode: "live", dryRun: false, targetLimit: 1,\s+explicitTargets: \[\{ ticker: input\.ticker, market: input\.market, currency: input\.currency \}\]/);
     const lease = readFileSync(join(ROOT, leasePath), "utf8");
     assert.match(lease, /const context = new AsyncLocalStorage/);
     assert.doesNotMatch(lease, /canonicalOwnerUserId|canonical_owner_user_id|export const context/);

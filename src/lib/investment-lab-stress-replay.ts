@@ -119,6 +119,8 @@ export type InvestmentLabStressReplayWindow = Readonly<{
 export type InvestmentLabStressReplay = Readonly<{
   policy: typeof INVESTMENT_LAB_STRESS_REPLAY_POLICY;
   account: string;
+  valuationBlocker?: "current_valuation_incomplete";
+  valuationGapCount?: number;
   windows: readonly InvestmentLabStressReplayWindow[];
 }>;
 

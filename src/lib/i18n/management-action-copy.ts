@@ -1,6 +1,10 @@
 /** UI-only translations for validated management action messages.
  * Business results and persisted values remain in their original form. */
 export const managementActionEnglish: Readonly<Record<string, string>> = {
+  "보유 계좌를 다시 확인해 주세요.": "Check the holding account again.",
+  "검색 결과에서 종목을 다시 선택해 주세요.": "Select the instrument from the search results again.",
+  "종목 가격을 확인하지 못했습니다. 잠시 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요.": "The price could not be verified. Try saving again shortly or enter a current price per unit.",
+  "자동 가격 조회가 준비되지 않았습니다. 현재 1좌 가격을 입력하거나 잠시 후 다시 저장해 주세요.": "Automatic quotes are unavailable. Enter a current price per unit or try saving again shortly.",
   "로그인과 사용자 연결을 확인해 주세요.": "Check your sign-in and user link.",
   "보유종목 또는 계좌 상태가 변경되었습니다. 화면을 새로고침해 주세요.": "The holding or account has changed. Refresh the page.",
   "저장된 분석 데이터 상태를 확인하지 못했습니다. 잠시 후 다시 확인해 주세요.": "The stored analysis-data status could not be verified. Please try again later.",
@@ -87,6 +91,10 @@ export function translateManagementActionCopy(text: string): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   const exact = managementActionEnglish[normalized];
   if (exact !== undefined) return exact;
+  let busy = /^다른 가격 조회가 진행 중입니다\. (\d+)초 후 다시 시도해 주세요\.$/.exec(normalized);
+  if (busy) return `Another price refresh is in progress. Try again in ${busy[1]} seconds.`;
+  busy = /^가격 조회가 진행 중입니다\. (\d+)초 후 다시 저장하거나 현재 1좌 가격을 입력해 주세요\.$/.exec(normalized);
+  if (busy) return `A price refresh is in progress. Save again in ${busy[1]} seconds or enter a current price per unit.`;
   let match = /^다른 가격 조회 직후입니다\. (\d+)초 후 다시 시도해 주세요\.$/.exec(normalized);
   if (match) return `Another price request just completed. Try again in ${match[1]} seconds.`;
   match = /^가격 기록 (\d+)개를 확인했습니다\. 일부 구간은 제공자 응답이 없어 저장된 범위만 사용합니다\.$/.exec(normalized);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { PGlite } from "@electric-sql/pglite";
 
 const migration = readFileSync(
   new URL("../drizzle/0025_nebulous_the_phantom.sql", import.meta.url),
@@ -12,6 +13,19 @@ const schema = readFileSync(
 );
 
 describe("holding onboarding schema", () => {
+  it("allows an unknown cost without changing known costs or accepting zero", async () => {
+    const optionalCostMigration = readFileSync(new URL("../drizzle/0042_holding_onboarding_optional_cost.sql", import.meta.url), "utf8");
+    assert.equal(optionalCostMigration.trim(), 'ALTER TABLE "holding_onboarding_evidence" ALTER COLUMN "average_cost" DROP NOT NULL;');
+    const pg = new PGlite();
+    try {
+      await pg.exec("create table holding_onboarding_evidence(id integer primary key,average_cost numeric not null check(average_cost>0)); insert into holding_onboarding_evidence values(1,123.45);");
+      await pg.exec(optionalCostMigration);
+      await pg.exec("insert into holding_onboarding_evidence values(2,null)");
+      assert.deepEqual((await pg.query("select id,average_cost from holding_onboarding_evidence order by id")).rows, [{ id: 1, average_cost: "123.45" }, { id: 2, average_cost: null }]);
+      await assert.rejects(pg.exec("insert into holding_onboarding_evidence values(3,0)"), /check constraint/);
+    } finally { await pg.close(); }
+  });
+
   it("adds one immutable owner-scoped evidence table", () => {
     assert.match(migration, /CREATE TABLE "holding_onboarding_evidence"/);
     assert.match(

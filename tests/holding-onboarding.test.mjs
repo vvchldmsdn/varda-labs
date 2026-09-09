@@ -39,6 +39,7 @@ describe("holding onboarding contract", () => {
     assert.equal(result.ok, true);
     assert.deepEqual(result.input, {
       accountId: ACCOUNT_ID,
+      instrumentId: null,
       portfolioGroupId: GROUP_ID,
       newPortfolioGroupName: null,
       market: "korea",
@@ -75,6 +76,24 @@ describe("holding onboarding contract", () => {
     assert.equal(result.input.ticker, "VOO");
     assert.equal(result.input.currentPrice, null);
     assert.equal(result.input.reportedReturnPct, null);
+  });
+
+  it("starts without a cost or group and never infers purchase performance", () => {
+    const result = parseHoldingOnboardingInput(form({
+      accountId: ACCOUNT_ID, market: "us", assetType: "stock", ticker: "AAPL", quantity: "2", averageCost: "   ",
+    }));
+    assert.equal(result.ok, true);
+    assert.equal(result.input.averageCost, null);
+    assert.equal(result.input.portfolioGroupId, null);
+    assert.equal(result.input.newPortfolioGroupName, null);
+    assert.equal(calculateLocalReturnPct({ averageCost: null, currentPrice: 200 }), null);
+    for (const averageCost of ["0", "-1", "NaN", "100.12345"]) {
+      const invalid = parseHoldingOnboardingInput(form({
+        accountId: ACCOUNT_ID, market: "us", assetType: "stock", ticker: "AAPL", quantity: "2", averageCost,
+      }));
+      assert.equal(invalid.ok, false);
+      assert.equal(invalid.field, "averageCost");
+    }
   });
 
   it("rejects two group authorities and invalid cost evidence", () => {
@@ -156,9 +175,9 @@ describe("holding onboarding contract", () => {
     assert.doesNotMatch(writerSource, /\bfetch\s*\(/);
   });
 
-  it("labels direct cost as authoritative and broker return as reference-only", () => {
-    assert.match(formSource, /손익 계산의 기준 원가입니다/);
-    assert.match(formSource, /검산용으로만 보존하며 손익 계산에는 사용하지 않습니다/);
+  it("keeps missing cost unknown and broker return reference-only", () => {
+    assert.equal(HOLDING_ONBOARDING_POLICY.missingAverageCost, "unknown_never_zero_or_current_price");
+    assert.equal(HOLDING_ONBOARDING_POLICY.reportedReturnRole, "reference_only");
   });
 });
 

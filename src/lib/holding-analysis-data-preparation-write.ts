@@ -15,6 +15,7 @@ import {
   type HoldingAnalysisDataPreparationActionState,
 } from "@/lib/holding-analysis-data-readiness";
 import { runKisHistoryCacheSync } from "@/lib/market-data/kis-history-cache-sync";
+import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
 import {
   createKisMarketDataProvider,
   getKisProviderPolicy,
@@ -119,7 +120,7 @@ export async function prepareSessionHoldingAnalysisData(
       endDate,
       -(HISTORY_WINDOW_CALENDAR_DAYS - 1),
     );
-    const result = await runKisHistoryCacheSync({
+    const result = await withKisRefreshLease(() => runKisHistoryCacheSync({
       targets: [
         {
           key: [target.market, target.currency, ticker].join("|"),
@@ -134,7 +135,7 @@ export async function prepareSessionHoldingAnalysisData(
       startDate,
       endDate,
       provider: createKisMarketDataProvider(),
-    });
+    }));
 
     return state(
       "success",
@@ -142,7 +143,10 @@ export async function prepareSessionHoldingAnalysisData(
         ? `가격 기록 ${result.fetchedRowCount}개를 확인했습니다. 일부 구간은 제공자 응답이 없어 저장된 범위만 사용합니다.`
         : `가격 기록 ${result.fetchedRowCount}개를 확인해 분석 데이터로 준비했습니다.`,
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof KisRefreshLeaseBusyError) {
+      return Object.freeze({ status: "busy" as const, message: `다른 가격 조회가 진행 중입니다. ${error.retryAfterSeconds}초 후 다시 시도해 주세요.`, retryAfterSeconds: error.retryAfterSeconds });
+    }
     return state(
       "error",
       "과거 가격을 준비하지 못했습니다. 저장된 데이터는 변경하지 않고 중단했습니다.",

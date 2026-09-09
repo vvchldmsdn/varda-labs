@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { buildInvestmentLabStressReplay } from "../src/lib/investment-lab-stress-replay.ts";
+import { importWithPorts } from "./helpers/import-with-ports.mjs";
 
 const TEST_WINDOW = Object.freeze({
   id: "fixture",
@@ -13,6 +14,32 @@ const TEST_WINDOW = Object.freeze({
 });
 
 describe("investment lab historical stress replay", () => {
+  it("does not promote an incompletely valued current portfolio into a complete replay", async () => {
+    let marketReads = 0;
+    const [query] = await importWithPorts(["src/db/queries/investment-lab-stress-replay.ts"], {
+      "@/db/queries/portfolio-risk": { loadPortfolioRiskPriceCandidates: async () => { marketReads++; return []; }, loadPortfolioRiskFxRates: async () => { marketReads++; return []; } },
+    });
+    const result = await query.getReadOnlyTenantInvestmentLabStressReplay({
+      account: "all",
+      portfolioStructurePromise: Promise.resolve({ holdingRows: [holding("Known", "VOO", "us", "USD", 100000)], exclusions: [{ name: "Unknown", ticker: "QQQ", account: "my-account", market: "us", currency: "USD", assetType: "etf", reason: "missing_price" }] }),
+    });
+    assert.equal(result.valuationBlocker, "current_valuation_incomplete");
+    assert.equal(result.valuationGapCount, 1);
+    assert.deepEqual(result.windows, []);
+    assert.equal(marketReads, 0);
+  });
+
+  it("can load first-day hypothetical replay inputs without personal snapshots or cost basis", async () => {
+    const calls = [];
+    const [query] = await importWithPorts(["src/db/queries/investment-lab-stress-replay.ts"], {
+      "@/db/queries/portfolio-risk": { loadPortfolioRiskPriceCandidates: async ({ tickers }) => { calls.push(tickers); return []; }, loadPortfolioRiskFxRates: async () => [] },
+    });
+    const result = await query.getReadOnlyTenantInvestmentLabStressReplay({ account: "all", portfolioStructurePromise: Promise.resolve({ holdingRows: [holding("Known", "MSFT", "us", "USD", 100000)], exclusions: [] }) });
+    assert.equal(result.valuationBlocker, undefined);
+    assert.deepEqual(calls, [["069500", "MSFT", "VOO"]]);
+    assert.equal(result.windows.length, 3);
+    assert.ok(result.windows.every((window) => window.status === "unavailable"));
+  });
   it("renormalizes the eligible current-value subset and includes USD/KRW movement", () => {
     const model = buildInvestmentLabStressReplay({
       account: "all",

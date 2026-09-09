@@ -19,28 +19,13 @@ async function main() {
   const options = parseInvestmentLabStressHistoryCommandArgs(
     process.argv.slice(2),
   );
-  const [{ and, asc, eq, gt, inArray, isNotNull }, client, schema] =
+  const [{ and, asc, eq, gt, inArray, isNotNull, isNull }, client, schema] =
     await Promise.all([
       import("drizzle-orm"),
       import("../src/db/client.ts"),
       import("../src/db/schema.ts"),
     ]);
   const { accounts, appUsers, assets } = schema;
-  const activeOwnerRows = await client.db
-    .select({ id: appUsers.id })
-    .from(appUsers)
-    .where(
-      and(
-        eq(appUsers.status, "active"),
-        inArray(appUsers.role, ["user", "admin"]),
-      ),
-    );
-  if (activeOwnerRows.length !== 1) {
-    throw new Error(
-      `stress history completion requires exactly one active owner; found ${activeOwnerRows.length}`,
-    );
-  }
-  const activeOwnerUserId = activeOwnerRows[0].id;
   const holdingRows = await client.db
     .select({
       accountCode: accounts.code,
@@ -55,9 +40,9 @@ async function main() {
       and(
         eq(assets.accountId, accounts.id),
         eq(accounts.isActive, true),
-        inArray(accounts.code, ["brokerage", "isa", "irp"]),
         isNotNull(accounts.canonicalOwnerUserId),
-        eq(accounts.canonicalOwnerUserId, activeOwnerUserId),
+        eq(assets.canonicalOwnerUserId, accounts.canonicalOwnerUserId),
+        eq(assets.account, accounts.code),
       ),
     )
     .innerJoin(
@@ -68,7 +53,7 @@ async function main() {
         inArray(appUsers.role, ["user", "admin"]),
       ),
     )
-    .where(gt(assets.quantity, "0"))
+    .where(and(gt(assets.quantity, "0"), isNull(assets.archivedAt)))
     .orderBy(asc(accounts.code), asc(assets.market), asc(assets.ticker));
   const completion = planInvestmentLabStressHistoryCompletion({
     holdings: holdingRows,
