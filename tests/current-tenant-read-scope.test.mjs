@@ -660,19 +660,34 @@ describe("current tenant read scope runtime boundary", () => {
     assert.doesNotMatch(source, /readArgument\("--account"\)/);
   });
 
-  it("keeps Simulation shared research reads behind the resolved server session", () => {
+  it("keeps Simulation main and deferred research behind the resolved server session", () => {
     const pageSource = read("src/app/simulation/page.tsx");
     const smokeSource = read("scripts/smoke-simulation-route.mjs");
+    const detailSource = read("src/db/queries/simulation-detail.ts");
+    const detailRoute = read("src/app/api/research/simulation/route.ts");
+    const detailContext = read("src/lib/auth/research-detail-context.ts");
 
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.match(pageSource, /Promise\.all/);
     assert.match(pageSource, /if \(!resolution\.ok\)/);
     assert.match(pageSource, /PortfolioReadAccessBoundary/);
+    assert.match(pageSource, /const ownerResearchPromise = getReadOnlyTenantSimulationOwnerResearch\(/);
     assert.ok(
       pageSource.indexOf("if (!resolution.ok)") <
-        pageSource.indexOf("const modelPromise"),
-      "shared simulation evidence must not be read before session resolution",
+        pageSource.indexOf("const ownerResearchPromise"),
+      "owner simulation evidence must not be read before session resolution",
     );
+    assert.ok(pageSource.indexOf('scopeContext.state !== "ready"') < pageSource.indexOf("const ownerResearchPromise"));
+    assert.doesNotMatch(pageSource, /getReadOnlySimulationInputReadiness/);
+    assert.match(detailSource, /getReadOnlySimulationInputReadiness\(\{ includeResearch: true/);
+    assert.match(detailRoute, /const context = await resolveResearchDetailContext\(query\)/);
+    assert.match(detailRoute, /if \(!context\.ok\) return context\.response/);
+    assert.match(detailRoute, /await loadSimulationDetail\(\{ panel, query, \.\.\.context \}\)/);
+    assert.ok(detailRoute.indexOf("if (!context.ok)") < detailRoute.indexOf("await loadSimulationDetail"));
+    assert.match(detailContext, /const resolution = await resolveCurrentTenantContext\(\)/);
+    assert.match(detailContext, /if \(!resolution\.ok\)/);
+    assert.match(detailContext, /tenantContext: resolution\.tenantContext/);
+    assert.match(detailContext, /context\.state !== "ready" \|\| context\.resolution\.state !== "resolved"/);
     assert.doesNotMatch(
       pageSource,
       /\bfetch\s*\(|\/api\/|providerSubject|canonicalOwnerUserId|tenantContext\.ownerUserId/,

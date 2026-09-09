@@ -117,4 +117,19 @@ describe("ephemeral current valuation in History", () => {
       }
     }
   });
+
+  it("does not call a live-only observation the first saved record in the opened evidence view", async () => {
+    const [explorer, locale] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx", "src/components/i18n/locale-provider.tsx"], {
+      "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children }) => React.createElement("section", null, children) },
+    });
+    for (const initialLocale of ["ko", "en"]) {
+      const markup = model => renderToStaticMarkup(React.createElement(locale.LocaleProvider, { initialLocale }, React.createElement(explorer.HistoryTimeExplorer, { model, scopeLabel: "Fixture" })));
+      const liveOnly = markup(buildHistoryOverview({ rows: [], liveValuation: live() }));
+      assert.match(liveOnly, initialLocale === "ko" ? /비교할 이전 저장 기록 없음/ : /No previous saved record to compare/);
+      assert.doesNotMatch(liveOnly, /첫 저장점|First saved record/);
+      const savedOnly = markup(buildHistoryOverview({ rows: [row("2026-09-08", 1_400_000)] }));
+      assert.match(savedOnly, initialLocale === "ko" ? /첫 저장점/ : /First saved record/);
+      assert.doesNotMatch(savedOnly, /비교할 이전 저장 기록 없음|No previous saved record to compare/);
+    }
+  });
 });

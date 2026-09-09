@@ -1,4 +1,23 @@
 .intro { margin-top:10px; color:var(--muted); font-size:14px; line-height:1.7; }
+.firstSteps { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; flex:1; gap:clamp(32px,5vw,80px); padding:30px 0; }
+.firstStepsIntro h2 { max-width:480px; margin:18px 0; font-size:clamp(27px,3vw,42px); font-weight:500; line-height:1.35; letter-spacing:-.04em; text-wrap:balance; }
+.firstStepsIntro > p:not(:first-child) { max-width:480px; color:var(--muted); font-size:13px; line-height:1.85; }
+.firstStepsIntro > .firstStepsBoundary { margin-top:22px; font-size:11px; }
+.firstStepActions { border-top:1px solid var(--line); }
+.firstStepAction { display:flex; align-items:center; width:100%; gap:18px; min-height:112px; padding:24px 0; border-bottom:1px solid var(--line); text-align:left; transition:color 160ms; }
+.firstStepAction > svg { flex:none; color:var(--brand); }
+.firstStepAction > svg:last-child { margin-left:auto; }
+.firstStepAction strong { display:block; font-size:16px; font-weight:500; line-height:1.6; }
+.firstStepAction span span { display:block; margin-top:6px; color:var(--muted); font-size:12px; line-height:1.7; }
+.firstStepAction:hover { color:var(--brand); }
+.firstStepAction:focus-visible { outline:2px solid var(--brand); outline-offset:4px; }
+@media (max-width:760px), (max-width:1000px) and (max-height:500px) {
+  .firstSteps { grid-template-columns:1fr; gap:28px; padding:8px 0; }
+  .firstStepsIntro h2 { margin:12px 0; font-size:28px; }
+  .firstStepsIntro > .firstStepsBoundary { margin-top:14px; }
+  .firstStepAction { min-height:96px; gap:12px; padding:18px 0; }
+  .firstStepAction strong { font-size:15px; }
+}
 .workspace { display:grid; gap:28px; min-width:0; }
 .toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:18px; font-size:12px; color:var(--muted); }
 .toolbar > div { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }

@@ -13,7 +13,7 @@ describe("analysis result journey navigation", () => {
     assert.match(component, /items\.map/);
   });
 
-  it("keeps the Investment Lab comparison visible and opens deep analysis in a dialog", () => {
+  it("keeps ready Lab comparisons in the canvas and new-user experiments reachable through the same dialog journey", () => {
     const page = read("src/app/investment-lab/page.tsx");
     const view = read("src/components/investment-lab/investment-lab-view.tsx");
     const workspace = read(
@@ -31,7 +31,10 @@ describe("analysis result journey navigation", () => {
     assert.match(view, /<InvestmentLabWorkspace/);
     assert.match(workspace, /data-lab-workspace="integrated"/);
     assert.match(workspace, /<dialog/);
-    assert.match(workspace, /styles.canvas.*\{comparison\}/s);
+    assert.match(view, /showFirstSteps=\{showFirstSteps\}/);
+    assert.match(workspace, /showFirstSteps = false/);
+    assert.match(workspace, /className=\{styles.canvas\}>\{showFirstSteps \? <InvestmentLabFirstSteps[^>]*onOpenPanel=\{openOverlay\}[^>]*\/> : comparison\}/);
+    assert.match(workspace, /function openOverlay\(view: LabOverlay\) \{ select\(view\); \}/);
     assert.doesNotMatch(workspace, /role="tablist"/);
     for (const target of targets) {
       assert.match(source, new RegExp(`id="${target}"`));

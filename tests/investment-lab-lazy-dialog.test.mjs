@@ -49,3 +49,59 @@ test("simulation partial detail keeps available owner evidence when fixed resear
   assert.match(html, /AVAILABLE_OWNER_HISTORY/);
   assert.match(html, /고정 종목의 연구 입력을 읽지 못했습니다/);
 });
+
+test("Lab first steps preserve the selected scope and distinguish hypothetical exploration in both languages", async () => {
+  const [{ InvestmentLabFirstSteps }, { LocaleProvider }] = await importUiWithPorts([
+    "src/components/investment-lab/investment-lab-first-steps.tsx",
+    "src/components/i18n/locale-provider.tsx",
+  ], { "next/link": { default: ({ children, ...props }) => createElement("a", props, children) } });
+  for (const locale of ["ko", "en"]) {
+    const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale: locale }, createElement(InvestmentLabFirstSteps, {
+      scopeKey: "account:11111111-1111-4111-8111-111111111111", onOpenPanel() {},
+    })));
+    assert.match(html, /href="\/simulation\?scope=account%3A11111111-1111-4111-8111-111111111111"/);
+    assert.equal((html.match(/<button/g) ?? []).length, 2);
+    assert.doesNotMatch(html, /<table|<svg[^>]+data-past-return/);
+    assert.match(html, locale === "ko" ? /내 과거 수익이나 실제 매매 기록이 되지 않아요/ : /not your past returns or actual trades/);
+    assert.match(html, locale === "ko" ? /확인된 가격·평가액 범위/ : /verified price and valuation evidence/);
+    if (locale === "en") assert.doesNotMatch(html, /[가-힣]/);
+  }
+});
+
+test("Lab replaces only short valid personal histories with first steps, preserving real calculation and error states", async () => {
+  const Empty = () => null;
+  const ports = {
+    "./investment-lab-workspace": { InvestmentLabWorkspace: ({ showFirstSteps, comparison }) => createElement("section", { "data-first-steps": String(showFirstSteps) }, comparison) },
+  };
+  for (const [path, name] of [
+    ["@/components/portfolio-primary-navigation", "PortfolioPrimaryNavigation"],
+    ["./investment-lab-scope-tabs", "InvestmentLabScopeTabs"],
+    ["./investment-lab-dialog", "InvestmentLabDialog"],
+    ["./investment-lab-evidence-group", "InvestmentLabEvidenceGroup"],
+    ["./investment-lab-deferred-performance", "InvestmentLabDeferredPerformance"],
+    ["./investment-lab-funding-preflight", "InvestmentLabFundingPreflightView"],
+    ["./investment-lab-observed-history", "InvestmentLabObservedHistoryView"],
+    ["./investment-lab-period-selector", "InvestmentLabPeriodSelector"],
+    ["./investment-lab-scenario-chart", "InvestmentLabScenarioChartView"],
+  ]) ports[path] = { [name]: Empty };
+  const [{ InvestmentLabView }] = await importUiWithPorts(["src/components/investment-lab/investment-lab-view.tsx"], ports);
+  const unavailable = { status: "unavailable" };
+  const props = {
+    weightEvidence: {}, accountComposition: unavailable,
+    anchorBasketScenario: unavailable, anchorValueWeightScenario: unavailable,
+    anchorCurrentWeightMonthlyScenario: unavailable, anchorEqualWeightMonthlyScenario: unavailable,
+    approvedTargetWeightScenario: unavailable, fountScopeAdjustment: unavailable,
+    model: { observedPath: unavailable, coverage: {}, sourceAuthority: { coverage: {} }, blockers: [] },
+    observedHistory: { status: "unavailable", coverage: { observedDateCount: 0, segmentCount: 0 }, blockers: [] },
+    period: { status: "full" }, selectedScope: { key: "all" },
+    dataAvailability: createElement("p", null, "DETAILED_DIAGNOSTICS"),
+  };
+  const render = changes => renderToStaticMarkup(createElement(InvestmentLabView, { ...props, ...changes }));
+  const initial = render({});
+  assert.match(initial, /data-first-steps="true"/);
+  assert.doesNotMatch(initial, /DETAILED_DIAGNOSTICS/);
+  assert.match(render({ period: { status: "invalid" } }), /data-first-steps="false"/);
+  assert.match(render({ observedHistory: { ...props.observedHistory, blockers: ["invalid_market_value"] } }), /data-first-steps="false"/);
+  assert.match(render({ observedHistory: { ...props.observedHistory, coverage: { observedDateCount: 2 } } }), /data-first-steps="false"/);
+  assert.match(render({ model: { ...props.model, observedPath: { status: "ready" } } }), /data-first-steps="false"/);
+});

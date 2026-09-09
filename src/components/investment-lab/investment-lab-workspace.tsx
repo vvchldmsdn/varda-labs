@@ -1,6 +1,8 @@
 "use client";
 
 import { LabText } from "./lab-text";
+import { T } from "@/components/i18n/localized-text";
+import { InvestmentLabFirstSteps } from "./investment-lab-first-steps";
 import { CalculationGuideDialog } from "@/components/explanations/calculation-guide-dialog";
 import { investmentLabCalculationGuide } from "./investment-lab-calculation-guide";
 import { labEnglish } from "./lab-copy";
@@ -30,11 +32,13 @@ export function InvestmentLabWorkspace({
   weights,
   scopeKey,
   tools,
+  showFirstSteps = false,
 }: {
   comparison: ReactNode;
   weights: InvestmentLabWeightEvidence;
   scopeKey: PortfolioAnalysisScopeKey;
   tools?: ReactNode;
+  showFirstSteps?: boolean;
 }) {
   const { panel: activeOverlay, select, query } = useResearchPanelNavigation(resolveInvestmentLabPanel);
   const titleId = useId();
@@ -63,11 +67,11 @@ export function InvestmentLabWorkspace({
 
   return (
     <div className={styles.workspace} data-lab-workspace="integrated">
-      <div className={styles.toolbar}><span><LabText value="같은 기간 · 같은 투자금 흐름" /></span><div>{tools}<CalculationGuideDialog guide={investmentLabCalculationGuide} label={{ ko: "계산 원리", en: "How it works" }} title={{ ko: "투자 방법만 바꿔 보면", en: "What if you changed the investment method?" }} /></div></div>
+      <div className={styles.toolbar}><span>{showFirstSteps ? <T ko="현재 구성으로 하는 가상 실험" en="Hypothetical experiments with today's holdings" /> : <LabText value="같은 기간 · 같은 투자금 흐름" />}</span><div>{tools}<CalculationGuideDialog guide={investmentLabCalculationGuide} label={{ ko: "계산 원리", en: "How it works" }} title={{ ko: "투자 방법만 바꿔 보면", en: "What if you changed the investment method?" }} /></div></div>
 
-      <div className={styles.canvas}>{comparison}</div>
+      <div className={styles.canvas}>{showFirstSteps ? <InvestmentLabFirstSteps scopeKey={scopeKey} onOpenPanel={openOverlay} /> : comparison}</div>
 
-      <div className={styles.launchers}>
+      {!showFirstSteps ? <div className={styles.launchers}>
         <button className={styles.launcher} onClick={() => openOverlay("weights")} type="button">
           <SlidersHorizontal aria-hidden="true" size={22} strokeWidth={1.6} />
           <span><strong><LabText value="비중 실험" /></strong><span className="sr-only"><LabText value="자산 비중을 바꾸고 실제 경로와 비교해 보세요." /></span></span>
@@ -78,7 +82,7 @@ export function InvestmentLabWorkspace({
           <span><strong><LabText value="구성 분석" /></strong><span className="sr-only"><LabText value="포트폴리오 구성과 종목 간 노출을 살펴보세요." /></span></span>
           <ArrowUpRight aria-hidden="true" size={18} />
         </button>
-      </div>
+      </div> : null}
       <p className={styles.stageFootnote}><LabText value="과거 기록과 가정의 비교입니다. 투자 추천이나 실제 주문으로 이어지지 않습니다." /></p>
 
       <dialog

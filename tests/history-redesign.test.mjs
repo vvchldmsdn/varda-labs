@@ -31,7 +31,8 @@ describe("history redesign boundaries", () => {
     assert.match(view, /<PortfolioHistoryTable/);
     assert.match(view, /원시 기록 검증/);
     assert.match(view, /<HistoryRecordsDialog/);
-    assert.match(view, /detail === "raw" \? <HistoryRawEvidence/);
+    assert.match(view, /detail === "raw" && recordedOverview \? <HistoryRawEvidence/);
+    assert.match(view, /overview=\{recordedOverview\}/);
   });
 
   it("isolates interaction in a serializable client component with no browser-side data fetch", () => {

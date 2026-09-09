@@ -77,6 +77,11 @@ export function InvestmentLabView({
     period.status === "unavailable" &&
     period.reason === "range_evidence_incomplete" &&
     observedHistory.status !== "unavailable";
+  const showFirstSteps =
+    period.status !== "invalid" &&
+    model.observedPath.status !== "ready" &&
+    observedHistory.blockers.length === 0 &&
+    observedHistory.coverage.observedDateCount < 2;
 
   return (
     <main
@@ -188,6 +193,7 @@ export function InvestmentLabView({
           id="investment-lab-results"
         >
           <InvestmentLabWorkspace
+            showFirstSteps={showFirstSteps}
             weights={weightEvidence}
             scopeKey={selectedScope.key}
             tools={
@@ -217,7 +223,7 @@ export function InvestmentLabView({
                 </InvestmentLabDialog>
               </>
             }
-            comparison={
+            comparison={showFirstSteps ? null :
               <>
                 {showSegmentedHistory ? (
                   <div className="mt-6">

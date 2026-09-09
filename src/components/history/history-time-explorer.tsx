@@ -195,7 +195,7 @@ function RangeMetrics({
       />
       <SummaryMetric
         detail={t(`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`, translateHomeHistory(`${formatDate(rangeSummary.startDate)} ~ ${formatDate(rangeSummary.endDate)}`))}
-        label={t("기록점", "Recorded points")}
+        label={t("관측점", "Observations")}
         value={t(`${rangeSummary.pointCount}개`, translateHomeHistory(`${rangeSummary.pointCount}개`))}
       />
     </dl>
@@ -343,11 +343,11 @@ function SelectedDayEvidence({
 
       <dl className="mt-5 grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceMetric
-          detail={t(point.gapDays === null
-              ? "첫 저장점"
-              : `${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`, translateHomeHistory(point.gapDays === null
-              ? "첫 저장점"
-              : `${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`))}
+          detail={point.gapDays === null
+            ? point.rowKind === "live"
+              ? t("비교할 이전 저장 기록 없음", "No previous saved record to compare")
+              : t("첫 저장점", "First saved record")
+            : t(`${point.gapDays}일 간격 · ${formatSignedPercent(point.movementPct)}`, `${point.gapDays} days apart · ${formatSignedPercent(point.movementPct)}`)}
           label={t("이전 저장점 대비", "Versus the previous record")}
           value={t(formatSignedKrw(point.movementKrw), translateHomeHistory(formatSignedKrw(point.movementKrw)))}
           valueClass={tone(point.movementKrw)}

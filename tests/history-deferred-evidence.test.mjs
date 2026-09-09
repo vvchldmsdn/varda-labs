@@ -30,12 +30,27 @@ function fixture(count) {
     summary: { balanceRowCount: count, portfolioRowCount: portfolioRows.length, derivedPortfolioRowCount: 0, partialPortfolioRowCount: 0, balanceDateRange: { minDate: dates[0], maxDate: dates.at(-1) }, portfolioDateRange: { minDate: dates[0], maxDate: dates.at(-1) }, overlappingDateCount: count } } };
 }
 
-function render(history, detailParams = {}) {
+function render(history, detailParams = {}, liveValuation) {
   currentQuery = new URLSearchParams({ scope: scope.key, ...detailParams });
-  return renderToStaticMarkup(React.createElement(view.HistoryView, { history, events: null, eventsSupported: true, generatedAt: "2026-09-08T00:00:00Z", detailParams }));
+  return renderToStaticMarkup(React.createElement(view.HistoryView, { history, events: null, eventsSupported: true, generatedAt: "2026-09-08T00:00:00Z", detailParams, liveValuation }));
 }
 
 describe("History demand-driven server evidence", () => {
+  it("keeps record insights saved-only when a live point replaces today's snapshot or is the only value", () => {
+    const { history } = fixture(2);
+    const liveValuation = { state: "ready", date: "2023-01-02", capturedAt: "2023-01-02T00:00:00Z", valueKrw: 9_000_000, priceSources: ["kis"], freshQuoteCount: 1, recordedPriceCount: 0 };
+    const savedMarkup = render(history, { detail: "records" });
+    const mixedMarkup = render(history, { detail: "records" }, liveValuation);
+    const insights = markup => markup.match(/<section[^>]*data-history-recorded-insights="saved"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+    assert.ok(insights(savedMarkup));
+    assert.equal(insights(mixedMarkup), insights(savedMarkup));
+    assert.match(mixedMarkup, /9,000,000/);
+    const liveOnly = render(fixture(0).history, { detail: "records" }, liveValuation);
+    assert.match(liveOnly, /아직 저장된 평가 기록이 없습니다/);
+    assert.doesNotMatch(liveOnly, /data-history-recorded-insights|저장 저점|저장점 방향 기준/);
+    assert.match(liveOnly, /9,000,000/);
+  });
+
   it("does not build raw server children or render any hidden table for a 1000-day main page", () => {
     const { history } = fixture(1000);
     // Accessing raw data throws: a client-only visibility guard cannot satisfy this.
