@@ -75,7 +75,10 @@
 .varda-onboarding-success a { display:inline-flex; align-items:center; gap:10px; min-height:44px; color:var(--accent); font-size:13px; }
 @keyframes varda-onboarding-enter { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width:760px) {
-  .varda-holding-add-content { width:calc(100% - 40px); margin:16px auto 90px; }
+  /* Keep the final form actions above the fixed 74px navigation. Page padding
+     remains scrollable space, unlike a trailing child margin that can collapse. */
+  .varda-holding-add-page { padding-bottom:calc(106px + env(safe-area-inset-bottom)); }
+  .varda-holding-add-content { width:calc(100% - 40px); margin:16px auto 0; }
   .varda-holding-add-heading { padding:21px 0 24px; }
   .varda-holding-add-heading h1 { font-size:31px; }
   .varda-holding-add-heading > p:last-child { font-size:12px; }

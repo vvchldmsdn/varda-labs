@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 const accountId = "11111111-1111-4111-8111-111111111111";
 const idle = { status: "idle", results: [] };
@@ -97,5 +98,120 @@ describe("holding batch saves", () => {
     assert.equal(result.results[1].result.status, "error");
     assert.equal(f.writes.length, 2);
     assert.ok(f.revalidated.includes("/portfolio/holdings"));
+  });
+});
+
+function elements(tree) {
+  if (!tree || typeof tree !== "object") return [];
+  if (Array.isArray(tree)) return tree.flatMap(elements);
+  return [tree, ...elements(tree.props?.children)];
+}
+
+async function batchFormFixture(locale, outcomes, { collectionState = null } = {}) {
+  const state = [];
+  const submissions = [];
+  let stateIndex = 0, actionState = idle, action;
+  const InstrumentSearch = () => null;
+  const [component] = await importUiWithPorts(["src/components/holding-onboarding-form.tsx"], {
+    react: {
+      useState(initial) {
+        const index = stateIndex++;
+        if (!(index in state)) state[index] = typeof initial === "function" ? initial() : initial;
+        return [state[index], next => { state[index] = typeof next === "function" ? next(state[index]) : next; }];
+      },
+      useActionState(callback) {
+        action = async data => { actionState = await callback(actionState, data); };
+        return [actionState, action, false];
+      },
+    },
+    "next/link": { default: () => null },
+    "@/components/use-market-collection-polling": { useMarketCollectionPolling: () => collectionState },
+    "@/components/i18n/locale-provider": { useI18n: () => ({ t: (ko, en) => locale === "ko" ? ko : en }) },
+    "@/components/i18n/management-text": { ManagementText: () => null },
+    "@/components/onboarding/instrument-search": { InstrumentSearch },
+    "@/components/onboarding/holding-import-panel": { HoldingImportPanel: () => null },
+    "@/app/portfolio/holdings/new/actions": { createHoldingBatch: async (_previous, data) => {
+      const rows = JSON.parse(data.get("holdings"));
+      submissions.push(rows);
+      return outcomes[submissions.length - 1](rows);
+    } },
+  });
+  function render() {
+    stateIndex = 0;
+    return elements(component.HoldingOnboardingForm({ options: {
+      state: "ready", accounts: [{ id: accountId, name: "QA", accountType: "securities", code: "qa" }], portfolioGroups: [],
+    } }));
+  }
+  return {
+    render, submissions,
+    add(ticker) {
+      render().find(node => node.type === InstrumentSearch).props.onSelect({ id: "", ticker, name: ticker, market: "us", currency: "USD", assetType: "stock" });
+      const quantity = render().find(node => node.props?.className === "varda-onboarding-quantity");
+      elements(quantity).find(node => node.type === "input").props.onChange({ target: { value: "1" } });
+      render().find(node => node.type === "button" && node.props.className === "varda-onboarding-secondary").props.onClick();
+    },
+    async submit() {
+      const data = new FormData();
+      for (const node of render()) if (node.type === "input" && node.props.type === "hidden") data.set(node.props.name, node.props.value);
+      await action(data);
+    },
+  };
+}
+
+const waitingPrice = { status: "price_unavailable", message: "Price lookup queued" };
+const partialNotice = nodes => nodes.find(node => node.props?.role === "status" && node.props.className === "varda-onboarding-hint")?.props.children;
+
+describe("holding batch completion notices", () => {
+  for (const locale of ["ko", "en"]) {
+    it(`${locale}: keeps a quote-only request unsaved and does not claim that holdings were saved`, async () => {
+      const h = await batchFormFixture(locale, [rows => ({ status: "partial", results: [{ key: rows[0].key, result: waitingPrice }] })]);
+      h.add("AAPL"); h.add("MSFT");
+      await h.submit();
+      const nodes = h.render();
+      assert.equal(nodes.some(node => node.props?.className === "varda-onboarding-success"), false);
+      assert.match(partialNotice(nodes), locale === "ko" ? /아직 저장된 종목이 없습니다.*가격 확인/ : /No holdings have been saved yet.*prices/);
+      const retryRows = JSON.parse(nodes.find(node => node.type === "input" && node.props.name === "holdings").props.value);
+      assert.deepEqual(retryRows.map(row => row.ticker), ["AAPL", "MSFT"]);
+    });
+
+    it(`${locale}: preserves a real earlier success when a later retry still waits for a quote`, async () => {
+      const h = await batchFormFixture(locale, [
+        rows => ({ status: "partial", results: [{ key: rows[0].key, result: success }, { key: rows[1].key, result: waitingPrice }] }),
+        rows => ({ status: "partial", results: [{ key: rows[0].key, result: waitingPrice }] }),
+      ]);
+      h.add("AAPL"); h.add("MSFT");
+      await h.submit();
+      assert.equal(h.render().some(node => node.props?.className === "varda-onboarding-success"), true);
+      await h.submit();
+      assert.deepEqual(h.submissions[1].map(row => row.ticker), ["MSFT"]);
+      const nodes = h.render();
+      assert.equal(nodes.some(node => node.props?.className === "varda-onboarding-success"), true);
+      assert.match(partialNotice(nodes), locale === "ko" ? /^저장된 종목은 유지/ : /^Saved holdings are kept/);
+    });
+  }
+
+  it("does not call a validation or ownership conflict a pending price lookup", async () => {
+    const h = await batchFormFixture("en", [rows => ({ status: "partial", results: [{ key: rows[0].key, result: { status: "conflict", message: "Account changed" } }] })]);
+    h.add("AAPL");
+    await h.submit();
+    assert.match(partialNotice(h.render()), /No holdings have been saved yet.*Check each holding/);
+    assert.doesNotMatch(partialNotice(h.render()), /prices/);
+  });
+
+  it("removes stale polling wait guidance after a retry successfully saves the remaining holdings", async () => {
+    const h = await batchFormFixture("en", [
+      rows => ({ status: "partial", results: [{ key: rows[0].key, result: success }, { key: rows[1].key, result: waitingPrice }] }),
+      rows => ({ status: "complete", results: rows.map(row => ({ key: row.key, result: success })) }),
+    ], { collectionState: "waiting" });
+    h.add("AAPL"); h.add("MSFT");
+    await h.submit();
+    const waitingGuidance = nodes => nodes.some(node => node.props?.role === "status" && typeof node.props.children === "string" && /Price lookup is still pending/.test(node.props.children));
+    assert.equal(waitingGuidance(h.render()), true);
+    await h.submit();
+    const nodes = h.render();
+    assert.equal(nodes.some(node => node.props?.className === "varda-onboarding-success"), true);
+    assert.equal(waitingGuidance(nodes), false, "completed saves supersede a previous polling timeout");
+    const remaining = JSON.parse(nodes.find(node => node.type === "input" && node.props.name === "holdings").props.value);
+    assert.deepEqual(remaining, []);
   });
 });
