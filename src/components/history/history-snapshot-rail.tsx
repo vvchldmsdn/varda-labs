@@ -50,7 +50,7 @@ export function HistorySnapshotRail({
                 <T ko={formatCompactKrw(point.valueKrw)} en={formatCompactKrw(point.valueKrw, "en")}/>
               </span>
               <span className="mt-1 text-[11px] text-[var(--faint)]">
-                {<T ko={point.events.length > 0
+                {point.rowKind === "live" ? <T ko="현재 평가 · 미저장" en="Current valuation · Not saved"/> : <T ko={point.events.length > 0
                   ? `활동 ${point.events.length}건`
                   : rowKindLabel(point.rowKind)} en={translateHomeHistory(point.events.length > 0
                   ? `활동 ${point.events.length}건`

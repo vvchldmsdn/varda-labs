@@ -11,6 +11,7 @@ import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { getReadOnlyTenantEvents } from "@/db/queries/tenant-events";
 import { getReadOnlyTenantHistoryBalance } from "@/db/queries/history-balance";
+import { getReadOnlyTenantHistoryLiveValuation } from "@/db/queries/history-live-valuation";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { normalizeHistoryLane } from "@/lib/history-balance";
 import { normalizeHistoryPositionSelection } from "@/lib/history-position-detail";
@@ -100,7 +101,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       comparisonFrom: params.comparisonFrom,
       comparisonTo: params.comparisonTo,
     });
-  const [history, events] = await Promise.all([
+  const [history, events, liveValuation] = await Promise.all([
     getReadOnlyTenantHistoryBalance({
       analysisScopes: scopeContext.catalog.scopes,
       tenantContext: resolution.tenantContext,
@@ -116,6 +117,9 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           scope: eventScope,
         })
       : Promise.resolve(null),
+    lane === "all" || lane === "portfolio"
+      ? getReadOnlyTenantHistoryLiveValuation({ scope: selectedScope, tenantContext: resolution.tenantContext })
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -124,6 +128,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       eventsSupported={eventScope !== null}
       generatedAt={new Date().toISOString()}
       history={history}
+      liveValuation={liveValuation}
       detailParams={params}
     />
   );

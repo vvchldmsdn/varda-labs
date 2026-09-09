@@ -51,16 +51,14 @@ export function HistoryTimeExplorer({
   status?: ReactNode;
 }) {
   const { t } = useI18n();
-  const returnAvailable = model.points.some(
-    (point) => point.totalReturnPct !== null,
-  );
+  const returnAvailable = historyPointsWithMetric(model.points, "return").length > 0;
   const [mode, setMode] = useState<HistoryExplorerMode>(
     "value",
   );
   const [range, setRange] = useState<HistoryExplorerRange>("90D");
   const visiblePoints = useMemo(
-    () => selectHistoryRange(model.points, range),
-    [model.points, range],
+    () => selectHistoryRange(historyPointsWithMetric(model.points, mode), range),
+    [model.points, mode, range],
   );
   const rangeSummary = useMemo(
     () => summarizeHistoryRange(visiblePoints),
@@ -70,11 +68,13 @@ export function HistoryTimeExplorer({
     model.points.at(-1)?.date ?? null,
   );
   const [inspectedDate, setInspectedDate] = useState<string | null>(null);
+  const selectablePoints = historyPointsWithMetric(visiblePoints, mode);
   const selectedPoint =
-    visiblePoints.find((point) => point.date === selectedDate) ??
-    visiblePoints.at(-1) ??
+    selectablePoints.find((point) => point.date === selectedDate) ??
+    selectablePoints.at(-1) ??
     null;
-  const inspectedPoint = visiblePoints.find((point) => point.date === inspectedDate) ?? selectedPoint;
+  const inspectedPoint = selectablePoints.find((point) => point.date === inspectedDate) ?? selectedPoint;
+  const hasLiveValuation = visiblePoints.some(point => point.rowKind === "live");
 
   if (model.status === "no_data") {
     return (
@@ -100,7 +100,7 @@ export function HistoryTimeExplorer({
   function changeMode(nextMode: HistoryExplorerMode) {
     if (nextMode === "return" && !returnAvailable) return;
     setInspectedDate(null);
-    const nextMetricPoints = historyPointsWithMetric(visiblePoints, nextMode);
+    const nextMetricPoints = selectHistoryRange(historyPointsWithMetric(model.points, nextMode), range);
     setMode(nextMode);
     setSelectedDate(
       nextMetricPoints.at(-1)?.date ?? visiblePoints.at(-1)?.date ?? null,
@@ -110,9 +110,10 @@ export function HistoryTimeExplorer({
   return (
     <section aria-labelledby="history-time-explorer-title" className={styles.explorer}>
       <div className={styles.stageMain}>
-        <aside className={styles.hero} aria-label={t("선택한 저장일", "Selected recorded date")}>
+        <aside className={styles.hero} aria-label={t("선택한 날짜", "Selected date")}>
           <div className={styles.heroNumbers}>
             <p className={styles.heroDate}>{<T ko={formatDate(inspectedPoint?.date ?? null)} en={translateHomeHistory(formatDate(inspectedPoint?.date ?? null))}/>}</p>
+            {inspectedPoint?.liveValuation ? <CurrentValuationEvidence point={inspectedPoint} /> : null}
             <p className={styles.heroValue} data-history-inspected-value>{<T ko={mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </p>
             <p className={styles.heroCaption}>{<T ko={mode === "value" ? "총평가액" : "저장 수익률"} en={translateHomeHistory(mode === "value" ? "총평가액" : "저장 수익률")}/>}<span className={tone(inspectedPoint?.movementKrw ?? null)}><T ko="이전 대비" en="Previous change"/> {<T ko={formatSignedKrw(inspectedPoint?.movementKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.movementKrw ?? null))}/>}</span></p>
           </div>
@@ -125,7 +126,7 @@ export function HistoryTimeExplorer({
               {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</button>)}
             </div>
           </div>
-          <p className={styles.railNote}>{scopeLabel} · {rangeSummary.pointCount}<T ko="개 저장점" en=" recorded points"/><br /><T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/></p>
+          <p className={styles.railNote}>{scopeLabel} · {rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br />{hasLiveValuation ? <T ko="과거 저장 기록에 오늘의 현재 평가를 연결합니다. 오늘 값은 저장 스냅샷이 아닙니다." en="Recorded history connects to today's current valuation. Today's point is not a saved snapshot."/> : <T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/>}</p>
           {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{typeof status === "string" ? <T ko={status} en={translateHomeHistory(status)}/> : status}</div> : null}
         </aside>
         <div className={styles.plot}>
@@ -139,9 +140,9 @@ export function HistoryTimeExplorer({
         </div>
       </div>
       <footer className={styles.stageFooter}>
-        <p><T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/></p>
+        <p>{hasLiveValuation ? <T ko="저장 기록 + 현재 평가 · 현금흐름 미보정" en="Records + current valuation · Not adjusted for cash flows"/> : <T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/>}</p>
         <div>
-          <PresentationDialog mountOnOpen label="날짜별 기록" labelEn={"Records by date"} title="날짜별 저장 기록" titleEn={"Recorded values by date"}>
+          <PresentationDialog mountOnOpen label="날짜별 기록" labelEn={"Records by date"} title="날짜별 기록과 현재 평가" titleEn={"Records and current valuation by date"}>
             <HistorySnapshotRail onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
           </PresentationDialog>
           <PresentationDialog mountOnOpen label="기간 요약·근거" labelEn={"Period summary and sources"} title="히스토리 계산 근거" titleEn={"History calculation sources"} description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." descriptionEn={"Review changes over the selected period and the records behind each date."} wide>
@@ -338,6 +339,8 @@ function SelectedDayEvidence({
         </p>
       </div>
 
+      {point.liveValuation ? <CurrentValuationEvidence point={point} detailed /> : null}
+
       <dl className="mt-5 grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceMetric
           detail={t(point.gapDays === null
@@ -400,6 +403,22 @@ function SelectedDayEvidence({
       </div>
     </section>
   );
+}
+
+function CurrentValuationEvidence({ point, detailed = false }: { point: HistoryOverviewPoint; detailed?: boolean }) {
+  const { t } = useI18n();
+  const live = point.liveValuation;
+  if (!live) return null;
+  // Keep the compact KST clock identical across server/browser ICU locale data.
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(live.capturedAt));
+  return <div className="my-2 text-[11px] leading-5 text-[var(--muted)]" data-history-live="true">
+    {live.priceSources.includes("design_preview") ? <p>{t("디자인 예시 · 실제 투자 데이터가 아닙니다", "Design example · Not actual investment data")}</p> : null}
+    <p className="font-medium text-[var(--brand)]">{live.recordedPriceCount > 0 ? t("현재 평가 · 저장 가격 포함", "Current valuation · Includes recorded prices") : t("실시간 평가", "Live valuation")} · {time} KST</p>
+    {detailed ? <><p>{t("현재 보유 수량 × 최신 가격 × 적용 환율로 계산한 표시 전용 값입니다. 과거 스냅샷을 수정하거나 오늘의 저장 수익률·위험 지표를 만들지 않습니다.", "A display-only valuation using current quantities, latest prices and the applied FX rate. It does not change past snapshots or create recorded return or risk metrics.")}</p>
+      <p>{t(`최근 조회 시세 ${live.freshQuoteCount}종목 · 저장·수동 가격 ${live.recordedPriceCount}종목`, `${live.freshQuoteCount} recently fetched quotes · ${live.recordedPriceCount} recorded or manual prices`)}</p>
+      {live.oldestPriceAt ? <p>{t("가장 오래된 가격 시각", "Oldest price timestamp")}: {live.oldestPriceAt}</p> : null}
+    </> : null}
+  </div>;
 }
 
 function EvidenceMetric({

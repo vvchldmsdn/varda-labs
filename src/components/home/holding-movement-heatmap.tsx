@@ -60,7 +60,7 @@ export function HoldingMovementHeatmap({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 id="holding-heatmap-title" className={styles.panelTitle}><T ko="종목 흐름" en="Holding history"/></h2>
-          <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="날짜별 변동과 자산의 구성을 확인하세요." en="Explore daily changes and your asset allocation."/></p>
+          <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="오늘은 종목 가격 등락, 과거는 저장된 일별 변동입니다." en="Today shows holding price changes; past dates show recorded daily changes."/></p>
         </div>
         <div className={styles.chartRanges} aria-label={t("종목 흐름 보기 방식", "Holding history view")}>
           <ModeButton active={mode === "movement"} onClick={() => setMode("movement")}><T ko="일별 변동" en="Daily changes"/></ModeButton>
@@ -120,6 +120,7 @@ export function HoldingMovementHeatmap({
               {selectedRow.ticker ? ` · ${selectedRow.ticker}` : ""}
               {<T ko={selectedCell.basis === "market_value" ? " · 평가액 변동 근거" : ""} en={translateHomeHistory(selectedCell.basis === "market_value" ? " · 평가액 변동 근거" : "")}/>}
               {<T ko={selectedCell.basis === "live_movement" ? " · 실시간 변동 근거" : ""} en={translateHomeHistory(selectedCell.basis === "live_movement" ? " · 실시간 변동 근거" : "")}/>}
+              {selectedCell.basis === "live_price" ? <T ko=" · 거래통화 기준 가격 등락" en=" · Price change in the trading currency"/> : null}
             </p>
             </div>
             <button
@@ -134,7 +135,7 @@ export function HoldingMovementHeatmap({
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-[var(--wash)] pt-4 text-xs sm:grid-cols-5">
             <HeatmapDetail
-              label={t("등락", "Change")}
+              label={selectedCell.priceReturnEvidence ? t("가격 등락", "Price change") : t("등락", "Change")}
               value={t(selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true), translateHomeHistory(selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true)))}
               tone={selectedCell.changePct}
             />
@@ -143,6 +144,12 @@ export function HoldingMovementHeatmap({
             <HeatmapDetail label={t("가격 영향", "Price impact")} value={t(formatKrw(selectedCell.priceChangeKrw), translateHomeHistory(formatKrw(selectedCell.priceChangeKrw)))} tone={selectedCell.priceChangeKrw} />
             <HeatmapDetail label={t("환율 영향", "FX impact")} value={t(formatKrw(selectedCell.fxChangeKrw), translateHomeHistory(formatKrw(selectedCell.fxChangeKrw)))} tone={selectedCell.fxChangeKrw} />
           </dl>
+          {selectedCell.priceReturnEvidence ? <div className="mt-3 border-t border-[var(--wash)] pt-3 text-[11px] leading-5 text-[var(--muted)]" data-heatmap-price-evidence>
+            {selectedCell.priceReturnEvidence.reason === null ? <>
+              <p>{selectedCell.priceReturnEvidence.previousCloseDate} <T ko="종가" en="close"/> {selectedCell.priceReturnEvidence.previousClose?.toLocaleString()} → {selectedCell.priceReturnEvidence.currentPrice?.toLocaleString()} {selectedCell.priceReturnEvidence.currency}</p>
+              <p><T ko="가격 등락률은 (현재 단위 가격 ÷ 기준 종가 − 1) × 100%입니다. 보유 수량·매매·환율은 반영하지 않습니다. 원화 평가액 변동은 위 항목에서 별도로 확인하세요." en="Price change is (current unit price ÷ reference close − 1) × 100%. It excludes quantity, trades and FX. KRW valuation changes are shown separately above."/></p>
+            </> : <p><T ko={priceReturnReason(selectedCell.priceReturnEvidence.reason, "ko")} en={priceReturnReason(selectedCell.priceReturnEvidence.reason, "en")}/></p>}
+          </div> : null}
         </div>
       ) : null}
     </section>
@@ -433,11 +440,12 @@ function HeatmapRow({
           <button
             key={`${row.holdingId}:${cell.date}`}
             type="button"
-            aria-label={`${row.name} ${formatDate(cell.date)} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
+            aria-label={`${row.name} ${formatDate(cell.date)} ${cell.priceReturnEvidence ? t("가격 등락", "Price change") : ""} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
             aria-pressed={selected}
             className={styles.heatmapCell}
             data-cell-index={cellIndex}
             data-heatmap-cell
+            data-change-basis={cell.basis}
             data-row-index={rowIndex}
             onKeyDown={(event) =>
               moveHeatmapFocus({
@@ -460,6 +468,12 @@ function HeatmapRow({
       })}
     </>
   );
+}
+
+function priceReturnReason(reason: "missing_current_quote" | "missing_previous_close" | "conflicting_previous_close", locale: "ko" | "en") {
+  if (reason === "missing_current_quote") return locale === "ko" ? "현재 시세 근거가 없어 가격 등락률을 표시하지 않습니다." : "Price change is unavailable because current quote evidence is missing.";
+  if (reason === "conflicting_previous_close") return locale === "ko" ? "같은 기준일의 종가가 서로 달라 가격 등락률을 표시하지 않습니다." : "Price change is unavailable because reference closes conflict on the same date.";
+  return locale === "ko" ? "비교할 이전 종가가 없어 가격 등락률을 표시하지 않습니다." : "Price change is unavailable because the previous close is missing.";
 }
 
 function moveHeatmapFocus({

@@ -51,6 +51,8 @@ import {
   type PortfolioMovementSource,
 } from "@/lib/portfolio-movement";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import { buildHoldingPriceReturn, type HoldingPriceReturn } from "@/lib/holding-price-return";
+import { currentKstDate } from "@/lib/current-kst-date";
 import { buildCycleForSnapshotDate, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 const NON_INVESTMENT_ASSET_TYPES = new Set([
@@ -100,6 +102,7 @@ export type DashboardHolding = {
   needsTrim: boolean;
   dailyChangeKrw: number | null;
   dailyReturnPct: number | null;
+  dailyPriceReturn?: HoldingPriceReturn;
   dailySource: MovementSource;
   previousCloseValueKrw: number | null;
   priceDailyChangeKrw: number | null;
@@ -381,7 +384,7 @@ export async function getPortfolioDashboard(
   const holdings = holdingsBase
     .map((holding) =>
       attachDailyContribution(
-        holding,
+        { ...holding, dailyPriceReturn: buildHoldingPriceReturn({ holding, priceRows: recentPriceRows, movementCycle, now }) },
         movement.contributions.get(holding.id) ??
           fallbackContributions.get(holding.id),
       ),
@@ -425,7 +428,7 @@ export async function getPortfolioDashboard(
     costBasisKrw === null ? null : costBasisKrw + realizedCostBasisKrw,
   );
   const holdingHistory = buildPortfolioDashboardHoldingHistory({
-    currentDate: movementCycle.snapshotDate,
+    currentDate: currentKstDate(now),
     holdings: demand.surface === "home"
       ? holdings
       : holdings.filter((holding) => historyAssetIds.includes(holding.id)),

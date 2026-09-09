@@ -1,4 +1,7 @@
 import { LabText } from "./lab-text";
+import { T } from "@/components/i18n/localized-text";
+import { InvestmentLabEvidenceGroup } from "./investment-lab-evidence-group";
+import explanationStyles from "./investment-lab-explanation.module.css";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
 import { InvestmentLabCashComparisonView } from "./investment-lab-cash-comparison";
@@ -30,19 +33,27 @@ function InvestmentLabCalculationEvidence({
   >;
 }) {
   return (
-    <div className="space-y-6">
-      <InvestmentLabCashComparisonView comparison={model.cashComparison} />
-
-      <ReturnEstimateSection model={model} />
-      <VooComparisonSection model={model} />
-
-      <InvestmentLabContributionExperiment
-        fixedMixWeights={fixedMixWeights}
-        key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
-        scenarios={model.contributionExperimentScenarios}
-      />
+    <div>
+      <p className={explanationStyles.intro}><T ko="먼저 수익률이 계산된 방식을 확인하세요. 다른 기준선과 날짜별 원자료는 필요한 항목만 펼쳐 볼 수 있습니다." en="Start with how returns were calculated. Open other baselines and date-level records only when you need them." /></p>
+      <InvestmentLabEvidenceGroup title={{ ko: "투자금을 더 넣은 효과를 구분해요", en: "Separate performance from adding more money" }} description={{ ko: "실제·가상 추정수익률과 계산에 쓴 금액", en: "Actual and hypothetical estimated returns and the values behind them" }} open>
+        <ReturnEstimateSection model={model} />
+      </InvestmentLabEvidenceGroup>
+      <InvestmentLabEvidenceGroup title={{ ko: "가격이 전혀 움직이지 않았다면?", en: "What if prices had not moved?" }} description={{ ko: "매수·매도 금액만 반영한 수익률 0% 기준선", en: "A zero-return baseline reflecting purchase and sale amounts only" }}>
+        <InvestmentLabCashComparisonView comparison={model.cashComparison} />
+      </InvestmentLabEvidenceGroup>
+      <InvestmentLabEvidenceGroup title={{ ko: "미국 지수에 투자했다면?", en: "What if you had invested in the US index?" }} description={{ ko: "VOO 가격과 날짜별 환율을 사용한 비교", en: "A comparison using VOO prices and date-specific FX" }}>
+        <VooComparisonSection model={model} />
+      </InvestmentLabEvidenceGroup>
+      <InvestmentLabEvidenceGroup title={{ ko: "추가 투자 방식을 바꿔 봐요", en: "Explore a different contribution method" }} description={{ ko: "연구용 추가 투자 시나리오와 비교 조건", en: "Historical contribution scenarios and their comparison rules" }}>
+        <InvestmentLabContributionExperiment
+          fixedMixWeights={fixedMixWeights}
+          key={`${observedSummary.startServiceDate}:${observedSummary.endServiceDate}:${fixedMixWeights?.kodexWeightBps ?? 0}`}
+          scenarios={model.contributionExperimentScenarios}
+        />
+      </InvestmentLabEvidenceGroup>
 
       {model.status === "ready" ? (
+        <InvestmentLabEvidenceGroup title={{ ko: "날짜별 원자료를 확인해요", en: "Inspect the records date by date" }} description={{ ko: "평가액 · 비교 가격 · 반영한 매매", en: "Values, comparison prices, and applied trades" }}>
         <section className="overflow-hidden border-y border-[var(--line)]">
           <div className="flex flex-col gap-1 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -93,8 +104,10 @@ function InvestmentLabCalculationEvidence({
             </table>
           </div>
         </section>
+        </InvestmentLabEvidenceGroup>
       ) : null}
 
+      <InvestmentLabEvidenceGroup title={{ ko: "얼마나 많은 근거를 썼나요?", en: "How much evidence was used?" }} description={{ ko: "비교일과 저장값 개수 · 처리 중인 거래", en: "Counts of comparison dates and records, plus pending trades" }}>
       <section className="border-y border-[var(--line)] py-5">
         <h2 className="text-lg font-semibold"><LabText value="데이터 상태" /></h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -116,6 +129,7 @@ function InvestmentLabCalculationEvidence({
           />
         </div>
       </section>
+      </InvestmentLabEvidenceGroup>
     </div>
   );
 }

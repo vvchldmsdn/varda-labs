@@ -14,6 +14,7 @@ import type { InvestmentLabScenarioMatrixId } from "@/lib/investment-lab-scenari
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 import { InvestmentLabChartCanvas } from "./investment-lab-chart-canvas";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
+import { InvestmentLabScenarioMethod } from "./investment-lab-scenario-method";
 import styles from "./investment-lab-modern.module.css";
 import {
   defaultLabScenario,
@@ -94,17 +95,7 @@ export function InvestmentLabTimeMachine({
                 title="무엇을 비교하나요?"
                 compactLabel
               >
-              <div className="max-w-2xl space-y-5 text-sm leading-7 text-[var(--muted)]">
-                <p>
-                  <strong className="font-medium text-[var(--ink)]"><LabText value=" 같은 기간, 같은 외부 입출금 " /></strong>
-                  <br /><LabText value=" 검은 선은 저장된 실제 평가액, 주황 선은 같은 시작 평가액과 입출금으로 계산한 선택 시나리오입니다. 계좌 사이의 이동은 선택한 분석 범위에 맞춰 처리합니다. " /></p>
-                <p>
-                  <strong className="font-medium text-[var(--ink)]"><LabText value=" 평가액 차이와 수익률은 다릅니다 " /></strong>
-                  <br /><LabText value=" 평가액에는 입출금이 포함됩니다. 아래 추정수익률과 낙폭은 외부 흐름을 조정한 기존 계산 결과를 사용합니다. 계산 근거가 없으면 숫자를 만들지 않습니다. " /></p>
-                <p>
-                  <strong className="font-medium text-[var(--ink)]"><LabText value=" 과거 비교이지 미래 예측이 아닙니다 " /></strong>
-                  <br /><LabText value=" KIS 원종가 경로에는 배당·기업행사 조정과 투자자 수준의 거래비용·세금이 포함되지 않습니다. 곡선은 저장된 관측점을 부드럽게 연결한 표시이며, 새로운 평가 데이터를 생성하지 않습니다. " /></p>
-              </div>
+                <InvestmentLabScenarioMethod scenarioId={selected.id} />
               </InvestmentLabDialog>
             </div>
           </div>
@@ -327,7 +318,7 @@ export function InvestmentLabTimeMachine({
       <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-[11px] text-[var(--faint)]">
         <span><LabText value={labScenarioDetail(selected.id)} /></span>
         <span>
-          {chart.period!.comparisonDateCount}<LabText value="개 평가일 · 같은 기간·입출금 " /></span>
+          {chart.period!.comparisonDateCount}<LabText value="개 평가일 · 같은 기간·투자금 흐름 " /></span>
       </div>
            </>}
            </InvestmentLabDialog>

@@ -1,4 +1,6 @@
 import type { PortfolioHistoryDisplayRow } from "./history-balance.ts";
+import type { HistoryLiveValuation } from "./history-live-valuation.ts";
+import { currentKstDate } from "./current-kst-date.ts";
 
 export const HISTORY_OVERVIEW_POLICY = Object.freeze({
   version: "stored_history_time_explorer_v1",
@@ -9,6 +11,7 @@ export const HISTORY_OVERVIEW_POLICY = Object.freeze({
   movementMeaning: "point_to_point_valuation_change_not_cashflow_adjusted_return",
   eventMeaning: "same_calendar_date_context_not_causal_attribution",
   riskMeaning: "stored_portfolio_snapshot_fields_only",
+  livePoint: "ephemeral_current_kst_date_valuation_separate_from_stored_rows",
 } as const);
 
 export type HistoryOverviewEventInput = Readonly<{
@@ -43,7 +46,10 @@ export type HistoryOverviewPoint = Readonly<{
   drawdownKrw: number;
   drawdownPct: number;
   source: string;
-  rowKind: PortfolioHistoryDisplayRow["rowKind"];
+  rowKind: PortfolioHistoryDisplayRow["rowKind"] | "live";
+  liveValuation?: HistoryLiveValuation;
+  /** Separate saved observation when today's valuation visually replaces the same date. */
+  recordedPoint?: HistoryOverviewPoint;
   risk: HistoryOverviewRisk | null;
   events: readonly HistoryOverviewEvent[];
 }>;
@@ -88,16 +94,23 @@ export type HistoryMovementSummary = Readonly<{
 export function buildHistoryOverview({
   rows,
   events = [],
+  liveValuation,
 }: {
   rows: readonly PortfolioHistoryDisplayRow[];
   events?: readonly HistoryOverviewEventInput[];
+  liveValuation?: HistoryLiveValuation | null;
 }): HistoryOverviewModel {
   const selection = selectCanonicalRows(rows);
+  const liveRow = liveOverviewRow(liveValuation, selection.rows);
+  const recordedPoint = liveRow && selection.rows.at(-1)?.snapshotDate === liveRow.snapshotDate
+    ? buildHistoryOverview({ rows: selection.rows, events }).points.at(-1)
+    : undefined;
+  const displayRows = liveRow ? [...selection.rows.filter(row => row.snapshotDate !== liveRow.snapshotDate), liveRow] : selection.rows;
   const eventsByDate = groupEventsByDate(events);
   let runningPeak = Number.NEGATIVE_INFINITY;
   const points: HistoryOverviewPoint[] = [];
 
-  for (const row of selection.rows) {
+  for (const row of displayRows) {
     const previous = points.at(-1) ?? null;
     const valueKrw = row.totalMarketValue!;
     runningPeak = Math.max(runningPeak, valueKrw);
@@ -123,7 +136,9 @@ export function buildHistoryOverview({
         drawdownPct:
           runningPeak !== 0 ? (drawdownKrw / runningPeak) * 100 : 0,
         source: row.source,
-        rowKind: row.rowKind,
+        rowKind: row === liveRow ? "live" : row.rowKind,
+        ...(row === liveRow && liveValuation ? { liveValuation } : {}),
+        ...(row === liveRow && recordedPoint ? { recordedPoint } : {}),
         risk: riskEvidence(row),
         events: Object.freeze([...(eventsByDate.get(row.snapshotDate) ?? [])]),
       }),
@@ -187,6 +202,15 @@ export function buildHistoryOverview({
     longestGainStreak: longestStreak(points, 1),
     longestLossStreak: longestStreak(points, -1),
   });
+}
+
+function liveOverviewRow(live: HistoryLiveValuation | null | undefined, stored: readonly PortfolioHistoryDisplayRow[]): PortfolioHistoryDisplayRow | null {
+  if (!live || live.state !== "ready" || live.valueKrw === null || !Number.isFinite(live.valueKrw) || live.valueKrw < 0 || !isIsoDate(live.date)) return null;
+  const capturedAt = new Date(live.capturedAt);
+  if (!Number.isFinite(capturedAt.getTime()) || currentKstDate(capturedAt) !== live.date || (stored.at(-1)?.snapshotDate ?? "") > live.date) return null;
+  // This display endpoint never enters raw snapshot tables or stored return/risk calculations.
+  return { snapshotDate: live.date, account: "", source: "varda_current_valuation", rowKind: "derived", derivedFromAccounts: [],
+    totalMarketValue: live.valueKrw, totalPnl: null, totalReturnPct: null, totalCost: null, investedAmount: null, cashValue: null };
 }
 
 type CanonicalSelection = Readonly<{

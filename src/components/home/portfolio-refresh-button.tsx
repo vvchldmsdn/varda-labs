@@ -52,6 +52,7 @@ export function PortfolioRefreshButton({
         if (
           result.state === "synced" ||
           result.state === "partial" ||
+          result.state === "fresh" ||
           result.state === "cooldown"
         ) {
           startTransition(() => router.refresh());
@@ -66,19 +67,32 @@ export function PortfolioRefreshButton({
   useEffect(() => {
     if (!autoSync || designPreview) return;
 
-    const bucket = Math.floor(
-      Date.now() / TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds,
-    );
-    const key = `varda:live-price-sync:${bucket}`;
-    if (window.sessionStorage.getItem(key)) return;
-
-    const timeout = window.setTimeout(() => {
-      if (window.sessionStorage.getItem(key)) return;
-      window.sessionStorage.setItem(key, "attempted");
+    let lastBucket: number | null = null;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      const bucket = Math.floor(Date.now() / TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds);
+      const key = "varda:live-price-sync:last-bucket";
+      if (lastBucket === bucket) return;
+      lastBucket = bucket;
+      try {
+        if (window.sessionStorage.getItem(key) === String(bucket)) return;
+        // Keep one bucket and tolerate browsers that disable session storage.
+        window.sessionStorage.setItem(key, String(bucket));
+      } catch {
+        // The effect-local bucket still prevents duplicate focus/visibility requests.
+      }
       void sync("page_view");
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
+    };
+    const timeout = window.setTimeout(check, 0);
+    const interval = window.setInterval(check, TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
   }, [autoSync, designPreview, sync]);
 
   return (

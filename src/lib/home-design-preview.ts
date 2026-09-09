@@ -77,7 +77,7 @@ export function buildHomeDesignPreview(scopeInput: string | readonly string[] | 
   const totalPnlKrw = selectedTotal - costBasisKrw;
   const latestDate = "2026-08-21";
   const recentSnapshots = buildPortfolioHistory(selectedTotal, 122, latestDate);
-  const holdingHistory = buildHoldingHistory(holdings, latestDate);
+  const holdingHistory = buildHoldingHistory(holdings, "2026-08-22");
   const todayFxChangeKrw = holdings
     .filter((holding) => holding.currency === "USD")
     .reduce((sum, holding) => sum - Math.round(holding.valueKrw * 0.0018), 0);
@@ -284,6 +284,11 @@ function buildHolding(seed: HoldingSeed, selectedTotal: number): DashboardHoldin
     needsTrim: currentWeight - targetWeight >= 12,
     dailyChangeKrw,
     dailyReturnPct,
+    // Illustrative design fixture only; production derives native return from admitted raw closes.
+    dailyPriceReturn: {
+      changePct: dailyReturnPct, currentPrice, previousClose: currentPrice / (1 + dailyReturnPct / 100),
+      previousCloseDate: "2026-08-21", currency, observedAt: "2026-08-22T09:16:00+09:00", reason: null,
+    },
     dailySource: "daily_position_snapshot",
     previousCloseValueKrw: valueKrw - dailyChangeKrw,
     priceDailyChangeKrw:
@@ -350,6 +355,12 @@ function buildHoldingHistory(holdings: readonly DashboardHolding[], endDate: str
     account: holding.account,
     currentWeight: holding.currentWeight,
     cells: dates.map((date, cellIndex) => {
+      if (cellIndex === dates.length - 1 && holding.dailyPriceReturn) {
+        observedCellCount += 1;
+        return { date, changePct: holding.dailyPriceReturn.changePct, marketValueKrw: holding.valueKrw,
+          changeKrw: holding.dailyChangeKrw, priceChangeKrw: holding.priceDailyChangeKrw, fxChangeKrw: holding.fxDailyChangeKrw,
+          basis: "live_price" as const, priceReturnEvidence: holding.dailyPriceReturn };
+      }
       const missing = (rowIndex * 5 + cellIndex) % 23 === 0;
       if (missing) {
         return {

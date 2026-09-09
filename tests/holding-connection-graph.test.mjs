@@ -40,6 +40,16 @@ describe("holding connection graph", () => {
     assert.equal(graph.nodes.length, 2);
     assert.equal(graph.edges.length, 0);
   });
+
+  it("does not mix today's native price returns into saved KRW unit-value correlations", () => {
+    const rows = [historyRow("a", "Alpha", 60, [1, 2, 3, 4, 5, 6]), historyRow("b", "Beta", 40, [2, 4, 6, 8, 10, 12])];
+    rows[0].cells.push({ ...rows[0].cells[0], date: "2026-08-07", changePct: 50, basis: "live_price" });
+    rows[1].cells.push({ ...rows[1].cells[0], date: "2026-08-07", changePct: -50, basis: "live_price" });
+    const graph = buildHoldingConnectionGraph({ dates: dates(7), rows, observedCellCount: 14, expectedCellCount: 14, coveragePct: 100 });
+    assert.equal(graph.edges.length, 1);
+    assert.equal(graph.edges[0].observations, 6);
+    assert.ok(Math.abs(graph.edges[0].correlation - 1) < 1e-12);
+  });
 });
 
 function dates(count) {

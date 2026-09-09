@@ -5,6 +5,10 @@ import { labCopyC } from "./lab-copy-c";
 import { labCopyExtra } from "./lab-copy-extra";
 
 const english: Readonly<Record<string, string>> = { ...commonEnglish, ...labCopyA, ...labCopyB, ...labCopyC, ...labCopyExtra,
+  "같은 기간 · 같은 투자금 흐름": "Same period · Same investment flows",
+  "개 평가일 · 같은 기간·투자금 흐름": " valuation dates · Same period and investment flows",
+  "동일한 매수·매도 금액 · 국내 지수 ETF": "Same purchase and sale amounts · Korean index ETF",
+  "동일 투자금 흐름 · 이자 없음": "Same investment flows · No interest",
   "계산에는 미사용": "Not used in calculations",
   "비교할 최신 writer 구간 없음": "No latest recording period for comparison",
   "같은 날짜 재실행은 최신 상태로 갱신": "A rerun on the same date updates the latest state",

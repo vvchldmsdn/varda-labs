@@ -1,7 +1,8 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
-import { simulationEnglish } from "@/components/simulation/simulation-copy";
 import type { SimulationOwnerResearchExecutionResult } from "@/lib/simulation-owner-research-execution";
 import { InvestmentLabDialog as SimulationDialog } from "@/components/investment-lab/investment-lab-dialog";
+import { CalculationGuideDialog } from "@/components/explanations/calculation-guide-dialog";
+import { simulationCalculationGuide } from "./simulation-calculation-guide";
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 import { simulationReturnLabel } from "./simulation-presentation";
@@ -34,13 +35,23 @@ export function OwnerResearchExecutionSection({
           >
             <SimulationText ko={"내 포트폴리오 확률 경로"} />{" "}</h2>
         </div>
+        <div className="flex flex-wrap items-center gap-1">
+        <CalculationGuideDialog
+          guide={simulationCalculationGuide}
+          label={{ ko: "계산 과정", en: "How it works" }}
+          title={{ ko: "시뮬레이션, 이렇게 계산해요", en: "How the simulation is calculated" }}
+        />
         <SimulationDialog
-          label="결과 해석·계산 근거" labelEn={simulationEnglish("결과 해석·계산 근거")}
-          title="확률 경로를 읽는 방법" titleEn={simulationEnglish("확률 경로를 읽는 방법")}
+          label="종목별 계산 근거" labelEn="Holdings & calculation evidence"
+          title="사용한 종목과 계산 근거" titleEn="Holdings and calculation evidence"
+          icon="table"
           size="wide"
           compactLabel
         >
-          <div className="grid gap-6 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
+          <p className="text-sm leading-6 text-[var(--muted)]"><SimulationText ko="어떤 종목이 포함됐는지 먼저 확인하세요. 계산 방식과 용어는 ‘계산 과정’에서 순서대로 볼 수 있습니다." en="Check which holdings were included below. The How it works guide walks through the method and terms." /></p>
+          <details className="mt-4 border-y border-[var(--line)] py-3">
+            <summary className="cursor-pointer text-sm font-medium"><SimulationText ko="계산 기준 상세" en="Detailed calculation criteria" /></summary>
+          <div className="mt-4 grid gap-6 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
             <div>
               <h3 className="mb-2 font-medium text-[var(--ink)]">
                 P10 · P50 · P90
@@ -68,6 +79,7 @@ export function OwnerResearchExecutionSection({
                 {execution.coverage.modeledCurrentValuePct.toFixed(2)}<SimulationText ko={"%가 계산 대상입니다. 제외한 비중은 이력을 꾸며내지 않고 남겨 두며, 포함 종목만 100%로 다시 환산합니다. 수수료·세금·현금수익률 미포함, 조회 시 계산 · 저장 안 함."} />{" "}</p>
             </div>
           </div>
+          </details>
           {execution.status === "ready" &&
           execution.coverage.omittedWeightBps > 0 ? (
             <p
@@ -148,6 +160,7 @@ export function OwnerResearchExecutionSection({
           ) : null}
           {execution.status === "ready" ? <ExecutionAssumptions execution={execution} /> : null}
         </SimulationDialog>
+        </div>
       </div>
       <p className={styles.executionMeta}>
         <span>
@@ -192,21 +205,21 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
     >
       <dl className={styles.resultSummary}>
         <div>
-          <dt>{execution.assumptions.horizon}<SimulationText ko={"단계 후 중앙 수익률"} /></dt>
+          <dt><SimulationText ko="마지막 수익률 중간값" en="Middle final return" /></dt>
           <dd className={execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}>
             <SimulationText ko={simulationReturnLabel(100 + execution.terminal.p50ReturnPct)} />
           </dd>
-          <p><SimulationText ko={"전체 계산 경로의 중앙값 P50"} /></p>
+          <p>{execution.assumptions.horizon}<SimulationText ko="단계 후 · 500개 경로의 가운데 값" en=" steps · Middle of 500 paths" /></p>
         </div>
         <div>
-          <dt><SimulationText ko={"손실로 끝날 확률"} /></dt>
+          <dt><SimulationText ko="손실로 끝난 경로" en="Paths ending in loss" /></dt>
           <dd>{execution.terminal.lossProbabilityPct.toFixed(1)}%</dd>
-          <p><SimulationText ko={"종료값이 시작값보다 낮은 경로 비율"} /></p>
+          <p><SimulationText ko="마지막 값이 출발점보다 낮은 비율" en="Share ending below their starting value" /></p>
         </div>
         <div>
-          <dt><SimulationText ko={"큰 하락폭 · MDD P90"} /></dt>
+          <dt><SimulationText ko="중간 최대 하락 · MDD" en="Largest drop along the way" /></dt>
           <dd className="text-[var(--negative)]">{execution.terminal.maxDrawdownP90Pct.toFixed(1)}%</dd>
-          <p><SimulationText ko={"경로 내 최대 낙폭의 더 큰 손실 쪽 경계"} /></p>
+          <p><SimulationText ko="약 10% 경로는 이보다 더 하락" en="About 10% of paths had a larger drop" /></p>
         </div>
       </dl>
       <ResearchFanChart large execution={execution} />

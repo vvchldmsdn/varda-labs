@@ -125,7 +125,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
           </nav>
           {preview ? <span className="varda-topbar-preview"><i />{t("예시 데이터")}</span>
             : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `${formatKstTime(generatedAt)} 기준`}</span> : null}
-          {!preview && generatedAt ? <PortfolioRefreshButton compact /> : null}
+          {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={currentPath === "/history"} /> : null}
           <LanguageSwitch />
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>

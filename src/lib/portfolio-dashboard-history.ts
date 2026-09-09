@@ -1,4 +1,5 @@
 import { percentOrNull, sumBy, toNumber } from "./portfolio-math.ts";
+import type { HoldingPriceReturn } from "./holding-price-return.ts";
 
 export type PortfolioDashboardPositionHistoryRow = Readonly<{
   snapshotDate: string;
@@ -29,6 +30,7 @@ export type PortfolioDashboardHistoryHolding = Readonly<{
   valueKrw?: number;
   dailyChangeKrw?: number | null;
   dailyReturnPct?: number | null;
+  dailyPriceReturn?: HoldingPriceReturn;
   priceDailyChangeKrw?: number | null;
   fxDailyChangeKrw?: number | null;
 }>;
@@ -40,7 +42,8 @@ export type PortfolioDashboardHeatmapCell = Readonly<{
   changeKrw: number | null;
   priceChangeKrw: number | null;
   fxChangeKrw: number | null;
-  basis: "live_movement" | "unit_value" | "market_value" | "missing";
+  basis: "live_price" | "live_movement" | "unit_value" | "market_value" | "missing";
+  priceReturnEvidence?: HoldingPriceReturn;
 }>;
 
 export type PortfolioDashboardHeatmapRow = Readonly<{
@@ -148,19 +151,20 @@ function currentMovementCell(
   date: string,
   holding: PortfolioDashboardHistoryHolding,
 ): PortfolioDashboardHeatmapCell {
-  const changePct = toNumber(holding.dailyReturnPct);
+  const changePct = toNumber(holding.dailyPriceReturn?.changePct);
   const changeKrw = toNumber(holding.dailyChangeKrw);
   const marketValueKrw = toNumber(holding.valueKrw);
 
-  if (changePct === null || changeKrw === null || marketValueKrw === null) {
+  if (changePct === null) {
     return Object.freeze({
       date,
       changePct: null,
       marketValueKrw,
-      changeKrw: null,
+      changeKrw,
       priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
       fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
       basis: "missing" as const,
+      ...(holding.dailyPriceReturn ? { priceReturnEvidence: holding.dailyPriceReturn } : {}),
     });
   }
 
@@ -171,7 +175,8 @@ function currentMovementCell(
     changeKrw,
     priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
     fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
-    basis: "live_movement" as const,
+    basis: "live_price" as const,
+    priceReturnEvidence: holding.dailyPriceReturn,
   });
 }
 

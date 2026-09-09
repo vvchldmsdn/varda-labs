@@ -1,6 +1,8 @@
 "use client";
 
 import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
+import { T } from "@/components/i18n/localized-text";
+import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 
 
 import { useEffect, useRef, useState } from "react";
@@ -18,9 +20,7 @@ export function AdditionalContributionLogicDialog({
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = overflow; };
+    return acquireBodyScrollLock(document.body);
   }, [open]);
   const rows = preview.rows.toSorted(
     (left, right) =>
@@ -96,22 +96,23 @@ export function AdditionalContributionLogicDialog({
               />
             </section>
 
-            <section className="border-b border-[var(--line)] pb-5 text-xs leading-6 text-[var(--muted)]" aria-label={pt("배분 공식")}>
+            <details className="border-b border-[var(--line)] pb-5 text-sm leading-7 text-[var(--muted)]">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium text-[var(--ink)]"><T ko="정확한 계산식과 조정 규칙" en="Exact formulas and adjustment rules" /></summary>
               <p><PortfolioText ko={"유효 목표액 = (현재 총평가액 + 신규 투입금) × 목표비중 × MA120 배율"} /></p>
               <p><PortfolioText ko={"종목별 부족액 = 유효 목표액 − 계산상 매도 후 평가액 (0 미만이면 0)"} /></p>
               <p><PortfolioText ko={"신규 투입금 + 계산상 매도대금을 부족액 비례로 배분합니다. 매도 종목은 다시 매수하지 않습니다. 원 단위 최대잔여 방식으로 결정하며 매도는 보유 평가액, 매수는 유효 부족액을 넘지 않습니다."} /></p>
               <p><PortfolioText ko={"목표 0% 종목도 손실이 아니고 원가 근거가 있을 때 정리합니다. 원 단위로 표현할 수 없는 1원 미만 평가액은 남을 수 있습니다. 수수료·세금·주문 단위는 반영하지 않은 금액 계획입니다."} /></p>
-            </section>
+            </details>
 
-            <section className="mt-7" aria-labelledby="holding-calculation-title">
-              <div className="flex flex-wrap items-end justify-between gap-2">
+            <details className="mt-4" aria-labelledby="holding-calculation-title">
+              <summary className="min-h-11 cursor-pointer py-3">
                 <div>
                   <h3 id="holding-calculation-title" className="text-sm font-medium"><PortfolioText ko={"종목별 계산 근거"} /></h3>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     <PortfolioText ko={"원래 목표로 계산한 금액과 MA120 반영 후 최종 금액을 함께 비교합니다."} />{" "}</p>
                 </div>
                 <span className="text-xs text-[var(--muted)]">{rows.length}<PortfolioText ko={"개 종목"} /></span>
-              </div>
+              </summary>
 
               <div className="mt-3 overflow-x-auto border-y border-[var(--line)]">
                 <table className="w-full min-w-[1080px] border-collapse text-sm">
@@ -150,12 +151,12 @@ export function AdditionalContributionLogicDialog({
                   </tbody>
                 </table>
               </div>
-            </section>
+            </details>
 
             <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
               <h3 className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></h3>
               <p className="mt-1 leading-6 text-[var(--muted)]">
-                <PortfolioText ko={"원 서비스 후반부에 있던 환율 진입시점, 위험기여, 시장 레짐, 뉴스, 성과감시 감액은 사용자별 정규화 근거가 아직 없어 이번 계산에 임의로 넣지 않았습니다. 근거가 연결되면 같은 단계에 추가할 수 있습니다."} />{" "}</p>
+                <T ko="목표비중과 현재 보유 상태, 확인된 가격 추세로 금액을 나눕니다. 환율 전망·뉴스·시장 상황에 따른 추가 조정과 수수료·세금·실제 주문 단위는 포함하지 않습니다." en="Amounts use your target weights, current holdings, and verified price trends. Extra adjustments for FX forecasts, news or market conditions, as well as fees, taxes and actual order sizes, are excluded." /></p>
             </section>
           </div>
         </div>
@@ -169,7 +170,7 @@ function FlowStep({ index, label, value }: { index: string; label: string; value
 }
 
 function PolicyFact({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return <div><p className="text-[11px] font-medium text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-2 font-medium"><PortfolioText ko={value} /></p><p className="mt-1 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={detail} /></p></div>;
+  return <div><p className="text-xs font-medium text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-2 font-medium"><PortfolioText ko={value} /></p><details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs text-[var(--muted)]"><T ko="이 규칙 자세히 보기" en="About this rule" /></summary><p className="pb-3 text-sm leading-7 text-[var(--muted)]"><PortfolioText ko={detail} /></p></details></div>;
 }
 
 function actionLabel(row: AdditionalContributionResultPreview["rows"][number]) {

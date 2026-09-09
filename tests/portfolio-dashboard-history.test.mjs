@@ -157,13 +157,14 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[2]?.cells.every((cell) => cell.basis === "missing"), true);
   });
 
-  it("uses live movement for the current service date without rewriting history", () => {
+  it("uses native price return for today while retaining separate KRW movement and unchanged history", () => {
     const currentHoldings = [
       {
         ...holdings[0],
         valueKrw: 1_300_000,
         dailyChangeKrw: 30_000,
         dailyReturnPct: 2.3622,
+        dailyPriceReturn: priceReturn(3),
         priceDailyChangeKrw: 24_000,
         fxDailyChangeKrw: 6_000,
       },
@@ -172,6 +173,7 @@ describe("portfolio dashboard holding history", () => {
         valueKrw: 900_000,
         dailyChangeKrw: 0,
         dailyReturnPct: 0,
+        dailyPriceReturn: priceReturn(0),
         priceDailyChangeKrw: 0,
         fxDailyChangeKrw: 0,
       },
@@ -198,21 +200,22 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[0]?.cells[0]?.changePct, -1);
     assert.deepEqual(result.rows[0]?.cells[1], {
       date: "2026-08-24",
-      changePct: 2.3622,
+      changePct: 3,
       marketValueKrw: 1_300_000,
       changeKrw: 30_000,
       priceChangeKrw: 24_000,
       fxChangeKrw: 6_000,
-      basis: "live_movement",
+      basis: "live_price",
+      priceReturnEvidence: priceReturn(3),
     });
     assert.equal(result.rows[1]?.cells[1]?.changePct, 0);
-    assert.equal(result.rows[1]?.cells[1]?.basis, "live_movement");
+    assert.equal(result.rows[1]?.cells[1]?.basis, "live_price");
   });
 
   it("preserves Friday, weekend, Monday and today's live movement on separate service days", () => {
     const result = buildPortfolioDashboardHoldingHistory({
       currentDate: "2026-09-08",
-      holdings: [{ ...holdings[0], valueKrw: 1000, dailyChangeKrw: -10, dailyReturnPct: -1 }],
+      holdings: [{ ...holdings[0], valueKrw: 1000, dailyChangeKrw: -10, dailyReturnPct: -1, dailyPriceReturn: priceReturn(-1) }],
       rows: [["2026-09-05", 2], ["2026-09-06", 0], ["2026-09-07", 0], ["2026-09-08", 1]].map(([date, change]) => row({
         snapshotDate: date, assetId: "asset-kodex", source: "varda_manual_daily_snapshot",
         cycleEndAt: new Date(`${date}T07:00:00+09:00`),
@@ -252,21 +255,36 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.observedCellCount, 1);
   });
 
-  for (const missing of ["dailyReturnPct", "dailyChangeKrw", "valueKrw"]) {
-    it(`does not fall through to a stored zero when today's ${missing} is unavailable`, () => {
+  for (const dailyPriceReturn of [undefined, { ...priceReturn(null), reason: "missing_previous_close" }]) {
+    it("does not use portfolio returns or a stored zero when today's price evidence is unavailable", () => {
       const result = buildPortfolioDashboardHoldingHistory({
         currentDate: "2026-09-08",
-        holdings: [{ ...holdings[0], valueKrw: 1000, dailyReturnPct: 1, dailyChangeKrw: 10, [missing]: null }],
+        holdings: [{ ...holdings[0], valueKrw: 1000, dailyReturnPct: 1, dailyChangeKrw: 10, dailyPriceReturn }],
         rows: [row({ snapshotDate: "2026-09-08", assetId: "asset-kodex", unitValueChangePct: 0, marketValueChangeKrw: 0, marketValueKrw: 1000 })],
       });
       assert.equal(result.rows[0].cells[0].basis, "missing");
       assert.equal(result.rows[0].cells[0].changePct, null);
-      assert.equal(result.rows[0].cells[0].changeKrw, null);
+      assert.equal(result.rows[0].cells[0].changeKrw, 10, "available money movement is independent from missing price-return evidence");
       assert.equal(result.observedCellCount, 0);
       assert.equal(result.coveragePct, 0);
     });
   }
+  for (const missing of ["dailyReturnPct", "dailyChangeKrw", "valueKrw"]) {
+    it(`retains native price change when portfolio ${missing} is missing`, () => {
+      const result = buildPortfolioDashboardHoldingHistory({ currentDate: "2026-09-09", rows: [],
+        holdings: [{ ...holdings[0], valueKrw: 1000, dailyReturnPct: 1, dailyChangeKrw: 10, dailyPriceReturn: priceReturn(3), [missing]: null }] });
+      assert.equal(result.rows[0].cells.at(-1).changePct, 3);
+      assert.equal(result.rows[0].cells.at(-1).basis, "live_price");
+      if (missing === "dailyChangeKrw") assert.equal(result.rows[0].cells.at(-1).changeKrw, null);
+      if (missing === "valueKrw") assert.equal(result.rows[0].cells.at(-1).marketValueKrw, null);
+    });
+  }
 });
+
+function priceReturn(changePct) {
+  return { changePct, currentPrice: changePct === null ? null : 100 + changePct, previousClose: 100,
+    previousCloseDate: "2026-08-21", currency: "KRW", observedAt: "2026-08-24T01:00:00Z", reason: null };
+}
 
 function row(overrides) {
   return {

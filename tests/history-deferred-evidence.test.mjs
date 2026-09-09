@@ -124,6 +124,7 @@ describe("History demand-driven server evidence", () => {
   it("uses the existing dynamic page authentication and resolved scope before any requested raw read", async () => {
     const { history } = fixture(5);
     const reads = [];
+    const liveReads = [];
     let localeCookieValue = "en";
     let resolution = { ok: false, reason: "unauthenticated" };
     let context = { state: "ready", resolution: { state: "resolved", scope }, catalog: { scopes: [scope] } };
@@ -139,26 +140,33 @@ describe("History demand-driven server evidence", () => {
       "@/db/queries/portfolio-analysis-scopes": { getReadOnlyTenantPortfolioAnalysisScopeContext: async () => context },
       "@/db/queries/history-balance": { getReadOnlyTenantHistoryBalance: async args => { reads.push(args); return history; } },
       "@/db/queries/tenant-events": { getReadOnlyTenantEvents: async () => null },
+      "@/db/queries/history-live-valuation": { getReadOnlyTenantHistoryLiveValuation: async args => { liveReads.push(args); return null; } },
     });
     assert.equal(page.dynamic, "force-dynamic");
     assert.equal((await page.generateMetadata()).title, "History | VARDA LABS");
     localeCookieValue = undefined;
     assert.equal((await page.generateMetadata()).title, "히스토리 | VARDA LABS");
     assert.equal(reads.length, 0, "localized metadata must not trigger a financial evidence read");
+    assert.equal(liveReads.length, 0);
     await page.default({ searchParams: Promise.resolve({ detail: "raw", scope: scope.key }) });
     assert.equal(reads.length, 0);
+    assert.equal(liveReads.length, 0);
     resolution = { ok: true, tenantContext: { ownerUserId: owner } };
     context = { state: "unavailable" };
     await page.default({ searchParams: Promise.resolve({ detail: "raw", scope: scope.key }) });
     assert.equal(reads.length, 0);
+    assert.equal(liveReads.length, 0);
     context = { state: "ready", resolution: { state: "resolved", scope }, catalog: { scopes: [scope] } };
     for (const panel of [undefined, "records", "raw"]) {
       const result = await page.default({ searchParams: Promise.resolve({ detail: panel, scope: scope.key }) });
       assert.equal(reads.at(-1).includeRawEvidence, panel === "raw");
       assert.equal(reads.at(-1).tenantContext.ownerUserId, owner);
       assert.equal(reads.at(-1).scope.accountId, accountId);
+      assert.equal(liveReads.at(-1).tenantContext.ownerUserId, owner);
+      assert.equal(liveReads.at(-1).scope.accountId, accountId);
       assert.equal(result.props.detailParams.detail, panel);
     }
+    assert.equal(liveReads.length, 3);
   });
 
   it("uses the real deferred History view in design preview and paginates its existing 122 points", async () => {
