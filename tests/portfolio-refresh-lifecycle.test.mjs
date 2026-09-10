@@ -6,6 +6,34 @@ import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 const WINDOW_MS = TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds;
 const STORAGE_KEY = "varda:live-price-sync:last-bucket";
 
+describe("Today navigation refresh wiring", () => {
+  it("activates shared automatic quote checks on direct Today entry and labels view time honestly", async () => {
+    const RefreshButton = () => null;
+    const icons = Object.fromEntries(["ArrowUpRight", "ChartNoAxesCombined", "ChartPie", "ChevronLeft", "ChevronRight", "FlaskConical", "History", "House", "Menu", "Plus", "Settings2", "TrendingUp", "UserRound", "X"].map(name => [name, () => null]));
+    let locale = "en";
+    const [component] = await importUiWithPorts(["src/components/app-navigation.tsx"], {
+      react: { useRef: () => ({ current: null }) },
+      "next/image": { default: () => null },
+      "next/link": { default: () => null, useLinkStatus: () => ({ pending: false }) },
+      "next/navigation": { usePathname: () => "/today", useSearchParams: () => new URLSearchParams("scope=all") },
+      "lucide-react": icons,
+      "@/components/i18n/locale-provider": { useI18n: () => ({ locale, t: (ko, en) => locale === "en" ? en ?? ko : ko }) },
+      "@/components/i18n/language-switch": { LanguageSwitch: () => null },
+      "@/components/home/portfolio-refresh-button": { PortfolioRefreshButton: RefreshButton },
+    });
+    const elements = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(elements) : [tree, ...elements(tree.props?.children)];
+    const render = props => elements(component.AppNavigation({ generatedAt: "2026-09-10T03:37:00Z", ...props }));
+    const today = render({});
+    assert.equal(today.find(element => element.type === RefreshButton).props.autoSync, true, "Today must refresh without visiting Home first");
+    assert.equal(render({ activePath: "/history" }).find(element => element.type === RefreshButton).props.autoSync, true);
+    assert.equal(render({ activePath: "/simulation" }).find(element => element.type === RefreshButton).props.autoSync, false);
+    assert.match(today.find(element => element.props?.className === "varda-updated-at").props.children, /^View refreshed /);
+    locale = "ko";
+    assert.match(render({}).find(element => element.props?.className === "varda-updated-at").props.children, /^화면 갱신 /);
+    assert.equal(render({ generatedAt: undefined }).some(element => element.type === RefreshButton), false);
+  });
+});
+
 /** Runs the component's real effects and event callbacks with a deterministic browser I/O clock. */
 async function refreshHarness(test, { visibility = "visible", storageFailure = null, autoRespond = true, responseState = "fresh" } = {}) {
   let now = Math.floor(Date.parse("2026-09-09T01:00:00Z") / WINDOW_MS) * WINDOW_MS + 1_000;

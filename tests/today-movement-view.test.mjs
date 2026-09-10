@@ -5,6 +5,42 @@ import {
   buildTodayMovementAttribution,
   selectTodayHoldingHistory,
 } from "../src/lib/today-movement-view.ts";
+import { buildTodayQuoteFreshness, formatTodayEvidenceRange } from "../src/lib/today-quote-freshness.ts";
+
+describe("today quote retrieval evidence", () => {
+  const now = "2026-09-10T03:37:00.000Z";
+  const holding = (overrides = {}) => ({ movementEligible: true, currency: "KRW", currentPrice: 100, priceStatus: "ok", priceFetchedAt: "2026-09-10T03:36:00.000Z", priceAsOf: "2026-09-09T06:30:00.000Z", ...overrides });
+  it("keeps oldest and newest retrieval times separate from market evidence and render time", () => {
+    const result = buildTodayQuoteFreshness({ holdings: [holding(), holding({ priceFetchedAt: "2026-09-10T03:33:40.000Z", priceAsOf: now })], fxFetchedAt: null, now });
+    assert.deepEqual(result.fetched, { oldest: "2026-09-10T03:33:40.000Z", newest: "2026-09-10T03:36:00.000Z" });
+    assert.deepEqual(result.observed, { oldest: "2026-09-09T06:30:00.000Z", newest: now });
+    assert.equal(result.staleQuoteCount, 0, "a newly retrieved closed-market price is not a stale retrieval");
+    assert.equal(formatTodayEvidenceRange(result.fetched, now), "12:33:40–12:36:00 KST");
+    assert.equal(formatTodayEvidenceRange(result.observed, now), "2026-09-09 15:30:00–2026-09-10 12:37:00 KST");
+  });
+  it("does not let a freshly retrieved holding hide another stale quote or FX rate", () => {
+    const result = buildTodayQuoteFreshness({ holdings: [holding(), holding({ currency: "USD", priceFetchedAt: "2026-09-10T03:20:00Z" })], fxFetchedAt: "2026-09-10T03:30:00Z", now });
+    assert.equal(result.staleQuoteCount, 1);
+    assert.equal(result.hasFxExposure, true);
+    assert.equal(result.fxNeedsRefresh, true);
+    assert.equal(result.fxFetchedAt, "2026-09-10T03:30:00.000Z");
+  });
+  it("retains missing retrieval evidence instead of replacing it with price or render time", () => {
+    const result = buildTodayQuoteFreshness({ holdings: [holding({ priceFetchedAt: null, priceAsOf: now, currency: "USD" }), holding({ priceFetchedAt: "invalid" }), holding({ priceStatus: "error" }), holding({ priceFetchedAt: "2026-09-10T04:00:00Z" })], fxFetchedAt: "invalid", now });
+    assert.equal(result.missingQuoteCount, 4);
+    assert.deepEqual(result.fetched, { oldest: null, newest: null });
+    assert.equal(formatTodayEvidenceRange(result.fetched, now), "—");
+    assert.equal(result.fxFetchedAt, null);
+    assert.equal(result.fxNeedsRefresh, true);
+  });
+  it("excludes manually valued non-movement holdings and ignores FX for a KRW-only scope", () => {
+    const result = buildTodayQuoteFreshness({ holdings: [holding(), holding({ movementEligible: false, currency: "USD", priceFetchedAt: null })], fxFetchedAt: null, now });
+    assert.equal(result.missingQuoteCount, 0);
+    assert.equal(result.hasFxExposure, false);
+    assert.equal(result.fxNeedsRefresh, false);
+    assert.equal(formatTodayEvidenceRange(result.fetched, now), "12:36:00 KST");
+  });
+});
 
 describe("today movement view attribution", () => {
   it("keeps trade flow outside price and FX performance attribution", () => {
