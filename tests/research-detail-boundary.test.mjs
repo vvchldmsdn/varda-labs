@@ -47,6 +47,7 @@ test("both detail endpoints reject unauthenticated reads before any research que
     "@/lib/auth/research-detail-context": { resolveResearchDetailContext: async () => ({ ok: false, response: Response.json({ error: "authentication_required" }, { status: 401, headers: RESEARCH_DETAIL_HEADERS }) }) },
     "@/db/queries/investment-lab-detail": { loadInvestmentLabDetail: async () => { reads++; } },
     "@/db/queries/simulation-detail": { loadSimulationDetail: async () => { reads++; } },
+    "@/db/queries/simulation-owner-economic": { economicResearchPresentation: () => { throw new Error("unauthenticated economic presentation"); } },
   });
   for (const endpoint of [lab, simulation]) {
     const response = await endpoint.GET(new Request("https://example.test/api/research?view=weights&scope=all"));
@@ -173,6 +174,11 @@ test("simulation detail evaluates only the selected owner results and preserves 
   }
   const ports = {
     "./simulation-owner-research": { getReadOnlyTenantSimulationOwnerResearch: async (input) => { assert.equal(input.scope.key, "account:a"); assert.equal(input.tenantContext.ownerUserId, "owner-a"); return owner; } },
+    "./simulation-owner-economic": {
+      getReadOnlyTenantSimulationOwnerEconomicResearch: async () => { throw new Error("economic model was not selected"); },
+      getReadOnlyTenantSimulationOwnerEconomicValidation: async () => { throw new Error("economic model was not selected"); },
+      economicResearchPresentation: () => { throw new Error("economic model was not selected"); },
+    },
     "./simulation-input-readiness": { getReadOnlySimulationInputReadiness: async () => { calls.push("fixed"); throw new Error("optional fixed model unavailable"); } },
   };
   for (const [path, name] of [
@@ -186,7 +192,7 @@ test("simulation detail evaluates only the selected owner results and preserves 
     ["simulation-research-universe-preflight", "getReadOnlySimulationResearchUniversePreflight"],
   ]) ports[`./${path}`] = { [name]: async () => ({ status: "ready" }) };
   const [{ loadSimulationDetail }] = await importWithPorts(["src/db/queries/simulation-detail.ts"], ports);
-  const input = { tenantContext: { ownerUserId: "owner-a" }, selectedScope: { key: "account:a" }, scopeCatalog: [], query: { horizon: "126", end: "2026-09-08" } };
+  const input = { tenantContext: { ownerUserId: "owner-a" }, selectedScope: { key: "account:a" }, scopeCatalog: [], query: { model: "bootstrap", horizon: "126", end: "2026-09-08" } };
   panel = "weights";
   const weights = await loadSimulationDetail({ ...input, panel });
   assert.deepEqual(calls, ["candidateComparison"]);

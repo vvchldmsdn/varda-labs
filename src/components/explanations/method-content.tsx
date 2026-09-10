@@ -3,6 +3,7 @@
 import MethodExplorer from "./method-explorer";
 import { investmentLabMethod } from "./investment-lab-method";
 import { simulationMethod } from "./simulation-method";
+import { economicSimulationMethod } from "./economic-simulation-method";
 import { contributionMethod } from "./contribution-method";
 import { movementMethod, riskMethod } from "./portfolio-methods";
 import type { MethodGuide, MethodTopic } from "./method-types";
@@ -10,6 +11,7 @@ import type { MethodGuide, MethodTopic } from "./method-types";
 const guides: Record<MethodTopic, MethodGuide> = {
   "investment-lab": investmentLabMethod,
   simulation: simulationMethod,
+  "economic-simulation": economicSimulationMethod,
   contribution: contributionMethod,
   movement: movementMethod,
   risk: riskMethod,

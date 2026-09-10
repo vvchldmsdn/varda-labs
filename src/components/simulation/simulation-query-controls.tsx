@@ -19,7 +19,7 @@ export function SimulationLink(props: ComponentProps<typeof Link>) {
   if (typeof href === "string" && href.startsWith("/simulation")) {
     const [path, search = ""] = href.split("?");
     const next = new URLSearchParams(search);
-    for (const key of ["view", "preview"]) {
+    for (const key of ["view", "preview", "model"]) {
       const value = params.get(key);
       if (value && !next.has(key)) next.set(key, value);
     }
@@ -44,6 +44,7 @@ export function SimulationScopeTabs({
       "kodexWeight",
       "researchUniverse",
       "preview",
+      "model",
     ].map((key) => [key, params.get(key)]),
   );
   return (
@@ -61,13 +62,28 @@ export function SimulationContextFields() {
   const params = useSearchParams();
   return (
     <>
-      {["view", "preview"].map((key) =>
+      {["view", "preview", "model"].map((key) =>
         params.get(key) ? (
           <input key={key} type="hidden" name={key} value={params.get(key)!} />
         ) : null,
       )}
     </>
   );
+}
+
+export function SimulationModelSelector() {
+  const params = useSearchParams();
+  const selected = params.get("model") ?? "economic";
+  return <nav aria-label="Simulation model" className="flex min-w-0 gap-1 rounded-md bg-[var(--wash)] p-1" data-simulation-model-selector>
+    {(["economic", "bootstrap"] as const).map((model) => {
+      const next = new URLSearchParams(params.toString());
+      next.set("model", model);
+      return <Link key={model} href={`/simulation?${next}`} prefetch={false} scroll={false} aria-current={selected === model ? "page" : undefined}
+        className={`min-h-10 rounded px-3 py-2 text-xs transition-colors ${selected === model ? "bg-[var(--paper)] font-medium text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}>
+        <SimulationText ko={model === "economic" ? "경제지표 경로" : "과거 수익률 경로"} en={model === "economic" ? "Economic paths" : "Historical paths"} />
+      </Link>;
+    })}
+  </nav>;
 }
 
 export function SimulationDateControl() {

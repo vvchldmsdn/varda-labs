@@ -1,5 +1,6 @@
 /** System-owned research copy; financial inputs, identifiers and names are preserved. */
 export const SIMULATION_COPY: Readonly<Record<string, string>> = {
+  "현재 경제 상태 조건부 모형": "Current-state economic model",
   "Stationary bootstrap · 하락위험 과거 관측 검증": "Stationary bootstrap · Historical downside validation",
   "종료 손실확률·최대낙폭 검증": "Terminal loss & drawdown validation",
   "확률밴드와 동일한 90개 학습 구간과 500개 완전 경로를 사용합니다. 예측 종료 손실확률과 MDD P50·P90을, 바로 이어진 실제": "Uses the same 90-observation training windows and 500 complete paths as the fan-band validation. Compare predicted terminal loss probability and MDD P50/P90 with the observed outcomes over the immediately following",

@@ -315,3 +315,8 @@ import "./base44-settings-canonical-plan.test.mjs";
 import "./base44-event-canonical-plan.test.mjs";
 import "./base44-history-canonical-plan.test.mjs";
 import "./base44-market-context-canonical-plan.test.mjs";
+import "./simulation-economic-state-model.test.mjs";
+import "./simulation-owner-economic-research.test.mjs";
+import "./simulation-owner-economic-candidates.test.mjs";
+import "./simulation-owner-economic-validation.test.mjs";
+import "./simulation-economic-integration.test.mjs";

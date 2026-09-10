@@ -236,7 +236,7 @@ export function simulateFactorResidualModel(input: {
   });
 }
 
-function normalizedEwmaWeights(count: number, decay: number) {
+export function normalizedEwmaWeights(count: number, decay: number) {
   const weights = Array.from(
     { length: count },
     (_, index) => decay ** (count - index - 1),
@@ -245,7 +245,7 @@ function normalizedEwmaWeights(count: number, decay: number) {
   return weights.map((value) => value / total);
 }
 
-function weightedMean(
+export function weightedMean(
   rows: readonly (readonly number[])[],
   weights: readonly number[],
   columnCount: number,
@@ -259,7 +259,7 @@ function weightedMean(
   return means;
 }
 
-function weightedCovariance(
+export function weightedCovariance(
   rows: readonly (readonly number[])[],
   means: readonly number[],
   weights: readonly number[],
@@ -289,7 +289,7 @@ function weightedCovariance(
   return covariance;
 }
 
-function weightedCrossCovariance(
+export function weightedCrossCovariance(
   leftRows: readonly (readonly number[])[],
   leftMeans: readonly number[],
   rightRows: readonly (readonly number[])[],
@@ -311,7 +311,7 @@ function weightedCrossCovariance(
   );
 }
 
-function shrinkOffDiagonal(matrix: readonly (readonly number[])[], intensity: number) {
+export function shrinkOffDiagonal(matrix: readonly (readonly number[])[], intensity: number) {
   return matrix.map((row, rowIndex) =>
     row.map((value, columnIndex) =>
       rowIndex === columnIndex ? value : value * (1 - intensity),
@@ -319,7 +319,7 @@ function shrinkOffDiagonal(matrix: readonly (readonly number[])[], intensity: nu
   );
 }
 
-function choleskyWithJitter(matrix: readonly (readonly number[])[]) {
+export function choleskyWithJitter(matrix: readonly (readonly number[])[]) {
   const scale = Math.max(
     ...matrix.map((row, index) => Math.abs(row[index])),
     1e-12,
@@ -359,7 +359,7 @@ function cholesky(matrix: readonly (readonly number[])[]) {
   return lower;
 }
 
-function solveCholesky(lower: readonly (readonly number[])[], values: readonly number[]) {
+export function solveCholesky(lower: readonly (readonly number[])[], values: readonly number[]) {
   const intermediate = new Array(values.length).fill(0);
   for (let row = 0; row < values.length; row += 1) {
     let value = values[row];
@@ -379,7 +379,7 @@ function solveCholesky(lower: readonly (readonly number[])[], values: readonly n
   return result;
 }
 
-function createStandardNormal(nextRandom: () => number) {
+export function createStandardNormal(nextRandom: () => number) {
   let spare: number | null = null;
   return () => {
     if (spare !== null) {
@@ -398,7 +398,7 @@ function createStandardNormal(nextRandom: () => number) {
   };
 }
 
-function correlatedNormal(
+export function correlatedNormal(
   lower: readonly (readonly number[])[],
   nextNormal: () => number,
 ) {
@@ -412,7 +412,7 @@ function correlatedNormal(
   });
 }
 
-function dot(left: readonly number[], right: readonly number[]) {
+export function dot(left: readonly number[], right: readonly number[]) {
   let sum = 0;
   let compensation = 0;
   for (let index = 0; index < left.length; index += 1) {

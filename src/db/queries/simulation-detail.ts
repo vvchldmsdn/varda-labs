@@ -13,6 +13,9 @@ import { getReadOnlyTenantSimulationOwnerResearch } from "./simulation-owner-res
 import { getReadOnlySimulationRegimeBootstrap } from "./simulation-regime-bootstrap";
 import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "./simulation-regime-historical-outcome-validation";
 import { getReadOnlySimulationResearchUniversePreflight } from "./simulation-research-universe-preflight";
+import { resolveSimulationPathModel } from "@/lib/simulation-model-selection";
+import { buildSimulationOwnerEconomicCandidates } from "@/lib/simulation-owner-economic-candidates";
+import { getReadOnlyTenantSimulationOwnerEconomicResearch, getReadOnlyTenantSimulationOwnerEconomicValidation, economicResearchPresentation } from "./simulation-owner-economic";
 
 export async function loadSimulationDetail({ panel, query, tenantContext, selectedScope, scopeCatalog }: {
   panel: SimulationPanel; query: Record<string, string | string[] | undefined>; tenantContext: TenantContext;
@@ -26,6 +29,27 @@ export async function loadSimulationDetail({ panel, query, tenantContext, select
   // Detail computations require the same owner matrix and paired baseline. They do
   // not rerender or serialize the main page, and no private result is globally cached.
   const ownerPromise = getReadOnlyTenantSimulationOwnerResearch({ endServiceDate: query.end, horizon: query.horizon, scope: selectedScope, serviceDate, tenantContext });
+  const pathModel = resolveSimulationPathModel(query.model);
+  if (!pathModel) throw new Error("invalid_simulation_model");
+  if (pathModel === "economic") {
+    const [owner, economic, economicValidation] = await Promise.all([
+      ownerPromise,
+      panel !== "validation" ? getReadOnlyTenantSimulationOwnerEconomicResearch({ ownerResearchPromise: ownerPromise, stateAsOfServiceDate: typeof query.end === "string" ? query.end : serviceDate }) : null,
+      panel === "validation" ? getReadOnlyTenantSimulationOwnerEconomicValidation({ ownerResearchPromise: ownerPromise }) : null,
+    ]);
+    return {
+      panel, pathModel, selectedScope, scopeCatalog,
+      preservedQuery: { scope: selectedScope.key, model: pathModel, end: single(query.end), horizon: single(query.horizon), kodexWeight: single(query.kodexWeight), researchUniverse: single(query.researchUniverse) },
+      economic: economic ? economicResearchPresentation(economic) : null,
+      economicCandidates: panel === "weights" && economic ? buildSimulationOwnerEconomicCandidates({ economic }) : null,
+      economicValidation,
+      model: null, analysisDataReadiness: null, ownerParametricFactor: null, ownerModelComparison: null, ownerModelCalibration: null,
+      historicalOutcomeValidation: null, regimeHistoricalOutcomeValidation: null, researchUniversePreflight: null, regime: null,
+      inputPreflight: panel === "evidence" ? owner.inputPreflight : null,
+      instruments: owner.execution.instruments, candidateComparison: null, walkForwardValidation: null, historicalValidation: null,
+      unavailableSections,
+    };
+  }
   const modelPromise = panel !== "weights" ? optional("고정 종목 연구", getReadOnlySimulationInputReadiness({ includeResearch: true, endServiceDate: query.end, horizon: query.horizon, kodexWeight: query.kodexWeight })) : null;
   const factorPromise = panel === "evidence" ? getReadOnlyTenantSimulationOwnerParametricFactorResearch({ ownerResearchPromise: ownerPromise }) : null;
   const factorResult = factorPromise ? optional("환율·금리 요인 모형", factorPromise) : null;
@@ -41,8 +65,9 @@ export async function loadSimulationDetail({ panel, query, tenantContext, select
     panel === "evidence" ? optional("시장 국면 연구", getReadOnlySimulationRegimeBootstrap({ endServiceDate: query.end, kodexWeight: query.kodexWeight })) : null,
   ] as const)]);
   return {
-    panel, selectedScope, scopeCatalog,
-    preservedQuery: { scope: selectedScope.key, end: single(query.end), horizon: single(query.horizon), kodexWeight: single(query.kodexWeight), researchUniverse: single(query.researchUniverse) },
+    panel, pathModel, selectedScope, scopeCatalog,
+    economic: null, economicCandidates: null, economicValidation: null,
+    preservedQuery: { scope: selectedScope.key, model: pathModel, end: single(query.end), horizon: single(query.horizon), kodexWeight: single(query.kodexWeight), researchUniverse: single(query.researchUniverse) },
     model: reads[0], analysisDataReadiness: reads[1], ownerParametricFactor: reads[2], ownerModelComparison: reads[3], ownerModelCalibration: reads[4], historicalOutcomeValidation: reads[5], regimeHistoricalOutcomeValidation: reads[6], researchUniversePreflight: reads[7], regime: reads[8],
     inputPreflight: panel === "evidence" ? owner.inputPreflight : null,
     instruments: panel === "weights" ? owner.execution.instruments : [],
@@ -54,4 +79,5 @@ export async function loadSimulationDetail({ panel, query, tenantContext, select
 }
 
 function single(value: string | string[] | undefined) { return typeof value === "string" ? value : null; }
-export type SimulationDetailData = Awaited<ReturnType<typeof loadSimulationDetail>>;
+type DetailResult = Awaited<ReturnType<typeof loadSimulationDetail>>;
+export type SimulationDetailData = { [Key in keyof DetailResult]: DetailResult[Key] };

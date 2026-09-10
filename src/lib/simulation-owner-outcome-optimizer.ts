@@ -4,8 +4,8 @@ import {
   type SimulationOwnerResearchWeight,
 } from "./simulation-owner-constrained-min-volatility.ts";
 
-export const SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY = Object.freeze({
-  version: "simulation_owner_outcome_candidate_search_v1",
+export const SIMULATION_OWNER_OUTCOME_SEARCH_POLICY = Object.freeze({
+  version: "simulation_owner_terminal_growth_candidate_search_v1",
   objectives: Object.freeze([
     "median_growth",
     "downside_floor",
@@ -20,6 +20,13 @@ export const SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY = Object.freeze({
   providerCalls: "forbidden",
   recommendation: "forbidden",
   orderAuthority: "forbidden",
+  interpretation:
+    "deterministic_constrained_research_candidates_confirmed_on_held_out_model_paths",
+} as const);
+
+export const SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY = Object.freeze({
+  ...SIMULATION_OWNER_OUTCOME_SEARCH_POLICY,
+  version: "simulation_owner_outcome_candidate_search_v1",
   interpretation:
     "deterministic_constrained_research_candidates_confirmed_on_held_out_bootstrap_paths",
 } as const);
@@ -40,10 +47,13 @@ export type SimulationOwnerOutcomeOptimizerResult = ReturnType<
 >;
 
 type TerminalFactorRow = readonly number[];
-type TerminalFactorEvidence = Readonly<{
+export type SimulationTerminalGrowthEvidence = Readonly<{
   pathIndex: number;
   factors: TerminalFactorRow;
 }>;
+type TerminalFactorEvidence = SimulationTerminalGrowthEvidence;
+export type SimulationOutcomeInstrument = Pick<SimulationOwnerResearchWeight,
+  "instrumentKey" | "market" | "currency" | "ticker">;
 
 const BASIS_POINT_TOTAL = 10_000;
 const SCORE_EPSILON = 1e-12;
@@ -52,16 +62,30 @@ export function buildSimulationOwnerOutcomeCandidates(input: {
   prepared: ReadyPreparedSimulationResearchPaths;
   currentWeights: readonly SimulationOwnerResearchWeight[];
 }) {
-  const base = {
-    policy: SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY,
-  };
   const validated = validateInput(input);
-  if (!validated) return unavailable(base, "input_shape_mismatch");
+  const result = validated
+    ? searchSimulationOwnerOutcomeCandidatesFromTerminalGrowth({
+        instruments: input.prepared.matrix.instruments,
+        currentWeights: input.currentWeights,
+        terminalFactors: validated.terminalFactors,
+      })
+    : unavailable({ policy: SIMULATION_OWNER_OUTCOME_SEARCH_POLICY }, "input_shape_mismatch");
+  return Object.freeze({ ...result, policy: SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY });
+}
 
-  const searchRows = validated.terminalFactors
+/** Model-neutral terminal growth input; no fabricated bootstrap matrix or draw plan. */
+export function searchSimulationOwnerOutcomeCandidatesFromTerminalGrowth(input: {
+  instruments: readonly SimulationOutcomeInstrument[];
+  currentWeights: readonly SimulationOwnerResearchWeight[];
+  terminalFactors: readonly SimulationTerminalGrowthEvidence[];
+}) {
+  const base = { policy: SIMULATION_OWNER_OUTCOME_SEARCH_POLICY };
+  if (!validTerminalEvidence(input)) return unavailable(base, "input_shape_mismatch");
+
+  const searchRows = input.terminalFactors
     .filter((row) => row.pathIndex % 2 === 0)
     .map((row) => row.factors);
-  const confirmationRows = validated.terminalFactors
+  const confirmationRows = input.terminalFactors
     .filter((row) => row.pathIndex % 2 === 1)
     .map((row) => row.factors);
   if (
@@ -200,6 +224,12 @@ function searchCandidate(input: {
       pass += 1
     ) {
       const incumbentScore = objectiveScore(bestMetrics, input.objective);
+      // Rebuild from complete weights once per pass: transfer estimates never
+      // accumulate through accepted moves or become published financial metrics.
+      const incumbentNav = input.terminalFactors.map((factors) =>
+        compensatedSum(factors.map((factor, index) =>
+          factor * (bestWeights[index] / BASIS_POINT_TOTAL))),
+      );
       let nextWeights: readonly number[] | null = null;
       let nextMetrics: SimulationOwnerOutcomeMetrics | null = null;
 
@@ -217,15 +247,33 @@ function searchCandidate(input: {
           });
           if (!constraints.valid) continue;
 
+          const nextScore = nextMetrics
+            ? objectiveScore(nextMetrics, input.objective)
+            : Number.NEGATIVE_INFINITY;
+          const estimate = estimateTransferScore({
+            terminalFactors: input.terminalFactors,
+            incumbentNav,
+            donor,
+            receiver,
+            stepBps,
+            objective: input.objective,
+          });
+          if (estimate && (
+            estimate.score + estimate.roundingAllowance <= incumbentScore + SCORE_EPSILON ||
+            estimate.score + estimate.roundingAllowance < nextScore - SCORE_EPSILON ||
+            (nextWeights !== null && lexicographicCompare(candidate, nextWeights) >= 0 &&
+              estimate.score + estimate.roundingAllowance <= nextScore + SCORE_EPSILON)
+          )) continue;
+
+          // Only eliminate clearly inferior transfers using the cheap estimate.
+          // Every contender (including rounding-close ties) uses the original
+          // full evaluator and the unchanged comparison / tie-breaking rules.
           const metrics = evaluateTerminalOutcomes({
             terminalFactors: input.terminalFactors,
             weightBps: candidate,
           });
           if (!metrics) continue;
           const score = objectiveScore(metrics, input.objective);
-          const nextScore = nextMetrics
-            ? objectiveScore(nextMetrics, input.objective)
-            : Number.NEGATIVE_INFINITY;
           if (
             score > incumbentScore + SCORE_EPSILON &&
             (score > nextScore + SCORE_EPSILON ||
@@ -246,6 +294,59 @@ function searchCandidate(input: {
   }
 
   return Object.freeze(bestWeights);
+}
+
+function estimateTransferScore(input: {
+  terminalFactors: readonly TerminalFactorRow[];
+  incumbentNav: readonly number[];
+  donor: number;
+  receiver: number;
+  stepBps: number;
+  objective: SimulationOwnerOutcomeObjective;
+}) {
+  const transfer = input.stepBps / BASIS_POINT_TOTAL;
+  const returns = new Array<number>(input.terminalFactors.length);
+  let largestMagnitude = 1;
+  for (let path = 0; path < returns.length; path += 1) {
+    const factors = input.terminalFactors[path];
+    const received = transfer * factors[input.receiver];
+    const donated = transfer * factors[input.donor];
+    returns[path] = compensatedSum([input.incumbentNav[path], received, -donated]) - 1;
+    largestMagnitude = Math.max(largestMagnitude, Math.abs(input.incumbentNav[path]) + received + donated);
+    if (!Number.isFinite(returns[path])) return null;
+  }
+  returns.sort((left, right) => left - right);
+  const p10 = type7Quantile(returns, 0.1);
+  const p50 = type7Quantile(returns, 0.5);
+  if (p10 === null || p50 === null) return null;
+  const score = input.objective === "median_growth" ? p50 * 100
+    : input.objective === "downside_floor" ? p10 * 100 : (p50 * 100 + p10 * 100) / 2;
+  // Positive weighted sums, a three-term compensated update and type-7
+  // interpolation have a small rounding envelope. Boundary cases must be
+  // evaluated in full rather than changing the 1e-12 financial score threshold.
+  const roundingAllowance = largestMagnitude * Number.EPSILON * 32 * 100;
+  return Number.isFinite(score) && Number.isFinite(roundingAllowance)
+    ? { score, roundingAllowance } : null;
+}
+
+function validTerminalEvidence(input: {
+  instruments: readonly SimulationOutcomeInstrument[];
+  currentWeights: readonly SimulationOwnerResearchWeight[];
+  terminalFactors: readonly SimulationTerminalGrowthEvidence[];
+}) {
+  const keys = input.instruments.map((row) => row.instrumentKey);
+  const pathIndexes = input.terminalFactors.map((row) => row.pathIndex);
+  return keys.length >= 2 && new Set(keys).size === keys.length &&
+    input.currentWeights.length === keys.length &&
+    input.currentWeights.reduce((sum, row) => sum + row.weightBps, 0) === BASIS_POINT_TOTAL &&
+    input.currentWeights.every((row, index) => {
+      const instrument = input.instruments[index];
+      return instrument && row.instrumentKey === instrument.instrumentKey &&
+        row.market === instrument.market && row.currency === instrument.currency &&
+        row.ticker === instrument.ticker && Number.isInteger(row.weightBps) && row.weightBps >= 0;
+    }) && new Set(pathIndexes).size === pathIndexes.length &&
+    input.terminalFactors.every((row) => Number.isSafeInteger(row.pathIndex) && row.pathIndex >= 0 &&
+      row.factors.length === keys.length && row.factors.every((value) => Number.isFinite(value) && value > 0));
 }
 
 function evaluateTerminalOutcomes(input: {
@@ -457,7 +558,7 @@ function lexicographicCompare(left: readonly number[], right: readonly number[])
 
 function unavailable(
   base: Readonly<{
-    policy: typeof SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY;
+    policy: typeof SIMULATION_OWNER_OUTCOME_SEARCH_POLICY;
   }>,
   reason:
     | "input_shape_mismatch"
