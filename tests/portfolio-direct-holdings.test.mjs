@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   analyzePortfolioDirectHoldings,
@@ -8,6 +11,48 @@ import {
 } from "../src/lib/portfolio-direct-holdings.ts";
 
 describe("portfolio direct holdings baseline", () => {
+  it("shows authorized account names in allocation details and evidence without changing holding identities", async () => {
+    const ringEntries = [];
+    const ports = {
+      "next/link": { default: ({ children, href }) => React.createElement("a", { href }, children) },
+      "@/components/portfolio-primary-navigation": { PortfolioPrimaryNavigation: () => null },
+      "@/components/portfolio-analysis-scope-tabs": { PortfolioAnalysisScopeTabs: () => null },
+      "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children }) => children },
+      "@/components/portfolio/direct-holdings-baseline": { DirectHoldingsBaseline: () => null },
+      "@/components/portfolio/portfolio-fx-shock": { PortfolioFxShock: () => null },
+      "@/components/portfolio/portfolio-structure-risk-analytics": { PortfolioStructureRiskAnalytics: () => null },
+      "@/components/portfolio/special-holdings-coverage": { SpecialHoldingsCoverage: () => null },
+      "./portfolio-allocation-ring": { PortfolioAllocationRing: ({ entries }) => { ringEntries.push(entries); return null; } },
+    };
+    const [view, locale] = await importUiWithPorts([
+      "src/components/portfolio/portfolio-structure-view.tsx",
+      "src/components/i18n/locale-provider.tsx",
+    ], ports);
+    const accountCode = "acct_3ef012345678";
+    const rows = [{ ...holding("Apple", "AAPL", "us", "USD", 350_000, accountCode), currentWeightPct: 100 }];
+    const originalRows = structuredClone(rows);
+    const accountScope = { kind: "account", key: "account:11111111-1111-4111-8111-111111111111", accountId: "11111111-1111-4111-8111-111111111111", accountCode, label: "My first investments" };
+    const data = {
+      analysisScopes: [{ kind: "all", key: "all", label: "All assets" }, accountScope],
+      selectedScope: { kind: "all", key: "all", label: "All assets" },
+      generatedAt: "2026-09-10T07:00:00Z", serviceDate: "2026-09-10",
+      structure: { totalValueKrw: 350_000, includedHoldingCount: 1, groupRows: [], holdingRows: rows,
+        exclusions: [{ ...exclusion("Waiting for price", "MISSING"), account: accountCode }],
+        usdKrwRate: 1340, dataHealth: { missingPriceCount: 1, missingFxCount: 0, unsupportedCurrencyCount: 0 } },
+      targetProjection: { status: "missing" }, targetEffectiveServiceDate: null,
+      riskModel: { calculation: { portfolio: null }, pathAnalytics: { maximumDrawdownPct: { value: null } } },
+    };
+    for (const language of ["ko", "en"]) {
+      const html = renderToStaticMarkup(React.createElement(locale.LocaleProvider, { initialLocale: language }, React.createElement(view.PortfolioStructureView, { data })));
+      const visibleText = html.replace(/<[^>]*>/g, "");
+      assert.equal(visibleText.includes(accountCode), false, "internal account code must not be presented as the account name");
+      assert.ok(visibleText.split(accountScope.label).length >= 5, "selected detail, expanded detail, holding table and exclusion table all use the authorized name");
+      assert.equal(ringEntries.at(-1)[0].key.split("|")[0], accountCode, "visual selection identity still uses the original account code");
+      assert.equal(ringEntries.at(-1)[0].weightPct, 100);
+    }
+    assert.deepEqual(rows, originalRows);
+  });
+
   it("groups exact identities and calculates concentration and currency exposure", () => {
     const model = buildPortfolioDirectHoldingsBaseline({
       selectedAccount: "brokerage",

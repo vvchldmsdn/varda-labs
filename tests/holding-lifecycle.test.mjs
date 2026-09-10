@@ -14,6 +14,7 @@ const writerSource = source("../src/lib/holding-lifecycle-write.ts");
 const actionSource = source("../src/app/portfolio/holdings/actions.ts");
 const componentSource = source("../src/components/holding-lifecycle-forms.tsx");
 const pageSource = source("../src/app/portfolio/holdings/page.tsx");
+const listSource = source("../src/components/holdings-management-list.tsx");
 const schemaSource = source("../src/db/schema.ts");
 const registrySource = source("../src/lib/tenant-writer-registry.ts");
 const migrationSource = source("../drizzle/0036_curvy_iron_monger.sql");
@@ -111,8 +112,13 @@ describe("owner-scoped holding lifecycle", () => {
     assert.match(actionSource, /restoreSessionHolding\(formData\)/);
     assert.match(actionSource, /revalidatePath\(path\)/);
     assert.match(componentSource, /name="archiveConfirmed"/);
-    assert.match(pageSource, /holding\.archivedAt === null/);
-    assert.match(pageSource, /종료된 보유종목/);
+    assert.match(pageSource, /<HoldingsManagementList holdings=\{visibleHoldings\}/);
+    assert.match(listSource, /const active = holdings\.filter\(holding => holding\.archivedAt === null\)/);
+    assert.match(listSource, /const archived = holdings\.filter\(holding => holding\.archivedAt !== null\)/);
+    assert.match(listSource, /active\.map\(holding =>[\s\S]*<HoldingArchiveForm holdingId=\{holding\.holdingId\} updatedAt=\{holding\.updatedAt\}/);
+    assert.match(listSource, /archived\.map\(holding =>[\s\S]*<HoldingRestoreForm holdingId=\{holding\.holdingId\} updatedAt=\{holding\.updatedAt\}/);
+    assert.match(listSource, /ko="종료된 보유종목" en="Closed holdings"/);
+    assert.doesNotMatch(listSource, /"use client"|canonicalOwnerUserId|ownerUserId/);
     assert.doesNotMatch(componentSource, /canonicalOwnerUserId|ownerUserId/);
   });
 

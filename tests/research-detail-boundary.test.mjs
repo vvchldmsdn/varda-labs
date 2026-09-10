@@ -3,6 +3,10 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
 import { researchDetailQuery, RESEARCH_DETAIL_HEADERS } from "../src/lib/research-detail-query.ts";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
+import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "../src/lib/portfolio-analysis-special-holding-authority.ts";
 
 test("detail query preserves duplicate financial and panel values for fail-closed resolvers", () => {
   const query = researchDetailQuery(new URLSearchParams("scope=a&scope=b&view=weights&view=evidence&horizon=126"));
@@ -65,6 +69,50 @@ test("composition uses only one current portfolio and no counterfactual main loa
   const result = await loadInvestmentLabDetail({ panel: "composition", tenantContext: { ownerUserId: "owner-a" }, selectedScope: { key: "account:a" }, scopeCatalog: [] });
   assert.deepEqual(called, ["portfolio", "xray", "stress"]);
   assert.equal(result.adjustment, null);
+});
+
+test("Lab preserves accounts awaiting their first quotes and renders valuation reasons in Korean and English", async () => {
+  const missing = (ticker, currency) => ({ name: ticker, ticker, account: "new-account", market: currency === "USD" ? "us" : "korea", currency, assetType: "stock", reason: "missing_price" });
+  let portfolio = { holdingRows: [], exclusions: [missing("005930", "KRW"), missing("AAPL", "USD")] };
+  const tenantContext = { ownerUserId: "owner-a" };
+  const selectedScope = { key: "account:a", kind: "account", accountCode: "new-account" };
+  const scopeCatalog = [
+    { ...selectedScope, label: "My account" },
+    { key: "account:other", kind: "account", accountCode: "other-account", label: "Other account" },
+  ];
+  const [{ loadInvestmentLabDetail }] = await importWithPorts(["src/db/queries/investment-lab-detail.ts"], {
+    "./portfolio-structure": { getReadOnlyTenantPortfolioStructureForScope: async (input) => { assert.equal(input.tenantContext, tenantContext); assert.equal(input.scope, selectedScope); return portfolio; } },
+    "./investment-lab-etf-xray": { getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio: () => { throw new Error("unrequested analysis"); } },
+    "./investment-lab-stress-replay": { getReadOnlyTenantInvestmentLabStressReplay: () => { throw new Error("unrequested analysis"); } },
+  });
+  const load = () => loadInvestmentLabDetail({ panel: "weights", tenantContext, selectedScope, scopeCatalog });
+  const { adjustment } = await load();
+  assert.deepEqual(adjustment.accounts.map(row => row.account), ["new-account"]);
+  assert.equal(adjustment.accounts[0].label, "My account");
+  assert.equal(adjustment.accounts[0].status, "unavailable");
+  assert.equal(adjustment.accounts[0].excludedHoldingCount, 2);
+  assert.equal(adjustment.accounts[0].exclusionReasonCounts.missingPrice, 2);
+  assert.ok(adjustment.accounts[0].blockers.includes("incomplete_valuation_coverage"));
+  const [{ InvestmentLabSmallAdjustment }, { LocaleProvider }] = await importUiWithPorts([
+    "src/components/investment-lab/investment-lab-small-adjustment.tsx",
+    "src/components/i18n/locale-provider.tsx",
+  ], {});
+  for (const locale of ["ko", "en"]) {
+    const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale: locale }, createElement(InvestmentLabSmallAdjustment, { model: adjustment })));
+    assert.match(html, /data-adjustment-account-count="1"/);
+    assert.match(html, /data-adjustment-ready-accounts="0"/);
+    assert.doesNotMatch(html, /<form|Other account/);
+    assert.match(html, locale === "ko" ? /가격·환율 근거가 없는 보유자산/ : /Some holdings lack price or FX evidence/);
+    if (locale === "en") assert.doesNotMatch(html, /[가-힣]/);
+  }
+  portfolio = { holdingRows: [], exclusions: [] };
+  assert.deepEqual((await load()).adjustment.accounts, [], "a genuinely empty scope must not acquire catalog accounts");
+  const fount = DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.fount;
+  const excludedResearchHolding = { ...missing("", "KRW"), name: fount.assetName, account: fount.account, market: fount.market, currency: fount.currency, assetType: fount.assetType };
+  portfolio = { holdingRows: [], exclusions: [excludedResearchHolding] };
+  assert.deepEqual((await load()).adjustment.accounts, [], "an intentionally excluded research holding must not reintroduce its account");
+  portfolio = { holdingRows: [], exclusions: [missing("AAPL", "USD"), excludedResearchHolding] };
+  assert.deepEqual((await load()).adjustment.accounts.map(row => row.account), ["new-account"]);
 });
 
 test("main routes and workspace entry bundles do not statically import detail calculators", () => {

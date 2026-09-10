@@ -107,7 +107,9 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(source, /Promise\.all/);
     assert.match(source, /holdingReadEvidence\(/);
     assert.match(source, /result\.state === "partial"/);
-    assert.match(source, /must not be used for valuation totals/);
+    assert.match(source, /result\.state === "partial" \? <p[^>]*text-\[var\(--warning\)\]/);
+    assert.match(source, /ko="[^"]*전체 평가액을 합산하지 않습니다\." en="Some incomplete holdings are excluded\. This list is not a complete portfolio valuation\."/);
+    assert.match(source, /<HoldingsManagementList holdings=\{visibleHoldings\}/);
     assert.doesNotMatch(
       source,
       /"use client"|providerSubject|canonicalOwnerUserId|legacyBase44Id/,

@@ -1,6 +1,7 @@
 "use client";
 
 import { ManagementText, ManagementElement } from "@/components/i18n/management-text";
+import { T } from "@/components/i18n/localized-text";
 import { useActionState } from "react";
 
 import { correctHoldingState } from "@/app/portfolio/holdings/actions";
@@ -61,11 +62,11 @@ export function HoldingStateCorrectionForm({
             min="0.0001"
             name="averageCost"
             placeholder="평균 매입가 입력"
-            required
             step="0.0001"
             type="number"
           />
         </label>
+        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가는 선택입니다. 비워 두면 기존 값을 유지하며, 미등록 상태라면 나중에 입력할 수 있습니다." en="Average cost is optional. Leave it blank to keep the saved value, or add it later if it is not recorded yet." /></p>
         <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"정정 사유 (선택)"}</ManagementText><ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}

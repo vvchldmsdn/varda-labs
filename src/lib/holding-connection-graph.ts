@@ -40,6 +40,8 @@ export function buildHoldingConnectionGraph(
     };
   });
   const edges: HoldingConnectionEdge[] = [];
+  let observedPairCount = 0;
+  let variablePairCount = 0;
 
   for (let leftIndex = 0; leftIndex < rows.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < rows.length; rightIndex += 1) {
@@ -47,18 +49,27 @@ export function buildHoldingConnectionGraph(
         rows[leftIndex]?.cells ?? [],
         rows[rightIndex]?.cells ?? [],
       );
-      if (!relationship || Math.abs(relationship.correlation) < 0.18) continue;
+      if (!relationship) continue;
+      observedPairCount += 1;
+      if (relationship.correlation === null) continue;
+      variablePairCount += 1;
+      if (Math.abs(relationship.correlation) < 0.18) continue;
       edges.push({
         key: `${rows[leftIndex]?.holdingId}:${rows[rightIndex]?.holdingId}`,
         leftIndex,
         rightIndex,
-        ...relationship,
+        correlation: relationship.correlation,
+        observations: relationship.observations,
       });
     }
   }
 
   return {
     nodes,
+    emptyReason: edges.length > 0 ? null
+      : observedPairCount === 0 ? "insufficient_personal_history" as const
+      : variablePairCount === 0 ? "insufficient_variation" as const
+      : "no_strong_connection" as const,
     edges: edges
       .toSorted(
         (left, right) => Math.abs(right.correlation) - Math.abs(left.correlation),
@@ -94,7 +105,7 @@ function pairwiseCorrelation(
     rightVariance += rightDelta ** 2;
   }
   const denominator = Math.sqrt(leftVariance * rightVariance);
-  if (!Number.isFinite(denominator) || denominator <= 0) return null;
+  if (!Number.isFinite(denominator) || denominator <= 0) return { correlation: null, observations: pairs.length };
 
   return {
     correlation: Math.max(-1, Math.min(1, covariance / denominator)),

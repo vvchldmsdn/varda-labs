@@ -190,7 +190,6 @@ function MembershipFields({
               />
               <span>
                 <strong className="block text-[var(--ink)]">{account.name}</strong>
-                <span className="text-xs text-[var(--muted)]">{account.code}</span>
               </span>
             </label>
           ))}

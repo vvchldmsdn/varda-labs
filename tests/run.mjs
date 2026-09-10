@@ -1,5 +1,7 @@
 import "./market-calendar.test.mjs";
+import "./management-usability.test.mjs";
 import "./market-collection.test.mjs";
+import "./latest-close-revalidation.test.mjs";
 import "./contribution-market-context.test.mjs";
 import "./contribution-adjustment-ui.test.mjs";
 import "./additional-contribution-cash-reserve.test.mjs";

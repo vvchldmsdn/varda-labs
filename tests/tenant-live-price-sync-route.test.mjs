@@ -10,9 +10,11 @@ const quote = () => ({ ...target, provider: "kis", source: "kis", status: "ok", 
 const fx = () => ({ usdKrw: "1400", status: "ok", fetchedAt: new Date() });
 
 async function fixture(options = {}) {
-  const config = { targets: [target], quotes: [], fx: fx(), authorized: true, configured: true, ...options };
+  const config = { targets: [target], quotes: [], fx: fx(), authorized: true, configured: true, closeFetchedAt: new Date(), ...options };
   const events = [], queued = [], callbacks = [], outcomes = [];
   const pending = new Map();
+  const closeChecks = new Map();
+  let leaseActive = false;
   const tenantContext = { ownerUserId: owner };
   const db = { select() {
     let table;
@@ -25,11 +27,32 @@ async function fixture(options = {}) {
   } };
   const [route] = await importWithPorts(["src/app/api/portfolio/live-prices/sync/route.ts"], {
     "next/server": { NextResponse: { json: (body, init) => Response.json(body, init) }, after: callback => callbacks.push(callback) },
-    "@/db/client": { db },
+    "@/db/client": { db, sqlClient: { query: async (sql, parameters) => {
+      if (sql.startsWith("select")) {
+        events.push("close_evidence");
+        assert.ok(config.targets.some(owned => owned.market === parameters[0] && owned.currency === parameters[1] && owned.ticker === parameters[2]));
+        const check = [...closeChecks.values()].find(value => value.instrumentKey === parameters[5] && value.priceDate === parameters[3] && value.status === "completed");
+        return [{ close_fetched_at: config.closeFetchedAt, completed_at: check?.finishedAt ?? null }];
+      }
+      if (sql.startsWith("insert")) {
+        closeChecks.set(parameters[0], { ...JSON.parse(parameters[3]), status: "running" });
+        return [];
+      }
+      assert.ok(sql.startsWith("update market_data_sync_runs"));
+      const check = closeChecks.get(parameters[0]); assert.ok(check);
+      check.status = sql.includes("status='completed'") ? "completed" : "failed"; check.finishedAt = new Date();
+      return [];
+    } } },
     "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => { events.push("auth"); return config.authorized ? { ok: true, tenantContext } : { ok: false, failure: { httpStatus: 401 } }; } },
     "@/db/queries/tenant-live-price-targets": { getTenantLivePriceTargets: async context => { assert.equal(context, tenantContext); events.push("owner_targets"); return config.targets; } },
     "@/lib/market-data/providers/kis": {
-      getKisProviderPolicy: () => ({ configured: config.configured }), createKisProviderRequestSession: () => ({}), createKisMarketDataProvider: () => ({}),
+      getKisProviderPolicy: () => ({ configured: config.configured }), createKisProviderRequestSession: () => ({}),
+      createKisMarketDataProvider: () => ({ name: "kis", fetchClosePrices: async (targets, context) => {
+        events.push("provider_close");
+        assert.equal(targets.length, 1); assert.deepEqual(targets[0].assetIds, []);
+        assert.ok(config.targets.some(owned => owned.ticker === targets[0].ticker && owned.market === targets[0].market && owned.currency === targets[0].currency));
+        return { provider: "kis", rows: [{ ...targets[0], priceDate: context.priceDate, closePrice: "100", fetchedAt: context.requestedAt, status: config.closeFailure ? "error" : "ok" }] };
+      } }),
       fetchKisUsdKrwFxCandidate: async input => { events.push("provider_fx"); assert.equal(input.target.ticker, "QQQ"); return {}; },
     },
     "@/lib/market-data/collection-queue": {
@@ -40,10 +63,19 @@ async function fixture(options = {}) {
       finishMarketCollection: async (job, outcome) => outcomes.push({ job, outcome }),
       getMarketCollectionSummary: async () => ({ pending: pending.size }),
     },
-    "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async task => { events.push("lease"); return task(); } },
+    "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async task => {
+      if (leaseActive) return task();
+      events.push("lease"); leaseActive = true;
+      try { return await task(); } finally { leaseActive = false; }
+    } },
     "@/lib/market-data/provider-budget": { withKisCollectionDeadline: async task => { events.push("deadline"); return task(); } },
     "@/lib/market-data/price-sync": { runMarketPriceSync: async input => { events.push("provider_live"); assert.equal(input.targetLimit, 1); assert.deepEqual(input.explicitTargets, [config.targets.find(owned => owned.ticker === input.explicitTargets[0]?.ticker)]); return { successCount: config.providerFailure ? 0 : 1, failedCount: config.providerFailure ? 1 : 0 }; } },
     "@/lib/market-data/kis-history-cache-sync": { runKisHistoryCacheSync: async () => { throw new Error("history is not authorized by this route"); } },
+    "@/lib/market-data/asset-price-snapshot-repository": { applyAssetPriceSnapshotRows: async input => {
+      events.push("write_close"); assert.equal(input.rows.length, 1); assert.equal(input.allowWrite, true); assert.equal(input.dryRun, false);
+      config.closeFetchedAt = input.rows[0].fetchedAt;
+      return { failedCount: 0, conflictCount: 0, updatedCount: 1 };
+    } },
     "@/lib/market-data/fx-refresh-job": { runUsdKrwFxCandidateJob: async () => ({ ok: true }) },
   });
   return { route, events, queued, callbacks, outcomes, config, pending,
@@ -95,6 +127,27 @@ describe("tenant live-price enqueue and after boundary", () => {
     await f.drain();
     assert.equal(f.outcomes[0].outcome.code, "cache_fresh");
     assert.equal(f.events.includes("provider_live"), false);
+  });
+
+  it("revalidates a stale shared close only after the queued live update and before marking work complete", async () => {
+    const f = await fixture({ closeFetchedAt: null });
+    assert.equal((await f.route.POST(request())).status, 202);
+    assert.equal(f.events.includes("provider_close"), false);
+    await f.drain();
+    assert.deepEqual(f.events.filter(event => event.startsWith("provider")), ["provider_live", "provider_close"]);
+    assert.ok(f.events.indexOf("write_close") > f.events.indexOf("provider_close"));
+    assert.equal(f.outcomes[0].outcome.ok, true);
+    assert.equal(f.events.filter(event => event === "lease").length, 1);
+  });
+
+  it("does not mark a successful live refresh complete when close revalidation failed", async () => {
+    const f = await fixture({ closeFetchedAt: null, closeFailure: true, fx: null });
+    await f.route.POST(request()); await f.drain();
+    assert.deepEqual(f.events.filter(event => event.startsWith("provider")), ["provider_live", "provider_close"]);
+    assert.equal(f.outcomes.length, 1); assert.equal(f.outcomes[0].outcome.ok, false);
+    assert.ok(f.outcomes[0].outcome.retryAfterSeconds >= 15);
+    assert.equal(f.events.includes("write_close"), false);
+    assert.equal(f.pending.size, 1);
   });
 
   it("polls an authorized owner's cached state without admitting another job or consuming an idle lease", async () => {

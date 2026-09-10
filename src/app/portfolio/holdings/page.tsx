@@ -1,15 +1,10 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import { ManagementText } from "@/components/i18n/management-text";
+import { T } from "@/components/i18n/localized-text";
+import { HoldingsManagementList } from "@/components/holdings-management-list";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
-import { HoldingAnalysisDataForm } from "@/components/holding-analysis-data-form";
-import {
-  HoldingArchiveForm,
-  HoldingRestoreForm,
-} from "@/components/holding-lifecycle-forms";
-import { HoldingStateCorrectionForm } from "@/components/holding-state-correction-form";
-import { ManualKrxGoldPriceForm } from "@/components/manual-krx-gold-price-form";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import {
   getReadOnlyTenantPortfolioAnalysisScopeContext,
@@ -23,8 +18,6 @@ import {
   type TenantHoldingQueryResult,
 } from "@/db/queries/tenant-holdings";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import { isKrxGoldManualAssetCandidate } from "@/lib/market-data/manual-asset-price";
-import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
@@ -75,9 +68,6 @@ export default async function TenantHoldingsPage({
   const activeHoldings = visibleHoldings.filter(
     (holding) => holding.archivedAt === null,
   );
-  const archivedHoldings = visibleHoldings.filter(
-    (holding) => holding.archivedAt !== null,
-  );
   const analysisDataResult =
     tenantResolution.ok && activeHoldings.length > 0
       ? await getReadOnlyTenantHoldingAnalysisDataReadiness({
@@ -101,238 +91,31 @@ export default async function TenantHoldingsPage({
   );
 
   return (
-    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-8 text-[var(--ink)]">
       <SecondaryPageHeader />
-      <section className="mx-auto w-full max-w-5xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-              Owner-scoped holdings
-            </h1>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Stored asset evidence through owned account relationships
-            </p>
+      <section className="mx-auto w-full max-w-5xl">
+        <header className="border-b border-[var(--line)] pb-6">
+          <Link href="/portfolio/manage" className="text-sm text-[var(--muted)]"><T ko="← 관리" en="← Manage" /></Link>
+          <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0"><h1 className="text-2xl font-medium"><T ko="보유 종목" en="Your holdings" /></h1><p className="mt-2 text-sm leading-6 text-[var(--muted)]"><T ko="수량과 매입가를 확인하고 수정하세요. 매입가는 나중에 입력해도 됩니다." en="Review quantities and average costs. You can add missing purchase costs later." /></p></div>
+            <Link href="/portfolio/holdings/new" className="inline-flex min-h-11 items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)]"><T ko="종목 추가" en="Add holding" /></Link>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/portfolio/holdings/new"
-              className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)]"
-            ><ManagementText>{"보유종목 추가"}</ManagementText></Link>
-            <Link
-              href="/portfolio/groups"
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-            ><ManagementText>{"분석 범위"}</ManagementText></Link>
-            <Link
-              href="/portfolio/accounts?account=all"
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-            >
-              Accounts
-            </Link>
-            <Link
-              href="/portfolio/position-snapshots?account=all"
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-            >
-              Position snapshots
-            </Link>
-            <Link
-              href="/portfolio/portfolio-snapshots?account=all"
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-            >
-              Portfolio snapshots
-            </Link>
-            <Link
-              href="/auth/session"
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
-            >
-              Session evidence
-            </Link>
-          </div>
+          <details className="mt-4 text-sm"><summary className="w-fit cursor-pointer py-2 text-[var(--muted)]"><T ko="계좌·관련 기록" en="Accounts & related records" /></summary><nav className="mt-2 flex flex-wrap gap-x-5 gap-y-3 text-sm">
+            <Link href="/portfolio/accounts"><T ko="계좌 관리" en="Accounts" /></Link>
+            <Link href="/portfolio/groups"><T ko="분석 범위" en="Analysis scopes" /></Link>
+            <Link href="/portfolio/position-snapshots?account=all"><T ko="종목별 기록" en="Holding records" /></Link>
+            <Link href="/portfolio/portfolio-snapshots?account=all"><T ko="포트폴리오 기록" en="Portfolio records" /></Link>
+          </nav></details>
+        </header>
+        <div className="my-6 min-w-0">
+          {scopeContext?.state === "ready" ? <PortfolioAnalysisScopeTabs basePath="/portfolio/holdings" scopes={scopeContext.catalog.scopes} selectedScopeKey={selectedScope?.key ?? null} /> : null}
+          <p className="mt-4 text-sm font-medium"><ManagementText>{selectedScope?.label ?? "범위를 확인할 수 없습니다"}</ManagementText></p>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{holdingReadEvidence(result, tenantResolution, scopeContext)}</p>
         </div>
-
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-6">
-          <div>
-            <p className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{"조회 범위"}</ManagementText></p>
-            <p className="mt-1 text-sm font-semibold">
-              <ManagementText>{selectedScope?.label ?? "범위를 확인할 수 없습니다"}</ManagementText>
-            </p>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              {holdingReadEvidence(
-                result,
-                tenantResolution,
-                scopeContext,
-              )}
-            </p>
-          </div>
-          {scopeContext?.state === "ready" ? (
-            <PortfolioAnalysisScopeTabs
-              basePath="/portfolio/holdings"
-              scopes={scopeContext.catalog.scopes}
-              selectedScopeKey={selectedScope?.key ?? null}
-            />
-          ) : null}
-        </div>
-
-        {result?.state === "ready" || result?.state === "partial" ? (
-          <div className="mt-5 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
-            {result.state === "partial" ? (
-              <p className="border-b border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-                This is a partial evidence list. Excluded rows remain visible in
-                the count, and this result must not be used for valuation totals.
-              </p>
-            ) : null}
-            <table className="min-w-[1320px] w-full border-collapse text-left text-sm">
-              <thead className="bg-[var(--wash)] text-xs text-[var(--muted)]">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Holding</th>
-                  <th className="px-4 py-3 font-semibold">Account</th>
-                  <th className="px-4 py-3 font-semibold">Market</th>
-                  <th className="px-4 py-3 text-right font-semibold">
-                    Quantity
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold">
-                    Average cost
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold">
-                    Stored price
-                  </th>
-                  <th className="px-4 py-3 font-semibold">Price evidence</th>
-                  <th className="px-4 py-3 font-semibold"><ManagementText>{"분석 데이터"}</ManagementText></th>
-                  <th className="px-4 py-3 font-semibold">Correction</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--wash)]">
-                {activeHoldings.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-5 text-[var(--muted)]" colSpan={9}><ManagementText>{"이 범위에 현재 보유 중인 종목이 없습니다."}</ManagementText></td>
-                  </tr>
-                ) : (
-                  activeHoldings.map((holding) => (
-                    <tr key={holding.holdingId}>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold">{holding.name}</p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {holding.ticker ?? "No ticker"}
-                          {holding.assetType ? ` / ${holding.assetType}` : ""}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold">{holding.accountName}</p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {holding.accountCode}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        {holding.market} / {holding.currency}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {holding.quantity}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {holding.averageCost === null
-                          ? "Not recorded"
-                          : `${holding.averageCost} ${holding.currency}`}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {holding.currentPrice} {holding.currency}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--muted)]">
-                        <p>{holding.priceStatus ?? "No status"}</p>
-                        <p>{holding.priceSource ?? "No source"}</p>
-                        <p>{formatPriceAsOf(holding.priceAsOf)}</p>
-                        {isKrxGoldManualAssetCandidate(holding) ? (
-                          <ManualKrxGoldPriceForm
-                            key={holding.currentPrice}
-                            currentPrice={holding.currentPrice}
-                          />
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <HoldingAnalysisDataForm
-                          holdingId={holding.holdingId}
-                          readiness={
-                            analysisDataByHolding.get(holding.holdingId) ?? null
-                          }
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <HoldingStateCorrectionForm
-                          averageCost={holding.averageCost}
-                          currency={holding.currency}
-                          holdingId={holding.holdingId}
-                          quantity={holding.quantity}
-                          updatedAt={holding.updatedAt}
-                        />
-                        <HoldingArchiveForm
-                          holdingId={holding.holdingId}
-                          updatedAt={holding.updatedAt}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="mt-5 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
-            Holdings remain closed until the session, owner relationship, and
-            row integrity checks all pass.
-          </p>
-        )}
-
-        {(result?.state === "ready" || result?.state === "partial") &&
-        archivedHoldings.length > 0 ? (
-          <section className="mt-8 border-t border-[var(--line)] pt-6">
-            <div>
-              <h2 className="text-lg font-semibold"><ManagementText>{"종료된 보유종목"}</ManagementText></h2>
-              <p className="mt-1 text-sm text-[var(--muted)]"><ManagementText>{"평가와 분석에서는 제외되며 수량·매입원가·과거 기록은 보존됩니다."}</ManagementText></p>
-            </div>
-            <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
-              <table className="min-w-[820px] w-full border-collapse text-left text-sm">
-                <thead className="bg-[var(--wash)] text-xs text-[var(--muted)]">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Holding</th>
-                    <th className="px-4 py-3 font-semibold">Account</th>
-                    <th className="px-4 py-3 font-semibold"><ManagementText>{"종료 시각"}</ManagementText></th>
-                    <th className="px-4 py-3 text-right font-semibold"><ManagementText>{"수량"}</ManagementText></th>
-                    <th className="px-4 py-3 font-semibold"><ManagementText>{"복원"}</ManagementText></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--wash)]">
-                  {archivedHoldings.map((holding) => (
-                    <tr key={holding.holdingId}>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold">{holding.name}</p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {holding.ticker ?? "No ticker"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold">{holding.accountName}</p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {holding.accountCode}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--muted)]">
-                        {formatPriceAsOf(holding.archivedAt)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {holding.quantity}
-                      </td>
-                      <td className="px-4 py-3">
-                        <HoldingRestoreForm
-                          holdingId={holding.holdingId}
-                          updatedAt={holding.updatedAt}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
+        {result?.state === "ready" || result?.state === "partial" ? <>
+          {result.state === "partial" ? <p className="mb-4 text-sm leading-6 text-[var(--warning)]"><T ko="일부 종목 정보가 불완전해 목록에서 제외했습니다. 이 목록으로 전체 평가액을 합산하지 않습니다." en="Some incomplete holdings are excluded. This list is not a complete portfolio valuation." /></p> : null}
+          <HoldingsManagementList holdings={visibleHoldings} analysisDataByHolding={analysisDataByHolding} />
+        </> : <p className="border-t border-[var(--line)] py-6 text-sm leading-6 text-[var(--warning)]"><T ko="보유종목을 불러오지 못했습니다. 로그인 상태와 선택한 계좌를 확인한 뒤 다시 시도해 주세요." en="Holdings could not be loaded. Check your sign-in and selected account, then try again." /></p>}
       </section>
     </main>
   );
@@ -343,36 +126,10 @@ function holdingReadEvidence(
   tenantResolution: SessionResolverResult,
   scopeContext: TenantPortfolioAnalysisScopeContextResult | null,
 ) {
-  if (!tenantResolution.ok) {
-    return `${sessionResolutionEvidence(tenantResolution)}; product data was not read.`;
-  }
-  if (scopeContext === null || scopeContext.state === "unavailable") {
-    return "Analysis scope read unavailable.";
-  }
-  if (scopeContext.state === "integrity_error") {
-    return "Analysis scope read blocked by catalog integrity checks.";
-  }
-  if (scopeContext.resolution.state === "blocked") {
-    return "Analysis scope input was blocked without falling back to all holdings.";
-  }
-  if (result === null) return "Holdings were not read.";
-  if (result.state === "unavailable") return "Holdings read unavailable.";
-  if (result.state === "integrity_error") return "Holdings read blocked.";
-  const activeCount = result.holdings.filter(
-    (holding) => holding.archivedAt === null,
-  ).length;
+  if (!tenantResolution.ok) return <T ko="로그인 상태를 확인해 주세요." en="Check your sign-in to view holdings." />;
+  if (!scopeContext || scopeContext.state !== "ready" || scopeContext.resolution.state === "blocked") return <T ko="선택한 계좌와 분석 범위를 확인해 주세요." en="Check the selected account and analysis scope." />;
+  if (!result || result.state === "unavailable" || result.state === "integrity_error") return <T ko="보유종목 정보를 확인하지 못했습니다." en="Holding information is unavailable." />;
+  const activeCount = result.holdings.filter(holding => holding.archivedAt === null).length;
   const archivedCount = result.holdings.length - activeCount;
-  const included = `${activeCount} active holding${
-    activeCount === 1 ? "" : "s"
-  }; ${archivedCount} archived`;
-  return result.state === "ready"
-    ? included
-    : `${included}; partial evidence, ${result.excludedHoldingCount} invalid row${
-        result.excludedHoldingCount === 1 ? "" : "s"
-      } excluded`;
-}
-
-function formatPriceAsOf(value: string | null) {
-  if (value === null) return "No timestamp";
-  return value.replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+  return <T ko={`보유 ${activeCount}종목 · 종료 ${archivedCount}종목${result.state === "partial" ? ` · 정보 확인 필요 ${result.excludedHoldingCount}종목` : ""}`} en={`${activeCount} active · ${archivedCount} closed${result.state === "partial" ? ` · ${result.excludedHoldingCount} need review` : ""}`} />;
 }

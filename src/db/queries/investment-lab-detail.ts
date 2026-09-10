@@ -23,7 +23,16 @@ export async function loadInvestmentLabDetail({ panel, tenantContext, selectedSc
     return { panel, xray, stress, adjustment: null, unavailableSections };
   }
   const portfolio = await portfolioPromise;
-  const adjustment = buildInvestmentLabSmallAdjustmentModel(applyInvestmentLabCurrentHoldingScope(portfolio).portfolio, portfolio.holdingRows.map((row) => row.account), new Map(scopeCatalog.flatMap((scope) => scope.kind === "account" ? [[scope.accountCode, scope.label] as const] : [])));
+  const scopedPortfolio = applyInvestmentLabCurrentHoldingScope(portfolio).portfolio;
+  // Missing first quotes still belong to an account. Keep their diagnostics
+  // without expanding beyond the already authorized, research-scoped holdings.
+  const accounts = [...scopedPortfolio.holdingRows, ...scopedPortfolio.exclusions]
+    .map((row) => row.account);
+  const adjustment = buildInvestmentLabSmallAdjustmentModel(
+    scopedPortfolio,
+    accounts,
+    new Map(scopeCatalog.flatMap((scope) => scope.kind === "account" ? [[scope.accountCode, scope.label] as const] : [])),
+  );
   return { panel, xray: null, stress: null, adjustment, unavailableSections };
 }
 export type InvestmentLabDetailData = {

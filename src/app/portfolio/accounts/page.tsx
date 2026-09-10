@@ -1,5 +1,6 @@
 import { localizedMetadata } from "@/lib/i18n/server";
-import { ManagementText } from "@/components/i18n/management-text";
+import { T } from "@/components/i18n/localized-text";
+import type { ReactNode } from "react";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -74,30 +75,28 @@ export default async function AccountManagementPage() {
             <div>
               <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                Account management
+                <T ko="계좌 관리" en="Your accounts" />
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-                Accounts represent custody locations such as a broker or pension
-                account. Use asset groups separately when several accounts should
-                be analyzed together.
+                <T ko="증권·연금 등 실제 보유 계좌를 관리합니다. 여러 계좌를 함께 분석하려면 분석 범위로 묶어 주세요." en="Manage brokerage, pension and other holding accounts. Link them through analysis scopes to view several accounts together." />
               </p>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
-              <NavLink href="/">Dashboard</NavLink>
-              <NavLink href="/portfolio/holdings">Holdings</NavLink>
-              <NavLink href="/portfolio/holdings/new">Add holding</NavLink>
-              <NavLink href="/portfolio/groups">분석 범위</NavLink>
-              <NavLink href="/portfolio/events?account=all">Events</NavLink>
+              <NavLink href="/"><T ko="홈" en="Home" /></NavLink>
+              <NavLink href="/portfolio/holdings"><T ko="보유 종목" en="Holdings" /></NavLink>
+              <NavLink href="/portfolio/holdings/new"><T ko="종목 추가" en="Add holding" /></NavLink>
+              <NavLink href="/portfolio/groups"><T ko="분석 범위" en="Analysis scopes" /></NavLink>
+              <NavLink href="/portfolio/events?account=all"><T ko="거래 기록" en="Transactions" /></NavLink>
             </nav>
           </div>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-            <SummaryCell label="Service date" value={serviceDate} />
+            <SummaryCell label={<T ko="서비스 기준일" en="Service date" />} value={serviceDate} />
             <SummaryCell
-              label="Active accounts"
+              label={<T ko="사용 중인 계좌" en="Active accounts" />}
               value={model.state === "ready" ? String(activeAccounts.length) : "-"}
             />
             <SummaryCell
-              label="Archived accounts"
+              label={<T ko="종료된 계좌" en="Closed accounts" />}
               value={
                 model.state === "ready" ? String(archivedAccounts.length) : "-"
               }
@@ -107,7 +106,7 @@ export default async function AccountManagementPage() {
 
         {model.state !== "ready" ? (
           <section className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
-            Account data is temporarily unavailable. No write was attempted.
+            <T ko="계좌 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." en="Account information is unavailable. Please try again shortly." />
           </section>
         ) : (
           <>
@@ -119,9 +118,9 @@ export default async function AccountManagementPage() {
               className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4"
               id="create-account"
             >
-              <h2 className="text-lg font-semibold">Create an account</h2>
+              <h2 className="text-lg font-semibold"><T ko="새 계좌" en="New account" /></h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                The immutable internal account code is generated on the server.
+                <T ko="알아보기 쉬운 이름을 정해 주세요. 이름은 나중에 바꿀 수 있습니다." en="Choose a name you recognize. You can change it later." />
               </p>
               <div className="mt-4">
                 <AccountCreateForm />
@@ -130,14 +129,14 @@ export default async function AccountManagementPage() {
 
             <section className="space-y-3">
               <div>
-                <h2 className="text-lg font-semibold">Active accounts</h2>
+                <h2 className="text-lg font-semibold"><T ko="사용 중인 계좌" en="Active accounts" /></h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Renaming does not rewrite holdings, snapshots, or event history.
+                  <T ko="계좌 이름을 바꿔도 보유종목과 과거 기록은 그대로 유지됩니다." en="Renaming keeps holdings and historical records intact." />
                 </p>
               </div>
               {activeAccounts.length === 0 ? (
                 <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
-                  Create the first account before adding a holding.
+                  <T ko="첫 계좌를 만든 다음 보유종목을 추가해 주세요." en="Create your first account, then add holdings." />
                 </div>
               ) : (
                 activeAccounts.map((account) => (
@@ -152,9 +151,9 @@ export default async function AccountManagementPage() {
             {archivedAccounts.length > 0 ? (
               <section className="space-y-3 border-t border-[var(--line)] pt-5">
                 <div>
-                  <h2 className="text-lg font-semibold">Archived accounts</h2>
+                  <h2 className="text-lg font-semibold"><T ko="종료된 계좌" en="Closed accounts" /></h2>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Historical evidence remains stored and accounts can be restored.
+                    <T ko="과거 기록은 보존되며 언제든 계좌를 복원할 수 있습니다." en="Historical records are preserved, and you can restore these accounts." />
                   </p>
                 </div>
                 {archivedAccounts.map((account) => (
@@ -172,22 +171,22 @@ export default async function AccountManagementPage() {
   );
 }
 
-function SummaryCell({ label, value }: { label: string; value: string }) {
+function SummaryCell({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <dt className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{label}</ManagementText></dt>
+      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 text-lg font-semibold">{value}</dd>
     </div>
   );
 }
 
-function NavLink({ href, children }: { href: string; children: string }) {
+function NavLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
-      className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
+      className="inline-flex min-h-11 items-center rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
       href={href}
     >
-      <ManagementText>{children}</ManagementText>
+      {children}
     </Link>
   );
 }
