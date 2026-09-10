@@ -21,13 +21,14 @@ describe("portfolio dashboard movement baseline", () => {
 
     assert.equal(result.storageSnapshotDate, "2026-08-24");
     assert.equal(result.baselineReferenceDate, "2026-08-23");
+    assert.equal(result.isCurrent, true);
     assert.deepEqual(
       result.rows.map((row) => row.id),
       ["current-a", "current-b"],
     );
   });
 
-  it("falls back exactly one logical day when the current cycle is delayed", () => {
+  it("retains one older logical day as context while marking the current cycle delayed", () => {
     const result = selectLatestPortfolioDashboardBaselineRows(
       [
         { id: "older", snapshotDate: "2026-08-22" },
@@ -38,6 +39,7 @@ describe("portfolio dashboard movement baseline", () => {
 
     assert.equal(result.storageSnapshotDate, "2026-08-23");
     assert.equal(result.baselineReferenceDate, "2026-08-22");
+    assert.equal(result.isCurrent, false);
     assert.deepEqual(result.rows.map((row) => row.id), ["previous"]);
   });
 
@@ -52,6 +54,7 @@ describe("portfolio dashboard movement baseline", () => {
 
     assert.equal(result.storageSnapshotDate, null);
     assert.equal(result.baselineReferenceDate, null);
+    assert.equal(result.isCurrent, false);
     assert.deepEqual(result.rows, []);
   });
 
@@ -94,7 +97,7 @@ describe("portfolio dashboard movement baseline", () => {
       dashboardSource,
       /const movementBaselineDate = baselineReferenceDate/,
     );
-    assert.match(dashboardSource, /baselineDate: movementBaselineDate/);
-    assert.match(dashboardSource, /referenceDate: movementBaselineDate/);
+    assert.match(dashboardSource, /baselineDate: activeMovementBaselineDate/);
+    assert.match(dashboardSource, /referenceDate: activeMovementBaselineDate/);
   });
 });

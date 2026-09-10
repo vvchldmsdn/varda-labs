@@ -27,17 +27,19 @@ describe("snapshot purchase cost evidence", () => {
   it("writes actual valuation but null cost and PnL for an unknown-cost position, account, and all-account snapshot", async () => {
     const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const now = new Date("2026-09-09T00:00:00.000Z");
+    const cutoffObservation = new Date("2026-09-08T21:59:59.000Z");
     const holdings = [null, "80"].map((averageCost, index) => ({
       ...base, averageCost, id: `asset-${index}`, canonicalOwnerUserId: owner, legacyBase44Id: null,
       name: `Asset ${index}`, ticker: index === 0 ? "005930" : "000660", market: "korea", assetType: "stock", category: null,
       account: `acct${index}`, accountId: `account-${index}`, currentPrice: "100", groupId: null, targetWeight: null, maAssetClass: null,
+      createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z",
     }));
     const rowsByTable = {
       accounts: holdings.map((row) => ({ id: row.accountId, canonicalOwnerUserId: owner, code: row.account, name: row.account, accountType: "investment", currency: "KRW", isActive: true })),
       assets: holdings,
-      fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1500", source: "test", status: "ok" }],
+      fx_rates: [{ rateDate: "2026-09-08", usdKrw: "1500", source: "test", status: "ok", isSample: false, fetchedAt: cutoffObservation }],
       asset_price_snapshots: holdings.map((row) => ({ ...row, priceDate: "2026-09-08", closePrice: "105", isSample: false, source: "kis", fetchedAt: now })),
-      live_price_quotes: holdings.map((row) => ({ ticker: row.ticker, market: row.market, currency: row.currency, price: "110", source: "kis", provider: "kis", quoteType: "live", status: "ok", fetchedAt: now, priceAsOf: now })),
+      live_price_quotes: holdings.map((row) => ({ ticker: row.ticker, market: row.market, currency: row.currency, price: "110", source: "kis", provider: "kis", quoteType: "live", status: "ok", fetchedAt: cutoffObservation, priceAsOf: cutoffObservation })),
     };
     const writes = [];
     const selection = () => {

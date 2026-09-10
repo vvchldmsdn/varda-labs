@@ -52,6 +52,7 @@ export function TodayMovement({
   detailQuery?: TodayHoldingDetailQuery;
 }) {
   const movement = data.todayMovement;
+  const baselineIsDelayed = movement.reason === "stale_baseline_snapshot";
   const attribution = buildTodayMovementAttribution(movement);
   const detail = selectTodayHoldingDetail(data, detailQuery);
   const holdingById = new Map(
@@ -135,7 +136,8 @@ export function TodayMovement({
           {!movement.ready ? (
             <div className={`${styles.stageNote} ${styles.stageWarning} text-[var(--warning)]`}>
               <p className="text-sm font-medium">{<T ko={reasonLabel(movement.reason)} en={translateHomeHistory(reasonLabel(movement.reason))}/>}</p>
-              <p className="mt-2 text-xs leading-5"><T ko="현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다." en="Values are not estimated until current prices can be matched to the baseline snapshot."/></p>
+              <p className="mt-2 text-xs leading-5"><T ko={baselineIsDelayed ? "새 기준 기록이 준비되면 오늘 변동이 계산됩니다. 현재 평가액은 최신 시세로 표시합니다." : "현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다."} en={baselineIsDelayed ? "Today's change will appear when the new baseline is ready. Current value still uses the latest prices." : "Values are not estimated until current prices can be matched to the baseline snapshot."}/></p>
+              {baselineIsDelayed ? <p><T ko="마지막 기준일" en="Last baseline"/> {formatDate(data.movementBaselineDate)}</p> : null}
             </div>
           ) : (
             <div className={styles.stageNote}>
@@ -544,6 +546,7 @@ function reasonLabel(reason: string | null) {
   if (!reason) return "오늘 변동 계산 근거를 준비하고 있습니다.";
   const labels: Record<string, string> = {
     missing_baseline_snapshot: "비교할 기준 스냅샷이 없습니다.",
+    stale_baseline_snapshot: "07:00 KST 기준 기록 준비 중",
     missing_fresh_live_prices: "현재 가격 근거가 부족합니다.",
     manual_valuation_not_updated_in_cycle:
       "이번 주기에 수동 평가 종목이 갱신되지 않았습니다.",

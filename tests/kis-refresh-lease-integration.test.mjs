@@ -10,7 +10,7 @@ function deferred() {
   return { promise, resolve };
 }
 let database;
-async function fixture() {
+async function fixture({ delay } = {}) {
   const pg = database ??= new PGlite();
   await pg.exec("drop schema public cascade; create schema public;" + DDL);
   const batches = [];
@@ -37,7 +37,10 @@ async function fixture() {
   } };
   const [lease, sync] = await importWithPorts([
     "src/lib/market-data/kis-refresh-lease.ts", "src/lib/market-data/price-sync.ts",
-  ], { "@/db/client": { db: drizzle(pg), sqlClient } });
+  ], {
+    "@/db/client": { db: drizzle(pg), sqlClient },
+    ...(delay ? { "node:timers/promises": { setTimeout: delay } } : {}),
+  });
   return { pg, batches, lease, started,
     pauseProvider() { providerGate = deferred(); return providerGate; },
     providerCalls() { return providerCalls; },
@@ -138,6 +141,42 @@ describe("KIS refresh and queued-worker lease integration", () => {
     gate.resolve();
     await assert.rejects(orphan, error => error.statusCode === 429);
     assert.equal(f.providerCalls(), 0);
+  });
+
+  it("waits for an active collection and claims immediately after it finishes", async () => {
+    let waits = 0;
+    const f = await fixture({ delay: async milliseconds => {
+      assert.ok(milliseconds <= 2_000);
+      waits++;
+      await f.pg.exec("update market_data_sync_runs set status='completed', finished_at=clock_timestamp() where status='running'");
+    } });
+    await f.pg.exec("insert into market_data_sync_runs(id,job_type,status,started_at,source) values(gen_random_uuid(),'kis_provider_lease','running',clock_timestamp(),'kis')");
+    await f.lease.withKisCollectionLeaseWait(() => f.run());
+    assert.equal(waits, 1);
+    assert.equal(f.providerCalls(), 1);
+    assert.equal(f.batches.length, 2);
+    assert.ok(f.batches.every(commands => commands[3].params[1] === 0));
+  });
+
+  it("stops waiting after 60 seconds without executing a conflicting task", async t => {
+    let clock = Date.now(), waited = 0;
+    t.mock.method(Date, "now", () => clock);
+    const f = await fixture({ delay: async milliseconds => { clock += milliseconds; waited += milliseconds; } });
+    await f.pg.exec("insert into market_data_sync_runs(id,job_type,status,started_at,source) values(gen_random_uuid(),'kis_provider_lease','running',clock_timestamp(),'kis')");
+    await assert.rejects(f.lease.withKisCollectionLeaseWait(() => f.run()), error => error instanceof f.lease.KisRefreshLeaseBusyError);
+    assert.equal(waited, 60_000);
+    assert.equal(f.providerCalls(), 0);
+  });
+
+  it("does not replay an entered task that throws a lease error", async () => {
+    const f = await fixture({ delay: async () => { assert.fail("must not wait after work starts"); } });
+    let calls = 0;
+    await assert.rejects(f.lease.withKisCollectionLeaseWait(async () => {
+      calls++;
+      throw new f.lease.KisRefreshLeaseBusyError(1);
+    }), error => error instanceof f.lease.KisRefreshLeaseBusyError);
+    assert.equal(calls, 1);
+    assert.equal(f.batches.length, 1);
   });
 });
 

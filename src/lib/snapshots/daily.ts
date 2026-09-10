@@ -6,11 +6,14 @@ import {
   desc,
   eq,
   getTableColumns,
+  gt,
   inArray,
   isNull,
   lt,
   lte,
   ne,
+  or,
+  sql,
 } from "drizzle-orm";
 
 import { db } from "@/db/client";
@@ -61,6 +64,8 @@ import {
   uniqueStrings,
 } from "@/lib/portfolio-math";
 import { snapshotPositionCostBasisKrw, summarizeSnapshotCostEvidence } from "@/lib/snapshots/cost-evidence";
+import { selectSnapshotCutoffFx } from "@/lib/snapshots/cutoff-fx";
+import { eventsChangedAfterCutoff, holdingsChangedAfterCutoff } from "@/lib/snapshots/cutoff-holdings";
 import {
   buildCycleForSnapshotDate,
   closeCalendarReferenceDateForAsset,
@@ -82,7 +87,8 @@ import {
 import { isSnapshotInvestmentAssetType } from "@/lib/snapshots/investment-eligibility";
 import {
   SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS,
-  selectSnapshotCutoffQuote,
+  isSnapshotCutoffOfficialClose,
+  selectSnapshotCutoffValuation,
 } from "@/lib/snapshots/cutoff-valuation";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -178,7 +184,7 @@ type FreshCloseSummary = {
 };
 
 type CutoffValuationSummary = {
-  policy: "fresh_kis_live_quote_else_official_close";
+  policy: "pre_cutoff_kis_quote_else_exact_official_close";
   maxQuoteAgeMinutes: number;
   requiredCount: number;
   observedCount: number;
@@ -507,15 +513,26 @@ export async function runDailySnapshot(
         eq(accounts.canonicalOwnerUserId, ownerUserId),
         eq(accounts.isActive, true),
         ne(accounts.accountType, "cash"),
-        isNull(assets.archivedAt),
+        or(isNull(assets.archivedAt), gt(assets.archivedAt, cycle.cycleEndAt)),
       ),
     )
     .orderBy(accounts.code, assets.name);
   const investmentAssetRows = allAssetRows.filter((asset) =>
     isSnapshotInvestmentAssetType(asset.assetType),
   );
+  const changedAfterCutoff = provenance.insertOnly ? []
+    : holdingsChangedAfterCutoff(investmentAssetRows.filter((asset) =>
+      requestedAccount === ALL_SNAPSHOT_ACCOUNTS || asset.account === requestedAccount,
+    ), cycle.cycleEndAt);
+  if (changedAfterCutoff.length > 0) {
+    throw new DailySnapshotRequestError(
+      "holdings_changed_after_cutoff",
+      "Holdings changed after the cutoff; their earlier quantities and costs cannot be assumed",
+      { snapshotDate, assetIds: changedAfterCutoff }, 409,
+    );
+  }
   const openInvestmentAssets = investmentAssetRows.filter((asset) =>
-    isOpenInvestmentAsset(asset),
+    !asset.archivedAt && isOpenInvestmentAsset(asset),
   );
   const targetResolution = resolveSnapshotAccountTargets({
     activeAccountCodes: context.activeAccountCodes,
@@ -536,11 +553,23 @@ export async function runDailySnapshot(
   const selectedAssets = openInvestmentAssets.filter((asset) =>
     targetAccounts.includes(asset.account),
   );
-  const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate);
+  const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate,
+    provenance.insertOnly ? null : cycle.cycleEndAt);
   const unsupportedCurrencyAssets = selectedAssets.filter(
     (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
   );
   const eventRows = await loadEventRows(snapshotDate, ownerUserId);
+  const changedEventsAfterCutoff = provenance.insertOnly ? []
+    : eventsChangedAfterCutoff(eventRows.filter((event) =>
+      event.account !== null && targetAccounts.includes(event.account),
+    ), cycle.cycleEndAt);
+  if (changedEventsAfterCutoff.length > 0) {
+    throw new DailySnapshotRequestError(
+      "event_changed_after_cutoff",
+      "Portfolio events changed after the cutoff; their earlier state cannot be assumed",
+      { snapshotDate, eventIds: changedEventsAfterCutoff }, 409,
+    );
+  }
   const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw, {
     asOfDate: snapshotDate,
   });
@@ -556,6 +585,7 @@ export async function runDailySnapshot(
     ownerUserId,
     manualValuation: provenance.manualValuation,
     capturedAt: cycle.capturedAt,
+    cycleEndAt: cycle.cycleEndAt,
     useCutoffValuation: !provenance.insertOnly,
   });
   const freshClose = summarizeFreshClose(selectedAssets, closeContext, snapshotDate);
@@ -563,6 +593,7 @@ export async function runDailySnapshot(
     selectedAssets,
     closeContext,
     required: !provenance.insertOnly,
+    cycleEndAt: cycle.cycleEndAt,
   });
   const closeSyncPlan = buildCloseSyncPlan({
     snapshotDate,
@@ -588,8 +619,8 @@ export async function runDailySnapshot(
 
   if (!dryRun && cutoffValuation.missing.length > 0) {
     throw new DailySnapshotRequestError(
-      "missing_fresh_cutoff_quotes",
-      "Fresh KIS cutoff quotes are required before writing the current daily snapshot",
+      "missing_cutoff_price_evidence",
+      "A pre-cutoff KIS quote or the exact official close is required before writing the current daily snapshot",
       { snapshotDate, missingCutoffAssets: cutoffValuation.missing },
       409,
     );
@@ -1611,20 +1642,28 @@ function buildRealizedReturnRunSummary(
 async function resolveSnapshotFx(
   snapshotDate: string,
   fxAsOfDate = snapshotDate,
+  cutoffAt: Date | null = null,
 ): Promise<ResolvedFxRate> {
-  const [row] = await db
+  const rows = await db
     .select()
     .from(fxRates)
-    .where(lte(fxRates.rateDate, fxAsOfDate))
-    .orderBy(desc(fxRates.rateDate))
+    .where(and(
+      lte(fxRates.rateDate, fxAsOfDate),
+      eq(fxRates.isSample, false),
+      eq(sql<string>`lower(trim(${fxRates.status}))`, "ok"),
+      sql`${fxRates.usdKrw} > 0 and ${fxRates.usdKrw} < 'Infinity'::numeric`,
+      cutoffAt ? lte(fxRates.fetchedAt, cutoffAt) : undefined,
+    ))
+    .orderBy(desc(fxRates.rateDate), desc(fxRates.fetchedAt), desc(fxRates.createdAt))
     .limit(1);
+  const row = selectSnapshotCutoffFx(rows, fxAsOfDate, cutoffAt);
 
   const usdKrw = toNumber(row?.usdKrw);
   if (!row || usdKrw === null || usdKrw <= 0) {
     throw new DailySnapshotRequestError(
       "missing_fx_rate",
       "A USD/KRW FX rate is required before writing a daily snapshot",
-      { snapshotDate, fxAsOfDate },
+      { snapshotDate, fxAsOfDate, cutoffAt: cutoffAt?.toISOString() ?? null },
       409,
     );
   }
@@ -1656,6 +1695,7 @@ async function buildCloseContext({
   ownerUserId,
   manualValuation,
   capturedAt,
+  cycleEndAt,
   useCutoffValuation,
 }: {
   snapshotDate: string;
@@ -1663,6 +1703,7 @@ async function buildCloseContext({
   ownerUserId: string;
   manualValuation: SnapshotWritePolicySummary["manualValuation"];
   capturedAt: Date;
+  cycleEndAt: Date;
   useCutoffValuation: boolean;
 }): Promise<CloseContext> {
   const instruments = targetAssets.map(({ market, currency, ticker }) => ({
@@ -1675,7 +1716,10 @@ async function buildCloseContext({
       ? await db
           .select()
           .from(assetPriceSnapshots)
-          .where(assetPriceSnapshotInstrumentCondition(instruments))
+          .where(and(
+            assetPriceSnapshotInstrumentCondition(instruments),
+            eq(assetPriceSnapshots.isSample, false),
+          ))
           .orderBy(desc(assetPriceSnapshots.priceDate))
           .limit(Math.max(400, instruments.length * 40))
       : [];
@@ -1695,7 +1739,7 @@ async function buildCloseContext({
               eq(livePriceQuotes.provider, "kis"),
               eq(livePriceQuotes.status, "ok"),
               inArray(livePriceQuotes.ticker, liveTickers),
-              lte(livePriceQuotes.fetchedAt, capturedAt),
+              lte(livePriceQuotes.fetchedAt, cycleEndAt),
             ),
           )
           .orderBy(desc(livePriceQuotes.fetchedAt))
@@ -1742,12 +1786,17 @@ async function buildCloseContext({
         );
     selectedByAssetId.set(asset.id, closeSelection);
 
-    const cutoffQuote = useCutoffValuation
-      ? selectSnapshotCutoffQuote({
+    const cutoffValuation = useCutoffValuation
+      ? selectSnapshotCutoffValuation({
           instrument: asset,
           rows: liveRows,
           capturedAt,
+          cycleEndAt,
+          officialClose: closeSelection,
         })
+      : null;
+    const cutoffQuote = cutoffValuation?.basis === "cutoff_live"
+      ? cutoffValuation.quote
       : null;
     valuationByAssetId.set(
       asset.id,
@@ -1762,7 +1811,9 @@ async function buildCloseContext({
             basis: "cutoff_live",
             fromCloseSnapshot: false,
           }
-        : closeSelection,
+        : cutoffValuation?.basis === "close"
+          ? cutoffValuation.close
+          : closeSelection,
     );
   }
 
@@ -1780,10 +1831,12 @@ function summarizeCutoffValuation({
   selectedAssets,
   closeContext,
   required,
+  cycleEndAt,
 }: {
   selectedAssets: AssetRow[];
   closeContext: CloseContext;
   required: boolean;
+  cycleEndAt: Date;
 }): CutoffValuationSummary {
   const requiredAssets = required
     ? selectedAssets.filter((asset) => normalizeTicker(asset.ticker))
@@ -1793,7 +1846,13 @@ function summarizeCutoffValuation({
   ).length;
   const missing = requiredAssets
     .filter(
-      (asset) => closeContext.valuationByAssetId.get(asset.id)?.basis !== "cutoff_live",
+      (asset) => {
+        const selected = closeContext.valuationByAssetId.get(asset.id);
+        return !selected || (
+          selected.basis !== "cutoff_live" &&
+          !isSnapshotCutoffOfficialClose(selected, cycleEndAt)
+        );
+      },
     )
     .map((asset) => ({
       assetId: asset.id,
@@ -1805,7 +1864,7 @@ function summarizeCutoffValuation({
     }));
 
   return {
-    policy: "fresh_kis_live_quote_else_official_close",
+    policy: "pre_cutoff_kis_quote_else_exact_official_close",
     maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60_000,
     requiredCount: requiredAssets.length,
     observedCount,
@@ -2582,7 +2641,7 @@ function selectOfficialCloseForAsset(
 function portfolioValuationBasis(provenance: SnapshotProvenance) {
   return provenance.insertOnly
     ? "historical_close_or_manual_carry"
-    : "cutoff_observed_price";
+    : "pre_cutoff_quote_or_exact_official_close";
 }
 
 function assetValueKrw(asset: AssetRow, price: number, fxRate: number) {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { sqlClient } from "@/db/client";
 
 // Longer than the longest deployed market job (300 seconds); a terminated
@@ -32,6 +33,27 @@ export async function withKisRefreshLease<T>(task: () => Promise<T>): Promise<T>
  * They retain mutual exclusion but need no whole-job 90-second idle period. */
 export async function withKisCollectionLease<T>(task: () => Promise<T>): Promise<T> {
   return withLease(task, 0);
+}
+
+/** The daily scheduler has no automatic retry. Give an active collection a
+ * short chance to finish, without relaxing mutual exclusion or HTTP budgets. */
+export async function withKisCollectionLeaseWait<T>(task: () => Promise<T>): Promise<T> {
+  const deadline = Date.now() + 60_000;
+  while (true) {
+    let started = false;
+    try {
+      return await withKisCollectionLease(async () => {
+        started = true;
+        return task();
+      });
+    } catch (error) {
+      // Never replay writes when the task itself throws a lease error.
+      if (started || !(error instanceof KisRefreshLeaseBusyError)) throw error;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw error;
+      await delay(Math.min(2_000, remaining, error.retryAfterSeconds * 1_000));
+    }
+  }
 }
 
 async function withLease<T>(task: () => Promise<T>, cooldownSeconds: number): Promise<T> {

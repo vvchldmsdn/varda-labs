@@ -64,6 +64,7 @@ export const homeHistoryMessages: Readonly<Record<string, string>> = {
   "오늘 변동 근거 확인 중": "Checking today's change data",
   "현재가 근거 부족": "Current price unavailable",
   "기준 스냅샷 부족": "Baseline snapshot unavailable",
+  "07:00 KST 기준 기록 준비 중": "Awaiting the 07:00 KST baseline",
   "변동 근거 확인 중": "Checking change data",
   "전체 자산": "All assets",
   "오늘의 움직임": "What moved today",
