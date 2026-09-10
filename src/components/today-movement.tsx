@@ -16,6 +16,7 @@ import {
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
+import { MethodDetails } from "@/components/explanations/method-details";
 import {
   TodayContributionExplorer,
   type TodayContributionDisplayRow,
@@ -179,6 +180,7 @@ export function TodayMovement({
           <footer className={styles.stageFooter}>
           <div className={styles.stageLaunchers}>
           <PresentationDialog label="변동 구성·계산 근거" labelEn={"Breakdown and calculation"} title="오늘 변동의 구성과 근거" titleEn={"Today's change breakdown"} description="가격·환율·순매매를 실제 기준 가격과 현재 가격으로 비교합니다." descriptionEn={"Compare price, FX and net trades using actual baseline and current prices."} wide>
+          <MethodDetails topic="movement" />
           <div className={styles.detailStack}>
           <LocalizedElement as="section" en={{"aria-label": "Value breakdown"}} aria-label="평가액 구성">
             <MovementBridge
