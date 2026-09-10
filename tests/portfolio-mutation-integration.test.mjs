@@ -227,6 +227,11 @@ describe("portfolio lifecycle mutation integration", () => {
       const outcomes = await Promise.all([f.accounts.createSessionAccount(form({ name: "Second" })), f.accounts.createSessionAccount(form({ name: "Second" }))]);
       assert.deepEqual(outcomes.map((row) => row.status).sort(), ["conflict", "success"]);
       assert.equal(await f.count("accounts"), 2);
+      const created = outcomes.find(row => row.status === "success");
+      const saved = (await f.pg.query("select id, canonical_owner_user_id from accounts where name = 'Second'")).rows[0];
+      assert.equal(created.createdAccountId, saved.id, "the continuation link targets the account actually created");
+      assert.equal(saved.canonical_owner_user_id, owner);
+      assert.equal(outcomes.find(row => row.status === "conflict").createdAccountId, undefined);
     } finally { await f.pg.exec("discard all"); }
   });
 

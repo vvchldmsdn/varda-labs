@@ -16,6 +16,7 @@ export type AccountManagementActionState = Readonly<{
     | "conflict"
     | "error";
   message: string | null;
+  createdAccountId?: string;
 }>;
 
 export type AccountCreateInput = Readonly<{

@@ -107,9 +107,10 @@ function elements(tree) {
   return [tree, ...elements(tree.props?.children)];
 }
 
-async function batchFormFixture(locale, outcomes, { collectionState = null } = {}) {
+async function batchFormFixture(locale, outcomes, { collectionState = null, initialAccountId, accounts = [{ id: accountId, name: "QA", accountType: "securities", code: "qa" }] } = {}) {
   const state = [];
   const submissions = [];
+  const submittedAccountIds = [];
   let stateIndex = 0, actionState = idle, action;
   const InstrumentSearch = () => null;
   const [component] = await importUiWithPorts(["src/components/holding-onboarding-form.tsx"], {
@@ -133,17 +134,18 @@ async function batchFormFixture(locale, outcomes, { collectionState = null } = {
     "@/app/portfolio/holdings/new/actions": { createHoldingBatch: async (_previous, data) => {
       const rows = JSON.parse(data.get("holdings"));
       submissions.push(rows);
+      submittedAccountIds.push(data.get("accountId"));
       return outcomes[submissions.length - 1](rows);
     } },
   });
   function render() {
     stateIndex = 0;
-    return elements(component.HoldingOnboardingForm({ options: {
-      state: "ready", accounts: [{ id: accountId, name: "QA", accountType: "securities", code: "qa" }], portfolioGroups: [],
+    return elements(component.HoldingOnboardingForm({ initialAccountId, options: {
+      state: "ready", accounts, portfolioGroups: [],
     } }));
   }
   return {
-    render, submissions,
+    render, submissions, submittedAccountIds,
     add(ticker) {
       render().find(node => node.type === InstrumentSearch).props.onSelect({ id: "", ticker, name: ticker, market: "us", currency: "USD", assetType: "stock" });
       const quantity = render().find(node => node.props?.className === "varda-onboarding-quantity");
@@ -162,6 +164,42 @@ const waitingPrice = { status: "price_unavailable", message: "Price lookup queue
 const partialNotice = nodes => nodes.find(node => node.props?.role === "status" && node.props.className === "varda-onboarding-hint")?.props.children;
 
 describe("holding batch completion notices", () => {
+  it("keeps the submitted second account through action resets, partial retries and completion", async () => {
+    const secondId = "33333333-3333-4333-8333-333333333333";
+    const h = await batchFormFixture("en", [
+      rows => ({ status: "partial", results: [{ key: rows[0].key, result: success }, { key: rows[1].key, result: waitingPrice }] }),
+      rows => ({ status: "complete", results: rows.map(row => ({ key: row.key, result: success })) }),
+    ], { accounts: [{ id: accountId, name: "First" }, { id: secondId, name: "Second" }] });
+    h.render().find(node => node.props?.["aria-label"] === "Holding account").props.onChange({ target: { value: secondId } });
+    h.add("MSFT"); h.add("VOO");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await h.submit();
+      const nodes = h.render();
+      const resetEvent = new Event("reset", { cancelable: true });
+      nodes.find(node => node.type === "form").props.onReset?.(resetEvent);
+      assert.equal(resetEvent.defaultPrevented, true, "the browser must not reset the selected account to its first option");
+      const select = nodes.find(node => node.props?.["aria-label"] === "Holding account");
+      assert.equal(select.props.value, secondId);
+      assert.equal(select.props.disabled, true);
+    }
+    assert.deepEqual(h.submittedAccountIds, [secondId, secondId]);
+    assert.deepEqual(h.submissions.map(rows => rows.map(row => row.ticker)), [["MSFT", "VOO"], ["VOO"]]);
+  });
+
+  it("uses the resolved account for selection and submission and requires a choice for an invalid hint", async () => {
+    const secondId = "33333333-3333-4333-8333-333333333333";
+    const accounts = [{ id: accountId, name: "First" }, { id: secondId, name: "Second" }];
+    for (const [initialAccountId, expected] of [[undefined, accountId], [secondId, secondId], ["", ""]]) {
+      const h = await batchFormFixture("en", [], { accounts, initialAccountId });
+      h.add("MSFT");
+      const nodes = h.render();
+      assert.equal(nodes.find(node => node.props?.["aria-label"] === "Holding account").props.value, expected);
+      assert.equal(nodes.find(node => node.props?.name === "accountId").props.value, expected);
+      assert.equal(nodes.find(node => node.props?.type === "submit").props.disabled, expected === "");
+      if (!expected) assert.ok(nodes.some(node => node.type === "option" && node.props.value === ""));
+    }
+  });
+
   for (const locale of ["ko", "en"]) {
     it(`${locale}: keeps a quote-only request unsaved and does not claim that holdings were saved`, async () => {
       const h = await batchFormFixture(locale, [rows => ({ status: "partial", results: [{ key: rows[0].key, result: waitingPrice }] })]);
