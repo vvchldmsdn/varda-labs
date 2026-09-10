@@ -95,18 +95,19 @@ export function summarizeHistoryRange(
   }
 
   const changeKrw = last.valueKrw - first.valueKrw;
+  const hasComparison = points.length >= 2;
   return Object.freeze({
     startDate: first.date,
     endDate: last.date,
     startValueKrw: first.valueKrw,
     endValueKrw: last.valueKrw,
-    changeKrw,
+    changeKrw: hasComparison ? changeKrw : null,
     changePct:
-      first.valueKrw === 0 ? null : (changeKrw / first.valueKrw) * 100,
+      !hasComparison || first.valueKrw === 0 ? null : (changeKrw / first.valueKrw) * 100,
     peakValueKrw: peak.valueKrw,
     peakDate: peak.date,
-    maxDrawdownPct,
-    maxDrawdownDate,
+    maxDrawdownPct: hasComparison ? maxDrawdownPct : null,
+    maxDrawdownDate: hasComparison ? maxDrawdownDate : null,
     pointCount: points.length,
   });
 }

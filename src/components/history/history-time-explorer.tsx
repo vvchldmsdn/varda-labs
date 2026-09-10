@@ -148,8 +148,8 @@ export function HistoryTimeExplorer({
           <PresentationDialog mountOnOpen label="기간 요약·근거" labelEn={"Period summary and sources"} title="히스토리 계산 근거" titleEn={"History calculation sources"} description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." descriptionEn={"Review changes over the selected period and the records behind each date."} wide>
             <dl className={styles.overview}>
               <div><dt className={styles.label}><T ko="저장 수익률" en="Recorded return"/></dt><dd className={`${styles.value} ${tone(inspectedPoint?.totalReturnPct ?? null)}`}>{<T ko={formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </dd><dd className={styles.note}><T ko="손익" en="Gain/loss"/> {<T ko={formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null))}/>}</dd></div>
-              <div><dt className={styles.label}><T ko="기간 평가액 변화" en="Period value change"/></dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{<T ko={formatSignedKrw(rangeSummary.changeKrw)} en={translateHomeHistory(formatSignedKrw(rangeSummary.changeKrw))}/>}</dd><dd className={styles.note}><T ko="현금흐름 미보정" en="Not adjusted for cash flows"/></dd></div>
-              <div><dt className={styles.label}><T ko="기간 최대 낙폭" en="Period maximum drawdown"/></dt><dd className={`${styles.value} ${tone(rangeSummary.maxDrawdownPct)}`}>{<T ko={formatSignedPercent(rangeSummary.maxDrawdownPct)} en={translateHomeHistory(formatSignedPercent(rangeSummary.maxDrawdownPct))}/>} </dd><dd className={styles.note}>{<T ko={formatDate(rangeSummary.maxDrawdownDate)} en={translateHomeHistory(formatDate(rangeSummary.maxDrawdownDate))}/>}</dd></div>
+              <div><dt className={styles.label}><T ko="기간 평가액 변화" en="Period value change"/></dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{<T ko={formatRangeComparison(rangeSummary, "changeKrw")} en={translateHomeHistory(formatRangeComparison(rangeSummary, "changeKrw"))}/>}</dd><dd className={styles.note}><T ko="현금흐름 미보정" en="Not adjusted for cash flows"/></dd></div>
+              <div><dt className={styles.label}><T ko="기간 최대 낙폭" en="Period maximum drawdown"/></dt><dd className={`${styles.value} ${tone(rangeSummary.maxDrawdownPct)}`}>{<T ko={formatRangeComparison(rangeSummary, "maxDrawdownPct")} en={translateHomeHistory(formatRangeComparison(rangeSummary, "maxDrawdownPct"))}/>} </dd><dd className={styles.note}>{<T ko={formatDate(rangeSummary.maxDrawdownDate)} en={translateHomeHistory(formatDate(rangeSummary.maxDrawdownDate))}/>}</dd></div>
             </dl>
             <RangeMetrics summary={rangeSummary} className="grid" />
             <RangeSummary summary={rangeSummary} />
@@ -162,6 +162,14 @@ export function HistoryTimeExplorer({
       </footer>
     </section>
   );
+}
+
+function formatRangeComparison(
+  summary: ReturnType<typeof summarizeHistoryRange>,
+  field: "changeKrw" | "changePct" | "maxDrawdownPct",
+) {
+  if (summary.pointCount < 2) return "비교 기록 부족";
+  return field === "changeKrw" ? formatSignedKrw(summary[field]) : formatSignedPercent(summary[field]);
 }
 
 function RangeMetrics({
@@ -184,13 +192,13 @@ function RangeMetrics({
       <SummaryMetric
         detail={t(formatDate(rangeSummary.maxDrawdownDate), translateHomeHistory(formatDate(rangeSummary.maxDrawdownDate)))}
         label={t("최대 낙폭", "Maximum drawdown")}
-        value={formatSignedPercent(rangeSummary.maxDrawdownPct)}
+        value={formatRangeComparison(rangeSummary, "maxDrawdownPct")}
         valueClass={tone(rangeSummary.maxDrawdownPct)}
       />
       <SummaryMetric
-        detail={formatSignedPercent(rangeSummary.changePct)}
+        detail={formatRangeComparison(rangeSummary, "changePct")}
         label={t("표시 범위 변화", "Displayed period change")}
-        value={t(formatSignedKrw(rangeSummary.changeKrw), translateHomeHistory(formatSignedKrw(rangeSummary.changeKrw)))}
+        value={formatRangeComparison(rangeSummary, "changeKrw")}
         valueClass={tone(rangeSummary.changeKrw)}
       />
       <SummaryMetric
@@ -245,11 +253,11 @@ function SummaryMetric({
     <div className="min-w-0 border-b border-r border-[var(--line)] px-3 py-4 even:border-r-0 first:pl-0 sm:px-4 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
       <dt className="text-[11px] text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
       <dd
-        className={`mt-2 truncate text-base font-semibold tabular-nums ${valueClass}`}
+        className={`mt-2 break-words text-base font-semibold tabular-nums ${valueClass}`}
       >
         <T ko={value} en={translateHomeHistory(value)}/>
       </dd>
-      <dd className="mt-2 truncate text-[11px] text-[var(--faint)]">
+      <dd className="mt-2 break-words text-[11px] text-[var(--faint)]">
         {<T ko={detail} en={translateHomeHistory(detail)}/>}
       </dd>
     </div>
@@ -279,13 +287,13 @@ function RangeSummary({
         <RangeValue
           detail={t("평가액 변화", "Value change")}
           label={t("변화 금액", "Amount changed")}
-          value={t(formatSignedKrw(summary.changeKrw), translateHomeHistory(formatSignedKrw(summary.changeKrw)))}
+          value={formatRangeComparison(summary, "changeKrw")}
           valueClass={tone(summary.changeKrw)}
         />
         <RangeValue
           detail={t("현금흐름 미보정", "Not adjusted for cash flows")}
           label={t("변화율", "Percentage change")}
-          value={formatSignedPercent(summary.changePct)}
+          value={formatRangeComparison(summary, "changePct")}
           valueClass={tone(summary.changePct)}
         />
       </div>
@@ -322,6 +330,8 @@ function SelectedDayEvidence({
 }) {
   const { t } = useI18n();
   if (!point) return null;
+  // A selected point may still have a valid prior peak outside the visible range.
+  const hasPreviousObservation = point.gapDays !== null;
 
   return (
     <section className="border-b border-[var(--line)] py-8">
@@ -359,10 +369,10 @@ function SelectedDayEvidence({
           valueClass={tone(point.totalPnlKrw)}
         />
         <EvidenceMetric
-          detail={formatSignedPercent(point.drawdownPct)}
+          detail={hasPreviousObservation ? formatSignedPercent(point.drawdownPct) : t("비교 기록 부족", "Not enough records")}
           label={t("고점 대비", "Versus the peak")}
-          value={t(formatSignedKrw(point.drawdownKrw), translateHomeHistory(formatSignedKrw(point.drawdownKrw)))}
-          valueClass={tone(point.drawdownKrw)}
+          value={hasPreviousObservation ? t(formatSignedKrw(point.drawdownKrw), translateHomeHistory(formatSignedKrw(point.drawdownKrw))) : t("비교 기록 부족", "Not enough records")}
+          valueClass={tone(hasPreviousObservation ? point.drawdownKrw : null)}
         />
         <EvidenceMetric
           detail={t("저장된 현금성 평가액", "Recorded cash-equivalent value")}
