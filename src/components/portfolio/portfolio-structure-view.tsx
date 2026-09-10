@@ -1,6 +1,7 @@
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
+import { LocalizedLink } from "@/components/i18n/localized-link";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ArrowRight } from "lucide-react";
@@ -55,7 +56,7 @@ export function PortfolioStructureView({data}:{data:PortfolioStructureViewData})
   return <main className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="portfolio-structure">
     <PortfolioPrimaryNavigation activePath="/portfolio/structure" generatedAt={data.generatedAt} selectedScopeKey={data.selectedScope.key}/>
     <div className={`varda-content varda-stage-content ${styles.page}`}>
-      <header className={styles.header}><div className={styles.title}><h1 id="portfolio-structure-title"><PortfolioText ko={"내 포트의 구조."} /></h1>{data.isDesignPreview?<LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement>:null}</div><div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/portfolio/structure" scopes={data.analysisScopes} selectedScopeKey={data.selectedScope.key} query={data.isDesignPreview?{preview:"design"}:undefined} variant="underline"/></div><Link className={styles.headerLink} href={`/portfolio/targets?scope=${encodeURIComponent(data.selectedScope.key)}`} title="목표비중 설정"><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={15} aria-hidden="true"/></Link></header>
+      <header className={styles.header}><div className={styles.title}><h1 id="portfolio-structure-title"><PortfolioText ko={"내 포트의 구조."} /></h1>{data.isDesignPreview?<LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement>:null}</div><div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/portfolio/structure" scopes={data.analysisScopes} selectedScopeKey={data.selectedScope.key} query={data.isDesignPreview?{preview:"design"}:undefined} variant="underline"/></div><LocalizedLink className={styles.headerLink} href={`/portfolio/targets?scope=${encodeURIComponent(data.selectedScope.key)}`} title="목표비중 설정" aria-label="목표비중 설정" en={{ title: portfolioEnglish("목표비중 설정"), "aria-label": portfolioEnglish("목표비중 설정") }}><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={15} aria-hidden="true"/></LocalizedLink></header>
       <LocalizedElement className={styles.allocation} aria-label="자산 배분 구성" as="section" en={{"aria-label": portfolioEnglish("자산 배분 구성")}}><PortfolioAllocationExplorer compact groupRows={data.structure.groupRows} holdingRows={data.structure.holdingRows} accountLabels={accountLabels} summary={summary} footer={details} serviceDate={data.serviceDate}/></LocalizedElement>
     </div>
   </main>;

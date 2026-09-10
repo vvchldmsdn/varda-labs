@@ -113,7 +113,7 @@ export function PortfolioDashboard({
             <dl className={styles.summaryMetric}>
               <dt><T ko="누적 수익률" en="Total return"/></dt>
               <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
-              <dd className={styles.status}>{<T ko={data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)}/>}</dd>
+              <dd className={styles.status}>{data.totalReturnPct === null ? <T ko="원가·거래 근거 부족" en="Cost or trade evidence is incomplete" /> : <T ko={`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)} />}</dd>
             </dl>
             <div className={`${styles.stageNote} ${baselineIsDelayed ? styles.stageWarning : ""}`}>
               <span><T ko={baselineIsDelayed ? "오늘 변동" : "오늘의 최대 기여"} en={baselineIsDelayed ? "Today's change" : "Largest contributor today"}/></span>

@@ -1,4 +1,4 @@
-import { percentOrNull, sumBy, toNumber } from "./portfolio-math.ts";
+import { percentOrNull, sumBy, sumComplete, toNumber } from "./portfolio-math.ts";
 
 export type PortfolioDashboardSnapshotTrendRow = Readonly<{
   snapshotDate: string;
@@ -32,15 +32,8 @@ export function buildPortfolioDashboardSnapshotTrend(
         accountRows,
         (row) => toNumber(row.totalMarketValue) ?? 0,
       );
-      const pnlRows = accountRows
-        .map((row) => toNumber(row.totalPnl))
-        .filter((value): value is number => value !== null);
-      const costRows = accountRows
-        .map((row) => toNumber(row.totalCost))
-        .filter((value): value is number => value !== null);
-      const totalPnl = pnlRows.length > 0 ? sumBy(pnlRows, (value) => value) : null;
-      const totalCost =
-        costRows.length > 0 ? sumBy(costRows, (value) => value) : null;
+      const totalPnl = sumComplete(accountRows, (row) => toNumber(row.totalPnl));
+      const totalCost = sumComplete(accountRows, (row) => toNumber(row.totalCost));
       const storedReturnPct =
         accountRows.length === 1
           ? toNumber(accountRows[0]?.totalReturnPct)

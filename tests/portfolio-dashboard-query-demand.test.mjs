@@ -65,6 +65,96 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
 const historicalPositionReads = (trace) => trace.filter((request) => request.table === "daily_position_snapshots" && request.limit !== null);
 
 describe("dashboard query demand and independent market reads", () => {
+  it("includes closed/unmatched sales in the correct account without current holdings", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-10T08:00:00Z") });
+    const closed = { ...event, assetId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", ticker: "CLOSED", beforeValue: null, afterValue: null };
+    const otherClosed = { ...closed, id: "other-sale", account: "isa", accountId: otherAccountId, afterValue: { trade_metrics: { disposed_cost_krw: 200000, realized_pnl_krw: 50000 } } };
+    for (const known of [false, true]) {
+      const sale = known ? { ...closed, afterValue: { trade_metrics: { disposed_cost_krw: 100000, realized_pnl_krw: 25000 } } } : closed;
+      const f = await fixture({ assetRows: [], eventRows: [sale, otherClosed] });
+      const all = await f.model.getPortfolioDashboard({ analysisScopes: [scope], scope, tenantContext });
+      assert.equal(all.totalValueKrw, 0);
+      assert.deepEqual(all.holdings, []);
+      assert.equal(all.realizedPnlKrw, known ? 75000 : null);
+      const account = all.accountSummaries.find(row => row.code === "brokerage");
+      assert.equal(account.holdingCount, 0);
+      assert.equal(account.realizedPnlKrw, known ? 25000 : null);
+      assert.equal(account.totalPnlKrw, known ? 25000 : null);
+      assert.equal(account.totalReturnPct, known ? 25 : null);
+      assert.equal(all.accountSummaries.find(row => row.code === "isa").realizedPnlKrw, 50000);
+
+      const accountScope = { kind: "account", key: `account:${accountId}`, accountId, accountCode: "brokerage", label: "Brokerage" };
+      const scoped = await fixture({ targets: { includesAllOwnedAccounts: false, wholeAccountIds: [accountId], directAssetIds: [] }, assetRows: [], eventRows: [sale] });
+      const selected = await scoped.model.getPortfolioDashboard({ analysisScopes: [accountScope], scope: accountScope, tenantContext });
+      assert.deepEqual(selected.accountSummaries.map(row => row.code), ["brokerage"]);
+      assert.equal(selected.realizedPnlKrw, account.realizedPnlKrw);
+      assert.equal(selected.accountSummaries[0].realizedPnlKrw, selected.realizedPnlKrw);
+      const ledgerRead = scoped.trace.find(row => row.table === "event_ledger_entries");
+      assert.ok(ledgerRead.predicate.params.includes(ownerId));
+      assert.ok(ledgerRead.predicate.params.includes(accountId));
+      assert.equal(ledgerRead.predicate.params.includes(otherAccountId), false);
+      assert.match(ledgerRead.predicate.sql, /"event_ledger_entries"\."account_id" in/);
+    }
+  });
+
+  it("does not expand direct-holding group totals to every historical sale in that account", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-10T08:00:00Z") });
+    const group = { kind: "portfolio_group", key: "group:dddddddd-dddd-4ddd-8ddd-dddddddddddd", groupId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", label: "One holding" };
+    const f = await fixture({ targets: { includesAllOwnedAccounts: false, wholeAccountIds: [], directAssetIds: [assetId] }, assetRows: [baseAsset], eventRows: [event] });
+    const result = await f.model.getPortfolioDashboard({ analysisScopes: [group], scope: group, tenantContext });
+    assert.equal(result.accountSummaries.length, 1);
+    assert.equal(result.accountSummaries[0].realizedPnlKrw, result.realizedPnlKrw);
+    assert.equal(result.realizedPnlKrw, 14000);
+    const ledger = f.trace.filter(row => row.table === "event_ledger_entries");
+    assert.equal(ledger.length, 1, "account summaries cannot perform an unscoped ledger reread");
+    assert.ok(ledger[0].predicate.params.includes(assetId));
+    assert.equal(ledger[0].predicate.params.includes(accountId), false, "a direct-holding scope cannot broaden to its whole account");
+    assert.equal(ledger[0].predicate.params.includes(otherAssetId), false);
+  });
+
+  it("keeps late cost entry out of past realized returns and renders missing trade evidence in KO/EN", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-10T08:00:00Z") });
+    const current = { ...baseAsset, averageCost: null };
+    const sale = { ...event, beforeValue: null, afterValue: null };
+    const f = await fixture({ assetRows: [current], eventRows: [sale] });
+    const args = { analysisScopes: [scope], scope, tenantContext };
+    const before = await f.model.getPortfolioDashboard(args);
+    current.averageCost = "101";
+    const after = await f.model.getPortfolioDashboard(args);
+    assert.equal(after.totalValueKrw, before.totalValueKrw);
+    assert.equal(after.holdings[0].quantity, before.holdings[0].quantity);
+    assert.equal(after.costBasisKrw, 1414000);
+    assert.equal(after.holdings[0].unrealizedPnlKrw, after.totalValueKrw - 1414000);
+    for (const result of [before, after]) {
+      for (const key of ["realizedCostBasisKrw", "realizedPnlKrw", "totalReturnPct", "totalPnlKrw"]) assert.equal(result[key], null, key);
+      assert.equal(result.holdings[0].realizedPnlKrw, null);
+      assert.equal(result.accountSummaries.find(row => row.code === "brokerage").realizedPnlKrw, null);
+      assert.equal(result.eventActivity[0].realizedPnlKrw, null);
+      assert.equal(result.eventActivity[0].missingCost, true);
+    }
+    assert.deepEqual(after.recentSnapshots, before.recentSnapshots);
+    assert.deepEqual(after.todayMovement, before.todayMovement);
+    const [{ PortfolioDashboard }, { HoldingStateCorrectionForm }, { LocaleProvider }] = await importUiWithPorts([
+      "src/components/portfolio-dashboard.tsx", "src/components/holding-state-correction-form.tsx", "src/components/i18n/locale-provider.tsx",
+    ], {
+      "@/app/portfolio/holdings/actions": { correctHoldingState: async () => { throw new Error("SSR must not submit a correction"); } },
+      "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() {} }) },
+      "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },
+      "next/image": { default: props => createElement("img", Object.fromEntries(Object.entries(props).filter(([name]) => name !== "priority"))) },
+    });
+    for (const [initialLocale, missingLabel, fxLabel, preservedLabel] of [
+      ["ko", "원가·거래 근거 부족", "매입 당시 환율에 따른 환차손익은 포함하지 않습니다", "과거 거래와 저장된 평가 기록은 바뀌지 않습니다"],
+      ["en", "Cost or trade evidence is incomplete", "excludes FX gains or losses since purchase", "Past trades and saved valuations are not rewritten"],
+    ]) {
+      const render = component => renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, component));
+      assert.match(render(createElement(PortfolioDashboard, { data: after })), new RegExp(missingLabel));
+      const form = render(createElement(HoldingStateCorrectionForm, { holdingId: assetId, updatedAt: "2026-09-10T01:02:03.123456Z", quantity: current.quantity, averageCost: current.averageCost, currency: "USD" }));
+      assert.ok(form.includes(fxLabel));
+      assert.ok(form.includes(preservedLabel));
+      assert.match(form, /value="2026-09-10T01:02:03\.123456Z"/);
+    }
+  });
+
   it("withholds a delayed cutoff's multi-day movement at 08:43 while keeping live value and price returns", async (t) => {
     const now = new Date("2026-09-09T23:43:00Z");
     t.mock.timers.enable({ apis: ["Date"], now });

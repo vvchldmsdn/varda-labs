@@ -7,6 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import { DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS } from "../src/lib/portfolio-analysis-special-holding-authority.ts";
+import { buildInvestmentLabStressReplay } from "../src/lib/investment-lab-stress-replay.ts";
 
 test("detail query preserves duplicate financial and panel values for fail-closed resolvers", () => {
   const query = researchDetailQuery(new URLSearchParams("scope=a&scope=b&view=weights&view=evidence&horizon=126"));
@@ -113,6 +114,41 @@ test("Lab preserves accounts awaiting their first quotes and renders valuation r
   assert.deepEqual((await load()).adjustment.accounts, [], "an intentionally excluded research holding must not reintroduce its account");
   portfolio = { holdingRows: [], exclusions: [missing("AAPL", "USD"), excludedResearchHolding] };
   assert.deepEqual((await load()).adjustment.accounts.map(row => row.account), ["new-account"]);
+});
+
+test("Lab stress exclusions show authorized account names without changing replay identities", async () => {
+  const accountCode = "acct_3ef012345678";
+  const unknownCode = "acct_unmatched";
+  const holding = (account, ticker) => ({ account, ticker, name: ticker, market: "us", currency: "USD", assetType: "stock", currentValueKrw: 100_000 });
+  const holdings = [holding(accountCode, "AAPL"), holding(unknownCode, "MSFT")];
+  const stress = buildInvestmentLabStressReplay({ account: "all", holdings, priceRows: [], fxRows: [], windows: [{ id: "fixture", label: "Fixture", description: "Historical evidence fixture", startDate: "2020-02-19", endDate: "2020-02-21" }] });
+  const originalStress = structuredClone(stress);
+  const [{ loadInvestmentLabDetail }] = await importWithPorts(["src/db/queries/investment-lab-detail.ts"], {
+    "./portfolio-structure": { getReadOnlyTenantPortfolioStructureForScope: async () => ({ holdingRows: holdings, exclusions: [] }) },
+    "./investment-lab-etf-xray": { getReadOnlyTenantInvestmentLabEtfXrayFromPortfolio: async () => null },
+    "./investment-lab-stress-replay": { getReadOnlyTenantInvestmentLabStressReplay: async () => stress },
+  });
+  const data = await loadInvestmentLabDetail({ panel: "composition", tenantContext: { ownerUserId: "owner-a" }, selectedScope: { kind: "all", key: "all" }, scopeCatalog: [
+    { kind: "account", key: "account:a", accountCode, label: "My first investments" },
+    { kind: "portfolio_group", key: "portfolio:b", accountCode: unknownCode, label: "Not an account name" },
+  ] });
+  assert.deepEqual(data.accountLabels, { [accountCode]: "My first investments" });
+  const [view, locale] = await importUiWithPorts([
+    "src/components/investment-lab/investment-lab-stress-replay.tsx", "src/components/i18n/locale-provider.tsx",
+  ], {});
+  for (const language of ["ko", "en"]) {
+    const html = renderToStaticMarkup(createElement(locale.LocaleProvider, { initialLocale: language }, createElement(view.InvestmentLabStressReplayView, { model: data.stress, accountLabels: data.accountLabels })));
+    const text = html.replace(/<[^>]*>/g, "");
+    assert.match(text, /My first investments/);
+    assert.doesNotMatch(text, /acct_3ef012345678|acct_unmatched|Not an account name/);
+    assert.ok(text.includes(language === "ko" ? "계좌" : "Account"));
+    const missingLabelsHtml = renderToStaticMarkup(createElement(locale.LocaleProvider, { initialLocale: language }, createElement(view.InvestmentLabStressReplayView, { model: data.stress })));
+    const missingLabelsText = missingLabelsHtml.replace(/<[^>]*>/g, "");
+    assert.doesNotMatch(missingLabelsText, /acct_3ef012345678|acct_unmatched|My first investments/);
+    assert.ok(missingLabelsText.includes(language === "ko" ? "계좌" : "Account"), "an older or incomplete detail payload uses a safe generic account label");
+  }
+  assert.deepEqual(stress, originalStress);
+  assert.deepEqual(stress.windows[0].excludedHoldings.map(row => row.account), [accountCode, unknownCode]);
 });
 
 test("main routes and workspace entry bundles do not statically import detail calculators", () => {

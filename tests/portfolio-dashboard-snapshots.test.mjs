@@ -4,6 +4,16 @@ import { describe, it } from "node:test";
 import { buildPortfolioDashboardSnapshotTrend } from "../src/lib/portfolio-dashboard-snapshots.ts";
 
 describe("owner-scoped portfolio dashboard snapshot trend", () => {
+  it("keeps mixed missing account cost or PnL out of combined return totals", () => {
+    for (const [cost, pnl, totalPnl] of [[null, null, null], [null, 50, 150], [850, null, null]]) {
+      const result = buildPortfolioDashboardSnapshotTrend([
+        row("2026-09-09", "brokerage", 1100, 1000, 100, 10),
+        row("2026-09-09", "isa", 900, cost, pnl, null),
+      ]);
+      assert.deepEqual(result, [{ date: "2026-09-09", totalMarketValue: 2000, totalPnl, totalReturnPct: null }]);
+    }
+  });
+
   it("derives all from named account rows and ignores stored all rows", () => {
     const result = buildPortfolioDashboardSnapshotTrend(
       [

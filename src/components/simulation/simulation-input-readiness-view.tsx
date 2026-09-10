@@ -16,7 +16,7 @@ export function SimulationInputReadinessView({model, ownerResearchExecution, res
  selectedScopeKey: PortfolioAnalysisScopeKey; scopeCatalog: readonly PortfolioAnalysisScope[];
 }) {
  const selectedKodexWeightPct = model.fixedMixSelection.kodexWeightPct;
- const selectedResearchHorizon = model.researchHorizonSelection.horizon ?? SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon;
+ const selectedResearchHorizon = model.researchHorizonSelection.horizon;
  const explicitEndServiceDate = model.endServiceDateSelection.status === "valid" && model.endServiceDateSelection.source === "query" ? model.requestedEndServiceDate : null;
   return (
     <main
@@ -102,13 +102,13 @@ function ResearchHorizonSelector({
   endServiceDate: string | null;
   kodexWeightPct: number | null;
   researchUniverse: string | null;
-  selectedHorizon: 63 | 126;
+  selectedHorizon: 63 | 126 | null;
 }) {
   return (
     <LocalizedElement
       aria-label="연구 기간 선택"
       className="flex items-center gap-3"
-      data-simulation-research-horizon={selectedHorizon} as="section" en={{"aria-label": simulationEnglish("연구 기간 선택")}}
+      data-simulation-research-horizon={selectedHorizon ?? "invalid"} as="section" en={{"aria-label": simulationEnglish("연구 기간 선택")}}
     >
       <span className="text-[11px] text-[var(--faint)]"><SimulationText ko={"연구 기간"} /></span>
       <nav className="flex gap-1 rounded-md bg-[var(--wash)] p-1">

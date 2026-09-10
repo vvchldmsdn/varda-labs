@@ -1,11 +1,51 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   buildTodayMovementAttribution,
   selectTodayHoldingHistory,
 } from "../src/lib/today-movement-view.ts";
 import { buildTodayQuoteFreshness, formatTodayEvidenceRange } from "../src/lib/today-quote-freshness.ts";
+
+describe("today exclusion account labels", () => {
+  it("uses authorized names unchanged in both languages and never substitutes internal account codes", async () => {
+    const [view, locale] = await importUiWithPorts([
+      "src/components/today-movement.tsx", "src/components/i18n/locale-provider.tsx",
+    ], {
+      "next/link": { default: ({ children, href }) => createElement("a", { href }, children) },
+      "@/components/portfolio-primary-navigation": { PortfolioPrimaryNavigation: () => null },
+      "@/components/portfolio-analysis-scope-tabs": { PortfolioAnalysisScopeTabs: () => null },
+      "@/components/today/today-contribution-explorer": { TodayContributionExplorer: () => null },
+      "@/components/today/holding-detail-drawer": { HoldingDetailDrawer: () => null },
+      "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children, title }) => title === "변동 계산 제외 근거" ? children : null },
+    });
+    const accounts = ["acct_summary", "acct_scope", "acct_unknown", null];
+    const data = {
+      holdings: [], selectedScope: { kind: "all", key: "all", label: "전체" },
+      analysisScopes: [{ kind: "account", key: "account:a", accountCode: "acct_scope", label: "My first investments" }],
+      accountSummaries: [{ code: "acct_summary", label: "계산 대기" }],
+      generatedAt: "2026-09-10T08:00:00Z", movementBaselineDate: null,
+      dataHealth: { latestFxRateDate: null, latestFxFetchedAt: null }, usdKrwRate: null,
+      todayMovement: { ready: false, reason: "missing_snapshot", source: "daily_position_snapshot", contributionRows: [], returnPct: null,
+        coverage: { currentCoveragePct: 0, snapshotCoveragePct: 0 }, movementExcludedCurrentValueKrw: 0,
+        exclusions: accounts.map((account, index) => ({ subject: "holding", reason: "missing_fresh_live_prices", source: "daily_position_snapshot", holdingId: `holding-${index}`, account, assetName: `Excluded ${index}` })) },
+    };
+    const original = structuredClone(data);
+    for (const language of ["ko", "en"]) {
+      const html = renderToStaticMarkup(createElement(locale.LocaleProvider, { initialLocale: language }, createElement(view.TodayMovement, { data })));
+      const text = html.replace(/<[^>]*>/g, "");
+      assert.match(text, /My first investments/);
+      assert.match(text, /계산 대기/, "the user account name must remain verbatim even when it matches translatable system copy");
+      assert.doesNotMatch(text, /acct_summary|acct_scope|acct_unknown/);
+      assert.ok(text.includes(language === "ko" ? "계좌" : "Account"));
+      assert.ok(text.includes(language === "ko" ? "일일 포지션 스냅샷" : "Daily position snapshot"));
+    }
+    assert.deepEqual(data, original, "metadata identities and calculation evidence remain untouched");
+  });
+});
 
 describe("today quote retrieval evidence", () => {
   const now = "2026-09-10T03:37:00.000Z";

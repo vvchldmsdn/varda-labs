@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   buildInvestmentLabSmallAdjustmentModel,
@@ -8,6 +11,25 @@ import {
 } from "../src/lib/investment-lab-small-adjustment.ts";
 
 describe("investment lab small adjustment", () => {
+  it("provides a focusable localized heading for submitted results and input errors", async () => {
+    const model = buildInvestmentLabSmallAdjustmentModel({ holdingRows: [holding("First", "ONE", "KRW", 300_000), holding("Second", "TWO", "USD", 200_000)], exclusions: [] });
+    const selected = account(model, "brokerage");
+    const calculate = amount => calculateInvestmentLabSmallAdjustment({ account: selected, sourceKey: selected.holdings[0].key, destinationKey: selected.holdings[1].key, transferAmountKrw: amount });
+    const [{ InvestmentLabSmallAdjustmentResult }, { LocaleProvider }] = await importUiWithPorts([
+      "src/components/investment-lab/investment-lab-small-adjustment-result.tsx", "src/components/i18n/locale-provider.tsx",
+    ], {});
+    for (const initialLocale of ["ko", "en"]) {
+      for (const [result, label] of [
+        [calculate(100_000), initialLocale === "ko" ? "계산 완료." : "Calculation complete."],
+        [calculate(0), initialLocale === "ko" ? "입력 내용을 확인해 주세요" : "Check your inputs"],
+      ]) {
+        const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, createElement(InvestmentLabSmallAdjustmentResult, { result, accountLabel: "My account", headingRef: { current: null } })));
+        assert.match(html, /<h3[^>]*tabindex="-1"/);
+        assert.ok(html.includes(label));
+      }
+    }
+  });
+
   it("builds account-scoped direct holding evidence without internal ids", () => {
     const model = buildInvestmentLabSmallAdjustmentModel({
       holdingRows: [

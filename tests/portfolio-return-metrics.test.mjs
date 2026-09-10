@@ -44,6 +44,83 @@ function tradeEvent(overrides) {
 }
 
 describe("portfolio return metrics", () => {
+  it("never reconstructs a past sale from costs entered or corrected on the current holding", () => {
+    const sale = tradeEvent({ eventType: "sell", amountKrw: "143000", quantityDelta: "-1", price: "110", fxRate: "1300" });
+    for (const averageCost of [null, "100", "101"]) {
+      const current = { ...asset, averageCost };
+      const result = buildReturnMetricsSummary([sale], [current], 1400);
+      assert.equal(result.realizedRows[0].realizedCostBasisKrw, null);
+      assert.equal(result.realizedRows[0].realizedPnlKrw, null);
+      assert.equal(result.realizedRows[0].missingCost, true);
+      assert.equal(result.realizedPnlKrw, null);
+      assert.equal(result.metricsByAssetKey.get(asset.legacyBase44Id).costBasisKrw, averageCost === null ? null : Number(averageCost) * 6 * 1400);
+    }
+  });
+
+  it("uses recorded pre-sale cost and FX independently of today's cost and FX", () => {
+    const sale = tradeEvent({ eventType: "sell", quantityDelta: "-1", price: "110", fxRate: "1300", beforeValue: { average_cost: 100 } });
+    for (const averageCost of [null, "101", "999"]) {
+      for (const currentFx of [1200, 1400]) {
+        const result = buildReturnMetricsSummary([sale], [{ ...asset, averageCost }], currentFx);
+        assert.equal(result.realizedCostBasisKrw, 130000);
+        assert.equal(result.realizedPnlKrw, 13000);
+      }
+    }
+  });
+
+  it("withholds historic foreign-currency cost or proceeds when event FX is missing", () => {
+    const sale = tradeEvent({ eventType: "sell", quantityDelta: "-1", price: "110", beforeValue: { average_cost: 100 } });
+    for (const currentFx of [1300, 1400]) {
+      for (const amountKrw of [null, "143000"]) {
+        const result = buildReturnMetricsSummary([{ ...sale, amountKrw }], [asset], currentFx);
+        assert.equal(result.realizedCostBasisKrw, null);
+        assert.equal(result.realizedPnlKrw, null);
+      }
+      const knownCost = buildReturnMetricsSummary([{ ...sale, afterValue: { trade_metrics: { disposed_cost_krw: 130000 } } }], [asset], currentFx);
+      assert.equal(knownCost.realizedCostBasisKrw, 130000);
+      assert.equal(knownCost.realizedPnlKrw, null, "a recorded cost alone does not prove missing sale proceeds");
+    }
+    const krw = buildReturnMetricsSummary([sale], [{ ...asset, currency: "KRW" }], 1400);
+    assert.equal(krw.realizedPnlKrw, 10, "KRW trades need no foreign-currency conversion");
+  });
+
+  it("keeps explicit zero realized PnL while withholding a missing cost denominator", () => {
+    for (const evidence of [{ memo: "realized_pnl_krw=0" }, { afterValue: { trade_metrics: { realized_pnl_krw: 0 } } }]) {
+      const result = buildReturnMetricsSummary([tradeEvent({ eventType: "sell", quantityDelta: "-1", ...evidence })], [asset], 1400);
+      assert.equal(result.realizedPnlKrw, 0);
+      assert.equal(result.realizedCostBasisKrw, null);
+      assert.equal(result.missingCostSellEventCount, 1);
+    }
+  });
+
+  it("does not treat a partial purchase ledger as the complete cost of a later sale", () => {
+    const buy = tradeEvent({ quantityDelta: "1", amountKrw: "100000" });
+    for (const events of [
+      [buy, tradeEvent({ eventDate: "2026-01-02", eventType: "sell", quantityDelta: "-2", amountKrw: "220000" })],
+      [buy, tradeEvent({ eventDate: "2026-01-02", quantityDelta: "1", price: "100", fxRate: null }), tradeEvent({ eventDate: "2026-01-03", eventType: "sell", quantityDelta: "-1", amountKrw: "110000" })],
+      [tradeEvent({ eventType: "sell", amountKrw: "110000", quantityDelta: "-1" }), { ...buy, eventDate: "2026-01-02" }, tradeEvent({ eventDate: "2026-01-03", eventType: "sell", quantityDelta: "-1", amountKrw: "110000" })],
+    ]) {
+      const result = buildReturnMetricsSummary(events, [asset], 1400);
+      assert.equal(result.realizedCostBasisKrw, null);
+      assert.equal(result.realizedPnlKrw, null);
+      assert.equal(result.realizedRows.at(-1).realizedCostBasisKrw, null);
+    }
+  });
+
+  it("propagates one unknown sale through asset, account and overall totals", () => {
+    const sales = [
+      tradeEvent({ eventDate: "2026-01-02", eventType: "sell", amountKrw: "110000", quantityDelta: "-1", afterValue: { trade_metrics: { disposed_cost_krw: 100000, realized_pnl_krw: 10000 } } }),
+      tradeEvent({ eventDate: "2026-01-03", eventType: "sell", amountKrw: "110000", quantityDelta: "-1" }),
+    ];
+    const result = buildReturnMetricsSummary(sales, [asset], 1400);
+    for (const summary of [result, result.metricsByAssetKey.get(asset.legacyBase44Id), summarizeRealizedReturnForAccount(result, "brokerage", new Set([asset.legacyBase44Id]))]) {
+      assert.equal(summary.realizedPnlKrw, null);
+      assert.equal(summary.realizedCostBasisKrw, null);
+    }
+    assert.equal(result.realizedRows[0].realizedPnlKrw, 10000);
+    assert.equal(result.realizedRows[1].realizedPnlKrw, null);
+  });
+
   it("calculates realized return from chronological buy and sell ledger events", () => {
     const summary = buildReturnMetricsSummary(
       [

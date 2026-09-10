@@ -22,6 +22,12 @@ describe("snapshot purchase cost evidence", () => {
     assert.deepEqual(summarizeSnapshotCostEvidence([{ costKrw: 200, pnlKrw: 40 }], 50, 10), {
       openCostKrw: 200, unrealizedPnlKrw: 40, totalCost: 250, totalPnl: 50, totalReturnPct: 20,
     });
+    assert.deepEqual(summarizeSnapshotCostEvidence([{ costKrw: 200, pnlKrw: 40 }], null, null), {
+      openCostKrw: 200, unrealizedPnlKrw: 40, totalCost: null, totalPnl: null, totalReturnPct: null,
+    });
+    assert.deepEqual(summarizeSnapshotCostEvidence([{ costKrw: 200, pnlKrw: 40 }], null, 0), {
+      openCostKrw: 200, unrealizedPnlKrw: 40, totalCost: null, totalPnl: 40, totalReturnPct: null,
+    });
   });
 
   it("writes actual valuation but null cost and PnL for an unknown-cost position, account, and all-account snapshot", async () => {
@@ -85,5 +91,31 @@ describe("snapshot purchase cost evidence", () => {
     const known = positions.find((row) => row.assetId === "asset-1");
     assert.equal(Number(known.costKrw), 160);
     assert.equal(Number(known.pnlKrw), 60);
+
+    // Later input completes current cost; an unproven past sale still cannot supply a return.
+    holdings[0].averageCost = "100";
+    rowsByTable.event_ledger_entries = [{
+      id: "historic-sale", eventDate: "2026-09-03", eventType: "sell", account: "acct0", assetId: "asset-0", legacyAssetId: "asset-0",
+      assetName: "Asset 0", ticker: "005930", amountKrw: "110", quantityDelta: "-1", price: "110", fxRate: "1",
+      beforeValue: null, afterValue: null, memo: null, recordedAt: new Date("2026-09-03T01:00:00Z"), createdAt: new Date("2026-09-03T01:00:00Z"), updatedAt: new Date("2026-09-03T01:00:00Z"),
+    }];
+    writes.length = 0;
+    const lateCost = await module.runDailySnapshot({ tenantContext: { ownerUserId: owner }, now, dryRun: false });
+    assert.equal(lateCost.ok, true);
+    for (const account of ["acct0", "all"]) {
+      assert.equal(lateCost.results[account].realizedPnlKrw, null);
+      assert.equal(lateCost.results[account].realizedCostBasisKrw, null);
+      assert.equal(lateCost.results[account].totalCost, null);
+      assert.equal(lateCost.results[account].totalPnl, null);
+    }
+    assert.equal(lateCost.results.all.totalMarketValue, 440);
+    assert.equal(lateCost.results.acct1.totalCost, 160);
+    const latePositions = writes.filter(write => write.table === "daily_position_snapshots").flatMap(write => write.rows);
+    assert.equal(Number(latePositions.find(row => row.assetId === "asset-0").costKrw), 200);
+    for (const portfolio of writes.filter(write => write.table === "daily_portfolio_snapshots").flatMap(write => write.rows).filter(row => row.account !== "acct1")) {
+      assert.equal(portfolio.totalReturnPct, null);
+      assert.match(portfolio.description, /realized_pnl_krw=unknown/);
+      assert.match(portfolio.description, /realized_cost_basis_krw=unknown/);
+    }
   });
 });

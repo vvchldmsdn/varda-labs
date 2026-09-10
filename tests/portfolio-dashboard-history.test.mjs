@@ -25,6 +25,17 @@ const holdings = [
 ];
 
 describe("portfolio dashboard holding history", () => {
+  it("does not publish a group return from only the positions with known cost or PnL", () => {
+    for (const [costKrw, pnlKrw, totalPnl] of [[null, null, null], [null, 50, 150], [850, null, null]]) {
+      const result = buildPortfolioDashboardPositionTrend({ holdings, rows: [
+        row({ snapshotDate: "2026-09-09", assetId: "asset-kodex", marketValueKrw: 1100, costKrw: 1000, pnlKrw: 100 }),
+        row({ snapshotDate: "2026-09-09", assetId: "asset-voo", marketValueKrw: 900, costKrw, pnlKrw }),
+        row({ snapshotDate: "2026-09-09", assetId: "outside-group", marketValueKrw: 9999, costKrw: 1, pnlKrw: 9998 }),
+      ] });
+      assert.deepEqual(result, [{ date: "2026-09-09", totalMarketValue: 2000, totalPnl, totalReturnPct: null }]);
+    }
+  });
+
   it("builds a name-first date matrix without hiding partial evidence", () => {
     const result = buildPortfolioDashboardHoldingHistory({
       holdings,
