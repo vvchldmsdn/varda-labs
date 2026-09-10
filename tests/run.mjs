@@ -21,6 +21,7 @@ import "./research-detail-boundary.test.mjs";
 import "./investment-lab-lazy-dialog.test.mjs";
 import "./simulation-deferred-research.test.mjs";
 import "./simulation-calculation-guide.test.mjs";
+import "./calculation-methodology.test.mjs";
 import "./portfolio-refresh-lifecycle.test.mjs";
 import "./holding-price-return.test.mjs";
 import "./history-live-valuation.test.mjs";

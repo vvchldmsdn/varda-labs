@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
+import { MethodDetails } from "@/components/explanations/method-details";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 import { PortfolioRiskControls } from "./portfolio-risk-controls";
@@ -38,7 +39,7 @@ export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=fa
       <footer className={styles.footer}><span><PortfolioText ko={"KRW 환산 ·"} />{" "}<PortfolioText ko={model.provenance.firstServiceDate??"근거 없음"} /> — <PortfolioText ko={model.provenance.lastServiceDate??"근거 없음"} /></span><div className={styles.launchers}>
         {portfolio?<PresentationDialog label="전체 상관계수" labelEn={portfolioEnglish("전체 상관계수")} title="전체 종목과 하락일 상관관계" titleEn={portfolioEnglish("전체 종목과 하락일 상관관계")} wide><RiskCorrelationSections instruments={model.calculation.instruments} portfolio={portfolio}/></PresentationDialog>:null}
         <PresentationDialog label="위험 수치·기여" labelEn={portfolioEnglish("위험 수치·기여")} title="위험 요약과 종목별 기여" titleEn={portfolioEnglish("위험 요약과 종목별 기여")} wide><RiskPortfolioSummary model={model}/><RiskStandaloneSummary model={model}/><div className={styles.modalSection}><RiskInstrumentTable model={model}/></div></PresentationDialog>
-        <PresentationDialog label="계산·데이터 근거" labelEn={portfolioEnglish("계산·데이터 근거")} title="분석 기준과 데이터 근거" titleEn={portfolioEnglish("분석 기준과 데이터 근거")} wide><RiskAnalysisBasis model={model} scopeLabel={selectedScope.label}/><div className={styles.modalSection}><RiskDataHealth model={model}/></div></PresentationDialog>
+        <PresentationDialog label="계산·데이터 근거" labelEn={portfolioEnglish("계산·데이터 근거")} title="분석 기준과 데이터 근거" titleEn={portfolioEnglish("분석 기준과 데이터 근거")} wide><MethodDetails topic="risk" /><RiskAnalysisBasis model={model} scopeLabel={selectedScope.label}/><div className={styles.modalSection}><RiskDataHealth model={model}/></div></PresentationDialog>
       </div></footer>
     </div>
   </main>;

@@ -2,6 +2,7 @@ import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
+import { MethodDetails } from "@/components/explanations/method-details";
 
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
@@ -31,6 +32,7 @@ export function PortfolioStructureRiskAnalytics({
       className="border-t border-[var(--line)] pt-9 lg:pt-12"
       data-section="portfolio-risk-landscape"
     >
+      <MethodDetails topic="risk" />
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">RISK LANDSCAPE</p>

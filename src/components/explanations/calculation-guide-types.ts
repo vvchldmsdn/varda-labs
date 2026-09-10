@@ -2,6 +2,7 @@ export type GuideCopy = { ko: string; en: string };
 
 export type CalculationGuideDefinition = {
   id: string;
+  methodTopic?: import("./method-types").MethodTopic;
   intro: GuideCopy;
   steps: readonly {
     id: string;

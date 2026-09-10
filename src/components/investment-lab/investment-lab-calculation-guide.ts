@@ -3,6 +3,7 @@ import type { CalculationGuideDefinition } from "@/components/explanations/calcu
 /** Presentation of the connected position-flow, execution, and Modified Dietz engines. */
 export const investmentLabCalculationGuide = {
   id: "investment-lab-method",
+  methodTopic: "investment-lab",
   intro: {
     ko: "그때 다른 자산을 골랐다면 어땠을까요? 실제 기록은 그대로 두고, 투자 방법만 바꾼 과거 경로를 나란히 봅니다.",
     en: "What if you had chosen different assets? Keep your actual records and compare them with a historical path using a different investment method.",

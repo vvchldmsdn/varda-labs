@@ -2,6 +2,7 @@
 
 import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
 import { T } from "@/components/i18n/localized-text";
+import { MethodDetails } from "@/components/explanations/method-details";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 
 
@@ -67,6 +68,7 @@ export function AdditionalContributionLogicDialog({
           </header>
 
           <div className="varda-dialog-content min-h-0 overflow-y-auto overscroll-contain">
+            <MethodDetails topic="contribution" />
             <section aria-labelledby="calculation-flow-title">
               <h3 id="calculation-flow-title" className="text-sm font-medium"><PortfolioText ko={"금액 흐름"} /></h3>
               <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)] sm:grid-cols-5">

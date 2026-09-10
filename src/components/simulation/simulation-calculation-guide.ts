@@ -3,6 +3,7 @@ import type { CalculationGuideDefinition } from "@/components/explanations/calcu
 /** Describes the connected owner stationary-bootstrap engine; this copy does not calculate returns. */
 export const simulationCalculationGuide = {
   id: "simulation-current-holdings",
+  methodTopic: "simulation",
   intro: {
     ko: "지금 가진 종목에 과거와 비슷한 움직임이 다시 나타난다면, 어떤 흐름이 가능할지 살펴봅니다.",
     en: "Explore what could happen if movements like those in the past occurred again for your current holdings.",

@@ -5,6 +5,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import type { CalculationGuideDefinition, GuideCopy } from "./calculation-guide-types";
 import styles from "./calculation-guide.module.css";
+import { MethodDetails } from "./method-details";
 
 export default function CalculationGuide({ guide }: { guide: CalculationGuideDefinition }) {
   const { locale, t } = useI18n();
@@ -28,6 +29,7 @@ export default function CalculationGuide({ guide }: { guide: CalculationGuideDef
 
   return <section ref={guideRef} className={styles.guide} data-calculation-guide={guide.id}>
     <p className={styles.intro}>{copy(guide.intro)}</p>
+    {guide.methodTopic ? <MethodDetails topic={guide.methodTopic} /> : null}
     <ol ref={stepsRef} className={styles.steps} aria-label={t("계산 순서", "Calculation steps")}>
       {guide.steps.map((item, index) => <li key={item.id}>
         <button type="button" aria-current={index === stepIndex ? "step" : undefined} aria-controls={panelId} onClick={() => showStep(index)}>
