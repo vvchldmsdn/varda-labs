@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   HOLDING_ONBOARDING_POLICY,
@@ -20,6 +21,33 @@ const formSource = readFileSync(
 );
 
 describe("holding onboarding contract", () => {
+  it("preselects only a requested active owned account and preserves generic entry defaults", async () => {
+    const newAccountId = "33333333-3333-4333-8333-333333333333";
+    const accounts = [{ id: ACCOUNT_ID }, { id: newAccountId }];
+    const HoldingOnboardingForm = () => null;
+    const [page] = await importUiWithPorts(["src/app/portfolio/holdings/new/page.tsx"], {
+      "next/link": { default: () => null },
+      "@/lib/i18n/server": { localizedMetadata: () => ({}) },
+      "@/components/i18n/localized-text": { T: () => null },
+      "@/components/secondary-page-header": { SecondaryPageHeader: () => null },
+      "@/components/holding-onboarding-form": { HoldingOnboardingForm },
+      "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => ({ ok: true, tenantContext: { ownerUserId: "fixture-owner" } }) },
+      "@/db/queries/holding-onboarding": { getHoldingOnboardingOptions: async () => ({ state: "ready", accounts, portfolioGroups: [] }) },
+    });
+    const elements = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(elements) : [tree, ...elements(tree.props?.children)];
+    for (const [hint, expected] of [
+      [undefined, ACCOUNT_ID], [newAccountId, newAccountId], [ACCOUNT_ID, ACCOUNT_ID],
+      ["44444444-4444-4444-8444-444444444444", ""], // Foreign account: absent from the session's options.
+      ["55555555-5555-4555-8555-555555555555", ""], // Closed account: absent from active options.
+      ["", ""], [[ACCOUNT_ID, newAccountId], ""],
+    ]) {
+      const tree = await page.default({ searchParams: Promise.resolve(hint === undefined ? {} : { accountId: hint }) });
+      const formNode = elements(tree).find(node => node.type === HoldingOnboardingForm);
+      assert.equal(formNode.props.initialAccountId, expected);
+      assert.equal(formNode.key, expected, "changing the selected account remounts the form with that account");
+    }
+  });
+
   it("normalizes a Korean ETF with direct average cost authority", () => {
     const result = parseHoldingOnboardingInput(
       form({

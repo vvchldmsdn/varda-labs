@@ -55,7 +55,7 @@ export async function createSessionAccount(
       ACCOUNT_MANAGEMENT_POLICY.maximumActiveAccounts,
     ]);
     if (number(result.saved_count) === 1) {
-      return state("success", "Account created.");
+      return Object.freeze({ ...state("success", "Account created."), createdAccountId: accountId });
     }
     if (number(result.duplicate_name_count) > 0) {
       return state("conflict", "An active account already uses this name.");

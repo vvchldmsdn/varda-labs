@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useRef } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { accountActionMessageKo, accountTypeLabel } from "@/lib/i18n/account-management-copy";
@@ -55,6 +56,14 @@ export function AccountCreateForm() {
         </button>
         <ActionMessage state={state} />
       </div>
+      {state.status === "success" && state.createdAccountId && !pending ? (
+        <Link
+          className={`inline-flex items-center ${secondaryButtonClassName}`}
+          href={{ pathname: "/portfolio/holdings/new", query: { accountId: state.createdAccountId } }}
+        >
+          {t("이 계좌에 종목 추가", "Add holdings to this account")}
+        </Link>
+      ) : null}
     </form>
   );
 }
@@ -96,6 +105,13 @@ export function AccountEditor({ account }: { account: AccountModel }) {
           </div>
         </dl>
       </div>
+
+      <Link
+        className={`mt-4 inline-flex items-center ${secondaryButtonClassName}`}
+        href={{ pathname: "/portfolio/holdings/new", query: { accountId: account.id } }}
+      >
+        {t("이 계좌에 종목 추가", "Add holdings to this account")}
+      </Link>
 
       <form action={updateAction} className="mt-4 flex flex-wrap items-end gap-3">
         <IdentityFields account={account} />

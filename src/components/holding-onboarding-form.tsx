@@ -16,11 +16,11 @@ const INITIAL_STATE: HoldingBatchState = { status: "idle", results: [] };
 const identity = (row: Pick<HoldingDraft, "market" | "ticker">) => `${row.market}:${row.ticker.trim().toUpperCase()}`;
 const positive = (value: string, precision: number) => /^\d+(?:\.\d+)?$/.test(value) && Number(value) > 0 && Number.isFinite(Number(value)) && (value.split(".")[1]?.length ?? 0) <= precision;
 
-export function HoldingOnboardingForm({ options, preview = false }: { options: HoldingOnboardingOptions; preview?: boolean }) {
+export function HoldingOnboardingForm({ options, initialAccountId, preview = false }: { options: HoldingOnboardingOptions; initialAccountId?: string; preview?: boolean }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<HoldingDraft[]>([]);
   const [saved, setSaved] = useState<Record<string, string>>({});
-  const [accountId, setAccountId] = useState(options.accounts[0]?.id ?? "");
+  const [accountId, setAccountId] = useState(initialAccountId ?? options.accounts[0]?.id ?? "");
   const [groupId, setGroupId] = useState("");
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<InstrumentChoice | null>(null);
@@ -75,12 +75,13 @@ export function HoldingOnboardingForm({ options, preview = false }: { options: H
     setRows(previous => previous.map(row => row.key === key ? { ...row, [field]: value } : row));
   }
 
-  return <form action={preview ? undefined : action} className="varda-holding-onboarding" onSubmit={event => { if (preview || unsaved.length === 0) event.preventDefault(); }}>
+  // Action completion requests a native reset; retain React-managed account and retry selections.
+  return <form action={preview ? undefined : action} className="varda-holding-onboarding" onReset={event => event.preventDefault()} onSubmit={event => { if (preview || unsaved.length === 0) event.preventDefault(); }}>
     <input type="hidden" name="holdings" value={JSON.stringify(unsaved)} />
     <input type="hidden" name="accountId" value={accountId} />
     <input type="hidden" name="portfolioGroupId" value={groupId} />
     <input type="hidden" name="newPortfolioGroupName" value={groupId ? "" : groupName} />
-    <div className="varda-onboarding-account-line"><label>{t("담을 계좌", "Add to account")}<select value={accountId} onChange={event => setAccountId(event.target.value)} disabled={pending || hasSaved} aria-label={t("보유 계좌", "Holding account")}>{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><span>{t("계좌 비밀번호나 거래 권한은 필요하지 않아요.", "No brokerage password or trading access needed.")}</span></div>
+    <div className="varda-onboarding-account-line"><label>{t("담을 계좌", "Add to account")}<select value={accountId} onChange={event => setAccountId(event.target.value)} disabled={pending || hasSaved} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><span>{t("계좌 비밀번호나 거래 권한은 필요하지 않아요.", "No brokerage password or trading access needed.")}</span></div>
     <div className="varda-onboarding-workspace">
       <section className="varda-onboarding-compose" aria-labelledby="holding-add-heading" onKeyDown={event => {
         if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();

@@ -87,7 +87,8 @@ describe("holding and account management usability", () => {
     const calls = [];
     const createAccount = () => {}, updateAccount = () => {}, archiveAccount = () => {}, restoreAccount = () => {};
     const [component] = await importUiWithPorts(["src/components/account-management.tsx"], {
-      react: { useActionState: action => { calls.push(action); return [{ status: "success", message: "Account created." }, () => {}, pending]; }, useEffect: () => {}, useRef: () => ({ current: null }) },
+      react: { useActionState: action => { calls.push(action); return [{ status: "success", message: "Account created.", createdAccountId: "new-account-id" }, () => {}, pending]; }, useEffect: () => {}, useRef: () => ({ current: null }) },
+      "next/link": { default: ({ href, ...props }) => createElement("a", { ...props, href: `${href.pathname}?${new URLSearchParams(href.query)}` }) },
       "@/components/i18n/locale-provider": { useI18n: () => ({ t: (ko, en) => locale === "ko" ? ko : en ?? ko }) },
       "@/app/portfolio/accounts/actions": { createAccount, updateAccount, archiveAccount, restoreAccount },
     });
@@ -95,6 +96,7 @@ describe("holding and account management usability", () => {
     const ko = create();
     assert.match(ko, /계좌 이름/);
     assert.match(ko, /계좌를 만들었습니다/);
+    assert.match(ko, /href="\/portfolio\/holdings\/new\?accountId=new-account-id"[^>]*>이 계좌에 종목 추가/);
     assert.doesNotMatch(ko, /Account name|Create account|Account created/);
     locale = "en";
     assert.match(create(), /Account name/);
@@ -104,6 +106,7 @@ describe("holding and account management usability", () => {
     assert.match(editor, /name="expectedUpdatedAt"[^>]*value="2026-09-10T03:00:00\.123Z"/);
     assert.match(editor, /disabled=""[^>]*name="archiveConfirmed"/);
     assert.match(editor, /Linked scopes/);
+    assert.match(editor, /href="\/portfolio\/holdings\/new\?accountId=account-id"[^>]*>Add holdings to this account/);
     assert.doesNotMatch(editor, /Group references/);
     locale = "ko";
     const importedAccount = renderToStaticMarkup(createElement(component.AccountEditor, { account: { ...account, accountType: "brokerage" } }));
@@ -111,6 +114,7 @@ describe("holding and account management usability", () => {
     assert.doesNotMatch(importedAccount, /brokerage/);
     pending = true;
     assert.match(create(), /disabled=""/);
+    assert.doesNotMatch(create(), /href=/, "do not offer a previous creation's account while another save is pending");
     assert.ok(calls.includes(createAccount) && calls.includes(updateAccount) && calls.includes(archiveAccount));
   });
 

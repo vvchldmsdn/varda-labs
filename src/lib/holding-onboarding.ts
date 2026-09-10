@@ -79,6 +79,16 @@ const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,49}$/;
 const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 const SIGNED_DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/;
 
+/** Resolve a selection hint only against the session's active account options. */
+export function resolveHoldingOnboardingAccountId(
+  accounts: readonly Readonly<{ id: string }>[],
+  requestedAccountId?: string | string[],
+): string {
+  if (requestedAccountId === undefined) return accounts[0]?.id ?? "";
+  if (typeof requestedAccountId !== "string") return "";
+  return accounts.find((account) => account.id === requestedAccountId)?.id ?? "";
+}
+
 export function parseHoldingOnboardingInput(
   formData: FormData,
 ): HoldingOnboardingParseResult {
