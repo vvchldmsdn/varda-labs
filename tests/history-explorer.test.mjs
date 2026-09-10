@@ -36,6 +36,33 @@ const points = Object.freeze([
 ]);
 
 describe("history explorer", () => {
+  it("requires two visible observations for period comparisons while retaining a single current value", () => {
+    for (const rowKind of ["stored", "live"]) {
+      const observation = Object.freeze({ ...point("2026-09-10", 125, null), rowKind });
+      const original = structuredClone(observation);
+      const summary = summarizeHistoryRange([observation]);
+      assert.equal(summary.pointCount, 1);
+      assert.equal(summary.startValueKrw, 125);
+      assert.equal(summary.endValueKrw, 125);
+      assert.equal(summary.peakValueKrw, 125);
+      assert.equal(summary.peakDate, "2026-09-10");
+      for (const field of ["changeKrw", "changePct", "maxDrawdownPct", "maxDrawdownDate"]) assert.equal(summary[field], null, field);
+      assert.deepEqual(observation, original);
+    }
+    const empty = summarizeHistoryRange([]);
+    assert.equal(empty.pointCount, 0);
+    for (const field of ["changeKrw", "changePct", "maxDrawdownPct", "maxDrawdownDate"]) assert.equal(empty[field], null, field);
+  });
+
+  it("retains true zero period change and drawdown for two equal-valued observations", () => {
+    const summary = summarizeHistoryRange([point("2026-09-09", 125, null), point("2026-09-10", 125, null)]);
+    assert.equal(summary.pointCount, 2);
+    assert.equal(summary.changeKrw, 0);
+    assert.equal(summary.changePct, 0);
+    assert.equal(summary.maxDrawdownPct, 0);
+    assert.equal(summary.peakValueKrw, 125);
+  });
+
   it("selects a fixed date window without filling absent dates", () => {
     assert.deepEqual(
       selectHistoryRange(points, "30D").map((item) => item.date),

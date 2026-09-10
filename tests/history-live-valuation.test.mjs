@@ -118,18 +118,52 @@ describe("ephemeral current valuation in History", () => {
     }
   });
 
-  it("does not call a live-only observation the first saved record in the opened evidence view", async () => {
+  it("distinguishes insufficient one-point comparisons from true zero changes in both locales", async () => {
     const [explorer, locale] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx", "src/components/i18n/locale-provider.tsx"], {
       "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children }) => React.createElement("section", null, children) },
     });
     for (const initialLocale of ["ko", "en"]) {
       const markup = model => renderToStaticMarkup(React.createElement(locale.LocaleProvider, { initialLocale }, React.createElement(explorer.HistoryTimeExplorer, { model, scopeLabel: "Fixture" })));
+      const metricValue = (html, label) => html.match(new RegExp(`<dt[^>]*>${label}</dt><dd[^>]*>([\\s\\S]*?)</dd>`))?.[1].replace(/<[^>]+>/g, "").trim();
+      const metricDetail = (html, label) => html.match(new RegExp(`<dt[^>]*>${label}</dt><dd[^>]*>[\\s\\S]*?</dd><dd[^>]*>([\\s\\S]*?)</dd>`))?.[1].replace(/<[^>]+>/g, "").trim();
+      const comparisonLabels = initialLocale === "ko"
+        ? ["기간 평가액 변화", "기간 최대 낙폭", "최대 낙폭", "표시 범위 변화", "변화 금액", "변화율", "고점 대비"]
+        : ["Period value change", "Period maximum drawdown", "Maximum drawdown", "Displayed period change", "Amount changed", "Percentage change", "Versus the peak"];
+      const insufficient = initialLocale === "ko" ? "비교 기록 부족" : "Not enough records";
+      const peakLabel = initialLocale === "ko" ? "고점 대비" : "Versus the peak";
       const liveOnly = markup(buildHistoryOverview({ rows: [], liveValuation: live() }));
       assert.match(liveOnly, initialLocale === "ko" ? /비교할 이전 저장 기록 없음/ : /No previous saved record to compare/);
       assert.doesNotMatch(liveOnly, /첫 저장점|First saved record/);
       const savedOnly = markup(buildHistoryOverview({ rows: [row("2026-09-08", 1_400_000)] }));
       assert.match(savedOnly, initialLocale === "ko" ? /첫 저장점/ : /First saved record/);
       assert.doesNotMatch(savedOnly, /비교할 이전 저장 기록 없음|No previous saved record to compare/);
+      const sameDaySavedAndLive = markup(buildHistoryOverview({ rows: [row("2026-09-09", 1_400_000)], liveValuation: live() }));
+      for (const html of [liveOnly, savedOnly, sameDaySavedAndLive]) {
+        for (const label of comparisonLabels) assert.equal(metricValue(html, label), insufficient, label);
+        assert.equal(metricDetail(html, peakLabel), insufficient);
+        assert.match(metricValue(html, initialLocale === "ko" ? "관측점" : "Observations"), /^1/);
+        assert.doesNotMatch(metricValue(html, initialLocale === "ko" ? "표시 범위 최고 평가액" : "Highest displayed value"), /기록|records/);
+      }
+      const flat = markup(buildHistoryOverview({ rows: [row("2026-09-07", 1_400_000), row("2026-09-08", 1_400_000)] }));
+      assert.doesNotMatch(flat, /비교 기록 부족|Not enough records/);
+      for (const label of comparisonLabels) assert.match(metricValue(flat, label), /0/, label);
+      assert.equal(metricDetail(flat, peakLabel), "0%");
+
+      // The default 90-day view has one point, but the point's real earlier peak
+      // remains valid even when that observation is outside the selected range.
+      for (const later of [
+        { rows: [row("2026-01-01", 2_000_000), row("2026-09-08", 1_400_000)] },
+        { rows: [row("2026-01-01", 2_000_000)], liveValuation: live() },
+      ]) {
+        const model = buildHistoryOverview(later);
+        const original = structuredClone(model);
+        const html = markup(model);
+        assert.equal(metricValue(html, comparisonLabels[0]), insufficient);
+        assert.match(metricValue(html, initialLocale === "ko" ? "관측점" : "Observations"), /^1/);
+        assert.match(metricValue(html, peakLabel), /(?:-|−)/);
+        assert.match(metricDetail(html, peakLabel), /(?:-|−).*%/);
+        assert.deepEqual(model, original);
+      }
     }
   });
 });

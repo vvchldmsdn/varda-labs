@@ -74,6 +74,7 @@ export const homeHistoryMessages: Readonly<Record<string, string>> = {
   "원화 환산 가치의 변화": "Changes in KRW conversion value",
   "현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다.": "Values are not estimated until current prices can be matched to the baseline snapshot.",
   "비교 기준": "Comparison baseline",
+  "비교 기록 부족": "Not enough records",
   "개 기여 근거": "contribution records",
   "종목별 기여": "Contribution by holding",
   "점의 길이는 실제 변동액에 비례합니다.": "The dot bars scale with the actual amount of change.",

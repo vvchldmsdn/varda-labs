@@ -84,10 +84,11 @@
 @media (max-width:760px), (max-width:1000px) and (max-height:500px) {
   .page { gap:24px; height:auto; min-height:0; }
   .header { flex-wrap:wrap; gap:12px; }
-  .title { flex:1; display:block; }
+  .title { flex:0 0 100%; min-width:0; display:block; }
   .title h1 { font-size:24px; }
   .previewNote { font-size:10px; margin-top:6px; white-space:normal; }
   .scopeBar { flex-basis:100%; order:3; }
+  .headerActions { flex:0 0 100%; min-width:0; flex-wrap:wrap; column-gap:16px; }
   .headerActions .textLink { min-width:44px; min-height:44px; justify-content:center; }
   .headerActions .textLink > span { display:inline; }
   .workspace { display:flex; flex-direction:column; flex:none; justify-content:flex-start; align-items:stretch; min-height:0; padding:0; gap:28px; background:transparent; border-radius:0; }
