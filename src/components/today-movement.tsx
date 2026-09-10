@@ -41,6 +41,7 @@ import {
   buildTodayMovementAttribution,
   selectTodayHoldingHistory,
 } from "@/lib/today-movement-view";
+import { buildTodayQuoteFreshness, formatTodayEvidenceRange } from "@/lib/today-quote-freshness";
 
 export function TodayMovement({
   data,
@@ -87,6 +88,7 @@ export function TodayMovement({
     .filter((row): row is TodayContributionDisplayRow => row !== null)
     .toSorted(compareContributionRows);
   const hasHoldingDetail = detail.status !== "empty";
+  const freshness = buildTodayQuoteFreshness({ holdings: data.holdings, fxFetchedAt: data.dataHealth.latestFxFetchedAt, now: data.generatedAt });
 
   return (
     <main
@@ -115,7 +117,7 @@ export function TodayMovement({
           </header>
 
           <div className={styles.todayStageMain}>
-          <section className={styles.stageSummary} aria-labelledby="today-movement-title">
+          <section className={styles.stageSummary} aria-labelledby="today-movement-title" tabIndex={0}>
             <div className={styles.balance}>
               <span><T ko={scopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="오늘 평가액 변동" en="Today's value change"/></span>
               <strong className={toneClass(attribution.changeKrw)}>
@@ -133,19 +135,32 @@ export function TodayMovement({
               <dd className={toneClass(attribution.fxImpactKrw)}>{<T ko={formatSignedKrw(attribution.fxImpactKrw)} en={translateHomeHistory(formatSignedKrw(attribution.fxImpactKrw))}/>}</dd>
               <dd className={styles.status}><T ko="원화 환산 가치의 변화" en="Changes in KRW conversion value"/></dd>
             </dl>
+          <div className={styles.stageNote}>
           {!movement.ready ? (
-            <div className={`${styles.stageNote} ${styles.stageWarning} text-[var(--warning)]`}>
+            <div className={`${styles.stageWarning} text-[var(--warning)]`}>
               <p className="text-sm font-medium">{<T ko={reasonLabel(movement.reason)} en={translateHomeHistory(reasonLabel(movement.reason))}/>}</p>
               <p className="mt-2 text-xs leading-5"><T ko={baselineIsDelayed ? "새 기준 기록이 준비되면 오늘 변동이 계산됩니다. 현재 평가액은 최신 시세로 표시합니다." : "현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다."} en={baselineIsDelayed ? "Today's change will appear when the new baseline is ready. Current value still uses the latest prices." : "Values are not estimated until current prices can be matched to the baseline snapshot."}/></p>
               {baselineIsDelayed ? <p><T ko="마지막 기준일" en="Last baseline"/> {formatDate(data.movementBaselineDate)}</p> : null}
             </div>
           ) : (
-            <div className={styles.stageNote}>
-              <span><T ko="비교 기준" en="Comparison baseline"/></span>
-              <strong>{<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</strong>
-              <p>{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p>
+            <div className="text-xs leading-6">
+              <span className="block text-[var(--muted)]"><T ko="비교 기준" en="Comparison baseline"/></span>
+              <strong className="mt-1 block font-medium">{<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</strong>
+              <p className="mt-1 text-[var(--muted)]">{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p>
             </div>
           )}
+          <div className="mt-3 space-y-1 text-[10px] leading-5 text-[var(--muted)] sm:text-[11px]" data-today-quote-freshness>
+            <p><T ko="시세 조회" en="Quotes retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange(freshness.fetched, data.generatedAt)}</span></p>
+            {freshness.hasFxExposure ? <p><T ko="환율 조회" en="FX retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange({ oldest: freshness.fxFetchedAt, newest: freshness.fxFetchedAt }, data.generatedAt)}</span></p> : null}
+            {freshness.staleQuoteCount + freshness.missingQuoteCount > 0 || freshness.fxNeedsRefresh ? <p className="text-[var(--warning)]"><T ko="일부 시세·환율 갱신 대기" en="Some quotes or FX await a refresh"/></p> : null}
+            <details>
+              <summary className="w-fit cursor-pointer underline decoration-[var(--line)] underline-offset-4"><T ko="시세 기준 안내" en="About these timestamps"/></summary>
+              <p className="mt-2"><T ko="화면이 보이는 동안 5분 간격으로 시세를 확인합니다. 조회 시각은 실제 체결 시각과 다를 수 있으며, 종목별로 다릅니다." en="Quotes are checked every 5 minutes while this page is visible. Retrieval times vary by holding and may differ from trade times."/></p>
+              <p className="mt-1"><T ko="저장된 가격 근거 시각" en="Recorded price evidence time"/> {formatTodayEvidenceRange(freshness.observed, data.generatedAt)}</p>
+              <p className="mt-1"><T ko="KIS 가격 근거 시각은 조회 시각으로 기록됩니다." en="KIS price evidence is recorded at retrieval time."/></p>
+            </details>
+          </div>
+          </div>
           </section>
 
           <section className={styles.stageContribution} aria-labelledby="contribution-title">
@@ -389,10 +404,8 @@ function HoldingDetailPanel({
             }
           />
           <DetailRow label="가격 출처" value={holding.priceSource ?? "-"} />
-          <DetailRow
-            label="가격 시각"
-            value={formatDateTime(holding.priceAsOf)}
-          />
+          <DetailRow label="시세 조회 시각" labelEn="Quote retrieved" value={formatDateTime(holding.priceFetchedAt)} />
+          <DetailRow label="가격 근거 시각" labelEn="Price evidence time" value={formatDateTime(holding.priceAsOf)} />
         </DetailColumn>
 
         <DetailColumn divided title="기준 근거">
@@ -484,16 +497,18 @@ function DetailColumn({
 
 function DetailRow({
   label,
+  labelEn,
   tone = null,
   value,
 }: {
   label: string;
+  labelEn?: string;
   tone?: number | null;
   value: string;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-3 text-sm">
-      <dt className="text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dt className="text-[var(--muted)]">{<T ko={label} en={labelEn ?? translateHomeHistory(label)}/>}</dt>
       <dd
         className={`max-w-[65%] text-right font-medium break-words ${tone === null ? "text-[var(--ink)]" : toneClass(tone)}`}
       >

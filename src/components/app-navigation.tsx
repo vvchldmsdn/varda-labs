@@ -124,8 +124,8 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
             {nextItem ? <Link href={hrefFor(nextItem.href)} aria-label={t(`다음 화면: ${nextItem.label}`, `Next page: ${t(nextItem.label)}`)} title={t(nextItem.label)}><ChevronRight size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
           </nav>
           {preview ? <span className="varda-topbar-preview"><i />{t("예시 데이터")}</span>
-            : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `${formatKstTime(generatedAt)} 기준`}</span> : null}
-          {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={currentPath === "/history"} /> : null}
+            : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `View refreshed ${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `화면 갱신 ${formatKstTime(generatedAt)}`}</span> : null}
+          {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={currentPath === "/history" || currentPath === "/today"} /> : null}
           <LanguageSwitch />
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
