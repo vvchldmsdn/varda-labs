@@ -40,6 +40,10 @@ describe("today quote retrieval evidence", () => {
     assert.equal(result.fxNeedsRefresh, false);
     assert.equal(formatTodayEvidenceRange(result.fetched, now), "12:36:00 KST");
   });
+  it("shows one retrieval time when timestamps differ only below display precision", () => {
+    const range = { oldest: "2026-09-10T04:02:58.102Z", newest: "2026-09-10T04:02:58.963Z" };
+    assert.equal(formatTodayEvidenceRange(range, "2026-09-10T04:03:00Z"), "13:02:58 KST");
+  });
 });
 
 describe("today movement view attribution", () => {

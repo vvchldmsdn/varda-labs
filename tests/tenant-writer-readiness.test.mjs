@@ -59,7 +59,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 33);
-    assert.equal(registeredPaths.length, 41);
+    assert.equal(registeredPaths.length, 42);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -368,7 +368,11 @@ describe("tenant writer Phase 1D-A readiness", () => {
       { table: "portfolio_group_asset_memberships", ownerPolicy: "trusted_context_required" },
       { table: "market_data_sync_runs", ownerPolicy: "owner_forbidden" },
       { table: "live_price_quotes", ownerPolicy: "owner_forbidden" },
+      { table: "asset_price_snapshots", ownerPolicy: "owner_forbidden" },
     ]);
+    const closeRevalidationWriters = leaseWriters.filter(writer => writer.implementationPaths.includes("src/lib/market-data/latest-close-revalidation.ts"));
+    assert.equal(closeRevalidationWriters.length, 4);
+    assert.ok(closeRevalidationWriters.every(writer => writer.targets.some(target => target.table === "asset_price_snapshots" && target.ownerPolicy === "owner_forbidden")));
     const historyWriter = leaseWriters.find(({ id }) => id === "session_holding_analysis_data_preparation");
     assert.deepEqual(historyWriter.entrypoints, [
       "/portfolio/holdings#prepareHoldingAnalysisData",

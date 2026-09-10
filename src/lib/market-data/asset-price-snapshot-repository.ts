@@ -415,6 +415,9 @@ function getProtectedExistingReason(
     if (existing.adjustedCloseBasis === ADJUSTED_CLOSE_BASIS.provider) {
       return "protected_provider_adjusted_history";
     }
+    if (existing.fetchedAt && incoming.fetchedAt && existing.fetchedAt.getTime() > incoming.fetchedAt.getTime()) {
+      return "older_provider_observation";
+    }
     if (isKisClosePriceSource(existing.source)) return null;
     return getKisValueConflictReason(existing, incoming);
   }
@@ -431,6 +434,7 @@ function getUpsertSetWhere(writePolicy: AssetPriceSnapshotWritePolicy) {
     return sql`
       ${assetPriceSnapshots.adjustedCloseBasis}
         is distinct from ${ADJUSTED_CLOSE_BASIS.provider}
+      and (${assetPriceSnapshots.fetchedAt} is null or excluded.fetched_at >= ${assetPriceSnapshots.fetchedAt})
       and (
         ${assetPriceSnapshots.source} like 'kis_%'
         or (
@@ -526,6 +530,7 @@ function snapshotMatches(
     existing.source === incoming.source &&
     existing.providerSymbol === incoming.providerSymbol &&
     existing.providerExchange === incoming.providerExchange &&
+    (!isKisClosePriceSource(incoming.source ?? null) || sameNullableDateValue(existing.fetchedAt, incoming.fetchedAt)) &&
     existing.isSample === incoming.isSample
   );
 }

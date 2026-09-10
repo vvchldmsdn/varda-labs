@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useI18n } from "@/components/i18n/locale-provider";
+import { accountActionMessageKo, accountTypeLabel } from "@/lib/i18n/account-management-copy";
 
 import {
   archiveAccount,
@@ -19,6 +21,7 @@ const INITIAL_STATE: AccountManagementActionState = Object.freeze({
 });
 
 export function AccountCreateForm() {
+  const { t } = useI18n();
   const [state, action, pending] = useActionState(createAccount, INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -29,19 +32,18 @@ export function AccountCreateForm() {
   return (
     <form action={action} className="space-y-3" ref={formRef}>
       <label className="block text-sm font-semibold text-[var(--ink)]">
-        Account name
+        {t("계좌 이름", "Account name")}
         <input
           className={fieldClassName}
           maxLength={100}
           name="name"
-          placeholder="e.g. Mirae Asset, Retirement account"
+          placeholder={t("예: 내 증권계좌, 연금계좌", "e.g. My brokerage, Retirement account")}
           required
           type="text"
         />
       </label>
       <p className="text-xs leading-5 text-[var(--muted)]">
-        New accounts use KRW as the reporting base. Each holding keeps its own
-        market currency, so USD holdings remain supported.
+        {t("평가액은 원화로 표시합니다. 미국 주식 등 외화 종목도 등록할 수 있습니다.", "Valuations are shown in KRW. You can also add holdings in foreign currencies, including US stocks.")}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -49,7 +51,7 @@ export function AccountCreateForm() {
           disabled={pending}
           type="submit"
         >
-          {pending ? "Creating..." : "Create account"}
+          {t(pending ? "만드는 중…" : "계좌 만들기", pending ? "Creating…" : "Create account")}
         </button>
         <ActionMessage state={state} />
       </div>
@@ -58,6 +60,7 @@ export function AccountCreateForm() {
 }
 
 export function AccountEditor({ account }: { account: AccountModel }) {
+  const { t } = useI18n();
   const [updateState, updateAction, updatePending] = useActionState(
     updateAccount,
     INITIAL_STATE,
@@ -72,21 +75,21 @@ export function AccountEditor({ account }: { account: AccountModel }) {
   return (
     <article className="rounded-md border border-[var(--line)] bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-[var(--ink)]">{account.name}</p>
+        <div className="min-w-0 max-w-full">
+          <p className="break-words font-semibold text-[var(--ink)]">{account.name}</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {account.accountType} / {account.currency}
+            {t(...accountTypeLabel(account.accountType))} / {account.currency}
           </p>
         </div>
         <dl className="flex gap-4 text-right text-xs text-[var(--muted)]">
           <div>
-            <dt>Active holdings</dt>
+            <dt>{t("보유 종목", "Holdings")}</dt>
             <dd className="mt-1 font-semibold text-[var(--ink)]">
               {account.activeHoldingCount}
             </dd>
           </div>
           <div>
-            <dt>Group references</dt>
+            <dt>{t("연결된 분석 범위", "Linked scopes")}</dt>
             <dd className="mt-1 font-semibold text-[var(--ink)]">
               {account.openGroupReferenceCount}
             </dd>
@@ -96,8 +99,8 @@ export function AccountEditor({ account }: { account: AccountModel }) {
 
       <form action={updateAction} className="mt-4 flex flex-wrap items-end gap-3">
         <IdentityFields account={account} />
-        <label className="min-w-56 flex-1 text-sm font-semibold text-[var(--ink)]">
-          Display name
+        <label className="min-w-0 w-full flex-1 text-sm font-semibold text-[var(--ink)] sm:min-w-56">
+          {t("계좌 이름", "Account name")}
           <input
             className={fieldClassName}
             defaultValue={account.name}
@@ -112,7 +115,7 @@ export function AccountEditor({ account }: { account: AccountModel }) {
           disabled={updatePending}
           type="submit"
         >
-          {updatePending ? "Saving..." : "Save name"}
+          {t(updatePending ? "저장 중…" : "이름 저장", updatePending ? "Saving…" : "Save name")}
         </button>
         <ActionMessage state={updateState} />
       </form>
@@ -133,12 +136,12 @@ export function AccountEditor({ account }: { account: AccountModel }) {
               value="yes"
             />
             <span>
-              Archive this account without deleting its historical evidence.
+              {t("과거 기록을 보존하고 이 계좌를 종료합니다.", "Close this account while keeping its historical records.")}
             </span>
           </label>
           {archiveBlocked ? (
             <p className="mt-2 text-xs text-[var(--warning)]">
-              Close or move holdings and remove group references first.
+              {t("먼저 보유종목을 이동·종료하고 분석 범위 연결을 해제해 주세요.", "Move or close holdings and remove analysis-scope links first.")}
             </p>
           ) : null}
         </div>
@@ -147,7 +150,7 @@ export function AccountEditor({ account }: { account: AccountModel }) {
           disabled={archiveBlocked || archivePending}
           type="submit"
         >
-          {archivePending ? "Archiving..." : "Archive"}
+          {t(archivePending ? "종료 중…" : "계좌 종료", archivePending ? "Closing…" : "Close account")}
         </button>
         <ActionMessage state={archiveState} />
       </form>
@@ -156,14 +159,15 @@ export function AccountEditor({ account }: { account: AccountModel }) {
 }
 
 export function ArchivedAccountRow({ account }: { account: AccountModel }) {
+  const { t } = useI18n();
   const [state, action, pending] = useActionState(restoreAccount, INITIAL_STATE);
 
   return (
     <article className="flex flex-col gap-3 rounded-md border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="font-semibold text-[var(--muted)]">{account.name}</p>
+      <div className="min-w-0">
+        <p className="break-words font-semibold text-[var(--muted)]">{account.name}</p>
         <p className="mt-1 text-xs text-[var(--faint)]">
-          Archived / {account.accountType} / {account.currency}
+          {t("종료됨", "Closed")} / {t(...accountTypeLabel(account.accountType))} / {account.currency}
         </p>
       </div>
       <form action={action} className="flex flex-wrap items-center gap-3">
@@ -173,7 +177,7 @@ export function ArchivedAccountRow({ account }: { account: AccountModel }) {
           disabled={pending}
           type="submit"
         >
-          {pending ? "Restoring..." : "Restore"}
+          {t(pending ? "복원 중…" : "복원", pending ? "Restoring…" : "Restore")}
         </button>
         <ActionMessage state={state} />
       </form>
@@ -195,6 +199,7 @@ function IdentityFields({ account }: { account: AccountModel }) {
 }
 
 function ActionMessage({ state }: { state: AccountManagementActionState }) {
+  const { t } = useI18n();
   return (
     <p
       aria-live="polite"
@@ -204,7 +209,7 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
           : "text-sm text-[var(--warning)]"
       }
     >
-      {state.message}
+      {state.message ? t(accountActionMessageKo(state.message), state.message) : null}
     </p>
   );
 }
@@ -212,8 +217,8 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
 const fieldClassName =
   "mt-1.5 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--ink)]";
 const primaryButtonClassName =
-  "rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
+  "min-h-11 rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButtonClassName =
-  "rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)] disabled:cursor-not-allowed disabled:opacity-50";
+  "min-h-11 rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)] disabled:cursor-not-allowed disabled:opacity-50";
 const dangerButtonClassName =
-  "rounded-md border border-[var(--warning-soft)] bg-white px-4 py-2 text-sm font-semibold text-[var(--negative)] disabled:cursor-not-allowed disabled:opacity-50";
+  "min-h-11 rounded-md border border-[var(--warning-soft)] bg-white px-4 py-2 text-sm font-semibold text-[var(--negative)] disabled:cursor-not-allowed disabled:opacity-50";

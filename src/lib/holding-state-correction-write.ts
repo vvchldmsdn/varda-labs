@@ -104,7 +104,7 @@ async function runAtomicCorrection({
   assetId: string;
   expectedUpdatedAt: string;
   quantity: string;
-  averageCost: string;
+  averageCost: string | null;
   reason: string | null;
 }) {
   const results = await sqlClient.transaction((transaction) => [
@@ -169,14 +169,14 @@ with lock_acquired as materialized (
     count(*) filter (
       where updated_at = $4::timestamptz
         and quantity = $5::numeric
-        and average_cost is not distinct from $6::numeric
+        and average_cost is not distinct from coalesce($6::numeric, average_cost)
     ) as unchanged_count
   from existing_asset
 ), corrected as (
   update assets asset
   set
     quantity = $5::numeric,
-    average_cost = $6::numeric,
+    average_cost = coalesce($6::numeric, existing.average_cost),
     updated_at = greatest(
       transaction_timestamp(),
       existing.updated_at + interval '1 millisecond'

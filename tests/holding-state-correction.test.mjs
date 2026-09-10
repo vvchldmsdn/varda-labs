@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   HOLDING_STATE_CORRECTION_POLICY,
@@ -20,6 +21,36 @@ const registrySource = source("../src/lib/tenant-writer-registry.ts");
 const migrationSource = source("../drizzle/0027_easy_kulan_gath.sql");
 
 describe("owner-scoped holding state correction", () => {
+  it("allows a quantity-only correction while preserving cost and rejects explicit invalid costs", () => {
+    const base = { assetId: ASSET_ID, expectedUpdatedAt: UPDATED_AT, quantity: "3" };
+    for (const value of [undefined, "", "   "]) {
+      const result = parseHoldingStateCorrectionInput(form({ ...base, ...(value === undefined ? {} : { averageCost: value }) }));
+      assert.equal(result.ok, true);
+      assert.equal(result.input.averageCost, null, "blank means preserve the saved cost, not clear or replace it with zero");
+    }
+    for (const averageCost of ["0", "-1", "1.00001", "unknown", "1e2"]) {
+      assert.equal(parseHoldingStateCorrectionInput(form({ ...base, averageCost })).ok, false);
+    }
+  });
+
+  it("lets a user submit quantity without a cost while retaining exact version evidence", async () => {
+    const [component] = await importUiWithPorts(["src/components/holding-state-correction-form.tsx"], {
+      react: { useActionState: (_action, state) => [state, () => {}, false] },
+      "@/app/portfolio/holdings/actions": { correctHoldingState: () => {} },
+      "@/components/i18n/management-text": { ManagementText: () => null, ManagementElement: () => null },
+      "@/components/i18n/localized-text": { T: () => null },
+    });
+    const elements = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(elements) : [tree, ...elements(tree.props?.children)];
+    for (const averageCost of [null, "100.0000"]) {
+      const nodes = elements(component.HoldingStateCorrectionForm({ holdingId: ASSET_ID, updatedAt: UPDATED_AT, quantity: "3", averageCost, currency: "KRW" }));
+      const cost = nodes.find(node => node.props?.name === "averageCost");
+      assert.equal(Boolean(cost.props.required), false);
+      assert.equal(cost.props.defaultValue, averageCost ?? "");
+      assert.equal(nodes.find(node => node.props?.name === "quantity").props.required, true);
+      assert.equal(nodes.find(node => node.props?.name === "expectedUpdatedAt").props.value, UPDATED_AT);
+    }
+  });
+
   it("parses only positive, bounded quantity and average-cost corrections", () => {
     const parsed = parseHoldingStateCorrectionInput(
       form({

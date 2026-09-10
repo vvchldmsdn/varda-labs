@@ -165,7 +165,7 @@ export function PortfolioDashboard({
                 <RailMetric label="가격 영향" value={movementReady ? formatSignedKrw(priceImpactKrw ?? 0) : "계산 대기"} tone={priceImpactKrw} />
                 <RailMetric label="환율 영향" value={formatSignedKrw(data.todayFxChangeKrw)} tone={data.todayFxChangeKrw} />
                 <RailMetric label="최대 기여" value={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} valueEn={movementReady ? topContributor?.name ?? "No change" : "Awaiting data"} tone={topContributor?.dailyChangeKrw ?? null} />
-                <RailMetric label="시세 근거" value={`${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`} />
+                <RailMetric label="변동 비교 근거" value={`${movementEvidenceCount}/${data.dataHealth.movementEligibleAssetCount}`} />
                 <RailMetric label="USD/KRW" value={data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"} />
               </dl>
               <div>

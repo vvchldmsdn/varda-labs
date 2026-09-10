@@ -406,6 +406,7 @@ export const TENANT_WRITER_REGISTRY = [
       "src/lib/holding-onboarding-write.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/price-sync.ts",
+      "src/lib/market-data/latest-close-revalidation.ts",
     ],
     targets: [
       adminTarget("market_provider_budgets", "insert", "update"),
@@ -416,6 +417,7 @@ export const TENANT_WRITER_REGISTRY = [
       userTarget("portfolio_group_asset_memberships", "insert"),
       adminTarget("market_data_sync_runs", "insert", "update"),
       sharedTarget("live_price_quotes", "insert", "update"),
+      sharedTarget("asset_price_snapshots", "insert", "update"),
     ],
     transition: {
       prepare: "split_target_classes",
@@ -619,6 +621,7 @@ export const TENANT_WRITER_REGISTRY = [
     implementationPaths: [
       "src/lib/market-data/provider-budget.ts",
       "src/lib/market-data/collection-queue.ts",
+      "src/lib/market-data/latest-close-revalidation.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/price-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
@@ -652,6 +655,7 @@ export const TENANT_WRITER_REGISTRY = [
     implementationPaths: [
       "src/lib/market-data/provider-budget.ts",
       "src/lib/market-data/collection-queue.ts",
+      "src/lib/market-data/latest-close-revalidation.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/kis-history-cache-sync.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
@@ -706,6 +710,7 @@ export const TENANT_WRITER_REGISTRY = [
     implementationPaths: [
       "src/lib/market-data/provider-budget.ts",
       "src/lib/market-data/collection-queue.ts",
+      "src/lib/market-data/latest-close-revalidation.ts",
       "src/lib/cron-market-cycle-run-repository.ts",
       "src/lib/market-data/core-market-factor-refresh-job.ts",
       "src/lib/market-data/fx-refresh-job.ts",

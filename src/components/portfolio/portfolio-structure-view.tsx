@@ -40,27 +40,32 @@ export type PortfolioStructureViewData = Readonly<{
 }>;
 
 export function PortfolioStructureView({data}:{data:PortfolioStructureViewData}) {
+  const accountLabels: Readonly<Record<string, string>> = Object.fromEntries(
+    data.analysisScopes.flatMap(scope => scope.kind === "account" ? [[scope.accountCode, scope.label]] : []),
+  );
   const policyStatus=policyStatusLabel(data.targetProjection.status);
   const policyDetail=policyStatusDetail({effectiveServiceDate:data.targetEffectiveServiceDate,projection:data.targetProjection});
   const riskPortfolio=data.riskModel.calculation.portfolio;
   const summary=<div className={styles.coreSummary}><div className={styles.total}><span><PortfolioText ko={data.selectedScope.label} en={data.selectedScope.key === "all" ? "All assets" : data.selectedScope.label} /> {" "}<PortfolioText ko={"평가액"} /></span><strong>{formatKrw(data.structure.totalValueKrw)}</strong></div><dl className={styles.overviewMetrics}><HeroMetric label="보유 종목" value={`${data.structure.includedHoldingCount}개`}/><HeroMetric label="유효 분산 수 ENB" value={riskPortfolio?formatNumber(riskPortfolio.riskContributionEnb.value,2):"근거 부족"}/><HeroMetric label="목표비중" value={policyStatus}/></dl></div>;
   const details=<>
     <PresentationDialog label="위험 분석" labelEn={portfolioEnglish("위험 분석")} title="상관·분산·베타 분석" titleEn={portfolioEnglish("상관·분산·베타 분석")} wide><dl className={styles.riskMetrics}><RailMetric label="Sharpe" value={riskPortfolio?formatNumber(riskPortfolio.sharpe.value,2):"근거 부족"} detail="위험 대비 수익 · 무위험 수익률 가정 포함"/><RailMetric label="평균 상관" value={riskPortfolio?formatNumber(riskPortfolio.weightedAverageCorrelation.value,2):"근거 부족"} detail="종목들이 함께 움직이는 정도"/><RailMetric label="하락 구간 상관" value={riskPortfolio?formatNumber(riskPortfolio.stress.weightedAverageCorrelation.value,2):"근거 부족"} detail="하락일에 관측한 동반 움직임"/><RailMetric label="최대 낙폭" value={data.riskModel.pathAnalytics.maximumDrawdownPct.value===null?"근거 부족":formatRiskPercent(data.riskModel.pathAnalytics.maximumDrawdownPct.value)} detail="분석 기간 고점 대비 최대 하락"/></dl><PortfolioStructureRiskAnalytics model={data.riskModel} scopeKey={data.selectedScope.key} totalHoldingCount={data.structure.includedHoldingCount} isDesignPreview={data.isDesignPreview}/><Link className={styles.headerLink} href={`/portfolio/risk?scope=${encodeURIComponent(data.selectedScope.key)}${data.isDesignPreview?"&preview=design":""}`}><PortfolioText ko={"종목별 위험과 데이터 근거"} />{" "}<ArrowRight size={13} aria-hidden="true"/></Link></PresentationDialog>
-    <PresentationDialog label="보유 근거" labelEn={portfolioEnglish("보유 근거")} title="보유 종목과 데이터 근거" titleEn={portfolioEnglish("보유 종목과 데이터 근거")} wide><p className={styles.evidenceNote}><PortfolioText ko={policyDetail} /> · <PortfolioText ko={dataHealthDetail(data.structure)} /><br/>USD/KRW {formatNumber(data.structure.usdKrwRate,2)} {" "}<PortfolioText ko={"· 기준일"} />{" "}{formatDate(data.serviceDate)} {" "}<PortfolioText ko={"· 읽기 전용 분석"} /></p><HoldingEvidenceTable rows={data.structure.holdingRows}/>{data.structure.exclusions.length?<section className={styles.modalSection}><h3><PortfolioText ko={"평가 제외"} />{" "}{data.structure.exclusions.length}<PortfolioText ko={"행"} /></h3><ExclusionTable rows={data.structure.exclusions}/></section>:null}</PresentationDialog>
+    <PresentationDialog label="보유 근거" labelEn={portfolioEnglish("보유 근거")} title="보유 종목과 데이터 근거" titleEn={portfolioEnglish("보유 종목과 데이터 근거")} wide><p className={styles.evidenceNote}><PortfolioText ko={policyDetail} /> · <PortfolioText ko={dataHealthDetail(data.structure)} /><br/>USD/KRW {formatNumber(data.structure.usdKrwRate,2)} {" "}<PortfolioText ko={"· 기준일"} />{" "}{formatDate(data.serviceDate)} {" "}<PortfolioText ko={"· 읽기 전용 분석"} /></p><HoldingEvidenceTable rows={data.structure.holdingRows} accountLabels={accountLabels}/>{data.structure.exclusions.length?<section className={styles.modalSection}><h3><PortfolioText ko={"평가 제외"} />{" "}{data.structure.exclusions.length}<PortfolioText ko={"행"} /></h3><ExclusionTable rows={data.structure.exclusions} accountLabels={accountLabels}/></section>:null}</PresentationDialog>
     <PresentationDialog label="집중·환율" labelEn={portfolioEnglish("집중·환율")} title="집중도와 환율 노출" titleEn={portfolioEnglish("집중도와 환율 노출")} wide><DirectHoldingsBaseline model={data.directHoldingsBaseline} scopeLabel={data.selectedScope.label}/><div className={styles.modalSection}><PortfolioFxShock baseline={data.directHoldingsBaseline} currentUsdKrwRate={data.structure.usdKrwRate}/></div><div className={styles.modalSection}><SpecialHoldingsCoverage model={data.specialHoldingsCoverage}/></div></PresentationDialog>
   </>;
   return <main className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="portfolio-structure">
     <PortfolioPrimaryNavigation activePath="/portfolio/structure" generatedAt={data.generatedAt} selectedScopeKey={data.selectedScope.key}/>
     <div className={`varda-content varda-stage-content ${styles.page}`}>
       <header className={styles.header}><div className={styles.title}><h1 id="portfolio-structure-title"><PortfolioText ko={"내 포트의 구조."} /></h1>{data.isDesignPreview?<LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement>:null}</div><div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/portfolio/structure" scopes={data.analysisScopes} selectedScopeKey={data.selectedScope.key} query={data.isDesignPreview?{preview:"design"}:undefined} variant="underline"/></div><Link className={styles.headerLink} href={`/portfolio/targets?scope=${encodeURIComponent(data.selectedScope.key)}`} title="목표비중 설정"><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={15} aria-hidden="true"/></Link></header>
-      <LocalizedElement className={styles.allocation} aria-label="자산 배분 구성" as="section" en={{"aria-label": portfolioEnglish("자산 배분 구성")}}><PortfolioAllocationExplorer compact groupRows={data.structure.groupRows} holdingRows={data.structure.holdingRows} summary={summary} footer={details} serviceDate={data.serviceDate}/></LocalizedElement>
+      <LocalizedElement className={styles.allocation} aria-label="자산 배분 구성" as="section" en={{"aria-label": portfolioEnglish("자산 배분 구성")}}><PortfolioAllocationExplorer compact groupRows={data.structure.groupRows} holdingRows={data.structure.holdingRows} accountLabels={accountLabels} summary={summary} footer={details} serviceDate={data.serviceDate}/></LocalizedElement>
     </div>
   </main>;
 }
 function HoldingEvidenceTable({
   rows,
+  accountLabels,
 }: {
   rows: readonly PortfolioStructureHoldingRow[];
+  accountLabels: Readonly<Record<string, string>>;
 }) {
   return (
     <div className="overflow-x-auto pb-4">
@@ -88,7 +93,7 @@ function HoldingEvidenceTable({
                   {row.ticker ?? <PortfolioText ko="종목 코드 없음" />} · {row.market.toUpperCase()} · {row.currency}
                 </div>
               </TableCell>
-              <TableCell><PortfolioText ko={accountLabel(row.account)} /></TableCell>
+              <TableCell><PortfolioText ko={accountLabel(row.account, accountLabels)} /></TableCell>
               <TableCell>{row.groupName === "Ungrouped" ? <PortfolioText ko="미분류" /> : row.groupName}</TableCell>
               <TableCell align="right">{formatNumber(row.quantity, 4)}</TableCell>
               <TableCell align="right">{formatNumber(row.currentPrice, 2)}</TableCell>
@@ -108,7 +113,7 @@ function HoldingEvidenceTable({
   );
 }
 
-function ExclusionTable({ rows }: { rows: readonly PortfolioStructureExclusion[] }) {
+function ExclusionTable({ rows, accountLabels }: { rows: readonly PortfolioStructureExclusion[]; accountLabels: Readonly<Record<string, string>> }) {
   return (
     <div className="overflow-x-auto pb-4">
       <table className="w-full min-w-[850px] border-separate border-spacing-0 text-left text-sm">
@@ -131,7 +136,7 @@ function ExclusionTable({ rows }: { rows: readonly PortfolioStructureExclusion[]
                   {row.ticker ?? <PortfolioText ko="종목 코드 없음" />}
                 </div>
               </TableCell>
-              <TableCell><PortfolioText ko={accountLabel(row.account)} /></TableCell>
+              <TableCell><PortfolioText ko={accountLabel(row.account, accountLabels)} /></TableCell>
               <TableCell>{row.groupName === "Ungrouped" ? <PortfolioText ko="미분류" /> : row.groupName}</TableCell>
               <TableCell><PortfolioText ko={exclusionReasonLabel(row.reason)} /></TableCell>
               <TableCell align="right">{formatNumber(row.quantity, 4)}</TableCell>
@@ -245,7 +250,8 @@ function policyStatusDetail({
   return "현재 범위에 승인된 목표비중 없음";
 }
 
-function accountLabel(account: string) {
+function accountLabel(account: string, labels: Readonly<Record<string, string>>) {
+  if (Object.hasOwn(labels, account)) return labels[account];
   if (account === "brokerage") return "증권";
   if (account === "isa") return "ISA";
   if (account === "irp") return "IRP";

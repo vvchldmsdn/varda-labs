@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 import {
   PORTFOLIO_GROUP_MANAGEMENT_POLICY,
@@ -24,6 +27,28 @@ const componentSource = source(
 );
 
 describe("portfolio group management", () => {
+  it("labels account membership with its name while preserving create and edit checkbox identities", async () => {
+    const [component] = await importUiWithPorts(["src/components/portfolio-group-management.tsx"], {
+      "@/app/portfolio/groups/actions": { savePortfolioGroup: () => {}, archivePortfolioGroup: () => {} },
+    });
+    const account = { id: ACCOUNT_A, name: "나의 증권 계좌", code: "acct_3ef012345678" };
+    for (const editing of [false, true]) {
+      const props = { accounts: [account], assets: [], ...(editing ? { group: {
+        id: GROUP_ID, name: "My portfolio", description: null, updatedAt: UPDATED_AT,
+        accountIds: [ACCOUNT_A], assetIds: [],
+      } } : {}) };
+      const html = renderToStaticMarkup(React.createElement(editing ? component.PortfolioGroupEditor : component.PortfolioGroupCreateForm, props));
+      const visibleText = html.replace(/<[^>]*>/g, "");
+      assert.ok(visibleText.includes(account.name));
+      assert.equal(visibleText.includes(account.code), false);
+      const checkbox = html.match(/<input\b[^>]*name="accountId"[^>]*>/)?.[0];
+      assert.ok(checkbox);
+      assert.match(checkbox, /type="checkbox"/);
+      assert.ok(checkbox.includes(`value="${ACCOUNT_A}"`));
+      assert.equal(checkbox.includes('checked=""'), editing);
+    }
+  });
+
   it("normalizes create input and canonicalizes membership lists", () => {
     const result = parsePortfolioGroupSaveInput(
       form({

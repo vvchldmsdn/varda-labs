@@ -53,7 +53,7 @@ export const homeHistoryMessages: Readonly<Record<string, string>> = {
   "가격 영향": "Price impact",
   "환율 영향": "FX impact",
   "최대 기여": "Largest contributor",
-  "시세 근거": "Price coverage",
+  "변동 비교 근거": "Change comparison coverage",
   "투입 금액 계산": "Plan a contribution",
   "포트폴리오 구조": "Portfolio allocation",
   "실시간 시세 갱신 필요": "Live prices need refreshing",

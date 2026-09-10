@@ -169,11 +169,20 @@ function ConnectionMap({
   const graph = useMemo(() => buildHoldingConnectionGraph(history), [history]);
 
   if (graph.nodes.length < 2 || graph.edges.length === 0) {
+    const reason = graph.emptyReason ?? "insufficient_personal_history";
     return (
-      <div className="grid min-h-[310px] place-items-center border-y border-[var(--wash)] px-6 text-center">
+      <div className="grid min-h-[310px] place-items-center border-y border-[var(--wash)] px-6 text-center" data-connection-empty={reason}>
         <div className="max-w-sm">
-          <p className="text-sm font-semibold text-[var(--ink)]"><T ko="연결을 계산할 공통 이력이 아직 부족합니다." en="There is not enough shared history to calculate connections."/></p>
-          <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="가격 상관관계와 ETF 구성 겹침은 서로 다른 근거이므로 상세 화면에서 나누어 확인합니다." en="Price correlations and ETF overlap use different data. Review each separately in the details."/></p>
+          {reason === "insufficient_personal_history" ? <>
+            <p className="text-sm font-semibold text-[var(--ink)]"><T ko="개인 일별 기록을 쌓고 있어요." en="Your daily portfolio records are building up."/></p>
+            <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="두 종목의 같은 날짜 기록이 6개 이상 필요합니다. 공유 시장 이력을 이용한 분석은 상관·위험 상세에서 확인하세요." en="Connections need at least 6 matching daily records for two holdings. Explore shared market history in Correlation and risk details."/></p>
+          </> : reason === "insufficient_variation" ? <>
+            <p className="text-sm font-semibold text-[var(--ink)]"><T ko="일별 등락이 일정해 연결을 계산하기 어렵습니다." en="Daily changes are too uniform to calculate a connection."/></p>
+            <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="공통 기록은 있지만 등락의 변화가 없어 상관계수를 계산할 수 없습니다." en="Matching records are available, but correlation is undefined when daily changes do not vary."/></p>
+          </> : <>
+            <p className="text-sm font-semibold text-[var(--ink)]"><T ko="이 기간에는 뚜렷한 연결이 없습니다." en="No distinct connection in this period."/></p>
+            <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="공통 기록은 충분하지만 연결선 표시 기준에 미치지 않았습니다. 자세한 상관관계는 상세 화면에서 확인하세요." en="There are enough matching records, but correlations are below the line display threshold. Explore the details for more."/></p>
+          </>}
           <ConnectionLinks riskHref={riskHref} />
         </div>
       </div>

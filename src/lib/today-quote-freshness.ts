@@ -50,7 +50,9 @@ export function formatTodayEvidenceRange(range: EvidenceRange, now: string) {
     const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value));
     return !spansDates && kstDate(value) === reference ? time : `${kstDate(value)} ${time}`;
   };
-  return `${format(range.oldest)}${range.oldest === range.newest ? "" : `–${format(range.newest)}`} KST`;
+  const oldest = format(range.oldest);
+  const newest = format(range.newest);
+  return `${oldest}${oldest === newest ? "" : `–${newest}`} KST`;
 }
 
 function kstDate(value: string) {

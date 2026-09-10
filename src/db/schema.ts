@@ -703,7 +703,7 @@ export const holdingStateCorrections = pgTable(
     correctedAverageCost: decimal("corrected_average_cost", {
       precision: 20,
       scale: 4,
-    }).notNull(),
+    }),
     previousAssetUpdatedAt: timestamp("previous_asset_updated_at", {
       withTimezone: true,
     }).notNull(),

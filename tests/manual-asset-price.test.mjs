@@ -135,6 +135,10 @@ describe("manual asset price", () => {
       new URL("../src/app/portfolio/holdings/page.tsx", import.meta.url),
       "utf8",
     );
+    const listSource = readFileSync(
+      new URL("../src/components/holdings-management-list.tsx", import.meta.url),
+      "utf8",
+    );
 
     assert.match(actionSource, /^"use server";/);
     assert.match(actionSource, /writeSessionManualKrxGoldPrice/);
@@ -155,8 +159,10 @@ describe("manual asset price", () => {
     assert.match(formSource, /^"use client";/);
     assert.match(formSource, /useActionState/);
     assert.doesNotMatch(formSource, /fetch\s*\(|\/api\//);
-    assert.match(pageSource, /isKrxGoldManualAssetCandidate/);
-    assert.match(pageSource, /ManualKrxGoldPriceForm/);
+    assert.match(pageSource, /import \{ HoldingsManagementList \} from "@\/components\/holdings-management-list"/);
+    assert.match(pageSource, /<HoldingsManagementList holdings=\{visibleHoldings\}/);
+    assert.match(listSource, /isKrxGoldManualAssetCandidate\(holding\) \?[^\n]*<ManualKrxGoldPriceForm/);
+    assert.doesNotMatch(listSource, /"use client"|fetch\s*\(|\/api\//);
   });
 
   it("keeps the current CRUD boundary admin-protected", () => {

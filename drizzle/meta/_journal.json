@@ -309,6 +309,13 @@
       "when": 1788961110400,
       "tag": "0043_powerful_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789013264866,
+      "tag": "0044_holding_correction_optional_cost",
+      "breakpoints": true
     }
   ]
 }

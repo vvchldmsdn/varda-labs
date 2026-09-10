@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { isHoldingMutationVersion } from "../src/lib/holding-mutation-version.ts";
 import { parseHoldingStateCorrectionInput } from "../src/lib/holding-state-correction.ts";
@@ -49,6 +50,7 @@ async function fixture() {
   const pg = database ??= new PGlite();
   const sqlErrors = [];
   await pg.exec("drop schema public cascade; create schema public;" + DDL);
+  await pg.exec(readFileSync(new URL("../drizzle/0044_holding_correction_optional_cost.sql", import.meta.url), "utf8"));
   // The mutation token must be UTC independently of the database session timezone.
   await pg.exec("set timezone = 'Asia/Seoul'");
   await pg.query("insert into accounts values ($1, $2, 'brokerage', 'Brokerage', 0, true)", [account, owner]);
@@ -90,6 +92,51 @@ async function fixture() {
 
 describe("holding mutation version SQL round trips", () => {
   after(async () => { await database?.close(); });
+
+  it("corrects quantity before cost is known, retains null audit evidence, then allows later cost entry", async () => {
+    const f = await fixture();
+    const before = await f.holding();
+    const quantityOnly = form(before.updatedAt, "");
+    quantityOnly.set("quantity", "3");
+    assert.equal((await f.correction.writeSessionHoldingStateCorrection(quantityOnly)).status, "success");
+    const corrected = await f.holding();
+    assert.equal(Number(corrected.quantity), 3);
+    assert.equal(corrected.averageCost, null);
+    assert.equal(corrected.currentPrice, before.currentPrice);
+    assert.notEqual(corrected.updatedAt, before.updatedAt);
+    assert.equal((await f.correction.writeSessionHoldingStateCorrection(quantityOnly)).status, "conflict");
+    const audit = (await f.pg.query("select previous_quantity::text, corrected_quantity::text, previous_average_cost, corrected_average_cost from holding_state_corrections")).rows;
+    assert.equal(audit.length, 1);
+    assert.equal(Number(audit[0].previous_quantity), 2);
+    assert.equal(Number(audit[0].corrected_quantity), 3);
+    assert.equal(audit[0].previous_average_cost, null);
+    assert.equal(audit[0].corrected_average_cost, null);
+    const addCost = form(corrected.updatedAt, "100");
+    addCost.set("quantity", "3");
+    assert.equal((await f.correction.writeSessionHoldingStateCorrection(addCost)).status, "success");
+    const withCost = await f.holding();
+    assert.equal(Number(withCost.quantity), 3);
+    assert.equal(Number(withCost.averageCost), 100);
+  });
+
+  it("preserves known cost when an empty cost field accompanies a quantity correction, including no-op detection", async () => {
+    const f = await fixture();
+    assert.equal((await f.correction.writeSessionHoldingStateCorrection(form((await f.holding()).updatedAt, "100"))).status, "success");
+    const before = await f.holding();
+    const quantityOnly = form(before.updatedAt, "");
+    quantityOnly.set("quantity", "3");
+    assert.equal((await f.correction.writeSessionHoldingStateCorrection(quantityOnly)).status, "success");
+    const corrected = await f.holding();
+    assert.equal(Number(corrected.quantity), 3);
+    assert.equal(Number(corrected.averageCost), 100);
+    assert.equal(corrected.currentPrice, before.currentPrice);
+    const audit = (await f.pg.query("select previous_average_cost, corrected_average_cost from holding_state_corrections order by corrected_at desc limit 1")).rows[0];
+    assert.equal(Number(audit.previous_average_cost), 100);
+    assert.equal(Number(audit.corrected_average_cost), 100);
+    quantityOnly.set("expectedUpdatedAt", corrected.updatedAt);
+    assert.equal((await f.correction.writeSessionHoldingStateCorrection(quantityOnly)).status, "invalid");
+    assert.equal((await f.pg.query("select count(*)::int as n from holding_state_corrections")).rows[0].n, 2);
+  });
 
   it("adds missing cost and permits a second correction without changing valuation or inventing trades", async () => {
     const f = await fixture();
@@ -155,7 +202,7 @@ create table assets (
 );
 create table holding_state_corrections (
   id uuid primary key default gen_random_uuid(), canonical_owner_user_id uuid, asset_id uuid, account_id uuid,
-  previous_quantity numeric, corrected_quantity numeric, previous_average_cost numeric, corrected_average_cost numeric,
+  previous_quantity numeric, corrected_quantity numeric, previous_average_cost numeric, corrected_average_cost numeric not null check(corrected_average_cost > 0),
   previous_asset_updated_at timestamptz, corrected_asset_updated_at timestamptz, reason text, policy_version text, corrected_at timestamptz
 );
 create table portfolio_group_asset_memberships (id uuid primary key, asset_id uuid, canonical_owner_user_id uuid, valid_from date, valid_to date);

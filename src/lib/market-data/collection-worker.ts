@@ -12,6 +12,7 @@ import { createKisMarketDataProvider, createKisProviderRequestSession, fetchKisU
 import { runUsdKrwFxCandidateJob } from "@/lib/market-data/fx-refresh-job";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { withKisCollectionDeadline } from "@/lib/market-data/provider-budget";
+import { revalidateLatestClose } from "@/lib/market-data/latest-close-revalidation";
 
 /** Durable queue owns the work. A terminated after callback is recoverable. */
 export function scheduleMarketCollection() {
@@ -43,6 +44,7 @@ export async function drainMarketCollection() {
                 explicitTargets: [{ ticker: job.ticker, market: job.market, currency: job.currency }] });
               ok = result.successCount === 1 && result.failedCount === 0;
             }
+            if (ok) await revalidateLatestClose({ target: job, provider });
           } else if (job.kind === "history" && job.startDate && job.endDate) {
             const result = await runKisHistoryCacheSync({ targets: [{ key: job.key, ticker: job.ticker,
               market: job.market, currency: job.currency, accounts: [], assetIds: [], assetNames: [] }],
@@ -60,6 +62,7 @@ export async function drainMarketCollection() {
             }
           }
         } catch (error) {
+          ok = false;
           deferred = isProviderCollectionDeferred(error);
           const wait = typeof error === "object" && error !== null && "retryAfterSeconds" in error ? Number(error.retryAfterSeconds) : 0;
           if (Number.isFinite(wait) && wait > 0) retryAfterSeconds = Math.max(retryAfterSeconds, Math.min(3600, Math.ceil(wait)));

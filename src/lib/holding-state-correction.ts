@@ -22,7 +22,8 @@ export type HoldingStateCorrectionInput = Readonly<{
   assetId: string;
   expectedUpdatedAt: string;
   quantity: string;
-  averageCost: string;
+  /** Null preserves the existing cost, including an unknown cost. */
+  averageCost: string | null;
   reason: string | null;
 }>;
 
@@ -53,8 +54,11 @@ export function parseHoldingStateCorrectionInput(
     return invalid("보유 수량은 0보다 큰 숫자로 소수점 6자리까지 입력해 주세요.");
   }
 
-  const averageCost = positiveDecimal(formData.get("averageCost"), 20, 4);
-  if (averageCost === null) {
+  const averageCostInput = formData.get("averageCost");
+  const preserveAverageCost = averageCostInput === null ||
+    (typeof averageCostInput === "string" && averageCostInput.trim() === "");
+  const averageCost = preserveAverageCost ? null : positiveDecimal(averageCostInput, 20, 4);
+  if (!preserveAverageCost && averageCost === null) {
     return invalid(
       "1좌당 평균 매입가는 0보다 큰 숫자로 소수점 4자리까지 입력해 주세요.",
     );
