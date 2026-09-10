@@ -13,9 +13,8 @@ export function InvestmentLabFirstSteps({ scopeKey, onOpenPanel }: {
     <section className={styles.firstSteps} data-lab-first-steps>
       <div className={styles.firstStepsIntro}>
         <p className="varda-kicker"><T ko="지금 구성으로 시작하기" en="Start with what you own" /></p>
-        <h2><T ko="내 종목으로, 다른 가능성을 살펴보세요." en="Explore another possibility with your holdings." /></h2>
-        <p><T ko="내 실제 기록과 투자 방법을 비교하려면 서로 다른 날짜의 평가 기록이 더 필요해요. 그동안 현재 보유 구성으로 이런 질문을 살펴볼 수 있어요." en="Comparing investment methods against your own results needs more valuation records from different dates. Meanwhile, explore these questions using your current holdings." /></p>
-        <p className={styles.firstStepsBoundary}><T ko="각 실험은 확인된 가격·평가액 범위에서 계산해요. 지금 구성으로 만든 가정이며, 내 과거 수익이나 실제 매매 기록이 되지 않아요." en="Each experiment uses verified price and valuation evidence. These are hypothetical results for your current holdings, not your past returns or actual trades." /></p>
+        <h2><T ko="내 종목으로 시작하는 실험" en="Explore your portfolio." /></h2>
+        <p><T ko="내 기록이 쌓이기 전에도, 지금 보유한 종목으로 실험할 수 있어요." en="Explore today’s holdings while your personal history builds." /></p>
       </div>
       <div className={styles.firstStepActions}>
         <button type="button" className={styles.firstStepAction} onClick={() => onOpenPanel("weights")}>
@@ -34,6 +33,7 @@ export function InvestmentLabFirstSteps({ scopeKey, onOpenPanel }: {
           <ArrowUpRight aria-hidden="true" size={18} />
         </button>
       </div>
+      <p className={styles.firstStepsBoundary}><T ko="각 실험은 확인된 가격·평가액 범위에서 계산해요. 지금 구성으로 만든 가정이며, 내 과거 수익이나 실제 매매 기록이 되지 않아요." en="Each experiment uses verified price and valuation evidence. These are hypothetical results for your current holdings, not your past returns or actual trades." /></p>
     </section>
   );
 }
