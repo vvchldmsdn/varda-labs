@@ -124,6 +124,7 @@ export type PortfolioMovementContribution = {
 
 export type PortfolioMovementExclusionReason =
   | "missing_baseline_snapshot"
+  | "stale_baseline_snapshot"
   | "missing_fresh_live_prices"
   | "manual_valuation_not_updated_in_cycle"
   | "missing_previous_close_fallback"

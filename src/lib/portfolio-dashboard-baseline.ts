@@ -60,6 +60,9 @@ export function selectLatestPortfolioDashboardBaselineRows<
   return {
     storageSnapshotDate,
     baselineReferenceDate,
+    // Keep the latest past record available as context, but a delayed cycle
+    // cannot represent the current service day's change.
+    isCurrent: storageSnapshotDate === serviceDate,
     rows:
       storageSnapshotDate === null
         ? []

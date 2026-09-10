@@ -271,6 +271,7 @@ export async function getPortfolioDashboard(
     recentFxRows,
     latestPositionRows,
     baselineReferenceDate,
+    baselineIsCurrent,
     recentPositionRows,
     historyAssetIds,
     recentPortfolioRows,
@@ -286,6 +287,8 @@ export async function getPortfolioDashboard(
   });
 
   const movementBaselineDate = baselineReferenceDate;
+  const activeMovementBaselineDate = baselineIsCurrent ? movementBaselineDate : null;
+  const baselineIsDelayed = movementBaselineDate !== null && !baselineIsCurrent;
 
   const investmentAssetRows = assetRows.filter(isDashboardInvestmentAsset);
   const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
@@ -356,14 +359,14 @@ export async function getPortfolioDashboard(
     positionRows: latestPositionRows,
     eventRows,
     selectedAccount: "all",
-    baselineDate: movementBaselineDate,
+    baselineDate: activeMovementBaselineDate,
     usdKrwRate,
     movementCycle,
   });
   const previousCloseFallback = buildPreviousCloseMovement({
     holdings: holdingsBase,
     priceRows: recentPriceRows,
-    referenceDate: movementBaselineDate,
+    referenceDate: activeMovementBaselineDate,
     usdKrwRate,
     movementCycle,
   });
@@ -373,7 +376,18 @@ export async function getPortfolioDashboard(
     movementBaselineDate !== null && event.eventDate > movementBaselineDate &&
     (event.eventType === "buy" || event.eventType === "sell"),
   );
-  const movement = dailyPositionMovement.ready
+  // Never relabel a delayed snapshot's multi-day move as today's change. The
+  // historical baseline date remains visible, and live valuation stays intact.
+  const movement = baselineIsDelayed
+    ? {
+        ...dailyPositionMovement,
+        reason: "stale_baseline_snapshot",
+        exclusions: dailyPositionMovement.exclusions.map((exclusion) => ({
+          ...exclusion,
+          reason: "stale_baseline_snapshot" as const,
+        })),
+      }
+    : dailyPositionMovement.ready
     ? dailyPositionMovement
     : canUsePreviousCloseFallback && previousCloseFallback.ready
       ? previousCloseFallback

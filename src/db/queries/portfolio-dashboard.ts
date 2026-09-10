@@ -311,6 +311,7 @@ async function loadDashboardContextSources({
     recentFxRows,
     latestPositionRows: baselineSelection.rows,
     baselineReferenceDate: baselineSelection.baselineReferenceDate,
+    baselineIsCurrent: baselineSelection.isCurrent,
     recentPositionRows,
     historyAssetIds,
     recentPortfolioRows,

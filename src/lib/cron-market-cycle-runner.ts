@@ -13,11 +13,8 @@ import {
 } from "@/lib/cron-market-cycle-run-repository";
 import { runCoreMarketFactorRefreshJob } from "@/lib/market-data/core-market-factor-refresh-job";
 import { runUsdKrwFxRefreshJob } from "@/lib/market-data/fx-refresh-job";
-import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
-import {
-  getKisPriceSyncCooldownStatus,
-  runMarketPriceSync,
-} from "@/lib/market-data/price-sync";
+import { KisRefreshLeaseBusyError, withKisCollectionLeaseWait } from "@/lib/market-data/kis-refresh-lease";
+import { runMarketPriceSync } from "@/lib/market-data/price-sync";
 import {
   createKisMarketDataProvider,
   getKisProviderPolicy,
@@ -45,7 +42,7 @@ type CloseSyncSummary = {
 };
 
 type LiveSyncSummary = {
-  status: "not_attempted" | "completed" | "partial";
+  status: "not_attempted" | "completed" | "partial" | "failed";
   expectedTargetCount: number;
   requestedCount: number;
   successCount: number;
@@ -80,7 +77,7 @@ export type CronMarketCycleRunResult = {
   runId: string | null;
   snapshotDate: string;
   fx: {
-    status: "written" | "skipped" | "not_attempted";
+    status: "written" | "skipped" | "not_attempted" | "failed";
     rateDate: string | null;
     source: string | null;
   };
@@ -103,7 +100,7 @@ export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): 
   scheduleMarketCollection();
   try {
     // All close groups and the following live refresh share one internal lease.
-    return await withKisRefreshLease(() => runMarketCycleWithLease(options));
+    return await withKisCollectionLeaseWait(() => runMarketCycleWithLease(options));
   } catch (error) {
     if (error instanceof KisRefreshLeaseBusyError) {
       return emptyResult({
@@ -155,19 +152,6 @@ async function runMarketCycleWithLease({
   let kisProvider: MarketDataProvider | null = null;
 
   try {
-    const fxResult = await runUsdKrwFxRefreshJob({
-      dryRun: false,
-      acceptExistingVardaRow: true,
-    });
-    if (fxResult.status === "planned" || fxResult.status === "blocked") {
-      throw new Error("FX refresh did not produce an admissible actual result");
-    }
-    fxSummary = {
-      status: fxResult.status,
-      rateDate: fxResult.candidate.rateDate,
-      source: fxResult.candidate.source,
-    };
-
     try {
       const factorResult = await runCoreMarketFactorRefreshJob({
         dryRun: false,
@@ -185,7 +169,7 @@ async function runMarketCycleWithLease({
       factorSync = { ...emptyFactorSyncSummary(), status: "failed" };
     }
 
-    let { snapshotJob, plan } = await loadPlan(now);
+    let { snapshotJob, plan, deferredBlockers } = await loadPlan(now);
     if (!plan.ok) {
       return finishBlocked({
         runId,
@@ -221,7 +205,7 @@ async function runMarketCycleWithLease({
 
       kisProvider = createKisMarketDataProvider();
       closeSync = await syncCloseGroups(plan.closeGroups, kisProvider);
-      ({ snapshotJob, plan } = await loadPlan(now));
+      ({ snapshotJob, plan, deferredBlockers } = await loadPlan(now));
       if (!plan.ok || plan.action === "sync_closes_then_snapshot") {
         return finishBlocked({
           runId,
@@ -247,6 +231,13 @@ async function runMarketCycleWithLease({
     }
 
     if (plan.action === "no_action") {
+      if (deferredBlockers.length > 0) {
+        return finishBlocked({
+          runId, snapshotDate, fxSummary, factorSync, closeSync, liveSync,
+          plan: { ...plan, ok: false, action: "blocked", blockers: deferredBlockers },
+          snapshotJob,
+        });
+      }
       const result = emptyResult({
         ok: true,
         status: "no_action",
@@ -261,45 +252,8 @@ async function runMarketCycleWithLease({
       return result;
     }
 
-    const policy = getKisProviderPolicy();
-    if (!policy.configured) {
-      return finishBlocked({
-        runId,
-        snapshotDate,
-        fxSummary,
-        factorSync,
-        closeSync,
-        liveSync,
-        plan: {
-          ...plan,
-          ok: false,
-          action: "blocked",
-          blockers: [...plan.blockers, "kis_provider_not_configured"],
-        },
-        snapshotJob,
-      });
-    }
-
-    kisProvider ??= createKisMarketDataProvider();
-    liveSync = await syncLiveQuotes(kisProvider);
-    if (liveSync.status !== "completed") {
-      return finishBlocked({
-        runId,
-        snapshotDate,
-        fxSummary,
-        factorSync,
-        closeSync,
-        liveSync,
-        plan: {
-          ...plan,
-          ok: false,
-          action: "blocked",
-          blockers: [...plan.blockers, "live_quote_sync_incomplete"],
-        },
-        snapshotJob,
-      });
-    }
-
+    // Persist independently admitted cutoff evidence before requesting today's
+    // quotes. An unrelated live symbol/provider failure must not lose a day.
     const snapshotWrite = await runDailySnapshotJob({
       dryRun: false,
       snapshotDate,
@@ -323,10 +277,39 @@ async function runMarketCycleWithLease({
         closeSync,
         liveSync,
         snapshot: snapshotSummary,
-        blockers: ["snapshot_write_incomplete"],
+        blockers: ["snapshot_write_incomplete", ...deferredBlockers],
       });
       await finishRun(result, "blocked");
       return result;
+    }
+
+    // FX rows are upserted by date. Refreshing before the snapshot can replace
+    // the last observation from before 07:00 with an inadmissible later one.
+    try {
+      const fxResult = await runUsdKrwFxRefreshJob({
+        dryRun: false,
+        acceptExistingVardaRow: true,
+      });
+      if (fxResult.status === "planned" || fxResult.status === "blocked") {
+        fxSummary = { status: "failed", rateDate: null, source: null };
+      } else {
+        fxSummary = {
+          status: fxResult.status,
+          rateDate: fxResult.candidate.rateDate,
+          source: fxResult.candidate.source,
+        };
+      }
+    } catch {
+      fxSummary = { status: "failed", rateDate: null, source: null };
+    }
+
+    if (getKisProviderPolicy().configured) {
+      try {
+        kisProvider ??= createKisMarketDataProvider();
+        liveSync = await syncLiveQuotes(kisProvider);
+      } catch {
+        liveSync = { ...emptyLiveSyncSummary(), status: "failed" };
+      }
     }
 
     const result = emptyResult({
@@ -365,15 +348,29 @@ async function runMarketCycleWithLease({
 }
 
 async function loadPlan(now: Date) {
-  const [snapshotJob, kisCooldown] = await Promise.all([
-    runDailySnapshotJob({ dryRun: true, now }),
-    getKisPriceSyncCooldownStatus("close", now),
-  ]);
+  const snapshotJob = await runDailySnapshotJob({ dryRun: true, now });
+  // Invalid evidence belongs to its tenant. Keep those failures in the job
+  // report while allowing other owners' independently checked snapshots to run.
+  const targetPlans = snapshotJob.targets.map((target) => ({
+    target,
+    plan: buildCronMarketCyclePlan({
+      snapshotJob: { ...snapshotJob, targetCount: 1,
+        failedCount: target.status === "failed" ? 1 : 0, targets: [target] },
+      kisCooldownActive: false,
+    }),
+  }));
+  const eligible = targetPlans.filter(({ plan }) => plan.ok).map(({ target }) => target);
+  const isolateTargets = eligible.length > 0 && eligible.length < snapshotJob.targets.length;
   return {
     snapshotJob,
+    deferredBlockers: [...new Set(targetPlans.filter(({ plan }) => !plan.ok).flatMap(({ plan }) => plan.blockers))].sort(),
     plan: buildCronMarketCyclePlan({
-      snapshotJob,
-      kisCooldownActive: kisCooldown.active,
+      snapshotJob: isolateTargets
+        ? { ...snapshotJob, targetCount: eligible.length, failedCount: 0, targets: eligible }
+        : snapshotJob,
+      // This path already owns the collection lease. Each KIS HTTP call still
+      // consumes the durable budget; legacy whole-job idle time does not apply.
+      kisCooldownActive: false,
     }),
   };
 }

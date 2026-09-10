@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTableName } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 const ownerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const accountId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -62,6 +65,81 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
 const historicalPositionReads = (trace) => trace.filter((request) => request.table === "daily_position_snapshots" && request.limit !== null);
 
 describe("dashboard query demand and independent market reads", () => {
+  it("withholds a delayed cutoff's multi-day movement at 08:43 while keeping live value and price returns", async (t) => {
+    const now = new Date("2026-09-09T23:43:00Z");
+    t.mock.timers.enable({ apis: ["Date"], now });
+    const koreanAsset = { ...baseAsset, ticker: "069500", name: "KODEX 200", market: "korea", currency: "KRW" };
+    const f = await fixture({ assetRows: [koreanAsset], eventRows: [],
+      baselineRows: [{ id: "delayed-snapshot", snapshotDate: "2026-09-09", assetId, account: "brokerage", ticker: "069500", assetType: "etf", quantity: "10", unitPrice: "100", marketValueKrw: "1000", fxRate: "1" }],
+      liveRows: [{ ticker: "069500", market: "korea", currency: "KRW", price: "110", status: "ok", quoteType: "live", fetchedAt: now, priceAsOf: now }],
+      priceRows: ["2026-09-08", "2026-09-09"].map(priceDate => ({ ticker: "069500", market: "korea", currency: "KRW", priceDate, closePrice: priceDate === "2026-09-09" ? "110" : "100", fxRate: "1" })),
+    });
+    const args = { analysisScopes: [scope], scope, tenantContext };
+    const home = await f.model.getPortfolioDashboard(args);
+    const today = await f.model.getPortfolioDashboard({ ...args, demand: { surface: "today", holdingDetail: emptyDetail } });
+    assert.equal(home.totalValueKrw, 1100, "the current valuation is never replaced or cleared");
+    assert.equal(home.movementBaselineDate, "2026-09-08", "keep the last historical baseline explicit");
+    assert.equal(home.dataHealth.latestSnapshotPositions, 1);
+    assert.equal(home.todayMovement.ready, false);
+    assert.equal(home.todayMovement.reason, "stale_baseline_snapshot");
+    assert.equal(home.dataHealth.movementReason, "stale_baseline_snapshot");
+    for (const key of ["todayChangeKrw", "todayReturnPct", "todayFxChangeKrw"]) assert.equal(home[key], null, key);
+    for (const key of ["changeKrw", "priceChangeKrw", "fxChangeKrw", "returnPct", "scopePreviousTotalKrw", "scopeCurrentTotalKrw"]) assert.equal(home.todayMovement[key], null, key);
+    assert.deepEqual(home.todayMovement.contributionRows, []);
+    assert.deepEqual(home.topMovers, []);
+    assert.equal(home.holdings[0].dailyChangeKrw, null);
+    assert.equal(home.holdings[0].dailyReturnPct, null);
+    assert.deepEqual(home.todayMovement.exclusions.map(row => row.reason), ["stale_baseline_snapshot"]);
+    assert.deepEqual(today.todayMovement, home.todayMovement);
+    const cell = home.holdingHistory.rows[0].cells.at(-1);
+    assert.equal(cell.date, "2026-09-10");
+    assert.equal(cell.changePct, 0, "the separately evidenced unchanged unit price stays available");
+    assert.equal(cell.marketValueKrw, 1100);
+    assert.equal(cell.changeKrw, null, "the stale portfolio movement cannot leak into today's heatmap detail");
+
+    const [{ PortfolioDashboard }, { TodayMovement }, { LocaleProvider }] = await importUiWithPorts([
+      "src/components/portfolio-dashboard.tsx", "src/components/today-movement.tsx", "src/components/i18n/locale-provider.tsx",
+    ], {
+      "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() { throw new Error("SSR must not refresh"); } }) },
+      "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },
+      "next/image": { default: props => createElement("img", Object.fromEntries(Object.entries(props).filter(([name]) => name !== "priority"))) },
+    });
+    for (const [initialLocale, pendingLabel, baselineLabel] of [["ko", "07:00 KST 기준 기록 준비 중", "마지막 기준일"], ["en", "Awaiting the 07:00 KST baseline", "Last baseline"]]) {
+      for (const component of [PortfolioDashboard, TodayMovement]) {
+        const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, createElement(component, { data: home })));
+        const summary = html.match(/<section class="stageSummary"[\s\S]*?<\/section>/)?.[0];
+        assert.ok(summary?.includes(pendingLabel), `${component.name}/${initialLocale}: cutoff delay appears in the primary content`);
+        assert.ok(summary.includes(baselineLabel), `${component.name}/${initialLocale}: the older date is labeled as the last baseline`);
+        assert.ok(summary.includes("2026.09.08"));
+        assert.ok(summary.includes("stageWarning"), "the notice uses the visible mobile and desktop warning slot");
+        assert.doesNotMatch(html, /data-holding-detail-trigger="(?:row|summary)"/, "there are no stale contribution actions");
+      }
+    }
+  });
+
+  for (const scenario of [
+    { label: "the new cutoff's unchanged KRW prices", now: "2026-09-09T23:43:00Z", snapshotDate: "2026-09-10", currency: "KRW", fxRate: "1", expectedFx: 0 },
+    { label: "FX-only movement with a current cutoff", now: "2026-09-09T23:43:00Z", snapshotDate: "2026-09-10", currency: "USD", fxRate: "1399", expectedFx: 1100 },
+    { label: "the existing cycle immediately before 07:00", now: "2026-09-09T21:59:59Z", snapshotDate: "2026-09-09", currency: "KRW", fxRate: "1", expectedFx: 0 },
+  ]) {
+    it(`preserves ${scenario.label}`, async (t) => {
+      const now = new Date(scenario.now);
+      t.mock.timers.enable({ apis: ["Date"], now });
+      const instrument = { ticker: scenario.currency === "USD" ? "QQQ" : "069500", market: scenario.currency === "USD" ? "us" : "korea", currency: scenario.currency };
+      const f = await fixture({ assetRows: [{ ...baseAsset, ...instrument }], eventRows: [],
+        baselineRows: [{ id: "current-snapshot", snapshotDate: scenario.snapshotDate, assetId, account: "brokerage", ...instrument, assetType: "etf", quantity: "10", unitPrice: "110", marketValueKrw: String(1100 * Number(scenario.fxRate)), fxRate: scenario.fxRate }],
+        liveRows: [{ ...instrument, price: "110", status: "ok", quoteType: "live", fetchedAt: now, priceAsOf: now }],
+      });
+      const home = await f.model.getPortfolioDashboard({ analysisScopes: [scope], scope, tenantContext });
+      assert.equal(home.todayMovement.ready, true);
+      assert.equal(home.todayMovement.reason, null);
+      assert.equal(home.todayMovement.changeKrw, scenario.expectedFx);
+      assert.equal(home.todayMovement.priceChangeKrw, 0);
+      assert.equal(home.todayMovement.fxChangeKrw, scenario.expectedFx);
+      assert.equal(home.todayMovement.contributionRows.length, 1);
+    });
+  }
+
   it("connects today's KST heatmap to native price return while preserving separate FX movement", async (t) => {
     t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-08T15:20:00Z") });
     const f = await fixture({ assetRows: [baseAsset], eventRows: [],

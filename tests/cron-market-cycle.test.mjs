@@ -149,7 +149,6 @@ describe("Cron market-cycle controller", () => {
     );
     assert.match(runner, /mode: "close"/);
     assert.match(runner, /mode: "live"/);
-    assert.match(runner, /live_quote_sync_incomplete/);
     assert.match(runner, /runDailySnapshotJob\(\{[\s\S]*now: new Date\(\)/);
     assert.match(repository, /pg_try_advisory_xact_lock/);
     assert.match(repository, /metadata_json ->> 'snapshotDate'/);

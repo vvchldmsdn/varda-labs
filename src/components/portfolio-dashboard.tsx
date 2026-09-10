@@ -41,6 +41,7 @@ export function PortfolioDashboard({
   liveSyncEnabled?: boolean;
 }) {
   const movementReady = data.dataHealth.movementReady;
+  const baselineIsDelayed = data.dataHealth.movementReason === "stale_baseline_snapshot";
   const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
   const topContributor = movementReady
     ? selectLargestMovementContributor(data.holdings)
@@ -107,17 +108,18 @@ export function PortfolioDashboard({
               <dd className={toneClass(todayChangeKrw)}>
                 {<T ko={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"} en={translateHomeHistory(movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기")}/>}
               </dd>
-              <dd className={styles.status}><T ko="기준일" en="As of"/> {<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</dd>
+              <dd className={styles.status}><T ko={baselineIsDelayed ? "마지막 기준일" : "기준일"} en={baselineIsDelayed ? "Last baseline" : "As of"}/> {<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</dd>
             </dl>
             <dl className={styles.summaryMetric}>
               <dt><T ko="누적 수익률" en="Total return"/></dt>
               <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
               <dd className={styles.status}>{<T ko={data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(data.totalPnlKrw === null ? "원가 근거 부족" : `누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)}/>}</dd>
             </dl>
-            <div className={styles.stageNote}>
-              <span><T ko="오늘의 최대 기여" en="Largest contributor today"/></span>
+            <div className={`${styles.stageNote} ${baselineIsDelayed ? styles.stageWarning : ""}`}>
+              <span><T ko={baselineIsDelayed ? "오늘 변동" : "오늘의 최대 기여"} en={baselineIsDelayed ? "Today's change" : "Largest contributor today"}/></span>
               <strong><T ko={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} en={movementReady ? topContributor?.name ?? "No change" : "Awaiting data"}/></strong>
               <p><T ko={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)} en={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount, "en") : translateHomeHistory(movementPendingReason(data))}/></p>
+              {baselineIsDelayed ? <p><T ko="새 기준 기록이 준비되면 오늘 변동이 계산됩니다. 현재 평가액은 최신 시세로 표시합니다." en="Today's change will appear when the new baseline is ready. Current value still uses the latest prices."/></p> : null}
             </div>
           </section>
 
@@ -238,6 +240,7 @@ function movementBasisText(data: DashboardData) {
 }
 
 function movementPendingReason(data: DashboardData) {
+  if (data.dataHealth.movementReason === "stale_baseline_snapshot") return "07:00 KST 기준 기록 준비 중";
   if (data.dataHealth.movementReason === "missing_current_price") return "현재가 근거 부족";
   if (data.dataHealth.movementReason === "missing_baseline_snapshot") return "기준 스냅샷 부족";
   if (data.dataHealth.movementReason === "missing_fresh_live_prices") return "실시간 시세 갱신 필요";
