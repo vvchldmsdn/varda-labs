@@ -10,10 +10,11 @@ import { closeCalendarReferenceDateForAsset, resolveSnapshotCycle } from "../src
 const target = { ticker: "AAPL", market: "us", currency: "USD" };
 const lookup = { ...target, key: "us:USD:AAPL", accounts: [], assetIds: [], assetNames: [] };
 let database;
-async function fixture() {
+async function fixture({ now: fixtureNow = new Date("2026-09-10T04:10:31Z"), useWallClock = false } = {}) {
   const pg = database ??= new PGlite();
   await pg.exec("drop schema public cascade; create schema public;" + DDL);
-  const now = new Date();
+  const now = useWallClock ? new Date() : fixtureNow;
+  let clock = now;
   const date = closeCalendarReferenceDateForAsset(target, resolveSnapshotCycle(now).snapshotDate);
   let concurrentUpdate;
   const client = new Proxy(pg, { get(object, key) {
@@ -27,7 +28,15 @@ async function fixture() {
     return typeof value === "function" ? value.bind(object) : value;
   } });
   const sqlClient = {
-    query: async (sql, parameters = []) => (await pg.query(sql, parameters)).rows,
+    query: async (sql, parameters = []) => {
+      // Direct revalidation tests advance an injected clock. Keep completed-at
+      // evidence on that clock too; the durable worker retains PostgreSQL time.
+      if (!useWallClock && sql.startsWith("update market_data_sync_runs") && sql.includes("clock_timestamp()")) {
+        sql = sql.replaceAll("clock_timestamp()", `$${parameters.length + 1}::timestamptz`);
+        parameters = [...parameters, clock.toISOString()];
+      }
+      return (await pg.query(sql, parameters)).rows;
+    },
     async transaction(build) {
       const commands = build({ query: (sql, parameters = []) => ({ sql, parameters }) });
       return pg.transaction(async tx => {
@@ -54,7 +63,10 @@ async function fixture() {
   return { pg, now, date, row, repository, revalidation, provider, sqlClient, calls: () => calls,
     setRows(rows) { responseRows = rows; },
     race(run) { concurrentUpdate = run; },
-    run(at = now, selectedProvider = provider) { return revalidation.revalidateLatestClose({ target, provider: selectedProvider, now: at }); },
+    run(at = now, selectedProvider = provider) {
+      clock = at;
+      return revalidation.revalidateLatestClose({ target, provider: selectedProvider, now: at });
+    },
     write(rows) { return repository.applyAssetPriceSnapshotRows({ rows, targets: [lookup], dryRun: false, writePolicy: "kis", allowWrite: true }); },
     async seed(extra = {}) { return repository.applyAssetPriceSnapshotRows({ rows: [row({ closePrice: "317.55", fetchedAt: new Date(now.getTime() - 2 * 3600000), ...extra })], targets: [lookup], dryRun: false, writePolicy: "kis", allowWrite: true }); },
     async stored() { return (await pg.query("select close_price,fetched_at,date::text as date from asset_price_snapshots order by date desc")).rows; },
@@ -88,6 +100,21 @@ describe("latest shared close revalidation", () => {
     assert.equal((await f.stored())[0].fetched_at.toISOString(), f.now.toISOString());
     await f.run(new Date(f.now.getTime() + 30 * 60000)); assert.equal(f.calls(), 1);
     await f.run(new Date(f.now.getTime() + 61 * 60000)); assert.equal(f.calls(), 2);
+  });
+  it("requests the new close date across the 07:00 KST cutoff even when the prior date is fresh", async () => {
+    const f = await fixture({ now: new Date("2026-09-10T21:59:00Z") });
+    const requestedDates = [];
+    const provider = { name: "kis", async fetchClosePrices(_targets, context) {
+      requestedDates.push(context.priceDate);
+      return { provider: "kis", rows: [f.row({ priceDate: context.priceDate, fetchedAt: context.requestedAt })] };
+    } };
+    assert.equal((await f.run(f.now, provider)).state, "revalidated");
+    const afterCutoff = new Date(f.now.getTime() + 2 * 60000);
+    assert.equal((await f.run(afterCutoff, provider)).state, "revalidated");
+    assert.deepEqual(requestedDates, ["2026-09-09", "2026-09-10"]);
+    assert.deepEqual((await f.stored()).map(row => row.date), ["2026-09-10", "2026-09-09"]);
+    assert.equal((await f.run(new Date(afterCutoff.getTime() + 5 * 60000), provider)).state, "fresh");
+    assert.equal(requestedDates.length, 2);
   });
   it("negative-caches an earlier actual close without relabeling it or refreshing its observation time", async () => {
     const f = await fixture();
@@ -153,7 +180,7 @@ describe("latest shared close revalidation", () => {
     const stored = (await f.stored())[0]; assert.equal(Number(stored.close_price), 316); assert.equal(stored.fetched_at.toISOString(), later.toISOString());
   });
   it("retains a failed close check in the durable queue and retries it without refetching a fresh live quote", async () => {
-    const f = await fixture(); await f.seed();
+    const f = await fixture({ useWallClock: true }); await f.seed();
     await f.pg.exec(readFileSync("drizzle/0043_powerful_living_tribunal.sql", "utf8"));
     await f.pg.exec("create table live_price_quotes(id uuid default gen_random_uuid(),ticker text,market text,currency text,provider text,status text,price numeric,fetched_at timestamptz)");
     let liveCalls = 0;

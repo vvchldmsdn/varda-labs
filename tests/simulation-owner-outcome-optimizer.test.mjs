@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import ts from "typescript";
 
 import {
   buildSimulationOwnerOutcomeCandidates,
+  searchSimulationOwnerOutcomeCandidatesFromTerminalGrowth,
   SIMULATION_OWNER_OUTCOME_OPTIMIZER_POLICY,
 } from "../src/lib/simulation-owner-outcome-optimizer.ts";
 import { prepareSimulationResearchPaths } from "../src/lib/simulation-research-execution-core.ts";
@@ -12,6 +15,18 @@ import {
 } from "./support/simulation-owner-ready-matrix.mjs";
 
 describe("owner simulation outcome candidate search", () => {
+  it("matches the original full-evaluation search exactly, including ties and rounding-close changes", async () => {
+    const reference = await fullEvaluationReference();
+    for (const mode of ["varied", "ties", "rounding", "large"]) {
+      const input = terminalFixture(mode);
+      const unchanged = structuredClone(input);
+      const actual = searchSimulationOwnerOutcomeCandidatesFromTerminalGrowth(input);
+      const expected = reference.searchSimulationOwnerOutcomeCandidatesFromTerminalGrowth(input);
+      assert.deepEqual(actual, expected, mode);
+      assert.deepEqual(input, unchanged, `${mode}: inputs remain unchanged`);
+    }
+  });
+
   it("finds deterministic candidates that improve on held-out paths within every guardrail", () => {
     const prepared = readyPrepared();
     const currentWeights = ownerWeights([5_000, 2_500, 2_500]);
@@ -141,4 +156,37 @@ function readyPrepared() {
   });
   assert.equal(prepared.status, "ready");
   return prepared;
+}
+
+function terminalFixture(mode) {
+  const instruments = Array.from({ length: 8 }, (_, i) => ({
+    instrumentKey: `${i % 2 ? "us|USD" : "korea|KRW"}|T${i}`,
+    market: i % 2 ? "us" : "korea", currency: i % 2 ? "USD" : "KRW", ticker: `T${i}`,
+  }));
+  return {
+    instruments,
+    currentWeights: instruments.map(row => ({ ...row, weightBps: 1250 })),
+    terminalFactors: Array.from({ length: 40 }, (_, pathIndex) => ({
+      pathIndex,
+      factors: instruments.map((_, asset) => {
+        if (mode === "rounding") return 1 + ((asset * 13 + pathIndex * 7) % 41) * 1e-14;
+        if (mode === "large") return 1e12 + ((asset * 13 + pathIndex * 7) % 41) * .0001;
+        return (95 + ((mode === "ties" ? Math.floor(asset / 2) : asset) * 13 + pathIndex * 7) % 41) / 100 + ((pathIndex % 7) - 3) * .0001;
+      }),
+    })),
+  };
+}
+
+async function fullEvaluationReference() {
+  // Disable only the new screening estimate. The reference therefore evaluates
+  // every feasible transfer with the pre-optimization full evaluator, retaining
+  // its floating-point results, constraints and lexicographic tie rules.
+  const sourceUrl = new URL("../src/lib/simulation-owner-outcome-optimizer.ts", import.meta.url);
+  const source = readFileSync(sourceUrl, "utf8");
+  const fullSource = source.replace(/const estimate = estimateTransferScore\(\{[\s\S]*?\}\);/, "const estimate = null;");
+  assert.notEqual(fullSource, source, "reference must disable transfer screening");
+  const compiled = ts.transpileModule(fullSource, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText.replace(/from (["'])(\.{1,2}\/[^"']+)\1/g, (_, quote, path) => `from ${quote}${new URL(path, sourceUrl).href}${quote}`);
+  return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 }

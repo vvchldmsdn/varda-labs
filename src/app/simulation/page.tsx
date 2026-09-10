@@ -12,6 +12,9 @@ import { buildSimulationPageControls } from "@/lib/simulation-page-controls";
 import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulation-owner-research";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import { resolveSimulationPathModel } from "@/lib/simulation-model-selection";
+import { getReadOnlyTenantSimulationOwnerEconomicResearch, economicResearchPresentation } from "@/db/queries/simulation-owner-economic";
+import { EconomicExecutionSection } from "@/components/simulation/economic-execution-section";
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return localizedMetadata({ title: "시뮬레이션 | VARDA LABS" }, "Simulation | VARDA LABS");
@@ -22,6 +25,7 @@ type SimulationPageProps = {
     scope?: string | string[];
     end?: string | string[];
     horizon?: string | string[];
+    model?: string | string[];
     kodexWeight?: string | string[];
     researchUniverse?: string | string[];
     view?: string | string[];
@@ -73,6 +77,7 @@ export default async function SimulationPage({
 
   const selectedScope = scopeContext.resolution.scope;
   const now = new Date();
+  const pathModel = resolveSimulationPathModel(params.model);
   const model = buildSimulationPageControls({
     endServiceDate: params.end,
     horizon: params.horizon,
@@ -89,13 +94,14 @@ export default async function SimulationPage({
   return (
     <SimulationInputReadinessView
       model={model}
+      pathModel={pathModel}
       scopeCatalog={scopeContext.catalog.scopes}
       selectedScopeKey={selectedScope.key}
       researchUniverse={typeof params.researchUniverse === "string" ? params.researchUniverse : null}
       ownerResearchExecution={
         <SimulationSectionErrorBoundary section="owner-research-execution" title="내 포트폴리오 확률 경로">
           <Suspense fallback={<p role="status"><SimulationText ko="확률 경로를 계산하고 있습니다." /></p>}>
-            <OwnerResearchExecutionContent resultPromise={ownerResearchPromise} selectedScopeKey={selectedScope.key} />
+            <OwnerResearchExecutionContent resultPromise={ownerResearchPromise} selectedScopeKey={selectedScope.key} pathModel={pathModel} stateAsOfServiceDate={typeof params.end === "string" && model.endServiceDateSelection.status === "valid" ? params.end : resolveSnapshotCycle(now).snapshotDate} />
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
@@ -103,10 +109,17 @@ export default async function SimulationPage({
   );
 }
 
-async function OwnerResearchExecutionContent({ resultPromise, selectedScopeKey }: {
+async function OwnerResearchExecutionContent({ resultPromise, selectedScopeKey, pathModel, stateAsOfServiceDate }: {
+  pathModel: ReturnType<typeof resolveSimulationPathModel>;
+  stateAsOfServiceDate: string;
   resultPromise: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch>;
   selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   const result = await resultPromise;
+  if (pathModel === null) return <p role="alert"><SimulationText ko="계산 모형을 확인해 주세요. 경제지표 또는 과거 수익률 경로를 선택할 수 있습니다." en="Choose Economic paths or Historical paths to run a model." /></p>;
+  if (pathModel === "economic") {
+    const economic = await getReadOnlyTenantSimulationOwnerEconomicResearch({ ownerResearchPromise: resultPromise, stateAsOfServiceDate });
+    return <EconomicExecutionSection result={economicResearchPresentation(economic)} baseline={result.execution} />;
+  }
   return <OwnerResearchExecutionSection execution={result.execution} selectedScopeKey={selectedScopeKey} />;
 }

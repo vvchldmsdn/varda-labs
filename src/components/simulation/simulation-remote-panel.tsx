@@ -22,10 +22,12 @@ import { RegimeHistoricalOutcomeValidationSection } from "./regime-historical-ou
 import { RegimeReadinessHistoryPanel } from "./regime-readiness-history-panel";
 import { RegimeBootstrapResearchSection } from "./regime-bootstrap-research-section";
 import { ResearchUniversePreflightSection } from "./research-universe-preflight-section";
+import { EconomicDetailPanel } from "./economic-detail-panel";
 
 export default function SimulationRemotePanel({ query }: { query: string }) {
   const { data, error, retry } = useResearchDetail<SimulationDetailData>("/api/research/simulation", query);
   if (!data) return <ResearchDetailStatus error={error} retry={retry} />;
+  if (data.pathModel === "economic") return protect("economic-detail", <EconomicDetailPanel data={data} />);
   if (data.panel === "weights" && data.candidateComparison) return <div id="simulation-weight-experiment">{protect("OwnerCandidateComparisonSection", <OwnerCandidateComparisonSection comparison={data.candidateComparison} instruments={data.instruments} />)}</div>;
   return <>
     {data.unavailableSections.length ? <p role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"읽지 못한 근거:"} />{" "}{data.unavailableSections.join(", ")}<SimulationText ko={". 준비된 결과는 아래에 표시합니다."} /></p> : null}

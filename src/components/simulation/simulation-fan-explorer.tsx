@@ -29,7 +29,7 @@ export function SimulationFanExplorer({
   const pt = useSimulationText();
   const executionName = execution.id.startsWith("owner-") && execution.name === "내 포트폴리오"
     ? pt("내 포트폴리오", "My portfolio")
-    : execution.name;
+    : pt(execution.name);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
   const [width, setWidth] = useState(960);

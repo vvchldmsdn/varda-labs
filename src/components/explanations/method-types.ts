@@ -1,6 +1,6 @@
 import type { GuideCopy } from "./calculation-guide-types";
 
-export type MethodTopic = "investment-lab" | "simulation" | "contribution" | "movement" | "risk";
+export type MethodTopic = "investment-lab" | "simulation" | "economic-simulation" | "contribution" | "movement" | "risk";
 
 export type MethodFigure =
   | { kind: "flow"; caption: GuideCopy; nodes: readonly { label: GuideCopy; detail: GuideCopy }[] }

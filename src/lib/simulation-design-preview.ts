@@ -23,6 +23,7 @@ export type SimulationPreviewQuery = {
   scope?: string | readonly string[];
   end?: string | string[];
   horizon?: string | string[];
+  model?: string | readonly string[];
   previewState?: string | string[];
 };
 
@@ -162,5 +163,5 @@ export function buildSimulationDesignPreview(query: SimulationPreviewQuery) {
     history: [],
     researchHorizonSelection: horizon,
   });
-  return { portfolio, execution, comparison, validation, preflight, model };
+  return { portfolio, execution, comparison, validation, preflight, model, matrix, currentWeights, dates };
 }
