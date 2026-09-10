@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const { buildInvestmentLabDesignPreview } = await import("@/lib/investment-lab-design-preview");
     const p = buildInvestmentLabDesignPreview(query);
     if (performance) return Response.json({ preview: true }, { headers: RESEARCH_DETAIL_HEADERS });
-    const data: InvestmentLabDetailData = { panel: panel!, xray: panel === "composition" ? p.etfXray : null, stress: null, adjustment: null, unavailableSections: [] };
+    const data: InvestmentLabDetailData = { panel: panel!, accountLabels: {}, xray: panel === "composition" ? p.etfXray : null, stress: null, adjustment: null, unavailableSections: [] };
     return Response.json(data, { headers: RESEARCH_DETAIL_HEADERS });
   }
   const context = await resolveResearchDetailContext(query);

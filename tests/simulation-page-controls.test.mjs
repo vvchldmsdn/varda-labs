@@ -2,9 +2,37 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import ts from "typescript";
 import { buildSimulationPageControls } from "../src/lib/simulation-page-controls.ts";
 import { resolveSnapshotCycle } from "../src/lib/snapshots/market-calendar.ts";
+
+test("the horizon selector never marks the default as selected for invalid or duplicate periods", async () => {
+  const [view] = await importUiWithPorts(["src/components/simulation/simulation-input-readiness-view.tsx"], {
+    "@/components/portfolio-primary-navigation": { PortfolioPrimaryNavigation: () => null },
+    "@/components/investment-lab/investment-lab-dialog": { InvestmentLabDialog: () => null },
+    "./simulation-workspace": { SimulationWorkspace: ({ tools }) => tools },
+    "./simulation-query-controls": {
+      SimulationScopeTabs: () => null, SimulationDateControl: () => null,
+      SimulationLink: ({ href, children, scroll, ...props }) => { assert.equal(scroll, false); return createElement("a", { ...props, href }, children); },
+    },
+  });
+  const scope = "account:11111111-1111-4111-8111-111111111111";
+  for (const [horizon, expectedSelection] of [[undefined, 63], ["126", 126], ["999", null], [["63", "126"], null]]) {
+    const model = buildSimulationPageControls({ now: new Date("2026-09-10T08:00:00Z"), horizon, endServiceDate: "2026-09-09" });
+    const html = renderToStaticMarkup(createElement(view.SimulationInputReadinessView, { model, scopeCatalog: [], selectedScopeKey: scope, researchUniverse: null }));
+    assert.ok(html.includes(`data-simulation-research-horizon="${expectedSelection ?? "invalid"}"`));
+    const links = [...html.matchAll(/<a\b([^>]*)>/g)].map(match => ({ attributes: match[1], url: new URL(match[1].match(/href="([^"]+)"/)[1].replaceAll("&amp;", "&"), "https://example.test") }));
+    assert.deepEqual(links.map(link => link.url.searchParams.get("horizon")), ["63", "126"]);
+    assert.ok(links.every(link => link.url.searchParams.get("scope") === scope && link.url.searchParams.get("end") === "2026-09-09"));
+    const selected = links.filter(link => link.attributes.includes('aria-current="page"'));
+    assert.equal(selected.length, expectedSelection === null ? 0 : 1);
+    if (expectedSelection !== null) assert.equal(Number(selected[0].url.searchParams.get("horizon")), expectedSelection);
+    else assert.match(html, /data-invalid-horizon-query/);
+  }
+});
 
 test("simulation controls preserve the 7 AM service boundary without reading research history", () => {
   for (const [time, expectedDate] of [

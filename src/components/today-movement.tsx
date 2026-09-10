@@ -59,9 +59,10 @@ export function TodayMovement({
   const holdingById = new Map(
     data.holdings.map((holding) => [holding.id, holding]),
   );
-  const accountLabelByCode = new Map(
-    data.accountSummaries.map((account) => [account.code, account.label]),
-  );
+  const accountLabelByCode = new Map([
+    ...data.analysisScopes.flatMap((scope) => scope.kind === "account" ? [[scope.accountCode, scope.label] as const] : []),
+    ...data.accountSummaries.map((account) => [account.code, account.label] as const),
+  ]);
   const rows = movement.contributionRows
     .map((row): TodayContributionDisplayRow | null => {
       const holding = holdingById.get(row.holdingId);
@@ -222,7 +223,9 @@ export function TodayMovement({
                   <div key={`${row.subject}-${row.reason}-${row.holdingId ?? row.snapshotId ?? index}`} className="grid gap-1 py-3 text-sm sm:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto] sm:gap-5">
                     <span className="font-medium">{row.assetName ?? row.ticker ?? row.subject}</span>
                     <span className="text-[var(--muted)]">{<T ko={reasonLabel(row.reason)} en={translateHomeHistory(reasonLabel(row.reason))}/>}</span>
-                    <span className="text-[var(--muted)]">{<T ko={row.account ?? sourceLabel(row.source)} en={translateHomeHistory(row.account ?? sourceLabel(row.source))}/>}</span>
+                    <span className="text-[var(--muted)]">{row.account != null
+                      ? accountLabelByCode.get(row.account) ?? <T ko="계좌" en="Account" />
+                      : <T ko={sourceLabel(row.source)} en={translateHomeHistory(sourceLabel(row.source))}/>}</span>
                   </div>
                 ))}
               </div>

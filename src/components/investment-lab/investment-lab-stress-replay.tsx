@@ -18,8 +18,10 @@ const STRATEGY_COLORS = Object.freeze({
 
 export function InvestmentLabStressReplayView({
   model,
+  accountLabels = {},
 }: {
   model: InvestmentLabStressReplay;
+  accountLabels?: Readonly<Record<string, string>>;
 }) {
   return (
     <section
@@ -44,7 +46,7 @@ export function InvestmentLabStressReplayView({
       {model.valuationBlocker ? <p role="status" className="border-y border-[var(--line)] py-5 text-sm leading-7 text-[var(--warning)]"><T ko={`${model.valuationGapCount ?? 0}개 보유종목의 현재 평가액을 확인할 수 없어 과거 구성 비교를 보류했습니다. 평가액이 확인된 종목만으로 전체 비중을 다시 계산하지 않습니다. 보유종목에서 가격과 환율 근거를 확인해 주세요.`} en={`Current valuations are unavailable for ${model.valuationGapCount ?? 0} holdings, so this replay is paused. We do not reweight only the known holdings to represent your whole portfolio. Check their price and exchange-rate evidence in Holdings.`} /></p> : null}
       <div className="space-y-4">
         {model.windows.map((window) => (
-          <StressWindowCard key={window.id} window={window} />
+          <StressWindowCard key={window.id} window={window} accountLabels={accountLabels} />
         ))}
       </div>
     </section>
@@ -74,8 +76,10 @@ export function InvestmentLabStressReplayUnavailable() {
 
 function StressWindowCard({
   window,
+  accountLabels,
 }: {
   window: InvestmentLabStressReplayWindow;
+  accountLabels: Readonly<Record<string, string>>;
 }) {
   const readyStrategies = window.strategies.filter(
     (strategy) => strategy.status === "ready",
@@ -159,7 +163,7 @@ function StressWindowCard({
                 <strong className="text-[var(--ink)]">
                   {row.ticker ?? row.name}
                 </strong>{" "}
-                · {row.account} · <LabText value={exclusionReasonLabel(row.reason)} />
+                · {Object.hasOwn(accountLabels, row.account) ? accountLabels[row.account] : <T ko="계좌" en="Account" />} · <LabText value={exclusionReasonLabel(row.reason)} />
               </li>
             ))}
           </ul>

@@ -342,7 +342,7 @@ function MovementMatrix({
     : `minmax(174px, 214px) repeat(${history.dates.length}, ${cellWidth}px)`;
 
   return (
-    <div className={stage ? styles.stageMatrix : "overflow-x-auto pb-1"} data-heatmap-grid>
+    <div className={stage ? styles.stageMatrix : "overflow-x-auto pb-1"} data-heatmap-grid data-single-date={stage && history.dates.length === 1 ? true : undefined}>
       {stage ? (
         <div className={styles.mobileMovements}>
           <div className={styles.mobileMovementDate}>

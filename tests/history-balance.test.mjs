@@ -23,6 +23,20 @@ function portfolioRow(overrides) {
 }
 
 describe("history balance helpers", () => {
+  it("keeps derived history partial when one account has unknown cost or profit", () => {
+    for (const [totalCost, totalPnl, expectedPnl] of [[null, null, null], [null, "50", 150], ["850", null, null]]) {
+      const result = buildPortfolioHistoryDisplayRows({ account: "all", expectedAccounts: ["brokerage", "isa"], rows: [
+        portfolioRow({ totalMarketValue: "1100", totalCost: "1000", totalPnl: "100", totalReturnPct: "10" }),
+        portfolioRow({ account: "isa", totalMarketValue: "900", totalCost, totalPnl, totalReturnPct: null }),
+      ] });
+      assert.equal(result[0].totalMarketValue, 2000);
+      assert.equal(result[0].totalPnl, expectedPnl);
+      assert.equal(result[0].totalCost, totalCost === null ? null : 1850);
+      assert.equal(result[0].totalReturnPct, null);
+      assert.equal(result[0].rowKind, "partial");
+    }
+  });
+
   it("normalizes account and lane query values", () => {
     assert.equal(normalizeHistoryAccount("brokerage"), "brokerage");
     assert.equal(normalizeHistoryAccount(["isa", "brokerage"]), "isa");

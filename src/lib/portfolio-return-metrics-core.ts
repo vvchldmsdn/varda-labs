@@ -1,8 +1,7 @@
 import {
   convertToKrw,
   normalizeTicker,
-  resolveKrwFxRate,
-  sumBy,
+  sumComplete,
   toNumber,
 } from "./portfolio-math.ts";
 
@@ -58,8 +57,8 @@ export type AssetReturnMetrics = {
   assetKey: string;
   account: string;
   costBasisKrw: number | null;
-  realizedCostBasisKrw: number;
-  realizedPnlKrw: number;
+  realizedCostBasisKrw: number | null;
+  realizedPnlKrw: number | null;
   missingCost: boolean;
 };
 
@@ -72,8 +71,8 @@ export type RealizedReturnRow = {
   assetName: string;
   assetKey: string | null;
   account: string | null;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
   missingCost: boolean;
 };
 
@@ -88,14 +87,14 @@ export type ReturnMetricsSummary = {
   skippedBuyEventCount: number;
   unmatchedSellEventCount: number;
   missingCostSellEventCount: number;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
 };
 
 export type AccountRealizedReturnSummary = {
   account: PortfolioReturnSelectedAccount;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
   realizedSellEventCount: number;
   unmatchedSellEventCount: number;
   missingCostSellEventCount: number;
@@ -112,6 +111,7 @@ export function buildReturnMetricsSummary(
   const metricsByAssetKey = new Map<string, AssetReturnMetrics>();
   const realizedRows: RealizedReturnRow[] = [];
   const runningLedger = new Map<string, { quantity: number; costKrw: number }>();
+  const incompleteLedgers = new Set<string>();
   let skippedBuyEventCount = 0;
 
   for (const asset of assetRows) {
@@ -140,11 +140,12 @@ export function buildReturnMetricsSummary(
     const ledgerKey = assetKey ?? event.legacyAssetId;
     const account = portfolioEventAccount(event) ?? asset?.account ?? null;
     const quantity = eventTradeQuantity(event);
-    const amountKrw = historyTradeAmountKrw(event, asset, usdKrwRate);
+    const amountKrw = historyTradeAmountKrw(event, asset);
 
     if (event.eventType === "buy") {
-      if (!ledgerKey || amountKrw <= 0) {
+      if (!ledgerKey || amountKrw === null || amountKrw <= 0 || quantity <= 0) {
         skippedBuyEventCount += 1;
+        if (ledgerKey) incompleteLedgers.add(ledgerKey);
         continue;
       }
       const row = runningLedger.get(ledgerKey) ?? { quantity: 0, costKrw: 0 };
@@ -157,21 +158,23 @@ export function buildReturnMetricsSummary(
     if (event.eventType !== "sell") continue;
 
     const explicitMetrics = readExplicitTradeMetrics(event);
-    const ledgerRow = ledgerKey ? runningLedger.get(ledgerKey) : undefined;
+    const ledgerRow = ledgerKey && !incompleteLedgers.has(ledgerKey) ? runningLedger.get(ledgerKey) : undefined;
     const disposedCostKrw =
       explicitMetrics.disposedCostKrw ??
       estimateDisposedCostFromLedger(ledgerRow, quantity) ??
-      estimateDisposedCostFromEvent(event, asset, quantity, usdKrwRate);
+      estimateDisposedCostFromEvent(event, asset, quantity);
     const fallbackRealizedPnlKrw =
-      disposedCostKrw !== null && amountKrw > 0
+      disposedCostKrw !== null && amountKrw !== null && amountKrw > 0
         ? amountKrw - disposedCostKrw
         : parseRealizedPnl(event.memo);
     const realizedPnlKrw =
       explicitMetrics.realizedPnlKrw ?? fallbackRealizedPnlKrw;
-    const realizedCostBasisKrw = disposedCostKrw ?? 0;
+    const realizedCostBasisKrw = disposedCostKrw;
     const missingCost = disposedCostKrw === null;
 
-    if (ledgerRow && disposedCostKrw !== null) {
+    if (ledgerKey && (quantity <= 0 || !ledgerRow || quantity > ledgerRow.quantity)) {
+      incompleteLedgers.add(ledgerKey);
+    } else if (ledgerRow && disposedCostKrw !== null) {
       ledgerRow.quantity = Math.max(ledgerRow.quantity - quantity, 0);
       ledgerRow.costKrw = Math.max(ledgerRow.costKrw - disposedCostKrw, 0);
     }
@@ -179,8 +182,8 @@ export function buildReturnMetricsSummary(
     if (assetKey) {
       const metrics = metricsByAssetKey.get(assetKey);
       if (metrics) {
-        metrics.realizedPnlKrw += realizedPnlKrw;
-        metrics.realizedCostBasisKrw += realizedCostBasisKrw;
+        metrics.realizedPnlKrw = sumComplete([metrics.realizedPnlKrw, realizedPnlKrw], value => value);
+        metrics.realizedCostBasisKrw = sumComplete([metrics.realizedCostBasisKrw, realizedCostBasisKrw], value => value);
         metrics.missingCost = metrics.missingCost || missingCost;
       }
     }
@@ -211,8 +214,8 @@ export function buildReturnMetricsSummary(
     skippedBuyEventCount,
     unmatchedSellEventCount: realizedRows.filter((row) => !row.assetKey).length,
     missingCostSellEventCount: realizedRows.filter((row) => row.missingCost).length,
-    realizedPnlKrw: sumBy(realizedRows, (row) => row.realizedPnlKrw),
-    realizedCostBasisKrw: sumBy(realizedRows, (row) => row.realizedCostBasisKrw),
+    realizedPnlKrw: sumComplete(realizedRows, (row) => row.realizedPnlKrw),
+    realizedCostBasisKrw: sumComplete(realizedRows, (row) => row.realizedCostBasisKrw),
   };
 }
 
@@ -236,7 +239,7 @@ export function getAssetReturnMetrics(
 }
 
 export function getSelectedRealizedRows(
-  summary: ReturnMetricsSummary,
+  summary: Pick<ReturnMetricsSummary, "realizedRows">,
   selectedAccount: PortfolioReturnSelectedAccount,
   selectedAssetKeys: Set<string>,
 ) {
@@ -257,8 +260,8 @@ export function summarizeRealizedReturnForAccount(
   const rows = getSelectedRealizedRows(summary, selectedAccount, selectedAssetKeys);
   return {
     account: selectedAccount,
-    realizedPnlKrw: sumBy(rows, (row) => row.realizedPnlKrw),
-    realizedCostBasisKrw: sumBy(rows, (row) => row.realizedCostBasisKrw),
+    realizedPnlKrw: sumComplete(rows, (row) => row.realizedPnlKrw),
+    realizedCostBasisKrw: sumComplete(rows, (row) => row.realizedCostBasisKrw),
     realizedSellEventCount: rows.length,
     unmatchedSellEventCount: rows.filter((row) => !row.assetKey).length,
     missingCostSellEventCount: rows.filter((row) => row.missingCost).length,
@@ -327,18 +330,16 @@ function readExplicitTradeMetrics(event: PortfolioReturnEventRow) {
 function historyTradeAmountKrw(
   event: PortfolioReturnEventRow,
   asset: PortfolioReturnAssetRow | null,
-  usdKrwRate: number,
 ) {
   const amount = toNumber(event.amountKrw);
   if (amount !== null && amount !== 0) return Math.abs(amount);
 
   const quantity = eventTradeQuantity(event);
-  const price = toNumber(event.price) ?? 0;
-  const fxRate =
-    toNumber(event.fxRate) ??
-    resolveKrwFxRate(asset?.currency ?? "KRW", usdKrwRate).rate ??
-    0;
-  return Math.abs(quantity * price * fxRate);
+  const price = toNumber(event.price);
+  const fxRate = historicalEventFxRate(event, asset);
+  if (quantity <= 0 || price === null || price <= 0 || fxRate === null) return null;
+  const amountKrw = quantity * price * fxRate;
+  return Number.isFinite(amountKrw) ? amountKrw : null;
 }
 
 function eventTradeQuantity(event: PortfolioReturnEventRow) {
@@ -359,10 +360,10 @@ function estimateDisposedCostFromLedger(
   ledgerRow: { quantity: number; costKrw: number } | undefined,
   quantity: number,
 ) {
-  if (!ledgerRow || quantity <= 0 || ledgerRow.quantity <= 0 || ledgerRow.costKrw <= 0) {
+  if (!ledgerRow || quantity <= 0 || quantity > ledgerRow.quantity || ledgerRow.quantity <= 0 || ledgerRow.costKrw <= 0) {
     return null;
   }
-  const ratio = Math.min(quantity / ledgerRow.quantity, 1);
+  const ratio = quantity / ledgerRow.quantity;
   return ledgerRow.costKrw * ratio;
 }
 
@@ -370,21 +371,27 @@ function estimateDisposedCostFromEvent(
   event: PortfolioReturnEventRow,
   asset: PortfolioReturnAssetRow | null,
   quantity: number,
-  usdKrwRate: number,
 ) {
   if (quantity <= 0) return null;
 
   const before = parseJsonObject(event.beforeValue);
-  const averageCost =
-    readNumberField(before, ["average_cost", "averageCost", "avg_cost"]) ??
-    toNumber(asset?.averageCost);
+  // A current holding correction cannot supply the cost of an earlier sale.
+  const averageCost = readNumberField(before, ["average_cost", "averageCost", "avg_cost"]);
   if (averageCost === null || averageCost <= 0) return null;
 
-  const fxRate =
-    toNumber(event.fxRate) ??
-    resolveKrwFxRate(asset?.currency ?? "KRW", usdKrwRate).rate ??
-    0;
-  return quantity * averageCost * fxRate;
+  const fxRate = historicalEventFxRate(event, asset);
+  if (fxRate === null) return null;
+  const costKrw = quantity * averageCost * fxRate;
+  return Number.isFinite(costKrw) ? costKrw : null;
+}
+
+function historicalEventFxRate(event: PortfolioReturnEventRow, asset: PortfolioReturnAssetRow | null) {
+  const recorded = toNumber(event.fxRate);
+  if (recorded !== null) return recorded > 0 ? recorded : null;
+  const currency = readStringField(parseJsonObject(event.beforeValue), ["currency"]) ??
+    readStringField(parseJsonObject(event.afterValue), ["currency"]) ?? asset?.currency;
+  // KRW needs no conversion. Missing foreign-currency FX stays unknown.
+  return currency?.toUpperCase() === "KRW" ? 1 : null;
 }
 
 function fallbackCostBasisKrw(asset: PortfolioReturnAssetRow, usdKrwRate: number) {
@@ -503,9 +510,9 @@ function compareEventsAscending(a: PortfolioReturnEventRow, b: PortfolioReturnEv
 }
 
 function parseRealizedPnl(memo: string | null) {
-  if (!memo) return 0;
+  if (!memo) return null;
   const match = memo.match(/realized_pnl_krw=([-+]?\d+(?:\.\d+)?)/i);
-  return match ? Number(match[1]) : 0;
+  return match ? toNumber(match[1]) : null;
 }
 
 function parseJsonObject(value: unknown): ParsedObject | null {

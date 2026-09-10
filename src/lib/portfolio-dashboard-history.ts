@@ -1,4 +1,4 @@
-import { percentOrNull, sumBy, toNumber } from "./portfolio-math.ts";
+import { percentOrNull, sumBy, sumComplete, toNumber } from "./portfolio-math.ts";
 import type { HoldingPriceReturn } from "./holding-price-return.ts";
 
 export type PortfolioDashboardPositionHistoryRow = Readonly<{
@@ -230,14 +230,8 @@ export function buildPortfolioDashboardPositionTrend({
         dateRows,
         (row) => toNumber(row.marketValueKrw) ?? 0,
       );
-      const pnlValues = dateRows
-        .map((row) => toNumber(row.pnlKrw))
-        .filter((value): value is number => value !== null);
-      const costValues = dateRows
-        .map((row) => toNumber(row.costKrw))
-        .filter((value): value is number => value !== null);
-      const totalPnl = pnlValues.length > 0 ? sumBy(pnlValues, (value) => value) : null;
-      const totalCost = costValues.length > 0 ? sumBy(costValues, (value) => value) : null;
+      const totalPnl = sumComplete(dateRows, (row) => toNumber(row.pnlKrw));
+      const totalCost = sumComplete(dateRows, (row) => toNumber(row.costKrw));
 
       return Object.freeze({
         date,

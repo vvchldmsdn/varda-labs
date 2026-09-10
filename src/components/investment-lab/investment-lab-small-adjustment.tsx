@@ -4,7 +4,7 @@ import { LabText } from "./lab-text";
 import { labEnglish } from "./lab-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { InvestmentLabSmallAdjustmentResult } from "./investment-lab-small-adjustment-result";
 import {
@@ -29,6 +29,7 @@ export function InvestmentLabSmallAdjustment({
   const [amount, setAmount] = useState("");
   const [result, setResult] =
     useState<InvestmentLabSmallAdjustmentCalculation | null>(null);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const selectedAccount =
     model.accounts.find((row) => row.account === accountCode) ??
     model.accounts[0];
@@ -36,6 +37,20 @@ export function InvestmentLabSmallAdjustment({
   const readyAccountCount = model.accounts.filter(
     (row) => row.status === "ready",
   ).length;
+
+  useEffect(() => {
+    // Only submitting sets a result; editing inputs clears it without moving focus.
+    const heading = resultHeadingRef.current;
+    if (!result || !heading) return;
+    heading.focus({ preventScroll: true });
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
+    const scroller = heading.closest<HTMLElement>(".varda-dialog-content");
+    if (scroller) {
+      scroller.scrollTo({ top: scroller.scrollTop + heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16, behavior });
+    } else {
+      heading.scrollIntoView({ behavior, block: "nearest" });
+    }
+  }, [result]);
 
   function resetCalculation() {
     setSourceKey("");
@@ -191,6 +206,7 @@ export function InvestmentLabSmallAdjustment({
 
       {result ? (
         <InvestmentLabSmallAdjustmentResult
+          headingRef={resultHeadingRef}
           accountLabel={
             model.accounts.find((row) => row.account === result.account)
               ?.label ?? result.account

@@ -206,15 +206,15 @@ function derivedAllPortfolioRow(
     availableRows,
     (row) => row.totalMarketValue,
   );
-  const totalCost = sumNullable(availableRows, (row) => row.totalCost);
-  const totalPnl = sumNullable(availableRows, (row) => row.totalPnl);
+  const totalCost = sumComplete(availableRows, (row) => numberOrNull(row.totalCost));
+  const totalPnl = sumComplete(availableRows, (row) => numberOrNull(row.totalPnl));
 
   return {
     snapshotDate: representative.snapshotDate,
     account: "all",
     source: representative.source,
     rowKind:
-      availableRows.length === expectedAccounts.length
+      availableRows.length === expectedAccounts.length && totalCost !== null && totalPnl !== null
         ? "derived"
         : "partial",
     derivedFromAccounts: [...availableAccounts],
@@ -268,3 +268,4 @@ function isHistoryAccount(value: string | null): value is HistoryAccount {
 function isHistoryLane(value: string | null): value is HistoryLane {
   return HISTORY_LANES.includes(value as HistoryLane);
 }
+import { sumComplete } from "./portfolio-math.ts";

@@ -67,6 +67,8 @@ export function HoldingStateCorrectionForm({
           />
         </label>
         <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가는 선택입니다. 비워 두면 기존 값을 유지하며, 미등록 상태라면 나중에 입력할 수 있습니다." en="Average cost is optional. Leave it blank to keep the saved value, or add it later if it is not recorded yet." /></p>
+        {currency === "USD" ? <p className="text-xs leading-5 text-[var(--muted)]"><T ko="달러 기준 1좌당 매입가를 입력하세요. 현재 보유손익의 원화 환산에는 현재 환율을 사용하므로, 매입 당시 환율에 따른 환차손익은 포함하지 않습니다." en="Enter the purchase price per unit in USD. Current holding profit/loss is converted to KRW at the current exchange rate, so it excludes FX gains or losses since purchase." /></p> : null}
+        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가만 바꾸면 현재 평가액과 수량은 유지됩니다. 과거 거래와 저장된 평가 기록은 바뀌지 않습니다." en="Changing only average cost keeps the current value and quantity unchanged. Past trades and saved valuations are not rewritten." /></p>
         <label className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"정정 사유 (선택)"}</ManagementText><ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}

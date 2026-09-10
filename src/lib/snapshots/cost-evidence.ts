@@ -27,12 +27,12 @@ export function snapshotPositionCostBasisKrw(asset: SnapshotCostInput, usdKrw: n
 
 export function summarizeSnapshotCostEvidence(
   positions: readonly Readonly<{ costKrw: number | null; pnlKrw: number | null }>[],
-  realizedCostBasisKrw: number,
-  realizedPnlKrw: number,
+  realizedCostBasisKrw: number | null,
+  realizedPnlKrw: number | null,
 ) {
   const openCostKrw = sumComplete(positions, (position) => position.costKrw);
   const unrealizedPnlKrw = sumComplete(positions, (position) => position.pnlKrw);
-  const totalCost = openCostKrw === null ? null : openCostKrw + realizedCostBasisKrw;
-  const totalPnl = unrealizedPnlKrw === null ? null : unrealizedPnlKrw + realizedPnlKrw;
+  const totalCost = sumComplete([openCostKrw, realizedCostBasisKrw], value => value);
+  const totalPnl = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
   return { openCostKrw, unrealizedPnlKrw, totalCost, totalPnl, totalReturnPct: percentOrNull(totalPnl, totalCost) };
 }

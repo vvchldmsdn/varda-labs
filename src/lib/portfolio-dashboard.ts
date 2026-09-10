@@ -17,6 +17,7 @@ import {
   getSelectedRealizedRows,
   portfolioEventAccount,
   type AssetReturnMetrics,
+  type RealizedReturnRow,
   type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
 import { buildPortfolioDashboardSnapshotTrend } from "@/lib/portfolio-dashboard-snapshots";
@@ -89,9 +90,9 @@ export type DashboardHolding = {
   priceStatus: string | null;
   valueKrw: number;
   costBasisKrw: number | null;
-  realizedCostBasisKrw: number;
+  realizedCostBasisKrw: number | null;
   unrealizedPnlKrw: number | null;
-  realizedPnlKrw: number;
+  realizedPnlKrw: number | null;
   totalPnlKrw: number | null;
   holdingReturnPct: number | null;
   totalReturnPct: number | null;
@@ -116,7 +117,7 @@ export type AccountSummary = {
   totalValueKrw: number;
   costBasisKrw: number | null;
   unrealizedPnlKrw: number | null;
-  realizedPnlKrw: number;
+  realizedPnlKrw: number | null;
   totalPnlKrw: number | null;
   holdingReturnPct: number | null;
   totalReturnPct: number | null;
@@ -169,9 +170,9 @@ export type DashboardData = {
   marketPriceReferenceDate: string | null;
   totalValueKrw: number;
   costBasisKrw: number | null;
-  realizedCostBasisKrw: number;
+  realizedCostBasisKrw: number | null;
   unrealizedPnlKrw: number | null;
-  realizedPnlKrw: number;
+  realizedPnlKrw: number | null;
   totalPnlKrw: number | null;
   holdingReturnPct: number | null;
   totalReturnPct: number | null;
@@ -422,24 +423,20 @@ export async function getPortfolioDashboard(
     scopePreviousTotalKrw,
   );
   const costBasisKrw = sumComplete(holdings, (holding) => holding.costBasisKrw);
-  const realizedCostBasisKrw =
-    sumBy(holdings, (holding) => holding.realizedCostBasisKrw) +
-    sumBy(
-      realizedRows.filter((row) => !row.assetKey),
-      (row) => row.realizedCostBasisKrw,
-    );
+  const realizedCostBasisKrw = sumComplete([
+    ...holdings.map((holding) => holding.realizedCostBasisKrw),
+    ...realizedRows.filter((row) => !row.assetKey).map((row) => row.realizedCostBasisKrw),
+  ], value => value);
   const unrealizedPnlKrw = sumComplete(holdings, (holding) => holding.unrealizedPnlKrw);
-  const realizedPnlKrw =
-    sumBy(holdings, (holding) => holding.realizedPnlKrw) +
-    sumBy(
-      realizedRows.filter((row) => !row.assetKey),
-      (row) => row.realizedPnlKrw,
-    );
-  const totalPnlKrw = unrealizedPnlKrw === null ? null : unrealizedPnlKrw + realizedPnlKrw;
+  const realizedPnlKrw = sumComplete([
+    ...holdings.map((holding) => holding.realizedPnlKrw),
+    ...realizedRows.filter((row) => !row.assetKey).map((row) => row.realizedPnlKrw),
+  ], value => value);
+  const totalPnlKrw = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
   const holdingReturnPct = percentOrNull(unrealizedPnlKrw, costBasisKrw);
   const totalReturnPct = percentOrNull(
     totalPnlKrw,
-    costBasisKrw === null ? null : costBasisKrw + realizedCostBasisKrw,
+    sumComplete([costBasisKrw, realizedCostBasisKrw], value => value),
   );
   const holdingHistory = buildPortfolioDashboardHoldingHistory({
     currentDate: currentKstDate(now),
@@ -502,6 +499,7 @@ export async function getPortfolioDashboard(
       accountRows.map((account) => account.code),
       holdings,
       accountLabels,
+      realizedRows,
     ),
     holdings,
     nonInvestmentAssets,
@@ -671,7 +669,7 @@ function buildHolding({
   const unrealizedPnlKrw = costBasisKrw === null ? null : valueKrw - costBasisKrw;
   const realizedPnlKrw = returnMetrics.realizedPnlKrw;
   const realizedCostBasisKrw = returnMetrics.realizedCostBasisKrw;
-  const totalPnlKrw = unrealizedPnlKrw === null ? null : unrealizedPnlKrw + realizedPnlKrw;
+  const totalPnlKrw = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
   const currentWeight =
     accountTotalValueKrw > 0 ? (valueKrw / accountTotalValueKrw) * 100 : 0;
   // Strategic targets remain authoritative outside the additional-contribution preview.
@@ -707,7 +705,7 @@ function buildHolding({
     holdingReturnPct: percentOrNull(unrealizedPnlKrw, costBasisKrw),
     totalReturnPct: percentOrNull(
       totalPnlKrw,
-      costBasisKrw === null ? null : costBasisKrw + realizedCostBasisKrw,
+      sumComplete([costBasisKrw, realizedCostBasisKrw], value => value),
     ),
     currentWeight,
     targetWeight,
@@ -769,24 +767,30 @@ function buildAccountSummaries(
   accountCodes: readonly string[],
   holdings: DashboardHolding[],
   accountLabels: Map<string, string>,
+  realizedRows: RealizedReturnRow[],
 ): AccountSummary[] {
   return accountCodes.map((code) => {
     const accountHoldings = holdings.filter((holding) => holding.account === code);
     const totalValueKrw = sumBy(accountHoldings, (holding) => holding.valueKrw);
     const costBasisKrw = sumComplete(accountHoldings, (holding) => holding.costBasisKrw);
-    const realizedCostBasisKrw = sumBy(
-      accountHoldings,
-      (holding) => holding.realizedCostBasisKrw,
+    const accountRealizedRows = getSelectedRealizedRows(
+      { realizedRows },
+      code,
+      new Set(accountHoldings.map(holding => holding.legacyBase44Id ?? holding.id)),
+    );
+    const realizedCostBasisKrw = sumComplete(
+      accountRealizedRows,
+      (row) => row.realizedCostBasisKrw,
     );
     const unrealizedPnlKrw = sumComplete(
       accountHoldings,
       (holding) => holding.unrealizedPnlKrw,
     );
-    const realizedPnlKrw = sumBy(
-      accountHoldings,
-      (holding) => holding.realizedPnlKrw,
+    const realizedPnlKrw = sumComplete(
+      accountRealizedRows,
+      (row) => row.realizedPnlKrw,
     );
-    const totalPnlKrw = unrealizedPnlKrw === null ? null : unrealizedPnlKrw + realizedPnlKrw;
+    const totalPnlKrw = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
     return {
       code,
       label: accountLabels.get(code) ?? code,
@@ -798,7 +802,7 @@ function buildAccountSummaries(
       holdingReturnPct: percentOrNull(unrealizedPnlKrw, costBasisKrw),
       totalReturnPct: percentOrNull(
         totalPnlKrw,
-        costBasisKrw === null ? null : costBasisKrw + realizedCostBasisKrw,
+        sumComplete([costBasisKrw, realizedCostBasisKrw], value => value),
       ),
       holdingCount: accountHoldings.length,
     };

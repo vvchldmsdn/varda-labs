@@ -60,6 +60,7 @@ import {
   percentOrNull,
   resolveKrwFxRate,
   sumBy,
+  sumComplete,
   toNumber,
   uniqueStrings,
 } from "@/lib/portfolio-math";
@@ -168,8 +169,8 @@ type RealizedReturnRunSummary = {
   skippedBuyEventCount: number;
   unmatchedSellEventCount: number;
   missingCostSellEventCount: number;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
   accounts: AccountRealizedReturnSummary[];
 };
 
@@ -331,8 +332,8 @@ type AccountSnapshotPlan = {
   totalCost: number | null;
   openCostKrw: number | null;
   unrealizedPnlKrw: number | null;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
   realizedSellEventCount: number;
   unmatchedRealizedSellEventCount: number;
   missingCostRealizedSellEventCount: number;
@@ -352,8 +353,8 @@ type AllAccountSnapshotPlan = {
   totalCost: number | null;
   openCostKrw: number | null;
   unrealizedPnlKrw: number | null;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
   realizedSellEventCount: number;
   unmatchedRealizedSellEventCount: number;
   missingCostRealizedSellEventCount: number;
@@ -412,8 +413,8 @@ type AccountComputed = {
   groupCount: number;
   openCostKrw: number | null;
   unrealizedPnlKrw: number | null;
-  realizedPnlKrw: number;
-  realizedCostBasisKrw: number;
+  realizedPnlKrw: number | null;
+  realizedCostBasisKrw: number | null;
   realizedSellEventCount: number;
   unmatchedRealizedSellEventCount: number;
   missingCostRealizedSellEventCount: number;
@@ -917,8 +918,8 @@ function buildAllAccountPlan({
   );
   const existingPortfolio = existingRows.find(isVardaGeneratedRow) ?? null;
   const totalMarketValue = sumBy(completed, (build) => build.totalMarketValue);
-  const realizedPnlKrw = sumBy(completed, (build) => build.realizedPnlKrw);
-  const realizedCostBasisKrw = sumBy(
+  const realizedPnlKrw = sumComplete(completed, (build) => build.realizedPnlKrw);
+  const realizedCostBasisKrw = sumComplete(
     completed,
     (build) => build.realizedCostBasisKrw,
   );
@@ -979,8 +980,8 @@ function buildAllAccountPlan({
             `fx_source=${fx.source}`,
             "return_basis=unrealized_plus_event_ledger_realized_v1",
             `open_cost_krw=${openCostKrw === null ? "unknown" : Math.round(openCostKrw)}`,
-            `realized_pnl_krw=${Math.round(realizedPnlKrw)}`,
-            `realized_cost_basis_krw=${Math.round(realizedCostBasisKrw)}`,
+            `realized_pnl_krw=${realizedPnlKrw === null ? "unknown" : Math.round(realizedPnlKrw)}`,
+            `realized_cost_basis_krw=${realizedCostBasisKrw === null ? "unknown" : Math.round(realizedCostBasisKrw)}`,
             `realized_sell_events=${realizedSellEventCount}`,
             ...provenance.descriptionTags,
           ].join("; "),
@@ -1346,8 +1347,8 @@ function buildPortfolioSnapshot(
       `fx_source=${fx.source}`,
       "return_basis=unrealized_plus_event_ledger_realized_v1",
       `open_cost_krw=${computed.openCostKrw === null ? "unknown" : Math.round(computed.openCostKrw)}`,
-      `realized_pnl_krw=${Math.round(computed.realizedPnlKrw)}`,
-      `realized_cost_basis_krw=${Math.round(computed.realizedCostBasisKrw)}`,
+      `realized_pnl_krw=${computed.realizedPnlKrw === null ? "unknown" : Math.round(computed.realizedPnlKrw)}`,
+      `realized_cost_basis_krw=${computed.realizedCostBasisKrw === null ? "unknown" : Math.round(computed.realizedCostBasisKrw)}`,
       `realized_sell_events=${computed.realizedSellEventCount}`,
       ...computed.provenance.descriptionTags,
     ].join("; "),
@@ -1630,8 +1631,8 @@ function buildRealizedReturnRunSummary(
     skippedBuyEventCount: summary.skippedBuyEventCount,
     unmatchedSellEventCount: summary.unmatchedSellEventCount,
     missingCostSellEventCount: summary.missingCostSellEventCount,
-    realizedPnlKrw: sumBy(accountSummaries, (account) => account.realizedPnlKrw),
-    realizedCostBasisKrw: sumBy(
+    realizedPnlKrw: sumComplete(accountSummaries, (account) => account.realizedPnlKrw),
+    realizedCostBasisKrw: sumComplete(
       accountSummaries,
       (account) => account.realizedCostBasisKrw,
     ),
