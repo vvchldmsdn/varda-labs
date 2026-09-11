@@ -1,5 +1,8 @@
 import "server-only";
+import { performance } from "node:perf_hooks";
+import { setTimeout as delay } from "node:timers/promises";
 import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
+import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 
 import {
   buildCronMarketCyclePlan,
@@ -25,6 +28,7 @@ import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 type CloseSyncSummary = {
+  deferred: { code: "provider_budget_limited" | "provider_token_cooldown"; retryAfterSeconds: number } | null;
   groupCount: number;
   requestedCount: number;
   successCount: number;
@@ -96,11 +100,14 @@ export type CronMarketCycleRunResult = {
 type CronMarketCycleOptions = { now?: Date; cronScheduleUtc?: string | null };
 
 export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): Promise<CronMarketCycleRunResult> {
+  // Include lease acquisition and planning in the retry window. The route has
+  // 300 seconds; stop adding waits at 180 seconds to leave time for snapshots.
+  const closeRetryDeadline = performance.now() + 180_000;
   // Drain even when today's cycle was already completed; preserve snapshot ordering.
   scheduleMarketCollection();
   try {
     // All close groups and the following live refresh share one internal lease.
-    return await withKisCollectionLeaseWait(() => runMarketCycleWithLease(options));
+    return await withKisCollectionLeaseWait(() => runMarketCycleWithLease({ ...options, closeRetryDeadline }));
   } catch (error) {
     if (error instanceof KisRefreshLeaseBusyError) {
       return emptyResult({
@@ -116,10 +123,12 @@ export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): 
 async function runMarketCycleWithLease({
   now = new Date(),
   cronScheduleUtc = null,
+  closeRetryDeadline,
 }: {
   now?: Date;
   cronScheduleUtc?: string | null;
-} = {}): Promise<CronMarketCycleRunResult> {
+  closeRetryDeadline: number;
+}): Promise<CronMarketCycleRunResult> {
   const snapshotDate = resolveSnapshotCycle(now).snapshotDate;
   const claim = await claimCronMarketCycleRun({
     snapshotDate,
@@ -204,7 +213,14 @@ async function runMarketCycleWithLease({
       }
 
       kisProvider = createKisMarketDataProvider();
-      closeSync = await syncCloseGroups(plan.closeGroups, kisProvider);
+      closeSync = await syncCloseGroups(plan.closeGroups, kisProvider, closeRetryDeadline);
+      if (closeSync.deferred) {
+        return finishBlocked({
+          runId, snapshotDate, fxSummary, factorSync, closeSync, liveSync, snapshotJob,
+          plan: { ...plan, ok: false, action: "blocked",
+            blockers: ["close_sync_retry_window_exhausted", closeSync.deferred.code, ...deferredBlockers] },
+        });
+      }
       ({ snapshotJob, plan, deferredBlockers } = await loadPlan(now));
       if (!plan.ok || plan.action === "sync_closes_then_snapshot") {
         return finishBlocked({
@@ -378,11 +394,13 @@ async function loadPlan(now: Date) {
 async function syncCloseGroups(
   groups: CronCloseSyncGroup[],
   provider: MarketDataProvider,
+  retryDeadline: number,
 ) {
   const summary = emptyCloseSyncSummary();
+  let retries = 0;
 
   for (const group of groups) {
-    const result = await runMarketPriceSync({
+    const syncGroup = () => runMarketPriceSync({
       mode: "close",
       dryRun: false,
       fixture: false,
@@ -393,6 +411,35 @@ async function syncCloseGroups(
         tickers: group.tickers,
       },
     });
+    let result: Awaited<ReturnType<typeof syncGroup>>;
+    while (true) {
+      try {
+        result = await syncGroup();
+        break;
+      } catch (error) {
+        if (!isProviderCollectionDeferred(error)) throw error;
+        const retryAfterSeconds = Math.max(1, Math.ceil(Number(error.retryAfterSeconds)));
+        const deferred = {
+          code: "code" in error && error.code === "provider_token_cooldown"
+            ? "provider_token_cooldown" as const : "provider_budget_limited" as const,
+          retryAfterSeconds,
+        };
+        const waitMs = retryAfterSeconds * 1_000;
+        if (retries >= 4 || performance.now() + waitMs >= retryDeadline) {
+          summary.deferred = deferred;
+          return summary;
+        }
+        // Only replay the unfinished close group. Price sync persists rows after
+        // the provider batch completes; earlier groups and financial writes are
+        // never replayed. All attempts still reserve the normal durable budget.
+        retries += 1;
+        await delay(waitMs);
+        if (performance.now() >= retryDeadline) {
+          summary.deferred = deferred;
+          return summary;
+        }
+      }
+    }
     const complete =
       result.requestedCount === group.tickers.length &&
       result.successCount === result.requestedCount &&
@@ -554,6 +601,7 @@ function emptyResult(
 
 function emptyCloseSyncSummary(): CloseSyncSummary {
   return {
+    deferred: null,
     groupCount: 0,
     requestedCount: 0,
     successCount: 0,

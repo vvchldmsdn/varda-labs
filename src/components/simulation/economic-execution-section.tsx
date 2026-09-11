@@ -29,13 +29,16 @@ export function EconomicExecutionSection({ result, baseline }: {
       <EconomicObservationReadiness result={result} />
       <p className="mt-4 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="‘모형·데이터’에서 종목별 준비 상태와 경제지표의 날짜를 확인하세요. 종목 가격 이력은 보유종목 관리에서 확인할 수 있습니다." en="Open Model & data for each holding's readiness and economic-data dates. Review holding price history in holdings management." /></p>
     </div> : <>
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-b border-[var(--line)] pb-3" data-economic-starting-state>
+      <details className={styles.startingFactors} data-economic-starting-state>
+        <summary><SimulationText ko="경제지표 출발값" en="Starting economic values" /><span><SimulationText ko="환율 · 금리" en="FX · yields" /></span></summary>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 pb-3">
         {result.currentFactors.map((factor) => <InvestmentLabDialog key={factor.factorKey} label={`${factor.factorKey === "usdkrw" ? "USD/KRW" : factor.factorKey === "us_10y_yield" ? "미국 10년" : "장단기 금리차"} ${factor.value.toFixed(2)}${factor.factorKey === "usdkrw" ? "" : factor.factorKey === "us_10y_yield" ? "%" : "%p"}`} labelEn={`${factor.label} ${factor.value.toFixed(2)}${factor.factorKey === "usdkrw" ? "" : factor.factorKey === "us_10y_yield" ? "%" : "pp"}`} title={factor.factorKey === "usdkrw" ? "달러/원 환율" : factor.factorKey === "us_10y_yield" ? "미국 10년 국채금리" : "미국 장단기 금리차"} titleEn={factor.label} icon="table">
           <p className="text-sm text-[var(--muted)]"><SimulationText ko="출발값" en="Starting value" /> {factor.value.toFixed(2)} {factor.factorKey === "usdkrw" ? "KRW / USD" : factor.factorKey === "us_10y_yield" ? "%" : "%p"} · {factor.factorDate}</p>
           <FactorTrajectory result={result} factorKey={factor.factorKey} />
           <p className="text-xs leading-6 text-[var(--muted)]"><SimulationText ko={`선은 단계별 중앙값, 면은 P10~P90입니다. ${result.assumptions.pathCount.toLocaleString("ko-KR")}개 경로에서 집계한 분포이며 실제 경제지표 전망을 보장하지 않습니다.`} en={`The line is the stepwise median; the band is P10–P90 across ${result.assumptions.pathCount.toLocaleString("en-US")} paths. This is a model distribution, not an assured economic forecast.`} /></p>
         </InvestmentLabDialog>)}
-      </div>
+        </div>
+      </details>
       <div className={styles.resultLayout}>
         <dl className={styles.resultSummary}>
           <div><dt><SimulationText ko="마지막 수익률 중간값" en="Median final return" /></dt><dd>{simulationReturnLabel(100 + result.terminal.p50ReturnPct)}</dd><p>{result.assumptions.horizon}<SimulationText ko={`단계 · ${result.assumptions.pathCount.toLocaleString("ko-KR")}개 공동 경로`} en={` steps · ${result.assumptions.pathCount.toLocaleString("en-US")} joint paths`} /></p></div>

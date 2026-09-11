@@ -1,5 +1,9 @@
 .workspace { display:grid; min-width:0; gap:28px; }
 .economicExecution { min-width:0; }
+.startingFactors { margin:8px 0 12px; border-bottom:1px solid var(--line); }
+.startingFactors summary { min-height:44px; padding:12px 0; cursor:pointer; font-size:12px; }
+.startingFactors summary > span { margin-left:12px; color:var(--muted); font-size:11px; }
+.startingFactors summary:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
 .toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
 .toolbar > div { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
 .canvas { min-width:0; padding:8px 0 0; }
@@ -267,6 +271,14 @@
   .resultSummary dt { min-height:0; font-size:12px; line-height:1.6; }
   .resultSummary dd { margin-top:10px; font-size:28px; }
   .resultSummary p { display:block; max-width:none; font-size:11px; line-height:1.8; }
+  .economicExecution .resultLayout { gap:20px; }
+  .economicExecution .resultSummary { order:1; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:12px 0 16px; border-block:1px solid var(--line); }
+  .economicExecution .resultLayout > figure { order:0; }
+  .economicExecution .resultSummary > div:first-child { grid-column:auto; padding:0; border:0; }
+  .economicExecution .resultSummary dt { min-height:32px; font-size:10px; line-height:1.5; }
+  .economicExecution .resultSummary dd,
+  .economicExecution .resultSummary > div:first-child dd { font-size:clamp(22px,6.5vw,28px); margin-top:6px; overflow-wrap:anywhere; }
+  .economicExecution .resultSummary p { font-size:10px; line-height:1.5; margin-top:8px; }
   .resultLayout > figure,.stageFan { height:auto; flex:none; width:100%; }
   .stageFan .fanControls { flex-wrap:wrap; gap:10px; padding:0 0 12px; }
   .stageFan .fanControls button { min-height:44px; padding:10px 12px; font-size:12px; }

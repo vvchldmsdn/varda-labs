@@ -77,6 +77,92 @@ describe("Daily market cycle cutoff recovery", () => {
     assert.ok(!f.events.includes("live"));
   });
 
+  it("waits for a deferred close budget and writes the cutoff exactly once", async () => {
+    const f = await fixture({ missingClose: true, closeErrors: [deferred("provider_budget_limited", 25)] });
+    const result = await f.run();
+    assert.equal(result.status, "completed");
+    assert.deepEqual(f.events, ["collection-lease", "claim", "factors", "preflight", "close", "wait:25", "close", "preflight", "snapshot", "fx", "live", "finish:completed"]);
+    assert.equal(result.closeSync.deferred, null);
+    assert.equal(result.snapshot.writtenCount, 1);
+    assert.equal(f.events.filter((event) => event === "snapshot").length, 1);
+  });
+
+  it("honors the token cooldown following a request-budget deferral", async () => {
+    const f = await fixture({ missingClose: true, closeErrors: [
+      deferred("provider_budget_limited", 20), deferred("provider_token_cooldown", 60),
+    ] });
+    const result = await f.run();
+    assert.equal(result.status, "completed");
+    assert.deepEqual(f.events.filter((event) => event.startsWith("wait:")), ["wait:20", "wait:60"]);
+    assert.equal(f.snapshotFx(), 1375);
+    assert.ok(f.events.indexOf("snapshot") < f.events.indexOf("fx"));
+  });
+
+  it("does not replay a completed close group when a later group is deferred", async () => {
+    const f = await fixture({ missingClose: true, multipleCloseGroups: true,
+      closeErrors: [null, deferred("provider_budget_limited", 10)] });
+    const result = await f.run();
+    assert.equal(result.status, "completed");
+    assert.deepEqual(f.closeMarkets, ["korea", "us", "us"]);
+    assert.equal(result.closeSync.groupCount, 2);
+    assert.equal(result.closeSync.successCount, 2);
+    assert.equal(f.events.filter((event) => event === "snapshot").length, 1);
+  });
+
+  it("retains completed close evidence when a later group exceeds the retry window", async () => {
+    const f = await fixture({ missingClose: true, multipleCloseGroups: true,
+      closeErrors: [null, deferred("provider_token_cooldown", 3600)] });
+    const result = await f.run();
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.blockers, ["close_sync_retry_window_exhausted", "provider_token_cooldown"]);
+    assert.deepEqual(result.closeSync.deferred, { code: "provider_token_cooldown", retryAfterSeconds: 3600 });
+    assert.equal(result.closeSync.successCount, 1);
+    assert.equal(result.snapshot.targetCount, 1);
+    assert.ok(!f.events.includes("snapshot"));
+    assert.ok(!f.events.includes("fx"));
+    assert.ok(!f.events.includes("live"));
+    assert.ok(!f.events.some((event) => event.startsWith("wait:")));
+    assert.equal(f.finished.at(-1).metadata.closeSync.deferred.retryAfterSeconds, 3600);
+  });
+
+  it("counts lease and planning time against the close retry deadline", async () => {
+    const f = await fixture({ missingClose: true, leaseDelayMs: 60_000, planningDelayMs: 100_000,
+      closeErrors: [deferred("provider_budget_limited", 25)] });
+    const result = await f.run();
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(f.closeMarkets, ["korea"]);
+    assert.ok(!f.events.some((event) => event.startsWith("wait:")));
+  });
+
+  it("does not issue another close request if a delayed timer crosses the deadline", async () => {
+    const f = await fixture({ missingClose: true, sleepOvershootMs: 180_000,
+      closeErrors: [deferred("provider_budget_limited", 1)] });
+    const result = await f.run();
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(f.closeMarkets, ["korea"]);
+    assert.ok(!f.events.includes("snapshot"));
+  });
+
+  it("bounds repeated short deferrals instead of retrying indefinitely", async () => {
+    const f = await fixture({ missingClose: true,
+      closeErrors: Array.from({ length: 6 }, () => deferred("provider_budget_limited", 1)) });
+    const result = await f.run();
+    assert.equal(result.status, "blocked");
+    assert.equal(f.closeMarkets.length, 5);
+    assert.equal(f.events.filter((event) => event.startsWith("wait:")).length, 4);
+    assert.ok(!f.events.includes("snapshot"));
+  });
+
+  it("does not retry an ordinary close failure", async () => {
+    const f = await fixture({ missingClose: true, closeErrors: [new Error("fixture close failure")] });
+    const result = await f.run();
+    assert.equal(result.status, "failed");
+    assert.deepEqual(result.blockers, ["unexpected_market_cycle_error"]);
+    assert.deepEqual(f.closeMarkets, ["korea"]);
+    assert.ok(!f.events.some((event) => event.startsWith("wait:")));
+    assert.ok(!f.events.includes("snapshot"));
+  });
+
   it("retains a genuine snapshot write failure and skips auxiliary live work", async () => {
     const f = await fixture({ snapshotWriteFails: true });
     const result = await f.run();
@@ -116,17 +202,27 @@ describe("Daily market cycle cutoff recovery", () => {
   });
 });
 
-async function fixture({ missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false } = {}) {
+function deferred(code, retryAfterSeconds) {
+  return Object.assign(new Error("fixture provider deferred"), { code, retryAfterSeconds });
+}
+
+async function fixture({ missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false, closeErrors = [], multipleCloseGroups = false, leaseDelayMs = 0, planningDelayMs = 0, sleepOvershootMs = 0 } = {}) {
   const events = [], finished = [];
+  const closeMarkets = [], failures = [...closeErrors];
+  let elapsedMs = 0, completedCloseGroups = 0;
+  const closeGroups = [{ market: "korea", expectedCloseDate: "2026-09-09", tickers: ["069500"] },
+    ...(multipleCloseGroups ? [{ market: "us", expectedCloseDate: "2026-09-09", tickers: ["AAPL"] }] : [])];
   let missing = missingClose;
   let currentFx = 1375, snapshotFx = null;
   const now = new Date("2026-09-09T22:58:55.000Z");
   const completeSync = { requestedCount: 1, successCount: 1, failedCount: 0, skippedCount: 0, insertedCount: 1, updatedCount: 0, conflictCount: 0, targetFilterSummary: { filteredPriceTargetCount: 1 } };
   const [runner] = await importWithPorts(["src/lib/cron-market-cycle-runner.ts"], {
+    "node:perf_hooks": { performance: { now: () => elapsedMs } },
+    "node:timers/promises": { async setTimeout(ms) { events.push(`wait:${ms / 1000}`); elapsedMs += ms + sleepOvershootMs; } },
     "@/lib/market-data/collection-worker": { scheduleMarketCollection() {} },
     "@/lib/market-data/kis-refresh-lease": {
       KisRefreshLeaseBusyError: class extends Error {},
-      async withKisCollectionLeaseWait(task) { events.push("collection-lease"); return task(); },
+      async withKisCollectionLeaseWait(task) { events.push("collection-lease"); elapsedMs += leaseDelayMs; return task(); },
     },
     "@/lib/cron-market-cycle-run-repository": {
       async claimCronMarketCycleRun(input) {
@@ -142,13 +238,20 @@ async function fixture({ missingClose = false, closeSucceeds = true, liveResult 
       if (fxStatus === "written") currentFx = 1382;
       return { status: fxStatus, candidate: { rateDate: "2026-09-09", source: "kis" } };
     } },
-    "@/lib/market-data/core-market-factor-refresh-job": { async runCoreMarketFactorRefreshJob() { events.push("factors"); return { insertedCount: 0, candidateCount: 0, skippedCount: 0, latestCandidateDate: null }; } },
+    "@/lib/market-data/core-market-factor-refresh-job": { async runCoreMarketFactorRefreshJob() { events.push("factors"); elapsedMs += planningDelayMs; return { insertedCount: 0, candidateCount: 0, skippedCount: 0, latestCandidateDate: null }; } },
     "@/lib/market-data/providers/kis": { getKisProviderPolicy: () => ({ configured }), createKisMarketDataProvider: () => ({ name: "kis" }) },
     "@/lib/market-data/price-sync": {
       async getKisPriceSyncCooldownStatus() { assert.fail("collection lease must not be vetoed by a completed job cooldown"); },
-      async runMarketPriceSync({ mode }) {
+      async runMarketPriceSync({ mode, targetFilter }) {
         events.push(mode);
-        if (mode === "close") { if (closeSucceeds) missing = false; return completeSync; }
+        if (mode === "close") {
+          closeMarkets.push(targetFilter.market);
+          const error = failures.shift();
+          if (error) throw error;
+          completedCloseGroups += 1;
+          if (closeSucceeds && completedCloseGroups === closeGroups.length) missing = false;
+          return completeSync;
+        }
         if (liveError) throw new Error("fixture provider failure");
         return { ...completeSync, ...liveResult };
       },
@@ -163,11 +266,11 @@ async function fixture({ missingClose = false, closeSucceeds = true, liveResult 
         writtenCount: dryRun || failed ? 0 : 1, blockedCount: missing ? 1 : 0, failedCount: (failed ? 1 : 0) + (blockedTenant ? 1 : 0),
         targets: [{ status: missing ? "blocked" : "ready", result: {
           writeReady: !missing,
-          closeSyncPlan: { missingCount: missing ? 1 : 0, staleCount: 0, suggestedKisBatches: missing ? [{ market: "korea", expectedCloseDate: "2026-09-09", tickers: ["069500"] }] : [] },
+          closeSyncPlan: { missingCount: missing ? closeGroups.length : 0, staleCount: 0, suggestedKisBatches: missing ? closeGroups : [] },
           plannedWrites: { dailyPortfolioSnapshots: counts, dailyPositionSnapshots: counts }, results: {},
         } }, ...(blockedTenant ? [{ status: "failed", error: { code: "holdings_changed_after_cutoff" } }] : [])],
       };
     } },
   });
-  return { events, finished, snapshotFx: () => snapshotFx, currentFx: () => currentFx, run: () => runner.runCronMarketCycle({ now }) };
+  return { events, finished, closeMarkets, snapshotFx: () => snapshotFx, currentFx: () => currentFx, run: () => runner.runCronMarketCycle({ now }) };
 }
