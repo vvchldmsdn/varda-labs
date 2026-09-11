@@ -16,6 +16,7 @@ test("the horizon selector never marks the default as selected for invalid or du
     "@/components/investment-lab/investment-lab-dialog": { InvestmentLabDialog: () => null },
     "./simulation-workspace": { SimulationWorkspace: ({ tools }) => tools },
     "./simulation-query-controls": {
+      SimulationNavigationBoundary: ({ children }) => children,
       SimulationScopeTabs: () => null, SimulationDateControl: () => null, SimulationModelSelector: () => null,
       SimulationLink: ({ href, children, scroll, ...props }) => { assert.equal(scroll, false); return createElement("a", { ...props, href }, children); },
     },
@@ -43,7 +44,7 @@ test("calculation settings describe the selected model and keep the economic cut
     "@/components/portfolio-primary-navigation": { PortfolioPrimaryNavigation: () => null },
     "@/components/investment-lab/investment-lab-dialog": { InvestmentLabDialog: ({ children }) => children },
     "./simulation-workspace": { SimulationWorkspace: () => null },
-    "./simulation-query-controls": { SimulationScopeTabs: () => null, SimulationDateControl: () => null, SimulationModelSelector: () => null, SimulationLink: () => null },
+    "./simulation-query-controls": { SimulationNavigationBoundary: ({ children }) => children, SimulationScopeTabs: () => null, SimulationDateControl: () => null, SimulationModelSelector: () => null, SimulationLink: () => null },
   });
   const model = buildSimulationPageControls({ now: new Date("2026-09-10T08:00:00Z") });
   for (const locale of ["ko", "en"]) {
@@ -109,6 +110,7 @@ test("simulation page returns authenticated controls while owner research is pen
     "@/components/simulation/simulation-input-readiness-view": { SimulationInputReadinessView: component },
     "@/components/simulation/owner-research-execution-section": { OwnerResearchExecutionSection: component },
     "@/components/simulation/economic-execution-section": { EconomicExecutionSection: component },
+    "@/components/simulation/simulation-loading": { SimulationLoading: component },
     "@/components/simulation/simulation-section-error-boundary": { SimulationSectionErrorBoundary: component },
     "@/lib/simulation-page-controls": { buildSimulationPageControls },
     "@/lib/simulation-model-selection": { resolveSimulationPathModel },

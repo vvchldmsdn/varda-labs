@@ -17,7 +17,7 @@ export const SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY = Object.freeze({
   factorMaximumCarryDays: 7,
   freshnessBasis: "maximum_age_of_release_factor_and_period_end_dates",
   factorTransforms: Object.freeze({ usdkrw: "log_level_change", us_10y_yield: "percentage_point_change", us_10y2y_curve: "percentage_point_change" }),
-  pathCount: 500,
+  pathCount: 1000,
   samplePathCount: 12,
   seed: 0x45434f4e,
   minimumObservationCount: 45,
@@ -48,6 +48,7 @@ export type SimulationOwnerEconomicResearchInput = Readonly<{
   /** Caller supplies the current service date for current-state research, or the
    * training cutoff for retrospective validation. Omitted means matrix end. */
   stateAsOfServiceDate?: string;
+  includeDisplayPaths?: boolean;
 }>;
 export type SimulationOwnerEconomicResearchResult = ReturnType<typeof buildSimulationOwnerEconomicResearch>;
 export type ReadySimulationOwnerEconomicResearch = Extract<SimulationOwnerEconomicResearchResult, { status: "ready" }>;
@@ -126,7 +127,8 @@ export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEcono
   if (model.status !== "ready") return unavailable(base, model.reason, source, factorSources);
   const evaluated = evaluateEconomicStatePaths({ prepared: model.prepared, weights: input.weights.map((row) => row.weightBps / 10_000) });
   if (evaluated.status !== "ready") return unavailable(base, "path_summary_unavailable", source, factorSources);
-  const summary = summarizeSimulationNavPaths({ paths: evaluated.paths, horizon: input.horizon, samplePathCount: policy.samplePathCount });
+  const summary = summarizeSimulationNavPaths({ paths: evaluated.paths, horizon: input.horizon, samplePathCount: policy.samplePathCount,
+    includeDisplayPaths: input.includeDisplayPaths });
   if (summary.status !== "ready") return unavailable(base, "path_summary_unavailable", source, factorSources);
   return Object.freeze({
     ...base, status: "ready" as const, reason: null,
@@ -139,6 +141,7 @@ export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEcono
       stateAsOfServiceDate: asOf,
     }),
     terminal: summary.terminal, bands: summary.bands, samplePaths: summary.samplePaths,
+    displayPaths: summary.displayPaths,
     prepared: model.prepared,
     executionWeights: Object.freeze(input.weights.map((row) => Object.freeze({ ...row }))),
     source, factorSources, currentFactors, factorBands: model.factorBands, diagnostics: model.diagnostics,
@@ -243,7 +246,7 @@ function unavailable(base: Readonly<{ id: string; name: string; account: string;
   source: ReturnType<typeof buildSource>, factorSources: ReturnType<typeof sourceSummaries> = Object.freeze([])) {
   return Object.freeze({
     ...base, status: "unavailable" as const, reason, assumptions: null, terminal: null,
-    bands: Object.freeze([]), samplePaths: Object.freeze([]), prepared: null,
+    bands: Object.freeze([]), samplePaths: Object.freeze([]), displayPaths: null, prepared: null,
     executionWeights: Object.freeze([]), source, factorSources, currentFactors: Object.freeze([]), factorBands: Object.freeze([]), diagnostics: null,
     remediation: reason === "insufficient_factor_overlap" || reason === "current_factor_state_stale" || reason === "current_factor_state_missing" ? Object.freeze({
       code: "refresh_core_market_factor_history" as const,

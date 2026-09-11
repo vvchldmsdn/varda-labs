@@ -25,6 +25,7 @@ import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 type SimulationOwnerResearchBaseOptions = Readonly<{
+  includeDisplayPaths?: boolean;
   tenantContext: TenantContext;
   endServiceDate?: string | string[];
   horizon?: string | string[];
@@ -124,6 +125,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
         })
       : undefined;
   const execution = buildSimulationOwnerResearchExecution({
+    includeDisplayPaths: options.includeDisplayPaths ?? false,
     candidate,
     inputPreflight,
     endSelection,

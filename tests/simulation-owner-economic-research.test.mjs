@@ -7,12 +7,12 @@ import { ownerWeights, readyOwnerMatrix } from "./support/simulation-owner-ready
 import { shiftRiskDate } from "../src/lib/portfolio-risk-calendar.ts";
 
 describe("owner economic research input admission and summary", () => {
-  it("uses current admitted levels, strict prior releases, correct units and the same 500 paths", () => {
+  it("uses current admitted levels, strict prior releases, correct units and the same 1000 paths", () => {
     const input = makeInput();
-    const result = buildSimulationOwnerEconomicResearch(input);
+    const result = buildSimulationOwnerEconomicResearch({ ...input, includeDisplayPaths: true });
     assert.equal(result.status, "ready");
     assert.equal(result.source.alignedObservationCount, 89);
-    assert.equal(result.assumptions.pathCount, 500);
+    assert.equal(result.assumptions.pathCount, 1000);
     assert.equal(result.prepared.horizon, 21);
     assert.equal(result.currentFactors.length, 3);
     const end = input.matrix.requestedServiceDates.at(-1);
@@ -28,6 +28,16 @@ describe("owner economic research input admission and summary", () => {
     const summary = summarizeSimulationNavPaths({ paths: evaluated.paths, horizon: 21, samplePathCount: 12 });
     assert.deepEqual(result.terminal, summary.terminal);
     assert.deepEqual(result.bands, summary.bands);
+    assert.equal(result.displayPaths.pathCount, 1000);
+    assert.equal(result.displayPaths.values.length, 22000);
+    for (const pathIndex of [0, 499, 500, 999]) {
+      for (const stepIndex of [0, 1, 21]) {
+        assert.equal(result.displayPaths.values[pathIndex * 22 + stepIndex], Number((evaluated.paths[pathIndex][stepIndex] * 100).toPrecision(7)));
+      }
+    }
+    const compact = buildSimulationOwnerEconomicResearch(input);
+    assert.equal(compact.displayPaths, null);
+    assert.deepEqual(compact.terminal, result.terminal);
     assert.equal(result.policy.pointInTimeAvailability, "not_established");
     assert.equal(result.policy.providerCalls, "forbidden");
   });

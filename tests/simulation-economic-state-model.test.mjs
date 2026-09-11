@@ -7,6 +7,17 @@ import {
 } from "../src/lib/simulation-economic-state-model.ts";
 
 describe("sequential economic-state conditional research model", () => {
+  it("admits 1000 complete 126-step paths and rejects a tampered over-budget cube", () => {
+    const model = simulateEconomicStateModel(syntheticInput({ horizon: 126, pathCount: 1000 }));
+    assert.equal(model.status, "ready");
+    assert.equal(model.prepared.assetGrowth.length, 1000 * 127 * 2);
+    assert.equal(model.diagnostics.simulatedStepCount, 126000);
+    const result = evaluateEconomicStatePaths({ prepared: model.prepared, weights: [0.6, 0.4] });
+    assert.equal(result.status, "ready");
+    assert.equal(result.paths.length, 1000);
+    assert.equal(result.paths[999].length, 127);
+    assert.equal(evaluateEconomicStatePaths({ prepared: { ...model.prepared, pathCount: 1001 }, weights: [0.6, 0.4] }).status, "unavailable");
+  });
   it("reproduces paths and uses the same asset growth for every portfolio evaluation", () => {
     const input = syntheticInput({ horizon: 63, pathCount: 100 });
     const first = simulateEconomicStateModel(input);
@@ -108,7 +119,7 @@ describe("sequential economic-state conditional research model", () => {
     for (const patch of [
       { observations: input.observations.slice(0, 44) },
       { observations: [...input.observations, input.observations[0]] },
-      { horizon: 127 }, { pathCount: 501 }, { seed: 1.5 },
+      { horizon: 127 }, { pathCount: 1001 }, { seed: 1.5 },
       { initialFactorState: [Number.NaN, 4, 0.1] }, { assetKeys: ["a", "a"] },
       { observations: [{ ...input.observations[0], assetLogReturns: [0, Number.NaN] }, ...input.observations.slice(1)] },
     ]) assert.equal(simulateEconomicStateModel({ ...input, ...patch }).status, "unavailable");

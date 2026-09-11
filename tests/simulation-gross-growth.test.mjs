@@ -184,7 +184,7 @@ describe("Simulation Validation gross growth Phase 1B", () => {
   });
 
   it("rejects outputs above the explicit memory safety bound", () => {
-    const matrix = wideZeroReturnMatrix(1001);
+    const matrix = wideZeroReturnMatrix(2001);
     const drawPlan = buildPlan(matrix, {
       horizon: 1000,
       pathCount: 1,
@@ -192,8 +192,19 @@ describe("Simulation Validation gross growth Phase 1B", () => {
     });
     const result = materializeSimulationGrossGrowth({ matrix, drawPlan });
 
-    assert.equal(result.totalGrowthFactorCells, 1_002_001);
+    assert.equal(result.totalGrowthFactorCells, 2_003_001);
     assertBlocked(result, "growth_output_too_large");
+  });
+
+  it("keeps eight-holding 126-step portfolios available at the new 1000-path budget", () => {
+    const matrix = wideZeroReturnMatrix(8);
+    const drawPlan = buildPlan(matrix, { horizon: 126, pathCount: 1000, expectedBlockLength: 1 });
+    const result = materializeSimulationGrossGrowth({ matrix, drawPlan });
+    assert.equal(result.status, "ready");
+    assert.equal(result.totalGrowthFactorCells, 1_016_000);
+    assert.equal(result.paths.length, 1000);
+    assert.equal(result.paths[999].points.length, 127);
+    assert.equal(result.paths[999].points[126].grossGrowthFactors.length, 8);
   });
 
   it("does not resample, aggregate, summarize, persist, or call runtime data", () => {

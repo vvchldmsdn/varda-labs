@@ -19,13 +19,16 @@ export function EconomicDetailPanel({ data }: { data: SimulationDetailData }) {
   const comparison = data.economicCandidates;
   if (!comparison || comparison.status !== "ready") return <Unavailable />;
   const current = comparison.currentExecution;
+  const pathCount = comparison.pairing.pathCount;
+  const searchPathCount = Math.ceil(pathCount / 2);
+  const confirmationPathCount = Math.floor(pathCount / 2);
   const domain = resolveResearchFanChartValueDomain([current, ...comparison.outcomeCandidates.map((row) => row.execution)]);
   return <section data-economic-candidates>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h3 className="text-lg font-medium"><SimulationText ko="같은 미래, 다른 비중" en="Same paths, different weights" /></h3>
       <CalculationGuideDialog guide={economicCalculationGuide} label={{ ko: "탐색 원리", en: "Search method" }} title={{ ko: "비중 실험의 계산 원리", en: "How the weight experiment works" }} />
     </div>
-    <p className="mt-2 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="경제 충격과 종목별 경로 500개는 그대로 두고 시작 비중만 바꿉니다. 250개 경로에서 후보를 찾고 나머지 250개에서도 목적값이 개선된 경우만 표시합니다." en="All 500 economic and holding paths stay fixed; only starting weights change. Candidates are searched on 250 paths and shown only if their objective also improves on the other 250." /></p>
+    <p className="mt-2 text-sm leading-7 text-[var(--muted)]"><SimulationText ko={`경제 충격과 종목별 경로 ${pathCount.toLocaleString("ko-KR")}개는 그대로 두고 시작 비중만 바꿉니다. ${searchPathCount}개 경로에서 후보를 찾고 나머지 ${confirmationPathCount}개에서도 목적값이 개선된 경우만 표시합니다.`} en={`All ${pathCount.toLocaleString("en-US")} economic and holding paths stay fixed; only starting weights change. Candidates are searched on ${searchPathCount} paths and shown only if their objective also improves on the other ${confirmationPathCount}.`} /></p>
     <div className="mt-5 grid grid-cols-3 gap-3 border-y border-[var(--line)] py-4 text-sm">
       <Metric ko="현재 P50 수익률" en="Current P50 return" value={simulationReturnLabel(current.terminal.p50Index)} />
       <Metric ko="현재 하위 P10" en="Current P10 return" value={simulationReturnLabel(current.terminal.p10Index)} />
@@ -33,7 +36,7 @@ export function EconomicDetailPanel({ data }: { data: SimulationDetailData }) {
     </div>
     {comparison.outcomeCandidates.length === 0 ? <p className="py-8 text-sm leading-7"><SimulationText ko="현재 제약 안에서는 탐색·확인 양쪽에서 개선된 후보를 찾지 못했습니다. 현재 비중이 최적이라는 뜻은 아닙니다." en="No candidate improved its objective in both partitions within these constraints. This does not establish that current weights are optimal." /></p> : <div className="divide-y divide-[var(--line)]">{comparison.outcomeCandidates.map((candidate) => <details key={candidate.objective} className="py-5" data-economic-objective={candidate.objective}>
       <summary className="cursor-pointer marker:text-[var(--brand)]"><span className="ml-2 text-base font-medium"><ObjectiveLabel objective={candidate.objective} /></span><span className="ml-3 text-xs text-[var(--muted)]"><SimulationText ko="확인 표본 목적값" en="Confirmation objective" /> +{candidate.confirmation.objectiveImprovementPctPoints.toFixed(2)}%p</span></summary>
-      <p className="mt-3 text-sm text-[var(--muted)]"><SimulationText ko="아래는 동일한 전체 500경로에서 현재 → 후보의 변화입니다. 다른 위험 지표까지 모두 좋아진다는 의미는 아닙니다." en="Below: current → candidate on the same full set of 500 paths. Other risk metrics can worsen." /></p>
+      <p className="mt-3 text-sm text-[var(--muted)]"><SimulationText ko={`아래는 동일한 전체 ${pathCount.toLocaleString("ko-KR")}개 경로에서 현재 → 후보의 변화입니다. 다른 위험 지표까지 모두 좋아진다는 의미는 아닙니다. 후보 차트의 ${candidate.execution.samplePaths.length}개 표본선은 표시용이며 지표는 전체 경로로 계산합니다.`} en={`Below: current → candidate on the same full set of ${pathCount.toLocaleString("en-US")} paths. Other risk metrics can worsen. The candidate chart's ${candidate.execution.samplePaths.length} sample lines are for display; metrics use every path.`} /></p>
       <div className="my-4 grid grid-cols-2 gap-5 sm:grid-cols-4">
         <Metric ko="P50 수익률" en="P50 return" value={`${simulationReturnLabel(current.terminal.p50Index)} → ${simulationReturnLabel(candidate.execution.terminal.p50Index)}`} />
         <Metric ko="하위 P10" en="P10 return" value={`${simulationReturnLabel(current.terminal.p10Index)} → ${simulationReturnLabel(candidate.execution.terminal.p10Index)}`} />

@@ -37,7 +37,7 @@ export function OwnerHistoricalOutcomeValidationSection({
           >
             <SimulationText ko={"내 포트폴리오 예측 범위와 실제 결과"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            <SimulationText ko={"현재 상장종목 비중을 과거에도 그대로 보유했다고 가정합니다. 각 종료일 직전 90개 수익률로 500개 경로를 만든 뒤, 바로 이어진 21개 수익률 구간의 실제 결과와 비교합니다."} />{" "}</p>
+            <SimulationText ko={`현재 상장종목 비중을 과거에도 그대로 보유했다고 가정합니다. 각 종료일 직전 ${result.policy.trainingReturnStepCount}개 수익률로 ${result.policy.pathCount.toLocaleString("ko-KR")}개 경로를 만든 뒤, 바로 이어진 ${result.policy.outcomeReturnStepCount}개 수익률 구간의 실제 결과와 비교합니다.`} en={`Assume today's listed-holding weights also applied historically. At each endpoint, use the preceding ${result.policy.trainingReturnStepCount} returns to generate ${result.policy.pathCount.toLocaleString("en-US")} paths, then compare with observed outcomes over the immediately following ${result.policy.outcomeReturnStepCount} returns.`} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           <SimulationText ko={"읽기 전용 · 추천 아님"} />{" "}</span>

@@ -74,8 +74,8 @@ export const simulationMethod = {
       id: "bootstrap-and-hold",
       title: { ko: "02 · 과거 묶음을 다시 뽑아 보유 경로 만들기", en: "02 · Resample history into buy-and-hold paths" },
       lead: {
-        ko: "선택한 기준일까지의 최근 90개 원화 수익률 관측에서 모든 종목의 같은 날 행을 함께 뽑습니다. 평균 길이가 5인 연속 묶음을 이어 500개 경로를 만들며, 기간 선택에 따라 63개 또는 126개 관측 단계를 계산합니다.",
-        en: "Each draw takes the entire same-day row of KRW returns across holdings from the latest 90 observations up to the selected cutoff. Consecutive blocks averaging 5 observations form 500 paths, each containing 63 or 126 steps according to the selected horizon.",
+        ko: "선택한 기준일까지의 최근 90개 원화 수익률 관측에서 모든 종목의 같은 날 행을 함께 뽑습니다. 평균 길이가 5인 연속 묶음을 이어 1,000개 경로를 만들며, 기간 선택에 따라 63개 또는 126개 관측 단계를 계산합니다.",
+        en: "Each draw takes the entire same-day row of KRW returns across holdings from the latest 90 observations up to the selected cutoff. Consecutive blocks averaging 5 observations form 1,000 paths, each containing 63 or 126 steps according to the selected horizon.",
       },
       equations: [
         {
@@ -121,8 +121,8 @@ export const simulationMethod = {
         en: "If A gains 10% then loses 10% while B stays flat, A’s growth factor is 1.10 × 0.90 = 0.99. The portfolio ends at 0.5 × 0.99 + 0.5 × 1 = 0.995, a −0.5% return. Rebalancing back to 50:50 every step would produce a different result.",
       },
       caveat: {
-        ko: "같은 입력과 난수 시드에서는 같은 결과가 나옵니다. 화면의 개별 예시 선은 12개지만 요약은 500개 전체를 사용합니다. 63·126단계는 달력 일수가 아닙니다. 입출금·세금·거래비용·리밸런싱을 반영하지 않으며, 과거에 없던 충격을 새로 만들어 내거나 현재 시장 국면을 조건으로 경로를 고르는 모형도 아닙니다.",
-        en: "Identical inputs and the same random seed reproduce the result. Only 12 individual sample paths are drawn, but summaries use all 500. The 63 or 126 steps are not calendar days. Paths omit cash flows, taxes, trading costs and rebalancing; they neither invent shocks absent from the sample nor condition draws on the current market regime.",
+        ko: "같은 입력과 난수 시드에서는 같은 결과가 나옵니다. 메인 차트는 1,000개 경로를 모두 그립니다. 비중 후보 차트는 표시용 표본 12개를 사용하지만 요약은 전체 1,000개로 계산합니다. 63·126단계는 달력 일수가 아닙니다. 입출금·세금·거래비용·리밸런싱을 반영하지 않으며, 과거에 없던 충격을 새로 만들어 내거나 현재 시장 국면을 조건으로 경로를 고르는 모형도 아닙니다.",
+        en: "Identical inputs and the same random seed reproduce the result. The main chart draws all 1,000 paths. Candidate charts use 12 sample lines for display, while summaries use all 1,000 paths. The 63 or 126 steps are not calendar days. Paths omit cash flows, taxes, trading costs and rebalancing; they neither invent shocks absent from the sample nor condition draws on the current market regime.",
       },
     },
     // lib/simulation-normalized-nav-distribution-summary.ts;
@@ -131,8 +131,8 @@ export const simulationMethod = {
       id: "quantiles-and-loss",
       title: { ko: "03 · 분위수와 종료 손실의 빈도", en: "03 · Quantiles and terminal-loss frequency" },
       lead: {
-        ko: "각 단계에서 500개 경로의 값을 작은 순서로 정렬해 P10·P50·P90을 구합니다. 종료 손실은 마지막 값이 시작값보다 작은 경로만 셉니다. 중간에 잠시 하락한 경로의 비율과는 다른 지표입니다.",
-        en: "At each step, sort the 500 path values to calculate P10, P50 and P90. Terminal loss counts only paths that finish below their starting value. It is distinct from the proportion of paths that temporarily fall along the way.",
+        ko: "각 단계에서 1,000개 경로의 값을 작은 순서로 정렬해 P10·P50·P90을 구합니다. 종료 손실은 마지막 값이 시작값보다 작은 경로만 셉니다. 중간에 잠시 하락한 경로의 비율과는 다른 지표입니다.",
+        en: "At each step, sort the 1,000 path values to calculate P10, P50 and P90. Terminal loss counts only paths that finish below their starting value. It is distinct from the proportion of paths that temporarily fall along the way.",
       },
       equations: [
         {
@@ -145,8 +145,8 @@ export const simulationMethod = {
         {
           expression: "Qq = (1 − λ)x₍k+1₎ + λx₍k+2₎",
           reading: {
-            ko: "정렬한 값의 첫 순위를 1로 두고 이웃 두 값을 선형 보간합니다. 사용하는 방식은 Type 7 분위수입니다. 500개 값의 P50은 250번째와 251번째 값의 평균입니다.",
-            en: "With ordered ranks starting at 1, interpolate linearly between neighboring values. This is the Type 7 quantile convention. For 500 values, P50 is the mean of ranks 250 and 251.",
+            ko: "정렬한 값의 첫 순위를 1로 두고 이웃 두 값을 선형 보간합니다. 사용하는 방식은 Type 7 분위수입니다. 1,000개 값의 P50은 500번째와 501번째 값의 평균입니다.",
+            en: "With ordered ranks starting at 1, interpolate linearly between neighboring values. This is the Type 7 quantile convention. For 1,000 values, P50 is the mean of ranks 500 and 501.",
           },
         },
         {
@@ -158,7 +158,7 @@ export const simulationMethod = {
         },
       ],
       symbols: [
-        { symbol: "M, H", meaning: { ko: "전체 경로 수 500과 선택한 종료 단계 63 또는 126", en: "500 paths and the selected terminal step, 63 or 126" } },
+        { symbol: "M, H", meaning: { ko: "전체 경로 수 1,000과 선택한 종료 단계 63 또는 126", en: "1,000 paths and the selected terminal step, 63 or 126" } },
         { symbol: "q, x₍j₎, Qq", meaning: { ko: "분위 수준, 작은 순서로 j번째 값, 보간한 분위수", en: "Quantile level, j-th value in ascending order, and interpolated quantile" } },
         { symbol: "Rₘ, 𝟙{·}", meaning: { ko: "경로 m의 종료 수익률과 조건이 참이면 1, 아니면 0인 지시 함수", en: "Terminal return of path m, and an indicator equal to 1 if the condition is true, otherwise 0" } },
       ],
@@ -173,8 +173,8 @@ export const simulationMethod = {
         ],
       },
       example: {
-        ko: "위 5개 값의 P10은 80과 90 사이의 40% 지점인 84입니다. 실제 모형에서 500개 중 175개가 손실로 끝나면 표시 빈도는 35%입니다. 경로 하나가 더 손실로 바뀌면 0.2%p 변합니다.",
-        en: "For the five values above, P10 is 40% of the way from 80 to 90, or 84. In the actual 500-path model, 175 loss-ending paths give a frequency of 35%. One additional loss-ending path changes it by 0.2 percentage points.",
+        ko: "위 5개 값의 P10은 80과 90 사이의 40% 지점인 84입니다. 실제 모형에서 1,000개 중 350개가 손실로 끝나면 표시 빈도는 35%입니다. 경로 하나가 더 손실로 바뀌면 0.1%p 변합니다.",
+        en: "For the five values above, P10 is 40% of the way from 80 to 90, or 84. In the actual 1,000-path model, 350 loss-ending paths give a frequency of 35%. One additional loss-ending path changes it by 0.1 percentage points.",
       },
       caveat: {
         ko: "이 빈도는 과거 표본을 재추출한 모형 안의 비율이며 실제 미래 손실 확률을 보증하지 않습니다. P10–P90은 각 시점의 가운데 80% 구간입니다. 경로 전체가 그 안에 머물 확률이 80%라는 뜻이 아니며, P50 선도 보통 하나의 실제 추출 경로와 일치하지 않습니다.",
@@ -192,10 +192,10 @@ export const simulationMethod = {
       },
       equations: [
         {
-          expression: "P5 = Q₀.₀₅(R);  T₅ = (1/25) Σⱼ₌₁²⁵ R₍j₎",
+          expression: "P5 = Q₀.₀₅(R);  T₅ = (1/50) Σⱼ₌₁⁵⁰ R₍j₎",
           reading: {
-            ko: "종료 수익률 500개를 정렬합니다. P5는 앞서 설명한 보간 분위수이고, T₅는 가장 작은 25개를 정확히 골라 평균한 하위 5% 수익률입니다. 경계에서 동률이 나와도 25개보다 더 많이 포함하지 않습니다.",
-            en: "Sort all 500 terminal returns. P5 uses the interpolated quantile above; T₅ averages exactly the lowest 25 returns. Ties at the cutoff do not expand the tail beyond 25 observations.",
+            ko: "종료 수익률 1,000개를 정렬합니다. P5는 앞서 설명한 보간 분위수이고, T₅는 가장 작은 50개를 정확히 골라 평균한 하위 5% 수익률입니다. 경계에서 동률이 나와도 50개보다 더 많이 포함하지 않습니다.",
+            en: "Sort all 1,000 terminal returns. P5 uses the interpolated quantile above; T₅ averages exactly the lowest 50 returns. Ties at the cutoff do not expand the tail beyond 50 observations.",
           },
         },
         {
@@ -215,13 +215,13 @@ export const simulationMethod = {
         {
           expression: "MDDₘ = maxₜ (1 − Nₘ,t / Peakₘ,t)",
           reading: {
-            ko: "각 단계의 고점 대비 하락 비율 중 가장 큰 값을 선택합니다. 낙폭은 양수 크기입니다. MDD P50·P90은 경로 500개에서 각각 구한 MDD의 분위수입니다.",
-            en: "Take the largest proportional decline from the running peak. Drawdown is a nonnegative magnitude. MDD P50 and P90 are quantiles of the 500 individually calculated path drawdowns.",
+            ko: "각 단계의 고점 대비 하락 비율 중 가장 큰 값을 선택합니다. 낙폭은 양수 크기입니다. MDD P50·P90은 경로 1,000개에서 각각 구한 MDD의 분위수입니다.",
+            en: "Take the largest proportional decline from the running peak. Drawdown is a nonnegative magnitude. MDD P50 and P90 are quantiles of the 1,000 individually calculated path drawdowns.",
           },
         },
       ],
       symbols: [
-        { symbol: "R₍j₎, T₅", meaning: { ko: "종료 수익률의 오름차순 j번째 값과 하위 25개 평균", en: "j-th smallest terminal return and the mean of the lowest 25" } },
+        { symbol: "R₍j₎, T₅", meaning: { ko: "종료 수익률의 오름차순 j번째 값과 하위 50개 평균", en: "j-th smallest terminal return and the mean of the lowest 50" } },
         { symbol: "Peakₘ,t, MDDₘ", meaning: { ko: "경로 m의 단계 t까지 최고값과 경로 전체 최대 낙폭", en: "Running peak through step t and maximum drawdown for path m" } },
       ],
       figure: {
@@ -235,12 +235,12 @@ export const simulationMethod = {
         ],
       },
       example: {
-        ko: "그림의 낙폭은 1 − 90/120 = 25%입니다. 별도의 하위 꼬리 계산 예로, 최악의 25개 중 5개가 −30%, 나머지 20개가 −10%이면 하위 5% 평균은 (5 × −30 + 20 × −10)/25 = −14%입니다.",
-        en: "The diagram’s drawdown is 1 − 90/120 = 25%. As a separate tail example, if the worst 25 returns comprise five at −30% and twenty at −10%, their mean is (5 × −30 + 20 × −10)/25 = −14%.",
+        ko: "그림의 낙폭은 1 − 90/120 = 25%입니다. 별도의 하위 꼬리 계산 예로, 최악의 50개 중 10개가 −30%, 나머지 40개가 −10%이면 하위 5% 평균은 (10 × −30 + 40 × −10)/50 = −14%입니다.",
+        en: "The diagram’s drawdown is 1 − 90/120 = 25%. As a separate tail example, if the worst 50 returns comprise ten at −30% and forty at −10%, their mean is (10 × −30 + 40 × −10)/50 = −14%.",
       },
       caveat: {
-        ko: "MDD는 P50 가격 선 하나에서 계산한 낙폭이 아닙니다. 하위 5%는 25개 경로의 결과이므로 표본에 민감하며 최악의 가능한 손실 한도를 뜻하지 않습니다. 관측 단계 사이에 발생한 장중 낙폭은 포착하지 못합니다.",
-        en: "MDD is not computed from the P50 value line alone. The lower 5% contains just 25 paths, making it sample-sensitive; it is not a bound on the worst possible loss. Intraday falls between observation steps are not captured.",
+        ko: "MDD는 P50 가격 선 하나에서 계산한 낙폭이 아닙니다. 하위 5%는 50개 경로의 결과이므로 표본에 민감하며 최악의 가능한 손실 한도를 뜻하지 않습니다. 관측 단계 사이에 발생한 장중 낙폭은 포착하지 못합니다.",
+        en: "MDD is not computed from the P50 value line alone. The lower 5% contains just 50 paths, making it sample-sensitive; it is not a bound on the worst possible loss. Intraday falls between observation steps are not captured.",
       },
     },
     // lib/simulation-owner-walk-forward-validation.ts;

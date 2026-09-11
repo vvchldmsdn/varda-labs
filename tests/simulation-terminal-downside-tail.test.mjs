@@ -6,7 +6,7 @@ import {
   summarizeSimulationTerminalDownsideTail,
 } from "../src/lib/simulation-terminal-downside-tail.ts";
 
-describe("Simulation terminal downside-tail summary v1", () => {
+describe("Simulation terminal downside-tail summary v2", () => {
   it("calculates P5 and the exact lowest-25 mean over 500 paths", () => {
     const terminalReturns = Array.from(
       { length: 500 },
@@ -56,8 +56,8 @@ describe("Simulation terminal downside-tail summary v1", () => {
     );
   });
 
-  it("blocks any denominator other than the complete 500-path policy", () => {
-    for (const pathCount of [0, 499, 501]) {
+  it("blocks unsupported or incomplete path denominators", () => {
+    for (const pathCount of [0, 499, 501, 999, 1001]) {
       const result = summarizeSimulationTerminalDownsideTail({
         terminalReturns: Array.from({ length: pathCount }, () => 0),
       });
@@ -79,16 +79,10 @@ describe("Simulation terminal downside-tail summary v1", () => {
   it("publishes the fixed tail, sign, tie, and denominator semantics", () => {
     assert.equal(
       SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.version,
-      "simulation_terminal_downside_tail_summary_v1",
+      "simulation_terminal_downside_tail_summary_v2",
     );
-    assert.equal(
-      SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.requiredPathCount,
-      500,
-    );
-    assert.equal(
-      SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tailPathCount,
-      25,
-    );
+    assert.deepEqual(SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.supportedPathCounts, [500, 1000]);
+    assert.equal(SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tailProbability, 0.05);
     assert.equal(
       SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tiePolicy,
       "fixed_rank_count_without_boundary_expansion_v1",

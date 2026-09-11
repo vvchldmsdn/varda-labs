@@ -26,7 +26,7 @@ export const SIMULATION_OWNER_PARAMETRIC_FACTOR_POLICY = Object.freeze({
     us_10y_yield: "percentage_point_change",
     us_10y2y_curve: "percentage_point_change",
   }),
-  pathCount: 500,
+  pathCount: 1000,
   samplePathCount: 12,
   seed: 0x46414354,
   modelPolicyVersion: SIMULATION_FACTOR_RESIDUAL_MODEL_POLICY.version,

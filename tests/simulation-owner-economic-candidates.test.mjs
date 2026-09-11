@@ -37,8 +37,8 @@ describe("economic asset-path candidate search", () => {
       const expected = summarizeSimulationNavPaths({ paths: evaluated.paths, horizon: 2, samplePathCount: 12 });
       assert.deepEqual(candidate.execution.terminal, expected.terminal);
       assert.deepEqual(candidate.execution.bands, expected.bands);
-      assert.equal(candidate.search.pathCount, 250);
-      assert.equal(candidate.confirmation.pathCount, 250);
+      assert.equal(candidate.search.pathCount, 500);
+      assert.equal(candidate.confirmation.pathCount, 500);
       assert.ok(candidate.confirmation.objectiveImprovementPctPoints > 0);
       assert.ok(candidate.constraints.oneWayTurnoverBps <= 2000);
       assert.ok(candidate.constraints.fxExposureChangeBps <= 1000);
@@ -48,7 +48,7 @@ describe("economic asset-path candidate search", () => {
 
   it("withholds unconfirmed choices without blocking the current distribution", () => {
     const economic = fixture();
-    for (let path = 1; path < 500; path += 2) {
+    for (let path = 1; path < 1000; path += 2) {
       const offset = (path * 3 + 2) * 3;
       economic.prepared.assetGrowth.set([1.5, 0.5, 0.5], offset);
     }
@@ -79,8 +79,8 @@ describe("economic asset-path candidate search", () => {
 
 function fixture() {
   const executionWeights = ownerWeights([6000, 2000, 2000]);
-  const assetGrowth = new Float64Array(500 * 3 * 3);
-  for (let path = 0; path < 500; path += 1) {
+  const assetGrowth = new Float64Array(1000 * 3 * 3);
+  for (let path = 0; path < 1000; path += 1) {
     const delta = (path % 10) / 1000;
     assetGrowth.set([1, 1, 1, 0.9 + delta, 1.2 + delta, 1.05 + delta, 0.8 + delta, 1.4 + delta, 1.1 + delta], path * 9);
   }
@@ -90,7 +90,7 @@ function fixture() {
     prepared: {
       status: "ready", modelVersion: SIMULATION_ECONOMIC_STATE_MODEL_POLICY.version,
       assetKeys: executionWeights.map((row) => row.instrumentKey), factorKeys: SIMULATION_ECONOMIC_STATE_MODEL_POLICY.factorKeys,
-      horizon: 2, pathCount: 500, seed: 33, assetGrowth, factorStates: new Float64Array(500 * 3 * 3),
+      horizon: 2, pathCount: 1000, seed: 33, assetGrowth, factorStates: new Float64Array(1000 * 3 * 3),
     },
   };
 }

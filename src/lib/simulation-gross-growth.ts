@@ -27,7 +27,8 @@ export const SIMULATION_GROSS_GROWTH_POLICY = Object.freeze({
   outputKind: "per_instrument_gross_growth_factor_only",
   portfolioAggregation: "forbidden",
   distributionSummary: "forbidden",
-  maxGrowthFactorCells: 1_000_000,
+  // Doubling the owner path budget must not halve the supported holding count.
+  maxGrowthFactorCells: 2_000_000,
 } as const);
 
 export function materializeSimulationGrossGrowth(

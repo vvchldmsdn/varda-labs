@@ -33,6 +33,7 @@ export function OwnerOutcomeCandidateExplorer({
   status: ReadyComparison["outcomeCandidateStatus"];
 }) {
   const pt = useSimulationText();
+  const pathCount = currentExecution.assumptions.pathCount;
   const [selectedObjective, setSelectedObjective] =
     useState<OutcomeCandidate["objective"] | null>(
       candidates[0]?.objective ?? null,
@@ -54,7 +55,7 @@ export function OwnerOutcomeCandidateExplorer({
             <SimulationText ko={"확률 경로를 비중으로 역산"} />{" "}</p>
           <h3 className="mt-1 text-base font-semibold"><SimulationText ko={"목적별 비중 후보"} /></h3>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            <SimulationText ko={"500개 경로를 탐색용 250개와 확인용 250개로 분리합니다. 현재 비중보다 확인용 경로에서도 나아진 경우만 보여주며, 같은 종목·환율 자료와 같은 무작위 경로를 사용합니다."} />{" "}</p>
+            <SimulationText ko={`${pathCount.toLocaleString("ko-KR")}개 경로를 탐색용 ${Math.ceil(pathCount / 2)}개와 확인용 ${Math.floor(pathCount / 2)}개로 분리합니다. 현재 비중보다 확인용 경로에서도 나아진 경우만 보여주며, 같은 종목·환율 자료와 같은 무작위 경로를 사용합니다.`} en={`Split ${pathCount.toLocaleString("en-US")} paths into ${Math.ceil(pathCount / 2)} selection paths and ${Math.floor(pathCount / 2)} confirmation paths. Only candidates that also improve on current weights in the confirmation paths are shown, using the same instruments, FX data and random paths.`} />{" "}</p>
         </div>
         {selected ? (
           <div
@@ -130,14 +131,16 @@ function ReadyOutcomeCandidate({
     >
       <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
-          detail="확인용 250개 경로"
+          detail={`확인용 ${candidate.confirmation.pathCount}개 경로`}
+          detailEn={`${candidate.confirmation.pathCount} confirmation paths`}
           label={objectiveMetricLabel(candidate.objective)}
           value={formatSignedPct(
             candidate.confirmation.objectiveImprovementPctPoints,
           )}
         />
         <Metric
-          detail="전체 500개 경로 · 후보 - 현재"
+          detail={`전체 ${currentExecution.assumptions.pathCount.toLocaleString("ko-KR")}개 경로 · 후보 - 현재`}
+          detailEn={`All ${currentExecution.assumptions.pathCount.toLocaleString("en-US")} paths · Candidate − current`}
           label="중앙값 수익률 차이"
           value={formatSignedPct(candidate.deltas.p50ReturnPctPoints)}
         />
@@ -240,10 +243,12 @@ function OutcomeChartCard({
 
 function Metric({
   detail,
+  detailEn,
   label,
   value,
 }: {
   detail: string;
+  detailEn?: string;
   label: string;
   value: string;
 }) {
@@ -251,7 +256,7 @@ function Metric({
     <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
       <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
       <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
-      <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} en={detailEn} /></dd>
     </div>
   );
 }

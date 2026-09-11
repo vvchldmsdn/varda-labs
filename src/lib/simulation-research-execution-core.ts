@@ -9,6 +9,7 @@ import { sampleSimulationSpaghettiPaths } from "./simulation-spaghetti-path-samp
 import { buildStationaryBootstrapDrawPlan } from "./simulation-stationary-bootstrap.ts";
 import { calculateSimulationTerminalLossProbability } from "./simulation-terminal-loss-probability.ts";
 import { summarizeSimulationTerminalDownsideTail } from "./simulation-terminal-downside-tail.ts";
+import { buildSimulationDisplayPaths } from "./simulation-display-paths.ts";
 
 export type SimulationResearchExecutionBlockerReason =
   | "research_vector_invalid"
@@ -52,6 +53,7 @@ export function executeSimulationResearchPaths(input: {
   horizon: number;
   pathCount: number;
   samplePathCount: number;
+  includeDisplayPaths?: boolean;
 }) {
   const prepared = prepareSimulationResearchPaths(input);
   if (prepared.status !== "ready") {
@@ -64,6 +66,7 @@ export function executeSimulationResearchPaths(input: {
     scenarioVersion: input.scenarioVersion,
     weights: input.weights,
     samplePathCount: input.samplePathCount,
+    includeDisplayPaths: input.includeDisplayPaths,
   });
 }
 
@@ -122,6 +125,7 @@ export function executeSimulationResearchPathsFromPrepared(input: {
   scenarioVersion: string;
   weights: readonly ResearchWeight[];
   samplePathCount: number;
+  includeDisplayPaths?: boolean;
 }) {
   const vectorPacket = buildSimulationScenarioVectorReviewPacket({
     scenarioId: input.scenarioId,
@@ -221,6 +225,10 @@ export function executeSimulationResearchPathsFromPrepared(input: {
     status: "ready" as const,
     reason: null,
     assumptions: input.prepared.assumptions,
+    displayPaths: input.includeDisplayPaths ? buildSimulationDisplayPaths({
+      pathCount: normalizedNav.pathCount, horizon: normalizedNav.horizon,
+      navAt: (pathIndex, stepIndex) => normalizedNav.paths[pathIndex].points[stepIndex].nav,
+    }) : null,
     terminal: Object.freeze({
       p10Index: distribution.terminalSummary.p10 * 100,
       p50Index: distribution.terminalSummary.p50 * 100,
@@ -283,5 +291,6 @@ function blockedResult(reason: SimulationResearchExecutionBlockerReason) {
     terminal: null,
     bands: Object.freeze([]),
     samplePaths: Object.freeze([]),
+    displayPaths: null,
   });
 }

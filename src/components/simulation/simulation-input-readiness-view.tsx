@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { InvestmentLabDialog as SimulationDialog } from "@/components/investment-lab/investment-lab-dialog";
 import { SimulationWorkspace } from "./simulation-workspace";
-import { SimulationLink as Link, SimulationScopeTabs, SimulationDateControl, SimulationModelSelector } from "./simulation-query-controls";
+import { SimulationLink as Link, SimulationScopeTabs, SimulationDateControl, SimulationModelSelector, SimulationNavigationBoundary } from "./simulation-query-controls";
 import type { SimulationPageControls } from "@/lib/simulation-page-controls";
 import type { PortfolioAnalysisScope, PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import { SIMULATION_RESEARCH_HORIZON_POLICY } from "@/lib/simulation-research-horizon";
@@ -32,7 +32,7 @@ export function SimulationInputReadinessView({model, pathModel, ownerResearchExe
         selectedScopeKey={selectedScopeKey}
         generatedAt={model.generatedAt}
       />
-      <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
+      <SimulationNavigationBoundary className="varda-content varda-presentation-content varda-stage-content flex flex-col">
         <header className={styles.stageHeader}>
           <div className={styles.stageHeading}><h1 className="varda-page-title"><SimulationText ko={"시뮬레이션"} /></h1>
             <SimulationDialog
@@ -94,7 +94,7 @@ export function SimulationInputReadinessView({model, pathModel, ownerResearchExe
         </div>
         <footer className={styles.stageFootnote}>
           <SimulationText ko={"현재 구성 기준 연구 · 수수료·세금·현금수익률 미포함 · 결과는 수익 보장, 추천 또는 주문 근거가 아닙니다."} />{" "}</footer>
-      </div>
+      </SimulationNavigationBoundary>
     </main>
   );
 }
