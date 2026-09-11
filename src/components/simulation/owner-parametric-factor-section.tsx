@@ -36,7 +36,7 @@ export function OwnerParametricFactorSection({
           >
             <SimulationText ko={"환율·금리 요인 확률모형"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            <SimulationText ko={"같은 날짜의 종목 수익률과 USD/KRW·미국 10년물 금리·장단기 금리차 변화를 맞춰 통계 관계를 추정한 뒤 500개 경로를 계산합니다. 기존 재표본 추출과 다른 가정의 결과이므로 두 모형의 차이 자체를 불확실성으로 봐야 합니다."} />{" "}</p>
+            <SimulationText ko={`같은 날짜의 종목 수익률과 USD/KRW·미국 10년물 금리·장단기 금리차 변화를 맞춰 통계 관계를 추정한 뒤 ${result.policy.pathCount.toLocaleString("ko-KR")}개 경로를 계산합니다. 기존 재표본 추출과 다른 가정의 결과이므로 두 모형의 차이 자체를 불확실성으로 봐야 합니다.`} en={`Align same-date holding returns with changes in USD/KRW, US 10-year yields and the yield spread, estimate statistical relationships, then calculate ${result.policy.pathCount.toLocaleString("en-US")} paths. Its assumptions differ from bootstrap, so disagreement between the models is itself a source of uncertainty.`} />{" "}</p>
         </div>
         <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
           <SimulationText ko={"조회 시 계산 · 저장 안 함"} />{" "}</span>

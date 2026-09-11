@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ComponentProps, ComponentType } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { ScrollableNavRail } from "@/components/scrollable-nav-rail";
 
@@ -17,12 +18,14 @@ export function PortfolioAnalysisScopeTabs({
   scopes,
   selectedScopeKey,
   variant = "segmented",
+  linkComponent: ScopeLink = Link,
 }: {
   basePath: string;
   query?: PortfolioAnalysisScopeQuery;
   scopes: readonly PortfolioAnalysisScope[];
   selectedScopeKey: PortfolioAnalysisScopeKey | null;
   variant?: "segmented" | "underline";
+  linkComponent?: typeof Link | ComponentType<ComponentProps<typeof Link>>;
 }) {
   const {t} = useI18n();
   const underline = variant === "underline";
@@ -45,7 +48,7 @@ export function PortfolioAnalysisScopeTabs({
       {scopes.map((scope) => {
         const selected = scope.key === selectedScopeKey;
         return (
-          <Link
+          <ScopeLink
             key={scope.key}
             aria-current={selected ? "page" : undefined}
             aria-label={`${scope.kind === "all" ? t("전체 자산") : scope.label} ${t(scopeKindLabel(scope))}`}
@@ -65,7 +68,7 @@ export function PortfolioAnalysisScopeTabs({
             href={buildPortfolioAnalysisScopeHref(basePath, scope.key, query)}
           >
             {scope.kind === "all" ? t(underline ? "전체 자산" : "전체") : scope.label}
-          </Link>
+          </ScopeLink>
         );
       })}
     </ScrollableNavRail>

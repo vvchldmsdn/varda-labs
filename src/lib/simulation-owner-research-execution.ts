@@ -28,7 +28,7 @@ export const SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY = Object.freeze({
   krxGoldPolicy: "omit_without_backcast_until_manual_history_exists",
   zeroWeightPolicy: "preserve_diagnostic_row_omit_from_execution_matrix",
   horizonPolicyVersion: SIMULATION_RESEARCH_HORIZON_POLICY.version,
-  pathCount: 500,
+  pathCount: 1000,
   expectedBlockLength: 5,
   seed: 0x56415244,
   samplePathCount: 12,
@@ -104,6 +104,7 @@ export function buildSimulationOwnerResearchExecution(input: {
   horizonSelection: SimulationResearchHorizonSelection;
   matrix: SimulationReturnMatrixResult | null;
   preparedPaths?: PreparedSimulationResearchPaths;
+  includeDisplayPaths?: boolean;
 }) {
   const base = {
     id: `owner-${input.candidate.account}`,
@@ -214,6 +215,12 @@ export function buildSimulationOwnerResearchExecution(input: {
   if (prepared.status !== "ready") {
     return unavailable(base, prepared.reason);
   }
+  if (prepared.assumptions.pathCount !== SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount ||
+    prepared.assumptions.horizon !== input.horizonSelection.horizon ||
+    prepared.assumptions.seed !== SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.seed ||
+    prepared.assumptions.expectedBlockLength !== SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.expectedBlockLength) {
+    return unavailable(base, "prepared_path_policy_mismatch");
+  }
   const execution = executeSimulationResearchPathsFromPrepared({
     prepared,
     scenarioId: `owner-current-${input.candidate.account}`,
@@ -221,6 +228,7 @@ export function buildSimulationOwnerResearchExecution(input: {
     weights,
     samplePathCount:
       SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.samplePathCount,
+    includeDisplayPaths: input.includeDisplayPaths ?? true,
   });
   if (execution.status !== "ready") {
     return unavailable(base, execution.reason);
@@ -265,6 +273,7 @@ type OwnerExecutionBlockerReason =
   | "modeled_subset_empty"
   | "historical_evidence_not_admitted"
   | "weight_derivation_failed"
+  | "prepared_path_policy_mismatch"
   | "input_matrix_unavailable"
   | "input_matrix_shape_mismatch"
   | SimulationResearchExecutionBlockerReason;
@@ -370,6 +379,7 @@ function unavailable(
     terminal: null,
     bands: Object.freeze([]),
     samplePaths: Object.freeze([]),
+    displayPaths: null,
     executionWeights: Object.freeze([]),
   });
 }

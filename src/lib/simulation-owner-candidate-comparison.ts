@@ -142,7 +142,7 @@ export function buildSimulationOwnerCandidateComparison(input: {
     }),
     constraints: allocation.constraints,
     training: allocation.training,
-    currentExecution,
+    currentExecution: withoutDisplayPaths(currentExecution),
     candidateExecution,
     outcomeCandidateStatus: outcomeOptimization.status,
     outcomeCandidateReason: outcomeOptimization.reason,
@@ -176,6 +176,12 @@ export function buildSimulationOwnerCandidateComparison(input: {
         currentExecution.terminal.maxDrawdownP90Pct,
     }),
   });
+}
+
+// Preserve the common execution DTO type used by current/candidate chart props,
+// while omitting the main chart's large display array from this detail response.
+function withoutDisplayPaths(execution: ReadyExecution): ReadyExecution {
+  return Object.freeze({ ...execution, displayPaths: null });
 }
 
 function unavailable(

@@ -5,6 +5,7 @@ import { buildPrivateOwnerRawCloseSimulationReturnMatrix } from "./simulation-re
 import {
   buildSimulationOwnerResearchExecution,
   resolveSimulationOwnerExecutionEndSelection,
+  SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY,
 } from "./simulation-owner-research-execution.ts";
 import { prepareSimulationResearchPaths } from "./simulation-research-execution-core.ts";
 import { buildSimulationOwnerCandidateComparison } from "./simulation-owner-candidate-comparison.ts";
@@ -28,7 +29,7 @@ export type SimulationPreviewQuery = {
 };
 
 // In-memory synthetic market inputs, used only by the explicit development preview.
-export function buildSimulationDesignPreview(query: SimulationPreviewQuery) {
+export function buildSimulationDesignPreview(query: SimulationPreviewQuery, includeDisplayPaths = false) {
   const portfolio = buildPortfolioStructureDesignPreview(query.scope);
   const end =
     typeof query.end === "string" && isRiskDate(query.end)
@@ -120,9 +121,10 @@ export function buildSimulationDesignPreview(query: SimulationPreviewQuery) {
     seed: 0x56415244,
     expectedBlockLength: 5,
     horizon: horizon.horizon ?? 63,
-    pathCount: 500,
+    pathCount: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount,
   });
   const execution = buildSimulationOwnerResearchExecution({
+    includeDisplayPaths,
     candidate,
     inputPreflight: preflight,
     endSelection: resolveSimulationOwnerExecutionEndSelection({

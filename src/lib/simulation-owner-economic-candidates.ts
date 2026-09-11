@@ -2,7 +2,7 @@ import {
   evaluateEconomicStatePaths,
   type ReadyPreparedEconomicStatePaths,
 } from "./simulation-economic-state-model.ts";
-import type { buildSimulationOwnerEconomicResearch } from "./simulation-owner-economic-research.ts";
+import { SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY, type buildSimulationOwnerEconomicResearch } from "./simulation-owner-economic-research.ts";
 import { summarizeSimulationNavPaths } from "./simulation-nav-path-summary.ts";
 import { searchSimulationOwnerOutcomeCandidatesFromTerminalGrowth } from "./simulation-owner-outcome-optimizer.ts";
 import type { SimulationOwnerResearchWeight } from "./simulation-owner-constrained-min-volatility.ts";
@@ -119,7 +119,7 @@ function summarizeEconomicWeights(input: {
 }
 
 function validPreparedIdentity(prepared: ReadyPreparedEconomicStatePaths, weights: readonly SimulationOwnerResearchWeight[]) {
-  if (prepared.status !== "ready" || prepared.pathCount !== 500 ||
+  if (prepared.status !== "ready" || prepared.pathCount !== SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY.pathCount ||
     !Number.isSafeInteger(prepared.horizon) || prepared.horizon < 1 || prepared.horizon > 126 ||
     prepared.assetKeys.length !== weights.length || weights.length === 0 ||
     new Set(prepared.assetKeys).size !== prepared.assetKeys.length ||

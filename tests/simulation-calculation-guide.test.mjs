@@ -20,11 +20,12 @@ describe("beginner simulation calculation guide", () => {
     const history = simulationCalculationGuide.steps.find(step => step.id === "history");
     const paths = simulationCalculationGuide.steps.find(step => step.id === "paths");
     assert.equal(Number(history.body.en.match(/latest (\d+) observation/)?.[1]), policy.sourceReturnStepCount);
-    assert.equal(Number(paths.body.en.match(/create (\d+) possible paths/)?.[1]), policy.pathCount);
-    assert.equal(Number(paths.detail.en.match(/Only (\d+) sample paths/)?.[1]), policy.samplePathCount);
+    assert.equal(Number(paths.body.en.match(/create ([\d,]+) possible paths/)?.[1].replaceAll(",", "")), policy.pathCount);
+    assert.equal(Number(paths.detail.en.match(/main chart displays all ([\d,]+) paths/)?.[1].replaceAll(",", "")), policy.pathCount);
+    assert.equal(Number(paths.detail.en.match(/Candidate charts display (\d+) samples/)?.[1]), policy.samplePathCount);
     assert.equal(Number(paths.detail.en.match(/a (\d+)% chance/)?.[1]) / 100, 1 / policy.expectedBlockLength);
     assert.match(paths.detail.en, /stretch lengths vary and average five/);
-    assert.match(paths.detail.en, /all 500 are used for the summary statistics/);
+    assert.match(paths.detail.en, /summary statistics use every path/);
     assert.deepEqual(paths.nodes.at(-1).detail.en.match(/\d+/g).map(Number), SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons);
     assert.match(paths.takeAway.en, /No trades rebalance/);
     assert.match(history.takeAway.en, /same date stay together/);
@@ -81,17 +82,18 @@ describe("beginner simulation calculation guide", () => {
     ], { "next/link": linkPort, "next/dynamic": { default: () => function DeferredGuide() { throw new Error("The closed guide must not render its lazy contents"); } } });
     const base = {
       id: "owner-all", name: "내 포트폴리오", account: "all", instruments: [],
-      endSelection: { endServiceDate: "2026-09-01", source: "latest_common_stored" },
+      policy: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY,
+      endSelection: { status: "valid", endServiceDate: "2026-09-01", source: "latest_common_stored" },
       coverage: { modeledInstrumentCount: 1, candidateInstrumentCount: 1, modeledCurrentValuePct: 100, omittedWeightBps: 0 },
     };
     const ready = {
       ...base, status: "ready", executionWeights: [], samplePaths: [],
-      assumptions: { horizon: 63, pathCount: 500 },
+      assumptions: { horizon: 63, pathCount: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount },
       source: { endServiceDate: "2026-09-01", returnStepCount: 90, priceBasis: "raw_price_return" },
       terminal: { p50ReturnPct: 0, lossProbabilityPct: 0, maxDrawdownP90Pct: 0 },
       bands: [{ stepIndex: 0, p10: 100, p50: 100, p90: 100 }],
     };
-    const blocked = { ...base, status: "unavailable", reason: "input_matrix_unavailable" };
+    const blocked = { ...base, status: "unavailable", reason: "input_matrix_unavailable", assumptions: null };
     for (const initialLocale of ["ko", "en"]) {
       for (const execution of [ready, blocked]) {
         const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale },
@@ -111,7 +113,7 @@ describe("beginner simulation calculation guide", () => {
     for (const selectedScopeKey of ["account:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "portfolio:cccccccc-cccc-4ccc-8ccc-cccccccccccc"]) {
       for (const initialLocale of ["ko", "en"]) {
         for (const reason of ["owner_input_unavailable", "historical_evidence_not_admitted", "input_matrix_unavailable", "invalid_end_service_date", "invalid_horizon_selection"]) {
-          const execution = { status: "unavailable", reason, account: selectedScopeKey, instruments: [], endSelection: { endServiceDate: null, source: "latest_common_stored" }, coverage: { modeledInstrumentCount: 0, candidateInstrumentCount: 2, modeledCurrentValuePct: 0, omittedWeightBps: 0 } };
+          const execution = { status: "unavailable", reason, policy: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY, assumptions: null, account: selectedScopeKey, instruments: [], endSelection: { status: "unavailable", endServiceDate: null, source: "latest_common_stored" }, coverage: { modeledInstrumentCount: 0, candidateInstrumentCount: 2, modeledCurrentValuePct: 0, omittedWeightBps: 0 } };
           const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale }, React.createElement(owner.OwnerResearchExecutionSection, { execution, selectedScopeKey })));
           assert.match(markup, initialLocale === "ko" ? /아직 이 구성으로 계산할 수 없습니다/ : /This portfolio cannot be simulated yet/);
           assert.doesNotMatch(markup, /계산에 필요한 근거를 확인하고 있습니다|We are checking the evidence/);

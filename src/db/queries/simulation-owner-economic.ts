@@ -9,6 +9,7 @@ import { buildSimulationOwnerEconomicValidation } from "@/lib/simulation-owner-e
 export async function getReadOnlyTenantSimulationOwnerEconomicResearch(options: {
   ownerResearchPromise: Promise<ReadOnlyTenantSimulationOwnerResearchResult>;
   stateAsOfServiceDate: string;
+  includeDisplayPaths?: boolean;
 }) {
   const owner = await options.ownerResearchPromise;
   const input = owner.parametricFactorInput;
@@ -21,6 +22,7 @@ export async function getReadOnlyTenantSimulationOwnerEconomicResearch(options: 
     ownerExecutionReady: input !== null,
     stateAsOfServiceDate: options.stateAsOfServiceDate,
     factorRows,
+    includeDisplayPaths: options.includeDisplayPaths ?? false,
   });
 }
 

@@ -71,9 +71,9 @@ export function OwnerResearchExecutionSection({
             </div>
             <div>
               <h3 className="mb-2 font-medium text-[var(--ink)]">
-                <SimulationText ko={"500개 경로 · 12개 표본"} />{" "}</h3>
+                <SimulationText ko={`${execution.policy.pathCount.toLocaleString("ko-KR")}개 경로 · 전체 표시`} en={`${execution.policy.pathCount.toLocaleString("en-US")} paths · All displayed`} />{" "}</h3>
               <p>
-                <SimulationText ko={"최근 90개 공동 수익률을 평균 5단계 블록으로 재표본 추출합니다. 최초 배분 후 리밸런싱 없이 500개 경로를 계산하며, 차트에는 분포 또는 대표 표본 12개를 표시합니다. 표본만으로 전체 손실 확률을 판단하지 않습니다."} />{" "}</p>
+                <SimulationText ko={`최근 90개 공동 수익률을 평균 5단계 블록으로 재표본 추출합니다. 최초 배분 후 리밸런싱 없이 ${execution.policy.pathCount.toLocaleString("ko-KR")}개 경로를 계산하며, 메인 차트에는 전체 경로와 분포를 표시합니다. 비중 후보 차트의 표본선과 달리 지표는 전체 경로로 계산합니다.`} en={`Resample the latest 90 joint returns in blocks averaging five steps. Calculate ${execution.policy.pathCount.toLocaleString("en-US")} paths with no rebalancing after initial allocation. The main chart displays every path and the distribution. Candidate charts show sample lines, while metrics use every path.`} />{" "}</p>
             </div>
             <div>
               <h3 className="mb-2 font-medium text-[var(--ink)]">
@@ -232,7 +232,7 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
           <dd className={execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}>
             <SimulationText ko={simulationReturnLabel(100 + execution.terminal.p50ReturnPct)} />
           </dd>
-          <p>{execution.assumptions.horizon}<SimulationText ko="단계 후 · 500개 경로의 가운데 값" en=" steps · Middle of 500 paths" /></p>
+          <p>{execution.assumptions.horizon}<SimulationText ko={`단계 후 · ${execution.assumptions.pathCount.toLocaleString("ko-KR")}개 경로의 가운데 값`} en={` steps · Middle of ${execution.assumptions.pathCount.toLocaleString("en-US")} paths`} /></p>
         </div>
         <div>
           <dt><SimulationText ko="손실로 끝난 경로" en="Paths ending in loss" /></dt>
@@ -300,6 +300,10 @@ function unavailableReasonLabel(
   if (reason === "historical_evidence_not_admitted") return {
     ko: "종목별 과거 가격·환율의 출처와 날짜별 연결 근거가 부족합니다.",
     en: "Historical prices, exchange rates or their source and date alignment are incomplete.",
+  };
+  if (reason === "prepared_path_policy_mismatch") return {
+    ko: "준비된 경로와 현재 계산 조건이 일치하지 않습니다. 계산을 다시 실행해 주세요.",
+    en: "The prepared paths do not match the current calculation settings. Run the calculation again.",
   };
   return { ko: labels[reason] };
 }

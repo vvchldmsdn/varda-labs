@@ -39,13 +39,11 @@ export function summarizeSimulationTerminalDownsideTail(
     return blockedResult(singleBlocker("invalid_p5_return"));
   }
 
-  const tailReturns = sortedReturns.slice(
-    0,
-    SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tailPathCount,
-  );
+  const tailPathCount = sortedReturns.length * SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tailProbability;
+  const tailReturns = sortedReturns.slice(0, tailPathCount);
   const lowerTailMeanTerminalReturn =
     neumaierSum(tailReturns) /
-    SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tailPathCount;
+    tailPathCount;
   if (
     !Number.isFinite(lowerTailMeanTerminalReturn) ||
     lowerTailMeanTerminalReturn <= -1 ||
@@ -59,8 +57,8 @@ export function summarizeSimulationTerminalDownsideTail(
     runtimeTrustStatus:
       SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.runtimeTrustStatus,
     policy: SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY,
-    pathCount: SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.requiredPathCount,
-    tailPathCount: SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.tailPathCount,
+    pathCount: sortedReturns.length,
+    tailPathCount,
     p5TerminalReturn: canonicalZero(p5TerminalReturn),
     lowerTailMeanTerminalReturn: canonicalZero(
       lowerTailMeanTerminalReturn,

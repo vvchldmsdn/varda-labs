@@ -32,7 +32,7 @@ export function OwnerCandidateComparisonSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
-            <SimulationText ko={"현재안과 같은 500개 경로"} />{" "}</p>
+            <SimulationText ko="현재안과 동일한 전체 경로" en="The same complete paths as current weights" />{" "}</p>
           <h2 className="mt-1 text-lg font-semibold" id="owner-candidate-comparison-title">
             <SimulationText ko={"변동성 완화 후보 비교"} />{" "}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">

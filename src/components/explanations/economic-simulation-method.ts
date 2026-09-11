@@ -173,8 +173,8 @@ export const economicSimulationMethod = {
       id: "paired-weight-objectives",
       title: { ko: "3. 동일한 경로에서 제한된 비중 후보를 비교합니다", en: "3. Compare constrained weights on identical paths" },
       lead: {
-        ko: "먼저 종목별 500개 경로를 한 번 만듭니다. 현재 비중과 모든 후보가 이 경로를 공유하므로 우연히 유리한 다른 난수를 받은 결과를 비교하지 않습니다. 각 경로에서는 출발 수량을 유지하며 중간 매매나 비중 재조정을 하지 않습니다.",
-        en: "Generate 500 asset-level paths once. Current and candidate weights share them, so comparisons do not reward an allocation merely for receiving a different lucky draw. Each portfolio holds its starting units without intermediate trades or rebalancing.",
+        ko: "먼저 종목별 1,000개 경로를 한 번 만듭니다. 현재 비중과 모든 후보가 이 경로를 공유하므로 우연히 유리한 다른 난수를 받은 결과를 비교하지 않습니다. 각 경로에서는 출발 수량을 유지하며 중간 매매나 비중 재조정을 하지 않습니다. 메인 차트는 합산한 포트폴리오 경로를 모두 표시하고, 후보 차트만 표시용 표본 12개를 사용합니다.",
+        en: "Generate 1,000 asset-level paths once. Current and candidate weights share them, so comparisons do not reward an allocation merely for receiving a different lucky draw. Each portfolio holds its starting units without intermediate trades or rebalancing. The main chart displays every aggregated portfolio path; only candidate charts use 12 display samples.",
       },
       equations: [
         {
@@ -199,10 +199,10 @@ export const economicSimulationMethod = {
           },
         },
         {
-          expression: "R̄sample = (1/500) Σₚ₌₁…500 Rₚ",
+          expression: "R̄sample = (1/1000) Σₚ₌₁…1000 Rₚ",
           reading: {
-            ko: "계산된 평균은 500개 경로의 표본평균입니다. Student-t 충격은 로그 변화에서 두꺼운 꼬리를 가지므로, 비영 요인 노출을 지수 변환한 가격의 유한한 이론적 평균은 보장되지 않습니다. 이 표본평균을 안정적인 기대수익률로 해석하지 않으며, 비중 탐색의 목적에는 P50·P10 분위수만 사용합니다.",
-            en: "A reported average is the sample mean of 500 paths. Student-t log shocks have heavy tails; exponentiating nonzero factor exposure does not guarantee a finite theoretical mean price. This sample mean is not a stable expected-return estimate. Weight search instead uses P50 and P10 quantiles.",
+            ko: "계산된 평균은 1,000개 경로의 표본평균입니다. Student-t 충격은 로그 변화에서 두꺼운 꼬리를 가지므로, 비영 요인 노출을 지수 변환한 가격의 유한한 이론적 평균은 보장되지 않습니다. 이 표본평균을 안정적인 기대수익률로 해석하지 않으며, 비중 탐색의 목적에는 P50·P10 분위수만 사용합니다.",
+            en: "A reported average is the sample mean of 1,000 paths. Student-t log shocks have heavy tails; exponentiating nonzero factor exposure does not guarantee a finite theoretical mean price. This sample mean is not a stable expected-return estimate. Weight search instead uses P50 and P10 quantiles.",
           },
         },
         {
@@ -249,15 +249,15 @@ export const economicSimulationMethod = {
       id: "model-confirmation-and-time-check",
       title: { ko: "4. 모형 안의 확인과 시간순 점검을 구분합니다", en: "4. Separate model confirmation from chronological checks" },
       lead: {
-        ko: "현재 후보를 찾는 250개 경로와 확인하는 250개 경로는 같은 모형에서 생성됩니다. 별도의 시간순 점검은 과거 90개 구간만 학습하고 이후 실제 21개 구간을 봅니다. 두 검사를 섞어서 미래 성능이 검증되었다고 표시하지 않습니다.",
-        en: "The 250 selection paths and 250 confirmation paths come from the same model. A separate chronological check fits only the preceding 90 intervals and inspects the following 21 actual intervals. These checks do not combine into proof of future performance.",
+        ko: "현재 후보를 찾는 500개 경로와 확인하는 500개 경로는 같은 모형에서 생성됩니다. 별도의 시간순 점검은 과거 90개 구간만 학습하고 이후 실제 21개 구간을 봅니다. 두 검사를 섞어서 미래 성능이 검증되었다고 표시하지 않습니다.",
+        en: "The 500 selection paths and 500 confirmation paths come from the same model. A separate chronological check fits only the preceding 90 intervals and inspects the following 21 actual intervals. These checks do not combine into proof of future performance.",
       },
       equations: [
         {
           expression: "ΔSsearch = Ssearch(w) − Ssearch(w0),  ΔSconfirm = Sconfirm(w) − Sconfirm(w0)",
           reading: {
-            ko: "짝수 경로 250개에서 목적 점수를 높이는 후보를 찾고, 홀수 경로 250개에서 같은 후보와 현재 구성을 비교합니다. 두 개선값 모두 10⁻¹²%포인트보다 클 때만 후보를 공개합니다. 조건을 통과하는 후보가 없을 수 있습니다.",
-            en: "Search for a better objective on 250 even-indexed paths, then compare that same candidate with current weights on 250 odd-indexed paths. Both improvements must exceed 10⁻¹² percentage points for publication. No candidate may qualify.",
+            ko: "짝수 경로 500개에서 목적 점수를 높이는 후보를 찾고, 홀수 경로 500개에서 같은 후보와 현재 구성을 비교합니다. 두 개선값 모두 10⁻¹²%포인트보다 클 때만 후보를 공개합니다. 조건을 통과하는 후보가 없을 수 있습니다.",
+            en: "Search for a better objective on 500 even-indexed paths, then compare that same candidate with current weights on 500 odd-indexed paths. Both improvements must exceed 10⁻¹² percentage points for publication. No candidate may qualify.",
           },
         },
         {
@@ -291,8 +291,8 @@ export const economicSimulationMethod = {
         kind: "flow",
         caption: { ko: "구분해서 읽기 · 모형 경로 확인은 실제 미래 검증과 다릅니다", en: "Keep the distinction · model-path confirmation is not validation on the real future" },
         nodes: [
-          { label: { ko: "과거 90개 학습", en: "Fit 90 past intervals" }, detail: { ko: "모형 추정 · 250개로 후보 찾기", en: "Fit model · select using 250 paths" } },
-          { label: { ko: "다른 250개 확인", en: "Confirm on another 250" }, detail: { ko: "같은 모형 안의 별도 난수 경로", en: "Separate random paths from the same model" } },
+          { label: { ko: "과거 90개 학습", en: "Fit 90 past intervals" }, detail: { ko: "모형 추정 · 500개로 후보 찾기", en: "Fit model · select using 500 paths" } },
+          { label: { ko: "다른 500개 확인", en: "Confirm on another 500" }, detail: { ko: "같은 모형 안의 별도 난수 경로", en: "Separate random paths from the same model" } },
           { label: { ko: "후속 21개 관측", en: "Observe the next 21" }, detail: { ko: "선택에 쓰지 않은 실제 수익률", en: "Actual returns unused in selection" } },
         ],
       },

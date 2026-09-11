@@ -43,7 +43,7 @@ export const economicCalculationGuide = {
       nodes: [
         { label: { ko: "비슷한 경제 상태", en: "Similar economic states" } },
         { label: { ko: "공통 충격 + 종목별 차이", en: "Shared shocks + asset differences" } },
-        { label: { ko: "500개 가능한 흐름", en: "500 possible paths" } },
+        { label: { ko: "1,000개 가능한 흐름", en: "1,000 possible paths" }, detail: { ko: "메인 차트에 전체 표시", en: "All displayed on the main chart" } },
       ],
       takeAway: {
         ko: "평균 방향과 흔들림은 다릅니다. 비슷한 과거가 있다고 미래가 같은 방향으로 움직이도록 고정하지 않습니다.",
@@ -72,8 +72,8 @@ export const economicCalculationGuide = {
         en: "An apparently better candidate neither recommends new instruments nor becomes an actual order.",
       },
       detail: {
-        ko: "일방향 비중 이동량은 최대 20%, 비원화 표시 자산 비중 변화는 최대 10%포인트로 제한합니다. 종목 비중 상한은 35%와 기존 구성의 최대 종목 비중 중 큰 값입니다. 균형 기준은 P50과 P10의 평균입니다. P10은 모형 경로의 하위 경계이지 손실의 최저 한도나 안전 보장이 아닙니다.",
-        en: "One-way turnover is capped at 20%, and the change in non-KRW-denominated weight at 10 percentage points. The position-weight ceiling is the greater of 35% and the largest current position weight. The balanced objective averages P50 and P10. P10 is a lower boundary within model paths, not a maximum possible loss or a safety guarantee.",
+        ko: "일방향 비중 이동량은 최대 20%, 비원화 표시 자산 비중 변화는 최대 10%포인트로 제한합니다. 종목 비중 상한은 35%와 기존 구성의 최대 종목 비중 중 큰 값입니다. 균형 기준은 P50과 P10의 평균입니다. 후보 차트에는 표본선 12개를 보여주지만 지표는 전체 1,000개 경로로 계산합니다. P10은 모형 경로의 하위 경계이지 손실의 최저 한도나 안전 보장이 아닙니다.",
+        en: "One-way turnover is capped at 20%, and the change in non-KRW-denominated weight at 10 percentage points. The position-weight ceiling is the greater of 35% and the largest current position weight. The balanced objective averages P50 and P10. Candidate charts show 12 sample lines, while metrics use all 1,000 paths. P10 is a lower boundary within model paths, not a maximum possible loss or a safety guarantee.",
       },
     },
     {
@@ -81,12 +81,12 @@ export const economicCalculationGuide = {
       label: { ko: "검증과 해석", en: "Checks and interpretation" },
       title: { ko: "후보를 찾은 자료와 확인할 자료를 나눠요", en: "Separate candidate selection from confirmation" },
       body: {
-        ko: "500개 모형 경로를 짝수·홀수 250개씩 나눕니다. 한쪽에서 후보를 찾고 다른 쪽에서도 현재보다 목적 점수가 개선될 때만 보여줍니다. 이 확인도 같은 학습 모형 안의 검사입니다. 실제 미래를 미리 맞혔다는 증거와 구분해야 합니다.",
-        en: "Split the 500 model paths into even and odd sets of 250. Select a candidate on one set and show it only if its objective also improves on current weights in the other. Both sets come from the same fitted model, so this is distinct from evidence of predicting actual future outcomes.",
+        ko: "1,000개 모형 경로를 짝수·홀수 500개씩 나눕니다. 한쪽에서 후보를 찾고 다른 쪽에서도 현재보다 목적 점수가 개선될 때만 보여줍니다. 이 확인도 같은 학습 모형 안의 검사입니다. 실제 미래를 미리 맞혔다는 증거와 구분해야 합니다.",
+        en: "Split the 1,000 model paths into even and odd sets of 500. Select a candidate on one set and show it only if its objective also improves on current weights in the other. Both sets come from the same fitted model, so this is distinct from evidence of predicting actual future outcomes.",
       },
       nodes: [
-        { label: { ko: "250개로 후보 탐색", en: "Select on 250 paths" } },
-        { label: { ko: "다른 250개로 확인", en: "Confirm on another 250" } },
+        { label: { ko: "500개로 후보 탐색", en: "Select on 500 paths" } },
+        { label: { ko: "다른 500개로 확인", en: "Confirm on another 500" } },
         { label: { ko: "별도의 시간순 점검", en: "Separate chronological check" }, detail: { ko: "학습 90개 → 이후 21개", en: "Train on 90 → inspect the next 21" } },
       ],
       takeAway: {

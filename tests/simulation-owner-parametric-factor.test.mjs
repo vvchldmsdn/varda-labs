@@ -11,7 +11,7 @@ import {
 } from "./support/simulation-owner-ready-matrix.mjs";
 
 describe("owner-scoped parametric factor research", () => {
-  it("builds a separate account-scoped 500-path result", () => {
+  it("builds a separate account-scoped 1000-path result", () => {
     const matrix = readyOwnerMatrix();
     const result = buildSimulationOwnerParametricFactorResearch({
       account: "all",
@@ -24,7 +24,7 @@ describe("owner-scoped parametric factor research", () => {
 
     assert.equal(result.status, "ready");
     assert.equal(result.account, "all");
-    assert.equal(result.assumptions.pathCount, 500);
+    assert.equal(result.assumptions.pathCount, 1000);
     assert.equal(result.samplePaths.length, 12);
     assert.equal(result.bands.length, 64);
     assert.equal(result.source.alignedObservationCount, 89);

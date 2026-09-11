@@ -3,17 +3,25 @@
 import { SimulationText, useSimulationText } from "@/components/simulation/simulation-text";
 
 
-import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
-import { AreaChart, ChartNoAxesCombined } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { AreaChart, ChartNoAxesCombined, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 import {
   nearestSimulationBand,
+  forEachSimulationFanPathPoint,
+  nearestSimulationFanPath,
+  nearestSimulationFanPathPoint,
   resolveResearchFanChartValueDomain,
+  resolveSimulationFanPathSource,
+  simulationFanPathCount,
+  simulationFanPathIdentity,
   simulationReturnLabel,
   type ResearchFanChartData,
   type ResearchFanChartValueDomain,
 } from "./simulation-presentation";
 import styles from "./simulation-workspace.module.css";
+import chartStyles from "./simulation-path-chart.module.css";
+import { SimulationPathCanvas } from "./simulation-path-canvas";
 
 export function SimulationFanExplorer({
   execution,
@@ -31,10 +39,11 @@ export function SimulationFanExplorer({
     ? pt("내 포트폴리오", "My portfolio")
     : pt(execution.name);
   const ref = useRef<HTMLDivElement>(null);
-  const id = useId();
+  const source = useMemo(() => resolveSimulationFanPathSource(execution), [execution]);
+  const pathCount = simulationFanPathCount(source);
   const [width, setWidth] = useState(960);
   const [plotHeight, setPlotHeight] = useState(430);
-  const [mode, setMode] = useState<"band" | "paths">("band");
+  const [mode, setMode] = useState<"band" | "paths">(source.kind === "all" ? "paths" : "band");
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [unit, setUnit] = useState<"index" | "return">("return");
   const [hoveredPath, setHoveredPath] = useState<number | null>(null);
@@ -55,8 +64,9 @@ export function SimulationFanExplorer({
   const top = 20;
   const bottom = height - 35;
   const geometry = useMemo(() => {
-    const domain =
-      valueDomain ?? resolveResearchFanChartValueDomain([execution]);
+    const ownDomain = resolveResearchFanChartValueDomain([execution]);
+    // A supplied comparison domain may extend the view, but must not clip complete paths.
+    const domain = valueDomain ? { min: Math.min(ownDomain.min, valueDomain.min), max: Math.max(ownDomain.max, valueDomain.max) } : ownDomain;
     const spread = Math.max(domain.max - domain.min, 1);
     const min = domain.min - spread * 0.09;
     const max = domain.max + spread * 0.09;
@@ -73,39 +83,17 @@ export function SimulationFanExplorer({
         })),
       );
     // Straight band edges preserve percentile ordering between observed steps.
-    const areaPoints = [
-      ...execution.bands.map((band) => [x(band.stepIndex), y(band.p90)]),
-      ...[...execution.bands]
-        .reverse()
-        .map((band) => [x(band.stepIndex), y(band.p10)]),
-    ];
-    const area =
-      areaPoints
-        .map(([px, py], index) => `${index ? "L" : "M"}${px},${py}`)
-        .join(" ") + " Z";
     const halfArea = (upper: "p90" | "p50", lower: "p50" | "p10") => {
       const coordinates = [...execution.bands.map((band) => [x(band.stepIndex), y(band[upper])]), ...execution.bands.toReversed().map((band) => [x(band.stepIndex), y(band[lower])])];
       return coordinates.map(([px, py], index) => `${index ? "L" : "M"}${px},${py}`).join(" ") + " Z";
     };
-    const paths = execution.samplePaths.map((path) => ({
-      id: path.pathIndex,
-      points: path.points.map((point) => ({ x: x(point.stepIndex), y: y(point.indexValue), step: point.stepIndex, value: point.indexValue })),
-      d: path.points
-        .map(
-          (point, index) =>
-            `${index ? "L" : "M"}${x(point.stepIndex)},${y(point.indexValue)}`,
-        )
-        .join(" "),
-    }));
     return {
       x,
       y,
       min,
       max,
-      area,
       upperArea: halfArea("p90", "p50"),
       lowerArea: halfArea("p50", "p10"),
-      paths,
       median: line("p50"),
       lower: line("p10"),
       upper: line("p90"),
@@ -114,10 +102,18 @@ export function SimulationFanExplorer({
   const band = nearestSimulationBand(execution.bands, activeStep ?? execution.assumptions.horizon);
   const format = (value: number) =>
     unit === "return" ? simulationReturnLabel(value) : value.toFixed(1);
-  const activeX = band ? geometry.x(band.stepIndex) : 0;
-  const focusedPath = hoveredPath ?? selectedPath;
-  const inspectedPath = mode === "paths" ? geometry.paths.find((path) => path.id === focusedPath) : null;
-  const pathPoint = inspectedPath?.points.reduce<(typeof inspectedPath.points)[number] | undefined>((nearest, point) => !nearest || Math.abs(point.step - (band?.stepIndex ?? 0)) < Math.abs(nearest.step - (band?.stepIndex ?? 0)) ? point : nearest, undefined);
+  const pathSelection = hoveredPath ?? selectedPath;
+  const focusedPath = mode === "paths" && pathSelection !== null && pathSelection < pathCount ? pathSelection : null;
+  const pathPoint = focusedPath === null ? null : nearestSimulationFanPathPoint(source, focusedPath, activeStep ?? execution.assumptions.horizon);
+  const displayedStep = pathPoint?.stepIndex ?? band?.stepIndex ?? execution.assumptions.horizon;
+  const activeX = geometry.x(displayedStep);
+  const focusedIdentity = focusedPath === null ? null : simulationFanPathIdentity(source, focusedPath);
+  const selectedLine = useMemo(() => {
+    if (focusedPath === null) return null;
+    const points: string[] = [];
+    forEachSimulationFanPathPoint(source, focusedPath, (step, value) => points.push(`${points.length ? "L" : "M"}${geometry.x(step)},${geometry.y(value)}`));
+    return points.join(" ");
+  }, [source, focusedPath, geometry]);
   const axisSteps = width < 480 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
 
   function inspect(event: PointerEvent<SVGSVGElement>) {
@@ -126,23 +122,40 @@ export function SimulationFanExplorer({
     const py = ((event.clientY - bounds.top) / bounds.height) * height;
     const step = Math.max(0, Math.min(execution.assumptions.horizon, ((px - left) / (right - left)) * execution.assumptions.horizon));
     setActiveStep(step);
-    if (mode !== "paths") return;
-    let candidate: number | null = null;
-    let distance = 24;
-    for (const path of geometry.paths) {
-      const point = path.points.reduce<(typeof path.points)[number] | undefined>((nearest, current) => !nearest || Math.abs(current.step - step) < Math.abs(nearest.step - step) ? current : nearest, undefined);
-      if (point && Math.abs(point.y - py) < distance) { candidate = path.id; distance = Math.abs(point.y - py); }
-    }
+    if (mode !== "paths") return null;
+    const candidate = nearestSimulationFanPath(source, step, py, geometry.y);
     setHoveredPath(candidate);
+    return candidate;
   }
 
   function leave() { setActiveStep(null); setHoveredPath(null); }
+
+  function selectPath(path: number | null) {
+    setHoveredPath(null);
+    setSelectedPath(path === null ? null : Math.max(0, Math.min(pathCount - 1, path)));
+  }
+
+  function inspectWithKeyboard(event: KeyboardEvent<SVGSVGElement>) {
+    const step = Math.round(activeStep ?? execution.assumptions.horizon);
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      setHoveredPath(null);
+      setActiveStep(Math.max(0, Math.min(execution.assumptions.horizon, step + (event.key === "ArrowRight" ? 1 : -1))));
+    } else if (mode === "paths" && pathCount && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      event.preventDefault();
+      selectPath(selectedPath === null ? 0 : selectedPath + (event.key === "ArrowDown" ? 1 : -1));
+    } else if (event.key === "Escape") {
+      leave();
+      setSelectedPath(null);
+    }
+  }
 
   return (
     <figure
       className={large ? styles.stageFan : "min-w-0"}
       data-research-fan-chart={execution.id}
       data-fan-mode={mode}
+      data-fan-path-coverage={source.kind}
     >
       <div
         className={`${styles.fanControls} flex flex-wrap items-center justify-between gap-3 text-xs ${compact ? "py-1.5" : "py-3"}`}
@@ -154,10 +167,10 @@ export function SimulationFanExplorer({
         >
           {(
             [
-              { key: "band", label: "분포 구간", icon: AreaChart },
-              { key: "paths", label: "표본 경로", icon: ChartNoAxesCombined },
+              { key: "paths", label: source.kind === "all" ? "전체 경로" : "표본 경로", en: source.kind === "all" ? "All paths" : "Sample paths", icon: ChartNoAxesCombined },
+              { key: "band", label: "분포 구간", en: "Distribution", icon: AreaChart },
             ] as const
-          ).map(({ key, label, icon: Icon }) => (
+          ).map(({ key, label, en, icon: Icon }) => (
             <button
               key={key}
               type="button"
@@ -166,7 +179,7 @@ export function SimulationFanExplorer({
               className={`flex items-center gap-2 rounded-full px-4 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${compact ? "min-h-9" : "min-h-10"} ${mode === key ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
               <Icon size={14} aria-hidden="true" />
-              <SimulationText ko={label} />
+              <SimulationText ko={label} en={en} />
             </button>
           ))}
         </div>
@@ -194,26 +207,27 @@ export function SimulationFanExplorer({
         </div>
       </div>
       {band && !compact ? <div className={styles.fanReadout} data-fan-readout>
-        <p><SimulationText ko={band.stepIndex === 0 ? "현재" : `${band.stepIndex}단계`} /><span><SimulationText ko={pathPoint && focusedPath !== null ? `표본 ${focusedPath + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}` : "분포의 세 지점"} /></span></p>
-        {pathPoint ? <strong>{format(pathPoint.value)}</strong> : <dl><div><dt>P10</dt><dd>{format(band.p10)}</dd></div><div><dt>P50</dt><dd>{format(band.p50)}</dd></div><div><dt>P90</dt><dd>{format(band.p90)}</dd></div></dl>}
+        <p><SimulationText ko={displayedStep === 0 ? "현재" : `${displayedStep}단계`} /><span>{pathPoint && focusedIdentity !== null && focusedIdentity !== undefined ? pt(`${source.kind === "all" ? "경로" : "표본"} ${focusedIdentity + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}`, `${source.kind === "all" ? "Path" : "Sample"} ${focusedIdentity + 1}${selectedPath === focusedPath ? " · Selected" : ""}`) : pt("분포의 세 지점")}</span></p>
+        {pathPoint ? <strong>{format(pathPoint.indexValue)}</strong> : <dl><div><dt>P10</dt><dd>{format(band.p10)}</dd></div><div><dt>P50</dt><dd>{format(band.p50)}</dd></div><div><dt>P90</dt><dd>{format(band.p90)}</dd></div></dl>}
       </div> : null}
-      <div ref={ref} className={large ? styles.fanPlot : "relative w-full"} style={large ? undefined : { height }}>
+      <div ref={ref} className={`${large ? styles.fanPlot : "w-full"} ${chartStyles.plot}`} style={large ? undefined : { height }}>
+        {execution.bands.length > 0 && mode === "paths" && pathCount > 0 ? <SimulationPathCanvas source={source} width={width} height={height} x={geometry.x} y={geometry.y} /> : null}
         {execution.bands.length ? (
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-full w-full touch-pan-y"
+            className={chartStyles.overlay}
             role="img"
+            tabIndex={0}
             onPointerMove={inspect}
             onPointerDown={inspect}
+            onPointerUp={(event) => { const candidate = inspect(event); if (mode === "paths") selectPath(candidate === selectedPath ? null : candidate); }}
             onPointerLeave={leave}
             onPointerCancel={leave}
-            onClick={() => { if (mode === "paths") setSelectedPath(hoveredPath === selectedPath ? null : hoveredPath); }}
+            onKeyDown={inspectWithKeyboard}
             aria-label={pt(`${executionName} 연구 시뮬레이션 경로와 P10 P50 P90 구간`)}
           >
             <title>{pt(`${executionName} 확률 분포`)}</title>
-            <defs>
-              <pattern id={`${id}-dots`} width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="var(--accent)" opacity=".48" /></pattern>
-            </defs>
+            <desc>{pt("좌우 방향키로 시점을, 위아래 방향키로 경로를 선택합니다. Escape로 선택을 해제합니다.", "Use left and right arrows for time, up and down arrows for paths. Press Escape to clear the selection.")}</desc>
             {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
               const value =
                 geometry.min + (geometry.max - geometry.min) * ratio;
@@ -248,17 +262,10 @@ export function SimulationFanExplorer({
               strokeDasharray="4 5"
             />
             <g key={`${execution.id}-${mode}`} className={styles.fanReveal}>
-            <path d={geometry.upperArea} fill="var(--accent)" opacity={mode === "band" ? ".09" : ".025"} />
-            <path d={geometry.lowerArea} fill="var(--negative)" opacity={mode === "band" ? ".07" : ".025"} />
-            <path d={geometry.area} fill={`url(#${id}-dots)`} opacity={mode === "band" ? 1 : .18} />
-            {mode === "paths"
-              ? geometry.paths.map((path) => (
-                  <g key={path.id} className={styles.samplePath} opacity={focusedPath === null ? .65 : focusedPath === path.id ? 1 : .16}>
-                    <path d={path.d} fill="none" stroke={focusedPath === path.id ? "var(--ink)" : "var(--faint)"} strokeWidth={focusedPath === path.id ? 1.8 : .6} opacity={focusedPath === path.id ? 1 : .45} />
-                    {path.points.filter((_, index) => index % Math.max(1, Math.ceil(path.points.length / 28)) === 0 || index === path.points.length - 1).map((point) => <circle key={point.step} cx={point.x} cy={point.y} r={focusedPath === path.id ? 2.5 : 1.8} fill={focusedPath === path.id ? "var(--accent)" : "var(--ink)"} />)}
-                  </g>
-                ))
-              : null}
+            {mode === "band" ? <>
+              <path d={geometry.upperArea} fill="var(--accent)" opacity=".10" />
+              <path d={geometry.lowerArea} fill="var(--negative)" opacity=".08" />
+            </> : null}
             <path
               d={geometry.lower}
               fill="none"
@@ -279,6 +286,8 @@ export function SimulationFanExplorer({
               stroke="var(--ink)"
               strokeWidth="2.8"
             />
+            {selectedLine ? <path d={selectedLine} fill="none" stroke="var(--paper)" strokeWidth="4" pointerEvents="none" /> : null}
+            {selectedLine ? <path d={selectedLine} fill="none" stroke="var(--ink)" strokeWidth="1.8" pointerEvents="none" data-selected-simulation-path={focusedIdentity} /> : null}
             </g>
             {axisSteps.map((ratio) => (
               <text
@@ -308,18 +317,7 @@ export function SimulationFanExplorer({
                   stroke="var(--line)"
                   strokeDasharray="3 4"
                 />
-                {(["p10", "p50", "p90"] as const).map((key) => (
-                  <circle
-                    key={key}
-                    cx={activeX}
-                    cy={geometry.y(band[key])}
-                    r={key === "p50" ? 5 : 3}
-                    fill={key === "p50" ? "var(--accent)" : "var(--paper)"}
-                    stroke={key === "p50" ? "var(--paper)" : "var(--faint)"}
-                    strokeWidth="1.5"
-                  />
-                ))}
-                {pathPoint ? <circle cx={pathPoint.x} cy={pathPoint.y} r="6" fill="var(--accent)" stroke="var(--paper)" strokeWidth="2" /> : null}
+                {pathPoint ? <line x1={activeX - 5} x2={activeX + 5} y1={geometry.y(pathPoint.indexValue)} y2={geometry.y(pathPoint.indexValue)} stroke="var(--ink)" strokeWidth="2" /> : null}
               </g>
             ) : null}
           </svg>
@@ -328,8 +326,12 @@ export function SimulationFanExplorer({
             <SimulationText ko={"표시할 확률 경로가 없습니다."} />{" "}</div>
         )}
       </div>
-      {mode === "paths" && !compact ? <div className={styles.pathChoices} aria-label={pt("표본 경로 선택")}>
-        <span><SimulationText ko={"표본"} /></span>{geometry.paths.map((path) => <button key={path.id} type="button" aria-label={pt(`표본 경로 ${path.id + 1} 선택`)} aria-pressed={selectedPath === path.id} onClick={() => setSelectedPath(selectedPath === path.id ? null : path.id)}>{String(path.id + 1).padStart(2, "0")}</button>)}
+      {mode === "paths" && pathCount > 0 && !compact ? <div className={chartStyles.pathControls} aria-label={pt("경로 선택", "Path selection")}>
+        <button type="button" disabled={selectedPath === 0} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath - 1)} aria-label={pt("이전 경로", "Previous path")}><ChevronLeft size={14} aria-hidden="true" /></button>
+        <label><span>{pt("경로", "Path")}</span><input type="number" min={1} max={pathCount} step={1} value={selectedPath === null ? "" : selectedPath + 1} placeholder="—" aria-label={pt("경로 번호", "Path number")} onChange={(event) => selectPath(event.currentTarget.value === "" ? null : Math.floor(Number(event.currentTarget.value)) - 1)} /></label>
+        <button type="button" disabled={selectedPath === pathCount - 1} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath + 1)} aria-label={pt("다음 경로", "Next path")}><ChevronRight size={14} aria-hidden="true" /></button>
+        {selectedPath !== null ? <button type="button" onClick={() => selectPath(null)} aria-label={pt("경로 선택 해제", "Clear path selection")}><X size={13} aria-hidden="true" /></button> : null}
+        <span className={chartStyles.pathCount}>{pt(`${source.kind === "all" ? "전체" : "표본"} ${pathCount.toLocaleString()}개`, `${source.kind === "all" ? "All" : "Sample"} ${pathCount.toLocaleString()} paths`)}</span>
       </div> : null}
       <div className="mt-2 flex items-center gap-4">
         <input
@@ -350,11 +352,11 @@ export function SimulationFanExplorer({
             }
           }}
           aria-valuetext={pt(band
-              ? `${band.stepIndex}단계, 중앙값 ${format(band.p50)}`
+              ? pathPoint ? pt(`${pathPoint.stepIndex}단계, 경로 ${(focusedIdentity ?? 0) + 1}, ${format(pathPoint.indexValue)}`, `Step ${pathPoint.stepIndex}, path ${(focusedIdentity ?? 0) + 1}, ${format(pathPoint.indexValue)}`) : `${band.stepIndex}단계, 중앙값 ${format(band.p50)}`
               : `${execution.assumptions.horizon}단계`)}
         />
         <span className="w-16 text-right text-[11px] tabular-nums text-[var(--muted)]">
-          {band?.stepIndex ?? execution.assumptions.horizon}<SimulationText ko={"단계"} />{" "}</span>
+          {displayedStep}<SimulationText ko={"단계"} />{" "}</span>
       </div>
       {compact ? null : (
         <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
@@ -365,7 +367,7 @@ export function SimulationFanExplorer({
             <i className="h-2.5 w-5 rounded-sm bg-[var(--line)]" />
             <SimulationText ko={"P10~P90 · 모형 내 80% 구간"} />{" "}</span>
           <span>
-            <SimulationText ko={"표본 경로"} />{" "}{execution.samplePaths.length}<SimulationText ko={"개 · 연구 분포, 수익 보장 아님"} />{" "}</span>
+            {pt(`${source.kind === "all" ? "전체" : "표본"} ${pathCount.toLocaleString()}개 경로 · 연구 분포, 수익 보장 아님`, `${source.kind === "all" ? "All" : "Sample"} ${pathCount.toLocaleString()} paths · Research distribution, not guaranteed returns`)}</span>
         </figcaption>
       )}
     </figure>

@@ -15,8 +15,10 @@ import {
   X,
 } from "lucide-react";
 import styles from "./simulation-workspace.module.css";
+import { SimulationLoading } from "./simulation-loading";
+import loadingStyles from "./simulation-loading.module.css";
 
-const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <p role="status" className="py-10 text-sm"><SimulationText ko={"상세 분석을 불러오고 있습니다."} /></p> });
+const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <SimulationLoading phase="evidence" compact /> });
 
 type SimulationOverlay = "weights" | "validation" | "evidence";
 
@@ -62,7 +64,10 @@ export function SimulationWorkspace({
     <div className={styles.workspace} data-simulation-workspace="integrated">
       <div className={styles.toolbar}><span><SimulationText ko={"현재 보유 구성 · 연구 분포"} /></span><div>{tools}</div></div>
 
-      <div className={styles.canvas}>{paths}</div>
+      <div className={`${styles.canvas} ${loadingStyles.resultFrame}`}>
+        <div className={loadingStyles.pendingResult}><SimulationLoading /></div>
+        <div className={loadingStyles.settledResult}>{paths}</div>
+      </div>
 
       <div className={styles.launchers}>
         {(Object.keys(OVERLAYS) as SimulationOverlay[]).map((view) => {

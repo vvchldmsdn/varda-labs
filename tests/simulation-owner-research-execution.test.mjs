@@ -104,7 +104,7 @@ describe("owner-scoped portfolio research execution", () => {
     assert.equal(result.coverage.modeledCurrentValuePct, 100);
     assert.equal(result.coverage.omittedWeightBps, 0);
     assert.equal(result.assumptions.horizon, 63);
-    assert.equal(result.assumptions.pathCount, 500);
+    assert.equal(result.assumptions.pathCount, 1000);
     assert.deepEqual(
       result.executionWeights.map(({ ticker, weightBps }) => ({
         ticker,

@@ -19,7 +19,7 @@ export const SIMULATION_ECONOMIC_STATE_MODEL_POLICY = Object.freeze({
   maximumObservationCount: 90,
   maximumAssetCount: 64,
   maximumHorizon: 126,
-  maximumPathCount: 500,
+  maximumPathCount: 1000,
   ewmaDecay: 0.97,
   factorCovarianceOffDiagonalShrinkage: 0.15,
   residualCovarianceOffDiagonalShrinkage: 0.25,
@@ -216,7 +216,7 @@ export function evaluateEconomicStatePaths(input: {
   if (
     prepared.status !== "ready" || prepared.modelVersion !== SIMULATION_ECONOMIC_STATE_MODEL_POLICY.version ||
     count < 1 || count > 64 || new Set(prepared.assetKeys).size !== count ||
-    !Number.isInteger(prepared.pathCount) || prepared.pathCount < 1 || prepared.pathCount > 500 ||
+    !Number.isInteger(prepared.pathCount) || prepared.pathCount < 1 || prepared.pathCount > SIMULATION_ECONOMIC_STATE_MODEL_POLICY.maximumPathCount ||
     !Number.isInteger(prepared.horizon) || prepared.horizon < 1 || prepared.horizon > 126 ||
     !Number.isInteger(horizon) || horizon < 1 || horizon > prepared.horizon ||
     weights.length !== count || weights.some((v) => !Number.isFinite(v) || v < 0) ||

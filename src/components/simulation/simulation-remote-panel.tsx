@@ -23,10 +23,15 @@ import { RegimeReadinessHistoryPanel } from "./regime-readiness-history-panel";
 import { RegimeBootstrapResearchSection } from "./regime-bootstrap-research-section";
 import { ResearchUniversePreflightSection } from "./research-universe-preflight-section";
 import { EconomicDetailPanel } from "./economic-detail-panel";
+import { SimulationLoading } from "./simulation-loading";
 
 export default function SimulationRemotePanel({ query }: { query: string }) {
   const { data, error, retry } = useResearchDetail<SimulationDetailData>("/api/research/simulation", query);
-  if (!data) return <ResearchDetailStatus error={error} retry={retry} />;
+  if (!data) {
+    if (error) return <ResearchDetailStatus error={error} retry={retry} />;
+    const panel = new URLSearchParams(query).get("view");
+    return <SimulationLoading phase={panel === "weights" || panel === "validation" ? panel : "evidence"} compact />;
+  }
   if (data.pathModel === "economic") return protect("economic-detail", <EconomicDetailPanel data={data} />);
   if (data.panel === "weights" && data.candidateComparison) return <div id="simulation-weight-experiment">{protect("OwnerCandidateComparisonSection", <OwnerCandidateComparisonSection comparison={data.candidateComparison} instruments={data.instruments} />)}</div>;
   return <>

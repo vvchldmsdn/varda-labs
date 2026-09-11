@@ -14,9 +14,9 @@ export function SimulationDesignPreview({
 }: {
   query: SimulationPreviewQuery;
 }) {
-  const preview = buildSimulationDesignPreview(query);
   const pathModel = resolveSimulationPathModel(query.model);
-  const economic = pathModel === "economic" ? buildSimulationEconomicDesignPreview(query, preview).economic : null;
+  const preview = buildSimulationDesignPreview(query, pathModel === "bootstrap");
+  const economic = pathModel === "economic" ? buildSimulationEconomicDesignPreview(query, preview, true).economic : null;
   const { portfolio, execution, model } =
     preview;
   return (
