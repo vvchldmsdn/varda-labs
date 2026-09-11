@@ -33,6 +33,8 @@ const mobileNavigation = [
   navigation[0].items[3], navigation[0].items[2],
 ];
 
+const mobileResearchNavigation = [navigation[1].items[1], navigation[1].items[2]];
+
 function PendingHint() {
   const { pending } = useLinkStatus();
   return <span className="varda-link-pending" data-pending={pending || undefined} aria-hidden="true" />;
@@ -130,11 +132,19 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
           </Link>
-          <button type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")}>
-            <Menu size={22} strokeWidth={1.6} aria-hidden="true" />
+          <button type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")} aria-haspopup="dialog">
+            <Menu size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("메뉴", "Menu")}</span>
           </button>
         </div>
       </div>
+      <nav className="varda-mobile-research" aria-label={t("투자 실험 바로가기", "Portfolio research shortcuts")}>
+        {mobileResearchNavigation.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={hrefFor(href)} prefetch={false} aria-current={isActive(href) ? "page" : undefined}>
+            <Icon size={18} strokeWidth={1.6} aria-hidden="true" />
+            <span>{t(label)}</span><ArrowUpRight className="varda-mobile-research-arrow" size={15} aria-hidden="true" /><PendingHint />
+          </Link>
+        ))}
+      </nav>
       <nav className="varda-mobile-bottom" aria-label={t("빠른 메뉴", "Quick navigation")}>
         {mobileNavigation.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}>

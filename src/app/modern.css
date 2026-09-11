@@ -32,7 +32,22 @@ button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
 .varda-topbar-add { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 7px 0 7px 12px; font-size: 11px; }
 .varda-topbar-add:hover { color: var(--brand); }
 .varda-topbar-preview { display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--muted); }
-.varda-mobile-menu-button, .varda-mobile-bottom, .varda-mobile-brand { display: none; }
+.varda-mobile-menu-button, .varda-mobile-bottom, .varda-mobile-brand, .varda-mobile-research { display: none; }
+@media (max-width: 760px), (max-width: 1000px) and (max-height: 500px) {
+  .varda-mobile-research { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 0 20px 8px; border-bottom: 1px solid var(--line); }
+  .varda-mobile-research a { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 48px; color: var(--ink); font-size: 12px; font-weight: 500; transition: color 160ms; }
+  .varda-mobile-research a span:not(.varda-link-pending) { white-space: nowrap; }
+  .varda-mobile-research a svg { flex: none; }
+  .varda-mobile-research-arrow { margin-left: auto; color: var(--muted); }
+  .varda-mobile-research a:hover, .varda-mobile-research a[aria-current="page"] { color: var(--brand); }
+  .varda-mobile-research a[aria-current="page"]::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: var(--brand); }
+  .varda-mobile-research a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 2px; }
+  .varda-mobile-menu-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+}
+@media (max-width: 360px) {
+  .varda-mobile-research { margin-inline: 16px; gap: 16px; }
+  .varda-mobile-research a { gap: 6px; font-size: 11px; }
+}
 .varda-content-anchor { display: block; width: 0; height: 0; scroll-margin-top: 20px; }
 .varda-nav-placeholder { height: 80px; }
 .varda-skip-link { position: fixed; top: -80px; left: 116px; padding: 10px 20px; background: var(--ink); color: white; border-radius: 24px; z-index: 100; }
@@ -127,7 +142,7 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
   .varda-topbar { min-height: 68px; padding-inline: 22px; gap: 8px; }
   .varda-topbar-location, .varda-topbar-actions { gap: 13px; }
   .varda-mobile-brand { display: block; font-size: 15px; font-weight: 750; letter-spacing: .25em; }
-  .varda-mobile-menu-button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
+  .varda-mobile-menu-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding-inline: 6px; font-size: 11px; border-radius: 8px; }
   .varda-breadcrumb, .varda-breadcrumb-slash, .varda-updated-at, .varda-topbar-location strong { display: none; }
   .varda-topbar-add { min-height: 36px; padding: 8px; }
   .varda-topbar-add span { display: none; }
