@@ -1,5 +1,7 @@
 import "server-only";
 
+import { portfolioDashboardHistoryDisplayDate } from "@/lib/portfolio-dashboard-history";
+
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { PortfolioHistoryRawRow } from "@/lib/history-balance";
 import type { HistoryPositionComparisonRawRow } from "@/lib/history-position-comparison";
@@ -116,6 +118,7 @@ export async function loadTenantHistoryGroupPositionRows({
 const TENANT_HISTORY_PORTFOLIO_ROWS_SQL = `
   select
     snapshot.snapshot_date::text as snapshot_date,
+    snapshot.cycle_end_at::text as cycle_end_at,
     account.code as account,
     snapshot.source,
     snapshot.cash_value::text as cash_value,
@@ -202,6 +205,7 @@ const TENANT_HISTORY_POSITION_COMPARISON_ROWS_SQL = `
 const TENANT_HISTORY_GROUP_POSITION_ROWS_SQL = `
   select
     snapshot.snapshot_date::text as snapshot_date,
+    snapshot.cycle_end_at::text as cycle_end_at,
     snapshot.source,
     snapshot.account,
     snapshot.account_id::text as account_id,
@@ -225,6 +229,11 @@ function projectPortfolioRow(
 ): PortfolioHistoryRawRow {
   return Object.freeze({
     snapshotDate: requiredString(row.snapshot_date),
+    valuationDate: portfolioDashboardHistoryDisplayDate({
+      snapshotDate: requiredString(row.snapshot_date),
+      source: requiredString(row.source),
+      cycleEndAt: nullableString(row.cycle_end_at ?? null),
+    }),
     account: requiredString(row.account),
     source: requiredString(row.source),
     cashValue: nullableString(row.cash_value),
@@ -291,6 +300,11 @@ function projectGroupPositionRow(
 ): HistoryPositionScopeCandidate {
   return Object.freeze({
     snapshotDate: requiredString(row.snapshot_date),
+    valuationDate: portfolioDashboardHistoryDisplayDate({
+      snapshotDate: requiredString(row.snapshot_date),
+      source: requiredString(row.source),
+      cycleEndAt: nullableString(row.cycle_end_at ?? null),
+    }),
     source: requiredString(row.source),
     account: requiredString(row.account),
     accountId: nullableString(row.account_id),

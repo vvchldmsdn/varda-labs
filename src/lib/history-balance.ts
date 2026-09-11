@@ -1,3 +1,5 @@
+import { commonHistoryValuationDate, historySnapshotDisplayDate } from "./history-snapshot-date.ts";
+
 export const HISTORY_ACCOUNTS = ["all", "brokerage", "isa", "irp"] as const;
 export const HISTORY_LANES = ["all", "portfolio", "balance", "events"] as const;
 
@@ -20,6 +22,7 @@ export type BalanceHistoryValueRow = {
 
 export type PortfolioHistoryRawRow = {
   snapshotDate: string;
+  valuationDate?: string | null;
   account: string;
   source: string;
   rowKind?: "stored" | "derived" | "partial";
@@ -39,6 +42,7 @@ export type PortfolioHistoryRawRow = {
 
 export type PortfolioHistoryDisplayRow = {
   snapshotDate: string;
+  valuationDate?: string | null;
   account: string;
   source: string;
   rowKind: "stored" | "derived" | "partial";
@@ -132,6 +136,7 @@ function storedPortfolioRow(
 ): PortfolioHistoryDisplayRow {
   return {
     snapshotDate: row.snapshotDate,
+    valuationDate: historySnapshotDisplayDate(row),
     account,
     source: row.source,
     rowKind: row.rowKind ?? "stored",
@@ -211,6 +216,7 @@ function derivedAllPortfolioRow(
 
   return {
     snapshotDate: representative.snapshotDate,
+    valuationDate: commonHistoryValuationDate(availableRows),
     account: "all",
     source: representative.source,
     rowKind:

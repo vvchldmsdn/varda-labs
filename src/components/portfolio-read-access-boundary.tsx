@@ -2,6 +2,7 @@ import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { T } from "@/components/i18n/localized-text";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { RetryPageButton } from "@/components/retry-page-button";
 
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import { sessionResolutionNextAction } from "@/lib/session-resolution-next-action";
@@ -28,6 +29,20 @@ export function PortfolioReadAccessBoundary({
 }) {
   if (!resolution.ok && resolution.failure.code === "unauthenticated") redirect("/auth/sign-in");
   if (!resolution.ok && resolution.failure.code === "identity_unlinked") redirect("/portfolio/onboarding");
+  if (!resolution.ok && (resolution.failure.code === "auth_provider_unavailable" || resolution.failure.code === "identity_store_unavailable")) {
+    return (
+      <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+        <SecondaryPageHeader />
+        <section className="mx-auto w-full max-w-3xl border-y border-[var(--line)] py-8">
+          <h1 className="text-2xl font-semibold"><T ko="잠시 연결을 확인하고 있어요" en="We could not verify your connection" /></h1>
+          <p role="status" className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
+            <T ko="로그인 상태를 확인하지 못해 자산 정보를 불러오지 않았습니다. 잠시 후 다시 시도해 주세요." en="We could not confirm your sign-in, so your portfolio has not been loaded. Please try again shortly." />
+          </p>
+          <RetryPageButton />
+        </section>
+      </main>
+    );
+  }
   const nextAction = sessionResolutionNextAction(resolution);
 
   return (

@@ -53,6 +53,8 @@ describe("tenant portfolio analysis scope query", () => {
       Object.freeze({ kind: "all", key: "all", label: "전체" }),
       Object.freeze({ kind: "account", key: `account:${accountId}`, accountId, accountCode: "isa", label: "홈" }),
       Object.freeze({ kind: "portfolio_group", key: selectedScopeKey, portfolioGroupId: groupId, label: "장기 투자" }),
+      Object.freeze({ kind: "account", key: "account:22222222-2222-4222-8222-222222222222", accountId: "22222222-2222-4222-8222-222222222222", accountCode: "qa", label: "QA 실험실" }),
+      Object.freeze({ kind: "portfolio_group", key: "portfolio:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", portfolioGroupId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", label: "QA 실험실" }),
     ]);
     const query = Object.freeze({ account: "isa", scope: "all", end: "2026-08-12", horizon: Object.freeze(["63", "126"]) });
     const before = structuredClone({ scopes, query });
@@ -62,7 +64,8 @@ describe("tenant portfolio analysis scope query", () => {
       "src/components/i18n/locale-provider.tsx",
     ], {
       "next/link": { default: ({ href, children, ...props }) => {
-        links.push({ href, label: children, current: props["aria-current"], accessibleName: props["aria-label"] });
+        const text = node => Array.isArray(node) ? node.map(text).join("") : React.isValidElement(node) ? text(node.props.children) : node == null ? "" : String(node);
+        links.push({ href, label: text(children), current: props["aria-current"], accessibleName: props["aria-label"] });
         return React.createElement("a", { href, ...props }, children);
       } },
       "next/navigation": { usePathname: () => "/simulation" },
@@ -80,6 +83,8 @@ describe("tenant portfolio analysis scope query", () => {
       assert.equal(links[0].label, locale === "en" ? "All" : "전체");
       assert.equal(links[1].label, "홈", "user-defined names must not use the product-label translation");
       assert.equal(links[2].label, "장기 투자");
+      assert.equal(links[3].label, locale === "en" ? "QA 실험실Account" : "QA 실험실계좌");
+      assert.equal(links[4].label, locale === "en" ? "QA 실험실Scope" : "QA 실험실분석 범위");
       for (const [index, link] of links.entries()) {
         const url = new URL(link.href, "https://example.test");
         assert.equal(url.pathname, "/simulation");

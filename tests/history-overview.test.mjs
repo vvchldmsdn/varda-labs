@@ -14,11 +14,11 @@ describe("history overview", () => {
           source: "base44_import",
           rowKind: "stored",
         }),
-        row("2026-07-01", 110, {
+        row("2026-07-02", 110, {
           source: "varda_manual_daily_snapshot",
           rowKind: "stored",
         }),
-        row("2026-07-01", 120, {
+        row("2026-07-02", 120, {
           source: "varda_manual_daily_snapshot",
           rowKind: "derived",
         }),
@@ -119,7 +119,7 @@ function row(snapshotDate, totalMarketValue, overrides = {}) {
   return {
     snapshotDate,
     account: "brokerage",
-    source: "varda_manual_daily_snapshot",
+    source: "varda_daily_snapshot_v1",
     rowKind: "stored",
     derivedFromAccounts: [],
     cashValue: 10,

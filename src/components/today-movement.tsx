@@ -238,7 +238,7 @@ export function TodayMovement({
           </footer>
         </div>
         {hasHoldingDetail ? (
-          <HoldingDetailPanel data={data} designPreview={designPreview} detail={detail} selectedScopeKey={data.selectedScope.key} />
+          <HoldingDetailPanel data={data} designPreview={designPreview} detail={detail} selectedScopeKey={data.selectedScope.key} accountLabels={accountLabelByCode} />
         ) : null}
       </div>
     </main>
@@ -293,11 +293,13 @@ function MovementBridge({
   );
 }
 function HoldingDetailPanel({
+  accountLabels,
   data,
   designPreview,
   detail,
   selectedScopeKey,
 }: {
+  accountLabels: ReadonlyMap<string, string>;
   data: DashboardData;
   designPreview: boolean;
   detail: TodayHoldingDetailResult;
@@ -372,7 +374,7 @@ function HoldingDetailPanel({
             {holding.name}
           </h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {holding.account} · {<T ko={holding.ticker ?? "티커 없음"} en={translateHomeHistory(holding.ticker ?? "티커 없음")}/>} ·{" "}
+            {accountLabels.get(holding.account) ?? <T ko="계좌" en="Account" />} · {<T ko={holding.ticker ?? "티커 없음"} en={translateHomeHistory(holding.ticker ?? "티커 없음")}/>} ·{" "}
             {holding.market.toUpperCase()} · {holding.currency}
           </p>
         </div>

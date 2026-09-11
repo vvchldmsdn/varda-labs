@@ -350,6 +350,11 @@ function SelectedDayEvidence({
       </div>
 
       {point.liveValuation ? <CurrentValuationEvidence point={point} detailed /> : null}
+      {point.storageSnapshotDate && point.storageSnapshotDate !== point.date ? (
+        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+          <T ko={`저장 날짜 ${formatDate(point.storageSnapshotDate)} · 그래프는 평가 기준일로 표시합니다.`} en={`Saved on ${formatDate(point.storageSnapshotDate)} · The chart uses the valuation date.`} />
+        </p>
+      ) : null}
 
       <dl className="mt-5 grid border-y border-[var(--wash)] sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceMetric
