@@ -1,10 +1,11 @@
+import { historySnapshotDisplayDate } from "./history-snapshot-date.ts";
 import type { PortfolioHistoryDisplayRow } from "./history-balance.ts";
 import type { HistoryLiveValuation } from "./history-live-valuation.ts";
 import { currentKstDate } from "./current-kst-date.ts";
 
 export const HISTORY_OVERVIEW_POLICY = Object.freeze({
   version: "stored_history_time_explorer_v1",
-  dateAuthority: "stored_snapshot_date",
+  dateAuthority: "writer_service_date_with_original_snapshot_key_preserved",
   rowAuthority:
     "stored_before_derived_before_partial_then_varda_before_base44",
   missingDates: "not_interpolated_or_carried",
@@ -35,6 +36,8 @@ export type HistoryOverviewRisk = Readonly<{
 
 export type HistoryOverviewPoint = Readonly<{
   date: string;
+  /** Original raw lookup key; never shifted for display. */
+  storageSnapshotDate?: string;
   valueKrw: number;
   cashValueKrw: number | null;
   investedAmountKrw: number | null;
@@ -102,25 +105,27 @@ export function buildHistoryOverview({
 }): HistoryOverviewModel {
   const selection = selectCanonicalRows(rows);
   const liveRow = liveOverviewRow(liveValuation, selection.rows);
-  const recordedPoint = liveRow && selection.rows.at(-1)?.snapshotDate === liveRow.snapshotDate
+  const recordedPoint = liveRow && selection.rows.length > 0 && historySnapshotDisplayDate(selection.rows.at(-1)!) === liveRow.snapshotDate
     ? buildHistoryOverview({ rows: selection.rows, events }).points.at(-1)
     : undefined;
-  const displayRows = liveRow ? [...selection.rows.filter(row => row.snapshotDate !== liveRow.snapshotDate), liveRow] : selection.rows;
+  const displayRows = liveRow ? [...selection.rows.filter(row => historySnapshotDisplayDate(row) !== liveRow.snapshotDate), liveRow] : selection.rows;
   const eventsByDate = groupEventsByDate(events);
   let runningPeak = Number.NEGATIVE_INFINITY;
   const points: HistoryOverviewPoint[] = [];
 
   for (const row of displayRows) {
+    const date = historySnapshotDisplayDate(row)!;
     const previous = points.at(-1) ?? null;
     const valueKrw = row.totalMarketValue!;
     runningPeak = Math.max(runningPeak, valueKrw);
     const movementKrw = previous ? valueKrw - previous.valueKrw : null;
-    const gapDays = previous ? dateDifference(previous.date, row.snapshotDate) : null;
+    const gapDays = previous ? dateDifference(previous.date, date) : null;
     const drawdownKrw = valueKrw - runningPeak;
 
     points.push(
       Object.freeze({
-        date: row.snapshotDate,
+        date,
+        ...(row !== liveRow ? { storageSnapshotDate: row.snapshotDate } : {}),
         valueKrw,
         cashValueKrw: finiteOrNull(row.cashValue),
         investedAmountKrw: finiteOrNull(row.investedAmount),
@@ -140,7 +145,7 @@ export function buildHistoryOverview({
         ...(row === liveRow && liveValuation ? { liveValuation } : {}),
         ...(row === liveRow && recordedPoint ? { recordedPoint } : {}),
         risk: riskEvidence(row),
-        events: Object.freeze([...(eventsByDate.get(row.snapshotDate) ?? [])]),
+        events: Object.freeze([...(eventsByDate.get(date) ?? [])]),
       }),
     );
   }
@@ -207,7 +212,7 @@ export function buildHistoryOverview({
 function liveOverviewRow(live: HistoryLiveValuation | null | undefined, stored: readonly PortfolioHistoryDisplayRow[]): PortfolioHistoryDisplayRow | null {
   if (!live || live.state !== "ready" || live.valueKrw === null || !Number.isFinite(live.valueKrw) || live.valueKrw < 0 || !isIsoDate(live.date)) return null;
   const capturedAt = new Date(live.capturedAt);
-  if (!Number.isFinite(capturedAt.getTime()) || currentKstDate(capturedAt) !== live.date || (stored.at(-1)?.snapshotDate ?? "") > live.date) return null;
+  if (!Number.isFinite(capturedAt.getTime()) || currentKstDate(capturedAt) !== live.date || (stored.length > 0 ? historySnapshotDisplayDate(stored.at(-1)!) ?? "" : "") > live.date) return null;
   // This display endpoint never enters raw snapshot tables or stored return/risk calculations.
   return { snapshotDate: live.date, account: "", source: "varda_current_valuation", rowKind: "derived", derivedFromAccounts: [],
     totalMarketValue: live.valueKrw, totalPnl: null, totalReturnPct: null, totalCost: null, investedAmount: null, cashValue: null };
@@ -227,13 +232,14 @@ function selectCanonicalRows(
   let excludedInvalidRowCount = 0;
 
   for (const row of rows) {
-    if (!isIsoDate(row.snapshotDate) || finiteOrNull(row.totalMarketValue) === null) {
+    const date = historySnapshotDisplayDate(row);
+    if (!isIsoDate(row.snapshotDate) || date === null || !isIsoDate(date) || finiteOrNull(row.totalMarketValue) === null) {
       excludedInvalidRowCount += 1;
       continue;
     }
-    const sameDate = rowsByDate.get(row.snapshotDate) ?? [];
+    const sameDate = rowsByDate.get(date) ?? [];
     sameDate.push(row);
-    rowsByDate.set(row.snapshotDate, sameDate);
+    rowsByDate.set(date, sameDate);
   }
 
   const selected: PortfolioHistoryDisplayRow[] = [];
@@ -255,7 +261,7 @@ function selectCanonicalRows(
     excludedAlternativeRowCount += candidates.length - 1;
   }
 
-  selected.sort((left, right) => left.snapshotDate.localeCompare(right.snapshotDate));
+  selected.sort((left, right) => historySnapshotDisplayDate(left)!.localeCompare(historySnapshotDisplayDate(right)!));
 
   return Object.freeze({
     rows: Object.freeze(selected),

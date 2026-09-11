@@ -25,6 +25,7 @@ import "./calculation-methodology.test.mjs";
 import "./portfolio-refresh-lifecycle.test.mjs";
 import "./holding-price-return.test.mjs";
 import "./history-live-valuation.test.mjs";
+import "./history-service-date.test.mjs";
 import "./financial-correctness-regression.test.mjs";
 import "./portfolio-mutation-integration.test.mjs";
 import "./kis-refresh-lease-integration.test.mjs";

@@ -189,6 +189,7 @@ describe("history balance helpers", () => {
       "totalMarketValue",
       "totalPnl",
       "totalReturnPct",
+      "valuationDate",
     ]);
   });
 });

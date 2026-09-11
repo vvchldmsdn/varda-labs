@@ -57,7 +57,7 @@ export default async function PortfolioGroupsPage() {
               <NavLink href="/portfolio/holdings/new">보유종목 추가</NavLink>
             </nav>
           </div>
-          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+          <dl className="mt-4 grid grid-cols-[1.3fr_1fr_1.3fr] divide-x divide-[var(--line)] border-y border-[var(--line)] py-3">
             <SummaryCell
               label="기준일"
               value={serviceDate.replaceAll("-", ".")}
@@ -119,9 +119,9 @@ export default async function PortfolioGroupsPage() {
 
 function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+    <div className="min-w-0 px-2 first:pl-0 last:pr-0 sm:px-4">
       <dt className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{label}</ManagementText></dt>
-      <dd className="mt-2 text-lg font-semibold"><ManagementText>{value}</ManagementText></dd>
+      <dd className="mt-2 text-sm font-semibold tabular-nums sm:text-lg"><ManagementText>{value}</ManagementText></dd>
     </div>
   );
 }

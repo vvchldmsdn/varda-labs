@@ -29,6 +29,10 @@ export function PortfolioAnalysisScopeTabs({
 }) {
   const {t} = useI18n();
   const underline = variant === "underline";
+  const labelCounts = new Map<string, number>();
+  for (const scope of scopes) {
+    if (scope.kind !== "all") labelCounts.set(scope.label, (labelCounts.get(scope.label) ?? 0) + 1);
+  }
 
   return (
     <ScrollableNavRail
@@ -68,6 +72,11 @@ export function PortfolioAnalysisScopeTabs({
             href={buildPortfolioAnalysisScopeHref(basePath, scope.key, query)}
           >
             {scope.kind === "all" ? t(underline ? "전체 자산" : "전체") : scope.label}
+            {scope.kind !== "all" && (labelCounts.get(scope.label) ?? 0) > 1 ? (
+              <span className="ml-1.5 text-[0.75em] font-normal opacity-80">
+                {scope.kind === "account" ? t("계좌", "Account") : t("분석 범위", "Scope")}
+              </span>
+            ) : null}
           </ScopeLink>
         );
       })}
