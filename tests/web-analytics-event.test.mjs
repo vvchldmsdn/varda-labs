@@ -22,7 +22,7 @@ describe("Web Analytics event boundaries", () => {
   });
 
   it("drops initial and later auth events including reset tokens and OAuth codes", () => {
-    for (const path of ["/auth", "/auth/", "/auth/sign-in", "/auth/reset-password?token=synthetic-reset-token", "/auth/callback?code=synthetic-oauth-code&state=synthetic-state", "/%61uth/reset-password?token=synthetic-reset-token"]) {
+    for (const path of ["/auth", "/auth/", "/auth/sign-in", "/auth/reset-password?token=synthetic-reset-token", "/auth/callback?code=synthetic-oauth-code&state=synthetic-state", "/%61uth/reset-password?token=synthetic-reset-token", "/api/investment-plans", "/api/auth/callback", "/oauth/callback"]) {
       for (const type of ["pageview", "event"]) assert.equal(sanitizeWebAnalyticsEvent({ type, url: `https://varda-labs.vercel.app${path}` }), null);
     }
     assert.equal(canTrackWebAnalyticsPath(null), false);

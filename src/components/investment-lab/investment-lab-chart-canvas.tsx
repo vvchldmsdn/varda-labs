@@ -34,12 +34,14 @@ export function InvestmentLabChartCanvas({
   selected,
   compact = false,
   sidebar,
+  sample = false,
 }: {
   chart: InvestmentLabScenarioChart;
   actual: InvestmentLabScenarioChartLine;
   selected: InvestmentLabScenarioChartLine;
   compact?: boolean;
   sidebar?: ReactNode;
+  sample?: boolean;
 }) {
   const { locale } = useLabI18n();
   const ref = useRef<HTMLDivElement>(null);
@@ -130,14 +132,14 @@ export function InvestmentLabChartCanvas({
       {actualPoint && selectedPoint ? (
         <div className={styles.chartReadout} data-lab-tooltip>
           <div><p>{actualPoint.serviceDate.replaceAll("-", ".")}<span><LabText value={hover === null && pinnedIndex === null ? "종료일의 차이" : "선택일의 차이"} /></span></p><strong className={labMoneyTone(selectedPoint.valueKrw - actualPoint.valueKrw)}>{labKrw(selectedPoint.valueKrw - actualPoint.valueKrw, true)}</strong></div>
-          <dl><div><dt><LabText value="실제" /></dt><dd>{labKrw(actualPoint.valueKrw)}</dd></div><div><dt><LabText value="가상" /></dt><dd>{labKrw(selectedPoint.valueKrw)}</dd></div></dl>
+          <dl><div><dt><LabText value={sample ? "샘플 보유" : "실제"} /></dt><dd>{labKrw(actualPoint.valueKrw)}</dd></div><div><dt><LabText value={sample ? "비교 전략" : "가상"} /></dt><dd>{labKrw(selectedPoint.valueKrw)}</dd></div></dl>
           {selectedPoint.hasPendingExecution ? <p className="text-[11px] text-[var(--warning)]"><LabText value="이 평가일에는 대기 거래가 포함됩니다." /></p> : null}
         </div>
       ) : null}
       </aside>
       <div className={styles.chartPlot} ref={ref}>
       <LocalizedElement as="svg"
-        aria-label={`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`}
+        aria-label={`${labScenarioLabel(selected.id)}와 ${sample ? "샘플" : "실제"} 포트폴리오 평가액 비교`}
         className="block h-full w-full touch-pan-y"
         height={height}
         onPointerLeave={() => setHover(null)}
@@ -145,7 +147,7 @@ export function InvestmentLabChartCanvas({
         onPointerDown={move}
         onClick={() => setPinnedIndex(hover)}
         role="img"
-        viewBox={`0 0 ${width} ${height}`} en={{"aria-label": labEnglish(`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`)}}
+        viewBox={`0 0 ${width} ${height}`} en={{"aria-label": sample ? "Sample portfolio and example strategy comparison" : labEnglish(`${labScenarioLabel(selected.id)}와 실제 포트폴리오 평가액 비교`)}}
       >
         <defs>
           <pattern id={`${id}-dots`} width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".75" fill="var(--accent)" opacity=".32" /></pattern>

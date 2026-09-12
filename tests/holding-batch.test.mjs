@@ -131,6 +131,10 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
     "@/components/i18n/management-text": { ManagementText: () => null },
     "@/components/onboarding/instrument-search": { InstrumentSearch },
     "@/components/onboarding/holding-import-panel": { HoldingImportPanel: () => null },
+    // This suite exercises ordinary batch onboarding, not the separate local-draft
+    // reference panel or the browser analytics transport.
+    "@/components/onboarding/plan-holding-reference": { PlanHoldingReference: () => null },
+    "@/lib/first-visit-events": { trackFirstVisit: () => {} },
     "@/app/portfolio/holdings/new/actions": { createHoldingBatch: async (_previous, data) => {
       const rows = JSON.parse(data.get("holdings"));
       submissions.push(rows);

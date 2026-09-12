@@ -203,12 +203,29 @@ export const HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
 export const MARKET_COLLECTION_TABLE_POLICIES = Object.freeze([
   adminSystem("market_collection_jobs"), adminSystem("market_provider_budgets"),
 ]);
-export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+export const MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES, ...MARKET_COLLECTION_TABLE_POLICIES,
+]);
+export const INVESTMENT_PLAN_TABLE_POLICIES = Object.freeze([
+  userOwned("investment_plans", "owner_user_id", "not_applicable"),
+]);
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  // Plans depend only on the verified identity core, not legacy portfolio data.
+  // Preserve each older staged schema without declaring an absent plan table.
+  if (publicTableSet.has("investment_plans")) {
+    if (!IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("investment plans require the complete identity core");
+    }
+    return Object.freeze([
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "investment_plans")),
+      ...INVESTMENT_PLAN_TABLE_POLICIES,
+    ]);
+  }
   const presentCoreTables = IDENTITY_CORE_TABLE_POLICIES.filter(
     ({ table }) => publicTableSet.has(table),
   );
@@ -427,7 +444,7 @@ export function resolveTenantTablePolicies(publicTableNames) {
   const presentCollectionTables = MARKET_COLLECTION_TABLE_POLICIES.filter(({ table }) => publicTableSet.has(table));
   if (presentCollectionTables.length === 0) return HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES;
   if (presentCollectionTables.length !== MARKET_COLLECTION_TABLE_POLICIES.length) throw new Error("market collection tables must be expanded atomically");
-  return EXPANDED_TENANT_TABLE_POLICIES;
+  return MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES;
 }
 
 export function summarizeTenantClassifications(policies = TENANT_TABLE_POLICIES) {

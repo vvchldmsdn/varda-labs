@@ -107,6 +107,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
         </Link>
         {links}
         <div className="varda-sidebar-bottom">
+          <Link href="/plans" className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
           {preview ? <span className="varda-preview-label" title={t("디자인 미리보기 · 예시 데이터", "Design preview · Demo data")}><i />{t("예시")}</span> : null}
           <Link href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
             <UserRound size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계정")}</span>
@@ -159,6 +160,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
             <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></button>
           </div>
           {links}
+          <Link className="varda-menu-account" href="/plans" onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
             <UserRound size={18} />{t("내 계정")}<ArrowUpRight size={15} />
           </Link>

@@ -322,3 +322,8 @@ import "./simulation-owner-economic-research.test.mjs";
 import "./simulation-owner-economic-candidates.test.mjs";
 import "./simulation-owner-economic-validation.test.mjs";
 import "./simulation-economic-integration.test.mjs";
+import "./investment-plan.test.mjs";
+import "./investment-plan-persistence.test.mjs";
+import "./plan-auth-return.test.mjs";
+import "./plan-holding-reference.test.mjs";
+import "./public-product-demo.test.mjs";

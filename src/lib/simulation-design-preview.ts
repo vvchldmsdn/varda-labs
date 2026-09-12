@@ -28,8 +28,8 @@ export type SimulationPreviewQuery = {
   previewState?: string | string[];
 };
 
-// In-memory synthetic market inputs, used only by the explicit development preview.
-export function buildSimulationDesignPreview(query: SimulationPreviewQuery, includeDisplayPaths = false) {
+// In-memory synthetic market inputs, for explicit development previews and the fixed public-product-demo projection.
+function buildSimulationDesignInputs(query: SimulationPreviewQuery, includeDisplayPaths = false) {
   const portfolio = buildPortfolioStructureDesignPreview(query.scope);
   const end =
     typeof query.end === "string" && isRiskDate(query.end)
@@ -135,6 +135,16 @@ export function buildSimulationDesignPreview(query: SimulationPreviewQuery, incl
     matrix: query.previewState === "missing" ? null : matrix,
     ...(prepared.status === "ready" ? { preparedPaths: prepared } : {}),
   });
+  return { portfolio, execution, preflight, prepared, candidate, matrix, dates, end, horizon };
+}
+
+/** Bounded public example: the actual sampler and chart, without unrelated candidate/walk-forward work. */
+export function buildSimulationChartExample(horizon: 63 | 126) {
+  return buildSimulationDesignInputs({ horizon: String(horizon) }, true).execution;
+}
+
+export function buildSimulationDesignPreview(query: SimulationPreviewQuery, includeDisplayPaths = false) {
+  const { portfolio, execution, preflight, prepared, candidate, matrix, dates, end, horizon } = buildSimulationDesignInputs(query, includeDisplayPaths);
   const currentWeights =
     execution.status === "ready" ? execution.executionWeights : [];
   const comparison = buildSimulationOwnerCandidateComparison({

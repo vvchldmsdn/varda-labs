@@ -2,6 +2,8 @@ import { localizedMetadata } from "@/lib/i18n/server";
 import { ManagementText } from "@/components/i18n/management-text";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { PLAN_RETURN_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
 import { ArrowRight, Check, RotateCcw } from "lucide-react";
 import { AuthHeading, AuthShell } from "@/components/auth/auth-shell";
 import { SignOutButton } from "@/components/auth/auth-transport-controls";
@@ -39,8 +41,10 @@ export default async function SessionPage({
   if (evidence === "unauthenticated") redirect("/auth/sign-in");
   if (evidence === "unverified") redirect("/auth/verify-email");
   if (evidence === "invalid") redirect("/auth/sign-in");
-  if (evidence === "authenticated" && params.view !== "account" && !preview)
-    redirect("/portfolio/onboarding");
+  if (evidence === "authenticated" && params.view !== "account" && !preview) {
+    const destination = planReturnDestination(evidence, (await cookies()).get(PLAN_RETURN_COOKIE)?.value);
+    redirect(destination ?? "/portfolio/onboarding");
+  }
   const presentationRuntime = assessIdentityPairingClaimPresentationEnvironment(
     {
       VERCEL_ENV: process.env.VERCEL_ENV,

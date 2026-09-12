@@ -47,6 +47,23 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
 ]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
+  it("registers native investment plans with verified session authority and no holding or legacy owner writes", () => {
+    const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "session_investment_plans");
+    assert.equal(writer.authorization, "server_verified_session");
+    assert.equal(writer.canonicalOwnerRolloutScope, "not_applicable");
+    assert.equal(writer.canonicalOwnerHttpInput, "forbidden");
+    assert.deepEqual(writer.targets, [{ table: "investment_plans", classification: "user_owned", operations: ["insert", "delete"], ownerPolicy: "trusted_context_required" }]);
+    const source = readFileSync(join(ROOT, writer.implementationPaths[0]), "utf8");
+    const route = readFileSync(join(ROOT, writer.entrypoints[0]), "utf8");
+    assert.match(route, /resolveCurrentTenantContext\(\)/);
+    assert.match(route, /saveInvestmentPlan\(tenant, value.id, parsed.input\)/);
+    assert.match(source, /getTenantSqlClient\(\)/);
+    assert.match(source, /set_config\('app.current_user_id', \$1, true\)/);
+    assert.match(source, /owner_user_id = \$1::uuid/);
+    assert.match(source, /investment_plan_tenant_active\(\)/);
+    assert.match(source, /pg_advisory_xact_lock/);
+    assert.doesNotMatch(source, /canonical_owner_user_id|insert into assets|insert into transactions/i);
+  });
   it("registers every current DML implementation exactly once by path", () => {
     const discoveredPaths = discoverDmlPaths().sort();
     const registeredPaths = [
@@ -58,8 +75,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 33);
-    assert.equal(registeredPaths.length, 42);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 34);
+    assert.equal(registeredPaths.length, 43);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -132,7 +149,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 20,
       intentionally_skipped_legacy: 1,
-      not_applicable: 12,
+      not_applicable: 13,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
