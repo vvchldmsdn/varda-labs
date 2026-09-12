@@ -4,7 +4,7 @@ export function canTrackWebAnalyticsPath(pathname: string | null): boolean {
   if (!pathname) return false;
   try {
     const path = decodeURIComponent(pathname);
-    return path !== "/auth" && !path.startsWith("/auth/");
+    return !["/auth", "/api", "/oauth"].some(prefix => path === prefix || path.startsWith(`${prefix}/`));
   } catch {
     return false;
   }

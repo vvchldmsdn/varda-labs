@@ -1,6 +1,7 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioDashboard } from "@/components/portfolio-dashboard";
@@ -41,6 +42,7 @@ export default async function Home({ searchParams }: HomeProps) {
   }
 
   const resolution = await resolveCurrentTenantContext();
+  if (!resolution.ok && resolution.failure.code === "unauthenticated") redirect("/start");
   if (!resolution.ok) {
     return (
       <PortfolioDashboardAccessBoundary

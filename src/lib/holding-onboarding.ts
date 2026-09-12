@@ -51,6 +51,7 @@ export type HoldingOnboardingActionState = Readonly<{
     | "error";
   message: string | null;
   assetId?: string;
+  firstHoldingCreated?: true;
   retryAfterSeconds?: number;
 }>;
 

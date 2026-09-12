@@ -98,6 +98,19 @@ const LEGACY_EXCLUDED_TRANSITION = {
 
 export const TENANT_WRITER_REGISTRY = [
   {
+    id: "session_investment_plans",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["src/app/api/investment-plans/route.ts"],
+    implementationPaths: ["src/db/queries/investment-plans.ts"],
+    targets: [userTarget("investment_plans", "insert", "delete")],
+    transition: USER_API_TRANSITION,
+    // Native owner_user_id + transaction-local tenant RLS; no legacy owner backfill.
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "initial_app_user_provisioning",
     classification: "identity_system",
     authorization: "migration_cli",
@@ -157,7 +170,7 @@ export const TENANT_WRITER_REGISTRY = [
     id: "self_service_tenant_onboarding",
     classification: "identity_system",
     authorization: "server_verified_session",
-    entrypoints: ["src/app/portfolio/onboarding/actions.ts"],
+    entrypoints: ["src/app/portfolio/onboarding/actions.ts", "src/app/plans/actions.ts"],
     implementationPaths: [
       "src/lib/auth/self-service-tenant-onboarding-write.ts",
     ],

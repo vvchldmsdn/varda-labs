@@ -1,6 +1,9 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
+import { PLAN_RETURN_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
 import { ArrowRight, RotateCcw } from "lucide-react";
 import { AuthHeading, AuthShell } from "@/components/auth/auth-shell";
 import { OnboardingView } from "@/components/auth/onboarding-view";
@@ -33,6 +36,12 @@ export default async function PortfolioOnboardingPage({
     return <OnboardingView step={step} accountName="나의 증권 계좌" preview />;
   }
 
+  const planIntent = (await cookies()).get(PLAN_RETURN_COOKIE)?.value;
+  if (planIntent === "1") {
+    const session = await readCurrentSessionSubject();
+    const destination = planReturnDestination(session.state, planIntent);
+    if (destination) redirect(destination);
+  }
   const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok) {
     if (resolution.failure.code === "unauthenticated")

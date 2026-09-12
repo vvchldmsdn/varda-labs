@@ -110,7 +110,9 @@ describe("auth and onboarding experience", () => {
   it("separates post-login continuation from explicit account management", () => {
     const session = read("src/app/auth/session/page.tsx");
     assert.match(session, /params.view !== "account"/);
-    assert.match(session, /redirect\("\/portfolio\/onboarding"\)/);
+    assert.match(session, /redirect\(destination \?\? "\/portfolio\/onboarding"\)/);
+    assert.match(session, /evidence === "authenticated" && params.view !== "account" && !preview/);
+    assert.match(session, /planReturnDestination\(evidence, \(await cookies\(\)\).get\(PLAN_RETURN_COOKIE\)\?\.value\)/);
     assert.match(session, /evidence === "unauthenticated"/);
     assert.doesNotMatch(session, /\.user\.(?:email|name|image)|@\/db/);
     assert.match(

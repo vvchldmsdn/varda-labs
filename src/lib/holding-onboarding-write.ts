@@ -111,7 +111,7 @@ export async function writeSessionHoldingOnboarding(
     if (Number(rows[0]?.saved_count ?? 0) !== 1) {
       return state("conflict", "계좌 또는 분석 범위가 변경되었거나 보관되었습니다. 화면을 새로고침해 주세요.");
     }
-    return state("success", "보유종목을 분석 범위에 추가했습니다.", assetId);
+    return { ...state("success", "보유종목을 분석 범위에 추가했습니다.", assetId), ...(rows[0]?.first_holding_created === true ? { firstHoldingCreated: true as const } : {}) };
   } catch (error) {
     if (error instanceof OnboardingPriceUnavailableError) {
       return Object.freeze({
@@ -276,7 +276,10 @@ function state(
 }
 
 const ATOMIC_ONBOARDING_QUERY = `
-with owned_account as materialized (
+with prior_holdings as materialized (
+  -- The owner lock precedes this statement. Archived holdings count as prior use.
+  select count(*) as count from assets where canonical_owner_user_id = $1::uuid
+), owned_account as materialized (
   select id, code from accounts
   where id = $3::uuid and canonical_owner_user_id = $1::uuid and is_active = true
   for update
@@ -326,5 +329,7 @@ with owned_account as materialized (
   from inserted_evidence evidence cross join selected_group group_row
   returning asset_id
 )
-select count(*) as saved_count from inserted_membership
+select count(*) as saved_count,
+  (count(*) = 1 and (select count from prior_holdings) = 0) as first_holding_created
+from inserted_membership
 `;

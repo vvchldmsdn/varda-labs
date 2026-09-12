@@ -10,8 +10,8 @@ export type InstrumentChoice = {
   assetType: "etf" | "stock";
 };
 
-export function InstrumentSearch({ onSelect, disabled = false, preview = false, initialQuery = "" }: {
-  onSelect: (instrument: InstrumentChoice) => void; disabled?: boolean; preview?: boolean; initialQuery?: string;
+export function InstrumentSearch({ onSelect, disabled = false, preview = false, initialQuery = "", privateQuery = false }: {
+  onSelect: (instrument: InstrumentChoice) => void; disabled?: boolean; preview?: boolean; initialQuery?: string; privateQuery?: boolean;
 }) {
   const { t } = useI18n();
   const id = useId();
@@ -30,14 +30,16 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
           setStatus("ready");
           return;
         }
-        const response = await fetch(`/api/instruments/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
+        const response = privateQuery
+          ? await fetch("/api/instruments/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: query.trim() }), signal: controller.signal, cache: "no-store" })
+          : await fetch(`/api/instruments/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
         if (!response.ok) throw new Error("search unavailable");
         const data = await response.json();
         if (!controller.signal.aborted) { setResults(data.instruments); setStatus("ready"); }
       } catch { if (!controller.signal.aborted) { setResults([]); setStatus("error"); } }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, preview]);
+  }, [query, preview, privateQuery]);
   return <div className="varda-instrument-search">
     <label htmlFor={id}>{t("어떤 종목을 가지고 있나요?", "What do you hold?")}</label>
     <div className="varda-instrument-search-input"><Search size={20} aria-hidden="true" />

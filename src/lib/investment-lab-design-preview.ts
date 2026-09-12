@@ -22,7 +22,7 @@ type PreviewQuery = {
   kodexWeight?: string | readonly string[];
 };
 
-// Synthetic inputs for the explicit development-only preview; never stored or queried.
+// Synthetic inputs for development previews and the fixed public-product-demo projection; never stored or queried.
 export function buildInvestmentLabDesignPreview(query: PreviewQuery) {
   const dashboard = buildHomeDesignPreview(query.scope);
   const structure = buildPortfolioStructureDesignPreview(query.scope).structure;

@@ -82,6 +82,22 @@ async function fixture(options = {}) {
 
 describe("portfolio lifecycle mutation integration", () => {
   after(async () => { await database?.close(); });
+  it("marks only the first ever actual holding within the existing owner lock", async () => {
+    const f = await fixture();
+    const first = await f.holdings.writeSessionHoldingOnboarding(holdingForm());
+    assert.equal(first.status, "success");
+    assert.equal(first.firstHoldingCreated, true);
+    assert.ok(first.assetId);
+    await f.pg.query("update assets set archived_at = now() where id = $1", [first.assetId]);
+    const second = await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ticker: "OTHER" }));
+    assert.equal(second.status, "success");
+    assert.equal(second.firstHoldingCreated, undefined);
+    const duplicate = await f.holdings.writeSessionHoldingOnboarding(holdingForm({ ticker: "OTHER" }));
+    assert.notEqual(duplicate.status, "success");
+    assert.equal(duplicate.firstHoldingCreated, undefined);
+    assert.equal(await f.count("assets"), 2);
+    assert.equal(f.batches[0][2].text, "select pg_advisory_xact_lock(hashtextextended($1, 0))");
+  });
   it("rechecks account lifecycle after a real pre-write market-read interleave", async () => {
     const f = await fixture();
     try {

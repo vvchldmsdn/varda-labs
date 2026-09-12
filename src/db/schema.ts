@@ -50,6 +50,23 @@ export const appUsers = pgTable(
   }),
 );
 
+// Deliberately separate from actual holdings, quantities and transaction records.
+export const investmentPlans = pgTable("investment_plans", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  id: uuid("id").notNull(),
+  inputJson: jsonb("input_json").notNull(),
+  engineVersion: varchar("engine_version", { length: 80 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.id] }),
+  ownerCreatedIdx: index("investment_plans_owner_created_idx").on(table.ownerUserId, table.createdAt),
+  inputCheck: check("investment_plans_input_check", sql`jsonb_typeof(${table.inputJson}) = 'object' and octet_length(${table.inputJson}::text) <= 4096`),
+  engineCheck: check("investment_plans_engine_check", sql`${table.engineVersion} = 'deficit_proportional_capped_v1'`),
+  selectPolicy: pgPolicy("investment_plans_tenant_select_v1", { for: "select", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  insertPolicy: pgPolicy("investment_plans_tenant_insert_v1", { for: "insert", to: tenantDatabaseRole, withCheck: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  deletePolicy: pgPolicy("investment_plans_tenant_delete_v1", { for: "delete", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+})).enableRLS();
+
 export const authIdentities = pgTable(
   "auth_identities",
   {

@@ -1,12 +1,15 @@
 import { AuthElement, AuthText } from "./auth-localized";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { AuthHeading, AuthShell } from "./auth-shell";
 import { SocialSignInButtons, SignOutButton } from "./auth-transport-controls";
 import { EmailAuthForm } from "./email-auth-form";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 import { getAuthMethodAvailability } from "@/lib/auth/auth-method-availability";
 import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
+import { PLAN_RETURN_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
+import { PlanReturnNotice } from "./plan-return-notice";
 import styles from "./auth-experience.module.css";
 
 export async function AuthEntry({
@@ -31,7 +34,8 @@ export async function AuthEntry({
       // Keep sign-in available after a transient session-read failure.
     }
   }
-  if (sessionState === "authenticated") redirect("/portfolio/onboarding");
+  const planIntent = !designPreview && (await cookies()).get(PLAN_RETURN_COOKIE)?.value === "1";
+  if (sessionState === "authenticated") redirect(planReturnDestination(sessionState, planIntent ? "1" : null) ?? "/portfolio/onboarding");
   const availability = getAuthMethodAvailability();
   const signingUp = mode === "sign-up";
   const alternateHref = `${signingUp ? "/auth/sign-in" : "/auth/sign-up"}${designPreview ? "?preview=design" : ""}`;
@@ -57,6 +61,7 @@ export async function AuthEntry({
             )
           }
         />
+        {planIntent ? <PlanReturnNotice /> : null}
         {sessionState === "invalid" ? (
           <div className={styles.stack}>
             <p role="alert" className={styles.notice}><AuthText>{"여러 로그인 정보가 함께 남아 있습니다. 로그아웃 후 사용할 계정 하나로 다시 로그인해 주세요."}</AuthText></p>
