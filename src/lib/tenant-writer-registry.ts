@@ -98,6 +98,18 @@ const LEGACY_EXCLUDED_TRANSITION = {
 
 export const TENANT_WRITER_REGISTRY = [
   {
+    id: "session_portfolio_drafts",
+    classification: "user_owned",
+    authorization: "server_verified_session",
+    entrypoints: ["src/app/api/portfolio-drafts/route.ts"],
+    implementationPaths: ["src/db/queries/portfolio-drafts.ts"],
+    targets: [userTarget("portfolio_drafts", "insert", "delete")],
+    transition: USER_API_TRANSITION,
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "session_investment_plans",
     classification: "user_owned",
     authorization: "server_verified_session",

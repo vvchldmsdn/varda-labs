@@ -67,6 +67,7 @@ describe("plan to holding handoff", () => {
       "@/components/onboarding/instrument-search": { InstrumentSearch: () => null },
       "@/components/onboarding/holding-import-panel": { HoldingImportPanel: () => null },
       "@/components/onboarding/plan-holding-reference": { PlanHoldingReference: () => null },
+      "@/components/first-visit/quick-holding-reference": { QuickHoldingReference: () => null },
       "@/lib/first-visit-events": { trackFirstVisit: (...args) => events.push(args) },
     });
     const options = { accounts: [{ id: "fixture", name: "Fixture" }], portfolioGroups: [] };

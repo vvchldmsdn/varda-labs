@@ -1,7 +1,7 @@
 "use client";
 import { track } from "@vercel/analytics";
 
-export const FIRST_VISIT_EVENTS = ["entry_view", "sample_result", "personal_started", "personal_result", "signup_completed", "plan_saved", "first_holding_created"] as const;
+export const FIRST_VISIT_EVENTS = ["entry_view", "sample_result", "personal_started", "personal_result", "signup_completed", "plan_saved", "first_holding_created", "demo_started", "portfolio_input_started", "portfolio_result_viewed", "portfolio_saved"] as const;
 export type FirstVisitEvent = typeof FIRST_VISIT_EVENTS[number];
 const sent = new Set<string>();
 /** Only fixed names, no data/properties. Dedupe key stays in this browser, never sent. */

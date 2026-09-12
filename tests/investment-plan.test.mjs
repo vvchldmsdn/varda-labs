@@ -46,6 +46,11 @@ describe("Anonymous investment plan uses explicit-target allocation", () => {
     try{const [mod]=await importWithPorts(["src/lib/first-visit-events.ts"],{"@vercel/analytics":{track:(...args)=>calls.push(args)}});
       mod.trackFirstVisit("plan_saved","private-plan-id");mod.trackFirstVisit("plan_saved","private-plan-id");mod.trackFirstVisit("not-allowed","email@example.com");mod.trackFirstVisit("sample_result");
       assert.deepEqual(calls,[["varda_plan_saved"],["varda_sample_result"]]);
+      for (const event of ["demo_started", "portfolio_input_started", "portfolio_result_viewed", "portfolio_saved"]) {
+        mod.trackFirstVisit(event, "private-portfolio-id");
+        mod.trackFirstVisit(event, "private-portfolio-id");
+      }
+      assert.deepEqual(calls.slice(2), [["varda_demo_started"], ["varda_portfolio_input_started"], ["varda_portfolio_result_viewed"], ["varda_portfolio_saved"]]);
     }finally{globalThis.sessionStorage=old;if(enabled===undefined)delete process.env.NEXT_PUBLIC_VARDA_FUNNEL_EVENTS;else process.env.NEXT_PUBLIC_VARDA_FUNNEL_EVENTS=enabled;}
   });
 });

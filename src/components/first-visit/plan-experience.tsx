@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
+import { clearPlanReturnCookies, planReturnIntentCookies } from "@/lib/auth/plan-return";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { calculatePlan, createPlanDraft, parseDraft, PLAN_STORAGE_KEY, SAMPLE_PLAN, type PlanDraft, type PlanInput } from "@/lib/investment-plan";
 import { trackFirstVisit } from "@/lib/first-visit-events";
+import { parseQuickDraft, QUICK_STORAGE_KEY } from "@/lib/quick-portfolio";
 import { PlanResults } from "./plan-results";
 import { MoneyInput } from "./money-input";
 import styles from "./first-visit.module.css";
@@ -13,7 +15,7 @@ type FormRow = { name: string; value: string; target: string };
 const formRows = (input: PlanInput) => input.rows.map(r => ({ name: r.name, value: String(r.value), target: String(r.targetBps / 100) }));
 const emptyRows = (): FormRow[] => [{ name: "", value: "", target: "" }, { name: "", value: "", target: "" }];
 const readNumber = (s: string, decimals = 0) => (decimals ? /^\d+(\.\d{1,2})?$/ : /^\d+$/).test(s.trim()) ? Number(s) : NaN;
-export function PlanExperience({ personal }: { personal: boolean }) {
+export function PlanExperience({ personal, fromQuick = false }: { personal: boolean; fromQuick?: boolean }) {
   const router = useRouter();
   const [rows, setRows] = useState<FormRow[]>(personal ? emptyRows : formRows(SAMPLE_PLAN));
   const [amount, setAmount] = useState(personal ? "" : String(SAMPLE_PLAN.amount));
@@ -28,13 +30,15 @@ export function PlanExperience({ personal }: { personal: boolean }) {
     if (!personal) { trackFirstVisit("sample_result"); return; }
     trackFirstVisit("personal_started");
     const frame=requestAnimationFrame(()=>{try {
+      const quick = fromQuick ? parseQuickDraft(localStorage.getItem(QUICK_STORAGE_KEY)) : null;
+      if (quick) { setRows(quick.input.rows.map(row => ({ name: row.name, value: String(row.value), target: "" }))); setAmount(""); setResult(null); setDraft(null); setStorageNote("자산 이름과 금액을 가져왔어요. 원하는 목표 비중과 이번 투자금만 입력해 주세요."); setLoaded(true); return; }
       const restored = parseDraft(localStorage.getItem(PLAN_STORAGE_KEY));
       if (restored) { setRows(formRows(restored.input)); setAmount(String(restored.input.amount)); setResult(restored.input); setDraft(restored); setStorageNote("이 브라우저에서 계산한 입력을 복원했습니다."); }
       else localStorage.removeItem(PLAN_STORAGE_KEY);
     } catch { setStorageNote("브라우저 임시 저장을 사용할 수 없습니다. 화면에서는 계산할 수 있지만 인증 후 복원하려면 브라우저 저장을 허용해 주세요."); }
     setLoaded(true);});
     return()=>cancelAnimationFrame(frame);
-  }, [personal]);
+  }, [personal, fromQuick]);
   useEffect(() => {
     if (!draft) return;
     const expire = () => { try { const current = parseDraft(localStorage.getItem(PLAN_STORAGE_KEY)); if (!current || current.id === draft.id) localStorage.removeItem(PLAN_STORAGE_KEY); } catch {} setDraft(null); setStorageNote("임시 보관 기간이 끝났습니다. 저장하려면 다시 계산해 주세요."); };
@@ -50,18 +54,20 @@ export function PlanExperience({ personal }: { personal: boolean }) {
     setError(""); setResult(input);
     const next = createPlanDraft(input,draft);
     setDraft(next);
-    try { localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(next)); setStorageNote("계산한 입력을 이 브라우저에 최대 24시간 임시 보관합니다."); } catch { setStorageNote("임시 저장에 실패했습니다. 결과는 볼 수 있지만 인증 후 입력 복원이 불가능합니다. 브라우저 저장을 허용한 뒤 다시 계산해 주세요."); }
+    let persisted = false;
+    try { localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(next)); persisted = true; setStorageNote("계산한 입력을 이 브라우저에 최대 24시간 임시 보관합니다."); } catch { setStorageNote("임시 저장에 실패했습니다. 결과는 볼 수 있지만 인증 후 입력 복원이 불가능합니다. 브라우저 저장을 허용한 뒤 다시 계산해 주세요."); }
     trackFirstVisit("personal_result", next.id);
+    if (fromQuick && persisted) router.replace("/try?mode=personal", { scroll: false });
     requestAnimationFrame(() => resultRef.current?.focus());
   }
   function save() {
     if (!draft || !result || draft.expiresAt <= Date.now()) { setError("저장 전에 다시 계산해 주세요."); return; }
     try { localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(draft)); if (localStorage.getItem(PLAN_STORAGE_KEY) !== JSON.stringify(draft)) throw new Error(); }
     catch { setError("입력을 임시 보관하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요."); return; }
-    document.cookie = "varda_plan_return=1; Path=/; Max-Age=86400; SameSite=Lax";
+    for (const cookie of planReturnIntentCookies("allocation", location.protocol === "https:")) document.cookie = cookie;
     router.push("/plans");
   }
-  function clear() { try { localStorage.removeItem(PLAN_STORAGE_KEY); } catch {} document.cookie = "varda_plan_return=; Path=/; Max-Age=0; SameSite=Lax"; setRows(emptyRows()); setAmount(""); setResult(null); setDraft(null); setError(""); setStorageNote("이 브라우저의 임시 입력을 삭제했습니다."); }
+  function clear() { try { localStorage.removeItem(PLAN_STORAGE_KEY); } catch {} for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie; setRows(emptyRows()); setAmount(""); setResult(null); setDraft(null); setError(""); setStorageNote("이 브라우저의 임시 입력을 삭제했습니다."); }
   return <div className={styles.workspace}>
     <section><p className={styles.eyebrow}>{personal ? "나의 투자 계획" : "가상의 포트폴리오 · 투자 추천 아님"}</p><h1>{personal ? "이번 투자금, 어디에 얼마씩?" : "예시로 배분을 살펴보세요."}</h1>
       <p className={styles.lead}>{personal ? "보유 금액과 목표 비중을 적고,\n이번 투자금을 나눠보세요." : "금액이나 비중을 바꿔보세요.\n배분 결과가 바로 달라집니다."}</p>

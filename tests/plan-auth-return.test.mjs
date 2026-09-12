@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { planReturnDestination } from "../src/lib/auth/plan-return.ts";
+import { planReturnDestination, planReturnCancelDestination, planReturnIntentCookies } from "../src/lib/auth/plan-return.ts";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 describe("plan authentication return", () => {
+  it("uses only explicit bounded source for cancellation and replaces prior quick intent for allocation", () => {
+    assert.equal(planReturnCancelDestination("quick"), "/try/analyze");
+    for (const source of ["allocation", undefined, null, "https://evil.test", "/try/analyze", "quick;Path=/"]) assert.equal(planReturnCancelDestination(source), "/try?mode=personal");
+    const quick = planReturnIntentCookies("quick", true);
+    const allocation = planReturnIntentCookies("allocation", true);
+    assert.equal(quick[0], allocation[0]);
+    assert.equal(quick[1], "varda_plan_source=quick; Path=/; Max-Age=86400; SameSite=Lax; Secure");
+    assert.equal(allocation[1], "varda_plan_source=allocation; Path=/; Max-Age=86400; SameSite=Lax; Secure");
+    assert.equal(planReturnDestination("authenticated", "1"), "/plans");
+  });
   it("accepts only a fixed intent after a verified session", () => {
     assert.equal(planReturnDestination("authenticated", "1"), "/plans");
     for (const state of ["unauthenticated", "unverified", "invalid", "unavailable"]) {
@@ -53,6 +63,8 @@ describe("plan authentication return", () => {
     const element = notice.PlanReturnNotice();
     const link = element.props.children[1];
     assert.equal(link.props.href, "/try?mode=personal");
+    assert.equal(notice.PlanReturnNotice({ source: "quick" }).props.children[1].props.href, "/try/analyze");
+    assert.equal(notice.PlanReturnNotice({ source: "https://evil.test" }).props.children[1].props.href, "/try?mode=personal");
     const previousDocument = globalThis.document;
     const previousLocation = globalThis.location;
     const previousStorage = globalThis.localStorage;
@@ -62,7 +74,7 @@ describe("plan authentication return", () => {
     globalThis.localStorage = { removeItem: () => { throw new Error("must preserve the draft"); }, clear: () => { throw new Error("must preserve unrelated storage"); } };
     try {
       link.props.onClick();
-      assert.deepEqual(writes, ["varda_plan_return=; Path=/; Max-Age=0; SameSite=Lax; Secure"]);
+      assert.deepEqual(writes, ["varda_plan_return=; Path=/; Max-Age=0; SameSite=Lax; Secure", "varda_plan_source=; Path=/; Max-Age=0; SameSite=Lax; Secure"]);
     } finally {
       globalThis.document = previousDocument;
       globalThis.location = previousLocation;

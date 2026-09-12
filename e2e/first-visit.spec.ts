@@ -51,10 +51,10 @@ for (const width of widths) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
     await page.goto("/start");
-    await expect(page.getByRole("heading", { name: "이번 달 투자금," })).toBeVisible();
-    await expect(page.getByRole("link", { name: "샘플로 계산해보기" })).toBeInViewport();
+    await expect(page.getByRole("heading", { name: "내 자산을, 조금 더 깊이." })).toBeVisible();
+    await expect(page.getByRole("link", { name: "샘플로 1분 체험" })).toBeInViewport();
     await capture(page, "start", width);
-    await page.getByRole("link", { name: "샘플로 계산해보기" }).click();
+    await page.goto("/try");
     const sample = page.getByRole("region", { name: "샘플 계산 결과" });
     await expect(sample).toBeVisible();
     const before = await sample.innerText();

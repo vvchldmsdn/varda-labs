@@ -1,4 +1,4 @@
 "use client";
 import { useEffect } from "react";
-import { trackFirstVisit } from "@/lib/first-visit-events";
-export function EntryEvent() { useEffect(() => { trackFirstVisit("entry_view"); }, []); return null; }
+import { trackFirstVisit, type FirstVisitEvent } from "@/lib/first-visit-events";
+export function EntryEvent({ event = "entry_view" }: { event?: FirstVisitEvent }) { useEffect(() => { trackFirstVisit(event); }, [event]); return null; }

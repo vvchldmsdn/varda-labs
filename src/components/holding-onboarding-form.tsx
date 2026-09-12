@@ -9,6 +9,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import { ManagementText } from "@/components/i18n/management-text";
 import { InstrumentSearch, type InstrumentChoice } from "@/components/onboarding/instrument-search";
 import { HoldingImportPanel } from "@/components/onboarding/holding-import-panel";
+import { QuickHoldingReference } from "@/components/first-visit/quick-holding-reference";
 import { PlanHoldingReference } from "@/components/onboarding/plan-holding-reference";
 import { trackFirstVisit } from "@/lib/first-visit-events";
 import type { HoldingOnboardingOptions } from "@/db/queries/holding-onboarding";
@@ -18,7 +19,7 @@ const INITIAL_STATE: HoldingBatchState = { status: "idle", results: [] };
 const identity = (row: Pick<HoldingDraft, "market" | "ticker">) => `${row.market}:${row.ticker.trim().toUpperCase()}`;
 const positive = (value: string, precision: number) => /^\d+(?:\.\d+)?$/.test(value) && Number(value) > 0 && Number.isFinite(Number(value)) && (value.split(".")[1]?.length ?? 0) <= precision;
 
-export function HoldingOnboardingForm({ options, initialAccountId, preview = false, fromPlan = false }: { options: HoldingOnboardingOptions; initialAccountId?: string; preview?: boolean; fromPlan?: boolean }) {
+export function HoldingOnboardingForm({ options, initialAccountId, preview = false, fromPlan = false, fromQuick = false }: { options: HoldingOnboardingOptions; initialAccountId?: string; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<HoldingDraft[]>([]);
   const [saved, setSaved] = useState<Record<string, string>>({});
@@ -96,7 +97,8 @@ export function HoldingOnboardingForm({ options, initialAccountId, preview = fal
       }}>
         <p className="varda-onboarding-eyebrow" id="holding-add-heading">01 · {t("종목과 수량", "HOLDING & QUANTITY")}</p>
         {fromPlan ? <PlanHoldingReference disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSearch={name => { setSelected(null); setQuantity(""); setCost(""); setError(null); setPlanSearch(previous => ({ name, revision: previous.revision + 1 })); }} /> : null}
-        <InstrumentSearch key={planSearch.revision} initialQuery={planSearch.name} privateQuery={fromPlan} preview={preview} disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSelect={instrument => { setSelected(instrument); setQuantity(""); setCost(""); setError(null); }} />
+        {fromQuick ? <QuickHoldingReference disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSearch={name => { setSelected(null); setQuantity(""); setCost(""); setError(null); setPlanSearch(previous => ({ name, revision: previous.revision + 1 })); }} /> : null}
+        <InstrumentSearch key={planSearch.revision} initialQuery={planSearch.name} privateQuery={fromPlan || fromQuick} preview={preview} disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSelect={instrument => { setSelected(instrument); setQuantity(""); setCost(""); setError(null); }} />
         {selected ? <div className="varda-onboarding-selected">
           <div className="varda-onboarding-selected-title"><div><strong>{selected.name}</strong><span>{selected.ticker} · {selected.market === "korea" ? "KR" : "US"} · {selected.currency}</span></div><button type="button" disabled={pending} onClick={() => setSelected(null)} aria-label={t("종목 선택 취소", "Clear selected holding")}><X size={18} /></button></div>
           <label className="varda-onboarding-quantity">{t("몇 주 가지고 있나요?", "How many shares do you hold?")}<input value={quantity} onChange={event => { setQuantity(event.target.value); setError(null); }} type="number" inputMode="decimal" min="0.000001" step="0.000001" placeholder="0" disabled={pending} autoComplete="off" /></label>

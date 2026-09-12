@@ -8,7 +8,7 @@ import { EmailAuthForm } from "./email-auth-form";
 import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
 import { getAuthMethodAvailability } from "@/lib/auth/auth-method-availability";
 import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
-import { PLAN_RETURN_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
+import { PLAN_RETURN_COOKIE, PLAN_RETURN_SOURCE_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
 import { PlanReturnNotice } from "./plan-return-notice";
 import styles from "./auth-experience.module.css";
 
@@ -34,7 +34,9 @@ export async function AuthEntry({
       // Keep sign-in available after a transient session-read failure.
     }
   }
-  const planIntent = !designPreview && (await cookies()).get(PLAN_RETURN_COOKIE)?.value === "1";
+  const cookieStore = await cookies();
+  const planIntent = !designPreview && cookieStore.get(PLAN_RETURN_COOKIE)?.value === "1";
+  const planSource = planIntent ? cookieStore.get(PLAN_RETURN_SOURCE_COOKIE)?.value : undefined;
   if (sessionState === "authenticated") redirect(planReturnDestination(sessionState, planIntent ? "1" : null) ?? "/portfolio/onboarding");
   const availability = getAuthMethodAvailability();
   const signingUp = mode === "sign-up";
@@ -61,7 +63,7 @@ export async function AuthEntry({
             )
           }
         />
-        {planIntent ? <PlanReturnNotice /> : null}
+        {planIntent ? <PlanReturnNotice source={planSource} /> : null}
         {sessionState === "invalid" ? (
           <div className={styles.stack}>
             <p role="alert" className={styles.notice}><AuthText>{"여러 로그인 정보가 함께 남아 있습니다. 로그아웃 후 사용할 계정 하나로 다시 로그인해 주세요."}</AuthText></p>

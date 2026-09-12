@@ -47,6 +47,17 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
 ]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
+  it("registers approximate portfolio drafts as a verified-session writer independent of actual holdings", () => {
+    const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "session_portfolio_drafts");
+    assert.equal(writer.authorization, "server_verified_session");
+    assert.equal(writer.canonicalOwnerHttpInput, "forbidden");
+    assert.equal(writer.canonicalOwnerRolloutScope, "not_applicable");
+    assert.deepEqual(writer.targets, [{ table: "portfolio_drafts", classification: "user_owned", operations: ["insert", "delete"], ownerPolicy: "trusted_context_required" }]);
+    const source = readFileSync(join(ROOT, writer.implementationPaths[0]), "utf8");
+    assert.match(source, /investment_plan_tenant_active\(\)/);
+    assert.match(source, /owner_user_id = \$1::uuid/);
+    assert.doesNotMatch(source, /canonical_owner_user_id|insert into assets|insert into transactions/i);
+  });
   it("registers native investment plans with verified session authority and no holding or legacy owner writes", () => {
     const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "session_investment_plans");
     assert.equal(writer.authorization, "server_verified_session");
@@ -75,8 +86,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 34);
-    assert.equal(registeredPaths.length, 43);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 35);
+    assert.equal(registeredPaths.length, 44);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -149,7 +160,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 20,
       intentionally_skipped_legacy: 1,
-      not_applicable: 13,
+      not_applicable: 14,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
