@@ -6,15 +6,25 @@ import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfoli
 import { useState, useTransition, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowUpRight, Check, LoaderCircle } from "lucide-react";
+import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import styles from "./contribution-stage.module.css";
 
 const PRESETS = [1_000_000, 3_000_000, 5_000_000, 10_000_000];
+const CONTRIBUTION_FORM_ID = "additional-contribution-form";
+export type ContributionTargetActionKind = "set" | "review";
 
-export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, status, children, allocations }: {
+/** Outside the form (including a reason dialog), use its current amount too. */
+export function ContributionTargetAction({ action }: { action: ContributionTargetActionKind }) {
+  return <button type="submit" form={CONTRIBUTION_FORM_ID} formNoValidate className={styles.textLink}><PortfolioText ko={action === "set" ? "목표비중 설정" : "목표비중 다시 확인"} en={action === "set" ? "Set target weights" : "Review target weights"} /><ArrowUpRight size={16} aria-hidden="true" /></button>;
+}
+
+export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, status, targetAction, children, allocations }: {
   amountKrw: number;
-  scopeKey: string;
+  scopeKey: PortfolioAnalysisScopeKey;
   isDesignPreview: boolean;
   status: "ready" | "blocked";
+  targetAction?: ContributionTargetActionKind;
   children: ReactNode;
   allocations?: ReactNode;
 }) {
@@ -25,7 +35,14 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
     const data = new FormData(event.currentTarget);
+    if (targetAction) {
+      const navigation = buildPortfolioTargetNavigation({ scopeKey, from: "contribution", isDesignPreview,
+        amount: String(data.get("amount") ?? "").replaceAll(",", "").trim() });
+      startTransition(() => router.push(navigation.settingsHref));
+      return;
+    }
     const query = new URLSearchParams();
     query.set("scope", scopeKey);
     query.set("amount", String(data.get("amount") ?? ""));
@@ -36,8 +53,9 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
 
   return (
     <section className={styles.workspace} data-calculating={isPending} aria-label={pt("추가 투입 계산")}>
-      <form action="/additional-contribution" method="get" onSubmit={submit} className={styles.form}>
+      <form id={CONTRIBUTION_FORM_ID} action={targetAction ? "/portfolio/targets" : "/additional-contribution"} method="get" onSubmit={submit} className={styles.form}>
         <input type="hidden" name="scope" value={scopeKey} />
+        {targetAction ? <input type="hidden" name="from" value="contribution" /> : null}
         {isDesignPreview ? <input type="hidden" name="preview" value="design" /> : null}
         <label htmlFor="additional-contribution-amount"><PortfolioText ko={"얼마를 더 투자할까요?"} /></label>
         <div className={styles.amountInput}>
@@ -52,8 +70,8 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
           }}><PortfolioText ko={`${preset / 10_000}만`} en={new Intl.NumberFormat("en-US", { style: "currency", currency: "KRW", notation: "compact", maximumFractionDigits: 1 }).format(preset)} /></button>)}
         </div>
         <div className={styles.submitRow}>
-          <button type="submit" className={styles.calculate} disabled={isPending}><PortfolioText ko={isPending ? "계산 중" : "배분안 계산"} />{isPending ? <LoaderCircle className={styles.spinner} size={17} aria-hidden="true" /> : <ArrowUpRight size={18} aria-hidden="true" />}</button>
-          <span className={styles.calculationStatus} role="status">{isPending ? pt("현재 가격과 목표를 계산하고 있어요") : submitted ? <>{status === "ready" ? <Check size={13} aria-hidden="true" /> : null}<PortfolioText ko={status === "ready" ? "계산 완료" : "계산 근거 확인 필요"} /></> : ""}</span>
+          <button type="submit" formNoValidate={Boolean(targetAction)} className={styles.calculate} disabled={isPending}>{targetAction ? <PortfolioText ko={isPending ? "목표비중으로 이동 중" : targetAction === "set" ? "목표비중 설정" : "목표비중 다시 확인"} en={isPending ? "Opening target weights" : targetAction === "set" ? "Set target weights" : "Review target weights"} /> : <PortfolioText ko={isPending ? "계산 중" : "배분안 계산"} />}{isPending ? <LoaderCircle className={styles.spinner} size={17} aria-hidden="true" /> : <ArrowUpRight size={18} aria-hidden="true" />}</button>
+          <span className={styles.calculationStatus} role="status">{isPending ? targetAction ? pt("입력한 금액을 유지하고 이동합니다", "Keeping your entered amount") : pt("현재 가격과 목표를 계산하고 있어요") : submitted ? <>{status === "ready" ? <Check size={13} aria-hidden="true" /> : null}<PortfolioText ko={status === "ready" ? "계산 완료" : "계산 근거 확인 필요"} /></> : ""}</span>
         </div>
         <p id="additional-contribution-amount-hint" className={styles.hint}><PortfolioText ko={"계산 결과만 제공하며 실제 주문은 실행하지 않습니다."} /></p>
       </form>

@@ -8,7 +8,7 @@ import { AdditionalContributionAllocationTable, AdditionalContributionFlowScene,
 import { AdditionalContributionLogicDialog } from "./additional-contribution-logic-dialog";
 import { ContributionAdjustmentDialog } from "./contribution-adjustment-dialog";
 import type { ContributionMarketContext } from "@/lib/contribution-market-context";
-import { ContributionCalculator, ContributionFundingVisual } from "./contribution-calculator";
+import { ContributionCalculator, ContributionFundingVisual, ContributionTargetAction, type ContributionTargetActionKind } from "./contribution-calculator";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
@@ -20,6 +20,14 @@ import styles from "./contribution-stage.module.css";
 
 type BlockedPreview = Readonly<{ status: "blocked"; blockers: readonly string[] }>;
 
+export function contributionTargetAction(blockers: readonly string[]): ContributionTargetActionKind | undefined {
+  // Only these states are resolved by saving the current scope's target weights.
+  // Data failures and policy-integrity conflicts must keep their own explanation.
+  const editable = ["portfolio_target_policy_missing", "target_policy_missing", "portfolio_target_policy_universe_changed", "target_policy_universe_mismatch"];
+  if (!blockers.length || !blockers.every((blocker) => editable.includes(blocker))) return undefined;
+  return blockers.some((blocker) => blocker.endsWith("missing")) ? "set" : "review";
+}
+
 export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync = true, generatedAt, preview, scopes, selectedScope, marketContext }: {
   amountKrw: number;
   enableLivePriceSync?: boolean;
@@ -30,6 +38,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
   marketContext?: ContributionMarketContext;
 }) {
   const designQuery = enableLivePriceSync ? {} : { preview: "design" };
+  const targetAction = preview.status === "blocked" ? contributionTargetAction(preview.blockers) : undefined;
   return (
     <main className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="additional-contribution" data-preview-status={preview.status}>
       <PortfolioPrimaryNavigation activePath="/additional-contribution" generatedAt={generatedAt} selectedScopeKey={selectedScope.key} />
@@ -37,10 +46,10 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
         <header className={styles.header}>
           <div className={styles.title}><h1 id="additional-contribution-title"><PortfolioText ko={"다음 투입의 균형."} /></h1>{!enableLivePriceSync ? <LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement> : null}</div>
           <div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/additional-contribution" query={{ amount: String(amountKrw), ...designQuery }} scopes={scopes} selectedScopeKey={selectedScope.key} variant="underline" /></div>
-          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}<LocalizedLink className={styles.textLink} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }} href={buildPortfolioTargetNavigation({ scopeKey: selectedScope.key, from: "contribution", amount: String(amountKrw), isDesignPreview: !enableLivePriceSync }).settingsHref}><Target size={16} aria-hidden="true" /><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={13} aria-hidden="true" /></LocalizedLink></div>
+          <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}{targetAction ? <ContributionTargetAction action={targetAction} /> : <LocalizedLink className={styles.textLink} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }} href={buildPortfolioTargetNavigation({ scopeKey: selectedScope.key, from: "contribution", amount: String(amountKrw), isDesignPreview: !enableLivePriceSync }).settingsHref}><Target size={16} aria-hidden="true" /><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={13} aria-hidden="true" /></LocalizedLink>}</div>
         </header>
-        <ContributionCalculator amountKrw={amountKrw} scopeKey={selectedScope.key} isDesignPreview={!enableLivePriceSync} status={preview.status} allocations={preview.status === "ready" ? <FeaturedAllocation preview={preview} /> : undefined}>
-          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span><PortfolioText ko={"배분의 시작은 목표비중에서"} /></span><strong><PortfolioText ko={"계산 근거를"} /><br /><PortfolioText ko={"확인해 주세요."} /></strong><p><PortfolioText ko={preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."} /></p></div>}
+        <ContributionCalculator amountKrw={amountKrw} scopeKey={selectedScope.key} isDesignPreview={!enableLivePriceSync} status={preview.status} targetAction={targetAction} allocations={preview.status === "ready" ? <FeaturedAllocation preview={preview} /> : undefined}>
+          {preview.status === "ready" ? <ContributionFundingVisual cash={preview.cashAmountKrw} trims={preview.totalTrimProceedsKrw} total={preview.totalAvailableFundsKrw} residual={preview.residualCashKrw} rows={preview.rows.map((row, index) => ({ key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`, name: row.name, amount: row.allocationKrw }))} /> : <div className={styles.waitingVisual}><span><PortfolioText ko={targetAction ? "배분의 시작은 목표비중에서" : "계산에 필요한 근거"} en={targetAction ? "Start with target weights" : "Evidence needed to calculate"} /></span><strong><PortfolioText ko={targetAction ? "목표비중을" : "계산 근거를"} en={targetAction ? "Target weights" : "Calculation evidence"} /><br /><PortfolioText ko={targetAction === "set" ? "먼저 설정해 주세요." : "확인해 주세요."} en={targetAction === "set" ? "Set them first." : "Please review."} /></strong><p><PortfolioText ko={preview.blockers[0] ? blockerLabel(preview.blockers[0]) : "현재 배분안을 계산할 수 없습니다."} /></p></div>}
         </ContributionCalculator>
         <footer className={styles.footer}>
           {preview.status === "ready" ? <>
@@ -51,7 +60,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
               <ContributionAdjustmentDialog preview={preview} context={marketContext} />
               <PresentationDialog label="비중·자금 흐름" labelEn={portfolioEnglish("비중·자금 흐름")} title="추가투입 전후 변화" titleEn={portfolioEnglish("추가투입 전후 변화")} wide><AdditionalContributionWeightScene preview={preview} /><AdditionalContributionFlowScene preview={preview} /></PresentationDialog>
             </div>
-          </> : <><span className={styles.modalNote}><PortfolioText ko={"계산 결과만 제공하며 실제 주문은 실행하지 않습니다."} /></span><PresentationDialog label="계산 근거 확인" labelEn={portfolioEnglish("계산 근거 확인")} title="배분안을 계산할 수 없는 이유" titleEn={portfolioEnglish("배분안을 계산할 수 없는 이유")} wide><BlockedPreview blockers={preview.blockers} /></PresentationDialog></>}
+          </> : <><span className={styles.modalNote}><PortfolioText ko={"계산 결과만 제공하며 실제 주문은 실행하지 않습니다."} /></span><PresentationDialog label="계산 근거 확인" labelEn={portfolioEnglish("계산 근거 확인")} title="배분안을 계산할 수 없는 이유" titleEn={portfolioEnglish("배분안을 계산할 수 없는 이유")} wide><BlockedPreview blockers={preview.blockers} targetAction={targetAction} /></PresentationDialog></>}
         </footer>
       </div>
     </main>
@@ -67,7 +76,7 @@ function FeaturedAllocation({ preview }: { preview: AdditionalContributionResult
     {featured.length === 0 ? <p className={styles.modalNote}><PortfolioText ko={"계산된 매수·매도 종목이 없습니다. 재원은 현금으로 유지합니다."} /></p> : null}
   </div>;
 }
-function BlockedPreview({ blockers }: { blockers: readonly string[] }) {
+function BlockedPreview({ blockers, targetAction }: { blockers: readonly string[]; targetAction?: ContributionTargetActionKind }) {
   return (
     <section
       className="border-y border-[var(--line)] py-12"
@@ -83,6 +92,7 @@ function BlockedPreview({ blockers }: { blockers: readonly string[] }) {
           </li>
         ))}
       </ul>
+      {targetAction ? <div className="mt-6"><ContributionTargetAction action={targetAction} /></div> : null}
     </section>
   );
 }
