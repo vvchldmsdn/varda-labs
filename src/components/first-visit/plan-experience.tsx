@@ -86,4 +86,3 @@ export function PlanExperience({ personal }: { personal: boolean }) {
     </div>
   </div>;
 }
-
