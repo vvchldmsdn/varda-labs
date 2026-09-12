@@ -11,6 +11,76 @@ const scope = "account:11111111-1111-4111-8111-111111111111";
 const fixtureRow = (overrides = {}) => ({ accountName: "Test account", assetName: "Example fund", market: "korea", currency: "KRW", ticker: "123456", buyability: "buyable", currentValueKrw: 300, targetWeightBps: 10_000, ...overrides });
 
 describe("target-weight editing and navigation", () => {
+  it("offers target setup only for missing or changed target policies, never data failures", async () => {
+    const [view] = await importUiWithPorts(["src/components/additional-contribution/additional-contribution-page-view.tsx"], {
+      "next/link": { default: () => null },
+      "next/navigation": { useRouter: () => ({}) },
+      "./additional-contribution-result": { AdditionalContributionAllocationTable: () => null, AdditionalContributionFlowScene: () => null, AdditionalContributionWeightScene: () => null },
+      "./additional-contribution-logic-dialog": { AdditionalContributionLogicDialog: () => null },
+      "./contribution-adjustment-dialog": { ContributionAdjustmentDialog: () => null },
+      "@/components/home/portfolio-refresh-button": { PortfolioRefreshButton: () => null },
+      "@/components/portfolio-primary-navigation": { PortfolioPrimaryNavigation: () => null },
+      "@/components/presentation/presentation-dialog": { PresentationDialog: () => null },
+    });
+    for (const blocker of ["portfolio_target_policy_missing", "target_policy_missing"]) assert.equal(view.contributionTargetAction([blocker]), "set");
+    for (const blocker of ["portfolio_target_policy_universe_changed", "target_policy_universe_mismatch"]) assert.equal(view.contributionTargetAction([blocker]), "review");
+    for (const blockers of [[], ["invalid_current_value"], ["portfolio_target_policy_conflict"], ["target_policy_not_effective"], ["portfolio_target_policy_integrity_error"], ["unknown_future_blocker"], ["portfolio_target_policy_missing", "invalid_current_value"]]) {
+      assert.equal(view.contributionTargetAction(blockers), undefined);
+    }
+  });
+  it("routes the currently typed amount through target setup and back, with the same scope and preview", async () => {
+    const pushes = [];
+    const [{ ContributionCalculator, ContributionTargetAction }] = await importUiWithPorts(["src/components/additional-contribution/contribution-calculator.tsx"], {
+      "next/navigation": { useRouter: () => ({ push: (...args) => pushes.push(args) }) },
+      "@/components/portfolio/portfolio-text": { PortfolioText: () => null, usePortfolioText: () => (ko, en) => en ?? ko },
+      react: { useState: initial => [initial, () => {}], useTransition: () => [false, callback => callback()] },
+    });
+    function elements(tree) {
+      if (!tree || typeof tree !== "object") return [];
+      if (Array.isArray(tree)) return tree.flatMap(elements);
+      return [tree, ...elements(tree.props?.children)];
+    }
+    const originalFormData = globalThis.FormData;
+    // DOM form collection is the only substituted browser port; run the real submit handler.
+    globalThis.FormData = class { constructor(form) { this.amount = form.amount; } get() { return this.amount; } };
+    try {
+      for (const targetAction of ["set", "review"]) {
+        const tree = elements(ContributionCalculator({ amountKrw: 1_000_000, scopeKey: scope, isDesignPreview: true, status: "blocked", targetAction }));
+        const form = tree.find(element => element.type === "form");
+        const externalAction = ContributionTargetAction({ action: targetAction });
+        assert.equal(externalAction.props.form, form.props.id);
+        assert.equal(externalAction.props.formNoValidate, true);
+        form.props.onSubmit({ preventDefault() {}, currentTarget: { amount: " 7,500,000 " } });
+        const entry = new URL(pushes.at(-1)[0], "http://local.test");
+        assert.equal(entry.pathname, "/portfolio/targets");
+        assert.equal(entry.searchParams.get("amount"), "7500000");
+        assert.equal(entry.searchParams.get("scope"), scope);
+        assert.equal(entry.searchParams.get("from"), "contribution");
+        assert.equal(entry.searchParams.get("preview"), "design");
+        const back = buildPortfolioTargetNavigation({ scopeKey: entry.searchParams.get("scope"), from: entry.searchParams.get("from"), amount: entry.searchParams.get("amount"), isDesignPreview: true });
+        assert.equal(new URL(back.returnHref, "http://local.test").searchParams.get("amount"), "7500000");
+        form.props.onSubmit({ preventDefault() {}, currentTarget: { amount: "" } });
+        assert.equal(new URL(pushes.at(-1)[0], "http://local.test").searchParams.has("amount"), false);
+      }
+      const form = elements(ContributionCalculator({ amountKrw: 1_000_000, scopeKey: scope, isDesignPreview: false, status: "blocked" })).find(element => element.type === "form");
+      form.props.onSubmit({ preventDefault() {}, currentTarget: { amount: "2,000,000" } });
+      assert.equal(new URL(pushes.at(-1)[0], "http://local.test").pathname, "/additional-contribution");
+    } finally { globalThis.FormData = originalFormData; }
+  });
+  it("labels the target-first action explicitly in Korean and English", async () => {
+    const [{ ContributionCalculator }, { LocaleProvider }] = await importUiWithPorts([
+      "src/components/additional-contribution/contribution-calculator.tsx", "src/components/i18n/locale-provider.tsx",
+    ], { "next/navigation": { useRouter: () => ({ push() { throw new Error("SSR must not navigate"); } }) } });
+    for (const locale of ["ko", "en"]) {
+      for (const targetAction of ["set", "review"]) {
+        const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale: locale }, createElement(ContributionCalculator, {
+          amountKrw: 1_000_000, scopeKey: scope, isDesignPreview: false, status: "blocked", targetAction,
+        })));
+        assert.match(html, locale === "en" ? targetAction === "set" ? /Set target weights/ : /Review target weights/ : targetAction === "set" ? /목표비중 설정/ : /목표비중 다시 확인/);
+        assert.match(html, /action="\/portfolio\/targets"/);
+      }
+    }
+  });
   it("preserves account scope, contribution amount, and explicit demo context in both directions", () => {
     const navigation = buildPortfolioTargetNavigation({ scopeKey: scope, from: "contribution", amount: "5000000", isDesignPreview: true });
     const entry = new URL(navigation.settingsHref, "http://local.test");
