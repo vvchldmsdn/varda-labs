@@ -1,6 +1,8 @@
 import { commonEnglish, translationEntry } from "@/lib/i18n/locale";
 
 export const authEnglish: Readonly<Record<string,string>> = {
+  "이 자산으로 시작하세요": "Continue with your portfolio",
+  "입력한 자산은 가입 후 Home에 그대로 이어집니다.": "Your assets will be ready on Home after sign-up.",
   "내 계정": "My account",
   "포트폴리오": "Portfolio",
   "로그인이 확인되었습니다. 나의 포트폴리오로 이어가세요.": "You are signed in. Continue to your portfolio.",

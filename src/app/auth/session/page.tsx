@@ -3,7 +3,7 @@ import { ManagementText } from "@/components/i18n/management-text";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { PLAN_RETURN_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
+import { PLAN_RETURN_COOKIE, PLAN_RETURN_SOURCE_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
 import { ArrowRight, Check, RotateCcw } from "lucide-react";
 import { AuthHeading, AuthShell } from "@/components/auth/auth-shell";
 import { SignOutButton } from "@/components/auth/auth-transport-controls";
@@ -42,7 +42,8 @@ export default async function SessionPage({
   if (evidence === "unverified") redirect("/auth/verify-email");
   if (evidence === "invalid") redirect("/auth/sign-in");
   if (evidence === "authenticated" && params.view !== "account" && !preview) {
-    const destination = planReturnDestination(evidence, (await cookies()).get(PLAN_RETURN_COOKIE)?.value);
+    const store = await cookies();
+    const destination = planReturnDestination(evidence, store.get(PLAN_RETURN_COOKIE)?.value, store.get(PLAN_RETURN_SOURCE_COOKIE)?.value);
     redirect(destination ?? "/portfolio/onboarding");
   }
   const presentationRuntime = assessIdentityPairingClaimPresentationEnvironment(
@@ -88,6 +89,7 @@ export default async function SessionPage({
                 ><ManagementText>{"로그인 화면 보기"}</ManagementText></Link>
               )}
             </div>
+            <details className={styles.disclosure}><summary>활동 기록 안내</summary><p>로그인 후 방문 시각과 이용 화면을 서비스 개선을 위해 기록합니다. 기능별 활동은 최근 90일을 집계하며 오래된 기록은 새 활동 집계 때 정리합니다. 이름·이메일과 최근 접속은 계정 삭제 시 함께 삭제됩니다. 금액·종목·계좌 정보는 활동 기록에 포함하지 않습니다.</p></details>
             <details className={styles.disclosure} id="existing-data">
               <summary><ManagementText>{"기존 데이터 연결"}</ManagementText></summary>
               <p><ManagementText>{"이전 서비스의 자산 기록은 별도로 확인한 연결 코드로만 연결됩니다. 코드를 다른 사람에게 공유하지 마세요."}</ManagementText></p>

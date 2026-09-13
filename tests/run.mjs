@@ -331,3 +331,7 @@ import "./demo-mode.test.mjs";
 import "./quick-portfolio.test.mjs";
 import "./quick-portfolio-persistence.test.mjs";
 import "./quick-portfolio-holding-reference.test.mjs";
+import "./portfolio-activation.test.mjs";
+import "./activation-routing.test.mjs";
+
+import "./member-activity.test.mjs";

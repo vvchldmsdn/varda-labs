@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
@@ -10,6 +10,8 @@ import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type AccountManagementModel = Readonly<{
   state: "ready";
+  // Archived assets and assets in closed accounts still establish prior use.
+  hasAssetHistory: boolean;
   accounts: readonly Readonly<{
     id: string;
     code: string;
@@ -49,10 +51,7 @@ export async function getReadOnlyTenantAccountManagementModel({
         })
         .from(assets)
         .where(
-          and(
-            eq(assets.canonicalOwnerUserId, ownerUserId),
-            sql`${assets.accountId} is not null`,
-          ),
+          eq(assets.canonicalOwnerUserId, ownerUserId),
         ),
       loadTenantPortfolioGroupMemberships({
         mode: "open",
@@ -87,6 +86,7 @@ export async function getReadOnlyTenantAccountManagementModel({
 
     return Object.freeze({
       state: "ready",
+      hasAssetHistory: assetRows.length > 0,
       accounts: Object.freeze(
         accountRows.map((row) =>
           Object.freeze({

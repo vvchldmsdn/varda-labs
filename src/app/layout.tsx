@@ -1,3 +1,4 @@
+import { MemberActivityTracker } from "@/components/member-activity-tracker";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getLocale } from "@/lib/i18n/server";
@@ -52,6 +53,7 @@ export default async function RootLayout({
         <LocaleProvider initialLocale={locale}>
         {children}
         <Suspense fallback={null}><LocaleDocumentTitle /></Suspense>
+        <Suspense fallback={null}><MemberActivityTracker /></Suspense>
         <ServiceWebAnalytics />
         <ServiceSpeedInsights />
         </LocaleProvider>

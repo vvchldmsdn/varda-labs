@@ -96,7 +96,7 @@ describe("self-service empty tenant onboarding", () => {
     assert.match(actionSource, /redirect\("\/portfolio\/onboarding"\)/);
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.match(pageSource, /failure\.code === "identity_unlinked"/);
-    assert.match(pageSource, /OnboardingView/);
+    assert.match(pageSource, /QuickEntry/);
     assert.match(accountPageSource, /redirect\("\/portfolio\/onboarding"\)/);
     assert.match(componentSource, /"use client"/);
     assert.match(componentSource, /useActionState/);

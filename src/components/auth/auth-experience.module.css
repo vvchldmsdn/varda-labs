@@ -593,3 +593,5 @@
 @media (prefers-reduced-motion: reduce) {
   .orbitDots, .orbitFocus, .orbitSatellite { transform: none; }
 }
+
+.compactStage{display:block;width:min(560px,calc(100% - 32px));border:0;background:transparent;margin-block:24px auto;overflow:visible}.compactStage .formStage{padding:24px 20px 48px}

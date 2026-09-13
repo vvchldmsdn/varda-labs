@@ -1,3 +1,4 @@
+import { isActivityAdmin } from "@/lib/auth/member-activity-identity";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { T } from "@/components/i18n/localized-text";
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
@@ -46,6 +47,7 @@ export default async function PortfolioManagementPage({ searchParams }: {
   }
   if (process.env.NODE_ENV === "development" && params.preview === "design") targetQuery.set("preview", "design");
   const targetHref = `/portfolio/targets?${targetQuery}`;
+  const activityAdmin = await isActivityAdmin();
   return <main className="varda-page varda-stage-page">
     <SecondaryPageHeader />
     <div className="varda-content varda-stage-content">
@@ -61,6 +63,7 @@ export default async function PortfolioManagementPage({ searchParams }: {
             <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href === "/portfolio/targets" ? targetHref : href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span><PortfolioText ko={title} /><small><PortfolioText ko={description} /></small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
           </PresentationDialog>)}
         </LocalizedElement>
+        {activityAdmin ? <Link className="mt-5 inline-flex min-h-11 items-center text-sm underline" href="/management/members">회원 활동 관리 →</Link> : null}
         <footer className="varda-management-stage-footer"><span><PortfolioText ko={"정리된 데이터에서 시작하는 분석"} /></span><PresentationDialog label={<><CircleHelp size={14} aria-hidden="true" /><PortfolioText ko={"처음 시작하기"} /></>} title="포트폴리오를 만드는 순서" titleEn={portfolioEnglish("포트폴리오를 만드는 순서")}><ol className="varda-management-guide"><li><strong><PortfolioText ko={"01 · 계좌 등록"} /></strong><p><PortfolioText ko={"증권·연금 계좌를 만들고 분석할 자산을 정리하세요."} /></p><Link href="/portfolio/accounts"><PortfolioText ko={"계좌 관리"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"02 · 보유 종목 등록"} /></strong><p><T ko="종목 이름과 수량으로 시작하세요. 매입가는 나중에 입력해도 됩니다." en="Start with a holding name and quantity. You can add purchase costs later." /></p><Link href="/portfolio/holdings/new"><PortfolioText ko={"종목 추가"} />{" "}<ArrowRight size={14} /></Link></li><li><strong><PortfolioText ko={"03 · 목표비중 설정"} /></strong><p><PortfolioText ko={"금현물을 포함해 관리하려는 종목의 목표비중을 정하세요."} /></p><Link href={targetHref}><PortfolioText ko={"목표비중 관리"} />{" "}<ArrowRight size={14} /></Link></li></ol></PresentationDialog></footer>
       </div>
     </div>

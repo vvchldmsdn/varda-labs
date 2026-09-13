@@ -12,10 +12,12 @@ export function AuthShell({
   children,
   alternate,
   preview = false,
+  compact = false,
 }: {
   children: ReactNode;
   alternate?: { href: string; label: string };
   preview?: boolean;
+  compact?: boolean;
 }) {
   return (
     <main className={styles.shell}>
@@ -36,8 +38,8 @@ export function AuthShell({
         ) : null}
         </div>
       </header>
-      <div className={styles.stage}>
-        <aside className={styles.introduction}>
+      <div className={`${styles.stage} ${compact ? styles.compactStage : ""}`}>
+        {!compact ? <aside className={styles.introduction}>
           <p className={styles.introEyebrow}>A CLEARER VIEW OF YOUR WEALTH</p>
           <h2><AuthText>{"나의 자산을,"}</AuthText><br /><AuthText>{"더 선명하게."}</AuthText></h2>
           <p><AuthText>{"흩어진 자산의 오늘을 살펴보고,"}</AuthText><br /><AuthText>{"기록을 바탕으로 다음을 계획하세요."}</AuthText></p>
@@ -48,7 +50,7 @@ export function AuthShell({
             <span><Waypoints size={18} aria-hidden="true" /><AuthText>{"다양한 가정으로 탐색하는 가능성"}</AuthText></span>
           </div>
           <p className={styles.introSignature}>YOUR ASSETS. YOUR PERSPECTIVE.</p>
-        </aside>
+        </aside> : null}
         <div className={styles.formStage}>{children}</div>
       </div>
       <footer className={styles.footer}>

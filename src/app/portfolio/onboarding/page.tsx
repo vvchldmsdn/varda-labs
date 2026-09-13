@@ -3,13 +3,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
-import { PLAN_RETURN_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
+import { PLAN_RETURN_COOKIE, PLAN_RETURN_SOURCE_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
 import { ArrowRight, RotateCcw } from "lucide-react";
 import { AuthHeading, AuthShell } from "@/components/auth/auth-shell";
-import { OnboardingView } from "@/components/auth/onboarding-view";
+import { QuickPortfolio } from "@/components/first-visit/quick-portfolio";
+import { PublicNav } from "@/components/first-visit/public-nav";
+import { listPortfolioDrafts } from "@/db/queries/portfolio-drafts";
+import entryStyles from "@/components/first-visit/first-visit.module.css";
 import { getReadOnlyTenantAccountManagementModel } from "@/db/queries/account-management";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import { derivePortfolioSetupProgress } from "@/lib/portfolio-setup-progress";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import styles from "@/components/auth/auth-experience.module.css";
 
@@ -29,17 +31,14 @@ export default async function PortfolioOnboardingPage({
   const params = await searchParams;
   if (process.env.NODE_ENV === "development" && params.preview === "design") {
     if (params.step === "unavailable") return <OnboardingUnavailable preview />;
-    const step =
-      params.step === "account" || params.step === "holding"
-        ? params.step
-        : "portfolio";
-    return <OnboardingView step={step} accountName="나의 증권 계좌" preview />;
+    return <QuickEntry preview />;
   }
 
-  const planIntent = (await cookies()).get(PLAN_RETURN_COOKIE)?.value;
+  const store = await cookies();
+  const planIntent = store.get(PLAN_RETURN_COOKIE)?.value;
   if (planIntent === "1") {
     const session = await readCurrentSessionSubject();
-    const destination = planReturnDestination(session.state, planIntent);
+    const destination = planReturnDestination(session.state, planIntent, store.get(PLAN_RETURN_SOURCE_COOKIE)?.value);
     if (destination) redirect(destination);
   }
   const resolution = await resolveCurrentTenantContext();
@@ -47,7 +46,7 @@ export default async function PortfolioOnboardingPage({
     if (resolution.failure.code === "unauthenticated")
       redirect("/auth/sign-in");
     if (resolution.failure.code === "identity_unlinked")
-      return <OnboardingView step="portfolio" />;
+      return <QuickEntry />;
     return <OnboardingUnavailable />;
   }
 
@@ -56,21 +55,16 @@ export default async function PortfolioOnboardingPage({
     tenantContext: resolution.tenantContext,
   });
   if (model.state !== "ready") return <OnboardingUnavailable />;
-  const activeAccounts = model.accounts.filter((account) => account.isActive);
-  const progress = derivePortfolioSetupProgress({
-    activeAccountCount: activeAccounts.length,
-    activeHoldingCount: activeAccounts.reduce(
-      (count, account) => count + account.activeHoldingCount,
-      0,
-    ),
-  });
-  if (progress.isComplete) redirect("/");
-  return (
-    <OnboardingView
-      step={activeAccounts.length ? "holding" : "account"}
-      accountName={activeAccounts[0]?.name}
-    />
-  );
+  if (model.hasAssetHistory) redirect("/");
+  let hasDraft = false;
+  try { hasDraft = (await listPortfolioDrafts(resolution.tenantContext)).length > 0; }
+  catch { return <OnboardingUnavailable />; }
+  if (hasDraft) redirect("/");
+  return <QuickEntry />;
+}
+
+function QuickEntry({ preview = false }: { preview?: boolean }) {
+  return <main className={entryStyles.page}><PublicNav signedIn />{preview ? <p>화면 미리보기 · 저장 없음</p> : null}<QuickPortfolio signedIn preview={preview} /></main>;
 }
 
 function OnboardingUnavailable({ preview = false }: { preview?: boolean }) {
@@ -84,7 +78,7 @@ function OnboardingUnavailable({ preview = false }: { preview?: boolean }) {
         <AuthHeading
           eyebrow="PLEASE TRY AGAIN"
           title="잠시 확인이 필요해요"
-          description="계정이나 계좌 상태를 확인하지 못했습니다. 기존 기록을 보호하기 위해 새로운 포트폴리오는 만들지 않았습니다."
+          description="내 자산을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
         />
         <div className={styles.stack}>
           <Link
