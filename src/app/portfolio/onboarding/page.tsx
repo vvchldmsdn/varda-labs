@@ -16,9 +16,9 @@ import styles from "@/components/auth/auth-experience.module.css";
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return localizedMetadata({
-  title: "포트폴리오 시작 | VARDA-LABS",
+  title: "포트폴리오 시작 | CAIRN LABS",
   robots: { index: false, follow: false },
-}, "Get started | VARDA LABS");
+}, "Get started | CAIRN LABS");
 }
 
 export default async function PortfolioOnboardingPage({

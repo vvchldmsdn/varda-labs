@@ -48,7 +48,7 @@ export const authEnglish: Readonly<Record<string,string>> = {
   "새 비밀번호": "New password",
   "앞으로 사용할 비밀번호를 입력해 주세요.": "Enter the password you would like to use.",
   "화면 미리보기 · 로그인 및 데이터 저장 없음": "Design preview · No sign-in or data storage",
-  "VARDA-LABS 홈": "VARDA-LABS home",
+  "CAIRN LABS 홈": "CAIRN LABS home",
   "나의 자산을,": "Your wealth,", "더 선명하게.": "in a clearer light.",
   "흩어진 자산의 오늘을 살펴보고,": "See how your assets are doing today.",
   "기록을 바탕으로 다음을 계획하세요.": "Plan your next steps with a clearer view of the past.",

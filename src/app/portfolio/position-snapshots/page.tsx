@@ -18,7 +18,7 @@ import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "종목 스냅샷 | VARDA LABS" }, "Position snapshots | VARDA LABS");
+  return localizedMetadata({ title: "종목 스냅샷 | CAIRN LABS" }, "Position snapshots | CAIRN LABS");
 }
 
 type TenantPositionSnapshotsPageProps = {
@@ -71,7 +71,7 @@ export default async function TenantPositionSnapshotsPage({
       <section className="mx-auto w-full max-w-6xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-normal">
               Owner-scoped position snapshots
             </h1>

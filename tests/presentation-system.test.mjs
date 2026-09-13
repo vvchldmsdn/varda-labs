@@ -89,8 +89,8 @@ describe("simple modern design system", () => {
   });
   it("uses the compact shared logo and preserves primary navigation", () => {
     const source = read("src/components/app-navigation.tsx");
-    assert.match(source, /VARDA/);
-    assert.match(source, /varda-mark\.png/);
+    assert.match(source, /CAIRN LABS/);
+    assert.match(source, /BrandLogo stacked/);
     assert.match(source, /buildPortfolioAnalysisScopeHref/);
     assert.match(source, /aria-current/);
     assert.match(css, /prefers-reduced-motion/);

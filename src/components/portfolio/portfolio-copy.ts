@@ -439,7 +439,7 @@ export const PORTFOLIO_COPY: Readonly<Record<string, string>> = {
   "반대 방향": "Opposite direction",
   "같은 방향": "Same direction",
   "셀을 선택해 종목 쌍을 확인하세요": "Select a cell to inspect a holding pair",
-  "관리 | VARDA LABS": "Manage | VARDA LABS",
+  "관리 | CAIRN LABS": "Manage | CAIRN LABS",
   "자산과 계좌": "Assets & accounts",
   "증권·연금 계좌를 추가하고 관리합니다.": "Add and manage brokerage and retirement accounts.",
   "보유 수량, 매입원가와 자산 정보를 확인합니다.": "Review holding quantities, cost basis and asset details.",

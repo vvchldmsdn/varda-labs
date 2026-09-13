@@ -4,9 +4,9 @@ import { AuthEntry } from "@/components/auth/auth-entry";
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return localizedMetadata({
-  title: "회원가입 | VARDA-LABS",
+  title: "회원가입 | CAIRN LABS",
   robots: { index: false, follow: false },
-}, "Sign up | VARDA LABS");
+}, "Sign up | CAIRN LABS");
 }
 
 export default async function SignUpPage({

@@ -9,7 +9,7 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "위험 분석 | VARDA LABS" }, "Risk analysis | VARDA LABS");
+  return localizedMetadata({ title: "위험 분석 | CAIRN LABS" }, "Risk analysis | CAIRN LABS");
 }
 
 type PortfolioRiskPageProps = {

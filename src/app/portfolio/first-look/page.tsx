@@ -13,7 +13,7 @@ import styles from "@/components/onboarding/first-portfolio-analysis.module.css"
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "첫 포트폴리오 분석 | VARDA LABS" }, "Your first look | VARDA LABS");
+  return localizedMetadata({ title: "첫 포트폴리오 분석 | CAIRN LABS" }, "Your first look | CAIRN LABS");
 }
 
 export default async function FirstLookPage({ searchParams }: {

@@ -14,7 +14,7 @@ import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "홈 | VARDA LABS" }, "Home | VARDA LABS");
+  return localizedMetadata({ title: "홈 | CAIRN LABS" }, "Home | CAIRN LABS");
 }
 
 type HomeProps = {

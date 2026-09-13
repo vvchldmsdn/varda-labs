@@ -129,7 +129,7 @@ describe("auth and onboarding experience", () => {
     const shell = read("src/components/auth/auth-shell.tsx");
     const css = read("src/components/auth/auth-experience.module.css");
     const form = read("src/components/auth/onboarding-account-form.tsx");
-    assert.match(shell, /varda-mark.png/);
+    assert.match(shell, /BrandLogo/);
     assert.match(css, /var\(--surface\)/);
     assert.match(css, /var\(--brand\)/);
     assert.match(css, /max-width: 600px/);

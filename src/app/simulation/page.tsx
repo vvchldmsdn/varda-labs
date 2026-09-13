@@ -18,7 +18,7 @@ import { EconomicExecutionSection } from "@/components/simulation/economic-execu
 import { SimulationLoading } from "@/components/simulation/simulation-loading";
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
-  return localizedMetadata({ title: "시뮬레이션 | VARDA LABS" }, "Simulation | VARDA LABS");
+  return localizedMetadata({ title: "시뮬레이션 | CAIRN LABS" }, "Simulation | CAIRN LABS");
 }
 type SimulationPageProps = {
   searchParams: Promise<{

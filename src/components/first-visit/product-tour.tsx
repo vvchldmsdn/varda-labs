@@ -21,7 +21,7 @@ export function ProductTour({ standalone = false }: { standalone?: boolean }) {
       .catch(() => { if (!controller.signal.aborted) setFailed(key); });
     return () => controller.abort();
   }, [view, horizon, key]);
-  return <section id="product-tour" className={styles.tour} aria-label="Varda 기능 체험">
+  return <section id="product-tour" className={styles.tour} aria-label="Cairn Labs 기능 체험">
     <p className={styles.eyebrow}>계획을 세운 다음에는</p>
     <h2>내 자산을 보는<br/>새로운 관점.</h2>
     <p className={styles.intro}>다른 선택과 비교하고, 가능한 미래를 탐색해보세요.</p>

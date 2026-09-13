@@ -4,10 +4,10 @@ import { AuthRecovery } from "@/components/auth/auth-recovery";
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return localizedMetadata({
-  title: "비밀번호 재설정 | VARDA-LABS",
+  title: "비밀번호 재설정 | CAIRN LABS",
   robots: { index: false, follow: false },
   referrer: "no-referrer" as const,
-}, "Reset password | VARDA LABS");
+}, "Reset password | CAIRN LABS");
 }
 
 export default async function ResetPasswordPage({

@@ -18,7 +18,7 @@ import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "거래·자산 이벤트 | VARDA LABS" }, "Transactions and asset events | VARDA LABS");
+  return localizedMetadata({ title: "거래·자산 이벤트 | CAIRN LABS" }, "Transactions and asset events | CAIRN LABS");
 }
 
 type TenantEventsPageProps = {
@@ -49,7 +49,7 @@ export default async function TenantEventsPage({
       <section className="mx-auto w-full max-w-6xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-normal"><ManagementText>{"소유 계정 이벤트"}</ManagementText></h1>
             <p className="mt-2 text-sm text-[var(--muted)]"><ManagementText>{"소유권이 확인된 계정 연결을 통해 읽은 거래 및 자산 상태 근거"}</ManagementText></p>
           </div>

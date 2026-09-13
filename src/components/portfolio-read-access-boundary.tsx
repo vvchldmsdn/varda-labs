@@ -49,7 +49,7 @@ export function PortfolioReadAccessBoundary({
     <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
-        <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko={title} en={titleEn ?? title} /></h1>
         <p className="mt-2 text-sm text-[var(--muted)]"><T ko={description} en={descriptionEn ?? description} /></p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">

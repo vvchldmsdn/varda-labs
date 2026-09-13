@@ -17,7 +17,7 @@ import { selectTodayHoldingHistory } from "@/lib/today-movement-view";
 import { formatKrw, formatSignedKrw, formatPercent } from "@/components/home/portfolio-format";
 import styles from "@/components/demo/demo.module.css";
 
-export const metadata: Metadata = { title: "샘플로 Varda 체험 | VARDA LABS", description: "가입 없이 샘플 포트폴리오로 자산의 변동, 구조, 다른 선택과 가능한 미래를 직접 살펴보세요.", robots: { index: false, follow: true } };
+export const metadata: Metadata = { title: "샘플로 Cairn Labs 체험 | CAIRN LABS", description: "가입 없이 샘플 포트폴리오로 자산의 변동, 구조, 다른 선택과 가능한 미래를 직접 살펴보세요.", robots: { index: false, follow: true } };
 export default async function DemoPage({ params, searchParams }: { params: Promise<{ view: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { view } = await params;
   if (!isDemoView(view)) notFound();

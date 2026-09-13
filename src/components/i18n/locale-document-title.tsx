@@ -25,7 +25,7 @@ export function LocaleDocumentTitle() {
   const {locale} = useI18n();
   useEffect(() => {
     const names = pageNames[pathname];
-    if (names) document.title = `${names[locale === "en" ? 1 : 0]} | VARDA LABS`;
+    if (names) document.title = `${names[locale === "en" ? 1 : 0]} | CAIRN LABS`;
   }, [pathname, locale]);
   return null;
 }

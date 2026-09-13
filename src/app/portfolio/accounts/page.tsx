@@ -20,7 +20,7 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "계좌 관리 | VARDA LABS" }, "Accounts | VARDA LABS");
+  return localizedMetadata({ title: "계좌 관리 | CAIRN LABS" }, "Accounts | CAIRN LABS");
 }
 
 export default async function AccountManagementPage() {
@@ -73,7 +73,7 @@ export default async function AccountManagementPage() {
         <header className="border-b border-[var(--line)] pb-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
+              <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
                 <T ko="계좌 관리" en="Your accounts" />
               </h1>

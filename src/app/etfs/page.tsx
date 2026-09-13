@@ -19,7 +19,7 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "ETF 정보 | VARDA LABS" }, "ETF information | VARDA LABS");
+  return localizedMetadata({ title: "ETF 정보 | CAIRN LABS" }, "ETF information | CAIRN LABS");
 }
 
 type EtfsPageProps = {
@@ -43,8 +43,8 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
       <PortfolioReadAccessBoundary
         closedMessage="로그인한 사용자가 확인되기 전에는 ETF 참고 데이터를 조회하지 않습니다."
         closedMessageEn="ETF reference data remains closed until the signed-in product user is resolved."
-        description="ETF 기본 정보와 구성종목은 공통 참고 데이터이며, 조회하려면 활성 VARDA LABS 사용자 세션이 필요합니다."
-        descriptionEn="ETF masters and holdings are shared reference data, but product access still requires an active Varda Labs user session."
+        description="ETF 기본 정보와 구성종목은 공통 참고 데이터이며, 조회하려면 활성 CAIRN LABS 사용자 세션이 필요합니다."
+        descriptionEn="ETF masters and holdings are shared reference data, but product access still requires an active Cairn Labs user session."
         resolution={resolution}
         title="ETF 참고 데이터"
         titleEn="ETF Reference"
@@ -85,7 +85,7 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-[var(--muted)]">
-                  Varda Labs
+                  Cairn Labs
                 </p>
                 <h1 className="mt-1 text-xl font-semibold tracking-normal">
                   ETF Reference

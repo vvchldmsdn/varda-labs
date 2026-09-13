@@ -158,9 +158,9 @@ describe("History demand-driven server evidence", () => {
       "@/db/queries/history-live-valuation": { getReadOnlyTenantHistoryLiveValuation: async args => { liveReads.push(args); return null; } },
     });
     assert.equal(page.dynamic, "force-dynamic");
-    assert.equal((await page.generateMetadata()).title, "History | VARDA LABS");
+    assert.equal((await page.generateMetadata()).title, "History | CAIRN LABS");
     localeCookieValue = undefined;
-    assert.equal((await page.generateMetadata()).title, "히스토리 | VARDA LABS");
+    assert.equal((await page.generateMetadata()).title, "히스토리 | CAIRN LABS");
     assert.equal(reads.length, 0, "localized metadata must not trigger a financial evidence read");
     assert.equal(liveReads.length, 0);
     await page.default({ searchParams: Promise.resolve({ detail: "raw", scope: scope.key }) });

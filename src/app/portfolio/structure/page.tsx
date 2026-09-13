@@ -14,7 +14,7 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "포트 구조 | VARDA LABS" }, "Allocation | VARDA LABS");
+  return localizedMetadata({ title: "포트 구조 | CAIRN LABS" }, "Allocation | CAIRN LABS");
 }
 
 type PortfolioStructurePageProps = {

@@ -43,7 +43,7 @@ function enforceDashboardBasicAuth(request: NextRequest) {
     status: 401,
     headers: {
       "Cache-Control": "no-store",
-      "WWW-Authenticate": 'Basic realm="Varda Labs", charset="UTF-8"',
+      "WWW-Authenticate": 'Basic realm="Cairn Labs", charset="UTF-8"',
     },
   });
 }

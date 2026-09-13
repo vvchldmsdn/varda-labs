@@ -32,7 +32,7 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "투자 랩 | VARDA LABS" }, "Investment Lab | VARDA LABS");
+  return localizedMetadata({ title: "투자 랩 | CAIRN LABS" }, "Investment Lab | CAIRN LABS");
 }
 
 type InvestmentLabPageProps = {
