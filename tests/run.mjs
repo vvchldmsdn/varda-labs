@@ -327,3 +327,7 @@ import "./investment-plan-persistence.test.mjs";
 import "./plan-auth-return.test.mjs";
 import "./plan-holding-reference.test.mjs";
 import "./public-product-demo.test.mjs";
+import "./demo-mode.test.mjs";
+import "./quick-portfolio.test.mjs";
+import "./quick-portfolio-persistence.test.mjs";
+import "./quick-portfolio-holding-reference.test.mjs";

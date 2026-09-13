@@ -10,10 +10,11 @@ type Entry = Readonly<{ key: string; name: string; weightPct: number }>;
 const COLORS = ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c", "#c98e76", "#9a96a8", "#bbbcaa"];
 const TAU = Math.PI * 2;
 
-export function PortfolioAllocationRing({ entries, selectedKey, onSelect }: {
+export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compositionOnly = false }: {
   entries: readonly Entry[];
   selectedKey: string;
   onSelect: (key: string) => void;
+  compositionOnly?: boolean;
 }) {
   const pt = usePortfolioText();
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect }: {
           <p>{active?.name ?? <PortfolioText ko="보유 종목 없음" />}</p>
         </div>
       </div>
-      <p className={styles.hint}><PortfolioText ko={"조각을 선택해 비중과 목표를 비교하세요"} /></p>
+      <p className={styles.hint}><PortfolioText ko={compositionOnly ? "조각을 선택해 자산별 비중을 확인하세요" : "조각을 선택해 비중과 목표를 비교하세요"} en={compositionOnly ? "Select a segment to explore each asset's weight" : undefined} /></p>
     </div>
   );
 }

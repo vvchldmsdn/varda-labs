@@ -38,11 +38,13 @@ export function HoldingMovementHeatmap({
   history,
   riskHref,
   structureHref,
+  etfHref = "/etfs",
   stage = false,
 }: {
   history: PortfolioDashboardHoldingHistory;
   riskHref: string;
   structureHref: string;
+  etfHref?: string | null;
   stage?: boolean;
 }) {
   const { t } = useI18n();
@@ -108,7 +110,7 @@ export function HoldingMovementHeatmap({
       ) : null}
 
       {mode === "connections" ? (
-        <ConnectionMap history={history} riskHref={riskHref} />
+        <ConnectionMap history={history} riskHref={riskHref} etfHref={etfHref} />
       ) : null}
       </div>
 
@@ -161,9 +163,11 @@ export function HoldingMovementHeatmap({
 function ConnectionMap({
   history,
   riskHref,
+  etfHref,
 }: {
   history: PortfolioDashboardHoldingHistory;
   riskHref: string;
+  etfHref: string | null;
 }) {
   const { t } = useI18n();
   const graph = useMemo(() => buildHoldingConnectionGraph(history), [history]);
@@ -183,7 +187,7 @@ function ConnectionMap({
             <p className="text-sm font-semibold text-[var(--ink)]"><T ko="이 기간에는 뚜렷한 연결이 없습니다." en="No distinct connection in this period."/></p>
             <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="공통 기록은 충분하지만 연결선 표시 기준에 미치지 않았습니다. 자세한 상관관계는 상세 화면에서 확인하세요." en="There are enough matching records, but correlations are below the line display threshold. Explore the details for more."/></p>
           </>}
-          <ConnectionLinks riskHref={riskHref} />
+          <ConnectionLinks riskHref={riskHref} etfHref={etfHref} />
         </div>
       </div>
     );
@@ -284,17 +288,17 @@ function ConnectionMap({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-4 px-1 pt-1">
         <p className={`${styles.connectionDesktop} max-w-xl text-[10px] leading-4 text-[var(--faint)]`}><T ko="선은 같은 날짜에 관측된 일별 등락의 방향만 요약합니다. ETF 내부 종목 겹침이나 투자 권고를 뜻하지 않습니다." en="Lines summarize daily changes observed on matching dates. They do not represent ETF overlap or investment recommendations."/></p>
-        <ConnectionLinks riskHref={riskHref} />
+        <ConnectionLinks riskHref={riskHref} etfHref={etfHref} />
       </div>
     </div>
   );
 }
 
-function ConnectionLinks({ riskHref }: { riskHref: string }) {
+function ConnectionLinks({ riskHref, etfHref }: { riskHref: string; etfHref: string | null }) {
   return (
     <div className="mt-5 flex justify-center gap-5 text-xs font-medium">
       <Link className="border-b border-[var(--faint)] pb-1 hover:text-[var(--brand)]" href={riskHref}><T ko="상관·위험 상세" en="Correlation and risk details"/></Link>
-      <Link className="border-b border-[var(--faint)] pb-1 hover:text-[var(--brand)]" href="/etfs"><T ko="ETF 겹침 상세" en="ETF overlap details"/></Link>
+      {etfHref ? <Link className="border-b border-[var(--faint)] pb-1 hover:text-[var(--brand)]" href={etfHref}><T ko="ETF 겹침 상세" en="ETF overlap details"/></Link> : null}
     </div>
   );
 }

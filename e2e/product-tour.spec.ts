@@ -38,7 +38,8 @@ for (const width of [1440, 390, 320]) {
     await expect(page.getByLabel("샘플 포트폴리오 경로 시점", { exact: true })).toHaveAttribute("max", "126");
     await page.screenshot({ path: `${directory}/plans-simulation-${width}.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
-    expect(requests.some(path => /^\/api\/(research|portfolio)/.test(path))).toBe(false);
+    // /plans may check the authenticated draft library; charts never fetch portfolio data.
+    expect(requests.some(path => path !== "/api/portfolio-drafts" && /^\/api\/(research|portfolio)/.test(path))).toBe(false);
     await page.getByRole("link", { name: "넓은 화면으로 체험하기" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page.locator("[data-lab-chart] svg")).toBeVisible();

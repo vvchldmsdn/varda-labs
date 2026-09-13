@@ -209,12 +209,24 @@ export const MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
 export const INVESTMENT_PLAN_TABLE_POLICIES = Object.freeze([
   userOwned("investment_plans", "owner_user_id", "not_applicable"),
 ]);
+export const PORTFOLIO_DRAFT_TABLE_POLICIES = Object.freeze([
+  userOwned("portfolio_drafts", "owner_user_id", "not_applicable"),
+]);
 export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
-  ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES,
+  ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  if (publicTableSet.has("portfolio_drafts")) {
+    if (!IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("portfolio drafts require the complete identity core");
+    }
+    return Object.freeze([
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "portfolio_drafts")),
+      ...PORTFOLIO_DRAFT_TABLE_POLICIES,
+    ]);
+  }
   // Plans depend only on the verified identity core, not legacy portfolio data.
   // Preserve each older staged schema without declaring an absent plan table.
   if (publicTableSet.has("investment_plans")) {

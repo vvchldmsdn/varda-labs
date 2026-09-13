@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { clearPlanReturnCookies, planReturnIntentCookies } from "@/lib/auth/plan-return";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { preparePlanAccount } from "@/app/plans/actions";
@@ -10,7 +11,7 @@ import { PlanResults } from "./plan-results";
 import { ProductTour } from "./product-tour";
 import styles from "./first-visit.module.css";
 type SavedPlan = { id: string; input: PlanInput; createdAt: string };
-export function PlanLibrary({ localAuthDisabled = false }: { localAuthDisabled?: boolean }) {
+export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false }: { localAuthDisabled?: boolean; hideEmpty?: boolean }) {
   const router=useRouter();
   const [unavailableReason, setUnavailableReason] = useState<"local" | "auth" | "service">("service");
   const [access, setAccess] = useState<"checking" | "ready" | "guest" | "unlinked" | "unavailable">("checking");
@@ -56,7 +57,7 @@ export function PlanLibrary({ localAuthDisabled = false }: { localAuthDisabled?:
       // The id is stable across retries; success is emitted only after the server confirms it.
       trackFirstVisit("plan_saved",data.id);
       try { const current=parseDraft(localStorage.getItem(PLAN_STORAGE_KEY)); if(current?.id===draft.id) localStorage.removeItem(PLAN_STORAGE_KEY); } catch {}
-      document.cookie="varda_plan_return=; Path=/; Max-Age=0; SameSite=Lax";
+      for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
       setSelected({id:data.id,input:draft.input,createdAt:new Date().toISOString()});setDraft(null);setMessage("계획을 저장했습니다. 실제 보유자산이나 거래로 등록하지 않았습니다."); await load();
     } catch {setError("연결이 끊겼습니다. 같은 입력으로 다시 저장하면 중복 생성하지 않습니다.");}
     finally {lock.current=false;setPending(false);}
@@ -77,8 +78,9 @@ export function PlanLibrary({ localAuthDisabled = false }: { localAuthDisabled?:
     }catch{setError("삭제하지 못했습니다. 다시 시도해 주세요.");}finally{lock.current=false;setPending(false);}
   }
   function reuse(plan:SavedPlan,holdings=false){try{localStorage.setItem(PLAN_STORAGE_KEY,JSON.stringify(createPlanDraft(plan.input)));router.push(holdings?"/portfolio/holdings/new?from=plan":"/try?mode=personal");}catch{setError("입력을 옮기지 못했습니다. 브라우저 저장을 허용해 주세요.");}}
-  function authIntent(){document.cookie="varda_plan_return=1; Path=/; Max-Age=86400; SameSite=Lax";}
-  function cancelAuthIntent(){document.cookie="varda_plan_return=; Path=/; Max-Age=0; SameSite=Lax";}
+  function authIntent(){for (const cookie of planReturnIntentCookies("allocation", location.protocol === "https:")) document.cookie = cookie;}
+  function cancelAuthIntent(){for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;}
+  if (hideEmpty && !draft && !plans.length && !selected && !error && !message) return null;
   return <section className={styles.planLayout}><div className={styles.planMain}><p className={styles.eyebrow}>MY PLANS</p><h1>{draft?"다음 투자도, 여기서 이어가세요.":"내 투자계획"}</h1><p className={styles.privacy}>계획을 저장하면 자산과 목표는 그대로, 다음 투자금만 바꿔 다시 계산할 수 있어요.</p>
     {message?<p role="status" className={styles.notice}>{message}</p>:null}{error?<p role="alert" className={styles.error}>{error}</p>:null}
     {loading?<p role="status">계획을 확인하고 있어요.</p>:null}
