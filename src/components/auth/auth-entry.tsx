@@ -35,9 +35,9 @@ export async function AuthEntry({
     }
   }
   const cookieStore = await cookies();
-  const planIntent = !designPreview && cookieStore.get(PLAN_RETURN_COOKIE)?.value === "1";
+  const planIntent = cookieStore.get(PLAN_RETURN_COOKIE)?.value === "1";
   const planSource = planIntent ? cookieStore.get(PLAN_RETURN_SOURCE_COOKIE)?.value : undefined;
-  if (sessionState === "authenticated") redirect(planReturnDestination(sessionState, planIntent ? "1" : null) ?? "/portfolio/onboarding");
+  if (sessionState === "authenticated") redirect(planReturnDestination(sessionState, planIntent ? "1" : null, planSource) ?? "/portfolio/onboarding");
   const availability = getAuthMethodAvailability();
   const signingUp = mode === "sign-up";
   const alternateHref = `${signingUp ? "/auth/sign-in" : "/auth/sign-up"}${designPreview ? "?preview=design" : ""}`;
@@ -45,6 +45,7 @@ export async function AuthEntry({
   return (
     <AuthShell
       preview={designPreview}
+      compact
       alternate={{ href: alternateHref, label: alternateLabel }}
     >
       <AuthElement as="section"
@@ -54,9 +55,9 @@ export async function AuthEntry({
       >
         <AuthHeading
           eyebrow={signingUp ? "YOUR PORTFOLIO STARTS HERE" : "WELCOME BACK"}
-          title={signingUp ? "회원가입" : "로그인"}
+          title={planSource === "quick" ? "이 자산으로 시작하세요" : signingUp ? "회원가입" : "로그인"}
           description={
-            signingUp ? (
+            planSource === "quick" ? "입력한 자산은 가입 후 Home에 그대로 이어집니다." : signingUp ? (
               <><AuthText>{"나의 자산, 나의 기록."}</AuthText><br /><AuthText>{"편한 방법으로 시작하세요."}</AuthText></>
             ) : (
               <><AuthText>{"다시, 나의 자산 흐름으로."}</AuthText><br /><AuthText>{"가입한 방법으로 로그인하세요."}</AuthText></>

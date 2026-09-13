@@ -330,6 +330,13 @@
       "when": 1789250996187,
       "tag": "0046_portfolio_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1789310468770,
+      "tag": "0047_member_activity",
+      "breakpoints": true
     }
   ]
 }

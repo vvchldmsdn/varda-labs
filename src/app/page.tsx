@@ -1,5 +1,11 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
+import Link from "next/link";
+import { listPortfolioDrafts } from "@/db/queries/portfolio-drafts";
+import { getReadOnlyTenantAccountManagementModel } from "@/db/queries/account-management";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import type { TenantContext } from "@/lib/session-resolver-contract";
+import { QuickHome } from "@/components/first-visit/quick-home";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
@@ -22,12 +28,16 @@ type HomeProps = {
     account?: string | string[];
     preview?: string | string[];
     scope?: string | string[];
+    welcome?: string;
   }>;
 };
 
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
 
+  if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "quick") {
+    return <><p role="status" className="px-6 py-2 text-xs">화면 미리보기 · 가상 입력</p><QuickHome input={{ currency: "KRW", rows: [{ name: "KODEX 200", value: 3000000, instrumentId: "kr-069500" }, { name: "VOO", value: 2000000, instrumentId: "us-voo" }] }} createdAt="2026-09-13T00:00:00Z" preview welcome /></>;
+  }
   if (
     process.env.NODE_ENV === "development" &&
     firstSearchParam(params.preview) === "design"
@@ -43,6 +53,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok && resolution.failure.code === "unauthenticated") redirect("/start");
+  if (!resolution.ok && resolution.failure.code === "identity_unlinked") redirect("/portfolio/onboarding");
   if (!resolution.ok) {
     return (
       <PortfolioDashboardAccessBoundary
@@ -79,18 +90,33 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent dashboardPromise={dashboardPromise} />
+      <DashboardContent dashboardPromise={dashboardPromise} tenant={resolution.tenantContext} allScope={scopeContext.resolution.scope.kind === "all"} welcome={params.welcome === "1"} />
     </Suspense>
   );
 }
 
 async function DashboardContent({
-  dashboardPromise,
+  dashboardPromise, tenant, allScope, welcome,
 }: {
   dashboardPromise: ReturnType<typeof getPortfolioDashboard>;
+  tenant: TenantContext;
+  allScope: boolean;
+  welcome: boolean;
 }) {
   const dashboard = await dashboardPromise;
-  return <PortfolioDashboard data={dashboard} liveSyncEnabled />;
+  if (allScope && dashboard.dataHealth.importedAssetCount === 0) {
+    const history = await getReadOnlyTenantAccountManagementModel({
+      serviceDate: resolveSnapshotCycle(new Date()).snapshotDate, tenantContext: tenant,
+    });
+    // Zero current assets can mean a complete sale or closed accounts. Only a
+    // confirmed absence of all owned asset history starts the first-use flow.
+    if (history.state === "ready" && !history.hasAssetHistory) {
+      const drafts = await listPortfolioDrafts(tenant);
+      if (drafts[0]) return <QuickHome id={drafts[0].id} input={drafts[0].input} createdAt={drafts[0].createdAt} welcome={welcome} />;
+      redirect("/portfolio/onboarding");
+    }
+  }
+  return <>{welcome ? <p role="status" className="px-6 py-3 text-sm">입력한 자산을 저장했어요. <Link href="/plans" className="underline">저장한 구성 보기</Link></p> : null}<PortfolioDashboard data={dashboard} liveSyncEnabled /></>;
 }
 
 function firstSearchParam(value: string | string[] | undefined) {

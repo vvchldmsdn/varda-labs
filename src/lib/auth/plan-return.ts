@@ -16,6 +16,6 @@ export function clearPlanReturnCookies(secure = false): string[] {
   return [PLAN_RETURN_COOKIE + suffix, PLAN_RETURN_SOURCE_COOKIE + suffix];
 }
 
-export function planReturnDestination(sessionState: string, cookieValue: unknown): typeof PLAN_RETURN_PATH | null {
-  return sessionState === "authenticated" && cookieValue === "1" ? PLAN_RETURN_PATH : null;
+export function planReturnDestination(sessionState: string, cookieValue: unknown, source?: unknown): string | null {
+  return sessionState === "authenticated" && cookieValue === "1" ? source === "quick" ? "/portfolio/activate" : PLAN_RETURN_PATH : null;
 }

@@ -175,7 +175,7 @@ export function EmailAuthForm({
       {!enabled && !preview ? (
         <p className={styles.note}><AuthText>{"이메일 로그인은 준비 중입니다."}</AuthText></p>
       ) : null}
-      <div className={styles.recoveryLinks}>
+      {!signingUp ? <div className={styles.recoveryLinks}>
         <Link
           href={`/auth/forgot-password${preview ? "?preview=design" : ""}`}
           className={styles.textLink}
@@ -184,7 +184,7 @@ export function EmailAuthForm({
           href={`/auth/verify-email${preview ? "?preview=design" : ""}`}
           className={styles.textLink}
         ><AuthText>{"인증 메일 재전송"}</AuthText></Link>
-      </div>
+      </div> : null}
     </AuthElement>
   );
 }

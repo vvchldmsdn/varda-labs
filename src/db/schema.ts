@@ -2954,3 +2954,25 @@ export type NewDailyPositionSnapshot = typeof dailyPositionSnapshots.$inferInser
 
 export type Settings = typeof settings.$inferSelect;
 export type NewSettings = typeof settings.$inferInsert;
+
+// Operational usage aggregates: intentionally inaccessible to tenant SQL roles.
+export const memberActivityProfiles = pgTable("member_activity_profiles", {
+  ownerUserId: uuid("owner_user_id").primaryKey().references(() => appUsers.id, { onDelete: "cascade" }),
+  displayName: varchar("display_name", { length: 80 }),
+  email: varchar("email", { length: 254 }),
+  firstSeen: timestamp("first_seen", { withTimezone: true }).defaultNow().notNull(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow().notNull(),
+}).enableRLS();
+export const memberActivityDaily = pgTable("member_activity_daily", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  activityDate: date("activity_date").notNull(),
+  feature: varchar("feature", { length: 20 }).notNull(),
+  views: integer("views").notNull(),
+  visits: integer("visits").notNull(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.activityDate, table.feature] }),
+  dateIdx: index("member_activity_daily_date_idx").on(table.activityDate),
+  countsCheck: check("member_activity_daily_counts", sql`${table.views} > 0 and ${table.visits} >= 0 and ${table.visits} <= ${table.views}`),
+  featureCheck: check("member_activity_daily_feature", sql`${table.feature} in ('home','today','structure','contribution','lab','simulation','history','manage','plans','input')`),
+})).enableRLS();

@@ -98,6 +98,18 @@ const LEGACY_EXCLUDED_TRANSITION = {
 
 export const TENANT_WRITER_REGISTRY = [
   {
+    id: "session_member_activity",
+    classification: "admin_system",
+    authorization: "server_verified_session",
+    entrypoints: ["src/app/api/member-activity/route.ts"],
+    implementationPaths: ["src/db/queries/member-activity.ts"],
+    targets: [adminTarget("member_activity_profiles", "insert", "update"), adminTarget("member_activity_daily", "insert", "update", "delete")],
+    transition: SHARED_TRANSITION,
+    canonicalOwnerRolloutScope: "not_applicable",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "session_portfolio_drafts",
     classification: "user_owned",
     authorization: "server_verified_session",

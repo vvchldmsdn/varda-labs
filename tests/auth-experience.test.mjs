@@ -53,7 +53,7 @@ describe("auth and onboarding experience", () => {
     }
   });
 
-  it("resumes the next incomplete step from owned persisted accounts", () => {
+  it("keeps account setup progress separate from initial activation", () => {
     const empty = derivePortfolioSetupProgress({
       activeAccountCount: 0,
       activeHoldingCount: 0,
@@ -83,8 +83,8 @@ describe("auth and onboarding experience", () => {
         ),
     );
     assert.match(page, /tenantContext: resolution.tenantContext/);
-    assert.match(page, /account.isActive/);
-    assert.match(page, /if \(progress.isComplete\) redirect\("\/"\)/);
+    assert.match(page, /model.hasAssetHistory/);
+    assert.match(page, /if \(hasDraft\) redirect\("\/"\)/);
     assert.match(page, /model.state !== "ready"/);
   });
 
@@ -112,7 +112,7 @@ describe("auth and onboarding experience", () => {
     assert.match(session, /params.view !== "account"/);
     assert.match(session, /redirect\(destination \?\? "\/portfolio\/onboarding"\)/);
     assert.match(session, /evidence === "authenticated" && params.view !== "account" && !preview/);
-    assert.match(session, /planReturnDestination\(evidence, \(await cookies\(\)\).get\(PLAN_RETURN_COOKIE\)\?\.value\)/);
+    assert.match(session, /planReturnDestination\(evidence, store.get\(PLAN_RETURN_COOKIE\)\?\.value, store.get\(PLAN_RETURN_SOURCE_COOKIE\)\?\.value\)/);
     assert.match(session, /evidence === "unauthenticated"/);
     assert.doesNotMatch(session, /\.user\.(?:email|name|image)|@\/db/);
     assert.match(

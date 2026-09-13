@@ -21,11 +21,11 @@ const chapters = [
 ];
 export default function StartPage() {
   return <main className={styles.page}><EntryEvent />
-    <nav className={styles.nav} aria-label="첫 방문 메뉴"><Link className={styles.brand} href="/start"><BrandLogo /></Link><div className={styles.navLinks}><Link href="/demo/home">서비스 체험</Link><Link href="/plans">내 기록</Link><Link href="/auth/sign-in" prefetch={false}>로그인</Link></div></nav>
+    <nav className={styles.nav} aria-label="첫 방문 메뉴"><Link className={styles.brand} href="/start"><BrandLogo /></Link><div className={styles.navLinks}><Link href="/demo/home">서비스 체험</Link><Link href="/auth/sign-up" prefetch={false}>회원가입</Link><Link href="/auth/sign-in" prefetch={false}>로그인</Link></div></nav>
     <header className={styles.hero}><div><p className={styles.eyebrow}>A NEW PERSPECTIVE ON YOUR PORTFOLIO</p><h1>내 자산을,<br />조금 더 <span>깊이.</span></h1></div><div className={styles.heroCopy}><p>왜 움직였는지, 어디에 모여 있는지.<br />다른 선택과 가능한 미래까지 살펴보세요.</p><div className={styles.actions}><Link className={styles.primary} href="/try/analyze">내 포트폴리오 분석하기 <ArrowUpRight size={17} /></Link><Link className={styles.secondary} href="/demo/home">샘플로 1분 체험 <ArrowUpRight size={17} /></Link></div><p className={styles.note}>가입 없이 먼저 체험하고, 저장할 때 계정을 만드세요.</p></div></header>
     <ProductFilm />
     <section className={styles.chapters} aria-label="실제 화면으로 체험하기">{chapters.map(chapter => <Link key={chapter.href} className={styles.chapter} href={chapter.href}><span>{chapter.number}</span><h2>{chapter.title}</h2><p>{chapter.description}</p><ArrowUpRight size={16} aria-hidden="true" /></Link>)}</section>
-    <section className={styles.closing}><div><p className={styles.eyebrow}>START WITH WHAT YOU KNOW</p><h2>처음부터 모든 걸<br />입력할 필요는 없어요.</h2></div><div><p>종목 이름과 대략적인 평가금액만으로<br />내 포트폴리오의 구성을 먼저 확인하세요.</p><p>목표 비중이 있다면 이번 투자금의 배분도 계산할 수 있어요. 실제 보유종목 등록은 그다음에 이어가면 됩니다.</p><div className={styles.actions}><Link className={styles.primary} href="/try/analyze">내 자산으로 시작하기 <ArrowUpRight size={17} /></Link><Link className={styles.secondary} href="/try?mode=personal">목표 비중으로 투자금 나누기</Link></div></div></section>
+    <section className={styles.closing}><div><p className={styles.eyebrow}>START WITH WHAT YOU KNOW</p><h2>처음부터 모든 걸<br />입력할 필요는 없어요.</h2></div><div><p>종목 이름과 대략적인 평가금액만으로<br />내 포트폴리오의 구성을 먼저 확인하세요.</p><div className={styles.actions}><Link className={styles.primary} href="/try/analyze">내 자산으로 시작하기 <ArrowUpRight size={17} /></Link><Link className={styles.secondary} href="/try?mode=personal">목표 비중으로 투자금 나누기</Link></div></div></section>
     <footer className={styles.footer}><span>CAIRN LABS</span><span>샘플은 가상 데이터입니다. 종목 추천·수익 보장·실제 주문을 제공하지 않습니다.</span></footer>
   </main>;
 }
