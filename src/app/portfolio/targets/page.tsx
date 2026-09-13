@@ -10,7 +10,7 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "목표비중 | VARDA LABS" }, "Target weights | VARDA LABS");
+  return localizedMetadata({ title: "목표비중 | CAIRN LABS" }, "Target weights | CAIRN LABS");
 }
 
 type PortfolioTargetsPageProps = {

@@ -19,9 +19,9 @@ import styles from "@/components/auth/auth-experience.module.css";
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return localizedMetadata({
-  title: "내 계정 | VARDA-LABS",
+  title: "내 계정 | CAIRN LABS",
   robots: { index: false, follow: false },
-}, "My account | VARDA LABS");
+}, "My account | CAIRN LABS");
 }
 type SessionEvidence = "authenticated" | "unauthenticated" | "unavailable" | "unverified" | "invalid";
 

@@ -1,5 +1,5 @@
 import { AuthText } from "./auth-localized";
-import Image from "next/image";
+import { BrandLogo } from "@/components/brand-logo";
 import Link from "next/link";
 import { ArrowUpRight, ChartNoAxesCombined, LockKeyhole, ScanLine, Waypoints } from "lucide-react";
 import type { ReactNode } from "react";
@@ -23,9 +23,8 @@ export function AuthShell({
         <p className={styles.preview}><AuthText>{"화면 미리보기 · 로그인 및 데이터 저장 없음"}</AuthText></p>
       ) : null}
       <header className={styles.header}>
-        <LocalizedLink href={preview ? "/?preview=design" : "/"} className="varda-wordmark" aria-label="VARDA-LABS 홈" en={{"aria-label":"VARDA-LABS home"}}>
-          <Image src="/varda-mark.png" width={24} height={24} alt="" priority />
-          <span>VARDA-LABS</span>
+        <LocalizedLink href={preview ? "/?preview=design" : "/"} className="varda-wordmark" aria-label="CAIRN LABS 홈" en={{"aria-label":"CAIRN LABS home"}}>
+          <BrandLogo />
         </LocalizedLink>
         <div className="varda-auth-language-actions">
         <LanguageSwitch />
@@ -53,7 +52,7 @@ export function AuthShell({
         <div className={styles.formStage}>{children}</div>
       </div>
       <footer className={styles.footer}>
-        <span>VARDA-LABS</span>
+        <span>CAIRN LABS</span>
         <span>
           <LockKeyhole size={12} aria-hidden="true" /><AuthText>{"계좌 비밀번호를 수집하지 않습니다."}</AuthText></span>
       </footer>

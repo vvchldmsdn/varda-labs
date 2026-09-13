@@ -9,7 +9,7 @@ import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "관리 | VARDA LABS" }, "Manage | VARDA LABS");
+  return localizedMetadata({ title: "관리 | CAIRN LABS" }, "Manage | CAIRN LABS");
 }
 
 const groups = [

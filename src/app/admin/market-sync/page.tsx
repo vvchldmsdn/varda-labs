@@ -16,7 +16,7 @@ import type {
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "시장 데이터 동기화 | VARDA LABS" }, "Market sync | VARDA LABS");
+  return localizedMetadata({ title: "시장 데이터 동기화 | CAIRN LABS" }, "Market sync | CAIRN LABS");
 }
 
 export default async function AdminMarketSyncPage() {
@@ -30,7 +30,7 @@ export default async function AdminMarketSyncPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold text-[var(--muted)]">
-                Varda Labs Admin
+                Cairn Labs Admin
               </p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
                 Market Sync Status

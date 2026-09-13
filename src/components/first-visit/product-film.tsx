@@ -39,12 +39,12 @@ export function ProductFilm() {
     if (playing) { pausedByUser.current = true; video.current?.pause(); }
     else { pausedByUser.current = false; setRequested(true); void video.current?.play().catch(() => {}); }
   }
-  return <figure ref={frame} className={styles.film} aria-label="실제 Varda 샘플 화면 사용 영상">
-    <div className={styles.filmTop}><span><i aria-hidden="true" /> VARDA / PRODUCT TOUR</span><span>가상 포트폴리오로 촬영한 실제 화면</span></div>
+  return <figure ref={frame} className={styles.film} aria-label="실제 Cairn Labs 샘플 화면 사용 영상">
+    <div className={styles.filmTop}><span><i aria-hidden="true" /> CAIRN LABS / PRODUCT TOUR</span><span>가상 포트폴리오로 촬영한 실제 화면</span></div>
     <div className={styles.screen}>
       <picture><source media="(max-width: 640px)" srcSet="/product-demo/poster-mobile.png" />
         {/* Native picture chooses one captured viewport without downloading both. */}
-        <img src="/product-demo/poster-desktop.png" alt="Varda 샘플 포트폴리오의 자산 배분과 종목별 비중 화면" width={1280} height={800} fetchPriority="high" />
+        <img src="/product-demo/poster-desktop.png" alt="Cairn Labs 샘플 포트폴리오의 자산 배분과 종목별 비중 화면" width={1280} height={800} fetchPriority="high" />
       </picture>
       <video ref={video} src={source} muted playsInline loop preload="none" aria-label="오늘 변동, 포트 구조, 투자 랩, 시뮬레이션을 살펴보는 제품 영상" aria-describedby="product-film-description" className={source && ready && !failed ? styles.videoReady : styles.videoHidden} onLoadStart={() => setReady(false)} onLoadedData={() => setReady(true)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onError={() => { setFailed(true); setPlaying(false); }} />
       {!failed ? <button className={styles.play} onClick={toggle} aria-label={playing ? "제품 영상 일시정지" : "제품 영상 재생"}>{playing ? <Pause size={15} /> : <Play size={15} />}<span>{playing ? "일시정지" : "영상으로 둘러보기"}</span></button> : <span className={styles.filmFailure}>영상 대신 실제 화면을 보여드리고 있어요.</span>}

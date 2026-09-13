@@ -30,7 +30,7 @@ const notoSansKr = Noto_Sans_KR({
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   return {
-  title: locale === "en" ? "VARDA LABS · My portfolio" : "VARDA LABS · 나의 포트폴리오",
+  title: locale === "en" ? "CAIRN LABS · My portfolio" : "CAIRN LABS · 나의 포트폴리오",
   description: locale === "en" ? "Follow your assets and plan your portfolio." : "자산의 흐름을 확인하고, 나의 포트폴리오를 계획하는 공간.",
   // All current routes belong to the private portfolio application.
   robots: { index: false, follow: false },

@@ -10,7 +10,7 @@ import { getContributionMarketContext } from "@/db/queries/contribution-market-c
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "추가 투입 | VARDA LABS" }, "Contribute | VARDA LABS");
+  return localizedMetadata({ title: "추가 투입 | CAIRN LABS" }, "Contribute | CAIRN LABS");
 }
 
 const DEFAULT_AMOUNT_KRW = 3_000_000;

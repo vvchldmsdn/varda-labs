@@ -24,7 +24,7 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "보유 종목 | VARDA LABS" }, "Holdings | VARDA LABS");
+  return localizedMetadata({ title: "보유 종목 | CAIRN LABS" }, "Holdings | CAIRN LABS");
 }
 
 type TenantHoldingsPageProps = {

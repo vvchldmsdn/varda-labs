@@ -19,7 +19,7 @@ export function PortfolioAnalysisScopeBoundary({
     <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
-        <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko={title} en={titleEn ?? title} /></h1>
         <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
           <T ko={scopeBoundaryMessage(context)} en={context.state === "unavailable" ? "Account and group scopes are currently unavailable. No portfolio data was read." : context.state === "integrity_error" ? "Account or group integrity checks failed. No portfolio data was read." : "The selected account or group is unavailable. Your scope has not been replaced."} />

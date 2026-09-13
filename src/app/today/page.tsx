@@ -16,7 +16,7 @@ import { normalizeTodayHoldingDetailQuery } from "@/lib/today-holding-detail";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "오늘 변동 | VARDA LABS" }, "Today | VARDA LABS");
+  return localizedMetadata({ title: "오늘 변동 | CAIRN LABS" }, "Today | CAIRN LABS");
 }
 
 type TodayPageProps = {

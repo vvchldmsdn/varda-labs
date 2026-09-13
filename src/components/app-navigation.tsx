@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { BrandLogo } from "@/components/brand-logo";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef } from "react";
@@ -101,9 +101,8 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
     <header className="varda-app-navigation">
       <a className="varda-skip-link" href="#varda-main-content">{t("본문으로 건너뛰기", "Skip to content")}</a>
       <aside className="varda-sidebar" aria-label={t("서비스 탐색", "App navigation")}>
-        <Link className="varda-sidebar-brand" href={hrefFor("/")} aria-label={t("VARDA LABS 홈", "VARDA LABS home")}>
-          <Image src="/varda-mark.png" alt="" width={29} height={29} />
-          <span>VARDA</span>
+        <Link className="varda-sidebar-brand" href={hrefFor("/")} aria-label={t("CAIRN LABS 홈", "CAIRN LABS home")}>
+          <BrandLogo stacked />
         </Link>
         {links}
         <div className="varda-sidebar-bottom">
@@ -116,7 +115,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
       </aside>
       <div className="varda-topbar">
         <div className="varda-topbar-location">
-          <span className="varda-mobile-brand">VARDA</span>
+          <span className="varda-mobile-brand"><BrandLogo /></span>
           <span className="varda-breadcrumb">PORTFOLIO</span><span className="varda-breadcrumb-slash">/</span>
           <strong>{t(currentItem?.label ?? "관리")}</strong>
         </div>
@@ -156,7 +155,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
       <dialog ref={menuRef} className="varda-mobile-menu" aria-label={t("전체 메뉴", "All navigation")}
         onClick={(event) => { if (event.target === event.currentTarget) menuRef.current?.close(); }}>
         <div className="varda-mobile-menu-inner">
-          <div className="varda-mobile-menu-heading"><span className="varda-wordmark">VARDA LABS</span>
+          <div className="varda-mobile-menu-heading"><span className="varda-wordmark"><BrandLogo /></span>
             <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></button>
           </div>
           {links}

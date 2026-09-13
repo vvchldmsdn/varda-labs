@@ -17,7 +17,7 @@ import type { MarketRegimeDuplicateGroup } from "@/lib/market-context";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "시장 데이터 | VARDA LABS" }, "Market data | VARDA LABS");
+  return localizedMetadata({ title: "시장 데이터 | CAIRN LABS" }, "Market data | CAIRN LABS");
 }
 
 export default async function MarketPage() {
@@ -49,7 +49,7 @@ export default async function MarketPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold text-[var(--muted)]">
-                Varda Labs
+                Cairn Labs
               </p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal">
                 Market Context

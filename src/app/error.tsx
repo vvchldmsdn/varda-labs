@@ -19,7 +19,7 @@ export default function AppError({
   return (
     <main className="min-h-screen bg-[var(--paper)] px-5 py-8 text-[var(--ink)] sm:px-8">
       <div className="mx-auto flex min-h-[70vh] w-full max-w-[1180px] flex-col justify-between border-y border-[var(--line)] py-8 sm:py-12">
-        <p className="text-xs font-semibold text-[var(--muted)]">VARDA-LABS / RECOVERY</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">CAIRN LABS / RECOVERY</p>
         <section className="max-w-2xl py-20" aria-labelledby="app-error-title">
           <p className="text-xs text-[var(--brand)]"><ManagementText>{"요청을 끝까지 처리하지 못했습니다"}</ManagementText></p>
           <h1 id="app-error-title" className="mt-4 text-3xl font-semibold sm:text-5xl"><ManagementText>{"이 화면만 다시 불러옵니다."}</ManagementText></h1>

@@ -15,7 +15,7 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return localizedMetadata({ title: "분석 범위 관리 | VARDA LABS" }, "Analysis scopes | VARDA LABS");
+  return localizedMetadata({ title: "분석 범위 관리 | CAIRN LABS" }, "Analysis scopes | CAIRN LABS");
 }
 
 export default async function PortfolioGroupsPage() {
@@ -47,7 +47,7 @@ export default async function PortfolioGroupsPage() {
         <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold text-[var(--muted)]">Varda Labs</p>
+              <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal"><ManagementText>{"분석 범위 관리"}</ManagementText></h1>
               <p className="mt-2 text-sm text-[var(--muted)]"><ManagementText>{"실제 계좌와 별개로, 함께 분석할 계좌와 종목을 묶습니다."}</ManagementText></p>
             </div>

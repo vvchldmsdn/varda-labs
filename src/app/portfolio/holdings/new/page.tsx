@@ -11,7 +11,7 @@ import "@/components/onboarding/holding-onboarding.css";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
-  return localizedMetadata({ title: "보유 종목 추가 | VARDA LABS" }, "Add holdings | VARDA LABS");
+  return localizedMetadata({ title: "보유 종목 추가 | CAIRN LABS" }, "Add holdings | CAIRN LABS");
 }
 
 export default async function NewHoldingPage({ searchParams }: { searchParams: Promise<{ preview?: string; accountId?: string | string[]; from?: string }> }) {
