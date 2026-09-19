@@ -52,7 +52,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compos
                 style={{
                   "--lift-x": `${(Math.cos(middle) * 9).toFixed(3)}px`,
                   "--lift-y": `${(Math.sin(middle) * 9).toFixed(3)}px`,
-                  opacity: hoveredKey && !lifted ? .6 : 1,
+                  opacity: active && !lifted ? .62 : 1,
                 } as CSSProperties}
                 onPointerEnter={(event) => { if (event.pointerType !== "touch") setHoveredKey(segment.key); }}
                 onFocus={() => setHoveredKey(segment.key)}

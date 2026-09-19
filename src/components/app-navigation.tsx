@@ -67,10 +67,10 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
 
   function isActive(href: string) {
     if (href === currentPath) return true;
-    if (href === "/portfolio/structure" && currentPath === "/portfolio/risk") return true;
+    if (href === "/portfolio/structure" && ["/portfolio/risk", "/etfs"].includes(currentPath)) return true;
     return href === "/portfolio/manage" && (
       currentPath.startsWith("/admin/") ||
-      currentPath === "/market" || currentPath === "/etfs" ||
+      currentPath === "/market" ||
       (currentPath.startsWith("/portfolio/") && !["/portfolio/structure", "/portfolio/risk"].includes(currentPath))
     );
   }

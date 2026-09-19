@@ -2,13 +2,13 @@
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatDate, formatPercent, formatSignedKrw, toneClass } from "@/components/home/portfolio-format";
 import type { DashboardFxTrendPoint } from "@/lib/fx-trend";
 import styles from "./fx-impact-popover.module.css";
 
-const CHART_WIDTH = 420;
-const CHART_HEIGHT = 132;
+const CHART_WIDTH = 960;
+const CHART_HEIGHT = 280;
 const CHART_PADDING = 10;
 
 export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactPct, points }: {
@@ -22,6 +22,10 @@ export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactP
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (open) panelRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }, [open]);
   const chart = useMemo(() => buildChart(points), [points]);
   const latest = points.at(-1) ?? null;
   return <div className={styles.root}>
@@ -39,7 +43,7 @@ export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactP
           </span>
           </>}
     </button>
-    {open ? <section id={panelId} aria-label={t("원 달러 환율 추세", "USD/KRW exchange rate trend")} className={styles.panel}>
+    {open ? <section ref={panelRef} id={panelId} aria-label={t("원 달러 환율 추세", "USD/KRW exchange rate trend")} className={styles.panel}>
           <div className="flex items-start justify-between gap-5">
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">USD / KRW</p>
@@ -71,7 +75,7 @@ export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactP
               <div className="mt-4">
                 <svg
                   aria-label={t("원 달러 환율과 60일선, 120일선 추세", "USD/KRW with 60-day and 120-day moving averages")}
-                  className="h-[150px] w-full overflow-visible"
+                  className={styles.chart} preserveAspectRatio="none"
                   role="img"
                   viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
                 >

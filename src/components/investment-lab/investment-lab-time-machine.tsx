@@ -75,7 +75,7 @@ export function InvestmentLabTimeMachine({
             <div className="flex flex-wrap items-center justify-end gap-2">
               <label className="sr-only" htmlFor="investment-lab-scenario-select"><LabText value=" 비교 시나리오 " /></label>
               <select
-                className="min-h-10 max-w-[230px] rounded-full border border-[var(--line)] bg-transparent px-4 text-xs"
+                className="cairn-select"
                 id="investment-lab-scenario-select"
                 onChange={(event) => {
                   setRequested(event.target.value as InvestmentLabScenarioMatrixId);

@@ -7,3 +7,8 @@
 .panel > :first-child > button { width:44px; height:44px; flex:none; }
 @keyframes reveal { from { opacity:.3; } to { opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .panel { animation:none; } }
+
+.chart { display:block; width:100%; height:clamp(220px,32vh,340px); overflow:visible; }
+.panel dl dd { font-size:18px; }
+.panel dl > :first-child dd { font-size:24px; }
+@media (max-width:760px) { .chart { height:180px; } .panel dl dd { font-size:14px; } .panel dl > :first-child dd { font-size:17px; } }

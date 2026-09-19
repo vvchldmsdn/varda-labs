@@ -187,7 +187,7 @@ function DotContributionBar({ value, maximum, active }: { value: number; maximum
             <circle cx="4" cy="4" r="1.7" fill="var(--line)" />
           </pattern>
           <pattern id={`${patternId}-value`} width="8" height="8" patternUnits="userSpaceOnUse">
-            <circle cx="4" cy="4" r={active ? 2.55 : 2.05} fill={positive ? active ? "var(--accent)" : "var(--ink)" : "var(--negative)"} className={styles.matrixDot} />
+            <circle cx="4" cy="4" r={active ? 2.55 : 2.05} fill={positive ? "var(--accent)" : "var(--negative)"} className={styles.matrixDot} />
           </pattern>
         </defs>
         <rect x="10" y="0" width="480" height="32" fill={`url(#${patternId}-track)`} opacity=".55" />

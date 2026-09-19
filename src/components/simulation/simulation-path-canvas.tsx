@@ -37,8 +37,8 @@ export const SimulationPathCanvas = memo(function SimulationPathCanvas({
       const negative = tokens.getPropertyValue("--negative").trim() || "#648bb0";
       const neutral = tokens.getPropertyValue("--muted").trim() || "#777777";
       const count = simulationFanPathCount(source);
-      context.globalAlpha = count > 100 ? 0.1 : 0.38;
-      context.lineWidth = count > 100 ? 0.7 : 0.9;
+      context.globalAlpha = count > 100 ? 0.14 : 0.38;
+      context.lineWidth = count > 100 ? 0.8 : 0.9;
       context.lineJoin = "round";
       for (let path = 0; path < count; path += 1) {
         const terminal = nearestSimulationFanPathPoint(source, path, Number.MAX_SAFE_INTEGER)?.indexValue ?? 100;

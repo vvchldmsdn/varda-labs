@@ -74,7 +74,7 @@ describe("holding connection graph", () => {
     assert.ok(Math.abs(graph.edges[0].correlation - 1) < 1e-12);
   });
 
-  it("renders honest Korean and English empty states while retaining access to shared-market analysis", async () => {
+  it("renders honest Korean and English empty states with the structure entry point", async () => {
     let locale = "ko";
     const [ui] = await importUiWithPorts(["src/components/home/holding-movement-heatmap.tsx"], {
       react: { useId, useMemo: fn => fn(), useEffect: () => {}, useRef: current => ({ current }), useState: initial => [initial === "movement" ? "connections" : initial, () => {}] },
@@ -85,16 +85,16 @@ describe("holding connection graph", () => {
     const history = rows => ({ dates: dates(6), rows, observedCellCount: 0, expectedCellCount: 12, coveragePct: 0 });
     const insufficient = history([historyRow("a", "Alpha", 60, []), historyRow("b", "Beta", 40, [])]);
     const weak = history([historyRow("a", "Alpha", 60, [-3, -2, -1, 1, 2, 3]), historyRow("b", "Beta", 40, [1, -1, 0, 0, -1, 1])]);
-    const render = value => renderToStaticMarkup(createElement(ui.HoldingMovementHeatmap, { history: value, riskHref: "/portfolio/risk?scope=all", structureHref: "/portfolio/structure" }));
+    const render = value => renderToStaticMarkup(createElement(ui.HoldingMovementHeatmap, { history: value, riskHref: "/portfolio/risk?scope=all", structureHref: "/portfolio/structure?scope=all" }));
     for (const selected of ["ko", "en"]) {
       locale = selected;
       const pending = render(insufficient), unrelated = render(weak);
       assert.match(pending, /data-connection-empty="insufficient_personal_history"/);
-      assert.ok(pending.includes(locale === "ko" ? "개인 일별 기록을 쌓고 있어요." : "Your daily portfolio records are building up."));
-      assert.ok(pending.includes(locale === "ko" ? "공유 시장 이력" : "shared market history"));
-      assert.match(pending, /href="\/portfolio\/risk\?scope=all"/);
+      assert.ok(pending.includes(locale === "ko" ? "같은 날짜의 종목별 등락 기록이 6개 이상 필요해요." : "At least 6 matching daily records are needed."));
+      assert.ok(pending.includes(locale === "ko" ? "포트 구조 살펴보기" : "Explore portfolio structure"));
+      assert.match(pending, /href="\/portfolio\/structure\?scope=all"/);
       assert.match(unrelated, /data-connection-empty="no_strong_connection"/);
-      assert.ok(unrelated.includes(locale === "ko" ? "공통 기록은 충분하지만" : "There are enough matching records"));
+      assert.ok(unrelated.includes(locale === "ko" ? "표시 기준에 맞는 관계가 없어요" : "No relationships meet the display threshold"));
     }
     assert.equal(translateHomeHistory("변동 비교 근거"), "Change comparison coverage");
   });

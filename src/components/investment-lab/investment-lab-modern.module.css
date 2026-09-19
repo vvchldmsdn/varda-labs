@@ -185,3 +185,9 @@
   .scenarioList { grid-template-columns:1fr; }
   .scenario { min-height:70px; }
 }
+
+@media (min-width:761px) {
+  .chartReadout dl { gap:20px; }
+  .chartReadout dl > div { display:grid; justify-content:start; gap:6px; }
+  .chartReadout dd { font-size:21px; }
+}
