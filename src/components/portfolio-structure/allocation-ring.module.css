@@ -15,3 +15,6 @@
 @keyframes value-enter { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 600px) { .centerValue strong { font-size: 40px; } .centerValue p { font-size: 11px; margin-top: 10px; } .centerLabel { font-size: 10px; } .hint { font-size: 9px; } }
 @media (prefers-reduced-motion: reduce) { .segmentEntry, .centerValue { animation: none; } .segment { transition: none; } .segment[data-active="true"] { transform: none; filter: none; } }
+
+.segment[aria-pressed="true"] { stroke:var(--ink); stroke-width:1.8; stroke-linejoin:round; }
+.segment[data-active="true"] { filter:none; }

@@ -15,7 +15,7 @@ button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
 .varda-sidebar-group > p { display: none; }
 .varda-sidebar-link { position: relative; display: flex; align-items: center; flex-direction: column; gap: 7px; padding: 12px 2px; margin: 3px 0; min-height: 62px; font-size: 10px; color: var(--muted); transition: color 180ms, transform 180ms var(--motion-ease); }
 .varda-sidebar-link::before { content: ""; position: absolute; left: 1px; top: 23px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); transform: scale(0); transition: transform 240ms var(--motion-ease); }
-.varda-sidebar-link:hover { color: var(--ink); transform: translateY(-2px); }
+.varda-sidebar-link:hover { color: var(--ink); }
 .varda-sidebar-link[aria-current="page"] { color: var(--ink); font-weight: 700; }
 .varda-sidebar-link[aria-current="page"]::before { transform: scale(1); }
 .varda-sidebar-link[aria-current="page"] svg { stroke-width: 2; }

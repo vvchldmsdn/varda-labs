@@ -21,6 +21,7 @@ import {
 } from "./simulation-presentation";
 import styles from "./simulation-workspace.module.css";
 import chartStyles from "./simulation-path-chart.module.css";
+import { ExpandableChart } from "@/components/presentation/expandable-chart";
 import { SimulationPathCanvas } from "./simulation-path-canvas";
 
 export function SimulationFanExplorer({
@@ -151,6 +152,7 @@ export function SimulationFanExplorer({
   }
 
   return (
+    <ExpandableChart enabled={large && !compact} title={pt("시뮬레이션 경로", "Simulation paths")}>
     <figure
       className={large ? styles.stageFan : "min-w-0"}
       data-research-fan-chart={execution.id}
@@ -284,10 +286,10 @@ export function SimulationFanExplorer({
               d={geometry.median}
               fill="none"
               stroke="var(--ink)"
-              strokeWidth="2.8"
+              strokeWidth="1.4"
             />
             {selectedLine ? <path d={selectedLine} fill="none" stroke="var(--paper)" strokeWidth="4" pointerEvents="none" /> : null}
-            {selectedLine ? <path d={selectedLine} fill="none" stroke="var(--ink)" strokeWidth="1.8" pointerEvents="none" data-selected-simulation-path={focusedIdentity} /> : null}
+            {selectedLine ? <path d={selectedLine} fill="none" stroke="var(--ink)" strokeWidth="2.2" pointerEvents="none" data-selected-simulation-path={focusedIdentity} /> : null}
             </g>
             {axisSteps.map((ratio) => (
               <text
@@ -371,5 +373,6 @@ export function SimulationFanExplorer({
         </figcaption>
       )}
     </figure>
+    </ExpandableChart>
   );
 }

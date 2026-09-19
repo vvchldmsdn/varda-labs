@@ -1,0 +1,15 @@
+.frame { display:flex; flex-direction:column; min-width:0; min-height:0; height:100%; }
+.toolbar { display:flex; flex:none; justify-content:flex-end; align-items:center; gap:16px; padding-bottom:6px; }
+.toolbar h2 { margin-right:auto; font-size:18px; font-weight:500; }
+.toolbar [hidden] { display:none; }
+.frame > figure { flex:1; min-height:0; }
+.frame[data-expanded] { position:fixed; inset:24px; z-index:120; height:auto; padding:24px 32px; border:1px solid var(--line); border-radius:18px; background:var(--paper); box-shadow:0 16px 80px #20211f26; }
+.frame[data-expanded] > :not(.backdrop) { position:relative; }
+.frame[data-expanded] > figure { height:100%; overflow:auto; }
+.backdrop { position:fixed; inset:0; z-index:-1; background:#20211f55; cursor:default; }
+.frame[data-expanded]::before { content:""; position:absolute; inset:0; border-radius:inherit; background:var(--paper); pointer-events:none; }
+@media (max-width:760px) {
+  .frame { height:auto; }
+  .frame[data-expanded] { inset:12px; padding:18px; overflow:auto; }
+  .frame[data-expanded] > figure { flex:none; }
+}

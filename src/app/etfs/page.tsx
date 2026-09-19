@@ -25,6 +25,8 @@ export async function generateMetadata() {
 type EtfsPageProps = {
   searchParams: Promise<{
     q?: string | string[];
+    scope?: string | string[];
+    account?: string | string[];
     ticker?: string | string[];
     etfMasterId?: string | string[];
     id?: string | string[];
@@ -52,6 +54,11 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
     );
   }
 
+  const scope = firstParam(params.scope);
+  const account = firstParam(params.account);
+  const context = new URLSearchParams();
+  if (scope) context.set("scope", scope);
+  if (account) context.set("account", account);
   const query = firstParam(params.q);
   const ticker = firstParam(params.ticker);
   const explicitMasterId = firstParam(params.etfMasterId) ?? firstParam(params.id);
@@ -92,13 +99,15 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
                 </h1>
               </div>
               <Link
-                href="/"
+                href={`/portfolio/structure${context.size ? `?${context}` : ""}`}
                 className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--muted)] hover:bg-[var(--wash)]"
               >
-                Dashboard
+                Portfolio Structure
               </Link>
             </div>
             <form action="/etfs" className="mt-4 space-y-2">
+              {scope ? <input type="hidden" name="scope" value={scope} /> : null}
+              {account ? <input type="hidden" name="account" value={account} /> : null}
               <label className="block text-xs font-semibold text-[var(--muted)]" htmlFor="q">
                 Search ticker or name
               </label>
@@ -125,6 +134,7 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
             masters={masters}
             selectedMasterId={holdings?.etfMaster?.id ?? selectedMasterId}
             query={query}
+            context={context.toString()}
           />
         </aside>
 
@@ -141,10 +151,12 @@ function EtfMasterList({
   masters,
   selectedMasterId,
   query,
+  context,
 }: {
   masters: ReadOnlyEtfMasterSearchResult[];
   selectedMasterId: string | null;
   query: string | null;
+  context: string;
 }) {
   return (
     <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
@@ -157,7 +169,7 @@ function EtfMasterList({
           masters.map((master) => (
             <Link
               key={master.id}
-              href={etfMasterHref(master.id, query)}
+              href={etfMasterHref(master.id, query, context)}
               className={cn(
                 "block rounded-md border px-3 py-2 text-sm transition",
                 selectedMasterId === master.id
@@ -472,8 +484,9 @@ function findMasterIdByTicker(
   );
 }
 
-function etfMasterHref(masterId: string, query: string | null) {
-  const params = new URLSearchParams({ etfMasterId: masterId });
+function etfMasterHref(masterId: string, query: string | null, context: string) {
+  const params = new URLSearchParams(context);
+  params.set("etfMasterId", masterId);
   if (query) params.set("q", query);
   return `/etfs?${params.toString()}`;
 }

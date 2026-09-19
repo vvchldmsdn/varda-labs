@@ -36,9 +36,7 @@ type HeatmapMode = "movement" | "allocation" | "connections";
 
 export function HoldingMovementHeatmap({
   history,
-  riskHref,
   structureHref,
-  etfHref = "/etfs",
   stage = false,
 }: {
   history: PortfolioDashboardHoldingHistory;
@@ -69,7 +67,7 @@ export function HoldingMovementHeatmap({
         <div className={styles.chartRanges} aria-label={t("종목 흐름 보기 방식", "Holding history view")}>
           <ModeButton active={mode === "movement"} onClick={() => setMode("movement")}><T ko="일별 변동" en="Daily changes"/></ModeButton>
           <ModeButton active={mode === "allocation"} onClick={() => setMode("allocation")}><T ko="구성" en="Allocation"/></ModeButton>
-          <ModeButton active={mode === "connections"} onClick={() => setMode("connections")}><T ko="연결" en="Connections"/></ModeButton>
+          <ModeButton active={mode === "connections"} onClick={() => setMode("connections")}><T ko="동반 움직임" en="Co-movement"/></ModeButton>
         </div>
       </div>
 
@@ -110,7 +108,7 @@ export function HoldingMovementHeatmap({
       ) : null}
 
       {mode === "connections" ? (
-        <ConnectionMap history={history} riskHref={riskHref} etfHref={etfHref} />
+        <ConnectionMap history={history} structureHref={structureHref} />
       ) : null}
       </div>
 
@@ -160,151 +158,15 @@ export function HoldingMovementHeatmap({
   );
 }
 
-function ConnectionMap({
-  history,
-  riskHref,
-  etfHref,
-}: {
-  history: PortfolioDashboardHoldingHistory;
-  riskHref: string;
-  etfHref: string | null;
-}) {
-  const { t } = useI18n();
+function ConnectionMap({ history, structureHref }: { history: PortfolioDashboardHoldingHistory; structureHref: string }) {
   const graph = useMemo(() => buildHoldingConnectionGraph(history), [history]);
-
-  if (graph.nodes.length < 2 || graph.edges.length === 0) {
-    const reason = graph.emptyReason ?? "insufficient_personal_history";
-    return (
-      <div className="grid min-h-[310px] place-items-center border-y border-[var(--wash)] px-6 text-center" data-connection-empty={reason}>
-        <div className="max-w-sm">
-          {reason === "insufficient_personal_history" ? <>
-            <p className="text-sm font-semibold text-[var(--ink)]"><T ko="개인 일별 기록을 쌓고 있어요." en="Your daily portfolio records are building up."/></p>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="두 종목의 같은 날짜 기록이 6개 이상 필요합니다. 공유 시장 이력을 이용한 분석은 상관·위험 상세에서 확인하세요." en="Connections need at least 6 matching daily records for two holdings. Explore shared market history in Correlation and risk details."/></p>
-          </> : reason === "insufficient_variation" ? <>
-            <p className="text-sm font-semibold text-[var(--ink)]"><T ko="일별 등락이 일정해 연결을 계산하기 어렵습니다." en="Daily changes are too uniform to calculate a connection."/></p>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="공통 기록은 있지만 등락의 변화가 없어 상관계수를 계산할 수 없습니다." en="Matching records are available, but correlation is undefined when daily changes do not vary."/></p>
-          </> : <>
-            <p className="text-sm font-semibold text-[var(--ink)]"><T ko="이 기간에는 뚜렷한 연결이 없습니다." en="No distinct connection in this period."/></p>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]"><T ko="공통 기록은 충분하지만 연결선 표시 기준에 미치지 않았습니다. 자세한 상관관계는 상세 화면에서 확인하세요." en="There are enough matching records, but correlations are below the line display threshold. Explore the details for more."/></p>
-          </>}
-          <ConnectionLinks riskHref={riskHref} etfHref={etfHref} />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="border-y border-[var(--wash)] py-4">
-      <MobileHoldingConnections graph={graph} />
-      <div className={styles.connectionDesktop}>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-[10px] text-[var(--muted)]">
-        <p><T ko="최근 저장 일별 등락 · 상위" en="Recorded daily changes · Top"/> {graph.nodes.length}<T ko="종목" en="Holding"/></p>
-        <div className="flex items-center gap-4" aria-label={t("연결선 범례", "Connection legend")}>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-px w-5 bg-[var(--brand-mid)]" /><T ko="함께 움직임" en="Moving together"/></span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-px w-5 bg-[var(--warning)]" /><T ko="반대 움직임" en="Moving apart"/></span>
-        </div>
-      </div>
-      <div className="mt-2 overflow-x-auto">
-        <svg
-          aria-label={t("종목별 최근 등락 상관 연결도", "Connections between recent holding returns")}
-          className="h-[300px] min-w-[720px] w-full"
-          role="img"
-          viewBox="0 0 900 300"
-        >
-          <ellipse
-            cx="450"
-            cy="145"
-            fill="none"
-            rx="332"
-            ry="104"
-            stroke="var(--wash)"
-            strokeDasharray="2 7"
-          />
-          {graph.edges.map((edge) => {
-            const left = graph.nodes[edge.leftIndex];
-            const right = graph.nodes[edge.rightIndex];
-            if (!left || !right) return null;
-            const strength = Math.abs(edge.correlation);
-            return (
-              <line
-                key={edge.key}
-                x1={left.x}
-                x2={right.x}
-                y1={left.y}
-                y2={right.y}
-                stroke={edge.correlation >= 0 ? "var(--brand-mid)" : "var(--warning)"}
-                strokeDasharray={edge.correlation < 0 ? "4 4" : undefined}
-                strokeLinecap="round"
-                strokeOpacity={0.24 + strength * 0.42}
-                strokeWidth={0.8 + strength * 3.2}
-              >
-                <title>{t(`${left.name} · ${right.name}: 상관 ${edge.correlation.toFixed(2)} (${edge.observations}일)`, `${left.name} · ${right.name}: Correlation ${edge.correlation.toFixed(2)} (${edge.observations} days)`)}</title>
-              </line>
-            );
-          })}
-          {graph.nodes.map((node) => (
-            <g key={node.holdingId}>
-              <circle
-                cx={node.x}
-                cy={node.y}
-                fill="var(--paper)"
-                r={node.radius + 4}
-                stroke="var(--wash)"
-              />
-              <circle
-                cx={node.x}
-                cy={node.y}
-                fill="var(--brand)"
-                fillOpacity="0.88"
-                r={node.radius}
-              >
-                <title>{t(`${node.name} · 현재 비중 ${formatPercent(node.currentWeight)}`, `${node.name} · Current weight ${formatPercent(node.currentWeight)}`)}</title>
-              </circle>
-              <text
-                x={node.x}
-                y={node.y + node.radius + 18}
-                fill="var(--ink)"
-                fontSize="11"
-                fontWeight="600"
-                textAnchor="middle"
-              >
-                {compactName(node.name)}
-              </text>
-              <text
-                x={node.x}
-                y={node.y + node.radius + 32}
-                fill="var(--faint)"
-                fontSize="9"
-                textAnchor="middle"
-              >
-                {formatPercent(node.currentWeight)}
-              </text>
-            </g>
-          ))}
-        </svg>
-      </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-4 px-1 pt-1">
-        <p className={`${styles.connectionDesktop} max-w-xl text-[10px] leading-4 text-[var(--faint)]`}><T ko="선은 같은 날짜에 관측된 일별 등락의 방향만 요약합니다. ETF 내부 종목 겹침이나 투자 권고를 뜻하지 않습니다." en="Lines summarize daily changes observed on matching dates. They do not represent ETF overlap or investment recommendations."/></p>
-        <ConnectionLinks riskHref={riskHref} etfHref={etfHref} />
-      </div>
-    </div>
-  );
-}
-
-function ConnectionLinks({ riskHref, etfHref }: { riskHref: string; etfHref: string | null }) {
-  return (
-    <div className="mt-5 flex justify-center gap-5 text-xs font-medium">
-      <Link className="border-b border-[var(--faint)] pb-1 hover:text-[var(--brand)]" href={riskHref}><T ko="상관·위험 상세" en="Correlation and risk details"/></Link>
-      {etfHref ? <Link className="border-b border-[var(--faint)] pb-1 hover:text-[var(--brand)]" href={etfHref}><T ko="ETF 겹침 상세" en="ETF overlap details"/></Link> : null}
-    </div>
-  );
-}
-
-function compactName(value: string) {
-  return value.length > 18 ? `${value.slice(0, 16)}…` : value;
+  const reason = graph.emptyReason ?? "insufficient_personal_history";
+  return <div className="border-y border-[var(--wash)] py-4">
+    {graph.edges.length ? <MobileHoldingConnections graph={graph} /> : <div className="py-12 text-sm text-[var(--muted)]" data-connection-empty={reason}>
+      {reason === "insufficient_personal_history" ? <T ko="같은 날짜의 종목별 등락 기록이 6개 이상 필요해요." en="At least 6 matching daily records are needed." /> : reason === "insufficient_variation" ? <T ko="등락의 변화가 없어 상관관계를 계산할 수 없어요." en="Correlation is unavailable when daily changes do not vary." /> : <T ko="이 기간에는 표시 기준에 맞는 관계가 없어요." en="No relationships meet the display threshold in this period." />}
+    </div>}
+    <Link href={structureHref} className="mt-4 inline-block text-xs underline underline-offset-4"><T ko="포트 구조 살펴보기" en="Explore portfolio structure"/></Link>
+  </div>;
 }
 
 function MovementMatrix({

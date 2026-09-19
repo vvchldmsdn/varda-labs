@@ -360,3 +360,11 @@
   .stageContribution .activeContribution dl, .stageContribution .activeContribution .eyebrow { display: none; }
   .stageContribution .activeContribution .textLink { margin: 0; min-height: 36px; font-size: 12px; }
 }
+
+@media (min-width:761px) {
+  .stageVisual, .heatmapPanel { padding:14px 0 0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+  .stageMatrix .heatmapRowLabel { background:var(--paper); }
+  .evidence > :last-child { grid-column:1 / -1; width:100%; display:block; }
+  .evidence { grid-template-columns:minmax(180px,.7fr) minmax(0,1.5fr); gap:24px; }
+  .evidence .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 28px; }
+}
