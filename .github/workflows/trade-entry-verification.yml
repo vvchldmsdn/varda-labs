@@ -4,95 +4,82 @@ on:
     branches: [codex/trade-entry-hotfix-20260924]
 permissions:
   contents: read
-concurrency:
-  group: production-trade-entry-smoke
-  cancel-in-progress: true
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
-    env:
-      EXPECTED_SHA: cacf3b33739a5bf5c5a8a8149bd400ddb09ef327
+    timeout-minutes: 5
     steps:
-      - name: Wait for the exact production commit and inspect public GET responses
+      - name: Check exact deployment, visible buttons and anonymous authentication boundary
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           python3 - <<'PY'
-          import os, json, time
-          import urllib.request, urllib.error, urllib.parse
+          import os, json, urllib.request, urllib.error, urllib.parse
           from html.parser import HTMLParser
           from pathlib import Path
-          sha = os.environ['EXPECTED_SHA']
-          assert sha == 'cacf3b33739a5bf5c5a8a8149bd400ddb09ef327'
-          api = 'https://api.github.com/repos/vvchldmsdn/varda-labs/commits/' + sha + '/status'
-          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'User-Agent': 'Cairn-readonly-deployment-check', 'Accept': 'application/vnd.github+json'}
-          deployment = None
-          for i in range(55):
-              with urllib.request.urlopen(urllib.request.Request(api, headers=headers), timeout=25) as response:
-                  payload = json.load(response)
-              statuses = [s for s in payload.get('statuses', []) if s.get('context', '').lower() == 'vercel']
-              if statuses:
-                  current = statuses[0]
-                  if current['state'] == 'success':
-                      deployment = {'sha': sha, 'state': current['state'], 'target': current.get('target_url'), 'updatedAt': current.get('updated_at')}
-                      break
-                  if current['state'] in ['failure', 'error']:
-                      raise RuntimeError('Vercel reported failure for the intended commit')
-              print('Waiting for intended Vercel deployment', i + 1, flush=True)
-              time.sleep(10)
-          assert deployment, 'Deployment did not become successful within this check'
-          print(json.dumps({'deployment': deployment}), flush=True)
-          base = 'https://varda-labs.vercel.app'
+          sha='cacf3b33739a5bf5c5a8a8149bd400ddb09ef327'
+          api='https://api.github.com/repos/vvchldmsdn/varda-labs/commits/'+sha+'/status'
+          request=urllib.request.Request(api,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'Cairn-readonly-deployment-check','Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(request,timeout=25) as response: payload=json.load(response)
+          statuses=[s for s in payload.get('statuses',[]) if s.get('context','').lower()=='vercel']
+          assert statuses and statuses[0]['state']=='success','Exact production deployment is not ready'
+          deployment={'sha':sha,'state':'success','target':statuses[0].get('target_url'),'updatedAt':statuses[0].get('updated_at')}
+          base='https://varda-labs.vercel.app'
           class NoRedirect(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self, req, fp, code, msg, hdrs, newurl):
-                  return None
-          opener = urllib.request.build_opener(NoRedirect())
+              def redirect_request(self,req,fp,code,msg,hdrs,newurl): return None
+          opener=urllib.request.build_opener(NoRedirect())
           def get(path):
               assert path.startswith('/') and not path.startswith('//')
-              request = urllib.request.Request(base + path, headers={'User-Agent':'Cairn-readonly-deployment-check','Cache-Control':'no-cache'}, method='GET')
-              try:
-                  response = opener.open(request, timeout=45)
-              except urllib.error.HTTPError as error:
-                  response = error
-              with response:
-                  return response.status, dict(response.headers), response.read(2500000).decode('utf-8', errors='replace')
-          class Links(HTMLParser):
-              def __init__(self):
-                  super().__init__(); self.hrefs=[]
-              def handle_starttag(self, tag, attrs):
-                  if tag == 'a':
-                      self.hrefs.append(dict(attrs).get('href',''))
+              request=urllib.request.Request(base+path,headers={'User-Agent':'Cairn-readonly-deployment-check','Cache-Control':'no-cache'},method='GET')
+              try: response=opener.open(request,timeout=45)
+              except urllib.error.HTTPError as error: response=error
+              with response: return response.status,{k.lower():v for k,v in response.headers.items()},response.read(2500000).decode('utf-8',errors='replace')
+          class Page(HTMLParser):
+              def __init__(self): super().__init__(); self.hrefs=[]; self.redirects=[]; self.formCount=0
+              def handle_starttag(self,tag,attrs):
+                  a=dict(attrs)
+                  if tag=='a': self.hrefs.append(a.get('href',''))
+                  if tag=='form': self.formCount+=1
+                  if tag=='meta' and a.get('http-equiv','').lower()=='refresh':
+                      content=a.get('content','')
+                      if 'url=' in content.lower(): self.redirects.append(content[content.lower().index('url=')+4:].strip())
           checks=[]
-          status, h, body = get('/portfolio/manage')
-          links=Links(); links.feed(body)
-          assert status == 200, ('management status',status)
-          for action in ['buy','sell']:
-              assert '/portfolio/ledger?action='+action in links.hrefs, 'Missing deployed '+action+' record entry'
-          checks.append({'path':'/portfolio/manage','status':status,'buyLink':True,'sellLink':True})
-          for action in ['buy','sell']:
-              status,h,body=get('/portfolio/ledger?action='+action)
-              location=h.get('Location',h.get('location',''))
-              assert status in [302,303,307,308], ('anonymous ledger redirect',status)
-              target=urllib.parse.urlparse(urllib.parse.urljoin(base,location))
-              assert target.netloc == 'varda-labs.vercel.app' and target.path == '/auth/sign-in'
-              assert urllib.parse.parse_qs(target.query).get('returnTo') == ['/portfolio/ledger?action='+action]
-              checks.append({'path':'/portfolio/ledger?action='+action,'status':status,'authRedirect':True,'intentPreserved':True})
-          status,h,body=get('/api/portfolio/ledger')
-          assert status in [401,403], ('anonymous API must remain closed',status)
-          cache=h.get('Cache-Control',h.get('cache-control',''))
-          assert 'no-store' in cache.lower()
-          checks.append({'path':'/api/portfolio/ledger','status':status,'anonymousClosed':True,'noStore':True})
-          status,h,body=get('/start')
-          assert status == 200
-          checks.append({'path':'/start','status':status})
-          status,h,body=get('/google0533341d86bd3f64.html')
-          assert status == 200 and body.strip() == 'google-site-verification: google0533341d86bd3f64.html'
-          checks.append({'path':'/google0533341d86bd3f64.html','status':status,'verificationPreserved':True})
           result={'deployment':deployment,'checks':checks,'scope':'Anonymous read-only HTTP; no login, no financial writes, no user data access.'}
-          Path('production-trade-smoke.json').write_text(json.dumps(result,indent=2))
-          print(json.dumps(result,indent=2),flush=True)
+          try:
+              status,h,body=get('/portfolio/manage'); page=Page();page.feed(body)
+              assert status==200,('management status',status)
+              assert all('/portfolio/ledger?action='+a in page.hrefs for a in ['buy','sell']),'Missing deployed record buttons'
+              checks.append({'path':'/portfolio/manage','status':status,'buyLink':True,'sellLink':True})
+              print(json.dumps(checks[-1]),flush=True)
+              for action in ['buy','sell']:
+                  status,h,body=get('/portfolio/ledger?action='+action);page=Page();page.feed(body)
+                  # Next.js streaming can return 200 with its actual meta redirect.
+                  # A 200 alone never establishes access control or successful routing.
+                  if status in [302,303,307,308]: location=h.get('location','');transport='http'
+                  else:
+                      assert status==200 and len(page.redirects)==1,('No unambiguous streamed auth redirect',status,page.redirects)
+                      location=page.redirects[0];transport='streamed-meta'
+                      assert page.formCount==0,'Anonymous response must not render a transaction form'
+                  target=urllib.parse.urlparse(urllib.parse.urljoin(base,location))
+                  assert target.netloc=='varda-labs.vercel.app' and target.path=='/auth/sign-in',('Wrong auth redirect target',target.path)
+                  assert urllib.parse.parse_qs(target.query).get('returnTo')==['/portfolio/ledger?action='+action],'Lost trade intent'
+                  checks.append({'path':'/portfolio/ledger?action='+action,'status':status,'authRedirect':True,'transport':transport,'intentPreserved':True})
+                  print(json.dumps(checks[-1]),flush=True)
+              status,h,body=get('/api/portfolio/ledger')
+              assert status in [401,403],('Anonymous API exposed',status)
+              assert 'no-store' in h.get('cache-control','').lower()
+              checks.append({'path':'/api/portfolio/ledger','status':status,'anonymousClosed':True,'noStore':True})
+              print(json.dumps(checks[-1]),flush=True)
+              status,h,body=get('/start');assert status==200
+              checks.append({'path':'/start','status':status})
+              status,h,body=get('/google0533341d86bd3f64.html')
+              assert status==200 and body.strip()=='google-site-verification: google0533341d86bd3f64.html','Google verification file changed'
+              checks.append({'path':'/google0533341d86bd3f64.html','status':status,'verificationPreserved':True})
+              result['passed']=True
+          finally:
+              Path('production-trade-smoke.json').write_text(json.dumps(result,indent=2))
+              print(json.dumps(result,indent=2),flush=True)
           PY
       - name: Retain non-sensitive smoke results
         if: always()
