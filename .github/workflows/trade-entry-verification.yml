@@ -1,63 +1,103 @@
-name: Isolated trade-entry verification
+name: Production trade-entry read-only smoke
 on:
   push:
     branches: [codex/trade-entry-hotfix-20260924]
-concurrency:
-  group: isolated-trade-entry
-  cancel-in-progress: true
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: production-trade-entry-smoke
+  cancel-in-progress: true
 jobs:
-  verify:
+  smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 12
     env:
-      NEXT_TELEMETRY_DISABLED: '1'
-      DATABASE_URL: postgresql://test:test@127.0.0.1:1/isolated
-      TENANT_DATABASE_URL: postgresql://test:test@127.0.0.1:1/isolated
-      DATABASE_URL_UNPOOLED: postgresql://test:test@127.0.0.1:1/isolated
+      EXPECTED_SHA: cacf3b33739a5bf5c5a8a8149bd400ddb09ef327
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - name: Read installed Next.js guidance before application changes
+      - name: Wait for the exact production commit and inspect public GET responses
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          for file in node_modules/next/dist/docs/01-app/01-getting-started/03-layouts-and-pages.md node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md node_modules/next/dist/docs/01-app/01-getting-started/11-css.md; do
-            test -f "$file"
-            sed -n '1,170p' "$file"
-          done
-      - name: Materialize the asserted UI patch
-        run: |
-          if test -f scripts/apply-trade-entry-hotfix.mjs; then node scripts/apply-trade-entry-hotfix.mjs; fi
-          if test -f scripts/refine-trade-entry-hotfix.mjs; then node scripts/refine-trade-entry-hotfix.mjs; fi
-          git diff --check
-      - name: Test, lint, build and exercise the real UI with isolated API doubles
-        run: node scripts/verify-trade-entry-hotfix.mjs
-      - name: Retain synthetic verification evidence
+          python3 - <<'PY'
+          import os, json, time
+          import urllib.request, urllib.error, urllib.parse
+          from html.parser import HTMLParser
+          from pathlib import Path
+          sha = os.environ['EXPECTED_SHA']
+          assert sha == 'cacf3b33739a5bf5c5a8a8149bd400ddb09ef327'
+          api = 'https://api.github.com/repos/vvchldmsdn/varda-labs/commits/' + sha + '/status'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'User-Agent': 'Cairn-readonly-deployment-check', 'Accept': 'application/vnd.github+json'}
+          deployment = None
+          for i in range(55):
+              with urllib.request.urlopen(urllib.request.Request(api, headers=headers), timeout=25) as response:
+                  payload = json.load(response)
+              statuses = [s for s in payload.get('statuses', []) if s.get('context', '').lower() == 'vercel']
+              if statuses:
+                  current = statuses[0]
+                  if current['state'] == 'success':
+                      deployment = {'sha': sha, 'state': current['state'], 'target': current.get('target_url'), 'updatedAt': current.get('updated_at')}
+                      break
+                  if current['state'] in ['failure', 'error']:
+                      raise RuntimeError('Vercel reported failure for the intended commit')
+              print('Waiting for intended Vercel deployment', i + 1, flush=True)
+              time.sleep(10)
+          assert deployment, 'Deployment did not become successful within this check'
+          print(json.dumps({'deployment': deployment}), flush=True)
+          base = 'https://varda-labs.vercel.app'
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect())
+          def get(path):
+              assert path.startswith('/') and not path.startswith('//')
+              request = urllib.request.Request(base + path, headers={'User-Agent':'Cairn-readonly-deployment-check','Cache-Control':'no-cache'}, method='GET')
+              try:
+                  response = opener.open(request, timeout=45)
+              except urllib.error.HTTPError as error:
+                  response = error
+              with response:
+                  return response.status, dict(response.headers), response.read(2500000).decode('utf-8', errors='replace')
+          class Links(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.hrefs=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag == 'a':
+                      self.hrefs.append(dict(attrs).get('href',''))
+          checks=[]
+          status, h, body = get('/portfolio/manage')
+          links=Links(); links.feed(body)
+          assert status == 200, ('management status',status)
+          for action in ['buy','sell']:
+              assert '/portfolio/ledger?action='+action in links.hrefs, 'Missing deployed '+action+' record entry'
+          checks.append({'path':'/portfolio/manage','status':status,'buyLink':True,'sellLink':True})
+          for action in ['buy','sell']:
+              status,h,body=get('/portfolio/ledger?action='+action)
+              location=h.get('Location',h.get('location',''))
+              assert status in [302,303,307,308], ('anonymous ledger redirect',status)
+              target=urllib.parse.urlparse(urllib.parse.urljoin(base,location))
+              assert target.netloc == 'varda-labs.vercel.app' and target.path == '/auth/sign-in'
+              assert urllib.parse.parse_qs(target.query).get('returnTo') == ['/portfolio/ledger?action='+action]
+              checks.append({'path':'/portfolio/ledger?action='+action,'status':status,'authRedirect':True,'intentPreserved':True})
+          status,h,body=get('/api/portfolio/ledger')
+          assert status in [401,403], ('anonymous API must remain closed',status)
+          cache=h.get('Cache-Control',h.get('cache-control',''))
+          assert 'no-store' in cache.lower()
+          checks.append({'path':'/api/portfolio/ledger','status':status,'anonymousClosed':True,'noStore':True})
+          status,h,body=get('/start')
+          assert status == 200
+          checks.append({'path':'/start','status':status})
+          status,h,body=get('/google0533341d86bd3f64.html')
+          assert status == 200 and body.strip() == 'google-site-verification: google0533341d86bd3f64.html'
+          checks.append({'path':'/google0533341d86bd3f64.html','status':status,'verificationPreserved':True})
+          result={'deployment':deployment,'checks':checks,'scope':'Anonymous read-only HTTP; no login, no financial writes, no user data access.'}
+          Path('production-trade-smoke.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2),flush=True)
+          PY
+      - name: Retain non-sensitive smoke results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: trade-entry-verification-${{ github.run_id }}
-          path: output/trade-entry/
+          name: production-trade-smoke-${{ github.run_id }}
+          path: production-trade-smoke.json
           retention-days: 7
-      - name: Publish only the verified application patch on this branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test "$GITHUB_REF" = refs/heads/codex/trade-entry-hotfix-20260924
-          test ! -d src/app/trade-entry-local-qa
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/lib/trade-record-intent.ts src/components/trade-record-links.tsx src/components/trade-record-links.module.css src/components/app-navigation.tsx src/app/portfolio/manage/page.tsx src/app/portfolio/ledger/page.tsx src/components/native-ledger-view.tsx src/components/native-ledger-view.module.css tests/trade-record-intent.test.mjs tests/run.mjs tests/identity-bootstrap-claim-migration-cli.test.mjs tests/identity-bootstrap-claim-handoff-rehearsal.test.mjs scripts/verify-trade-entry-hotfix.mjs
-          if test -f scripts/apply-trade-entry-hotfix.mjs; then git rm scripts/apply-trade-entry-hotfix.mjs; fi
-          if test -f scripts/refine-trade-entry-hotfix.mjs; then git rm scripts/refine-trade-entry-hotfix.mjs; fi
-          if git diff --cached --quiet; then echo 'Verified source already published'; exit 0; fi
-          git diff --cached --check
-          git commit -m 'fix: expose buy and sell records and preserve trade entry intent'
-          header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          git -c "http.https://github.com/.extraheader=$header" push origin HEAD:codex/trade-entry-hotfix-20260924
