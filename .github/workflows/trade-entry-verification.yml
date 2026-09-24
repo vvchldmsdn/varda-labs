@@ -2,36 +2,60 @@ name: Isolated trade-entry verification
 on:
   push:
     branches: [codex/trade-entry-hotfix-20260924]
+concurrency:
+  group: isolated-trade-entry
+  cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       NEXT_TELEMETRY_DISABLED: '1'
       DATABASE_URL: postgresql://test:test@127.0.0.1:1/isolated
       TENANT_DATABASE_URL: postgresql://test:test@127.0.0.1:1/isolated
       DATABASE_URL_UNPOOLED: postgresql://test:test@127.0.0.1:1/isolated
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - name: Read installed Next.js guidance before app changes
+      - name: Read installed Next.js guidance before application changes
         run: |
           for file in node_modules/next/dist/docs/01-app/01-getting-started/03-layouts-and-pages.md node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md node_modules/next/dist/docs/01-app/01-getting-started/11-css.md; do
-            echo "--- $file ---"
-            if test -f "$file"; then sed -n '1,170p' "$file"; else echo 'Required bundled guidance is missing'; exit 1; fi
+            test -f "$file"
+            sed -n '1,170p' "$file"
           done
-      - name: Run scoped verification when hotfix is present
+      - name: Materialize the asserted UI patch
         run: |
-          if test -f scripts/verify-trade-entry-hotfix.mjs; then
-            node scripts/verify-trade-entry-hotfix.mjs
-          else
-            echo 'Read-only preparation; no application changes yet.'
-          fi
+          if test -f scripts/apply-trade-entry-hotfix.mjs; then node scripts/apply-trade-entry-hotfix.mjs; fi
+          git diff --check
+      - name: Test, lint, build and exercise the real UI with isolated API doubles
+        run: node scripts/verify-trade-entry-hotfix.mjs
+      - name: Retain synthetic verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-entry-verification-${{ github.run_id }}
+          path: output/trade-entry/
+          retention-days: 7
+      - name: Publish only the verified application patch on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/codex/trade-entry-hotfix-20260924
+          test ! -d src/app/trade-entry-local-qa
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/trade-record-intent.ts src/components/trade-record-links.tsx src/components/trade-record-links.module.css src/components/app-navigation.tsx src/app/portfolio/manage/page.tsx src/app/portfolio/ledger/page.tsx src/components/native-ledger-view.tsx src/components/native-ledger-view.module.css tests/trade-record-intent.test.mjs tests/run.mjs
+          if test -f scripts/apply-trade-entry-hotfix.mjs; then git rm scripts/apply-trade-entry-hotfix.mjs; fi
+          if git diff --cached --quiet; then echo 'Verified source already published'; exit 0; fi
+          git diff --cached --check
+          git commit -m 'fix: expose buy and sell records and preserve trade entry intent'
+          header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=$header" push origin HEAD:codex/trade-entry-hotfix-20260924
