@@ -69,6 +69,11 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
           const row = positions.find(p => p.id === asset.id);
           if (!row) continue;
           if (price?.observedAt && price.instrumentKey === target.key && price.ticker === target.ticker && price.currency === "USD" && price.source === "twelve_data") row.observation = { quantity: asset.quantity, price: price.value, currency: "USD", at, priceObservedAt: price.observedAt, basis: "raw", source: `twelve_data:${price.instrumentKey}` };
+          // A bounded history window must not skip the split/quantity check.
+          // Cash and other independently evidenced positions remain available.
+          if (ledger.entriesComplete === false && (ledger.accountsComplete === false || ledger.accounts.some(account => account.id === asset.accountId && account.state))) {
+            row.observation = null; row.evidenceReason = "corporate_actions_pending"; continue;
+          }
           const entries = ledger.entries.filter(entry => entry.accountId === asset.accountId);
           const acquired = entries.filter(entry => entry.data.event.type === "opening" ? entry.data.state.positions?.some(position => position.assetId === asset.id) : entry.data.event.type === "buy" && entry.data.event.assetId === asset.id).map(entry => entry.data.event.at).sort()[0];
           // An explicit opening/first buy confirms that day's quantity. Later known

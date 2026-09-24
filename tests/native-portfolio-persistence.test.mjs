@@ -386,3 +386,91 @@ it('enforces real API authentication, session continuity, origin and body owners
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation}))).status,200);
   assert.equal((await f.queries.readNativeLedger({ownerUserId:owner},account)).entries.length,1);
 });
+
+it('keeps current cash, quantity, costs and new writes after the native event window is exceeded',async(t)=>{
+  setNow(t,later);
+  const f=await fixture();
+  await f.pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,currency,quantity,name) values($1,$2,$3,'one','USD',10,'Existing')",[asset,owner,account]);
+  const opening=await f.open(account,{KRW:'0',USD:'250'},[{assetId:asset,currency:'USD',quantity:'10',costLots:[{amount:'600',currency:'USD',at:'2026-08-01T00:00:00Z',source:'user_native_ledger',remaining:{n:'1',d:'1'}}]}]);
+  // Deterministic historical deposits: independent expected cash = 250 + 10,001.
+  // Seed only the isolated database; actual application writer is used below.
+  await f.pg.query(`insert into event_ledger_entries(id,canonical_owner_user_id,event_date,event_type,source,recorded_at,account,account_id,asset_name,before_value,after_value,native_sequence,native_operation_id,native_data)
+    select gen_random_uuid(),$1::uuid,'2026-09-01','deposit','native_ledger_v1',$3::timestamptz+n*interval '1 second','one',$2::uuid,'','','',n,operation,
+      jsonb_build_object('request',jsonb_build_object('operationId',operation),'event',jsonb_build_object('type','deposit','at',$3::timestamptz+n*interval '1 second','amount','1','currency','USD'),
+        'state',jsonb_set(jsonb_set(jsonb_set(a.native_state,'{sequence}',to_jsonb(n)),'{at}',to_jsonb(to_char(($3::timestamptz+n*interval '1 second') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'))),'{cash,USD}',to_jsonb((250+n)::text)),
+        'effect',jsonb_build_object('cashLegs',jsonb_build_array(jsonb_build_object('currency','USD','delta','1','kind','external'))))
+    from accounts a cross join generate_series(1,10001) n cross join lateral (select gen_random_uuid() as operation where n>0) op where a.id=$2::uuid`,[owner,account,at]);
+  await f.pg.query("update accounts set native_state=(select native_data->'state' from event_ledger_entries where account_id=$1 and native_sequence=10001) where id=$1",[account]);
+  let ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.equal(ledger.accountsComplete,true); assert.equal(ledger.entriesComplete,false); assert.equal(ledger.historyComplete,false);
+  assert.deepEqual(ledger.entries,[]); assert.deepEqual(ledger.snapshots,[]);
+  const query=f.batches.at(-1).commands[2];
+  const exported=(await f.pg.query(query.text,query.params)).rows;
+  assert.deepEqual(exported,[{complete:false,rows:[]}],'over-cap query returns metadata, not 10,001 full-state JSON objects');
+  let evidence=await f.evidence(later), report=f.valuation.buildTrackedCurrencyPortfolio(evidence);
+  assert.equal(report.current.total,'11251'); assert.equal(report.current.positions.find(p=>p.id===asset).cost,'600');
+  assert.equal(evidence.current.positions.find(p=>p.id===asset).observation.quantity,'10.000000');
+  assert.equal(evidence.ledgerComplete,true); assert.equal(evidence.cashFlows,undefined); assert.equal(evidence.trades,null);
+  assert.equal(evidence.realizedTradesComplete,false); assert.equal(evidence.realizedTrades,null);
+  assert.equal(report.performanceReturn,null); assert.equal(report.realizedPnl.total,null); assert.deepEqual(report.history,[]);
+  const beforeWrite=f.batches.length;
+  const input={operationId:randomUUID(),accountId:account,expectedSequence:10001,event:{type:'deposit',at:later,amount:'5',currency:'USD'}};
+  assert.deepEqual(await f.queries.writeNativeMutation({ownerUserId:owner},input),{status:'created'});
+  const preflight=f.batches[beforeWrite];
+  assert.deepEqual(preflight.commands[1].params[1],[account]);
+  assert.ok(preflight.commands[2].text.includes('native_operation_id=$2::uuid'));
+  assert.equal((await f.queries.writeNativeMutation({ownerUserId:owner},input)).status,'existing');
+  assert.equal((await f.queries.writeNativeMutation({ownerUserId:owner},opening)).status,'existing','old retry remains discoverable beyond the historical window');
+  assert.equal((await f.queries.writeNativeMutation({ownerUserId:owner},{...input,event:{...input.event,amount:'6'}})).status,'conflict');
+  assert.equal((await f.queries.writeNativeMutation({ownerUserId:other},input)).status,'conflict');
+  evidence=await f.evidence(later); report=f.valuation.buildTrackedCurrencyPortfolio(evidence);
+  assert.equal(report.current.total,'11256');
+  assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},evidence)).created,1,'missing history does not prevent a new complete capture');
+  ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.equal(ledger.accounts[0].state.cash.USD,'10256'); assert.equal(ledger.accounts[0].state.sequence,10002);
+});
+
+it('does not let the snapshot window or account-list cap prevent scoped current reads and writes',async(t)=>{
+  setNow(t,later);
+  const f=await fixture();
+  const old='2023-01-01T00:00:00Z';
+  const opening={operationId:randomUUID(),accountId:account,expectedSequence:null,opening:{at:old,cash:{KRW:'0',USD:'100'},positions:[]}};
+  assert.equal((await f.queries.writeNativeMutation({ownerUserId:owner},opening)).status,'created');
+  const base=(await f.evidence(old)).current;
+  await f.pg.query(`insert into daily_portfolio_snapshots(canonical_owner_user_id,snapshot_date,account,account_id,source,captured_at,native_evidence)
+    select $1::uuid,($3::timestamptz+n*interval '1 day')::date,'one',$2::uuid,'native_ledger_v1',$3::timestamptz+n*interval '1 day',
+      jsonb_build_object('version',1,'sequence',0,'fx','[]'::jsonb,'frame',jsonb_set($4::jsonb,'{at}',to_jsonb(($3::timestamptz+n*interval '1 day')::text)))
+    from generate_series(1,1001) n`,[owner,account,old,JSON.stringify(base)]);
+  let ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.equal(ledger.historyComplete,false); assert.equal(ledger.entriesComplete,true); assert.equal(ledger.entries.length,1);
+  const query=f.batches.at(-1).commands[3];
+  assert.deepEqual((await f.pg.query(query.text,query.params)).rows,[{complete:false,rows:[]}]);
+  let evidence=await f.evidence(later),report=f.valuation.buildTrackedCurrencyPortfolio(evidence);
+  assert.equal(report.current.total,'100'); assert.equal(report.performanceReturn,null); assert.deepEqual(report.history,[]);
+  assert.equal((await f.mutate({type:'deposit',amount:'25',currency:'USD'})).result.status,'created');
+  await f.pg.query("insert into accounts(id,canonical_owner_user_id,code,name) select gen_random_uuid(),$1::uuid,'bounded-'||n,'Bounded' from generate_series(1,205) n",[owner]);
+  const all=await f.queries.readNativeLedger({ownerUserId:owner});
+  assert.equal(all.accountsComplete,false); assert.equal(all.accounts.length,200);
+  const incomplete=f.projection.attachNativeLedgerEvidence({ownerId:owner,reporting:'USD',asOf:later,current:{at:later,source:'test',scopeComplete:false,positions:[]},history:[],trades:null,fx:[],maxFxAgeMs:0,maxPriceAgeMs:0},all,'all');
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(incomplete).current.total,null,'bounded accounts are not presented as the full portfolio');
+  assert.equal((await f.mutate({type:'deposit',amount:'10',currency:'USD'})).result.status,'created');
+  evidence=await f.evidence(later); report=f.valuation.buildTrackedCurrencyPortfolio(evidence);
+  assert.equal(report.current.total,'135'); assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},evidence)).created,1);
+  ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.equal(ledger.accountsComplete,true); assert.equal(ledger.accounts[0].state.cash.USD,'135');
+  const rejected=await f.mutate({type:'deposit',amount:'1',currency:'USD',at:'2026-09-01T23:00:00Z'});
+  assert.deepEqual(rejected.result,{status:'invalid',reason:'event_precedes_recorded_snapshot'});
+});
+
+it('rejects an oversized historical JSON payload before returning it without losing current state',async()=>{
+  const f=await fixture(); await f.open(account,{KRW:'0',USD:'250'});
+  // Exercise the expanded JSON byte limit independently of the row count. This
+  // synthetic historical padding is never part of a browser mutation contract.
+  await f.pg.query("update event_ledger_entries set native_data=native_data||jsonb_build_object('synthetic_padding',repeat('x',17*1024*1024)) where account_id=$1 and native_data is not null",[account]);
+  const ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.equal(ledger.entriesComplete,false); assert.equal(ledger.accounts[0].state.cash.USD,'250');
+  const query=f.batches.at(-1).commands[2];
+  assert.deepEqual((await f.pg.query(query.text,query.params)).rows,[{complete:false,rows:[]}]);
+  assert.equal((await f.mutate({type:'deposit',amount:'1',currency:'USD'})).result.status,'created');
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(await f.evidence(later)).current.total,'251');
+});

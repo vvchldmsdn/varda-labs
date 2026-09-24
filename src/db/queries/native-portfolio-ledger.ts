@@ -11,6 +11,30 @@ import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 export type NativeStoredAsset = { id: string; quantity: string; currency: string; archived: boolean; name: string; ticker: string | null; market: string; assetType: string | null };
 export type NativeStoredAccount = { id: string; name: string; active?: boolean; updatedAt?: string; state: NativePortfolioState | null; assets: NativeStoredAsset[] };
 export type NativeStoredEntry = { id: string; accountId: string; operationId: string; data: { request: unknown; event: NativeEvent | { type: "opening"; at: string }; state: NativePortfolioState; effect: { cashLegs: { currency: "KRW" | "USD"; delta: string; kind: string }[] } | null } };
+const NATIVE_ACCOUNTS_QUERY = `select a.id,a.name,a.is_active as active,a.updated_at::text as "updatedAt",a.native_state as state,
+  coalesce((select jsonb_agg(jsonb_build_object('id',h.id,'quantity',h.quantity::text,'currency',h.currency,'archived',h.archived_at is not null,'name',h.name,'ticker',h.ticker,'market',h.market,'assetType',h.asset_type) order by h.id)
+   from assets h where h.account_id=a.id and h.canonical_owner_user_id=$1::uuid),'[]'::jsonb) as assets
+  from accounts a where a.canonical_owner_user_id=$1::uuid and (a.is_active or a.native_state is not null)
+  and ($2::uuid[] is null or a.id=any($2::uuid[])) order by a.id limit 201`;
+/** Check bounded IDs/count and payload size inside PostgreSQL before exporting
+ * any history JSON. Each event contains a full state, not just a small delta. */
+function boundedHistoryQuery(table: "event_ledger_entries" | "daily_portfolio_snapshots", column: string, limit: number, projection: string, order: string) {
+  return `with candidate as materialized (
+    select e.id from ${table} e where e.canonical_owner_user_id=$1::uuid and e.${column} is not null
+      and ($2::uuid is null or e.account_id=$2::uuid) order by ${order} limit ${limit + 1}
+  ), counted as materialized (select count(*)<=${limit} as complete from candidate), sized as materialized (
+    select coalesce(sum(octet_length(e.${column}::text)),0)<=16777216 as complete
+      from ${table} e join candidate c on c.id=e.id where (select complete from counted)
+  ), coverage as (select counted.complete and sized.complete as complete from counted,sized)
+  select coverage.complete,case when coverage.complete then coalesce((
+    select jsonb_agg(row_to_json(selected)) from (
+      select ${projection} from ${table} e join candidate c on c.id=e.id order by ${order}
+    ) selected),'[]'::jsonb) else '[]'::jsonb end as rows from coverage`;
+}
+const NATIVE_ENTRIES_QUERY = boundedHistoryQuery("event_ledger_entries", "native_data", 10000,
+  'e.id,e.account_id as "accountId",e.native_operation_id as "operationId",e.native_data as data', "e.recorded_at,e.native_sequence,e.account_id,e.id");
+const NATIVE_SNAPSHOTS_QUERY = boundedHistoryQuery("daily_portfolio_snapshots", "native_evidence", 1000,
+  'e.account_id as "accountId",e.native_evidence as evidence', "e.captured_at desc,e.id");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const hasNativeLedger = cache(async (tenant: TenantContext, scope?: PortfolioAnalysisScope) => {
   const group = scope?.kind === "portfolio_group";
@@ -29,17 +53,34 @@ export async function readNativeLedger(tenant: TenantContext, accountId?: string
   const sql = getTenantSqlClient();
   const result = await sql.transaction(tx => [
     tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
-    tx.query(`select a.id,a.name,a.is_active as active,a.updated_at::text as "updatedAt",a.native_state as state,
-      coalesce((select jsonb_agg(jsonb_build_object('id',h.id,'quantity',h.quantity::text,'currency',h.currency,'archived',h.archived_at is not null,'name',h.name,'ticker',h.ticker,'market',h.market,'assetType',h.asset_type) order by h.id)
-       from assets h where h.account_id=a.id and h.canonical_owner_user_id=$1::uuid),'[]'::jsonb) as assets
-      from accounts a where a.canonical_owner_user_id=$1::uuid and (a.is_active or a.native_state is not null) and ($2::uuid is null or a.id=$2::uuid) order by a.id limit 201`, [tenant.ownerUserId, accountId ?? null]),
-    tx.query(`select id,account_id as "accountId",native_operation_id as "operationId",native_data as data from event_ledger_entries
-      where canonical_owner_user_id=$1::uuid and native_data is not null and ($2::uuid is null or account_id=$2::uuid) order by recorded_at,native_sequence,account_id,id limit 10001`, [tenant.ownerUserId, accountId ?? null]),
-    tx.query(`select account_id as "accountId",native_evidence as evidence from daily_portfolio_snapshots where canonical_owner_user_id=$1::uuid
-      and native_evidence is not null and ($2::uuid is null or account_id=$2::uuid) order by captured_at desc limit 1001`, [tenant.ownerUserId, accountId ?? null]),
+    tx.query(NATIVE_ACCOUNTS_QUERY, [tenant.ownerUserId, accountId ? [accountId] : null]),
+    tx.query(NATIVE_ENTRIES_QUERY, [tenant.ownerUserId, accountId ?? null]),
+    tx.query(NATIVE_SNAPSHOTS_QUERY, [tenant.ownerUserId, accountId ?? null]),
   ], { isolationLevel: "RepeatableRead", readOnly: true });
-  if (result[1].length > 200 || result[2].length > 10000 || result[3].length > 1000) throw new Error("native_history_window_exceeded");
-  return { accounts: result[1] as NativeStoredAccount[], entries: result[2] as NativeStoredEntry[], snapshots: result[3] as { accountId: string; evidence: unknown }[] };
+  const accountsComplete = result[1].length <= 200;
+  const entriesComplete = result[2][0]?.complete === true;
+  const historyComplete = accountsComplete && entriesComplete && result[3][0]?.complete === true;
+  // Current balances and original cost lots live in account state. A bounded
+  // historical read must not make that state, or future transactions, unusable.
+  // Do not present a truncated ledger as complete cash-flow/performance evidence.
+  return { accounts: result[1].slice(0, 200) as NativeStoredAccount[], accountsComplete, entriesComplete, historyComplete,
+    entries: (entriesComplete ? result[2][0].rows : []) as NativeStoredEntry[], snapshots: (historyComplete ? result[3][0].rows : []) as { accountId: string; evidence: unknown }[] };
+}
+
+/** Mutation preflight reads at most the affected two accounts, an exact retry,
+ * and each account's latest capture. The SQL writer rechecks under its owner lock. */
+async function readNativeMutationContext(tenant: TenantContext, input: NativeMutation) {
+  if (!UUID.test(tenant.ownerUserId)) throw new Error("native_invalid_scope");
+  const ids = input.event?.type === "transfer" ? [input.accountId, input.event.peerAccountId] : [input.accountId];
+  const result = await getTenantSqlClient().transaction(tx => [
+    tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
+    tx.query(NATIVE_ACCOUNTS_QUERY, [tenant.ownerUserId, ids]),
+    tx.query(`select native_data->'request' as request from event_ledger_entries
+      where canonical_owner_user_id=$1::uuid and native_operation_id=$2::uuid and native_data is not null limit 1`, [tenant.ownerUserId, input.operationId]),
+    tx.query(`select account_id as "accountId",max((native_evidence->'frame'->>'at')::timestamptz)::text as at
+      from daily_portfolio_snapshots where canonical_owner_user_id=$1::uuid and account_id=any($2::uuid[]) and native_evidence is not null group by account_id`, [tenant.ownerUserId, ids]),
+  ], { isolationLevel: "RepeatableRead", readOnly: true });
+  return { accounts: result[1] as NativeStoredAccount[], duplicate: result[2][0], captures: result[3] as { accountId: string; at: string }[] };
 }
 
 type NativeUserEvent = NativeEvent extends infer E ? E extends NativeEvent ? Omit<E, "id" | "sequence" | "source"> : never : never;
@@ -76,17 +117,17 @@ function validNativeMutationChecked(value: unknown): value is NativeMutation {
 
 export async function writeNativeMutation(tenant: TenantContext, input: NativeMutation) {
   if (!validNativeMutation(input)) return { status: "invalid" as const, reason: "invalid_input" };
-  const ledger = await readNativeLedger(tenant);
-  const duplicate = ledger.entries.find(row => row.operationId === input.operationId);
-  if (duplicate) return { status: canonical(duplicate.data.request) === canonical(input) ? "existing" as const : "conflict" as const };
+  if (input.event?.type === "transfer" && !UUID.test(input.event.peerAccountId ?? "")) return { status: "invalid" as const, reason: "transfer_peer_missing" };
+  const ledger = await readNativeMutationContext(tenant, input);
+  const duplicate = ledger.duplicate;
+  if (duplicate) return { status: canonical(duplicate.request) === canonical(input) ? "existing" as const : "conflict" as const };
   const account = ledger.accounts.find(row => row.id === input.accountId);
   if (account?.active === false) return { status: "inactive" as const };
   if (!account || (account.state?.sequence ?? null) !== input.expectedSequence) return { status: "conflict" as const };
   const changes: NonNullable<ReturnType<typeof change>>[] = [];
   const at = input.opening?.at ?? input.event?.at ?? "";
   if (!Number.isFinite(Date.parse(at)) || Date.parse(at) > Date.now()) return { status: "invalid" as const, reason: "invalid_time" };
-  const changedAccountIds = new Set([input.accountId, ...(input.event?.type === "transfer" ? [input.event.peerAccountId] : [])]);
-  if (input.event && ledger.snapshots.some(s => changedAccountIds.has(s.accountId) && Date.parse((s.evidence as { frame?: { at?: string } })?.frame?.at ?? "") >= Date.parse(at))) return { status: "invalid" as const, reason: "event_precedes_recorded_snapshot" };
+  if (input.event && ledger.captures.some(s => Date.parse(s.at) >= Date.parse(at))) return { status: "invalid" as const, reason: "event_precedes_recorded_snapshot" };
   function change(a: NativeStoredAccount, event: NativeEvent | null) {
     if (a.state && a.assets.some(asset => !asset.archived && !a.state!.positions.some(p => p.assetId === asset.id && p.currency === asset.currency && Decimal.from(p.quantity).compare(asset.quantity) === 0))) return null;
     if (a.state && a.state.positions.some(p => !a.assets.some(asset => asset.id === p.assetId && asset.currency === p.currency && Decimal.from(asset.quantity).compare(p.quantity) === 0 && asset.archived === (Decimal.from(p.quantity).compare(0) === 0)))) return null;
