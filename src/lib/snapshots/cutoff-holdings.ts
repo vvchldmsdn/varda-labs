@@ -12,7 +12,7 @@ export function holdingsChangedAfterCutoff(
   const cutoffMs = cutoffAt.getTime();
   return holdings.filter((holding) => [holding.createdAt, holding.updatedAt].some((value) => {
     const time = new Date(value).getTime();
-    return !Number.isFinite(time) || !Number.isFinite(cutoffMs) || time > cutoffMs;
+    return !Number.isFinite(time) || !Number.isFinite(cutoffMs) || time >= cutoffMs;
   })).map((holding) => holding.id);
 }
 

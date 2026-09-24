@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import {
   and,
@@ -196,6 +197,7 @@ async function loadDashboardContextSources({
               positionScopePredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
+              brokerRecoveryBaselinePredicate(serviceDate, [...visibleAccountIds]),
               gte(dailyPositionSnapshots.snapshotDate, baselineWindowStart),
               lte(dailyPositionSnapshots.snapshotDate, serviceDate),
             ),
@@ -235,6 +237,7 @@ async function loadDashboardContextSources({
               historyPositionPredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
+              brokerRecoverySnapshotPredicate("daily_position_snapshots", [...visibleAccountIds]),
               lte(dailyPositionSnapshots.snapshotDate, serviceDate),
             ),
           )
@@ -256,6 +259,7 @@ async function loadDashboardContextSources({
               inArray(accounts.id, wholeAccountIds),
               eq(dailyPortfolioSnapshots.account, accounts.code),
               eq(dailyPortfolioSnapshots.isSample, false),
+              brokerRecoverySnapshotPredicate("daily_portfolio_snapshots", [...visibleAccountIds]),
             ),
           )
           .orderBy(
@@ -293,6 +297,7 @@ async function loadDashboardContextSources({
               positionScopePredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
+              brokerRecoverySnapshotPredicate("daily_position_snapshots", [...visibleAccountIds]),
             ),
           ),
   ]);

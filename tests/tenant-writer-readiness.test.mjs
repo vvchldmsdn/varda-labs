@@ -44,6 +44,8 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
   // New loopback cluster only; safety contract is tested in krw-usd-rc-rehearsal.test.mjs.
   "scripts/krw-usd-rc-rehearsal.mjs",
   "scripts/krw-usd-rc-rehearsal-cases.mjs",
+  "scripts/native-trade-cutoff-rehearsal-cases.mjs",
+  "scripts/broker-securities-rehearsal-cases.mjs", // Synthetic fixtures injected by the isolated loopback runner only.
   "scripts/rehearse-tenant-expand.mjs",
   "scripts/rehearse-identity-pairing-consume-writer.mjs",
   "scripts/rehearse-identity-bootstrap-claim-handoff.mjs",
@@ -52,6 +54,36 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
 ]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
+  it("registers broker evidence recovery only as a guarded offline operator", () => {
+    const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "approved_broker_evidence_recovery");
+    assert.equal(writer.authorization, "migration_cli");
+    assert.equal(writer.classification, "user_owned");
+    assert.equal(writer.canonicalOwnerHttpInput, "forbidden");
+    assert.equal(writer.transition.prepare, "dry_run_only");
+    assert.equal(writer.transition.activate, "atomic_broker_evidence_recovery");
+    assert.deepEqual(writer.entrypoints, ["scripts/lib/broker-securities-recovery.mjs#recoverBrokerSecurities"]);
+    assert.deepEqual(writer.targets.map(({ table, operations }) => ({ table, operations })), [
+      { table: "broker_recovery_batches", operations: ["insert", "update"] },
+      { table: "assets", operations: ["insert", "update"] },
+      { table: "event_ledger_entries", operations: ["insert"] },
+      { table: "portfolio_group_asset_memberships", operations: ["update", "delete"] },
+      { table: "holding_lifecycle_events", operations: ["insert"] },
+    ]);
+    const operator = readFileSync(join(ROOT, writer.implementationPaths[0]), "utf8");
+    assert.match(operator, /write = false/); assert.match(operator, /restoreVerified = false/);
+    assert.match(operator, /recovery_confirmation_mismatch/); assert.match(operator, /restore_not_verified/);
+    assert.match(operator, /recovery_state_changed/); assert.match(operator, /recovery_owner_inactive/);
+    assert.match(operator, /pg_advisory_xact_lock/);
+    assert.match(operator, /write\?'commit':'rollback'/);
+    assert.doesNotMatch(operator, /process\.env|DATABASE_URL|fetch\(/);
+    assert.equal(REHEARSAL_ONLY_DML_PATHS.has(writer.implementationPaths[0]), false);
+    for (const path of walkProductRuntimeFiles(join(ROOT, "src"))) {
+      if (relativePath(path) !== "src/lib/tenant-writer-registry.ts") assert.doesNotMatch(readFileSync(path, "utf8"), /broker-securities-recovery|recoverBrokerSecurities/);
+    }
+    const rehearsal = readFileSync(join(ROOT, "scripts/broker-securities-rehearsal-cases.mjs"), "utf8");
+    assert.doesNotMatch(rehearsal, /process\.env|DATABASE_URL|fetch\(/);
+    assert.match(rehearsal, /Synthetic broker/);
+  });
   it("registers the disabled provider collection seam as operational-only without session or owner writes", () => {
     const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "machine_twelve_data_collection");
     assert.equal(writer.classification, "admin_system");
@@ -111,8 +143,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 44);
-    assert.equal(registeredPaths.length, 52);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 45);
+    assert.equal(registeredPaths.length, 53);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -183,7 +215,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 23,
+      in_scope: 24,
       intentionally_skipped_legacy: 1,
       not_applicable: 20,
     });
@@ -337,6 +369,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
         if (
           [
+            "approved_broker_evidence_recovery",
             "native_portfolio_snapshots",
             "machine_native_portfolio_snapshots",
             "post_consume_account_owner_assignment",
@@ -366,6 +399,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(canonicalOwnerWriters, [
+      "approved_broker_evidence_recovery",
       "native_portfolio_snapshots",
       "machine_native_portfolio_snapshots",
       "post_consume_account_owner_assignment",

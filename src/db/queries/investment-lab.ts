@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
@@ -130,6 +131,7 @@ function createTenantInvestmentLabRepository(
             inArray(accounts.code, selectedAccounts),
             eq(dailyPositionSnapshots.account, accounts.code),
             eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
             isNotNull(dailyPositionSnapshots.legacyAssetId),
           ),
         )
@@ -182,6 +184,7 @@ function createTenantInvestmentLabRepository(
           inArray(accounts.code, snapshotAccounts),
           eq(dailyPortfolioSnapshots.account, accounts.code),
           eq(dailyPortfolioSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_portfolio_snapshots"),
         ),
       )
       .orderBy(
@@ -223,6 +226,7 @@ function createTenantInvestmentLabRepository(
           inArray(accounts.code, selectedAccounts),
           eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
           eq(
             sql<string>`lower(trim(${dailyPositionSnapshots.assetName}))`,
             decision.assetName.toLowerCase(),
@@ -280,6 +284,7 @@ function createTenantInvestmentLabRepository(
             inArray(accounts.code, selectedAccounts),
             eq(dailyPositionSnapshots.account, accounts.code),
             eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
             eq(dailyPositionSnapshots.legacyAssetId, legacyAssetId),
           ),
         )
@@ -389,6 +394,7 @@ function createTenantInvestmentLabRepository(
           inArray(accounts.code, selectedAccounts),
           eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
           inArray(dailyPositionSnapshots.snapshotDate, [...serviceDates]),
         ),
       )

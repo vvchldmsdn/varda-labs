@@ -77,10 +77,11 @@ async function readNativeMutationContext(tenant: TenantContext, input: NativeMut
     tx.query(NATIVE_ACCOUNTS_QUERY, [tenant.ownerUserId, ids]),
     tx.query(`select native_data->'request' as request from event_ledger_entries
       where canonical_owner_user_id=$1::uuid and native_operation_id=$2::uuid and native_data is not null limit 1`, [tenant.ownerUserId, input.operationId]),
-    tx.query(`select account_id as "accountId",max((native_evidence->'frame'->>'at')::timestamptz)::text as at
-      from daily_portfolio_snapshots where canonical_owner_user_id=$1::uuid and account_id=any($2::uuid[]) and native_evidence is not null group by account_id`, [tenant.ownerUserId, ids]),
+    tx.query(`select distinct on (account_id) account_id as "accountId",(native_evidence->'frame'->>'at') as at,native_evidence->'frame'->>'boundary' as boundary
+      from daily_portfolio_snapshots where canonical_owner_user_id=$1::uuid and account_id=any($2::uuid[]) and native_evidence is not null
+      order by account_id,(native_evidence->'frame'->>'at')::timestamptz desc,(native_evidence->'frame'->>'boundary' is null) desc`, [tenant.ownerUserId, ids]),
   ], { isolationLevel: "RepeatableRead", readOnly: true });
-  return { accounts: result[1] as NativeStoredAccount[], duplicate: result[2][0], captures: result[3] as { accountId: string; at: string }[] };
+  return { accounts: result[1] as NativeStoredAccount[], duplicate: result[2][0], captures: result[3] as { accountId: string; at: string; boundary?: string }[] };
 }
 
 type NativeUserEvent = NativeEvent extends infer E ? E extends NativeEvent ? Omit<E, "id" | "sequence" | "source"> : never : never;
@@ -102,8 +103,13 @@ function validNativeMutationChecked(value: unknown): value is NativeMutation {
   if (!strictKeys(v, ["operationId", "accountId", "expectedSequence", "opening", "event", "newAsset"]) || !UUID.test(v.operationId ?? "") || !UUID.test(v.accountId ?? "") || (v.expectedSequence !== null && (!Number.isSafeInteger(v.expectedSequence) || v.expectedSequence < 0)) || Boolean(v.opening) === Boolean(v.event)) return false;
   if (v.opening && (!strictKeys(v.opening, ["at", "cash", "positions"]) || v.expectedSequence !== null || v.newAsset)) return false;
   if (v.event) {
-    const fields: Record<string, string[]> = { deposit: ["amount", "currency"], withdraw: ["amount", "currency"], dividend: ["amount", "currency", "assetId"], fee: ["amount", "currency", "assetId"], buy: ["assetId", "quantity", "price", "currency", "fee"], sell: ["assetId", "quantity", "price", "currency", "fee"], exchange: ["debit", "credit", "fee"], transfer: ["direction", "amount", "currency", "transferId", "peerAccountId"], split: ["assetId", "ratio"], cost_basis: ["assetId", "costLots"] };
-    if (!fields[v.event.type] || !strictKeys(v.event, ["type", "at", ...fields[v.event.type]]) || v.expectedSequence === null) return false;
+    const tradeFields = ["assetId", "quantity", "price", "currency", "settlement", "executionUnitPrice", "orderUnitPrice", "fee", "tax"];
+    const fields: Record<string, string[]> = { deposit: ["amount", "currency"], withdraw: ["amount", "currency"], dividend: ["amount", "currency", "assetId"], fee: ["amount", "currency", "assetId"], buy: tradeFields, sell: tradeFields, exchange: ["debit", "credit", "fee"], transfer: ["direction", "amount", "currency", "transferId", "peerAccountId"], split: ["assetId", "ratio"], cost_basis: ["assetId", "costLots"] };
+    if (!fields[v.event.type] || !strictKeys(v.event, ["type", "at", "dateEvidence", ...fields[v.event.type]]) || v.expectedSequence === null) return false;
+    if (v.event.dateEvidence && !strictKeys(v.event.dateEvidence, ["precision", "reportedDate", "timeZone", "policy"])) return false;
+    if (v.event.type === "buy" || v.event.type === "sell") for (const money of [v.event.settlement, v.event.executionUnitPrice, v.event.orderUnitPrice, v.event.fee, v.event.tax]) {
+      if (money != null && (!strictKeys(money, ["amount", "currency"]) || typeof money.amount !== "string" || !isCurrency(money.currency))) return false;
+    }
   }
   if (v.newAsset) {
     const a = v.newAsset;
@@ -125,9 +131,19 @@ export async function writeNativeMutation(tenant: TenantContext, input: NativeMu
   if (account?.active === false) return { status: "inactive" as const };
   if (!account || (account.state?.sequence ?? null) !== input.expectedSequence) return { status: "conflict" as const };
   const changes: NonNullable<ReturnType<typeof change>>[] = [];
+  let newAsset = input.newAsset;
+  let userEvent = input.event;
+  // Rebuy uses the existing identity, including an archived zero holding. The
+  // original request remains the idempotency key's payload, not its projection.
+  if (newAsset && userEvent?.type === "buy") {
+    const matches = account.assets.filter(a => a.ticker?.toUpperCase() === newAsset!.ticker && a.market === newAsset!.market);
+    if (matches.length > 1 || matches.some(a => a.currency !== newAsset!.currency || a.assetType !== newAsset!.assetType)) return { status: "invalid" as const, reason: "instrument_identity_conflict" };
+    if (matches.length === 1) { userEvent = { ...userEvent, assetId: matches[0].id }; newAsset = undefined; }
+  }
+  if (userEvent && "assetId" in userEvent && userEvent.assetId && !newAsset && !account.assets.some(asset => asset.id === userEvent.assetId)) return { status: "invalid" as const, reason: "holding_scope_mismatch" };
   const at = input.opening?.at ?? input.event?.at ?? "";
   if (!Number.isFinite(Date.parse(at)) || Date.parse(at) > Date.now()) return { status: "invalid" as const, reason: "invalid_time" };
-  if (input.event && ledger.captures.some(s => Date.parse(s.at) >= Date.parse(at))) return { status: "invalid" as const, reason: "event_precedes_recorded_snapshot" };
+  if (input.event && ledger.captures.some(s => (Date.parse(s.at) > Date.parse(at) || (s.boundary !== "before" && Date.parse(s.at) === Date.parse(at))))) return { status: "invalid" as const, reason: "event_precedes_recorded_snapshot" };
   function change(a: NativeStoredAccount, event: NativeEvent | null) {
     if (a.state && a.assets.some(asset => !asset.archived && !a.state!.positions.some(p => p.assetId === asset.id && p.currency === asset.currency && Decimal.from(p.quantity).compare(asset.quantity) === 0))) return null;
     if (a.state && a.state.positions.some(p => !a.assets.some(asset => asset.id === p.assetId && asset.currency === p.currency && Decimal.from(asset.quantity).compare(p.quantity) === 0 && asset.archived === (Decimal.from(p.quantity).compare(0) === 0)))) return null;
@@ -135,9 +151,9 @@ export async function writeNativeMutation(tenant: TenantContext, input: NativeMu
     if (!result.ok) return null;
     const next = "next" in result ? result.next : result.state;
     if (!a.state && (a.assets.filter(x => !x.archived).some(asset => !next.positions.some(p => p.assetId === asset.id && p.currency === asset.currency && Decimal.from(p.quantity).compare(asset.quantity) === 0)) || next.positions.some(p => !a.assets.some(asset => !asset.archived && asset.id === p.assetId && asset.currency === p.currency && Decimal.from(asset.quantity).compare(p.quantity) === 0)))) return null;
-    return { accountId: a.id, expectedState: a.state, expectedAssets: a.assets, next, event: event ?? { type: "opening", at }, effect: "next" in result ? { cashLegs: result.cashLegs, quantityDelta: result.quantityDelta, realized: result.realized } : null, entryId: randomUUID(), serviceDate: resolveSnapshotCycle(new Date(at)).snapshotDate, newAsset: a.id === input.accountId ? input.newAsset ?? null : null };
+    return { accountId: a.id, expectedState: a.state, expectedAssets: a.assets, next, event: event ?? { type: "opening", at }, effect: "next" in result ? { cashLegs: result.cashLegs, quantityDelta: result.quantityDelta, realized: result.realized, execution: result.execution } : null, entryId: randomUUID(), serviceDate: event?.dateEvidence?.reportedDate ?? resolveSnapshotCycle(new Date(at)).snapshotDate, newAsset: a.id === input.accountId ? newAsset ?? null : null };
   }
-  const event = input.event ? { ...input.event, id: input.operationId, sequence: (account.state?.sequence ?? 0) + 1, source: "user_native_ledger" } as NativeEvent : null;
+  const event = userEvent ? { ...userEvent, id: input.operationId, sequence: (account.state?.sequence ?? 0) + 1, source: "user_native_ledger" } as NativeEvent : null;
   // New zero-quantity instrument is introduced only as part of its actual first buy.
   const primary = change(account, event);
   if (!primary) return { status: "invalid" as const, reason: "state_or_event_mismatch" };

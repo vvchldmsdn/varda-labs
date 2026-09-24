@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { Decimal } from '../src/lib/money.ts';
+import {buildNativeCutoffEvidence} from '../src/lib/snapshots/native-cutoff-evidence.ts';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
 
 const owner='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', other='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -16,9 +17,12 @@ let database;
 after(async()=>{ await database?.close(); });
 
 const ddl=`
+create table live_price_quotes(ticker text,market text,currency text,provider text,source text,quote_type text,status text,price numeric,price_as_of timestamptz,fetched_at timestamptz);
+create table fx_rates(usdkrw numeric,observed_at timestamptz,fetched_at timestamptz,source text,rate_kind text,status text,is_sample boolean default false);
+
 create table app_users(id uuid primary key,status text not null,role text default 'user');
 create table accounts(id uuid primary key,canonical_owner_user_id uuid,code text not null,name text not null,is_active boolean default true,updated_at timestamptz default now());
-create table assets(id uuid primary key,canonical_owner_user_id uuid,account_id uuid,account text not null,name text,ticker text,market text,currency text,asset_type text,quantity numeric(20,6) not null default 0,current_price numeric(20,4),average_cost numeric(20,4),price_source text,price_status text,archived_at timestamptz,updated_at timestamptz default now());
+create table assets(id uuid primary key,canonical_owner_user_id uuid,account_id uuid,account text not null,name text,ticker text,market text,currency text,asset_type text,quantity numeric(20,6) not null default 0,current_price numeric(20,4),average_cost numeric(20,4),price_source text,price_status text,price_as_of timestamptz,price_fetched_at timestamptz,price_quote_type text,archived_at timestamptz,updated_at timestamptz default now());
 create table event_ledger_entries(id uuid primary key,canonical_owner_user_id uuid,event_date date not null,event_type text not null,source text,recorded_at timestamptz,rule_version text,account text,account_id uuid,asset_id uuid,legacy_asset_id varchar(24) not null,asset_name text not null,before_value text not null,after_value text not null,is_sample boolean not null default false);
 create table daily_portfolio_snapshots(id uuid primary key default gen_random_uuid(),canonical_owner_user_id uuid,snapshot_date date,account text,account_id uuid,source text not null default 'base44_import',rule_version text,is_sample boolean not null default false,captured_at timestamptz);
 create unique index snapshot_owner_date_account_source on daily_portfolio_snapshots(canonical_owner_user_id,snapshot_date,account,source) where canonical_owner_user_id is not null;
@@ -27,8 +31,8 @@ async function fixture(withApi=false) {
   const pg=database??=new PGlite();
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
   await pg.exec(readFileSync(new URL('../drizzle/0050_native_portfolio_ledger.sql',import.meta.url),'utf8'));
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
-  await pg.exec('grant usage on schema public to varda_tenant_app');
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
+  await pg.exec('grant usage on schema public to varda_tenant_app; grant select on live_price_quotes,fx_rates to varda_tenant_app');
   for(const table of ['accounts','assets','event_ledger_entries','daily_portfolio_snapshots']) await pg.exec(`alter table ${table} enable row level security; alter table ${table} force row level security; create policy tenant_select on ${table} for select to varda_tenant_app using(canonical_owner_user_id = nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${table} to varda_tenant_app;`);
   await pg.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);
   await pg.query("insert into accounts(id,canonical_owner_user_id,code,name) values($1,$4,'one','One'),($2,$4,'two','Two'),($3,$5,'foreign','Foreign')",[account,peer,foreign,owner,other]);
@@ -36,7 +40,7 @@ async function fixture(withApi=false) {
   const legacy=(await pg.query("select * from event_ledger_entries where source='base44_import'")).rows;
   let beforeWrite=null;
   const batches=[];
-  const transport=(tenant)=>({transaction:async(build,options)=>{
+  const transport=(tenant)=>({query:async(text,params=[])=>{assert.equal(tenant,false);return (await pg.query(text,params)).rows;},transaction:async(build,options)=>{
     const commands=build({query:(text,params=[])=>({text,params})}); batches.push({tenant,commands,options});
     if(beforeWrite && (!tenant || commands.some(c=>c.text.includes('apply_native_portfolio_tenant_mutation')))) { const effect=beforeWrite; beforeWrite=null; await effect(pg,commands); }
     return pg.transaction(async tx=>{
@@ -45,7 +49,7 @@ async function fixture(withApi=false) {
     });
   }});
   let authenticated=true, subject='verified-one';
-  const [queries,projection,valuation,snapshots,route]=await importWithPorts(['src/db/queries/native-portfolio-ledger.ts','src/lib/native-portfolio-projection.ts','src/lib/currency-tracked-portfolio.ts','src/db/queries/native-portfolio-snapshots.ts',...(withApi?['src/app/api/portfolio/ledger/route.ts']:[])],{
+  const [queries,projection,valuation,snapshots,cutoff,route]=await importWithPorts(['src/db/queries/native-portfolio-ledger.ts','src/lib/native-portfolio-projection.ts','src/lib/currency-tracked-portfolio.ts','src/db/queries/native-portfolio-snapshots.ts','src/db/queries/native-cutoff-evidence.ts',...(withApi?['src/app/api/portfolio/ledger/route.ts']:[])],{
     '@/db/tenant-client':{getTenantSqlClient:()=>transport(true)}, '@/db/client':{sqlClient:transport(false),db:drizzle(pg)},
     '@/lib/auth/current-session-subject':{readCurrentSessionSubject:async()=>authenticated?{state:'authenticated',provider:'neon',providerSubject:subject}:{state:'unauthenticated'}},
     '@/lib/auth/current-tenant-context':{resolveCurrentTenantContext:async()=>({ok:true,tenantContext:{ownerUserId:owner}})},
@@ -65,7 +69,7 @@ async function fixture(withApi=false) {
     const positions=ledger.accounts[0].assets.filter(a=>!a.archived).map(a=>({id:a.id,ownerId:owner,accountId,name:'Actual test stock',observation:{quantity:a.quantity,price,currency:a.currency,at:time,basis:'raw',source:'test raw quote'}}));
     return projection.attachNativeLedgerEvidence({ownerId:owner,reporting,asOf:time,current:{at:time,source:'test raw quote',scopeComplete:false,positions},history:[],trades:null,fx:[{base:'USD',quote:'KRW',rate:fxRate,observedAt:time,fetchedAt:time,kind:'daily_reference',source:'test fixture'}],maxFxAgeMs:0,maxPriceAgeMs:0},ledger,'account');
   }
-  return {pg,queries,projection,valuation,snapshots,route,evidence,open,mutate,batches,legacy,setBeforeWrite(fn){beforeWrite=fn;},setIdentity(nextSubject,active=true){subject=nextSubject;authenticated=active;}};
+  return {pg,queries,projection,valuation,snapshots,cutoff,route,evidence,open,mutate,batches,legacy,setBeforeWrite(fn){beforeWrite=fn;},setIdentity(nextSubject,active=true){subject=nextSubject;authenticated=active;}};
 }
 
 it('executes the actual SQL writer, tenant reads, engine and projection against fixed ledger amounts',async()=>{
@@ -305,10 +309,7 @@ it('captures cash-only owners on the existing daily job without provider calls a
   const f=await fixture(); await f.open(account,{KRW:'0',USD:'2000'});
   const [job]=await importWithPorts(['src/lib/snapshots/native-daily-job.ts'],{
     '@/db/client':{db:drizzle(f.pg)},
-    '@/db/queries/currency-tracked-portfolio':{getTrackedCurrencyEvidence:async(tenant,scope,reporting,options)=>{
-      assert.equal(tenant.ownerUserId,owner); assert.equal(scope.accountId,account); assert.equal(options.collect,false);
-      return f.evidence(options.asOf.toISOString(),'100',reporting);
-    }},
+    '@/db/queries/native-cutoff-evidence':f.cutoff,
     '@/db/queries/native-portfolio-snapshots':f.snapshots,
   });
   let result=await job.runNativeDailySnapshotJob(); assert.equal(result.dryRun,true); assert.equal(result.targetCount,1); assert.equal(result.created,0);
@@ -382,7 +383,7 @@ it('enforces real API authentication, session continuity, origin and body owners
   assert.equal((await f.queries.readNativeLedger({ownerUserId:owner},account)).entries.length,0);
   process.env.NATIVE_LEDGER_ROLLOUT='qa'; process.env.NATIVE_LEDGER_QA_OWNERS=owner;
   const created=await f.route.POST(request('POST',{sessionKey,mutation})); assert.equal(created.status,201);
-  assert.equal((await created.json()).snapshot,'unavailable','missing local quote schema must not invalidate durable ledger success');
+  assert.equal((await created.json()).snapshot,'scheduled','a transaction must never create an intraday daily baseline');
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation}))).status,200);
   assert.equal((await f.queries.readNativeLedger({ownerUserId:owner},account)).entries.length,1);
 });
@@ -473,4 +474,106 @@ it('rejects an oversized historical JSON payload before returning it without los
   assert.deepEqual((await f.pg.query(query.text,query.params)).rows,[{complete:false,rows:[]}]);
   assert.equal((await f.mutate({type:'deposit',amount:'1',currency:'USD'})).result.status,'created');
   assert.equal(f.valuation.buildTrackedCurrencyPortfolio(await f.evidence(later)).current.total,'251');
+});
+
+
+it('persists native settlement, exact fractional quantities, archive/rebuy identity and atomic retries',async()=>{
+  const f=await fixture(); await f.open(account,{KRW:'1000000',USD:'50'});
+  const buy={type:'buy',assetId:asset,quantity:'0.411494',currency:'USD',settlement:{amount:'420000',currency:'KRW'}};
+  const instrument={id:asset,name:'Fractional stock',ticker:'FRACT',market:'us',currency:'USD',assetType:'stock'};
+  const first=await f.mutate(buy,account,{newAsset:instrument}); assert.equal(first.result.status,'created');
+  assert.equal((await f.queries.writeNativeMutation({ownerUserId:owner},first.input)).status,'existing');
+  let ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.deepEqual(ledger.accounts[0].state.cash,{KRW:'580000',USD:'50'});
+  assert.equal(ledger.entries.at(-1).data.effect.execution.average,null);
+  assert.equal((await f.mutate({...buy,type:'sell'})).result.status,'created');
+  ledger=await f.queries.readNativeLedger({ownerUserId:owner},account); assert.equal(ledger.accounts[0].assets[0].archived,true);
+  const nextId=randomUUID();
+  assert.equal((await f.mutate({...buy,assetId:nextId},account,{newAsset:{...instrument,id:nextId}})).result.status,'created');
+  ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  assert.equal(ledger.accounts[0].assets.length,1); assert.equal(ledger.accounts[0].assets[0].id,asset); assert.equal(ledger.accounts[0].assets[0].archived,false);
+  assert.equal(ledger.entries.at(-1).data.event.assetId,asset);
+  const attack=await f.mutate({...buy,assetId:randomUUID()}); assert.equal(attack.result.status,'invalid');
+});
+
+it('captures the same exclusive 07:00 state after 07:00/07:05/07:30/08:00 worker delays',async()=>{
+  const f=await fixture(); await f.open(account,{KRW:'0',USD:'1000'});
+  const boundary='2026-09-01T22:00:00.000Z';
+  assert.equal((await f.mutate({type:'deposit',amount:'100',currency:'USD',at:'2026-09-01T21:59:59.999Z'})).result.status,'created');
+  assert.equal((await f.mutate({type:'deposit',amount:'50',currency:'USD',at:boundary})).result.status,'created');
+  assert.equal((await f.mutate({type:'deposit',amount:'25',currency:'USD',at:'2026-09-01T22:00:00.001Z'})).result.status,'created');
+  assert.equal((await f.mutate({type:'deposit',amount:'20',currency:'USD',at:'2026-09-01T22:05:00Z'})).result.status,'created');
+  for(const capturedAt of [boundary,'2026-09-01T22:05:00Z','2026-09-01T22:30:00Z','2026-09-01T23:00:00Z']) {
+    const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',capturedAt);
+    assert.equal(evidence.current.at,boundary); assert.equal(evidence.current.boundary,'before');
+    assert.equal(evidence.nativeSequences[account],1);
+    assert.equal(f.valuation.buildTrackedCurrencyPortfolio(evidence).current.total,'1100');
+  }
+  const capturedAt='2026-09-01T22:30:00Z';
+  const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',capturedAt);
+  assert.deepEqual(await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},evidence,'2026-09-02',capturedAt),{status:'ready',created:1});
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},evidence,'2026-09-02',capturedAt)).created,0);
+  const projected=await f.evidence('2026-09-02T00:00:00Z');
+  const report=f.valuation.buildTrackedCurrencyPortfolio(projected);
+  assert.equal(report.current.total,'1195'); assert.equal(report.movement.valuationChange,'95');
+  assert.equal(report.movement.attribution.investmentChange,'0'); assert.equal(report.performanceReturn.totalReturn,0);
+  const saved=(await f.pg.query("select captured_at,native_evidence from daily_portfolio_snapshots where source='native_ledger_cutoff_v2'")).rows[0];
+  assert.equal(new Date(saved.captured_at).toISOString(),new Date(capturedAt).toISOString());
+  assert.equal(saved.native_evidence.frame.at,boundary);
+});
+
+it('fences a historical write strictly before cutoff but accepts an exact-boundary event',async()=>{
+  const f=await fixture(); await f.open(account,{KRW:'0',USD:'100'});
+  const cutoff='2026-09-01T22:00:00.000Z',now='2026-09-01T22:30:00.000Z';
+  const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',now);
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},evidence,'2026-09-02',now)).created,1);
+  assert.equal((await f.mutate({type:'deposit',amount:'1',currency:'USD',at:'2026-09-01T21:59:59.999Z'})).result.reason,'event_precedes_recorded_snapshot');
+  assert.equal((await f.mutate({type:'deposit',amount:'1',currency:'USD',at:cutoff})).result.status,'created');
+});
+
+it('uses a pre-cutoff holding quantity even after a later full sale, with no current-price backfill',async()=>{
+  const f=await fixture(); await f.open(account,{KRW:'0',USD:'1000'});
+  const now='2026-09-01T22:30:00.000Z';
+  await f.mutate({type:'buy',assetId:asset,quantity:'2',price:'100',currency:'USD',at:'2026-09-01T21:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});
+  await f.pg.query("insert into live_price_quotes values('TEST','us','USD','kis','kis_test','close','ok',110,'2026-09-01T21:00:00Z','2026-09-01T21:01:00Z')");
+  await f.mutate({type:'sell',assetId:asset,quantity:'2',price:'111',currency:'USD',at:'2026-09-01T22:05:00Z'});
+  const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',now);
+  assert.equal(evidence.current.positions.find(p=>p.id===asset).observation.quantity,'2');
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(evidence).current.total,'1020');
+  await f.pg.query("update live_price_quotes set price_as_of='2026-09-01T22:05:00Z',fetched_at='2026-09-01T22:06:00Z'");
+  const missing=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',now);
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(missing).current.complete,false);
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},missing,'2026-09-02',now)).status,'incomplete');
+});
+
+it('retains old capture evidence but chooses canonical cutoff when v1 captures coexist',async(t)=>{
+  for(const captureAt of ['2026-09-01T22:00:00.000Z','2026-09-01T22:05:00.000Z']) {
+    const f=await fixture();await f.open(account,{KRW:'0',USD:'100'});
+    const boundary='2026-09-01T22:00:00.000Z',later='2026-09-01T22:05:00.000Z';
+    if(captureAt!==boundary) await f.mutate({type:'deposit',amount:'50',currency:'USD',at:'2026-09-01T22:01:00.000Z'});
+    setNow(t,captureAt);
+    assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},await f.evidence(captureAt))).created,1);
+    const original=(await f.pg.query("select native_evidence from daily_portfolio_snapshots where source='native_ledger_v1'")).rows;
+    if(captureAt===boundary) {setNow(t,later);await f.mutate({type:'deposit',amount:'50',currency:'USD',at:'2026-09-01T22:01:00.000Z'});}
+    setNow(t,later);
+    const cutoff=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',later);
+    assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},cutoff,'2026-09-02',later)).created,1);
+    setNow(t,'2026-09-02T00:00:00Z');
+    const result=f.valuation.buildTrackedCurrencyPortfolio(await f.evidence('2026-09-02T00:00:00Z'));
+    assert.equal(result.current.total,'150');assert.equal(result.movement.valuationChange,'50');assert.equal(result.movement.attribution.investmentChange,'0');
+    assert.deepEqual((await f.pg.query("select native_evidence from daily_portfolio_snapshots where source='native_ledger_v1'")).rows,original);
+  }
+});
+
+it('does not resurrect a rejected corporate-action price from an old frozen capture',async()=>{
+  const f=await fixture();await f.open(account,{KRW:'0',USD:'1000'});
+  await f.mutate({type:'buy',assetId:asset,quantity:'2',price:'100',currency:'USD',at:'2026-09-01T01:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});
+  const ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
+  const base=await f.evidence('2026-09-01T21:00:00Z');
+  const historical={version:1,sequence:1,fx:[],frame:structuredClone(base.current)};
+  const row=base.current.positions.find(p=>p.id===asset);row.observation=null;row.evidenceReason='corporate_actions_pending';
+  ledger.snapshots.push({accountId:account,evidence:historical});
+  const cutoff=buildNativeCutoffEvidence(base,ledger,'2026-09-02','2026-09-01T22:30:00Z');
+  assert.equal(cutoff.current.positions.find(p=>p.id===asset).observation,null);
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(cutoff).current.complete,false);
 });

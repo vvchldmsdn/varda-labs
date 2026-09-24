@@ -1,4 +1,5 @@
 import "./market-calendar.test.mjs";
+import "./broker-securities-recovery.test.mjs";
 import "./isolated-release-preview.test.mjs";
 import "./simulation-cleanup-command.test.mjs";
 import "./simulation-path-detail.test.mjs";
@@ -367,3 +368,5 @@ import "./currency-model-provenance.test.mjs";
 import "./krw-usd-rc-rehearsal.test.mjs";
 
 import "./trade-record-intent.test.mjs";
+import "./broker-cash-reconciliation.test.mjs";
+import "./broker-recovery-snapshot-scope.test.mjs";

@@ -44,8 +44,8 @@ async function fixture() {
     storage: { retentionSeconds: 86400, quoteFreshSeconds: 600, fxFreshSeconds: 600, historyFreshSeconds: 3600 } };
   return { pg, service, store, queue, collector, adapter, configuration, config, state };
 }
+after(async () => { await pg?.close(); });
 describe("Twelve Data actual SQL persistence and demand pipeline", () => {
-  after(async () => { await pg?.close(); });
   it("is disabled without server configuration and validates private config without database reads", async () => {
     const { service, configuration, state, config } = await fixture();
     assert.equal((await service.readTwelveDataEvidence(query("live"))).status, "disabled");
@@ -270,4 +270,17 @@ describe("Twelve Data actual SQL persistence and demand pipeline", () => {
     ]) await assert.rejects(store.persistTwelveDataEvidence(claim, payload, config), /identity_invalid|provenance_invalid/);
     assert.equal((await pg.query("select count(*)::int as count from market_provider_observations")).rows[0].count, 0);
   });
+});
+
+it("admits cutoff-fresh stored prices during a delayed worker without extending retention", async () => {
+  const {service,config,pg,state}=await fixture();
+  await service.requestTwelveDataEvidence(query("live"),config);await service.drainTwelveDataService(config);
+  const cutoff=new Date(Date.now()-30*60000).toISOString();
+  await pg.query("update market_provider_observations set observed_at=$1::timestamptz-interval '1 minute', fetched_at=$1::timestamptz-interval '1 minute',last_fetched_at=$1::timestamptz-interval '1 minute'",[cutoff]);
+  const calls=state.calls.length;
+  assert.equal((await service.readTwelveDataEvidence({kind:"live",target,asOf:cutoff,knownAt:cutoff},config)).status,"stale");
+  assert.equal((await service.readTwelveDataEvidence({kind:"live",target,asOf:cutoff,knownAt:cutoff,freshnessBasis:"cutoff"},config)).status,"admitted");
+  await pg.exec("update market_provider_observations set expires_at=now()-interval '1 second'");
+  assert.equal((await service.readTwelveDataEvidence({kind:"live",target,asOf:cutoff,knownAt:cutoff,freshnessBasis:"cutoff"},config)).status,"missing");
+  assert.equal(state.calls.length,calls);
 });

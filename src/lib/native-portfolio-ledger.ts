@@ -1,14 +1,16 @@
 import { Decimal, isCurrency, moneyMinor, type Currency } from "./money.ts";
 
 export type NativeFraction = { n: string; d: string };
-export type NativeCostLot = { amount: string; currency: Currency; at: string; source: string; remaining: NativeFraction };
+export type NativeDateEvidence = { precision: "date_only"; reportedDate: string; timeZone: "Asia/Seoul"; policy: "service_day_midpoint" };
+export type NativeCostLot = { amount: string; currency: Currency; at: string; source: string; remaining: NativeFraction; dateEvidence?: NativeDateEvidence };
 export type NativePosition = { assetId: string; currency: Currency; quantity: string; costLots: NativeCostLot[] | null };
 export type NativePortfolioState = { version: 1; accountId: string; startedAt: string; at: string; sequence: number; cash: { KRW: string; USD: string }; positions: NativePosition[] };
 export type NativeMoney = { amount: string; currency: Currency };
-type EventBase = { id: string; sequence: number; at: string; source: string };
+type EventBase = { id: string; sequence: number; at: string; source: string; dateEvidence?: NativeDateEvidence };
+export type NativeTradeInput = { type: "buy" | "sell"; assetId: string; quantity: string; currency: Currency; price?: string; settlement?: NativeMoney; executionUnitPrice?: NativeMoney; orderUnitPrice?: NativeMoney; fee?: NativeMoney | null; tax?: NativeMoney | null };
 export type NativeEvent = EventBase & (
   | { type: "deposit" | "withdraw" | "dividend" | "fee"; amount: string; currency: Currency; assetId?: string }
-  | { type: "buy" | "sell"; assetId: string; quantity: string; price: string; currency: Currency; fee?: NativeMoney }
+  | NativeTradeInput
   | { type: "exchange"; debit: NativeMoney; credit: NativeMoney; fee?: NativeMoney }
   | { type: "transfer"; direction: "in" | "out"; amount: string; currency: Currency; transferId: string; peerAccountId: string }
   | { type: "split"; assetId: string; ratio: NativeFraction }
@@ -16,7 +18,40 @@ export type NativeEvent = EventBase & (
 );
 export type NativeCashLeg = { currency: Currency; delta: string; kind: "external" | "trade" | "income" | "fee" | "exchange" | "transfer" };
 export type NativeOpeningInput = { accountId: string; at: string; cash: { KRW: string; USD: string }; positions: NativePosition[] };
-export type NativeEventResult = { ok: true; next: NativePortfolioState; cashLegs: NativeCashLeg[]; quantityDelta: { assetId: string; quantity: string } | null; realized: { proceeds: NativeMoney; disposedCostLots: NativeCostLot[] | null } | null } | { ok: false; reason: string };
+export type NativeEventResult = { ok: true; next: NativePortfolioState; cashLegs: NativeCashLeg[]; quantityDelta: { assetId: string; quantity: string } | null; realized: { proceeds: NativeMoney; disposedCostLots: NativeCostLot[] | null } | null; execution: ReturnType<typeof resolveNativeTrade> | null } | { ok: false; reason: string };
+
+/** Sorting/whole-day weighting only, never an asserted intraday execution time. */
+export function nativeDateOnlyAt(reportedDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(reportedDate) || new Date(`${reportedDate}T00:00:00Z`).toISOString().slice(0, 10) !== reportedDate) fail("invalid_trade_date");
+  return `${reportedDate}T10:00:00.000Z`; // midpoint of [07:00 KST, next 07:00)
+}
+export function validateNativeDateEvidence(at: string, evidence?: NativeDateEvidence) {
+  if (!evidence) return;
+  if (evidence.precision !== "date_only" || evidence.timeZone !== "Asia/Seoul" || evidence.policy !== "service_day_midpoint" || at !== nativeDateOnlyAt(evidence.reportedDate)) fail("invalid_trade_date");
+}
+
+/** Instrument currency and actual settlement are separate. Order prices never settle cash. */
+export function resolveNativeTrade(event: NativeTradeInput) {
+  if (!isCurrency(event.currency)) fail("invalid_currency");
+  const q = quantity(event.quantity, true);
+  const unit = event.executionUnitPrice ?? (event.price !== undefined ? { amount: event.price, currency: event.currency } : undefined);
+  if (event.executionUnitPrice && event.price !== undefined && (event.executionUnitPrice.currency !== event.currency || positivePrice(event.price).compare(positivePrice(event.executionUnitPrice.amount)) !== 0)) fail("execution_evidence_conflict");
+  if (unit && (!isCurrency(unit.currency) || unit.currency !== event.currency)) fail("execution_currency_mismatch");
+  const price = unit ? positivePrice(unit.amount) : null;
+  if (event.orderUnitPrice) {
+    if (event.orderUnitPrice.currency !== event.currency) fail("order_currency_mismatch");
+    positivePrice(event.orderUnitPrice.amount);
+  }
+  if (!event.settlement && !unit) fail("settlement_required");
+  const settlement = event.settlement ?? { amount: q.mul(price!).toExactString(), currency: event.currency };
+  const total = money(settlement.amount, settlement.currency, true);
+  if (price && settlement.currency === event.currency && q.mul(price).compare(total) !== 0) fail("execution_evidence_conflict");
+  // A repeating average remains rational. Never invent a USD average for a KRW settlement.
+  const average = settlement.currency === event.currency ? total.div(q) : null;
+  return { settlement: { amount: total.toExactString(), currency: settlement.currency },
+    average: average ? { n: average.n.toString(), d: average.d.toString(), currency: event.currency, source: unit ? "reported_execution" as const : "derived_execution_average" as const } : null,
+    executionUnitPrice: unit ?? null, fee: event.fee ?? null, tax: event.tax ?? null };
+}
 
 export const NATIVE_LEDGER_POLICY = Object.freeze({ version: "native_ledger_v1", disposal: "proportional_weighted_average", fees: "expense_separately", unknownCost: "retain_unknown_until_explicit_dated_basis", maxPositions: 200, maxCostLots: 2000, rationalDigits: 100 });
 
@@ -37,12 +72,14 @@ export function applyNativeEvent(state: NativePortfolioState, event: NativeEvent
   try {
     validateState(state);
     text(event.id, "event_id"); text(event.source, "source"); timestamp(event.at);
+    validateNativeDateEvidence(event.at, event.dateEvidence);
     if (!Number.isSafeInteger(event.sequence) || event.sequence !== state.sequence + 1) fail("event_sequence_mismatch");
     if (Date.parse(event.at) < Date.parse(state.at)) fail("event_time_order_invalid");
     const next = structuredClone(state);
     const cashLegs: NativeCashLeg[] = [];
     let quantityDelta: { assetId: string; quantity: string } | null = null;
     let realized: { proceeds: NativeMoney; disposedCostLots: NativeCostLot[] | null } | null = null;
+    let execution: ReturnType<typeof resolveNativeTrade> | null = null;
     const cash = (currency: Currency, delta: Decimal, kind: NativeCashLeg["kind"]) => {
       if (!isCurrency(currency)) fail("invalid_currency");
       // Validate each real settlement independently; no hidden fractional-cent rounding.
@@ -53,7 +90,7 @@ export function applyNativeEvent(state: NativePortfolioState, event: NativeEvent
       next.cash[currency] = balance.toExactString();
       if (delta.compare(0) !== 0) cashLegs.push({ currency, delta: delta.toExactString(), kind });
     };
-    const fee = (value: NativeMoney | undefined) => {
+    const fee = (value: NativeMoney | null | undefined) => {
       if (value) cash(value.currency, money(value.amount, value.currency, false).mul(-1), "fee");
     };
     const position = (assetId: string): NativePosition => {
@@ -70,8 +107,10 @@ export function applyNativeEvent(state: NativePortfolioState, event: NativeEvent
       case "buy": case "sell": {
         text(event.assetId, "asset_id");
         if (!isCurrency(event.currency)) fail("invalid_currency");
-        const amount = quantity(event.quantity, true), price = positivePrice(event.price);
-        const gross = money(amount.mul(price).toExactString(), event.currency, true);
+        const amount = quantity(event.quantity, true);
+        execution = resolveNativeTrade(event);
+        const settlementCurrency = execution.settlement.currency;
+        const gross = Decimal.from(execution.settlement.amount);
         let holding = next.positions.find(row => row.assetId === event.assetId);
         if (!holding && event.type === "buy") {
           // The parent writer has verified this is an existing owned assets.id.
@@ -82,19 +121,19 @@ export function applyNativeEvent(state: NativePortfolioState, event: NativeEvent
         if (holding!.currency !== event.currency) fail("instrument_currency_mismatch");
         const oldQuantity = quantity(holding!.quantity);
         if (event.type === "buy") {
-          cash(event.currency, gross.mul(-1), "trade"); fee(event.fee);
+          cash(settlementCurrency, gross.mul(-1), "trade"); fee(event.fee); fee(event.tax);
           holding!.quantity = quantity(oldQuantity.add(amount).toExactString()).toExactString();
           if (oldQuantity.compare(0) === 0) holding!.costLots = [];
           // A known new purchase cannot fill unknown original acquisition evidence.
-          if (holding!.costLots !== null) holding!.costLots.push({ amount: gross.toExactString(), currency: event.currency, at: event.at, source: event.source, remaining: { n: "1", d: "1" } });
+          if (holding!.costLots !== null) holding!.costLots.push({ amount: gross.toExactString(), currency: settlementCurrency, at: event.at, source: event.source, remaining: { n: "1", d: "1" }, ...(event.dateEvidence ? { dateEvidence: event.dateEvidence } : {}) });
           quantityDelta = { assetId: event.assetId, quantity: amount.toExactString() };
         } else {
           if (amount.compare(oldQuantity) > 0) fail("insufficient_quantity");
           const retained = oldQuantity.sub(amount).div(oldQuantity), disposed = amount.div(oldQuantity);
-          realized = { proceeds: { amount: gross.toExactString(), currency: event.currency }, disposedCostLots: holding!.costLots === null ? null : holding!.costLots.map(lot => ({ ...lot, remaining: encoded(fraction(lot.remaining).mul(disposed)) })) };
+          realized = { proceeds: { amount: gross.toExactString(), currency: settlementCurrency }, disposedCostLots: holding!.costLots === null ? null : holding!.costLots.map(lot => ({ ...lot, remaining: encoded(fraction(lot.remaining).mul(disposed)) })) };
           holding!.quantity = oldQuantity.sub(amount).toExactString();
           holding!.costLots = holding!.quantity === "0" ? [] : holding!.costLots === null ? null : holding!.costLots.map(lot => ({ ...lot, remaining: encoded(fraction(lot.remaining).mul(retained)) }));
-          cash(event.currency, gross, "trade"); fee(event.fee);
+          cash(settlementCurrency, gross, "trade"); fee(event.fee); fee(event.tax);
           quantityDelta = { assetId: event.assetId, quantity: amount.mul(-1).toExactString() };
         }
         break;
@@ -133,7 +172,7 @@ export function applyNativeEvent(state: NativePortfolioState, event: NativeEvent
     }
     next.at = event.at; next.sequence = event.sequence;
     validateState(next);
-    return { ok: true, next, cashLegs, quantityDelta, realized };
+    return { ok: true, next, cashLegs, quantityDelta, realized, execution };
   } catch (error) { return failure(error); }
 }
 
@@ -180,7 +219,7 @@ function encoded(value: Decimal): NativeFraction {
 function validateLots(lots: NativeCostLot[] | null, asOf: string, positiveQuantity: boolean) {
   if (lots === null) return;
   if (!Array.isArray(lots) || lots.length > NATIVE_LEDGER_POLICY.maxCostLots || (positiveQuantity && lots.length === 0)) fail("invalid_cost_lots");
-  for (const lot of lots) { money(lot.amount, lot.currency, false); timestamp(lot.at); text(lot.source, "cost_source"); if (Date.parse(lot.at) > Date.parse(asOf)) fail("future_cost_evidence"); fraction(lot.remaining); }
+  for (const lot of lots) { money(lot.amount, lot.currency, false); timestamp(lot.at); validateNativeDateEvidence(lot.at, lot.dateEvidence); text(lot.source, "cost_source"); if (Date.parse(lot.at) > Date.parse(asOf)) fail("future_cost_evidence"); fraction(lot.remaining); }
 }
 function normalizeLots(lots: NativeCostLot[] | null) { return lots === null ? null : lots.map(lot => ({ ...lot, amount: Decimal.from(lot.amount).toExactString(), remaining: encoded(fraction(lot.remaining)) })); }
 function validateState(state: NativePortfolioState) {

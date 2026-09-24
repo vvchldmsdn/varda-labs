@@ -17,7 +17,7 @@ import type {
 
 export type InvestmentLabValuationClose = InvestmentLabAdjustedClose &
   Readonly<{ serviceDate: string }>;
-export type InvestmentLabValuePoint = Readonly<{ serviceDate: string; totalValue: number; at?: string }>;
+export type InvestmentLabValuePoint = Readonly<{ boundary?: "before"; serviceDate: string; totalValue: number; at?: string }>;
 
 export function prepareInvestmentLabCounterfactualPathInput(
   input: {

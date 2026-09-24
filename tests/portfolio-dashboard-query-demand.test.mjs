@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTableName } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
+import { PGlite } from "@electric-sql/pglite";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
@@ -138,6 +139,7 @@ describe("dashboard query demand and independent market reads", () => {
       "src/components/portfolio-dashboard.tsx", "src/components/holding-state-correction-form.tsx", "src/components/i18n/locale-provider.tsx",
     ], {
       "@/app/portfolio/holdings/actions": { correctHoldingState: async () => { throw new Error("SSR must not submit a correction"); } },
+      "next/dynamic": { default: () => () => null },
       "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() {} }) },
       "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },
       "next/image": { default: props => createElement("img", Object.fromEntries(Object.entries(props).filter(([name]) => name !== "priority"))) },
@@ -190,6 +192,7 @@ describe("dashboard query demand and independent market reads", () => {
     const [{ PortfolioDashboard }, { TodayMovement }, { LocaleProvider }] = await importUiWithPorts([
       "src/components/portfolio-dashboard.tsx", "src/components/today-movement.tsx", "src/components/i18n/locale-provider.tsx",
     ], {
+      "next/dynamic": { default: () => () => null },
       "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() { throw new Error("SSR must not refresh"); } }) },
       "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },
       "next/image": { default: props => createElement("img", Object.fromEntries(Object.entries(props).filter(([name]) => name !== "priority"))) },
@@ -365,4 +368,36 @@ describe("dashboard query demand and independent market reads", () => {
     assert.deepEqual(today.eventActivity, []);
     assert.equal(home.eventActivity.length, 2);
   });
+});
+
+
+it("executes Dashboard baseline SQL without bridging a recovered trade while preserving pre-trade history", async () => {
+  const f = await fixture();
+  await f.read({ surface: "home" });
+  const reads = f.trace.filter(request => request.table === "daily_position_snapshots");
+  const baseline = reads.find(request => request.projection?.id);
+  const history = reads.find(request => request.projection?.snapshotDate && request.limit !== null);
+  assert.ok(baseline && history);
+  const pg = new PGlite();
+  try {
+    await pg.exec(`create table accounts(id uuid,canonical_owner_user_id uuid,is_active boolean,code text);
+      create table daily_position_snapshots(id text,canonical_owner_user_id uuid,account_id uuid,account text,asset_id uuid,
+        snapshot_date date,is_sample boolean,source text,captured_at timestamptz,created_at timestamptz);
+      create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);`);
+    await pg.query("insert into accounts values($1,$2,true,'brokerage'),($3,$2,true,'isa')", [accountId,ownerId,otherAccountId]);
+    await pg.query("insert into broker_recovery_batches values($1,$2,$3,'2026-09-08T02:00:00Z')", [ownerId,accountId,JSON.stringify({trades:[{tradeDate:"2026-09-08"}]})]);
+    for (const [name,account,code,asset,date] of [
+      ["old-brokerage",accountId,"brokerage",assetId,"2026-09-07"],
+      ["old-isa",otherAccountId,"isa",otherAssetId,"2026-09-07"],
+      ["affected",accountId,"brokerage",assetId,"2026-09-08"],
+    ]) await pg.query("insert into daily_position_snapshots values($1,$2,$3,$4,$5,$6,false,'test','2026-09-08T01:00:00Z','2026-09-08T01:00:00Z')",[name,ownerId,account,code,asset,date]);
+    const execute = async request => (await pg.query(`select daily_position_snapshots.id from daily_position_snapshots
+      inner join accounts on daily_position_snapshots.account_id=accounts.id where ${request.predicate.sql}
+      order by daily_position_snapshots.id`,request.predicate.params)).rows.map(row=>row.id);
+    assert.deepEqual(await execute(baseline), []);
+    assert.deepEqual(await execute(history), ["old-brokerage","old-isa"]);
+    await pg.query("insert into daily_position_snapshots values('corrected',$1,$2,'brokerage',$3,'2026-09-08',false,'test','2026-09-08T03:00:00Z','2026-09-08T03:00:00Z')",[ownerId,accountId,assetId]);
+    assert.deepEqual(await execute(baseline), ["corrected"]);
+    assert.deepEqual(await execute(history), ["corrected","old-brokerage","old-isa"]);
+  } finally { await pg.close(); }
 });

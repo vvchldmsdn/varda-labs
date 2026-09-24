@@ -45,7 +45,7 @@ export function convertMoney(amount: string | number | Decimal, from: Currency, 
   if (!factor.ok) return factor;
   try { return { ok: true, value: Decimal.from(amount).mul(factor.value) }; } catch { return { ok: false, reason: "invalid_value" }; }
 }
-export type ValuationObservation = { quantity: string; price: string; currency: Currency; at: string; priceObservedAt?: string; basis: "raw"; source: string };
+export type ValuationObservation = { quantity: string; price: string; currency: Currency; at: string; priceObservedAt?: string; priceFetchedAt?: string; basis: "raw"; source: string };
 export function valuePosition(row: ValuationObservation, reporting: Currency, fx: readonly FxEvidence[], maxAgeMs: number): CurrencyResult<Decimal> {
   if (row.basis !== "raw") return { ok: false, reason: "price_basis_mismatch" };
   try {
@@ -76,7 +76,7 @@ export function costInReportingCurrency(cost: { amount: string; currency: Curren
 }
 
 /** Weighted-average disposal keeps each acquisition's original date and currency. */
-export function costLotsInReportingCurrency(lots: readonly { amount: string; currency: Currency; at: string; source: string; remaining: { n: string; d: string } }[] | null, reporting: Currency, fx: readonly FxEvidence[], maxAgeMs: number, asOf: string) {
+export function costLotsInReportingCurrency(lots: readonly { amount: string; currency: Currency; at: string; source: string; remaining: { n: string; d: string }; dateEvidence?: { precision: "date_only" } }[] | null, reporting: Currency, fx: readonly FxEvidence[], maxAgeMs: number, asOf: string) {
   if (!lots) return { ok: false as const, reason: "missing_cost_evidence" };
   try {
     let total = Decimal.from(0);
@@ -84,7 +84,7 @@ export function costLotsInReportingCurrency(lots: readonly { amount: string; cur
       if (Date.parse(lot.at) > Date.parse(asOf)) return { ok: false as const, reason: "future_evidence" };
       const fraction = new Decimal(BigInt(lot.remaining.n), BigInt(lot.remaining.d));
       if (fraction.compare(0) < 0 || fraction.compare(1) > 0) return { ok: false as const, reason: "invalid_value" };
-      const converted = costInReportingCurrency(lot, reporting, fx, maxAgeMs);
+      const converted = costInReportingCurrency(lot, reporting, lot.dateEvidence ? fx.filter(rate => rate.kind === "daily_reference") : fx, maxAgeMs);
       if (!converted.ok) return converted;
       total = total.add(converted.value.mul(fraction));
     }

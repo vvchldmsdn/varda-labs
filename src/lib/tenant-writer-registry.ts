@@ -43,7 +43,8 @@ export type WriterTransitionPolicy = Readonly<{
     | "atomic_identity_pairing_consume"
     | "atomic_self_service_tenant_onboarding"
     | "post_consume_owner_assignment"
-    | "atomic_target_policy_approval";
+    | "atomic_target_policy_approval"
+    | "atomic_broker_evidence_recovery";
   freeze:
     | "freeze_without_verified_owner"
     | "freeze_user_targets_only"
@@ -97,6 +98,26 @@ const LEGACY_EXCLUDED_TRANSITION = {
 } as const;
 
 export const TENANT_WRITER_REGISTRY = [
+  {
+    id: "approved_broker_evidence_recovery",
+    classification: "user_owned",
+    authorization: "migration_cli",
+    entrypoints: ["scripts/lib/broker-securities-recovery.mjs#recoverBrokerSecurities"],
+    implementationPaths: ["scripts/lib/broker-securities-recovery.mjs"],
+    targets: [
+      userTarget("broker_recovery_batches", "insert", "update"),
+      userTarget("assets", "insert", "update"),
+      userTarget("event_ledger_entries", "insert"),
+      userTarget("portfolio_group_asset_memberships", "update", "delete"),
+      userTarget("holding_lifecycle_events", "insert"),
+    ],
+    // Offline operator, not HTTP authority. Writes require reviewed owner/state,
+    // a manifest confirmation and verified restore; the default is rollback.
+    transition: { prepare: "dry_run_only", activate: "atomic_broker_evidence_recovery", freeze: "freeze_without_verified_owner" },
+    canonicalOwnerRolloutScope: "in_scope",
+    canonicalOwnerHttpInput: "forbidden",
+    legacyOwnerEvidence: "separate",
+  },
   {
     id: "session_simulation_execution", classification: "user_owned", authorization: "server_verified_session",
     entrypoints: ["src/lib/server/simulation-path-details.ts", "src/app/api/simulation/path-detail/route.ts"],

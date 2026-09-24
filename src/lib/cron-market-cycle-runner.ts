@@ -121,7 +121,7 @@ export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): 
     } else throw error;
   }
   // Native cash-only portfolios and admitted providers do not depend on KIS readiness.
-  const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false }).catch(() => ({ status: "failed" as const }));
+  const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false, snapshotDate: result.snapshotDate }).catch(() => ({ status: "failed" as const }));
   return { ...result, nativeSnapshot };
 }
 

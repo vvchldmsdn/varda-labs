@@ -1,7 +1,7 @@
 import { Decimal, isCurrency, type Currency } from "./money.ts";
 import { valuePosition, costInReportingCurrency, costLotsInReportingCurrency, convertMoney, selectValuationFxAt, type FxEvidence, type ValuationObservation } from "./currency-valuation.ts";
 import { attributeCurrencyTrades, calculateCurrencyModifiedDietz, type DatedSplit } from "./currency-performance.ts";
-import type { NativeCostLot } from "./native-portfolio-ledger.ts";
+import type { NativeCostLot, NativeDateEvidence } from "./native-portfolio-ledger.ts";
 import { resolveSnapshotCycle } from "./snapshots/market-calendar.ts";
 
 export const TRACKED_CURRENCY_VERSION = "owned_native_valuation_v1";
@@ -15,16 +15,16 @@ export type TrackedNativePosition = {
   cost?: { amount: string; currency: Currency; at: string; source: string } | null;
 };
 export type TrackedValuationFrame = {
-  at: string; source: string; positions: readonly TrackedNativePosition[];
+  at: string; boundary?: "before"; source: string; positions: readonly TrackedNativePosition[];
   /** Caller must account for archived positions and cash before claiming a complete portfolio. */
   scopeComplete: boolean;
 };
 export type TrackedTrade = {
-  id: string; ownerId: string; positionId: string; quantityDelta: string; price: string;
+  id: string; ownerId: string; positionId: string; quantityDelta: string; price: string | null;
   currency: Currency; at: string; source: string; sequence?: number;
 };
 export type TrackedRealizedTrade = {
-  id: string; ownerId: string; accountId: string; positionId: string; name: string; at: string; source: string;
+  id: string; ownerId: string; accountId: string; positionId: string; name: string; at: string; source: string; dateEvidence?: NativeDateEvidence;
   proceeds: { amount: string; currency: Currency } | null;
   /** Frozen disposal fractions from the sale event, never the holding's later cost basis. */
   disposedCostLots: readonly NativeCostLot[] | null;
@@ -35,7 +35,7 @@ export type TrackedPortfolioEvidence = {
   /** null means unknown ledger coverage, including when endpoint quantities happen to match. */
   trades: readonly TrackedTrade[] | null;
   fx: readonly FxEvidence[]; maxFxAgeMs: number; maxPriceAgeMs: number;
-  cashFlows?: readonly { id: string; ownerId: string; accountId: string; at: string; currency: Currency; delta: string; kind: "external" | "trade" | "income" | "fee" | "exchange" | "transfer"; externalToScope?: boolean }[];
+  cashFlows?: readonly { id: string; ownerId: string; accountId: string; at: string; currency: Currency; delta: string; kind: "external" | "trade" | "income" | "fee" | "exchange" | "transfer"; externalToScope?: boolean; dateEvidence?: NativeDateEvidence }[];
   ledgerComplete?: boolean;
   corporateActionsInWindow?: boolean;
   splits?: readonly (DatedSplit & { positionId: string })[];
@@ -47,7 +47,7 @@ export type TrackedPortfolioEvidence = {
 export type CurrencyTrackedInput = TrackedPortfolioEvidence;
 type Issue = { code: string; positionId?: string; at?: string };
 type ValuedFrame = {
-  at: string; total: string | null; verifiedSubtotal: string; complete: boolean;
+  boundary?: "before"; at: string; total: string | null; verifiedSubtotal: string; complete: boolean;
   coverage: { positions: number; valued: number; scopeComplete: boolean; excludedPositions: number; excludedWeightPct: number | null };
   positions: { id: string; name: string; value: string | null; cost: string | null; weightPct: number | null; priceObservedAt: string | null; reason: string | null }[];
   issues: Issue[];
@@ -106,7 +106,7 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
     const complete = !issues.length && frame.scopeComplete;
     if (complete) exactTotals.set(frame, subtotal);
     if (complete && subtotal.compare(0) > 0) positions.forEach(row => { row.weightPct = exactValues.get(row.id)!.div(subtotal).mul(100).toNumber(); });
-    return { at: frame.at, total: complete ? subtotal.toNumber().toString() : null, verifiedSubtotal: subtotal.toNumber().toString(), complete, coverage: { positions: positions.length, valued: positions.filter(row => row.value !== null).length, scopeComplete: frame.scopeComplete, excludedPositions: positions.filter(row => row.value === null).length, excludedWeightPct: complete ? 0 : null }, positions, issues };
+    return { boundary: frame.boundary, at: frame.at, total: complete ? subtotal.toNumber().toString() : null, verifiedSubtotal: subtotal.toNumber().toString(), complete, coverage: { positions: positions.length, valued: positions.filter(row => row.value !== null).length, scopeComplete: frame.scopeComplete, excludedPositions: positions.filter(row => row.value === null).length, excludedWeightPct: complete ? 0 : null }, positions, issues };
   };
   const current = valueFrame(evidence.current, false);
   const history = evidence.history.map(frame => valueFrame(frame, true));
@@ -121,7 +121,7 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
     if (!reason && (previous.size !== evidence.current.positions.length || evidence.current.positions.some(row => !previous.has(row.id)))) reason = "position_axis_mismatch";
     const ids = new Set<string>();
     if (!reason) for (const trade of evidence.trades ?? []) {
-      if (!trade.id || ids.has(trade.id) || !previous.has(trade.positionId) || !Number.isFinite(Date.parse(trade.at)) || Date.parse(trade.at) <= Date.parse(before.at) || Date.parse(trade.at) > Date.parse(evidence.current.at)) { reason = "invalid_trade_ledger"; break; }
+      if (!trade.id || ids.has(trade.id) || !previous.has(trade.positionId) || !Number.isFinite(Date.parse(trade.at)) || (Date.parse(trade.at) < Date.parse(before.at) || (before.boundary !== "before" && Date.parse(trade.at) === Date.parse(before.at))) || Date.parse(trade.at) > Date.parse(evidence.current.at)) { reason = "invalid_trade_ledger"; break; }
       ids.add(trade.id);
     }
     let price = Decimal.from(0), exchange = Decimal.from(0), flow = Decimal.from(0), change = Decimal.from(0);
@@ -130,14 +130,14 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
       const p0 = previous.get(row.id)!;
       // Historical baseline/trade FX must be admitted as daily evidence; latest FX may be spot.
       const fx = [...historicFx, ...currentFx.filter(rate => Date.parse(rate.observedAt) > Date.parse(before.at))];
-      const result = attributeCurrencyTrades({ before: { ...p0.observation!, at: before.at }, after: { ...row.observation!, at: evidence.current.at }, trades: evidence.trades!.filter(trade => trade.positionId === row.id).toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.sequence ?? 0) - (b.sequence ?? 0)), splits: evidence.splits?.filter(split => split.positionId === row.id), reporting: evidence.reporting, fx, beforeFx: frozenFx(before.at), maxFxAgeMs: evidence.maxFxAgeMs });
+      const result = attributeCurrencyTrades({ beforeBoundary: before.boundary, before: { ...p0.observation!, at: before.at }, after: { ...row.observation!, at: evidence.current.at }, trades: evidence.trades!.filter(trade => trade.positionId === row.id).toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.sequence ?? 0) - (b.sequence ?? 0)), splits: evidence.splits?.filter(split => split.positionId === row.id), reporting: evidence.reporting, fx, beforeFx: frozenFx(before.at), maxFxAgeMs: evidence.maxFxAgeMs });
       if (!result.ok) { reason = result.reason; break; }
       price = price.add(result.value.price); exchange = exchange.add(result.value.exchange); flow = flow.add(result.value.flow); change = change.add(result.value.change);
       positionChanges.push({ id: row.id, name: row.name, price: result.value.price.toNumber().toString(), exchange: result.value.exchange.toNumber().toString(), change: result.value.change.toNumber().toString() });
     }
     if (!reason && evidence.ledgerComplete && evidence.cashFlows) {
       let external = Decimal.from(0);
-      for (const leg of evidence.cashFlows.filter(leg => Date.parse(leg.at) > Date.parse(before.at) && Date.parse(leg.at) <= Date.parse(evidence.current.at))) {
+      for (const leg of evidence.cashFlows.filter(leg => (Date.parse(leg.at) > Date.parse(before.at) || (before.boundary === "before" && Date.parse(leg.at) === Date.parse(before.at))) && Date.parse(leg.at) <= Date.parse(evidence.current.at))) {
         if (leg.kind !== "external" && !leg.externalToScope) continue;
         const converted = convertMoney(leg.delta, leg.currency, evidence.reporting, leg.at, evidence.fx, evidence.maxFxAgeMs);
         if (!converted.ok) { reason = converted.reason; break; }
@@ -150,8 +150,8 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
   const start = history[0];
   const performance = evidence.ledgerComplete && current.complete && start?.complete && history.every(frame => frame.complete) && evidence.cashFlows ? calculateCurrencyModifiedDietz({
     reporting: evidence.reporting, cashFlowEvidence: "complete", fx: evidence.fx, maxFxAgeMs: evidence.maxFxAgeMs, boundary: evidence.groupEvidence ? "selected_group" : "portfolio_including_cash",
-    valuations: [...history, current].map(frame => ({ at: frame.at, serviceDate: resolveSnapshotCycle(new Date(frame.at)).snapshotDate, amount: frame.total!, currency: evidence.reporting, source: "native_ledger_snapshot" })),
-    flows: evidence.cashFlows.filter(leg => (leg.kind === "external" || leg.externalToScope) && Date.parse(leg.at) > Date.parse(start.at) && Date.parse(leg.at) <= Date.parse(current.at)).map(leg => ({ id: leg.id, amount: Decimal.from(leg.delta).compare(0) < 0 ? Decimal.from(leg.delta).mul(-1).toExactString() : leg.delta, currency: leg.currency, at: leg.at, serviceDate: resolveSnapshotCycle(new Date(leg.at)).snapshotDate, source: "native_ledger", kind: Decimal.from(leg.delta).compare(0) < 0 ? "external_out" as const : "external_in" as const }))
+    valuations: [...history, current].map(frame => ({ boundary: frames.find(source => source.at === frame.at)?.boundary, at: frame.at, serviceDate: resolveSnapshotCycle(new Date(frame.at)).snapshotDate, amount: frame.total!, currency: evidence.reporting, source: "native_ledger_snapshot" })),
+    flows: evidence.cashFlows.filter(leg => (leg.kind === "external" || leg.externalToScope) && (Date.parse(leg.at) > Date.parse(start.at) || (evidence.history[0]?.boundary === "before" && Date.parse(leg.at) === Date.parse(start.at))) && Date.parse(leg.at) <= Date.parse(current.at)).map(leg => ({ id: leg.id, amount: Decimal.from(leg.delta).compare(0) < 0 ? Decimal.from(leg.delta).mul(-1).toExactString() : leg.delta, currency: leg.currency, at: leg.at, dateEvidence: leg.dateEvidence, serviceDate: resolveSnapshotCycle(new Date(leg.at)).snapshotDate, source: "native_ledger", kind: Decimal.from(leg.delta).compare(0) < 0 ? "external_out" as const : "external_in" as const }))
   }) : null;
   return { status: current.complete ? "ready" as const : "incomplete" as const, version: TRACKED_CURRENCY_VERSION, reporting: evidence.reporting, asOf: evidence.asOf, current, history, movement, realizedPnl: valueRecordedSales(evidence, historicFx), performanceReturn: performance, performanceReason: performance ? null : evidence.groupEvidence?.reason ?? "portfolio_cash_flow_evidence_required", boundary: "explicit_owned_native_positions" };
 }
@@ -167,7 +167,7 @@ function valueRecordedSales(evidence: TrackedPortfolioEvidence, historicalFx: re
     try {
       if (!sale.id || counts.get(sale.id) !== 1 || !sale.accountId || !sale.positionId || !sale.source.trim() || !Number.isFinite(Date.parse(sale.at)) || Date.parse(sale.at) > Date.parse(evidence.asOf)) { row.reason = "invalid_recorded_sale"; return row; }
       if (!sale.proceeds || !isCurrency(sale.proceeds.currency) || Decimal.from(sale.proceeds.amount).compare(0) <= 0) { row.reason = "sale_proceeds_missing"; return row; }
-      const proceeds = convertMoney(sale.proceeds.amount, sale.proceeds.currency, evidence.reporting, sale.at, historicalFx, evidence.maxFxAgeMs);
+      const proceeds = convertMoney(sale.proceeds.amount, sale.proceeds.currency, evidence.reporting, sale.at, sale.dateEvidence ? historicalFx.filter(rate => rate.kind === "daily_reference") : historicalFx, evidence.maxFxAgeMs);
       if (!proceeds.ok) { row.reason = proceeds.reason; return row; }
       row.proceeds = proceeds.value.toNumber().toString();
       if (!sale.disposedCostLots?.length) { row.reason = "missing_cost_evidence"; return row; }

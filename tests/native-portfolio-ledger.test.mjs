@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { Decimal } from '../src/lib/money.ts';
 import { fxFactor } from '../src/lib/currency-valuation.ts';
-import { createNativePortfolioState, applyNativeEvent, nativeCostAmounts } from '../src/lib/native-portfolio-ledger.ts';
+import { createNativePortfolioState, applyNativeEvent, nativeCostAmounts, resolveNativeTrade, nativeDateOnlyAt } from '../src/lib/native-portfolio-ledger.ts';
 
 const at = '2026-09-01T00:00:00Z';
 const later = '2026-09-02T00:00:00Z';
@@ -172,4 +172,42 @@ it('requires explicit complete openings, unique positions and bounded valid cost
     { positions: [{ ...input.positions[0], costLots: [{ ...lot(), at: later }] }] },
     ...[{ n: '0', d: '1' }, { n: '2', d: '1' }, { n: '1', d: '0' }, { n: '1', d: '9'.repeat(101) }].map(remaining => ({ positions: [{ ...input.positions[0], costLots: [{ ...lot(), remaining }] }] })),
   ]) assert.equal(createNativePortfolioState({ ...input, ...override }).ok, false);
+});
+
+
+it('preserves a KRW fractional US execution without manufacturing USD cash or price', () => {
+  const state = opening({ cash: { KRW: '500000', USD: '12.34' } });
+  const result = run(state, { type: 'buy', assetId: 'fractional', currency: 'USD', quantity: '0.411494', settlement: { amount: '420000', currency: 'KRW' } });
+  assert.deepEqual(result.next.cash, { KRW: '80000', USD: '12.34' });
+  assert.equal(result.next.positions[0].quantity, '0.411494');
+  assert.equal(result.execution.average, null);
+  assert.equal(result.execution.executionUnitPrice, null);
+  assert.equal(result.execution.fee, null);
+  assert.deepEqual(result.next.positions[0].costLots[0], { amount: '420000', currency: 'KRW', at: later, source: 'actual test execution', remaining: { n: '1', d: '1' } });
+  const sale = run(result.next, { type: 'sell', assetId: 'fractional', currency: 'USD', quantity: '0.411494', settlement: { amount: '410000', currency: 'KRW' }, fee: { amount: '0', currency: 'KRW' } });
+  assert.equal(sale.next.positions[0].quantity, '0');
+  assert.equal(sale.next.cash.USD, '12.34');
+  assert.equal(sale.realized.proceeds.amount, '410000');
+  assert.equal(sale.execution.fee.amount, '0');
+});
+for (const [quantity, amount, order, expected, currency] of [['42','1422.12','33.81','33.86','USD'], ['27','2900610','106500','107430','KRW'], ['7','606.69','86.68','86.67','USD']]) {
+  it(`uses execution total instead of order reference (${quantity} shares)`, () => {
+    const result = resolveNativeTrade({ type:'buy',assetId:'test',currency,quantity,settlement:{amount,currency},orderUnitPrice:{amount:order,currency} });
+    assert.equal(Decimal.from(result.average.n).div(result.average.d).compare(expected),0);
+    assert.equal(result.average.source,'derived_execution_average');
+    assert.equal(result.settlement.amount,amount);
+  });
+}
+it('rejects contradictory totals, fractional cents and excessive quantity precision', () => {
+  const state=opening({cash:{KRW:'1000000',USD:'1000'}});
+  reject(state,{type:'buy',assetId:'x',currency:'USD',quantity:'1',price:'100',settlement:{amount:'99',currency:'USD'}},'execution_evidence_conflict');
+  reject(state,{type:'buy',assetId:'x',currency:'USD',quantity:'0.1234567',settlement:{amount:'10',currency:'USD'}},'invalid_quantity');
+  assert.throws(()=>resolveNativeTrade({type:'buy',assetId:'x',currency:'USD',quantity:'1',settlement:{amount:'1.001',currency:'USD'}}));
+});
+it('preserves a date-only trade and its explicit service-day midpoint policy in the original cost', () => {
+  const state=opening({cash:{KRW:'0',USD:'100'}});
+  const dateEvidence={precision:'date_only',reportedDate:'2026-09-02',timeZone:'Asia/Seoul',policy:'service_day_midpoint'};
+  const result=run(state,{type:'buy',assetId:'x',currency:'USD',quantity:'1',settlement:{amount:'10',currency:'USD'},at:nativeDateOnlyAt(dateEvidence.reportedDate),dateEvidence});
+  assert.deepEqual(result.next.positions[0].costLots[0].dateEvidence,dateEvidence);
+  reject(state,{type:'buy',assetId:'x',currency:'USD',quantity:'1',price:'10',at:later,dateEvidence},'invalid_trade_date');
 });

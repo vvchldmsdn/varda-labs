@@ -165,3 +165,14 @@ it("actual portfolio performance and Lab link the same complete observed periods
   assert.equal(incomplete.current.complete, true);
   assert.equal(incomplete.performanceReturn, null, "an incomplete middle record must not be silently removed");
 });
+
+it("includes an exact-cutoff deposit once after an exclusive baseline in both comparison paths", () => {
+  const owned=evidence([100,200,200],[{id:"boundary-deposit",at:at(1),amount:"100",currency:"USD",direction:"inflow"}]);
+  owned.actualPath=owned.actualPath.map(row=>({...row,boundary:"before"}));
+  const result=run(owned,history([10,10,10]));
+  assert.equal(result.status,"ready");
+  assert.deepEqual(result.rows.map(row=>row.alternativeValue),[100,200,200]);
+  assert.equal(result.actualReturnPct,0);assert.equal(result.alternativeReturnPct,0);
+  const returns=md([{...value(1,100),boundary:"before"},{...value(2,200),boundary:"before"}],[flow(1,100,7)]);
+  assert.equal(returns.status,"ready");assert.equal(returns.totalReturn,0);
+});

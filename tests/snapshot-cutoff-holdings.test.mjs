@@ -10,7 +10,8 @@ const holding = (overrides = {}) => ({id: "owned", createdAt: "2026-08-16T00:00:
   updatedAt: "2026-08-16T00:00:00Z", ...overrides});
 describe("snapshot holding cutoff evidence", () => {
   it("permits unchanged holdings in a delayed snapshot and preserves the exact boundary", () => {
-    assert.deepEqual(holdingsChangedAfterCutoff([holding(), holding({updatedAt: cutoff})], cutoff), []);
+    assert.deepEqual(holdingsChangedAfterCutoff([holding()], cutoff), []);
+    assert.deepEqual(holdingsChangedAfterCutoff([holding({updatedAt: cutoff})], cutoff), ["owned"]);
   });
   it("does not backdate a new user's 08:43 registration to the 07:00 snapshot", () => {
     assert.deepEqual(holdingsChangedAfterCutoff([holding({createdAt: "2026-09-09T23:43:00Z",

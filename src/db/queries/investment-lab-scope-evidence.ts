@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 
@@ -88,6 +89,7 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
             tenantContext.ownerUserId,
           ),
           eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
         ),
       )
       .orderBy(
@@ -161,6 +163,7 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
             tenantContext.ownerUserId,
           ),
           eq(dailyPortfolioSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_portfolio_snapshots"),
           isNotNull(dailyPortfolioSnapshots.accountId),
         ),
       ),

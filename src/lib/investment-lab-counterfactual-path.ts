@@ -126,10 +126,10 @@ export function buildInvestmentLabUnitCounterfactualPath(input: {
   let units = anchor.totalValue / anchorPrice;
   const inWindowFlows = scheduledFlows.filter(
     (flow) =>
-      (anchor.at && flow.eventAt ? Date.parse(flow.eventAt) > Date.parse(anchor.at) : flow.eventDate > anchor.serviceDate) &&
+      (anchor.at && flow.eventAt ? Date.parse(flow.eventAt) > Date.parse(anchor.at) || (anchor.boundary === "before" && Date.parse(flow.eventAt) === Date.parse(anchor.at)) : flow.eventDate > anchor.serviceDate) &&
       flow.eventDate <= endServiceDate,
   );
-  const flowsByEvent = [...inWindowFlows, ...pendingFlows.filter(flow => anchor.at && Date.parse(flow.eventAt!) > Date.parse(anchor.at) && flow.eventDate <= endServiceDate)].sort(compareInvestmentLabEventOrder);
+  const flowsByEvent = [...inWindowFlows, ...pendingFlows.filter(flow => anchor.at && (Date.parse(flow.eventAt!) > Date.parse(anchor.at) || (anchor.boundary === "before" && Date.parse(flow.eventAt!) === Date.parse(anchor.at))) && flow.eventDate <= endServiceDate)].sort(compareInvestmentLabEventOrder);
   const flowsByExecution = [...inWindowFlows].sort(
     compareInvestmentLabExecutionOrder,
   );
@@ -147,7 +147,7 @@ export function buildInvestmentLabUnitCounterfactualPath(input: {
     while (
       eventIndex < flowsByEvent.length &&
       flowsByEvent[eventIndex].eventDate <= actual.serviceDate &&
-      (!actual.at || !flowsByEvent[eventIndex].eventAt || Date.parse(flowsByEvent[eventIndex].eventAt!) <= Date.parse(actual.at))
+      (!actual.at || !flowsByEvent[eventIndex].eventAt || (Date.parse(flowsByEvent[eventIndex].eventAt!) < Date.parse(actual.at) || (actual.boundary !== "before" && Date.parse(flowsByEvent[eventIndex].eventAt!) === Date.parse(actual.at))))
     ) {
       const flow = flowsByEvent[eventIndex];
       activePending.add(flow.sourceIndex);
@@ -164,7 +164,7 @@ export function buildInvestmentLabUnitCounterfactualPath(input: {
       executionIndex < flowsByExecution.length &&
       flowsByExecution[executionIndex].executionServiceDate <=
         actual.serviceDate &&
-      (!actual.at || Date.parse(`${flowsByExecution[executionIndex].executionServiceDate}T07:00:00+09:00`) <= Date.parse(actual.at))
+      (!actual.at || Date.parse(`${flowsByExecution[executionIndex].executionServiceDate}T07:00:00+09:00`) < Date.parse(actual.at) || (actual.boundary !== "before" && Date.parse(`${flowsByExecution[executionIndex].executionServiceDate}T07:00:00+09:00`) === Date.parse(actual.at)))
     ) {
       const flow = flowsByExecution[executionIndex];
       const applied = applyInvestmentLabUnitFlow(units, flow);
@@ -287,7 +287,7 @@ function cleanZero(value: number) {
 
 export type CurrencyCounterfactualEvidence = Readonly<{
   reportingCurrency: Currency; asOf: string; complete: boolean;
-  actualPath: readonly { at: string; totalValue: string }[];
+  actualPath: readonly { at: string; totalValue: string; boundary?: "before" }[];
   externalFlows: readonly { id: string; at: string; amount: string; currency: Currency; direction: "inflow" | "outflow" }[];
 }>;
 export const CURRENCY_COUNTERFACTUAL_POLICY = Object.freeze({
@@ -316,11 +316,11 @@ export function buildCurrencyInvestmentLabCounterfactual(input: {
   if (points.some((point, index) => !Number.isFinite(Date.parse(point.at)) || Date.parse(point.at) > Date.parse(evidence.asOf) || (index > 0 && Date.parse(point.at) <= Date.parse(points[index - 1].at)) || point.currency !== points[0].currency || point.dataset !== points[0].dataset || !point.dataset || point.basis !== (expectedActions === "verified_split_adjusted" ? "split_adjusted" : "raw_price"))) return blocked("scenario_history_invalid");
   if (points.some(point => Date.parse(point.at) !== Date.parse(`${resolveSnapshotCycle(new Date(point.at)).snapshotDate}T07:00:00+09:00`))) return blocked("scenario_history_invalid");
   try {
-    const actualPath = [];
+    const actualPath: { at: string; serviceDate: string; totalValue: number; boundary?: "before" }[] = [];
     for (const row of evidence.actualPath) {
       if (!Number.isFinite(Date.parse(row.at)) || Date.parse(row.at) > Date.parse(evidence.asOf) || Decimal.from(row.totalValue).compare(0) < 0) return blocked("actual_portfolio_evidence_incomplete");
       const serviceDate = resolveSnapshotCycle(new Date(row.at)).snapshotDate;
-      actualPath.push({ at: row.at, serviceDate, totalValue: Decimal.from(row.totalValue).toNumber() });
+      actualPath.push({ boundary: row.boundary, at: row.at, serviceDate, totalValue: Decimal.from(row.totalValue).toNumber() });
     }
     actualPath.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     if (actualPath.length < 2) return blocked("insufficient_actual_path");
@@ -335,7 +335,7 @@ export function buildCurrencyInvestmentLabCounterfactual(input: {
     const events: InvestmentLabMoneyFlow[] = [], flows: PortfolioCashFlow[] = [];
     for (const [sequence, flow] of evidence.externalFlows.entries()) {
       if (!flow.id || !Number.isFinite(Date.parse(flow.at)) || !["inflow", "outflow"].includes(flow.direction)) return blocked("invalid_flow");
-      if (Date.parse(flow.at) <= Date.parse(first.at) || Date.parse(flow.at) > Date.parse(last.at)) continue;
+      if ((Date.parse(flow.at) < Date.parse(first.at) || (first.boundary !== "before" && Date.parse(flow.at) === Date.parse(first.at))) || (Date.parse(flow.at) > Date.parse(last.at) || (last.boundary === "before" && Date.parse(flow.at) === Date.parse(last.at)))) continue;
       const converted = convertMoney(flow.amount, flow.currency, evidence.reportingCurrency, flow.at, historicalFx, maxFxAgeMs);
       if (!converted.ok) return blocked(converted.reason);
       const amount = converted.value.toNumber();
@@ -358,7 +358,7 @@ export function buildCurrencyInvestmentLabCounterfactual(input: {
     const rows = path.rows.map(row => ({ at: row.at!, serviceDate: row.serviceDate, actualValue: row.actualValue,
       alternativeValue: row.investedValue + row.pendingBuyCash - row.pendingSellObligation, pendingCash: row.pendingBuyCash, pendingWithdrawal: row.pendingSellObligation }));
     const returns = (side: "actualValue" | "alternativeValue") => calculateCurrencyModifiedDietz({ reporting: evidence.reportingCurrency, cashFlowEvidence: "complete", fx: [], maxFxAgeMs,
-      valuations: rows.map(row => ({ at: row.at, serviceDate: row.serviceDate, amount: String(row[side]), currency: evidence.reportingCurrency, source: "native_same_flow_counterfactual" })), flows });
+      valuations: rows.map(row => ({ boundary: actualPath.find(point => point.at === row.at)?.boundary, at: row.at, serviceDate: row.serviceDate, amount: String(row[side]), currency: evidence.reportingCurrency, source: "native_same_flow_counterfactual" })), flows });
     const actual = returns("actualValue"), alternative = returns("alternativeValue");
     if (actual.status !== "ready" || alternative.status !== "ready") return blocked("cash_flow_return_unavailable");
     return { status: "ready" as const, reason: null, policy: CURRENCY_COUNTERFACTUAL_POLICY, reportingCurrency: evidence.reportingCurrency, scenarioInstrumentId: scenario.instrumentId, rows,
