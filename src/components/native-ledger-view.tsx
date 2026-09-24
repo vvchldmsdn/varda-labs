@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { fieldsAfterLedgerSave, resolveTradeRecordSelection } from "@/lib/trade-record-intent";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AppNavigation } from "@/components/app-navigation";
 import { MoneyInput } from "@/components/first-visit/money-input";
@@ -71,9 +72,7 @@ export function buildNativeLedgerMutation({ account, kind, fields, lots, operati
 }
 
 export function resolveNativeLedgerSelection(accounts: Account[], hint: SelectionHint) {
-  const account = accounts.find(row => row.active !== false && row.id === hint.accountId);
-  const asset = account?.assets.find(row => row.id === hint.assetId);
-  return { accountId: account?.id ?? "", assetId: asset?.id ?? "", action: account && ["buy", "sell", "cost_basis"].includes(hint.action ?? "") ? hint.action as EventKind : "deposit" as EventKind };
+  return resolveTradeRecordSelection(accounts, hint);
 }
 
 export function NativeLedgerView({ initialSelection = {} }: { initialSelection?: SelectionHint }) {
@@ -81,6 +80,7 @@ export function NativeLedgerView({ initialSelection = {} }: { initialSelection?:
   const [data, setData] = useState<LedgerData | null>(null), [accountId, setAccountId] = useState("");
   const [kind, setKind] = useState<EventKind>("deposit"), [fields, setFields] = useState<Fields>({ currency: "USD", assetType: "etf" });
   const [lots, setLots] = useState<CostField[]>([{ amount: "", currency: "USD", at: "" }]);
+  const [savedOpening, setSavedOpening] = useState(false);
   const [confirmed, setConfirmed] = useState(false), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [error, setError] = useState(""), [success, setSuccess] = useState(false), [conflict, setConflict] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
@@ -133,7 +133,7 @@ export function NativeLedgerView({ initialSelection = {} }: { initialSelection?:
       const body = await response.json();
       if (body.error === "temporarily_unavailable") setData(previous => previous ? { ...previous, canWrite: false } : previous);
       if (!response.ok || !["created", "existing"].includes(body.status)) { if (response.status === 409) setConflict(true); if (response.status === 401) setSignedOut(true); throw new Error(body.error ?? "unavailable"); }
-      pending.current = null; setSuccess(true); setConfirmed(false); setFields(previous => ({ currency: previous.currency ?? "USD", at: localNow(), assetType: "etf" })); setLots([{ amount: "", currency: "USD", at: "" }]);
+      pending.current = null; setSuccess(true); setSavedOpening(!account.state); setConfirmed(false); setFields(previous => fieldsAfterLedgerSave(previous, !account.state, localNow())); setLots([{ amount: "", currency: "USD", at: "" }]);
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "unavailable"); }
     finally { lock.current = false; setBusy(false); }
@@ -143,10 +143,14 @@ export function NativeLedgerView({ initialSelection = {} }: { initialSelection?:
   const currencySelect = <label>{t("통화", "Currency")}<select value={fields.currency ?? "USD"} onChange={event => edit("currency", event.target.value)}><option>USD</option><option>KRW</option></select></label>;
   const accountName = (row: Account) => row.name;
   return <div className={styles.page}><AppNavigation activePath="/portfolio/manage" /><main id="varda-main-content" className={styles.body}>
-    <div className={styles.heading}><h1>{t("보유 정보와 현금", "Holdings & cash")}</h1><Link href={`/?currency=${fields.currency === "KRW" ? "KRW" : "USD"}`}>{t("홈으로 →", "Home →")}</Link></div>
+    <div className={styles.heading}><h1>{t("매매·현금 기록", "Trades & cash")}</h1><Link href={`/?currency=${fields.currency === "KRW" ? "KRW" : "USD"}`}>{t("홈으로 →", "Home →")}</Link></div>
+    <p className={styles.note}>{t("증권사에서 체결한 거래를 기록합니다.", "Record trades already executed at your broker.")}</p>
+    <div className={styles.tradeKinds} role="group" aria-label={t("매매 유형", "Trade type")}>
+      {(["buy", "sell"] as const).map(action => <button key={action} type="button" aria-pressed={kind === action} disabled={busy || loading || !data?.canWrite || signedOut || conflict} onClick={() => { setKind(action); pending.current = null; setError(""); setSuccess(false); }}>{action === "buy" ? t("매수 기록", "Record buy") : t("매도 기록", "Record sell")}</button>)}
+    </div>
     {loading ? <p role="status" className={styles.note}>{t("보유 정보를 확인하고 있어요…", "Loading your holdings…")}</p> : null}
     {error ? <div role="alert" className={styles.error}><p>{errorMessage(error)}</p>{signedOut ? <Link href="/auth/sign-in?returnTo=%2Fportfolio%2Fledger">{t("로그인", "Sign in")}</Link> : conflict || !data ? <button className={styles.secondary} type="button" onClick={() => void load(true)} disabled={loading}>{t("최신 정보 확인", "Review latest holdings")}</button> : null}</div> : null}
-    {success ? <p role="status" className={styles.success}>{t("기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.", "Recorded. Your updated holdings are available on Home.")}</p> : null}
+    {success ? <p role="status" className={styles.success}>{savedOpening ? t("잔액을 확인했어요. 선택한 거래를 이어서 기록하세요.", "Balances confirmed. Continue with your selected transaction.") : t("기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.", "Recorded. Your updated holdings are available on Home.")}</p> : null}
     {data?.canWrite && !account ? <><p className={styles.note}>{t("기록할 계좌를 먼저 선택해 주세요.", "Add an account to keep these records.")}</p><Link href="/portfolio/accounts">{t("계좌 추가 →", "Add an account →")}</Link></> : null}
     {data && !data.canWrite && !error ? <p role="status" className={styles.note}>{errorMessage("temporarily_unavailable")}</p> : null}
     {account && data?.canWrite ? <><form onSubmit={submit} className={styles.form} noValidate>
@@ -164,7 +168,7 @@ export function NativeLedgerView({ initialSelection = {} }: { initialSelection?:
         {kind === "cost_basis" ? <fieldset><legend>{t("현재 보유분의 매입원가", "Cost of the current holding")}</legend><p className={styles.note}>{t("현재 남아 있는 보유분에 해당하는 금액과 실제 매입 날짜를 입력하세요. 여러 날짜라면 나누어 추가하세요.", "Enter the cost attributable to your remaining holding and its actual acquisition date. Add separate dates when needed.")}</p><div className={styles.lots}>{lots.map((lot, index) => <div className={styles.lot} key={index}><div className={styles.row}><label>{t("매입원가", "Acquisition cost")}<MoneyInput value={lot.amount} allowDecimals={lot.currency === "USD"} onValueChange={value => { setLots(previous => previous.map((row, i) => i === index ? { ...row, amount: value } : row)); pending.current = null; }} /></label><label>{t("통화", "Currency")}<select value={lot.currency} onChange={event => { setLots(previous => previous.map((row, i) => i === index ? { ...row, currency: event.target.value as Currency } : row)); pending.current = null; }}><option>USD</option><option>KRW</option></select></label></div><label>{t("실제 매입 시각", "Acquired at")}<input type="datetime-local" step="0.001" value={lot.at} onChange={event => { setLots(previous => previous.map((row, i) => i === index ? { ...row, at: event.target.value } : row)); pending.current = null; }} /></label>{lots.length > 1 ? <button type="button" className={styles.secondary} onClick={() => { setLots(previous => previous.filter((_, i) => i !== index)); pending.current = null; }}>{t("제외", "Remove")}</button> : null}</div>)}</div><button type="button" className={styles.secondary} onClick={() => { setLots(previous => [...previous, { amount: "", currency: unit, at: "" }]); pending.current = null; }}>{t("다른 매입 날짜 추가", "Add another acquisition date")}</button></fieldset> : null}
       </> : null}
       {label("기록 시각 · 기기 시간대", "Recorded at · Device time zone", "at", "datetime-local")}
-      <div className={styles.actions}><button className={styles.primary} type="submit" disabled={busy || loading || conflict || signedOut}>{busy ? t("기록 중…", "Saving…") : account.state ? t("기록하기", "Save record") : t("이 잔액으로 시작", "Start with these balances")}</button><Link href={`/?currency=${fields.currency === "KRW" ? "KRW" : "USD"}`}>{t("나중에 하기", "Later")}</Link></div>
+      <div className={styles.actions}><button className={styles.primary} type="submit" disabled={busy || loading || conflict || signedOut}>{busy ? t("기록 중…", "Saving…") : account.state ? kind === "buy" ? t("매수 기록 저장", "Save buy record") : kind === "sell" ? t("매도 기록 저장", "Save sell record") : t("기록하기", "Save record") : t("잔액 확인 후 계속", "Confirm balances and continue")}</button><Link href={`/?currency=${fields.currency === "KRW" ? "KRW" : "USD"}`}>{t("나중에 하기", "Later")}</Link></div>
     </form></> : null}
   </main></div>;
 }

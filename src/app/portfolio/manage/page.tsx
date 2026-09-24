@@ -1,3 +1,4 @@
+import { TradeRecordLinks } from "@/components/trade-record-links";
 import { isActivityAdmin } from "@/lib/auth/member-activity-identity";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { T } from "@/components/i18n/localized-text";
@@ -25,6 +26,7 @@ const groups = [
     { href: "/etfs", title: "ETF 정보", description: "ETF의 분류와 참고 정보를 확인합니다.", icon: FolderOpen },
   ] },
   { title: "기록", links: [
+    { href: "/portfolio/ledger", title: "매매·현금 기록", description: "체결한 매매와 입출금을 기록합니다.", icon: ListChecks },
     { href: "/portfolio/events?account=all", title: "거래와 이벤트", description: "매매·입출금 등 자산의 변화를 확인합니다.", icon: ListChecks },
     { href: "/portfolio/portfolio-snapshots?account=all", title: "포트폴리오 스냅샷", description: "날짜별로 저장된 평가액과 수익률입니다.", icon: Database },
     { href: "/portfolio/position-snapshots?account=all", title: "종목별 스냅샷", description: "보유 종목의 날짜별 평가 근거입니다.", icon: FolderOpen },
@@ -56,11 +58,12 @@ export default async function PortfolioManagementPage({ searchParams }: {
           <p className="varda-kicker">YOUR WORKSPACE</p>
           <h1><PortfolioText ko={"나의 자산,"} />{" "}<br /><PortfolioText ko={"나의 기준."} /></h1>
           <p className="varda-management-cover-note"><PortfolioText ko={"포트폴리오를 이루는 데이터와"} />{" "}<br /><PortfolioText ko={"분석의 기준을 관리하세요."} /></p>
+          <TradeRecordLinks />
           <Link href="/portfolio/holdings/new" className="varda-action"><Plus size={16} aria-hidden="true" /><PortfolioText ko={"보유 종목 추가"} /></Link>
         </header>
         <LocalizedElement className="varda-management-index" aria-label="관리할 데이터 선택" as="div" en={{"aria-label": portfolioEnglish("관리할 데이터 선택")}}>
           {groups.map((group, index) => <PresentationDialog key={group.title} title={group.title} titleEn={portfolioEnglish(group.title)} triggerClassName="varda-management-chapter" label={<><span className="varda-management-chapter-number">0{index + 1}</span><span className="varda-management-chapter-title"><strong><PortfolioText ko={group.title} /></strong><small><PortfolioText ko={group.links.map(link => link.title).join(" · ")} /></small></span></>}>
-            <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href === "/portfolio/targets" ? targetHref : href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span><PortfolioText ko={title} /><small><PortfolioText ko={description} /></small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
+            <div>{group.links.map(({ href, title, description, icon: Icon }) => <Link href={href === "/portfolio/targets" ? targetHref : href} className="varda-management-link" key={href}><Icon size={19} strokeWidth={1.6} aria-hidden="true" /><span><PortfolioText ko={title} en={href === "/portfolio/ledger" ? "Trade & cash records" : undefined} /><small><PortfolioText ko={description} en={href === "/portfolio/ledger" ? "Record executed trades and cash movements." : undefined} /></small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
           </PresentationDialog>)}
         </LocalizedElement>
         {activityAdmin ? <Link className="mt-5 inline-flex min-h-11 items-center text-sm underline" href="/management/members">회원 활동 관리 →</Link> : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { TradeRecordLinks } from "@/components/trade-record-links";
 import { BrandLogo } from "@/components/brand-logo";
 import { REPORTING_ROUTES, ReportingCurrencySwitch } from "@/components/reporting-currency-switch";
 import Link, { useLinkStatus } from "next/link";
@@ -138,6 +139,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
             : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `View refreshed ${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `화면 갱신 ${formatKstTime(generatedAt)}`}</span> : null}
           {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={currentPath === "/history" || currentPath === "/today"} /> : null}
           <LanguageSwitch />
+          {!preview ? <TradeRecordLinks variant="topbar" accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} /> : null}
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
           </Link>
@@ -169,6 +171,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
             <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></button>
           </div>
           {links}
+          {!preview ? <TradeRecordLinks variant="menu" accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
           <Link className="varda-menu-account" href="/plans" onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
           {!preview ? <Link className="varda-menu-account" href="/portfolio/reporting" onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
