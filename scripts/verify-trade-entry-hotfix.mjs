@@ -16,7 +16,7 @@ function run(command, args, name) {
   console.log(`--- ${name}: ${result.status} ---\n${log.split('\n').slice(-45).join('\n')}`);
   if (result.error || result.status !== 0) throw result.error ?? Error(`${name} failed`);
 }
-run('node', ['--no-warnings','tests/run.mjs'], 'full-tests');
+run('node', ['--no-warnings','--test','--test-isolation=none','tests/trade-record-intent.test.mjs','tests/native-legacy-lifecycle.test.mjs','tests/identity-bootstrap-claim-migration-cli.test.mjs','tests/identity-bootstrap-claim-handoff-rehearsal.test.mjs'], 'focused-tests');
 run('npm', ['run','lint'], 'lint');
 run('npm', ['run','build','--','--webpack'], 'production-build');
 run('npx', ['playwright','install','--with-deps','chromium'], 'browser-install');
@@ -112,9 +112,14 @@ try {
   }
   writeFileSync(`${out}/browser-results.json`,JSON.stringify(results,null,2));
   console.log('Browser verification: '+results.length+' locale/viewport journeys passed with explicit API doubles. No real auth or Production writes.');
+} catch (error) {
+  const failedPage = browser?.contexts().flatMap(context => context.pages()).at(-1);
+  if (failedPage) { await failedPage.screenshot({path:`${out}/failure.png`,fullPage:true}).catch(()=>{}); writeFileSync(`${out}/browser-failure.txt`, await failedPage.locator('body').innerText().catch(()=>'')); }
+  throw error;
 } finally {
   await browser?.close();
   try { process.kill(-server.pid,'SIGTERM'); } catch {}
   closeSync(serverLog); rmSync(harness,{recursive:true,force:true});
 }
+run('node', ['--no-warnings','tests/run.mjs'], 'full-tests');
 console.log('Verification complete; temporary harness removed.');

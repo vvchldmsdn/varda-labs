@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { join as joinPath } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -75,7 +76,7 @@ describe("identity bootstrap claim migration CLI", () => {
       "C:\\repo",
       {
         readFile(path, options) {
-          assert.equal(path, "C:\\repo\\.env.local");
+          assert.equal(path, joinPath("C:\\repo", ".env.local"));
           assert.deepEqual(options, { encoding: "utf8" });
           return "ignored";
         },

@@ -365,3 +365,5 @@ import "./native-group-performance.test.mjs";
 import "./currency-reference-evidence.test.mjs";
 import "./currency-model-provenance.test.mjs";
 import "./krw-usd-rc-rehearsal.test.mjs";
+
+import "./trade-record-intent.test.mjs";

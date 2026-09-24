@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { resolve as resolvePath } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -29,7 +30,7 @@ describe("identity bootstrap claim handoff rehearsal", () => {
 
     assert.equal(
       result.envFile,
-      "C:\\repo\\.env.preview-rehearsal.local",
+      resolvePath("C:\\repo", ".env.preview-rehearsal.local"),
     );
     assert.throws(
       () =>
