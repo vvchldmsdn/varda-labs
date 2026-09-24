@@ -76,4 +76,3 @@ describe("quick portfolio currency presentation", () => {
     } finally { globalThis.localStorage = originalStorage; }
   });
 });
-

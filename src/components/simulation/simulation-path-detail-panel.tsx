@@ -50,4 +50,3 @@ export default function SimulationPathDetailPanel({ handle, pathIndex, step, onS
     </>}
   </section>;
 }
-

@@ -18,6 +18,3 @@ export function executionFixture(model='economic', assets=3, horizon=21) {
   if(economic.status!=='ready') throw Error(`fixture ${economic.status}`);
   return economicPathSnapshot(economic,execution);
 }
-
-
-

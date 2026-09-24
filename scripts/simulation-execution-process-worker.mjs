@@ -31,4 +31,3 @@ process.once('message',async input=>{
   } catch(error) {process.send({ok:false,code:error.code??'CASE_FAILED'});}
   finally {await pool?.end();}
 });
-
