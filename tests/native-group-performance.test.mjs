@@ -83,6 +83,18 @@ it("unassigned income restricts group return only; unsupported members never nor
   assert.ok(r.current.positions.every(p => p.weightPct === null));
 });
 
+it("does not omit unassigned income exactly after an exclusive service-day baseline", () => {
+  for (const type of ["dividend", "fee"]) {
+    const f = fixture();
+    f.ledger.snapshots.forEach(row => { row.evidence.frame.boundary = "before"; });
+    f.event("stock-account", { type, amount: "5", currency: "USD", at: start });
+    const result = buildTrackedCurrencyPortfolio(f.project());
+    assert.equal(result.current.complete, true);
+    assert.equal(result.performanceReturn, null);
+    assert.equal(result.performanceReason, "group_income_allocation_missing");
+  }
+});
+
 it("membership window excludes older frames and future memberships, and handles same asset union only once", () => {
   const selected = resolveNativeGroupSelection({ accountMemberships: [{ targetId: "cash-account", validFrom: "2026-09-01", validTo: null }], assetMemberships: [{ targetId: "old", validFrom: "2026-09-01", validTo: "2026-09-03" }, { targetId: "stock", validFrom: "2026-09-03", validTo: null }, { targetId: "future", validFrom: "2026-10-01", validTo: null }] }, end);
   assert.deepEqual(selected.directAssetIds, ["stock"]); assert.equal(selected.stableSince, "2026-09-02T22:00:00.000Z");

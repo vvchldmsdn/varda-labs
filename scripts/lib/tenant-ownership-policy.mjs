@@ -225,14 +225,21 @@ export const MEMBER_ACTIVITY_TABLE_POLICIES = Object.freeze([adminSystem("member
 export const PROVIDER_RESERVATION_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_reservations")]);
 // License-scoped evidence is intentionally private to the server admission service.
 export const PROVIDER_EVIDENCE_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_observations"), adminSystem("market_provider_action_coverage"), adminSystem("market_provider_corporate_actions")]);
+export const BROKER_RECOVERY_TABLE_POLICIES = Object.freeze([userOwned("broker_recovery_batches")]);
 
 export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...BROKER_RECOVERY_TABLE_POLICIES,
   ...SIMULATION_EXECUTION_TABLE_POLICIES,
   ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES, ...PROVIDER_RESERVATION_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES, ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  if (publicTableSet.has("broker_recovery_batches")) {
+    const dependencies = [...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table), "accounts", "assets", "event_ledger_entries", "holding_lifecycle_events", "portfolio_group_asset_memberships"];
+    if (!dependencies.every(table => publicTableSet.has(table))) throw new Error("broker recovery requires complete identity and holding lifecycle tables");
+    return Object.freeze([...BROKER_RECOVERY_TABLE_POLICIES, ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "broker_recovery_batches"))]);
+  }
   if (SIMULATION_EXECUTION_TABLE_POLICIES.some(({table})=>publicTableSet.has(table))) {
     if (!SIMULATION_EXECUTION_TABLE_POLICIES.every(({table})=>publicTableSet.has(table)) || !IDENTITY_CORE_TABLE_POLICIES.every(({table})=>publicTableSet.has(table))) throw new Error("simulation executions require complete execution tables and identity core");
     return Object.freeze([...SIMULATION_EXECUTION_TABLE_POLICIES, ...resolveTenantTablePolicies(publicTableNames.filter(table=>!SIMULATION_EXECUTION_TABLE_POLICIES.some(policy=>policy.table===table)))]);

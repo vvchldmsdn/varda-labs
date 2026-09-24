@@ -1,5 +1,6 @@
 "use client";
 
+import { QuickTradeActions } from "@/components/quick-trade-actions";
 import { useMemo, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { PortfolioAllocationRing } from "@/components/portfolio/portfolio-allocation-ring";
@@ -121,7 +122,7 @@ export function CurrencyTrackedView({ evidence, timeZone = "Asia/Seoul", contrib
       {current.complete && entries.length > 0 && (!surface || surface === "home" || surface === "structure") ? <div className={styles.ring}><PortfolioAllocationRing entries={entries} selectedKey={active?.id ?? ""} onSelect={setSelected} compositionOnly /></div> : null}
     </section>
     {showHoldings ? <section className={styles.section} aria-label={t("보유자산", "Holdings")}><h2>{t("보유자산", "Holdings")}</h2>
-      <div className={styles.holdings}>{current.positions.map(row => <button type="button" key={row.id} aria-pressed={active?.id === row.id} onClick={() => setSelected(row.id)}><span>{row.name}{row.reason ? <small>{unavailable(row.reason)}</small> : null}</span><span><strong>{money(row.value)}</strong>{row.weightPct !== null ? <small>{row.weightPct.toFixed(2)}%</small> : null}</span></button>)}</div>
+      <div className={styles.holdings}>{current.positions.map(row => <div key={row.id}><button type="button" key={row.id} aria-pressed={active?.id === row.id} onClick={() => setSelected(row.id)}><span>{row.name}{row.reason ? <small>{unavailable(row.reason)}</small> : null}</span><span><strong>{money(row.value)}</strong>{row.weightPct !== null ? <small>{row.weightPct.toFixed(2)}%</small> : null}</span></button>{surface === "home" && evidence.current.source !== "synthetic_fixture" && evidence.current.positions.find(p => p.id === row.id)?.kind === "holding" ? <QuickTradeActions accountId={evidence.current.positions.find(p => p.id === row.id)?.accountId} assetId={row.id} name={row.name} quantity={evidence.current.positions.find(p => p.id === row.id)?.observation?.quantity} /> : null}</div>)}</div>{surface === "home" && evidence.current.source !== "synthetic_fixture" ? <QuickTradeActions /> : null}
       {active ? <details className={styles.method}><summary>{active.name} · {t("평가 근거", "Valuation details")}</summary>{native ? <p>{t("원본 수량 × 원본 가격", "Original quantity × original price")} · {native.quantity} × {money(native.price, native.currency)} · {native.currency}</p> : null}<p>{t("시세 관측 시각", "Price observed")} · {active.priceObservedAt ? date(active.priceObservedAt) : "—"}</p><p>{t("근거가 있는 원가", "Cost with evidence")} · {money(active.cost)}</p><p>{t("조회한 보유자산의 평가입니다. 전체 재산이나 수익률을 뜻하지 않습니다.", "This values the included holdings. It is not total wealth or a performance return.")}</p></details> : null}
     </section> : null}
 

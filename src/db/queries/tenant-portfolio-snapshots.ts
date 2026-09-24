@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoverySnapshotPredicateText } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import { loadOwnedActiveSnapshotAccounts } from "@/db/queries/tenant-snapshot-accounts";
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
@@ -122,6 +123,7 @@ const TENANT_PORTFOLIO_SNAPSHOT_ROWS_SQL = `
       and account.is_active = true
       and snapshot.account = account.code
       and snapshot.is_sample = false
+      and ${brokerRecoverySnapshotPredicateText("snapshot", "recovery.account_id = any($2::uuid[])")}
     order by account.sort_order, account.code
   ) as snapshot_row on true
   order by snapshot_row.account_sort_order, snapshot_row.account_code

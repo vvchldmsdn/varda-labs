@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import {
   and,
@@ -78,6 +79,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
           inArray(accounts.code, selectedAccounts),
           eq(dailyPortfolioSnapshots.account, accounts.code),
           eq(dailyPortfolioSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_portfolio_snapshots"),
         ),
       )
       .orderBy(
@@ -140,6 +142,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
           inArray(accounts.code, selectedAccounts),
           eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
           eq(dailyPositionSnapshots.assetName, goldDecision.assetName),
           eq(accounts.code, goldDecision.account),
           eq(

@@ -2,6 +2,7 @@ import type {
   HistoryAccount,
   HistoryLane,
 } from "./history-balance.ts";
+import { projectBrokerRecoveryDisplay, type BrokerRecoveryDisplay } from "./broker-recovery-display.ts";
 
 export const HISTORY_EVENT_TIMELINE_POLICY = Object.freeze({
   version: "stored_named_account_event_timeline_v1",
@@ -40,6 +41,7 @@ export type HistoryEventRawRow = Readonly<{
   quantityDelta: string | null;
   price: string | null;
   fxRate: string | null;
+  brokerRecoveryData?: unknown;
 }>;
 
 export type HistoryEventMissingField =
@@ -75,6 +77,7 @@ export type HistoryEventDisplayRow = Readonly<{
   quantityDelta: number | null;
   price: number | null;
   fxRate: number | null;
+  brokerEvidence?: BrokerRecoveryDisplay;
 }>;
 
 export type HistoryEventTimelineModel = Readonly<{
@@ -208,6 +211,7 @@ export function projectHistoryEventRows(
     const amountKrw = finiteNumber(row.amountKrw);
     const quantityDelta = finiteNumber(row.quantityDelta);
     const price = finiteNumber(row.price);
+    const brokerEvidence = projectBrokerRecoveryDisplay(row.brokerRecoveryData, row);
     const missingFields = collectMissingFields({
       row,
       eventKind,
@@ -241,6 +245,7 @@ export function projectHistoryEventRows(
       quantityDelta,
       price,
       fxRate: finiteNumber(row.fxRate),
+      ...(brokerEvidence ? { brokerEvidence } : {}),
     });
   });
 

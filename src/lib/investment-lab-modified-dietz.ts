@@ -99,7 +99,7 @@ export const OBSERVED_TIMESTAMP_MODIFIED_DIETZ_POLICY = Object.freeze({
   feeTaxTreatment: "included_in_valuation_not_external_flow",
 } as const);
 
-type UnitReturnValuePoint = Readonly<{ serviceDate: string; value: number; at?: string }>;
+type UnitReturnValuePoint = Readonly<{ boundary?: "before"; serviceDate: string; value: number; at?: string }>;
 type UnitReturnFlow = Readonly<{ effectiveServiceDate: string; sequence: number; direction: "inflow" | "outflow"; amount: number; at?: string }>;
 type UnitModifiedDietzPeriod = Readonly<{
   startServiceDate: string; endServiceDate: string; calendarDays: number;
@@ -158,8 +158,8 @@ export function calculateUnitModifiedDietz(input: {
     const lastDate = valuationTime(valuations.at(-1)!);
     flows.forEach((flow) => {
       if (
-        flowTime(flow) <= firstDate ||
-        flowTime(flow) > lastDate
+        (flowTime(flow) < firstDate || (valuations[0].boundary !== "before" && flowTime(flow) === firstDate)) ||
+        (flowTime(flow) > lastDate || (valuations.at(-1)!.boundary === "before" && flowTime(flow) === lastDate))
       ) {
         blockers.push(
           blocker(
@@ -191,7 +191,7 @@ export function calculateUnitModifiedDietz(input: {
 
     while (
       flowIndex < flows.length &&
-      flowTime(flows[flowIndex]) <= valuationTime(ending)
+      (flowTime(flows[flowIndex]) < valuationTime(ending) || (ending.boundary !== "before" && flowTime(flows[flowIndex]) === valuationTime(ending)))
     ) {
       const flow = flows[flowIndex];
       const elapsedDays = timed ? (flowTime(flow) - valuationTime(beginning)) / 86_400_000 : riskCalendarDayDistance(
@@ -291,7 +291,7 @@ function normalizeValuations(
       return;
     }
     seen.add(identity);
-    normalized.push({ serviceDate: row.serviceDate, value: row.value, ...(timed ? { at: row.at! } : {}) });
+    normalized.push({ serviceDate: row.serviceDate, value: row.value, ...(timed ? { at: row.at!, boundary: row.boundary } : {}) });
   });
 
   return normalized.sort((left, right) =>

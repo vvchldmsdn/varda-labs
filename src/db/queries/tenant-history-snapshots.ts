@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoverySnapshotPredicateText } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import { portfolioDashboardHistoryDisplayDate } from "@/lib/portfolio-dashboard-history";
 
@@ -137,6 +138,7 @@ const TENANT_HISTORY_PORTFOLIO_ROWS_SQL = `
   where account.is_active = true
     and snapshot.account = account.code
     and snapshot.is_sample = false
+    and ${brokerRecoverySnapshotPredicateText("snapshot", "$1::uuid[] is null or recovery.account_id = any($1::uuid[])")}
     and ($1::uuid[] is null or account.id = any($1::uuid[]))
   order by snapshot.snapshot_date, account.sort_order, account.code, snapshot.source
 `;
@@ -172,6 +174,7 @@ const TENANT_HISTORY_POSITION_DETAIL_ROWS_SQL = `
     and snapshot.snapshot_date = $3::date
     and snapshot.source = $4::text
     and snapshot.is_sample = false
+    and ${brokerRecoverySnapshotPredicateText("snapshot")}
   order by snapshot.market_value_krw desc, snapshot.asset_name, snapshot.legacy_asset_id
   limit $5::integer
 `;
@@ -198,6 +201,7 @@ const TENANT_HISTORY_POSITION_COMPARISON_ROWS_SQL = `
     and snapshot.snapshot_date = $3::date
     and snapshot.source = $4::text
     and snapshot.is_sample = false
+    and ${brokerRecoverySnapshotPredicateText("snapshot")}
   order by snapshot.asset_name, snapshot.legacy_asset_id
   limit $5::integer
 `;
@@ -215,6 +219,7 @@ const TENANT_HISTORY_GROUP_POSITION_ROWS_SQL = `
     snapshot.pnl_krw::text as pnl_krw
   from public.daily_position_snapshots as snapshot
   where snapshot.is_sample = false
+    and ${brokerRecoverySnapshotPredicateText("snapshot", "recovery.account_id = any($2::uuid[]) or recovery.account_id in (select account_id from public.assets where id = any($3::uuid[]))", "daily_position_snapshots")}
     and snapshot.snapshot_date >= $1::date
     and (
       snapshot.account_id = any($2::uuid[])

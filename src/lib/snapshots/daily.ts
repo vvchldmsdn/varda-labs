@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import {
   and,
@@ -1898,6 +1899,7 @@ async function loadManualCarrySelections({
         eq(dailyPositionSnapshots.source, SNAPSHOT_SOURCE),
         lt(dailyPositionSnapshots.snapshotDate, snapshotDate),
         inArray(dailyPositionSnapshots.assetId, manualAssetIds),
+        brokerRecoverySnapshotPredicate("daily_position_snapshots"),
       ),
     )
     .orderBy(desc(dailyPositionSnapshots.snapshotDate));
@@ -2384,6 +2386,7 @@ async function loadExistingRows({
         and(
           eq(dailyPositionSnapshots.canonicalOwnerUserId, ownerUserId),
           eq(dailyPositionSnapshots.account, account),
+          brokerRecoveryBaselinePredicate(snapshotDate),
           lt(dailyPositionSnapshots.snapshotDate, snapshotDate),
         ),
       )

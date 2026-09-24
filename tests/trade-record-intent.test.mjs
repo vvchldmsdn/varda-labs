@@ -22,3 +22,8 @@ it("continues the intended holding after opening balances but clears transaction
   assert.deepEqual(m.fieldsAfterLedgerSave(fields, true, "time"), { assetId, currency: "USD", at: "time", assetType: "etf" });
   assert.deepEqual(m.fieldsAfterLedgerSave(fields, false, "time"), { currency: "USD", at: "time", assetType: "etf" });
 });
+
+it("retains a selected new instrument through the opening step", () => {
+  const result=m.fieldsAfterLedgerSave({assetId:"new",name:"Example",ticker:"EXAMPLE",currency:"USD",assetType:"stock",inputMode:"total",cashUsd:"100"},true,"time");
+  assert.equal(result.name,"Example");assert.equal(result.ticker,"EXAMPLE");assert.equal(result.inputMode,"total");assert.equal(result.cashUsd,undefined);
+});

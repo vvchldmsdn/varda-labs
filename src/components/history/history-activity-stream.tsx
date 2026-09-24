@@ -2,6 +2,7 @@
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
+import { BrokerEvidenceDetails } from "@/components/events/broker-evidence-details";
 
 import { formatHistoryKrw } from "./history-format";
 
@@ -47,6 +48,7 @@ export function HistoryActivityStream({
                   {<T ko={eventTypeLabel(event.eventType)} en={translateHomeHistory(eventTypeLabel(event.eventType))}/>} · {event.accountName}
                   {event.groupName ? ` · ${event.groupName}` : ""}
                 </p>
+                {event.brokerEvidence ? <BrokerEvidenceDetails evidence={event.brokerEvidence} /> : null}
               </div>
               <p className="text-sm font-semibold tabular-nums sm:text-right">
                 {<T ko={event.amountKrw === null

@@ -368,3 +368,5 @@
   .evidence { grid-template-columns:minmax(180px,.7fr) minmax(0,1.5fr); gap:24px; }
   .evidence .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 28px; }
 }
+
+.tradeHoldings{padding:28px 0 60px}.tradeHoldings h2{font-size:20px;font-weight:550;margin-bottom:18px}.tradeHoldings>div:not(:last-child){display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:14px 0}.tradeHoldings>div:last-child{margin-top:16px}.tradeHoldings small{display:block;color:var(--muted);font-size:12px;margin-top:4px}

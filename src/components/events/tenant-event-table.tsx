@@ -1,4 +1,7 @@
+import { T } from "@/components/i18n/localized-text";
 import type { TenantEventLedgerDto } from "@/lib/tenant-event-ledger-read-model";
+import { formatBrokerEvidenceMoney } from "@/lib/broker-recovery-display";
+import { BrokerEvidenceDetails } from "./broker-evidence-details";
 
 const EVENT_LABELS: Readonly<Record<string, string>> = Object.freeze({
   buy: "매수",
@@ -39,16 +42,16 @@ export function TenantEventTable({
             >
               <td className="px-4 py-3 tabular-nums">
                 <p className="font-semibold">{event.eventDate}</p>
-                <p className="text-xs text-[var(--muted)]">
+                {event.source !== "broker_recovery_v1" ? <p className="text-xs text-[var(--muted)]">
                   {formatRecordedAt(event.recordedAt)}
-                </p>
+                </p> : null}
               </td>
               <td className="px-4 py-3">
                 <p className="font-semibold">
                   {EVENT_LABELS[event.eventType] ?? event.eventType}
                 </p>
                 <p className="text-xs text-[var(--muted)]">
-                  {event.source ?? "출처 없음"}
+                  {event.source === "broker_recovery_v1" ? <T ko="거래내역 복구" en="Recovered trade" /> : event.source ?? "출처 없음"}
                 </p>
               </td>
               <td className="px-4 py-3">
@@ -63,7 +66,12 @@ export function TenantEventTable({
                 <p className="text-xs text-[var(--muted)]">{event.accountCode}</p>
               </td>
               <td className="px-4 py-3 text-right tabular-nums">
-                {event.amountKrw === null ? "-" : krw.format(event.amountKrw)}
+                {event.brokerEvidence?.executionGross
+                  ? formatBrokerEvidenceMoney(event.brokerEvidence.executionGross)
+                  : event.brokerEvidence?.cashSettlement
+                    ? <><span className="mr-1 text-xs text-[var(--muted)]">결제액</span>{formatBrokerEvidenceMoney(event.brokerEvidence.cashSettlement)}</>
+                  : event.amountKrw === null ? "-" : krw.format(event.amountKrw)}
+                {event.brokerEvidence ? <BrokerEvidenceDetails evidence={event.brokerEvidence} /> : null}
               </td>
               <td className="px-4 py-3 text-right tabular-nums">
                 {event.quantityDelta ?? "-"}

@@ -55,7 +55,7 @@ describe("tenant ownership policy", () => {
     assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes("member_activity_daily"),false);
   });
   it("classifies provider reservations as optional operational data without changing earlier collection schemas", () => {
-    const names = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table);
+    const names = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && policy.table !== "broker_recovery_batches" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table);
     const priorNames = names.filter(table => table !== "market_provider_reservations");
     const prior = resolveTenantTablePolicies(priorNames);
     assert.equal(prior.length, 47);
@@ -80,7 +80,7 @@ describe("tenant ownership policy", () => {
     const coreNames = CORE_EXPANDED_TENANT_TABLE_POLICIES.map(({ table }) => table);
     assert.throws(() => resolveTenantTablePolicies(["investment_plans"]), /complete identity core/);
     assert.deepEqual(resolveTenantTablePolicies([...coreNames, "investment_plans"]), [...CORE_EXPANDED_TENANT_TABLE_POLICIES, policy]);
-    const priorNames = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table).filter(table => table !== "investment_plans" && table !== "portfolio_drafts" && table !== "market_provider_reservations");
+    const priorNames = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && policy.table !== "broker_recovery_batches" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table).filter(table => table !== "investment_plans" && table !== "portfolio_drafts" && table !== "market_provider_reservations");
     const prior = resolveTenantTablePolicies(priorNames);
     assert.equal(prior.length, 45);
     assert.equal(prior.some(({ table }) => table === "investment_plans"), false);
@@ -96,6 +96,18 @@ describe("tenant ownership policy", () => {
     assert.throws(() => resolveTenantTablePolicies(["portfolio_drafts"]), /complete identity core/);
     assert.deepEqual(resolveTenantTablePolicies([...core, "portfolio_drafts"]), [...CORE_EXPANDED_TENANT_TABLE_POLICIES, policy]);
     assert.equal(resolveTenantTablePolicies(core).some(({ table }) => table === "portfolio_drafts"), false);
+  });
+
+  it("adds broker recovery ownership only when its required owner and holding tables exist", () => {
+    const names = EXPANDED_TENANT_TABLE_POLICIES.map(({ table }) => table);
+    const policy = resolveTenantTablePolicies(names).find(({ table }) => table === "broker_recovery_batches");
+    assert.equal(policy.classification, "user_owned");
+    assert.equal(policy.canonicalOwnerRequired, true);
+    assert.equal(policy.canonicalOwnerRolloutScope, "in_scope");
+    assert.equal(resolveTenantTablePolicies(names.filter(table => table !== "broker_recovery_batches")).some(({ table }) => table === "broker_recovery_batches"), false);
+    for (const dependency of ["app_users", "auth_identities", "accounts", "assets", "event_ledger_entries", "holding_lifecycle_events", "portfolio_group_asset_memberships"]) {
+      assert.throws(() => resolveTenantTablePolicies(names.filter(table => table !== dependency)), /broker recovery requires/);
+    }
   });
 
   it("resolves the staged atomic identity-system expansions", () => {
@@ -152,12 +164,12 @@ describe("tenant ownership policy", () => {
     assert.equal(holdingOnboardingExpandedNames.length, 36);
     assert.equal(portfolioTargetPolicyExpandedNames.length, 39);
     assert.equal(holdingStateCorrectionExpandedNames.length, 40);
-    assert.equal(expandedNames.length, 56);
+    assert.equal(expandedNames.length, 57);
     for (const name of ["simulation_execution_service", "simulation_execution_frequency"]) {
       assert.equal(EXPANDED_TENANT_TABLE_POLICIES.find(policy => policy.table === name)?.classification, "admin_system");
     }
     const withoutEvidence = expandedNames.filter(name => !PROVIDER_EVIDENCE_TABLE_POLICIES.some(policy => policy.table === name));
-    assert.equal(resolveTenantTablePolicies(withoutEvidence.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets" && name !== "market_provider_reservations")).length, 50);
+    assert.equal(resolveTenantTablePolicies(withoutEvidence.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets" && name !== "market_provider_reservations")).length, 51);
     assert.throws(() => resolveTenantTablePolicies(withoutEvidence.filter(name => name !== "market_provider_budgets" && name !== "market_provider_reservations")), /market collection tables must be expanded atomically/);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
     assert.deepEqual(
@@ -235,7 +247,7 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 34,
+        user_owned: 35,
         shared_reference: 7,
       admin_system: 11,
         identity_system: 4,

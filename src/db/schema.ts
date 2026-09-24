@@ -2069,6 +2069,25 @@ export const etfHoldings = pgTable(
   }),
 );
 
+export const brokerRecoveryBatches = pgTable("broker_recovery_batches", {
+  id: uuid("id").primaryKey(),
+  canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull().references(() => appUsers.id, { onDelete: "restrict" }),
+  accountId: uuid("account_id").notNull(),
+  manifestHash: varchar("manifest_hash", { length: 64 }).notNull(),
+  expectedStateHash: varchar("expected_state_hash", { length: 64 }).notNull(),
+  beforeState: jsonb("before_state").notNull(),
+  afterState: jsonb("after_state").notNull(),
+  manifest: jsonb("manifest").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  accountOwner: foreignKey({ name: "broker_recovery_account_owner_fk", columns: [t.accountId,t.canonicalOwnerUserId], foreignColumns: [accounts.id,accounts.canonicalOwnerUserId] }).onDelete("restrict"),
+  ownerAccount: uniqueIndex("broker_recovery_batch_owner_account_unique").on(t.id,t.canonicalOwnerUserId,t.accountId),
+  manifestUnique: uniqueIndex("broker_recovery_manifest_unique").on(t.canonicalOwnerUserId,t.accountId,t.manifestHash),
+  manifestHashCheck: check("broker_recovery_batches_manifest_hash_check", sql`${t.manifestHash} ~ '^[a-f0-9]{64}$'`),
+  stateHashCheck: check("broker_recovery_batches_expected_state_hash_check", sql`${t.expectedStateHash} ~ '^[a-f0-9]{64}$'`),
+  selectPolicy: pgPolicy("broker_recovery_tenant_select", { for: "select", to: tenantDatabaseRole, using: currentTenantOwns(t.canonicalOwnerUserId) }),
+})).enableRLS();
+
 export const eventLedgerEntries = pgTable(
   "event_ledger_entries",
   {
@@ -2087,6 +2106,9 @@ export const eventLedgerEntries = pgTable(
 
     assetId: uuid("asset_id"),
     legacyAssetId: varchar("legacy_asset_id", { length: 24 }),
+    brokerRecoveryBatchId: uuid("broker_recovery_batch_id"),
+    brokerRecoveryData: jsonb("broker_recovery_data"),
+    brokerRecoveryAssetId: uuid("broker_recovery_asset_id").generatedAlwaysAs(sql`case when broker_recovery_batch_id is not null then asset_id else null end`),
     nativeData: jsonb("native_data"),
     nativeSequence: integer("native_sequence"),
     nativeOperationId: uuid("native_operation_id"),
@@ -2122,7 +2144,11 @@ export const eventLedgerEntries = pgTable(
     ).on(table.legacyBase44Id),
     nativeSequenceUnique: uniqueIndex("event_native_sequence_unique").on(table.canonicalOwnerUserId, table.accountId, table.nativeSequence).where(sql`${table.nativeData} is not null`),
     nativeOperationUnique: uniqueIndex("event_native_operation_unique").on(table.canonicalOwnerUserId, table.accountId, table.nativeOperationId).where(sql`${table.nativeData} is not null`),
-    nativeCheck: check("event_ledger_native_check", sql`(${table.nativeData} is null and ${table.nativeSequence} is null and ${table.nativeOperationId} is null and ${table.legacyAssetId} is not null) or (${table.nativeData} is not null and ${table.nativeSequence} >= 0 and ${table.nativeOperationId} is not null and ${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.source} = 'native_ledger_v1' and not ${table.isSample})`),
+    brokerRecoveryFk: foreignKey({ name: "event_broker_recovery_batch_fk", columns: [table.brokerRecoveryBatchId,table.canonicalOwnerUserId,table.accountId], foreignColumns: [brokerRecoveryBatches.id,brokerRecoveryBatches.canonicalOwnerUserId,brokerRecoveryBatches.accountId] }).onDelete("restrict"),
+    brokerRecoveryAssetOwnerFk: foreignKey({ name: "event_broker_recovery_asset_owner_fk", columns: [table.brokerRecoveryAssetId,table.canonicalOwnerUserId], foreignColumns: [assets.id,assets.canonicalOwnerUserId] }).onDelete("restrict"),
+    brokerRecoveryAssetAccountFk: foreignKey({ name: "event_broker_recovery_asset_account_fk", columns: [table.brokerRecoveryAssetId,table.accountId], foreignColumns: [assets.id,assets.accountId] }).onDelete("restrict"),
+    brokerRecoveryUnique: uniqueIndex("event_broker_recovery_row_unique").on(table.brokerRecoveryBatchId,sql`(${table.brokerRecoveryData}->>'rowId')`).where(sql`${table.brokerRecoveryBatchId} is not null`),
+    nativeCheck: check("event_ledger_native_check", sql`(${table.brokerRecoveryBatchId} is null and ${table.brokerRecoveryData} is null and ((${table.nativeData} is null and ${table.nativeSequence} is null and ${table.nativeOperationId} is null and ${table.legacyAssetId} is not null and ${table.source} is distinct from 'broker_recovery_v1') or (${table.nativeData} is not null and ${table.nativeSequence} >= 0 and ${table.nativeOperationId} is not null and ${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.source} = 'native_ledger_v1' and not ${table.isSample}))) or coalesce((${table.brokerRecoveryBatchId} is not null and ${table.brokerRecoveryData} is not null and ${table.nativeData} is null and ${table.nativeSequence} is null and ${table.nativeOperationId} is null and ${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.assetId} is not null and ${table.source} = 'broker_recovery_v1' and ${table.ruleVersion} = 'broker_recovery_v1' and ${table.eventType} in ('buy','sell') and not ${table.isSample} and ${table.brokerRecoveryData}->>'version' = '1' and coalesce(length(${table.brokerRecoveryData}->>'rowId'),0) between 1 and 120 and ${table.brokerRecoveryData}->>'tradeDate' = ${table.eventDate}::text and octet_length(${table.brokerRecoveryData}::text) <= 32768),false)`),
     eventDateTypeIdx: index("event_ledger_entries_date_type_idx").on(
       table.eventDate,
       table.eventType,
@@ -2574,7 +2600,7 @@ export const dailyPortfolioSnapshots = pgTable(
     legacyBase44IdUnique: uniqueIndex(
       "daily_portfolio_snapshots_legacy_base44_id_unique",
     ).on(table.legacyBase44Id),
-    nativeEvidenceCheck: check("snapshot_native_evidence_check", sql`${table.nativeEvidence} is null or (${table.source} = 'native_ledger_v1' and not ${table.isSample} and octet_length(${table.nativeEvidence}::text) <= 2000000)`),
+    nativeEvidenceCheck: check("snapshot_native_evidence_check", sql`${table.nativeEvidence} is null or (${table.source} in ('native_ledger_v1','native_ledger_cutoff_v2') and not ${table.isSample} and octet_length(${table.nativeEvidence}::text) <= 2000000)`),
     snapshotAccountIdx: index("daily_portfolio_snapshots_date_account_idx").on(
       table.snapshotDate,
       table.account,

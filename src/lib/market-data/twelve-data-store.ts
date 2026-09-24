@@ -7,7 +7,7 @@ import { twelveDataConfigAllows, type TwelveDataServiceConfig } from "./twelve-d
 import { assertDateWindow, assertActionDateWindow, twelveDataExchangeDate, resolveTwelveDataListing, type TwelveDataListing } from "./providers/twelve-data-contract";
 import type { PriceLookupTarget } from "./providers/types";
 
-export type TwelveDataEvidenceQuery = { kind: "live" | "history" | "fx"; target?: PriceLookupTarget; startDate?: string; endDate?: string; asOf: string; knownAt?: string; requestedAt?: string };
+export type TwelveDataEvidenceQuery = { kind: "live" | "history" | "fx"; target?: PriceLookupTarget; startDate?: string; endDate?: string; asOf: string; knownAt?: string; requestedAt?: string; freshnessBasis?: "cutoff" };
 export type ProviderStoredPrice = { instrumentKey: string; ticker: string; micCode: string; exchange: string; value: string; currency: "USD"; observedAt: string | null; exchangeDate: string | null; fetchedAt: string; source: "twelve_data"; basis: "raw"; session: "regular" };
 export type ProviderStoredFx = { baseCurrency: "USD"; quoteCurrency: "KRW"; rate: string; observedAt: string; fetchedAt: string; source: "twelve_data"; kind: "spot" };
 export type ProviderStoredHistoricalFx = Omit<ProviderStoredFx, "kind"> & { kind: "historical_spot"; requestedAt: string };
@@ -119,6 +119,7 @@ export async function queryTwelveDataEvidence(query: TwelveDataEvidenceQuery, co
   if (!twelveDataConfigAllows(config, datasets[query.kind])) return empty("disabled");
   const current = Date.now(), asOf = Date.parse(query.asOf), known = query.knownAt ? Date.parse(query.knownAt) : current;
   if (!Number.isFinite(asOf) || !Number.isFinite(known) || asOf > current || known > current) throw new Error("twelve_data_query_time_invalid");
+  if (query.freshnessBasis === "cutoff" && (known !== asOf || query.kind === "history")) throw new Error("twelve_data_cutoff_query_invalid");
   const c = config!, listing = query.kind === "fx" ? null : resolveTwelveDataListing(query.target!, c.provider.listings);
   if (query.kind === "history") { assertDateWindow(query.startDate!, query.endDate!, new Date(asOf)); }
   const rows = await sqlClient.query(`select *,exchange_date::text as exchange_day from market_provider_observations where scope_key=$1 and identity_key=$2 and dataset=$3
@@ -128,7 +129,11 @@ export async function queryTwelveDataEvidence(query: TwelveDataEvidenceQuery, co
   if (!rows.length) return empty("missing");
   if (rows.some(row => row.status === "conflict")) return empty("conflict");
   const ttl = query.kind === "history" ? c.storage.historyFreshSeconds : query.kind === "fx" ? c.storage.fxFreshSeconds : c.storage.quoteFreshSeconds;
-  const refreshDue = rows.some(row => current - instant(row.last_fetched_at).getTime() > ttl * 1000);
+  // Historical admission uses first-known evidence at that cutoff. Rights and
+  // retention above still use the actual current clock, never a backdated clock.
+  const refreshDue = rows.some(row => query.freshnessBasis === "cutoff"
+    ? asOf - instant(row.fetched_at).getTime() > ttl * 1000
+    : current - instant(row.last_fetched_at).getTime() > ttl * 1000);
   const result = { ...empty(refreshDue ? "stale" : "admitted"), refreshDue };
   if (query.kind === "fx") result.fx = rows.map(row => ({ baseCurrency: "USD", quoteCurrency: "KRW", rate: String(row.value), observedAt: iso(row.observed_at), fetchedAt: iso(row.fetched_at), source: "twelve_data", kind: "spot" }));
   else result.prices = rows.map(row => ({ instrumentKey: String(row.instrument_key), ticker: String(row.ticker), micCode: String(row.mic_code), exchange: String(row.exchange),

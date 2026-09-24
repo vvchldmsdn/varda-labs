@@ -37,7 +37,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
     const quoteType = quote?.quoteType ?? asset.priceQuoteType;
     // Do not admit a new provider without the matching licensing/admission path.
     if (!source?.startsWith("kis") || !observedAt || !fetchedAt || observedAt > now || fetchedAt > now || observedAt > fetchedAt || status !== "ok" || !["live", "close"].includes(quoteType ?? "")) return base;
-    return { ...base, observation: { quantity: asset.quantity, price: quote?.price ?? asset.currentPrice, currency: asset.currency, at, priceObservedAt: observedAt.toISOString(), basis: "raw", source } };
+    return { ...base, observation: { quantity: asset.quantity, price: quote?.price ?? asset.currentPrice, currency: asset.currency, at, priceObservedAt: observedAt.toISOString(), priceFetchedAt: fetchedAt.toISOString(), basis: "raw", source } };
   });
   const evidence: TrackedPortfolioEvidence = { ownerId: tenant.ownerUserId, reporting, asOf: at,
     current: { at, source: "owned_native_asset_and_kis_quote", positions, scopeComplete: false },
@@ -68,7 +68,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
         for (const asset of assets) {
           const row = positions.find(p => p.id === asset.id);
           if (!row) continue;
-          if (price?.observedAt && price.instrumentKey === target.key && price.ticker === target.ticker && price.currency === "USD" && price.source === "twelve_data") row.observation = { quantity: asset.quantity, price: price.value, currency: "USD", at, priceObservedAt: price.observedAt, basis: "raw", source: `twelve_data:${price.instrumentKey}` };
+          if (price?.observedAt && price.instrumentKey === target.key && price.ticker === target.ticker && price.currency === "USD" && price.source === "twelve_data") row.observation = { quantity: asset.quantity, price: price.value, currency: "USD", at, priceObservedAt: price.observedAt, priceFetchedAt: price.fetchedAt, basis: "raw", source: `twelve_data:${price.instrumentKey}` };
           // A bounded history window must not skip the split/quantity check.
           // Cash and other independently evidenced positions remain available.
           if (ledger.entriesComplete === false && (ledger.accountsComplete === false || ledger.accounts.some(account => account.id === asset.accountId && account.state))) {
@@ -150,14 +150,14 @@ function nativeHistoricalFxTimes(evidence: TrackedPortfolioEvidence, allCurrenci
     if (row.observation && Decimal.from(row.observation.quantity).compare(0) !== 0) need(frame.at, row.observation.currency, true);
   }
   for (const frame of [...evidence.history, evidence.current]) for (const row of frame.positions) {
-    for (const lot of row.costLots ?? []) if (Decimal.from(lot.amount).compare(0) !== 0 && BigInt(lot.remaining.n) !== BigInt(0)) need(lot.at, lot.currency);
+    for (const lot of row.costLots ?? []) if (!lot.dateEvidence && Decimal.from(lot.amount).compare(0) !== 0 && BigInt(lot.remaining.n) !== BigInt(0)) need(lot.at, lot.currency);
     if (row.cost) need(row.cost.at, row.cost.currency);
   }
-  for (const flow of evidence.cashFlows ?? []) if (Decimal.from(flow.delta).compare(0) !== 0) need(flow.at, flow.currency);
+  for (const flow of evidence.cashFlows ?? []) if (!flow.dateEvidence && Decimal.from(flow.delta).compare(0) !== 0) need(flow.at, flow.currency);
   for (const trade of evidence.trades ?? []) if (Decimal.from(trade.quantityDelta).compare(0) !== 0) need(trade.at, trade.currency);
   for (const sale of evidence.realizedTrades ?? []) {
-    if (sale.proceeds) need(sale.at, sale.proceeds.currency);
-    for (const lot of sale.disposedCostLots ?? []) if (Decimal.from(lot.amount).compare(0) !== 0 && BigInt(lot.remaining.n) !== BigInt(0)) need(lot.at, lot.currency);
+    if (sale.proceeds && !sale.dateEvidence) need(sale.at, sale.proceeds.currency);
+    for (const lot of sale.disposedCostLots ?? []) if (!lot.dateEvidence && Decimal.from(lot.amount).compare(0) !== 0 && BigInt(lot.remaining.n) !== BigInt(0)) need(lot.at, lot.currency);
   }
   return [...times].sort().slice(0, 1000);
 }

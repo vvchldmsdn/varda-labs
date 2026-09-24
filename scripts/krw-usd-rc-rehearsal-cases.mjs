@@ -18,7 +18,7 @@ async function legacyRows(db) {
     plans: (await db.query('select * from investment_plans order by id')).rows,
     fx: (await db.query("select to_jsonb(f)-'observed_at'-'rate_kind' as row from fx_rates f order by id")).rows,
     budgets: (await db.query("select to_jsonb(b)-'provider'-'window_credits'-'credit_count' as row from market_provider_budgets b")).rows,
-    ledger: (await db.query("select to_jsonb(e)-'native_data'-'native_sequence'-'native_operation_id' as row from event_ledger_entries e order by id")).rows,
+    ledger: (await db.query("select to_jsonb(e)-'native_data'-'native_sequence'-'native_operation_id'-'broker_recovery_batch_id'-'broker_recovery_data'-'broker_recovery_asset_id' as row from event_ledger_entries e order by id")).rows,
   };
 }
 
@@ -37,6 +37,7 @@ export async function seedLegacy(db) {
 
 export async function verifyLegacy(db, before) {
   assert.deepEqual(await legacyRows(db), before, '0048..0053 must preserve existing KRW values and JSON');
+  assert.equal((await db.query('select count(*)::int as n from event_ledger_entries where broker_recovery_batch_id is not null or broker_recovery_data is not null or broker_recovery_asset_id is not null')).rows[0].n, 0);
   assert.equal((await db.query('select count(*)::int as n from accounts where native_state is not null')).rows[0].n, 0);
   assert.equal((await db.query('select count(*)::int as n from fx_rates where observed_at is not null or rate_kind is not null')).rows[0].n, 0);
   assert.deepEqual((await db.query('select provider,window_credits,credit_count::text from market_provider_budgets')).rows, [{ provider: 'kis', window_credits: 0, credit_count: '0' }]);
@@ -225,6 +226,10 @@ export async function runCases({ admin, worker, tenant, report }) {
   });
   await providerCases({ admin, transport, check, tenant });
   assert.ok(sessions.size >= 3, 'multiple TCP backend sessions must actually be used');
+  const { runNativeTradeCutoffCases } = await import('./native-trade-cutoff-rehearsal-cases.mjs');
+  await runNativeTradeCutoffCases({admin,worker,tenant,report});
+  const { runBrokerSecuritiesCases } = await import('./broker-securities-rehearsal-cases.mjs');
+  await runBrokerSecuritiesCases({admin,report});
   report.distinctBackendSessions = sessions.size;
 }
 

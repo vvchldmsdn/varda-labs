@@ -36,10 +36,13 @@ async function fixture({ unknownCost = false } = {}) {
     const { name, columns } = getTableConfig(table);
     const existing = (await pg.query("select column_name from information_schema.columns where table_schema='public' and table_name=$1", [name])).rows.map(row => row.column_name);
     if (!existing.length) await pg.exec(`create table ${quote(name)} (${columns.map(column => `${quote(column.name)} ${column.getSQLType()}`).join(",")})`);
-    else for (const column of columns) if (!existing.includes(column.name)) await pg.exec(`alter table ${quote(name)} add column ${quote(column.name)} ${column.getSQLType()}`);
+    else for (const column of columns) if (!existing.includes(column.name) && !column.name.startsWith("broker_recovery_")) await pg.exec(`alter table ${quote(name)} add column ${quote(column.name)} ${column.getSQLType()}`);
   }
   await pg.exec("grant usage on schema public to varda_tenant_app");
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation']) await pg.exec(readFileSync(`drizzle/${migration}.sql`, 'utf8'));
+  // The newer recovery migration owns its generated columns, FKs and tenant RLS.
+  // Keep this older compact fixture's prerequisite asset/account key in sync.
+  await pg.exec("create unique index assets_id_account_unique on assets(id,account_id)");
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence']) await pg.exec(readFileSync(`drizzle/${migration}.sql`, 'utf8'));
   for (const name of ["accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots", "asset_groups", "settings", "portfolio_groups", "portfolio_group_account_memberships", "portfolio_group_asset_memberships"]) {
     await pg.exec(`alter table ${quote(name)} enable row level security; alter table ${quote(name)} force row level security;
       create policy tenant_read on ${quote(name)} for select to varda_tenant_app using(canonical_owner_user_id=nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${quote(name)} to varda_tenant_app;`);

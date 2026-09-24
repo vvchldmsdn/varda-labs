@@ -128,12 +128,12 @@ export async function getOwnedCurrencyResearchInput(tenant: TenantContext, scope
   const actualWindow = [...report.history, current].filter(frame => !actualWindowEndAt || Date.parse(frame.at) <= Date.parse(actualWindowEndAt));
   const start = actualWindow[0], finish = actualWindow.at(-1);
   const actualComplete = evidence.ledgerComplete === true && evidence.cashFlows !== undefined && actualWindow.every(frame => frame.complete);
-  const externalFlows = (evidence.cashFlows ?? []).filter(flow => (flow.kind === "external" || flow.externalToScope) && start && finish && Date.parse(flow.at) > Date.parse(start.at) && Date.parse(flow.at) <= Date.parse(finish.at)).map(flow => ({ id: flow.id, at: flow.at, currency: flow.currency,
+  const externalFlows = (evidence.cashFlows ?? []).filter(flow => (flow.kind === "external" || flow.externalToScope) && start && finish && (Date.parse(flow.at) > Date.parse(start.at) || (start.boundary === "before" && Date.parse(flow.at) === Date.parse(start.at))) && (Date.parse(flow.at) < Date.parse(finish.at) || (finish.boundary !== "before" && Date.parse(flow.at) === Date.parse(finish.at)))).map(flow => ({ id: flow.id, at: flow.at, dateEvidence: flow.dateEvidence, currency: flow.currency,
     amount: Decimal.from(flow.delta).compare(0) < 0 ? Decimal.from(flow.delta).mul(-1).toExactString() : flow.delta,
     direction: Decimal.from(flow.delta).compare(0) < 0 ? "outflow" as const : "inflow" as const }));
   const boundary = evidence.groupEvidence ? "selected_group" as const : "portfolio_including_cash" as const;
   const performance = historyEndAt ? actualComplete && actualWindow.length >= 2 ? calculateCurrencyModifiedDietz({ reporting, cashFlowEvidence: "complete", fx, maxFxAgeMs: evidence.maxFxAgeMs, boundary,
-    valuations: actualWindow.map(frame => ({ amount: frame.total!, currency: reporting, at: frame.at, serviceDate: resolveSnapshotCycle(new Date(frame.at)).snapshotDate, source: "owned_native_capture" })),
+    valuations: actualWindow.map(frame => ({ boundary: frame.boundary, amount: frame.total!, currency: reporting, at: frame.at, serviceDate: resolveSnapshotCycle(new Date(frame.at)).snapshotDate, source: "owned_native_capture" })),
     flows: externalFlows.map(flow => ({ ...flow, serviceDate: resolveSnapshotCycle(new Date(flow.at)).snapshotDate, source: "owned_native_external_flow", kind: flow.direction === "inflow" ? "external_in" as const : "external_out" as const })) }) : null
     : "performanceReturn" in report ? report.performanceReturn : null;
   const actualBoundary = performance && "boundary" in performance ? performance.boundary : boundary;
@@ -148,7 +148,7 @@ export async function getOwnedCurrencyResearchInput(tenant: TenantContext, scope
       method: actualBoundary === "selected_group" ? "modified_dietz_selected_group" : "modified_dietz_including_cash", boundary: actualBoundary,
       reason: performance?.status === "ready" ? null : "actual_cash_flow_performance_incomplete" },
     counterfactual: { reportingCurrency: reporting, asOf, complete: actualComplete,
-      actualPath: actualWindow.map(frame => ({ at: frame.at, totalValue: frame.total ?? "0" })),
+      actualPath: actualWindow.map(frame => ({ boundary: frame.boundary, at: frame.at, totalValue: frame.total ?? "0" })),
       externalFlows,
     },
   };

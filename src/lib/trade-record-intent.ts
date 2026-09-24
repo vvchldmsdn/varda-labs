@@ -23,7 +23,8 @@ export function tradeRecordHref(input: TradeRecordHint = {}) {
   if (hint.action) params.set("action", hint.action);
   return "/portfolio/ledger" + (params.size ? "?" + params.toString() : "");
 }
-/** Opening balances do not complete the requested trade; retain only its holding selection. */
+/** Opening balances do not complete the requested trade; retain instrument selection, never opening amounts. */
 export function fieldsAfterLedgerSave(previous: Record<string, string>, wasOpening: boolean, at: string): Record<string, string> {
-  return { currency: previous.currency ?? "USD", at, assetType: "etf", ...(wasOpening && previous.assetId ? { assetId: previous.assetId } : {}) };
+  const selection = wasOpening ? Object.fromEntries(["assetId", "name", "ticker", "assetType", "inputMode"].filter(key => previous[key] !== undefined).map(key => [key, previous[key]])) : {};
+  return { currency: previous.currency ?? "USD", at, assetType: "etf", ...selection };
 }

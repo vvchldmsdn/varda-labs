@@ -1,3 +1,4 @@
+import { QuickTradeActions } from "@/components/quick-trade-actions";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
 
@@ -187,6 +188,11 @@ export function PortfolioDashboard({
             </p>
           </footer>
         </div>
+        {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
+          <h2><T ko="보유종목" en="Holdings" /></h2>
+          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{row.name}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions assetId={row.id} name={row.name} quantity={String(row.quantity)} /></div>)}
+          <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
+        </section> : null}
       </div>
     </main>
   );

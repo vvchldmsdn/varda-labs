@@ -1,4 +1,5 @@
 import { Decimal } from "./money.ts";
+import { resolveNativeTrade } from "./native-portfolio-ledger.ts";
 import type { TrackedPortfolioEvidence, TrackedValuationFrame, TrackedNativePosition, TrackedTrade, TrackedRealizedTrade } from "./currency-tracked-portfolio.ts";
 import type { FxEvidence } from "./currency-valuation.ts";
 import type { NativeStoredAccount, NativeStoredEntry } from "../db/queries/native-portfolio-ledger.ts";
@@ -46,8 +47,16 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
   if (positions.some(row => row.kind !== "cash" && !row.accountId)) complete = false;
   const grouped = new Map<string, { frames: TrackedValuationFrame[]; accounts: Set<string> }>();
   const fx = [...base.fx];
+  // v1 observations remain stored. From an account's first canonical cutoff,
+  // use only its daily series so a later old 07:05 capture cannot steal Today.
+  const cutover = new Map<string, number>();
   for (const snapshot of ledger.snapshots) {
     const data = snapshot.evidence as NativeSnapshotEvidence;
+    if (data?.frame?.boundary === "before") cutover.set(snapshot.accountId, Math.min(cutover.get(snapshot.accountId) ?? Infinity, Date.parse(data.frame.at)));
+  }
+  for (const snapshot of ledger.snapshots) {
+    const data = snapshot.evidence as NativeSnapshotEvidence;
+    if (data?.frame && data.frame.boundary !== "before" && Date.parse(data.frame.at) >= (cutover.get(snapshot.accountId) ?? Infinity)) continue;
     if (!allowed.has(snapshot.accountId) || data?.version !== 1 || !data.frame || Date.parse(data.frame.at) >= Date.parse(base.asOf) || (selection && Date.parse(data.frame.at) < Date.parse(selection.stableSince))) continue;
     if (data.frame.positions.some(row => row.ownerId !== base.ownerId || row.accountId !== snapshot.accountId)) throw new Error("native_snapshot_owner_mismatch");
     const group = grouped.get(data.frame.at) ?? { frames: [], accounts: new Set<string>() };
@@ -59,13 +68,16 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
     // An explicitly closed, empty account stays part of historical ownership.
     // Its zero value after closure needs no invented quote or earlier quantity.
     const closedEmpty = ledger.accounts.filter(account => !group.accounts.has(account.id) && account.active === false && account.updatedAt && Date.parse(account.updatedAt) <= Date.parse(at) && account.state && Object.values(account.state.cash).every(value => Decimal.from(value).compare(0) === 0) && account.state.positions.every(position => Decimal.from(position.quantity).compare(0) === 0));
-    return { at, source: "native_ledger_snapshot", positions: group.frames.flatMap(frame => frame.positions), scopeComplete: group.accounts.size + closedEmpty.length === allowed.size && group.frames.every(frame => frame.scopeComplete) };
+    return { at, ...(group.frames.every(frame => frame.boundary === "before") ? { boundary: "before" as const } : {}), source: "native_ledger_snapshot", positions: group.frames.flatMap(frame => frame.positions), scopeComplete: group.accounts.size + closedEmpty.length === allowed.size && group.frames.every(frame => frame.scopeComplete && frame.boundary === group.frames[0].boundary) };
   });
   const cashFlows: NonNullable<TrackedPortfolioEvidence["cashFlows"]>[number][] = [];
   const trades: TrackedTrade[] = [];
   const splits: NonNullable<TrackedPortfolioEvidence["splits"]>[number][] = [];
   const realizedTrades: TrackedRealizedTrade[] = [];
   const before = history.at(-1)?.at;
+  const afterBaseline = (at: string) => Boolean(before && (Date.parse(at) > Date.parse(before) || (history.at(-1)?.boundary === "before" && Date.parse(at) === Date.parse(before))));
+  const afterHistoryStart = (at: string) => Date.parse(at) > Date.parse(history[0]?.at ?? base.asOf)
+    || (history[0]?.boundary === "before" && Date.parse(at) === Date.parse(history[0].at));
   let corporateActionsInWindow = false;
   for (const entry of ledger.entries) {
     if (!allowed.has(entry.accountId)) continue;
@@ -75,21 +87,28 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
       const realized = (entry.data.effect as (NonNullable<NativeStoredEntry["data"]["effect"]> & { realized?: Pick<TrackedRealizedTrade, "proceeds" | "disposedCostLots"> | null }) | null)?.realized;
       const sold = ledger.accounts.find(account => account.id === entry.accountId)?.assets.find(asset => asset.id === event.assetId);
       realizedTrades.push({ id: entry.id, ownerId: base.ownerId, accountId: entry.accountId, positionId: event.assetId, name: sold?.name ?? event.assetId,
-        at: event.at, source: event.source, proceeds: realized?.proceeds ?? null, disposedCostLots: realized?.disposedCostLots ?? null });
+        at: event.at, source: event.source, dateEvidence: event.dateEvidence, proceeds: realized?.proceeds ?? null, disposedCostLots: realized?.disposedCostLots ?? null });
     }
     for (const [index, leg] of (entry.data.effect?.cashLegs ?? []).entries()) {
       if (includesCash(entry.accountId)) {
         const externalToScope = event.type === "transfer" && (!allowed.has(event.peerAccountId) || !includesCash(event.peerAccountId));
-        cashFlows.push({ ...leg, kind: leg.kind as NonNullable<TrackedPortfolioEvidence["cashFlows"]>[number]["kind"], externalToScope, id: `${entry.id}:${index}`, ownerId: base.ownerId, accountId: entry.accountId, at: event.at });
-        if (before && Date.parse(event.at) > Date.parse(before)) trades.push({ id: `${entry.id}:cash:${index}`, ownerId: base.ownerId, positionId: `cash:${entry.accountId}:${leg.currency}`, quantityDelta: leg.delta, price: "1", currency: leg.currency, at: event.at, source: "native_ledger_cash", sequence: entry.data.state.sequence });
+        cashFlows.push({ ...leg, kind: leg.kind as NonNullable<TrackedPortfolioEvidence["cashFlows"]>[number]["kind"], externalToScope, id: `${entry.id}:${index}`, ownerId: base.ownerId, accountId: entry.accountId, at: event.at, dateEvidence: event.dateEvidence });
+        if (afterBaseline(event.at)) trades.push({ id: `${entry.id}:cash:${index}`, ownerId: base.ownerId, positionId: `cash:${entry.accountId}:${leg.currency}`, quantityDelta: leg.delta, price: "1", currency: leg.currency, at: event.at, source: "native_ledger_cash", sequence: entry.data.state.sequence });
       } else if ((event.type === "buy" || event.type === "sell" || event.type === "dividend" || event.type === "fee") && event.assetId && includesAsset(entry.accountId, event.assetId)) {
         // This account's cash is outside the group. Cash paid into a selected
         // holding is capital in; sale proceeds/distributions are capital out.
-        cashFlows.push({ ...leg, delta: Decimal.from(leg.delta).mul(-1).toExactString(), kind: "external", id: `${entry.id}:${index}`, ownerId: base.ownerId, accountId: entry.accountId, at: event.at });
-      } else if ((event.type === "dividend" || event.type === "fee") && !event.assetId && Date.parse(event.at) > Date.parse(history[0]?.at ?? base.asOf)) flowIssue = "group_income_allocation_missing";
+        cashFlows.push({ ...leg, delta: Decimal.from(leg.delta).mul(-1).toExactString(), kind: "external", id: `${entry.id}:${index}`, ownerId: base.ownerId, accountId: entry.accountId, at: event.at, dateEvidence: event.dateEvidence });
+      } else if ((event.type === "dividend" || event.type === "fee") && !event.assetId && afterHistoryStart(event.at)) flowIssue = "group_income_allocation_missing";
     }
-    if (before && Date.parse(event.at) > Date.parse(before) && (event.type === "buy" || event.type === "sell") && includesAsset(entry.accountId, event.assetId)) trades.push({ id: `${entry.id}:asset`, ownerId: base.ownerId, positionId: event.assetId, quantityDelta: Decimal.from(event.quantity).mul(event.type === "buy" ? 1 : -1).toExactString(), price: event.price, currency: event.currency, at: event.at, source: event.source, sequence: entry.data.state.sequence });
-    if (before && Date.parse(event.at) > Date.parse(before) && event.type === "split" && includesAsset(entry.accountId, event.assetId)) { corporateActionsInWindow = true; splits.push({ at: event.at, positionId: event.assetId, ratio: event.ratio, sequence: entry.data.state.sequence }); }
+    if (afterBaseline(event.at) && (event.type === "buy" || event.type === "sell") && includesAsset(entry.accountId, event.assetId)) {
+      // Settlement is sufficient for cash/realized proceeds. Price/FX attribution
+      // additionally needs an actual instrument-currency execution price.
+      const execution = resolveNativeTrade(event);
+      let price: string | null = execution.executionUnitPrice?.amount ?? null;
+      if (!price && execution.average) try { price = Decimal.from(execution.average.n).div(execution.average.d).toExactString(); } catch { /* repeating average: retain exact settlement, do not round a price */ }
+      trades.push({ id: `${entry.id}:asset`, ownerId: base.ownerId, positionId: event.assetId, quantityDelta: Decimal.from(event.quantity).mul(event.type === "buy" ? 1 : -1).toExactString(), price, currency: event.currency, at: event.at, source: event.source, sequence: entry.data.state.sequence });
+    }
+    if (afterBaseline(event.at) && event.type === "split" && includesAsset(entry.accountId, event.assetId)) { corporateActionsInWindow = true; splits.push({ at: event.at, positionId: event.assetId, ratio: event.ratio, sequence: entry.data.state.sequence }); }
   }
   // A new/sold holding has a zero quantity at the other endpoint, not an invented
   // historical holding. A neutral unit factor is used ONLY for explicit zero quantity.

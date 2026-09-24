@@ -4,8 +4,6 @@ import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { isSameOriginAuthRequest, readBoundedAuthBody } from "@/lib/auth/auth-request-validation";
 import { readNativeLedger, validNativeMutation, writeNativeMutation } from "@/db/queries/native-portfolio-ledger";
-import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
-import { saveNativeSnapshots } from "@/db/queries/native-portfolio-snapshots";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const response = (body: object, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" } });
@@ -36,10 +34,8 @@ export async function POST(request: Request) {
     const result = await writeNativeMutation(auth.tenant, body.mutation);
     if (result.status === "invalid") return response({ error: result.reason }, 400);
     if (result.status === "conflict" || result.status === "inactive") return response({ error: result.status }, 409);
-    // Ledger success is durable even when a price/FX service cannot capture a valuation.
-    // Snapshot capture has its own CAS and never overwrites earlier evidence.
-    let snapshot = "unavailable";
-    try { snapshot = (await saveNativeSnapshots(auth.tenant, await getTrackedCurrencyEvidence(auth.tenant, { kind: "all", key: "all", label: "All" }, "USD"))).status; } catch { /* no financial payload or credentials in logs */ }
-    return response({ status: result.status, snapshot }, result.status === "created" ? 201 : 200);
+    // A trade records an event, not a daily valuation. Only the cutoff job may
+    // capture the service-day baseline; intraday saves cannot claim that slot.
+    return response({ status: result.status, snapshot: "scheduled" }, result.status === "created" ? 201 : 200);
   } catch { return response({ error: "unavailable" }, 503); }
 }
