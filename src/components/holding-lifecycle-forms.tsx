@@ -2,6 +2,8 @@
 
 import { ManagementText, ManagementElement } from "@/components/i18n/management-text";
 import { useActionState } from "react";
+import { NativeLedgerNotice } from "@/components/native-ledger-notice";
+import { NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 
 import {
   archiveHolding,
@@ -105,6 +107,8 @@ function ActionMessage({
   state: HoldingLifecycleActionState;
 }) {
   return (
+    <div>
+    {state.message === NATIVE_LEDGER_REQUIRED_MESSAGE ? <NativeLedgerNotice /> : null}
     <p
       aria-live="polite"
       className={[
@@ -115,6 +119,7 @@ function ActionMessage({
     >
       <ManagementText>{state.message}</ManagementText>
     </p>
+    </div>
   );
 }
 

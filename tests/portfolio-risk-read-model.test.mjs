@@ -68,7 +68,7 @@ describe("portfolio risk read model", () => {
     );
   });
 
-  it("calculates ENB and Sharpe from verified KIS raw history when adjusted history is unavailable", () => {
+  it("preserves ENB from verified KIS raw history and withholds Sharpe without a rate source", () => {
     const fixture = portfolioRiskReadModelFixture();
     const candidates = fixture.priceRows.map((row) => ({
       ...row,
@@ -111,7 +111,8 @@ describe("portfolio risk read model", () => {
     assert.equal(result.provenance.usableReturnObservations, 30);
     assert.equal(result.calculation.calculationStatus, "complete");
     assert.notEqual(result.calculation.portfolio?.riskContributionEnb.value, null);
-    assert.notEqual(result.calculation.portfolio?.sharpe.value, null);
+    assert.equal(result.calculation.portfolio?.sharpe.value, null);
+    assert.equal(result.calculation.portfolio?.sharpe.reason, "risk_free_evidence_not_supplied");
   });
 
   it("filters holdings by account before instrument aggregation and weights", () => {

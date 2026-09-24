@@ -13,11 +13,13 @@ import { runUsdKrwFxCandidateJob } from "@/lib/market-data/fx-refresh-job";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { withKisCollectionDeadline } from "@/lib/market-data/provider-budget";
 import { revalidateLatestClose } from "@/lib/market-data/latest-close-revalidation";
+import { resumeConfiguredTwelveDataService } from "@/lib/market-data/twelve-data-service";
 
 /** Durable queue owns the work. A terminated after callback is recoverable. */
 export function scheduleMarketCollection() {
   after(async () => {
-    try { await drainMarketCollection(); } catch { /* Durable pending/expired claims survive a server interruption. */ }
+    // Each partition resumes even if the other is idle, disabled, cooling down, or fails.
+    await Promise.allSettled([drainMarketCollection(), resumeConfiguredTwelveDataService()]);
   });
 }
 

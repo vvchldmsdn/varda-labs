@@ -1,3 +1,5 @@
+import { isHoldingMutationVersion as isAccountMutationVersion } from "./holding-mutation-version.ts";
+
 export const ACCOUNT_MANAGEMENT_POLICY = Object.freeze({
   version: "owner_scoped_account_management_v1",
   maximumActiveAccounts: 64,
@@ -40,8 +42,6 @@ type ParseResult<T> =
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STRICT_UTC_TIMESTAMP_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 
 export function parseAccountCreateInput(
@@ -102,13 +102,7 @@ function parseIdentity(
   if (accountId === null || !UUID_PATTERN.test(accountId)) {
     return invalid("The account identity is invalid.");
   }
-  const parsedTimestamp = new Date(expectedUpdatedAt ?? "");
-  if (
-    expectedUpdatedAt === null ||
-    !STRICT_UTC_TIMESTAMP_PATTERN.test(expectedUpdatedAt) ||
-    !Number.isFinite(parsedTimestamp.getTime()) ||
-    parsedTimestamp.toISOString() !== expectedUpdatedAt
-  ) {
+  if (!isAccountMutationVersion(expectedUpdatedAt)) {
     return invalid("Refresh the page before changing this account.");
   }
   return Object.freeze({

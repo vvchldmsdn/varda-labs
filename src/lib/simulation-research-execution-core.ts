@@ -109,6 +109,7 @@ export function prepareSimulationResearchPaths(input: {
     reason: null,
     matrix: input.matrix,
     grossGrowth,
+    drawPlan,
     assumptions: Object.freeze({
       horizon: input.horizon,
       pathCount: input.pathCount,

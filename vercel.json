@@ -1,10 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build:vercel",
+  "git": { "deploymentEnabled": { "codex/bc-production-release-20260920": false } },
   "crons": [
     {
       "path": "/api/cron/market-cycle/run",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/simulation-executions",
+      "schedule": "0 20 * * *"
     }
   ]
 }

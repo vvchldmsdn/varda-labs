@@ -1,5 +1,11 @@
 /** System-owned portfolio copy; holding and account names remain unchanged. */
 export const PORTFOLIO_COPY: Readonly<Record<string, string>> = {
+  "무위험 수익률": "Risk-free return",
+  "같은 통화·기간의 무위험 수익률 근거 필요": "Matching currency and interval risk-free evidence required",
+  "같은 통화·기간의 무위험 수익률 근거 없음": "No matching currency and interval risk-free evidence",
+  "같은 통화·기간의 수익률 근거 필요": "Matching currency and interval return evidence required",
+  "검증된 무위험 수익률 기준": "Verified risk-free return basis",
+  "무위험 수익률을 뺀 수익을 변동성과 비교합니다. 같은 통화·기간의 무위험 수익률 근거가 확인되기 전에는 표시하지 않습니다.": "Compares excess return with volatility. Unavailable until risk-free evidence matches the reporting currency and observation intervals.",
   "투입금 흐름": "Funding flow",
   "신규": "New cash",
   "· 계산상 매도": "· Calculated sales",

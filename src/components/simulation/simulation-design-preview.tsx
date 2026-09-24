@@ -8,6 +8,8 @@ import { resolveSimulationPathModel } from "@/lib/simulation-model-selection";
 import { buildSimulationEconomicDesignPreview } from "@/lib/simulation-economic-design-preview";
 import { EconomicExecutionSection } from "./economic-execution-section";
 import { economicResearchPresentation } from "@/db/queries/simulation-owner-economic";
+import { registerSimulationPath } from "@/lib/server/simulation-path-details";
+import { bootstrapPathSnapshot, economicPathSnapshot } from "@/lib/simulation-path-snapshot";
 
 export function SimulationDesignPreview({
   query,
@@ -19,6 +21,7 @@ export function SimulationDesignPreview({
   const economic = pathModel === "economic" ? buildSimulationEconomicDesignPreview(query, preview, true).economic : null;
   const { portfolio, execution, model } =
     preview;
+  const pathDetail = registerSimulationPath("development-preview", economic ? economicPathSnapshot(economic, execution) : bootstrapPathSnapshot(execution, preview.prepared), true);
   return (
     <div className="relative min-h-screen">
       <SimulationInputReadinessView
@@ -28,7 +31,7 @@ export function SimulationDesignPreview({
         selectedScopeKey={portfolio.selectedScope.key}
         researchUniverse={null}
         ownerResearchExecution={
-          economic ? <EconomicExecutionSection result={economicResearchPresentation(economic)} baseline={execution} /> : pathModel === "bootstrap" ? <OwnerResearchExecutionSection execution={execution} selectedScopeKey={portfolio.selectedScope.key} /> : <p role="alert">Invalid simulation model</p>
+          economic ? <EconomicExecutionSection pathDetail={pathDetail} result={economicResearchPresentation(economic)} baseline={execution} /> : pathModel === "bootstrap" ? <OwnerResearchExecutionSection pathDetail={pathDetail} execution={execution} selectedScopeKey={portfolio.selectedScope.key} /> : <p role="alert">Invalid simulation model</p>
         }
 
       />

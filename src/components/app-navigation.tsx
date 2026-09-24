@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { REPORTING_ROUTES, ReportingCurrencySwitch } from "@/components/reporting-currency-switch";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef } from "react";
@@ -40,10 +41,11 @@ function PendingHint() {
   return <span className="varda-link-pending" data-pending={pending || undefined} aria-hidden="true" />;
 }
 
-export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
+export function AppNavigation({ activePath, generatedAt, selectedScopeKey, researchHref }: {
   activePath?: string;
   generatedAt?: string;
   selectedScopeKey?: PortfolioAnalysisScopeKey;
+  researchHref?: string;
 }) {
   const {t, locale} = useI18n();
   const pathname = usePathname();
@@ -54,6 +56,11 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
   const currentPath = activePath ?? pathname;
 
   function hrefFor(path: string) {
+    if (researchHref) {
+      if (path === "/portfolio/structure") return `${researchHref}#research-structure`;
+      if (path === "/investment-lab") return `${researchHref}#research-lab`;
+      if (path === "/simulation") return `${researchHref}#research-simulation`;
+    }
     const [pathBase, pathQuery = ""] = path.split("?");
     const scoped = selectedScopeKey
       ? buildPortfolioAnalysisScopeHref(pathBase, selectedScopeKey, Object.fromEntries(new URLSearchParams(pathQuery)))
@@ -61,6 +68,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
     const [base, query = ""] = scoped.split("?");
     const next = new URLSearchParams(query);
     if (!selectedScopeKey && scope) next.set("scope", scope);
+    if (!researchHref && REPORTING_ROUTES.some(route => route === base) && ["KRW", "USD"].includes(params.get("currency") ?? "")) next.set("currency", params.get("currency")!);
     if (preview) next.set("preview", "design");
     return `${base}${next.size ? `?${next}` : ""}`;
   }
@@ -106,6 +114,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
         </Link>
         {links}
         <div className="varda-sidebar-bottom">
+          {!preview ? <Link href="/portfolio/reporting" className="varda-sidebar-account"><span aria-hidden="true">$</span><span>{t("통화별 평가", "Currency valuation")}</span></Link> : null}
           <Link href="/plans" className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
           {preview ? <span className="varda-preview-label" title={t("디자인 미리보기 · 예시 데이터", "Design preview · Demo data")}><i />{t("예시")}</span> : null}
           <Link href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
@@ -137,6 +146,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
           </button>
         </div>
       </div>
+      {!researchHref && !preview && REPORTING_ROUTES.some(route => route === currentPath) ? <div className="varda-reporting-toolbar"><ReportingCurrencySwitch /></div> : null}
       <nav className="varda-mobile-research" aria-label={t("투자 실험 바로가기", "Portfolio research shortcuts")}>
         {mobileResearchNavigation.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={hrefFor(href)} prefetch={false} aria-current={isActive(href) ? "page" : undefined}>
@@ -160,6 +170,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey }: {
           </div>
           {links}
           <Link className="varda-menu-account" href="/plans" onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
+          {!preview ? <Link className="varda-menu-account" href="/portfolio/reporting" onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
             <UserRound size={18} />{t("내 계정")}<ArrowUpRight size={15} />
           </Link>

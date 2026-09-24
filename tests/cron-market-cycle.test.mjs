@@ -164,6 +164,7 @@ describe("Cron market-cycle controller", () => {
         path: "/api/cron/market-cycle/run",
         schedule: "0 22 * * *",
       },
+      { path: "/api/cron/simulation-executions", schedule: "0 20 * * *" },
     ]);
   });
 });

@@ -158,7 +158,7 @@ function RiskMetricStrip({ model }: { model: PortfolioRiskReadModel }) {
     {
       label: "Sharpe",
       value: formatMetric(portfolio.sharpe.value, 2),
-      detail: "무위험 수익률 0% 가정",
+      detail: "같은 통화·기간의 무위험 수익률 근거 필요",
     },
     {
       label: "연환산 변동성",
@@ -380,7 +380,7 @@ function RiskMetricGuide() {
         />
         <GuideItem
           title="Sharpe"
-          body="감수한 변동성 한 단위당 얻은 수익입니다. 높을수록 효율적이지만, 현재는 비교 가능한 무위험 수익률 원천이 확정되지 않아 0%를 가정합니다."
+          body="무위험 수익률을 뺀 수익을 변동성과 비교합니다. 같은 통화·기간의 무위험 수익률 근거가 확인되기 전에는 표시하지 않습니다."
         />
         <GuideItem
           title="베타"

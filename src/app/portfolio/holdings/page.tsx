@@ -18,6 +18,7 @@ import {
   type TenantHoldingQueryResult,
 } from "@/db/queries/tenant-holdings";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { readNativeManagementAccounts } from "@/db/queries/native-account-management";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
@@ -42,6 +43,7 @@ export default async function TenantHoldingsPage({
     resolveCurrentTenantContext(),
   ]);
   const serviceDate = resolveSnapshotCycle().snapshotDate;
+  const nativeAccounts = tenantResolution.ok ? await readNativeManagementAccounts(tenantResolution.tenantContext) : [];
   const scopeContext = tenantResolution.ok
     ? await getReadOnlyTenantPortfolioAnalysisScopeContext({
         account: params.account,
@@ -114,7 +116,7 @@ export default async function TenantHoldingsPage({
         </div>
         {result?.state === "ready" || result?.state === "partial" ? <>
           {result.state === "partial" ? <p className="mb-4 text-sm leading-6 text-[var(--warning)]"><T ko="일부 종목 정보가 불완전해 목록에서 제외했습니다. 이 목록으로 전체 평가액을 합산하지 않습니다." en="Some incomplete holdings are excluded. This list is not a complete portfolio valuation." /></p> : null}
-          <HoldingsManagementList holdings={visibleHoldings} analysisDataByHolding={analysisDataByHolding} />
+          <HoldingsManagementList holdings={visibleHoldings} analysisDataByHolding={analysisDataByHolding} nativeAccounts={nativeAccounts} />
         </> : <p className="border-t border-[var(--line)] py-6 text-sm leading-6 text-[var(--warning)]"><T ko="보유종목을 불러오지 못했습니다. 로그인 상태와 선택한 계좌를 확인한 뒤 다시 시도해 주세요." en="Holdings could not be loaded. Check your sign-in and selected account, then try again." /></p>}
       </section>
     </main>

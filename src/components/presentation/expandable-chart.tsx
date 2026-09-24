@@ -7,7 +7,7 @@ import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import styles from "./expandable-chart.module.css";
 
 /** Expands the mounted chart; its data and interaction state stay in place. */
-export function ExpandableChart({ children, title, enabled = true }: { children: ReactNode; title: string; enabled?: boolean }) {
+export function ExpandableChart({ children, title, enabled = true, onEscape }: { children: ReactNode; title: string; enabled?: boolean; onEscape?: () => boolean }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
@@ -57,7 +57,7 @@ export function ExpandableChart({ children, title, enabled = true }: { children:
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      setExpanded(false);
+      if (!onEscape?.()) setExpanded(false);
     }
     if (event.key !== "Tab") return;
     const controls = [...event.currentTarget.querySelectorAll<HTMLElement>(

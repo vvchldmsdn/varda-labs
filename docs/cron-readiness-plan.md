@@ -39,7 +39,9 @@ The reusable controller now implements the same order behind
 
 The route is `GET /api/cron/market-cycle/run`. It accepts no query parameters,
 uses machine authorization only, and is fail-closed while the environment gate
-is absent. `vercel.json` declares exactly one daily schedule at `0 22 * * *`.
+is absent. `vercel.json` keeps the market schedule at `0 22 * * *`. A separate
+daily `0 20 * * *` job cleans only temporary simulation executions; its own
+server gate, lease and bounded batch never trigger market collection.
 On Hobby this means one invocation sometime during the 22:00 UTC hour, after
 the 07:00 KST service-date boundary.
 

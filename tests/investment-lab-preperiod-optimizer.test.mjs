@@ -9,7 +9,7 @@ import {
 import { estimateInvestmentLabOptimizerCandidates } from "../src/lib/investment-lab-preperiod-optimizer-math.ts";
 
 describe("investment lab owner-universe pre-period optimizer", () => {
-  it("builds four deterministic, capped and fully invested research candidates", () => {
+  it("builds three deterministic candidates and withholds unadmitted Sharpe optimization", () => {
     const first = buildInvestmentLabPreperiodOptimizer(fixture());
     const second = buildInvestmentLabPreperiodOptimizer(fixture());
 
@@ -22,10 +22,10 @@ describe("investment lab owner-universe pre-period optimizer", () => {
         "highest_return",
         "minimum_volatility",
         "minimum_drawdown",
-        "maximum_sharpe",
       ],
     );
     for (const candidate of first.candidates) {
+      assert.equal(candidate.trainingMetrics.annualizedSharpe, null);
       assert.equal(
         candidate.weights.reduce((sum, row) => sum + row.weightBps, 0),
         10_000,
@@ -35,6 +35,8 @@ describe("investment lab owner-universe pre-period optimizer", () => {
       assert.equal(candidate.scenario.status, "ready");
     }
     assert.deepEqual(second.candidates, first.candidates);
+    assert.deepEqual(first.policy.unsupportedObjectives, ["maximum_sharpe"]);
+    assert.equal(first.policy.riskFreeRate, "unavailable_without_matched_interval_evidence");
   });
 
   it("preserves explicit zero-basis-point rows for the exact terminal-return candidate", () => {

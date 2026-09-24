@@ -71,7 +71,7 @@ export function InvestmentLabPreperiodOptimizerView({
                 className="grid grid-cols-2 gap-x-6 lg:inline-grid lg:grid-cols-4"
                 role="group" en={{"aria-label": labEnglish("비중 후보 선택")}}
               >
-                {OBJECTIVES.map((objective) => (
+                {OBJECTIVES.filter(objective => model.candidates.some(row => row.objective === objective.id)).map((objective) => (
                   <button
                     aria-pressed={candidate.objective === objective.id}
                     className={`min-h-10 border-b-2 px-1 py-2 text-sm font-semibold ${
@@ -115,7 +115,7 @@ export function InvestmentLabPreperiodOptimizerView({
                 )}
               />
               <Metric
-                detail="무위험 수익률 0% 가정"
+                detail="같은 통화·기간의 무위험 수익률 근거 필요"
                 label="샤프"
                 value={formatNumber(candidate.trainingMetrics.annualizedSharpe)}
               />

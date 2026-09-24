@@ -53,7 +53,7 @@ async function fixture() {
   await pg.exec(readFileSync(new URL("../drizzle/0044_holding_correction_optional_cost.sql", import.meta.url), "utf8"));
   // The mutation token must be UTC independently of the database session timezone.
   await pg.exec("set timezone = 'Asia/Seoul'");
-  await pg.query("insert into accounts values ($1, $2, 'brokerage', 'Brokerage', 0, true)", [account, owner]);
+  await pg.query("insert into accounts values ($1, $2, 'brokerage', 'Brokerage', 0, true, null)", [account, owner]);
   await pg.query("insert into assets (id, account_id, canonical_owner_user_id, account, name, ticker, asset_type, market, currency, quantity, average_cost, current_price, updated_at) values ($1,$2,$3,'brokerage','Fixture','005930','stock','korea','KRW',2,null,110,$4)", [asset, account, owner, initialVersion]);
   const sqlClient = {
     async transaction(build) {
@@ -193,7 +193,7 @@ describe("holding mutation version SQL round trips", () => {
 });
 
 const DDL = `
-create table accounts (id uuid primary key, canonical_owner_user_id uuid not null, code text not null, name text not null, sort_order integer not null, is_active boolean not null);
+create table accounts (id uuid primary key, canonical_owner_user_id uuid not null, code text not null, name text not null, sort_order integer not null, is_active boolean not null, native_state jsonb);
 create table assets (
   id uuid primary key, account_id uuid not null, canonical_owner_user_id uuid not null, account text not null,
   name text not null, ticker text, asset_type text, market text not null, currency text not null,

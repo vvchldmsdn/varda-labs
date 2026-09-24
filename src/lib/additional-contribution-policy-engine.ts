@@ -53,6 +53,8 @@ export type AdditionalContributionPolicyRow<T> = Readonly<{
   assetType: string | null;
   buyable: boolean;
   costBasisKrw: number | null;
+  /** An exact decimal comparison can only veto a sale; legacy callers remain unchanged. */
+  hasExactLoss?: boolean;
   currentValueKrw: number;
   ma120Evidence: Readonly<{
     distanceFromMaPct: number | null;
@@ -147,6 +149,7 @@ export function calculateExplainableAdditionalContribution<T>({
       targetWeightBps: row.targetWeightBps,
       trimDriftThresholdPct,
       unrealizedReturnPct,
+      hasExactLoss: row.hasExactLoss === true,
     });
     const ma = resolveMaAdjustment(row);
     const strategicTargetValueKrw =
@@ -301,28 +304,30 @@ function validateInputs<T>({ cashAmountKrw, minimumExecutionRatioPct, rows, trim
     keys.add(row.allocationKey);
     if (!validMoney(row.currentValueKrw)) blockers.add("invalid_current_value");
     if (row.costBasisKrw !== null && !validMoney(row.costBasisKrw)) blockers.add("invalid_cost_basis");
+    if (row.hasExactLoss !== undefined && typeof row.hasExactLoss !== "boolean") blockers.add("invalid_cost_basis");
     if (!Number.isSafeInteger(row.targetWeightBps) || row.targetWeightBps < 0 || row.targetWeightBps > 10_000) blockers.add("invalid_target_weight");
   }
   if (rows.length > 0 && sum(rows, (row) => row.targetWeightBps) !== 10_000) blockers.add("target_policy_incomplete");
   return blockers;
 }
 
-function resolveTrim({ currentValueKrw, driftRatioPct, postContributionTotalKrw, targetWeightBps, trimDriftThresholdPct, unrealizedReturnPct }: {
+function resolveTrim({ currentValueKrw, driftRatioPct, postContributionTotalKrw, targetWeightBps, trimDriftThresholdPct, unrealizedReturnPct, hasExactLoss }: {
   currentValueKrw: number;
   driftRatioPct: number | null;
   postContributionTotalKrw: number;
   targetWeightBps: number;
   trimDriftThresholdPct: number;
   unrealizedReturnPct: number | null;
+  hasExactLoss: boolean;
 }) {
   if (targetWeightBps === 0 && currentValueKrw > 0) {
     if (unrealizedReturnPct === null) return trimResult(0, "target_zero_cost_basis_unavailable");
-    if (unrealizedReturnPct < 0) return trimResult(0, "target_zero_but_loss");
+    if (hasExactLoss || unrealizedReturnPct < 0) return trimResult(0, "target_zero_but_loss");
     return trimResult(Math.floor(currentValueKrw), "eligible_zero_target_exit");
   }
   if (driftRatioPct === null || belowThreshold(driftRatioPct, trimDriftThresholdPct)) return trimResult(0, "not_overweight");
   if (unrealizedReturnPct === null) return trimResult(0, "cost_basis_unavailable");
-  if (unrealizedReturnPct < 0) return trimResult(0, "loss_position");
+  if (hasExactLoss || unrealizedReturnPct < 0) return trimResult(0, "loss_position");
   const landingValueKrw =
     (targetWeightBps / 10_000) *
     ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.trimLandingTargetMultiplier *

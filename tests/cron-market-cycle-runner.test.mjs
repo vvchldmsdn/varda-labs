@@ -217,6 +217,7 @@ async function fixture({ missingClose = false, closeSucceeds = true, liveResult 
   const now = new Date("2026-09-09T22:58:55.000Z");
   const completeSync = { requestedCount: 1, successCount: 1, failedCount: 0, skippedCount: 0, insertedCount: 1, updatedCount: 0, conflictCount: 0, targetFilterSummary: { filteredPriceTargetCount: 1 } };
   const [runner] = await importWithPorts(["src/lib/cron-market-cycle-runner.ts"], {
+    "@/lib/snapshots/native-daily-job": { async runNativeDailySnapshotJob() { return { status: "completed", targetCount: 0, created: 0 }; } },
     "node:perf_hooks": { performance: { now: () => elapsedMs } },
     "node:timers/promises": { async setTimeout(ms) { events.push(`wait:${ms / 1000}`); elapsedMs += ms + sleepOvershootMs; } },
     "@/lib/market-data/collection-worker": { scheduleMarketCollection() {} },

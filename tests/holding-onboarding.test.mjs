@@ -26,6 +26,8 @@ describe("holding onboarding contract", () => {
     const accounts = [{ id: ACCOUNT_ID }, { id: newAccountId }];
     const HoldingOnboardingForm = () => null;
     const [page] = await importUiWithPorts(["src/app/portfolio/holdings/new/page.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       "next/link": { default: () => null },
       "@/lib/i18n/server": { localizedMetadata: () => ({}) },
       "@/components/i18n/localized-text": { T: () => null },

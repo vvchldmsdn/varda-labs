@@ -142,7 +142,7 @@ describe("simulation presentation", () => {
     );
     assert.match(
       source,
-      /onInput=\{\(event\) => setActiveStep\(Number\(event\.currentTarget\.value\)\)\}/,
+      /onInput=\{\(event\) => inspectStep\(Number\(event\.currentTarget\.value\)\)\}/,
     );
     assert.match(
       source,
@@ -196,7 +196,7 @@ describe("simulation presentation", () => {
       "src/components/simulation/owner-research-execution-section.tsx",
       "utf8",
     );
-    assert.match(source, /<ResearchFanChart large execution=\{execution\} \/>/);
+    assert.match(source, /<ResearchFanChart pathDetail=\{pathDetail\} pathDetailNotice=\{pathDetailNotice\} large execution=\{execution\} \/>/);
     assert.doesNotMatch(source, /<ResearchFanChart compact/);
   });
 });

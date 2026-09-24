@@ -209,17 +209,54 @@ export const MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
 export const INVESTMENT_PLAN_TABLE_POLICIES = Object.freeze([
   userOwned("investment_plans", "owner_user_id", "not_applicable"),
 ]);
+export const NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES = Object.freeze([
+  userOwned("native_contribution_plans", "owner_user_id", "not_applicable"),
+]);
+export const SIMULATION_EXECUTION_TABLE_POLICIES = Object.freeze([
+  userOwned("simulation_executions", "owner_user_id", "not_applicable"),
+  userOwned("simulation_execution_chunks", "owner_user_id", "not_applicable"),
+  adminSystem("simulation_execution_service"),
+  adminSystem("simulation_execution_frequency"),
+]);
 export const PORTFOLIO_DRAFT_TABLE_POLICIES = Object.freeze([
   userOwned("portfolio_drafts", "owner_user_id", "not_applicable"),
 ]);
 export const MEMBER_ACTIVITY_TABLE_POLICIES = Object.freeze([adminSystem("member_activity_daily"), adminSystem("member_activity_profiles")]);
+export const PROVIDER_RESERVATION_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_reservations")]);
+// License-scoped evidence is intentionally private to the server admission service.
+export const PROVIDER_EVIDENCE_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_observations"), adminSystem("market_provider_action_coverage"), adminSystem("market_provider_corporate_actions")]);
 
 export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
-  ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES,
+  ...SIMULATION_EXECUTION_TABLE_POLICIES,
+  ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES, ...PROVIDER_RESERVATION_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES, ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  if (SIMULATION_EXECUTION_TABLE_POLICIES.some(({table})=>publicTableSet.has(table))) {
+    if (!SIMULATION_EXECUTION_TABLE_POLICIES.every(({table})=>publicTableSet.has(table)) || !IDENTITY_CORE_TABLE_POLICIES.every(({table})=>publicTableSet.has(table))) throw new Error("simulation executions require complete execution tables and identity core");
+    return Object.freeze([...SIMULATION_EXECUTION_TABLE_POLICIES, ...resolveTenantTablePolicies(publicTableNames.filter(table=>!SIMULATION_EXECUTION_TABLE_POLICIES.some(policy=>policy.table===table)))]);
+  }
+  if (publicTableSet.has("native_contribution_plans")) {
+    if (!IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) throw new Error("native contribution plans require the complete identity core");
+    return Object.freeze([...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "native_contribution_plans")), ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES]);
+  }
+  if (PROVIDER_EVIDENCE_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
+    if (!PROVIDER_EVIDENCE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table)) || !publicTableSet.has("market_provider_reservations")) throw new Error("provider evidence requires complete evidence and reservation tables");
+    const prior = resolveTenantTablePolicies(publicTableNames.filter(table => !PROVIDER_EVIDENCE_TABLE_POLICIES.some(policy => policy.table === table)));
+    return Object.freeze([...prior, ...PROVIDER_EVIDENCE_TABLE_POLICIES]);
+  }
+  // 0049 is optional relative to the original collection expansion; never invent an absent ledger.
+  if (publicTableSet.has("market_provider_reservations")) {
+    if (!MARKET_COLLECTION_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("provider reservations require complete market collection tables");
+    }
+    const prior = resolveTenantTablePolicies(publicTableNames.filter(table => table !== "market_provider_reservations"));
+    if (!MARKET_COLLECTION_TABLE_POLICIES.every(({ table }) => prior.some(policy => policy.table === table))) {
+      throw new Error("provider reservations require the reviewed market collection expansion");
+    }
+    return Object.freeze([...prior, ...PROVIDER_RESERVATION_TABLE_POLICIES]);
+  }
   if (MEMBER_ACTIVITY_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
     if (!MEMBER_ACTIVITY_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table)) || !IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) throw new Error("member activity requires complete activity and identity tables");
     return Object.freeze([...resolveTenantTablePolicies(publicTableNames.filter(table => !MEMBER_ACTIVITY_TABLE_POLICIES.some(policy => policy.table === table))), ...MEMBER_ACTIVITY_TABLE_POLICIES]);

@@ -6,9 +6,11 @@ import { ACTIVATION_STORAGE_KEY, activationIntent, bindCurrentActivationIntent, 
 import { QUICK_STORAGE_KEY, type QuickDraft } from "@/lib/quick-portfolio";
 import { clearPlanReturnCookies, planReturnIntentCookies } from "@/lib/auth/plan-return";
 import { trackFirstVisit } from "@/lib/first-visit-events";
+import { useI18n } from "@/components/i18n/locale-provider";
 import styles from "./quick-portfolio.module.css";
 
 export function ContinueWithPortfolio({ draft, signedIn = false, preview = false }: { draft: QuickDraft; signedIn?: boolean; preview?: boolean }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [error, setError] = useState("");
   return <><button type="button" disabled={preview} className={styles.primary} onClick={() => {
@@ -18,11 +20,12 @@ export function ContinueWithPortfolio({ draft, signedIn = false, preview = false
       localStorage.setItem(ACTIVATION_STORAGE_KEY, JSON.stringify(activationIntent(draft)));
       for (const cookie of planReturnIntentCookies("quick", location.protocol === "https:")) document.cookie = cookie;
       router.push("/portfolio/activate");
-    } catch { setError("입력을 보관할 수 없어요. 브라우저의 사이트 저장 권한을 확인해 주세요."); }
-  }}>{signedIn ? "저장하고 Home으로" : "가입하고 이 자산으로 시작"}</button>{error ? <p role="alert">{error}</p> : null}</>;
+    } catch { setError("storage"); }
+  }}>{signedIn ? t("저장하고 Home으로", "Save and open Home") : t("가입하고 이 자산으로 시작", "Sign up and keep my portfolio")}</button>{error ? <p role="alert">{t("입력을 보관할 수 없어요. 브라우저의 사이트 저장 권한을 확인해 주세요.", "Allow site storage in your browser to keep these inputs through sign-in.")}</p> : null}</>;
 }
 
 export function PortfolioActivation() {
+  const { t } = useI18n();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(true);
   const running = useRef(false);
@@ -75,10 +78,20 @@ export function PortfolioActivation() {
   }
   useEffect(() => { const frame = requestAnimationFrame(() => { void resume(); }); return () => cancelAnimationFrame(frame); }, []);
   return <section className={styles.workspace} aria-busy={pending}>
-    <h1>{pending ? "내 자산을 가져오고 있어요" : "잠시 확인해 주세요"}</h1>
-    {pending ? <p role="status">곧 Home으로 이동합니다.</p> : <><p role="alert">{error}</p><div className={styles.actions}><button className={styles.primary} onClick={() => void resume()}>다시 시도</button><Link href="/try/analyze" onClick={() => {
+    <h1>{pending ? t("내 자산을 가져오고 있어요", "Bringing your portfolio along") : t("잠시 확인해 주세요", "Let’s check one thing")}</h1>
+    {pending ? <p role="status">{t("곧 Home으로 이동합니다.", "Opening Home shortly.")}</p> : <><p role="alert">{t(error, activationErrors[error] ?? "Could not save your input. Try again or check your inputs below.")}</p><div className={styles.actions}><button className={styles.primary} onClick={() => void resume()}>{t("다시 시도", "Try again")}</button><Link href="/try/analyze" onClick={() => {
       try { localStorage.removeItem(ACTIVATION_STORAGE_KEY); } catch {}
       for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
-    }}>내 입력 확인</Link><Link href="/plans">내 기록</Link></div></>}
+    }}>{t("내 입력 확인", "Check my inputs")}</Link><Link href="/plans">{t("내 기록", "My records")}</Link></div></>}
   </section>;
 }
+
+const activationErrors: Record<string, string> = {
+  "이어갈 입력이 없어요. 내 자산을 확인해 주세요.": "No current draft was found. Check your inputs to continue.",
+  "로그인한 계정이 바뀌었어요. 입력을 확인한 뒤 다시 저장해 주세요.": "Your signed-in account changed. Review your inputs before saving again.",
+  "다른 화면에서 입력이 바뀌었거나 저장이 취소됐어요. 최신 입력을 확인해 주세요.": "Your draft changed in another tab or saving was cancelled. Check your latest inputs.",
+  "저장 공간이 가득 찼어요. 내 기록에서 이전 입력을 삭제해 주세요.": "Your saved-input limit is reached. Delete an older entry in My records.",
+  "입력 보관 기간이 끝났어요. 내 자산을 다시 확인해 주세요.": "Your draft expired. Check your portfolio inputs again.",
+  "저장하지 못했어요. 입력은 그대로 있으니 다시 시도해 주세요.": "Could not save. Your input is still here; try again.",
+  "지금은 연결할 수 없어요. 잠시 후 다시 시도해 주세요.": "Could not connect. Please try again shortly.",
+};

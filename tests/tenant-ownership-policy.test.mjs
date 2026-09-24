@@ -21,6 +21,7 @@ import {
   PORTFOLIO_TARGET_POLICY_TABLE_POLICIES,
   PORTFOLIO_TARGET_POLICY_EXPANDED_TENANT_TABLE_POLICIES,
   PORTFOLIO_SCOPE_EXPANDED_TENANT_TABLE_POLICIES,
+  PROVIDER_EVIDENCE_TABLE_POLICIES,
   SIMULATION_APPROVAL_TABLE_POLICIES,
   SIMULATION_EXPANDED_TENANT_TABLE_POLICIES,
   TARGET_POLICY_APPROVAL_TABLE_POLICIES,
@@ -53,6 +54,23 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(result.slice(-2).map(({classification})=>classification),["admin_system","admin_system"]);
     assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes("member_activity_daily"),false);
   });
+  it("classifies provider reservations as optional operational data without changing earlier collection schemas", () => {
+    const names = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table);
+    const priorNames = names.filter(table => table !== "market_provider_reservations");
+    const prior = resolveTenantTablePolicies(priorNames);
+    assert.equal(prior.length, 47);
+    assert.equal(prior.some(({ table }) => table === "market_provider_reservations"), false);
+    const expanded = resolveTenantTablePolicies(names);
+    assert.deepEqual(expanded.slice(0, -1), prior);
+    const ledger = expanded.at(-1);
+    assert.equal(ledger.table, "market_provider_reservations");
+    assert.equal(ledger.classification, "admin_system");
+    assert.equal(ledger.canonicalOwnerRequired, false);
+    assert.equal(ledger.canonicalOwnerRolloutScope, "not_applicable");
+    assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes(ledger.table), false);
+    assert.throws(() => resolveTenantTablePolicies(names.filter(table => table !== "market_provider_budgets")), /provider reservations require complete market collection tables/);
+    assert.throws(() => resolveTenantTablePolicies(["market_provider_reservations"]), /provider reservations require complete market collection tables/);
+  });
   it("classifies native investment plans without adding them to legacy owner backfill", () => {
     const policy = EXPANDED_TENANT_TABLE_POLICIES.find(({ table }) => table === "investment_plans");
     assert.equal(policy.classification, "user_owned");
@@ -62,7 +80,7 @@ describe("tenant ownership policy", () => {
     const coreNames = CORE_EXPANDED_TENANT_TABLE_POLICIES.map(({ table }) => table);
     assert.throws(() => resolveTenantTablePolicies(["investment_plans"]), /complete identity core/);
     assert.deepEqual(resolveTenantTablePolicies([...coreNames, "investment_plans"]), [...CORE_EXPANDED_TENANT_TABLE_POLICIES, policy]);
-    const priorNames = EXPANDED_TENANT_TABLE_POLICIES.map(({ table }) => table).filter(table => table !== "investment_plans" && table !== "portfolio_drafts");
+    const priorNames = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table).filter(table => table !== "investment_plans" && table !== "portfolio_drafts" && table !== "market_provider_reservations");
     const prior = resolveTenantTablePolicies(priorNames);
     assert.equal(prior.length, 45);
     assert.equal(prior.some(({ table }) => table === "investment_plans"), false);
@@ -134,9 +152,13 @@ describe("tenant ownership policy", () => {
     assert.equal(holdingOnboardingExpandedNames.length, 36);
     assert.equal(portfolioTargetPolicyExpandedNames.length, 39);
     assert.equal(holdingStateCorrectionExpandedNames.length, 40);
-    assert.equal(expandedNames.length, 47);
-    assert.equal(resolveTenantTablePolicies(expandedNames.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets")).length, 45);
-    assert.throws(() => resolveTenantTablePolicies(expandedNames.filter(name => name !== "market_provider_budgets")), /market collection tables must be expanded atomically/);
+    assert.equal(expandedNames.length, 56);
+    for (const name of ["simulation_execution_service", "simulation_execution_frequency"]) {
+      assert.equal(EXPANDED_TENANT_TABLE_POLICIES.find(policy => policy.table === name)?.classification, "admin_system");
+    }
+    const withoutEvidence = expandedNames.filter(name => !PROVIDER_EVIDENCE_TABLE_POLICIES.some(policy => policy.table === name));
+    assert.equal(resolveTenantTablePolicies(withoutEvidence.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets" && name !== "market_provider_reservations")).length, 50);
+    assert.throws(() => resolveTenantTablePolicies(withoutEvidence.filter(name => name !== "market_provider_budgets" && name !== "market_provider_reservations")), /market collection tables must be expanded atomically/);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
     assert.deepEqual(
       resolveTenantTablePolicies(coreExpandedNames),
@@ -213,9 +235,9 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 31,
+        user_owned: 34,
         shared_reference: 7,
-        admin_system: 5,
+      admin_system: 11,
         identity_system: 4,
         unresolved: 0,
       },

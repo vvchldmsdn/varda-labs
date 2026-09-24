@@ -80,7 +80,8 @@ export async function getKisRequestBudgetSummary() {
     coalesce(sum(limited_count),0)::bigint as limited,
     count(*) filter(where blocked_until>now())::integer as blocked_scopes,
     coalesce(max(extract(epoch from blocked_until-now())) filter(where blocked_until>now()),0)::integer as retry_after_seconds
-    from market_provider_budgets`);
+    from market_provider_budgets
+    where coalesce(to_jsonb(market_provider_budgets)->>'provider','kis')='kis'`);
   return { requests: Number(row?.requests ?? 0), limited: Number(row?.limited ?? 0), blockedScopes: Number(row?.blocked_scopes ?? 0), retryAfterSeconds: Number(row?.retry_after_seconds ?? 0) };
 }
 

@@ -103,6 +103,14 @@ test("simulation page returns authenticated controls while owner research is pen
   let scopeAllowed = true;
   const component = () => null;
   const ports = {
+    "@/lib/server/simulation-path-details": { registerTenantSimulationPath: () => { throw new Error("detail registration must wait for the execution"); } },
+    "@/lib/simulation-path-snapshot": { bootstrapPathSnapshot: () => { throw new Error("snapshot must wait for the execution"); }, economicPathSnapshot: () => { throw new Error("snapshot must wait for the execution"); } },
+    "@/db/queries/native-portfolio-ledger": { hasNativeLedger: async () => false },
+    "@/db/queries/currency-tracked-portfolio": { getTrackedCurrencyEvidence: async () => { throw new Error("unexpected native read"); } },
+    "@/db/queries/currency-research": { getCurrencyResearchInput: async () => { throw new Error("unexpected native research"); } },
+    "@/components/currency-portfolio-surface": { CurrencyPortfolioSurface: () => null },
+    "@/lib/money": { isCurrency: value => value === "KRW" || value === "USD" },
+    "@/lib/native-economic-admission": { nativeEconomicAdmission: () => { throw new Error("unexpected native admission"); } },
     "@/lib/i18n/server": { localizedMetadata: () => ({}) },
     "@/components/simulation/simulation-text": { SimulationText: component },
     "@/components/portfolio-read-access-boundary": { PortfolioReadAccessBoundary: component },

@@ -11,6 +11,8 @@ describe("plan to holding handoff", () => {
     globalThis.localStorage = { getItem: key => { assert.equal(key, PLAN_STORAGE_KEY); return raw; } };
     try {
       const [reference] = await importUiWithPorts(["src/components/onboarding/plan-holding-reference.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
         react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot() },
         "next/link": { default: () => null },
         "@/components/i18n/locale-provider": { useI18n: () => ({ t: ko => ko }) },
@@ -35,6 +37,8 @@ describe("plan to holding handoff", () => {
     let authenticated = true;
     const searches = [];
     const [route] = await importUiWithPorts(["src/app/api/instruments/search/route.ts"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => authenticated ? { ok: true, tenantContext: { ownerUserId: "fixture" } } : { ok: false, failure: { httpStatus: 401 } } },
       "@/db/queries/onboarding-instrument-search": { searchOnboardingInstruments: async q => { searches.push(q); return []; } },
     });
@@ -58,6 +62,8 @@ describe("plan to holding handoff", () => {
     let result = { status: "complete", results: [{ key: "row", result: { status: "success", assetId: "saved-id", firstHoldingCreated: true } }] };
     const events = [];
     const [form] = await importUiWithPorts(["src/components/holding-onboarding-form.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       react: { useState: initial => [initial, () => {}], useActionState: (fn, initial) => { submit = fn; return [initial, () => {}, false]; } },
       "next/link": { default: () => null },
       "@/components/use-market-collection-polling": { useMarketCollectionPolling: () => null },

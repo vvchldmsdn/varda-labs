@@ -39,6 +39,11 @@ const LEGACY_TABLE_LITERAL_PATTERN =
 const LEGACY_RAW_SQL_TABLE_PATTERN =
   /\b(?:from|join|into|update|delete\s+from)\s+["']?(?:goals|transactions|fixed_transactions|monthly_incomes)\b/i;
 const REHEARSAL_ONLY_DML_PATHS = new Set([
+  "scripts/measure-simulation-execution-sql.mjs", // Embedded PGlite; no socket/ambient DB.
+  "scripts/simulation-execution-process-cases.mjs", // Called only by new isolated loopback cluster runner.
+  // New loopback cluster only; safety contract is tested in krw-usd-rc-rehearsal.test.mjs.
+  "scripts/krw-usd-rc-rehearsal.mjs",
+  "scripts/krw-usd-rc-rehearsal-cases.mjs",
   "scripts/rehearse-tenant-expand.mjs",
   "scripts/rehearse-identity-pairing-consume-writer.mjs",
   "scripts/rehearse-identity-bootstrap-claim-handoff.mjs",
@@ -47,6 +52,26 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
 ]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
+  it("registers the disabled provider collection seam as operational-only without session or owner writes", () => {
+    const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "machine_twelve_data_collection");
+    assert.equal(writer.classification, "admin_system");
+    assert.equal(writer.authorization, "machine_admin");
+    assert.equal(writer.canonicalOwnerRolloutScope, "not_applicable");
+    assert.equal(writer.canonicalOwnerHttpInput, "forbidden");
+    assert.deepEqual(writer.entrypoints, [
+      "src/lib/market-data/twelve-data-collection.ts#enqueueTwelveDataCollection",
+      "src/lib/market-data/twelve-data-collection.ts#drainTwelveDataCollection",
+    ]);
+    assert.deepEqual(writer.targets.map(({ table, ownerPolicy, operations }) => ({ table, ownerPolicy, operations })), [
+      { table: "market_provider_budgets", ownerPolicy: "owner_forbidden", operations: ["insert", "update"] },
+      { table: "market_provider_reservations", ownerPolicy: "owner_forbidden", operations: ["insert", "delete"] },
+      { table: "market_collection_jobs", ownerPolicy: "owner_forbidden", operations: ["insert", "update", "delete"] },
+    ]);
+    const source = readFileSync(join(ROOT, "src/lib/market-data/twelve-data-collection.ts"), "utf8");
+    assert.match(source, /if \(!enabled\(config\)\) return \{ status: "disabled"/);
+    assert.doesNotMatch(readFileSync(join(ROOT, "src/lib/market-data/twelve-data-budget.ts"), "utf8"), /canonical_owner_user_id|owner_user_id/);
+    assert.equal(TENANT_WRITER_REGISTRY.filter(({ implementationPaths }) => implementationPaths.includes("src/lib/market-data/twelve-data-budget.ts")).length, 1);
+  });
   it("registers approximate portfolio drafts as a verified-session writer independent of actual holdings", () => {
     const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "session_portfolio_drafts");
     assert.equal(writer.authorization, "server_verified_session");
@@ -86,8 +111,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 36);
-    assert.equal(registeredPaths.length, 45);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 44);
+    assert.equal(registeredPaths.length, 52);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -158,9 +183,9 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 20,
+      in_scope: 23,
       intentionally_skipped_legacy: 1,
-      not_applicable: 15,
+      not_applicable: 20,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
@@ -245,6 +270,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         "base44_history_import",
         "base44_market_context_import",
         "cron_market_cycle_controller",
+        "expired_simulation_execution_cleanup",
         "operator_investment_lab_stress_history_completion",
         "session_holding_analysis_data_preparation",
         "session_holding_onboarding",
@@ -311,6 +337,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
         if (
           [
+            "native_portfolio_snapshots",
+            "machine_native_portfolio_snapshots",
             "post_consume_account_owner_assignment",
             "session_holding_onboarding",
             "session_holding_state_correction",
@@ -338,6 +366,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(canonicalOwnerWriters, [
+      "native_portfolio_snapshots",
+      "machine_native_portfolio_snapshots",
       "post_consume_account_owner_assignment",
       "session_holding_onboarding",
       "session_holding_state_correction",
@@ -680,7 +710,7 @@ function discoverDmlPaths() {
     .filter((path) => {
       const source = readFileSync(path, "utf8");
       return (
-        RAW_SQL_DML_PATTERN.test(source) ||
+        RAW_SQL_DML_PATTERN.test(source) || /\bselect\s+apply_native_portfolio_(?:tenant_)?mutation\s*\(/i.test(source) ||
         (DB_IMPORT_PATTERN.test(source) && DRIZZLE_DML_PATTERN.test(source))
       );
     })

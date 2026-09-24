@@ -1,4 +1,7 @@
 import { localizedMetadata } from "@/lib/i18n/server";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 import { AdditionalContributionPageView } from "@/components/additional-contribution/additional-contribution-page-view";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
@@ -22,6 +25,7 @@ type AdditionalContributionPageProps = {
     amount?: string | string[];
     preview?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
   }>;
 };
 
@@ -88,6 +92,11 @@ export default async function AdditionalContributionPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
+    return <CurrencyPortfolioSurface surface="contribution" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
+  }
   const [preview, marketContext] = await Promise.all([
     getReadOnlyTenantAdditionalContributionPreviewForScope({
       cashAmountKrw: amountKrw,

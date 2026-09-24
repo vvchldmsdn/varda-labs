@@ -34,12 +34,15 @@ export const SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY = Object.freeze({
 
 type OwnerWeight = Readonly<{ instrumentKey: string; market: string; currency: string; ticker: string; weightBps: number }>;
 type FactorKey = (typeof SIMULATION_REGIME_FACTOR_DEFINITIONS)[number]["factorKey"];
-type LevelObservation = Readonly<{ factorKey: FactorKey; factorDate: string; periodEndDate: string; releaseDate: string; value: number }>;
+type LevelObservation = Readonly<{ factorKey: FactorKey; factorDate: string; periodEndDate: string; releaseDate: string; value: number;
+  source: string | null; sourceSeriesId: string | null; sourceVersion: string | null; importedAt: string | null }>;
 type FactorSeries = Map<FactorKey, LevelObservation[]>;
-type AlignedObservation = EconomicStateObservation & Readonly<{ serviceDate: string }>;
+type AlignedObservation = EconomicStateObservation & Readonly<{ previousServiceDate: string; serviceDate: string }>;
 
 export type SimulationOwnerEconomicResearchInput = Readonly<{
   account: string;
+  /** Omitted only by the existing KRW entrypoints. USD is not an admitted model. */
+  reportingCurrency?: string;
   matrix: SimulationReturnMatrixResult | null;
   weights: readonly OwnerWeight[];
   horizon: number | null;
@@ -55,8 +58,15 @@ export type ReadySimulationOwnerEconomicResearch = Extract<SimulationOwnerEconom
 
 export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEconomicResearchInput) {
   const policy = SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY;
-  const base = Object.freeze({ id: `owner-economic-state-${input.account}`, name: "현재 경제 상태 조건부 모형", account: input.account, policy });
+  const base = Object.freeze({ id: `owner-economic-state-${input.account}`, name: "현재 경제 상태 조건부 모형", account: input.account, policy, requestedReportingCurrency: input.reportingCurrency ?? "KRW" });
   const asOf = input.stateAsOfServiceDate ?? input.matrix?.requestedServiceDates.at(-1) ?? "";
+  if (input.reportingCurrency !== undefined && input.reportingCurrency !== "KRW") {
+    return unavailable(base, "unsupported_reporting_currency", buildSource(input.matrix, [], 0, asOf));
+  }
+  if (input.matrix && (input.matrix.policy.returnKind !== policy.sourceReturnKind || input.matrix.policy.fxPolicy !== "date_specific_usdkrw" ||
+    !["simulation_return_matrix_v1", "simulation_private_owner_raw_close_return_matrix_v1"].includes(input.matrix.policy.version))) {
+    return unavailable(base, "unsupported_return_basis", buildSource(input.matrix, [], 0, asOf));
+  }
   if (!input.ownerExecutionReady || !input.matrix || input.matrix.status !== "ready" || input.horizon === null) {
     return unavailable(base, "owner_research_unavailable", buildSource(input.matrix, [], 0, asOf));
   }
@@ -85,6 +95,8 @@ export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEcono
     unit: factorUnit(index), value: row.value, transformedValue: initial.state[index],
     asOfServiceDate: asOf, factorDate: row.factorDate, periodEndDate: row.periodEndDate,
     releaseDate: row.releaseDate, carryDays: observationAge(row, asOf),
+    source: row.source, sourceSeriesId: row.sourceSeriesId, sourceVersion: row.sourceVersion, importedAt: row.importedAt,
+    publicationTimestamp: null, availabilityTimestamp: null,
   })));
   const eligibleRows = matrix.matrix.filter((row) => row.serviceDate <= asOf).slice(-policy.maximumObservationCount);
   const aligned: AlignedObservation[] = [];
@@ -113,7 +125,7 @@ export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEcono
     if (assetLogReturns.some((value) => !Number.isFinite(value))) {
       return unavailable(base, "invalid_input", buildSource(matrix, aligned, factorGapRowCount, asOf), factorSources);
     }
-    aligned.push(Object.freeze({ serviceDate: row.serviceDate, previousFactorState: previous.state,
+    aligned.push(Object.freeze({ previousServiceDate: row.previousServiceDate, serviceDate: row.serviceDate, previousFactorState: previous.state,
       factorChanges: Object.freeze(current.state.map((value, i) => value - previous.state[i])) as EconomicFactorState,
       assetLogReturns: Object.freeze(assetLogReturns),
     }));
@@ -145,6 +157,7 @@ export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEcono
     prepared: model.prepared,
     executionWeights: Object.freeze(input.weights.map((row) => Object.freeze({ ...row }))),
     source, factorSources, currentFactors, factorBands: model.factorBands, diagnostics: model.diagnostics,
+    provenance: economicProvenance(source, factorSources),
     remediation: null,
     exposures: Object.freeze(model.exposures.map((row, index) => Object.freeze({
       instrumentKey: row.assetKey, ticker: matrix.instruments[index].ticker,
@@ -166,7 +179,10 @@ function normalizeLevelRows(rows: readonly SimulationRegimeFactorObservation[], 
       (typeof row.value === "string" && row.value.trim() === "")) return null;
     const value = typeof row.value === "number" ? row.value : Number(row.value);
     if (!Number.isFinite(value) || (row.factorKey === "usdkrw" && value <= 0)) return null;
-    series.get(row.factorKey as FactorKey)!.push(Object.freeze({ factorKey: row.factorKey as FactorKey, factorDate: row.factorDate, periodEndDate: row.periodEndDate, releaseDate: row.releaseDate, value }));
+    const imported = row.observedAt instanceof Date ? Number.isFinite(row.observedAt.getTime()) ? row.observedAt.toISOString() : null : row.observedAt;
+    series.get(row.factorKey as FactorKey)!.push(Object.freeze({ factorKey: row.factorKey as FactorKey, factorDate: row.factorDate, periodEndDate: row.periodEndDate, releaseDate: row.releaseDate, value,
+      source: row.source?.trim() || null, sourceSeriesId: row.sourceSeriesId?.trim() || null, sourceVersion: row.sourceVersion?.trim() || null,
+      importedAt: imported && Number.isFinite(Date.parse(imported)) ? imported : null }));
   }
   for (const values of series.values()) {
     values.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
@@ -217,6 +233,9 @@ function sourceSummaries(series: FactorSeries, date: string, stateDates: readonl
         return row && observationAge(row, stateDate) <= SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY.factorMaximumCarryDays;
       }).length,
       availabilityTimestampStatus: "not_preserved" as const, vintageStatus: "not_preserved" as const,
+      sourceIdentities: Object.freeze([...new Set(rows.map(row => JSON.stringify({ source: row.source, seriesId: row.sourceSeriesId, version: row.sourceVersion })))].map(identity => JSON.parse(identity) as { source: string | null; seriesId: string | null; version: string | null })),
+      currentImportedAt: current?.importedAt ?? null,
+      currentFactorDate: current?.factorDate ?? null, currentPeriodEndDate: current?.periodEndDate ?? null,
     });
   }));
 }
@@ -225,27 +244,50 @@ function factorUnit(index: number) {
   return index === 0 ? "KRW_per_USD" as const : index === 1 ? "percent" as const : "percentage_points" as const;
 }
 
-function buildSource(matrix: SimulationReturnMatrixResult | null, aligned: readonly Readonly<{ serviceDate: string }>[], gaps: number, asOf: string) {
+function buildSource(matrix: SimulationReturnMatrixResult | null, aligned: readonly Readonly<{ previousServiceDate: string; serviceDate: string }>[], gaps: number, asOf: string) {
   return Object.freeze({
     matrixRowCount: matrix?.matrix.length ?? 0, alignedObservationCount: aligned.length,
     requiredAlignedObservationCount: SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY.minimumObservationCount,
     observationShortfall: Math.max(0, SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY.minimumObservationCount - aligned.length),
     factorGapRowCount: gaps, firstAlignedServiceDate: aligned[0]?.serviceDate ?? null,
+    firstAlignedPreviousServiceDate: aligned[0]?.previousServiceDate ?? null,
     lastAlignedServiceDate: aligned.at(-1)?.serviceDate ?? null,
     matrixEndServiceDate: matrix?.requestedServiceDates.at(-1) ?? null,
     stateAsOfServiceDate: asOf,
     excludedFutureMatrixRowCount: matrix?.matrix.filter((row) => row.serviceDate > asOf).length ?? 0,
+    matrixPolicy: matrix?.policy ?? null,
+  });
+}
+
+function economicProvenance(source: ReturnType<typeof buildSource>, factorSources: ReturnType<typeof sourceSummaries>) {
+  return Object.freeze({
+    modelKind: "krw_economic_state" as const, reportingCurrency: "KRW" as const,
+    policyId: SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY.version, modelId: SIMULATION_ECONOMIC_STATE_MODEL_POLICY.version,
+    returnBasis: "krw_investor_simple_return_to_log_return" as const,
+    fxBasis: "dated_usdkrw_in_training_returns_no_second_fx_multiplier" as const,
+    inputMatrixPolicy: source.matrixPolicy,
+    factorDataVersion: null, factorDataVersionStatus: "provider_vintage_not_preserved" as const,
+    factorSources, factorObservedAtRole: "import_provenance_only" as const,
+    publicationTimestamp: null, availabilityTimestamp: null,
+    rateSource: factorSources.find(row => row.factorKey === "us_10y_yield")?.sourceIdentities ?? null,
+    rateRole: "US_10Y_yield_percent_explanatory_factor_not_cash_or_risk_free" as const,
+    benchmarkSource: null, benchmarkRole: "not_used_by_economic_generator" as const,
+    calibrationPeriod: { from: source.firstAlignedPreviousServiceDate, to: source.lastAlignedServiceDate, observations: source.alignedObservationCount },
+    seed: SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY.seed, parameters: SIMULATION_ECONOMIC_STATE_MODEL_POLICY,
+    stateTransition: SIMULATION_ECONOMIC_STATE_MODEL_POLICY.conditioning,
   });
 }
 
 type UnavailableReason = "owner_research_unavailable" | "invalid_state_as_of_date" | "weight_identity_mismatch" | "invalid_factor_evidence" |
+  "unsupported_reporting_currency" | "unsupported_return_basis" |
   "current_factor_state_stale" | "current_factor_state_missing" | "insufficient_factor_overlap" | "invalid_input" | "insufficient_observations" |
   "factor_covariance_not_positive_definite" | "residual_covariance_not_positive_definite" | "simulation_nonfinite" | "path_summary_unavailable";
 
-function unavailable(base: Readonly<{ id: string; name: string; account: string; policy: typeof SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY }>, reason: UnavailableReason,
+function unavailable(base: Readonly<{ id: string; name: string; account: string; policy: typeof SIMULATION_OWNER_ECONOMIC_RESEARCH_POLICY; requestedReportingCurrency: string }>, reason: UnavailableReason,
   source: ReturnType<typeof buildSource>, factorSources: ReturnType<typeof sourceSummaries> = Object.freeze([])) {
   return Object.freeze({
     ...base, status: "unavailable" as const, reason, assumptions: null, terminal: null,
+    provenance: economicProvenance(source, factorSources),
     bands: Object.freeze([]), samplePaths: Object.freeze([]), displayPaths: null, prepared: null,
     executionWeights: Object.freeze([]), source, factorSources, currentFactors: Object.freeze([]), factorBands: Object.freeze([]), diagnostics: null,
     remediation: reason === "insufficient_factor_overlap" || reason === "current_factor_state_stale" || reason === "current_factor_state_missing" ? Object.freeze({

@@ -6,6 +6,7 @@ import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
+import { isNativeLedgerGuardError, NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 import {
   accounts,
   assetPriceSnapshots,
@@ -55,10 +56,11 @@ export async function writeSessionHoldingOnboarding(
   try {
     // Verify the destination before spending a shared provider request. The
     // transaction checks it again after market I/O to protect lifecycle races.
-    const ownedAccounts = await db.select({ id: accounts.id }).from(accounts).where(
+    const ownedAccounts = await db.select({ id: accounts.id, nativeState: accounts.nativeState }).from(accounts).where(
       and(eq(accounts.id, parsed.input.accountId), eq(accounts.canonicalOwnerUserId, ownerUserId), eq(accounts.isActive, true)),
     ).limit(1);
     if (ownedAccounts.length !== 1) return state("conflict", "보유 계좌를 다시 확인해 주세요.");
+    if (ownedAccounts[0].nativeState != null) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
 
     let input = parsed.input;
     if (input.instrumentId) {
@@ -108,11 +110,13 @@ export async function writeSessionHoldingOnboarding(
       price.priceFetchedAt.toISOString(), price.priceAsOf?.toISOString() ?? null,
       price.priceQuoteType, input.reportedReturnPct, HOLDING_ONBOARDING_POLICY.version,
     ]);
+    if (Number(rows[0]?.native_account_count ?? 0) > 0) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
     if (Number(rows[0]?.saved_count ?? 0) !== 1) {
       return state("conflict", "계좌 또는 분석 범위가 변경되었거나 보관되었습니다. 화면을 새로고침해 주세요.");
     }
     return { ...state("success", "보유종목을 분석 범위에 추가했습니다.", assetId), ...(rows[0]?.first_holding_created === true ? { firstHoldingCreated: true as const } : {}) };
   } catch (error) {
+    if (isNativeLedgerGuardError(error)) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
     if (error instanceof OnboardingPriceUnavailableError) {
       return Object.freeze({
         status: "price_unavailable",
@@ -282,6 +286,7 @@ with prior_holdings as materialized (
 ), owned_account as materialized (
   select id, code from accounts
   where id = $3::uuid and canonical_owner_user_id = $1::uuid and is_active = true
+    and native_state is null
   for update
 ), existing_group as materialized (
   select id from portfolio_groups
@@ -330,6 +335,7 @@ with prior_holdings as materialized (
   returning asset_id
 )
 select count(*) as saved_count,
+  (select count(*) from accounts where id=$3::uuid and canonical_owner_user_id=$1::uuid and native_state is not null) as native_account_count,
   (count(*) = 1 and (select count from prior_holdings) = 0) as first_holding_created
 from inserted_membership
 `;

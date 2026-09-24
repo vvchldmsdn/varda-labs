@@ -5,6 +5,7 @@ import { labCopyC } from "./lab-copy-c";
 import { labCopyExtra } from "./lab-copy-extra";
 
 const english: Readonly<Record<string, string>> = { ...commonEnglish, ...labCopyA, ...labCopyB, ...labCopyC, ...labCopyExtra,
+  "같은 통화·기간의 무위험 수익률 근거 필요": "Matching currency and interval risk-free evidence required",
   "같은 기간 · 같은 투자금 흐름": "Same period · Same investment flows",
   "개 평가일 · 같은 기간·투자금 흐름": " valuation dates · Same period and investment flows",
   "동일한 매수·매도 금액 · 국내 지수 ETF": "Same purchase and sale amounts · Korean index ETF",

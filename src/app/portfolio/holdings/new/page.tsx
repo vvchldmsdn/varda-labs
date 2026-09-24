@@ -6,6 +6,7 @@ import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { HoldingOnboardingForm } from "@/components/holding-onboarding-form";
 import { getHoldingOnboardingOptions, type HoldingOnboardingOptions } from "@/db/queries/holding-onboarding";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { readNativeManagementAccounts } from "@/db/queries/native-account-management";
 import { resolveHoldingOnboardingAccountId } from "@/lib/holding-onboarding";
 import "@/components/onboarding/holding-onboarding.css";
 
@@ -18,6 +19,7 @@ export default async function NewHoldingPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const preview = process.env.NODE_ENV === "development" && params.preview === "design";
   const resolution = preview ? null : await resolveCurrentTenantContext();
+  const nativeAccounts = resolution?.ok ? await readNativeManagementAccounts(resolution.tenantContext) : [];
   const options: HoldingOnboardingOptions | { state: "unavailable" } | null = preview ? {
     state: "ready", accounts: [{ id: "11111111-1111-4111-8111-111111111111", code: "preview", name: "나의 증권 계좌", accountType: "securities" }], portfolioGroups: [],
   } : resolution?.ok ? await getHoldingOnboardingOptions(resolution.tenantContext) : null;
@@ -32,7 +34,7 @@ export default async function NewHoldingPage({ searchParams }: { searchParams: P
       {!preview && !resolution?.ok ? <div className="varda-onboarding-error"><T ko="로그인 후 보유종목을 추가할 수 있습니다." en="Sign in to add holdings." /><p><Link className="varda-onboarding-text-button" href="/auth/sign-in"><T ko="로그인" en="Sign in" /></Link></p></div>
         : options?.state !== "ready" ? <p className="varda-onboarding-error"><T ko="계좌 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." en="Accounts could not be loaded. Please try again shortly." /></p>
         : options.accounts.length === 0 ? <div><p><T ko="종목을 담을 첫 계좌를 먼저 준비해 주세요." en="Create your first account before adding holdings." /></p><Link className="varda-onboarding-text-button" href="/portfolio/accounts"><T ko="첫 계좌 만들기" en="Create your first account" /></Link></div>
-        : <HoldingOnboardingForm key={initialAccountId} options={options} initialAccountId={initialAccountId} preview={preview} fromPlan={params.from === "plan"} fromQuick={params.from === "quick"} />}
+        : <HoldingOnboardingForm key={initialAccountId} options={options} initialAccountId={initialAccountId} nativeAccountIds={nativeAccounts.map(account => account.id)} preview={preview} fromPlan={params.from === "plan"} fromQuick={params.from === "quick"} />}
       {(params.from === "plan" || params.from === "quick") && options?.state === "ready" && options.accounts.length === 0 ? <p className="varda-onboarding-hint"><T ko="저장한 계획은 그대로 남아 있어요. 계좌를 만든 뒤 내 계획에서 종목 등록을 이어갈 수 있습니다." en="Your saved plan remains available. After creating an account, continue adding holdings from My plans." /><Link className="varda-onboarding-text-button" href="/plans"><T ko="나중에 등록하고 내 계획으로" en="Add holdings later and return to my plans" /></Link></p> : null}
     </div>
   </main>;

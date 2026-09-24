@@ -87,25 +87,79 @@ export type InvestmentLabModifiedDietzResult =
       blockers: readonly InvestmentLabModifiedDietzBlocker[];
     }>;
 
+export const OBSERVED_TIMESTAMP_MODIFIED_DIETZ_POLICY = Object.freeze({
+  ...INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+  version: "observed_timestamp_modified_dietz_v1",
+  classification: "cash_flow_weighted_return_estimate",
+  valuationAxis: "observed_timestamps",
+  externalFlowTiming: "observed_timestamps",
+  flowWeight: "elapsed_milliseconds_fraction_remaining",
+  cashBalance: "included_in_portfolio_valuation",
+  incomeTreatment: "included_in_valuation_not_external_flow",
+  feeTaxTreatment: "included_in_valuation_not_external_flow",
+} as const);
+
+type UnitReturnValuePoint = Readonly<{ serviceDate: string; value: number; at?: string }>;
+type UnitReturnFlow = Readonly<{ effectiveServiceDate: string; sequence: number; direction: "inflow" | "outflow"; amount: number; at?: string }>;
+type UnitModifiedDietzPeriod = Readonly<{
+  startServiceDate: string; endServiceDate: string; calendarDays: number;
+  beginningValue: number; endingValue: number; netExternalFlow: number;
+  weightedExternalFlow: number; denominator: number; flowCount: number; periodReturn: number;
+  startAt?: string; endAt?: string;
+}>;
+type UnitDietzPolicy = typeof INVESTMENT_LAB_MODIFIED_DIETZ_POLICY | typeof OBSERVED_TIMESTAMP_MODIFIED_DIETZ_POLICY;
+type UnitModifiedDietzResult = Readonly<{
+  status: "ready"; policy: UnitDietzPolicy; totalReturn: number; periodCount: number; flowCount: number;
+  periods: readonly UnitModifiedDietzPeriod[]; riskMetrics: InvestmentLabPathRiskMetrics; blockers: readonly [];
+}> | Readonly<{
+  status: "blocked"; policy: UnitDietzPolicy; totalReturn: null; periodCount: 0; flowCount: 0;
+  periods: readonly []; riskMetrics: InvestmentLabPathRiskMetrics; blockers: readonly InvestmentLabModifiedDietzBlocker[];
+}>;
+
+/** Legacy API and date-only policy retain their original KRW contract. */
 export function calculateInvestmentLabModifiedDietz(input: {
-  valuations: readonly InvestmentLabReturnValuePoint[];
-  flows: readonly InvestmentLabReturnFlow[];
+  valuations: readonly InvestmentLabReturnValuePoint[]; flows: readonly InvestmentLabReturnFlow[];
 }): InvestmentLabModifiedDietzResult {
+  const result = calculateUnitModifiedDietz({
+    valuations: input.valuations.map(row => ({ serviceDate: row.serviceDate, value: row.valueKrw })),
+    flows: input.flows.map(row => ({ effectiveServiceDate: row.effectiveServiceDate, sequence: row.sequence, direction: row.direction, amount: row.amountKrw })),
+  });
+  if (result.status === "blocked") return Object.freeze({ ...result, policy: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY });
+  return Object.freeze({ ...result, policy: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+    periods: Object.freeze(result.periods.map(period => Object.freeze({
+      startServiceDate: period.startServiceDate, endServiceDate: period.endServiceDate, calendarDays: period.calendarDays,
+      beginningValueKrw: period.beginningValue, endingValueKrw: period.endingValue,
+      netExternalFlowKrw: period.netExternalFlow, weightedExternalFlowKrw: period.weightedExternalFlow,
+      denominatorKrw: period.denominator, flowCount: period.flowCount, periodReturn: period.periodReturn,
+    }))),
+  });
+}
+
+/** One currency-neutral period calculation, with explicit optional timestamp timing. */
+export function calculateUnitModifiedDietz(input: {
+  valuations: readonly UnitReturnValuePoint[];
+  flows: readonly UnitReturnFlow[];
+  timing?: "observed_timestamps";
+}): UnitModifiedDietzResult {
+  const timed = input.timing === "observed_timestamps";
+  const policy = timed ? OBSERVED_TIMESTAMP_MODIFIED_DIETZ_POLICY : INVESTMENT_LAB_MODIFIED_DIETZ_POLICY;
   const blockers: InvestmentLabModifiedDietzBlocker[] = [];
-  const valuations = normalizeValuations(input.valuations, blockers);
-  const flows = normalizeFlows(input.flows, blockers);
+  const valuations = normalizeValuations(input.valuations, blockers, timed);
+  const flows = normalizeFlows(input.flows, blockers, timed);
+  const valuationTime = (row: UnitReturnValuePoint) => timed ? Date.parse(row.at!) : Date.parse(`${row.serviceDate}T00:00:00Z`);
+  const flowTime = (row: UnitReturnFlow) => timed ? Date.parse(row.at!) : Date.parse(`${row.effectiveServiceDate}T00:00:00Z`);
 
   if (valuations.length < 2) {
     blockers.push(blocker("insufficient_valuations"));
   }
 
   if (valuations.length >= 2) {
-    const firstDate = valuations[0].serviceDate;
-    const lastDate = valuations.at(-1)!.serviceDate;
+    const firstDate = valuationTime(valuations[0]);
+    const lastDate = valuationTime(valuations.at(-1)!);
     flows.forEach((flow) => {
       if (
-        flow.effectiveServiceDate <= firstDate ||
-        flow.effectiveServiceDate > lastDate
+        flowTime(flow) <= firstDate ||
+        flowTime(flow) > lastDate
       ) {
         blockers.push(
           blocker(
@@ -118,77 +172,78 @@ export function calculateInvestmentLabModifiedDietz(input: {
     });
   }
 
-  if (blockers.length > 0) return blocked(blockers);
+  if (blockers.length > 0) return blocked(blockers, policy);
 
-  const periods: InvestmentLabModifiedDietzPeriod[] = [];
+  const periods: UnitModifiedDietzPeriod[] = [];
   let flowIndex = 0;
   let linkedGrowth = 1;
 
   for (let index = 1; index < valuations.length; index += 1) {
     const beginning = valuations[index - 1];
     const ending = valuations[index];
-    const calendarDays = riskCalendarDayDistance(
+    const calendarDays = timed ? (valuationTime(ending) - valuationTime(beginning)) / 86_400_000 : riskCalendarDayDistance(
       beginning.serviceDate,
       ending.serviceDate,
     );
-    let netExternalFlowKrw = 0;
-    let weightedExternalFlowKrw = 0;
+    let netExternalFlow = 0;
+    let weightedExternalFlow = 0;
     let flowCount = 0;
 
     while (
       flowIndex < flows.length &&
-      flows[flowIndex].effectiveServiceDate <= ending.serviceDate
+      flowTime(flows[flowIndex]) <= valuationTime(ending)
     ) {
       const flow = flows[flowIndex];
-      const elapsedDays = riskCalendarDayDistance(
+      const elapsedDays = timed ? (flowTime(flow) - valuationTime(beginning)) / 86_400_000 : riskCalendarDayDistance(
         beginning.serviceDate,
         flow.effectiveServiceDate,
       );
       const weight = (calendarDays - elapsedDays) / calendarDays;
       const signedAmount =
-        flow.direction === "inflow" ? flow.amountKrw : -flow.amountKrw;
+        flow.direction === "inflow" ? flow.amount : -flow.amount;
 
-      netExternalFlowKrw += signedAmount;
-      weightedExternalFlowKrw += signedAmount * weight;
+      netExternalFlow += signedAmount;
+      weightedExternalFlow += signedAmount * weight;
       flowCount += 1;
       flowIndex += 1;
     }
 
-    const denominatorKrw =
-      beginning.valueKrw + weightedExternalFlowKrw;
-    if (!Number.isFinite(denominatorKrw) || denominatorKrw <= 0) {
+    const denominator =
+      beginning.value + weightedExternalFlow;
+    if (!Number.isFinite(denominator) || denominator <= 0) {
       return blocked([
         blocker("non_positive_denominator", null, ending.serviceDate),
-      ]);
+      ], policy);
     }
 
     const periodReturn =
-      (ending.valueKrw - beginning.valueKrw - netExternalFlowKrw) /
-      denominatorKrw;
+      (ending.value - beginning.value - netExternalFlow) /
+      denominator;
     const growth = 1 + periodReturn;
     if (!Number.isFinite(periodReturn) || growth < -1e-12) {
       return blocked([
         blocker("invalid_period_return", null, ending.serviceDate),
-      ]);
+      ], policy);
     }
 
     linkedGrowth *= Math.max(0, growth);
     if (!Number.isFinite(linkedGrowth)) {
       return blocked([
         blocker("invalid_period_return", null, ending.serviceDate),
-      ]);
+      ], policy);
     }
 
     periods.push(
       Object.freeze({
         startServiceDate: beginning.serviceDate,
         endServiceDate: ending.serviceDate,
+        ...(timed ? { startAt: beginning.at!, endAt: ending.at! } : {}),
         calendarDays,
-        beginningValueKrw: beginning.valueKrw,
-        endingValueKrw: ending.valueKrw,
-        netExternalFlowKrw: cleanZero(netExternalFlowKrw),
-        weightedExternalFlowKrw: cleanZero(weightedExternalFlowKrw),
-        denominatorKrw,
+        beginningValue: beginning.value,
+        endingValue: ending.value,
+        netExternalFlow: cleanZero(netExternalFlow),
+        weightedExternalFlow: cleanZero(weightedExternalFlow),
+        denominator,
         flowCount,
         periodReturn: cleanZero(periodReturn),
       }),
@@ -197,7 +252,7 @@ export function calculateInvestmentLabModifiedDietz(input: {
 
   return Object.freeze({
     status: "ready",
-    policy: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+    policy,
     totalReturn: cleanZero(linkedGrowth - 1),
     periodCount: periods.length,
     flowCount: flows.length,
@@ -208,50 +263,53 @@ export function calculateInvestmentLabModifiedDietz(input: {
 }
 
 function normalizeValuations(
-  rows: readonly InvestmentLabReturnValuePoint[],
+  rows: readonly UnitReturnValuePoint[],
   blockers: InvestmentLabModifiedDietzBlocker[],
+  timed: boolean,
 ) {
   const seen = new Set<string>();
-  const normalized: InvestmentLabReturnValuePoint[] = [];
+  const normalized: UnitReturnValuePoint[] = [];
 
   rows.forEach((row, sourceIndex) => {
-    if (!isRiskDate(row.serviceDate)) {
+    if (!isRiskDate(row.serviceDate) || (timed && !Number.isFinite(Date.parse(row.at ?? "")))) {
       blockers.push(
         blocker("invalid_valuation_date", sourceIndex, row.serviceDate),
       );
       return;
     }
-    if (!Number.isFinite(row.valueKrw) || row.valueKrw < 0) {
+    if (!Number.isFinite(row.value) || row.value < 0) {
       blockers.push(
         blocker("invalid_valuation_value", sourceIndex, row.serviceDate),
       );
       return;
     }
-    if (seen.has(row.serviceDate)) {
+    const identity = timed ? String(Date.parse(row.at!)) : row.serviceDate;
+    if (seen.has(identity)) {
       blockers.push(
         blocker("duplicate_valuation_date", sourceIndex, row.serviceDate),
       );
       return;
     }
-    seen.add(row.serviceDate);
-    normalized.push({ serviceDate: row.serviceDate, valueKrw: row.valueKrw });
+    seen.add(identity);
+    normalized.push({ serviceDate: row.serviceDate, value: row.value, ...(timed ? { at: row.at! } : {}) });
   });
 
   return normalized.sort((left, right) =>
-    left.serviceDate.localeCompare(right.serviceDate),
+    timed ? Date.parse(left.at!) - Date.parse(right.at!) : left.serviceDate.localeCompare(right.serviceDate),
   );
 }
 
 function normalizeFlows(
-  rows: readonly InvestmentLabReturnFlow[],
+  rows: readonly UnitReturnFlow[],
   blockers: InvestmentLabModifiedDietzBlocker[],
+  timed: boolean,
 ) {
   const seenSequences = new Set<number>();
-  const normalized: Array<InvestmentLabReturnFlow & { sourceIndex: number }> =
+  const normalized: Array<UnitReturnFlow & { sourceIndex: number }> =
     [];
 
   rows.forEach((row, sourceIndex) => {
-    if (!isRiskDate(row.effectiveServiceDate)) {
+    if (!isRiskDate(row.effectiveServiceDate) || (timed && !Number.isFinite(Date.parse(row.at ?? "")))) {
       blockers.push(
         blocker("invalid_flow_date", sourceIndex, row.effectiveServiceDate),
       );
@@ -287,7 +345,7 @@ function normalizeFlows(
       );
       return;
     }
-    if (!Number.isFinite(row.amountKrw) || row.amountKrw <= 0) {
+    if (!Number.isFinite(row.amount) || row.amount <= 0) {
       blockers.push(
         blocker(
           "invalid_flow_amount",
@@ -304,7 +362,7 @@ function normalizeFlows(
 
   return normalized.sort(
     (left, right) =>
-      left.effectiveServiceDate.localeCompare(right.effectiveServiceDate) ||
+      (timed ? Date.parse(left.at!) - Date.parse(right.at!) : left.effectiveServiceDate.localeCompare(right.effectiveServiceDate)) ||
       left.sequence - right.sequence ||
       left.sourceIndex - right.sourceIndex,
   );
@@ -320,10 +378,11 @@ function blocker(
 
 function blocked(
   blockers: readonly InvestmentLabModifiedDietzBlocker[],
-): InvestmentLabModifiedDietzResult {
+  policy: UnitDietzPolicy,
+): UnitModifiedDietzResult {
   return Object.freeze({
     status: "blocked",
-    policy: INVESTMENT_LAB_MODIFIED_DIETZ_POLICY,
+    policy,
     totalReturn: null,
     periodCount: 0,
     flowCount: 0,

@@ -1,10 +1,15 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isIsolatedReleasePreview } from "../src/lib/deployment/isolated-release-preview.ts";
 
 const PREVIEW_ENVIRONMENT = "preview";
 
-export function getVercelBuildSteps(vercelEnvironment) {
+export function getVercelBuildSteps(vercelEnvironment, env = {}) {
+  if (vercelEnvironment === PREVIEW_ENVIRONMENT && env.BC_ISOLATED_PREVIEW_ENABLED === "true") {
+    if (!isIsolatedReleasePreview(env)) throw new Error("Isolated release Preview target verification failed.");
+    return ["db:preview:release-verify", "build"];
+  }
   return vercelEnvironment === PREVIEW_ENVIRONMENT
     ? [
         "db:preview:preflight",
@@ -37,7 +42,7 @@ export function runVercelBuild({
     }
   }
 
-  const steps = getVercelBuildSteps(vercelEnvironment);
+  const steps = getVercelBuildSteps(vercelEnvironment, env);
   log(
     `[vercel-build] environment=${vercelEnvironment ?? "local"} steps=${steps.join(",")}`,
   );

@@ -41,7 +41,8 @@ export const INVESTMENT_LAB_PREPERIOD_OPTIMIZER_POLICY = Object.freeze({
   maximumInstrumentCount: MAXIMUM_OPTIMIZER_INSTRUMENTS,
   manualValuationHandling:
     "fixed_at_anchor_weight_and_excluded_from_training_objective",
-  riskFreeRate: "zero_research_assumption",
+  riskFreeRate: "unavailable_without_matched_interval_evidence",
+  unsupportedObjectives: Object.freeze(["maximum_sharpe"] as const),
   holdoutPath: "same_anchor_same_external_flows_no_rebalancing",
   providerBackfill: "forbidden",
   authority: "retrospective_research_candidate_not_recommendation",
@@ -217,6 +218,9 @@ export function buildInvestmentLabPreperiodOptimizer(input: Readonly<{
 
   const candidates: InvestmentLabPreperiodOptimizerCandidate[] = [];
   for (const estimate of estimates) {
+    // Preserve legacy pure optimization math, but never publish an objective
+    // selected using an unadmitted zero risk-free return assumption.
+    if (estimate.objective === "maximum_sharpe") continue;
     const allocations = allocateBasisPointsByValue(
       optimizedInstruments.map((instrument, index) => ({
         key: instrument.key,
@@ -273,7 +277,7 @@ export function buildInvestmentLabPreperiodOptimizer(input: Readonly<{
       Object.freeze({
         objective: estimate.objective,
         weights: Object.freeze(weights),
-        trainingMetrics,
+        trainingMetrics: Object.freeze({ ...trainingMetrics, annualizedSharpe: null }),
         searchMethod: estimate.searchMethod,
         scenario,
       }),

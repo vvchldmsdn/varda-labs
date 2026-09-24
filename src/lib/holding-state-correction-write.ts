@@ -1,6 +1,7 @@
 import "server-only";
 
-import { sqlClient } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
+import { isNativeLedgerGuardError, NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
   HOLDING_STATE_CORRECTION_POLICY,
@@ -18,6 +19,7 @@ type CorrectionResult = Readonly<{
   unchanged_count?: string | number;
   corrected_count?: string | number;
   evidence_count?: string | number;
+  native_account_count?: string | number;
 }>;
 
 export async function writeSessionHoldingStateCorrection(
@@ -52,6 +54,7 @@ export async function writeSessionHoldingStateCorrection(
       ownerUserId,
       ...parsed.input,
     });
+    if (number(result.native_account_count) > 0) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
     if (
       number(result.corrected_count) === 1 &&
       number(result.evidence_count) === 1
@@ -78,6 +81,7 @@ export async function writeSessionHoldingStateCorrection(
     }
     return state("conflict", "정정 조건을 다시 확인해 주세요.");
   } catch (error) {
+    if (isNativeLedgerGuardError(error)) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
     const code = databaseErrorCode(error);
     if (["23503", "23505", "23514", "55P03", "57014"].includes(code ?? "")) {
       return state(
@@ -107,10 +111,7 @@ async function runAtomicCorrection({
   averageCost: string | null;
   reason: string | null;
 }) {
-  const results = await sqlClient.transaction((transaction) => [
-    transaction.query("set local lock_timeout = '2s'"),
-    transaction.query("set local statement_timeout = '8s'"),
-    transaction.query(ATOMIC_CORRECTION_QUERY, [
+  const results = await runPortfolioMutation(ownerUserId, ATOMIC_CORRECTION_QUERY, [
       `varda.holding_state_correction.v1:${ownerUserId}:${assetId}`,
       ownerUserId,
       assetId,
@@ -119,9 +120,8 @@ async function runAtomicCorrection({
       averageCost,
       reason,
       HOLDING_STATE_CORRECTION_POLICY.version,
-    ]),
-  ]);
-  return (results[2]?.[0] ?? {}) as CorrectionResult;
+    ]);
+  return (results[0] ?? {}) as CorrectionResult;
 }
 
 function number(value: string | number | undefined) {
@@ -150,7 +150,8 @@ with lock_acquired as materialized (
     asset.account_id,
     asset.quantity,
     asset.average_cost,
-    asset.updated_at
+    asset.updated_at,
+    account_row.native_state is not null as native_account
   from assets asset
   join accounts account_row
     on account_row.id = asset.account_id
@@ -165,6 +166,7 @@ with lock_acquired as materialized (
 ), facts as materialized (
   select
     count(*) as existing_asset_count,
+    count(*) filter (where native_account) as native_account_count,
     count(*) filter (where updated_at = $4::timestamptz) as exact_asset_count,
     count(*) filter (
       where updated_at = $4::timestamptz
@@ -187,6 +189,7 @@ with lock_acquired as materialized (
     and facts.existing_asset_count = 1
     and facts.exact_asset_count = 1
     and facts.unchanged_count = 0
+    and facts.native_account_count = 0
   returning
     asset.id,
     asset.account_id,

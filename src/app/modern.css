@@ -140,9 +140,9 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
   .varda-sidebar { display: none; }
   .varda-page:has(.varda-app-navigation), .varda-secondary-page:has(.varda-app-navigation) { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
   .varda-topbar { min-height: 68px; padding-inline: 22px; gap: 8px; }
-  .varda-topbar-location, .varda-topbar-actions { gap: 13px; }
+  .varda-topbar-location, .varda-topbar-actions { gap: clamp(4px, 1.3vw, 13px); min-width: 0; }
   .varda-mobile-brand { display: block; font-size: 15px; font-weight: 750; letter-spacing: .25em; }
-  .varda-mobile-menu-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding-inline: 6px; font-size: 11px; border-radius: 8px; }
+  .varda-mobile-menu-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding-inline: 6px; font-size: 11px; border-radius: 8px; white-space: nowrap; flex: none; }
   .varda-breadcrumb, .varda-breadcrumb-slash, .varda-updated-at, .varda-topbar-location strong { display: none; }
   .varda-topbar-add { min-height: 36px; padding: 8px; }
   .varda-topbar-add span { display: none; }
@@ -174,3 +174,12 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
   .varda-management-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
   .varda-skip-link { left: 16px; }
 }
+@media (max-width: 359px) {
+  .varda-mobile-menu-button { min-width: 44px; }
+  .varda-mobile-menu-button span { display: none; }
+}
+/* Reporting currency is a distinct control, independent of language. */
+.varda-reporting-toolbar { display: flex; justify-content: flex-end; padding: 8px 24px; border-bottom: 1px solid var(--line); }
+.varda-reporting-control { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
+.varda-reporting-control select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+@media (max-width: 640px) { .varda-reporting-toolbar { padding: 4px 18px; } .varda-reporting-control { gap: 8px; } }

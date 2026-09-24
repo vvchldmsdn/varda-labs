@@ -25,6 +25,7 @@ import {
 import type { MarketDataProvider } from "@/lib/market-data/providers/types";
 import { safeErrorMessage } from "@/lib/redaction";
 import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
+import { runNativeDailySnapshotJob } from "@/lib/snapshots/native-daily-job";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
 type CloseSyncSummary = {
@@ -95,6 +96,7 @@ export type CronMarketCycleRunResult = {
     failedCount: number;
   };
   blockers: string[];
+  nativeSnapshot?: Awaited<ReturnType<typeof runNativeDailySnapshotJob>> | { status: "failed" };
 };
 
 type CronMarketCycleOptions = { now?: Date; cronScheduleUtc?: string | null };
@@ -105,19 +107,22 @@ export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): 
   const closeRetryDeadline = performance.now() + 180_000;
   // Drain even when today's cycle was already completed; preserve snapshot ordering.
   scheduleMarketCollection();
+  let result: CronMarketCycleRunResult;
   try {
     // All close groups and the following live refresh share one internal lease.
-    return await withKisCollectionLeaseWait(() => runMarketCycleWithLease({ ...options, closeRetryDeadline }));
+    result = await withKisCollectionLeaseWait(() => runMarketCycleWithLease({ ...options, closeRetryDeadline }));
   } catch (error) {
     if (error instanceof KisRefreshLeaseBusyError) {
-      return emptyResult({
+      result = emptyResult({
         ok: false, status: "active_conflict", runId: null,
         snapshotDate: resolveSnapshotCycle(options.now ?? new Date()).snapshotDate,
         blockers: ["kis_provider_refresh_busy"],
       });
-    }
-    throw error;
+    } else throw error;
   }
+  // Native cash-only portfolios and admitted providers do not depend on KIS readiness.
+  const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false }).catch(() => ({ status: "failed" as const }));
+  return { ...result, nativeSnapshot };
 }
 
 async function runMarketCycleWithLease({

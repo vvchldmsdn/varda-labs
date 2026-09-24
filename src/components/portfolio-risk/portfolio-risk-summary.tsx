@@ -62,9 +62,9 @@ export function RiskAnalysisBasis({
           detail={`${provenance.returnType} returns`}
         />
         <RiskSummaryCard
-          label="무위험 수익률 (가정)"
+          label="무위험 수익률"
           value={formatRiskRatioPercent(provenance.annualRiskFreeRate)}
-          detail={`canonical source 미확정 · daily ${formatRiskRatioPercent(provenance.dailyRiskFreeRate)}`}
+          detail="같은 통화·기간의 수익률 근거 필요"
         />
         <RiskSummaryCard
           label="연환산 기준"
@@ -104,7 +104,7 @@ export function RiskPortfolioSummary({
         <RiskSummaryCard
           label="Sharpe"
           value={formatRiskMetric(portfolio.sharpe)}
-          detail={metricDetail(portfolio.sharpe.reason, "무위험 수익률 0% 가정")}
+          detail={metricDetail(portfolio.sharpe.reason, "검증된 무위험 수익률 기준")}
         />
         <RiskSummaryCard
           label="평균 상관"
@@ -175,7 +175,7 @@ export function RiskStandaloneSummary({
         <RiskSummaryCard
           label="Sharpe"
           value={formatRiskMetric(instrument.sharpe)}
-          detail={metricDetail(instrument.sharpe.reason, "무위험 수익률 0% 가정")}
+          detail={metricDetail(instrument.sharpe.reason, "검증된 무위험 수익률 기준")}
         />
       </div>
     </RiskSection>

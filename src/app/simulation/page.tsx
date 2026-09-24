@@ -1,4 +1,12 @@
 import { localizedMetadata } from "@/lib/i18n/server";
+import { registerTenantSimulationPath } from "@/lib/server/simulation-path-details";
+import type { TenantContext } from "@/lib/session-resolver-contract";
+import { bootstrapPathSnapshot, economicPathSnapshot } from "@/lib/simulation-path-snapshot";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
+import { admitNativeKrwEconomic } from "@/lib/native-economic-admission";
+import { getOwnedCurrencyResearchInput } from "@/db/queries/currency-research";
 import { SimulationText } from "@/components/simulation/simulation-text";
 import { Suspense } from "react";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
@@ -24,6 +32,7 @@ type SimulationPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     end?: string | string[];
     horizon?: string | string[];
     model?: string | string[];
@@ -79,13 +88,26 @@ export default async function SimulationPage({
   const selectedScope = scopeContext.resolution.scope;
   const now = new Date();
   const pathModel = resolveSimulationPathModel(params.model);
-  const model = buildSimulationPageControls({
-    endServiceDate: params.end,
-    horizon: params.horizon,
-    kodexWeight: params.kodexWeight,
-    now,
-  });
-  const ownerResearchPromise = getReadOnlyTenantSimulationOwnerResearch({
+  const model = buildSimulationPageControls({ endServiceDate: params.end, horizon: params.horizon, kodexWeight: params.kodexWeight, now });
+  let admittedNativeResearch: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch> | undefined;
+  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    // The economic model is calibrated to KRW returns. Never relabel it or
+    // silently substitute a historical model when the user selected economic.
+    const historical = pathModel === "bootstrap";
+    const invalidReason = pathModel === null ? "invalid_model" : model.researchHorizonSelection.status !== "valid" ? "invalid_horizon" : model.endServiceDateSelection.status !== "valid" || (typeof params.end === "string" && params.end > resolveSnapshotCycle(now).snapshotDate) ? "invalid_end_date" : undefined;
+    if (invalidReason) return <CurrencyPortfolioSurface surface="simulation" reporting={reporting} economicUnsupported={!historical} researchUnavailableReason={invalidReason} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+    if (historical || reporting === "USD" || pathModel !== "economic") {
+      const research = historical ? await getOwnedCurrencyResearchInput(resolution.tenantContext, selectedScope, reporting, { horizon: model.researchHorizonSelection.horizon!, ...(typeof params.end === "string" ? { endServiceDate: params.end } : {}) }) : null;
+      return <CurrencyPortfolioSurface surface="simulation" reporting={reporting} research={research} economicUnsupported={!historical} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+    }
+    const candidate = getReadOnlyTenantSimulationOwnerResearch({ includeDisplayPaths: false, endServiceDate: params.end, horizon: params.horizon, scope: selectedScope, serviceDate: resolveSnapshotCycle(now).snapshotDate, tenantContext: resolution.tenantContext });
+    const [native, research] = await Promise.all([getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, "KRW"), candidate]);
+    const admission = admitNativeKrwEconomic(native, research);
+    if (!admission.ready) return <CurrencyPortfolioSurface surface="simulation" reporting="KRW" economicUnsupported researchUnavailableReason={admission.reason} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+    admittedNativeResearch = candidate;
+  }
+  const ownerResearchPromise = admittedNativeResearch ?? getReadOnlyTenantSimulationOwnerResearch({
     includeDisplayPaths: pathModel === "bootstrap",
     endServiceDate: params.end,
     horizon: params.horizon,
@@ -103,7 +125,7 @@ export default async function SimulationPage({
       ownerResearchExecution={
         <SimulationSectionErrorBoundary section="owner-research-execution" title="내 포트폴리오 확률 경로">
           <Suspense key={`${selectedScope.key}:${pathModel}:${model.requestedEndServiceDate}:${model.researchHorizonSelection.horizon}`} fallback={<SimulationLoading />}>
-            <OwnerResearchExecutionContent resultPromise={ownerResearchPromise} selectedScopeKey={selectedScope.key} pathModel={pathModel} stateAsOfServiceDate={typeof params.end === "string" && model.endServiceDateSelection.status === "valid" ? params.end : resolveSnapshotCycle(now).snapshotDate} />
+            <OwnerResearchExecutionContent tenantContext={resolution.tenantContext} resultPromise={ownerResearchPromise} selectedScopeKey={selectedScope.key} pathModel={pathModel} stateAsOfServiceDate={typeof params.end === "string" && model.endServiceDateSelection.status === "valid" ? params.end : resolveSnapshotCycle(now).snapshotDate} />
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
@@ -111,7 +133,8 @@ export default async function SimulationPage({
   );
 }
 
-async function OwnerResearchExecutionContent({ resultPromise, selectedScopeKey, pathModel, stateAsOfServiceDate }: {
+async function OwnerResearchExecutionContent({ tenantContext, resultPromise, selectedScopeKey, pathModel, stateAsOfServiceDate }: {
+  tenantContext: TenantContext;
   pathModel: ReturnType<typeof resolveSimulationPathModel>;
   stateAsOfServiceDate: string;
   resultPromise: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch>;
@@ -121,7 +144,9 @@ async function OwnerResearchExecutionContent({ resultPromise, selectedScopeKey, 
   if (pathModel === null) return <p role="alert"><SimulationText ko="계산 모형을 확인해 주세요. 경제지표 또는 과거 수익률 경로를 선택할 수 있습니다." en="Choose Economic paths or Historical paths to run a model." /></p>;
   if (pathModel === "economic") {
     const economic = await getReadOnlyTenantSimulationOwnerEconomicResearch({ ownerResearchPromise: resultPromise, stateAsOfServiceDate, includeDisplayPaths: true });
-    return <EconomicExecutionSection result={economicResearchPresentation(economic)} baseline={result.execution} />;
+    const registration = await registerTenantSimulationPath(tenantContext, economicPathSnapshot(economic, result.execution));
+    return <EconomicExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} result={economicResearchPresentation(economic)} baseline={result.execution} />;
   }
-  return <OwnerResearchExecutionSection execution={result.execution} selectedScopeKey={selectedScopeKey} />;
+  const registration = await registerTenantSimulationPath(tenantContext, bootstrapPathSnapshot(result.execution, result.preparedPaths));
+  return <OwnerResearchExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} execution={result.execution} selectedScopeKey={selectedScopeKey} />;
 }

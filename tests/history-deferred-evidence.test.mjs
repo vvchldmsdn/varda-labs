@@ -144,6 +144,9 @@ describe("History demand-driven server evidence", () => {
     let resolution = { ok: false, reason: "unauthenticated" };
     let context = { state: "ready", resolution: { state: "resolved", scope }, catalog: { scopes: [scope] } };
     const [page] = await importUiWithPorts(["src/app/history/page.tsx"], {
+      "@/db/queries/native-portfolio-ledger": { hasNativeLedger: async () => false },
+      "@/db/queries/currency-tracked-portfolio": { getTrackedCurrencyEvidence: async () => { throw new Error("unexpected native read"); } },
+      "@/components/currency-portfolio-surface": { CurrencyPortfolioSurface: () => null },
       ...routingPorts,
       "next/headers": { cookies: async () => ({ get: name => {
         assert.equal(name, "varda-locale");

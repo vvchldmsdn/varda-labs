@@ -1,6 +1,6 @@
 import "server-only";
 import { getTenantSqlClient } from "@/db/tenant-client";
-import { QUICK_VERSION } from "@/lib/quick-portfolio";
+import { quickEngineVersion } from "@/lib/quick-portfolio";
 import { isPlanId } from "@/lib/investment-plan";
 import { validateQuickPortfolio, type QuickInput } from "@/lib/quick-portfolio";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -31,7 +31,7 @@ export async function savePortfolioDraft(tenant: TenantContext, id: string, inpu
     tx.query("select set_config('app.current_user_id', $1, true)", [tenant.ownerUserId]),
     tx.query("select set_config('lock_timeout', '3000', true), set_config('statement_timeout', '5000', true)"),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`portfolio_drafts:${tenant.ownerUserId}`]),
-    tx.query(SAVE_PLAN_SQL, [tenant.ownerUserId, id, JSON.stringify(parsed.input), QUICK_VERSION]),
+    tx.query(SAVE_PLAN_SQL, [tenant.ownerUserId, id, JSON.stringify(parsed.input), quickEngineVersion(parsed.input)]),
   ], { isolationLevel: "ReadCommitted" });
   const status = rows[0]?.status;
   if (!["created", "existing", "conflict", "limit", "inactive"].includes(status)) throw new Error("portfolio_draft_write_unavailable");

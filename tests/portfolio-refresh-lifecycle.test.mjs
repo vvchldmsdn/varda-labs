@@ -19,6 +19,7 @@ describe("Today navigation refresh wiring", () => {
       "lucide-react": icons,
       "@/components/i18n/locale-provider": { useI18n: () => ({ locale, t: (ko, en) => locale === "en" ? en ?? ko : ko }) },
       "@/components/i18n/language-switch": { LanguageSwitch: () => null },
+      "@/components/reporting-currency-switch": { ReportingCurrencySwitch: () => null, REPORTING_ROUTES: ["/", "/today", "/history", "/simulation"] },
       "@/components/home/portfolio-refresh-button": { PortfolioRefreshButton: RefreshButton },
     });
     const elements = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(elements) : [tree, ...elements(tree.props?.children)];

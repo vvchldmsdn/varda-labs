@@ -1,4 +1,7 @@
 import { localizedMetadata } from "@/lib/i18n/server";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
@@ -34,6 +37,7 @@ type HistoryPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     lane?: string | string[];
     positionDate?: string | string[];
     positionSource?: string | string[];
@@ -84,6 +88,11 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
+    return <CurrencyPortfolioSurface surface="history" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
+  }
   const positionAccount =
     selectedScope.kind === "account" ? selectedScope.accountCode : "all";
   const eventScope = legacyEventScope(selectedScope);
