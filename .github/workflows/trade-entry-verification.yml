@@ -34,12 +34,13 @@ jobs:
       - name: Materialize the asserted UI patch
         run: |
           if test -f scripts/apply-trade-entry-hotfix.mjs; then node scripts/apply-trade-entry-hotfix.mjs; fi
+          if test -f scripts/refine-trade-entry-hotfix.mjs; then node scripts/refine-trade-entry-hotfix.mjs; fi
           git diff --check
       - name: Test, lint, build and exercise the real UI with isolated API doubles
         run: node scripts/verify-trade-entry-hotfix.mjs
       - name: Retain synthetic verification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: trade-entry-verification-${{ github.run_id }}
           path: output/trade-entry/
@@ -52,8 +53,9 @@ jobs:
           test ! -d src/app/trade-entry-local-qa
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/lib/trade-record-intent.ts src/components/trade-record-links.tsx src/components/trade-record-links.module.css src/components/app-navigation.tsx src/app/portfolio/manage/page.tsx src/app/portfolio/ledger/page.tsx src/components/native-ledger-view.tsx src/components/native-ledger-view.module.css tests/trade-record-intent.test.mjs tests/run.mjs
+          git add src/lib/trade-record-intent.ts src/components/trade-record-links.tsx src/components/trade-record-links.module.css src/components/app-navigation.tsx src/app/portfolio/manage/page.tsx src/app/portfolio/ledger/page.tsx src/components/native-ledger-view.tsx src/components/native-ledger-view.module.css tests/trade-record-intent.test.mjs tests/run.mjs tests/identity-bootstrap-claim-migration-cli.test.mjs tests/identity-bootstrap-claim-handoff-rehearsal.test.mjs scripts/verify-trade-entry-hotfix.mjs
           if test -f scripts/apply-trade-entry-hotfix.mjs; then git rm scripts/apply-trade-entry-hotfix.mjs; fi
+          if test -f scripts/refine-trade-entry-hotfix.mjs; then git rm scripts/refine-trade-entry-hotfix.mjs; fi
           if git diff --cached --quiet; then echo 'Verified source already published'; exit 0; fi
           git diff --cached --check
           git commit -m 'fix: expose buy and sell records and preserve trade entry intent'
