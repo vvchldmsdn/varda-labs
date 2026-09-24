@@ -6,15 +6,17 @@ import type { NativeGroupSelection } from "./native-group-scope.ts";
 
 export type NativeSnapshotEvidence = { version: 1; frame: TrackedValuationFrame; fx: readonly FxEvidence[]; sequence: number };
 /** Adapts the actual owner ledger into the existing valuation engine, never fabricates a price. */
-export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledger: { accounts: NativeStoredAccount[]; entries: NativeStoredEntry[]; snapshots: { accountId: string; evidence: unknown }[] }, scopeKind: string, selection?: NativeGroupSelection): TrackedPortfolioEvidence {
+export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledger: { accounts: NativeStoredAccount[]; entries: NativeStoredEntry[]; snapshots: { accountId: string; evidence: unknown }[]; accountsComplete?: boolean; historyComplete?: boolean }, scopeKind: string, selection?: NativeGroupSelection): TrackedPortfolioEvidence {
+  const historyComplete = ledger.historyComplete !== false;
+  if (!historyComplete) ledger = { ...ledger, entries: [], snapshots: [] };
   const group = scopeKind === "portfolio_group";
   const whole = new Set(selection?.wholeAccountIds ?? []), direct = new Set(selection?.directAssetIds ?? []);
   const includesCash = (accountId: string) => !group || whole.has(accountId);
   const includesAsset = (accountId: string, assetId: string) => !group || whole.has(accountId) || direct.has(assetId);
   if (group) ledger = { ...ledger, accounts: ledger.accounts.filter(a => whole.has(a.id) || a.assets.some(asset => direct.has(asset.id))) };
   const allowed = new Set(ledger.accounts.map(row => row.id));
-  let complete = ledger.accounts.length > 0 && (!group || Boolean(selection));
-  let realizedTradesComplete = complete;
+  let complete = ledger.accountsComplete !== false && ledger.accounts.length > 0 && (!group || Boolean(selection));
+  let realizedTradesComplete = complete && historyComplete;
   const positions = base.current.positions.map(row => ({ ...row }));
   let flowIssue: string | undefined;
   if (group) {
@@ -105,5 +107,5 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
       }
     }
   }
-  return { ...base, current, history, trades: complete && !flowIssue ? trades : null, fx, ledgerComplete: complete && !flowIssue, cashFlows, corporateActionsInWindow, splits, realizedTrades, realizedTradesComplete, ...(selection ? { groupEvidence: { policy: "current_membership_whole_cash_direct_holdings", stableSince: selection.stableSince, reason: flowIssue ?? null } } : {}), nativeSequences: Object.fromEntries(ledger.accounts.filter(a => a.state && a.active !== false).map(a => [a.id, a.state!.sequence])) };
+  return { ...base, current, history, trades: complete && historyComplete && !flowIssue ? trades : null, fx, ledgerComplete: complete && !flowIssue, cashFlows: historyComplete ? cashFlows : undefined, corporateActionsInWindow, splits, realizedTrades: historyComplete ? realizedTrades : null, realizedTradesComplete, ...(selection ? { groupEvidence: { policy: "current_membership_whole_cash_direct_holdings", stableSince: selection.stableSince, reason: flowIssue ?? null } } : {}), nativeSequences: Object.fromEntries(ledger.accounts.filter(a => a.state && a.active !== false).map(a => [a.id, a.state!.sequence])) };
 }

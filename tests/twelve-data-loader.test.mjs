@@ -53,6 +53,21 @@ describe("tracked owner provider integration with isolated boundary ports", () =
     assert.equal(result.current.positions[0].observation.price, "100"); assert.equal(result.current.positions[0].observation.source, "kis");
   });
 
+  it("does not skip native split evidence when the historical event window is unavailable", async () => {
+    const holding=asset();
+    const ledger={accounts:[{id:account,name:'Owned',active:true,assets:[{id:holding.id,quantity:'2',currency:'USD',archived:false}],state:{sequence:10001,at:'2026-08-01T00:00:00Z',cash:{USD:'25',KRW:'0'},positions:[{assetId:holding.id,quantity:'2',currency:'USD',costLots:null}]}}],entries:[],snapshots:[],entriesComplete:false,historyComplete:false};
+    const {loader}=await fixture({ledger,assets:[holding]});
+    const result=await loader.getTrackedCurrencyEvidence({ownerUserId:owner},scope,'USD');
+    const position=result.current.positions.find(row=>row.id===holding.id);
+    assert.equal(position.observation,null); assert.equal(position.evidenceReason,'corporate_actions_pending');
+    assert.equal(result.current.positions.find(row=>row.id===`cash:${account}:USD`).observation.quantity,'25');
+    assert.equal(result.trades,null); assert.equal(result.cashFlows,undefined); assert.equal(result.realizedTradesComplete,false);
+    const omitted=await fixture({ledger:{accounts:[],entries:[],snapshots:[],accountsComplete:false,entriesComplete:false,historyComplete:false},assets:[holding]});
+    const bounded=await omitted.loader.getTrackedCurrencyEvidence({ownerUserId:owner},scope,'USD');
+    assert.equal(bounded.current.positions[0].observation,null);
+    assert.equal(bounded.current.positions[0].evidenceReason,'corporate_actions_pending','a native account outside the bounded list cannot bypass split admission');
+  });
+
   it("read-only captures preserve one asOf and request no collection, including cost/event/snapshot FX", async () => {
     const costAt = "2026-08-01T12:00:00.000Z", snapshotAt = "2026-08-10T22:00:00.000Z", eventAt = "2026-08-12T12:00:00.000Z";
     const holding = asset(), lot = { amount: "200", currency: "USD", at: costAt, source: "user_native_ledger", remaining: { n: "1", d: "1" } };
