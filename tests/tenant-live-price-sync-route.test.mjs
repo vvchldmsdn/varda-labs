@@ -63,6 +63,7 @@ async function fixture(options = {}) {
       finishMarketCollection: async (job, outcome) => outcomes.push({ job, outcome }),
       getMarketCollectionSummary: async () => ({ pending: pending.size }),
     },
+    "@/lib/market-data/twelve-data-service": { resumeConfiguredTwelveDataService: async () => ({ status: "disabled", processed: 0, failed: 0 }) },
     "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async task => {
       if (leaseActive) return task();
       events.push("lease"); leaseActive = true;

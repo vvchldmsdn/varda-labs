@@ -1,4 +1,5 @@
 import type { SimulationEconomicPresentation } from "@/db/queries/simulation-owner-economic";
+import type { SimulationPathHandle } from "@/lib/simulation-path-detail";
 import type { SimulationOwnerResearchExecutionResult } from "@/lib/simulation-owner-research-execution";
 import { CalculationGuideDialog } from "@/components/explanations/calculation-guide-dialog";
 import { InvestmentLabDialog } from "@/components/investment-lab/investment-lab-dialog";
@@ -9,7 +10,9 @@ import { simulationReturnLabel } from "./simulation-presentation";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 import styles from "./simulation-workspace.module.css";
 
-export function EconomicExecutionSection({ result, baseline }: {
+export function EconomicExecutionSection({ result, baseline, pathDetail, pathDetailNotice }: {
+  pathDetail?: SimulationPathHandle;
+  pathDetailNotice?: "limit" | "storage" | "disabled";
   result: SimulationEconomicPresentation;
   baseline: SimulationOwnerResearchExecutionResult;
 }) {
@@ -45,7 +48,7 @@ export function EconomicExecutionSection({ result, baseline }: {
           <div><dt><SimulationText ko="손실로 끝난 경로" en="Paths ending in loss" /></dt><dd>{result.terminal.lossProbabilityPct.toFixed(1)}%</dd><p><SimulationText ko="이 모형의 가정 안에서 계산한 비율" en="Frequency under this model's assumptions" /></p></div>
           <div><dt><SimulationText ko="중간 최대 하락 · P90 MDD" en="Largest drop · P90 MDD" /></dt><dd>{result.terminal.maxDrawdownP90Pct.toFixed(1)}%</dd><p><SimulationText ko="약 10% 경로는 이보다 더 하락" en="About 10% of paths fell further" /></p></div>
         </dl>
-        <ResearchFanChart large execution={result} />
+        <ResearchFanChart pathDetail={pathDetail} pathDetailNotice={pathDetailNotice} large execution={result} />
       </div>
       <InvestmentLabDialog label="출발 상태와 포함 종목" labelEn="Starting state & holdings" title="경제지표와 자산을 연결한 근거" titleEn="How economic data connects to holdings" icon="table" size="wide">
         <EconomicDataEvidence result={result} />
@@ -99,6 +102,8 @@ function FactorTrajectory({ result, factorKey }: { result: Extract<SimulationEco
 }
 
 function EconomicReason({ reason }: { reason: string | null }) {
+  if (reason === "unsupported_reporting_currency") return <SimulationText ko="이 경제모형의 USD 보정 정책은 아직 검증되지 않았습니다. 기본 역사적 시뮬레이션을 선택할 수 있습니다." en="This economic model has no validated USD calibration. Historical bootstrap remains available as a separate choice." />;
+  if (reason === "unsupported_return_basis") return <SimulationText ko="입력 수익률·환율 기준이 이 KRW 경제모형과 일치하지 않습니다." en="The return or FX basis does not match this KRW economic model." />;
   if (reason === "insufficient_factor_overlap") return <SimulationText ko="환율·금리와 겹치는 이력 부족" en="Insufficient overlap with FX and yields" />;
   if (reason === "current_factor_state_stale") return <SimulationText ko="경제지표가 기준일의 최신성 한도를 넘었습니다." en="Economic observations are too old for the selected cutoff." />;
   if (reason === "current_factor_state_missing") return <SimulationText ko="기준일 이전에 사용할 경제지표 관측이 없습니다." en="Required economic observations are missing before the selected cutoff." />;

@@ -3,6 +3,8 @@
 import { ManagementText, ManagementElement } from "@/components/i18n/management-text";
 import { T } from "@/components/i18n/localized-text";
 import { useActionState } from "react";
+import { NativeLedgerNotice } from "@/components/native-ledger-notice";
+import { NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 
 import { correctHoldingState } from "@/app/portfolio/holdings/actions";
 import {
@@ -38,6 +40,7 @@ export function HoldingStateCorrectionForm({
     <details className="min-w-[230px]">
       <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]"><ManagementText>{"수량·평균매입가 정정"}</ManagementText></summary>
       <form action={action} className="mt-3 space-y-3">
+        {state.message === NATIVE_LEDGER_REQUIRED_MESSAGE ? <NativeLedgerNotice assetId={holdingId} action="cost_basis" /> : null}
         <input name="assetId" type="hidden" value={holdingId} />
         <input name="expectedUpdatedAt" type="hidden" value={updatedAt} />
 

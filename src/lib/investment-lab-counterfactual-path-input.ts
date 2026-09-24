@@ -8,6 +8,7 @@ import type {
   InvestmentLabAdjustedClose,
   InvestmentLabAmountProvenance,
   InvestmentLabScheduledFlow,
+  InvestmentLabScheduledMoneyFlow,
 } from "./investment-lab-execution-schedule.ts";
 import type {
   InvestmentLabActualPathPoint,
@@ -16,6 +17,7 @@ import type {
 
 export type InvestmentLabValuationClose = InvestmentLabAdjustedClose &
   Readonly<{ serviceDate: string }>;
+export type InvestmentLabValuePoint = Readonly<{ serviceDate: string; totalValue: number; at?: string }>;
 
 export function prepareInvestmentLabCounterfactualPathInput(
   input: {
@@ -26,8 +28,25 @@ export function prepareInvestmentLabCounterfactualPathInput(
   },
   defaultMaxValuationCarryDays: number,
 ) {
+  const prepared = prepareInvestmentLabUnitPathInput({ ...input,
+    actualPath: input.actualPath.map(({ totalMarketValueKrw, ...row }) => ({ ...row, totalValue: totalMarketValueKrw })),
+    scheduledFlows: input.scheduledFlows.map(({ amountKrw, ...row }) => ({ ...row, amount: amountKrw })),
+  }, defaultMaxValuationCarryDays);
+  return { ...prepared,
+    actualPath: prepared.actualPath.map(({ totalValue, ...row }) => ({ ...row, totalMarketValueKrw: totalValue })),
+    scheduledFlows: prepared.scheduledFlows.map(({ amount, ...row }) => ({ ...row, amountKrw: amount, amountProvenance: row.amountProvenance as InvestmentLabAmountProvenance })),
+  };
+}
+
+export function prepareInvestmentLabUnitPathInput(input: {
+  actualPath: readonly InvestmentLabValuePoint[];
+  closes: readonly InvestmentLabAdjustedClose[];
+  scheduledFlows: readonly InvestmentLabScheduledMoneyFlow[];
+  maxValuationCarryDays?: number;
+  allowZeroValuations?: boolean;
+}, defaultMaxValuationCarryDays: number) {
   const blockers: InvestmentLabCounterfactualPathBlocker[] = [];
-  const actualPath = normalizeActualPath(input.actualPath, blockers);
+  const actualPath = normalizeActualPath(input.actualPath, blockers, input.allowZeroValuations ?? false);
   const closes = normalizeCloses(input.closes, blockers);
   const scheduledFlows = normalizeScheduledFlows(
     input.scheduledFlows,
@@ -77,22 +96,24 @@ export function investmentLabValuationOnOrBefore(
 }
 
 export function compareInvestmentLabEventOrder(
-  left: InvestmentLabScheduledFlow,
-  right: InvestmentLabScheduledFlow,
+  left: Pick<InvestmentLabScheduledMoneyFlow, "eventDate" | "sequence" | "sourceIndex" | "eventAt">,
+  right: Pick<InvestmentLabScheduledMoneyFlow, "eventDate" | "sequence" | "sourceIndex" | "eventAt">,
 ) {
   return (
     left.eventDate.localeCompare(right.eventDate) ||
+    (left.eventAt && right.eventAt ? Date.parse(left.eventAt) - Date.parse(right.eventAt) : 0) ||
     left.sequence - right.sequence ||
     left.sourceIndex - right.sourceIndex
   );
 }
 
 export function compareInvestmentLabExecutionOrder(
-  left: InvestmentLabScheduledFlow,
-  right: InvestmentLabScheduledFlow,
+  left: Pick<InvestmentLabScheduledMoneyFlow, "executionServiceDate" | "sequence" | "sourceIndex" | "eventAt">,
+  right: Pick<InvestmentLabScheduledMoneyFlow, "executionServiceDate" | "sequence" | "sourceIndex" | "eventAt">,
 ) {
   return (
     left.executionServiceDate.localeCompare(right.executionServiceDate) ||
+    (left.eventAt && right.eventAt ? Date.parse(left.eventAt) - Date.parse(right.eventAt) : 0) ||
     left.sequence - right.sequence ||
     left.sourceIndex - right.sourceIndex
   );
@@ -107,41 +128,44 @@ export function pathBlocker(
 }
 
 function normalizeActualPath(
-  rows: readonly InvestmentLabActualPathPoint[],
+  rows: readonly InvestmentLabValuePoint[],
   blockers: InvestmentLabCounterfactualPathBlocker[],
+  allowZero: boolean,
 ) {
   if (rows.length < 2) {
     blockers.push(pathBlocker("insufficient_actual_path", null, null));
   }
 
   const seen = new Set<string>();
-  const normalized: InvestmentLabActualPathPoint[] = [];
+  const normalized: InvestmentLabValuePoint[] = [];
   rows.forEach((row, sourceIndex) => {
     if (!isRiskDate(row.serviceDate)) {
       blockers.push(pathBlocker("invalid_actual_date", sourceIndex, null));
       return;
     }
+    if (row.at !== undefined && !Number.isFinite(Date.parse(row.at))) { blockers.push(pathBlocker("invalid_actual_date", sourceIndex, row.serviceDate)); return; }
     if (
-      !Number.isFinite(row.totalMarketValueKrw) ||
-      row.totalMarketValueKrw <= 0
+      !Number.isFinite(row.totalValue) ||
+      row.totalValue < 0 || (!allowZero && row.totalValue === 0)
     ) {
       blockers.push(
         pathBlocker("invalid_actual_value", sourceIndex, row.serviceDate),
       );
       return;
     }
-    if (seen.has(row.serviceDate)) {
+    const identity = row.at === undefined ? row.serviceDate : String(Date.parse(row.at));
+    if (seen.has(identity)) {
       blockers.push(
         pathBlocker("duplicate_actual_date", sourceIndex, row.serviceDate),
       );
       return;
     }
-    seen.add(row.serviceDate);
+    seen.add(identity);
     normalized.push({ ...row });
   });
 
   return normalized.sort((left, right) =>
-    left.serviceDate.localeCompare(right.serviceDate),
+    left.at && right.at ? Date.parse(left.at) - Date.parse(right.at) : left.serviceDate.localeCompare(right.serviceDate),
   );
 }
 
@@ -181,13 +205,13 @@ function normalizeCloses(
 }
 
 function normalizeScheduledFlows(
-  rows: readonly InvestmentLabScheduledFlow[],
+  rows: readonly InvestmentLabScheduledMoneyFlow[],
   closes: readonly InvestmentLabValuationClose[],
   blockers: InvestmentLabCounterfactualPathBlocker[],
 ) {
   const closeByDate = new Map(closes.map((row) => [row.priceDate, row]));
   const seen = new Set<number>();
-  const normalized: InvestmentLabScheduledFlow[] = [];
+  const normalized: InvestmentLabScheduledMoneyFlow[] = [];
 
   rows.forEach((row) => {
     const sourceIndex = Number.isInteger(row.sourceIndex)
@@ -251,15 +275,16 @@ function normalizeScheduledFlows(
 }
 
 function isScheduledFlow(
-  row: InvestmentLabScheduledFlow,
-): row is InvestmentLabScheduledFlow {
+  row: InvestmentLabScheduledMoneyFlow,
+): row is InvestmentLabScheduledMoneyFlow {
   return (
     isRiskDate(row.eventDate) &&
     Number.isInteger(row.sequence) &&
     row.sequence >= 0 &&
     (row.direction === "inflow" || row.direction === "outflow") &&
-    Number.isFinite(row.amountKrw) &&
-    row.amountKrw > 0 &&
+    Number.isFinite(row.amount) &&
+    row.amount > 0 &&
+    (row.eventAt === undefined || Number.isFinite(Date.parse(row.eventAt))) &&
     isAmountProvenance(row.amountProvenance) &&
     Number.isInteger(row.sourceIndex) &&
     row.sourceIndex >= 0 &&
@@ -274,11 +299,12 @@ function isScheduledFlow(
 
 function isAmountProvenance(
   value: string,
-): value is InvestmentLabAmountProvenance {
+): value is InvestmentLabAmountProvenance | "dated_reporting_money" {
   return (
     value === "explicit_amount_krw" ||
     value === "derived_quantity_price_krw" ||
-    value === "derived_quantity_price_fx"
+    value === "derived_quantity_price_fx" ||
+    value === "dated_reporting_money"
   );
 }
 

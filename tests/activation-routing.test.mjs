@@ -51,6 +51,9 @@ describe("state-based activation routing", () => {
     let resolution = { ok: true, tenantContext: tenant }, drafts = [saved], withAccounts = false, hasAssetHistory = false, historyUnavailable = false;
     const dashboard = { holdings: [], nonInvestmentAssets: [{ name: "Existing deposit", value: 4000000 }] };
     const [page] = await importUiWithPorts(["src/app/page.tsx"], {
+      "@/db/queries/native-portfolio-ledger": { hasNativeLedger: async () => false },
+      "@/db/queries/currency-tracked-portfolio": { getTrackedCurrencyEvidence: async () => { throw new Error("unexpected native read"); } },
+      "@/components/currency-portfolio-surface": { CurrencyPortfolioSurface: named("CurrencyPortfolioSurface") },
       "next/navigation": { redirect },
       "next/link": { default: named("Link") },
       "@/lib/i18n/server": { localizedMetadata: value => value },

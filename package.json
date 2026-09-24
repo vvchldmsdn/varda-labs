@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:vercel": "node --no-warnings scripts/vercel-build.mjs",
+    "db:preview:release-verify": "node --no-warnings scripts/verify-isolated-release-preview.mjs",
     "db:preview:preflight": "node --no-warnings scripts/preview-database-evidence.mjs --phase preflight",
     "db:preview:postflight": "node --no-warnings scripts/preview-database-evidence.mjs --phase postflight",
     "start": "next start",
@@ -133,6 +134,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
     "typescript": "^5"

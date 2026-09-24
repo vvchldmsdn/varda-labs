@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import { createQuickDraft, parseQuickDraft, QUICK_STORAGE_KEY, type QuickDraft, type QuickInput } from "@/lib/quick-portfolio";
 import { ContinueWithPortfolio } from "./portfolio-activation";
 import { QuickResults } from "./quick-results";
+import { useI18n } from "@/components/i18n/locale-provider";
+import { intlLocale } from "@/lib/i18n/locale";
 import styles from "./quick-portfolio.module.css";
 type Saved = { id: string; input: QuickInput; createdAt: string };
 export function QuickPortfolioLibrary({ onVisibility }: { localAuthDisabled?: boolean; onVisibility?: (visible: boolean) => void }) {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const [draft, setDraft] = useState<QuickDraft | null>(null), [saved, setSaved] = useState<Saved[]>([]), [selected, setSelected] = useState<Saved | null>(null);
   const [access, setAccess] = useState<"loading" | "guest" | "ready" | "unlinked" | "unavailable">("loading");
@@ -28,13 +31,21 @@ export function QuickPortfolioLibrary({ onVisibility }: { localAuthDisabled?: bo
   const visible = Boolean(draft || saved.length || selected || message || error);
   useEffect(() => { onVisibility?.(visible); }, [onVisibility, visible]);
   if (!visible) return null;
-  return <section className={styles.saved} aria-label="간편 포트폴리오 저장"><p className={styles.eyebrow}>MY PORTFOLIO</p><h2>입력은 한 번, 내 포트폴리오는 계속.</h2>
-    {message ? <p role="status">{message}</p> : null}{error ? <p role="alert" className={styles.error}>{error}</p> : null}
-    {draft && access === "loading" ? <p role="status">저장 연결을 확인하고 있어요.</p> : null}
+  return <section className={styles.saved} aria-label={t("간편 포트폴리오 저장", "Saved portfolio inputs")}><p className={styles.eyebrow}>MY PORTFOLIO</p><h2>{t("입력은 한 번, 내 포트폴리오는 계속.", "Enter once. Keep your portfolio.")}</h2>
+    {message ? <p role="status">{t(message, libraryMessages[message])}</p> : null}{error ? <p role="alert" className={styles.error}>{t(error, libraryMessages[error])}</p> : null}
+    {draft && access === "loading" ? <p role="status">{t("저장 연결을 확인하고 있어요.", "Checking your saved inputs.")}</p> : null}
     {draft && (access === "guest" || access === "ready" || access === "unlinked") ? <div className={styles.actions}><ContinueWithPortfolio draft={draft} signedIn={access !== "guest"} /></div> : null}
-    {draft && access === "unavailable" ? <div className={styles.saveNotice}><p>지금은 저장할 수 없어요. 입력은 그대로 남아 있습니다.</p><button type="button" onClick={() => void load()}>다시 확인</button></div> : null}
-    {draft ? <><QuickResults input={draft.input} /><div className={styles.actions}><Link href="/try/analyze" onClick={() => { for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie; }}>내 입력으로 돌아가기</Link></div></> : null}
-    {selected ? <><h3>저장한 간편 포트폴리오</h3><QuickResults input={selected.input} /><div className={styles.actions}><button className={styles.primary} onClick={() => reuse(selected)}>금액을 바꿔 다시 확인</button><button onClick={() => reuse(selected, true)}>수량을 추가해 실제 자산으로 등록</button><Link href="/demo/simulation">시뮬레이션은 샘플로 먼저 보기</Link></div></> : null}
-    {access === "ready" && saved.length ? <><h3>내 간편 포트폴리오</h3>{saved.map(value => <article key={value.id}><p>{value.input.rows.map(row => row.name).join(" · ")}</p><p className={styles.note}>{new Date(value.createdAt).toLocaleDateString("ko-KR")} 저장 · {value.input.rows.length}개 자산</p><div className={styles.actions}><button onClick={() => setSelected(value)}>구성 보기</button><button onClick={() => reuse(value)}>금액 수정</button><details><summary>삭제</summary><p className={styles.note}>계정에서 이 간편 포트폴리오를 삭제합니다. 되돌릴 수 없습니다.</p><button disabled={pending} onClick={() => void remove(value.id)}>간편 포트폴리오 삭제 확인</button></details></div></article>)}</> : null}
+    {draft && access === "unavailable" ? <div className={styles.saveNotice}><p>{t("지금은 저장할 수 없어요. 입력은 그대로 남아 있습니다.", "Saving is unavailable right now. Your inputs are still here.")}</p><button type="button" onClick={() => void load()}>{t("다시 확인", "Try again")}</button></div> : null}
+    {draft ? <><QuickResults input={draft.input} /><div className={styles.actions}><Link href="/try/analyze" onClick={() => { for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie; }}>{t("내 입력으로 돌아가기", "Back to my inputs")}</Link></div></> : null}
+    {selected ? <><h3>{t("저장한 간편 포트폴리오", "Saved portfolio")}</h3><QuickResults input={selected.input} /><div className={styles.actions}><button className={styles.primary} onClick={() => reuse(selected)}>{t("금액을 바꿔 다시 확인", "Edit amounts")}</button><button onClick={() => reuse(selected, true)}>{t("수량을 추가해 실제 자산으로 등록", "Add actual quantities")}</button><Link href={`/portfolio/research?draft=${encodeURIComponent(selected.id)}`} onClick={() => { try { localStorage.setItem(QUICK_STORAGE_KEY, JSON.stringify({ ...createQuickDraft(selected.input), id: selected.id })); } catch { /* The account copy remains available. */ } }}>{t("가상 비교 · 시뮬레이션", "Comparisons and simulation")}</Link></div></> : null}
+    {access === "ready" && saved.length ? <><h3>{t("내 간편 포트폴리오", "My saved portfolios")}</h3>{saved.map(value => <article key={value.id}><p>{value.input.rows.map(row => row.name).join(" · ")}</p><p className={styles.note}>{new Date(value.createdAt).toLocaleDateString(intlLocale(locale), { timeZone: value.input.timeZone ?? "Asia/Seoul" })} · {value.input.currency} · {t(`${value.input.rows.length}개 자산`, `${value.input.rows.length} assets`)}</p><div className={styles.actions}><button onClick={() => setSelected(value)}>{t("구성 보기", "View composition")}</button><button onClick={() => reuse(value)}>{t("금액 수정", "Edit amounts")}</button><details><summary>{t("삭제", "Delete")}</summary><p className={styles.note}>{t("계정에서 이 간편 포트폴리오를 삭제합니다. 되돌릴 수 없습니다.", "This permanently deletes these portfolio inputs from your account.")}</p><button disabled={pending} onClick={() => void remove(value.id)}>{t("간편 포트폴리오 삭제 확인", "Confirm deletion")}</button></details></div></article>)}</> : null}
   </section>;
 }
+
+const libraryMessages: Record<string, string> = {
+  "브라우저의 임시 자산 입력을 복원하지 못했습니다.": "Could not restore your temporary inputs from this browser.",
+  "임시 자산 입력의 24시간 보관 기간이 끝났습니다.": "Your temporary inputs expired after 24 hours.",
+  "간편 포트폴리오를 계정에서 삭제했습니다.": "Portfolio inputs deleted from your account.",
+  "삭제하지 못했습니다. 다시 시도해 주세요.": "Could not delete. Please try again.",
+  "브라우저에 입력을 옮기지 못했습니다. 사이트 데이터 저장을 허용해 주세요.": "Allow site storage in your browser to continue with these inputs.",
+};

@@ -1,7 +1,6 @@
 import { buildPortfolioRiskInput } from "./portfolio-risk-input.ts";
 import {
   calculatePortfolioRiskPathAnalytics,
-  PORTFOLIO_RISK_BENCHMARKS,
 } from "./portfolio-risk-path-analytics.ts";
 import { calculatePortfolioRisk } from "./portfolio-risk.ts";
 import type {
@@ -65,43 +64,13 @@ export function composePortfolioRiskReadModel({
     inputStatus: input.status,
     instruments: input.instruments,
     returnRows: input.returnRows,
-    annualRiskFreeRate: 0,
+    annualRiskFreeRate: null,
   });
   const pathAnalytics = calculatePortfolioRiskPathAnalytics({
     instruments: input.instruments,
     returnRows: input.returnRows,
-    benchmarks: PORTFOLIO_RISK_BENCHMARKS.map((benchmark) => {
-      const benchmarkInput = buildPortfolioRiskInput({
-        holdings: [
-          {
-            account: "benchmark",
-            ticker: benchmark.ticker,
-            name: benchmark.label,
-            market: benchmark.market,
-            currency: benchmark.currency,
-            assetType: "benchmark",
-            quantity: 1,
-          },
-        ],
-        priceRows: canonicalPriceRows,
-        fxRows: canonicalFxRows,
-        policy: {
-          requestedReturnObservations: selection.window,
-          maxPriceCarryDays: PORTFOLIO_RISK_READ_POLICY.maxPriceCarryDays,
-          maxFxCarryDays: PORTFOLIO_RISK_READ_POLICY.maxFxCarryDays,
-          minimumReturnCoveragePct:
-            PORTFOLIO_RISK_READ_POLICY.minimumReturnCoveragePct,
-          minimumInstruments: 1,
-        },
-      });
-      return {
-        id: benchmark.id,
-        label: benchmark.label,
-        ticker: benchmark.ticker,
-        currency: benchmark.currency,
-        returnRows: benchmarkInput.returnRows,
-      };
-    }),
+    // No reviewed native-currency benchmark with exact interval provenance is loaded.
+    benchmarks: [],
   });
   const observations = input.valueRows.flatMap((row) => row.observations);
   const missingEvidence = summarizeMissingEvidence(input.valueRows);
@@ -140,6 +109,7 @@ export function composePortfolioRiskReadModel({
       annualizationFactor: calculation.annualizationFactor,
       annualRiskFreeRate: calculation.annualRiskFreeRate,
       dailyRiskFreeRate: calculation.dailyRiskFreeRate,
+      referenceEvidence: { reportingCurrency: 'KRW' as const, benchmark: null, riskFree: null, reasons: ['matched_benchmark_not_supplied', 'risk_free_evidence_not_supplied'] },
     },
     inputHealth: {
       status: input.status,

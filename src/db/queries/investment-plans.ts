@@ -1,7 +1,6 @@
 import "server-only";
 import { getTenantSqlClient } from "@/db/tenant-client";
-import { ADDITIONAL_CONTRIBUTION_POLICY } from "@/lib/additional-contribution-allocator";
-import { isPlanId, validatePlan, type PlanInput } from "@/lib/investment-plan";
+import { isPlanId, validatePlan, planEngineVersion, type PlanInput } from "@/lib/investment-plan";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type SavedInvestmentPlan = { id: string; input: PlanInput; createdAt: string };
@@ -30,7 +29,7 @@ export async function saveInvestmentPlan(tenant: TenantContext, id: string, inpu
     tx.query("select set_config('app.current_user_id', $1, true)", [tenant.ownerUserId]),
     tx.query("select set_config('lock_timeout', '3000', true), set_config('statement_timeout', '5000', true)"),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`investment_plans:${tenant.ownerUserId}`]),
-    tx.query(SAVE_PLAN_SQL, [tenant.ownerUserId, id, JSON.stringify(parsed.input), ADDITIONAL_CONTRIBUTION_POLICY.version]),
+    tx.query(SAVE_PLAN_SQL, [tenant.ownerUserId, id, JSON.stringify(parsed.input), planEngineVersion(parsed.input)]),
   ], { isolationLevel: "ReadCommitted" });
   const status = rows[0]?.status;
   if (!["created", "existing", "conflict", "limit", "inactive"].includes(status)) throw new Error("investment_plan_write_unavailable");

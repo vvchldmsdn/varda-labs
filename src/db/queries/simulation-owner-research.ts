@@ -167,6 +167,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
   return Object.freeze({
     inputPreflight,
     execution,
+    preparedPaths,
     get candidateComparison() { return candidateComparison(); },
     get walkForwardValidation() { return walkForwardValidation(); },
     get historicalValidation() { return historicalValidation(); },

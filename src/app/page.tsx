@@ -1,4 +1,8 @@
 import { localizedMetadata } from "@/lib/i18n/server";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
+import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 import { listPortfolioDrafts } from "@/db/queries/portfolio-drafts";
@@ -28,12 +32,21 @@ type HomeProps = {
     account?: string | string[];
     preview?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     welcome?: string;
   }>;
 };
 
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
+
+  if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "quick-usd") {
+    const asOf = "2026-09-13T00:00:00Z";
+    return <><p role="status" className="px-6 py-2 text-xs">Synthetic portfolio · USD preview</p><QuickHome input={{ version: 2, source: "manual", currency: "USD", locale: "en", timeZone: "America/New_York", asOf,
+      rows: [{ name: "VOO", value: 1234.56, instrumentId: "us-voo", inputCurrency: "USD" }, { name: "KODEX 200", value: 1300000, instrumentId: "kr-069500", inputCurrency: "KRW" }],
+      fx: [{ base: "USD", quote: "KRW", rate: "1300", observedAt: asOf, fetchedAt: asOf, source: "manual", kind: "user_input" }],
+    }} createdAt={asOf} preview welcome /></>;
+  }
 
   if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "quick") {
     return <><p role="status" className="px-6 py-2 text-xs">화면 미리보기 · 가상 입력</p><QuickHome input={{ currency: "KRW", rows: [{ name: "KODEX 200", value: 3000000, instrumentId: "kr-069500" }, { name: "VOO", value: 2000000, instrumentId: "us-voo" }] }} createdAt="2026-09-13T00:00:00Z" preview welcome /></>;
@@ -82,6 +95,12 @@ export default async function Home({ searchParams }: HomeProps) {
     );
   }
 
+  // Native holdings and cash are authoritative even when legacy assets are
+  // empty. Amount-only drafts still reach the existing QuickHome below.
+  if (await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, scopeContext.resolution.scope, params.currency === "USD" ? "USD" : "KRW");
+    return <CurrencyPortfolioSurface surface="home" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={scopeContext.resolution.scope} />;
+  }
   const dashboardPromise = getPortfolioDashboard({
     analysisScopes: scopeContext.catalog.scopes,
     scope: scopeContext.resolution.scope,
@@ -90,18 +109,21 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent dashboardPromise={dashboardPromise} tenant={resolution.tenantContext} allScope={scopeContext.resolution.scope.kind === "all"} welcome={params.welcome === "1"} />
+      <DashboardContent dashboardPromise={dashboardPromise} tenant={resolution.tenantContext} allScope={scopeContext.resolution.scope.kind === "all"} welcome={params.welcome === "1"} usd={params.currency === "USD"} scopes={scopeContext.catalog.scopes} selectedScope={scopeContext.resolution.scope} />
     </Suspense>
   );
 }
 
 async function DashboardContent({
-  dashboardPromise, tenant, allScope, welcome,
+  dashboardPromise, tenant, allScope, welcome, usd, scopes, selectedScope,
 }: {
   dashboardPromise: ReturnType<typeof getPortfolioDashboard>;
   tenant: TenantContext;
   allScope: boolean;
   welcome: boolean;
+  usd: boolean;
+  scopes: readonly PortfolioAnalysisScope[];
+  selectedScope: PortfolioAnalysisScope;
 }) {
   const dashboard = await dashboardPromise;
   if (allScope && dashboard.dataHealth.importedAssetCount === 0) {
@@ -115,6 +137,10 @@ async function DashboardContent({
       if (drafts[0]) return <QuickHome id={drafts[0].id} input={drafts[0].input} createdAt={drafts[0].createdAt} welcome={welcome} />;
       redirect("/portfolio/onboarding");
     }
+  }
+  if (usd) {
+    const evidence = await getTrackedCurrencyEvidence(tenant, selectedScope, "USD");
+    return <CurrencyPortfolioSurface surface="home" evidence={evidence} scopes={scopes} selectedScope={selectedScope} />;
   }
   return <>{welcome ? <p role="status" className="px-6 py-3 text-sm">입력한 자산을 저장했어요. <Link href="/plans" className="underline">저장한 구성 보기</Link></p> : null}<PortfolioDashboard data={dashboard} liveSyncEnabled /></>;
 }

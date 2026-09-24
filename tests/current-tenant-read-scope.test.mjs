@@ -673,13 +673,14 @@ describe("current tenant read scope runtime boundary", () => {
     assert.match(pageSource, /Promise\.all/);
     assert.match(pageSource, /if \(!resolution\.ok\)/);
     assert.match(pageSource, /PortfolioReadAccessBoundary/);
-    assert.match(pageSource, /const ownerResearchPromise = getReadOnlyTenantSimulationOwnerResearch\(/);
-    assert.ok(
-      pageSource.indexOf("if (!resolution.ok)") <
-        pageSource.indexOf("const ownerResearchPromise"),
-      "owner simulation evidence must not be read before session resolution",
-    );
-    assert.ok(pageSource.indexOf('scopeContext.state !== "ready"') < pageSource.indexOf("const ownerResearchPromise"));
+    assert.match(pageSource, /const ownerResearchPromise = admittedNativeResearch \?\? getReadOnlyTenantSimulationOwnerResearch\(/);
+    const ownerReads = [...pageSource.matchAll(/\bgetReadOnlyTenantSimulationOwnerResearch\(\{/g)];
+    assert.ok(ownerReads.length > 0);
+    for (const read of ownerReads) {
+      assert.ok(pageSource.indexOf("if (!resolution.ok)") < read.index,
+        "owner simulation evidence must not be read before session resolution");
+      assert.ok(pageSource.indexOf('scopeContext.state !== "ready"') < read.index);
+    }
     assert.doesNotMatch(pageSource, /getReadOnlySimulationInputReadiness/);
     assert.match(detailSource, /getReadOnlySimulationInputReadiness\(\{ includeResearch: true/);
     assert.match(detailRoute, /const context = await resolveResearchDetailContext\(query\)/);

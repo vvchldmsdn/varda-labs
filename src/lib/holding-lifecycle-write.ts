@@ -1,6 +1,7 @@
 import "server-only";
 
 import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
+import { isNativeLedgerGuardError, NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
   HOLDING_LIFECYCLE_POLICY,
@@ -21,6 +22,7 @@ type LifecycleResult = Readonly<{
   changed_count?: string | number;
   evidence_count?: string | number;
   membership_mutation_count?: string | number;
+  native_account_count?: string | number;
 }>;
 
 export async function archiveSessionHolding(
@@ -73,6 +75,7 @@ async function writeLifecycle(
       serviceDate: resolveSnapshotCycle(now).snapshotDate,
       occurredAt: now.toISOString(),
     });
+    if (number(result.native_account_count) > 0) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
     if (
       number(result.changed_count) === 1 &&
       number(result.evidence_count) === 1
@@ -98,6 +101,7 @@ async function writeLifecycle(
     }
     return state("conflict", "보유종목 상태 변경 조건을 다시 확인해 주세요.");
   } catch (error) {
+    if (isNativeLedgerGuardError(error)) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
     const code = databaseErrorCode(error);
     if (["23503", "23505", "23514", "55P03", "57014"].includes(code ?? "")) {
       return state(
@@ -163,7 +167,7 @@ const ATOMIC_ARCHIVE_QUERY = `
 with lock_acquired as materialized (
   select pg_advisory_xact_lock(hashtextextended($1, 0))
 ), existing_asset as materialized (
-  select asset.id, asset.account_id, asset.archived_at, asset.updated_at
+  select asset.id, asset.account_id, asset.archived_at, asset.updated_at, account_row.native_state is not null as native_account
   from assets asset
   join accounts account_row
     on account_row.id = asset.account_id
@@ -178,6 +182,7 @@ with lock_acquired as materialized (
 ), facts as materialized (
   select
     count(*) as existing_asset_count,
+    count(*) filter (where native_account) as native_account_count,
     count(*) filter (where updated_at = $4::timestamptz) as exact_asset_count
   from existing_asset
 ), changed as materialized (
@@ -196,6 +201,7 @@ with lock_acquired as materialized (
   where asset.id = existing.id
     and facts.existing_asset_count = 1
     and facts.exact_asset_count = 1
+    and facts.native_account_count = 0
   returning asset.id, asset.account_id, asset.archived_at, asset.updated_at
 ), deleted_memberships as (
   delete from portfolio_group_asset_memberships membership
@@ -246,7 +252,7 @@ const ATOMIC_RESTORE_QUERY = `
 with lock_acquired as materialized (
   select pg_advisory_xact_lock(hashtextextended($1, 0))
 ), existing_asset as materialized (
-  select asset.id, asset.account_id, asset.archived_at, asset.updated_at
+  select asset.id, asset.account_id, asset.archived_at, asset.updated_at, account_row.native_state is not null as native_account
   from assets asset
   join accounts account_row
     on account_row.id = asset.account_id
@@ -261,6 +267,7 @@ with lock_acquired as materialized (
 ), facts as materialized (
   select
     count(*) as existing_asset_count,
+    count(*) filter (where native_account) as native_account_count,
     count(*) filter (where updated_at = $4::timestamptz) as exact_asset_count
   from existing_asset
 ), changed as materialized (
@@ -276,6 +283,7 @@ with lock_acquired as materialized (
   where asset.id = existing.id
     and facts.existing_asset_count = 1
     and facts.exact_asset_count = 1
+    and facts.native_account_count = 0
   returning asset.id, asset.account_id, asset.archived_at, asset.updated_at
 ), evidence as (
   insert into holding_lifecycle_events (

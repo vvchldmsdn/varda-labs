@@ -30,7 +30,7 @@ export type PortfolioReturnEventRow = {
   eventType: string;
   account: string | null;
   assetId: string | null;
-  legacyAssetId: string;
+  legacyAssetId: string | null;
   ticker: string | null;
   assetName: string;
   amountKrw: string | number | null;
@@ -66,7 +66,7 @@ export type RealizedReturnRow = {
   eventId: string | null;
   eventDate: string;
   eventType: "sell";
-  legacyAssetId: string;
+  legacyAssetId: string | null;
   ticker: string | null;
   assetName: string;
   assetKey: string | null;

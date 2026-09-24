@@ -4,10 +4,42 @@ import { sqlClient } from "@/db/client";
 import { MARKET_COLLECTION_POLICY, normalizeCollectionJobs, type CollectionInput, type CollectionJob } from "@/lib/market-data/collection-policy";
 
 export type ClaimedCollectionJob = CollectionJob & { claimToken: string; attempts: number };
+export type CollectionPartition = { provider: "kis" } | { provider: "twelve_data"; scopeHash: string };
+const KIS_PARTITION: CollectionPartition = { provider: "kis" };
+
+function partitionPrefix(partition: CollectionPartition) {
+  if (partition.provider === "kis") return "kis:";
+  if (partition.provider !== "twelve_data" || !/^[a-f0-9]{64}$/.test(partition.scopeHash)) throw new Error("collection_partition_invalid");
+  return `twelve_data:${partition.scopeHash}:`;
+}
 
 /** Call only after verifying session holdings/catalog or machine authority. */
 export async function enqueueMarketCollection(inputs: readonly CollectionInput[]) {
   const jobs = normalizeCollectionJobs(inputs);
+  return enqueueJobs(jobs);
+}
+
+/** Internal server seam; callers must resolve licensed identities before enqueueing. */
+export async function enqueueProviderCollectionJobs(partition: CollectionPartition, jobs: readonly CollectionJob[]) {
+  const prefix = partitionPrefix(partition);
+  if (partition.provider !== "twelve_data" || jobs.length > 400 || new Set(jobs.map((job) => job.key)).size !== jobs.length || jobs.some((job) =>
+    !job.key.startsWith(prefix) || job.key.length > 200 || !/^[A-Za-z0-9:._-]+$/.test(job.key) ||
+    job.market !== "us" || job.currency !== "USD" || !/^[A-Z0-9][A-Z0-9.\-]{0,19}$/.test(job.ticker) ||
+    !["live", "history", "fx"].includes(job.kind) ||
+    (job.kind === "history" ? !validWindow(job.startDate, job.endDate) : job.startDate !== null || job.endDate !== null))) {
+    throw new Error("collection_identity_invalid");
+  }
+  return enqueueJobs(jobs);
+}
+
+function validWindow(start: string | null, end: string | null) {
+  if (!start || !end || !/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
+  const first = Date.parse(`${start}T00:00:00Z`), last = Date.parse(`${end}T00:00:00Z`);
+  return Number.isFinite(first) && Number.isFinite(last) && new Date(first).toISOString().slice(0, 10) === start &&
+    new Date(last).toISOString().slice(0, 10) === end && last >= first && last - first < 90 * 86_400_000;
+}
+
+async function enqueueJobs(jobs: readonly CollectionJob[]) {
   if (jobs.length === 0) return { queuedCount: 0, retryAfterSeconds: 10 };
   const results = await sqlClient.transaction((tx) => [
     tx.query("set local lock_timeout = '2s'"),
@@ -19,31 +51,39 @@ export async function enqueueMarketCollection(inputs: readonly CollectionInput[]
   return { queuedCount: jobs.length, retryAfterSeconds: MARKET_COLLECTION_POLICY.pollAfterSeconds };
 }
 
-export async function claimMarketCollection(): Promise<ClaimedCollectionJob | null> {
+export async function claimMarketCollection(partition: CollectionPartition = KIS_PARTITION): Promise<ClaimedCollectionJob | null> {
   const claimToken = randomUUID();
-  const rows = await sqlClient.query(CLAIM_SQL, [claimToken, MARKET_COLLECTION_POLICY.jobLeaseSeconds, MARKET_COLLECTION_POLICY.maximumAttempts]);
+  const rows = await sqlClient.query(CLAIM_SQL, [claimToken, MARKET_COLLECTION_POLICY.jobLeaseSeconds, MARKET_COLLECTION_POLICY.maximumAttempts, partitionPrefix(partition)]);
   const row = rows[0];
   if (!row) return null;
   return { key: String(row.key), kind: row.kind as CollectionJob["kind"], ticker: String(row.ticker),
     market: row.market as CollectionJob["market"], currency: row.currency as CollectionJob["currency"],
-    startDate: row.start_date ? String(row.start_date).slice(0, 10) : null,
-    endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+    startDate: row.start_date_text == null ? null : String(row.start_date_text),
+    endDate: row.end_date_text == null ? null : String(row.end_date_text),
     claimToken, attempts: Number(row.attempts) };
 }
 
-export async function hasReadyMarketCollection() {
+export async function hasReadyMarketCollection(partition: CollectionPartition = KIS_PARTITION) {
   const rows = await sqlClient.query(`select 1 from market_collection_jobs where
-    (status='pending' and available_at<=now()) or (status='running' and leased_until<=now()) limit 1`);
+    ((status='pending' and available_at<=now()) or (status='running' and leased_until<=now()))
+    and starts_with(key,$1) limit 1`, [partitionPrefix(partition)]);
   return rows.length > 0;
 }
 
-export async function maintainMarketCollection() {
+/** Writers must additionally enforce this token in their own write transaction. */
+export async function isMarketCollectionClaimCurrent(job: ClaimedCollectionJob) {
+  const rows = await sqlClient.query(`select 1 from market_collection_jobs
+    where key=$1 and claim_token=$2::uuid and status='running' and leased_until>clock_timestamp()`, [job.key, job.claimToken]);
+  return rows.length === 1;
+}
+
+export async function maintainMarketCollection(partition: CollectionPartition = KIS_PARTITION) {
   await sqlClient.query(`update market_collection_jobs set status='failed', claim_token=null, leased_until=null,
     available_at=now()+interval '1 hour', last_code='worker_interrupted', updated_at=now()
-    where status='running' and leased_until<=now() and attempts >= $1::integer`, [MARKET_COLLECTION_POLICY.maximumAttempts]);
+    where status='running' and leased_until<=now() and attempts >= $1::integer and starts_with(key,$2)`, [MARKET_COLLECTION_POLICY.maximumAttempts, partitionPrefix(partition)]);
   await sqlClient.query(`delete from market_collection_jobs where key in (
-    select key from market_collection_jobs where status in ('done','failed') and updated_at < now()-interval '7 days'
-    order by updated_at limit 500)`);
+    select key from market_collection_jobs where status in ('done','failed') and updated_at < now()-interval '7 days' and starts_with(key,$1)
+    order by updated_at limit 500)`, [partitionPrefix(partition)]);
 }
 
 export async function finishMarketCollection(job: ClaimedCollectionJob, outcome: { ok: boolean; code: string; retryAfterSeconds?: number; deferred?: boolean }) {
@@ -92,8 +132,9 @@ const CLAIM_SQL = `with candidate as (
   select key from market_collection_jobs where
     (status = 'pending' and available_at <= now() or status = 'running' and leased_until <= now())
     and attempts < $3::integer
+    and starts_with(key,$4)
   order by enqueued_at - case when kind in ('live','fx') then interval '30 seconds' else interval '0 seconds' end, key
   for update skip locked limit 1
 ) update market_collection_jobs q set status='running', claim_token=$1::uuid,
   leased_until=clock_timestamp()+make_interval(secs=>$2::integer), attempts=q.attempts+1, updated_at=clock_timestamp()
-  from candidate c where q.key=c.key returning q.*`;
+  from candidate c where q.key=c.key returning q.*,q.start_date::text as start_date_text,q.end_date::text as end_date_text`;

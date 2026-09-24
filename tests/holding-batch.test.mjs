@@ -114,6 +114,8 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
   let stateIndex = 0, actionState = idle, action;
   const InstrumentSearch = () => null;
   const [component] = await importUiWithPorts(["src/components/holding-onboarding-form.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
     react: {
       useState(initial) {
         const index = stateIndex++;

@@ -175,5 +175,5 @@ export function buildSimulationDesignPreview(query: SimulationPreviewQuery, incl
     history: [],
     researchHorizonSelection: horizon,
   });
-  return { portfolio, execution, comparison, validation, preflight, model, matrix, currentWeights, dates };
+  return { portfolio, execution, comparison, validation, preflight, model, matrix, currentWeights, dates, prepared };
 }

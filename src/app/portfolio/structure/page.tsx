@@ -1,4 +1,8 @@
 import { localizedMetadata } from "@/lib/i18n/server";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
+import { getOwnedCurrencyResearchInput } from "@/db/queries/currency-research";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { PortfolioStructureView } from "@/components/portfolio/portfolio-structure-view";
@@ -22,6 +26,7 @@ type PortfolioStructurePageProps = {
     account?: string | string[];
     preview?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     window?: string | string[];
   }>;
 };
@@ -71,6 +76,12 @@ export default async function PortfolioStructurePage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
+    const research = await getOwnedCurrencyResearchInput(resolution.tenantContext, selectedScope, reporting, { valuationEvidence: evidence, calculation: "risk_only" });
+    return <CurrencyPortfolioSurface surface="structure" evidence={evidence} research={research} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
+  }
   const now = new Date();
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
   const [model, riskModel] = await Promise.all([

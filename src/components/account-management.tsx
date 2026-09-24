@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { NATIVE_ACCOUNT_BALANCE_MESSAGE } from "@/lib/native-ledger-compatibility";
 import { useActionState, useEffect, useRef } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { accountActionMessageKo, accountTypeLabel } from "@/lib/i18n/account-management-copy";
@@ -226,6 +227,7 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
       }
     >
       {state.message ? t(accountActionMessageKo(state.message), state.message) : null}
+      {state.message === NATIVE_ACCOUNT_BALANCE_MESSAGE ? <Link className="block py-2 underline underline-offset-4" href="/portfolio/ledger">{t("거래·현금 원장에서 확인하기", "Review holdings & cash")}</Link> : null}
     </p>
   );
 }

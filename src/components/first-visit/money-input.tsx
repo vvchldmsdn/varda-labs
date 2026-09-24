@@ -5,13 +5,17 @@ import type { InputHTMLAttributes } from "react";
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> & {
   value: string;
   onValueChange: (value: string) => void;
+  allowDecimals?: boolean;
 };
 
-const format = (value: string) => /^\d+$/.test(value)
-  ? value.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : value;
+export const formatMoneyInput = (value: string) => {
+  if (!/^\d+(?:\.\d*)?$/.test(value)) return value;
+  const [integer, fraction] = value.split(".");
+  return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction === undefined ? "" : `.${fraction}`);
+};
 
-export function MoneyInput({ value, onValueChange, ...props }: Props) {
-  return <input {...props} type="text" inputMode="numeric" value={format(value)}
+export function MoneyInput({ value, onValueChange, allowDecimals = false, ...props }: Props) {
+  return <input {...props} type="text" inputMode={allowDecimals ? "decimal" : "numeric"} value={formatMoneyInput(value)}
     onKeyDown={event => {
       const input = event.currentTarget;
       const position = input.selectionStart;
@@ -24,7 +28,7 @@ export function MoneyInput({ value, onValueChange, ...props }: Props) {
       const before = input.value.slice(0, input.selectionStart ?? input.value.length).replaceAll(",", "").length;
       const raw = input.value.replaceAll(",", "");
       onValueChange(raw);
-      const formatted = format(raw);
+      const formatted = formatMoneyInput(raw);
       let position = 0;
       for (let count = 0; position < formatted.length && count < before; position++) {
         if (formatted[position] !== ",") count++;

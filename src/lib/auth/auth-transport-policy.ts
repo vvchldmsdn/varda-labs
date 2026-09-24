@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isIsolatedReleasePreview } from "../deployment/isolated-release-preview.ts";
 
 export const AUTH_TRANSPORT_SESSION_CACHE_SECONDS = 60;
 export {
@@ -28,6 +29,7 @@ export const AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS = Object.freeze([
 ] as const);
 
 export type AuthTransportEnvironment = Readonly<{
+  [key: string]: string | undefined;
   VERCEL_ENV?: string;
   NEON_AUTH_BASE_URL?: string;
   NEON_AUTH_BASE_URL_SHA256?: string;
@@ -52,7 +54,7 @@ export function assessAuthTransportEnvironment(
   if (
     !AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS.some(
       (candidate) => candidate === vercelEnvironment,
-    )
+    ) && !isIsolatedReleasePreview(environment)
   ) {
     return Object.freeze({ state: "disabled" });
   }

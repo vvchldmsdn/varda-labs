@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { SimulationPathHandle } from "@/lib/simulation-path-detail";
 import { SimulationText } from "@/components/simulation/simulation-text";
 import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import type { SimulationOwnerResearchExecutionResult } from "@/lib/simulation-owner-research-execution";
@@ -18,7 +19,11 @@ type ReadyExecution = Extract<
 export function OwnerResearchExecutionSection({
   execution,
   selectedScopeKey,
+  pathDetail,
+  pathDetailNotice,
 }: {
+  pathDetail?: SimulationPathHandle;
+  pathDetailNotice?: "limit" | "storage" | "disabled";
   execution: SimulationOwnerResearchExecutionResult;
   selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
@@ -181,7 +186,7 @@ export function OwnerResearchExecutionSection({
         {execution.coverage.omittedWeightBps > 0 ? <span className="text-[var(--warning)]"><SimulationText ko={"일부 종목 제외"} /></span> : null}
       </p>
       {execution.status === "ready" ? (
-        <ReadyOwnerExecution execution={execution} />
+        <ReadyOwnerExecution pathDetail={pathDetail} pathDetailNotice={pathDetailNotice} execution={execution} />
       ) : (
         <div
           data-owner-research-unavailable-reason={execution.reason}
@@ -219,7 +224,7 @@ export function OwnerResearchExecutionSection({
   );
 }
 
-function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
+function ReadyOwnerExecution({ execution, pathDetail, pathDetailNotice }: { execution: ReadyExecution; pathDetail?: SimulationPathHandle; pathDetailNotice?: "limit" | "storage" | "disabled" }) {
   return (
     <div
       className={styles.resultLayout}
@@ -245,7 +250,7 @@ function ReadyOwnerExecution({ execution }: { execution: ReadyExecution }) {
           <p><SimulationText ko="약 10% 경로는 이보다 더 하락" en="About 10% of paths had a larger drop" /></p>
         </div>
       </dl>
-      <ResearchFanChart large execution={execution} />
+      <ResearchFanChart pathDetail={pathDetail} pathDetailNotice={pathDetailNotice} large execution={execution} />
 
     </div>
   );

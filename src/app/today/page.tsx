@@ -1,4 +1,7 @@
 import { localizedMetadata } from "@/lib/i18n/server";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 
 
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
@@ -24,6 +27,7 @@ type TodayPageProps = {
     account?: string | string[];
     holdingAccount?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     ticker?: string | string[];
     market?: string | string[];
     preview?: string | string[];
@@ -76,6 +80,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     );
   }
 
+  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    const selectedScope = scopeContext.resolution.scope;
+    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
+    return <CurrencyPortfolioSurface surface="today" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+  }
   const dashboardPromise = getPortfolioDashboard({
     analysisScopes: scopeContext.catalog.scopes,
     demand: { surface: "today", holdingDetail: detailQuery },

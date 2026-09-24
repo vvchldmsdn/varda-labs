@@ -1,4 +1,5 @@
 import "server-only";
+import { fxObservationWrite } from "./fx-observation-write";
 
 import { eq } from "drizzle-orm";
 
@@ -113,7 +114,7 @@ export async function runUsdKrwFxCandidateJob({
     writesEnabled: true as const,
     status: "written" as const,
     contract: FX_REFRESH_ACTUAL_WRITE_CONTRACT,
-    write: await executeFxRateActualWrite(preparedWrite.write),
+    write: await executeFxRateActualWrite(preparedWrite.write, fxObservationWrite(candidate)),
   };
 }
 
@@ -131,7 +132,7 @@ async function getExistingFxRows(rateDate: string): Promise<ExistingFxRateRow[]>
     .where(eq(fxRates.rateDate, rateDate));
 }
 
-async function executeFxRateActualWrite(write: FxRateActualWrite) {
+async function executeFxRateActualWrite(write: FxRateActualWrite, observation: ReturnType<typeof fxObservationWrite>) {
   const returning = {
     id: fxRates.id,
     rateDate: fxRates.rateDate,
@@ -144,7 +145,7 @@ async function executeFxRateActualWrite(write: FxRateActualWrite) {
   if (write.action === "insert") {
     const [inserted] = await db
       .insert(fxRates)
-      .values(write.values)
+      .values({ ...write.values, ...observation })
       .returning(returning);
 
     return { action: "inserted" as const, table: write.table, row: inserted };
@@ -152,7 +153,7 @@ async function executeFxRateActualWrite(write: FxRateActualWrite) {
 
   const [updated] = await db
     .update(fxRates)
-    .set(write.values)
+    .set({ ...write.values, ...observation })
     .where(eq(fxRates.id, write.id))
     .returning(returning);
 

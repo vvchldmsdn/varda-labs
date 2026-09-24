@@ -29,7 +29,7 @@ export function buildRiskInstrumentMetrics({
   volatilityDaily: number;
   annualizationScale: number;
   annualizationFactor: number;
-  dailyRiskFreeRate: number;
+  dailyRiskFreeRate: number | null;
   riskContribution: RiskContributionRow | null;
 }): PortfolioRiskInstrumentMetrics {
   return {
@@ -38,7 +38,7 @@ export function buildRiskInstrumentMetrics({
     meanReturnDaily: arithmeticMean(returns),
     volatilityDaily,
     volatilityAnnualized: volatilityDaily * annualizationScale,
-    sharpe: annualizedSharpe({
+    sharpe: dailyRiskFreeRate === null ? { value: null, reason: "risk_free_evidence_not_supplied" } : annualizedSharpe({
       returns,
       dailyRiskFreeRate,
       annualizationFactor,

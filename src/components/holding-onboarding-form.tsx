@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { NativeLedgerNotice } from "@/components/native-ledger-notice";
+import { NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 import { useActionState, useState } from "react";
 import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
 import { ArrowRight, Check, Plus, Trash2, X } from "lucide-react";
@@ -19,7 +21,7 @@ const INITIAL_STATE: HoldingBatchState = { status: "idle", results: [] };
 const identity = (row: Pick<HoldingDraft, "market" | "ticker">) => `${row.market}:${row.ticker.trim().toUpperCase()}`;
 const positive = (value: string, precision: number) => /^\d+(?:\.\d+)?$/.test(value) && Number(value) > 0 && Number.isFinite(Number(value)) && (value.split(".")[1]?.length ?? 0) <= precision;
 
-export function HoldingOnboardingForm({ options, initialAccountId, preview = false, fromPlan = false, fromQuick = false }: { options: HoldingOnboardingOptions; initialAccountId?: string; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean }) {
+export function HoldingOnboardingForm({ options, initialAccountId, nativeAccountIds = [], preview = false, fromPlan = false, fromQuick = false }: { options: HoldingOnboardingOptions; initialAccountId?: string; nativeAccountIds?: readonly string[]; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<HoldingDraft[]>([]);
   const [saved, setSaved] = useState<Record<string, string>>({});
@@ -84,6 +86,10 @@ export function HoldingOnboardingForm({ options, initialAccountId, preview = fal
     setRows(previous => previous.map(row => row.key === key ? { ...row, [field]: value } : row));
   }
 
+  if (nativeAccountIds.includes(accountId)) return <div className="varda-holding-onboarding">
+    <label>{t("담을 계좌", "Add to account")}<select value={accountId} onChange={event => setAccountId(event.target.value)} aria-label={t("보유 계좌", "Holding account")}>{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+    <NativeLedgerNotice accountId={accountId} action="buy" />
+  </div>;
   // Action completion requests a native reset; retain React-managed account and retry selections.
   return <form action={preview ? undefined : action} className="varda-holding-onboarding" onReset={event => event.preventDefault()} onSubmit={event => { if (preview || unsaved.length === 0) event.preventDefault(); }}>
     <input type="hidden" name="holdings" value={JSON.stringify(unsaved)} />
@@ -131,6 +137,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, preview = fal
         })}</ol>}
         <details className="varda-onboarding-disclosure"><summary>{t("분석 그룹 설정 (선택)", "Analysis group (optional)")}</summary><p>{t("비워 두면 기본 그룹으로 정리됩니다. 나중에 관리 화면에서 바꿀 수 있어요.", "Leave blank to use a default group. You can change it later in Manage.")}</p><label>{t("기존 그룹", "Existing group")}<select value={groupId} disabled={pending || hasSaved} onChange={event => setGroupId(event.target.value)}><option value="">{t("기본 그룹 사용", "Use default group")}</option>{options.portfolioGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>{!groupId ? <label>{t("새 그룹 이름 (선택)", "New group name (optional)")}<input maxLength={100} value={groupName} disabled={pending || hasSaved} onChange={event => setGroupName(event.target.value)} /></label> : null}</details>
         <div className="varda-onboarding-save">
+          {state.results.some(item => item.result.message === NATIVE_LEDGER_REQUIRED_MESSAGE) ? <NativeLedgerNotice accountId={accountId} action="buy" /> : null}
           {state.status === "invalid" && state.results.length === 0 ? <p role="alert" className="varda-onboarding-error">{t("입력한 목록을 확인한 뒤 다시 저장해 주세요.", "Check the holding list and try saving again.")}</p> : null}
           {state.status === "partial" ? <p role="status" className="varda-onboarding-hint">{hasSaved
             ? t("저장된 종목은 유지됩니다. 나머지만 확인한 뒤 다시 저장하세요.", "Saved holdings are kept. Review and retry only the remaining holdings.")

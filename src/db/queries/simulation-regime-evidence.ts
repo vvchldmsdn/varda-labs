@@ -35,6 +35,9 @@ export const loadSimulationFactorRows = cache(
         releaseDate: globalMarketFactors.releaseDate,
         value: globalMarketFactors.value,
         volatility20dPct: globalMarketFactors.volatility20dPct,
+        source: globalMarketFactors.source,
+        sourceSeriesId: globalMarketFactors.sourceSeriesId,
+        observedAt: globalMarketFactors.observedAt,
       })
       .from(globalMarketFactors)
       .where(

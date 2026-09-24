@@ -14,6 +14,8 @@ describe("holding and account management usability", () => {
     let result = { state: "partial", holdings: [holding], excludedHoldingCount: 1 };
     const reads = [], lists = [];
     const [component] = await importUiWithPorts(["src/app/portfolio/holdings/page.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       "@/lib/i18n/server": { localizedMetadata: () => ({}) },
       "@/components/i18n/localized-text": { T: ({ ko, en }) => locale === "ko" ? ko : en },
       "@/components/i18n/management-text": { ManagementText: ({ children }) => children },
@@ -51,6 +53,8 @@ describe("holding and account management usability", () => {
     const corrections = [], archives = [], restores = [], analyses = [];
     const marker = (name, captured) => function FormMarker(props) { captured.push(props); return createElement("div", { [`data-${name}`]: props.holdingId }); };
     const [component] = await importUiWithPorts(["src/components/holdings-management-list.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       "@/components/i18n/localized-text": { T: ({ ko, en }) => locale === "ko" ? ko : en },
       "@/components/holding-state-correction-form": { HoldingStateCorrectionForm: marker("edit", corrections) },
       "@/components/holding-lifecycle-forms": { HoldingArchiveForm: marker("archive", archives), HoldingRestoreForm: marker("restore", restores) },
@@ -87,6 +91,8 @@ describe("holding and account management usability", () => {
     const calls = [];
     const createAccount = () => {}, updateAccount = () => {}, archiveAccount = () => {}, restoreAccount = () => {};
     const [component] = await importUiWithPorts(["src/components/account-management.tsx"], {
+      "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
+      "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       react: { useActionState: action => { calls.push(action); return [{ status: "success", message: "Account created.", createdAccountId: "new-account-id" }, () => {}, pending]; }, useEffect: () => {}, useRef: () => ({ current: null }) },
       "next/link": { default: ({ href, ...props }) => createElement("a", { ...props, href: `${href.pathname}?${new URLSearchParams(href.query)}` }) },
       "@/components/i18n/locale-provider": { useI18n: () => ({ t: (ko, en) => locale === "ko" ? ko : en ?? ko }) },
