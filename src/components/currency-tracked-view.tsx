@@ -1,13 +1,13 @@
 "use client";
 
 import { QuickTradeActions } from "@/components/quick-trade-actions";
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { PortfolioAllocationRing } from "@/components/portfolio/portfolio-allocation-ring";
 import { MoneyInput } from "@/components/first-visit/money-input";
 import { intlLocale } from "@/lib/i18n/locale";
 import { Decimal, formatMoney, parseMoneyInput, type Currency } from "@/lib/money";
-import { buildTrackedCurrencyPortfolio, type CurrencyTrackedInput } from "@/lib/currency-tracked-portfolio";
+import type { CurrencyTrackedInput, CurrencyTrackedResult } from "@/lib/currency-tracked-portfolio";
 import { calculateCurrencyContribution } from "@/lib/currency-contribution";
 import { NativeContributionPlanner } from "@/components/native-contribution-planner";
 import styles from "./currency-tracked-view.module.css";
@@ -16,8 +16,9 @@ type ContributionPolicy = { trimDriftThresholdPct: number; minimumExecutionRatio
 type Contribution = ReturnType<typeof calculateCurrencyContribution>;
 const ZONES = ["Asia/Seoul", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Tokyo", "UTC"];
 
-export function CurrencyTrackedView({ evidence, timeZone = "Asia/Seoul", contributionPolicy, surface, hideCurrencyControl = false, nativeContributionScopeKey }: {
+export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul", contributionPolicy, surface, hideCurrencyControl = false, nativeContributionScopeKey }: {
   evidence: CurrencyTrackedInput; timeZone?: string; contributionPolicy?: ContributionPolicy;
+  reports: Readonly<Record<Currency, CurrencyTrackedResult>>;
   surface?: "home" | "today" | "history" | "structure" | "contribution";
   hideCurrencyControl?: boolean;
   nativeContributionScopeKey?: string;
@@ -26,7 +27,7 @@ export function CurrencyTrackedView({ evidence, timeZone = "Asia/Seoul", contrib
   const [currency, setCurrency] = useState<Currency>(evidence.reporting);
   const [zone, setZone] = useState(timeZone);
   const [selected, setSelected] = useState("");
-  const report = useMemo(() => buildTrackedCurrencyPortfolio({ ...evidence, reporting: currency }), [currency, evidence]);
+  const report = reports[currency];
   const [cash, setCash] = useState("");
   const [cashCurrency, setCashCurrency] = useState<Currency>(evidence.reporting);
   const [targets, setTargets] = useState<Record<string, string>>({});
@@ -88,7 +89,7 @@ export function CurrencyTrackedView({ evidence, timeZone = "Asia/Seoul", contrib
     } catch { setError(t("입력과 평가 근거를 다시 확인해 주세요.", "Please check the inputs and valuation evidence.")); }
   }
 
-  if (!report.current) return <main className={styles.page}><h1>{t("자산 평가를 확인할 수 없어요.", "Portfolio valuation is unavailable.")}</h1><p>{t("다시 로그인한 뒤 확인해 주세요.", "Please sign in again and retry.")}</p></main>;
+  if (!report.current) return <main className={styles.page}><h1>{t("자산 평가를 확인할 수 없어요.", "Portfolio valuation is unavailable.")}</h1><p>{t("새로고침한 뒤 다시 확인해 주세요.", "Refresh the page and retry.")}</p></main>;
   const current = report.current;
   const showHoldings = !surface || ["home", "today", "structure"].includes(surface);
   const showMovement = !surface || ["home", "today"].includes(surface);
