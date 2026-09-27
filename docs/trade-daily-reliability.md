@@ -65,15 +65,15 @@ URL/analytics에 초안, 금액, operation이나 토큰을 넣지 않는다. 새
 - `scripts/reliability-postgres-cases.mjs`: 실제 writer/query/공통 엔진 + 여러 TCP 연결, owner/RLS, 동시 동일 ID/변조, 9주/$1,130, 오래된 worker, 정정/Cron CAS, 경계 시각, 재시도, 완료 응답 유실.
 - `scripts/reliability-browser-cases.mjs`: 실제 client component→실제 ledger route→실제 PostgreSQL. commit 응답 차단/새로고침/재로그인/과거 입력/만료 ID/계정 전환. 합성 identity resolver와 rollout admission만 테스트 프로세스에서 대체하고 Next shell/router는 테스트용 최소 shell이다. 전체 Next 탐색 및 실제 OAuth/email 로그인이 아니다.
 
-폐기 가능한 PostgreSQL **17.11**의 새 data directory/랜덤 loopback 포트를 확인하고 실행했다. PGlite만으로 통합 통과를 주장하지 않는다. CI 예정 Linux PostgreSQL16과 OS/버전 차이가 있으며 원격 실행은 미검증이다. 0058→0059 업그레이드, DDL 실패 rollback, legacy row 보존, 빈 DB 전체 migration을 확인한다.
+폐기 가능한 PostgreSQL **17.11**의 새 data directory/랜덤 loopback 포트를 확인하고 실행했다. 이어서 GitHub의 Linux PostgreSQL16 통합 검사도 통과했다. PGlite만으로 통합 통과를 주장하지 않는다. 0058→0059 업그레이드, DDL 실패 rollback, legacy row 보존, 빈 DB 전체 migration을 확인했다.
 
-최종 결과와 각 산출물 경로는 이 문서 아래 ‘최종 실행 결과’에 기록한다. 테스트 서버는 종료하며 보고서의 임시 loopback URL이 계속 서비스된다고 안내하지 않는다.
+후속 검증의 현재 결과와 산출물은 [출시 검증 기록](trade-daily-release-readiness.md)을 따른다. 아래 최초 구현 결과와 구분한다. 테스트 서버는 종료하며 보고서의 임시 loopback URL이 계속 서비스된다고 안내하지 않는다.
 
 ## migration / 중단 / 복구
 
 추가형 `drizzle/0059_trade_daily_reliability.sql`과 journal/schema를 함께 준비했다. revision·취소·작업 큐·실행 상태 테이블 4개, owner 전용 유효 원장 view, 취소/정정 함수와 DB 쓰기 차단을 포함한다. 기존 행 삭제/금융 원자료 보정은 없다.
 
-승인된 운영 적용 절차:
+운영 승인 후 적용할 절차:
 
 1. 현재 배포/스키마와 0058 기준의 호환성을 다시 확인하고 복구 가능한 DB 백업을 확보한다. 이 작업에서 운영 DB에는 접근하지 않았다.
 2. 신규 mutation·worker의 진입을 중단하고 이미 실행 중인 작업을 종료·확인한 뒤 migration을 transaction으로 적용한다. 배포 교체만으로 기존 Cron이 끝났다고 판단하지 않는다. 0059 초기 상태는 `legacy`라 기존 일반 거래는 호환되지만 revision/취소 신규 쓰기는 차단된다.
@@ -82,7 +82,7 @@ URL/analytics에 초안, 금액, operation이나 토큰을 넣지 않는다. 새
 5. **첫 revision 또는 취소 tombstone이 데이터 의미의 비호환 지점이다.** 일반 거래는 기존 형식과 호환되지만 `compatible` 모드에서는 오래된 writer를 예방적으로 차단한다. 첫 revision/취소 후 `legacy` 복귀는 DB 자체가 거부한다. 구버전 reader는 정정 전 상태를 읽을 수 있으므로 단순 구버전 배포로 복구하지 않는다.
 6. 장애 시 `paused`로 전환하고 새 작업 진입을 중단한다. 원장·revision·취소 ID·snapshot·큐를 보존한 채 호환 reader로 확정 거래를 조회한다. 원인을 수정한 호환 버전의 QA 후 `compatible`로 재개한다. revision 삭제, 역방향 수량 조작, 원본 덮어쓰기, tombstone 삭제는 복구 수단이 아니다.
 
-Production migration/스케줄/기능 활성화/배포는 별도 승인 전이다. 정규 CI 파일은 [CI 실행·필수 체크 연결](reliability-ci.md)을 따른다. GitHub 실행/branch protection 강제는 아직 적용하지 않았다.
+Production migration/스케줄/기능 활성화/배포는 별도 승인 전이다. 정규 CI 파일은 [CI 실행·필수 체크 연결](reliability-ci.md)을 따른다. GitHub의 실제 다섯 검사는 실행했으며 branch protection 강제 설정은 변경하지 않았다.
 
 ## 이전 구현 단계 실행 결과 (후속 보완의 최종 판정 아님)
 

@@ -373,7 +373,8 @@ it('enforces real API authentication, session continuity, origin and body owners
   assert.equal((await f.route.GET(request('GET'))).status,401);
   f.setIdentity('verified-one');
   const get=await f.route.GET(request('GET')); assert.equal(get.status,200); assert.equal(get.headers.get('cache-control'),'private, no-store');
-  const {sessionKey}=await get.json();
+  const {sessionKey,serverNow}=await get.json();
+  assert.ok(Number.isFinite(Date.parse(serverNow)) && Date.parse(serverNow)<=Date.now(),'ledger GET supplies an uncached server clock observation');
   const mutation={operationId:randomUUID(),accountId:account,expectedSequence:null,opening:{at,cash:{KRW:'0',USD:'0'},positions:[]}};
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation},'https://foreign.test'))).status,400);
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation,ownerUserId:other}))).status,400);
@@ -384,6 +385,8 @@ it('enforces real API authentication, session continuity, origin and body owners
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation}))).status,503);
   assert.equal((await f.queries.readNativeLedger({ownerUserId:owner},account)).entries.length,0);
   process.env.NATIVE_LEDGER_ROLLOUT='qa'; process.env.NATIVE_LEDGER_QA_OWNERS=owner;
+  const future=await f.route.POST(request('POST',{sessionKey,mutation:{...mutation,operationId:randomUUID(),opening:{...mutation.opening,at:new Date(Date.now()+60_000).toISOString()}}}));
+  assert.equal(future.status,400);assert.equal((await future.json()).error,'invalid_time','server writer still rejects future timestamps without a device-clock grace period');
   const created=await f.route.POST(request('POST',{sessionKey,mutation})); assert.equal(created.status,201);
   assert.equal((await created.json()).snapshot,'scheduled','a transaction must never create an intraday daily baseline');
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation}))).status,200);

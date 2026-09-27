@@ -141,22 +141,29 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       (report.ledgerHttpFailures ??= []).push({ status: response.status(), method: response.request().method(), error: body.error ?? 'non_json_error' });
     });
     await setIdentity(sessionTokens[0]);
-    await check('fullapp-native-home-quick-buy-sell-real-router-refresh', async () => {
+    await check('fullapp-native-home-quick-buy-sell-clock-skew-real-router-refresh', async () => {
+      await page.clock.install({ time: new Date(Date.now() + 60_000) });
       await visitValuation('/?currency=USD');
       await expect(page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true })).toBeVisible();
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,000.00');
       await page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true }).click();
       const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
       await dialog.getByLabel('수량', { exact: true }).fill('2'); await dialog.getByLabel('체결 총액', { exact: true }).fill('200');
+      const buyResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/portfolio/ledger' && response.request().method() === 'POST' && !!response.request().postDataJSON()?.mutation);
       await dialog.getByRole('button', { name: '매수 기록 저장', exact: true }).click();
+      assert.equal((await buyResponse).status(), 201, 'Fast device clock must not reject the default trade time');
       await expect(dialog).not.toBeVisible(); assert.equal((await readState()).positions[0].quantity, '12');
       await expect(page.getByRole('region', { name: '보유자산' })).toContainText('1,200.00');
+      await page.clock.setSystemTime(new Date(Date.now() - 60_000));
       await page.getByRole('button', { name: 'Synthetic USD holding 매도', exact: true }).click();
       await dialog.getByLabel('수량', { exact: true }).fill('1'); await dialog.getByLabel('체결 총액', { exact: true }).fill('110');
+      const sellResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/portfolio/ledger' && response.request().method() === 'POST' && !!response.request().postDataJSON()?.mutation);
       await dialog.getByRole('button', { name: '매도 기록 저장', exact: true }).click();
+      assert.equal((await sellResponse).status(), 201, 'Slow device clock must not reject the default trade time');
       await expect(dialog).not.toBeVisible(); assert.equal((await readState()).positions[0].quantity, '11'); assert.equal((await readState()).cash.USD, '910');
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,010.00');
       await page.screenshot({ path: path.join(output, 'desktop-home.png'), fullPage: true });
+      await page.clock.setSystemTime(new Date());
     });
     await check('fullapp-transactions-today-history-native-missing-evidence', async () => {
       await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '소유 계정 이벤트' })).toBeVisible();

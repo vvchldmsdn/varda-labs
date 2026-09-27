@@ -13,27 +13,27 @@ import { Decimal, formatMoney, isCurrency, moneyMinor, type Currency } from "@/l
 import type { NativeMutation, NativeStoredAccount } from "@/db/queries/native-portfolio-ledger";
 import styles from "./native-ledger-view.module.css";
 import { rememberTrade, pendingTrade, forgetTrade } from "@/lib/trade-operation-recovery";
+import { observeNativeLedgerClock, nativeLedgerNow, nativeLedgerLocalTime, type NativeLedgerClock } from "@/lib/native-ledger-clock";
 
 type EventKind = NonNullable<NativeMutation["event"]>["type"];
 type Account = NativeStoredAccount & { active?: boolean; assets: (NativeStoredAccount["assets"][number] & { name?: string; ticker?: string })[] };
 type SelectionHint = { accountId?: string; assetId?: string; action?: string };
-type LedgerData = { sessionKey: string; accounts: Account[]; canWrite: boolean; ordering?: {id:string;accountId:string;type:string;at:string}[]; trades?: { id:string; accountId:string; event: NonNullable<NativeMutation["event"]> }[] };
+type LedgerData = { serverNow: string; sessionKey: string; accounts: Account[]; canWrite: boolean; ordering?: {id:string;accountId:string;type:string;at:string}[]; trades?: { id:string; accountId:string; event: NonNullable<NativeMutation["event"]> }[] };
 type CostField = { amount: string; currency: Currency; at: string };
 type Fields = Record<string, string>;
 const EVENTS: [EventKind, string, string][] = [["deposit", "입금", "Deposit"], ["withdraw", "출금", "Withdraw"], ["buy", "매수", "Buy"], ["sell", "매도", "Sell"], ["dividend", "배당금", "Dividend"], ["fee", "수수료·세금", "Fee / tax"], ["exchange", "환전", "Exchange"], ["transfer", "내 계좌 간 이동", "Between my accounts"], ["split", "주식 분할·병합", "Stock split"], ["cost_basis", "매입원가 보완", "Add acquisition cost"]];
-function localNow() { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, -1); }
-function timestamp(value: string) { const at = new Date(value); if (!value || !Number.isFinite(at.getTime()) || at.getTime() > Date.now()) throw new Error("invalid_time"); return at.toISOString(); }
+function timestamp(value: string, nowMs: number) { const at = new Date(value); if (!value || !Number.isFinite(at.getTime()) || !Number.isFinite(nowMs) || at.getTime() > nowMs) throw new Error("invalid_time"); return at.toISOString(); }
 function exact(value: string, currency?: Currency, positive = true) { if (!/^\d+(?:\.\d+)?$/.test(value)) throw new Error("invalid_amount"); const amount = Decimal.from(value); if (amount.compare(0) < 0 || (positive && amount.compare(0) === 0)) throw new Error("invalid_amount"); if (currency) moneyMinor(value, currency); return amount.toExactString(); }
 function currency(value: string): Currency { if (!isCurrency(value)) throw new Error("invalid_currency"); return value; }
 
 /** UI request builder only. The authenticated writer revalidates all ownership,
  * settlement precision, quantities and original dated costs independently. */
-export function buildNativeLedgerMutation({ account, kind, fields, lots, operationId, newAssetId, confirmed }: {
-  account: Account; kind: EventKind; fields: Fields; lots: CostField[]; operationId: string; newAssetId: string; confirmed: boolean;
+export function buildNativeLedgerMutation({ account, kind, fields, lots, operationId, newAssetId, confirmed, nowMs = Date.now() }: {
+  account: Account; kind: EventKind; fields: Fields; lots: CostField[]; operationId: string; newAssetId: string; confirmed: boolean; nowMs?: number;
 }): NativeMutation {
   const dateEvidence: NativeDateEvidence | undefined = account.state && (kind === "buy" || kind === "sell") && fields.timePrecision === "date_only"
     ? { precision: "date_only", reportedDate: fields.tradeDate, timeZone: "Asia/Seoul", policy: "service_day_midpoint" } : undefined;
-  const at = timestamp(dateEvidence ? nativeDateOnlyAt(dateEvidence.reportedDate) : fields.at), base = { operationId, accountId: account.id, expectedSequence: account.state?.sequence ?? null };
+  const at = timestamp(dateEvidence ? nativeDateOnlyAt(dateEvidence.reportedDate) : fields.at, nowMs), base = { operationId, accountId: account.id, expectedSequence: account.state?.sequence ?? null };
   if (!account.state) {
     if (!confirmed) throw new Error("opening_confirmation_required");
     return { ...base, opening: { at, cash: { KRW: exact(fields.cashKrw ?? "", "KRW", false), USD: exact(fields.cashUsd ?? "", "USD", false) }, positions: account.assets.filter(row => !row.archived).map(row => ({ assetId: row.id, currency: currency(row.currency), quantity: exact(row.quantity, undefined, false), costLots: null })) } };
@@ -80,7 +80,7 @@ export function buildNativeLedgerMutation({ account, kind, fields, lots, operati
   if (kind === "split") return { ...base, event: { type: kind, at, assetId: position!.assetId, ratio: { n: exact(fields.ratioN), d: exact(fields.ratioD) } } };
   if (kind === "cost_basis") {
     if (!lots.length || position!.costLots !== null) throw new Error("cost_basis_already_known");
-    return { ...base, event: { type: kind, at, assetId: position!.assetId, costLots: lots.map(lot => ({ amount: exact(lot.amount, lot.currency, false), currency: lot.currency, at: timestamp(lot.at), source: "user_native_ledger", remaining: { n: "1", d: "1" } })) } };
+    return { ...base, event: { type: kind, at, assetId: position!.assetId, costLots: lots.map(lot => ({ amount: exact(lot.amount, lot.currency, false), currency: lot.currency, at: timestamp(lot.at, nowMs), source: "user_native_ledger", remaining: { n: "1", d: "1" } })) } };
   }
   throw new Error("invalid_input");
 }
@@ -101,6 +101,8 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, newIn
   const [uncertain, setUncertain] = useState(false);
   const [checking, setChecking] = useState(false), [expiredOperation, setExpiredOperation] = useState("");
   const session = useRef<string | null>(null), pending = useRef<{ sessionKey: string; mutation: NativeMutation } | null>(null), lock = useRef(false);
+  const clock = useRef<NativeLedgerClock | null>(null);
+  const localNow = () => nativeLedgerLocalTime(nativeLedgerNow(clock.current));
   const activeAccounts = data?.accounts.filter(row => row.active !== false) ?? [];
   const account = activeAccounts.find(row => row.id === accountId) ?? activeAccounts[0];
   const asset = account?.assets.find(row => row.id === fields.assetId);
@@ -132,7 +134,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, newIn
   function clearVisibleIdentity() {
     setSignedOut(true); setData(null); session.current=null; pending.current=null;
     setUncertain(false); setExpiredOperation(""); setSuccess(false); setConflict(false); setChecking(false);
-    setFields({currency:"USD",at:localNow()}); setLots([{amount:"",currency:"USD",at:""}]);
+    clock.current=null; setFields({currency:"USD"}); setLots([{amount:"",currency:"USD",at:""}]);
     setAccountId(""); setConfirmed(false); setSavedOpening(false); onPendingChange?.(false);
   }
   function rejectChangedIdentity(response: Response, body: {error?:string}) {
@@ -144,6 +146,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, newIn
       const response = await fetch("/api/portfolio/ledger", { cache: "no-store", credentials: "same-origin" });
       const body = await response.json();
       if (!response.ok || typeof body.sessionKey !== "string" || !Array.isArray(body.accounts)) { rejectChangedIdentity(response,body); throw new Error(body.error ?? "unavailable"); }
+      clock.current = observeNativeLedgerClock(body.serverNow);
       if (session.current && session.current !== body.sessionKey) { pending.current = null; onPendingChange?.(false); setUncertain(false); setFields({ currency: "USD", at: localNow() }); setLots([{ amount: "", currency: "USD", at: "" }]); setConfirmed(false); setAccountId(""); setError("account_changed"); setExpiredOperation(""); setChecking(false); setConflict(false); setSuccess(false); }
       const selection = resolveNativeLedgerSelection(body.accounts, { ...initialSelection, accountId: initialSelection.accountId ?? body.accounts.find((row: Account) => row.assets.some(asset => asset.id === initialSelection.assetId))?.id });
       if (compact && ((initialSelection.accountId && selection.accountId !== initialSelection.accountId) || (initialSelection.assetId && selection.assetId !== initialSelection.assetId) || !["buy", "sell"].includes(selection.action))) {
@@ -197,7 +200,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, newIn
     setError(""); setSuccess(false);
     let dispatched = false;
     try {
-      if (!pending.current) pending.current = { sessionKey: data.sessionKey, mutation: buildNativeLedgerMutation({ account, kind, fields, lots, operationId: crypto.randomUUID(), newAssetId: crypto.randomUUID(), confirmed }) };
+      if (!pending.current) pending.current = { sessionKey: data.sessionKey, mutation: buildNativeLedgerMutation({ account, kind, fields, lots, operationId: crypto.randomUUID(), newAssetId: crypto.randomUUID(), confirmed, nowMs: nativeLedgerNow(clock.current) }) };
       rememberTrade(localStorage, { ...pending.current, savedAt:Date.now() });
       if (uncertain) {
         const lookup = await fetch("/api/portfolio/ledger", {method:"POST",credentials:"same-origin",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionKey:data.sessionKey,operationId:pending.current.mutation.operationId})});

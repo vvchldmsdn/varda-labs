@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     if (new URL(request.url).search) return response({ error: "invalid_request" }, 400);
     const auth = await context(); if (auth instanceof Response) return auth;
     const ledger = await readNativeLedger(auth.tenant);
-    return response({ sessionKey: auth.sessionKey, accounts: ledger.accounts, ordering: ledger.entries.slice(-500).map(e=>({id:e.id,accountId:e.accountId,type:e.data.event.type,at:e.data.event.at})), trades: ledger.entries.filter(e => ["buy", "sell"].includes(e.data.event.type)).slice(-100).map(e => ({ id:e.id,accountId:e.accountId,event:e.data.event })), canWrite: releaseOwnerAllowed(process.env, "NATIVE_LEDGER", auth.tenant.ownerUserId) });
+    return response({ serverNow: new Date(Date.now()).toISOString(), sessionKey: auth.sessionKey, accounts: ledger.accounts, ordering: ledger.entries.slice(-500).map(e=>({id:e.id,accountId:e.accountId,type:e.data.event.type,at:e.data.event.at})), trades: ledger.entries.filter(e => ["buy", "sell"].includes(e.data.event.type)).slice(-100).map(e => ({ id:e.id,accountId:e.accountId,event:e.data.event })), canWrite: releaseOwnerAllowed(process.env, "NATIVE_LEDGER", auth.tenant.ownerUserId) });
   } catch { return response({ error: "unavailable" }, 503); }
 }
 export async function POST(request: Request) {

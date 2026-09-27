@@ -1,5 +1,6 @@
 import "./market-calendar.test.mjs";
 import "./trade-reliability.test.mjs";
+import "./native-ledger-clock.test.mjs";
 import "./snapshot-retry.test.mjs";
 import "./broker-securities-recovery.test.mjs";
 import "./isolated-release-preview.test.mjs";
