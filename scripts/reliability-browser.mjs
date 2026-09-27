@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {rehearseReliabilityBrowser} from './krw-usd-rc-rehearsal.mjs';
+const args=process.argv.slice(2);
+assert.equal(args.length,4);assert.equal(args[0],'--output-dir');assert.equal(args[2],'--pg-bin');
+assert.ok(path.isAbsolute(args[1])&&path.isAbsolute(args[3]));
+await mkdir(args[1],{recursive:true});
+const report=await rehearseReliabilityBrowser(['--execute-local','--pg-bin',args[3]],args[1]);
+await writeFile(path.join(args[1],'report.json'),JSON.stringify(report,null,2));
+console.log(JSON.stringify({status:report.status,error:report.testFailure,cases:report.cases?.filter(c=>!c.name.startsWith('migration:')),reportPath:report.reportPath}));
+process.exitCode=report.status==='PASS'?0:1;

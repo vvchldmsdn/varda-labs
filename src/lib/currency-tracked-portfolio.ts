@@ -40,6 +40,7 @@ export type TrackedPortfolioEvidence = {
   corporateActionsInWindow?: boolean;
   splits?: readonly (DatedSplit & { positionId: string })[];
   nativeSequences?: Readonly<Record<string, number>>;
+  nativeRevisions?: Readonly<Record<string, number>>;
   realizedTrades?: readonly TrackedRealizedTrade[] | null;
   realizedTradesComplete?: boolean;
   groupEvidence?: { policy: "current_membership_whole_cash_direct_holdings"; stableSince: string; reason: string | null };

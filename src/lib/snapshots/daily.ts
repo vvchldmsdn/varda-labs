@@ -17,7 +17,8 @@ import {
   sql,
 } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { db, sqlClient } from "@/db/client";
+import { snapshotFence } from "@/lib/snapshots/write-context";
 import { assetPriceSnapshotInstrumentCondition } from "@/db/queries/asset-price-snapshot-scope";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import {
@@ -479,7 +480,7 @@ export async function runDailySnapshot(
   if (
     !dryRun &&
     snapshotDate !== resolvedCycle.snapshotDate &&
-    !historicalValidation?.ok
+    !historicalValidation?.ok && !snapshotFence.getStore()
   ) {
     throw new DailySnapshotRequestError(
       "historical_write_not_enabled",
@@ -725,7 +726,7 @@ export async function runDailySnapshot(
   }
 
   if (!dryRun) {
-    await applySnapshotWrites(accountBuilds, allBuild, provenance.insertOnly);
+    await applySnapshotWrites(accountBuilds, allBuild, provenance.insertOnly, allAssetRows.filter(a=>targetAccounts.includes(a.account)),cycle.cycleEndAt,eventRows.filter(e=>e.account!==null && targetAccounts.includes(e.account)),snapshotDate);
     for (const build of accountBuilds) {
       build.status = build.status === "planned" ? "written" : build.status;
     }
@@ -1392,6 +1393,10 @@ async function applySnapshotWrites(
   accountBuilds: AccountSnapshotBuild[],
   allBuild: AllAccountSnapshotBuild | null,
   insertOnly: boolean,
+  expectedAssets:Asset[],
+  cutoff:Date,
+  expectedEvents:Awaited<ReturnType<typeof loadEventRows>>,
+  snapshotDate:string,
 ) {
   const queries: unknown[] = [];
 
@@ -1421,7 +1426,23 @@ async function applySnapshotWrites(
   }
 
   if (queries.length === 0) return;
-  await db.batch(queries as unknown as Parameters<typeof db.batch>[0]);
+  const fence=snapshotFence.getStore();
+  const owner=accountBuilds.find(b=>b.portfolio)?.portfolio?.canonicalOwnerUserId ?? allBuild?.portfolio?.canonicalOwnerUserId;
+  if(!owner) throw new Error("snapshot_owner_missing");
+  await sqlClient.transaction(tx=>[
+    tx.query("select set_config('lock_timeout','2s',true),set_config('app.trade_reliability_version','0059',true)"),tx.query("set local statement_timeout='15s'"),
+    tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`varda.portfolio_mutation.v1:${owner}`]),
+    ...(fence ? [tx.query("select assert_daily_snapshot_fence($1::uuid,$2)",[fence.id,fence.generation])] : []),
+    tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,quantity numeric,"updatedAt" timestamptz)), actual as (
+      select h.id,h.quantity,h.updated_at from assets h join accounts a on a.id=h.account_id
+      where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is null and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
+    ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.quantity is distinct from e.quantity or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedAssets.map(a=>({id:a.id,quantity:a.quantity,updatedAt:a.updatedAt}))),accountBuilds.map(b=>b.account),cutoff.toISOString()]),
+    tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,"updatedAt" timestamptz)), actual as (
+      select e.id,e.updated_at from event_ledger_entries e join accounts a on a.id=e.account_id and a.code=e.account
+      where a.canonical_owner_user_id=$1::uuid and a.is_active and a.code=any($3::text[]) and e.event_date<=$4::date
+    ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedEvents.map(e=>({id:e.id,updatedAt:e.updatedAt}))),accountBuilds.map(b=>b.account),snapshotDate]),
+    ...queries.map(q=>{ const statement=(q as {toSQL:()=>{sql:string;params:unknown[]}}).toSQL(); return tx.query(statement.sql,statement.params); }),
+  ],{isolationLevel:"ReadCommitted"});
 }
 
 function pushPortfolioWriteQuery(

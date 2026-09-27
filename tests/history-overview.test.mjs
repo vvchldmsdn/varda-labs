@@ -30,8 +30,16 @@ describe("history overview", () => {
     assert.equal(model.excludedAlternativeRowCount, 2);
     assert.equal(
       model.policy.rowAuthority,
-      "stored_before_derived_before_partial_then_varda_before_base44",
+      "complete_stored_before_derived_then_varda_before_base44",
     );
+  });
+
+  it("does not turn an incomplete account aggregate into a portfolio loss", () => {
+    const model=buildHistoryOverview({rows:[row("2026-07-01",200),row("2026-07-02",100,{rowKind:"partial"}),row("2026-07-03",220)]});
+    assert.equal(model.pointCount,2);
+    assert.equal(model.points[1].movementKrw,20);
+    assert.equal(model.points[1].gapDays,2);
+    assert.equal(model.worstMovement?.amountKrw,20);
   });
 
   it("keeps missing dates as gaps while calculating point-to-point valuation movement", () => {

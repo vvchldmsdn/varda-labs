@@ -46,6 +46,12 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
   "scripts/krw-usd-rc-rehearsal-cases.mjs",
   "scripts/native-trade-cutoff-rehearsal-cases.mjs",
   "scripts/broker-securities-rehearsal-cases.mjs", // Synthetic fixtures injected by the isolated loopback runner only.
+  "scripts/reliability-postgres-cases.mjs", // Disposable cluster pools injected by the reviewed runner.
+  "scripts/reliability-retry-cases.mjs", // Same injected loopback cluster; no remote connection configuration.
+  "scripts/reliability-compatibility-cases.mjs", // Separate database in the injected disposable loopback cluster.
+  "scripts/reliability-fullapp-cases.mjs", // Actual Next app against the isolated cluster through a loopback-only SQL bridge.
+  "scripts/reliability-limit-cases.mjs", // Bounded synthetic replay fixtures on injected isolated pools.
+  "scripts/reliability-browser-cases.mjs", // Browser fixture uses the same isolated DB and synthetic identity ports.
   "scripts/rehearse-tenant-expand.mjs",
   "scripts/rehearse-identity-pairing-consume-writer.mjs",
   "scripts/rehearse-identity-bootstrap-claim-handoff.mjs",
@@ -54,6 +60,82 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
 ]);
 
 describe("tenant writer Phase 1D-A readiness", () => {
+  it("keeps reliability fixture DML outside product writers and production imports", () => {
+    for (const fixture of ["scripts/reliability-postgres-cases.mjs", "scripts/reliability-browser-cases.mjs"]) {
+      assert.equal(REHEARSAL_ONLY_DML_PATHS.has(fixture), true);
+      const source = readFileSync(join(ROOT, fixture), "utf8");
+      assert.doesNotMatch(source, /DATABASE_URL|process\.env\.(?!NODE_ENV)|dotenv|fetch\(/);
+      assert.match(source, /export async function run(?:Reliability|Browser)Cases\(\{admin,worker,tenant,report/);
+      assert.equal(TENANT_WRITER_REGISTRY.some(writer => writer.implementationPaths.includes(fixture)), false);
+    }
+    for (const path of walkProductRuntimeFiles(join(ROOT, "src"))) {
+      assert.doesNotMatch(readFileSync(path, "utf8"), /reliability-(?:browser|postgres)-cases/);
+    }
+  });
+
+  it("registers owner-scoped revisions and recovery cancellation through the verified ledger writer", () => {
+    const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "session_native_portfolio_ledger");
+    assert.equal(writer.authorization, "server_verified_session");
+    assert.equal(writer.canonicalOwnerHttpInput, "forbidden");
+    for (const table of ["native_ledger_revisions", "native_operation_cancellations", "daily_snapshot_work"]) {
+      assert.deepEqual(writer.targets.find(target => target.table === table), {
+        table, classification: "user_owned", operations: ["insert"], ownerPolicy: "trusted_context_required",
+      });
+    }
+    const source = readFileSync(join(ROOT, "src/db/queries/native-portfolio-ledger.ts"), "utf8");
+    assert.match(source, /getTenantSqlClient\(\)/);
+    assert.match(source, /set_config\('app.current_user_id',\$1,true\)/);
+    assert.match(source, /select apply_native_trade_revision\(/);
+    assert.match(source, /select cancel_native_operation\(/);
+    assert.doesNotMatch(source, /(?:insert into|update|delete from)\s+(?:public\.)?(?:native_ledger_revisions|native_operation_cancellations|daily_snapshot_work)\b/i);
+    const migration = readFileSync(join(ROOT, "drizzle/0059_trade_daily_reliability.sql"), "utf8");
+    for (const table of ["native_ledger_revisions", "native_operation_cancellations"]) {
+      assert.match(migration, new RegExp(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`));
+      assert.match(migration, new RegExp(`GRANT SELECT ON ${table} TO varda_tenant_app`));
+      assert.doesNotMatch(migration, new RegExp(`GRANT[^;]*\\b(?:INSERT|UPDATE|DELETE|ALL)\\b[^;]*\\bON\\s+(?:TABLE\\s+)?(?:public\\.)?${table}\\s+TO\\s+varda_tenant_app`, "i"));
+    }
+    for (const functionName of ["apply_native_trade_revision", "cancel_native_operation"]) {
+      const body = migration.match(new RegExp(`CREATE FUNCTION ${functionName}\\([\\s\\S]*?END \\$\\$;`))?.[0];
+      assert.ok(body, `${functionName} must use the reviewed fixed function boundary`);
+      assert.match(body, /SECURITY DEFINER SET search_path=pg_catalog/);
+      assert.match(body, /p_owner IS DISTINCT FROM nullif\(current_setting\('app.current_user_id',true\)/);
+      assert.match(body, /investment_plan_tenant_active\(\)/);
+      assert.match(body, /pg_advisory_xact_lock/);
+    }
+  });
+
+  it("keeps daily work account-owned while only the trusted worker has direct DML", () => {
+    const workerPath = "src/lib/snapshots/durable-work.ts";
+    const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "cron_market_cycle_controller");
+    assert.equal(writer.authorization, "machine_admin");
+    assert.equal(writer.canonicalOwnerHttpInput, "forbidden");
+    assert.ok(writer.implementationPaths.includes(workerPath));
+    assert.deepEqual(writer.targets.find(target => target.table === "daily_snapshot_work"), {
+      table: "daily_snapshot_work", classification: "user_owned", operations: ["insert", "update"], ownerPolicy: "trusted_context_required",
+    });
+    const source = readFileSync(join(ROOT, workerPath), "utf8");
+    assert.match(source, /import "server-only"/);
+    assert.match(source, /select a\.canonical_owner_user_id/);
+    assert.match(source, /join app_users u on u\.id=a\.canonical_owner_user_id/);
+    assert.match(source, /u\.status='active'/);
+    const migration = readFileSync(join(ROOT, "drizzle/0059_trade_daily_reliability.sql"), "utf8");
+    assert.match(migration, /ALTER TABLE daily_snapshot_work FORCE ROW LEVEL SECURITY/);
+    assert.match(migration, /REVOKE ALL ON daily_snapshot_work FROM PUBLIC,varda_tenant_app/);
+    assert.doesNotMatch(migration, /GRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE)[^;]*\bON\s+daily_snapshot_work\s+TO\s+varda_tenant_app/i);
+  });
+  it("registers provider-free retry and confines operator recovery to isolated exact scope",()=>{
+    const retry=TENANT_WRITER_REGISTRY.find(({id})=>id==="cron_snapshot_retry");
+    assert.equal(retry.authorization,"machine_admin");assert.equal(retry.canonicalOwnerHttpInput,"forbidden");
+    assert.deepEqual(retry.entrypoints,["/api/cron/snapshots/retry"]);
+    assert.ok(retry.targets.every(target=>target.classification==="user_owned"));
+    const operator=TENANT_WRITER_REGISTRY.find(({id})=>id==="isolated_snapshot_work_operator");
+    assert.equal(operator.authorization,"migration_cli");assert.equal(operator.canonicalOwnerHttpInput,"forbidden");
+    assert.deepEqual(operator.targets.map(({table,operations})=>({table,operations})),[{table:"daily_snapshot_work",operations:["update"]},{table:"market_data_sync_runs",operations:["insert"]}]);
+    const source=readFileSync(join(ROOT,operator.implementationPaths[0]),"utf8");
+    assert.match(source,/inet_server_addr/);assert.match(source,/local_server_identity_mismatch/);assert.match(source,/work_scope_mismatch/);assert.match(source,/work_revision_or_account_changed/);assert.match(source,/work_generation_changed/);assert.match(source,/work_not_requeueable/);
+    assert.doesNotMatch(source,/process\.env|DATABASE_URL|fetch\(/);
+    assert.equal(REHEARSAL_ONLY_DML_PATHS.has(operator.implementationPaths[0]),false);
+  });
   it("registers broker evidence recovery only as a guarded offline operator", () => {
     const writer = TENANT_WRITER_REGISTRY.find(({ id }) => id === "approved_broker_evidence_recovery");
     assert.equal(writer.authorization, "migration_cli");
@@ -143,8 +225,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 45);
-    assert.equal(registeredPaths.length, 53);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 47);
+    assert.equal(registeredPaths.length, 55);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -215,7 +297,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(scopeCounts, {
-      in_scope: 24,
+      in_scope: 26,
       intentionally_skipped_legacy: 1,
       not_applicable: 20,
     });
@@ -303,6 +385,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         "base44_market_context_import",
         "cron_market_cycle_controller",
         "expired_simulation_execution_cleanup",
+        "isolated_snapshot_work_operator",
         "operator_investment_lab_stress_history_completion",
         "session_holding_analysis_data_preparation",
         "session_holding_onboarding",
@@ -383,6 +466,10 @@ describe("tenant writer Phase 1D-A readiness", () => {
           hasRawCanonicalOwnerDml
         ) {
           canonicalOwnerWriters.push(writer.id);
+        } else if (((["cron_market_cycle_controller","cron_snapshot_retry"].includes(writer.id) && path === "src/lib/snapshots/durable-work.ts") || (writer.id==="cron_snapshot_retry"&&path==="src/db/queries/native-portfolio-snapshots.ts")) && hasRawCanonicalOwnerDml) {
+          // Only the reviewed database-derived owner discovery path, never all
+          // implementations sharing the cron writer ID, receives this allowance.
+          canonicalOwnerWriters.push(writer.id);
         } else {
           assert.equal(
             hasRawCanonicalOwnerDml,
@@ -409,6 +496,9 @@ describe("tenant writer Phase 1D-A readiness", () => {
       "session_portfolio_group_management",
       "session_account_management",
       "portfolio_target_policy_session_write",
+      "cron_snapshot_retry",
+      "cron_snapshot_retry",
+      "cron_market_cycle_controller",
     ]);
   });
 
@@ -744,7 +834,7 @@ function discoverDmlPaths() {
     .filter((path) => {
       const source = readFileSync(path, "utf8");
       return (
-        RAW_SQL_DML_PATTERN.test(source) || /\bselect\s+apply_native_portfolio_(?:tenant_)?mutation\s*\(/i.test(source) ||
+        RAW_SQL_DML_PATTERN.test(source) || /\bselect\s+(?:apply_native_portfolio_(?:tenant_)?mutation|apply_native_trade_revision|cancel_native_operation)\s*\(/i.test(source) ||
         (DB_IMPORT_PATTERN.test(source) && DRIZZLE_DML_PATTERN.test(source))
       );
     })

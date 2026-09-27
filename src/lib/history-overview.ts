@@ -7,7 +7,7 @@ export const HISTORY_OVERVIEW_POLICY = Object.freeze({
   version: "stored_history_time_explorer_v1",
   dateAuthority: "writer_service_date_with_original_snapshot_key_preserved",
   rowAuthority:
-    "stored_before_derived_before_partial_then_varda_before_base44",
+    "complete_stored_before_derived_then_varda_before_base44",
   missingDates: "not_interpolated_or_carried",
   movementMeaning: "point_to_point_valuation_change_not_cashflow_adjusted_return",
   eventMeaning: "same_calendar_date_context_not_causal_attribution",
@@ -233,7 +233,7 @@ function selectCanonicalRows(
 
   for (const row of rows) {
     const date = historySnapshotDisplayDate(row);
-    if (!isIsoDate(row.snapshotDate) || date === null || !isIsoDate(date) || finiteOrNull(row.totalMarketValue) === null) {
+    if (row.rowKind === "partial" || !isIsoDate(row.snapshotDate) || date === null || !isIsoDate(date) || finiteOrNull(row.totalMarketValue) === null) {
       excludedInvalidRowCount += 1;
       continue;
     }

@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
 import { accounts, assets } from "@/db/schema";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import {
@@ -96,7 +97,7 @@ export async function writeSessionManualKrxGoldPrice(
     });
 
     const updatedAt = new Date();
-    const [updated] = await db
+    const statement = db
       .update(assets)
       .set({
         ...buildManualAssetPriceUpdate({
@@ -114,6 +115,8 @@ export async function writeSessionManualKrxGoldPrice(
         ),
       )
       .returning({ id: assets.id });
+    const query = statement.toSQL();
+    const [updated] = await runPortfolioMutation(tenantId, query.sql, query.params);
 
     if (!updated) {
       return actionState(

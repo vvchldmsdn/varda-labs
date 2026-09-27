@@ -3,11 +3,51 @@ import { describe, it } from "node:test";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
 
 describe("Daily market cycle cutoff recovery", () => {
+  it("completes native-only work instead of reporting no action",async()=>{
+    const f=await fixture({noLegacyTargets:true,nativeResult:{status:"completed",targetCount:1,created:1,failedCount:0,blockedCount:0}});
+    const result=await f.run();assert.equal(result.ok,true);assert.equal(result.status,"completed");
+    assert.equal(f.finished[0].requestedCount,1);assert.equal(f.finished[0].successCount,1);
+  });
+  it("uses the actual route HTTP policy for native failure and missing evidence",async()=>{
+    const prior=process.env.MARKET_CYCLE_CRON_WRITE_ENABLED;process.env.MARKET_CYCLE_CRON_WRITE_ENABLED="true";
+    try {
+      for(const [failedCount,blockedCount,expected] of [[1,0,500],[0,1,409]]) {
+        const f=await fixture({nativeResult:{status:"partial",targetCount:1,created:0,failedCount,blockedCount}});
+        const result=await f.run();
+        const [route]=await importWithPorts(["src/app/api/cron/market-cycle/run/route.ts"],{
+          "@/lib/admin-auth":{isAuthorizedAdminJob:()=>true},
+          "@/lib/cron-market-cycle-runner":{runCronMarketCycle:async()=>result},
+          "next/server":{NextResponse:{json:(body,options)=>Response.json(body,options)}},
+        });
+        const response=await route.GET(new Request("http://127.0.0.1/api/cron/market-cycle/run"));
+        assert.equal(response.status,expected);assert.equal((await response.json()).ok,false);
+      }
+    } finally {if(prior===undefined)delete process.env.MARKET_CYCLE_CRON_WRITE_ENABLED;else process.env.MARKET_CYCLE_CRON_WRITE_ENABLED=prior;}
+  });
+  it("keeps legacy failure above native missing-evidence status",async()=>{
+    const f=await fixture({snapshotWriteFails:true,nativeResult:{status:"partial",targetCount:1,created:0,failedCount:0,blockedCount:1}});
+    const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"failed");
+    assert.equal(f.finished[0].status,"failed");assert.equal(f.finished[0].failedCount,1);assert.equal(f.finished[0].skippedCount,1);
+  });
+  it("reports a retry failure even when the initial plan needed no action",async()=>{
+    const f=await fixture({snapshotWriteFails:true,snapshotsExist:true});
+    const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"failed");
+    assert.equal(f.finished[0].status,"failed");assert.equal(f.finished[0].failedCount,1);
+  });
+  it("includes a native failure in response and persisted final outcome",async()=>{
+    const f=await fixture({nativeResult:{status:"partial",targetCount:1,created:0,failedCount:1,blockedCount:0}});
+    const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"failed");
+    assert.equal(f.finished.length,1);assert.equal(f.finished[0].status,"failed");assert.equal(f.finished[0].failedCount,1);assert.equal(f.finished[0].metadata.nativeSnapshot.failedCount,1);assert.ok(!f.events.includes("live"));assert.ok(!f.events.includes("fx"));
+  });
+  it("keeps native missing evidence blocked instead of hiding it as no targets",async()=>{
+    const f=await fixture({nativeResult:{status:"partial",targetCount:1,created:0,failedCount:0,blockedCount:1}});
+    const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"blocked");assert.equal(f.finished[0].metadata.nativeSnapshot.targetCount,1);assert.ok(!f.events.includes("live"));assert.ok(!f.events.includes("fx"));
+  });
   it("uses the collection lease and completes close sync without a legacy cooldown veto", async () => {
     const f = await fixture({ missingClose: true });
     const result = await f.run();
     assert.equal(result.status, "completed");
-    assert.deepEqual(f.events, ["collection-lease", "claim", "factors", "preflight", "close", "preflight", "snapshot", "fx", "live", "finish:completed"]);
+    assert.deepEqual(f.events, ["claim", "collection-lease", "factors", "preflight", "close", "preflight", "snapshot", "native-snapshot", "fx", "live", "finish:completed"]);
     assert.equal(result.closeSync.successCount, 1);
     assert.equal(result.snapshot.writtenCount, 1);
   });
@@ -81,7 +121,7 @@ describe("Daily market cycle cutoff recovery", () => {
     const f = await fixture({ missingClose: true, closeErrors: [deferred("provider_budget_limited", 25)] });
     const result = await f.run();
     assert.equal(result.status, "completed");
-    assert.deepEqual(f.events, ["collection-lease", "claim", "factors", "preflight", "close", "wait:25", "close", "preflight", "snapshot", "fx", "live", "finish:completed"]);
+    assert.deepEqual(f.events, ["claim", "collection-lease", "factors", "preflight", "close", "wait:25", "close", "preflight", "snapshot", "native-snapshot", "fx", "live", "finish:completed"]);
     assert.equal(result.closeSync.deferred, null);
     assert.equal(result.snapshot.writtenCount, 1);
     assert.equal(f.events.filter((event) => event === "snapshot").length, 1);
@@ -114,7 +154,7 @@ describe("Daily market cycle cutoff recovery", () => {
       closeErrors: [null, deferred("provider_token_cooldown", 3600)] });
     const result = await f.run();
     assert.equal(result.status, "blocked");
-    assert.deepEqual(result.blockers, ["close_sync_retry_window_exhausted", "provider_token_cooldown"]);
+    assert.deepEqual(result.blockers, ["close_sync_retry_window_exhausted", "provider_token_cooldown", "legacy_snapshot_incomplete"]);
     assert.deepEqual(result.closeSync.deferred, { code: "provider_token_cooldown", retryAfterSeconds: 3600 });
     assert.equal(result.closeSync.successCount, 1);
     assert.equal(result.snapshot.targetCount, 1);
@@ -157,7 +197,7 @@ describe("Daily market cycle cutoff recovery", () => {
     const f = await fixture({ missingClose: true, closeErrors: [new Error("fixture close failure")] });
     const result = await f.run();
     assert.equal(result.status, "failed");
-    assert.deepEqual(result.blockers, ["unexpected_market_cycle_error"]);
+    assert.deepEqual(result.blockers, ["unexpected_market_cycle_error", "legacy_snapshot_incomplete"]);
     assert.deepEqual(f.closeMarkets, ["korea"]);
     assert.ok(!f.events.some((event) => event.startsWith("wait:")));
     assert.ok(!f.events.includes("snapshot"));
@@ -166,8 +206,8 @@ describe("Daily market cycle cutoff recovery", () => {
   it("retains a genuine snapshot write failure and skips auxiliary live work", async () => {
     const f = await fixture({ snapshotWriteFails: true });
     const result = await f.run();
-    assert.equal(result.status, "blocked");
-    assert.deepEqual(result.blockers, ["snapshot_write_incomplete"]);
+    assert.equal(result.status, "failed");
+    assert.deepEqual(result.blockers, ["snapshot_write_incomplete", "legacy_snapshot_failed"]);
     assert.equal(result.snapshot.writtenCount, 0);
     assert.ok(!f.events.includes("live"));
     assert.ok(!f.events.includes("fx"));
@@ -178,7 +218,7 @@ describe("Daily market cycle cutoff recovery", () => {
     const result = await f.run();
     assert.equal(result.status, "already_attempted");
     assert.equal(result.ok, true);
-    assert.deepEqual(f.events, ["collection-lease", "claim"]);
+    assert.deepEqual(f.events, ["claim"]);
     assert.equal(f.finished.length, 0);
   });
 
@@ -186,7 +226,7 @@ describe("Daily market cycle cutoff recovery", () => {
     const f = await fixture({ blockedTenant: true });
     const result = await f.run();
     assert.ok(f.events.includes("snapshot"));
-    assert.equal(result.status, "blocked");
+    assert.equal(result.status, "failed");
     assert.deepEqual(result.snapshot, { targetCount: 2, writtenCount: 1, blockedCount: 0, failedCount: 1 });
     assert.ok(result.blockers.includes("snapshot_preflight_error:holdings_changed_after_cutoff"));
     assert.equal(f.finished.at(-1).metadata.snapshot.writtenCount, 1);
@@ -195,7 +235,7 @@ describe("Daily market cycle cutoff recovery", () => {
   it("does not report success when existing owners need no write but another tenant is blocked", async () => {
     const f = await fixture({ blockedTenant: true, snapshotsExist: true });
     const result = await f.run();
-    assert.equal(result.status, "blocked");
+    assert.equal(result.status, "failed");
     assert.equal(result.snapshot.failedCount, 1);
     assert.ok(!f.events.includes("snapshot"));
     assert.ok(result.blockers.includes("snapshot_preflight_error:holdings_changed_after_cutoff"));
@@ -206,7 +246,7 @@ function deferred(code, retryAfterSeconds) {
   return Object.assign(new Error("fixture provider deferred"), { code, retryAfterSeconds });
 }
 
-async function fixture({ missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false, closeErrors = [], multipleCloseGroups = false, leaseDelayMs = 0, planningDelayMs = 0, sleepOvershootMs = 0 } = {}) {
+async function fixture({ noLegacyTargets=false, nativeResult={ status: "completed", targetCount: 0, created: 0, failedCount:0, blockedCount:0 }, missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false, closeErrors = [], multipleCloseGroups = false, leaseDelayMs = 0, planningDelayMs = 0, sleepOvershootMs = 0 } = {}) {
   const events = [], finished = [];
   const closeMarkets = [], failures = [...closeErrors];
   let elapsedMs = 0, completedCloseGroups = 0;
@@ -217,7 +257,7 @@ async function fixture({ missingClose = false, closeSucceeds = true, liveResult 
   const now = new Date("2026-09-09T22:58:55.000Z");
   const completeSync = { requestedCount: 1, successCount: 1, failedCount: 0, skippedCount: 0, insertedCount: 1, updatedCount: 0, conflictCount: 0, targetFilterSummary: { filteredPriceTargetCount: 1 } };
   const [runner] = await importWithPorts(["src/lib/cron-market-cycle-runner.ts"], {
-    "@/lib/snapshots/native-daily-job": { async runNativeDailySnapshotJob() { return { status: "completed", targetCount: 0, created: 0 }; } },
+    "@/lib/snapshots/native-daily-job": { async runNativeDailySnapshotJob() { events.push("native-snapshot"); assert.ok(!events.includes("fx"),"native cutoff must precede FX replacement"); assert.ok(!events.includes("live"),"native cutoff must precede live quote replacement"); return nativeResult; } },
     "node:perf_hooks": { performance: { now: () => elapsedMs } },
     "node:timers/promises": { async setTimeout(ms) { events.push(`wait:${ms / 1000}`); elapsedMs += ms + sleepOvershootMs; } },
     "@/lib/market-data/collection-worker": { scheduleMarketCollection() {} },
@@ -258,8 +298,9 @@ async function fixture({ missingClose = false, closeSucceeds = true, liveResult 
       },
     },
     "@/lib/snapshots/daily-job": { async runDailySnapshotJob({ dryRun }) {
-      events.push(dryRun ? "preflight" : "snapshot");
+      events.push(dryRun ? "preflight" : missing || snapshotsExist ? "snapshot-check" : "snapshot");
       if (!dryRun) snapshotFx = currentFx;
+      if(noLegacyTargets) return {ok:true,writeReady:true,snapshotDate:"2026-09-10",targetCount:0,writtenCount:0,blockedCount:0,failedCount:0,targets:[]};
       const failed = !dryRun && snapshotWriteFails;
       const counts = { insert: snapshotsExist ? 0 : 1, update: 0, skip: 0, blocked: 0 };
       return {
