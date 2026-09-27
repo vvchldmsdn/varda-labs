@@ -137,7 +137,7 @@ async function executeJob(root, job, pgBin) {
       const fullApp = JSON.parse(await readFile(path.join(output, 'fullapp', 'report.json'), 'utf8'));
       assert.equal(fullApp.status, 'PASS', 'Missing or skipped actual Next app journeys cannot pass CI');
       assert.equal(fullApp.build, 'PASS', 'Full-app journeys require the production build');
-      assert.ok(fullApp.cases.some(row => row.name === 'fullapp-native-home-quick-buy-sell-real-router-refresh' && row.status === 'PASS'));
+      assert.ok(fullApp.cases.some(row => row.name === 'fullapp-native-home-quick-buy-sell-clock-skew-real-router-refresh' && row.status === 'PASS'));
     }
     report.status = 'PASS';
   } catch (error) {
