@@ -6,6 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
 import { importUiWithPorts } from './helpers/import-ui-with-ports.mjs';
+import { addNativeReliabilityFixtureTables } from './helpers/native-reliability-fixture.mjs';
 import { NATIVE_LEDGER_REQUIRED_MESSAGE, NATIVE_ACCOUNT_BALANCE_MESSAGE } from '../src/lib/native-ledger-compatibility.ts';
 
 const owner='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', account='11111111-1111-4111-8111-111111111111', asset='44444444-4444-4444-8444-444444444444';
@@ -29,6 +30,7 @@ function form(values) { const data=new FormData(); for(const [k,v] of Object.ent
 async function fixture() {
   const pg=database??=new PGlite();
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
+  await addNativeReliabilityFixtureTables(pg);
   for(const file of ['0045_investment_plans.sql','0050_native_portfolio_ledger.sql','0052_native_legacy_lifecycle_guard.sql','0056_native_tenant_mutation.sql','0057_native_settlement_cutoff.sql','0059_trade_daily_reliability.sql']) await pg.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
   await pg.exec('grant usage on schema public to varda_tenant_app');
   for(const table of ['accounts','assets','event_ledger_entries','daily_portfolio_snapshots']) await pg.exec(`alter table ${table} enable row level security; alter table ${table} force row level security; create policy tenant_select on ${table} for select to varda_tenant_app using(canonical_owner_user_id = nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${table} to varda_tenant_app;`);

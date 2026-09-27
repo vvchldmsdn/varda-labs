@@ -82,7 +82,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await admin.query("insert into asset_price_snapshots(ticker,market,currency,date,close_price,source,fetched_at) values('999998','korea','KRW',$1,$2,'kis',$3)", [row.date, row.price, `${row.date}T21:00:00Z`]);
     await admin.query("insert into live_price_quotes(ticker,market,currency,price,source,provider,quote_type,status,price_as_of,fetched_at) values('999998','korea','KRW',$1,'kis','kis','live','ok',$2,$2) on conflict(market,ticker,provider) do update set price=excluded.price,price_as_of=excluded.price_as_of,fetched_at=excluded.fetched_at", [row.price, `${row.date}T21:59:59Z`]);
     await admin.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values($1,1400,'synthetic','ok',$2,$2,'spot') on conflict do nothing", [row.date, `${row.date}T21:00:00Z`]);
-    const result = await legacySnapshots.runDailySnapshot({ tenantContext: { ownerUserId: legacyOwner, role: 'user' }, dryRun: false, snapshotDate: row.snapshotDate, account: 'brokerage' });
+    const result = await legacySnapshots.runDailySnapshot({ tenantContext: { ownerUserId: legacyOwner, role: 'user' }, dryRun: false, snapshotDate: row.snapshotDate, now: new Date(`${row.snapshotDate}T01:00:00Z`), account: 'brokerage' });
     assert.equal(result.writeReady, true);
   }
   assert.deepEqual((await admin.query('select total_market_value::text from daily_portfolio_snapshots where account_id=$1 order by snapshot_date', [legacyAccount])).rows.map(row => Number(row.total_market_value)), [1100, 1200]);
@@ -99,16 +99,25 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     DATABASE_URL: connectionStrings[0], DATABASE_URL_UNPOOLED: connectionStrings[0], TENANT_DATABASE_URL: connectionStrings[1],
     CAIRN_FULLAPP_IDENTITIES: JSON.stringify(identities), CAIRN_FULLAPP_TRANSPORT_FILE: transportFile, NATIVE_LEDGER_ROLLOUT: 'qa', NATIVE_LEDGER_QA_OWNERS: `${owner},${other}` };
   environment.NODE_OPTIONS += ` --import=${pathToFileURL(path.join(stage, 'scripts/reliability-fullapp-preload.mjs')).href}`;
-  const appPort = await port(), url = `http://127.0.0.1:${appPort}`;
+  // Next normalizes loopback Request.url to localhost. Keep browser Origin equal
+  // to the actual route origin so the unchanged same-origin guard is exercised.
+  const appPort = await port(), url = `http://localhost:${appPort}`;
   const logfile = createWriteStream(path.join(output, 'next.log'));
   const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(appPort)],
     { cwd: stage, env: environment, windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stdout.pipe(logfile, { end: false }); server.stderr.pipe(logfile, { end: false });
   const browser = await chromium.launch({ headless: true }); let page;
   const browserContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Asia/Seoul' });
-  await browserContext.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await browserContext.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
   const readState = async () => (await ledger.readNativeLedger(context, account)).accounts[0].state;
   const setIdentity = async token => { await browserContext.clearCookies(); if (token) await browserContext.addCookies([{ name: 'cairn_fullapp_identity', value: token, url, httpOnly: true, sameSite: 'Lax' }]); };
+  async function visitValuation(route) {
+    await page.goto(url + route);
+    // Streamed Next markup can contain values before it becomes visible.
+    await expect(page.getByRole('region', { name: '현재 평가', exact: true })).toBeVisible();
+    if (route.startsWith('/history')) await expect(page.getByRole('heading', { name: '확인된 평가 기록', exact: true })).toBeVisible();
+    if (route.startsWith('/today')) await expect(page.getByRole('heading', { name: '무엇이 변했나요?', exact: true })).toBeVisible();
+  }
   async function check(name, callback) {
     const row = { name, status: 'FAIL' }; report.cases.push(row);
     try {
@@ -126,9 +135,14 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     page = await browserContext.newPage();
+    page.on('response', async response => {
+      if (new URL(response.url()).pathname !== '/api/portfolio/ledger' || response.status() < 400) return;
+      const body = await response.json().catch(() => ({}));
+      (report.ledgerHttpFailures ??= []).push({ status: response.status(), method: response.request().method(), error: body.error ?? 'non_json_error' });
+    });
     await setIdentity(sessionTokens[0]);
     await check('fullapp-native-home-quick-buy-sell-real-router-refresh', async () => {
-      await page.goto(url + '/?currency=USD');
+      await visitValuation('/?currency=USD');
       await expect(page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true })).toBeVisible();
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,000.00');
       await page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true }).click();
@@ -147,8 +161,8 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-transactions-today-history-native-missing-evidence', async () => {
       await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '소유 계정 이벤트' })).toBeVisible();
       await expect(page.locator('body')).toContainText('Synthetic USD');
-      await page.goto(url + '/today?currency=USD'); await expect(page.locator('body')).toContainText('2,010.00');
-      await page.goto(url + '/history?currency=USD'); await expect(page.getByRole('heading', { name: '확인된 평가 기록' })).toBeVisible();
+      await visitValuation('/today?currency=USD'); await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,010.00');
+      await visitValuation('/history?currency=USD');
       await expect(page.locator('body')).toContainText('과거 수량과 가격 시각이 확인돼야');
       await page.screenshot({ path: path.join(output, 'desktop-history-missing.png'), fullPage: true });
     });
@@ -180,7 +194,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       const initial = cutoff.buildNativeCutoffEvidence(evidence, await ledger.readNativeLedger(context, account), serviceDate, now.toISOString());
       assert.equal(initial.current.positions.find(row => row.id === asset).observation.quantity, '10');
       assert.equal((await snapshots.saveNativeCutoffSnapshots(context, initial, serviceDate, now.toISOString())).created, 1);
-      await page.goto(url + '/history?currency=USD');
+      await visitValuation('/history?currency=USD');
       await expect(page.locator('body')).toContainText('2,000.00');
       await page.goto(url + `/portfolio/ledger?accountId=${account}&assetId=${asset}&action=buy`);
       await page.getByText('과거 거래 추가·정정', { exact: true }).click();
@@ -194,14 +208,14 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       const revised = await ledger.readNativeLedger(context, account);
       assert.equal(revised.accounts[0].state.positions[0].quantity, '13'); assert.equal(revised.accounts[0].state.cash.USD, '710');
       assert.equal(revised.snapshots.length, 0, 'A superseded capture must disappear before rebuilding');
-      await page.goto(url + '/history?currency=USD'); await expect(page.locator('body')).toContainText('과거 수량과 가격 시각이 확인돼야');
+      await visitValuation('/history?currency=USD'); await expect(page.locator('body')).toContainText('과거 수량과 가격 시각이 확인돼야');
       const observations = await ledger.readNativeSnapshotObservations(context, account);
       const rebuilt = cutoff.buildNativeCutoffEvidence({ ...evidence, current: { ...evidence.current, positions: [] } }, { ...revised, observations }, serviceDate, now.toISOString());
       assert.equal(rebuilt.current.positions.find(row => row.id === asset).observation.quantity, '11');
       assert.equal((await snapshots.saveNativeCutoffSnapshots(context, rebuilt, serviceDate, now.toISOString())).created, 1);
-      await page.goto(url + '/?currency=USD'); await expect(page.getByRole('region', { name: '보유자산' })).toContainText('1,300.00');
-      await page.goto(url + '/today?currency=USD'); await expect(page.locator('body')).toContainText('2,010.00');
-      await page.goto(url + '/history?currency=USD'); await expect(page.locator('body')).toContainText('2,000.00');
+      await visitValuation('/?currency=USD'); await expect(page.getByRole('region', { name: '보유자산' })).toContainText('1,300.00');
+      await visitValuation('/today?currency=USD'); await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,010.00');
+      await visitValuation('/history?currency=USD'); await expect(page.locator('body')).toContainText('2,000.00');
       await expect(page.locator('body')).not.toContainText('과거 수량과 가격 시각이 확인돼야');
       await page.screenshot({ path: path.join(output, 'desktop-rebuilt-history.png'), fullPage: true });
     });
@@ -224,7 +238,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       assert.equal(await ledger.readNativeOperation(context, operationId), 'cancelled');
     });
     await check('fullapp-owner-switch-mobile-refresh-and-no-overflow', async () => {
-      await setIdentity(sessionTokens[1]); await page.goto(url + '/?currency=KRW');
+      await setIdentity(sessionTokens[1]); await visitValuation('/?currency=KRW');
       await expect(page.getByRole('button', { name: 'Synthetic KRW holding 매수', exact: true })).toBeVisible();
       await expect(page.locator('body')).not.toContainText('Synthetic USD');
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('200,000');
@@ -244,22 +258,25 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('201,000');
       await page.setViewportSize({ width: 320, height: 844 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.screenshot({ path: path.join(output, 'mobile-320-home.png'), fullPage: true });
-      await page.goto(url + '/portfolio/events?account=all'); await expect(page.locator('body')).toContainText('Synthetic KRW');
-      await page.goto(url + '/today?currency=KRW'); await expect(page.locator('body')).toContainText('201,000');
-      await page.goto(url + '/history?currency=KRW'); await expect(page.getByRole('heading', { name: '확인된 평가 기록' })).toBeVisible();
+      await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '소유 계정 이벤트' })).toBeVisible(); await expect(page.locator('body')).toContainText('Synthetic KRW');
+      await visitValuation('/today?currency=KRW'); await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('201,000');
+      await visitValuation('/history?currency=KRW');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     });
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
       await page.goto(url + '/history?scope=account%3A' + legacyAccount);
+      await page.getByRole('button', { name: '기간 요약·근거', exact: true }).click();
       await expect(page.getByRole('heading', { name: '기록 리듬', exact: true })).toBeVisible();
-      const dates = page.getByRole('button', { name: /이전 저장점 대비/ });
-      await expect(dates).toHaveCount(2);
-      await dates.first().click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
-      await dates.last().click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
+      // The graph shows the valuation date, one day before the daily save date.
+      const firstDate = page.getByRole('button', { name: /^2026\.08\.04 이전 저장점 대비/ });
+      const secondDate = page.getByRole('button', { name: /^2026\.08\.05 이전 저장점 대비/ });
+      await firstDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
+      await secondDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
       await page.screenshot({ path: path.join(output, 'desktop-legacy-history-heatmap.png'), fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 }); await page.reload();
-      await expect(dates).toHaveCount(2); await dates.first().click();
+      await page.getByRole('button', { name: '기간 요약·근거', exact: true }).click();
+      await firstDate.click();
       await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.screenshot({ path: path.join(output, 'mobile-legacy-history-heatmap.png'), fullPage: true });
@@ -277,6 +294,6 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     report.fullAppServerStopped = server.exitCode !== null || server.signalCode !== null;
     if (!report.fullAppServerStopped) throw new Error('Full-app server did not stop');
     const source = await readFile(path.join(stage, 'src/lib/auth/current-session-subject.ts'), 'utf8');
-    assert.ok(!source.includes('cairn_fullapp_identity'), 'Production identity source was modified');
+    assert.ok(source.includes('cairn_fullapp_identity'), 'Disposable test identity boundary must be explicit');
   }
 }

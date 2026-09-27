@@ -21,6 +21,11 @@ export async function runReliabilityRetryCases({admin,worker,tenant,report}) {
   const created=await ledger.writeNativeMutation({ownerUserId:owner,role:'user'},{operationId:randomUUID(),accountId:account,expectedSequence:null,opening:{at:'1999-12-01T00:00:00Z',cash:{KRW:'0',USD:'100'},positions:[]}});
   assert.equal(created.status,'created');
   async function check(name,fn){const result={name,status:'FAIL'};report.cases.push(result);await fn();result.status='PASS';}
+  await check('retry-operator-verifies-loopback-host-not-inet-cidr-rendering',async()=>{
+    const {rows:[identity]}=await admin.query("select inet_server_addr()::text as literal,host(inet_server_addr()) as host,session_user as role,current_database() as database");
+    assert.equal(identity.host,'127.0.0.1');assert.equal(identity.role,'rc_admin');assert.equal(identity.database,'postgres');
+    report.operatorTransport=identity;
+  });
   async function queueWrite(query,parameters=[]) {
     const client=await admin.connect();
     try {await client.query('BEGIN');await client.query("select set_config('app.trade_reliability_version','0059',true)");await client.query('select assert_trade_reliability_write(false)');const result=await client.query(query,parameters);await client.query('COMMIT');return result;}

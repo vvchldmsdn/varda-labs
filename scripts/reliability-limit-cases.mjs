@@ -40,7 +40,7 @@ export async function runReliabilityLimitCases({admin,tenant,report}) {
  const state=(await ledger.readNativeLedger(context,isolatedAccount)).accounts[0].state,bulk=await admin.connect();
  try {
   await bulk.query('BEGIN');await bulk.query("select set_config('app.trade_reliability_version','0059',true)");
-  for(let i=0;i<500;i++) await bulk.query("insert into event_ledger_entries(canonical_owner_user_id,account_id,account,event_date,event_type,source,native_operation_id,native_sequence,native_data) values($1,$2,'limit-records','2001-01-12','native_deposit','native_ledger_v1',$3,$4,$5)",[owner,isolatedAccount,randomUUID(),i+1,{event:{type:'deposit',at:'2001-01-12T00:00:00Z',currency:'USD',amount:'1'},state:{...state,sequence:i+1},effect:{cashLegs:[{currency:'USD',delta:'1',kind:'external'}]},request:{synthetic:true}}]);
+  for(let i=0;i<500;i++) await bulk.query("insert into event_ledger_entries(canonical_owner_user_id,account_id,account,asset_name,before_value,after_value,event_date,event_type,source,native_operation_id,native_sequence,native_data) values($1,$2,'limit-records','Synthetic record limit',$6,$7,'2001-01-12','native_deposit','native_ledger_v1',$3,$4,$5)",[owner,isolatedAccount,randomUUID(),i+1,{event:{type:'deposit',at:'2001-01-12T00:00:00Z',currency:'USD',amount:'1'},state:{...state,sequence:i+1},effect:{cashLegs:[{currency:'USD',delta:'1',kind:'external'}]},request:{synthetic:true}},JSON.stringify({...state,sequence:i}),JSON.stringify({...state,sequence:i+1})]);
   await bulk.query('COMMIT');
  } catch(e){await bulk.query('ROLLBACK');throw e;} finally{bulk.release();}
  const oversized=await ledger.readNativeLedger(context);

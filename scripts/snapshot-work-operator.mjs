@@ -19,7 +19,7 @@ export function validateLocalConnectionFile(value) {
   return {host:c.host,user:c.user,port:c.port,database:c.database,password:c.password,ssl:false,connectionTimeoutMillis:5000,statement_timeout:8000};
 }
 async function verifyLocalServer(client) {
-  const {rows:[server]}=await client.query("select inet_server_addr()::text as address,session_user as role,current_database() as database");
+  const {rows:[server]}=await client.query("select host(inet_server_addr()) as address,session_user as role,current_database() as database");
   assert.ok(['127.0.0.1','::1'].includes(server?.address)&&server.role==='rc_admin'&&['postgres','reliability_empty'].includes(server.database),'local_server_identity_mismatch');
 }
 const scopedQuery=`select w.id,w.canonical_owner_user_id as "ownerId",w.account_id as "accountId",w.snapshot_date::text as "snapshotDate",w.stage,w.revision,w.generation,w.status,w.attempts,w.reason,w.next_attempt_at as "nextAttemptAt",w.lease_until as "leaseUntil",

@@ -7,14 +7,15 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT, stageSource, childEnvironment } from './reliability-ci.mjs';
 
-/** All app changes below occur in a disposable source copy, not src/ or next.config. */
+/** Substitute only the external verified identity boundary in a disposable source copy. */
 export async function prepareFullApp(stage) {
   await stageSource(ROOT, stage);
-  const fixture = path.join(stage, 'scripts', '.fullapp-identity.ts');
+  const fixture = path.join(stage, 'src/lib/auth/current-session-subject.ts');
   await writeFile(fixture, `import 'server-only';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
-import type { CurrentSessionSubjectResult } from '../src/lib/auth/provider-session-contract';
+import type { CurrentSessionSubjectResult } from './provider-session-contract';
+export type { CurrentSessionSubjectResult } from './provider-session-contract';
 export const readCurrentSessionSubject = cache(async (): Promise<CurrentSessionSubjectResult> => {
   const token = (await cookies()).get('cairn_fullapp_identity')?.value;
   const identities = JSON.parse(process.env.CAIRN_FULLAPP_IDENTITIES ?? '{}') as Record<string,string>;
@@ -22,23 +23,6 @@ export const readCurrentSessionSubject = cache(async (): Promise<CurrentSessionS
   return subject ? {state:'authenticated',provider:'neon_auth',providerSubject:subject} : {state:'unauthenticated'};
 });
 `);
-  const configPath = path.join(stage, 'next.config.ts');
-  const source = await readFile(configPath, 'utf8');
-  assert.equal(source.split('export default nextConfig;').length, 2);
-  const identityPath = JSON.stringify(fixture.replaceAll('\\', '/'));
-  const actualPath = JSON.stringify(path.join(stage, 'src/lib/auth/current-session-subject.ts').replaceAll('\\', '/'));
-  await writeFile(configPath, source.replace('export default nextConfig;', () => `
-// Disposable full-app test build: external identity boundary only.
-const originalWebpack = nextConfig.webpack;
-nextConfig.webpack = (config, context) => {
-  if (originalWebpack) config = originalWebpack(config, context);
-  if (context.isServer) config.resolve.alias = { ...config.resolve.alias,
-    '@/lib/auth/current-session-subject$': ${identityPath},
-    [${actualPath}]: ${identityPath},
-  };
-  return config;
-};
-export default nextConfig;`));
   return { identityBoundary: 'external verified session subject substituted only in disposable build',
     sourceIdentitySha256: createHash('sha256').update(await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'))).digest('hex') };
 }
@@ -75,6 +59,11 @@ export async function main(args) {
     assert.equal(result.status, 'PASS', result.testFailure ?? 'Actual Next app browser journey failed');
   } catch (error) {
     report.status = 'FAIL'; report.error = String(error.message).slice(0, 600);
+  }
+  if (report.isolation) {
+    const originalIdentity = await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'));
+    assert.equal(createHash('sha256').update(originalIdentity).digest('hex'), report.isolation.sourceIdentitySha256, 'Original production auth source changed during rehearsal');
+    assert.ok(!originalIdentity.toString().includes('cairn_fullapp_identity'), 'Production identity source cannot contain the test fixture');
   }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({status:report.status,report:path.join(output,'report.json'),error:report.error}));

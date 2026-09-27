@@ -141,7 +141,7 @@ async function executeLocal(options, manifest) {
     startupAttempted = true;
     await nativeCommand(command('pg_ctl'), ['-D', dataDirectory, '-l', path.join(runDirectory, 'postgres.log'), '-w', '-t', '30', 'start', '-o', `-h 127.0.0.1 -p ${port} -c unix_socket_directories="" -c timezone=UTC -c max_connections=24 -c shared_buffers=32MB -c log_min_error_statement=panic`], environment);
     const connection = { host: '127.0.0.1', port, database: 'postgres', password, ssl: false,
-      connectionTimeoutMillis: 2000, statement_timeout: 15000, application_name: 'cairn-rc-local', options: '', max: 8 };
+      connectionTimeoutMillis: 15000, statement_timeout: 15000, application_name: 'cairn-rc-local', options: '', max: 8 };
     admin = new Pool({ ...connection, user: 'rc_admin' });
     const identity = (await admin.query("select current_setting('data_directory') as directory,host(inet_server_addr()) as address,current_database() as database")).rows[0];
     assert.equal(await realpath(identity.directory), await realpath(dataDirectory));

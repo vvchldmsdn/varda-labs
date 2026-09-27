@@ -31,7 +31,7 @@ Windows에서도 같은 명령을 사용하되 `--pg-bin`에는 확인한 Postgr
 - 실행 대상은 `output/reliability-ci/<job>-<run>/workspace`의 소스 복사다. 미커밋 코드도 포함하지만 `.env*`, `.vercel`, `.git`, `.next`, 기존 QA 출력은 복사하지 않는다. dependency 디렉터리만 재사용한다. 원래 checkout의 생성물·앱 소스는 변경하지 않는다.
 - 부모의 DB/Auth/provider/Git 토큰, preload, 사용자 설정 홈을 상속하지 않는다. 기본 DB 주소는 연결할 수 없는 loopback 포트 1이며 PostgreSQL rehearsal은 별도의 랜덤 포트/자격증명/신규 data directory만 사용한다. PostgreSQL 서버의 실제 data directory와 주소를 다시 확인한다.
 - Node socket은 loopback만 허용한다. 앱의 기존 `next/font` 로딩이 필요한 production build 단계에서는 `fonts.googleapis.com`, `fonts.gstatic.com`만 추가 허용한다. 전체 앱 harness의 build에도 같은 폰트 예외를 적용하고, 앱 실행/페이지 네트워크는 다시 loopback으로 제한한다.
-- 전체 앱 로컬 검사는 폐기용 소스 복사의 webpack alias에서 외부의 확인된 identity subject만 대체한다. 실제 tenant resolver·RLS·writer/query·valuation·App Router를 유지하고 Neon HTTP transport만 로컬 PostgreSQL로 연결한다. 원본 `src`/Next 설정과 실제 인증 코드는 변경하지 않는다. cookie 제거/identity 복귀는 실제 provider 로그아웃·이메일 로그인으로 보고하지 않는다. 실제 인증은 승인된 별도 QA Preview에서 검증한다.
+- 전체 앱 로컬 검사는 폐기용 소스 복사의 `current-session-subject` 모듈에서 외부의 확인된 identity subject만 대체한다. 실제 tenant resolver·RLS·writer/query·valuation·App Router를 유지하고 Neon HTTP transport만 로컬 PostgreSQL로 연결한다. 원본 인증 파일의 SHA256 불변도 확인하며 원본 `src`/Next 설정은 변경하지 않는다. cookie 제거/identity 복귀는 실제 provider 로그아웃·이메일 로그인으로 보고하지 않는다. 실제 인증은 승인된 별도 QA Preview에서 검증한다.
 - 이 guard는 우발적 외부 연결을 검출하는 장치이며 악성 PR 코드에 대한 OS sandbox라고 주장하지 않는다. GitHub workflow는 `pull_request`를 사용하며 `pull_request_target`, secrets, environment, 쓰기 권한을 사용하지 않는다. checkout 인증도 저장하지 않는다.
 - CI의 PostgreSQL 패키지 설치는 시스템 binary 확보용이다. 검증은 기존 시스템 DB에 접속하지 않고 runner가 만든 새 loopback cluster에서 수행한다. PGlite 결과를 실제 PostgreSQL로 표시하지 않는다.
 - 산출물은 합성 테스트의 요약·로그·스크린샷만 7일 보관한다. DB cluster 디렉터리·브라우저 프로필·인증 state는 업로드하지 않는다. 로컬 산출물은 `.gitignore` 대상이다.

@@ -29,21 +29,23 @@
 
 ## 실행 증거
 
-이 파일의 작성 시점에는 후속 검증이 진행 중이다. 이전 2,952개 PASS를 새 코드의 최종 결과로 사용하지 않는다. 실행 완료 후 아래를 실제 산출물과 최종 SHA로 갱신한다.
+후속 검증이 진행 중이다. 이전 2,952개 PASS를 새 코드의 최종 결과로 사용하지 않는다. 전용 [PR #198](https://github.com/vvchldmsdn/varda-labs/pull/198)의 최초 CI 실패를 수정하고 있으며, 최종 SHA의 다섯 검사 결과가 모두 확인돼야 완료다.
 
 | 구분 | 상태 | 근거 |
 | --- | --- | --- |
-| 코드/로컬 전체 검증 | NOT RUN | 후속 전체 검사 진행 중 |
+| 코드/로컬 전체 검증 | NOT RUN | lint/type PASS. 로컬 전체 unit 실행은 메모리 경합으로 중단했으며 원격 전체 검사로 이어짐 |
 | 실제 Next 앱 전체 | NOT RUN | 새로운 production 앱 harness 진행 중 |
 | 실제 인증 | NOT RUN | 기존 QA 이메일 로그인 재확인 진행 중 |
-| 원격 CI | NOT RUN | 전용 PR 작성 전 |
+| 원격 CI | FAIL | 첫 head `72bbd5a`의 lint/type·build PASS, unit/PG/browser의 검증 환경 결함 수정 중. 최종 결과 아님 |
 | Preview 격리 | PASS | 9/27 메타데이터·실제 DB 신원 확인: 별도 QA 프로젝트/endpoint, 운영 연결 제외 |
-| migration/복구 | NOT RUN | 후속 실제 PostgreSQL 호환성/실패 주입 검증 진행 중 |
+| migration/복구 | PASS | `output/release-readiness/pg-focused-report.json`: PG 17.11, 60 migration + 36 통합 사례, 실제 TCP/RLS/구버전 writer/중단 복구 검증. 최종 원격 재검증 대기 |
 | 운영 스케줄 준비 | BLOCKED | 코드 경로와 절차 준비, Production 스케줄 적용 승인 전 |
 
 ## Preview 및 운영 경계
 
 자동 Preview가 일반 build에서 migration을 수행할 수 있으므로 최초 push에 이 브랜치만 `git.deploymentEnabled=false`를 포함한다. 프로젝트 전체 자동 배포는 바꾸지 않는다. 별도 QA 프로젝트 `cairn-bc-preview-20260924`는 Git 연동 없이 승인된 `rapid-rain-28976365` 프로젝트의 고정 endpoint만 사용한다. QA 배포의 build는 migration 대신 journal hash·역할·RLS를 읽어 검증한다.
+
+9/27 격리 PG 검증 후 해당 QA DB에만 0057~0059를 적용했다. 기존 journal 57개와 파일 hash를 먼저 대조했으며 60개 적용 후 `legacy` 상태를 확인했다. 운영 DB는 조회하거나 변경하지 않았다. 근거: `output/release-readiness/qa-migrations.json`.
 
 9/27 현재 계정 플랜은 Hobby다. 기존 하루 1회 Cron은 유지한다. 권장되는 미완료 저장 wake는 5분 간격이며 단계당 최대 30건·60초, 전체 120초로 제한한다. 이 스케줄은 적용하지 않았다. Hobby의 빈번한 Cron 제한 때문에 별도 승인된 실행기 또는 플랜 검토가 필요하다. 공급자 수집 실행 주기는 늘리지 않는다.
 

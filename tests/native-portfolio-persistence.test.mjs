@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { Decimal } from '../src/lib/money.ts';
 import {buildNativeCutoffEvidence} from '../src/lib/snapshots/native-cutoff-evidence.ts';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
+import { addNativeReliabilityFixtureTables } from './helpers/native-reliability-fixture.mjs';
 
 const owner='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', other='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const account='11111111-1111-4111-8111-111111111111', peer='22222222-2222-4222-8222-222222222222', foreign='33333333-3333-4333-8333-333333333333', asset='44444444-4444-4444-8444-444444444444';
@@ -30,6 +31,7 @@ create unique index snapshot_owner_date_account_source on daily_portfolio_snapsh
 async function fixture(withApi=false) {
   const pg=database??=new PGlite();
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
+  await addNativeReliabilityFixtureTables(pg);
   await pg.exec(readFileSync(new URL('../drizzle/0050_native_portfolio_ledger.sql',import.meta.url),'utf8'));
   for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
   await pg.exec('grant usage on schema public to varda_tenant_app; grant select on live_price_quotes,fx_rates to varda_tenant_app');
