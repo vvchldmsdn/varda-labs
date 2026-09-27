@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import { trackedCurrencyFixture } from "../src/lib/currency-tracked-fixture.ts";
+import { buildTrackedCurrencyPortfolio } from "../src/lib/currency-tracked-portfolio.ts";
+import { importWithPorts } from "./helpers/import-with-ports.mjs";
+const [{ buildTrackedCurrencyReports }] = await importWithPorts(["src/lib/server/currency-tracked-reports.ts"], {});
 
 const walk = node => node && typeof node === "object" ? [node, ...[node.props?.children].flat(Infinity).flatMap(walk)] : [];
 const textOf = node => typeof node === "string" || typeof node === "number" ? String(node) : node?.props ? [node.props.children].flat(Infinity).map(textOf).join("") : "";
@@ -14,7 +17,10 @@ const basePorts = {
   "@/components/portfolio/portfolio-allocation-ring": { PortfolioAllocationRing: ring },
   "@/components/native-contribution-planner": { NativeContributionPlanner: () => null },
 };
-const importView = async (ports = {}) => (await importUiWithPorts(["src/components/currency-tracked-view.tsx"], { ...basePorts, ...ports }))[0].CurrencyTrackedView;
+const importView = async (ports = {}) => {
+  const View = (await importUiWithPorts(["src/components/currency-tracked-view.tsx"], { ...basePorts, ...ports }))[0].CurrencyTrackedView;
+  return props => View({ ...props, reports: props.reports ?? buildTrackedCurrencyReports(props.evidence) });
+};
 const contributionPolicy = { trimDriftThresholdPct: 12, minimumExecutionRatioPct: 85 };
 
 describe("owned portfolio currency view", () => {
@@ -89,5 +95,82 @@ describe("owned portfolio currency view", () => {
     const View = await importView({ react: { useMemo: fn => fn(), useState: () => [states[stateIndex++], () => {}] } });
     const tree = View({ evidence, contributionPolicy });
     assert.doesNotMatch(textOf(tree), /Calculated allocation/);
+  });
+  it("renders and switches server-computed reports with a slow or fast browser clock", async t => {
+    const evidence = trackedCurrencyFixture(), serverNow = Date.parse(evidence.asOf) + 1000;
+    let now = serverNow, index = 0;
+    t.mock.method(Date, "now", () => now);
+    const reports = buildTrackedCurrencyReports(evidence);
+    const states = [];
+    const View = await importView({ react: { useState: initial => {
+      const i = index++; if (!(i in states)) states[i] = initial;
+      return [states[i], value => { states[i] = typeof value === "function" ? value(states[i]) : value; }];
+    } } });
+    const render = () => { index = 0; return View({ evidence, reports, surface: "home" }); };
+    for (const offset of [-60_000, 60_000]) {
+      now = serverNow + offset;
+      if (offset < 0) assert.equal(buildTrackedCurrencyPortfolio(evidence).current, null, "the unchanged engine still rejects evidence future-dated to its own clock");
+      let tree = render();
+      walk(tree).find(node => node.type === "select" && ["USD", "KRW"].includes(node.props.value)).props.onChange({ target: { value: "USD" } });
+      tree = render(); assert.match(textOf(tree), /\$1,100\.00/);
+      walk(tree).find(node => node.type === "select" && node.props.value === "USD").props.onChange({ target: { value: "KRW" } });
+      tree = render(); assert.match(textOf(tree), /1,386,000/); assert.match(textOf(tree), /-₩14,000/);
+      assert.doesNotMatch(textOf(tree), /sign in again|valuation is unavailable/);
+    }
+  });
+  it("keeps genuine future evidence, foreign ownership and missing FX blocked on the server", t => {
+    const evidence = trackedCurrencyFixture(), serverNow = Date.parse(evidence.asOf) + 1000;
+    t.mock.method(Date, "now", () => serverNow);
+    const future = buildTrackedCurrencyReports({ ...evidence, asOf: new Date(serverNow + 1).toISOString() });
+    assert.equal(future.KRW.current, null); assert.equal(future.USD.current, null);
+    const other = structuredClone(evidence); other.current.positions[0].ownerId = "foreign-owner";
+    const blocked = buildTrackedCurrencyReports(other);
+    assert.equal(blocked.USD.reason, "owner_scope_mismatch"); assert.equal(blocked.KRW.current, null);
+    const missing = buildTrackedCurrencyReports({ ...evidence, fx: [] });
+    assert.equal(missing.USD.current.total, "1100"); assert.equal(missing.KRW.current.complete, false);
+    assert.equal(missing.KRW.current.total, null);
+  });
+  it("passes plain serializable reports including Modified Dietz through the real server surface", async () => {
+    const Client = () => null;
+    const [{ CurrencyPortfolioSurface }] = await importUiWithPorts(["src/components/currency-portfolio-surface.tsx"], {
+      "@/components/currency-portfolio-surface-client": { CurrencyPortfolioSurfaceClient: Client },
+    });
+    const evidence = { ...trackedCurrencyFixture(), ledgerComplete: true, cashFlows: [], realizedTrades: [], realizedTradesComplete: true };
+    const scope = { kind: "all", key: "all", label: "All" };
+    const tree = CurrencyPortfolioSurface({ evidence, surface: "home", scopes: [scope], selectedScope: scope });
+    assert.equal(tree.type, Client);
+    const assertPlain = value => {
+      assert.notEqual(typeof value, "bigint"); assert.notEqual(typeof value, "function");
+      if (value && typeof value === "object") { assert.ok(Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype); Object.values(value).forEach(assertPlain); }
+    };
+    assertPlain(tree.props.reports);
+    const reports = JSON.parse(JSON.stringify(tree.props.reports));
+    assert.equal(reports.USD.performanceReturn.status, "ready");
+    assert.ok(Math.abs(reports.USD.performanceReturn.totalReturn - 0.1) < 1e-12);
+    assert.ok(Math.abs(reports.KRW.performanceReturn.totalReturn + 0.01) < 1e-12);
+    const changed = structuredClone(evidence); changed.ownerId = "second-owner";
+    for (const frame of [changed.current, ...changed.history]) for (const position of frame.positions) position.ownerId = changed.ownerId;
+    changed.current.positions[0].observation.price = "900";
+    const second = CurrencyPortfolioSurface({ evidence: changed, surface: "home", scopes: [scope], selectedScope: scope });
+    assert.equal(second.props.reports.USD.current.total, "900", "server results must not be cached across owners or evidence refreshes");
+    assert.equal(tree.props.reports.USD.current.total, "1100");
+  });
+  it("computes both reports after the reporting page's authenticated tenant read", async () => {
+    const View = () => null, tenant = { ownerUserId: "synthetic-only" }, scope = { key: "all", kind: "all" };
+    const evidence = trackedCurrencyFixture(); let reads = 0;
+    const [{ default: Page }] = await importUiWithPorts(["src/app/portfolio/reporting/page.tsx"], {
+      "next/navigation": { redirect() { throw new Error("unexpected redirect"); } },
+      "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => ({ ok: true, tenantContext: tenant }) },
+      "@/db/queries/portfolio-analysis-scopes": { getReadOnlyTenantPortfolioAnalysisScopeContext: async ({ tenantContext }) => { assert.equal(tenantContext, tenant); return { state: "ready", resolution: { state: "resolved", scope } }; } },
+      "@/db/queries/currency-tracked-portfolio": { getTrackedCurrencyEvidence: async (owner, selected) => { assert.equal(owner, tenant); assert.equal(selected, scope); reads++; return evidence; } },
+      "@/components/portfolio-analysis-scope-boundary": { PortfolioAnalysisScopeBoundary: () => null },
+      "@/components/secondary-page-header": { SecondaryPageHeader: () => null },
+      "@/components/currency-tracked-view": { CurrencyTrackedView: View },
+    });
+    const tree = await Page({ searchParams: Promise.resolve({ currency: "USD" }) });
+    const result = walk(tree).find(node => node.type === View);
+    assert.equal(reads, 1); assert.equal(result.props.evidence, evidence);
+    assert.equal(result.props.reports.USD.current.total, "1100");
+    assert.equal(result.props.reports.KRW.current.total, "1386000");
   });
 });

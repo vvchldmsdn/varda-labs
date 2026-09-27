@@ -2600,7 +2600,7 @@ export const dailyPortfolioSnapshots = pgTable(
     legacyBase44IdUnique: uniqueIndex(
       "daily_portfolio_snapshots_legacy_base44_id_unique",
     ).on(table.legacyBase44Id),
-    nativeEvidenceCheck: check("snapshot_native_evidence_check", sql`${table.nativeEvidence} is null or (${table.source} in ('native_ledger_v1','native_ledger_cutoff_v2') and not ${table.isSample} and octet_length(${table.nativeEvidence}::text) <= 2000000)`),
+    nativeEvidenceCheck: check("snapshot_native_evidence_check", sql`${table.nativeEvidence} is null or ((${table.source} in ('native_ledger_v1','native_ledger_cutoff_v2') or ${table.source} ~ '^native_ledger_cutoff_v3:r[0-9]+$') and not ${table.isSample} and octet_length(${table.nativeEvidence}::text) <= 2000000)`),
     snapshotAccountIdx: index("daily_portfolio_snapshots_date_account_idx").on(
       table.snapshotDate,
       table.account,
@@ -3152,3 +3152,43 @@ export const simulationExecutionChunks=pgTable("simulation_execution_chunks", {
   owner:pgPolicy("simulation_chunks_owner",{to:tenantDatabaseRole,using:sql`${currentTenantOwns(t.ownerUserId)} and investment_plan_tenant_active()`,withCheck:sql`${currentTenantOwns(t.ownerUserId)} and investment_plan_tenant_active()`}),
   indexCheck:check("simulation_execution_chunks_chunk_index_check",sql`${t.chunkIndex} between 0 and 124`),manifestCheck:check("simulation_execution_chunks_manifest_check",sql`octet_length(${t.manifest}::text)<=1024`),dataCheck:check("simulation_execution_chunks_data_check",sql`octet_length(${t.data})<=615424`),
 })).enableRLS();
+
+// 0059 owns function/view privileges and FORCE RLS; the table shape stays in sync here.
+export const tradeReliabilityRuntime = pgTable("trade_reliability_runtime", {
+  singleton:boolean("singleton").primaryKey().notNull().default(true),
+  mode:text("mode").notNull().default("legacy"),
+  reason:text("reason").notNull().default("0059 installed; compatible release not activated"),
+  changedAt:timestamp("changed_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>[
+  check("trade_reliability_runtime_singleton_check",sql`${t.singleton}`),
+  check("trade_reliability_runtime_mode_check",sql`${t.mode} IN ('legacy','compatible','paused')`),
+]).enableRLS();
+export const nativeLedgerRevisions = pgTable("native_ledger_revisions", {
+  id:uuid("id").defaultRandom().primaryKey(),
+  canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),
+  accountId:uuid("account_id").notNull().references(()=>accounts.id),
+  operationId:uuid("operation_id").notNull(), markerSequence:integer("marker_sequence").notNull(),
+  affectedAt:timestamp("affected_at",{withTimezone:true}).notNull(),recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().defaultNow(),
+  reason:text("reason").notNull(),effectiveEntries:jsonb("effective_entries").notNull(),
+},t=>[
+  uniqueIndex("native_revision_owner_account_marker_unique").on(t.canonicalOwnerUserId,t.accountId,t.markerSequence),
+  check("native_ledger_revisions_reason_check",sql`length(${t.reason}) BETWEEN 1 AND 300`),
+  check("native_ledger_revisions_effective_entries_check",sql`jsonb_typeof(${t.effectiveEntries})='array' AND jsonb_array_length(${t.effectiveEntries}) BETWEEN 2 AND 501 AND octet_length(${t.effectiveEntries}::text)<=8000000`),
+  pgPolicy("native_revision_owner",{for:"select",to:tenantDatabaseRole,using:currentTenantOwns(t.canonicalOwnerUserId)}),
+]).enableRLS();
+export const nativeOperationCancellations=pgTable("native_operation_cancellations",{
+  canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),operationId:uuid("operation_id").notNull(),
+  cancelledAt:timestamp("cancelled_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.canonicalOwnerUserId,t.operationId]}),pgPolicy("native_cancellation_owner",{for:"select",to:tenantDatabaseRole,using:currentTenantOwns(t.canonicalOwnerUserId)})]).enableRLS();
+export const dailySnapshotWork=pgTable("daily_snapshot_work",{
+  id:uuid("id").defaultRandom().primaryKey(),canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),
+  accountId:uuid("account_id").notNull().references(()=>accounts.id),snapshotDate:date("snapshot_date").notNull(),stage:text("stage").notNull(),
+  revision:integer("revision").notNull().default(0),status:text("status").notNull().default("pending"),attempts:integer("attempts").notNull().default(0),generation:integer("generation").notNull().default(0),
+  leaseUntil:timestamp("lease_until",{withTimezone:true}),nextAttemptAt:timestamp("next_attempt_at",{withTimezone:true}),startedAt:timestamp("started_at",{withTimezone:true}),finishedAt:timestamp("finished_at",{withTimezone:true}),
+  reason:text("reason"),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("daily_snapshot_work_cutoff_unique").on(t.accountId,t.snapshotDate,t.stage,t.revision),
+  index("daily_snapshot_work_due").on(t.status,t.nextAttemptAt,t.snapshotDate),
+  check("daily_snapshot_work_stage_check",sql`${t.stage} IN ('legacy','native')`),
+  check("daily_snapshot_work_status_check",sql`${t.status} IN ('pending','running','completed','blocked','failed')`),
+]).enableRLS();

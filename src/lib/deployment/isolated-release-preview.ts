@@ -9,7 +9,7 @@ export const ISOLATED_RELEASE_PREVIEW = Object.freeze({
 
 export function isIsolatedReleasePreview(env: Readonly<Record<string, string | undefined>>) {
   if (env.VERCEL_ENV !== "preview" || env.BC_ISOLATED_PREVIEW_ENABLED !== "true"
-    || env.VERCEL_GIT_COMMIT_REF !== ISOLATED_RELEASE_PREVIEW.branch
+    || ![ISOLATED_RELEASE_PREVIEW.branch, "codex/trade-daily-reliability"].includes(env.VERCEL_GIT_COMMIT_REF ?? "")
     || env.NEON_PROJECT_ID !== ISOLATED_RELEASE_PREVIEW.project
     || env.NEON_AUTH_BASE_URL !== ISOLATED_RELEASE_PREVIEW.authBaseUrl) return false;
   try {

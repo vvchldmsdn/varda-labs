@@ -36,7 +36,7 @@ export async function migrationManifest(root = ROOT) {
   const journal = JSON.parse(await readFile(path.join(root, 'drizzle/meta/_journal.json'), 'utf8'));
   assert.equal(journal.dialect, 'postgresql');
   assert.deepEqual(journal.entries.slice(48,54).map(entry => entry.tag), RC_TAGS, 'RC migration range changed; review this runner');
-  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence'], 'Review any migration after execution admission');
+  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability'], 'Review any migration after execution admission');
   const seen = new Set();
   let previousTime = -1;
   return Promise.all(journal.entries.map(async (entry, position) => {
@@ -141,7 +141,7 @@ async function executeLocal(options, manifest) {
     startupAttempted = true;
     await nativeCommand(command('pg_ctl'), ['-D', dataDirectory, '-l', path.join(runDirectory, 'postgres.log'), '-w', '-t', '30', 'start', '-o', `-h 127.0.0.1 -p ${port} -c unix_socket_directories="" -c timezone=UTC -c max_connections=24 -c shared_buffers=32MB -c log_min_error_statement=panic`], environment);
     const connection = { host: '127.0.0.1', port, database: 'postgres', password, ssl: false,
-      connectionTimeoutMillis: 2000, statement_timeout: 15000, application_name: 'cairn-rc-local', options: '', max: 8 };
+      connectionTimeoutMillis: 15000, statement_timeout: 15000, application_name: 'cairn-rc-local', options: '', max: 8 };
     admin = new Pool({ ...connection, user: 'rc_admin' });
     const identity = (await admin.query("select current_setting('data_directory') as directory,host(inet_server_addr()) as address,current_database() as database")).rows[0];
     assert.equal(await realpath(identity.directory), await realpath(dataDirectory));
@@ -185,23 +185,47 @@ async function executeLocal(options, manifest) {
       assert.equal((await rollback.query("select count(*)::int as n from information_schema.columns where table_name='fx_rates' and column_name='observed_at'")).rows[0].n, 0);
       report.cases.push({ name: 'release-batch-error-rolls-back-ddl', status: 'PASS' });
     } finally { await rollback.query('ROLLBACK'); rollback.release(); }
-    await applyBatch(release);
+    if(options.reliability) {
+      await applyBatch(release.slice(0,-1));
+      await verifyLegacy(admin,before);
+      const latest=release.at(-1), check=await admin.connect();
+      try {
+        await check.query('BEGIN');await check.query(latest.sql);
+        await assert.rejects(check.query('SELECT 1/0'),e=>e.code==='22012');await check.query('ROLLBACK');
+        assert.equal((await check.query("select to_regclass('public.native_ledger_revisions') as name")).rows[0].name,null);
+        assert.equal((await check.query("select to_regclass('public.daily_snapshot_work') as name")).rows[0].name,null);
+      } finally {await check.query('ROLLBACK');check.release();}
+      await applyBatch([latest]);
+      report.cases.push({name:'0058-to-0059-upgrade-and-ddl-rollback',status:'PASS'});
+    } else await applyBatch(release);
     await verifyLegacy(admin, before);
     report.cases.push({ name: 'legacy-rows-preserved', status: 'PASS' });
     assert.equal((await admin.query('SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations')).rows[0].n, manifest.length);
     await admin.query(`GRANT USAGE ON SCHEMA public TO varda_tenant_app,rc_writer,rc_table_owner;
       GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO rc_writer;
       GRANT EXECUTE ON FUNCTION apply_native_portfolio_mutation(uuid,uuid,jsonb,jsonb) TO rc_writer;`);
+    await admin.query('GRANT EXECUTE ON FUNCTION assert_daily_snapshot_fence(uuid,integer) TO rc_writer');
+    await admin.query('GRANT EXECUTE ON FUNCTION assert_trade_reliability_write(boolean) TO rc_writer; REVOKE ALL ON trade_reliability_runtime FROM rc_writer');
     worker = new Pool({ ...connection, user: 'rc_writer' });
     tenant = new Pool({ ...connection, user: 'varda_tenant_app' });
     if (options.sharedExecution) {
       const { runSharedProcessCases } = await import('./simulation-execution-process-cases.mjs');
       await runSharedProcessCases({ admin, connection, environment, report });
+    } else if(options.fullAppOutput) {
+      const {runFullAppCases}=await import('./reliability-fullapp-cases.mjs');
+      await runFullAppCases({admin,worker,tenant,report,output:options.fullAppOutput,stage:options.fullAppStage,browserCache:options.browserCache});
+    } else if(options.browserOutput) {
+      const {runBrowserCases}=await import('./reliability-browser-cases.mjs');
+      await runBrowserCases({admin,worker,tenant,report,output:options.browserOutput});
+    } else if(options.reliability) {
+      const {runReliabilityCases}=await import('./reliability-postgres-cases.mjs');
+      await runReliabilityCases({admin,worker,tenant,report,connection,environment});
     } else await runCases({ admin, worker, tenant, report });
     report.status = 'PASS';
   } catch (error) {
     // Provider payloads, SQL parameter values and credentials are deliberately omitted.
     report.errorCode = error.code ?? (error.name === 'AssertionError' ? 'ASSERTION_FAILED' : 'REHEARSAL_FAILED');
+    if(options.reliability) report.testFailure=String(error.message).slice(0,600);
     report.status = 'FAIL';
   } finally {
     await Promise.allSettled([admin?.end(), worker?.end(), tenant?.end()]);
@@ -228,6 +252,22 @@ export async function rehearseSharedExecution(args) {
   if (!options.execute) return { status: 'BLOCKED', validation: 'PASS', prerequisites: await prerequisites(), reason: 'real_postgresql_not_executed', migrationCount: manifest.length };
   const result = await executeLocal({ ...options, sharedExecution: true }, manifest);
   return { ...result, status: result.status === 'NOT RUN' ? 'BLOCKED' : result.status };
+}
+
+export async function rehearseReliability(args) {
+  const options=parseOptions(args),manifest=await migrationManifest();
+  if(!options.execute) return {status:'BLOCKED',reason:'real_postgresql_not_executed'};
+  return executeLocal({...options,reliability:true},manifest);
+}
+export async function rehearseReliabilityBrowser(args,output) {
+  const options=parseOptions(args),manifest=await migrationManifest();
+  if(!options.execute) return {status:'BLOCKED'};
+  return executeLocal({...options,reliability:true,browserOutput:output},manifest);
+}
+export async function rehearseReliabilityFullApp(args,output,stage,browserCache) {
+  const options=parseOptions(args),manifest=await migrationManifest();
+  if(!options.execute) return {status:'BLOCKED'};
+  return executeLocal({...options,reliability:true,fullAppOutput:output,fullAppStage:stage,browserCache},manifest);
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

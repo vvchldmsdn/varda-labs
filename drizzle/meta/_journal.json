@@ -414,6 +414,13 @@
       "when": 1790208000001,
       "tag": "0058_broker_recovery_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790294400000,
+      "tag": "0059_trade_daily_reliability",
+      "breakpoints": true
     }
   ]
 }

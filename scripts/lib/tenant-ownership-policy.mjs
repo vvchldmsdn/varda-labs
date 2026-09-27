@@ -226,8 +226,18 @@ export const PROVIDER_RESERVATION_TABLE_POLICIES = Object.freeze([adminSystem("m
 // License-scoped evidence is intentionally private to the server admission service.
 export const PROVIDER_EVIDENCE_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_observations"), adminSystem("market_provider_action_coverage"), adminSystem("market_provider_corporate_actions")]);
 export const BROKER_RECOVERY_TABLE_POLICIES = Object.freeze([userOwned("broker_recovery_batches")]);
+// Operational access does not make account-specific retry/revision data shared.
+// Direct tenant DML stays forbidden by 0059; fixed functions and the trusted
+// worker derive canonical ownership from the verified session/account rows.
+export const TRADE_DAILY_RELIABILITY_TABLE_POLICIES = Object.freeze([
+  adminSystem("trade_reliability_runtime"),
+  userOwned("native_ledger_revisions", TRANSITIONAL_OWNER_COLUMN),
+  userOwned("native_operation_cancellations", TRANSITIONAL_OWNER_COLUMN),
+  userOwned("daily_snapshot_work", TRANSITIONAL_OWNER_COLUMN),
+]);
 
 export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES,
   ...BROKER_RECOVERY_TABLE_POLICIES,
   ...SIMULATION_EXECUTION_TABLE_POLICIES,
   ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES, ...PROVIDER_RESERVATION_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES, ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES,
@@ -235,6 +245,19 @@ export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  if (TRADE_DAILY_RELIABILITY_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
+    if (!TRADE_DAILY_RELIABILITY_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("trade daily reliability tables must be expanded atomically");
+    }
+    const dependencies = [...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table), "accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots"];
+    if (!dependencies.every(table => publicTableSet.has(table))) {
+      throw new Error("trade daily reliability requires complete identity, account, ledger and snapshot tables");
+    }
+    return Object.freeze([
+      ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES,
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.some(policy => policy.table === table))),
+    ]);
+  }
   if (publicTableSet.has("broker_recovery_batches")) {
     const dependencies = [...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table), "accounts", "assets", "event_ledger_entries", "holding_lifecycle_events", "portfolio_group_asset_memberships"];
     if (!dependencies.every(table => publicTableSet.has(table))) throw new Error("broker recovery requires complete identity and holding lifecycle tables");

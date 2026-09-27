@@ -6,6 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
+import { addNativeReliabilityFixtureTables } from './helpers/native-reliability-fixture.mjs';
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", other = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const account = "11111111-1111-4111-8111-111111111111", peer = "22222222-2222-4222-8222-222222222222", foreign = "33333333-3333-4333-8333-333333333333", asset = "44444444-4444-4444-8444-444444444444";
@@ -42,7 +43,8 @@ async function fixture({ unknownCost = false } = {}) {
   // The newer recovery migration owns its generated columns, FKs and tenant RLS.
   // Keep this older compact fixture's prerequisite asset/account key in sync.
   await pg.exec("create unique index assets_id_account_unique on assets(id,account_id)");
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence']) await pg.exec(readFileSync(`drizzle/${migration}.sql`, 'utf8'));
+  await addNativeReliabilityFixtureTables(pg);
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability']) await pg.exec(readFileSync(`drizzle/${migration}.sql`, 'utf8'));
   for (const name of ["accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots", "asset_groups", "settings", "portfolio_groups", "portfolio_group_account_memberships", "portfolio_group_asset_memberships"]) {
     await pg.exec(`alter table ${quote(name)} enable row level security; alter table ${quote(name)} force row level security;
       create policy tenant_read on ${quote(name)} for select to varda_tenant_app using(canonical_owner_user_id=nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${quote(name)} to varda_tenant_app;`);

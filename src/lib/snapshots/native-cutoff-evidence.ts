@@ -9,6 +9,7 @@ import type { NativeSnapshotEvidence } from "../native-portfolio-projection.ts";
 export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger: {
   accounts: NativeStoredAccount[]; entries: NativeStoredEntry[]; snapshots: { accountId: string; evidence: unknown }[];
   accountsComplete?: boolean; entriesComplete?: boolean;
+  observations?: {accountId:string;evidence:unknown}[];
 }, snapshotDate: string, capturedAt: string): TrackedPortfolioEvidence | null {
   const cutoff = buildCycleForSnapshotDate(snapshotDate, new Date(capturedAt)).cycleEndAt.toISOString();
   if (!Number.isFinite(Date.parse(capturedAt)) || Date.parse(capturedAt) < Date.parse(cutoff) || ledger.accountsComplete === false || ledger.entriesComplete === false || !ledger.accounts.length) return null;
@@ -16,6 +17,19 @@ export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger
   const frames = ledger.snapshots.flatMap(row => {
     const saved = row.evidence as NativeSnapshotEvidence;
     return saved?.version === 1 && saved.frame && Date.parse(saved.frame.at) <= Date.parse(cutoff) ? [saved.frame] : [];
+  });
+  // A correction invalidates the valuation, not its original KIS quote. These
+  // private frames are never performance/history inputs. Licensed provider
+  // observations must instead pass their current admission/storage path.
+  const originalObservations=(ledger.observations??[]).flatMap(row=>{
+    const saved=row.evidence as NativeSnapshotEvidence;
+    if(saved?.version!==1||!saved.frame||Date.parse(saved.frame.at)>Date.parse(cutoff))return [];
+    return [{...saved.frame,positions:saved.frame.positions.filter(p=>p.accountId===row.accountId && p.observation?.source.startsWith("kis") && p.observation.basis==="raw")}];
+  });
+  const originalFx=(ledger.observations??[]).flatMap(row=>{
+    const saved=row.evidence as NativeSnapshotEvidence;
+    return saved?.version===1 && saved.frame && Date.parse(saved.frame.at)<=Date.parse(cutoff)
+      ? (saved.fx??[]).filter(rate=>!rate.source.startsWith("twelve_data")) : [];
   });
   for (const account of ledger.accounts) {
     const events = ledger.entries.filter(row => row.accountId === account.id).sort((a, b) => a.data.state.sequence - b.data.state.sequence);
@@ -28,7 +42,7 @@ export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger
       if (Decimal.from(holding.quantity).compare(0) === 0) continue;
       const asset = account.assets.find(row => row.id === holding.assetId && row.currency === holding.currency);
       if (!asset) return null;
-      const candidates = [base.current, ...frames].flatMap(frame => frame.positions.filter(row => row.id === asset.id && row.ownerId === base.ownerId && row.accountId === account.id));
+      const candidates = [base.current, ...frames,...originalObservations].flatMap(frame => frame.positions.filter(row => row.id === asset.id && row.ownerId === base.ownerId && row.accountId === account.id && row.ticker===asset.ticker && row.market===asset.market));
       const rejected = base.current.positions.find(row => row.id === asset.id && row.accountId === account.id)?.evidenceReason;
       const quoted = candidates.filter(row => !rejected && row.observation && !row.unsupportedReason && !row.evidenceReason && row.observation.currency === holding.currency
         && Date.parse(row.observation.priceObservedAt ?? row.observation.at) <= Date.parse(cutoff)
@@ -44,6 +58,6 @@ export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger
   }
   return { ...base, asOf: capturedAt, current: { at: cutoff, boundary: "before", source: "native_ledger_cutoff_v2", scopeComplete: true, positions },
     history: [], trades: null, cashFlows: undefined, realizedTrades: undefined, realizedTradesComplete: false,
-    fx: base.fx.filter(rate => Date.parse(rate.observedAt) <= Date.parse(cutoff) && Date.parse(rate.fetchedAt) <= Date.parse(cutoff)),
-    ledgerComplete: true, nativeSequences: sequences };
+    fx: [...base.fx,...originalFx].filter(rate => Date.parse(rate.observedAt) <= Date.parse(cutoff) && Date.parse(rate.fetchedAt) <= Date.parse(cutoff)),
+    ledgerComplete: true, nativeSequences: sequences, nativeRevisions:Object.fromEntries(ledger.accounts.map(a=>[a.id,a.revision??0])) };
 }

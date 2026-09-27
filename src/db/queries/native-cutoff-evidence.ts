@@ -1,7 +1,7 @@
 import "server-only";
 import { sqlClient } from "@/db/client";
 import { getTenantSqlClient } from "@/db/tenant-client";
-import { readNativeLedger } from "./native-portfolio-ledger";
+import { readNativeLedger,readNativeSnapshotObservations } from "./native-portfolio-ledger";
 import { buildNativeCutoffEvidence } from "@/lib/snapshots/native-cutoff-evidence";
 import { buildCycleForSnapshotDate } from "@/lib/snapshots/market-calendar";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -14,7 +14,7 @@ import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 /** Read stored, admitted observations only, including now-archived holdings.
  * No provider call and no timestamp reconstructed from a bare price date. */
 export async function readNativeCutoffEvidence(tenant: TenantContext, accountId: string, snapshotDate: string, capturedAt: string) {
-  const ledger = await readNativeLedger(tenant, accountId);
+  const [ledger,observations]=await Promise.all([readNativeLedger(tenant,accountId),readNativeSnapshotObservations(tenant,accountId)]);
   if (!ledger.accounts.length || ledger.accounts.length !== 1 || ledger.accounts[0].id !== accountId) return null;
   const at = buildCycleForSnapshotDate(snapshotDate, new Date(capturedAt)).cycleEndAt.toISOString();
   const [[, assets], rates] = await Promise.all([
@@ -80,7 +80,7 @@ export async function readNativeCutoffEvidence(tenant: TenantContext, accountId:
       }
     });
   }
-  return buildNativeCutoffEvidence(base, ledger, snapshotDate, capturedAt);
+  return buildNativeCutoffEvidence(base, {...ledger,observations}, snapshotDate, capturedAt);
 }
 
 function exchangeDate(at: string) { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at)); }

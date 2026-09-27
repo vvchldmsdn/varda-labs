@@ -1,1 +1,2 @@
 drizzle/*.sql text eol=lf
+scripts/fixtures/reliability-pre0059/*.txt text eol=lf

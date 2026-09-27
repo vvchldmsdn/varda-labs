@@ -21,6 +21,8 @@ it('rejects parser-routing overrides, duplicate SSL options and nonstandard targ
  for(const altered of [url('neondb_owner','synthetic_admin').replace('.tech/neondb','.tech/other'),url('neondb_owner','synthetic_admin').replace('.tech/', '.tech:5433/'),url('neondb_owner','synthetic_admin').replace('sslmode=require','sslmode=disable')])assert.equal(isIsolatedReleasePreview({...env(),DATABASE_URL:altered,DATABASE_URL_UNPOOLED:altered}),false);
 });
 it('retains fingerprint/cookie requirements and leaves unrelated Preview auth disabled',()=>{
+ assert.equal(isIsolatedReleasePreview({...env(),VERCEL_GIT_COMMIT_REF:'codex/trade-daily-reliability'}),true);
+ assert.equal(isIsolatedReleasePreview({...env(),VERCEL_GIT_COMMIT_REF:'codex/unapproved-preview'}),false);
  assert.deepEqual(assessAuthTransportEnvironment({...env(),NEON_AUTH_BASE_URL_SHA256:''}),{state:'misconfigured'});
  assert.deepEqual(assessAuthTransportEnvironment({...env(),NEON_AUTH_COOKIE_SECRET:''}),{state:'misconfigured'});
  assert.deepEqual(assessAuthTransportEnvironment({VERCEL_ENV:'preview'}),{state:'disabled'});

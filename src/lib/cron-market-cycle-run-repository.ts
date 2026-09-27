@@ -1,9 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
-
-import { db, sqlClient } from "@/db/client";
-import { marketDataSyncRuns } from "@/db/schema";
+import { sqlClient } from "@/db/client";
 import { CRON_MARKET_CYCLE_LIMITS } from "@/lib/cron-market-cycle";
 
 const JOB_TYPE = "market_cycle";
@@ -57,6 +54,8 @@ export async function claimCronMarketCycleRun({
           and mode = $2
           and source = $3
           and metadata_json ->> 'snapshotDate' = $4
+          and (started_at>$6::timestamptz-interval '5 minutes'
+            or (select count(*) from market_data_sync_runs r where r.job_type=$1 and r.mode=$2 and r.source=$3 and r.metadata_json->>'snapshotDate'=$4)>=4)
         order by started_at desc
         limit 1
       ),
@@ -159,20 +158,9 @@ export async function finishCronMarketCycleRun({
   metadata: Record<string, unknown>;
   error?: string | null;
 }) {
-  await db
-    .update(marketDataSyncRuns)
-    .set({
-      status,
-      finishedAt,
-      requestedCount,
-      successCount,
-      failedCount,
-      skippedCount,
-      metadataJson: {
-        ...metadata,
-        secretsIncluded: false,
-      },
-      error: error ?? null,
-    })
-    .where(eq(marketDataSyncRuns.id, runId));
+  const rows=await sqlClient.query(`update market_data_sync_runs set status=$2,finished_at=$3::timestamptz,requested_count=$4,success_count=$5,failed_count=$6,skipped_count=$7,metadata_json=$8::jsonb,error=$9
+    where id=$1::uuid and status='running' and started_at>clock_timestamp()-interval '30 minutes'
+    and not exists(select 1 from market_data_sync_runs newer where newer.source=market_data_sync_runs.source and newer.mode=market_data_sync_runs.mode and newer.started_at>market_data_sync_runs.started_at)
+    returning id`,[runId,status,finishedAt.toISOString(),requestedCount,successCount,failedCount,skippedCount,JSON.stringify({...metadata,secretsIncluded:false}),error??null]);
+  if(rows.length!==1) throw new Error("cron_run_lease_lost");
 }

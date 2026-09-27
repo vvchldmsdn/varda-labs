@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { Decimal } from '../src/lib/money.ts';
 import {buildNativeCutoffEvidence} from '../src/lib/snapshots/native-cutoff-evidence.ts';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
+import { addNativeReliabilityFixtureTables } from './helpers/native-reliability-fixture.mjs';
 
 const owner='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', other='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const account='11111111-1111-4111-8111-111111111111', peer='22222222-2222-4222-8222-222222222222', foreign='33333333-3333-4333-8333-333333333333', asset='44444444-4444-4444-8444-444444444444';
@@ -30,8 +31,9 @@ create unique index snapshot_owner_date_account_source on daily_portfolio_snapsh
 async function fixture(withApi=false) {
   const pg=database??=new PGlite();
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
+  await addNativeReliabilityFixtureTables(pg);
   await pg.exec(readFileSync(new URL('../drizzle/0050_native_portfolio_ledger.sql',import.meta.url),'utf8'));
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
   await pg.exec('grant usage on schema public to varda_tenant_app; grant select on live_price_quotes,fx_rates to varda_tenant_app');
   for(const table of ['accounts','assets','event_ledger_entries','daily_portfolio_snapshots']) await pg.exec(`alter table ${table} enable row level security; alter table ${table} force row level security; create policy tenant_select on ${table} for select to varda_tenant_app using(canonical_owner_user_id = nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${table} to varda_tenant_app;`);
   await pg.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);
@@ -308,7 +310,7 @@ it('applies an actual split and dividend once using original SQL quantities and 
 it('captures cash-only owners on the existing daily job without provider calls and retries idempotently',async()=>{
   const f=await fixture(); await f.open(account,{KRW:'0',USD:'2000'});
   const [job]=await importWithPorts(['src/lib/snapshots/native-daily-job.ts'],{
-    '@/db/client':{db:drizzle(f.pg)},
+    '@/db/client':{db:drizzle(f.pg),sqlClient:{query:()=>{throw new Error('durable work not requested');}}},
     '@/db/queries/native-cutoff-evidence':f.cutoff,
     '@/db/queries/native-portfolio-snapshots':f.snapshots,
   });
@@ -371,7 +373,8 @@ it('enforces real API authentication, session continuity, origin and body owners
   assert.equal((await f.route.GET(request('GET'))).status,401);
   f.setIdentity('verified-one');
   const get=await f.route.GET(request('GET')); assert.equal(get.status,200); assert.equal(get.headers.get('cache-control'),'private, no-store');
-  const {sessionKey}=await get.json();
+  const {sessionKey,serverNow}=await get.json();
+  assert.ok(Number.isFinite(Date.parse(serverNow)) && Date.parse(serverNow)<=Date.now(),'ledger GET supplies an uncached server clock observation');
   const mutation={operationId:randomUUID(),accountId:account,expectedSequence:null,opening:{at,cash:{KRW:'0',USD:'0'},positions:[]}};
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation},'https://foreign.test'))).status,400);
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation,ownerUserId:other}))).status,400);
@@ -382,6 +385,8 @@ it('enforces real API authentication, session continuity, origin and body owners
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation}))).status,503);
   assert.equal((await f.queries.readNativeLedger({ownerUserId:owner},account)).entries.length,0);
   process.env.NATIVE_LEDGER_ROLLOUT='qa'; process.env.NATIVE_LEDGER_QA_OWNERS=owner;
+  const future=await f.route.POST(request('POST',{sessionKey,mutation:{...mutation,operationId:randomUUID(),opening:{...mutation.opening,at:new Date(Date.now()+60_000).toISOString()}}}));
+  assert.equal(future.status,400);assert.equal((await future.json()).error,'invalid_time','server writer still rejects future timestamps without a device-clock grace period');
   const created=await f.route.POST(request('POST',{sessionKey,mutation})); assert.equal(created.status,201);
   assert.equal((await created.json()).snapshot,'scheduled','a transaction must never create an intraday daily baseline');
   assert.equal((await f.route.POST(request('POST',{sessionKey,mutation}))).status,200);

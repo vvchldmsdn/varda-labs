@@ -14,20 +14,22 @@ export async function saveNativeCutoffSnapshots(tenant: TenantContext, evidence:
     || evidence.current.positions.some(row => row.ownerId !== tenant.ownerUserId || !row.accountId || !row.observation || row.unsupportedReason || row.evidenceReason)) return { status: "incomplete" as const, created: 0 };
   const availableCurrencies = (["KRW", "USD"] as const).filter(reporting => buildTrackedCurrencyPortfolio({ ...evidence, reporting }).current?.complete);
   if (!availableCurrencies.length) return { status: "incomplete" as const, created: 0 };
-  const payload = Object.entries(evidence.nativeSequences).map(([accountId, sequence]) => ({ accountId, sequence, evidence: { version: 1, sequence, availableCurrencies, capturedAt, snapshotDate,
+  const payload = Object.entries(evidence.nativeSequences).map(([accountId, sequence]) => ({ accountId, sequence, evidence: { version: 1, sequence, revision:evidence.nativeRevisions?.[accountId]??0, availableCurrencies, capturedAt, snapshotDate,
     frame: { ...evidence.current, positions: evidence.current.positions.filter(row => row.accountId === accountId) }, fx: evidence.fx.filter(rate => Date.parse(rate.observedAt) <= Date.parse(cutoff) && Date.parse(rate.fetchedAt) <= Date.parse(cutoff)) } }));
   if (!payload.length) return { status: "incomplete" as const, created: 0 };
   const rows = await runPortfolioMutation(tenant.ownerUserId, `
     with selected as materialized (
       select a.id,a.code,p.value from accounts a join jsonb_array_elements($2::jsonb) p on a.id=(p.value->>'accountId')::uuid
-      where a.canonical_owner_user_id=$1::uuid and exists (
-        select 1 from event_ledger_entries e where e.canonical_owner_user_id=$1::uuid and e.account_id=a.id and e.native_data is not null
+      where a.canonical_owner_user_id=$1::uuid
+       and coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=$1::uuid),0)=coalesce((p.value->'evidence'->>'revision')::integer,0)
+       and exists (
+        select 1 from effective_native_ledger_entries e where e.canonical_owner_user_id=$1::uuid and e.account_id=a.id and e.native_data is not null
         and e.native_sequence=(p.value->>'sequence')::int and (e.native_data->'event'->>'at')::timestamptz<$4::timestamptz
-        and not exists(select 1 from event_ledger_entries later where later.canonical_owner_user_id=$1::uuid and later.account_id=a.id and later.native_data is not null and later.native_sequence>e.native_sequence and (later.native_data->'event'->>'at')::timestamptz<$4::timestamptz)
+        and not exists(select 1 from effective_native_ledger_entries later where later.canonical_owner_user_id=$1::uuid and later.account_id=a.id and later.native_data is not null and later.native_sequence>e.native_sequence and (later.native_data->'event'->>'at')::timestamptz<$4::timestamptz)
       ) for update of a
     ), written as (
       insert into daily_portfolio_snapshots(canonical_owner_user_id,snapshot_date,account,account_id,source,rule_version,captured_at,native_evidence)
-      select $1::uuid,$3::date,code,id,'native_ledger_cutoff_v2','service_day_before_0700_v2',$5::timestamptz,value->'evidence' from selected
+      select $1::uuid,$3::date,code,id,case when coalesce((value->'evidence'->>'revision')::int,0)=0 then 'native_ledger_cutoff_v2' else 'native_ledger_cutoff_v3:r'||(value->'evidence'->>'revision') end,'service_day_before_0700_v2',$5::timestamptz,value->'evidence' from selected
       where (select count(*) from selected)=jsonb_array_length($2::jsonb)
       on conflict (canonical_owner_user_id,snapshot_date,account,source) where canonical_owner_user_id is not null do nothing returning id
     ) select count(*)::int as created,(select count(*) from selected)=jsonb_array_length($2::jsonb) as matched from written`, [tenant.ownerUserId, JSON.stringify(payload), snapshotDate, cutoff, capturedAt]);

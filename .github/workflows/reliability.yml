@@ -1,0 +1,147 @@
+name: Cairn reliability
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reliability-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-type:
+    name: lint-type
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/reliability-ci.mjs --job lint-type
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: lint-type-${{ github.run_id }}
+          path: |
+            output/reliability-ci/*/report.json
+            output/reliability-ci/*/logs/
+          retention-days: 7
+
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/reliability-ci.mjs --job unit-tests
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: unit-tests-${{ github.run_id }}
+          path: |
+            output/reliability-ci/*/report.json
+            output/reliability-ci/*/logs/
+          retention-days: 7
+
+  production-build:
+    name: production-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/reliability-ci.mjs --job production-build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: production-build-${{ github.run_id }}
+          path: |
+            output/reliability-ci/*/report.json
+            output/reliability-ci/*/logs/
+          retention-days: 7
+
+  postgres-integration:
+    name: postgres-integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Install PostgreSQL 16 tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-16
+      - name: Rehearse a new disposable loopback cluster
+        run: node scripts/reliability-ci.mjs --job postgres-integration --pg-bin /usr/lib/postgresql/16/bin
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: postgres-integration-${{ github.run_id }}
+          path: |
+            output/reliability-ci/*/report.json
+            output/reliability-ci/*/postgres-report.json
+            output/reliability-ci/*/logs/
+          retention-days: 7
+
+  browser-journeys:
+    name: browser-journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install playwright install --with-deps chromium
+      - name: Install PostgreSQL 16 tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-16
+      - run: node scripts/reliability-ci.mjs --job browser-journeys --pg-bin /usr/lib/postgresql/16/bin
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: browser-journeys-${{ github.run_id }}
+          path: |
+            output/reliability-ci/*/report.json
+            output/reliability-ci/*/logs/
+            output/reliability-ci/*/browser/*.json
+            output/reliability-ci/*/browser/*.png
+            output/reliability-ci/*/fullapp/report.json
+            output/reliability-ci/*/fullapp/build.log
+            output/reliability-ci/*/fullapp/next.log
+            output/reliability-ci/*/fullapp/*.png
+            output/reliability-ci/*/fullapp/failure-visible.txt
+          retention-days: 7

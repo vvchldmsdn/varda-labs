@@ -27,6 +27,7 @@ import { safeErrorMessage } from "@/lib/redaction";
 import { runDailySnapshotJob } from "@/lib/snapshots/daily-job";
 import { runNativeDailySnapshotJob } from "@/lib/snapshots/native-daily-job";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { snapshotDeadline } from "@/lib/snapshots/write-context";
 
 type CloseSyncSummary = {
   deferred: { code: "provider_budget_limited" | "provider_token_cooldown"; retryAfterSeconds: number } | null;
@@ -102,43 +103,18 @@ export type CronMarketCycleRunResult = {
 type CronMarketCycleOptions = { now?: Date; cronScheduleUtc?: string | null };
 
 export async function runCronMarketCycle(options: CronMarketCycleOptions = {}): Promise<CronMarketCycleRunResult> {
+  return snapshotDeadline.run(Date.now()+260000,()=>runCronMarketCycleWithinDeadline(options));
+}
+async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions): Promise<CronMarketCycleRunResult> {
   // Include lease acquisition and planning in the retry window. The route has
   // 300 seconds; stop adding waits at 180 seconds to leave time for snapshots.
   const closeRetryDeadline = performance.now() + 180_000;
-  // Drain even when today's cycle was already completed; preserve snapshot ordering.
-  scheduleMarketCollection();
-  let result: CronMarketCycleRunResult;
-  try {
-    // All close groups and the following live refresh share one internal lease.
-    result = await withKisCollectionLeaseWait(() => runMarketCycleWithLease({ ...options, closeRetryDeadline }));
-  } catch (error) {
-    if (error instanceof KisRefreshLeaseBusyError) {
-      result = emptyResult({
-        ok: false, status: "active_conflict", runId: null,
-        snapshotDate: resolveSnapshotCycle(options.now ?? new Date()).snapshotDate,
-        blockers: ["kis_provider_refresh_busy"],
-      });
-    } else throw error;
-  }
-  // Native cash-only portfolios and admitted providers do not depend on KIS readiness.
-  const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false, snapshotDate: result.snapshotDate }).catch(() => ({ status: "failed" as const }));
-  return { ...result, nativeSnapshot };
-}
-
-async function runMarketCycleWithLease({
-  now = new Date(),
-  cronScheduleUtc = null,
-  closeRetryDeadline,
-}: {
-  now?: Date;
-  cronScheduleUtc?: string | null;
-  closeRetryDeadline: number;
-}): Promise<CronMarketCycleRunResult> {
+  const now = options.now ?? new Date();
   const snapshotDate = resolveSnapshotCycle(now).snapshotDate;
   const claim = await claimCronMarketCycleRun({
     snapshotDate,
     startedAt: now,
-    cronScheduleUtc,
+    cronScheduleUtc:options.cronScheduleUtc ?? null,
   });
 
   if (claim.outcome !== "claimed") {
@@ -154,7 +130,56 @@ async function runMarketCycleWithLease({
     });
   }
 
-  const runId = claim.runId;
+  const runId=claim.runId;
+  // Drain even when today's cycle was already completed; preserve snapshot ordering.
+  scheduleMarketCollection();
+  let result: CronMarketCycleRunResult;
+  try {
+    // All close groups and the following live refresh share one internal lease.
+    result = await withKisCollectionLeaseWait(() => runMarketCycleWithLease({ ...options, now, runId, snapshotDate, closeRetryDeadline }));
+  } catch (error) {
+    if (error instanceof KisRefreshLeaseBusyError) {
+      result = emptyResult({
+        ok: false, status: "blocked", runId, snapshotDate,
+        blockers: ["kis_provider_refresh_busy"],
+      });
+    } else result=emptyResult({ok:false,status:"failed",runId,snapshotDate,blockers:["unexpected_market_cycle_error"]});
+  }
+  // Native cash-only portfolios and admitted providers do not depend on KIS readiness.
+  const ownsRun=Boolean(result.runId && !["already_attempted","active_conflict","lock_busy"].includes(result.status));
+  if(ownsRun && ["blocked","failed","no_action"].includes(result.status)) {
+    try {
+      const work=await runDailySnapshotJob({dryRun:false,durable:true,snapshotDate:result.snapshotDate});
+      result={...result,snapshot:{targetCount:work.targetCount,writtenCount:work.writtenCount,blockedCount:work.blockedCount,failedCount:work.failedCount}};
+      if(work.failedCount>0) result={...result,ok:false,status:"failed",blockers:[...result.blockers,"legacy_snapshot_failed"]};
+      else if(work.blockedCount>0 || !work.ok || work.writtenCount!==work.targetCount) result={...result,ok:false,status:result.status==="failed" ? "failed" : "blocked",blockers:[...result.blockers,"legacy_snapshot_incomplete"]};
+      else result={...result,ok:true,status:work.targetCount ? "completed" : "no_action",blockers:[]};
+    } catch { result={...result,ok:false,status:"failed",blockers:[...result.blockers,"legacy_snapshot_failed"]}; }
+  }
+  const nativeSnapshot = result.nativeSnapshot ?? await runNativeDailySnapshotJob({ dryRun: false, durable:true, snapshotDate: result.snapshotDate }).catch(() => ({ status: "failed" as const }));
+  const nativeFailed=nativeSnapshot.status === "failed" || ("failedCount" in nativeSnapshot && nativeSnapshot.failedCount>0);
+  const nativeBlocked="blockedCount" in nativeSnapshot && nativeSnapshot.blockedCount>0;
+  result={...result,nativeSnapshot,...(nativeFailed ? {ok:false,status:"failed" as const,blockers:[...result.blockers,"native_snapshot_failed"]} : nativeBlocked ? {ok:false,status:result.status==="failed" ? "failed" as const : "blocked" as const,blockers:[...result.blockers,"native_snapshot_incomplete"]} : {})};
+  if(result.ok && result.status==="no_action" && "targetCount" in nativeSnapshot && nativeSnapshot.targetCount>0) result={...result,status:"completed"};
+  if(ownsRun) {
+    try { await finishRun(result,result.status==="failed" ? "failed" : result.ok ? "completed" : "blocked"); }
+    catch { return {...result,ok:false,status:"failed",blockers:[...result.blockers,"run_finalization_failed"]}; }
+  }
+  return result;
+}
+
+async function runMarketCycleWithLease({
+  now = new Date(),
+  runId,
+  snapshotDate,
+  closeRetryDeadline,
+}: {
+  now?: Date;
+  cronScheduleUtc?: string | null;
+  runId: string;
+  snapshotDate: string;
+  closeRetryDeadline: number;
+}): Promise<CronMarketCycleRunResult> {
   let fxSummary: CronMarketCycleRunResult["fx"] = {
     status: "not_attempted",
     rateDate: null,
@@ -269,7 +294,6 @@ async function runMarketCycleWithLease({
         closeSync,
         liveSync,
       });
-      await finishRun(result, "completed");
       return result;
     }
 
@@ -277,6 +301,7 @@ async function runMarketCycleWithLease({
     // quotes. An unrelated live symbol/provider failure must not lose a day.
     const snapshotWrite = await runDailySnapshotJob({
       dryRun: false,
+      durable:true,
       snapshotDate,
       now: new Date(),
     });
@@ -300,10 +325,16 @@ async function runMarketCycleWithLease({
         snapshot: snapshotSummary,
         blockers: ["snapshot_write_incomplete", ...deferredBlockers],
       });
-      await finishRun(result, "blocked");
       return result;
     }
 
+    const nativeSnapshot = await runNativeDailySnapshotJob({dryRun:false,durable:true,snapshotDate}).catch(()=>({status:"failed" as const}));
+
+    if(nativeSnapshot.status==="failed" || nativeSnapshot.failedCount>0 || nativeSnapshot.blockedCount>0) {
+      return emptyResult({ok:false,status:nativeSnapshot.status==="failed" || nativeSnapshot.failedCount>0 ? "failed" : "blocked",runId,snapshotDate,fx:fxSummary,factorSync,closeSync,liveSync,snapshot:snapshotSummary,nativeSnapshot});
+    }
+
+    // Both ledger families must capture cutoff evidence before these upserts.
     // FX rows are upserted by date. Refreshing before the snapshot can replace
     // the last observation from before 07:00 with an inadmissible later one.
     try {
@@ -343,11 +374,11 @@ async function runMarketCycleWithLease({
       closeSync,
       liveSync,
       snapshot: snapshotSummary,
+      nativeSnapshot,
     });
-    await finishRun(result, "completed");
     return result;
   } catch (error) {
-    const safeError = safeErrorMessage(error, "Cron market cycle failed");
+    safeErrorMessage(error, "Cron market cycle failed");
     const result = emptyResult({
       ok: false,
       status: "failed",
@@ -359,11 +390,6 @@ async function runMarketCycleWithLease({
       liveSync,
       blockers: ["unexpected_market_cycle_error"],
     });
-    try {
-      await finishRun(result, "failed", safeError);
-    } catch {
-      // Preserve the original sanitized failure response when finalization fails.
-    }
     return result;
   }
 }
@@ -537,7 +563,6 @@ async function finishBlocked({
     },
     blockers: [...new Set(plan.blockers)].sort(),
   });
-  await finishRun(result, "blocked");
   return result;
 }
 
@@ -551,14 +576,10 @@ async function finishRun(
     runId: result.runId,
     status,
     finishedAt: new Date(),
-    requestedCount:
-      result.closeSync.requestedCount + result.liveSync.requestedCount,
-    successCount: result.closeSync.successCount + result.liveSync.successCount,
-    failedCount:
-      result.closeSync.failedCount +
-      result.liveSync.failedCount +
-      result.snapshot.failedCount,
-    skippedCount: result.closeSync.skippedCount + result.liveSync.skippedCount,
+    requestedCount: result.snapshot.targetCount + (result.nativeSnapshot && "targetCount" in result.nativeSnapshot ? result.nativeSnapshot.targetCount : result.nativeSnapshot?.status==="failed" ? 1 : 0),
+    successCount: result.snapshot.writtenCount + (result.nativeSnapshot && "targetCount" in result.nativeSnapshot ? result.nativeSnapshot.targetCount-result.nativeSnapshot.failedCount-result.nativeSnapshot.blockedCount : 0),
+    failedCount: result.snapshot.failedCount + (result.nativeSnapshot?.status === "failed" ? 1 : result.nativeSnapshot?.failedCount ?? 0),
+    skippedCount: result.snapshot.blockedCount + (result.nativeSnapshot && "blockedCount" in result.nativeSnapshot ? result.nativeSnapshot.blockedCount : 0),
     metadata: {
       snapshotDate: result.snapshotDate,
       phase: status,
@@ -568,6 +589,8 @@ async function finishRun(
       closeSync: result.closeSync,
       liveSync: result.liveSync,
       snapshot: result.snapshot,
+      nativeSnapshot:result.nativeSnapshot,
+      retryPolicy:{maxAttempts:4,backoffMinutes:5,lookbackDays:3,drainedBy:"next_market_cycle_invocation"},
       blockers: result.blockers,
     },
     error,
@@ -600,6 +623,7 @@ function emptyResult(
       blockedCount: 0,
       failedCount: 0,
     },
+    ...(overrides.nativeSnapshot ? {nativeSnapshot:overrides.nativeSnapshot} : {}),
     blockers: overrides.blockers ?? [],
   };
 }
