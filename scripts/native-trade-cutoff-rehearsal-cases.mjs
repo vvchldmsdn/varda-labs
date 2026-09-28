@@ -29,6 +29,12 @@ export async function runNativeTradeCutoffCases({admin,worker,tenant,report}) {
    await write({type:'sell',at:'2026-09-01T03:00:00Z',assetId:asset,quantity:'0.411494',currency:'USD',settlement:{amount:'420000',currency:'KRW'}});
    for(const [at,amount] of [['2026-09-01T21:59:59.999Z','100'],['2026-09-01T22:00:00.000Z','50'],['2026-09-01T22:00:00.001Z','25'],['2026-09-01T22:05:00Z','20']]) assert.equal((await write({type:'deposit',at,amount,currency:'USD'})).status,'created');
    await admin.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind,is_sample) values('2026-09-01','1000','synthetic_fx','ok','2026-09-01T21:00:00Z','2026-09-01T21:01:00Z','spot',false)");
+   // The legacy rehearsal used an hour-old spot rate. The current cutoff
+   // contract correctly rejects it; retain that negative check, then supply
+   // a separately timed synthetic observation within the unchanged 15m bound.
+   const stale=await cutoff.readNativeCutoffEvidence(ctx,account,'2026-09-02','2026-09-01T22:00:00.000Z');
+   assert.equal(valuation.buildTrackedCurrencyPortfolio(stale).current.total,null);
+   await admin.query("update fx_rates set observed_at='2026-09-01T21:50:00Z',fetched_at='2026-09-01T21:51:00Z' where date='2026-09-01' and source='synthetic_fx'");
    for(const actual of ['2026-09-01T22:00:00.000Z','2026-09-01T22:05:00Z','2026-09-01T22:30:00Z','2026-09-01T23:00:00Z']) {
      const e=await cutoff.readNativeCutoffEvidence(ctx,account,'2026-09-02',actual);
      assert.equal(valuation.buildTrackedCurrencyPortfolio(e).current.total,'2100');

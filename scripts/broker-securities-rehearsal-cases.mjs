@@ -1,6 +1,7 @@
+import {reconstructBrokerHistory} from './lib/broker-history-reconstruction.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readBrokerRecoveryState, recoverBrokerSecurities, recoveryHash } from './lib/broker-securities-recovery.mjs';
+import { readBrokerRecoveryState, recoverBrokerSecurities, recoveryHash, resolveConfirmedBrokerLiquidation } from './lib/broker-securities-recovery.mjs';
 import { resolveSnapshotCycle } from '../src/lib/snapshots/market-calendar.ts';
 
 // The caller supplies its already isolated database. This module discovers no
@@ -54,6 +55,22 @@ export async function runBrokerSecuritiesCases({ admin, report }) {
       assert.equal(Number(after.assets.find(a => a.id === f.asset).quantity), 5);
       assert.equal((await apply(f.plan)).status, 'existing');
       assert.deepEqual(await f.snapshot(), after);
+    });
+    await check('confirmed-liquidation-keeps-reported-quantity-and-retry-is-idempotent', async () => {
+      const f = await fixture({ archive: true });
+      Object.assign(f.plan.trades[0], resolveConfirmedBrokerLiquidation({currentQuantity:'4',reportedQuantity:'3.999990',confirmationReference:'Synthetic confirmation'}));
+      const before = await f.snapshot();
+      await apply(f.plan);
+      const evidence = (await client.query('select quantity_delta::text,broker_recovery_data from event_ledger_entries where id=$1',[f.plan.trades[0].id])).rows[0];
+      assert.equal(Number(evidence.quantity_delta), -4);
+      assert.equal(evidence.broker_recovery_data.quantityResolution.reportedQuantity, '3.999990');
+      assert.equal(evidence.broker_recovery_data.quantityResolution.confirmedRemainingQuantity, '0');
+      const after = await f.snapshot();
+      assert.equal(Number(after.assets.find(a=>a.id===f.asset).quantity),0);
+      assert.deepEqual(after.accounts,before.accounts);
+      assert.deepEqual(after.daily_portfolio_snapshots,before.daily_portfolio_snapshots);
+      assert.equal((await apply(f.plan)).status,'existing');
+      assert.deepEqual(await f.snapshot(),after);
     });
     await check('archive-memberships-lifecycle-and-atomic-rollback', async () => {
       const f = await fixture({ archive: true }), serviceDate = resolveSnapshotCycle().snapshotDate;
@@ -125,6 +142,29 @@ export async function runBrokerSecuritiesCases({ admin, report }) {
       const before = await f.snapshot();
       await assert.rejects(apply(f.plan), /recovery_new_holding_quote_missing/);
       assert.deepEqual(await f.snapshot(), before);
+    });
+    await check('compatible-writer-and-immutable-historical-replay', async () => {
+      const f=await fixture();
+      const mode=(await client.query('select mode from trade_reliability_runtime where singleton')).rows[0].mode;
+      await client.query("select set_trade_reliability_mode('compatible','isolated broker writer test')");
+      try {
+        await apply(f.plan);
+        await client.query("insert into asset_price_snapshots(date,ticker,market,currency,close_price,source) values('2026-07-31','FIXTURE','korea','KRW',33000,'kis_domestic_history_raw_v2') on conflict(market,currency,ticker,date) do nothing");
+        const before=await f.snapshot(), hash=recoveryHash(await readBrokerRecoveryState(client,f.owner,f.account));
+        const args={ownerId:f.owner,accountId:f.account,startDate:'2026-08-01',endDate:'2026-08-03',expectedStateHash:hash};
+        const dry=await reconstructBrokerHistory(client,args);assert.equal(dry.inserted,2);assert.equal(dry.blocked.length,1);assert.deepEqual(await f.snapshot(),before);
+        const applied=await reconstructBrokerHistory(client,{...args,write:true,confirmationHash:dry.hash,confirmedBasis:'dated_close_reconstruction'});assert.equal(applied.inserted,2);
+        const rows=(await client.query('select total_market_value::text,source,cash_value,total_cost,total_pnl from daily_portfolio_snapshots where canonical_owner_user_id=$1 and source=$2 order by snapshot_date',[f.owner,applied.source])).rows;
+        assert.equal(rows.length,2);assert.equal(Number(rows[0].total_market_value),165000);assert.equal(rows[0].cash_value,null);assert.equal(rows[0].total_cost,null);assert.equal(rows[0].total_pnl,null);
+        const after=await f.snapshot();assert.deepEqual(after.assets,before.assets);assert.deepEqual(after.accounts,before.accounts);assert.deepEqual(after.event_ledger_entries,before.event_ledger_entries);
+        const retry=await reconstructBrokerHistory(client,{...args,write:true,confirmationHash:dry.hash,confirmedBasis:'dated_close_reconstruction'});assert.equal(retry.inserted,0);assert.equal(retry.existing,2);
+        await client.query("begin");await client.query("select set_config('app.trade_reliability_version','0059',true)");
+        await client.query("insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,total_market_value,captured_at,cycle_end_at) values($1,$2,'brokerage','2026-08-02','varda_manual_daily_snapshot',170000,clock_timestamp(),'2026-08-01T22:00:00Z')",[f.owner,f.account]);await client.query("commit");
+        const preserved=await reconstructBrokerHistory(client,args);assert.equal(preserved.preserved,1);assert.equal(preserved.existing,1);
+        await client.query("select set_trade_reliability_mode('paused','isolated paused rejection')");
+        await assert.rejects(reconstructBrokerHistory(client,args),/financial_writes_paused/);
+        await assert.rejects(apply(f.plan),/financial_writes_paused/);
+      }finally{await client.query('select set_trade_reliability_mode($1,$2)',[mode,'isolated test restore']);}
     });
     await check('tenant-isolation-and-write-denial', async () => {
       const f = await fixture(); await apply(f.plan);

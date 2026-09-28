@@ -10,6 +10,17 @@ export function projectBrokerAcquisitionAverageCost(totalAmount, quantity) {
   const units=Decimal.from(totalAmount).div(quantity).mul(10000).minor('KRW','nearest');
   return new Decimal(units,10000n).toExactString();
 }
+/** A confirmed zero residual is holding-state evidence, not a correction of
+ * the broker's reported fill or the old acquisition. Keep both quantities. */
+export function resolveConfirmedBrokerLiquidation({ currentQuantity, reportedQuantity, confirmationReference }) {
+  assert.match(currentQuantity,decimal); assert.match(reportedQuantity,decimal);
+  assert.ok(Decimal.from(currentQuantity).compare(0)>0 && Decimal.from(reportedQuantity).compare(0)>0);
+  assert.ok(typeof confirmationReference==='string' && confirmationReference.trim().length>0 && confirmationReference.length<=300);
+  return { quantity: currentQuantity, quantityResolution: {
+    kind:'user_confirmed_full_liquidation_v1', reportedQuantity,
+    holdingQuantityBefore:currentQuantity, confirmedRemainingQuantity:'0', confirmationReference,
+  }};
+}
 export function recoveryHash(value) {
   const normalize = value => Array.isArray(value) ? value.map(normalize) : value && typeof value === 'object'
     ? Object.fromEntries(Object.keys(value).sort().map(key => [key,normalize(value[key])])) : value;
@@ -61,6 +72,16 @@ export function validateBrokerRecoveryPlan(plan) {
       assert.ok(Decimal.from(trade.orderUnitPrice.amount).compare(0)>0,'invalid_order_unit_price');
     }
     assert.ok(trade.tradeDate>=entry.lastDate,'recovery_trade_order'); entry.lastDate=trade.tradeDate;
+    if(trade.quantityResolution != null) {
+      const q=trade.quantityResolution;
+      assert.equal(q.kind,'user_confirmed_full_liquidation_v1');
+      assert.equal(trade.side,'sell','full_liquidation_requires_sell');
+      assert.deepEqual(q,resolveConfirmedBrokerLiquidation({currentQuantity:q.holdingQuantityBefore,reportedQuantity:q.reportedQuantity,confirmationReference:q.confirmationReference}).quantityResolution);
+      assert.equal(q.confirmedRemainingQuantity,'0');
+      assert.equal(entry.quantity.compare(q.holdingQuantityBefore),0,'liquidation_holding_changed');
+      assert.equal(entry.quantity.compare(trade.quantity),0,'liquidation_must_close_current_holding');
+    }
+
     entry.quantity=entry.quantity.add(Decimal.from(trade.quantity).mul(trade.side==='buy'?1:-1)); assert.ok(entry.quantity.compare(0)>=0,'recovery_oversell');
     for (const money of [trade.executionGross,trade.originalDisplay,trade.cashSettlement]) if (money) {
       assert.ok(['KRW','USD'].includes(money.currency)); assert.equal(typeof money.amount,'string');
@@ -101,7 +122,9 @@ export async function recoverBrokerSecurities(client, plan, { write = false, con
   if (write) { assert.equal(confirmation,manifestHash,'recovery_confirmation_mismatch'); assert.equal(restoreVerified,true,'restore_not_verified'); }
   await client.query('begin');
   try {
+    await client.query("select set_config('app.trade_reliability_version','0059',true)");
     await client.query("set local lock_timeout='3s'"); await client.query("set local statement_timeout='20s'");
+    await client.query('select assert_trade_reliability_write(false)');
     await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`varda.portfolio_mutation.v1:${plan.ownerId}`]);
     const prior=(await client.query('select id,manifest_hash,after_state from broker_recovery_batches where canonical_owner_user_id=$1 and account_id=$2 and (id=$3 or manifest_hash=$4)',[plan.ownerId,plan.accountId,plan.id,manifestHash])).rows;
     if(prior.length) {

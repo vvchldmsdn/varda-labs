@@ -11,6 +11,39 @@ const scope = "account:11111111-1111-4111-8111-111111111111";
 const fixtureRow = (overrides = {}) => ({ accountName: "Test account", assetName: "Example fund", market: "korea", currency: "KRW", ticker: "123456", buyability: "buyable", currentValueKrw: 300, targetWeightBps: 10_000, ...overrides });
 
 describe("target-weight editing and navigation", () => {
+  it("keeps the draft revision through success, transient rejection and retry without adopting refreshed props", async () => {
+    let reducer, persistedState;
+    const responses = [
+      { status: "success", message: "saved", approvalRevision: 2 },
+      { status: "invalid", message: "retry" },
+      { status: "success", message: "saved", approvalRevision: 3 },
+    ];
+    const [{ PortfolioTargetPolicyForm }] = await importUiWithPorts(["src/components/portfolio-target-policy-form.tsx"], {
+      "next/link": { default: () => null },
+      "@/app/portfolio/targets/actions": { savePortfolioTargetPolicy: async () => responses.shift() },
+      "@/components/i18n/locale-provider": { useI18n: () => ({ locale: "en", t: (ko, en) => en ?? ko }) },
+      "@/components/i18n/management-text": { ManagementText: () => null },
+      "@/components/onboarding/instrument-search": { InstrumentSearch: () => null },
+      react: {
+        createElement,
+        useActionState: (action, initial) => { reducer=action; persistedState ??= initial; return [persistedState,()=>{},false]; },
+        useState: initial => [typeof initial === "function" ? initial() : initial,()=>{}],
+        useMemo: calculate => calculate(),
+      },
+    });
+    const render = revision => PortfolioTargetPolicyForm({ rows: [fixtureRow()], universeHash: "same", scopeKey: scope, approvalRevision: revision });
+    render(1);
+    persistedState = await reducer(persistedState, new FormData());
+    assert.equal(persistedState.approvalRevision,2);
+    render(99);
+    assert.equal(persistedState.approvalRevision,2,"RSC props must not rebase the current draft");
+    persistedState = await reducer(persistedState,new FormData());
+    assert.equal(persistedState.status,"invalid");
+    assert.equal(persistedState.approvalRevision,2,"failure must not revert the successful revision");
+    persistedState = await reducer(persistedState,new FormData());
+    assert.equal(persistedState.approvalRevision,3);
+  });
+
   it("offers target setup only for missing or changed target policies, never data failures", async () => {
     const [view] = await importUiWithPorts(["src/components/additional-contribution/additional-contribution-page-view.tsx"], {
       "next/link": { default: () => null },
@@ -33,6 +66,7 @@ describe("target-weight editing and navigation", () => {
     const [{ ContributionCalculator, ContributionTargetAction }] = await importUiWithPorts(["src/components/additional-contribution/contribution-calculator.tsx"], {
       "next/navigation": { useRouter: () => ({ push: (...args) => pushes.push(args) }) },
       "@/components/portfolio/portfolio-text": { PortfolioText: () => null, usePortfolioText: () => (ko, en) => en ?? ko },
+      "@/components/onboarding/instrument-search": { InstrumentSearch: () => null },
       react: { useState: initial => [initial, () => {}], useTransition: () => [false, callback => callback()] },
     });
     function elements(tree) {

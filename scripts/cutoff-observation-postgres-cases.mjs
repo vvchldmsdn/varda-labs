@@ -8,10 +8,11 @@ import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 /** Only called with pools from the fresh, loopback-only disposable PG runner. */
 export async function runCutoffObservationCases({admin,worker,tenant,report}) {
   const sessions=new Set(), transport=sqlTransport(worker,sessions);
-  let gate=false,arrivals=0,release;
+  let gate=false,arrivals=0,release, mutateBeforeWrite=null;
   const barrier=new Promise(resolve=>{release=resolve;});
   const sqlClient={...transport,async transaction(build,options){
     const commands=build({query:(text,parameters=[])=>({text,parameters})});
+    if(mutateBeforeWrite && commands.some(q=>q.text.includes('insert into "daily_portfolio_snapshots"'))) { const mutate=mutateBeforeWrite; mutateBeforeWrite=null; await mutate(); }
     if(gate && commands.some(q=>q.text.includes('insert into "daily_portfolio_snapshots"'))) {
       if(++arrivals===2) release();
       await Promise.race([barrier,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('cutoff_write_barrier_timeout')),10000);timer.unref();})]);
@@ -27,13 +28,14 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
   const snapshotDate=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
   const receiptDate=new Date(Date.parse(`${snapshotDate}T00:00:00Z`)-86400000).toISOString().slice(0,10);
   const receipt=time=>`${receiptDate}T${time}Z`;
-  const openingDate=new Date(Date.parse(`${snapshotDate}T00:00:00Z`)-10*86400000).toISOString();
+  const openingDate=new Date(Date.parse(`${snapshotDate}T00:00:00Z`)-10*86400000).toISOString().replace(".000Z", ".123456Z");
   const bootstrap=await admin.connect();
   try {
     await bootstrap.query('BEGIN');await bootstrap.query("select set_config('app.trade_reliability_version','0059',true)");
     await bootstrap.query("insert into app_users(id,status,role) values($1,'active','user')",[owner]);
     await bootstrap.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency,created_at,updated_at) values($1,$2,'brokerage','Synthetic cutoff','brokerage','USD',$3,$3)",[account,owner,openingDate]);
     await bootstrap.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price,created_at,updated_at) values($1,$2,$3,'brokerage','Synthetic cutoff','CUTUNIT','us','USD','stock',10,100,$4,$4)",[asset,owner,account,openingDate]);
+    await bootstrap.query("insert into event_ledger_entries(legacy_asset_id,canonical_owner_user_id,account_id,account,event_date,event_type,asset_name,before_value,after_value,created_at,updated_at) values('synthetic-cutoff-legacy',$1,$2,'brokerage',$3,'manual_adjustment','Synthetic cutoff','unchanged','unchanged',$4,$4)",[owner,account,openingDate.slice(0,10),openingDate]);
     await bootstrap.query('COMMIT');
   }catch(error){await bootstrap.query('ROLLBACK');throw error;}finally{bootstrap.release();}
   let at=new Date(receipt('21:59:00')),price='105';
@@ -70,6 +72,16 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     assert.equal(evidence.fxRows[0].providerObservedAt,null);assert.equal(evidence.fxRows[0].timestampBasis,'collection');
     assert.equal(Number((await worker.query("select price from live_price_quotes where ticker='CUTUNIT'")).rows[0].price),110);
   });
+  for (const table of ['assets', 'event_ledger_entries']) {
+    await check(`cutoff-${table}-one-microsecond-concurrent-change-rejects-and-rolls-back`, async()=>{
+      const modify=async token=>{const c=await admin.connect();try{await c.query('BEGIN');await c.query("select set_config('app.trade_reliability_version','0059',true)");await c.query(`update ${table} set updated_at=$2 where account_id=$1`,[account,token]);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}};
+      mutateBeforeWrite=()=>modify(openingDate.replace('123456','123457'));
+      await assert.rejects(snapshot(),error=>error.code==='22012');
+      assert.equal((await worker.query('select count(*)::int n from daily_portfolio_snapshots where account_id=$1',[account])).rows[0].n,0);
+      assert.equal((await worker.query('select count(*)::int n from daily_position_snapshots where account_id=$1',[account])).rows[0].n,0);
+      await modify(openingDate);
+    });
+  }
   await check('cutoff-real-daily-writer-concurrency-10-times-105-times-1300-equals-1365000',async()=>{
     gate=true;const results=await Promise.allSettled([snapshot(),snapshot()]);gate=false;
     assert.equal(arrivals,2,'both plans reached real concurrent transactions');
@@ -138,6 +150,129 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     await worker.query("update live_price_quotes set fetched_at=$1,price_as_of=$1,price=999 where ticker in ('ON_TIME','TOO_LATE')",[receipt('22:05:00')]);
     const after=(await reader.readSnapshotCutoffObservations(snapshotDate)).quotes;
     assert.equal(Number(after.find(q=>q.ticker==='ON_TIME').price),123);assert.equal(after.filter(q=>q.ticker==='TOO_LATE').length,0);
+  });
+  await check('cutoff-progress-read-is-owner-and-scope-bounded', async()=>{
+    const [progress]=await importWithPorts(['src/db/queries/snapshot-progress.ts'],{'@/db/client':{db:drizzle(worker),sqlClient}});
+    await transport.transaction(tx=>[tx.query("select set_config('app.trade_reliability_version','0059',true)"),tx.query("insert into daily_snapshot_work(canonical_owner_user_id,account_id,snapshot_date,stage,revision,status,reason) values($1,$2,$3,'legacy',0,'failed','snapshot_write_failed') on conflict do nothing",[owner,account,snapshotDate])]);
+    const scope={kind:'account',key:`account:${account}`,accountId:account,accountCode:'brokerage',label:'Synthetic'};
+    assert.equal(await progress.getOwnedLegacySnapshotProgress({tenantContext:{ownerUserId:owner,role:'user'},scope,serviceDate:snapshotDate}),'failed');
+    for(const [lease,expected] of [[new Date(Date.now()+60000).toISOString(),'running'],[new Date(Date.now()-60000).toISOString(),'failed'],[null,'failed']]) {
+      await transport.transaction(tx=>[tx.query("select set_config('app.trade_reliability_version','0059',true)"),tx.query("update daily_snapshot_work set status='running',lease_until=$2 where account_id=$1",[account,lease])]);
+      assert.equal(await progress.getOwnedLegacySnapshotProgress({tenantContext:{ownerUserId:owner,role:'user'},scope,serviceDate:snapshotDate}),expected);
+    }
+    assert.equal(await progress.getOwnedLegacySnapshotProgress({tenantContext:{ownerUserId:randomUUID(),role:'user'},scope,serviceDate:snapshotDate}),'unknown');
+    assert.equal(await progress.getOwnedLegacySnapshotProgress({tenantContext:{ownerUserId:owner,role:'user'},scope:{...scope,accountId:randomUUID()},serviceDate:snapshotDate}),'unknown');
+  });
+  await check('target-approval-stale-editor-cas-and-explicit-zero-real-writer-query',async()=>{
+    const secondAsset=randomUUID();
+    const c=await admin.connect();
+    try {
+      await c.query('BEGIN'); await c.query("select set_config('app.trade_reliability_version','0059',true)");
+      await c.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price) values($1,$2,$3,'brokerage','Synthetic target','TARGETUNIT','us','USD','stock',4,100)",[secondAsset,owner,account]);
+      await c.query('COMMIT');
+    }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+    const scope={kind:'account',key:`account:${account}`,accountId:account,accountCode:'brokerage',label:'Synthetic'};
+    const policy=await import('../src/lib/portfolio-target-policy.ts');
+    const universe=policy.normalizePortfolioTargetUniverse([
+      {accountCode:'brokerage',accountId:account,accountName:'Synthetic',assetId:asset,assetName:'Synthetic cutoff',assetType:'stock',market:'us',currency:'USD',ticker:'CUTUNIT',currentValueKrw:600000},
+      {accountCode:'brokerage',accountId:account,accountName:'Synthetic',assetId:secondAsset,assetName:'Synthetic target',assetType:'stock',market:'us',currency:'USD',ticker:'TARGETUNIT',currentValueKrw:400000},
+    ]);
+    const hash=policy.createPortfolioTargetUniverseHash({scope,universe:universe.rows});
+    let readRevision=0;let modelRows=universe.rows;let currentHash=hash;let policyVersion='portfolio_target_policy_v1';
+    const tenantTransport=sqlTransport(tenant,sessions);
+    const [writer,reader]=await importWithPorts(['src/lib/portfolio-target-policy-write.ts','src/db/queries/tenant-target-policies.ts'],{
+      '@/db/client':{db:drizzle(worker),sqlClient},
+      '@/db/tenant-client':{getTenantSqlClient:()=>tenantTransport},
+      './tenant-client':{getTenantSqlClient:()=>tenantTransport},
+      // Only the external identity and pre-write screen projection are substituted.
+      // The actual SQL writer, lock/CAS and RLS reader are exercised below.
+      '@/db/queries/onboarding-instrument-search':{resolveOnboardingInstrumentById:async id=>id==='fixture:C'?{id,name:'Candidate C',ticker:'CANDUNIT',market:'us',currency:'USD',assetType:'stock'}:null},
+      '@/lib/auth/current-tenant-context':{resolveCurrentTenantContext:async()=>({ok:true,tenantContext:{ownerUserId:owner,role:'user'}})},
+      '@/db/queries/portfolio-analysis-scopes':{getReadOnlyTenantPortfolioAnalysisScopeContext:async()=>({state:'ready',resolution:{state:'resolved',scope}})},
+      '@/db/queries/portfolio-target-policy':{getReadOnlyTenantPortfolioTargetPolicyModel:async()=>({status:'ready',rows:modelRows,selectableAccounts:[{id:account,code:'brokerage',name:'Synthetic'}],universe:{...universe,rows:modelRows},currentUniverseHash:currentHash,approvedPolicy:{policy:readRevision?{approvalRevision:readRevision,policyVersion}:null}})},
+    });
+    const form=(revision,zeroAsset=asset)=>{const f=new FormData();f.set('scope',scope.key);f.set('rowCount','2');f.set('universeHash',hash);f.set('approvalRevision',String(revision));universe.rows.forEach((r,i)=>f.set(`targetWeight:${i}`,r.assetId===zeroAsset?'0':'100'));return f;};
+    const read=ownerUserId=>reader.loadCurrentTenantPortfolioTargetPolicy({scopeKind:'account',scopeAccountId:account,scopePortfolioGroupId:null,tenantContext:{ownerUserId,role:'user'}});
+    assert.equal((await writer.writeSessionPortfolioTargetPolicy(form(0))).status,'success');
+    const first=await read(owner); assert.equal(first.policy.approvalRevision,1);
+    assert.equal(first.policy.rows.find(r=>r.assetId===asset).targetWeightBps,0);
+    assert.equal((await read(randomUUID())).status,'missing');
+    // Deliberately retain the stale projection to force rejection at the SQL boundary.
+    assert.equal((await writer.writeSessionPortfolioTargetPolicy(form(0,secondAsset))).status,'conflict');
+    assert.deepEqual((await read(owner)).policy,first.policy);
+    readRevision=1;
+    const results=await Promise.all([writer.writeSessionPortfolioTargetPolicy(form(1,secondAsset)),writer.writeSessionPortfolioTargetPolicy(form(1,secondAsset))]);
+    assert.deepEqual(results.map(r=>r.status).sort(),['conflict','success']);
+    const second=await read(owner);assert.equal(second.policy.approvalRevision,2);assert.equal(second.policy.rows.find(r=>r.assetId===secondAsset).targetWeightBps,0);
+    assert.equal((await worker.query('select count(*)::int n from portfolio_target_policy_revisions where canonical_owner_user_id=$1',[owner])).rows[0].n,2);
+    assert.equal(Number((await worker.query('select quantity from assets where id=$1',[secondAsset])).rows[0].quantity),4);
+    assert.equal((await worker.query('select count(*)::int n from portfolio_target_policy_lifecycle_events where canonical_owner_user_id=$1',[owner])).rows[0].n,3);
+    const countBefore=(await worker.query('select count(*)::int n from assets where canonical_owner_user_id=$1',[owner])).rows[0].n;
+    readRevision=2;
+    const add=form(2);add.set('rowCount','3');add.set('candidates',JSON.stringify([{accountId:account,instrumentId:'fixture:C'}]));
+    universe.rows.forEach((r,i)=>add.set('targetWeight:'+i,r.assetId===asset?'0':'50'));add.set('targetWeight:2','50');
+    assert.equal((await writer.writeSessionPortfolioTargetPolicy(add)).status,'success');
+    const saved=(await read(owner)).policy;
+    assert.equal(saved.policyVersion,'portfolio_target_policy_v2');assert.equal(saved.rows.length,3);
+    const candidate=saved.rows.find(r=>r.ticker==='CANDUNIT');assert.equal(candidate.originAssetId,null);assert.equal(candidate.targetWeightBps,5000);
+    assert.equal((await read(randomUUID())).status,'missing');
+    assert.equal((await worker.query('select count(*)::int n from assets where canonical_owner_user_id=$1',[owner])).rows[0].n,countBefore);
+    await assert.rejects(tenant.query('insert into portfolio_target_plan_rows select * from portfolio_target_plan_rows limit 1'),e=>e.code==='42501');
+    const {unionTargetPlanRows}=await import('../src/lib/portfolio-target-plan.ts');
+    modelRows=policy.normalizePortfolioTargetUniverse(unionTargetPlanRows(universe.rows,saved.rows,[{id:account,code:'brokerage',name:'Synthetic'}])).rows;
+    policyVersion=saved.policyVersion;currentHash=saved.universeHash;readRevision=3;
+    // Removing then re-adding the same canonical candidate must retain the new row.
+    const readd=new FormData();readd.set('scope',scope.key);readd.set('rowCount','4');readd.set('universeHash',currentHash);readd.set('approvalRevision','3');
+    readd.set('removed',JSON.stringify([candidate.assetId]));readd.set('candidates',JSON.stringify([{accountId:account,instrumentId:'fixture:C'}]));
+    modelRows.forEach((r,i)=>readd.set('targetWeight:'+i,r.assetId===secondAsset?'50':'0'));readd.set('targetWeight:3','50');
+    assert.equal((await writer.writeSessionPortfolioTargetPolicy(readd)).status,'success');
+    assert.equal((await read(owner)).policy.rows.find(r=>r.ticker==='CANDUNIT').targetWeightBps,5000);
+
+  });
+  await check('simulation-paired-queue-writer-query-calendar-engine-and-stale-worker',async()=>{
+    const [prices,history,queue]=await importWithPorts(['src/lib/market-data/asset-price-snapshot-repository.ts','src/db/queries/simulation-owner-private-history.ts','src/lib/market-data/collection-queue.ts'],{'@/db/client':{db:drizzle(worker),sqlClient}});
+    const {writeKisPairedHistory}=await import('../src/lib/market-data/kis-paired-history-write.ts');
+    const {pairKisHistory}=await import('../src/lib/market-data/providers/kis-paired-history.ts');
+    const target={ticker:'CALUNIT',market:'korea',currency:'KRW',assetIds:[],assetNames:[]};
+    const rows=[['2026-09-18','100'],['2026-09-21','50'],['2026-09-22','55']].map(([priceDate,closePrice])=>({
+      ...target,priceDate,closePrice,source:'kis_domestic_itemchartprice',quoteType:'close',status:'ok',
+      providerSymbol:'CALUNIT',providerExchange:'KRX',fetchedAt:new Date('2026-09-23T00:00:00Z'),
+      adjustedClosePrice:null,adjustedCloseBasis:null,adjustedCloseProvider:null,adjustedCloseSource:null,adjustedCloseFetchedAt:null,
+      closePriceKrw:null,fxRate:null,isSample:false,
+    }));
+    assert.equal((await prices.applyAssetPriceSnapshotRows({rows,targets:[target],dryRun:false,allowWrite:true,writePolicy:'kis'})).insertedCount,3);
+    const rawBefore=(await admin.query("select date::text,close_price::text,source,fetched_at from asset_price_snapshots where ticker='CALUNIT' order by date")).rows;
+    const paired=pairKisHistory(rows,rows.map((row,i)=>({...row,closePrice:i<2?'50':'55'})));
+    await queue.enqueueMarketCollection([{...target,kind:'history',startDate:'2026-09-18',endDate:'2026-09-22'}]);
+    const claim=await queue.claimMarketCollection();assert.ok(claim.key.startsWith('kis:history:paired_v1:'));
+    const write=(job,data=paired)=>writeKisPairedHistory(async(text,args)=>(await worker.query(text,args)).rows,job,data);
+    assert.equal((await write(claim)).conflictCount,0);
+    assert.deepEqual((await admin.query("select date::text,close_price::text,source,fetched_at from asset_price_snapshots where ticker='CALUNIT' order by date")).rows,rawBefore);
+    const selection={status:'valid',instruments:[{...target,instrumentKey:'korea|KRW|CALUNIT',classification:'listed_instrument',weightBps:10000}]};
+    const args={tenantContext:{ownerUserId:owner,role:'user'},selection,endServiceDate:'2026-09-23',returnStepCount:2};
+    const first=await history.getReadOnlyPrivateOwnerRawHistoryBundle(args);
+    assert.equal(first.status,'ready');
+    assert.deepEqual(first.requestedServiceDates,['2026-09-19','2026-09-22','2026-09-23']);
+    assert.equal(first.matrix.policy.version,'simulation_return_matrix_calendar_adjusted_v2');
+    assert.equal(first.matrix.matrix[0].cells[0].value,0,'split must not become a 50 percent loss');
+    assert.ok(Math.abs(first.matrix.matrix[1].cells[0].value-0.1)<1e-12);
+    assert.equal((await write(claim)).conflictCount,0);
+    assert.deepEqual((await history.getReadOnlyPrivateOwnerRawHistoryBundle(args)).matrix,first.matrix);
+    const mismatch=paired.map(r=>({...r,closePrice:'999'}));assert.equal((await write(claim,mismatch)).conflictCount,3);
+    const legacy=await prices.applyAssetPriceSnapshotRows({rows,targets:[target],dryRun:false,allowWrite:true,writePolicy:'kis'});
+    assert.equal(legacy.updatedCount,0,'old raw writer cannot erase adjusted evidence');
+    await admin.query("update market_collection_jobs set leased_until=now()-interval '1 second' where key=$1",[claim.key]);
+    assert.equal((await write(claim)).failedCount,3);
+    const replacement=await queue.claimMarketCollection();assert.notEqual(replacement.claimToken,claim.claimToken);
+    await admin.query("delete from asset_price_snapshots where ticker='CALUNIT' and date='2026-09-21'");
+    assert.equal((await write(claim)).failedCount,3,'stale claim cannot reinsert a missing row');
+    const incomplete=await history.getReadOnlyPrivateOwnerRawHistoryBundle(args);
+    assert.equal(incomplete.status,'incomplete');
+    assert.equal(incomplete.matrix.matrix[0].cells[0].current.reason,'missing_trading_day_price');
+    assert.equal((await write(replacement)).conflictCount,0);
+    assert.deepEqual((await history.getReadOnlyPrivateOwnerRawHistoryBundle(args)).matrix,first.matrix);
+    const batch=await history.getReadOnlyPrivateOwnerRawHistoryValidationBatch({...args,currentReturnStepCount:2});
+    assert.equal(batch.current.status,'ready');assert.deepEqual(batch.current.matrix,first.matrix);
   });
   report.cutoffConnectionCount=sessions.size;
 }

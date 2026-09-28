@@ -1,4 +1,5 @@
 import "server-only";
+import { pairKisHistory, mergeKisPairedHistory } from "./kis-paired-history";
 import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 import { fetchKisWithBudget } from "@/lib/market-data/provider-budget";
 
@@ -476,7 +477,14 @@ async function fetchKisHistoricalClosePrices(
             }),
           );
         } else {
-          targetSeries.push([...normalized.rows]);
+          if (context.includeAdjusted) {
+            await sleep(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds);
+            const adjustedPayload = request.market === "korea"
+              ? await fetchKoreanHistoryWindow({target,token,config,window:request.window,adjusted:true,onRequest:()=>{requestCount+=1;}})
+              : await fetchUsHistoryWindow({target,token,config,window:request.window,adjusted:true,knownExchange:knownUsExchange,onRequest:()=>{requestCount+=1;}});
+            const adjusted = normalizeKisRawHistoryPayload({target,window:request.window,rawRows:adjustedPayload.rawRows,fetchedAt:new Date(),exchange:adjustedPayload.exchange});
+            targetSeries.push(pairKisHistory(normalized.rows,adjusted.rows));
+          } else targetSeries.push([...normalized.rows]);
         }
       } catch (error) {
       if (isProviderCollectionDeferred(error)) throw error;
@@ -493,7 +501,7 @@ async function fetchKisHistoricalClosePrices(
       await sleep(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds);
     }
 
-    series.push([...mergeKisRawHistoryRows(targetSeries)]);
+    series.push(context.includeAdjusted ? mergeKisPairedHistory(targetSeries) : [...mergeKisRawHistoryRows(targetSeries)]);
   }
 
   if (invalidRowCount > 0) {
@@ -508,7 +516,7 @@ async function fetchKisHistoricalClosePrices(
     warnings.push(`collapsed exact duplicate provider rows: ${duplicateRowCount}`);
   }
   warnings.push(
-    "KIS historical rows are raw price-return evidence; adjusted-close and total-return claims remain unset",
+    context.includeAdjusted ? "Paired raw and provider-adjusted closes; dividend reinvestment and total return are not claimed" : "KIS historical rows are raw price-return evidence; adjusted-close and total-return claims remain unset",
     context.dryRun
       ? "KIS historical dry-run fetched provider evidence without database writes"
       : "KIS historical fetch completed; this provider method does not write to the database",
@@ -517,8 +525,8 @@ async function fetchKisHistoricalClosePrices(
   return {
     provider: "kis",
     fetchedAt,
-    priceBasis: KIS_RAW_HISTORY_POLICY.priceBasis,
-    rows: [...mergeKisRawHistoryRows(series)],
+    priceBasis: context.includeAdjusted ? "raw_and_provider_adjusted" : KIS_RAW_HISTORY_POLICY.priceBasis,
+    rows: context.includeAdjusted ? mergeKisPairedHistory(series) : [...mergeKisRawHistoryRows(series)],
     failures,
     requestCount,
     warnings,
@@ -573,6 +581,7 @@ async function fetchKoreanHistoryWindow(options: {
   config: KisConfig;
   window: KisHistoryWindow;
   onRequest: () => void;
+  adjusted?: boolean;
 }): Promise<{
   rawRows: unknown;
   exchange: null;
@@ -583,7 +592,7 @@ async function fetchKoreanHistoryWindow(options: {
     fid_input_date_1: toCompactDate(options.window.startDate),
     fid_input_date_2: toCompactDate(options.window.endDate),
     fid_period_div_code: "D",
-    fid_org_adj_prc: "1",
+    fid_org_adj_prc: options.adjusted ? "0" : "1",
   });
   options.onRequest();
   const response = await fetchKisWithBudget(options.config,
@@ -617,6 +626,7 @@ async function fetchUsHistoryWindow(options: {
   window: KisHistoryWindow;
   knownExchange: (typeof US_EXCHANGES)[number] | null;
   onRequest: () => void;
+  adjusted?: boolean;
 }): Promise<{
   rawRows: unknown;
   exchange: (typeof US_EXCHANGES)[number];
@@ -634,7 +644,7 @@ async function fetchUsHistoryWindow(options: {
         SYMB: options.target.ticker,
         GUBN: "0",
         BYMD: toCompactDate(options.window.endDate),
-        MODP: "1",
+        MODP: options.adjusted ? "1" : "0",
         KEYB: "",
       });
       options.onRequest();
@@ -843,7 +853,7 @@ async function fetchUsClose(
         SYMB: target.ticker,
         GUBN: "0",
         BYMD: toCompactDate(context.priceDate),
-        MODP: "1",
+        MODP: "0",
         KEYB: "",
       });
       const response = await fetchKisWithBudget(config,

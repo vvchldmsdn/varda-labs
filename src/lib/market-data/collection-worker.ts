@@ -48,9 +48,11 @@ export async function drainMarketCollection() {
             }
             if (ok) await revalidateLatestClose({ target: job, provider });
           } else if (job.kind === "history" && job.startDate && job.endDate) {
+            if (!job.key.startsWith("kis:history:paired_v1:")) throw new Error("history_policy_changed");
             const result = await runKisHistoryCacheSync({ targets: [{ key: job.key, ticker: job.ticker,
               market: job.market, currency: job.currency, accounts: [], assetIds: [], assetNames: [] }],
-              startDate: job.startDate, endDate: job.endDate, provider });
+              startDate: job.startDate, endDate: job.endDate, provider,
+              pairedClaim: job.key.startsWith("kis:history:paired_v1:") ? job : undefined });
             ok = result.failedCount === 0 && result.fetchedRowCount > 0;
           } else if (job.kind === "fx") {
             const now = new Date();

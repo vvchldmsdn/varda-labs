@@ -29,6 +29,7 @@ export function historyLaneLabel(lane: HistoryLane) {
 }
 
 export function historySourceLabel(source: string) {
+  if (source.startsWith("broker_reconstructed_close_v1:")) return "종가 재구성 · 현금·손익 제외";
   if (source === "varda_current_valuation") return "현재 보유자산 평가";
   if (source === "stored_balance_record") return "저장 잔액 기록";
   if (source === "base44_import") return "Base44 이관";

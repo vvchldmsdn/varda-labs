@@ -11,7 +11,9 @@ import type {
 
 const ADMITTED_MATRIX_POLICY_VERSIONS = new Set([
   STATIONARY_BOOTSTRAP_POLICY.inputMatrixVersion,
+  "simulation_return_matrix_calendar_adjusted_v2",
   "simulation_private_owner_raw_close_return_matrix_v1",
+  "simulation_private_owner_raw_close_return_matrix_v2",
 ]);
 
 export function validateAndHashReadyReturnMatrix(

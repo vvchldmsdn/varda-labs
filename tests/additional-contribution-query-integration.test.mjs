@@ -201,9 +201,12 @@ describe("additional contribution query to policy integration", () => {
     const rows = [modelRow("AAA", 550000, 5000), modelRow("AAA", 450000, 5000, { assetId: "99999999-9999-4999-8999-999999999999" })]
       .map((row) => ({ ...row, quantity: "2", currentPrice: "110000", averageCost: "100000", fractionalKrwValue: "50000", fractionalAvgCost: null }));
     let predicate;
-    const builder = { from() { return this; }, innerJoin() { return this; }, where(value) { predicate = value; return this; }, orderBy() { return Promise.resolve(rows); } };
+    let selectIndex=0;
+    const select=()=>{ const index=selectIndex++; const result=index===1?[{id:accountId,code:"brokerage",name:"Synthetic"}]:rows;
+      return {from(){return this;},innerJoin(){return this;},where(value){if(index===0)predicate=value;return this;},orderBy(){return Promise.resolve(result);},then(resolve){return Promise.resolve(result).then(resolve);}};
+    };
     const modelModule = await importWithPorts("../src/db/queries/portfolio-target-policy.ts", {
-      "@/db/client": { db: { select: () => builder } },
+      "@/db/client": { db: { select } },
       "@/db/queries/portfolio-analysis-scope-targets": { getPortfolioAnalysisScopeTargets: async ({ tenantContext: context }) => {
         assert.equal(context, tenantContext);
         return { includesAllOwnedAccounts: false, wholeAccountIds: [accountId], directAssetIds: [] };

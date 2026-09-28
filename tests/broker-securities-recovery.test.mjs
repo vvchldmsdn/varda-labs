@@ -6,7 +6,7 @@ import { migrationManifest } from '../scripts/krw-usd-rc-rehearsal.mjs';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
 import { runBrokerSecuritiesCases } from '../scripts/broker-securities-rehearsal-cases.mjs';
 import {
-  readBrokerRecoveryState, recoverBrokerSecurities, recoveryHash, validateBrokerRecoveryPlan, projectBrokerAcquisitionAverageCost,
+  readBrokerRecoveryState, recoverBrokerSecurities, recoveryHash, validateBrokerRecoveryPlan, projectBrokerAcquisitionAverageCost, resolveConfirmedBrokerLiquidation,
 } from '../scripts/lib/broker-securities-recovery.mjs';
 
 it('rejects duplicate instrument identities without SQL even with different holding UUIDs', () => {
@@ -232,7 +232,27 @@ describe('broker securities recovery against the complete isolated SQL schema', 
   it('passes the reusable SQL rehearsal cases, including generated FKs and archive lifecycle', async () => {
     const report = { cases: [] };
     await runBrokerSecuritiesCases({ admin: client, report });
-    assert.equal(report.cases.length, 7);
+    assert.equal(report.cases.length, 9);
     assert(report.cases.every(result => result.status === 'PASS'));
   });
+});
+
+it('confirmed full liquidation preserves discrepant broker quantity without rewriting acquisition or creating cash', () => {
+  for (const reportedQuantity of ['1.000010','0.999990']) {
+    const resolution=resolveConfirmedBrokerLiquidation({currentQuantity:'1',reportedQuantity,confirmationReference:'Synthetic user confirmation'});
+    const asset=randomUUID();
+    const plan={version:1,id:randomUUID(),ownerId:randomUUID(),accountId:randomUUID(),cashValuation:'excluded',expectedStateHash:'a'.repeat(64),
+      holdings:[{id:asset,ticker:'SYNTHETIC',market:'us',currency:'USD',name:'Synthetic',assetType:'stock',startQuantity:'1',endQuantity:'0',averageCost:null,removeFractionalDisplay:false}],
+      trades:[{id:randomUUID(),rowId:'full-sale',assetId:asset,side:'sell',...resolution,tradeDate:'2026-08-01',fee:null,tax:null,evidence:['Synthetic reported order']}],
+    };
+    assert.doesNotThrow(()=>validateBrokerRecoveryPlan(plan));
+    assert.equal(plan.trades[0].quantityResolution.reportedQuantity,reportedQuantity);
+    assert.equal(plan.trades[0].cashSettlement,undefined);
+    const stale=structuredClone(plan);stale.holdings[0].startQuantity='2';
+    assert.throws(()=>validateBrokerRecoveryPlan(stale),/liquidation_holding_changed/);
+    const partial=structuredClone(plan);partial.trades[0].quantity='0.5';
+    assert.throws(()=>validateBrokerRecoveryPlan(partial),/liquidation_must_close_current_holding/);
+    const wrong=structuredClone(plan);wrong.trades[0].side='buy';
+    assert.throws(()=>validateBrokerRecoveryPlan(wrong),/full_liquidation_requires_sell/);
+  }
 });

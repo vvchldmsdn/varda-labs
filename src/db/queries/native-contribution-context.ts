@@ -26,37 +26,37 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
   if (!current?.complete || !evidence.ledgerComplete) return { status: "blocked", reason: "valuation_incomplete" };
   if (model.status !== "ready" || model.policyValidation.status !== "available" || !model.approvedPolicy.policy) return { status: "blocked", reason: "approved_targets_required" };
   const holdings = evidence.current.positions.filter(row => row.kind !== "cash" && row.observation && Decimal.from(row.observation.quantity).compare(0) > 0);
-  if (holdings.length !== model.rows.length || holdings.some(row => !model.rows.some(target => target.assetId === row.id && target.accountId === row.accountId && target.currency === row.observation!.currency))) return { status: "blocked", reason: "target_universe_changed" };
+  if (holdings.some(row => !model.rows.some(target => (target.heldAssetId ?? target.assetId) === row.id && target.accountId === row.accountId && target.currency === row.observation!.currency)) || model.rows.some(target=>target.heldAssetId!==null && !holdings.some(row=>row.id===(target.heldAssetId ?? target.assetId)))) return { status: "blocked", reason: "target_universe_changed" };
   const policy = model.approvedPolicy.policy;
   const currentAccounts = new Set([...holdings.map(row => row.accountId), ...evidence.current.positions.filter(row => row.kind === "cash" && row.observation?.source === "native_ledger_cash").map(row => row.accountId)]);
   // Evaluate native current quotes against the admitted historical series in that same currency/basis.
   const ma = await getReadOnlyTenantAdditionalContributionMa120Evidence({
-    holdings: holdings.map(row => ({ market: row.market ?? "", ticker: row.ticker ?? null, currency: row.observation!.currency, currentPrice: Number(row.observation!.price), priceSource: row.observation!.source, priceAsOf: row.observation!.priceObservedAt ?? row.observation!.at })), serviceDate, now,
+    holdings: [...holdings.map(row => ({ market: row.market ?? "", ticker: row.ticker ?? null, currency: row.observation!.currency, currentPrice: Number(row.observation!.price), priceSource: row.observation!.source, priceAsOf: row.observation!.priceObservedAt ?? row.observation!.at })), ...(model.ma120HoldingRows ?? []).filter(row=>model.rows.some(target=>target.heldAssetId===null && target.market===row.market && target.currency===row.currency && target.ticker===row.ticker))], serviceDate, now,
   }).catch(() => null);
-  const modifierRead=await readAdditionalContributionModifiers({tenantContext:tenant,scope,now,reportingCurrency:reporting,rows:holdings.map(row=>({key:row.id,assetId:row.id,currentValue:Number(current.positions.find(value=>value.id===row.id)?.value),market:row.market??null,currency:row.observation!.currency,ticker:row.ticker??null,name:row.name}))});
+  const modifierRead=await readAdditionalContributionModifiers({tenantContext:tenant,scope,now,reportingCurrency:reporting,rows:model.rows.map(row=>({key:row.assetId,assetId:row.heldAssetId ?? undefined,currentValue:row.heldAssetId===null?0:Number(current.positions.find(value=>value.id===(row.heldAssetId??row.assetId))?.value),market:row.market,currency:row.currency,ticker:row.ticker,name:row.assetName}))});
   const context:Extract<NativeContributionContextResult,{status:'ready'}> = {
     status: "ready", scopeKey, scopeLabel: scope.label,
     policy: { version: policy.policyVersion, revision: policy.approvalRevision, universeHash: policy.universeHash, vectorHash: policy.vectorHash, effectiveServiceDate: policy.effectiveServiceDate },
-    nativeSequences: Object.fromEntries(Object.entries(evidence.nativeSequences ?? {}).filter(([id]) => currentAccounts.has(id))), names: Object.fromEntries(holdings.map(row => [row.id, row.name])),
+    nativeSequences: Object.fromEntries(Object.entries(evidence.nativeSequences ?? {}).filter(([id]) => currentAccounts.has(id))), names: Object.fromEntries(model.rows.map(row => [row.assetId, row.assetName])),
     availableCash: evidence.current.positions.filter(row => row.kind === "cash" && row.observation && Decimal.from(row.observation.quantity).compare(0) > 0).map(row => ({ amount: row.observation!.quantity, currency: row.observation!.currency, at: evidence.current.at, source: row.observation!.source, kind: "native_cash", accountId: row.accountId })),
     input: {
       reportingCurrency: reporting, asOf: evidence.current.at, fx: evidence.fx, maxFxAgeMs: evidence.maxFxAgeMs,
       trimDriftThresholdPct: evidence.contributionPolicy.trimDriftThresholdPct, minimumExecutionRatioPct: evidence.contributionPolicy.minimumExecutionRatioPct,
       modifiers:modifierRead.modifiers,
-      rows: holdings.map(row => {
-        const target = model.rows.find(item => item.assetId === row.id)!;
-        const observed = row.observation!;
+      rows: model.rows.map(target => {
+        const row = holdings.find(item => item.id === (target.heldAssetId ?? target.assetId));
+        const observed = row?.observation;
         const trend = ma?.rows.find(item => item.instrumentKey === additionalContributionInstrumentKey(target));
-        const rawCompatible = trend?.priceBasis === "private_kis_raw_close" && observed.basis === "raw" && observed.source.startsWith("kis") && isCurrency(target.currency);
+        const rawCompatible = trend?.priceBasis === "private_kis_raw_close" && (target.heldAssetId===null || observed?.basis === "raw" && observed.source.startsWith("kis")) && isCurrency(target.currency);
         return {
-          allocationKey: row.id, assetType: target.assetType ?? null, buyable: target.buyability === "buyable", targetWeightBps: target.targetWeightBps,
-          ...modifierRead.rows[row.id],
+          allocationKey: target.assetId, assetType: target.assetType ?? null, buyable: target.buyability === "buyable", targetWeightBps: target.targetWeightBps,
+          ...modifierRead.rows[target.assetId],
           maAssetClass: additionalContributionMaAssetClass({ ...target, maAssetClass: target.maAssetClass ?? null }), maRuleEnabled: evidence.contributionPolicy.useTrendFilter && (target.maRuleEnabled ?? true),
           ma120Evidence: rawCompatible && trend ? { status: trend.status, distanceFromMaPct: trend.evidence?.distanceFromMaPct ?? null } : { status: "unavailable", distanceFromMaPct: null },
-          ...(rawCompatible ? { maBasis: { priceCurrency: observed.currency, averageCurrency: observed.currency, priceBasis: "raw", averageBasis: "raw" } } : {}),
-          metadata: { accountId: row.accountId, name: row.name, ticker: row.ticker, market: row.market, maEvidence: trend?.evidence ?? null },
-          value: { amount: Decimal.from(observed.quantity).mul(observed.price).toExactString(), currency: observed.currency, at: evidence.current.at, source: observed.source },
-          cost: null, costLots: row.costLots ?? null,
+          ...(rawCompatible ? { maBasis: { priceCurrency: target.currency, averageCurrency: target.currency, priceBasis: "raw", averageBasis: "raw" } } : {}),
+          metadata: { accountId: target.accountId, name: target.assetName, ticker: target.ticker, market: target.market, maEvidence: trend?.evidence ?? null },
+          value: { amount: observed ? Decimal.from(observed.quantity).mul(observed.price).toExactString() : "0", currency: isCurrency(target.currency)?target.currency:reporting, at: evidence.current.at, source: observed?.source ?? "unheld_target_zero" },
+          cost: null, costLots: row?.costLots ?? null,
         };
       }),
     },

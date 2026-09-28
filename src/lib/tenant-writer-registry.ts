@@ -103,9 +103,11 @@ export const TENANT_WRITER_REGISTRY = [
     classification: "user_owned",
     authorization: "migration_cli",
     entrypoints: ["scripts/lib/broker-securities-recovery.mjs#recoverBrokerSecurities"],
-    implementationPaths: ["scripts/lib/broker-securities-recovery.mjs"],
+    implementationPaths: ["scripts/lib/broker-securities-recovery.mjs", "scripts/lib/broker-history-reconstruction.mjs"],
     targets: [
       userTarget("broker_recovery_batches", "insert", "update"),
+      userTarget("daily_portfolio_snapshots", "insert"),
+      userTarget("daily_position_snapshots", "insert"),
       userTarget("assets", "insert", "update"),
       userTarget("event_ledger_entries", "insert"),
       userTarget("portfolio_group_asset_memberships", "update", "delete"),
@@ -665,6 +667,7 @@ export const TENANT_WRITER_REGISTRY = [
     targets: [
       userTarget("portfolio_target_policy_revisions", "insert", "update"),
       userTarget("portfolio_target_policy_rows", "insert"),
+      userTarget("portfolio_target_plan_rows", "insert"),
       userTarget("portfolio_target_policy_lifecycle_events", "insert"),
     ],
     transition: {
@@ -802,6 +805,7 @@ export const TENANT_WRITER_REGISTRY = [
       "src/lib/market-data/latest-close-revalidation.ts",
       "src/lib/market-data/kis-refresh-lease.ts",
       "src/lib/market-data/kis-history-cache-sync.ts",
+      "src/lib/market-data/kis-paired-history-write.ts",
       "src/lib/market-data/asset-price-snapshot-repository.ts",
     ],
     targets: [

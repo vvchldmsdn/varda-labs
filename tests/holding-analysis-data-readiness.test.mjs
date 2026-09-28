@@ -8,6 +8,7 @@ import {
   evaluateHoldingAnalysisDataCooldown,
   parseHoldingAnalysisDataPreparationInput,
 } from "../src/lib/holding-analysis-data-readiness.ts";
+import { simulationExpectedCloseDate } from "../src/lib/simulation-market-calendar.ts";
 import { shiftRiskDate } from "../src/lib/portfolio-risk-calendar.ts";
 
 const HOLDING_ID = "22222222-2222-4222-8222-222222222222";
@@ -215,8 +216,8 @@ function holding(overrides = {}) {
 
 function priceRows(count, candidate = holding()) {
   const latestPriceDate = shiftRiskDate(SERVICE_DATE, -1);
-  return Array.from({ length: count }, (_, index) => {
-    const priceDate = shiftRiskDate(latestPriceDate, index - count + 1);
+  const dates = Array.from({length:250},(_,index)=>shiftRiskDate("2026-01-02",index)).filter(date => date <= latestPriceDate && simulationExpectedCloseDate(candidate.market,shiftRiskDate(date,1)) === date).slice(-count);
+  return dates.map((priceDate, index) => {
     return {
       market: candidate.market,
       currency: candidate.currency,

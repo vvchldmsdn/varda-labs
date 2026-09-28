@@ -64,8 +64,8 @@ export const simulationMethod = {
         en: "Included values of ₩600,000 and ₩400,000 give starting weights of 60% and 40%. If manually valued assets are excluded, this 100% describes the modeled subset, not your entire wealth.",
       },
       caveat: {
-        ko: "메인 모형은 미조정 종가의 가격 수익률이며 배당·분할을 반영한 총수익률을 주장하지 않습니다. 정렬 시 이전 가격은 최대 7일, 환율은 최대 3일까지만 이어 쓸 수 있습니다. 허용 범위를 넘는 결측값을 0으로 채우지 않으며, 포함 대상 상장 종목의 근거가 부족하면 실행을 막습니다.",
-        en: "The main model uses raw closing-price returns; it does not claim dividend- or split-adjusted total returns. Alignment may carry an earlier price for up to 7 days and FX for up to 3 days. Missing values beyond these limits are not filled with zero, and insufficient evidence for an included listed holding blocks execution.",
+        ko: "메인 모형은 미조정 종가의 가격 수익률이며 배당·분할을 반영한 총수익률을 주장하지 않습니다. 새 실행은 확인된 휴장일에만 이전 종가를 최대 7일 이어 쓰며, 환율은 최대 3일까지만 사용합니다. 허용 범위를 넘는 결측값을 0으로 채우지 않으며, 포함 대상 상장 종목의 근거가 부족하면 실행을 막습니다.",
+        en: "The main model uses raw closing-price returns; it does not claim dividend- or split-adjusted total returns. New runs carry a previous close only across verified market closures, for at most 7 days; FX can be carried for at most 3 days. Missing values beyond these limits are not filled with zero, and insufficient evidence for an included listed holding blocks execution.",
       },
     },
     // lib/simulation-stationary-bootstrap.ts; lib/simulation-gross-growth.ts;

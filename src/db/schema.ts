@@ -1376,7 +1376,7 @@ export const portfolioTargetPolicyRevisions = pgTable(
     ),
     policyVersionCheck: check(
       "portfolio_target_revisions_policy_version_check",
-      sql`${table.policyVersion} = 'portfolio_target_policy_v1'`,
+      sql`${table.policyVersion} in ('portfolio_target_policy_v1', 'portfolio_target_policy_v2')`,
     ),
     approvalRevisionCheck: check(
       "portfolio_target_revisions_revision_check",
@@ -1531,6 +1531,97 @@ export const portfolioTargetPolicyRows = pgTable(
     ),
     tenantSelectPolicy: pgPolicy(
       "portfolio_target_policy_rows_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
+  }),
+).enableRLS();
+
+export const portfolioTargetPlanRows = pgTable(
+  "portfolio_target_plan_rows",
+  {
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    planRowId: uuid("plan_row_id").notNull(),
+    originAssetId: uuid("origin_asset_id"),
+    assetType: varchar("asset_type", { length: 30 }),
+    assetName: varchar("asset_name", { length: 255 }).notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    ticker: varchar("ticker", { length: 50 }),
+    buyability: varchar("buyability", { length: 32 }).notNull(),
+    targetWeightBps: integer("target_weight_bps").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      name: "portfolio_target_plan_rows_pk",
+      columns: [table.approvalRevisionId, table.planRowId],
+    }),
+    revisionOwnerFk: foreignKey({
+      name: "portfolio_target_plan_revision_owner_fk",
+      columns: [table.approvalRevisionId, table.canonicalOwnerUserId],
+      foreignColumns: [
+        portfolioTargetPolicyRevisions.id,
+        portfolioTargetPolicyRevisions.canonicalOwnerUserId,
+      ],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "portfolio_target_plan_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "portfolio_target_plan_asset_owner_fk",
+      columns: [table.originAssetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "portfolio_target_plan_asset_account_fk",
+      columns: [table.originAssetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    instrumentUnique: uniqueIndex("portfolio_target_plan_instrument_unique").on(table.approvalRevisionId,table.accountId,table.market,table.currency,table.ticker).where(sql`${table.ticker} is not null`),
+    candidateIdentityCheck: check("portfolio_target_plan_candidate_check",sql`${table.originAssetId} is not null or (${table.ticker} is not null and (${table.market},${table.currency}) in (('korea','KRW'),('us','USD')))`),
+    ownerIdx: index("portfolio_target_plan_owner_idx").on(
+      table.canonicalOwnerUserId,
+    ),
+    accountIdx: index("portfolio_target_plan_account_idx").on(table.accountId),
+    assetIdx: index("portfolio_target_plan_asset_idx").on(table.originAssetId),
+    assetNameCheck: check(
+      "portfolio_target_plan_asset_name_check",
+      sql`${table.assetName} = btrim(${table.assetName}) and char_length(${table.assetName}) > 0`,
+    ),
+    marketCheck: check(
+      "portfolio_target_plan_market_check",
+      sql`${table.market} = lower(btrim(${table.market})) and char_length(${table.market}) > 0`,
+    ),
+    currencyCheck: check(
+      "portfolio_target_plan_currency_check",
+      sql`${table.currency} = upper(btrim(${table.currency})) and char_length(${table.currency}) > 0`,
+    ),
+    tickerCheck: check(
+      "portfolio_target_plan_ticker_check",
+      sql`${table.ticker} is null or (${table.ticker} = upper(btrim(${table.ticker})) and char_length(${table.ticker}) > 0)`,
+    ),
+    buyabilityCheck: check(
+      "portfolio_target_plan_buyability_check",
+      sql`${table.buyability} in ('buyable', 'not_buyable', 'tickerless', 'unsupported_market', 'unsupported_currency')`,
+    ),
+    targetWeightCheck: check(
+      "portfolio_target_plan_weight_check",
+      sql`${table.targetWeightBps} between 0 and 10000`,
+    ),
+    positiveTargetBuyabilityCheck: check(
+      "portfolio_target_plan_positive_buyability_check",
+      sql`${table.targetWeightBps} = 0 or ${table.buyability} = 'buyable'`,
+    ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_target_plan_rows_tenant_select_v1",
       {
         as: "permissive",
         for: "select",

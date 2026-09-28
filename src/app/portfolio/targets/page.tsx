@@ -50,6 +50,6 @@ export default async function PortfolioTargetsPage({ searchParams }: PortfolioTa
   const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
   const selectedScope = scopeContext.resolution.scope;
   const model = await getReadOnlyTenantPortfolioTargetPolicyModel({ scope: selectedScope, serviceDate, tenantContext: resolution.tenantContext });
-  return <PortfolioTargetPolicyView selectedScope={selectedScope} scopes={scopeContext.catalog.scopes} serviceDate={serviceDate} rows={model.rows}
-    universeHash={model.currentUniverseHash} isReady={model.status === "ready"} policyStatus={model.policyValidation.status} approvalRevision={model.approvedPolicy.policy?.approvalRevision ?? null} from={params.from} amount={params.amount} />;
+  return <PortfolioTargetPolicyView selectedScope={selectedScope} scopes={scopeContext.catalog.scopes} serviceDate={serviceDate} rows={model.rows.map(row => ({ ...row, targetWeightBps: row.editorTargetWeightBps }))}
+    accounts={model.selectableAccounts} universeHash={model.currentUniverseHash} isReady={model.status === "ready"} policyStatus={model.policyValidation.status} approvalRevision={model.approvedPolicy.policy?.approvalRevision ?? null} from={params.from} amount={params.amount} />;
 }

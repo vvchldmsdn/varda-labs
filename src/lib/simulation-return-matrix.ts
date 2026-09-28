@@ -66,6 +66,27 @@ export const PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY =
     stochasticConsumer: "blocked_when_incomplete",
   } as const);
 
+export const CALENDAR_ALIGNED_RAW_CLOSE_MATRIX_POLICY = Object.freeze({
+  ...PRIVATE_OWNER_RAW_CLOSE_SIMULATION_RETURN_MATRIX_POLICY,
+  version: "simulation_private_owner_raw_close_return_matrix_v2",
+  calendarPolicy: "kr_us_exchange_sessions_2026_v1",
+} as const);
+
+/** New owner runs use session admission; stored v1 runs retain their original meaning. */
+export function buildCalendarAlignedPrivateOwnerRawCloseMatrix(input: {
+  requestedServiceDates: readonly string[];
+  instruments: readonly SimulationReturnMatrixInstrumentInput[];
+  priceRows: readonly SimulationRawCloseReturnMatrixPriceInput[];
+  fxRows: readonly SimulationReturnMatrixFxInput[];
+}): SimulationReturnMatrixResult {
+  return buildReturnMatrix({ ...input, instrumentInputs: input.instruments, policy: CALENDAR_ALIGNED_RAW_CLOSE_MATRIX_POLICY });
+}
+export function buildCalendarAlignedAdjustedMatrix(input: {
+ requestedServiceDates: readonly string[]; instruments: readonly SimulationReturnMatrixInstrumentInput[];
+ priceRows: readonly SimulationReturnMatrixPriceInput[]; fxRows: readonly SimulationReturnMatrixFxInput[];
+}): SimulationReturnMatrixResult {
+ return buildReturnMatrix({...input,instrumentInputs:input.instruments,policy:{...SIMULATION_RETURN_MATRIX_POLICY,version:"simulation_return_matrix_calendar_adjusted_v2"}});
+}
 export function buildSimulationReturnMatrix({
   requestedServiceDates,
   instruments: instrumentInputs,
@@ -148,7 +169,7 @@ function buildReturnMatrix({
   }
 
   const priceInput =
-    policy.version === "simulation_private_owner_raw_close_return_matrix_v1"
+    policy.priceField === "raw_close_price_only"
       ? normalizeSimulationRawClosePriceRows({
           rows: priceRows as readonly SimulationRawCloseReturnMatrixPriceInput[],
           instruments: universe.instruments,
@@ -205,6 +226,7 @@ function buildReturnMatrix({
         fxSeries: fxInput.series,
         maxPriceCarryDays: policy.maxPriceCarryDays,
         maxFxCarryDays: policy.maxFxCarryDays,
+        requireExchangeSession: policy.version === "simulation_private_owner_raw_close_return_matrix_v2" || policy.version === "simulation_return_matrix_calendar_adjusted_v2",
       });
       if (aligned.evidence.status === "ready" && aligned.unitValueKrw === null) {
         calculationBlockers.push({

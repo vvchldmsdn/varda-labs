@@ -21,10 +21,9 @@ type Ma120HoldingInput = Pick<
   | "market"
   | "currency"
   | "ticker"
-  | "currentPrice"
   | "priceSource"
   | "priceAsOf"
->;
+> & { currentPrice: number | null };
 
 export type AdditionalContributionMa120UnavailableReason =
   | "invalid_instrument_identity"

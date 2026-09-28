@@ -146,7 +146,7 @@ const KOREA_LUNAR_AND_ELECTION_MARKET_HOLIDAYS_BY_YEAR: Record<
     "2026-06-03",
     "2026-09-24",
     "2026-09-25",
-    "2026-09-28",
+    "2026-09-26",
   ],
 };
 

@@ -35,7 +35,7 @@ export async function readAdditionalContributionModifiers({tenantContext,scope,n
     const admitted=candidates.filter(row=>{if(row.source!==latest?.source||seen.has(row.rateDate))return false;seen.add(row.rateDate);return true;}).slice(0,252).reverse();
     const total=rows.reduce((sum,row)=>sum+row.currentValue,0);
     // Unknown exposure is not silently treated as domestic for the portfolio overlay.
-    const classified=rows.every(row=>projected[row.key].fxExposureType!=='UNKNOWN');
+    const classified=rows.filter(row=>row.currentValue>0).every(row=>projected[row.key].fxExposureType!=='UNKNOWN');
     const usd=rows.reduce((sum,row)=>sum+row.currentValue*(projected[row.key].fxExposureType==='US_LISTED'?1:projected[row.key].fxExposureType==='KR_UNHEDGED_GLOBAL'?.5:0),0);
     const fresh=latest&&Date.parse(today)-Date.parse(latest.rateDate)<=3*86400000&&now.getTime()-new Date(latest.fetchedAt!).getTime()<=3*86400000;
     const calculation=fresh&&classified&&total>0?calculateContributionFxOverlay(admitted.map(row=>Number(row.usdKrw)),usd/total*100):null;
@@ -52,12 +52,12 @@ export async function readAdditionalContributionModifiers({tenantContext,scope,n
     const key=(row:{market:string|null;currency:string|null;ticker:string|null})=>`${row.market?.toLowerCase()}:${row.currency?.toUpperCase()}:${row.ticker?.trim().toUpperCase()}`;
     const values=instruments.map(instrument=>rows.filter(row=>key(row)===key(instrument)).reduce((sum,row)=>sum+row.currentValue,0));
     const total=values.reduce((a,b)=>a+b,0);
-    const complete=risk.inputHealth.status==='ready'&&risk.provenance.usableReturnObservations>=90&&risk.provenance.excludedHoldingCount===0&&risk.provenance.lastServiceDate&&Date.parse(today)-Date.parse(risk.provenance.lastServiceDate)<=7*86400000&&rows.every(row=>instruments.some(instrument=>key(row)===key(instrument)))&&values.every(value=>value>0)&&matrix?.every(line=>line.every(value=>value!==null));
+    const complete=risk.inputHealth.status==='ready'&&risk.provenance.usableReturnObservations>=90&&risk.provenance.excludedHoldingCount===0&&risk.provenance.lastServiceDate&&Date.parse(today)-Date.parse(risk.provenance.lastServiceDate)<=7*86400000&&rows.filter(row=>row.currentValue>0).every(row=>instruments.some(instrument=>key(row)===key(instrument)))&&values.every(value=>value>0)&&matrix?.every(line=>line.every(value=>value!==null));
     if(complete&&matrix&&total>0) {
       const weights=values.map(value=>value/total),covariance=matrix.map((line,i)=>line.map((correlation,j)=>correlation!*instruments[i].volatilityDaily*instruments[j].volatilityDaily));
       const variance=weights.reduce((sum,wi,i)=>sum+weights.reduce((inner,wj,j)=>inner+wi*wj*covariance[i][j],0),0);
       const calculated=calculateRiskContribution({covariance,weights,portfolioVariance:variance,annualizationScale:Math.sqrt(252)});
-      rows.forEach(row=>{const i=instruments.findIndex(instrument=>key(row)===key(instrument));const pct=calculated.rows[i]?.signedRiskContributionPct;if(pct!==null&&pct!==undefined&&Number.isFinite(pct))projected[row.key].riskContribution=knownContributionEvidence(pct/100*row.currentValue/values[i],'portfolio_risk_v1_current_weights_krw',asOf);});
+      rows.forEach(row=>{if(row.currentValue===0){projected[row.key].riskContribution=knownContributionEvidence(0,'portfolio_risk_v1_current_weights_krw',asOf);return;}const i=instruments.findIndex(instrument=>key(row)===key(instrument));const pct=calculated.rows[i]?.signedRiskContributionPct;if(pct!==null&&pct!==undefined&&Number.isFinite(pct))projected[row.key].riskContribution=knownContributionEvidence(pct/100*row.currentValue/values[i],'portfolio_risk_v1_current_weights_krw',asOf);});
     }
   }
   return { modifiers:{...fallback,fx,regime,fundingBasis:'KRW',eventScore:missingContributionEvidence('stored_news_sentiment_is_not_gyeol_bearish_adjusted_score'),performance:performanceResult.status==='fulfilled'?performanceResult.value:missingContributionEvidence('performance_history_read_failed')},rows:projected };

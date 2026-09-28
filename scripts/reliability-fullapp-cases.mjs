@@ -291,7 +291,120 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.screenshot({ path: path.join(output, 'mobile-legacy-history-heatmap.png'), fullPage: true });
       assert.deepEqual((await admin.query('select total_market_value::text from daily_portfolio_snapshots where account_id=$1 order by snapshot_date', [legacyAccount])).rows.map(row => Number(row.total_market_value)), [1100, 1200]);
     });
+    await check('fullapp-legacy-home-router-refresh-retains-scroll-desktop-mobile', async()=>{
+      await setIdentity(sessionTokens[2]);
+      // Replace the external collection response only; RSC, DAL, ownership and DB stay real.
+      let nextSyncState='fresh';
+      await page.route('**/api/portfolio/live-prices/sync', async route=>{
+        const state=nextSyncState; nextSyncState='fresh';
+        await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({state})});
+      });
+      report.scrollRefresh = [];
+      for(const width of [1440,1366,390]) {
+        await page.setViewportSize({width,height:844});
+        await page.goto(url+'/?scope=account%3A'+legacyAccount);
+        const refresh=page.getByRole('button',{name:'실시간 시세 갱신',exact:true}).first();
+        await expect(refresh).toBeEnabled();
+        await page.evaluate(()=>document.fonts.ready);
+        // Wait for the holding layout to stop changing before setting the baseline.
+        await expect.poll(async()=>page.evaluate(()=>document.documentElement.scrollHeight)).toBeGreaterThan(1000);
+        await page.evaluate(async()=>{
+          await document.fonts.ready;
+          const animations=document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity);
+          await Promise.all(animations.map(a=>a.finished.catch(()=>{})));
+          window.scrollTo({top:Math.min(650,document.documentElement.scrollHeight-innerHeight),behavior:'instant'});
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        });
+        const before=await page.evaluate(()=>scrollY);assert.ok(before>100,'must test a scrolled real Home');
+        for(let attempt=0;attempt<2;attempt++) {
+          const refreshed=page.waitForResponse(r=>new URL(r.url()).pathname==='/' && r.request().headers().rsc==='1');
+          await refresh.evaluate(button=>button.click()); // avoid Playwright scrolling to the header itself
+          await refreshed;await expect(refresh).toBeEnabled();
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          const after=await page.evaluate(()=>scrollY);
+          report.scrollRefresh.push({width,attempt,before,after,geometry:await page.evaluate(()=>({height:document.documentElement.scrollHeight,viewport:innerHeight,anchors:[...document.querySelectorAll("main section")].map(e=>({top:e.getBoundingClientRect().top,height:e.getBoundingClientRect().height}))}))});
+          await page.screenshot({path:path.join(output,`home-refresh-debug-${width}-${attempt}.png`),fullPage:true});
+          assert.ok(Math.abs(after-before)<=2,`refresh moved page from ${before} to ${after}`);
+        }
+        // A real focus listener triggers the automatic refresh in the next freshness bucket.
+        await page.clock.setSystemTime(new Date(Date.now()+6*60_000));
+        const focusRefresh=page.waitForResponse(r=>new URL(r.url()).pathname==='/' && r.request().headers().rsc==='1');
+        await page.evaluate(()=>{sessionStorage.removeItem('varda:live-price-sync:last-bucket');window.dispatchEvent(new Event('focus'));});
+        await focusRefresh; await expect(refresh).toBeEnabled();
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        assert.ok(Math.abs(await page.evaluate(()=>scrollY)-before)<=2,'automatic focus refresh moved Home');
+        await page.clock.setSystemTime(new Date());
+        // Exercise the actual polling hook; only the remote collection boundary is synthetic.
+        nextSyncState='queued';
+        const queued=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/portfolio/live-prices/sync');
+        await refresh.evaluate(button=>button.click()); await queued;
+        const pollRefresh=page.waitForResponse(r=>new URL(r.url()).pathname==='/' && r.request().headers().rsc==='1');
+        await pollRefresh; await expect(refresh).toBeEnabled();
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        assert.ok(Math.abs(await page.evaluate(()=>scrollY)-before)<=2,'queued polling refresh moved Home');
+        report.scrollRefresh.push({width,scrollY:before,result:'retained after manual, automatic focus and queued polling RSC refreshes'});
+        await page.screenshot({path:path.join(output,`home-refresh-${width}.png`)});
+      }
+      await page.unroute('**/api/portfolio/live-prices/sync');
+    });
     await runLegacyContributionUiCase({page,check,admin,owner:legacyOwner,account:legacyAccount,asset:legacyAsset,url,output});
+    await check('fullapp-target-explicit-zero-refresh-and-stale-tab-save',async()=>{
+      const secondAsset=randomUUID(),c=await admin.connect();
+      try {
+        await c.query('BEGIN');await c.query("select set_config('app.trade_reliability_version','0059',true)");
+        await c.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price,price_source,price_status,price_quote_type,price_as_of,price_fetched_at) values($1,$2,$3,'brokerage','Synthetic second target','999997','korea','KRW','stock',4,100,'kis','ok','live',$4,$4)",[secondAsset,legacyOwner,legacyAccount,quoteAt]);
+        await c.query('COMMIT');
+      }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+      const targetUrl=url+'/portfolio/targets?scope=account%3A'+legacyAccount;
+      const stale=await browserContext.newPage();
+      const input=(p,name)=>p.locator('ol > li').filter({hasText:name}).locator('input[type="number"]');
+      try {
+        await page.goto(targetUrl);await stale.goto(targetUrl);
+        await input(page,'Synthetic legacy holding').fill('0');await input(page,'Synthetic second target').fill('100');
+        await page.getByRole('button',{name:'목표비중 저장',exact:true}).click();
+        try { await expect(page.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible(); } catch(error) { report.targetFailureText=await page.locator('main').innerText(); throw error; }
+
+        await stale.evaluate(()=>window.dispatchEvent(new Event('cairn-fullapp-refresh')));
+        await expect(stale.getByText('승인본 2 편집',{exact:true})).toBeVisible();
+        await expect(stale.locator('input[name="approvalRevision"]')).toHaveValue('1');
+        await input(stale,'Synthetic legacy holding').fill('100');await input(stale,'Synthetic second target').fill('0');
+        await stale.getByRole('button',{name:'목표비중 저장',exact:true}).click();
+        await expect(stale.getByRole('status').filter({hasText:'다른 저장이 먼저 완료되었습니다.'})).toBeVisible();
+        await page.reload();await expect(input(page,'Synthetic legacy holding')).toHaveValue('0');
+        await expect(input(page,'Synthetic second target')).toHaveValue('100');
+        for(const width of [1440,390]) {
+          await page.setViewportSize({width,height:width===1440?900:844});
+          await expect(input(page,'Synthetic legacy holding')).toBeVisible();
+          await expect(input(page,'Synthetic second target')).toBeVisible();
+          await expect(page.getByRole('button',{name:'목표비중 저장',exact:true})).toBeVisible();
+          await page.evaluate(()=>document.fonts.ready);
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+          await page.screenshot({path:path.join(output,'target-zero-'+width+'.png'),fullPage:true});
+        }
+        assert.equal((await admin.query("select count(*)::int n from portfolio_target_policy_revisions where canonical_owner_user_id=$1",[legacyOwner])).rows[0].n,2);
+        assert.equal(Number((await admin.query("select quantity from assets where id=$1",[secondAsset])).rows[0].quantity),4);
+        await admin.query("insert into etf_masters(id,name,ticker,market,currency,is_active,is_sample) values($1,'Synthetic unheld target','999996','korea','KRW',true,false)",[randomUUID()]);
+        const countBefore=(await admin.query('select count(*)::int n from assets where canonical_owner_user_id=$1',[legacyOwner])).rows[0].n;
+        await page.getByText('목표 종목 추가',{exact:true}).click();
+        await page.getByLabel('목표에 넣을 종목').fill('999996');
+        await page.getByRole('button',{name:/Synthetic unheld target/}).click();
+        await input(page,'Synthetic second target').fill('50');
+        await input(page,'Synthetic unheld target').fill('50');
+        await page.getByRole('button',{name:'목표비중 저장',exact:true}).click();
+        try { await expect(page.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible(); } catch(error) { report.targetFailureText=await page.locator('main').innerText(); throw error; }
+        await page.reload();
+        await expect(input(page,'Synthetic unheld target')).toHaveValue('50');
+        assert.equal((await admin.query('select count(*)::int n from assets where canonical_owner_user_id=$1',[legacyOwner])).rows[0].n,countBefore);
+        for(const width of [1440,390]) {
+          await page.setViewportSize({width,height:width===1440?900:844});
+          await expect(input(page,'Synthetic unheld target')).toBeVisible();
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+          await page.screenshot({path:path.join(output,'target-candidate-'+width+'.png'),fullPage:true});
+        }
+
+      }finally{await stale.close();}
+    });
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };

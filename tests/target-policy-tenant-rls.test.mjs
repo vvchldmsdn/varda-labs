@@ -41,7 +41,7 @@ describe("target policy tenant RLS boundary", () => {
       "export const assetGroups",
     );
     assert.equal((legacy.match(/\.enableRLS\(\);/g) ?? []).length, 3);
-    assert.equal((portfolio.match(/\.enableRLS\(\);/g) ?? []).length, 3);
+    assert.equal((portfolio.match(/\.enableRLS\(\);/g) ?? []).length, 4);
     assert.match(legacy, /currentTenantOwns\(table\.ownerUserId\)/);
     assert.equal(
       (legacy.match(/from \$\{targetPolicyApprovalRevisions\}/g) ?? [])
@@ -59,7 +59,7 @@ describe("target policy tenant RLS boundary", () => {
     assert.equal(
       (portfolio.match(/currentTenantOwns\(table\.canonicalOwnerUserId\)/g) ?? [])
         .length,
-      3,
+      4,
     );
   });
 
@@ -111,7 +111,7 @@ describe("target policy tenant RLS boundary", () => {
     assert.match(legacySql, /left join public\.target_policy_approval_vector_rows as vector/);
     assert.match(legacySql, /account\.is_active = true/);
     assert.match(portfolioSql, /from public\.portfolio_target_policy_revisions as revision/);
-    assert.match(portfolioSql, /left join public\.portfolio_target_policy_rows as policy_row/);
+    assert.match(portfolioSql, /from public\.portfolio_target_policy_rows[\s\S]*union all[\s\S]*from public\.portfolio_target_plan_rows/);
     assert.match(portfolioSql, /scope_account_id is not distinct from \$2::uuid/);
     assert.match(portfolioSql, /scope_portfolio_group_id is not distinct from \$3::uuid/);
     assert.doesNotMatch(

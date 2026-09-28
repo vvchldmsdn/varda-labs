@@ -130,6 +130,7 @@ export async function getReadOnlyTenantHoldingAnalysisDataReadiness(options: {
       entries: Object.freeze(
         options.holdings.map((holding) =>
           buildHoldingAnalysisDataReadiness({
+            requireAdjusted: true,
             holding,
             serviceDate: options.serviceDate,
             priceRows,
@@ -184,6 +185,11 @@ async function loadRawPriceRows(input: {
       ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
       priceDate: assetPriceSnapshots.priceDate,
       closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice:assetPriceSnapshots.adjustedClosePrice,
+      adjustedCloseBasis:assetPriceSnapshots.adjustedCloseBasis,
+      adjustedCloseProvider:assetPriceSnapshots.adjustedCloseProvider,
+      adjustedCloseSource:assetPriceSnapshots.adjustedCloseSource,
+      adjustedCloseFetchedAt:assetPriceSnapshots.adjustedCloseFetchedAt,
       source: assetPriceSnapshots.source,
       providerSymbol: assetPriceSnapshots.providerSymbol,
       providerExchange: assetPriceSnapshots.providerExchange,

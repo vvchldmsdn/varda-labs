@@ -36,7 +36,7 @@ describe("portfolio target policy persistence boundary", () => {
     assert.match(writer, /portfolio_target_policy_audit_v1/);
     assert.match(
       writer,
-      /serializePortfolioTargetPolicyRows\(record\.rows\)/,
+      /serializePortfolioTargetPolicyRows\(record\.rows, record\.policyVersion\)/,
     );
     assert.doesNotMatch(writer, /accountId:\s*row\.accountId/);
     assert.doesNotMatch(writer, /retry/i);

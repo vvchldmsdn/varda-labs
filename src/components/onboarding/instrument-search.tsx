@@ -10,7 +10,9 @@ export type InstrumentChoice = {
   assetType: "etf" | "stock";
 };
 
-export function InstrumentSearch({ onSelect, disabled = false, preview = false, initialQuery = "", privateQuery = false }: {
+export function InstrumentSearch({ onSelect, disabled = false, preview = false, initialQuery = "", privateQuery = false, manualEntryAvailable = true, label }: {
+  manualEntryAvailable?: boolean;
+  label?: {ko:string;en:string};
   onSelect: (instrument: InstrumentChoice) => void; disabled?: boolean; preview?: boolean; initialQuery?: string; privateQuery?: boolean;
 }) {
   const { t } = useI18n();
@@ -41,7 +43,7 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, preview, privateQuery]);
   return <div className="varda-instrument-search">
-    <label htmlFor={id}>{t("어떤 종목을 가지고 있나요?", "What do you hold?")}</label>
+    <label htmlFor={id}>{t(label?.ko ?? "어떤 종목을 가지고 있나요?", label?.en ?? "What do you hold?")}</label>
     <div className="varda-instrument-search-input"><Search size={20} aria-hidden="true" />
       <input id={id} value={query} maxLength={80} disabled={disabled} autoComplete="off"
         placeholder={t("종목 이름 또는 티커 검색", "Search a name or ticker")}
@@ -50,9 +52,9 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
       {status === "loading" && <LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
     </div>
     <div id={`${id}-status`} aria-live="polite" className="varda-onboarding-hint">
-      {status === "error" ? t("검색을 불러오지 못했습니다. 다시 입력하거나 티커로 직접 등록해 주세요.", "Search is unavailable. Try again or enter a ticker manually.") :
-        status === "ready" && !results.length ? t("확인된 종목 목록에 없습니다. 아래에서 티커로 직접 등록할 수 있습니다.", "No match in the verified catalog. You can enter a ticker below.") :
-        status === "idle" ? t("등록된 한국·미국 종목을 검색합니다. 시장과 통화는 자동으로 채워집니다.", "Search the available Korean and US catalog. Market and currency are filled in for you.") : null}
+      {status === "error" ? !manualEntryAvailable ? t("검색을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "Search unavailable. Try again shortly.") : t("검색을 불러오지 못했습니다. 다시 입력하거나 티커로 직접 등록해 주세요.", "Search is unavailable. Try again or enter a ticker manually.") :
+        status === "ready" && !results.length ? !manualEntryAvailable ? t("검색 결과가 없어요. 다른 이름이나 티커로 검색해 주세요.", "No results. Try another name or ticker.") : t("확인된 종목 목록에 없습니다. 아래에서 티커로 직접 등록할 수 있습니다.", "No match in the verified catalog. You can enter a ticker below.") :
+        status === "idle" && manualEntryAvailable ? t("등록된 한국·미국 종목을 검색합니다. 시장과 통화는 자동으로 채워집니다.", "Search the available Korean and US catalog. Market and currency are filled in for you.") : null}
     </div>
     {results.length > 0 && <ul className="varda-instrument-results" aria-label={t("검색 결과", "Search results")}>
       {results.map(row => <li key={row.id}><button type="button" disabled={disabled} onClick={() => { onSelect(row); setQuery(""); setResults([]); setStatus("idle"); }}>

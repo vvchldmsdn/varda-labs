@@ -201,7 +201,10 @@ describe("dashboard query demand and independent market reads", () => {
       for (const component of [PortfolioDashboard, TodayMovement]) {
         const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, createElement(component, { data: home })));
         const summary = html.match(/<section class="stageSummary"[\s\S]*?<\/section>/)?.[0];
-        assert.ok(summary?.includes(pendingLabel), `${component.name}/${initialLocale}: cutoff delay appears in the primary content`);
+        const expectedLabel = component === TodayMovement
+          ? (initialLocale === "ko" ? "07시 기준 기록이 없어 오늘 변동을 계산할 수 없어요." : "Today's change needs a 07:00 baseline.")
+          : pendingLabel;
+        assert.ok(summary?.replaceAll("&#x27;", "'").includes(expectedLabel), `${component.name}/${initialLocale}: cutoff evidence is missing without claiming work is running`);
         assert.ok(summary.includes(baselineLabel), `${component.name}/${initialLocale}: the older date is labeled as the last baseline`);
         assert.ok(summary.includes("2026.09.08"));
         assert.ok(summary.includes("stageWarning"), "the notice uses the visible mobile and desktop warning slot");

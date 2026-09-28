@@ -411,7 +411,8 @@ export function adjustedHistoryCoversRawHistory(
   const raw = sortHistoricalRows(rawRows);
   return (
     adjusted[0].priceDate <= raw[0].priceDate &&
-    adjusted.at(-1)!.priceDate >= raw.at(-1)!.priceDate
+    adjusted.at(-1)!.priceDate >= raw.at(-1)!.priceDate &&
+    raw.every(row => adjusted.some(candidate=>candidate.market===row.market && candidate.currency===row.currency && candidate.ticker===row.ticker && candidate.priceDate===row.priceDate))
   );
 }
 
@@ -498,6 +499,7 @@ function sortHistoricalRows<T extends AssetPriceInstrumentEvidenceRow>(
 function providerBindingKey(row: AdjustedHistoricalPriceConsumerEvidenceRow) {
   return [
     normalizeText(row.adjustedCloseProvider)?.toLowerCase(),
+    normalizeText(row.adjustedCloseSource)?.toLowerCase(),
     normalizeText(row.providerSymbol)?.toUpperCase(),
     normalizeText(row.providerExchange)?.toUpperCase(),
   ].join("|");

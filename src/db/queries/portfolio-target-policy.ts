@@ -3,6 +3,7 @@ import "server-only";
 import {
   and,
   asc,
+  desc,
   eq,
   inArray,
   isNull,
@@ -15,7 +16,7 @@ import { db } from "@/db/client";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
 import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfolio-structure";
 import { loadCurrentTenantPortfolioTargetPolicy } from "@/db/queries/tenant-target-policies";
-import { accounts, assets } from "@/db/schema";
+import { accounts, assets, livePriceQuotes } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import {
   portfolioStructureHoldingIdentityKey,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/portfolio-structure-target-policy";
 import {
   buildPortfolioTargetPolicyRecord,
+  preservePortfolioTargetDraft,
   buildCurrentAllocationStartingWeights,
   createPortfolioTargetUniverseHash,
   normalizePortfolioTargetUniverse,
@@ -35,6 +37,8 @@ import {
   additionalContributionFallbackValueKrw,
 } from "@/lib/additional-contribution-policy-input";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+
+import { unionTargetPlanRows, targetInstrumentIdentity, TARGET_PLAN_VERSION } from "@/lib/portfolio-target-plan";
 
 const INVESTMENT_ASSET_TYPES = ["etf", "stock", "pension", "commodity"];
 
@@ -59,7 +63,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
         inArrayWhenPresent(assets.id, targets.directAssetIds),
       ]);
 
-  const [assetRows, structure, approvedPolicy] = await Promise.all([
+  const [assetRows, structure, approvedPolicy, ownedAccounts, allHeldIdentities] = await Promise.all([
     scopePredicate === null
       ? Promise.resolve([])
       : db
@@ -109,6 +113,9 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       tenantContext,
     }),
     readCurrentApprovedPolicy({ scope, tenantContext }),
+    db.select({id:accounts.id,code:accounts.code,name:accounts.name}).from(accounts).where(and(eq(accounts.canonicalOwnerUserId,tenantContext.ownerUserId),eq(accounts.isActive,true))),
+    db.select({assetId:assets.id,accountId:assets.accountId,market:assets.market,currency:assets.currency,ticker:assets.ticker}).from(assets).where(and(eq(assets.canonicalOwnerUserId,tenantContext.ownerUserId),isNull(assets.archivedAt),sql<boolean>`(${assets.quantity}>0 or coalesce(${assets.fractionalKrwValue},0)>0)`)),
+
   ]);
 
   const currentValues = new Map(
@@ -119,7 +126,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
   );
   const ambiguousValues = duplicateIdentities(structure.holdingRows);
   const ambiguousAssets = duplicateIdentities(assetRows);
-  const universeInput: PortfolioTargetUniverseInput[] = assetRows.map((row) => ({
+  const holdingInput: PortfolioTargetUniverseInput[] = assetRows.map((row) => ({
     accountCode: row.accountCode,
     accountId: row.accountId,
     accountName: row.accountName,
@@ -134,9 +141,30 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       : currentValues.get(portfolioStructureHoldingIdentityKey(row)) ??
         additionalContributionFallbackValueKrw(row, structure.usdKrwRate),
   }));
+  const currentPolicyRows = approvedPolicy.policy?.rows ?? [];
+  const selectableAccounts = ownedAccounts.filter(a=>targets.includesAllOwnedAccounts || targets.wholeAccountIds.includes(a.id) || assetRows.some(row=>row.accountId===a.id));
+  const outsideScope = new Set(currentPolicyRows.filter(plan=>allHeldIdentities.some(holding=>holding.accountId && targetInstrumentIdentity({...holding,accountId:holding.accountId})===targetInstrumentIdentity(plan) && !holdingInput.some(row=>row.assetId===holding.assetId))).map(row=>row.assetId));
+  for (const row of currentPolicyRows) {
+    if (!selectableAccounts.some(account=>account.id===row.accountId)) outsideScope.add(row.assetId);
+  }
+  let planIdentityInvalid = false;
+  let unionRows: PortfolioTargetUniverseInput[];
+  try { unionRows = unionTargetPlanRows(holdingInput, currentPolicyRows, ownedAccounts); }
+  catch { planIdentityInvalid = true; unionRows = holdingInput; }
+  const universeInput = unionRows.map(row=>outsideScope.has(row.assetId)?{...row,currentValueKrw:null}:row);
+  const policyVersion = approvedPolicy.policy?.policyVersion ?? "portfolio_target_policy_v1";
+
+  const candidateTickers = universeInput.filter(row=>row.heldAssetId===null && !outsideScope.has(row.assetId)).flatMap(row=>row.ticker?[row.ticker]:[]);
+  const candidateQuotes = candidateTickers.length ? await db.select().from(livePriceQuotes)
+    .where(and(inArray(livePriceQuotes.ticker,candidateTickers),eq(livePriceQuotes.provider,"kis"),eq(livePriceQuotes.status,"ok")))
+    .orderBy(desc(livePriceQuotes.fetchedAt),desc(livePriceQuotes.priceAsOf)).limit(candidateTickers.length*4) : [];
+  const candidateMaRows = universeInput.filter(row=>row.heldAssetId===null).map(row=>{
+    const quote=candidateQuotes.find(q=>q.ticker===row.ticker && q.market===row.market && q.currency===row.currency && q.source?.startsWith("kis") && Number(q.price)>0 && q.priceAsOf && q.priceAsOf<=q.fetchedAt && q.fetchedAt<=new Date());
+    return {market:row.market,currency:row.currency,ticker:row.ticker,currentPrice:quote?Number(quote.price):null,priceSource:quote?.source??null,priceAsOf:quote?.priceAsOf?.toISOString()??null};
+  });
   const allocationMetadata = new Map(
     assetRows.map((row) => [
-      row.assetId,
+      universeInput.find(p=>p.heldAssetId===row.assetId)?.assetId ?? row.assetId,
       Object.freeze({
         assetType: row.assetType,
         costBasisKrw: additionalContributionCostBasisKrw(row, structure.usdKrwRate),
@@ -145,10 +173,10 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       }),
     ]),
   );
-  const universe = normalizePortfolioTargetUniverse(universeInput);
-  const currentPolicyRows = approvedPolicy.policy?.rows ?? [];
+  const normalizedUniverse = normalizePortfolioTargetUniverse(universeInput);
+  const universe = planIdentityInvalid ? Object.freeze({...normalizedUniverse,status:"blocked" as const,blockers:Object.freeze(["invalid_universe_row" as const])}) : normalizedUniverse;
   const exactPolicyUniverse =
-    approvedPolicy.status === "available" &&
+    approvedPolicy.status === "available" && outsideScope.size === 0 &&
     currentPolicyRows.length === universe.rows.length &&
     currentPolicyRows.every(
       (row, index) =>
@@ -159,9 +187,10 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
         row.ticker === universe.rows[index]?.ticker &&
         row.buyability === universe.rows[index]?.buyability,
     );
+  const editableEmpty = universe.blockers.length === 1 && universe.blockers[0] === "empty_universe" && selectableAccounts.length > 0;
   const currentUniverseHash =
-    universe.status === "ready"
-      ? createPortfolioTargetUniverseHash({ scope, universe: universe.rows })
+    universe.status === "ready" || editableEmpty
+      ? createPortfolioTargetUniverseHash({ scope, universe: universe.rows, policyVersion })
       : null;
   const policyValidation = validateApprovedPolicy({
     approvedPolicy,
@@ -174,6 +203,9 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
   const startingWeights = policyValidation.status === "available"
     ? new Map(currentPolicyRows.map((row) => [row.assetId, row.targetWeightBps]))
     : buildCurrentAllocationStartingWeights(universe.rows);
+  const retainedDraft = policyValidation.status === "universe_mismatch" && approvedPolicy.status === "available"
+    ? preservePortfolioTargetDraft(universe.rows, currentPolicyRows)
+    : null;
   const targetProjection = projectPortfolioStructureEffectiveTargets({
     policyStatus: policyValidation.status,
     structure,
@@ -187,6 +219,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
             currency: row.currency,
             ticker: row.ticker,
             targetWeightBps: startingWeights.get(row.assetId) ?? -1,
+            plannedOnly: row.heldAssetId === null,
           }))
         : [],
   });
@@ -194,7 +227,10 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
     targetProjection;
 
   return Object.freeze({
-    status: universe.status,
+    status: editableEmpty ? "ready" as const : universe.status,
+    selectableAccounts,
+    policyVersion,
+    nextPolicyVersion: TARGET_PLAN_VERSION,
     scope,
     serviceDate,
     universe,
@@ -205,7 +241,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
     currentUniverseHash,
     structure: effectiveStructure,
     structureTargetProjection: Object.freeze(structureTargetProjection),
-    ma120HoldingRows: Object.freeze(structure.holdingRows),
+    ma120HoldingRows: Object.freeze([...structure.holdingRows, ...candidateMaRows]),
     startingWeightSource: policyValidation.status === "available"
       ? ("approved_policy" as const)
       : ("current_allocation_starting_point" as const),
@@ -213,8 +249,13 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
       universe.rows.map((row) =>
         Object.freeze({
           ...row,
+          assetType: row.assetType,
+          costBasisKrw: null as number | null,
+          maAssetClass: null as string | null,
+          maRuleEnabled: true,
           ...allocationMetadata.get(row.assetId),
           targetWeightBps: startingWeights.get(row.assetId) ?? 0,
+          editorTargetWeightBps: retainedDraft ? retainedDraft.get(row.assetId) ?? null : startingWeights.get(row.assetId) ?? 0,
         }),
       ),
     ),
@@ -252,6 +293,7 @@ function validateApprovedPolicy({
       targetWeightBps: row.targetWeightBps,
     })),
     effectiveServiceDate: approvedPolicy.policy.effectiveServiceDate,
+    policyVersion: approvedPolicy.policy.policyVersion,
     scope,
     universe,
   });

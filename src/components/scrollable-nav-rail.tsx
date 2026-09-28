@@ -30,9 +30,16 @@ export function ScrollableNavRail({
       });
     };
     const frame = window.requestAnimationFrame(() => {
-      viewport
-        .querySelector<HTMLElement>('[aria-current="page"]')
-        ?.scrollIntoView({ block: "nearest", inline: "center" });
+      // Scope selection only scrolls this horizontal rail. scrollIntoView also
+      // scrolls its ancestors and pulled readers back to the top after RSC refresh.
+      const selected = viewport.querySelector<HTMLElement>('[aria-current="page"]');
+      if (selected) {
+        const rail = viewport.getBoundingClientRect();
+        const item = selected.getBoundingClientRect();
+        if (item.left < rail.left || item.right > rail.right) {
+          viewport.scrollLeft += (item.left + item.right - rail.left - rail.right) / 2;
+        }
+      }
       updateEdges();
     });
     const observer = new ResizeObserver(updateEdges);

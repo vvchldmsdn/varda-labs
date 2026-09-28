@@ -37,7 +37,7 @@ export function normalizeCollectionJobs(inputs: readonly CollectionInput[]): Col
     } else windows.push({ startDate: null, endDate: null });
     for (const window of windows) {
       const key = input.kind === "fx" ? "kis:fx:USD:KRW" :
-        ["kis", input.kind, market, currency, ticker, window.startDate ?? "", window.endDate ?? ""].join(":");
+        ["kis", input.kind === "history" ? "history:paired_v1" : input.kind, market, currency, ticker, window.startDate ?? "", window.endDate ?? ""].join(":");
       jobs.set(key, { key, kind: input.kind, ticker, market, currency, ...window });
     }
   }
