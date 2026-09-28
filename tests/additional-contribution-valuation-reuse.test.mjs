@@ -72,7 +72,8 @@ describe("additional contribution scoped valuation reuse", () => {
       });
       assert.equal(result.source, "legacy_account_policy");
       assert.equal(result.status, legacyAvailable ? "ready" : "blocked");
-      assert.equal(reads.filter(table => table === "assets").length, legacyAvailable ? 3 : 2);
+      // One additional identity-only read prevents hidden held assets becoming unheld plan rows.
+      assert.equal(reads.filter(table => table === "assets").length, legacyAvailable ? 4 : 3);
       assert.equal(reads.filter(table => table === "live_price_quotes").length, 1);
       if (legacyAvailable) {
         assert.equal(result.rows[0].allocationKey, `${accountId}:${assetId}`);

@@ -27,6 +27,16 @@ export function brokerRecoverySnapshotPredicateText(
             and corrected_snapshot.is_sample = false
             and coalesce(corrected_snapshot.captured_at, corrected_snapshot.created_at) > recovery.recorded_at
         )` : ""})
+  ) and not exists (
+    select 1 from public.${snapshotTable} as newer_reconstruction
+    where ${alias}.source like 'broker_reconstructed_close_v1:%'
+      and newer_reconstruction.canonical_owner_user_id=${alias}.canonical_owner_user_id
+      and newer_reconstruction.account_id=${alias}.account_id
+      and newer_reconstruction.snapshot_date=${alias}.snapshot_date
+      and newer_reconstruction.source like 'broker_reconstructed_close_v1:%'
+      and newer_reconstruction.source<>${alias}.source
+      and coalesce(newer_reconstruction.captured_at,newer_reconstruction.created_at)>coalesce(${alias}.captured_at,${alias}.created_at)
+      and newer_reconstruction.is_sample=false
   )`;
 }
 

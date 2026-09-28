@@ -64,7 +64,7 @@ export function buildSimulationOwnerEconomicResearch(input: SimulationOwnerEcono
     return unavailable(base, "unsupported_reporting_currency", buildSource(input.matrix, [], 0, asOf));
   }
   if (input.matrix && (input.matrix.policy.returnKind !== policy.sourceReturnKind || input.matrix.policy.fxPolicy !== "date_specific_usdkrw" ||
-    !["simulation_return_matrix_v1", "simulation_private_owner_raw_close_return_matrix_v1"].includes(input.matrix.policy.version))) {
+    !["simulation_return_matrix_v1", "simulation_return_matrix_calendar_adjusted_v2", "simulation_private_owner_raw_close_return_matrix_v1", "simulation_private_owner_raw_close_return_matrix_v2"].includes(input.matrix.policy.version))) {
     return unavailable(base, "unsupported_return_basis", buildSource(input.matrix, [], 0, asOf));
   }
   if (!input.ownerExecutionReady || !input.matrix || input.matrix.status !== "ready" || input.horizon === null) {

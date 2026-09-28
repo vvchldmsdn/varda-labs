@@ -5,6 +5,7 @@ export function BrokerEvidenceDetails({ evidence }: { evidence: BrokerRecoveryDi
   return <details className="mt-1 text-xs font-normal text-[var(--muted)]">
     <summary className="cursor-pointer"><T ko="거래·결제 내역" en="Trade and settlement" /></summary>
     <dl className="mt-2 space-y-1">
+      {evidence.liquidation ? <><div><dt className="inline"><T ko="증권사 표시 수량" en="Broker-reported quantity" /> </dt><dd className="inline tabular-nums">{evidence.liquidation.reportedQuantity}</dd></div><div><dt className="inline"><T ko="전량매도 후 보유" en="Holdings after full liquidation" /> </dt><dd className="inline tabular-nums">0</dd></div></> : null}
       {evidence.orderUnitPrice ? <div><dt className="inline"><T ko="주문 단가" en="Order unit price" /> </dt><dd className="inline tabular-nums">{formatBrokerEvidenceUnitPrice(evidence.orderUnitPrice)}</dd></div> : null}
       {evidence.executionGross ? <div><dt className="inline"><T ko="거래금액" en="Trade amount" /> </dt><dd className="inline tabular-nums">{formatBrokerEvidenceMoney(evidence.executionGross)}</dd></div> : null}
       {evidence.originalDisplay ? <div><dt className="inline"><T ko="주문 표시액" en="Order display amount" /> </dt><dd className="inline tabular-nums">{formatBrokerEvidenceMoney(evidence.originalDisplay)}</dd></div> : null}

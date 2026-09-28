@@ -1,5 +1,8 @@
+import { simulationExpectedServiceDates } from "./simulation-market-calendar.ts";
 import {
   admitSharedKisRawHistoricalPriceRows,
+  admitAdjustedHistoricalPriceRows,
+  type AdjustedHistoricalPriceConsumerEvidenceRow,
   type RawHistoricalPriceConsumerEvidenceRow,
 } from "./market-data/asset-price-consumer-admission.ts";
 import {
@@ -8,14 +11,15 @@ import {
 } from "./portfolio-risk-calendar.ts";
 import type { PortfolioHoldingClassification } from "./portfolio-special-holdings.ts";
 import {
-  buildPrivateOwnerRawCloseSimulationReturnMatrix,
+  buildCalendarAlignedPrivateOwnerRawCloseMatrix,
+  buildCalendarAlignedAdjustedMatrix,
   type SimulationReturnMatrixFxInput,
   type SimulationReturnMatrixResult,
 } from "./simulation-return-matrix.ts";
 import type { SimulationHistoricalEvidenceStatus } from "./simulation-historical-evidence-admission-types.ts";
 
 export const PRIVATE_OWNER_RAW_HISTORY_POLICY = Object.freeze({
-  version: "simulation_private_owner_raw_history_v2",
+  version: "simulation_private_owner_raw_history_v3",
   purpose: "tenant_scoped_simulation_research",
   ownerBoundary: "user_owned_instrument_universe",
   marketDataBoundary: "shared_instrument_date_cache",
@@ -46,10 +50,12 @@ export type PrivateOwnerRawHistoryResult = ReturnType<
 >;
 
 export function buildPrivateOwnerRawHistory(input: {
+  requireAdjusted?: boolean;
   requestedEndServiceDate: string;
+  sourceDateFrom?: string;
   returnStepCount?: number;
   instruments: readonly PrivateOwnerRawHistoryInstrumentInput[];
-  priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  priceRows: readonly (RawHistoricalPriceConsumerEvidenceRow & Partial<AdjustedHistoricalPriceConsumerEvidenceRow>)[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
 }) {
   const returnStepCount = resolveReturnStepCount(input.returnStepCount);
@@ -57,21 +63,29 @@ export function buildPrivateOwnerRawHistory(input: {
     (row) =>
       row.weightBps > 0 && row.classification === "listed_instrument",
   );
-  const scopeAdmission = admitSharedKisRawHistoricalPriceRows(input.priceRows);
+  const scopeRows = input.priceRows.filter(row => modeledInstruments.some(instrument => matchesInstrument(row, instrument)));
+  const scopeAdmission = admitSharedKisRawHistoricalPriceRows(scopeRows);
+  const adjustedRows=scopeRows.filter((row):row is RawHistoricalPriceConsumerEvidenceRow & AdjustedHistoricalPriceConsumerEvidenceRow=>
+    row.adjustedCloseProvider==="kis" && row.adjustedCloseSource?.endsWith(":adjusted_v1")===true);
+  const adjustedAdmission=admitAdjustedHistoricalPriceRows(adjustedRows);
+  const useAdjusted=adjustedRows.length>0 && adjustedAdmission.rows.length===scopeRows.length && adjustedAdmission.issues.length===0;
+
   const admittedRows = scopeAdmission.rows;
   const requestedServiceDates = resolvePrivateOwnerRawServiceDates({
     endServiceDate: input.requestedEndServiceDate,
+    sourceDateFrom: input.sourceDateFrom,
+    instruments: modeledInstruments,
     returnStepCount,
     priceRows: admittedRows,
     fxRows: input.fxRows,
     requiresFx: modeledInstruments.some((row) => row.currency === "USD"),
   });
-  const matrix =
+  const rawMatrix =
     scopeAdmission.status === "ready" &&
     requestedServiceDates.length ===
       returnStepCount + 1 &&
     modeledInstruments.length > 0
-      ? buildPrivateOwnerRawCloseSimulationReturnMatrix({
+      ? buildCalendarAlignedPrivateOwnerRawCloseMatrix({
           requestedServiceDates,
           instruments: modeledInstruments.map((row) => ({
             market: row.market,
@@ -89,6 +103,9 @@ export function buildPrivateOwnerRawHistory(input: {
           fxRows: input.fxRows,
         })
       : null;
+  const matrix=(useAdjusted || input.requireAdjusted) && requestedServiceDates.length===returnStepCount+1
+    ? buildCalendarAlignedAdjustedMatrix({requestedServiceDates,instruments:modeledInstruments.map(row=>({...row,historyStatus:"instrument_keyed" as const})),priceRows:adjustedAdmission.rows.map(({market,currency,ticker,priceDate,adjustedClosePrice})=>({market,currency,ticker,priceDate,adjustedClosePrice})),fxRows:input.fxRows})
+    : rawMatrix;
   const instruments = input.instruments.map((instrument) =>
     buildInstrumentEvidence({
       instrument,
@@ -102,7 +119,8 @@ export function buildPrivateOwnerRawHistory(input: {
   );
 
   return Object.freeze({
-    policy: PRIVATE_OWNER_RAW_HISTORY_POLICY,
+    policy: useAdjusted || input.requireAdjusted ? Object.freeze({...PRIVATE_OWNER_RAW_HISTORY_POLICY,
+      version:"simulation_private_owner_adjusted_history_v4",providerBoundary:"stored_complete_kis_paired_adjusted_only",priceBasis:"provider_adjusted_close",corporateActionAdjustment:"provider_claimed"}) : PRIVATE_OWNER_RAW_HISTORY_POLICY,
     requestedEndServiceDate: input.requestedEndServiceDate,
     requestedReturnStepCount: returnStepCount,
     status:
@@ -177,8 +195,10 @@ export function resolveLatestCommonPrivateOwnerRawServiceDate(input: {
 
 function resolvePrivateOwnerRawServiceDates(input: {
   endServiceDate: string;
+  sourceDateFrom?: string;
+  instruments: readonly PrivateOwnerRawHistoryInstrumentInput[];
   returnStepCount: number;
-  priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  priceRows: readonly (RawHistoricalPriceConsumerEvidenceRow & Partial<AdjustedHistoricalPriceConsumerEvidenceRow>)[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
   requiresFx: boolean;
 }) {
@@ -195,38 +215,24 @@ function resolvePrivateOwnerRawServiceDates(input: {
 
 export function resolvePrivateOwnerRawAvailableServiceDates(input: {
   endServiceDate: string;
-  priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  sourceDateFrom?: string;
+  instruments: readonly PrivateOwnerRawHistoryInstrumentInput[];
+  priceRows: readonly (RawHistoricalPriceConsumerEvidenceRow & Partial<AdjustedHistoricalPriceConsumerEvidenceRow>)[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
   requiresFx: boolean;
 }) {
-  if (!isRiskDate(input.endServiceDate)) return Object.freeze([] as string[]);
-
-  const dates = new Set(
-    input.priceRows
-      .filter((row) => isRiskDate(row.priceDate))
-      .map((row) => mapRiskEvidenceDateToServiceDate(row.priceDate))
-      .filter((date) => date <= input.endServiceDate),
-  );
-  if (input.requiresFx) {
-    for (const row of input.fxRows) {
-      if (
-        row.status.trim().toLowerCase() !== "ok" ||
-        positiveNumber(row.usdKrw) === null ||
-        !isRiskDate(row.rateDate)
-      ) {
-        continue;
-      }
-      const serviceDate = mapRiskEvidenceDateToServiceDate(row.rateDate);
-      if (serviceDate <= input.endServiceDate) dates.add(serviceDate);
-    }
-  }
-
-  return Object.freeze([...dates].sort());
+  const modeled = input.instruments.filter(row => row.weightBps > 0 && row.classification === "listed_instrument");
+  // The real DAL supplies its bounded scan start, so an entirely absent trading day
+  // cannot disappear from the time axis. Pure callers may derive only their supplied range.
+  const start = input.sourceDateFrom ?? input.priceRows.filter(row => isRiskDate(row.priceDate) &&
+    modeled.some(instrument => matchesInstrument(row, instrument))).map(row => row.priceDate).sort()[0];
+  return start ? simulationExpectedServiceDates([...new Set(modeled.map(row => row.market))], start, input.endServiceDate)
+    : Object.freeze([] as string[]);
 }
 
 function buildInstrumentEvidence(input: {
   instrument: PrivateOwnerRawHistoryInstrumentInput;
-  priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  priceRows: readonly (RawHistoricalPriceConsumerEvidenceRow & Partial<AdjustedHistoricalPriceConsumerEvidenceRow>)[];
   returnStepCount: number;
   requestedServiceDates: readonly string[];
   matrix: SimulationReturnMatrixResult | null;
@@ -309,8 +315,8 @@ function buildInstrumentEvidence(input: {
     }),
     provenance: Object.freeze({
       status: admission.status === "ready" ? "complete" : "incomplete",
-      priceBasis: PRIVATE_OWNER_RAW_HISTORY_POLICY.priceBasis,
-      adjustment: "not_claimed",
+      priceBasis: input.matrix?.policy.priceField === "adjusted_close_price_only" ? "provider_adjusted_close" : PRIVATE_OWNER_RAW_HISTORY_POLICY.priceBasis,
+      adjustment: input.matrix?.policy.priceField === "adjusted_close_price_only" ? "provider_claimed" : "not_claimed",
       storedRowCount: input.priceRows.length,
       rawCloseRowCount: admission.rows.length,
       qualifiedRowCount: admission.rows.length,
@@ -357,12 +363,6 @@ function matchesInstrument(
     row.currency.trim().toUpperCase() === instrument.currency &&
     row.ticker.trim().toUpperCase() === instrument.ticker
   );
-}
-
-function positiveNumber(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function normalizeText(value: unknown) {

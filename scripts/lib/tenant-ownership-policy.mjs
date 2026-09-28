@@ -241,12 +241,15 @@ export const SNAPSHOT_CUTOFF_TABLE_POLICIES = Object.freeze([
   sharedReference("snapshot_cutoff_fx_observations"),
 ]);
 
+export const PORTFOLIO_TARGET_PLAN_TABLE_POLICIES = Object.freeze([userOwned("portfolio_target_plan_rows", TRANSITIONAL_OWNER_COLUMN)]);
+
 export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...SNAPSHOT_CUTOFF_TABLE_POLICIES,
   ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES,
   ...BROKER_RECOVERY_TABLE_POLICIES,
   ...SIMULATION_EXECUTION_TABLE_POLICIES,
   ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES, ...PROVIDER_RESERVATION_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES, ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES,
+  ...PORTFOLIO_TARGET_PLAN_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
@@ -255,6 +258,10 @@ export function resolveTenantTablePolicies(publicTableNames) {
   if(cutoffTables.some(table=>publicTableSet.has(table))) {
     if(!cutoffTables.every(table=>publicTableSet.has(table)) || !["live_price_quotes","fx_rates"].every(table=>publicTableSet.has(table))) throw new Error("cutoff observations require both archives and shared caches");
     return Object.freeze([...cutoffTables.map(sharedReference),...resolveTenantTablePolicies(publicTableNames.filter(table=>!cutoffTables.includes(table)))]);
+  }
+  if (publicTableSet.has("portfolio_target_plan_rows")) {
+    if (!["app_users", "auth_identities", "accounts", "assets", "portfolio_target_policy_revisions", "portfolio_target_policy_rows", "portfolio_target_policy_lifecycle_events"].every(table => publicTableSet.has(table))) throw new Error("target plan requires complete ownership and target policy tables");
+    return Object.freeze([...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "portfolio_target_plan_rows")), ...PORTFOLIO_TARGET_PLAN_TABLE_POLICIES]);
   }
   if (TRADE_DAILY_RELIABILITY_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
     if (!TRADE_DAILY_RELIABILITY_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {

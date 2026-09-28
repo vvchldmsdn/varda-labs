@@ -273,7 +273,7 @@ function preferredPositionRows(
 export function portfolioDashboardHistoryDisplayDate(
   row: Pick<PortfolioDashboardPositionHistoryRow, "snapshotDate" | "source" | "cycleEndAt">,
 ) {
-  if (row.source !== "varda_manual_daily_snapshot") return row.snapshotDate;
+  if (row.source !== "varda_manual_daily_snapshot" && !row.source?.startsWith("broker_reconstructed_close_v1:")) return row.snapshotDate;
   const cycleEnd = timestamp(row.cycleEndAt ?? null);
   const cutoffDate = cycleEnd > 0
     ? new Date(cycleEnd + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)

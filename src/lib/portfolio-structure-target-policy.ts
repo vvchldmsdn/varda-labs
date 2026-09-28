@@ -11,6 +11,7 @@ export type PortfolioStructureEffectiveTargetInput = Readonly<{
   currency: string;
   ticker: string | null;
   targetWeightBps: number;
+  plannedOnly?: boolean;
 }>;
 
 export type PortfolioStructureTargetProjectionStatus =
@@ -101,12 +102,13 @@ export function projectPortfolioStructureEffectiveTargets({
   const unmatchedHoldingCount = holdingRows.length - matchedHoldingCount;
   const unmatchedTargetCount =
     targetByIdentity.size - matchedTargetIdentities.size;
+  const plannedOnlyCount = targets.filter(row=>row.plannedOnly === true && !matchedTargetIdentities.has(portfolioStructureHoldingIdentityKey(row))).length;
   const status =
-    unmatchedHoldingCount === 0 && unmatchedTargetCount === 0
+    unmatchedHoldingCount === 0 && unmatchedTargetCount === plannedOnlyCount
       ? ("applied" as const)
       : ("partial" as const);
   const groupRows = structure.groupRows.map((group) => {
-    if (status !== "applied") return group;
+    if (status !== "applied" || plannedOnlyCount > 0) return group;
     const effectiveTargetPct = holdingRows
       .filter((holding) => holding.groupName === group.name)
       .reduce(

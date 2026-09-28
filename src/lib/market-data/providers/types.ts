@@ -73,6 +73,7 @@ export type ProviderResult<TQuote extends LiveQuote | ClosePrice> = {
 };
 
 export type HistoricalPriceRequestContext = {
+  includeAdjusted?: boolean;
   dryRun: boolean;
   requestedAt: Date;
   startDate: string;
@@ -97,7 +98,7 @@ export type HistoricalPriceFailure = {
 export type HistoricalPriceResult = {
   provider: string;
   fetchedAt: Date;
-  priceBasis: "raw_price_return";
+  priceBasis: "raw_price_return" | "raw_and_provider_adjusted";
   rows: ClosePrice[];
   failures: HistoricalPriceFailure[];
   requestCount: number;

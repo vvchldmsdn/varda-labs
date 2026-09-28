@@ -23,6 +23,18 @@ export const readCurrentSessionSubject = cache(async (): Promise<CurrentSessionS
   return subject ? {state:'authenticated',provider:'neon_auth',providerSubject:subject} : {state:'unauthenticated'};
 });
 `);
+  // A disposable-only control invokes the real App Router refresh. It never
+  // substitutes financial queries, returned props, or React state.
+  await writeFile(path.join(stage, 'src/components/fullapp-refresh-control.tsx'), [
+    '"use client";',
+    'import {useEffect} from "react";',
+    'import {useRouter} from "next/navigation";',
+    'export function FullAppRefreshControl(){const router=useRouter();useEffect(()=>{const refresh=()=>router.refresh();window.addEventListener("cairn-fullapp-refresh",refresh);return()=>window.removeEventListener("cairn-fullapp-refresh",refresh);},[router]);return null;}',
+  ].join('\n'));
+  const layout=path.join(stage,'src/app/layout.tsx');
+  const layoutSource=await readFile(layout,'utf8');
+  assert.ok(layoutSource.includes('<body>'));
+  await writeFile(layout,'import {FullAppRefreshControl} from "@/components/fullapp-refresh-control";\n'+layoutSource.replace('<body>','<body><FullAppRefreshControl />'));
   return { identityBoundary: 'external verified session subject substituted only in disposable build',
     sourceIdentitySha256: createHash('sha256').update(await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'))).digest('hex') };
 }
@@ -64,6 +76,8 @@ export async function main(args) {
     const originalIdentity = await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'));
     assert.equal(createHash('sha256').update(originalIdentity).digest('hex'), report.isolation.sourceIdentitySha256, 'Original production auth source changed during rehearsal');
     assert.ok(!originalIdentity.toString().includes('cairn_fullapp_identity'), 'Production identity source cannot contain the test fixture');
+    assert.ok(!(await readFile(path.join(ROOT,'src/app/layout.tsx'),'utf8')).includes('FullAppRefreshControl'), 'Refresh control must stay in disposable builds');
+
   }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({status:report.status,report:path.join(output,'report.json'),error:report.error}));

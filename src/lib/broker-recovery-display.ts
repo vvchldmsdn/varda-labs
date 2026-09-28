@@ -6,6 +6,7 @@ export type BrokerRecoveryDisplay = Readonly<{
   originalDisplay: BrokerEvidenceMoney | null;
   cashSettlement: (BrokerEvidenceMoney & Readonly<{ date: string }>) | null;
   orderUnitPrice?: BrokerEvidenceMoney;
+  liquidation?: Readonly<{reportedQuantity:string;holdingQuantityBefore:string;remainingQuantity:"0"}>;
 }>;
 
 /** Whitelist financial evidence only. Operator IDs, source paths and the manifest stay server-side. */
@@ -21,6 +22,17 @@ export function projectBrokerRecoveryDisplay(value: unknown, event: {
     if (Decimal.from(data.quantity).compare(0) <= 0 ||
         Decimal.from(data.quantity).mul(event.eventType === "sell" ? -1 : 1).compare(event.quantityDelta) !== 0) return null;
   } catch { return null; }
+  let liquidation: BrokerRecoveryDisplay["liquidation"];
+  if(data.quantityResolution !== undefined) {
+    const r=record(data.quantityResolution);
+    if(!r || event.eventType!=="sell" || r.kind!=="user_confirmed_full_liquidation_v1" ||
+      typeof r.reportedQuantity!=="string" || !/^\d+(?:\.\d{1,6})?$/.test(r.reportedQuantity) ||
+      typeof r.holdingQuantityBefore!=="string" || r.confirmedRemainingQuantity!=="0") return null;
+    try {
+      if(Decimal.from(r.reportedQuantity).compare(0)<=0 || Decimal.from(r.holdingQuantityBefore).compare(data.quantity)!==0) return null;
+    } catch {return null;}
+    liquidation=Object.freeze({reportedQuantity:r.reportedQuantity,holdingQuantityBefore:r.holdingQuantityBefore,remainingQuantity:"0"});
+  }
   const executionGross = money(data.executionGross);
   const orderUnitPrice = unitPrice(data.orderUnitPrice);
   const originalDisplay = money(data.originalDisplay);
@@ -28,8 +40,8 @@ export function projectBrokerRecoveryDisplay(value: unknown, event: {
   const date = settlement?.date;
   const cashSettlement = settlementMoney && typeof date === "string" && validDate(date) && date >= event.eventDate
     ? Object.freeze({ ...settlementMoney, date }) : null;
-  if (!executionGross && !originalDisplay && !cashSettlement && !orderUnitPrice) return null;
-  return Object.freeze({ executionGross, originalDisplay, cashSettlement, ...(orderUnitPrice ? { orderUnitPrice } : {}) });
+  if (!executionGross && !originalDisplay && !cashSettlement && !orderUnitPrice && !liquidation) return null;
+  return Object.freeze({ executionGross, originalDisplay, cashSettlement, ...(orderUnitPrice ? { orderUnitPrice } : {}), ...(liquidation ? {liquidation} : {}) });
 }
 
 function unitPrice(value: unknown): BrokerEvidenceMoney | null {

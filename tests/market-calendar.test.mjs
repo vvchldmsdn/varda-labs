@@ -103,6 +103,12 @@ describe("market calendar", () => {
     );
   });
 
+  it("resumes Korean trading on September 28 after Chuseok, without a substitute holiday", () => {
+    // KASA 2026 calendar: Chuseok September 24-26, weekend September 27.
+    const asset = { market: "korea", currency: "KRW" };
+    assert.equal(closeCalendarReferenceDateForAsset(asset, "2026-09-28"), "2026-09-23");
+    assert.equal(closeCalendarReferenceDateForAsset(asset, "2026-09-29"), "2026-09-28");
+  });
   it("uses the declared market rather than quote currency for close coverage", () => {
     const asset = { market: "korea", currency: "USD" };
 

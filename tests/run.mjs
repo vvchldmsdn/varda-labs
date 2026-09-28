@@ -1,3 +1,4 @@
+import "./kis-paired-history.test.mjs";
 import "./market-calendar.test.mjs";
 import "./cutoff-contract-followup.test.mjs";
 import "./native-cutoff-provider-reuse.test.mjs";
@@ -383,3 +384,9 @@ import "./broker-cash-reconciliation.test.mjs";
 import "./broker-recovery-snapshot-scope.test.mjs";
 import "./kis-receipt-time.test.mjs";
 import "./native-historical-idempotency.test.mjs";
+
+import "./snapshot-progress.test.mjs";
+
+import "./simulation-market-calendar.test.mjs";
+
+import "./broker-history-reconstruction.test.mjs";

@@ -428,6 +428,13 @@
       "when": 1790467200000,
       "tag": "0060_snapshot_cutoff_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790640000000,
+      "tag": "0061_portfolio_target_plan_rows",
+      "breakpoints": true
     }
   ]
 }

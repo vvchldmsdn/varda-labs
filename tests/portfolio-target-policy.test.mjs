@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   buildCurrentAllocationStartingWeights,
+  preservePortfolioTargetDraft,
   buildPortfolioTargetPolicyRecord,
   createPortfolioTargetUniverseHash,
   normalizePortfolioTargetUniverse,
@@ -19,6 +20,20 @@ const ASSET_C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const allScope = Object.freeze({ kind: "all", key: "all", label: "전체" });
 
 describe("portfolio target policy", () => {
+  it("retains explicit zero and prior intent after new holdings without assigning new targets", () => {
+    const universe = normalizePortfolioTargetUniverse([
+      holding({ accountId: ACCOUNT_A, assetId: ASSET_A, value: 600, ticker: "AAA" }),
+      holding({ accountId: ACCOUNT_A, assetId: ASSET_B, value: 300, ticker: "BBB" }),
+      holding({ accountId: ACCOUNT_B, assetId: ASSET_C, value: 100, ticker: "AAA" }),
+    ]).rows;
+    const previous = universe.slice(0, 2).map((row, i) => ({ ...row, targetWeightBps: i === 0 ? 0 : 10_000 }));
+    const draft = preservePortfolioTargetDraft(universe, previous);
+    assert.equal(draft.get(ASSET_A), 0);
+    assert.equal(draft.get(ASSET_B), 10_000);
+    assert.equal(draft.get(ASSET_C), null, "same ticker in another account never inherits an intent");
+    assert.equal(preservePortfolioTargetDraft([{...universe[0], currency: "USD"}], previous).get(ASSET_A), null);
+    assert.equal(preservePortfolioTargetDraft(universe, [...previous, previous[0]]).get(ASSET_A), null);
+  });
   it("uses account and asset identity when the same ticker exists in two accounts", () => {
     const universe = normalizePortfolioTargetUniverse([
       holding({ accountId: ACCOUNT_B, assetId: ASSET_B, value: 400, ticker: "VOO" }),
@@ -199,3 +214,31 @@ function holding({
     currentValueKrw: value,
   });
 }
+
+
+describe("independent target plan identities",()=>{
+  it("retains 0/50/50 intent across first purchase and liquidation without creating holdings",async()=>{
+    const {unionTargetPlanRows,targetPlanRowId}=await import("../src/lib/portfolio-target-plan.ts");
+    const accounts=[{id:ACCOUNT_A,code:"brokerage",name:"Synthetic"}];
+    const a=holding({accountId:ACCOUNT_A,assetId:ASSET_A,value:60,ticker:"AAA"});
+    const b=holding({accountId:ACCOUNT_A,assetId:ASSET_B,value:40,ticker:"BBB"});
+    const id=targetPlanRowId(ASSET_A,ACCOUNT_A,"korea","KRW","CCC");
+    const saved=[{...a,originAssetId:ASSET_A,targetWeightBps:0},{...b,originAssetId:ASSET_B,targetWeightBps:5000},{...a,assetId:id,originAssetId:null,ticker:"CCC",assetName:"Candidate",targetWeightBps:5000}];
+    const before=unionTargetPlanRows([a,b],saved,accounts);
+    assert.equal(before.length,3);assert.equal(before.reduce((n,r)=>n+r.currentValueKrw,0),100);
+    assert.equal(before.find(r=>r.assetId===id).heldAssetId,null);
+    const after=unionTargetPlanRows([a,b,{...a,assetId:ASSET_C,ticker:"CCC",currentValueKrw:25}],saved,accounts);
+    assert.equal(after.length,3);assert.equal(after.find(r=>r.assetId===id).heldAssetId,ASSET_C);
+    const sold=unionTargetPlanRows([a],saved,accounts);
+    assert.equal(sold.find(r=>r.assetId===ASSET_B).currentValueKrw,0);
+    assert.equal(sold.find(r=>r.assetId===ASSET_B).heldAssetId,null);
+    assert.deepEqual(saved.map(r=>r.targetWeightBps),[0,5000,5000]);
+    assert.throws(()=>unionTargetPlanRows([a,a],saved,accounts),/ambiguous_holding/);
+    assert.throws(()=>unionTargetPlanRows([],saved,[]),/target_account/);
+    assert.notEqual(targetPlanRowId(ASSET_A,ACCOUNT_B,"korea","KRW","CCC"),id);
+    const record=buildPortfolioTargetPolicyRecord({scope:allScope,effectiveServiceDate:"2026-09-29",policyVersion:"portfolio_target_policy_v2",universe:normalizePortfolioTargetUniverse(before).rows,decisions:saved.map(r=>({assetId:r.assetId,targetWeightBps:r.targetWeightBps}))});
+    assert.equal(record.status,"ready");
+    const serialized=JSON.parse(serializePortfolioTargetPolicyRows(record.rows,record.policyVersion));
+    assert.equal(serialized.find(r=>r.asset_id===id).origin_asset_id,null);
+  });
+});

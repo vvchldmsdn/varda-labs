@@ -185,7 +185,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
       structure: {
         ...model.structure,
         selectedAccount: account as "brokerage" | "isa" | "irp",
-        holdingRows: [...model.ma120HoldingRows],
+        holdingRows: [...model.structure.holdingRows],
       },
       ma120Mode,
       now,

@@ -87,6 +87,8 @@ export type SimulationReturnMatrixBlocker = Readonly<{
 
 export type SimulationReturnMatrixMissingReason =
   | "missing_price"
+  | "missing_trading_day_price"
+  | "market_calendar_unavailable"
   | "stale_price"
   | "missing_fx"
   | "stale_fx";
@@ -136,7 +138,7 @@ export type SimulationReturnMatrixResult = Readonly<{
   status: SimulationReturnMatrixStatus;
   policy:
     | Readonly<{
-        version: "simulation_return_matrix_v1";
+        version: "simulation_return_matrix_v1" | "simulation_return_matrix_calendar_adjusted_v2";
         returnKind: "krw_investor_simple_return";
         priceField: "adjusted_close_price_only";
         fxPolicy: "date_specific_usdkrw";
@@ -148,7 +150,7 @@ export type SimulationReturnMatrixResult = Readonly<{
         stochasticConsumer: "blocked_when_incomplete";
       }>
     | Readonly<{
-        version: "simulation_private_owner_raw_close_return_matrix_v1";
+        version: "simulation_private_owner_raw_close_return_matrix_v1" | "simulation_private_owner_raw_close_return_matrix_v2";
         returnKind: "krw_investor_simple_return";
         priceField: "raw_close_price_only";
         priceBasis: "raw_price_return";

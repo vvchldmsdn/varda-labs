@@ -244,18 +244,15 @@ export function buildSimulationOwnerResearchExecution(input: {
       firstServiceDate: matrix.requestedServiceDates[0] ?? null,
       lastServiceDate: matrixEndServiceDate,
       priceBasis:
-        matrix.policy.version ===
-        "simulation_private_owner_raw_close_return_matrix_v1"
+        matrix.policy.priceField === "raw_close_price_only"
           ? ("raw_price_return" as const)
           : ("provider_adjusted_close" as const),
       corporateActionAdjustment:
-        matrix.policy.version ===
-        "simulation_private_owner_raw_close_return_matrix_v1"
+        matrix.policy.priceField === "raw_close_price_only"
           ? ("not_claimed" as const)
           : ("provider_claimed" as const),
       distributionAdjustment:
-        matrix.policy.version ===
-        "simulation_private_owner_raw_close_return_matrix_v1"
+        matrix.policy.priceField === "raw_close_price_only" || matrix.policy.version === "simulation_return_matrix_calendar_adjusted_v2"
           ? ("not_claimed" as const)
           : ("provider_claimed" as const),
     }),

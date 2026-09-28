@@ -1,3 +1,4 @@
+import { snapshotProgressMessage, type SnapshotProgress } from "@/lib/snapshots/progress";
 
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
@@ -47,14 +48,17 @@ import { buildTodayQuoteFreshness, formatTodayEvidenceRange } from "@/lib/today-
 export function TodayMovement({
   data,
   designPreview = false,
+  snapshotProgress = "unknown",
   detailQuery = { holdingAccount: null, ticker: null, market: null },
 }: {
   data: DashboardData;
   designPreview?: boolean;
+  snapshotProgress?: SnapshotProgress;
   detailQuery?: TodayHoldingDetailQuery;
 }) {
   const movement = data.todayMovement;
-  const baselineIsDelayed = movement.reason === "stale_baseline_snapshot";
+  const baselineIsDelayed = ["stale_baseline_snapshot", "missing_baseline_snapshot"].includes(movement.reason ?? "");
+  const baselineMessage = snapshotProgressMessage(snapshotProgress);
   const attribution = buildTodayMovementAttribution(movement);
   const detail = selectTodayHoldingDetail(data, detailQuery);
   const holdingById = new Map(
@@ -140,8 +144,8 @@ export function TodayMovement({
           <div className={styles.stageNote}>
           {!movement.ready ? (
             <div className={`${styles.stageWarning} text-[var(--warning)]`}>
-              <p className="text-sm font-medium">{<T ko={reasonLabel(movement.reason)} en={translateHomeHistory(reasonLabel(movement.reason))}/>}</p>
-              <p className="mt-2 text-xs leading-5"><T ko={baselineIsDelayed ? "새 기준 기록이 준비되면 오늘 변동이 계산됩니다. 현재 평가액은 최신 시세로 표시합니다." : "현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다."} en={baselineIsDelayed ? "Today's change will appear when the new baseline is ready. Current value still uses the latest prices." : "Values are not estimated until current prices can be matched to the baseline snapshot."}/></p>
+              <p className="text-sm font-medium">{baselineIsDelayed ? <T {...baselineMessage} /> : <T ko={reasonLabel(movement.reason)} en={translateHomeHistory(reasonLabel(movement.reason))}/>}</p>
+              <p className="mt-2 text-xs leading-5"><T ko={baselineIsDelayed ? "현재 평가액은 최신 시세로 표시합니다." : "현재가와 기준 스냅샷이 연결되기 전에는 값을 추정하지 않습니다."} en={baselineIsDelayed ? "Current value still uses the latest prices." : "Values are not estimated until current prices can be matched to the baseline snapshot."}/></p>
               {baselineIsDelayed ? <p><T ko="마지막 기준일" en="Last baseline"/> {formatDate(data.movementBaselineDate)}</p> : null}
             </div>
           ) : (

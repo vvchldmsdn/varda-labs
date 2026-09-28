@@ -128,7 +128,9 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
       const hasQueryablePlan =
         plan?.status === "queryable" && plan.queryRange !== null;
       return buildPrivateOwnerRawHistory({
+        requireAdjusted: true,
         requestedEndServiceDate: request.endServiceDate,
+        sourceDateFrom: plan?.queryRange?.sourceDateFrom,
         returnStepCount: request.returnStepCount,
         instruments: source.instruments,
         priceRows: hasQueryablePlan ? source.priceRows : [],
@@ -169,6 +171,8 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
     hasQueryablePlan
       ? resolvePrivateOwnerRawAvailableServiceDates({
           endServiceDate: options.endServiceDate,
+          sourceDateFrom: plan?.queryRange?.sourceDateFrom,
+          instruments: source.instruments,
           priceRows,
           fxRows,
           requiresFx: source.requiresFx,
@@ -180,7 +184,9 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   );
   const buildResult = (endServiceDate: string, returnStepCount: number) =>
     buildPrivateOwnerRawHistory({
+        requireAdjusted: true,
       requestedEndServiceDate: endServiceDate,
+      sourceDateFrom: plan?.queryRange?.sourceDateFrom,
       returnStepCount,
       instruments: source.instruments,
       priceRows,
@@ -280,6 +286,11 @@ async function loadRawPriceRows(input: {
       ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
       priceDate: assetPriceSnapshots.priceDate,
       closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice:assetPriceSnapshots.adjustedClosePrice,
+      adjustedCloseBasis:assetPriceSnapshots.adjustedCloseBasis,
+      adjustedCloseProvider:assetPriceSnapshots.adjustedCloseProvider,
+      adjustedCloseSource:assetPriceSnapshots.adjustedCloseSource,
+      adjustedCloseFetchedAt:assetPriceSnapshots.adjustedCloseFetchedAt,
       source: assetPriceSnapshots.source,
       providerSymbol: assetPriceSnapshots.providerSymbol,
       providerExchange: assetPriceSnapshots.providerExchange,

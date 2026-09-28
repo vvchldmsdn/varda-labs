@@ -79,6 +79,7 @@ const UUID_PATTERN =
 const MANAGED_ASSET_TYPES = new Set(["managed_product", "managed_sleeve"]);
 
 export function buildHoldingAnalysisDataReadiness(input: {
+  requireAdjusted?: boolean;
   holding: HoldingAnalysisDataCandidate;
   serviceDate: string;
   priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
@@ -125,6 +126,7 @@ export function buildHoldingAnalysisDataReadiness(input: {
   const trendReady =
     observationCount >= HOLDING_ANALYSIS_DATA_READINESS_POLICY.trendObservationCount;
   const history = buildPrivateOwnerRawHistory({
+    requireAdjusted: input.requireAdjusted,
     requestedEndServiceDate: latestServiceDate ?? input.serviceDate,
     returnStepCount:
       HOLDING_ANALYSIS_DATA_READINESS_POLICY.simulationReturnStepCount,

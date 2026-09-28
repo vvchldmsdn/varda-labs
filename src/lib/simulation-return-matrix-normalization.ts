@@ -1,3 +1,4 @@
+import { simulationExpectedCloseDate } from "./simulation-market-calendar.ts";
 import {
   isRiskDate,
   latestRiskObservationOnOrBefore,
@@ -407,6 +408,7 @@ export function alignSimulationValue({
   fxSeries,
   maxPriceCarryDays,
   maxFxCarryDays,
+  requireExchangeSession = false,
 }: {
   serviceDate: string;
   instrument: SimulationReturnMatrixInstrument;
@@ -414,6 +416,7 @@ export function alignSimulationValue({
   fxSeries: readonly SimulationFxObservation[];
   maxPriceCarryDays: number;
   maxFxCarryDays: number;
+  requireExchangeSession?: boolean;
 }): SimulationAlignedValue {
   const price = latestRiskObservationOnOrBefore(priceSeries, serviceDate);
   if (!price) return missingAlignedValue("missing_price");
@@ -425,6 +428,11 @@ export function alignSimulationValue({
     );
   }
 
+  if (requireExchangeSession) {
+    const expected = simulationExpectedCloseDate(instrument.market, serviceDate);
+    if (!expected) return missingAlignedValue("market_calendar_unavailable", price.row.sourceDate, price.carryDays);
+    if (price.row.sourceDate !== expected) return missingAlignedValue("missing_trading_day_price", price.row.sourceDate, price.carryDays);
+  }
   const fx =
     instrument.currency === "USD"
       ? latestRiskObservationOnOrBefore(fxSeries, serviceDate)

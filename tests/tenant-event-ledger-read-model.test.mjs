@@ -386,3 +386,13 @@ it("labels recovered trades in the selected language without displaying import t
     assert.match(ordinary, /2026-07-19 17:43:21 UTC/);
   }
 });
+
+it("shows broker quantity separately for confirmed full liquidation without operator references",()=>{
+  const evidence={version:1,tradeDate:"2026-09-24",side:"sell",quantity:"1",originalDisplay:{currency:"KRW",amount:"12345"},quantityResolution:{kind:"user_confirmed_full_liquidation_v1",reportedQuantity:"0.999990",holdingQuantityBefore:"1",confirmedRemainingQuantity:"0",confirmationReference:"private operator path"}};
+  const event={source:"broker_recovery_v1",eventDate:"2026-09-24",eventType:"sell",quantityDelta:"-1"};
+  const shown=projectBrokerRecoveryDisplay(evidence,event);
+  assert.deepEqual(shown.liquidation,{reportedQuantity:"0.999990",holdingQuantityBefore:"1",remainingQuantity:"0"});
+  assert.ok(!JSON.stringify(shown).includes("private"));
+  assert.equal(shown.cashSettlement,null);
+  assert.equal(projectBrokerRecoveryDisplay({...evidence,quantityResolution:{...evidence.quantityResolution,holdingQuantityBefore:"2"}},event),null);
+});

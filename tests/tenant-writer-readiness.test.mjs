@@ -160,6 +160,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(writer.entrypoints, ["scripts/lib/broker-securities-recovery.mjs#recoverBrokerSecurities"]);
     assert.deepEqual(writer.targets.map(({ table, operations }) => ({ table, operations })), [
       { table: "broker_recovery_batches", operations: ["insert", "update"] },
+      { table: "daily_portfolio_snapshots", operations: ["insert"] },
+      { table: "daily_position_snapshots", operations: ["insert"] },
       { table: "assets", operations: ["insert", "update"] },
       { table: "event_ledger_entries", operations: ["insert"] },
       { table: "portfolio_group_asset_memberships", operations: ["update", "delete"] },
@@ -240,7 +242,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 47);
-    assert.equal(registeredPaths.length, 56);
+    assert.equal(registeredPaths.length, 58);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -500,6 +502,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
 
     assert.deepEqual(canonicalOwnerWriters, [
+      "approved_broker_evidence_recovery",
       "approved_broker_evidence_recovery",
       "native_portfolio_snapshots",
       "machine_native_portfolio_snapshots",

@@ -1,6 +1,9 @@
 import type { PortfolioTargetBuyability } from "@/lib/portfolio-target-policy";
 
 export type PortfolioTargetEditorRow = Readonly<{
+  accountId?: string;
+  assetId?: string;
+  heldAssetId?: string | null;
   accountName: string;
   assetName: string;
   market: string;
@@ -8,7 +11,7 @@ export type PortfolioTargetEditorRow = Readonly<{
   ticker: string | null;
   buyability: PortfolioTargetBuyability;
   currentValueKrw: number | null;
-  targetWeightBps: number;
+  targetWeightBps: number | null;
 }>;
 
 export function parseDisplayedTargetPercent(value: string) {
@@ -18,7 +21,8 @@ export function parseDisplayedTargetPercent(value: string) {
   return basisPoints <= 10_000 ? basisPoints : null;
 }
 
-export function targetInputPercent(basisPoints: number) {
+export function targetInputPercent(basisPoints: number | null) {
+  if (basisPoints === null) return "";
   return (basisPoints / 100).toFixed(2).replace(/\.00$/, "");
 }
 

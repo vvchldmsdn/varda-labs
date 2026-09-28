@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { simulationExpectedCloseDate, simulationExpectedServiceDates } from "../src/lib/simulation-market-calendar.ts";
 import { shiftRiskDate } from "../src/lib/portfolio-risk-calendar.ts";
 import {
   PRIVATE_OWNER_RAW_HISTORY_POLICY,
@@ -128,77 +129,35 @@ describe("private owner KIS raw history", () => {
     );
   });
 
-  it("derives a sorted unique stored service-date axis without filling gaps", () => {
-    const fixture = readyFixture(3);
-    const expected = Array.from({ length: 4 }, (_, index) =>
-      shiftRiskDate(fixture.requestedEndServiceDate, index - 3),
-    );
-    const fxOnlyServiceDate = shiftRiskDate(
-      fixture.requestedEndServiceDate,
-      -8,
-    );
-    const input = {
-      endServiceDate: fixture.requestedEndServiceDate,
-      priceRows: [
-        ...fixture.priceRows,
-        fixture.priceRows[0],
-        { ...fixture.priceRows[0], priceDate: "not-a-date" },
-      ],
-      fxRows: [
-        ...fixture.fxRows,
-        {
-          rateDate: shiftRiskDate(fxOnlyServiceDate, -1),
-          usdKrw: 1_250,
-          status: "ok",
-        },
-        { rateDate: "2026-01-01", usdKrw: 0, status: "empty" },
-      ],
-    };
-
-    assert.deepEqual(
-      resolvePrivateOwnerRawAvailableServiceDates({
-        ...input,
-        requiresFx: false,
-      }),
-      expected,
-    );
-    assert.deepEqual(
-      resolvePrivateOwnerRawAvailableServiceDates({
-        ...input,
-        requiresFx: true,
-      }),
-      [fxOnlyServiceDate, ...expected],
-    );
+  it("keeps missing open sessions and ignores FX-only weekends", () => {
+    const instruments = [instrument("korea","KRW","069500",5000),instrument("us","USD","QQQ",5000)];
+    const input = {endServiceDate:"2026-09-29",sourceDateFrom:"2026-09-23",instruments,
+      priceRows:[rawRow(instruments[0],"2026-09-23",100),rawRow(instruments[1],"2026-09-23",100)],
+      fxRows:[{rateDate:"2026-09-27",usdKrw:1000,status:"ok"}],requiresFx:true};
+    assert.deepEqual(resolvePrivateOwnerRawAvailableServiceDates(input),["2026-09-24","2026-09-25","2026-09-26","2026-09-29"]);
+    assert.deepEqual(resolvePrivateOwnerRawAvailableServiceDates({...input,requiresFx:false,fxRows:[]}),["2026-09-24","2026-09-25","2026-09-26","2026-09-29"]);
   });
+  it("does not infer sessions outside verified calendars", () => {
+    assert.equal(simulationExpectedCloseDate("korea","2025-09-29"),null);
+    assert.equal(simulationExpectedCloseDate("unknown","2026-09-29"),null);
+    assert.deepEqual(simulationExpectedServiceDates(["korea"],"2025-01-01","2025-12-31"),[]);
+    assert.deepEqual(simulationExpectedServiceDates(["korea"],"2025-05-09","2026-01-03"),["2026-01-03"]);
+  });
+
 });
 
 function readyFixture(returnStepCount = 90) {
-  const requestedEndServiceDate = "2026-04-01";
-  const serviceDates = Array.from({ length: returnStepCount + 1 }, (_, index) =>
-    shiftRiskDate(requestedEndServiceDate, index - returnStepCount),
-  );
-  const instruments = [
-    instrument("korea", "KRW", "069500", 5_000),
-    instrument("us", "USD", "QQQ", 5_000),
-  ];
-
+  const requestedEndServiceDate = "2026-09-23";
+  const allDates = simulationExpectedServiceDates(["korea","us"],"2026-02-01",requestedEndServiceDate);
+  const serviceDates = allDates.slice(-(returnStepCount+1));
+  const sourceDateFrom = shiftRiskDate(serviceDates[0],-1);
+  const instruments = [instrument("korea","KRW","069500",5000),instrument("us","USD","QQQ",5000)];
+  const scan = Array.from({length:250},(_,index)=>shiftRiskDate("2026-02-01",index)).filter(date=>date<requestedEndServiceDate);
   return {
-    requestedEndServiceDate,
-    instruments,
-    priceRows: instruments.flatMap((row, instrumentIndex) =>
-      serviceDates.map((serviceDate, index) =>
-        rawRow(
-          row,
-          shiftRiskDate(serviceDate, -1),
-          100 + instrumentIndex * 20 + index,
-        ),
-      ),
-    ),
-    fxRows: serviceDates.map((serviceDate, index) => ({
-      rateDate: shiftRiskDate(serviceDate, -1),
-      usdKrw: 1_300 + index,
-      status: "ok",
-    })),
+    requestedEndServiceDate, sourceDateFrom, instruments,
+    priceRows: instruments.flatMap((row,instrumentIndex)=>scan.filter(date =>
+      simulationExpectedCloseDate(row.market,shiftRiskDate(date,1))===date).map((date,index)=>rawRow(row,date,100+instrumentIndex*20+index))),
+    fxRows: scan.map((rateDate,index)=>({rateDate,usdKrw:1300+index,status:"ok"})),
   };
 }
 

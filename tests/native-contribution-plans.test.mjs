@@ -160,6 +160,18 @@ it('loads approved targets and MA metadata without importing legacy value or cos
   const result=await loader.readNativeContributionContext({ownerUserId:owner},'all','USD');assert.equal(result.status,'ready');
   assert.deepEqual(result.nativeSequences,{[account]:1});
   assert.equal(result.input.rows[0].value.amount,'1000');assert.equal(result.input.rows[0].cost,null);assert.deepEqual(result.input.rows[0].costLots,[lot]);assert.equal(result.input.rows[0].assetType,'etf');assert.equal(result.input.rows[0].maAssetClass,'thematic');assert.equal(result.input.rows[0].ma120Evidence.status,'below_ma');assert.equal(maInput.holdings[0].currentPrice,100);
+  const candidateId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  model.rows[0].targetWeightBps=5000;
+  model.rows.push({...model.rows[0],assetId:candidateId,heldAssetId:null,originAssetId:null,ticker:'CAND',assetName:'Candidate',currentValueKrw:0,targetWeightBps:5000});
+  const withCandidate=await loader.readNativeContributionContext({ownerUserId:owner},'all','USD');
+  assert.equal(withCandidate.status,'ready');assert.equal(withCandidate.input.rows.length,2);
+  assert.equal(withCandidate.input.rows[1].value.amount,'0');assert.equal(withCandidate.input.rows[1].costLots,null);
+  assert.equal(evidence.current.positions.length,1,'target does not mutate positions');
+  // First buy binds the stable plan ID to a different actual holding ID.
+  const actualId='dddddddd-dddd-4ddd-8ddd-dddddddddddd';model.rows[1].heldAssetId=actualId;
+  evidence.current.positions.push({...evidence.current.positions[0],id:actualId,ticker:'CAND',observation:{...observed,quantity:'2'},costLots:[]});
+  const bought=await loader.readNativeContributionContext({ownerUserId:owner},'all','USD');
+  assert.equal(bought.status,'ready');assert.equal(bought.input.rows[1].allocationKey,candidateId);assert.equal(bought.input.rows[1].value.amount,'200');
   model.policyValidation.status='missing';assert.equal((await loader.readNativeContributionContext({ownerUserId:owner},'all','USD')).reason,'approved_targets_required');
 });
 it('renders a saved USD decision on a KRW page without changing its frozen result or making requests',async()=>{

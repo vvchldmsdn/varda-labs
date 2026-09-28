@@ -519,6 +519,7 @@ export async function runDailySnapshot(
   const allAssetRows = await db
     .select({
       ...getTableColumns(assets),
+      revisionToken: sql<string>`${assets.updatedAt}::text`,
       account: accounts.code,
     })
     .from(assets)
@@ -1519,7 +1520,7 @@ async function applySnapshotWrites(
   accountBuilds: AccountSnapshotBuild[],
   allBuild: AllAccountSnapshotBuild | null,
   insertOnly: boolean,
-  expectedAssets:Asset[],
+  expectedAssets:(Asset & { revisionToken: string })[],
   cutoff:Date,
   expectedEvents:Awaited<ReturnType<typeof loadEventRows>>,
   snapshotDate:string,
@@ -1571,11 +1572,11 @@ async function applySnapshotWrites(
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,quantity numeric,"updatedAt" timestamptz)), actual as (
       select h.id,h.quantity,h.updated_at from assets h join accounts a on a.id=h.account_id
       where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is null and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
-    ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.quantity is distinct from e.quantity or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedAssets.map(a=>({id:a.id,quantity:a.quantity,updatedAt:a.updatedAt}))),accountBuilds.map(b=>b.account),cutoff.toISOString()]),
+    ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.quantity is distinct from e.quantity or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedAssets.map(a=>({id:a.id,quantity:a.quantity,updatedAt:a.revisionToken}))),accountBuilds.map(b=>b.account),cutoff.toISOString()]),
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,"updatedAt" timestamptz)), actual as (
       select e.id,e.updated_at from event_ledger_entries e join accounts a on a.id=e.account_id and a.code=e.account
       where a.canonical_owner_user_id=$1::uuid and a.is_active and a.code=any($3::text[]) and e.event_date<=$4::date
-    ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedEvents.map(e=>({id:e.id,updatedAt:e.updatedAt}))),accountBuilds.map(b=>b.account),snapshotDate]),
+    ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedEvents.map(e=>({id:e.id,updatedAt:e.revisionToken}))),accountBuilds.map(b=>b.account),snapshotDate]),
     ...queries.map(q=>{ const statement=(q as {toSQL:()=>{sql:string;params:unknown[]}}).toSQL(); return tx.query(statement.sql,statement.params); }),
   ],{isolationLevel:"ReadCommitted"});
 }
@@ -1736,7 +1737,7 @@ async function loadAccountContext(
 
 async function loadEventRows(snapshotDate: string, ownerUserId: string) {
   return db
-    .select(getTableColumns(eventLedgerEntries))
+    .select({ ...getTableColumns(eventLedgerEntries), revisionToken: sql<string>`${eventLedgerEntries.updatedAt}::text` })
     .from(eventLedgerEntries)
     .innerJoin(
       accounts,

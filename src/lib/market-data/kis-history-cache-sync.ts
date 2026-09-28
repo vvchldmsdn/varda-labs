@@ -3,7 +3,8 @@ import { isProviderCollectionDeferred } from "@/lib/market-data/collection-polic
 
 import { eq } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { db, sqlClient } from "@/db/client";
+import { writeKisPairedHistory, type KisHistoryClaim } from "./kis-paired-history-write";
 import { marketDataSyncRuns } from "@/db/schema";
 import { applyAssetPriceSnapshotRows } from "@/lib/market-data/asset-price-snapshot-repository";
 import {
@@ -32,6 +33,8 @@ export const KIS_HISTORY_CACHE_SYNC_POLICY = Object.freeze({
   userOwnership: "shared_reference_no_owner_column",
 } as const);
 
+export const KIS_PAIRED_HISTORY_CACHE_SYNC_POLICY = Object.freeze({...KIS_HISTORY_CACHE_SYNC_POLICY,version:"kis_paired_history_cache_sync_v1",priceBasis:"raw_and_provider_adjusted",adjustedCloseMutation:"paired_provenance_claim_fenced_only"} as const);
+
 export type KisHistoryCacheSyncResult = {
   runId: string;
   status: "completed";
@@ -50,7 +53,7 @@ export type KisHistoryCacheSyncResult = {
   conflictCount: number;
   warnings: string[];
   failures: HistoricalPriceFailure[];
-  policy: typeof KIS_HISTORY_CACHE_SYNC_POLICY;
+  policy: typeof KIS_HISTORY_CACHE_SYNC_POLICY | typeof KIS_PAIRED_HISTORY_CACHE_SYNC_POLICY;
 };
 
 export class KisHistoryCacheSyncError extends Error {
@@ -69,6 +72,7 @@ export async function runKisHistoryCacheSync(options: {
   endDate: string;
   provider: MarketDataProvider;
   prefetchedResult?: HistoricalPriceResult;
+  pairedClaim?: KisHistoryClaim;
 }): Promise<KisHistoryCacheSyncResult> {
   if (
     options.provider.name !== KIS_HISTORY_CACHE_SYNC_POLICY.provider ||
@@ -77,6 +81,7 @@ export async function runKisHistoryCacheSync(options: {
     throw new Error("KIS historical cache sync requires the KIS provider");
   }
 
+  const policy = options.pairedClaim ? KIS_PAIRED_HISTORY_CACHE_SYNC_POLICY : KIS_HISTORY_CACHE_SYNC_POLICY;
   const startedAt = new Date();
   const [run] = await db
     .insert(marketDataSyncRuns)
@@ -91,7 +96,7 @@ export async function runKisHistoryCacheSync(options: {
       failedCount: 0,
       skippedCount: 0,
       metadataJson: {
-        policy: KIS_HISTORY_CACHE_SYNC_POLICY.version,
+        policy: policy.version,
         startDate: options.startDate,
         endDate: options.endDate,
         targets: options.targets.map((target) => ({
@@ -111,6 +116,7 @@ export async function runKisHistoryCacheSync(options: {
       options.prefetchedResult ??
       (await options.provider.fetchHistoricalClosePrices(options.targets, {
         dryRun: false,
+        includeAdjusted: Boolean(options.pairedClaim),
         requestedAt: startedAt,
         startDate: options.startDate,
         endDate: options.endDate,
@@ -121,7 +127,7 @@ export async function runKisHistoryCacheSync(options: {
     providerDiagnostics =
       summarizeKisHistoryProviderResult(providerResult);
 
-    if (providerResult.priceBasis !== KIS_HISTORY_CACHE_SYNC_POLICY.priceBasis) {
+    if (providerResult.priceBasis !== (options.pairedClaim ? "raw_and_provider_adjusted" : KIS_HISTORY_CACHE_SYNC_POLICY.priceBasis)) {
       throw new Error("KIS history returned an unsupported price basis");
     }
     if (providerResult.rows.length === 0) {
@@ -130,7 +136,9 @@ export async function runKisHistoryCacheSync(options: {
       );
     }
 
-    const writeSummary = await applyAssetPriceSnapshotRows({
+    const writeSummary = options.pairedClaim
+      ? await writeKisPairedHistory((text,params)=>sqlClient.query(text,params),options.pairedClaim,providerResult.rows)
+      : await applyAssetPriceSnapshotRows({
       rows: [...providerResult.rows],
       targets: options.targets,
       dryRun: false,
@@ -138,7 +146,7 @@ export async function runKisHistoryCacheSync(options: {
       allowWrite: true,
     });
     const failedCount =
-      providerResult.failures.length + writeSummary.failedCount;
+      providerResult.failures.length + writeSummary.failedCount + writeSummary.conflictCount;
     const finishedAt = new Date();
 
     await db
@@ -154,7 +162,7 @@ export async function runKisHistoryCacheSync(options: {
         failedCount,
         skippedCount: writeSummary.skippedCount,
         metadataJson: {
-          policy: KIS_HISTORY_CACHE_SYNC_POLICY.version,
+          policy: policy.version,
           startDate: options.startDate,
           endDate: options.endDate,
           targetCount: options.targets.length,
@@ -192,7 +200,7 @@ export async function runKisHistoryCacheSync(options: {
       conflictCount: writeSummary.conflictCount,
       warnings: [...providerResult.warnings],
       failures: [...providerResult.failures],
-      policy: KIS_HISTORY_CACHE_SYNC_POLICY,
+      policy,
     };
   } catch (error) {
     const message = safeErrorMessage(
@@ -210,7 +218,7 @@ export async function runKisHistoryCacheSync(options: {
         ),
         error: message,
         metadataJson: {
-          policy: KIS_HISTORY_CACHE_SYNC_POLICY.version,
+          policy: policy.version,
           startDate: options.startDate,
           endDate: options.endDate,
           targetCount: options.targets.length,

@@ -1,3 +1,5 @@
+import { getOwnedLegacySnapshotProgress } from "@/db/queries/snapshot-progress";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
 import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
@@ -93,10 +95,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     tenantContext: resolution.tenantContext,
   });
 
+  const progressPromise = getOwnedLegacySnapshotProgress({ tenantContext: resolution.tenantContext, scope: scopeContext.resolution.scope, serviceDate: resolveSnapshotCycle().snapshotDate });
   return (
     <Suspense fallback={<TodaySkeleton />}>
       <TodayContent
         dashboardPromise={dashboardPromise}
+        progressPromise={progressPromise}
         detailQuery={detailQuery}
       />
     </Suspense>
@@ -109,13 +113,15 @@ function firstSearchParam(value: string | string[] | undefined) {
 
 async function TodayContent({
   dashboardPromise,
+  progressPromise,
   detailQuery,
 }: {
   dashboardPromise: ReturnType<typeof getPortfolioDashboard>;
+  progressPromise: ReturnType<typeof getOwnedLegacySnapshotProgress>;
   detailQuery: ReturnType<typeof normalizeTodayHoldingDetailQuery>;
 }) {
-  const dashboard = await dashboardPromise;
-  return <TodayMovement data={dashboard} detailQuery={detailQuery} />;
+  const [dashboard, snapshotProgress] = await Promise.all([dashboardPromise, progressPromise]);
+  return <TodayMovement data={dashboard} detailQuery={detailQuery} snapshotProgress={snapshotProgress} />;
 }
 
 function TodaySkeleton() {
