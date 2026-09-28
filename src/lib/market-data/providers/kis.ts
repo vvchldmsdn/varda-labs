@@ -134,7 +134,6 @@ export function createKisMarketDataProvider(
 }
 
 export async function fetchKisUsdKrwFxCandidate({
-  fetchedAt = new Date(),
   rateDate,
   session = createKisProviderRequestSession(),
   target,
@@ -175,7 +174,7 @@ export async function fetchKisUsdKrwFxCandidate({
       const parsed = response.ok
         ? parseKisUsdKrwPriceDetailResponse(data, {
             exchange,
-            fetchedAt,
+            fetchedAt: new Date(),
             rateDate,
           })
         : { ok: false as const, error: `provider_http_${response.status}` };
@@ -244,7 +243,9 @@ async function fetchKisLiveQuotes(
   for (const target of targets) {
     try {
       const liveRow = await fetchKisLiveRow(target, token, config);
-      rows.push(toLiveQuote(target, liveRow, fetchedAt));
+      // Receipt completion, not request/batch start. The endpoint supplies no
+      // verified exchange timestamp; cutoff storage marks this as collection.
+      rows.push(toLiveQuote(target, liveRow, new Date()));
     } catch (error) {
       if (isProviderCollectionDeferred(error)) throw error;
       rows.push({

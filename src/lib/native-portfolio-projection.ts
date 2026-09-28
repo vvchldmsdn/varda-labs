@@ -5,7 +5,7 @@ import type { FxEvidence } from "./currency-valuation.ts";
 import type { NativeStoredAccount, NativeStoredEntry } from "../db/queries/native-portfolio-ledger.ts";
 import type { NativeGroupSelection } from "./native-group-scope.ts";
 
-export type NativeSnapshotEvidence = { version: 1; frame: TrackedValuationFrame; fx: readonly FxEvidence[]; sequence: number };
+export type NativeSnapshotEvidence = { version: 1; frame: TrackedValuationFrame; fx: readonly FxEvidence[]; sequence: number; availableCurrencies?: readonly string[] };
 /** Adapts the actual owner ledger into the existing valuation engine, never fabricates a price. */
 export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledger: { accounts: NativeStoredAccount[]; entries: NativeStoredEntry[]; snapshots: { accountId: string; evidence: unknown }[]; accountsComplete?: boolean; historyComplete?: boolean }, scopeKind: string, selection?: NativeGroupSelection): TrackedPortfolioEvidence {
   const historyComplete = ledger.historyComplete !== false;
@@ -47,16 +47,12 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
   if (positions.some(row => row.kind !== "cash" && !row.accountId)) complete = false;
   const grouped = new Map<string, { frames: TrackedValuationFrame[]; accounts: Set<string> }>();
   const fx = [...base.fx];
-  // v1 observations remain stored. From an account's first canonical cutoff,
-  // use only its daily series so a later old 07:05 capture cannot steal Today.
-  const cutover = new Map<string, number>();
+  // Intraday/post-trade captures are retained as evidence, never daily baselines.
+  // The absence of a first completed cutoff must remain an absent baseline.
   for (const snapshot of ledger.snapshots) {
     const data = snapshot.evidence as NativeSnapshotEvidence;
-    if (data?.frame?.boundary === "before") cutover.set(snapshot.accountId, Math.min(cutover.get(snapshot.accountId) ?? Infinity, Date.parse(data.frame.at)));
-  }
-  for (const snapshot of ledger.snapshots) {
-    const data = snapshot.evidence as NativeSnapshotEvidence;
-    if (data?.frame && data.frame.boundary !== "before" && Date.parse(data.frame.at) >= (cutover.get(snapshot.accountId) ?? Infinity)) continue;
+    if (data?.frame?.boundary !== "before") continue;
+    if (data.availableCurrencies && !data.availableCurrencies.includes(base.reporting)) continue;
     if (!allowed.has(snapshot.accountId) || data?.version !== 1 || !data.frame || Date.parse(data.frame.at) >= Date.parse(base.asOf) || (selection && Date.parse(data.frame.at) < Date.parse(selection.stableSince))) continue;
     if (data.frame.positions.some(row => row.ownerId !== base.ownerId || row.accountId !== snapshot.accountId)) throw new Error("native_snapshot_owner_mismatch");
     const group = grouped.get(data.frame.at) ?? { frames: [], accounts: new Set<string>() };
@@ -69,7 +65,7 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
     // Its zero value after closure needs no invented quote or earlier quantity.
     const closedEmpty = ledger.accounts.filter(account => !group.accounts.has(account.id) && account.active === false && account.updatedAt && Date.parse(account.updatedAt) <= Date.parse(at) && account.state && Object.values(account.state.cash).every(value => Decimal.from(value).compare(0) === 0) && account.state.positions.every(position => Decimal.from(position.quantity).compare(0) === 0));
     return { at, ...(group.frames.every(frame => frame.boundary === "before") ? { boundary: "before" as const } : {}), source: "native_ledger_snapshot", positions: group.frames.flatMap(frame => frame.positions), scopeComplete: group.accounts.size + closedEmpty.length === allowed.size && group.frames.every(frame => frame.scopeComplete && frame.boundary === group.frames[0].boundary) };
-  });
+  }).filter(frame => frame.scopeComplete);
   const cashFlows: NonNullable<TrackedPortfolioEvidence["cashFlows"]>[number][] = [];
   const trades: TrackedTrade[] = [];
   const splits: NonNullable<TrackedPortfolioEvidence["splits"]>[number][] = [];

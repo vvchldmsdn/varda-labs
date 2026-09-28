@@ -17,7 +17,7 @@ function fixture() {
   ];
   const fx = [start, middle, end].map((at, i) => ({ base: "USD", quote: "KRW", rate: i === 2 ? "1260" : "1400", observedAt: at, fetchedAt: at, source: "dated_fixture", kind: "daily_reference" }));
   const base = { ownerId: "owner", reporting: "USD", asOf: end, current: { at: end, source: "owned", positions: [holding("stock", "stock-account", "10", "110", "USD", end)], scopeComplete: false }, history: [], trades: null, fx, maxFxAgeMs: 3 * 86400000, maxPriceAgeMs: 86400000 };
-  const snapshots = accounts.map(account => ({ accountId: account.id, evidence: { version: 1, sequence: 0, fx, frame: { at: start, source: "native_ledger_snapshot", scopeComplete: true, positions: [
+  const snapshots = accounts.map(account => ({ accountId: account.id, evidence: { version: 1, sequence: 0, fx, frame: { at: start, boundary: "before", source: "native_ledger_cutoff_v2", scopeComplete: true, positions: [
     ...account.state.positions.map(p => holding(p.assetId, account.id, p.quantity, "100", p.currency, start)),
     ...["KRW", "USD"].map(currency => ({ ...holding(`cash:${account.id}:${currency}`, account.id, account.state.cash[currency], "1", currency, start), kind: "cash" })),
   ] } } }));

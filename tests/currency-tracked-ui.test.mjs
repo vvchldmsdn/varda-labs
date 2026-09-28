@@ -24,6 +24,25 @@ const importView = async (ports = {}) => {
 const contributionPolicy = { trimDriftThresholdPct: 12, minimumExecutionRatioPct: 85 };
 
 describe("owned portfolio currency view", () => {
+  it("labels an official close by its session date and a receipt by collection time", async () => {
+    const View = await importView();
+    const evidence = trackedCurrencyFixture();
+    const observation = evidence.current.positions[0].observation;
+    Object.assign(observation, {priceKind:"close",timestampBasis:"daily_close",priceReferenceDate:"2026-09-01",priceFetchedAt:evidence.current.at});
+    delete observation.priceObservedAt;
+    let report = buildTrackedCurrencyPortfolio(evidence);
+    assert.equal(report.current.positions[0].priceObservedAt,null);
+    assert.equal(report.current.positions[0].priceReferenceDate,"2026-09-01");
+    let rendered = textOf(View({evidence}));
+    assert.match(rendered,/Close session · 2026-09-01/);
+    assert.doesNotMatch(rendered,/Price observed ·/);
+    Object.assign(observation,{priceKind:"live",timestampBasis:"collection",priceObservedAt:evidence.current.at});
+    report = buildTrackedCurrencyPortfolio(evidence);
+    assert.equal(report.current.positions[0].priceObservedAt,null);
+    rendered = textOf(View({evidence}));
+    assert.match(rendered,/Quote collected ·/);
+    assert.doesNotMatch(rendered,/Price observed ·/);
+  });
   it("shows complete USD valuation and separates dates from performance claims", async () => {
     const View = await importView();
     const tree = View({ evidence: trackedCurrencyFixture(), timeZone: "America/New_York", contributionPolicy });

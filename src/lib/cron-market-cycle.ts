@@ -8,6 +8,18 @@ export const CRON_MARKET_CYCLE_LIMITS = {
   activeRunLeaseMinutes: 30,
 } as const;
 
+/** Only an invocation in the last 15 minutes before 07:00 prepares the next
+ * cutoff. Scheduling this invocation remains an explicit deployment action. */
+export function resolveCronCutoffPreparation(now: Date) {
+  if (!Number.isFinite(now.getTime())) return null;
+  const snapshotDate = new Date(now.getTime() + 9 * 60 * 60_000).toISOString().slice(0, 10);
+  const cutoffAt = new Date(`${snapshotDate}T07:00:00+09:00`);
+  const remainingMs = cutoffAt.getTime() - now.getTime();
+  return remainingMs > 0 && remainingMs <= 15 * 60_000
+    ? { snapshotDate, cutoffAt, remainingMs }
+    : null;
+}
+
 export type CronCloseSyncGroup = {
   market: "korea" | "us";
   expectedCloseDate: string;

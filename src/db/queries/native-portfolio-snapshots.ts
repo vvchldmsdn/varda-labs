@@ -15,6 +15,8 @@ export async function saveNativeCutoffSnapshots(tenant: TenantContext, evidence:
   const availableCurrencies = (["KRW", "USD"] as const).filter(reporting => buildTrackedCurrencyPortfolio({ ...evidence, reporting }).current?.complete);
   if (!availableCurrencies.length) return { status: "incomplete" as const, created: 0 };
   const payload = Object.entries(evidence.nativeSequences).map(([accountId, sequence]) => ({ accountId, sequence, evidence: { version: 1, sequence, revision:evidence.nativeRevisions?.[accountId]??0, availableCurrencies, capturedAt, snapshotDate,
+    valuationPolicy: "cutoff_latest_then_verified_close_v3", cycleEnd: cutoff,
+    cycleStart: new Date(Date.parse(cutoff)-86400000).toISOString(),
     frame: { ...evidence.current, positions: evidence.current.positions.filter(row => row.accountId === accountId) }, fx: evidence.fx.filter(rate => Date.parse(rate.observedAt) <= Date.parse(cutoff) && Date.parse(rate.fetchedAt) <= Date.parse(cutoff)) } }));
   if (!payload.length) return { status: "incomplete" as const, created: 0 };
   const rows = await runPortfolioMutation(tenant.ownerUserId, `

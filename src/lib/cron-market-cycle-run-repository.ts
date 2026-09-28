@@ -25,10 +25,12 @@ export async function claimCronMarketCycleRun({
   snapshotDate,
   startedAt,
   cronScheduleUtc,
+  phase = "daily",
 }: {
   snapshotDate: string;
   startedAt: Date;
   cronScheduleUtc: string | null;
+  phase?: "daily" | "pre_cutoff";
 }): Promise<CronMarketCycleClaim> {
   const activeSince = new Date(
     startedAt.getTime() -
@@ -36,7 +38,8 @@ export async function claimCronMarketCycleRun({
   );
   const metadata = JSON.stringify({
     snapshotDate,
-    phase: "claimed",
+    phase,
+    outcome: "claimed",
     cronScheduleUtc,
     secretsIncluded: false,
   });
@@ -112,7 +115,7 @@ export async function claimCronMarketCycleRun({
     `,
     [
       JOB_TYPE,
-      JOB_MODE,
+      phase === "pre_cutoff" ? "pre_cutoff" : JOB_MODE,
       JOB_SOURCE,
       snapshotDate,
       activeSince.toISOString(),

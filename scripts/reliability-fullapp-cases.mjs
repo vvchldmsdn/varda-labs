@@ -11,6 +11,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { importWithPorts } from '../tests/helpers/import-with-ports.mjs';
 import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 import { childEnvironment } from './reliability-ci.mjs';
+import { runContributionUiCases, runLegacyContributionUiCase } from './reliability-contribution-ui-cases.mjs';
 
 /** Neon wire transport only. The app's SQL, tenant roles, transactions and RLS are unchanged. */
 export function createSqlBridge({ worker, tenant, connectionStrings, token }) {
@@ -69,7 +70,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
   for (const row of [{ id: account, owner, asset, code: 'brokerage', name: 'Synthetic USD', currency: 'USD', ticker: 'TESTUSD', market: 'us', price: 100 },
     { id: otherAccount, owner: other, asset: otherAsset, code: 'brokerage', name: 'Synthetic KRW', currency: 'KRW', ticker: 'TESTKR', market: 'korea', price: 10000 }]) {
     await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,$3,$4,'brokerage',$5)", [row.id, row.owner, row.code, row.name, row.currency]);
-    await admin.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price,price_source,price_status,price_quote_type,price_as_of,price_fetched_at) values($1,$2,$3,$4,$5,$6,$7,$8,'stock',10,$9,'kis','ok','close',$10,$10)", [row.asset, row.owner, row.id, row.code, row.name + ' holding', row.ticker, row.market, row.currency, row.price, quoteAt]);
+    await admin.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,category,quantity,current_price,price_source,price_status,price_quote_type,price_as_of,price_fetched_at) values($1,$2,$3,$4,$5,$6,$7,$8,'stock','국내주식',10,$9,'kis','ok','close',$10,$10)", [row.asset, row.owner, row.id, row.code, row.name + ' holding', row.ticker, row.market, row.currency, row.price, quoteAt]);
     const result = await ledger.writeNativeMutation({ ownerUserId: row.owner, role: 'user' }, { operationId: randomUUID(), accountId: row.id, expectedSequence: null,
       opening: { at: '2026-08-01T00:00:00Z', cash: { KRW: row.currency === 'KRW' ? '100000' : '0', USD: row.currency === 'USD' ? '1000' : '0' }, positions: [{ assetId: row.asset, currency: row.currency, quantity: '10', costLots: null }] } });
     assert.equal(result.status, 'created');
@@ -77,7 +78,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
   await admin.query("insert into app_users(id,status,role) values($1,'active','user')", [legacyOwner]);
   await admin.query("insert into auth_identities(app_user_id,provider,provider_subject) values($1::uuid,'neon_auth',$1::text)", [legacyOwner]);
   await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency,created_at,updated_at) values($1,$2,'brokerage','Synthetic legacy','brokerage','KRW','2026-08-01','2026-08-01')", [legacyAccount, legacyOwner]);
-  await admin.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price,created_at,updated_at) values($1,$2,$3,'brokerage','Synthetic legacy holding','999998','korea','KRW','stock',10,120,'2026-08-01','2026-08-01')", [legacyAsset, legacyOwner, legacyAccount]);
+  await admin.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,category,quantity,current_price,price_source,price_status,price_quote_type,price_as_of,price_fetched_at,created_at,updated_at) values($1,$2,$3,'brokerage','Synthetic legacy holding','999998','korea','KRW','stock','국내주식',10,120,'kis','ok','live',$4,$4,'2026-08-01','2026-08-01')", [legacyAsset, legacyOwner, legacyAccount,quoteAt]);
   for (const row of [{ date: '2026-08-04', price: 110, snapshotDate: '2026-08-05' }, { date: '2026-08-05', price: 120, snapshotDate: '2026-08-06' }]) {
     await admin.query("insert into asset_price_snapshots(ticker,market,currency,date,close_price,source,fetched_at) values('999998','korea','KRW',$1,$2,'kis',$3)", [row.date, row.price, `${row.date}T21:00:00Z`]);
     await admin.query("insert into live_price_quotes(ticker,market,currency,price,source,provider,quote_type,status,price_as_of,fetched_at) values('999998','korea','KRW',$1,'kis','kis','live','ok',$2,$2) on conflict(market,ticker,provider) do update set price=excluded.price,price_as_of=excluded.price_as_of,fetched_at=excluded.fetched_at", [row.price, `${row.date}T21:59:59Z`]);
@@ -194,7 +195,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-historical-entry-invalidates-and-rebuilds-real-cutoff-history', async () => {
       const serviceDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() - 86400000));
       const cutoffAt = new Date(`${serviceDate}T07:00:00+09:00`).toISOString();
-      const observedAt = new Date(Date.parse(cutoffAt) - 3600000).toISOString();
+      const observedAt = new Date(Date.parse(cutoffAt) - 60000).toISOString();
       const evidence = { ownerId: owner, reporting: 'USD', asOf: now.toISOString(),
         current: { at: now.toISOString(), source: 'synthetic_test_observation', scopeComplete: true, positions: [{ id: asset, ownerId: owner, accountId: account, kind: 'holding', name: 'Synthetic USD holding', ticker: 'TESTUSD', market: 'us',
           observation: { quantity: '12', price: '100', currency: 'USD', at: observedAt, priceObservedAt: observedAt, priceFetchedAt: observedAt, basis: 'raw', source: 'kis' } }] }, history: [], trades: null, fx: [], maxPriceAgeMs: 86400000, maxFxAgeMs: 86400000 };
@@ -270,6 +271,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await visitValuation('/history?currency=KRW');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     });
+    await runContributionUiCases({page,check,admin,owner:other,account:otherAccount,asset:otherAsset,url,output});
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
       await page.goto(url + '/history?scope=account%3A' + legacyAccount);
@@ -289,6 +291,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.screenshot({ path: path.join(output, 'mobile-legacy-history-heatmap.png'), fullPage: true });
       assert.deepEqual((await admin.query('select total_market_value::text from daily_portfolio_snapshots where account_id=$1 order by snapshot_date', [legacyAccount])).rows.map(row => Number(row.total_market_value)), [1100, 1200]);
     });
+    await runLegacyContributionUiCase({page,check,admin,owner:legacyOwner,account:legacyAccount,asset:legacyAsset,url,output});
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };

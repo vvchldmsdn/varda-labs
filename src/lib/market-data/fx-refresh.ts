@@ -16,6 +16,7 @@ export const FX_REFRESH_ACTUAL_WRITE_CONTRACT = {
   routeActualWritesEnabled: true,
   requiredGuard: "dryRun=false&confirmWrite=true",
   writeTables: ["fx_rates"],
+  transactionalCapture: "snapshot_cutoff_fx_observations (bounded 06:45–07:00 KST receipts)",
   runMetadataWrites: false,
   forbiddenWriteTables: FX_REFRESH_DRY_RUN_CONTRACT.forbiddenWriteTables,
 } as const;
@@ -138,7 +139,6 @@ export async function fetchUsdKrwFxCandidate(options: {
     );
   }
 
-  const fetchedAt = options.fetchedAt ?? new Date();
   let response: Response;
 
   try {
@@ -182,7 +182,7 @@ export async function fetchUsdKrwFxCandidate(options: {
   }
 
   const parsed = parseExchangeRateOpenAccessUsdKrwResponse(payload, {
-    fetchedAt,
+    fetchedAt: new Date(),
   });
 
   if (!parsed.ok) {

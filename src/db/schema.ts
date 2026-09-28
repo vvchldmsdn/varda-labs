@@ -3192,3 +3192,44 @@ export const dailySnapshotWork=pgTable("daily_snapshot_work",{
   check("daily_snapshot_work_stage_check",sql`${t.stage} IN ('legacy','native')`),
   check("daily_snapshot_work_status_check",sql`${t.status} IN ('pending','running','completed','blocked','failed')`),
 ]).enableRLS();
+
+// Only the 15-minute pre-cutoff window is retained, capped at 32 receipts per
+// instrument/provider/day for 35 days. Completed snapshots own their evidence.
+export const snapshotCutoffPriceObservations = pgTable("snapshot_cutoff_price_observations", {
+  id: uuid("id").defaultRandom().primaryKey(), snapshotDate: date("snapshot_date").notNull(),
+  ticker: varchar("ticker", { length: 50 }).notNull(), market: varchar("market", { length: 20 }).notNull(),
+  currency: varchar("currency", { length: 10 }).notNull(), provider: varchar("provider", { length: 100 }).notNull(),
+  source: varchar("source", { length: 100 }).notNull(), quoteType: varchar("quote_type", { length: 50 }).notNull(),
+  price: decimal("price", { precision: 28, scale: 12 }).notNull(), observedAt: timestamp("observed_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  storedAt: timestamp("stored_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+  timestampBasis: varchar("timestamp_basis", { length: 20 }).notNull(),
+}, t => [
+  uniqueIndex("cutoff_price_receipt_unique").on(t.snapshotDate, t.market, t.ticker, t.currency, t.provider, t.fetchedAt),
+  index("cutoff_price_retention_idx").on(t.snapshotDate),
+  check("cutoff_price_positive", sql`${t.price}>0`),
+  check("cutoff_price_time_order", sql`${t.observedAt} is null or ${t.observedAt}<=${t.fetchedAt}`),
+  check("cutoff_price_basis", sql`(${t.timestampBasis}='collection' and ${t.observedAt} is null) or (${t.timestampBasis}='provider' and ${t.observedAt} is not null)`),
+  check("cutoff_price_date", sql`${t.snapshotDate}=(${t.fetchedAt} at time zone 'Asia/Seoul')::date`),
+  check("cutoff_price_window", sql`(${t.fetchedAt} at time zone 'Asia/Seoul')::time between time '06:45' and time '07:00'`),
+]).enableRLS();
+
+export const snapshotCutoffFxObservations = pgTable("snapshot_cutoff_fx_observations", {
+  id: uuid("id").defaultRandom().primaryKey(), snapshotDate: date("snapshot_date").notNull(),
+  pair: varchar("pair", { length: 10 }).notNull(), provider: varchar("provider", { length: 100 }).notNull(),
+  source: varchar("source", { length: 100 }).notNull(), rateDate: date("rate_date").notNull(),
+  usdKrw: decimal("usd_krw", { precision: 20, scale: 6 }).notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }), rateKind: varchar("rate_kind", { length: 30 }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  storedAt: timestamp("stored_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+  timestampBasis: varchar("timestamp_basis", { length: 20 }).notNull(),
+}, t => [
+  uniqueIndex("cutoff_fx_receipt_unique").on(t.snapshotDate, t.pair, t.provider, t.fetchedAt),
+  index("cutoff_fx_retention_idx").on(t.snapshotDate),
+  check("cutoff_fx_pair", sql`${t.pair}='USD/KRW'`),
+  check("cutoff_fx_positive", sql`${t.usdKrw}>0`),
+  check("cutoff_fx_time_order", sql`${t.observedAt} is null or ${t.observedAt}<=${t.fetchedAt}`),
+  check("cutoff_fx_basis", sql`(${t.timestampBasis}='collection' and ${t.observedAt} is null and ${t.rateKind} is null) or (${t.timestampBasis}='provider' and ${t.observedAt} is not null and ${t.rateKind} in ('spot','daily_reference'))`),
+  check("cutoff_fx_date", sql`${t.snapshotDate}=(${t.fetchedAt} at time zone 'Asia/Seoul')::date`),
+  check("cutoff_fx_window", sql`(${t.fetchedAt} at time zone 'Asia/Seoul')::time between time '06:45' and time '07:00'`),
+]).enableRLS();

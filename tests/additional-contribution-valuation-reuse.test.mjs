@@ -48,6 +48,7 @@ describe("additional contribution scoped valuation reuse", () => {
           vectorHash: packet.vectorHash, vector: packet.canonicalVector },
       } : { status: "missing", policy: null };
       const [query] = await importWithPorts(["src/db/queries/additional-contribution.ts"], {
+        '@/db/queries/additional-contribution-modifiers':{readAdditionalContributionModifiers:async()=>({modifiers:{fundingBasis:'KRW',fx:{status:'unavailable',reason:'fixture'},regime:{status:'unavailable',reason:'fixture'},eventScore:{status:'unavailable',reason:'fixture'},performance:{status:'unavailable',reason:'fixture'}},rows:{}})},
         "@/db/client": { db },
         "@/db/queries/tenant-group-reads": {
           loadActiveTenantAllocationGroupBundle: async () => ({ groups: [], members: [] }),

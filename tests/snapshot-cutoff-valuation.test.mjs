@@ -29,6 +29,16 @@ function quote(overrides = {}) {
 }
 
 describe("snapshot cutoff valuation quote selection", () => {
+  it("rejects conflicting latest quotes in either cache order and permits a verified close fallback", () => {
+    const cycleEndAt = new Date("2026-08-23T22:00:00Z");
+    const rows = [quote({price:"105"}),quote({price:"110"})];
+    const input = {instrument, capturedAt:cycleEndAt, cycleEndAt, rows};
+    assert.equal(selectSnapshotCutoffQuote(input), null);
+    assert.equal(selectSnapshotCutoffQuote({...input,rows:[...rows].reverse()}), null);
+    const fallback = selectSnapshotCutoffValuation({...input,officialClose:{price:100,referenceDate:"2026-08-21",expectedCloseDate:"2026-08-21",fromCloseSnapshot:true}});
+    assert.equal(fallback.basis,"close");
+    assert.equal(fallback.close.price,100);
+  });
   it("selects the latest fresh KIS quote for the exact instrument", () => {
     const selected = selectSnapshotCutoffQuote({
       instrument,

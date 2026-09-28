@@ -167,6 +167,15 @@ export async function writeNativeMutation(tenant: TenantContext, input: NativeMu
   if (input.history) {
     const complete = await readNativeLedger(tenant);
     if (!complete.entriesComplete || !complete.accountsComplete) return { status: "invalid" as const, reason: "historical_scope_too_large" };
+    if (complete.accounts.find(row => row.id === input.accountId)?.state?.sequence !== input.expectedSequence) {
+      // An identical request may commit between the two repeatable-read
+      // preflights. Resolve its original operation before treating a changed
+      // replay sequence as a conflict; never replay the same command twice.
+      const current = await readNativeMutationContext(tenant, input);
+      if (current.duplicate) return { status: canonical(current.duplicate.request) === canonical(input) ? "existing" as const : "conflict" as const };
+      if (current.cancelled) return { status: "invalid" as const, reason: "operation_cancelled" };
+      return { status: "conflict" as const };
+    }
     let replay;
     try { replay = replayNativeTrade(complete.accounts, complete.entries, input); }
     catch (error) { return { status: "invalid" as const, reason: error instanceof Error ? error.message : "historical_replay_invalid" }; }

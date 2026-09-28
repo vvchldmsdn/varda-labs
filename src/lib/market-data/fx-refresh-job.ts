@@ -1,5 +1,6 @@
 import "server-only";
 import { fxObservationWrite } from "./fx-observation-write";
+import { preserveUnchangedCutoffFx } from "@/db/queries/snapshot-cutoff-observations";
 
 import { eq } from "drizzle-orm";
 
@@ -81,6 +82,7 @@ export async function runUsdKrwFxCandidateJob({
     plannedWrite.action === "planned_skip" &&
     plannedWrite.reason === "same_varda_row_value"
   ) {
+    await preserveUnchangedCutoffFx(candidate);
     return {
       ...baseResult,
       ok: true,

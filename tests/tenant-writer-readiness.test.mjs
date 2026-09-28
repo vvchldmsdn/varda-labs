@@ -47,6 +47,9 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
   "scripts/native-trade-cutoff-rehearsal-cases.mjs",
   "scripts/broker-securities-rehearsal-cases.mjs", // Synthetic fixtures injected by the isolated loopback runner only.
   "scripts/reliability-postgres-cases.mjs", // Disposable cluster pools injected by the reviewed runner.
+  "scripts/cutoff-upgrade-audit.mjs", // Synthetic upgrade sentinels on the injected disposable cluster only.
+  "scripts/cutoff-observation-postgres-cases.mjs", // Synthetic external responses; actual writers on injected disposable PostgreSQL only.
+  "scripts/reliability-contribution-ui-cases.mjs", // UI fixtures use the existing isolated full-app runner's injected database.
   "scripts/reliability-retry-cases.mjs", // Same injected loopback cluster; no remote connection configuration.
   "scripts/reliability-compatibility-cases.mjs", // Separate database in the injected disposable loopback cluster.
   "scripts/reliability-fullapp-cases.mjs", // Actual Next app against the isolated cluster through a loopback-only SQL bridge.
@@ -70,6 +73,17 @@ describe("tenant writer Phase 1D-A readiness", () => {
     }
     for (const path of walkProductRuntimeFiles(join(ROOT, "src"))) {
       assert.doesNotMatch(readFileSync(path, "utf8"), /reliability-(?:browser|postgres)-cases/);
+    }
+  });
+
+  it("confines cutoff upgrade sentinels to the disposable rehearsal", () => {
+    const file = "scripts/cutoff-upgrade-audit.mjs";
+    const source = readFileSync(join(ROOT, file), "utf8");
+    assert.equal(REHEARSAL_ONLY_DML_PATHS.has(file), true);
+    assert.doesNotMatch(source, /DATABASE_URL|process\.env|dotenv|fetch\(|new (?:Client|Pool)/);
+    assert.match(source, /export async function prepareCutoffUpgradeAudit\(db\)/);
+    for (const path of walkProductRuntimeFiles(join(ROOT, "src"))) {
+      assert.doesNotMatch(readFileSync(path, "utf8"), /cutoff-upgrade-audit/);
     }
   });
 
@@ -226,7 +240,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 47);
-    assert.equal(registeredPaths.length, 55);
+    assert.equal(registeredPaths.length, 56);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -834,7 +848,7 @@ function discoverDmlPaths() {
     .filter((path) => {
       const source = readFileSync(path, "utf8");
       return (
-        RAW_SQL_DML_PATTERN.test(source) || /\bselect\s+(?:apply_native_portfolio_(?:tenant_)?mutation|apply_native_trade_revision|cancel_native_operation)\s*\(/i.test(source) ||
+        RAW_SQL_DML_PATTERN.test(source) || /\bselect\s+(?:apply_native_portfolio_(?:tenant_)?mutation|apply_native_trade_revision|cancel_native_operation|record_snapshot_cutoff_fx)\s*\(/i.test(source) ||
         (DB_IMPORT_PATTERN.test(source) && DRIZZLE_DML_PATTERN.test(source))
       );
     })

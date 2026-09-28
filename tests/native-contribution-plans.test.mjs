@@ -21,6 +21,7 @@ const request=(method,body,url='https://local.test/api/native-contribution-plans
 const pg=new PGlite(); let route,queries,tenant,subject,context,reads,beforeWrite,failDelete;
 before(async()=>{
   await pg.exec(`create role varda_tenant_app; create table app_users(id uuid primary key,status text); insert into app_users values('${owner}','active'),('${other}','active'); create table accounts(id uuid primary key,canonical_owner_user_id uuid,native_state jsonb,is_active boolean default true); grant select on accounts to varda_tenant_app;`);
+  await pg.exec(`create table portfolio_target_policy_revisions(canonical_owner_user_id uuid,lifecycle_status text,scope_kind text,scope_account_id uuid,scope_portfolio_group_id uuid,approval_revision integer,universe_hash text,vector_hash text,policy_version text); grant select on portfolio_target_policy_revisions to varda_tenant_app; alter table portfolio_target_policy_revisions enable row level security; create policy owner_read on portfolio_target_policy_revisions for select to varda_tenant_app using(canonical_owner_user_id=nullif(current_setting('app.current_user_id',true),'')::uuid);`);
   for(const file of ['0045_investment_plans.sql','0053_native_contribution_plans.sql']) await pg.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
   const sql={transaction:async build=>{
     const commands=build({query:(text,params=[])=>({text,params})});
@@ -36,7 +37,7 @@ before(async()=>{
   });
 });
 beforeEach(async()=>{
-  await pg.exec(`truncate native_contribution_plans,accounts; update app_users set status='active'; insert into accounts(id,canonical_owner_user_id,native_state) values('${account}','${owner}','{"sequence":1}')`);
+  await pg.exec(`truncate native_contribution_plans,accounts,portfolio_target_policy_revisions; update app_users set status='active'; insert into accounts(id,canonical_owner_user_id,native_state) values('${account}','${owner}','{"sequence":1}')`);
   tenant=owner;subject={state:'authenticated',provider:'test',providerSubject:'one'};context=basis();reads=0;beforeWrite=null;failDelete=false;
 });
 after(async()=>{await pg.close();});
@@ -64,7 +65,9 @@ it('recomputes on the server and stores an immutable plan with idempotent retry 
   assert.equal((await route.POST(request('POST',body))).status,503);
   assert.equal((await pg.query('select count(*)::int n from native_contribution_plans')).rows[0].n,0);
   process.env.NATIVE_LEDGER_ROLLOUT='qa'; process.env.NATIVE_LEDGER_QA_OWNERS=owner;
+  const preview=buildNativeContributionPlan(context,body.request);assert.equal(preview.status,'ready');
   const response=await route.POST(request('POST',body));assert.equal(response.status,201);const saved=(await response.json()).plan;
+  assert.deepEqual(saved.document.result,JSON.parse(JSON.stringify(preview.document.result)),'same input, policy and evidence must match preview and persisted server result');
   const original=structuredClone(saved.document);context.input.rows[0].value.amount='1200';context.input.reportingCurrency='KRW';
   const readBefore=reads;assert.equal((await route.POST(request('POST',body))).status,200);assert.equal(reads,readBefore);
   assert.deepEqual((await queries.listNativeContributionPlans({ownerUserId:owner}))[0].document,original);
@@ -105,6 +108,16 @@ it('rejects saving after an account closes even when its native sequence is unch
   assert.equal((await queries.saveNativeContributionPlan({ownerUserId:owner},input())).status,'conflict');
   assert.equal((await pg.query('select count(*)::int n from native_contribution_plans')).rows[0].n,0);
 });
+it('rechecks the approved target revision under the owner write lock and reports refreshed evidence',async()=>{
+  context.evidenceVersion='a'.repeat(64);
+  await pg.query("insert into portfolio_target_policy_revisions values($1,'approved','all',null,null,3,'u','v','approved_v1')",[owner]);
+  const saved=await queries.saveNativeContributionPlan({ownerUserId:owner},input({previewEvidenceVersion:'b'.repeat(64)}));
+  assert.equal(saved.status,'created');assert.equal(saved.basisChanged,true);
+  beforeWrite=async()=>{await pg.query("update portfolio_target_policy_revisions set approval_revision=4");};
+  const changed=await queries.saveNativeContributionPlan({ownerUserId:owner},input({previewEvidenceVersion:'a'.repeat(64)}));
+  assert.equal(changed.status,'conflict');
+  assert.equal((await pg.query('select count(*)::int n from native_contribution_plans')).rows[0].n,1);
+});
 it('deletes only owned plans with session and origin checks, and supports failure and repeated retry',async()=>{
   const one=input();await queries.saveNativeContributionPlan({ownerUserId:owner},one);
   const key=await session(),body={sessionKey:key,id:one.id};
@@ -138,6 +151,7 @@ it('loads approved targets and MA metadata without importing legacy value or cos
   let maInput;
   evidence.nativeSequences[second]=5;
   const [loader]=await importWithPorts(['src/db/queries/native-contribution-context.ts'],{
+    '@/db/queries/additional-contribution-modifiers':{readAdditionalContributionModifiers:async()=>({modifiers:{fundingBasis:'KRW',fx:{status:'unavailable',reason:'fixture'},regime:{status:'unavailable',reason:'fixture'},eventScore:{status:'unavailable',reason:'fixture'},performance:{status:'unavailable',reason:'fixture'}},rows:{}})},
     '@/db/queries/portfolio-analysis-scopes':{getReadOnlyTenantPortfolioAnalysisScopeContext:async()=>({state:'ready',resolution:{state:'resolved',scope:{kind:'all',key:'all',label:'All'}}})},
     '@/db/queries/currency-tracked-portfolio':{getTrackedCurrencyEvidence:async()=>evidence},
     '@/db/queries/portfolio-target-policy':{getReadOnlyTenantPortfolioTargetPolicyModel:async()=>model},

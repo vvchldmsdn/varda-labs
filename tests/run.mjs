@@ -1,4 +1,12 @@
 import "./market-calendar.test.mjs";
+import "./cutoff-contract-followup.test.mjs";
+import "./native-cutoff-provider-reuse.test.mjs";
+import "./cutoff-observation-storage.test.mjs";
+import "./daily-cutoff-readiness.test.mjs";
+import "./additional-contribution-modifiers.test.mjs";
+import "./contribution-topup-readiness.test.mjs";
+import "./additional-contribution-modifier-read.test.mjs";
+import "./additional-contribution-performance.test.mjs";
 import "./trade-reliability.test.mjs";
 import "./native-ledger-clock.test.mjs";
 import "./snapshot-retry.test.mjs";
@@ -373,3 +381,5 @@ import "./krw-usd-rc-rehearsal.test.mjs";
 import "./trade-record-intent.test.mjs";
 import "./broker-cash-reconciliation.test.mjs";
 import "./broker-recovery-snapshot-scope.test.mjs";
+import "./kis-receipt-time.test.mjs";
+import "./native-historical-idempotency.test.mjs";

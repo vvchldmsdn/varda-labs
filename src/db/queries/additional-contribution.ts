@@ -6,6 +6,7 @@ import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-stru
 import { getReadOnlyTenantApprovedTargetPolicy } from "@/db/queries/target-policy";
 import { getReadOnlyTenantTargetPolicyHoldingUniverse } from "@/db/queries/target-policy-holding-universe";
 import { loadLatestTenantPortfolioSettingsRows } from "@/db/queries/tenant-settings";
+import { readAdditionalContributionModifiers, type ContributionModifierRead } from '@/db/queries/additional-contribution-modifiers';
 import {
   additionalContributionMa120ReadFailure,
   attachAdditionalContributionMa120Evidence,
@@ -146,6 +147,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
   if (model.rows.some((row) => row.currentValueKrw === null)) {
     return scopedBlocked(scope, serviceDate, ["valuation_identity_missing"]);
   }
+  const modifierRead = await readAdditionalContributionModifiers({ tenantContext, scope, now, rows:model.rows.map(row=>({key:`${row.accountId}:${row.assetId}`,assetId:row.assetId,currentValue:row.currentValueKrw!,market:row.market,currency:row.currency,ticker:row.ticker,name:row.assetName})) });
 
   if (
     model.policyValidation.status === "missing" &&
@@ -192,6 +194,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
       model,
       policyParameters,
       preview: legacyPreview,
+      modifierRead,
       scope,
     });
   }
@@ -216,10 +219,12 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     cashAmountKrw,
     minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
     trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
+    modifiers:modifierRead.modifiers,
     rows: buildPolicyRows({
       ma120Read,
       modelRows: model.rows,
       useTrendFilter: policyParameters.useTrendFilter,
+      modifierRead,
     }),
   });
   if (result.status !== "ready") {
@@ -244,6 +249,7 @@ function adaptLegacyPreview({
   policyParameters,
   preview,
   scope,
+  modifierRead,
 }: {
   model: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>;
   policyParameters: ReturnType<typeof resolvePolicyParameters>;
@@ -251,6 +257,7 @@ function adaptLegacyPreview({
     ReturnType<typeof getReadOnlyTenantAdditionalContributionPreview>
   >;
   scope: Extract<PortfolioAnalysisScope, { kind: "account" }>;
+  modifierRead:ContributionModifierRead;
 }) {
   if (preview.status !== "ready") {
     return Object.freeze({
@@ -270,14 +277,18 @@ function adaptLegacyPreview({
     cashAmountKrw: preview.cashAmountKrw,
     minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
     trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
+    modifiers:modifierRead.modifiers,
     rows: model.rows.map((row) => {
       const target = match.targetsByAsset.get(row.assetId)!;
       const evidence = target.ma120Evidence;
       return Object.freeze({
         allocationKey: `${row.accountId}:${row.assetId}`,
+        ...modifierRead.rows[`${row.accountId}:${row.assetId}`],
         assetType: row.assetType ?? null,
         buyable: row.buyability === "buyable",
-        costBasisKrw: row.costBasisKrw ?? null,
+        // Legacy foreign average costs have no acquisition-FX evidence. Native
+        // plans use dated cost lots; this path cannot infer a KRW sale profit.
+        costBasisKrw: row.currency === 'KRW' ? row.costBasisKrw ?? null : null,
         currentValueKrw: row.currentValueKrw ?? Number.NaN,
         ma120Evidence: Object.freeze({
           distanceFromMaPct: evidence.distanceFromMaPct,
@@ -321,12 +332,14 @@ function buildPolicyRows({
   ma120Read,
   modelRows,
   useTrendFilter,
+  modifierRead,
 }: {
   ma120Read: AdditionalContributionMa120ReadPort;
   modelRows: Awaited<
     ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>
   >["rows"];
   useTrendFilter: boolean;
+  modifierRead:ContributionModifierRead;
 }) {
   const evidenceByKey = new Map(
     ma120Read.rows.map((row) => [row.instrumentKey, compactMa120Evidence(row)]),
@@ -336,9 +349,10 @@ function buildPolicyRows({
     const evidence = (key ? evidenceByKey.get(key) : null) ?? unavailableMa120Evidence();
     return Object.freeze({
       allocationKey: `${row.accountId}:${row.assetId}`,
+      ...modifierRead.rows[`${row.accountId}:${row.assetId}`],
       assetType: row.assetType ?? null,
       buyable: row.buyability === "buyable",
-      costBasisKrw: row.costBasisKrw ?? null,
+      costBasisKrw: row.currency === 'KRW' ? row.costBasisKrw ?? null : null,
       currentValueKrw: row.currentValueKrw ?? Number.NaN,
       ma120Evidence: Object.freeze({
         distanceFromMaPct: evidence.distanceFromMaPct,
@@ -412,6 +426,8 @@ function mapPolicyResult<T extends Readonly<{
     minimumExecutionTargetKrw: result.minimumExecutionTargetKrw,
     minimumExecutionSatisfied: result.minimumExecutionSatisfied,
     calculationPolicy: result.policy,
+    modifierEvidence:result.modifierEvidence,
+    minimumExecutionEvidenceAvailable:result.minimumExecutionEvidenceAvailable,
     calculationParameters: result.parameters,
     ma120Evidence: Object.freeze({
       mode,
@@ -425,6 +441,8 @@ function mapPolicyResult<T extends Readonly<{
       allocationKey: row.allocationKey,
       action: row.action,
       allocationKrw: row.allocationKrw,
+      rawAllocationKrw:row.rawAllocationKrw,
+      modifierBreakdown:row.modifierBreakdown,
       baseNeedKrw: row.baseNeedKrw,
       costBasisKrw: row.costBasisKrw,
       currentValueKrw: row.currentValueKrw,

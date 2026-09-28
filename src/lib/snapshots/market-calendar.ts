@@ -51,7 +51,7 @@ export function closeCalendarReferenceDateForAsset(
 }
 
 export function isUsdListedAsset(asset: MarketAsset) {
-  return asset.market === "us" || asset.currency === "USD";
+  return asset.market === "us";
 }
 
 function previousWeekdayOnOrBefore(date: string) {

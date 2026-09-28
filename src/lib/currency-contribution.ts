@@ -2,6 +2,7 @@ import { calculateExplainableAdditionalContribution, type AdditionalContribution
 import { convertMoney, costInReportingCurrency, costLotsInReportingCurrency, type FxEvidence } from "./currency-valuation.ts";
 import type { NativeCostLot } from "./native-portfolio-ledger.ts";
 import { Decimal, MINOR_DIGITS, moneyFromMinor, type Currency } from "./money.ts";
+import type { ContributionModifiers } from './additional-contribution-modifiers.ts';
 
 export const CURRENCY_CONTRIBUTION_VERSION = "explainable_contribution_currency_v1";
 export type ContributionMoneyEvidence = { amount: string; currency: Currency; at: string; source: string; kind?: "new_money" | "native_cash"; accountId?: string };
@@ -9,6 +10,7 @@ type MoneyEvidence = ContributionMoneyEvidence;
 export type CurrencyContributionInput = {
   reportingCurrency: Currency; asOf: string; fx: readonly FxEvidence[]; maxFxAgeMs: number;
   funds: readonly MoneyEvidence[]; trimDriftThresholdPct: number; minimumExecutionRatioPct: number;
+  modifiers?:ContributionModifiers;
   rows: (Omit<AdditionalContributionPolicyRow<unknown>, "currentValueKrw" | "costBasisKrw" | "hasExactLoss"> & {
     value: MoneyEvidence; cost: MoneyEvidence | null; costLots?: readonly NativeCostLot[] | null;
     maBasis?: { priceCurrency: Currency; averageCurrency: Currency; priceBasis: string; averageBasis: string };
@@ -52,7 +54,14 @@ function calculateCurrencyContributionChecked(input: CurrencyContributionInput) 
       hasExactLoss: cost?.ok ? value.value.compare(cost.value) < 0 : false,
       ma120Evidence: validMa ? row.ma120Evidence : { status: "unavailable", distanceFromMaPct: null } });
   }
-  const result = calculateExplainableAdditionalContribution({ rows, cashAmountKrw: Number(units), trimDriftThresholdPct: input.trimDriftThresholdPct, minimumExecutionRatioPct: input.minimumExecutionRatioPct });
+  // TRIM precedes the overlay. Its proceeds are funds too, and can be USD even
+  // when the new contribution and reporting display are KRW.
+  const policyInput = { rows, cashAmountKrw: Number(units), trimDriftThresholdPct: input.trimDriftThresholdPct, minimumExecutionRatioPct: input.minimumExecutionRatioPct };
+  const baseline = calculateExplainableAdditionalContribution(policyInput);
+  if (baseline.status !== "ready") return { status: "blocked" as const, reason: baseline.blockers.join(",") };
+  const foreignProceeds = baseline.rows.some(row => row.trimAmountKrw > 0 && input.rows.find(original => original.allocationKey === row.allocationKey)?.value.currency !== 'KRW');
+  const fundingBasis = !foreignProceeds && input.funds.filter(fund=>Decimal.from(fund.amount).compare(0)>0).every(fund=>fund.currency==='KRW') ? 'KRW' : 'unsupported';
+  const result = input.modifiers ? calculateExplainableAdditionalContribution({ ...policyInput, modifiers:{...input.modifiers,fundingBasis} }) : baseline;
   if (result.status !== "ready") return { status: "blocked" as const, reason: result.blockers.join(",") };
   const amount = (n: number) => moneyFromMinor(n, input.reportingCurrency);
   return {
@@ -68,11 +77,16 @@ function calculateCurrencyContributionChecked(input: CurrencyContributionInput) 
           currency: original.value.currency, at: input.asOf, source: "hypothetical_rebalance_sale", rounding: "floor_native_minor_unit", reportingAmount: amount(row.trimAmountKrw) };
       }),
       conversion: "reference_conversion_without_spread_or_fees" as const, orders: "none" as const },
+    modifierEvidence:result.modifierEvidence,
+    minimumExecutionEvidenceAvailable:result.minimumExecutionEvidenceAvailable,
+    minimumExecutionTarget:amount(result.minimumExecutionTargetKrw),
     available: amount(result.totalAvailableFundsKrw), buys: amount(result.totalAllocatedKrw), sales: amount(result.totalTrimProceedsKrw),
     remainingCash: amount(result.residualCashKrw), costs: 0,
     conversionRemainder: funds.sub(moneyFromMinor(units, input.reportingCurrency)).toNumber(),
     rows: result.rows.map(row => ({ key: row.allocationKey, buy: amount(row.allocationKrw), sell: amount(row.trimAmountKrw),
       beforePct: row.currentWeightPct, afterPct: row.postTradeWeightPct, targetPct: row.targetWeightBps / 100,
-      trimReason: row.trimReason, maMultiplier: row.maEffectiveMultiplier, maReason: row.maAdjustmentReason, profitPct: row.unrealizedReturnPct })),
+      trimReason: row.trimReason, maMultiplier: row.maEffectiveMultiplier, maReason: row.maAdjustmentReason, profitPct: row.unrealizedReturnPct,
+      rawAllocation:amount(row.rawAllocationKrw), baseNeed:row.baseNeedKrw/scale,
+      modifierBreakdown:row.modifierBreakdown?{...row.modifierBreakdown,rawAmount:amount(row.modifierBreakdown.rawAmount),penalizedAllocationKrw:amount(row.modifierBreakdown.penalizedAllocationKrw),topupAllocationKrw:amount(row.modifierBreakdown.topupAllocationKrw)}:null })),
   };
 }
